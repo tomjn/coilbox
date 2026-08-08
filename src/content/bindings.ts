@@ -323,6 +323,32 @@ export interface ReplayPlayer {
   countryCode?: string;
 }
 
+/**
+ * One skirmish AI from the replay's start-script `[aiN]` section, with the
+ * side/ally-team/colour resolved from the team it controls. The same resolution
+ * a `ReplayPlayer` gets, so a roster row or a chart series can treat an AI seat
+ * like any other.
+ */
+export interface ReplayAi {
+  /** The display name the host gave the bot, e.g. `AI 1`. */
+  name: string;
+  /** The AI's identifier, e.g. `SurvivalAI` or `BARb`. This names the opponent,
+   * since `name` is often just a slot number. */
+  shortName: string;
+  /** The AI's version, e.g. `<game>` for a game-supplied Lua AI. */
+  version?: string;
+  team?: number;
+  allyTeam?: number;
+  /** The player number whose machine ran the AI. */
+  host?: number;
+  /** Faction (the team's `side`). */
+  side?: string;
+  /** Normalized team colour `[r, g, b]` in 0..1, when present. */
+  rgbColor?: [number, number, number];
+  /** Set only when the winner is known. */
+  won?: boolean;
+}
+
 /** A start box (`startrect`), normalized 0..1 over the map (origin top-left). */
 export interface StartBox {
   left: number;
@@ -362,6 +388,10 @@ export interface DemoInfo {
   numAllyTeams: number;
   allyTeams: AllyTeamInfo[];
   players: ReplayPlayer[];
+  /** The skirmish AIs the match was played against. Kept out of `players`
+   * because a bot is not a person: no dossier, no skill, no country, and a name
+   * (`AI 1`) that repeats across unrelated matches. */
+  ais: ReplayAi[];
   /** True when this file is a coilbox remix (rewritten to run on a local build). */
   remixed?: boolean;
   /** For a remix, the gametype it was originally recorded on. */
@@ -404,6 +434,19 @@ export interface StatPlayer {
   skill?: string;
 }
 
+/** One skirmish AI as recorded in a stats-database game. */
+export interface StatAi {
+  name: string;
+  /** The AI's identity (`name` is usually just a slot label like `AI 1`). */
+  shortName: string;
+  version?: string;
+  allyTeam?: number;
+  /** Faction (the team's `side`). */
+  side?: string;
+  /** Set only for a decided game. */
+  won?: boolean;
+}
+
 /**
  * One ingested game — the denormalized row every stats view aggregates over. The
  * data layer for the personal profile, #375's head-to-head, and future per-map /
@@ -425,6 +468,9 @@ export interface StatRecord {
   winningAllyTeams: number[];
   remixed: boolean;
   players: StatPlayer[];
+  /** The skirmish AIs the match was played against. Empty on a record ingested
+   * before schema 2, until the next pass re-decodes it. */
+  ais: StatAi[];
   ingestedAt: number;
 }
 

@@ -27,8 +27,8 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 use flate2::read::GzDecoder;
 
 use crate::model::{
-    AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoTrailer, PlayerInfo, ReplayFile, StartBox,
-    TeamStatSample, TeamStatSeries,
+    AiInfo, AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoTrailer, PlayerInfo, ReplayFile,
+    StartBox, TeamStatSample, TeamStatSeries,
 };
 
 /// Folders under a write dir that hold client demos. The engine writes to
@@ -106,9 +106,9 @@ pub fn list_replays(root: &Path) -> Vec<ReplayFile> {
                     .map(|i| i.game_type.clone())
                     .filter(|s| !s.is_empty()),
                 duration_sec: summary.as_ref().map(|i| i.duration_sec),
-                player_count: summary
-                    .as_ref()
-                    .map(|i| i.players.iter().filter(|p| !p.spectator).count() as u32),
+                player_count: summary.as_ref().map(|i| {
+                    (i.players.iter().filter(|p| !p.spectator).count() + i.ais.len()) as u32
+                }),
                 start_time_ms: summary.as_ref().map(|i| i.start_time_ms),
                 skill_min,
                 skill_avg,
@@ -1340,6 +1340,40 @@ fn build_demo_info(raw: RawDemo, game: &Section, winners: Option<Vec<u32>>) -> D
         });
     }
 
+    // `[aiN]` seats a bot on a team, exactly as `[playerN]` seats a person, so the
+    // same team lookup resolves its ally team, side, colour and result. The keys
+    // are the ones `tauri-plugin-coilbox-play`'s `script.rs` writes (`Name`,
+    // `ShortName`, `Version`, `Team`, `Host`), lowercased by the TDF parser.
+    let mut ais: Vec<AiInfo> = Vec::new();
+    for (name, a) in &game.children {
+        if index_suffix(name, "ai").is_none() {
+            continue;
+        }
+        let team = a.get("team").and_then(|v| v.parse::<i32>().ok());
+        let team_sec = team.and_then(|t| teams.get(&t).copied());
+        let ally_team = team_sec.and_then(|t| t.get("allyteam").and_then(|v| v.parse().ok()));
+        ais.push(AiInfo {
+            name: a.get("name").unwrap_or("").to_string(),
+            short_name: a.get("shortname").unwrap_or("").to_string(),
+            version: a
+                .get("version")
+                .filter(|v| !v.is_empty())
+                .map(str::to_string),
+            team,
+            ally_team,
+            host: a.get("host").and_then(|v| v.parse().ok()),
+            side: team_sec
+                .and_then(|t| t.get("side"))
+                .filter(|s| !s.is_empty())
+                .map(str::to_string),
+            rgb_color: team_sec.and_then(|t| t.get("rgbcolor")).and_then(parse_rgb),
+            won: winners_known
+                .then(|| ally_team.map(|a| winning.contains(&(a as u32))))
+                .flatten(),
+        });
+    }
+    ais.sort_by_key(|a| a.team);
+
     let marker = read_remix_marker(game);
 
     let mod_options = game
@@ -1361,6 +1395,7 @@ fn build_demo_info(raw: RawDemo, game: &Section, winners: Option<Vec<u32>>) -> D
         num_ally_teams,
         ally_teams,
         players,
+        ais,
         remixed: marker.remixed,
         source_gametype: marker.source,
         origin_filename: marker.origin,
@@ -1585,6 +1620,26 @@ mod tests {
         [allyteam0]\n{\nstartrectleft=0;\nstartrecttop=0;\nstartrectright=0.3;\nstartrectbottom=1;\nnumallies=0;\n}\n\
         [allyteam1]\n{\nstartrectleft=0.7;\nstartrecttop=0;\nstartrectright=1;\nstartrectbottom=1;\nnumallies=0;\n}\n\
         [modoptions]\n{\nzombies=disabled;\nemptyval=;\n}\n}\n";
+
+    /// A 1v2 skirmish, in the shape and key order a real recording uses.
+    ///
+    /// Taken from `~/.spring/demos/2026-07-20_01-20-41-873_All That Glitters
+    /// v2.2.3_2025.06.21.sdfz`, which the engine wrote with the `[ai0]` block
+    /// entirely lowercase, keys in the order `team, host, version, name,
+    /// shortname`, and its sections in no particular order. A second bot is added
+    /// here on a team declared before the one it sits on, and with no `version`
+    /// key at all, since neither is guaranteed.
+    const AI_SCRIPT: &str = "[game]\n{\n\
+        mapname=All That Glitters v2.2.3;\n\
+        gametype=SplinterFaction 0.1.77;\n\
+        [allyteam1]\n{\nnumallies=0;\n}\n\
+        [team2]\n{\nallyteam=1;\nteamleader=0;\nrgbcolor=0.9 0.1 0.1;\nside=Cortex;\n}\n\
+        [player0]\n{\nteam=0;\nspectator=0;\nname=You;\n}\n\
+        [ai1]\n{\nteam=2;\nhost=0;\nname=AI 2;\nshortname=BARb;\n}\n\
+        [ai0]\n{\nteam=1;\nhost=0;\nversion=<game>;\nname=AI 1;\nshortname=SurvivalAI;\n}\n\
+        [team1]\n{\nallyteam=1;\nteamleader=0;\nrgbcolor=0.31 0.55 1;\nside=Federation of Kala;\n}\n\
+        [team0]\n{\nallyteam=0;\nteamleader=0;\nrgbcolor=0.99 0.12 0.87;\nside=Federation of Kala;\n}\n\
+        [allyteam0]\n{\nnumallies=0;\n}\n}\n";
 
     fn put_i32(b: &mut [u8], off: usize, v: i32) {
         b[off..off + 4].copy_from_slice(&v.to_le_bytes());
@@ -1881,6 +1936,84 @@ mod tests {
         assert!(specs.spectator);
         assert_eq!(specs.team, None);
         assert_eq!(specs.won, None); // spectators never "win"
+    }
+
+    fn ai_info(name: &str, script: &str, winners: Option<Vec<u32>>) -> DemoInfo {
+        let raw = read_header_and_script(&write_tmp(name, &build_demo(script, true))).unwrap();
+        let game = find_game(&parse_tdf(&raw.script));
+        build_demo_info(raw, &game, winners)
+    }
+
+    /// The seat a bot occupies is a team like any other, so its faction, colour
+    /// and ally team come from the same `[teamN]` lookup a player's do.
+    #[test]
+    fn an_ai_is_read_out_of_the_script_with_the_team_it_controls() {
+        let info = ai_info("ai-roster.sdfz", AI_SCRIPT, Some(vec![0]));
+
+        assert_eq!(info.players.len(), 1, "one human seat");
+        assert_eq!(info.ais.len(), 2);
+
+        // Ordered by the team each controls, not by the order they were written.
+        let first = &info.ais[0];
+        assert_eq!(first.name, "AI 1");
+        assert_eq!(first.short_name, "SurvivalAI");
+        assert_eq!(first.version.as_deref(), Some("<game>"));
+        assert_eq!(first.team, Some(1));
+        assert_eq!(first.host, Some(0));
+        assert_eq!(first.ally_team, Some(1));
+        assert_eq!(first.side.as_deref(), Some("Federation of Kala"));
+        assert_eq!(first.rgb_color, Some([0.31, 0.55, 1.0]));
+
+        let second = &info.ais[1];
+        assert_eq!(second.short_name, "BARb");
+        assert_eq!(second.team, Some(2));
+        assert_eq!(second.side.as_deref(), Some("Cortex"));
+        // The engine omits `version` for a bot that has none, so it is absent
+        // rather than an empty string.
+        assert_eq!(second.version, None);
+    }
+
+    /// A bot's win is its ally team's win, exactly as a player's is.
+    #[test]
+    fn an_ai_wins_and_loses_with_its_ally_team() {
+        let human_won = ai_info("ai-won-human.sdfz", AI_SCRIPT, Some(vec![0]));
+        assert!(human_won.ais.iter().all(|a| a.won == Some(false)));
+        assert_eq!(human_won.players[0].won, Some(true));
+
+        let bots_won = ai_info("ai-won-bots.sdfz", AI_SCRIPT, Some(vec![1]));
+        assert!(bots_won.ais.iter().all(|a| a.won == Some(true)));
+
+        let undecided = ai_info("ai-undecided.sdfz", AI_SCRIPT, None);
+        assert!(undecided.ais.iter().all(|a| a.won.is_none()));
+    }
+
+    /// `[allyteam0]` must not be mistaken for an AI section, and a match with no
+    /// bots reports none rather than an empty seat.
+    #[test]
+    fn a_match_without_bots_has_no_ais() {
+        assert!(ai_info("ai-none.sdfz", SCRIPT, Some(vec![1]))
+            .ais
+            .is_empty());
+    }
+
+    /// The Replays list counted seated players only, so a 1v2 skirmish read as a
+    /// one-player game.
+    #[test]
+    fn the_replay_list_counts_an_ai_seat() {
+        let root = std::env::temp_dir().join("coilbox_ai_count_test");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        std::fs::write(
+            root.join("demos").join("bots.sdfz"),
+            build_demo(AI_SCRIPT, true),
+        )
+        .unwrap();
+
+        let list = list_replays(&root);
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].player_count, Some(3));
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// `build_demo_info` with `None` winners is what both routing failures

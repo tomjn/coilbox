@@ -36,6 +36,7 @@ import { useReplayTarget } from "../../play/config";
 import type {
   AllyTeamInfo,
   DemoInfo,
+  ReplayAi,
   ReplayPlayer,
   StartBox,
 } from "../bindings";
@@ -147,18 +148,67 @@ function PlayerRow({ p, won }: { p: ReplayPlayer; won: boolean }) {
   );
 }
 
-/** Players grouped by ally-team, with the winning team highlighted; spectators last. */
+/**
+ * One skirmish AI's seat. Named by its `shortName` (the identity: `BARb`,
+ * `SurvivalAI`), since the recorded `name` is usually just a slot label. No
+ * dossier link: a bot has no stats profile, and its name repeats across
+ * unrelated matches.
+ */
+function AiRow({ a, won }: { a: ReplayAi; won: boolean }) {
+  const label = a.shortName || a.name || "AI";
+  const full = [a.name, a.shortName, a.version].filter(Boolean).join(" · ");
+  return (
+    <li className="flex items-center gap-2 py-1">
+      <span
+        className="inline-block size-3 shrink-0 rounded-sm border border-border/60"
+        style={{ backgroundColor: swatch(a.rgbColor) ?? "transparent" }}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1 truncate text-sm" title={full}>
+        {label}
+      </span>
+      <Badge
+        variant="ghost"
+        className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+      >
+        Bot
+      </Badge>
+      {a.side && (
+        <span className="shrink-0 text-xs text-muted-foreground">{a.side}</span>
+      )}
+      {won && (
+        <Trophy
+          className="size-3.5 shrink-0 text-amber-500"
+          aria-label="On the winning team"
+        />
+      )}
+    </li>
+  );
+}
+
+/**
+ * One seat in the roster. A `[playerN]` and an `[aiN]` both hold a team, so both
+ * belong in their ally team's card.
+ */
+type Seat =
+  | { kind: "player"; player: ReplayPlayer }
+  | { kind: "ai"; ai: ReplayAi };
+
+/** Players and bots grouped by ally-team, winning team highlighted, spectators last. */
 function Players({ info }: { info: DemoInfo }) {
-  const teams = new Map<number, ReplayPlayer[]>();
+  const teams = new Map<number, Seat[]>();
   const spectators: ReplayPlayer[] = [];
-  const push = (key: number, p: ReplayPlayer) => {
+  const push = (key: number, seat: Seat) => {
     const arr = teams.get(key);
-    if (arr) arr.push(p);
-    else teams.set(key, [p]);
+    if (arr) arr.push(seat);
+    else teams.set(key, [seat]);
   };
   for (const p of info.players) {
     if (p.spectator) spectators.push(p);
-    else push(p.allyTeam ?? -1, p);
+    else push(p.allyTeam ?? -1, { kind: "player", player: p });
+  }
+  for (const a of info.ais ?? []) {
+    push(a.allyTeam ?? -1, { kind: "ai", ai: a });
   }
   const allyTeamIds = [...teams.keys()].sort((a, b) => a - b);
 
@@ -191,9 +241,23 @@ function Players({ info }: { info: DemoInfo }) {
                 )}
               </div>
               <ul className="flex flex-col divide-y divide-border/40">
-                {teams.get(id)?.map((p) => (
-                  <PlayerRow key={`${id}-${p.name}`} p={p} won={won} />
-                ))}
+                {teams.get(id)?.map((seat, i) =>
+                  seat.kind === "player" ? (
+                    <PlayerRow
+                      key={`${id}-p-${seat.player.name}`}
+                      p={seat.player}
+                      won={won}
+                    />
+                  ) : (
+                    <AiRow
+                      // Two bots can share a shortName and a name, so the seat's
+                      // team is what tells them apart.
+                      key={`${id}-a-${seat.ai.team ?? i}`}
+                      a={seat.ai}
+                      won={won}
+                    />
+                  ),
+                )}
               </ul>
             </div>
           );

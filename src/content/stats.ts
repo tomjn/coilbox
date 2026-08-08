@@ -5,9 +5,11 @@ import type { StatRecord } from "./bindings";
  * view is a thin projection over the same flat table; these helpers back the
  * personal profile today and are the shared shape #375's head-to-head will reuse.
  *
- * A player is identified by their in-game name. The start-script only lists human
- * players (`[playerN]`), so AI opponents don't appear here — win/loss still comes
- * from the recorded winning ally-teams.
+ * A player is identified by their in-game name, so these aggregate over
+ * `record.players` only. The match's bots are recorded separately in
+ * `record.ais` (#1148) and deliberately stay out: a bot has no dossier, and its
+ * name repeats across unrelated matches. Win/loss comes from the recorded
+ * winning ally-teams either way.
  */
 
 /** One player's game from their point of view. */

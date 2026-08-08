@@ -40,6 +40,7 @@ function demoInfo(overrides: Partial<DemoInfo> = {}): DemoInfo {
       },
       { name: "Referee", spectator: true },
     ],
+    ais: [],
     modOptions: { zombies: "disabled" },
     ...overrides,
   };
@@ -139,6 +140,66 @@ describe("demoInfoToSkirmishDraft", () => {
     expect(
       demoInfoToSkirmishDraft({ info: demoInfo({ players: [] }), ais, sides }),
     ).toBeNull();
+  });
+
+  it("seats the bots the match was played against, after the players", () => {
+    const draft = demoInfoToSkirmishDraft({
+      info: demoInfo({
+        players: [{ name: "Alice", allyTeam: 0, spectator: false }],
+        ais: [
+          {
+            name: "AI 1",
+            shortName: "BARb",
+            version: "<game>",
+            team: 1,
+            allyTeam: 1,
+            side: "Cortex",
+            rgbColor: [0.3, 0.5, 1],
+          },
+        ],
+      }),
+      ais,
+      sides,
+    });
+    expect(draft?.participants).toHaveLength(3); // you + Alice + the bot
+    expect(draft?.participants[2]).toMatchObject({
+      kind: "ai",
+      name: "BARb",
+      side: "Cortex",
+      color: [0.3, 0.5, 1],
+      allyTeam: 1,
+    });
+    // The AI it was actually played with, not the standard fallback.
+    expect(draft?.participants[2]?.ai?.shortName).toBe("BARb");
+  });
+
+  it("falls back to the standard AI for a bot the target game doesn't have", () => {
+    const draft = demoInfoToSkirmishDraft({
+      info: demoInfo({
+        players: [{ name: "Alice", allyTeam: 0, spectator: false }],
+        ais: [{ name: "AI 1", shortName: "SurvivalAI", allyTeam: 1 }],
+      }),
+      ais,
+      sides,
+    });
+    expect(draft?.participants[2]?.name).toBe("SurvivalAI");
+    expect(draft?.participants[2]?.ai?.shortName).toBe("E323AI");
+  });
+
+  it("refights an all-bot recording rather than returning null", () => {
+    const draft = demoInfoToSkirmishDraft({
+      info: demoInfo({
+        players: [{ name: "Referee", spectator: true }],
+        ais: [
+          { name: "AI 1", shortName: "BARb", allyTeam: 0 },
+          { name: "AI 2", shortName: "BARb", allyTeam: 1 },
+        ],
+      }),
+      ais,
+      sides,
+    });
+    expect(draft?.participants).toHaveLength(3); // you + two bots
+    expect(draft?.participants.map((p) => p.allyTeam)).toEqual([0, 0, 1]);
   });
 
   it("falls back to a placeholder name for a malformed (nameless) player", () => {

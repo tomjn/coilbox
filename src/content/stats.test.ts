@@ -33,6 +33,7 @@ function rec(
     winnersKnown: opts.winnersKnown ?? true,
     winningAllyTeams: [0],
     remixed: opts.remixed ?? false,
+    ais: [],
     ingestedAt: 0,
     players,
   };
