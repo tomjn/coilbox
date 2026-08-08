@@ -1,4 +1,4 @@
-import { useFrame } from "@picoframe/frame";
+import { useFrame, useTheme } from "@picoframe/frame";
 import type { NavItem } from "@picoframe/plugin-sdk";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
@@ -76,13 +76,13 @@ const TOOL_CARD_CLASS = "transition-colors hover:border-ring sm:w-64";
  * The icon-only card: an icon beside a label, on the card surface. What every
  * card looked like before issue #991, kept as a mode rather than deleted because
  * a distribution can switch art off per tool (issue #1000), and because a
- * broken image URL falls back to it. No art, so none of the dark island applies.
+ * broken image URL falls back to it. No art, so none of the band applies.
  */
 const ICON_CARD_CLASS = `${CARD_SHELL_CLASS} ${TOOL_CARD_CLASS} items-center gap-3 bg-card p-4 text-card-foreground hover:bg-accent`;
 
 /**
- * The art card: the shared dark island of `cardShell.ts`, which owns why the
- * text on it stays light in both colour schemes.
+ * The art card: the shared shell of `cardShell.ts`, which owns why the text on it
+ * clears AA over any picture in either colour scheme.
  *
  * The hover cue is a shadow and a slow push into the art, because the icon
  * card's `hover:bg-accent` is invisible under a full-bleed image. The shadow
@@ -113,9 +113,14 @@ export function ToolCard({ item }: { item: NavItem }) {
   // warms mid-session) gets its own chance rather than inheriting the verdict on
   // a URL it has replaced.
   const [broken, setBroken] = useState<string | null>(null);
+  // The art Coilbox draws is drawn for the scheme the card is in, and the theme
+  // is the only thing here that re-renders when that flips. Reading the scheme
+  // inside `resolveCardArt` instead would leave a card painting the old ramp
+  // until something else made it render.
+  const { resolved } = useTheme();
   if (!visible) return null;
 
-  const art = cardArtUrl(resolveCardArt(item.id), broken);
+  const art = cardArtUrl(resolveCardArt(item.id, undefined, resolved), broken);
   const inner = art ? (
     <>
       <img

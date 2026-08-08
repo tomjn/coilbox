@@ -576,7 +576,11 @@ describe("contentCardArt", () => {
   it("answers nothing before the cache is warm", () => {
     resetContentArt();
     expect(
-      contentCardArt({ toolId: "play.skirmish", themeColor: "#fff" }),
+      contentCardArt({
+        toolId: "play.skirmish",
+        themeColor: "#fff",
+        scheme: "dark",
+      }),
     ).toBeUndefined();
   });
 
@@ -586,10 +590,18 @@ describe("contentCardArt", () => {
       new Map([["play.skirmish", "coilbox://localhost/unitsyncthumb/a-3.png"]]),
     );
     expect(
-      contentCardArt({ toolId: "play.skirmish", themeColor: "#fff" }),
+      contentCardArt({
+        toolId: "play.skirmish",
+        themeColor: "#fff",
+        scheme: "dark",
+      }),
     ).toBe("coilbox://localhost/unitsyncthumb/a-3.png");
     expect(
-      contentCardArt({ toolId: "conquest.list", themeColor: "#fff" }),
+      contentCardArt({
+        toolId: "conquest.list",
+        themeColor: "#fff",
+        scheme: "dark",
+      }),
     ).toBeUndefined();
   });
 

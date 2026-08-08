@@ -7,7 +7,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // runs in node with no DOM, and @picoframe/frame's published dist uses
 // extensionless relative imports the node resolver won't load, so both are
 // stubbed (same approach as greeting.test.ts).
-vi.mock("@picoframe/frame", () => ({ useFrame: () => ({ nav: [] }) }));
+// A card asks the theme which scheme it is drawing for. Dark is the default here
+// because it is what the generators answer with no document, so a card and a test
+// calling a generator directly agree without either of them naming a scheme.
+const theme = vi.hoisted(() => ({ resolved: "dark" as "dark" | "light" }));
+vi.mock("@picoframe/frame", () => ({
+  useFrame: () => ({ nav: [] }),
+  useTheme: () => theme,
+}));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
 import type { NavItem } from "@picoframe/plugin-sdk";
@@ -40,6 +47,7 @@ function register(step: CardArtStep, answer: string | false | undefined) {
 
 afterEach(() => {
   while (registered.length) registered.pop()?.();
+  theme.resolved = "dark";
 });
 
 /** One card as the markup a browser would get. */
@@ -69,7 +77,7 @@ describe("tool card rendering modes", () => {
     // The shipping state today, and the state a distribution with no art of its
     // own stays in.
     expect(artSrc(render(SKIRMISH))).toBe(
-      proceduralCardArt("skirmish", "hsl(221.2 83.2% 53.3%)"),
+      proceduralCardArt("skirmish", "hsl(221.2 83.2% 53.3%)", "dark"),
     );
   });
 
@@ -91,11 +99,21 @@ describe("tool card rendering modes", () => {
     expect(html).toContain("lucide-rocket");
   });
 
-  it("takes the shared dark island rather than its own copy of it", () => {
+  it("takes the shared card shell rather than its own copy of it", () => {
     register("bundled", "/art/skirmish.svg");
-    // `cardShell.ts` owns why the text on card art stays light in both colour
-    // schemes, and measures it. This is the card claiming that guarantee.
+    // `cardShell.ts` owns why the text on card art clears AA over any picture in
+    // either scheme, and measures it. This is the card claiming that guarantee.
     expect(render(SKIRMISH)).toContain(ART_CARD_CLASS);
+  });
+
+  it("draws its art for the scheme the page is in", () => {
+    // The card is on the page's ramp (#1044), so the art it paints has to be
+    // too, and the theme is what tells it. Without this the card would keep
+    // whichever scheme it first rendered in.
+    theme.resolved = "light";
+    expect(artSrc(render(SKIRMISH))).toBe(
+      proceduralCardArt("skirmish", "hsl(221.2 83.2% 53.3%)", "light"),
+    );
   });
 });
 

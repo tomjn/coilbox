@@ -12,15 +12,19 @@
  * which always answers, so adding or dropping a tool here is a local change with
  * no chain consequences.
  *
- * ## The dark contract
+ * ## The scheme contract
  *
- * The procedural field is always dark so card text can be light in both colour
- * schemes. These sit in the same slot under the same text, so they hold the same
- * contract: a dark field, marks drawn as light strokes and small bright shapes,
- * and nothing that paints a pale area big enough to sit under a word.
- * `bundledArt.test.ts` measures that rather than trusting it, and measures the
- * procedural art with the same yardstick so the threshold is not tuned to this
- * file.
+ * A card takes the page's ramp, so its art has to as well: a dark field under
+ * light marks on a dark card, and the mirror of that on a light one. Every
+ * lightness in {@link Palette} is written as its dark value and mirrored by
+ * {@link schemeLightness}, which is the same rule the procedural field uses, so
+ * the two sit beside each other in either scheme without a seam.
+ *
+ * What the drawings themselves may do is unchanged and stated in dark terms:
+ * marks are strokes and small shapes over the field, and nothing paints a flat
+ * area big enough to sit under a word. `bundledArt.test.ts` measures that in
+ * both schemes rather than trusting it, and measures the procedural art with the
+ * same yardstick so the threshold is not tuned to this file.
  *
  * The checker can only measure geometry it can compute, so filled art is drawn
  * with rects, circles, ellipses and polygons. A filled `<path>` is unmeasurable
@@ -35,8 +39,12 @@
  */
 
 import { mulberry32 } from "../conquest/rng";
-import type { CardArtSource } from "./art";
-import { FALLBACK_THEME_COLOR, parseColor } from "./proceduralArt";
+import type { CardArtSource, CardScheme } from "./art";
+import {
+  FALLBACK_THEME_COLOR,
+  parseColor,
+  schemeLightness,
+} from "./proceduralArt";
 
 /** Canvas the drawings are authored against, matching the procedural floor. */
 const WIDTH = 320;
@@ -48,7 +56,7 @@ interface Palette {
   fieldTop: string;
   /** Foot of the field gradient. */
   fieldFoot: string;
-  /** The soft light pools laid over the field. */
+  /** The soft pools laid over the field: light on a dark card, shade on a light one. */
   glow: string;
   /** Background structure: terrain, grids, anything the eye should skim. */
   faint: string;
@@ -83,19 +91,21 @@ const ACHROMATIC_SATURATION = 8;
 /** The fallback theme pre-parsed, for a colour that will not parse. */
 const FALLBACK_HSL = { h: 221.2, s: 83.2, l: 53.3 };
 
-function paletteFor(themeColor: string): Palette {
+function paletteFor(themeColor: string, scheme: CardScheme): Palette {
   const theme = parseColor(themeColor) ?? FALLBACK_HSL;
   const neutral = theme.s < ACHROMATIC_SATURATION;
   const sat = neutral ? clamp(theme.s, 0, 6) : clamp(theme.s, 24, 58);
   // A neutral theme has no hue worth rotating, so every offset collapses to 0.
   const hue = (offset: number) => (neutral ? theme.h : theme.h + offset);
+  // Lightnesses as they are on a dark card, mirrored when the card is light.
+  const tone = (dark: number) => schemeLightness(scheme, dark);
   return {
-    fieldTop: hsl(hue(14), sat, 17),
-    fieldFoot: hsl(hue(-10), sat * 0.65, 8),
-    glow: hsl(hue(22), Math.min(sat + 14, 70), 58),
-    faint: hsl(hue(0), Math.min(sat + 6, 62), 54),
-    line: hsl(hue(6), Math.min(sat + 18, 72), 70),
-    spark: hsl(hue(-16), neutral ? sat : Math.min(sat + 30, 82), 80),
+    fieldTop: hsl(hue(14), sat, tone(17)),
+    fieldFoot: hsl(hue(-10), sat * 0.65, tone(8)),
+    glow: hsl(hue(22), Math.min(sat + 14, 70), tone(58)),
+    faint: hsl(hue(0), Math.min(sat + 6, 62), tone(54)),
+    line: hsl(hue(6), Math.min(sat + 18, 72), tone(70)),
+    spark: hsl(hue(-16), neutral ? sat : Math.min(sat + 30, 82), tone(80)),
   };
 }
 
@@ -1216,12 +1226,13 @@ export const BUNDLED_ART_TOOL_IDS: readonly string[] = Object.keys(DRAWINGS);
 export function bundledCardArtSvg(
   toolId: string,
   themeColor: string,
+  scheme: CardScheme,
 ): string | undefined {
   // `hasOwn` rather than a truthiness check: a tool id of "constructor" would
   // otherwise find a function on Object's prototype and be drawn.
   if (!Object.hasOwn(DRAWINGS, toolId)) return undefined;
   const drawing = DRAWINGS[toolId];
-  const p = paletteFor(themeColor);
+  const p = paletteFor(themeColor, scheme);
   const ns = toolId.replace(/[^a-z0-9]+/gi, "-");
   const pools = drawing.pools.map(
     ([cx, cy, r, o], i) =>
@@ -1255,8 +1266,12 @@ export function bundledCardArtSvg(
  * The chain source. Percent-encoded rather than base64, matching the procedural
  * floor: shorter, and readable in devtools.
  */
-export const bundledCardArt: CardArtSource = ({ toolId, themeColor }) => {
-  const svg = bundledCardArtSvg(toolId, themeColor);
+export const bundledCardArt: CardArtSource = ({
+  toolId,
+  themeColor,
+  scheme,
+}) => {
+  const svg = bundledCardArtSvg(toolId, themeColor, scheme);
   if (!svg) return undefined;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 };
