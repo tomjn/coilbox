@@ -22,27 +22,7 @@ const PICOFRAME_OUTLINE_SM =
 vi.mock("@picoframe/frame", () => ({
   useSetting: () => [{}, () => {}],
   cn: (...parts: unknown[]) => twMerge(parts.filter(Boolean).join(" ")),
-  Button: ({
-    children,
-    className,
-    variant: _variant,
-    size: _size,
-    ...props
-  }: {
-    children?: unknown;
-    className?: string;
-    variant?: string;
-    size?: string;
-  } & Record<string, unknown>) =>
-    createElement(
-      "button",
-      {
-        type: "button",
-        className: twMerge(`${PICOFRAME_OUTLINE_SM} ${className ?? ""}`),
-        ...props,
-      },
-      children as never,
-    ),
+  buttonVariants: () => PICOFRAME_OUTLINE_SM,
 }));
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
@@ -88,12 +68,10 @@ import * as suggested from "./suggestedMap";
 import SuggestedMapZone, { SuggestedMapCard } from "./zones/SuggestedMap";
 
 const {
-  battleSuggestedMap,
   msToNextUtcDay,
   subscribeUtcDay,
   suggestedMapCandidates,
   suggestedMapClaim,
-  suggestedMapFor,
   suggestedMapInstalled,
   suggestedMapPlacement,
   suggestedMapPool,
@@ -349,7 +327,6 @@ describe("the map this card takes off the tool cards", () => {
   ): suggested.SuggestedMapAnswer => ({
     map,
     loading: false,
-    source: "curated",
     placement,
     inventory: NOTHING,
   });
@@ -781,21 +758,8 @@ describe("where the card goes", () => {
 });
 
 describe("holding the answer while the page is open", () => {
-  const A = {
-    map: map("a"),
-    source: "curated" as const,
-    placement: "cards" as const,
-  };
-  const B = {
-    map: map("b"),
-    source: "curated" as const,
-    placement: "cards" as const,
-  };
-  const BATTLE = {
-    map: map("b"),
-    source: "battle" as const,
-    placement: "cards" as const,
-  };
+  const A = { map: map("a"), placement: "cards" as const };
+  const B = { map: map("b"), placement: "cards" as const };
 
   it("takes the first real answer of the day", () => {
     expect(holdSuggestion(null, 5, A)).toEqual({ day: 5, ...A });
@@ -816,227 +780,6 @@ describe("holding the answer while the page is open", () => {
   it("lets go at the day boundary", () => {
     expect(holdSuggestion({ day: 5, ...A }, 6, B)).toEqual({ day: 6, ...B });
   });
-
-  it("upgrades once to a map people are playing", () => {
-    // A lobby connection settles seconds after the page paints, so the first
-    // answer of the day is always the rotation's.
-    const held = holdSuggestion({ day: 5, ...A }, 5, BATTLE);
-    expect(held).toEqual({ day: 5, ...BATTLE });
-    expect(holdSuggestion(held, 5, { ...B, source: "battle" })).toBe(held);
-  });
-});
-
-// --- preferring a map an open battle is using --------------------------------
-
-/** The curated pool the lobby cases pick from, in pool order. */
-const POOL = [
-  map("Fallendell", "Fallendell_V4"),
-  map("SpeedMetal", "SpeedMetal"),
-  map("DeltaSiege", "DeltaSiegeDry"),
-];
-
-/** One lobby room. `players` are occupants besides the host, as the server sends. */
-function room(mapName: string, players: string[] = ["a"]) {
-  return {
-    map: mapName,
-    host: "Autohost",
-    members: Object.fromEntries(players.map((p) => [p, {}])),
-  } as unknown as suggested.SuggestedLobbySnapshot["battles"][string];
-}
-
-/** A live lobby holding the given rooms. */
-function lobby(
-  ...rooms: ReturnType<typeof room>[]
-): suggested.SuggestedLobbySnapshot {
-  return {
-    battles: Object.fromEntries(rooms.map((r, i) => [String(i), r])),
-  };
-}
-
-const DAY = new Date("2026-08-07T09:00:00Z");
-
-describe("preferring a map an open battle is using", () => {
-  it("falls back to the rotation when no lobby connection is live", () => {
-    // `mirror.state` is null until something else connects, so this is the
-    // logged-out, offline and never-opened-multiplayer case.
-    expect(battleSuggestedMap(POOL, null, NOTHING)).toBeNull();
-    const answer = suggestedMapFor(POOL, null, DAY, NOTHING);
-    expect(answer.source).toBe("curated");
-    expect(answer.map).toBe(pickSuggestedMap(POOL, DAY, NOTHING));
-  });
-
-  it("prefers a map people are on when a connection is live", () => {
-    const answer = suggestedMapFor(
-      POOL,
-      lobby(room("SpeedMetal", ["a"])),
-      DAY,
-      NOTHING,
-    );
-    expect(answer.map?.id).toBe("SpeedMetal");
-    expect(answer.source).toBe("battle");
-    // Worth having only if it actually differs from what the day would give.
-    expect(answer.map).not.toBe(pickSuggestedMap(POOL, DAY, NOTHING));
-  });
-
-  it("falls back when a live connection has no rooms at all", () => {
-    expect(suggestedMapFor(POOL, lobby(), DAY, NOTHING).source).toBe("curated");
-  });
-
-  it("falls back when the only room is on a map it cannot offer", () => {
-    // Nothing in the pool has a verified download for this, and inventing one
-    // would feature a map that may not be downloadable anywhere.
-    expect(
-      battleSuggestedMap(POOL, lobby(room("Some Random Map v9")), NOTHING),
-    ).toBeNull();
-  });
-
-  it("will not follow a version the curated entry is not", () => {
-    // Offering Supreme Isthmus v2.1 because a room is on v2.2 would feature a
-    // map that still would not let the player into that room.
-    const pool = [map("Isthmus", "Supreme Isthmus v2.1")];
-    expect(
-      battleSuggestedMap(pool, lobby(room("Supreme Isthmus v2.2")), NOTHING),
-    ).toBeNull();
-  });
-
-  it("matches the spring name whatever case the server sends it in", () => {
-    expect(
-      battleSuggestedMap(POOL, lobby(room("fallendell_v4")), NOTHING)?.id,
-    ).toBe("Fallendell");
-  });
-
-  it("ignores an autohost sitting alone in an empty room", () => {
-    // The host is always counted, so a room of one is a bot waiting rather than
-    // people playing, and the card would be claiming something untrue.
-    expect(
-      battleSuggestedMap(POOL, lobby(room("SpeedMetal", [])), NOTHING),
-    ).toBeNull();
-  });
-
-  it("picks the map with the most people, not the most rooms", () => {
-    // Three idle pairs must not outrank one full team game.
-    const busy = lobby(
-      room("SpeedMetal", ["a"]),
-      room("SpeedMetal", ["a"]),
-      room("SpeedMetal", ["a"]),
-      room(
-        "DeltaSiegeDry",
-        Array.from({ length: 15 }, (_, i) => `p${i}`),
-      ),
-    );
-    expect(battleSuggestedMap(POOL, busy, NOTHING)?.id).toBe("DeltaSiege");
-  });
-
-  it("adds up the people across every room on the same map", () => {
-    const spread = lobby(
-      room("SpeedMetal", ["a", "b", "c"]),
-      room("SpeedMetal", ["a", "b", "c"]),
-      room("DeltaSiegeDry", ["a", "b", "c", "d", "e"]),
-    );
-    // 8 on SpeedMetal against 6 on DeltaSiege.
-    expect(battleSuggestedMap(POOL, spread, NOTHING)?.id).toBe("SpeedMetal");
-  });
-
-  it("breaks a tie by pool order rather than by what the server sent first", () => {
-    const tied = [room("DeltaSiegeDry", ["a"]), room("SpeedMetal", ["a"])];
-    const forwards = battleSuggestedMap(POOL, lobby(...tied), NOTHING)?.id;
-    const backwards = battleSuggestedMap(
-      POOL,
-      lobby(...[...tied].reverse()),
-      NOTHING,
-    )?.id;
-    // Pool order is Fallendell, SpeedMetal, DeltaSiege, so SpeedMetal wins.
-    expect(forwards).toBe("SpeedMetal");
-    expect(backwards).toBe("SpeedMetal");
-  });
-
-  it("ignores a room whose map is uncurated while following one that is not", () => {
-    const mixed = lobby(
-      room(
-        "Some Random Map v9",
-        Array.from({ length: 20 }, (_, i) => `p${i}`),
-      ),
-      room("DeltaSiegeDry", ["a"]),
-    );
-    expect(battleSuggestedMap(POOL, mixed, NOTHING)?.id).toBe("DeltaSiege");
-  });
-
-  it("passes over a busy map the player already has", () => {
-    // The card offers a download, so a map they have is no answer here either.
-    // The busiest map they do not have still beats the rotation.
-    const busy = lobby(
-      room("SpeedMetal", ["a", "b", "c"]),
-      room("DeltaSiegeDry", ["a"]),
-    );
-    expect(battleSuggestedMap(POOL, busy, has("SpeedMetal.sd7"))?.id).toBe(
-      "DeltaSiege",
-    );
-  });
-
-  it("has nothing to prefer when nothing is curated", () => {
-    expect(
-      battleSuggestedMap([], lobby(room("SpeedMetal", ["a"])), NOTHING),
-    ).toBeNull();
-  });
-});
-
-describe("the rotation, with the lobby out of the picture", () => {
-  // The guarantee #995 shipped, restated: a player with no lobby connection must
-  // get byte-identical answers to the ones they got before #996 existed.
-  it("is untouched over a full cycle when no connection is live", () => {
-    const start = Date.parse("2026-08-07T09:00:00Z");
-    for (let i = 0; i < POOL.length * 3; i++) {
-      const day = new Date(start + i * 86_400_000);
-      const answer = suggestedMapFor(POOL, null, day, NOTHING);
-      expect(answer.map).toBe(pickSuggestedMap(POOL, day, NOTHING));
-      expect(answer.source).toBe("curated");
-    }
-  });
-
-  it("is untouched when a live connection has nothing worth featuring", () => {
-    // Connected, but every room is empty or on an uncurated map.
-    const quiet = lobby(
-      room("SpeedMetal", []),
-      room("Some Random Map v9", ["a"]),
-    );
-    expect(suggestedMapFor(POOL, quiet, DAY, NOTHING).map).toBe(
-      pickSuggestedMap(POOL, DAY, NOTHING),
-    );
-  });
-});
-
-describe("the zone cannot reach for a connection", () => {
-  // The whole gate is "a connection happens to be live". Reading the mirror is a
-  // plain `useContext`, but nothing stops a later edit from calling `connect` or
-  // opening the login popover from this module, which would make the welcome
-  // screen demand an account. This asserts on the source so that edit fails here.
-  const source = readFileSync(
-    new URL("./suggestedMap.ts", import.meta.url),
-    "utf8",
-  );
-
-  it("takes only the passive reader from the lobby store", () => {
-    const imported = /import \{([^}]*)\} from "\.\.\/multiplayer\/store"/.exec(
-      source,
-    );
-    expect(imported?.[1].trim()).toBe("useMultiplayer");
-  });
-
-  it("never calls anything that connects, logs in or reads a credential", () => {
-    for (const forbidden of [
-      "openLoginPopover",
-      "lsGetCredential",
-      "mpConnect",
-      "mpLogin",
-      "autoConnect",
-      "lobby-servers",
-      "keychain",
-    ]) {
-      expect(source).not.toContain(forbidden);
-    }
-    // `connect(`, but not the `connected`/`connection` the comments talk about.
-    expect(source).not.toMatch(/\bconnect\s*\(/);
-  });
 });
 
 // --- the card ---------------------------------------------------------------
@@ -1047,13 +790,11 @@ type Install = ReturnType<typeof suggested.useSuggestedMapInstall>;
 function answer(args: {
   map?: SuggestedMap | null;
   loading?: boolean;
-  source?: suggested.SuggestedSource;
   placement?: suggested.SuggestedPlacement;
 }): suggested.SuggestedMapAnswer {
   return {
     map: args.map === undefined ? map("Fallendell", "Fallendell_V4") : args.map,
     loading: args.loading ?? false,
-    source: args.source ?? "curated",
     placement: args.placement ?? "cards",
     inventory: NOTHING,
   };
@@ -1064,7 +805,6 @@ function render(args: {
   map?: SuggestedMap | null;
   loading?: boolean;
   art?: string;
-  source?: suggested.SuggestedSource;
   install?: Partial<Install>;
 }): string {
   hooks.install = {
@@ -1206,26 +946,25 @@ describe("the suggested map card", () => {
     expect(html).toContain("disabled");
   });
 
-  it("says why the map is here when it came from a live battle", () => {
-    // The only thing on screen that separates the two sources. Without it the
-    // feature cannot be confirmed by looking at the card.
+  it("says what the catalog says about the map", () => {
     const curated = {
       ...map("Fallendell", "Fallendell_V4"),
       blurb: "2-4 player",
     };
-    expect(render({ map: curated, source: "curated" })).toContain("2-4 player");
-    const html = render({ map: curated, source: "battle" });
-    expect(html).toContain("Being played now");
-    expect(html).not.toContain("2-4 player");
+    expect(render({ map: curated })).toContain("2-4 player");
   });
 
-  it("still shows a download failure over the reason the map is here", () => {
+  it("still shows a download failure over the blurb", () => {
+    const curated = {
+      ...map("Fallendell", "Fallendell_V4"),
+      blurb: "2-4 player",
+    };
     const html = render({
-      source: "battle",
+      map: curated,
       install: { state: "failed", error: "404 Not Found" },
     });
     expect(html).toContain("404 Not Found");
-    expect(html).not.toContain("Being played now");
+    expect(html).not.toContain("2-4 player");
   });
 
   it("does not nag about a write root for a map already installed", () => {
@@ -1333,13 +1072,43 @@ describe("the page's one answer", () => {
     expect(zoneSource).toContain("useSuggestedMapAnswer");
   });
 
-  it("hands the zone whatever the page decided, battle or rotation", () => {
-    const html = render({
-      map: pictured("Isthmus", "Supreme Isthmus v2.1"),
-      source: "battle",
-    });
+  it("hands the zone whatever map the page decided", () => {
+    const html = render({ map: pictured("Isthmus", "Supreme Isthmus v2.1") });
     expect(html).toContain("Isthmus");
-    expect(html).toContain("Being played now");
+  });
+});
+
+describe("the card is decided without the lobby", () => {
+  // Issue #1029. The card preferred a map an open battle was using, over the
+  // rotation, whenever a connection happened to be live (#996). Four things had
+  // to line up: a connection, a room of two or more, on a map in the curated pool
+  // at exactly the curated spring name and version, that the player did not have.
+  // Measured against a real server it never once fired, and the last two pull
+  // against each other, because the maps people play are the maps players have.
+  //
+  // What it cost was the card's only present-tense claim, which outlived both the
+  // room and the connection (#1028), and it was the one thing that could replace
+  // an answer already held for the day. So it is gone, and these two assert on
+  // the source so that putting it back is a deliberate edit here rather than a
+  // quiet one there.
+  const source = readFileSync(
+    new URL("./suggestedMap.ts", import.meta.url),
+    "utf8",
+  );
+  const zoneSource = readFileSync(
+    new URL("./zones/SuggestedMap.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("reads nothing from the lobby at all", () => {
+    expect(source).not.toContain("multiplayer/");
+    expect(source).not.toContain("useMultiplayer");
+    expect(source).not.toContain("battles");
+  });
+
+  it("leaves the card no claim about the present tense", () => {
+    expect(zoneSource).not.toContain("Being played");
+    expect(zoneSource).not.toContain("multiplayer/");
   });
 });
 
@@ -1370,7 +1139,9 @@ describe("the picture the card settles on", () => {
 
 describe("the card promoted to the top of the page", () => {
   /** The card as the resume row renders it. */
-  function promoted(args: Parameters<typeof render>[0] = {}): string {
+  function promoted(
+    args: Parameters<typeof render>[0] & { className?: string } = {},
+  ): string {
     hooks.install = {
       state: "available",
       error: null,
@@ -1387,7 +1158,10 @@ describe("the card promoted to the top of the page", () => {
         createElement(
           suggested.SuggestedMapContext,
           { value: answer({ ...args, placement: "row" }) },
-          createElement(SuggestedMapCard, { variant: "row" }),
+          createElement(SuggestedMapCard, {
+            variant: "row",
+            ...(args.className ? { className: args.className } : {}),
+          }),
         ),
       ),
     );
@@ -1399,7 +1173,6 @@ describe("the card promoted to the top of the page", () => {
     const html = promoted();
     expect(html).toContain('aria-label="Suggested map"');
     expect(html).toContain("<section");
-    expect(html).not.toContain("suggested-map-heading");
   });
 
   it("is one element with no wrapper, which is what the row needs", () => {
@@ -1409,10 +1182,35 @@ describe("the card promoted to the top of the page", () => {
     expect(promoted({ map: null })).toBe("");
   });
 
-  it("keeps the same width it has in the Downloads group", () => {
-    // One card standing where a rail card would, rather than a fourth width for
-    // the page to explain.
-    expect(promoted()).toContain("sm:w-64");
+  it("is the same card, at the height of the cards it stands among", () => {
+    // The shape is not in question: it is the card the Downloads group shows.
+    // What was wrong is that it kept its own 177px in a row of 104px cards, at
+    // exactly the width of the tool grid directly below it, so it read as a card
+    // that had fallen out of that grid (issue #1114).
+    const html = promoted({ art: "https://example.test/thumb.jpg" });
+    expect(html).toContain(ART_BAND_CLASS);
+    expect(html).toContain("sm:h-[6.5rem]");
+    // No floor under the picture, or the card would be 177px again.
+    expect(html).not.toContain("min-h-28");
+    expect(html).not.toContain("sm:w-64");
+  });
+
+  it("is 2.39:1 at that height, and stops there", () => {
+    // It cannot take the row, which is the width of the window: at 3440px the
+    // card would be 33:1.
+    expect(promoted()).toContain("sm:w-[calc(6.5rem*2.39)]");
+  });
+
+  it("carries the accent, because it is first in the row", () => {
+    // The hero wore the only accent on the page while standing second. See
+    // `stackedLayout.test.ts` for the half of this that takes it off the hero.
+    expect(promoted()).toContain("border-primary/40");
+  });
+
+  it("drops the words from its action to fit", () => {
+    const html = promoted();
+    expect(html).not.toContain(">Install<");
+    expect(html).toContain('aria-label="Install Fallendell"');
   });
 
   it("still offers the install it was promoted to offer", () => {

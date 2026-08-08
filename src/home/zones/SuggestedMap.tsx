@@ -1,4 +1,4 @@
-import { Button } from "@picoframe/frame";
+import { buttonVariants, cn } from "@picoframe/frame";
 import { Check, Download, Loader2, Map as MapIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
@@ -78,7 +78,7 @@ export function SuggestedMapCard({
   // The page's answer, not this card's. `CoilboxHome` resolves it once, above the
   // layout, because the same map is claimed against the tool cards and two
   // resolutions could drift apart (issue #1077).
-  const { map, loading, source, inventory } = useSuggestedMapAnswer();
+  const { map, loading, inventory } = useSuggestedMapAnswer();
   const { state, error, canDownload, noWriteRoot, download } =
     useSuggestedMapInstall(map, inventory);
   // The URL that failed, not a flag, so a later answer gets its own chance
@@ -99,7 +99,14 @@ export function SuggestedMapCard({
   if (loading) return labelled(<Placeholder />);
   if (!map) return null;
 
+  const row = variant === "row";
+  // In the resume row the card is the same card, at the height of the cards it is
+  // standing among and the width that height allows. See {@link ROW_CARD_CLASS}.
+  const artWindow = row ? ROW_ART_WINDOW_CLASS : ART_WINDOW_CLASS;
   const installedName = state === "installed" ? springNameOf(map) : undefined;
+  // The states where pressing the card starts a download. Not `active` or
+  // `queued`: one is already running and a second press would enqueue it twice.
+  const offering = state === "available" || state === "failed";
   const body = (
     <>
       {art ? (
@@ -112,12 +119,12 @@ export function SuggestedMapCard({
           />
           {/* The art window. Grows with the card, so the picture reaches the
               band however deep the band gets. */}
-          <span aria-hidden="true" className={ART_WINDOW_CLASS} />
+          <span aria-hidden="true" className={artWindow} />
         </>
       ) : (
         <span
           aria-hidden="true"
-          className={`flex items-center justify-center ${ART_WINDOW_CLASS}`}
+          className={`flex items-center justify-center ${artWindow}`}
         >
           <MapIcon size={32} className="text-muted-foreground" />
         </span>
@@ -129,18 +136,10 @@ export function SuggestedMapCard({
           <span
             className={`block truncate text-xs ${art ? ART_DIM_CLASS : "text-muted-foreground"}`}
           >
-            {error ??
-              (source === "battle"
-                ? BATTLE_BLURB
-                : (map.blurb ?? "Curated map"))}
+            {error ?? map.blurb ?? "Curated map"}
           </span>
         </span>
-        <Action
-          state={state}
-          canDownload={canDownload}
-          onDownload={download}
-          title={map.title}
-        />
+        <Action state={state} compact={row} />
       </span>
     </>
   );
@@ -150,23 +149,50 @@ export function SuggestedMapCard({
   // nothing saying what it is. A plain div everywhere else: in the Downloads
   // group the group's heading already says it, and the `section` variant has one
   // of its own wrapped around this.
-  const Column = variant === "row" ? "section" : "div";
+  const Column = row ? "section" : "div";
+  const surface = cn(
+    art ? ART_CARD_CLASS : PLAIN_CARD_CLASS,
+    row && ROW_CARD_CLASS,
+  );
   return labelled(
     <Column
-      className={COLUMN_CLASS}
-      aria-label={variant === "row" ? "Suggested map" : undefined}
+      className={cn(COLUMN_CLASS, row && ROW_COLUMN_CLASS)}
+      aria-label={row ? "Suggested map" : undefined}
     >
       {installedName ? (
         // Installed: the card is the way to the map, so the whole surface is the
         // link and the band carries no button to nest inside it.
         <Link
           to={`/content/maps/${encodeURIComponent(installedName)}`}
-          className={`${art ? ART_CARD_CLASS : PLAIN_CARD_CLASS} hover:border-ring ${CARD_FOCUS_CLASS}`}
+          className={cn(surface, INTERACTIVE_CLASS)}
         >
           {body}
         </Link>
+      ) : offering ? (
+        // The offer: the whole card installs the map. It is one card about one
+        // map with one thing to do, and a small button in the corner of it was
+        // the only part that did anything, on a page where every card beside it
+        // is wholly clickable and says so on hover. The chip in the band stays as
+        // the affordance, and is inert.
+        <button
+          type="button"
+          onClick={download}
+          disabled={!canDownload}
+          aria-label={
+            state === "failed"
+              ? `Retry installing ${map.title}`
+              : `Install ${map.title}`
+          }
+          className={cn(
+            surface,
+            INTERACTIVE_CLASS,
+            "disabled:pointer-events-none disabled:opacity-50",
+          )}
+        >
+          {body}
+        </button>
       ) : (
-        <div className={art ? ART_CARD_CLASS : PLAIN_CARD_CLASS}>{body}</div>
+        <div className={surface}>{body}</div>
       )}
       {/* `noWriteRoot`, not `!canDownload`: the download folder takes a disk read
           to resolve, so `canDownload` is false on every first render however the
@@ -188,17 +214,6 @@ export function SuggestedMapCard({
     </Column>,
   );
 }
-
-/**
- * The subtitle when the map came from a live battle rather than the rotation.
- *
- * It replaces the catalog blurb rather than joining it, because the band gives
- * the subtitle one truncated line and the reason this map is here outranks its
- * description. It is also the only thing that distinguishes the two sources on
- * screen: the card is otherwise identical either way, so without this line the
- * feature could not be confirmed by looking at it.
- */
-const BATTLE_BLURB = "Being played now";
 
 /** The label above the card, matching the tool grid's group labels. */
 function Heading() {
@@ -261,47 +276,55 @@ function Placeholder() {
 /** What the card offers for the map, given where its download has got to. */
 function Action({
   state,
-  canDownload,
-  onDownload,
-  title,
+  compact = false,
 }: {
   state: SuggestedState;
-  canDownload: boolean;
-  onDownload: () => void;
-  title: string;
+  /**
+   * Drop the words and keep the icons.
+   *
+   * The promoted card is 248px wide where it has 256px in the Downloads group,
+   * and it is a good deal shorter, so the band has to give something back. The
+   * card is what carries the accessible name in every state, so nothing here is
+   * the only place a word appears.
+   */
+  compact?: boolean;
 }) {
   if (state === "installed") {
     return (
-      <span className="flex shrink-0 items-center gap-1 px-1 text-xs">
+      <span className={STATUS_CLASS}>
         <Check className="size-4" />
-        Installed
+        {!compact && "Installed"}
       </span>
     );
   }
   if (state === "active" || state === "queued") {
     return (
-      <span className="flex shrink-0 items-center gap-1 px-1 text-xs">
+      <span className={STATUS_CLASS}>
         <Loader2 className="size-3.5 motion-safe:animate-spin" />
-        {state === "active" ? "Downloading…" : "Queued"}
+        {!compact && (state === "active" ? "Downloading…" : "Queued")}
       </span>
     );
   }
+  // A span, not a button. The card around it is the control (see
+  // {@link SuggestedMapCard}), and a button inside a button is not markup a
+  // browser will render as written.
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      className={`shrink-0 ${ART_BUTTON_CLASS}`}
-      onClick={onDownload}
-      disabled={!canDownload || state === "unavailable"}
-      aria-label={
-        state === "failed" ? `Retry installing ${title}` : `Install ${title}`
-      }
+    <span
+      className={cn(
+        buttonVariants({ variant: "outline", size: "sm" }),
+        "pointer-events-none shrink-0",
+        compact && "px-2",
+        ART_BUTTON_CLASS,
+      )}
     >
       <Download className="size-4" />
-      {state === "failed" ? "Retry" : "Install"}
-    </Button>
+      {!compact && (state === "failed" ? "Retry" : "Install")}
+    </span>
   );
 }
+
+/** The two states that are a report rather than an offer. */
+const STATUS_CLASS = "flex shrink-0 items-center gap-1 px-1 text-xs";
 
 /**
  * The column the card sits in: the card, and under it the one line that only
@@ -321,6 +344,57 @@ const COLUMN_CLASS = "flex w-full flex-col gap-2 sm:w-64";
  */
 const ART_WINDOW_CLASS = "relative min-h-28 flex-1";
 
+/* -------------------------------------------------------------------------- *
+ * The card in the resume row, which is the same card at the row's own size.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * How tall the card is when it is promoted into the resume row: the height of
+ * the cards it is standing among.
+ *
+ * The card's shape is not in question and is not changed here. What was wrong is
+ * that it kept its own 177px in a row of 101px cards, so the one thing at the top
+ * of the page was a tall tile at exactly the width of the tool grid directly
+ * below it, and it read as a card that had fallen out of that grid (issue #1114).
+ *
+ * The row is not made to match it, which is the other way to get one bottom edge
+ * and the wrong one: a rail card stretched to 177px holds 76px of nothing between
+ * its detail line and the action `mt-auto` pins to its foot (#1074). So the card
+ * comes to the row rather than the row to the card, and `RESUME_ROW`'s
+ * `items-start` stays exactly as it was.
+ *
+ * `6.5rem` is 104px, which is what the Warpath and Conquest cards stand at. Not
+ * read off the rail, because no zone here knows another exists, and a number kept
+ * in step by hand is the price of that.
+ *
+ * Only from `sm`. Below that the row is a column, the card is full width like
+ * everything else in it, and a fixed height would crop the band.
+ *
+ * The accent border comes with it. The row reads left to right and the card is
+ * first because it outranks the hero (see `../StackedLayout`), but the hero wore
+ * the only accent on the page, which said the opposite. One accent, on the thing
+ * that is first, and `Continue` is told to drop its own while this card is there.
+ */
+const ROW_CARD_CLASS = "border-primary/40 sm:h-[6.5rem]";
+
+/**
+ * How wide the card is in the row: 2.39:1 against the height above, which is
+ * 248px.
+ *
+ * The card cannot simply take the row, which is the width of the window: at
+ * 3440px it would be 33:1, a picture at one end and a button at the other. 2.39
+ * is the anamorphic frame, and past it the picture stops being a picture of
+ * anything.
+ */
+const ROW_COLUMN_CLASS = "sm:w-[calc(6.5rem*2.39)]";
+
+/**
+ * The picture in the promoted card: whatever the band leaves of the card's
+ * height. No floor, because the card's height is the fixed thing there and
+ * `min-h-28` would push it back to 177px, which is the whole of issue #1114.
+ */
+const ROW_ART_WINDOW_CLASS = "relative flex-1";
+
 /**
  * The art card: the shared shell of `cardShell.ts`, which owns why the text over a
  * minimap clears AA in both colour schemes. A minimap is whatever colour the map
@@ -328,6 +402,18 @@ const ART_WINDOW_CLASS = "relative min-h-28 flex-1";
  * ends.
  */
 const ART_CARD_CLASS = ART_SHELL_CLASS;
+
+/**
+ * What a card that does something wears: the tool grid's own hover cue and the
+ * shared focus ring.
+ *
+ * The grid's cards and the rail's are links, and every one of them lifts its
+ * border on hover. This card was the exception while it was offering a map,
+ * because the only thing that did anything was the chip in its band, so it looked
+ * like a card that had stopped working. It is a control now, in both of its
+ * states: a link to the map once the map is there, and the install before that.
+ */
+const INTERACTIVE_CLASS = `transition-colors hover:border-ring ${CARD_FOCUS_CLASS}`;
 
 /** The no-art card: the ordinary card surface, with the map icon in place of art. */
 const PLAIN_CARD_CLASS = `${CARD_SHELL_CLASS} ${CARD_STACK_CLASS} bg-card text-card-foreground`;

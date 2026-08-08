@@ -214,9 +214,16 @@ const HERO_WIDTH = "min-w-0 sm:max-w-2xl";
  * which is what the row's `empty:hidden` needs, and it is the first of the three
  * because it outranks both. On a fresh install the other two draw nothing and it
  * is alone in the row, which is the ordinary case rather than the odd one: a
- * player with runs to resume and no maps at all has deleted their maps. It keeps
- * the tool card's width there, so it is one card standing where one rail card
- * would, rather than a fourth width for the page to explain.
+ * player with runs to resume and no maps at all has deleted their maps.
+ *
+ * The hero's accent border goes with the rank. The row reads left to right and
+ * the card is first, but the hero carried the only accent on the page, so the two
+ * signals said opposite things about which one to look at. `Continue` is told to
+ * drop it here rather than asked to work it out, since it cannot see what it is
+ * standing beside. The zone's own `border-primary/40` picks it up.
+ *
+ * How tall and how wide the card is there is the zone's, since it is a fact about
+ * the card. See `ROW_CARD_CLASS` in `./zones/SuggestedMap` (issue #1114).
  */
 function renderEntries(
   entries: readonly HomeEntry[],
@@ -232,7 +239,9 @@ function renderEntries(
       out.push(
         <div key={i} className={RESUME_ROW}>
           {promoted && <SuggestedMapCard variant="row" />}
-          <Continue className={HERO_WIDTH} />
+          <Continue
+            className={promoted ? `${HERO_WIDTH} border-border` : HERO_WIDTH}
+          />
           <ResumeRail />
         </div>,
       );
