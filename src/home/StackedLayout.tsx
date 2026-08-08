@@ -4,6 +4,7 @@ import { backdropStyle, resolveHomeBackground } from "./background";
 import { type HomeEntry, type ZoneId, zonesOnPage } from "./config";
 import HomeMarkup from "./HomeMarkup";
 import type { HomeLayoutProps } from "./layout";
+import type { SuggestedPlacement } from "./suggestedMap";
 import Continue from "./zones/Continue";
 import Greeting from "./zones/Greeting";
 import Onboarding from "./zones/Onboarding";
@@ -32,6 +33,7 @@ import ToolCards from "./zones/ToolCards";
 export default function StackedLayout({
   entries,
   background,
+  suggested = "cards",
 }: HomeLayoutProps) {
   const backdrop = backdropStyle(resolveHomeBackground(background));
   return (
@@ -52,7 +54,7 @@ export default function StackedLayout({
       {/* Positioned, so the zones paint over the backdrop without a z-index. */}
       <div className="relative p-8">
         <Slot id="home.top" />
-        {renderEntries(entries)}
+        {renderEntries(entries, suggested)}
         <Slot id="home.bottom" />
       </div>
     </div>
@@ -104,11 +106,13 @@ const ZONE_SPACING: Partial<Record<ZoneId, string>> = {
  * the cards would come out narrower than the hero above them for no reason the
  * page could explain. The window can be dragged to 600px, so this is reachable.
  *
- * `empty:hidden` on the row, with the two zones as its direct children and no
- * wrapper each. That is what makes the block vanish on a fresh install: both
- * zones render null, the row has no child nodes at all, and it takes its own top
- * margin with it. Wrapping each zone would leave the row holding two empty divs,
- * so it would keep the margin and the page would open with a gap in it.
+ * `empty:hidden` on the row, with each participant a direct child and no wrapper
+ * each. That is what makes the block vanish on a fresh install: every one of
+ * them renders null, the row has no child nodes at all, and it takes its own top
+ * margin with it. Wrapping each zone would leave the row holding empty divs, so
+ * it would keep the margin and the page would open with a gap in it. The
+ * promoted map card (see {@link renderEntries}) joins on those terms or not at
+ * all.
  *
  * ## The rail keeps its own height
  *
@@ -192,9 +196,34 @@ const HERO_WIDTH = "min-w-0 sm:max-w-2xl";
  * The zone list is read once here and handed to the greeting, which is the one
  * zone that says something about the others and so has to know which of them the
  * page carries (see `./zones/Greeting`).
+ *
+ * ## The promoted map card
+ *
+ * A player with no maps at all is offered one at the top of the page instead,
+ * ahead of the hero and the rail, because without a map nothing can be played
+ * and there is nothing to resume that would help (issue #1102). The page decides
+ * that, not this layout and not the zone: `suggested` arrives already answered.
+ *
+ * Promotion needs the resume row, and the row is the pairing above, so a page
+ * whose profile separated the hero and the rail, reversed them, or hung markup
+ * on either has no row to promote into and the card stays where the profile put
+ * it. That is the same answer those profiles get for everything else here: they
+ * wrote the order they wanted.
+ *
+ * The card joins the row as a third direct child with no wrapper of its own,
+ * which is what the row's `empty:hidden` needs, and it is the first of the three
+ * because it outranks both. On a fresh install the other two draw nothing and it
+ * is alone in the row, which is the ordinary case rather than the odd one: a
+ * player with runs to resume and no maps at all has deleted their maps. It keeps
+ * the tool card's width there, so it is one card standing where one rail card
+ * would, rather than a fourth width for the page to explain.
  */
-function renderEntries(entries: readonly HomeEntry[]): ReactNode[] {
+function renderEntries(
+  entries: readonly HomeEntry[],
+  placement: SuggestedPlacement,
+): ReactNode[] {
   const zones = zonesOnPage(entries);
+  const promoted = placement === "row" && promotable(entries);
   const out: ReactNode[] = [];
   for (let i = 0; i < entries.length; i += 1) {
     const entry = entries[i];
@@ -202,6 +231,7 @@ function renderEntries(entries: readonly HomeEntry[]): ReactNode[] {
     if (bare(entry, "continue") && next && bare(next, "resume")) {
       out.push(
         <div key={i} className={RESUME_ROW}>
+          {promoted && <SuggestedMapCard variant="row" />}
           <Continue className={HERO_WIDTH} />
           <ResumeRail />
         </div>,
@@ -210,13 +240,33 @@ function renderEntries(entries: readonly HomeEntry[]): ReactNode[] {
       continue;
     }
     if (bare(entry, "cards") && next && bare(next, "suggested")) {
-      out.push(<ToolCards key={i} suggested={<SuggestedMapCard />} />);
+      out.push(
+        <ToolCards
+          key={i}
+          suggested={promoted ? undefined : <SuggestedMapCard />}
+        />,
+      );
       i += 1;
       continue;
     }
-    out.push(renderEntry(entry, i, zones));
+    out.push(renderEntry(entry, i, zones, promoted));
   }
   return out;
+}
+
+/**
+ * Whether this page can promote the map card: it pairs the hero and the rail, so
+ * there is a row to promote into, and it carries a bare suggested zone, so there
+ * is a card to promote and no markup of its own to leave behind.
+ */
+function promotable(entries: readonly HomeEntry[]): boolean {
+  const row = entries.some(
+    (entry, i) =>
+      bare(entry, "continue") &&
+      entries[i + 1] !== undefined &&
+      bare(entries[i + 1], "resume"),
+  );
+  return row && entries.some((entry) => bare(entry, "suggested"));
 }
 
 /** A zone entry naming `zone` and carrying no markup of its own. */
@@ -259,6 +309,7 @@ function renderEntry(
   entry: HomeEntry,
   index: number,
   zones: ReadonlySet<ZoneId>,
+  promoted: boolean,
 ): ReactNode {
   const { before, after } = entry.strings;
   const spacing = entry.kind === "zone" ? ZONE_SPACING[entry.zone] : undefined;
@@ -268,7 +319,7 @@ function renderEntry(
       {entry.kind === "html" ? (
         <HomeMarkup markup={entry.html} />
       ) : (
-        zoneNode(entry, zones)
+        zoneNode(entry, zones, promoted)
       )}
       {after !== undefined && <HomeMarkup markup={after} />}
     </>
@@ -284,10 +335,18 @@ function renderEntry(
   );
 }
 
-/** The component for a built-in zone, with whatever config the entry carries. */
+/**
+ * The component for a built-in zone, with whatever config the entry carries.
+ *
+ * The suggested map draws nothing in place when it has been promoted, because
+ * its card is already in the resume row above. Its entry still has to be here to
+ * be promoted at all: promotion moves the card the profile asked for and never
+ * conjures one a profile left out.
+ */
 function zoneNode(
   entry: Extract<HomeEntry, { kind: "zone" }>,
   zones: ReadonlySet<ZoneId>,
+  promoted: boolean,
 ): ReactNode {
   switch (entry.zone) {
     case "onboarding":
@@ -307,6 +366,6 @@ function zoneNode(
     case "cards":
       return <ToolCards />;
     case "suggested":
-      return <SuggestedMap />;
+      return promoted ? null : <SuggestedMap />;
   }
 }

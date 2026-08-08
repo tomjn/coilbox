@@ -1,7 +1,7 @@
-import { getProfile } from "../profile/profile";
+import { getOnboardingPlacement, getProfile } from "../profile/profile";
 import { publishArtOverrides } from "./artOverride";
 import BrandedHome from "./BrandedHome";
-import { resolveHome } from "./config";
+import { resolveHome, zonesOnPage } from "./config";
 import { homeMode, resolveLayout } from "./layout";
 import { resolveCardArtOverrides } from "./profileArt";
 import {
@@ -59,19 +59,31 @@ export default function CoilboxHome() {
  * above the layout is what keeps that a page-wide answer rather than a race
  * between two zones. This is the only place it is resolved, and the zone that
  * draws it reads this answer (issue #1077).
+ *
+ * Which zones the page carries is part of that answer rather than something the
+ * card could work out, because the card can now be promoted to the top of the
+ * page and has to know what else is up there: the onboarding zone owns the
+ * first-run download offer, and where it is on the page the promotion stands
+ * down (issue #1102). The layout is told where the card goes for the same
+ * reason it is told everything else, so no zone learns about another.
  */
 function LayoutHome() {
   const { layout, background, entries } = resolveHome(getProfile().home);
-  const suggested = useSuggestedMap();
-  const shown = entries.some(
-    (e) => e.kind === "zone" && e.zone === "suggested",
-  );
+  const zones = zonesOnPage(entries);
+  const suggested = useSuggestedMap({
+    zone: zones.has("suggested"),
+    onboarding: zones.has("onboarding") && getOnboardingPlacement() !== "off",
+  });
   publishArtOverrides(resolveCardArtOverrides(entries));
-  useContentCardArt(suggestedMapClaim(suggested.map, shown));
+  useContentCardArt(suggestedMapClaim(suggested));
   const Layout = resolveLayout(layout);
   return (
     <SuggestedMapContext value={suggested}>
-      <Layout entries={entries} background={background} />
+      <Layout
+        entries={entries}
+        background={background}
+        suggested={suggested.placement}
+      />
     </SuggestedMapContext>
   );
 }

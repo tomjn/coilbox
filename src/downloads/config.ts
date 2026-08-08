@@ -46,13 +46,30 @@ export function useDownloadsConfig() {
  * skylobby data dir still counts as installed.
  */
 export function useContentRootPaths(): string[] {
-  const [paths, setPaths] = useState<string[]>([]);
+  return useContentRoots().paths;
+}
+
+/**
+ * The same paths, with the flag that says whether they have been read yet.
+ *
+ * `paths` is empty both before the read lands and on an install with no content
+ * root at all, and a caller that acts on "the user has nothing installed" cannot
+ * tell those apart from the array alone. Same distinction, and the same reason,
+ * as {@link useWriteRoot}'s `loading` (issue #1099).
+ */
+export function useContentRoots(): { paths: string[]; loading: boolean } {
+  const [roots, setRoots] = useState<{ paths: string[]; loading: boolean }>({
+    paths: [],
+    loading: true,
+  });
   useEffect(() => {
     contentStateLoad(undefined)
-      .then(({ state }) => setPaths(state.roots.map((r) => r.path)))
-      .catch(() => setPaths([]));
+      .then(({ state }) =>
+        setRoots({ paths: state.roots.map((r) => r.path), loading: false }),
+      )
+      .catch(() => setRoots({ paths: [], loading: false }));
   }, []);
-  return paths;
+  return roots;
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   type LayoutName,
 } from "./layoutNames";
 import StackedLayout from "./StackedLayout";
+import type { SuggestedPlacement } from "./suggestedMap";
 
 export { DEFAULT_LAYOUT } from "./layoutNames";
 
@@ -24,6 +25,15 @@ export interface HomeLayoutProps {
   entries: readonly HomeEntry[];
   /** The profile's `home.background`, unvalidated. See `./background`. */
   background: unknown;
+  /**
+   * Where the suggested map card goes, which the page decides above the layout
+   * and which no zone can answer for itself. See `./suggestedMap`.
+   *
+   * Omitted means `"cards"`: the card sits where the profile listed its zone.
+   * That is what a layout host that says nothing gets, and what the layout drew
+   * before promotion existed.
+   */
+  suggested?: SuggestedPlacement;
 }
 
 /**

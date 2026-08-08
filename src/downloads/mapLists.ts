@@ -60,7 +60,8 @@ export type PackMapState =
 export function packMapState(args: {
   input: EnqueueInput | null;
   filename?: string;
-  installed: Set<string>;
+  /** Read-only, so a caller holding one shared listing can pass it as it is. */
+  installed: ReadonlySet<string>;
   queueStatus: QueueStatus | null;
 }): PackMapState {
   const { input, filename, installed, queueStatus } = args;

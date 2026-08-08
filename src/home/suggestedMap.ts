@@ -30,9 +30,9 @@ import {
   useSuggestedMapLists,
   useSuggestedMaps,
 } from "../content/branding";
-import { useUnitsyncMinimap, useUnitsyncScan } from "../content/config";
+import { useUnitsyncScan } from "../content/config";
 import { dlInstalledContent } from "../downloads/bindings";
-import { useContentRootPaths, useWriteRoot } from "../downloads/config";
+import { useContentRoots, useWriteRoot } from "../downloads/config";
 import {
   type EnqueueInput,
   identityOf,
@@ -121,21 +121,75 @@ function picturable(map: SuggestedMap): boolean {
  * #1067). The next map in the rotation is a real picture of a real map, so the
  * rotation moves on and the missing thumbnail costs a reader nothing.
  *
- * Skipping is install-independent on purpose, so everyone still gets the same
- * map on the same day. A player who has the map installed would have got its
- * minimap, and gives that up to keep the rotation the same everywhere.
+ * Install-independent on purpose. What the player has decides which of these
+ * maps is offered, in {@link pickSuggestedMap}, and this list is where the walk
+ * starts from, so two players still start from the same place on the same day.
  *
- * Unless it would empty the rotation. A distribution's own `mapLists` join this
- * pool, and one that curates maps without thumbnails would otherwise lose the
- * zone altogether and never be told why. A card with a glyph beats no card.
+ * An empty pool used to fall back to the unpictured candidates, so that a
+ * distribution curating maps without thumbnails kept a card with a glyph on it.
+ * It no longer does, because "there is nothing to offer" is now an ordinary
+ * state of this card rather than a defect: a player who has every curated map
+ * gets no card either (issue #1102). Two ways to empty the offer, one outcome,
+ * one code path.
  */
 export function suggestedMapPool(
   maps: SuggestedMap[],
   lists: SuggestedMapList[],
 ): SuggestedMap[] {
-  const candidates = suggestedMapCandidates(maps, lists);
-  const pictured = candidates.filter(picturable);
-  return pictured.length > 0 ? pictured : candidates;
+  return suggestedMapCandidates(maps, lists).filter(picturable);
+}
+
+/* -------------------------------------------------------------------------- *
+ * What the player already has.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The two readings of "the player has this map" that every install check in the
+ * app uses, resolved once for the page.
+ *
+ * Both, because either alone misses cases. The on-disk file listing does not
+ * know a map installed under a different file name from the one the catalog
+ * records, and the unitsync scan is empty until it resolves and on an install
+ * with no engine at all. A hit from either is believed.
+ *
+ * `known` is the difference between "the player has nothing" and "nobody has
+ * looked yet", which this card cannot paper over: an unread inventory read as an
+ * empty one offers a map the player already has, and promotes the card to the
+ * top of the page for a player whose maps are all present.
+ */
+export interface MapInventory {
+  /** Lowercased map file names present in a content root. */
+  files: ReadonlySet<string>;
+  /** Lowercased map names a settled unitsync scan reported. */
+  names: ReadonlySet<string>;
+  /** True once both readings have landed. */
+  known: boolean;
+}
+
+/**
+ * Whether the player already has this curated map.
+ *
+ * The same three comparisons `filterUninstalledMaps` makes for the get-started
+ * card, so the two surfaces agree about what counts as installed: the catalog's
+ * file name against the listing, and the spring name or the title against what
+ * the engine can see.
+ */
+export function suggestedMapInstalled(
+  map: SuggestedMap,
+  inventory: MapInventory,
+): boolean {
+  const filename = map.filename?.toLowerCase();
+  if (filename && inventory.files.has(filename)) return true;
+  const springName = springNameOf(map)?.toLowerCase();
+  if (springName && inventory.names.has(springName)) return true;
+  return inventory.names.has(map.title.toLowerCase());
+}
+
+/** Whether the player has no maps at all, which is a definite answer or false. */
+export function noMapsInstalled(inventory: MapInventory): boolean {
+  return (
+    inventory.known && inventory.files.size === 0 && inventory.names.size === 0
+  );
 }
 
 /** Milliseconds in a day. */
@@ -242,24 +296,44 @@ export function useUtcDay(): number {
 }
 
 /**
- * The map to feature on a given day, or null when there is nothing curated.
+ * The map to feature on a given day: the day's own map, or the next one along
+ * that the player does not already have. Null when they have all of them.
  *
  * The day index steps the pool by one, so over any run of `pool.length` days
- * every curated map is suggested exactly once and none is favoured. Everyone
- * computes it from the same two inputs, so everyone gets the same answer without
- * asking a server.
+ * every curated map is reached exactly once and none is favoured.
+ *
+ * The walk forward is the whole of issue #1102. The card offers a map you do not
+ * have, so a map you have is passed over, and the card leaves the page when
+ * every candidate is passed over. What that gives up is stated where it was
+ * decided: PR #1018 kept an installed map on the card and turned it into a link
+ * to it, precisely so that everyone saw the same map on the same day, and two
+ * players with different installs now see different maps. A card you cannot act
+ * on is not worth the space on a launcher.
+ *
+ * Walking forward from the day's index rather than picking out of a
+ * pre-filtered list is what keeps the answer steady while the page is open. A
+ * filtered list is indexed by its own length, so installing any map at all
+ * would renumber it and change the card to an unrelated map. Here, learning that
+ * some other map is installed moves nothing, and the answer only changes when
+ * the map on the card is the one that got installed.
  *
  * Takes the date rather than reading the clock, so a test can ask about any day.
  */
 export function pickSuggestedMap(
   pool: SuggestedMap[],
   date: Date,
+  inventory: MapInventory,
 ): SuggestedMap | null {
   if (pool.length === 0) return null;
   const day = utcDayIndex(date);
   // Two-step modulo: a date before 1970 gives a negative index, and JavaScript's
   // `%` keeps the sign.
-  return pool[((day % pool.length) + pool.length) % pool.length];
+  const start = ((day % pool.length) + pool.length) % pool.length;
+  for (let step = 0; step < pool.length; step += 1) {
+    const map = pool[(start + step) % pool.length];
+    if (!suggestedMapInstalled(map, inventory)) return map;
+  }
+  return null;
 }
 
 /**
@@ -301,6 +375,17 @@ export type SuggestedMapAnswer = {
   map: SuggestedMap | null;
   loading: boolean;
   source: SuggestedSource;
+  /** Where on the page the card goes, or that there is no card. */
+  placement: SuggestedPlacement;
+  /**
+   * What the player has, as this answer read it.
+   *
+   * Carried with the answer rather than read again by the card, because the pick
+   * and the card's own "Installed" badge are two statements about the same
+   * inventory and two readings could disagree. It is also one directory listing
+   * and one unitsync scan for the page rather than one per reader.
+   */
+  inventory: MapInventory;
 };
 
 /**
@@ -320,10 +405,15 @@ export type SuggestedMapAnswer = {
  * Ranked by heads, not rooms: three idle autohosts should not outrank one full
  * team game. Ties go to pool order, so the answer is a function of the snapshot
  * and never of the order the server happened to send the rooms in.
+ *
+ * A map the player already has is no answer either, for the same reason the
+ * rotation passes over one: this card offers a download. The busiest map they do
+ * not have still beats the rotation.
  */
 export function battleSuggestedMap(
   pool: SuggestedMap[],
   lobby: SuggestedLobbySnapshot | null,
+  inventory: MapInventory,
 ): SuggestedMap | null {
   if (!lobby) return null;
   const players = new Map<string, number>();
@@ -340,6 +430,7 @@ export function battleSuggestedMap(
   for (const map of pool) {
     const springName = springNameOf(map);
     if (!springName) continue;
+    if (suggestedMapInstalled(map, inventory)) continue;
     // Exact spring name, lowercased, the same identity `poolKey` uses. Not a
     // fuzzy match on the version suffix: "Supreme Isthmus v2.1" and v2.2 are
     // different archives, and offering the curated one because a battle is on
@@ -365,10 +456,11 @@ export function suggestedMapFor(
   pool: SuggestedMap[],
   lobby: SuggestedLobbySnapshot | null,
   date: Date,
+  inventory: MapInventory,
 ): { map: SuggestedMap | null; source: SuggestedSource } {
-  const battle = battleSuggestedMap(pool, lobby);
+  const battle = battleSuggestedMap(pool, lobby, inventory);
   if (battle) return { map: battle, source: "battle" };
-  return { map: pickSuggestedMap(pool, date), source: "curated" };
+  return { map: pickSuggestedMap(pool, date, inventory), source: "curated" };
 }
 
 /**
@@ -384,27 +476,30 @@ export type SuggestedState = PackMapState | "failed";
 /**
  * Classify the suggested map.
  *
- * Two independent readings of "already installed", because either alone misses
- * cases. The on-disk file listing does not know a map installed under a
- * different file name, and the unitsync scan is empty until it resolves and on
- * an install with no engine yet. A hit from either is believed.
+ * "Installed" is now mostly unreachable, and deliberately still here. The card
+ * only ever offers a map the player does not have, so the only way it can be
+ * looking at an installed map is that its own download just landed: the queue
+ * reports `done` at once, and the inventory catches up a moment later when
+ * {@link useMapInventory} re-reads it. That is the acknowledgement the button
+ * owes the click, so the card holds its map and says so rather than skipping to
+ * the next map in the rotation under the reader's hands.
  *
  * Pure, so the states the card can be in are testable without mounting it.
  */
 export function suggestedMapState(args: {
   input: EnqueueInput | null;
-  filename?: string;
-  /** The map's spring name, when its download declares one. */
-  springName?: string;
-  /** Lowercased map file names present in a content root. */
-  installed: Set<string>;
-  /** Lowercased map names a settled unitsync scan reported. */
-  scanned: Set<string>;
+  map: SuggestedMap | null;
+  inventory: MapInventory;
   queueStatus: QueueStatus | null;
 }): SuggestedState {
-  const { input, filename, springName, installed, scanned, queueStatus } = args;
-  if (springName && scanned.has(springName.toLowerCase())) return "installed";
-  const base = packMapState({ input, filename, installed, queueStatus });
+  const { input, map, inventory, queueStatus } = args;
+  if (map && suggestedMapInstalled(map, inventory)) return "installed";
+  const base = packMapState({
+    input,
+    filename: map?.filename,
+    installed: inventory.files,
+    queueStatus,
+  });
   if (base === "available" && queueStatus === "error") return "failed";
   return base;
 }
@@ -426,21 +521,89 @@ export function springNameOf(map: SuggestedMap): string | undefined {
  * Pure, and expressed in `contentArt`'s own currency, so the pick layer learns
  * nothing about the catalog: it is handed a picture that is spoken for.
  *
- * `shown` is whether the page has a suggested map zone at all. A profile that
- * left it out has no card holding this map, and a claim then would cost the Maps
- * card a picture for nothing.
- *
- * The claim stands whether or not the map is installed. Uninstalled, the card
- * paints the catalog's thumbnail and no tool card can offer the map anyway,
- * because those offers come from the unitsync scan. So the claim only bites in
- * exactly the case that is the defect.
+ * Read off the placement, which is the one thing that knows whether there is a
+ * card at all. A card that is not on the page must claim nothing, or a tool card
+ * loses a picture to a card nobody can see, and since the card can now be absent
+ * for three different reasons (no zone, nothing left to offer, the catalog said
+ * nothing) that has to be one question rather than three.
  */
 export function suggestedMapClaim(
-  map: SuggestedMap | null,
-  shown: boolean,
+  answer: SuggestedMapAnswer,
 ): readonly ContentPick[] {
-  const springName = shown && map ? springNameOf(map) : undefined;
+  const springName =
+    answer.placement === "absent" || !answer.map
+      ? undefined
+      : springNameOf(answer.map);
   return springName ? [{ kind: "map", mapName: springName }] : [];
+}
+
+/* -------------------------------------------------------------------------- *
+ * Where the card goes, which is a page-level answer rather than a card's own.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The three places the suggested map card can be.
+ *
+ * - `cards`: fourth in the tool grid's Downloads group, where a map suggestion
+ *   is one download offer among the others. The ordinary answer.
+ * - `row`: promoted into the top row, ahead of the continue hero and the resume
+ *   rail. Getting a first map installed outranks resuming a run, because without
+ *   a map nothing can be played.
+ * - `absent`: no card. The profile left the zone out, or the catalog offers
+ *   nothing, or the player already has everything it could offer.
+ */
+export type SuggestedPlacement = "cards" | "row" | "absent";
+
+/** What the page is, as far as this card is concerned. */
+export interface SuggestedPage {
+  /** The page carries the suggested map zone. */
+  zone: boolean;
+  /**
+   * The page carries the onboarding zone, and it is switched on.
+   *
+   * That zone owns first run, and what it draws when the player has no maps is
+   * the get-started card's own list of maps to download, or, before there is an
+   * engine to play them with, the "Set up Coilbox" card. Either way the page is
+   * already making the offer this card would be promoted to make, so the
+   * promotion stands down rather than asking twice. See {@link
+   * suggestedMapPlacement}.
+   */
+  onboarding: boolean;
+}
+
+/**
+ * Where the card goes, given what the page carries and what the player has.
+ *
+ * Promotion is the unusual answer and it is deliberately narrow. Two things have
+ * to be true: the player has no maps at all, and nothing else on the page is
+ * already offering them one.
+ *
+ * The second is not a guess. `GetStartedCard`, which the onboarding zone draws,
+ * offers curated maps on exactly the condition that promotes this card, that the
+ * player has no maps, and offers them several with a packs banner under them.
+ * Before there is an engine it draws nothing and `SetupCard` asks for the engine
+ * and the content folder instead, which is both more fundamental and the thing
+ * that has to happen before a download has anywhere to go. So on the default
+ * page the promoted card would be a second voice saying a version of what
+ * onboarding is already saying, and it yields. A distribution that drops the
+ * onboarding zone, or sets `onboarding: "off"`, has nobody making the offer, and
+ * there the card takes the top row.
+ *
+ * While the answer is still loading the card keeps the place the profile gave
+ * it, so the placeholder holds the Downloads row's height (issue #1083) and the
+ * card never appears in one place and then moves to another.
+ */
+export function suggestedMapPlacement(args: {
+  page: SuggestedPage;
+  loading: boolean;
+  map: SuggestedMap | null;
+  /** Whether the player has no maps at all. See {@link noMapsInstalled}. */
+  noMaps: boolean;
+}): SuggestedPlacement {
+  if (!args.page.zone) return "absent";
+  if (args.loading) return "cards";
+  if (!args.map) return "absent";
+  return args.noMaps && !args.page.onboarding ? "row" : "cards";
 }
 
 /**
@@ -462,18 +625,35 @@ export function suggestedMapClaim(
  * else connects, so a logged-out or offline player gets the rotation and only the
  * rotation.
  *
- * The battle answer is latched for the life of the mount. `mirror.state.battles`
- * changes every time anyone anywhere joins or leaves a room, which on a busy
- * server is several times a second, and an unlatched card would swap its picture,
- * name and blurb under a reader who is looking at it. So the zone settles on the
- * first answer the lobby gives and keeps it. The cost is that the pick can be a
- * session old, which for rooms that live tens of minutes is a boundary worth
- * trading for a card that holds still.
+ * The answer is held for the day, once it is a real answer.
+ *
+ * Three things move under this card while it is on screen, and it should sit
+ * still through all of them. `mirror.state.battles` changes every time anyone
+ * anywhere joins or leaves a room, which on a busy server is several times a
+ * second. The inventory changes the moment any download lands, including the
+ * card's own. And the pool the two are read against changes with them. An
+ * unheld card would swap its picture, name and blurb under a reader who is
+ * looking at it, and worst of all it would do that the instant they pressed
+ * Install, which is the one moment the card owes them an answer about the map
+ * they just asked for.
+ *
+ * So the first real answer of the day is kept, and the day is what releases it:
+ * {@link useUtcDay} turns the card over at UTC midnight where it stands (issue
+ * #1022) and the hold turns over with it. Nothing is held before the catalog and
+ * the inventory have both answered, because a held guess is a guess kept all
+ * session.
+ *
+ * The one thing that may still replace a held answer is the lobby's, once, and
+ * only over the rotation's. A connection settles seconds after the page paints,
+ * so an unheld first answer would otherwise mean the card could never prefer a
+ * map people are on (issue #996). After that first upgrade the lobby is ignored,
+ * which is what stops the card following the server's churn.
  */
-export function useSuggestedMap(): SuggestedMapAnswer {
+export function useSuggestedMap(page: SuggestedPage): SuggestedMapAnswer {
   const catalogLists = useSuggestedMapLists();
   const maps = useSuggestedMaps();
   const loaded = useCatalogLoaded();
+  const inventory = useMapInventory();
   const { mirror } = useMultiplayer();
   const day = useUtcDay();
   // The rotation reads nothing off a date but its UTC day, so the day's own
@@ -485,27 +665,117 @@ export function useSuggestedMap(): SuggestedMapAnswer {
       suggestedMapPool(maps, mergeMapLists(catalogLists, getProfileMapLists())),
     [maps, catalogLists],
   );
-  const answer = useMemo(
-    () => suggestedMapFor(pool, mirror.state, today),
-    [pool, mirror.state, today],
+  const ready = loaded && inventory.known;
+  const fresh = useMemo(
+    () => suggestedMapFor(pool, mirror.state, today, inventory),
+    [pool, mirror.state, today, inventory],
   );
+  const placement = suggestedMapPlacement({
+    page,
+    loading: !ready,
+    map: fresh.map,
+    noMaps: noMapsInstalled(inventory),
+  });
 
-  const [latched, setLatched] = useState<SuggestedMap | null>(null);
+  const [held, setHeld] = useState<Held | null>(null);
   useEffect(() => {
-    // `prev ?? map` keeps the first answer, and returning `prev` unchanged lets
-    // React bail out of the re-render for every later lobby delta.
-    if (answer.source === "battle") setLatched((prev) => prev ?? answer.map);
-  }, [answer]);
+    if (!ready) return;
+    // Returning `prev` unchanged lets React bail out of the re-render for every
+    // lobby delta and every download that lands.
+    setHeld((prev) => holdSuggestion(prev, day, { ...fresh, placement }));
+  }, [ready, day, fresh, placement]);
+
+  const settled = held?.day === day ? held : null;
+  return useMemo(
+    () => ({
+      map: ready ? (settled?.map ?? fresh.map) : null,
+      loading: !ready,
+      source: settled?.source ?? fresh.source,
+      placement: settled?.placement ?? placement,
+      inventory,
+    }),
+    [ready, settled, fresh, placement, inventory],
+  );
+}
+
+/** The answer this mount is holding, and the day it is the answer for. */
+interface Held {
+  day: number;
+  map: SuggestedMap | null;
+  source: SuggestedSource;
+  placement: SuggestedPlacement;
+}
+
+/**
+ * Keep what is held, or take the new answer. Pure, so the day boundary and the
+ * one lobby upgrade are testable without a clock or a connection.
+ */
+export function holdSuggestion(
+  prev: Held | null,
+  day: number,
+  answer: Omit<Held, "day">,
+): Held {
+  if (!prev || prev.day !== day) return { day, ...answer };
+  if (prev.source !== "battle" && answer.source === "battle")
+    return { day, ...answer };
+  return prev;
+}
+
+/**
+ * What the player has, re-read whenever the download queue finishes anything.
+ *
+ * The two inventories are the ones every other install check in the app uses, so
+ * a map fetched from the maps page or a pack counts here without this being told
+ * about it. Neither is allowed to answer until it has actually read something:
+ * an unloaded content root and an unfinished scan both look exactly like an
+ * empty install, and this card acts on "the player has no maps" by taking the
+ * top of the page.
+ */
+export function useMapInventory(): MapInventory {
+  const { paths, loading: rootsLoading } = useContentRoots();
+  const { target, loading: targetLoading } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const [files, setFiles] = useState<ReadonlySet<string> | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (paths.length === 0) return;
+    try {
+      const { maps } = await dlInstalledContent({ paths });
+      setFiles(new Set(maps));
+    } catch {
+      // Leave the last listing in place. A failed read is not a report that the
+      // user has nothing, and treating it as one re-offers an installed map.
+    }
+  }, [paths]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+  useDownloadComplete(refresh);
+
+  // A target that has resolved but not scanned yet is the case to wait for. An
+  // install with no engine has no scan to wait for and never will, so it is
+  // known the moment the content state says there is no target.
+  const hasTarget = !!(target?.enginePath && target?.dataDir);
+  const scanKnown =
+    !targetLoading &&
+    (!hasTarget ||
+      (!scan.loading &&
+        (scan.data !== null || scan.error !== null || scan.cancelled)));
 
   return useMemo(
     () => ({
-      map: latched ?? answer.map,
-      loading: !loaded,
-      source: latched ? "battle" : answer.source,
+      files: files ?? EMPTY_NAMES,
+      names: new Set((scan.data?.maps ?? []).map((m) => m.name.toLowerCase())),
+      known:
+        (files !== null || (!rootsLoading && paths.length === 0)) && scanKnown,
     }),
-    [latched, answer, loaded],
+    [files, rootsLoading, paths.length, scan.data, scanKnown],
   );
 }
+
+/** One empty set, so an unread inventory is not a new object every render. */
+const EMPTY_NAMES: ReadonlySet<string> = new Set<string>();
 
 /**
  * The page's answer, handed to the zone that draws it.
@@ -544,7 +814,9 @@ export function useSuggestedMapAnswer(): SuggestedMapAnswer {
 }
 
 /**
- * The suggested map's own picture.
+ * The suggested map's own picture: the catalog's `thumb`, through the same Rust
+ * image proxy and disk cache the download browsers use. Fetched once, then
+ * available offline.
  *
  * Deliberately not {@link ./art}'s `resolveCardArt`. That chain answers "what
  * should the card for a *tool* show", keyed by nav id and floored by a
@@ -552,251 +824,50 @@ export function useSuggestedMapAnswer(): SuggestedMapAnswer {
  * the only honest art for a named map is a picture of it. A procedural swirl
  * under a map's name would be a picture of nothing.
  *
- * So one source in two forms, both of them that map's minimap:
+ * One source, and there used to be two. The other was the engine's own minimap
+ * of the archive on disk, which is a better picture and is only available for a
+ * map the player has. The card now only ever names a map they do not have
+ * (issue #1102), so it was never asked for, and everything built to stop the two
+ * sources swapping under a reader (issues #1095, #1100, PR #1101) went with it.
  *
- * 1. Installed: the engine's own render, cached on disk by the unitsync worker
- *    and served over `coilbox://` since PR #982. No network, so it survives
- *    offline, and it is the picture of the archive the player actually has.
- * 2. Not installed: the catalog's `thumb`, through the same Rust image proxy and
- *    disk cache the download browsers use. Fetched once, then offline too.
+ * What survives that is the card's own download landing while it is still on
+ * screen, which does put an installed map under this hook. It stays on the
+ * thumbnail it is already painting: it is a picture of the same map, the card is
+ * about to be replaced by the next launch anyway, and reaching for the minimap
+ * there would mean rendering a full-size map image to change a picture into
+ * another picture of the same thing.
  *
  * `thumb` is optional on a curated map, and a map that arrived through a pack had
  * none, so for most of the rotation there was nothing for this to resolve and the
- * card came up blank (issue #1037). {@link suggestedMapPool} now passes over a map
- * the catalog cannot picture, so a thumbnail the editor forgot costs a map its turn
- * in the rotation rather than costing a reader their card (issue #1070).
+ * card came up blank (issue #1037). {@link suggestedMapPool} passes over a map
+ * the catalog cannot picture, so a thumbnail the editor forgot costs a map its
+ * turn in the rotation rather than costing a reader their card (issue #1070).
  *
- * Neither source is available on a cold offline first run for a map the player
- * does not have. The card then renders without art, which the component handles by
- * dropping to its plain surface rather than by reaching for a third source.
- *
- * Both hooks run on every render, as hooks must. The minimap one is handed a map
- * name only when the map is installed, and does nothing without one.
- *
- * ## Why the middle step exists
- *
- * For a map you have, both sources answer, and they answer at different times:
- * the thumbnail at about 760ms and the minimap at about 990ms. The card painted
- * the first and then changed to the second, and since both are pictures of the
- * same map the change said nothing the first one did not (issue #1095).
- *
- * The two are not interchangeable, so the fix is not to drop one. The minimap is
- * the archive the player actually has, rendered by their own engine and needing
- * no network. The thumbnail is the catalog's own image of the map, and a mirror
- * is exactly the thing that hands back a different map under a name (issue
- * #1067). Preferring whichever arrived first would have made which picture you
- * get a function of which cache happened to be warm, which is a different card
- * on two launches of the same app on the same map.
- *
- * Nor does swapping the preference settle it. Whichever source is preferred, the
- * other can still resolve first and be replaced, so an ordering alone only moves
- * the swap to the run where the caches warm the other way round.
- *
- * So the answer is written down and read back, the way the tool cards' is (PR
- * #1096): {@link rememberedSuggestedMapArt} holds the minimap this card settled
- * on last launch, read from `localStorage` while this module loads, and it
- * stands in front of the thumbnail until this launch's own minimap arrives. That
- * is the same URL in the ordinary case, so the picture on the card never
- * changes.
- *
- * Only the minimap is remembered. The thumbnail resolves to a `data:` URL of the
- * image itself, about 140KB for the map on the card as this was written, so
- * there is nothing short to write down. That is no loss: a map you do not have
- * is a map the minimap is never asked for, so its card shows the thumbnail from
- * its first paint and has no swap to remove.
- *
- * A remembered entry can only ever be early, never wrong about its subject. It
- * names the map it is a picture of and is ignored for any other, and both
- * pictures this card can show are pictures of that one map. So there is no
- * pruning here of the kind `contentArt` needs, where a stale entry could put one
- * card's map on another card. The one thing that can go stale is the file, which
- * is a cache entry something else may evict, and the card withdraws it through
- * {@link forgetSuggestedMapArt} when the image will not load.
+ * On a cold offline first run there is nothing to fetch, and the card renders
+ * without art on its plain surface rather than reaching for a third source.
  */
 export function useSuggestedMapArt(
   map: SuggestedMap | null,
-  installed: boolean,
   broken: string | null = null,
 ): string | undefined {
-  const { target } = usePreferredTarget();
-  const springName = map ? springNameOf(map) : undefined;
-  const minimap = useUnitsyncMinimap(
-    target?.enginePath,
-    target?.dataDir,
-    installed ? springName : undefined,
-  );
   const thumb = useCachedImage(map?.thumb, true);
-  const url = minimap.url;
-  useEffect(() => {
-    if (springName && url) rememberSuggestedMapArt(springName, url);
-  }, [springName, url]);
-  return suggestedArtUrl({
-    minimap: url,
-    remembered: rememberedArtFor(remembered, springName),
-    thumb,
-    broken,
-  });
+  return thumb && thumb !== broken ? thumb : undefined;
 }
-
-/**
- * Which of the three answers the card paints, in preference order, skipping any
- * the card has already refused.
- *
- * Pure, so the order and the fall-through are testable without a DOM or a
- * unitsync worker.
- */
-export function suggestedArtUrl(args: {
-  minimap?: string | null;
-  remembered?: string;
-  thumb?: string;
-  broken: string | null;
-}): string | undefined {
-  for (const url of [args.minimap, args.remembered, args.thumb])
-    if (url && url !== args.broken) return url;
-  return undefined;
-}
-
-/* -------------------------------------------------------------------------- *
- * What the card painted last launch, so this launch paints it at once.
- * -------------------------------------------------------------------------- */
-
-/** The minimap this card settled on, and the map it is a picture of. */
-export interface RememberedMapArt {
-  mapName: string;
-  url: string;
-}
-
-/** Where the snapshot is kept, alongside the tool cards' and the theme's. */
-const ART_STORAGE_KEY = "coilbox.home.suggestedMapArt";
-
-/**
- * What the last launch painted.
- *
- * Declared here rather than beside the rest of the snapshot code at the foot of
- * the file. A `let` is unreachable until its declaration runs, and Vite's hot
- * reload can re-evaluate a module while React is part way through a render,
- * which would put {@link useSuggestedMapArt} between the two.
- */
-let remembered: RememberedMapArt | null = null;
-
-/** The text last written, so an unchanged snapshot is not written again. */
-let writtenArt: string | undefined;
-
-/** What the last launch painted. For tests, and for the card's own error path. */
-export function rememberedSuggestedMapArt(): RememberedMapArt | null {
-  return remembered;
-}
-
-/**
- * Take a snapshot as the starting point, without writing it back. What the
- * module does at load with the stored text, and what a test does by hand.
- */
-export function seedSuggestedMapArt(entry: RememberedMapArt | null): void {
-  remembered = entry;
-}
-
-/**
- * The remembered URL for this map, if it is a picture of this map.
- *
- * Case-insensitive, for the reason every other name comparison here is: a spring
- * name reaches this module from the catalog in one case and from a unitsync scan
- * in another.
- */
-export function rememberedArtFor(
-  entry: RememberedMapArt | null,
-  mapName: string | undefined,
-): string | undefined {
-  if (!entry || !mapName) return undefined;
-  return entry.mapName.toLowerCase() === mapName.toLowerCase()
-    ? entry.url
-    : undefined;
-}
-
-/** Hold what this launch resolved and write it down, if it says anything new. */
-export function rememberSuggestedMapArt(mapName: string, url: string): void {
-  remembered = { mapName, url };
-  const text = JSON.stringify({ version: 1, ...remembered });
-  if (text === writtenArt) return;
-  writtenArt = text;
-  try {
-    localStorage.setItem(ART_STORAGE_KEY, text);
-  } catch {
-    // No storage (a test's node environment, or a webview with it switched off).
-    // Everything above still works, this launch simply teaches the next one
-    // nothing.
-  }
-}
-
-/**
- * Forget a picture that would not load.
- *
- * A remembered URL names a file in a cache something else is free to evict, and
- * an evicted file is indistinguishable from a working one until the card tries
- * to paint it. Dropping it here rather than only in the card is what lets the
- * card fall through to the catalog's thumbnail instead of to its bare map glyph.
- */
-export function forgetSuggestedMapArt(url: string): void {
-  if (remembered?.url !== url) return;
-  remembered = null;
-  writtenArt = undefined;
-  try {
-    localStorage.removeItem(ART_STORAGE_KEY);
-  } catch {
-    // As above.
-  }
-}
-
-/**
- * Read a snapshot back.
- *
- * Anything it does not recognise is nothing at all. The cost of answering
- * nothing is one launch of the behaviour every launch had before this existed.
- */
-export function decodeSuggestedMapArt(
-  text: string | null,
-): RememberedMapArt | null {
-  if (!text) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== "object" || parsed === null) return null;
-  const { version, mapName, url } = parsed as Record<string, unknown>;
-  if (version !== 1) return null;
-  if (typeof mapName !== "string" || typeof url !== "string") return null;
-  if (!mapName || !url) return null;
-  return { mapName, url };
-}
-
-/** The stored snapshot, or nothing where there is no storage to read. */
-function readRememberedArt(): RememberedMapArt | null {
-  try {
-    const text = localStorage.getItem(ART_STORAGE_KEY);
-    writtenArt = text ?? undefined;
-    return decodeSuggestedMapArt(text);
-  } catch {
-    return null;
-  }
-}
-
-// Read while the module loads, which is before anything renders. Synchronous on
-// purpose: this is the value first paint needs, and a promise would arrive after
-// exactly the paint it exists to fill.
-remembered = readRememberedArt();
 
 /**
  * Whether the user already has this map, whether a download is under way, and
  * how to start one.
  *
- * The two inventories are the ones every other install check in the app uses, so
- * a map fetched from the maps page or a pack shows as installed here without
- * being told about it. `useDownloadComplete` re-reads the on-disk listing when
- * the queue finishes anything, which is what flips the card the moment its own
- * download lands.
+ * The inventory arrives with the page's answer rather than being read again
+ * here, because the pick and this badge are two statements about the same two
+ * listings and two readings of them could disagree. It re-reads itself whenever
+ * the download queue finishes anything, which is what turns this card's own
+ * Install button into "Installed" the moment its download lands.
  */
-export function useSuggestedMapInstall(map: SuggestedMap | null): {
+export function useSuggestedMapInstall(
+  map: SuggestedMap | null,
+  inventory: MapInventory,
+): {
   state: SuggestedState;
   /** The queue's message for a failed download, when there is one. */
   error: string | null;
@@ -815,50 +886,13 @@ export function useSuggestedMapInstall(map: SuggestedMap | null): {
 } {
   const writeRoot = useWriteRoot();
   const writePath = writeRoot.path;
-  const rootPaths = useContentRootPaths();
-  const { target } = usePreferredTarget();
-  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { enqueue, statusFor, items } = useDownloadQueue();
-  const [installed, setInstalled] = useState<Set<string>>(new Set());
-
-  const refreshInstalled = useCallback(async () => {
-    if (rootPaths.length === 0) return;
-    try {
-      const { maps } = await dlInstalledContent({ paths: rootPaths });
-      setInstalled(new Set(maps));
-    } catch {
-      // Leave the last listing in place. A failed read is not a report that the
-      // user has nothing, and treating it as one re-offers an installed map.
-    }
-  }, [rootPaths]);
-
-  useEffect(() => {
-    refreshInstalled();
-  }, [refreshInstalled]);
-  useDownloadComplete(refreshInstalled);
-
-  const scanned = useMemo(
-    () =>
-      new Set(
-        (scan.loading ? [] : (scan.data?.maps ?? [])).map((m) =>
-          m.name.toLowerCase(),
-        ),
-      ),
-    [scan.loading, scan.data],
-  );
 
   const input = map ? suggestedMapToInput(map, writePath) : null;
   const identity = input ? identityOf(input) : null;
   const queueStatus = identity ? statusFor(identity) : null;
   const state = map
-    ? suggestedMapState({
-        input,
-        filename: map.filename,
-        springName: springNameOf(map),
-        installed,
-        scanned,
-        queueStatus,
-      })
+    ? suggestedMapState({ input, map, inventory, queueStatus })
     : "unavailable";
   const error =
     items.find((i) => i.identity === identity && i.error)?.error ?? null;
