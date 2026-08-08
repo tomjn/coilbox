@@ -4,6 +4,7 @@ import {
   parseColor,
   proceduralCardArt,
   proceduralCardArtSvg,
+  schemeLightness,
 } from "./proceduralArt";
 
 /**
@@ -142,9 +143,9 @@ describe("proceduralCardArtSvg", () => {
     }
   });
 
-  it("draws one composition and mirrors its lightness, rather than two pictures", () => {
+  it("draws one composition in two ramps, rather than two pictures", () => {
     // What keeps the two schemes a family: same geometry, same hues, same
-    // saturations, and every lightness reflected about the middle of the ramp.
+    // saturations, and a lightness derived from the dark card's own value.
     for (const tool of TOOLS) {
       const dark = colours(proceduralCardArtSvg(tool, BLUE, DARK));
       const light = colours(proceduralCardArtSvg(tool, BLUE, LIGHT));
@@ -155,8 +156,17 @@ describe("proceduralCardArtSvg", () => {
       dark.forEach((colour, i) => {
         expect(light[i].h).toBe(colour.h);
         expect(light[i].s).toBe(colour.s);
-        expect(light[i].l).toBeCloseTo(100 - colour.l, 6);
       });
+    }
+  });
+
+  it("keeps the rings a visible mark on a light card, not a wash", () => {
+    // Issue #1064. The rings are the whole difference between the procedural
+    // field and a blank panel, and an exact mirror left them at 36 where they
+    // barely read. They are the last colour in the markup.
+    for (const tool of TOOLS) {
+      const rings = colours(proceduralCardArtSvg(tool, BLUE, LIGHT)).at(-1);
+      expect(rings?.l).toBeLessThan(30);
     }
   });
 
@@ -201,6 +211,52 @@ describe("proceduralCardArtSvg", () => {
     expect(proceduralCardArtSvg("warpath", soup, DARK)).toBe(
       proceduralCardArtSvg("warpath", soup, DARK),
     );
+  });
+});
+
+/**
+ * The light ramp, stated once. `bundledArt.ts` calls this too, so a change here
+ * fails as one number rather than as thirty drawings quietly drifting.
+ */
+describe("schemeLightness", () => {
+  it("leaves a dark card's value alone", () => {
+    for (const dark of [8, 17, 54, 70, 80]) {
+      expect(schemeLightness(DARK, dark)).toBe(dark);
+    }
+  });
+
+  it("mirrors the field exactly", () => {
+    // The field is what `cardShell.ts` guarantees the label's contrast against,
+    // so it stays the exact mirror it has always been. Every field lightness in
+    // either file sits at or below 22.
+    expect(schemeLightness(LIGHT, 8)).toBe(92);
+    expect(schemeLightness(LIGHT, 17)).toBe(83);
+    expect(schemeLightness(LIGHT, 22)).toBe(78);
+  });
+
+  it("pushes a mark past the mirror, the brighter the further", () => {
+    // Issue #1064. An exact mirror is correct arithmetic and the wrong
+    // perceptual result: the same lightness step is a far bigger fraction of a
+    // near-black field than of a near-white one, so a mark that glows on a dark
+    // card merely recedes when inverted onto a light one.
+    expect(schemeLightness(LIGHT, 54)).toBeCloseTo(38.27, 2);
+    expect(schemeLightness(LIGHT, 64)).toBeCloseTo(25.6, 2);
+    expect(schemeLightness(LIGHT, 70)).toBeCloseTo(18, 2);
+    expect(schemeLightness(LIGHT, 80)).toBeCloseTo(5.33, 2);
+  });
+
+  it("keeps the marks in the order the drawing put them in", () => {
+    // The push must not reshuffle which mark the eye lands on, or the light
+    // card would be a different picture rather than the same one.
+    const light = [30, 40, 50, 54, 58, 64, 70, 80, 90].map((dark) =>
+      schemeLightness(LIGHT, dark),
+    );
+    expect(light).toEqual([...light].sort((a, b) => b - a));
+  });
+
+  it("never runs off the end of the ramp", () => {
+    expect(schemeLightness(LIGHT, 100)).toBe(0);
+    expect(schemeLightness(LIGHT, 0)).toBe(100);
   });
 });
 
