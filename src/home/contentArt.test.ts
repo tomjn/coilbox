@@ -39,15 +39,24 @@ import {
   contentCardArt,
   contentOffers,
   contentPicks,
+  decodeRemembered,
+  encodeRemembered,
+  forgetContentArt,
   gamePick,
   PICK_PRIORITY,
   picksKey,
+  pruneRemembered,
   publishContentArt,
+  type RememberedArt,
+  rememberContentArt,
+  rememberedContentArt,
+  rememberedFrom,
   replayPick,
   resetContentArt,
   scenarioPick,
   skirmishPick,
   subscribeContentArt,
+  validateRememberedArt,
 } from "./contentArt";
 import { resetResolvedMinimaps, resolvePicks } from "./useContentCardArt";
 
@@ -740,6 +749,304 @@ describe("publishContentArt", () => {
     publishContentArt(new Map([["play.skirmish", "coilbox://x"]]));
     expect(contentArtVersion()).toBeGreaterThan(before);
     resetContentArt();
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * What the last launch painted.
+ * -------------------------------------------------------------------------- */
+
+const mapPick = (mapName: string): ContentPick => ({ kind: "map", mapName });
+
+function snapshot(
+  entries: [string, ContentPick, string][],
+): Map<string, RememberedArt> {
+  return new Map(entries.map(([tool, pick, url]) => [tool, { pick, url }]));
+}
+
+describe("pruneRemembered", () => {
+  const last = snapshot([
+    ["play.skirmish", mapPick("Valles Marineris 2.6.1"), "coilbox://a"],
+    ["content.maps", mapPick("Isthmus v3"), "coilbox://b"],
+  ]);
+
+  it("keeps a picture this launch has picked again", () => {
+    const kept = pruneRemembered(
+      last,
+      new Map([["play.skirmish", mapPick("Valles Marineris 2.6.1")]]),
+    );
+    expect(kept.get("play.skirmish")?.url).toBe("coilbox://a");
+  });
+
+  it("keeps a picture for a card this launch has no answer for yet", () => {
+    // The ordinary state of the first few hundred milliseconds, and the case the
+    // snapshot exists for. Dropping here would put the flash straight back.
+    expect(pruneRemembered(last, new Map()).size).toBe(2);
+  });
+
+  it("drops a picture the card has moved off", () => {
+    // The launch after you change your skirmish map. Showing the old one would
+    // be a wrong answer rather than a slow one.
+    const kept = pruneRemembered(
+      last,
+      new Map([["play.skirmish", mapPick("Somewhere Else v1")]]),
+    );
+    expect(kept.has("play.skirmish")).toBe(false);
+    expect(kept.has("content.maps")).toBe(true);
+  });
+
+  it("drops a picture another card has been given", () => {
+    // Priority is the declared list, so a warm start must not paint the map on
+    // the card a cold start would have taken it off.
+    const kept = pruneRemembered(
+      last,
+      new Map([["play.skirmish", mapPick("Isthmus v3")]]),
+    );
+    expect(kept.has("content.maps")).toBe(false);
+  });
+
+  it("drops a picture the suggested map has claimed", () => {
+    const kept = pruneRemembered(last, new Map(), [
+      mapPick("Valles Marineris 2.6.1"),
+    ]);
+    expect(kept.has("play.skirmish")).toBe(false);
+    expect(kept.has("content.maps")).toBe(true);
+  });
+
+  it("matches a claim whatever case each side was written in", () => {
+    // The claim is the catalog's spring name and the snapshot holds a unitsync
+    // scan name, exactly as `contentPicks` has to reconcile them.
+    const kept = pruneRemembered(last, new Map(), [
+      mapPick("VALLES MARINERIS 2.6.1"),
+    ]);
+    expect(kept.has("play.skirmish")).toBe(false);
+  });
+
+  it("keeps a game whose name matches a claimed map", () => {
+    const games = snapshot([
+      ["content.games", { kind: "game", gameName: "Twin" }, "coilbox://g"],
+    ]);
+    expect(pruneRemembered(games, new Map(), [mapPick("Twin")]).size).toBe(1);
+  });
+
+  it("never paints one picture on two cards, on any install", () => {
+    // The property the two drops above exist for, asserted against a real
+    // assignment rather than a hand-built collision, and at the moment it is
+    // hardest: the saved setup has loaded and the unitsync scan has not, so this
+    // launch has an answer for Singleplayer and none for Maps. The map the setup
+    // now names is the one the Maps card was showing last launch.
+    const stale = snapshot([
+      ["play.skirmish", mapPick("Isthmus v3"), "coilbox://old"],
+      ["content.maps", mapPick("Tabula-v6"), "coilbox://maps"],
+      ["content.games", { kind: "game", gameName: "MF" }, "coilbox://games"],
+    ]);
+    const fresh = contentPicks({
+      draft: { gameName: "MF", mapName: "Tabula-v6" },
+      replays: [],
+      campaigns: [],
+      progress: progressFile(),
+      scenarios: [],
+      ...noCollections,
+    });
+    expect(fresh.has("content.maps")).toBe(false);
+    const kept = pruneRemembered(stale, fresh);
+    const painted = new Map(fresh);
+    for (const [toolId, entry] of kept)
+      if (!painted.has(toolId)) painted.set(toolId, entry.pick);
+    const keys = [...painted.values()].map((p) =>
+      p.kind === "map" ? `m:${p.mapName}` : `g:${p.gameName}`,
+    );
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe("rememberedFrom", () => {
+  it("writes down what was resolved, with the pick that explains it", () => {
+    const next = rememberedFrom(
+      new Map([["play.skirmish", "coilbox://a"]]),
+      new Map([["play.skirmish", mapPick("Valles Marineris 2.6.1")]]),
+      new Map(),
+    );
+    expect(next.get("play.skirmish")).toEqual({
+      pick: mapPick("Valles Marineris 2.6.1"),
+      url: "coilbox://a",
+    });
+  });
+
+  it("leaves out a URL with no pick behind it", () => {
+    // Unverifiable next launch, so remembering it would be remembering exactly
+    // the thing this design rejected.
+    expect(
+      rememberedFrom(
+        new Map([["play.skirmish", "coilbox://a"]]),
+        new Map(),
+        new Map(),
+      ).size,
+    ).toBe(0);
+  });
+
+  it("carries an entry this publish said nothing about", () => {
+    // The stores settle at different times, so the first publish of a launch is
+    // often one card. Overwriting with it would cost the others their head start.
+    const next = rememberedFrom(
+      new Map([["play.skirmish", "coilbox://new"]]),
+      new Map([["play.skirmish", mapPick("A")]]),
+      snapshot([["content.maps", mapPick("B"), "coilbox://old"]]),
+    );
+    expect(next.get("content.maps")?.url).toBe("coilbox://old");
+  });
+
+  it("refuses to carry a picture this publish gave to another card", () => {
+    const next = rememberedFrom(
+      new Map([["play.skirmish", "coilbox://new"]]),
+      new Map([["play.skirmish", mapPick("B")]]),
+      snapshot([["content.maps", mapPick("B"), "coilbox://old"]]),
+    );
+    expect(next.has("content.maps")).toBe(false);
+  });
+});
+
+describe("the stored snapshot", () => {
+  it("round trips both kinds of pick", () => {
+    const entries = snapshot([
+      ["play.skirmish", mapPick("Valles Marineris 2.6.1"), "coilbox://a"],
+      ["content.games", { kind: "game", gameName: "MF v2.58" }, "coilbox://b"],
+    ]);
+    expect([...decodeRemembered(encodeRemembered(entries))]).toEqual([
+      ...entries,
+    ]);
+  });
+
+  it("reads nothing at all rather than half a page", () => {
+    // Half a snapshot is not a safer snapshot: the entries only avoid each
+    // other's pictures as a set.
+    for (const text of [
+      null,
+      "",
+      "{",
+      "[]",
+      '{"version":2,"entries":[]}',
+      '{"version":1}',
+      '{"version":1,"entries":[{"tool":"a","kind":"map","name":"M"}]}',
+      '{"version":1,"entries":[{"tool":"a","kind":"other","name":"M","url":"u"}]}',
+      '{"version":1,"entries":[{"tool":"","kind":"map","name":"M","url":"u"}]}',
+    ]) {
+      expect(decodeRemembered(text).size, String(text)).toBe(0);
+    }
+  });
+});
+
+describe("painting from the snapshot", () => {
+  beforeEach(() => {
+    resetContentArt();
+  });
+
+  const remembered = () =>
+    rememberContentArt(
+      snapshot([["play.skirmish", mapPick("A"), "coilbox://remembered"]]),
+    );
+
+  it("answers before this launch has resolved anything", () => {
+    remembered();
+    expect(resolveCardArt("play.skirmish", "#3b82f6")).toEqual({
+      kind: "art",
+      url: "coilbox://remembered",
+      source: "content",
+    });
+  });
+
+  it("yields to this launch's own answer", () => {
+    remembered();
+    publishContentArt(
+      new Map([["play.skirmish", "coilbox://fresh"]]),
+      new Map([["play.skirmish", mapPick("A")]]),
+    );
+    expect(
+      contentCardArt({
+        toolId: "play.skirmish",
+        themeColor: "#fff",
+        scheme: "dark",
+      }),
+    ).toBe("coilbox://fresh");
+  });
+
+  it("stops answering once this launch's picks contradict it", () => {
+    remembered();
+    validateRememberedArt(new Map([["play.skirmish", mapPick("B")]]));
+    expect(resolveCardArt("play.skirmish", "#3b82f6").source).not.toBe(
+      "content",
+    );
+  });
+
+  it("keeps answering while this launch's picks agree", () => {
+    remembered();
+    validateRememberedArt(new Map([["play.skirmish", mapPick("A")]]));
+    expect(resolveCardArt("play.skirmish", "#3b82f6").source).toBe("content");
+  });
+
+  it("falls through to an illustration when the picture will not load", () => {
+    // An evicted cache file. The icon-only card would be worse than the drawing
+    // the remembered picture displaced, so the step withdraws its answer and the
+    // chain carries on below it.
+    remembered();
+    forgetContentArt("coilbox://remembered");
+    const after = resolveCardArt("play.skirmish", "#3b82f6");
+    expect(after.source).not.toBe("content");
+    expect(after.kind).toBe("art");
+  });
+
+  it("withdraws a URL this launch resolved when it will not load either", () => {
+    publishContentArt(
+      new Map([["play.skirmish", "coilbox://fresh"]]),
+      new Map([["play.skirmish", mapPick("A")]]),
+    );
+    forgetContentArt("coilbox://fresh");
+    expect(resolveCardArt("play.skirmish", "#3b82f6").source).not.toBe(
+      "content",
+    );
+  });
+
+  it("leaves the other cards alone when one picture fails", () => {
+    rememberContentArt(
+      snapshot([
+        ["play.skirmish", mapPick("A"), "coilbox://one"],
+        ["content.maps", mapPick("B"), "coilbox://two"],
+      ]),
+    );
+    forgetContentArt("coilbox://one");
+    expect(rememberedContentArt().get("content.maps")?.url).toBe(
+      "coilbox://two",
+    );
+  });
+
+  it("wakes the subscribers when it drops a picture", () => {
+    // The card is already painted, so nothing re-renders it unless the store
+    // says so, and it would sit on the icon card for the rest of the session.
+    remembered();
+    const woken = vi.fn();
+    const unsubscribe = subscribeContentArt(woken);
+    forgetContentArt("coilbox://remembered");
+    expect(woken).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it("says nothing about a URL it never offered", () => {
+    remembered();
+    const before = contentArtVersion();
+    forgetContentArt("coilbox://somewhere-else");
+    expect(contentArtVersion()).toBe(before);
+    expect(rememberedContentArt().size).toBe(1);
+  });
+
+  it("keeps what the publish said, for the next launch to check", () => {
+    publishContentArt(
+      new Map([["play.skirmish", "coilbox://fresh"]]),
+      new Map([["play.skirmish", mapPick("A")]]),
+    );
+    expect(rememberedContentArt().get("play.skirmish")).toEqual({
+      pick: mapPick("A"),
+      url: "coilbox://fresh",
+    });
   });
 });
 
