@@ -1,7 +1,7 @@
 import { useFrame } from "@picoframe/frame";
 import { useMultiplayer } from "../../multiplayer/store";
 import { useResume } from "../continue";
-import { homeToolGroups } from "../nav";
+import { homeHasTools } from "../nav";
 
 /** The heading and the line under it. */
 export type GreetingCopy = { heading: string; tagline: string };
@@ -14,7 +14,11 @@ export type GreetingState = {
   username: string | null;
   /** Whether anything is waiting to be resumed. */
   hasResume: boolean;
-  /** Whether the tool grid has anything in it. */
+  /**
+   * Whether there is a tool to choose. External links do not count: they are a
+   * way out of Coilbox rather than something to do in it, so a page showing
+   * nothing but a links card still has no tools.
+   */
   hasTools: boolean;
 };
 
@@ -118,7 +122,7 @@ export default function Greeting(overrides: GreetingOverrides = {}) {
       title,
       username,
       hasResume,
-      hasTools: homeToolGroups(nav).length > 0,
+      hasTools: homeHasTools(nav),
     },
     overrides,
   );

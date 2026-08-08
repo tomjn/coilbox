@@ -1,12 +1,35 @@
 import type { NavGroup } from "@picoframe/plugin-sdk";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The zone reads the frame (title + nav) and the lobby connection. Vitest runs in
 // node with no DOM, and @picoframe/frame's published dist uses extensionless
 // relative imports the node resolver won't load, so both are stubbed and the
 // component is called as a function (same approach as layout.test.ts).
+//
+// `cn` and `Button` are stubbed too, because one case here renders the tool grid
+// off the same nav the greeting read, to check the two zones agree about a page
+// with links and no tools. Same stubs as linkCard.test.ts, and `cn` is the real
+// tailwind-merge for the same reason.
 const frame = vi.fn<() => { title: string; nav: NavGroup[] }>();
-vi.mock("@picoframe/frame", () => ({ useFrame: () => frame() }));
+vi.mock("@picoframe/frame", async () => {
+  const { clsx } = await import("clsx");
+  const { twMerge } = await import("tailwind-merge");
+  return {
+    useFrame: () => frame(),
+    cn: (...parts: unknown[]) => twMerge(clsx(parts)),
+    Button: ({
+      children,
+      ...props
+    }: { children?: unknown } & Record<string, unknown>) =>
+      createElement("button", { type: "button", ...props }, children as never),
+  };
+});
+
+// The links card opens its chips through the OS opener, which is not there in node.
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
 type Lobby = {
   activeKey: string | null;
@@ -25,6 +48,7 @@ import Greeting, {
   type GreetingOverrides,
   greetingCopy,
 } from "./zones/Greeting";
+import ToolCards from "./zones/ToolCards";
 
 const TOOLS: NavGroup[] = [
   { id: "play", items: [{ id: "skirmish", label: "Skirmish", to: "/play" }] },
@@ -33,6 +57,21 @@ const TOOLS: NavGroup[] = [
 /** Nav with nothing on it but Home, which the grid never lists. */
 const HOME_ONLY: NavGroup[] = [
   { id: "main", items: [{ id: "home", label: "Home", to: "/" }] },
+];
+
+/**
+ * A distribution narrowed down to nothing but its `profile.links`: a non-empty
+ * nav group carrying no route into the app.
+ */
+const LINKS_ONLY: NavGroup[] = [
+  {
+    id: "profile-links",
+    label: "Community",
+    items: [
+      { id: "profile-link-0", label: "Discord", href: "https://discord.gg/x" },
+      { id: "profile-link-1", label: "Forum", href: "https://forum.example" },
+    ],
+  },
 ];
 
 /** Logged out: no connection, nobody to greet. */
@@ -201,6 +240,39 @@ describe("Greeting zone", () => {
     expect(render().tagline).toBe("No tools available yet.");
   });
 
+  it("says there are no tools when the nav is external links and nothing else", () => {
+    // The group is not empty, so counting groups said there were tools and the
+    // page went out with a heading, a strip of links and no sentence about
+    // either (#1057). A link is a way out of Coilbox, not something to do in it.
+    frame.mockReturnValue({ title: "Coilbox", nav: LINKS_ONLY });
+    expect(render().tagline).toBe("No tools available yet.");
+  });
+
+  it("still sends you to the tools when a group mixes tools and links", () => {
+    // The reference links the Animation, Mapconv and Lego plugins declare sit in
+    // the same group as the tools they are references for. One tool in the group
+    // is enough: there is something to choose.
+    frame.mockReturnValue({
+      title: "Coilbox",
+      nav: [
+        {
+          id: "animation",
+          label: "Animation",
+          items: [
+            { id: "animation.cob", label: "COB tools", to: "/animation/cob" },
+            {
+              id: "animation.skeletor-s3o",
+              label: "Skeletor S3O",
+              href: "https://github.com/Beherith/Skeletor_S3O",
+              sidebar: false,
+            },
+          ],
+        },
+      ],
+    });
+    expect(render().tagline).toBe("Choose a tool to get started.");
+  });
+
   it("offers to resume when the collector found something", () => {
     resume.mockReturnValue({
       candidates: [{ id: "warpath:run-1" }],
@@ -225,6 +297,20 @@ describe("Greeting zone", () => {
     // from disk, so an empty list is what the greeting sees until they answer.
     lobby.mockReturnValue(online("Zephyr"));
     expect(render().tagline).toBe("Choose a tool to get started.");
+  });
+
+  it("does not take the links off the page to say it", () => {
+    // Both zones off the one nav: only the sentence changes. The links are the
+    // only thing a distribution narrowed this far has left, and the fix would be
+    // a worse bug if the page lost them.
+    frame.mockReturnValue({ title: "Coilbox", nav: LINKS_ONLY });
+    expect(render().tagline).toBe("No tools available yet.");
+    const grid = renderToStaticMarkup(
+      createElement(MemoryRouter, null, createElement(ToolCards)),
+    );
+    expect(grid).toContain("data-link-card");
+    expect(grid).toContain("Discord");
+    expect(grid).toContain("Forum");
   });
 
   it("says what the zone entry told it to", () => {
