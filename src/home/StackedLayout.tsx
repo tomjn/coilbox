@@ -114,22 +114,33 @@ const RESUME_ROW =
   "mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap";
 
 /**
- * What the row tells the hero about its width: fill whatever the rail leaves,
- * but take a line of its own rather than shrink below 32rem.
+ * What the layout tells the hero about its width: as wide as its contents, and
+ * never wider than 42rem.
  *
- * The width is the layout's decision, not the zone's, which is why it arrives as
- * a class instead of living in `Continue`. 32rem is where the hero stops looking
- * like one: below it the action wraps under the title and the card is a tall
- * column beside a row of small ones.
+ * It used to fill whatever the rail left, and that is what left the action a long
+ * way from the text it belongs to (#1059). How far depended on how many rail
+ * cards there happened to be, which is a thing the hero cannot see and should not
+ * have to. A card sized to its contents has no spare room to spread, so the
+ * question stops being asked.
  *
- * Only from `sm`, where {@link RESUME_ROW} is a row at all. Below that the main
- * axis is vertical and a basis would be a height.
+ * No flex utility at all, because `flex: 0 1 auto` is already the answer: size to
+ * the content, do not grow into the rest of the line, and shrink only when the
+ * hero alone is wider than the line it is on. It is the same nothing the rail is
+ * handed, and for the same reason.
  *
- * The rail is handed nothing, deliberately. A flex item's default is to size to
- * its content and not grow, which is already the rail: as wide as the cards it
- * has, and free to wrap them when the line it lands on is narrower than that.
+ * 42rem is a title's limit, not a card's. Past it a run's name is a paragraph, and
+ * the row would rather wrap the title than push the rail onto a second line: a
+ * hero at the cap still leaves a two-card rail beside it on a 1256px page. The cap
+ * is only from `sm`, since below that {@link RESUME_ROW} is a column and the card
+ * is narrower than 42rem anyway.
+ *
+ * `min-w-0` so a long title shrinks and wraps rather than pushing the row wider
+ * than the page.
+ *
+ * Used for a lone hero too, not just the row. A profile that separated the zones
+ * asked for them apart, not for a card the width of the window.
  */
-const RESUME_HERO = "min-w-0 sm:flex-[1_1_32rem]";
+const HERO_WIDTH = "min-w-0 sm:max-w-2xl";
 
 /**
  * The page's entries, with two pairs of zones composed into one.
@@ -163,7 +174,7 @@ function renderEntries(entries: readonly HomeEntry[]): ReactNode[] {
     if (bare(entry, "continue") && next && bare(next, "resume")) {
       out.push(
         <div key={i} className={RESUME_ROW}>
-          <Continue className={RESUME_HERO} />
+          <Continue className={HERO_WIDTH} />
           <ResumeRail />
         </div>,
       );
@@ -248,7 +259,7 @@ function zoneNode(entry: Extract<HomeEntry, { kind: "zone" }>): ReactNode {
         />
       );
     case "continue":
-      return <Continue />;
+      return <Continue className={HERO_WIDTH} />;
     case "resume":
       return <ResumeRail />;
     case "cards":
