@@ -121,7 +121,9 @@ pub struct ReplayFile {
     pub game_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration_sec: Option<u32>,
-    /// Non-spectator player count.
+    /// How many seats the match had: non-spectator players plus skirmish AIs. A
+    /// bot occupies a team and a slot in the ally structure, so leaving it out
+    /// reported a 1v3 skirmish as a one-player game.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub player_count: Option<u32>,
     /// Battle start (epoch-millis) from the demo header — more accurate than mtime.
@@ -189,6 +191,40 @@ pub struct PlayerInfo {
     pub country_code: Option<String>,
 }
 
+/// One skirmish AI from a demo's start-script `[aiN]` section, with the
+/// side/ally-team/colour resolved from the team it controls. That is the same
+/// resolution `PlayerInfo` gets, so a roster or a chart series can treat an AI
+/// seat like any other.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AiInfo {
+    /// The display name the host gave this bot, e.g. `AI 1`.
+    pub name: String,
+    /// The AI's identifier, e.g. `SurvivalAI` or `BARb`. This is what names the
+    /// opponent, since `name` is often just a slot number.
+    pub short_name: String,
+    /// The AI's version, e.g. `<game>` for a game-supplied Lua AI.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub team: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ally_team: Option<i32>,
+    /// The player number whose machine ran the AI (`host` in the script).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host: Option<i32>,
+    /// Faction (the team's `side`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub side: Option<String>,
+    /// Normalized team colour `[r, g, b]` (0..1), when present.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rgb_color: Option<[f32; 3]>,
+    /// True/false when the winner is known, and `None` when it couldn't be
+    /// determined.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub won: Option<bool>,
+}
+
 /// A start box (`startrect`), normalized 0..1 over the map (origin top-left).
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -240,6 +276,10 @@ pub struct DemoInfo {
     pub num_ally_teams: u32,
     pub ally_teams: Vec<AllyTeamInfo>,
     pub players: Vec<PlayerInfo>,
+    /// The skirmish AIs the script seated. Separate from `players` because a bot
+    /// is not a person: it has no dossier, no skill and no country, and its name
+    /// (`AI 1`) is a slot label that repeats across unrelated matches.
+    pub ais: Vec<AiInfo>,
     /// The `[modoptions]` section verbatim (key -> value), for surfaces that want
     /// to reproduce the battle's options (e.g. refight-as-skirmish, #368). Empty
     /// when the script carried no `[modoptions]` section.

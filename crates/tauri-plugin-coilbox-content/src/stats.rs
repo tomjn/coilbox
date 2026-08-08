@@ -25,7 +25,9 @@ use crate::model::DemoInfo;
 
 /// The current stats-store schema. Bumped when the record shape changes in a way a
 /// stale store couldn't be read as (today: a straight re-ingest rebuilds it).
-pub const STATS_SCHEMA_VERSION: u32 = 1;
+/// 2: records carry the match's skirmish AIs (`ais`), which the start-script
+/// parser did not read before.
+pub const STATS_SCHEMA_VERSION: u32 = 2;
 
 /// One player (or spectator) as recorded in a game, flattened from the demo's
 /// start-script. `side` is the faction; `won` is set only for a decided game where
@@ -43,6 +45,24 @@ pub struct StatPlayer {
     pub won: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skill: Option<String>,
+}
+
+/// One skirmish AI as recorded in a game. `shortName` is the AI's identity (the
+/// `name` is usually just a slot label like `AI 1`), and `won` follows the same
+/// rule as a player's.
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StatAi {
+    pub name: String,
+    pub short_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ally_team: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub side: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub won: Option<bool>,
 }
 
 /// One ingested game: the denormalized row every stats view reads. `filename` is the
@@ -70,6 +90,11 @@ pub struct StatRecord {
     pub winning_ally_teams: Vec<u32>,
     pub remixed: bool,
     pub players: Vec<StatPlayer>,
+    /// The skirmish AIs the match was played against. Kept out of `players` so a
+    /// bot never becomes a name in the player list, but present so a view can
+    /// count opponents (and so #543's "beat distinct AIs" has something to read).
+    #[serde(default)]
+    pub ais: Vec<StatAi>,
     /// When this record was written (epoch-ms).
     pub ingested_at: u64,
 }
@@ -140,6 +165,18 @@ fn record_from(entry: &DemoFileEntry, info: DemoInfo) -> StatRecord {
             skill: p.skill,
         })
         .collect();
+    let ais = info
+        .ais
+        .into_iter()
+        .map(|a| StatAi {
+            name: a.name,
+            short_name: a.short_name,
+            version: a.version,
+            ally_team: a.ally_team,
+            side: a.side,
+            won: a.won,
+        })
+        .collect();
     StatRecord {
         filename: entry.filename.clone(),
         path: entry.path.to_string_lossy().into_owned(),
@@ -155,6 +192,7 @@ fn record_from(entry: &DemoFileEntry, info: DemoInfo) -> StatRecord {
         winning_ally_teams: info.winning_ally_teams,
         remixed: info.remixed,
         players,
+        ais,
         ingested_at: now_ms(),
     }
 }
@@ -249,6 +287,7 @@ mod tests {
             num_ally_teams: 2,
             ally_teams: Vec::new(),
             players,
+            ais: Vec::new(),
             remixed: false,
             source_gametype: None,
             origin_filename: None,
@@ -300,6 +339,42 @@ mod tests {
     }
 
     #[test]
+    fn record_from_carries_the_ais_the_match_was_played_against() {
+        let mut info = demo_info("Comet", true, vec![player("Alice", 0, Some(true))]);
+        info.ais = vec![crate::model::AiInfo {
+            name: "AI 1".into(),
+            short_name: "BARb".into(),
+            version: Some("stable".into()),
+            team: Some(1),
+            ally_team: Some(1),
+            host: Some(0),
+            side: Some("Cortex".into()),
+            rgb_color: None,
+            won: Some(false),
+        }];
+        let rec = record_from(&entry("a.sdfz", 10, 20), info);
+        // A bot is an opponent, not a name in the player list.
+        assert_eq!(rec.players.len(), 1);
+        assert_eq!(rec.ais.len(), 1);
+        assert_eq!(rec.ais[0].short_name, "BARb");
+        assert_eq!(rec.ais[0].version.as_deref(), Some("stable"));
+        assert_eq!(rec.ais[0].side.as_deref(), Some("Cortex"));
+        assert_eq!(rec.ais[0].won, Some(false));
+    }
+
+    /// A store written before AIs were recorded has no `ais` key at all. It must
+    /// still load, so the ingest that refills it can run.
+    #[test]
+    fn a_record_written_without_ais_still_loads() {
+        let json = r#"{"schemaVersion":1,"records":[{"filename":"a.sdfz","path":"/demos/a.sdfz",
+            "mapName":"M","gameType":"G","engineVersion":"105","durationSec":1,"startTimeMs":2,
+            "sizeBytes":3,"modifiedMs":4,"winnersKnown":false,"winningAllyTeams":[],
+            "remixed":false,"players":[],"ingestedAt":5}]}"#;
+        let store: StatsStore = serde_json::from_str(json).unwrap();
+        assert!(store.records[0].ais.is_empty());
+    }
+
+    #[test]
     fn unchanged_matches_signature() {
         let rec = record_from(&entry("a.sdfz", 10, 20), demo_info("M", true, vec![]));
         assert!(unchanged(&rec, &entry("a.sdfz", 10, 20)));
@@ -346,8 +421,10 @@ mod tests {
     const TEST_OFF_SCRIPT_SIZE: usize = 304;
     const TEST_OFF_GAME_TIME: usize = 312;
     const TEST_OFF_WALLCLOCK: usize = 316;
-    const TEST_SCRIPT: &str =
-        "[game]\n{\nmapname=TestMap;\ngametype=TestGame;\n[player0]\n{\nname=Alice;\nspectator=0;\n}\n}\n";
+    const TEST_SCRIPT: &str = "[game]\n{\nmapname=TestMap;\ngametype=TestGame;\n\
+        [player0]\n{\nname=Alice;\nteam=0;\nspectator=0;\n}\n\
+        [ai0]\n{\nname=AI 1;\nshortname=BARb;\nversion=stable;\nteam=1;\nhost=0;\n}\n\
+        [team0]\n{\nallyteam=0;\n}\n[team1]\n{\nallyteam=1;\n}\n}\n";
 
     fn build_test_demo(script: &str) -> Vec<u8> {
         let mut h = vec![0u8; 352];
@@ -414,6 +491,11 @@ mod tests {
         assert_eq!(summary.skipped, 0);
         assert_eq!(store.records[0].map_name, "TestMap");
         assert_eq!(store.records[0].players.len(), 1);
+        // The field the version bump exists for: a record written before AI
+        // sections were parsed gains its opponents on the forced re-decode.
+        assert_eq!(store.records[0].ais.len(), 1);
+        assert_eq!(store.records[0].ais[0].short_name, "BARb");
+        assert_eq!(store.records[0].ais[0].ally_team, Some(1));
         assert_eq!(store.schema_version, STATS_SCHEMA_VERSION);
 
         let _ = std::fs::remove_dir_all(&dir);
