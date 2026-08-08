@@ -1,7 +1,9 @@
 import { getProfile } from "../profile/profile";
+import { publishArtOverrides } from "./artOverride";
 import BrandedHome from "./BrandedHome";
 import { resolveHome } from "./config";
 import { homeMode, resolveLayout } from "./layout";
+import { resolveCardArtOverrides } from "./profileArt";
 import { useContentCardArt } from "./useContentCardArt";
 
 /**
@@ -39,10 +41,17 @@ export default function CoilboxHome() {
  * {@link CoilboxHome} because the branded arm returns before it and a hook
  * cannot be called conditionally. Nothing is rendered for it. The art reaches
  * the cards through the chain in {@link ./art}, not through a prop.
+ *
+ * The distribution's own per-tool art is published the same way and from the
+ * same place, because it is the same kind of decision: art belongs to the page
+ * rather than to a zone, so that the cards settle their pictures against each
+ * other. It is published first so the content picks can see it (see
+ * {@link ./artOverride}).
  */
 function LayoutHome() {
-  useContentCardArt();
   const { layout, background, entries } = resolveHome(getProfile().home);
+  publishArtOverrides(resolveCardArtOverrides(entries));
+  useContentCardArt();
   const Layout = resolveLayout(layout);
   return <Layout entries={entries} background={background} />;
 }

@@ -528,6 +528,39 @@ describe("contentPicks", () => {
     expect(picks.has("play.skirmish")).toBe(true);
   });
 
+  it("gives the shared map to the next card when the first is overridden", () => {
+    // Issue #1000. A distribution that supplies its own Singleplayer picture has
+    // taken that card out of the running, so the map it would have claimed goes
+    // to the strongest card left rather than being held by a card that will
+    // never paint it.
+    const picks = contentPicks({
+      ...populated,
+      campaigns: [{ campaign: sharedCampaign }],
+      overridden: new Set(["play.skirmish"]),
+    });
+    expect(picks.has("play.skirmish")).toBe(false);
+    expect(picks.get("play.replays")).toEqual({ kind: "map", mapName: SHARED });
+  });
+
+  it("takes an overridden card out whether it was given an image or false", () => {
+    // `art: false` is the icon-only card, which shows no picture at all, so it
+    // yields its offer for exactly the same reason an image does.
+    const offers = contentOffers({
+      ...populated,
+      overridden: new Set(["play.skirmish", "content.maps"]),
+    });
+    expect(offers.has("play.skirmish")).toBe(false);
+    expect(offers.has("content.maps")).toBe(false);
+    expect(offers.has("play.replays")).toBe(true);
+  });
+
+  it("leaves every card in the running when nothing is overridden", () => {
+    // The vanilla install, which is every install today.
+    expect([...contentPicks({ ...populated, overridden: new Set() })]).toEqual([
+      ...contentPicks(populated),
+    ]);
+  });
+
   it("offers nothing for a tool the priority list does not rank", () => {
     // `assignPicks` walks the priority list, so a tool offering content without
     // a rank would be dropped without a word.

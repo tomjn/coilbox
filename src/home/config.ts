@@ -12,13 +12,13 @@
  * `resolveHome` is pure: it takes the raw value and reads nothing else, so the
  * whole contract is unit-testable without a profile, a layout or a DOM.
  *
- * ## What this build does not use yet
+ * ## What this module does not decide
  *
- * Each entry is carried through verbatim in {@link HomeEntry.entry}. Keys this
- * build has no use for are neither validated nor stripped, deliberately, so the
- * issues that add them are additions rather than rewrites:
- *
- * - The per-tool `art` map on the cards zone is issue #1000.
+ * Each entry is carried through verbatim in {@link HomeEntry.entry}, and a key
+ * whose meaning belongs to another module is left raw for it rather than
+ * half-checked here. `background` is `./background`'s, and the cards zone's
+ * per-tool `art` map is `./profileArt`'s. Both fall back visibly on a bad value
+ * the same way this module does.
  */
 
 /** A profile's `home` key. Every field is optional, and an absent key is the default. */
@@ -59,9 +59,12 @@ export interface HomeZoneConfig {
   title?: string;
   /** Greeting only: the line under the heading. */
   tagline?: string;
-  /** Cards only: tool id to a file reference, or `false` for icon only. Issue #1000. */
+  /**
+   * Cards only: tool id to a file reference, or `false` for the icon-only card.
+   * See `./profileArt`, which owns what a value here resolves to.
+   */
   art?: Record<string, string | false>;
-  /** Anything else an author wrote, kept for the issues above. */
+  /** Anything else an author wrote, kept verbatim for its own reader. */
   [key: string]: unknown;
 }
 
