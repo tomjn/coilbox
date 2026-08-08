@@ -553,6 +553,8 @@ Curated **map packs** offered for bulk download on the Maps download page — a 
 
 Each map's `download` is `{ "kind": "map", "springName", "searchUrl"? }` (fetched by springname via pr-downloader) or `{ "kind": "url", "url", "filename", "subdir"? }` (a direct mirror file); `filename` enables "already downloaded" detection. This is the same shape and mechanism the branding catalog's `suggested.mapLists` uses — see [Branding catalog](../README.md#branding-catalog); catalog packs are listed first, then a profile's, deduped by `id`.
 
+A map may also carry `blurb`, a line of description, and `thumb`, an array of image URLs of which the first that loads wins. Neither is needed for the pack itself, which shows no pictures. Both are what the home page's suggested map card shows on the day it picks that map, so a pack map without them is a card with a stock line and no art.
+
 ### `excludedMaps` (object[])
 
 Keeps maps out of warpath and galactic conquest, the two modes that pick maps on the player's behalf. Adds to the branding catalog's own list rather than replacing it, so a distribution can exclude more maps than the catalog does and never fewer.

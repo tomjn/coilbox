@@ -156,11 +156,11 @@ export type FeaturedSource = "battle" | "curated";
  * The curated map most people are on right now, or null.
  *
  * Deliberately restricted to the pool. The pool is the set of maps this card can
- * honestly offer: each has a verified spring name, a thumbnail, a blurb and a
- * download that works. Synthesising an entry for any map a battle happens to name
- * would drop the card to a bare name over a glyph for a map that may not be
- * downloadable anywhere, which is a worse home page than the rotation. So a
- * battle on an uncurated map is no answer, and the rotation stands.
+ * honestly offer: each has a verified spring name and a download that works, and
+ * the catalog carries a picture of it. Synthesising an entry for any map a battle
+ * happens to name would drop the card to a bare name over a glyph for a map that
+ * may not be downloadable anywhere, which is a worse home page than the rotation.
+ * So a battle on an uncurated map is no answer, and the rotation stands.
  *
  * That makes this a re-ordering of the curated rotation rather than a new source
  * of maps, which is what "prefer a map an open battle is using *over the curated
@@ -341,8 +341,14 @@ export function useFeaturedMap(): {
  * 2. Not installed: the catalog's `thumb`, through the same Rust image proxy and
  *    disk cache the download browsers use. Fetched once, then offline too.
  *
- * Neither is available on a cold offline first run for a map the player does not
- * have. The card then renders without art, which the component handles by
+ * `thumb` is optional on a curated map, and the map packs were written without
+ * one because a pack row shows no picture. The pool takes the packs' maps too, so
+ * for most of the rotation there was nothing for this to resolve and the card came
+ * up blank (issue #1037). The catalog now carries a picture for every map in the
+ * pool, so a map added to a pack without one is a card with no art on its day.
+ *
+ * Neither source is available on a cold offline first run for a map the player
+ * does not have. The card then renders without art, which the component handles by
  * dropping to its plain surface rather than by reaching for a third source.
  *
  * Both hooks run on every render, as hooks must. The minimap one is handed a map
