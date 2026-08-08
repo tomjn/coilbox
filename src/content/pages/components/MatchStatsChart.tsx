@@ -21,8 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { DemoInfo, DemoTrailer, Metric } from "../../bindings";
 import {
+  type ChartMode,
   type ChartRow,
   type ChartSeries,
   chartRows,
@@ -32,7 +34,9 @@ import {
   endPoints,
   formatChartValue,
   formatDuration,
+  formatRate,
   metricGroups,
+  perMinuteRows,
   secondsPerFrame,
   spreadLabels,
   teamSeries,
@@ -40,8 +44,9 @@ import {
 } from "../../matchStats";
 
 /**
- * The match's chart: one line per team over match time, and a control that picks
- * which of the registry's metrics it draws.
+ * The match's chart: one line per team over match time, a control that picks
+ * which of the registry's metrics it draws, and one that picks whether it draws
+ * the running totals the file recorded or the rate they were rising at.
  *
  * Everything the chart derives is in `matchStats.ts`, because vitest runs in node
  * and can't render a component. This file is the recharts wiring and nothing else.
@@ -102,6 +107,40 @@ function MetricPicker({
 }
 
 /**
+ * Cumulative or per minute. A pair of buttons rather than a second dropdown,
+ * because it is a choice between two views of the match and not a setting: both
+ * options stay on screen, and which one is showing is the button that is lit.
+ */
+function ModePicker({
+  value,
+  onChange,
+}: {
+  value: ChartMode;
+  onChange: (mode: ChartMode) => void;
+}) {
+  const item =
+    "rounded-md border border-border/60 px-3 py-1 text-xs data-[state=on]:border-primary data-[state=on]:bg-primary/10";
+  return (
+    <ToggleGroup
+      type="single"
+      value={value}
+      // Radix clears the value when the lit button is pressed again, and there
+      // is no third view to fall back to, so an empty change is ignored.
+      onValueChange={(v) => v && onChange(v as ChartMode)}
+      className="gap-2"
+      aria-label="Charted values"
+    >
+      <ToggleGroupItem value="cumulative" className={item}>
+        Cumulative
+      </ToggleGroupItem>
+      <ToggleGroupItem value="perMinute" className={item}>
+        Per minute
+      </ToggleGroupItem>
+    </ToggleGroup>
+  );
+}
+
+/**
  * Every series at the sample under the crosshair, biggest first. recharts clones
  * this element with `active` and `payload`, and one payload entry carries the
  * whole row, so the sorting and the cap happen once over the row rather than
@@ -109,10 +148,12 @@ function MetricPicker({
  */
 function SeriesTooltip({
   series,
+  format,
   active,
   payload,
 }: {
   series: ChartSeries[];
+  format: (value: number) => string;
   active?: boolean;
   payload?: { payload?: ChartRow }[];
 }) {
@@ -132,9 +173,7 @@ function SeriesTooltip({
               aria-hidden
             />
             <span className="min-w-0 flex-1 truncate">{r.label}</span>
-            <span className="shrink-0 tabular-nums">
-              {formatChartValue(r.value)}
-            </span>
+            <span className="shrink-0 tabular-nums">{format(r.value)}</span>
           </li>
         ))}
       </ul>
@@ -214,14 +253,16 @@ export function MatchStatsChart({
 }) {
   const opening = defaultMetric(metrics);
   const [key, setKey] = useState(opening?.key ?? "");
+  const [mode, setMode] = useState<ChartMode>("cumulative");
   const metric = metrics.find((m) => m.key === key) ?? opening;
 
   const series = useMemo(() => teamSeries(trailer, info), [trailer, info]);
-  const rows = useMemo(
-    () =>
-      metric ? chartRows(series, metric.key, secondsPerFrame(trailer)) : [],
-    [series, metric, trailer],
-  );
+  const rows = useMemo(() => {
+    if (!metric) return [];
+    const totals = chartRows(series, metric.key, secondsPerFrame(trailer));
+    return mode === "perMinute" ? perMinuteRows(totals) : totals;
+  }, [series, metric, trailer, mode]);
+  const formatValue = mode === "perMinute" ? formatRate : formatChartValue;
 
   if (!metric || series.length === 0 || rows.length === 0) return null;
 
@@ -231,13 +272,13 @@ export function MatchStatsChart({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
-      {/* The control row. #1137 (cumulative or per minute), #1138 (players or
-       * sides) and #1140 (the value table's own controls) land beside the
-       * picker: the chart's inputs are all state in this component, and the two
-       * that change what is plotted are arguments to `teamSeries` and
-       * `chartRows` rather than anything the chart itself has to know. */}
+      {/* The control row. #1138 (players or sides) and #1140 (the value table's
+       * own controls) land beside these: the chart's inputs are all state in
+       * this component, and what they change is which pure function runs over
+       * the trailer rather than anything the chart itself has to know. */}
       <div className="flex flex-wrap items-center gap-2">
         <MetricPicker metrics={metrics} value={metric.key} onChange={setKey} />
+        <ModePicker value={mode} onChange={setMode} />
       </div>
 
       <ResponsiveContainer width="100%" height={280}>
@@ -272,14 +313,14 @@ export function MatchStatsChart({
            * a lie about the first ten minutes. */}
           <YAxis
             domain={[0, "auto"]}
-            tickFormatter={formatChartValue}
+            tickFormatter={formatValue}
             tick={axisTick}
             tickLine={false}
             axisLine={false}
             width={52}
           />
           <Tooltip
-            content={<SeriesTooltip series={series} />}
+            content={<SeriesTooltip series={series} format={formatValue} />}
             cursor={{ stroke: "currentColor", strokeOpacity: 0.35 }}
             isAnimationActive={false}
           />
