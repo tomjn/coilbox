@@ -126,8 +126,15 @@ export async function resolvePicks(
  * Every store read here is one another home zone already mounts, or one cheap
  * listing, so the added cost of the home page knowing what you played is the
  * minimap renders themselves, and those are cached on disk across launches.
+ *
+ * `claimed` is whatever the page is already showing outside the tool cards,
+ * which today is the suggested map's card. It arrives as a parameter rather than
+ * being read here, because resolving it reaches the branding catalog and the
+ * lobby mirror and this file is already the one thing between the pure chain and
+ * a Tauri bridge. `CoilboxHome` resolves it, in the same render that publishes
+ * the distribution's overrides and for the same reason.
  */
-export function useContentCardArt(): void {
+export function useContentCardArt(claimed: readonly ContentPick[] = []): void {
   useSyncExternalStore(
     subscribeContentArt,
     contentArtVersion,
@@ -164,6 +171,7 @@ export function useContentCardArt(): void {
     // distribution has already given art does not claim a map on its way to
     // never showing it.
     overridden: overriddenTools(),
+    claimed,
   });
 
   // The picks are rebuilt on every render, so the effect depends on their value

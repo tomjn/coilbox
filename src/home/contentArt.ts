@@ -74,6 +74,11 @@
  * page showing one picture four times, and no card can see that from inside
  * itself.
  *
+ * The suggested map's card is on that page too, and is not a tool. It reaches
+ * the catalog and the lobby mirror, neither of which may be imported here, so it
+ * arrives already decided, as `claimed`: one more picture that is spoken for. See
+ * {@link ContentPickSources.claimed}.
+ *
  * ## Where the picks come from, and where they deliberately differ
  *
  * The campaign and skirmish picks answer a different question from
@@ -158,6 +163,21 @@ export interface ContentPickSources {
    * picture it would have claimed falls to the next card that wants it.
    */
   overridden?: ReadonlySet<string>;
+  /**
+   * Content a card outside this set is already showing (issue #1055).
+   *
+   * The suggested map's card is the one on the page that is not a tool, so it
+   * has no tool id, takes no part in {@link PICK_PRIORITY}, and has no second
+   * map to fall back on: it is about one named map and nothing else. It is also
+   * the card most likely to collide, because a curated map is one an install is
+   * likely to have. So it takes its map before the priority list is walked, and
+   * every card in the list settles around it.
+   *
+   * Pre-taken rather than first in the priority list, which is the same
+   * exclusion PR #1072 made from the other direction: `overridden` is a card
+   * that cannot use a picture, this is a picture no card may use.
+   */
+  claimed?: readonly ContentPick[];
 }
 
 /** The map your saved Singleplayer setup is pointed at. */
@@ -304,9 +324,19 @@ export function contentOffers(
   return offers;
 }
 
-/** A piece of content, as one string. Maps and games are separate namespaces. */
+/**
+ * A piece of content, as one string. Maps and games are separate namespaces.
+ *
+ * Case-insensitive, because the names being compared do not all come from the
+ * same place. A card's own pick is a unitsync scan name, while a claim from the
+ * suggested map is the spring name the catalog downloads it by, and the two are
+ * written by different hands. `suggestedMapState` already compares them
+ * lowercased for the same reason. Two installed maps whose names differ only in
+ * case are the same map to a reader either way.
+ */
 function contentKey(pick: ContentPick): string {
-  return pick.kind === "map" ? `m:${pick.mapName}` : `g:${pick.gameName}`;
+  const name = pick.kind === "map" ? pick.mapName : pick.gameName;
+  return `${pick.kind === "map" ? "m" : "g"}:${name.toLowerCase()}`;
 }
 
 /**
@@ -316,11 +346,17 @@ function contentKey(pick: ContentPick): string {
  * illustration, which is the right answer rather than a compromise: the second
  * copy of a picture carries none of the information the first one did, and the
  * drawing it displaced carried some.
+ *
+ * `claimed` starts the taken set off, so a picture already on the page outside
+ * this set is spoken for before the walk begins. The walk itself is unchanged,
+ * and the answer still depends on {@link PICK_PRIORITY} alone and never on which
+ * zone rendered first.
  */
 export function assignPicks(
   offers: ReadonlyMap<string, readonly ContentPick[]>,
+  claimed: readonly ContentPick[] = [],
 ): Map<string, ContentPick> {
-  const taken = new Set<string>();
+  const taken = new Set<string>(claimed.map(contentKey));
   const picks = new Map<string, ContentPick>();
   for (const toolId of PICK_PRIORITY) {
     const free = offers.get(toolId)?.find((p) => !taken.has(contentKey(p)));
@@ -341,7 +377,7 @@ export function assignPicks(
 export function contentPicks(
   sources: ContentPickSources,
 ): Map<string, ContentPick> {
-  return assignPicks(contentOffers(sources));
+  return assignPicks(contentOffers(sources), sources.claimed);
 }
 
 /** A stable string for a set of picks, so an effect can depend on their value. */
