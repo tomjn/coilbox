@@ -10,6 +10,7 @@ import {
 import {
   type BattleConfig,
   type LaunchEvent,
+  playCancel,
   playFocus,
   playLaunch,
   playLaunchReplay,
@@ -62,6 +63,12 @@ interface PlayContextValue {
   launchSave: (opts: SaveOpts) => Promise<{ exitCode: number | null }>;
   /** Bring the running game's window to the foreground (best-effort). */
   focusGame: () => void;
+  /**
+   * Force-quit the running game and immediately clear run state, regardless of
+   * whether the engine cooperates or the launch promise ever settles. The
+   * escape hatch for a stuck "In game" badge (#925).
+   */
+  cancel: () => void;
 }
 
 const PlayContext = createContext<PlayContextValue | null>(null);
@@ -80,6 +87,18 @@ export function PlayProvider({ children }: { children: ReactNode }) {
   // Synchronous guard: `running` state lags a render behind, so gate on a ref to
   // reject a second launch without disturbing the in-flight run.
   const runningRef = useRef(false);
+  // Tracks which run id is current, so a launch promise that settles late (after
+  // `cancel` already cleared state, or after a second run started) doesn't
+  // clobber a run it no longer belongs to.
+  const activeRunIdRef = useRef<string | null>(null);
+
+  const clearRun = useCallback(() => {
+    runningRef.current = false;
+    activeRunIdRef.current = null;
+    setRunning(false);
+    setActiveRunId(null);
+    setKind(null);
+  }, []);
 
   const start = useCallback(
     async (
@@ -92,9 +111,10 @@ export function PlayProvider({ children }: { children: ReactNode }) {
       if (runningRef.current) throw new Error("a game is already running");
       runningRef.current = true;
       const runId = crypto.randomUUID();
+      activeRunIdRef.current = runId;
       const onEvent = new Channel<LaunchEvent>();
-      // The authoritative unfreeze is the launch promise resolving; the channel is
-      // required by the command signature but unused here.
+      // The authoritative unfreeze is the launch promise resolving. The channel
+      // is required by the command signature but unused here.
       onEvent.onmessage = () => {};
       setRunning(true);
       setActiveRunId(runId);
@@ -102,13 +122,13 @@ export function PlayProvider({ children }: { children: ReactNode }) {
       try {
         return await run(runId, onEvent);
       } finally {
-        runningRef.current = false;
-        setRunning(false);
-        setActiveRunId(null);
-        setKind(null);
+        // Only clear if this run is still the active one. `cancel` may already
+        // have cleared it (and a new run may since have started) before this
+        // promise settles.
+        if (activeRunIdRef.current === runId) clearRun();
       }
     },
-    [],
+    [clearRun],
   );
 
   const launch = useCallback(
@@ -143,6 +163,17 @@ export function PlayProvider({ children }: { children: ReactNode }) {
     void playFocus({ runId: activeRunId }).catch(() => {});
   }, [activeRunId]);
 
+  const cancel = useCallback(() => {
+    const runId = activeRunIdRef.current;
+    if (!runId) return;
+    // Clear synchronously so the badge and the single-run guard free up right
+    // away. Don't wait on play_cancel, or on the still-pending launch promise
+    // (the start finally-block now no-ops for it via the run id check). A stuck
+    // launch is exactly the case this exists for.
+    clearRun();
+    void playCancel({ runId }).catch(() => {});
+  }, [clearRun]);
+
   return (
     <PlayContext.Provider
       value={{
@@ -153,6 +184,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
         launchReplay,
         launchSave,
         focusGame,
+        cancel,
       }}
     >
       {children}
