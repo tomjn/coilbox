@@ -13,6 +13,8 @@ import {
   chartRows,
   defaultMetric,
   END_LABEL_MAX_SERIES,
+  endPoints,
+  formatChartValue,
   formatDuration,
   formatTotal,
   hasStatistics,
@@ -23,6 +25,7 @@ import {
   resultLabel,
   seatCount,
   secondsPerFrame,
+  spreadLabels,
   TOOLTIP_ROW_LIMIT,
   teamSeries,
   teamTotal,
@@ -522,5 +525,94 @@ describe("the end-point labels", () => {
 
   it("has nowhere to land for a line that is never drawn", () => {
     expect(lastPointIndex([], "team0")).toBe(-1);
+  });
+
+  it("take a line's last drawn figure, not the chart's last row", () => {
+    const series = teamSeries(
+      trailer([
+        [at(0, KEY_A, 1), at(450, KEY_A, 4), at(900, KEY_A, 9)],
+        [at(0, KEY_A, 2), at(450, KEY_A, 5)],
+      ]),
+      info(),
+    );
+    const rows = chartRows(series, KEY_A, 1 / 30);
+    expect(endPoints(series, rows)).toEqual([
+      {
+        id: "team0",
+        label: "Team 0",
+        color: expect.any(String),
+        timeSec: 30,
+        value: 9,
+      },
+      {
+        id: "team1",
+        label: "Team 1",
+        color: expect.any(String),
+        timeSec: 15,
+        value: 5,
+      },
+    ]);
+  });
+
+  it("skips a line that was never drawn", () => {
+    const series = teamSeries(trailer([[at(0, KEY_A, 1)]]), info());
+    expect(endPoints(series, [])).toEqual([]);
+  });
+});
+
+describe("spreadLabels", () => {
+  const at_ = (id: string, y: number) => ({ id, y });
+
+  it("leaves labels alone when they already clear each other", () => {
+    const out = spreadLabels([at_("a", 10), at_("b", 60)], 14, 0, 200);
+    expect(out).toEqual([at_("a", 10), at_("b", 60)]);
+  });
+
+  it("pushes a duel's two labels apart rather than printing one on the other", () => {
+    const out = spreadLabels([at_("a", 100), at_("b", 102)], 14, 0, 200);
+    expect(out.map((l) => l.y)).toEqual([100, 114]);
+  });
+
+  it("returns them top to bottom whatever order they arrive in", () => {
+    const out = spreadLabels([at_("b", 102), at_("a", 100)], 14, 0, 200);
+    expect(out.map((l) => l.id)).toEqual(["a", "b"]);
+  });
+
+  it("keeps the stack inside the plot rather than off the bottom", () => {
+    const out = spreadLabels([at_("a", 195), at_("b", 198)], 14, 0, 200);
+    expect(out.map((l) => l.y)).toEqual([186, 200]);
+  });
+
+  it("keeps the top label inside the plot", () => {
+    expect(spreadLabels([at_("a", -5)], 14, 0, 200)[0].y).toBe(0);
+  });
+});
+
+describe("formatChartValue", () => {
+  it("does not round a gridline into a different figure", () => {
+    // The bug this exists for: `formatTotal` calls 1,050,000 "1.1M", and evenly
+    // spaced gridlines then read as unevenly spaced ones.
+    expect(formatTotal(1_050_000)).toBe("1.1M");
+    expect(formatChartValue(1_050_000)).toBe("1.05M");
+  });
+
+  it("shortens one axis the same way all the way up it", () => {
+    expect([8_000, 16_000, 24_000, 32_000].map(formatChartValue)).toEqual([
+      "8k",
+      "16k",
+      "24k",
+      "32k",
+    ]);
+  });
+
+  it("drops a trailing zero decimal", () => {
+    expect(formatChartValue(1_400_000)).toBe("1.4M");
+    expect(formatChartValue(350_000)).toBe("350k");
+    expect(formatChartValue(12_000_000)).toBe("12M");
+  });
+
+  it("leaves a figure small enough to read", () => {
+    expect(formatChartValue(0)).toBe("0");
+    expect(formatChartValue(276)).toBe("276");
   });
 });

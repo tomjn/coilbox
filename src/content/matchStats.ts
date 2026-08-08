@@ -88,6 +88,25 @@ export function formatTotal(value: number): string {
   return v.toLocaleString();
 }
 
+/**
+ * A figure on the chart: on an axis tick or in the tooltip.
+ *
+ * Two decimals rather than {@link formatTotal}'s one, because a tick at
+ * 1,050,000 labelled `1.1M` makes evenly spaced gridlines read as uneven ones.
+ * Shortened from a thousand rather than ten thousand, so one axis doesn't run
+ * `8,000, 16k, 24k`.
+ */
+export function formatChartValue(value: number): string {
+  const v = Math.round(value);
+  const abs = Math.abs(v);
+  if (abs < 1_000) return v.toLocaleString();
+  const million = abs >= 1_000_000;
+  const n = v / (million ? 1_000_000 : 1_000);
+  // `toFixed` always leaves a point, so trimming zeros can't eat a whole number.
+  const text = n.toFixed(2).replace(/\.?0+$/, "");
+  return `${text}${million ? "M" : "k"}`;
+}
+
 /** A headline tile: one registry metric, totalled across the match. */
 export interface HeadlineTotal {
   metric: Metric;
@@ -372,4 +391,62 @@ export function lastPointIndex(rows: ChartRow[], id: string): number {
   for (let i = rows.length - 1; i >= 0; i--)
     if (typeof rows[i][id] === "number") return i;
   return -1;
+}
+
+/** Where a series' label goes: the last point it was drawn at. */
+export interface EndPoint {
+  id: string;
+  label: string;
+  color: string;
+  timeSec: number;
+  value: number;
+}
+
+/** One end point per series that was drawn at all, in series order. */
+export function endPoints(series: ChartSeries[], rows: ChartRow[]): EndPoint[] {
+  const points: EndPoint[] = [];
+  for (const s of series) {
+    const i = lastPointIndex(rows, s.id);
+    if (i < 0) continue;
+    const value = rows[i][s.id];
+    if (typeof value !== "number") continue;
+    points.push({
+      id: s.id,
+      label: s.label,
+      color: s.color,
+      timeSec: rows[i].timeSec,
+      value,
+    });
+  }
+  return points;
+}
+
+/**
+ * Push labels apart down the page so two lines that finish on nearly the same
+ * figure keep two readable labels. Without this a duel, which is the case the
+ * end-point labels exist for, prints one name on top of another.
+ *
+ * Labels come back top to bottom. Each keeps its own `y` where it can, is pushed
+ * down to clear the one above, and the whole stack is pulled back up if that
+ * took it past `bottom`.
+ */
+export function spreadLabels<T extends { y: number }>(
+  labels: T[],
+  gap: number,
+  top: number,
+  bottom: number,
+): T[] {
+  const sorted = [...labels].sort((a, b) => a.y - b.y);
+  let above = top - gap;
+  const down = sorted.map((l) => {
+    const y = Math.max(l.y, above + gap);
+    above = y;
+    return { ...l, y };
+  });
+  let below = bottom + gap;
+  for (let i = down.length - 1; i >= 0; i--) {
+    down[i] = { ...down[i], y: Math.min(down[i].y, below - gap) };
+    below = down[i].y;
+  }
+  return down;
 }

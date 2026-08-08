@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
 import {
   CartesianGrid,
-  LabelList,
   Legend,
   Line,
   LineChart,
   ResponsiveContainer,
   Tooltip,
+  usePlotArea,
+  useXAxisScale,
+  useYAxisScale,
   XAxis,
   YAxis,
 } from "recharts";
@@ -26,11 +28,13 @@ import {
   chartRows,
   defaultMetric,
   END_LABEL_MAX_SERIES,
+  type EndPoint,
+  endPoints,
+  formatChartValue,
   formatDuration,
-  formatTotal,
-  lastPointIndex,
   metricGroups,
   secondsPerFrame,
+  spreadLabels,
   teamSeries,
   tooltipRows,
 } from "../../matchStats";
@@ -129,7 +133,7 @@ function SeriesTooltip({
             />
             <span className="min-w-0 flex-1 truncate">{r.label}</span>
             <span className="shrink-0 tabular-nums">
-              {formatTotal(r.value)}
+              {formatChartValue(r.value)}
             </span>
           </li>
         ))}
@@ -141,23 +145,62 @@ function SeriesTooltip({
   );
 }
 
-/** A series' name, drawn once at the end of its own line. */
-function endLabel(label: string, color: string, at: number) {
-  return function EndLabel(props: {
-    x?: number | string;
-    y?: number | string;
-    index?: number;
-  }) {
-    if (props.index !== at) return null;
-    const x = Number(props.x);
-    const y = Number(props.y);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-    return (
-      <text x={x + 6} y={y} dy={4} fill={color} fontSize={11}>
-        {clip(label)}
-      </text>
+/** Vertical room one end-point label needs, in pixels. */
+const END_LABEL_GAP = 14;
+
+/** A label more than this far from its line gets a leader drawn to it. */
+const LEADER_THRESHOLD = 2;
+
+/**
+ * Every series' name at the end of its own line, laid out together so two lines
+ * that finish on nearly the same figure don't print one name over the other.
+ * recharts' own `LabelList` places each series on its own, which is exactly the
+ * case a duel produces, so this reads the axis scales instead.
+ */
+function EndLabels({ points }: { points: EndPoint[] }) {
+  const xScale = useXAxisScale();
+  const yScale = useYAxisScale();
+  const plot = usePlotArea();
+  if (!xScale || !yScale || !plot) return null;
+
+  const placed = points
+    .map((p) => ({ ...p, x: xScale(p.timeSec), y: yScale(p.value) }))
+    .filter(
+      (p): p is EndPoint & { x: number; y: number } =>
+        Number.isFinite(p.x) && Number.isFinite(p.y),
     );
-  };
+  const spread = spreadLabels(
+    placed,
+    END_LABEL_GAP,
+    plot.y,
+    plot.y + plot.height,
+  );
+  // `y` is the label's own row after spreading, `line` is where its line ended.
+  const lineY = new Map(placed.map((p) => [p.id, p.y]));
+
+  return (
+    <g>
+      {spread.map((p) => {
+        const from = lineY.get(p.id) ?? p.y;
+        return (
+          <g key={p.id}>
+            {Math.abs(from - p.y) > LEADER_THRESHOLD && (
+              <polyline
+                points={`${p.x},${from} ${p.x + 4},${p.y}`}
+                fill="none"
+                stroke={p.color}
+                strokeWidth={1}
+                opacity={0.6}
+              />
+            )}
+            <text x={p.x + 6} y={p.y} dy={4} fill={p.color} fontSize={11}>
+              {clip(p.label)}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
 }
 
 export function MatchStatsChart({
@@ -229,7 +272,7 @@ export function MatchStatsChart({
            * a lie about the first ten minutes. */}
           <YAxis
             domain={[0, "auto"]}
-            tickFormatter={formatTotal}
+            tickFormatter={formatChartValue}
             tick={axisTick}
             tickLine={false}
             axisLine={false}
@@ -252,19 +295,9 @@ export function MatchStatsChart({
               dot={false}
               activeDot={{ r: 3 }}
               isAnimationActive={false}
-            >
-              {labelled && (
-                <LabelList
-                  dataKey={s.id}
-                  content={endLabel(
-                    s.label,
-                    s.color,
-                    lastPointIndex(rows, s.id),
-                  )}
-                />
-              )}
-            </Line>
+            />
           ))}
+          {labelled && <EndLabels points={endPoints(series, rows)} />}
         </LineChart>
       </ResponsiveContainer>
 
