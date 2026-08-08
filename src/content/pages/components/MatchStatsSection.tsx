@@ -177,8 +177,11 @@ export function MatchStatsSection({
     }
     if (!data) return null;
     if (!hasStatistics(data.trailer)) {
+      // Not always an abandoned recording: three of the replays this was built
+      // against name a winner and still carry no samples at all (#1190). So this
+      // says what the file shows and doesn't pick a reason for it.
       return (
-        <NoStatistics detail="The engine wrote none: this recording ended without a game over, so there was never a finished match to measure." />
+        <NoStatistics detail="The engine wrote none for it. Either the recording was abandoned, or the match ended without its statistics ever being written." />
       );
     }
     return (
