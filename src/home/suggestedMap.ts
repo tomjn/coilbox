@@ -13,7 +13,13 @@
  * so the rotation is testable without a clock, a network or a DOM.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   type SuggestedMap,
   type SuggestedMapList,
@@ -144,6 +150,94 @@ const DAY_MS = 86_400_000;
  */
 export function utcDayIndex(date: Date): number {
   return Math.floor(date.getTime() / DAY_MS);
+}
+
+/**
+ * How long a tick waits at the very least, so a timer that fires a hair before
+ * the boundary reschedules once rather than spinning until the clock catches up.
+ */
+const MIN_TICK_MS = 1_000;
+
+/**
+ * Milliseconds from `now` to the next UTC midnight, floored at
+ * {@link MIN_TICK_MS}.
+ *
+ * Counted off the same `Math.floor(t / DAY_MS)` {@link utcDayIndex} uses, so the
+ * instant this waits for is exactly the instant that changes the day index.
+ */
+export function msToNextUtcDay(now: number): number {
+  return Math.max((Math.floor(now / DAY_MS) + 1) * DAY_MS - now, MIN_TICK_MS);
+}
+
+/**
+ * The UTC day the rotation is on, and everything that keeps it current.
+ *
+ * Coilbox is a launcher, so a window left open for more than a day is ordinary.
+ * The day was read once per mount, and a session that spanned UTC midnight kept
+ * yesterday's map until the page was revisited, which is a boundary nobody was
+ * watching for (issue #1022).
+ *
+ * One module-level store rather than a timer per hook. The suggested map is
+ * resolved twice on every home render, once above the layout for the claim
+ * against the tool cards and once in the zone that draws it (issue #1077), and
+ * two timers would let those two cross midnight in separate tasks. The card would
+ * then paint one map while the claim reserved another. One store notifies both
+ * listeners from the same tick, and React batches them into one commit, so they
+ * cannot disagree.
+ *
+ * The tick re-reads the clock rather than adding one to the day, so a machine
+ * that slept through midnight lands on the day it woke up on rather than the day
+ * after the one it slept on.
+ *
+ * No timer runs while nothing is mounted. The last listener to go clears it, and
+ * the first to arrive re-reads the day before anything renders, so a page left
+ * unmounted across midnight is right on its first frame.
+ */
+let currentDay = utcDayIndex(new Date());
+const dayListeners = new Set<() => void>();
+let dayTimer: ReturnType<typeof setTimeout> | undefined;
+
+function scheduleDayTick(): void {
+  dayTimer = setTimeout(tickDay, msToNextUtcDay(Date.now()));
+}
+
+function tickDay(): void {
+  const day = utcDayIndex(new Date());
+  if (day !== currentDay) {
+    currentDay = day;
+    for (const listener of dayListeners) listener();
+  }
+  scheduleDayTick();
+}
+
+/** Subscribe to the day boundary. Exported for the tests that drive the tick. */
+export function subscribeUtcDay(listener: () => void): () => void {
+  dayListeners.add(listener);
+  if (dayTimer === undefined) {
+    currentDay = utcDayIndex(new Date());
+    scheduleDayTick();
+  }
+  return () => {
+    dayListeners.delete(listener);
+    if (dayListeners.size > 0) return;
+    clearTimeout(dayTimer);
+    dayTimer = undefined;
+  };
+}
+
+/** The day the rotation is on now. Exported for the tests that read it. */
+export function utcDayNow(): number {
+  return currentDay;
+}
+
+/**
+ * The UTC day, as a value that changes when the rotation should turn over.
+ *
+ * `utcDayNow` is the server snapshot too, because a static render has no clock
+ * to wait for and the day the module loaded on is the only answer there is.
+ */
+export function useUtcDay(): number {
+  return useSyncExternalStore(subscribeUtcDay, utcDayNow, utcDayNow);
 }
 
 /**
@@ -342,9 +436,9 @@ export function suggestedMapClaim(
  * answered and there is nothing curated", which the card needs because it shows
  * a placeholder for the first and nothing for the second.
  *
- * The date is taken once per mount. The rotation turns over at UTC midnight, and
- * a session that spans one keeps yesterday's map until the page is revisited,
- * which is a boundary nobody is watching for.
+ * The date comes from {@link useUtcDay}, so a session left open across UTC
+ * midnight turns the card over where it stands rather than holding yesterday's
+ * map until the page is next visited (issue #1022).
  *
  * When a lobby connection happens to be live, a map people are on beats the
  * rotation (issue #996). Reading it is passive: `useMultiplayer` is a plain
@@ -371,7 +465,11 @@ export function useSuggestedMap(): {
   const maps = useSuggestedMaps();
   const loaded = useCatalogLoaded();
   const { mirror } = useMultiplayer();
-  const today = useMemo(() => new Date(), []);
+  const day = useUtcDay();
+  // The rotation reads nothing off a date but its UTC day, so the day's own
+  // first instant stands for every instant in it. Built here rather than passed
+  // as a number so the pure functions keep the `Date` argument a test can write.
+  const today = useMemo(() => new Date(day * DAY_MS), [day]);
   const pool = useMemo(
     () =>
       suggestedMapPool(maps, mergeMapLists(catalogLists, getProfileMapLists())),
