@@ -291,6 +291,26 @@ export function describeHome(home: ResolvedHome): string {
 }
 
 /**
+ * The built-in zones this page carries.
+ *
+ * Derived from {@link ResolvedHome.entries} rather than stored beside them, so
+ * the page has one list of zones and nothing to keep a second one in step with.
+ *
+ * The greeting reads it to decide which of its sentences are about anything the
+ * player can see (issues #1079 and #1082). That is the page's composition, which
+ * is the layout's to know and is settled before any zone renders. It is not
+ * another zone's state: whether the grid drew a card, or whether there is a run
+ * waiting, still belongs to the zone that draws it.
+ */
+export function zonesOnPage(
+  entries: readonly HomeEntry[],
+): ReadonlySet<ZoneId> {
+  const zones = new Set<ZoneId>();
+  for (const entry of entries) if (entry.kind === "zone") zones.add(entry.zone);
+  return zones;
+}
+
+/**
  * The pinned layout name, or undefined to track the default.
  *
  * A name this build does not ship is dropped here rather than carried through to

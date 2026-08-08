@@ -473,20 +473,43 @@ describe("StackedLayout suggested map", () => {
 });
 
 describe("StackedLayout zone config", () => {
+  /** The greeting's props, with the zone set spelled out as a sorted list. */
+  function greetingProps(entries: Parameters<typeof render>[0]) {
+    const [greeting] = render(entries).filter((r) => r.name === "greeting");
+    const { zones, ...rest } = greeting.props as {
+      zones: ReadonlySet<string>;
+    } & Record<string, unknown>;
+    return { ...rest, zones: [...zones].sort() };
+  }
+
   it("hands the greeting the wording its entry carries", () => {
     const { entries } = resolveHome({
       zones: [{ zone: "greeting", title: "Splinter Faction", tagline: "Go." }],
     });
-    const [greeting] = render(entries).filter((r) => r.name === "greeting");
-    expect(greeting.props).toEqual({
+    expect(greetingProps(entries)).toEqual({
       title: "Splinter Faction",
       tagline: "Go.",
+      zones: ["greeting"],
     });
   });
 
   it("hands the greeting nothing when the entry says nothing", () => {
-    const [greeting] = renderDefault().filter((r) => r.name === "greeting");
-    expect(greeting.props).toEqual({ title: undefined, tagline: undefined });
+    const { entries } = resolveHome(undefined);
+    expect(greetingProps(entries)).toEqual({
+      title: undefined,
+      tagline: undefined,
+      zones: [...DEFAULT_ZONES].sort(),
+    });
+  });
+
+  it("tells the greeting which zones the profile left out", () => {
+    // The greeting is the one zone that says something about the others, so it
+    // is handed the same list the layout is rendering from rather than forming
+    // its own opinion (#1079, #1082).
+    const { entries } = resolveHome({
+      zones: [{ zone: "greeting" }, { zone: "continue" }],
+    });
+    expect(greetingProps(entries).zones).toEqual(["continue", "greeting"]);
   });
 });
 

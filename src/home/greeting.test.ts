@@ -48,11 +48,17 @@ vi.mock("../multiplayer/store", () => ({ useMultiplayer: () => lobby() }));
 const resume = vi.fn<() => { candidates: unknown[]; loading: boolean }>();
 vi.mock("./continue", () => ({ useResume: () => resume() }));
 
-import Greeting, {
-  type GreetingOverrides,
-  greetingCopy,
-} from "./zones/Greeting";
+import { DEFAULT_ZONES, type ZoneId } from "./config";
+import Greeting, { type GreetingProps, greetingCopy } from "./zones/Greeting";
 import ToolCards from "./zones/ToolCards";
+
+/** The stock page: every zone Coilbox ships, which is what an install with no `home` key draws. */
+const EVERY_ZONE: ReadonlySet<ZoneId> = new Set(DEFAULT_ZONES);
+
+/** The page a distribution's `zones` list makes: these zones and no others. */
+function page(...zones: ZoneId[]): ReadonlySet<ZoneId> {
+  return new Set(zones);
+}
 
 const TOOLS: NavGroup[] = [
   { id: "play", items: [{ id: "skirmish", label: "Skirmish", to: "/play" }] },
@@ -98,12 +104,15 @@ type Line = false | { props: { children: string; className: string } };
 /**
  * The heading and the line (or lines) the rendered zone puts on the page.
  *
- * `tagline` is the one a page with a tool card shows. `taglineWithoutTools` is
- * the alternative, null when the state already settled which sentence is right
- * and only one is on the page.
+ * `tagline` is the one a page with a tool card shows, and null when the greeting
+ * drew no line at all. `taglineWithoutTools` is the alternative, null when the
+ * state already settled which sentence is right and only one is on the page.
+ *
+ * The page defaults to the stock one, because that is what almost every test here
+ * is about. The cases that leave a zone out say so.
  */
-function render(overrides?: GreetingOverrides) {
-  const node = Greeting(overrides) as unknown as {
+function render(props: Partial<GreetingProps> = {}) {
+  const node = Greeting({ zones: EVERY_ZONE, ...props }) as unknown as {
     props: { children: [{ props: { children: string } }, Line, Line] };
   };
   const [heading, tagline, without] = node.props.children;
@@ -138,6 +147,7 @@ describe("greetingCopy", () => {
       title: "Coilbox",
       username: "Zephyr",
       hasResume: false,
+      zones: EVERY_ZONE,
     });
     expect(heading).toBe("Welcome back, Zephyr");
   });
@@ -147,6 +157,7 @@ describe("greetingCopy", () => {
       title: "Beyond All Reason",
       username: null,
       hasResume: false,
+      zones: EVERY_ZONE,
     });
     expect(heading).toBe("Beyond All Reason");
   });
@@ -156,6 +167,7 @@ describe("greetingCopy", () => {
       title: "Coilbox",
       username: null,
       hasResume: true,
+      zones: EVERY_ZONE,
     });
     expect(copy.tagline).toBe("Pick up where you left off.");
     // Settled here, so the page carries one sentence and needs no second.
@@ -170,14 +182,99 @@ describe("greetingCopy", () => {
       title: "Coilbox",
       username: null,
       hasResume: false,
+      zones: EVERY_ZONE,
     });
     expect(copy.tagline).toBe("Choose a tool to get started.");
     expect(copy.taglineWithoutTools).toBe("No tools available yet.");
   });
 });
 
+/**
+ * Every sentence Coilbox writes here is about another zone, so it is only true of
+ * a page that carries that zone. A distribution's `zones` list decides which, and
+ * the greeting is handed the same list the layout is rendering from (#1079,
+ * #1082).
+ */
+describe("greetingCopy on a page missing the zone it would talk about", () => {
+  const state = { title: "Ironhold", username: null, hasResume: false };
+
+  it("says nothing about tools when the page has no grid", () => {
+    // The tools exist. The distribution chose not to draw them, so "No tools
+    // available yet." reads as a broken install, and "Choose a tool to get
+    // started." invites a click there is nothing to click.
+    const copy = greetingCopy({
+      ...state,
+      zones: page("greeting", "continue"),
+    });
+    expect(copy.tagline).toBeNull();
+    expect(copy.taglineWithoutTools).toBeNull();
+  });
+
+  it("keeps the tool lines for a page that has the grid and nothing else", () => {
+    const copy = greetingCopy({ ...state, zones: page("greeting", "cards") });
+    expect(copy.tagline).toBe("Choose a tool to get started.");
+    expect(copy.taglineWithoutTools).toBe("No tools available yet.");
+  });
+
+  it("does not promise a resume when neither zone that shows one is on the page", () => {
+    const copy = greetingCopy({
+      ...state,
+      hasResume: true,
+      zones: page("greeting", "cards"),
+    });
+    expect(copy.tagline).toBe("Choose a tool to get started.");
+    expect(copy.taglineWithoutTools).toBe("No tools available yet.");
+  });
+
+  it("promises a resume for a page with the hero alone", () => {
+    const copy = greetingCopy({
+      ...state,
+      hasResume: true,
+      zones: page("greeting", "continue"),
+    });
+    expect(copy.tagline).toBe("Pick up where you left off.");
+  });
+
+  it("promises a resume for a page with the rail alone", () => {
+    // A profile that listed `resume` without `continue` still shows you things to
+    // go back to, so the line is about something the player can see.
+    const copy = greetingCopy({
+      ...state,
+      hasResume: true,
+      zones: page("greeting", "resume"),
+    });
+    expect(copy.tagline).toBe("Pick up where you left off.");
+  });
+
+  it("leaves the heading on its own when the page has none of those zones", () => {
+    const copy = greetingCopy({
+      ...state,
+      hasResume: true,
+      zones: page("greeting", "suggested"),
+    });
+    expect(copy.heading).toBe("Ironhold");
+    expect(copy.tagline).toBeNull();
+    expect(copy.taglineWithoutTools).toBeNull();
+  });
+
+  it("still says the distribution's own line on a page with none of them", () => {
+    // The author wrote that sentence about that page, so it is not Coilbox's to
+    // withdraw.
+    const copy = greetingCopy(
+      { ...state, zones: page("greeting") },
+      { tagline: "Hold the line." },
+    );
+    expect(copy.tagline).toBe("Hold the line.");
+  });
+});
+
 describe("greetingCopy with a distribution's own wording", () => {
-  const state = { title: "Coilbox", username: "Zephyr", hasResume: true };
+  const state = {
+    title: "Coilbox",
+    username: "Zephyr",
+    hasResume: true,
+    zones: EVERY_ZONE,
+  };
 
   it("replaces the heading even for a logged-in player", () => {
     // A distribution that names its own front door means it, so the name
@@ -277,6 +374,26 @@ describe("Greeting zone", () => {
     expect(r.heading).toBe("Splinter Faction");
     expect(r.tagline).toBe("Fight on.");
     expect(r.taglineWithoutTools).toBeNull();
+  });
+
+  it("draws the heading alone on a page with no grid and nothing to resume", () => {
+    // A distribution that listed the greeting and its own markup. Both tool
+    // sentences would be about a grid that is not there (#1079).
+    const r = render({ zones: page("greeting") });
+    expect(r.heading).toBe("Coilbox");
+    expect(r.tagline).toBeNull();
+    expect(r.taglineWithoutTools).toBeNull();
+  });
+
+  it("keeps the resume line on a page with the hero and no grid", () => {
+    resume.mockReturnValue({
+      candidates: [{ id: "warpath:run-1" }],
+      loading: false,
+    });
+    const r = render({ zones: page("greeting", "continue") });
+    expect(r.tagline).toBe("Pick up where you left off.");
+    // Nothing on the page waits for the grid's marker, because there is no grid.
+    expect(r.classes).not.toContain("data-tool-card");
   });
 });
 
