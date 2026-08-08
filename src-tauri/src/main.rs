@@ -74,7 +74,41 @@ fn linux_appimage_webview_workaround() {
     eprintln!("coilbox: libwayland re-exec failed, continuing without it: {err}");
 }
 
+// Keep GIO to the modules the AppImage shipped (issue #1012).
+//
+// The AppImage carries the GLib of its build base (2.72, from Ubuntu 22.04), but
+// GIO scans the module directory it was compiled with, which on the user's
+// machine is the host's. On any distribution newer than the build base those
+// modules want a GLib we do not have, so every launch prints
+//
+//   libgvfscommon.so: undefined symbol: g_task_set_static_name
+//   Failed to load module: .../libgvfsdbus.so
+//
+// and the app is left with no gvfs at all. GLib reads GIO_MODULE_DIR first and
+// only falls back to the compiled-in path, so naming the bundled directory keeps
+// the scan inside the AppImage, where the TLS module we do use already lives.
+//
+// Set before the Wayland re-exec below so it survives it.
+#[cfg(target_os = "linux")]
+fn pin_gio_modules_to_bundle() {
+    use std::env;
+
+    if env::var_os("APPIMAGE").is_none() || env::var_os("GIO_MODULE_DIR").is_some() {
+        return;
+    }
+    // linuxdeploy's GTK hook points this at the bundled directory, so it already
+    // carries the architecture triple in the path.
+    let Some(bundled) = env::var_os("GIO_EXTRA_MODULES") else {
+        return;
+    };
+    if std::path::Path::new(&bundled).is_dir() {
+        env::set_var("GIO_MODULE_DIR", bundled);
+    }
+}
+
 fn main() {
+    #[cfg(target_os = "linux")]
+    pin_gio_modules_to_bundle();
     #[cfg(target_os = "linux")]
     linux_appimage_webview_workaround();
 
