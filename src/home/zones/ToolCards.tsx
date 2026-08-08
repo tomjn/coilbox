@@ -12,6 +12,7 @@ import {
   CARD_FOCUS_CLASS,
   CARD_SHELL_CLASS,
 } from "../cardShell";
+import { forgetContentArt } from "../contentArt";
 import { homeToolGroups, splitGroupItems } from "../nav";
 import { openExternal, useResolvedNavItem } from "../navItem";
 import LinkCard from "./LinkCard";
@@ -95,8 +96,9 @@ const TOOL_CARD_CLASS = `transition-colors hover:border-ring sm:w-64 ${CARD_FOCU
 /**
  * The icon-only card: an icon beside a label, on the card surface. What every
  * card looked like before issue #991, kept as a mode rather than deleted because
- * a distribution can switch art off per tool (issue #1000), and because a
- * broken image URL falls back to it. No art, so none of the band applies.
+ * a distribution can switch art off per tool (issue #1000), and because it is
+ * the floor when every URL the chain offers fails to load. No art, so none of
+ * the band applies.
  */
 const ICON_CARD_CLASS = `${CARD_SHELL_CLASS} ${TOOL_CARD_CLASS} items-center gap-3 bg-card p-4 text-card-foreground hover:bg-accent`;
 
@@ -114,9 +116,12 @@ const ART_CARD_CLASS = `${ART_SHELL_CLASS} ${TOOL_CARD_CLASS} hover:shadow-md`;
  * Which art a card should paint, given what the chain resolved and which URL (if
  * any) has already failed to load.
  *
- * Pure, so the fallback is testable without a DOM. A URL that errors takes the
- * card back to the icon-only mode, which is the one presentation guaranteed to
- * need nothing off disk or off the network.
+ * Pure, so the fallback is testable without a DOM. A URL that errors is refused
+ * here whatever the chain says, so a step that goes on offering it cannot put
+ * the card back on it. Where the card lands is then the chain's business: a
+ * withdrawn URL leaves an illustration, and a URL nothing withdraws leaves the
+ * icon-only mode, which is the one presentation guaranteed to need nothing off
+ * disk or off the network.
  */
 export function cardArtUrl(art: CardArt, broken: string | null): string | null {
   if (art.kind !== "art") return null;
@@ -163,7 +168,15 @@ export function ToolCard({ item }: { item: NavItem }) {
         src={art}
         alt=""
         className="absolute inset-0 size-full object-cover transition-transform duration-300 motion-safe:group-hover:scale-105"
-        onError={() => setBroken(art)}
+        onError={() => {
+          // Told to the content step as well as remembered here. That URL may be
+          // a cache file the last launch painted and something has since
+          // evicted, and only the step that offered it can withdraw it, which is
+          // what lets the chain answer with an illustration rather than leaving
+          // this card on its icon.
+          forgetContentArt(art);
+          setBroken(art);
+        }}
       />
       {/* The art window. Grows with the card so a row of cards whose names wrap
           to different depths still shows art edge to edge under all of them. */}
