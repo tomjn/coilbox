@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { dlInstalledContent } from "../downloads/bindings";
 import { useContentRootPaths } from "../downloads/config";
 import { usePreferredTarget } from "../play/config";
@@ -47,7 +53,7 @@ export interface GetStartedOfferState {
 const OFFERS_NOTHING: GetStartedOffer = { games: [], maps: [] };
 
 /**
- * What the first-run get-started offer comes to, for everyone who needs to know.
+ * What the first-run get-started offer comes to, collected once for the page.
  *
  * The shared collector for two readers: `GetStartedCard`, which draws the offer,
  * and the home page, which has to know whether onboarding is offering maps before
@@ -57,6 +63,11 @@ const OFFERS_NOTHING: GetStartedOffer = { games: [], maps: [] };
  * predicates over one question drift. Same reason `useResume` exists (see
  * `../home/continue`): the zones and the page share a collector rather than
  * reading each other.
+ *
+ * Called once per page, and published through {@link GetStartedOfferContext} to
+ * everyone else. Both readers used to call it, which was two listings and two
+ * snapshots for one question (issue #1111). See the context for why sharing the
+ * collector was not enough on its own.
  *
  * ## What "not yet" means, and what it does not
  *
@@ -94,7 +105,7 @@ const OFFERS_NOTHING: GetStartedOffer = { games: [], maps: [] };
  * The setup gate is live over the top of the snapshot, so completing setup while
  * the page is open reveals the card with the list already captured.
  */
-export function useGetStartedOffer(): GetStartedOfferState {
+export function useCollectGetStartedOffer(): GetStartedOfferState {
   const { complete, loading: setupLoading } = useSetupStatus();
   const rootPaths = useContentRootPaths();
   const entries = useBrandingCatalog();
@@ -173,6 +184,41 @@ export function useGetStartedOffer(): GetStartedOfferState {
     installed,
     refresh,
   };
+}
+
+/**
+ * The page's offer, handed to everyone who reads it.
+ *
+ * The collector holds a snapshot, and that is what made a second instance a
+ * second answer rather than a second read (issue #1111). The list is pinned the
+ * moment it is first answerable and held for the rest of the visit (issue #526),
+ * so two collectors mounted milliseconds apart pin at two moments, and a
+ * download landing between them leaves one holding a row the other has already
+ * dropped. `useResume` gets away with three callers because it holds nothing.
+ *
+ * So there is one collection per page and everything else reads it. Not because
+ * the two answers were seen to differ, but because agreeing by coincidence is
+ * what issue #1077 removed from the suggested map for the same reason, and
+ * PR #1121 has since made the offer outlive the mount that drew it, which widens
+ * the window a second snapshot could pin differently in.
+ *
+ * `null` when nothing has provided one, which {@link useGetStartedOffer} refuses
+ * rather than papers over. A reader that collected its own copy would be the
+ * defect this exists to remove, so it has to fail loudly rather than quietly
+ * work.
+ */
+export const GetStartedOfferContext =
+  createContext<GetStartedOfferState | null>(null);
+
+/**
+ * What the get-started card is offering. Must be used under
+ * {@link GetStartedOfferContext}.
+ */
+export function useGetStartedOffer(): GetStartedOfferState {
+  const state = useContext(GetStartedOfferContext);
+  if (!state)
+    throw new Error("get-started offer read outside GetStartedOfferContext");
+  return state;
 }
 
 /**
