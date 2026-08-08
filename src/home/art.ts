@@ -244,3 +244,7 @@ registerCardArtSource("bundled", bundledCardArt);
 import { contentCardArt } from "./contentArt";
 
 registerCardArtSource("content", contentCardArt);
+
+import { overrideCardArt } from "./artOverride";
+
+registerCardArtSource("override", overrideCardArt);
