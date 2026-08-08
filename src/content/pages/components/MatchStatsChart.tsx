@@ -25,12 +25,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { DemoInfo, DemoTrailer, Metric } from "../../bindings";
 import {
   allySeries,
+  type ChartDisplay,
   type ChartMode,
   type ChartRow,
   type ChartSeries,
   type ChartView,
   chartHeight,
-  chartRows,
   defaultChartView,
   defaultMetric,
   END_LABEL_MAX_SERIES,
@@ -40,18 +40,21 @@ import {
   formatDuration,
   formatRate,
   metricGroups,
-  perMinuteRows,
+  modeRows,
   secondsPerFrame,
   spreadLabels,
   teamSeries,
   tooltipRows,
+  valueTable,
 } from "../../matchStats";
+import { MatchStatsTable } from "./MatchStatsTable";
 
 /**
  * The match's chart: a line per seat or a line per side over match time, a
  * control that picks which of the registry's metrics it draws, one that picks
  * whether it draws the running totals the file recorded or the rate they were
- * rising at, and one that picks which of those two sets of lines it draws.
+ * rising at, one that picks which of those two sets of lines it draws, and one
+ * that swaps the plot for the same figures printed as a table (#1140).
  *
  * Everything the chart derives is in `matchStats.ts`, because vitest runs in node
  * and can't render a component. This file is the recharts wiring and nothing else.
@@ -156,6 +159,11 @@ const MODES: { value: ChartMode; label: string }[] = [
 const VIEWS: { value: ChartView; label: string }[] = [
   { value: "players", label: "Players" },
   { value: "teams", label: "Teams" },
+];
+
+const DISPLAYS: { value: ChartDisplay; label: string }[] = [
+  { value: "chart", label: "Chart" },
+  { value: "table", label: "Table" },
 ];
 
 /**
@@ -275,6 +283,7 @@ export function MatchStatsChart({
   // Null until the reader picks one, so the opening view follows the match's own
   // size without an effect that would overwrite what they chose.
   const [chosen, setChosen] = useState<ChartView | null>(null);
+  const [display, setDisplay] = useState<ChartDisplay>("chart");
   const metric = metrics.find((m) => m.key === key) ?? opening;
 
   const players = useMemo(() => teamSeries(trailer, info), [trailer, info]);
@@ -282,14 +291,23 @@ export function MatchStatsChart({
   const view = chosen ?? defaultChartView(players, sides);
   const series = view === "teams" ? sides : players;
 
-  const rows = useMemo(() => {
-    if (!metric) return [];
-    const totals = chartRows(series, metric.key, secondsPerFrame(trailer));
-    return mode === "perMinute" ? perMinuteRows(totals) : totals;
-  }, [series, metric, trailer, mode]);
+  const rows = useMemo(
+    () =>
+      metric
+        ? modeRows(series, metric.key, secondsPerFrame(trailer), mode)
+        : [],
+    [series, metric, trailer, mode],
+  );
   const formatValue = mode === "perMinute" ? formatRate : formatChartValue;
+  // The same rows the plot draws, printed. Nothing is asked of the trailer a
+  // second time, so the two can't answer different questions.
+  const table = useMemo(
+    () => (metric ? valueTable(series, rows, { metric, mode, view }) : null),
+    [series, rows, metric, mode, view],
+  );
 
-  if (!metric || series.length === 0 || rows.length === 0) return null;
+  if (!metric || !table || series.length === 0 || rows.length === 0)
+    return null;
 
   // Four or fewer lines get their names at their end points, and the legend's
   // colour-matching job disappears with them.
@@ -297,10 +315,9 @@ export function MatchStatsChart({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
-      {/* The control row. #1140's value table lands beside these: the chart's
-       * inputs are all state in this component, and what they change is which
-       * pure function runs over the trailer rather than anything the chart
-       * itself has to know. */}
+      {/* The control row. Every one of these picks which pure function runs
+       * over the trailer, and the last picks whether the answer is drawn or
+       * printed, so the table needs nothing the plot didn't already have. */}
       <div className="flex flex-wrap items-center gap-2">
         <MetricPicker metrics={metrics} value={metric.key} onChange={setKey} />
         <Choice
@@ -315,72 +332,78 @@ export function MatchStatsChart({
           label="Charted lines"
           onChange={setChosen}
         />
+        <Choice
+          value={display}
+          options={DISPLAYS}
+          label="Shown as"
+          onChange={setDisplay}
+        />
       </div>
 
-      <ResponsiveContainer width="100%" height={chartHeight(series.length)}>
-        <LineChart
-          data={rows}
-          margin={{
-            top: 8,
-            right: labelled ? END_LABEL_GUTTER : 8,
-            bottom: 0,
-            left: 0,
-          }}
-        >
-          {/* Horizontal only. A vertical grid over a time axis adds lines
-           * without adding a reading. */}
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="currentColor"
-            opacity={0.12}
-            vertical={false}
-          />
-          <XAxis
-            dataKey="timeSec"
-            type="number"
-            domain={[0, "dataMax"]}
-            tickFormatter={axisTime}
-            tick={axisTick}
-            tickLine={false}
-            axisLine={false}
-            minTickGap={32}
-          />
-          {/* Anchored at zero. A chart of resources that starts at 40,000 tells
-           * a lie about the first ten minutes. */}
-          <YAxis
-            domain={[0, "auto"]}
-            tickFormatter={formatValue}
-            tick={axisTick}
-            tickLine={false}
-            axisLine={false}
-            width={52}
-          />
-          <Tooltip
-            content={<SeriesTooltip series={series} format={formatValue} />}
-            cursor={{ stroke: "currentColor", strokeOpacity: 0.35 }}
-            isAnimationActive={false}
-          />
-          {!labelled && <Legend wrapperStyle={{ fontSize: 12 }} />}
-          {series.map((s) => (
-            <Line
-              key={s.id}
-              type="monotone"
-              dataKey={s.id}
-              name={s.label}
-              stroke={s.color}
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 3 }}
+      {display === "table" ? (
+        <MatchStatsTable table={table} />
+      ) : (
+        <ResponsiveContainer width="100%" height={chartHeight(series.length)}>
+          <LineChart
+            data={rows}
+            margin={{
+              top: 8,
+              right: labelled ? END_LABEL_GUTTER : 8,
+              bottom: 0,
+              left: 0,
+            }}
+          >
+            {/* Horizontal only. A vertical grid over a time axis adds lines
+             * without adding a reading. */}
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="currentColor"
+              opacity={0.12}
+              vertical={false}
+            />
+            <XAxis
+              dataKey="timeSec"
+              type="number"
+              domain={[0, "dataMax"]}
+              tickFormatter={axisTime}
+              tick={axisTick}
+              tickLine={false}
+              axisLine={false}
+              minTickGap={32}
+            />
+            {/* Anchored at zero. A chart of resources that starts at 40,000 tells
+             * a lie about the first ten minutes. */}
+            <YAxis
+              domain={[0, "auto"]}
+              tickFormatter={formatValue}
+              tick={axisTick}
+              tickLine={false}
+              axisLine={false}
+              width={52}
+            />
+            <Tooltip
+              content={<SeriesTooltip series={series} format={formatValue} />}
+              cursor={{ stroke: "currentColor", strokeOpacity: 0.35 }}
               isAnimationActive={false}
             />
-          ))}
-          {labelled && <EndLabels points={endPoints(series, rows)} />}
-        </LineChart>
-      </ResponsiveContainer>
-
-      {/* The value table (#1140) belongs under the chart, reading the same
-       * `series` and `rows` this does, so it shows whichever view and whichever
-       * of the two questions is selected without asking a second time. */}
+            {!labelled && <Legend wrapperStyle={{ fontSize: 12 }} />}
+            {series.map((s) => (
+              <Line
+                key={s.id}
+                type="monotone"
+                dataKey={s.id}
+                name={s.label}
+                stroke={s.color}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 3 }}
+                isAnimationActive={false}
+              />
+            ))}
+            {labelled && <EndLabels points={endPoints(series, rows)} />}
+          </LineChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }

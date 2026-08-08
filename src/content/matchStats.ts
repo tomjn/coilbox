@@ -438,6 +438,9 @@ export function allySeries(
 /** Whether the chart draws a line per seat or a line per side. */
 export type ChartView = "players" | "teams";
 
+/** Whether the figures are drawn as lines or printed as a table (#1140). */
+export type ChartDisplay = "chart" | "table";
+
 /**
  * More lines than this and the chart opens on Teams. At or below it a match is
  * small enough to read line by line, and a duel must not open on a view that
@@ -594,6 +597,23 @@ export function perMinuteRows(rows: ChartRow[]): ChartRow[] {
     if (first >= 0) rates[first][id] = openingRate(rates, id, first);
   }
   return rates;
+}
+
+/**
+ * The rows a match is read from: the running totals the file recorded, or the
+ * rate they were rising at, whichever the reader asked for.
+ *
+ * One call, one array. The plot draws it and the value table prints it, so the
+ * table cannot answer a different question from the lines above it.
+ */
+export function modeRows(
+  series: ChartSeries[],
+  key: MetricKey,
+  secPerFrame: number,
+  mode: ChartMode,
+): ChartRow[] {
+  const totals = chartRows(series, key, secPerFrame);
+  return mode === "perMinute" ? perMinuteRows(totals) : totals;
 }
 
 /** One line of the tooltip. */
@@ -754,4 +774,84 @@ export function spreadLabels<T extends { y: number }>(
     below = down[i].y;
   }
   return down;
+}
+
+/* ---------------------------------------------------------------------------
+ * The value table (#1140).
+ *
+ * A line answers what shape a match was. It does not answer what the number
+ * was, and for a reader using a screen reader it answers nothing at all. The
+ * table is the same figures printed, so this derives none of them: it is handed
+ * the series and the rows the plot was given and formats what is already there.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * A figure in the table, which is the one place a figure is not shortened.
+ * `73.3k` is the reading the chart already gives, and the table exists because
+ * that reading is not a number anybody can quote.
+ *
+ * Two decimals, because the engine records floats and a per-minute figure is
+ * often under ten, and thousands separated, because six digits in a column of
+ * sixteen are counted otherwise.
+ */
+export function formatTableValue(value: number): string {
+  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+/** One column of the table: a series, in the order the chart draws it. */
+export interface ValueColumn {
+  id: string;
+  label: string;
+  color: string;
+}
+
+/** One row: a match time, and every column's figure at it. */
+export interface ValueRow {
+  timeSec: number;
+  /** The row's own header. A match time, never a sample number. */
+  time: string;
+  /** In column order. Null where the series has no reading at that time. */
+  cells: (string | null)[];
+}
+
+/** Everything the table prints, including the name it is announced under. */
+export interface ValueTable {
+  /**
+   * The table's caption, and so its accessible name. The chart's title work is
+   * done by the controls above it, which a screen reader reading a cell has no
+   * access to, so the name has to carry the metric, the question and the lines.
+   */
+  caption: string;
+  columns: ValueColumn[];
+  rows: ValueRow[];
+}
+
+/**
+ * The chart's own figures as a table.
+ *
+ * `rows` is whatever {@link modeRows} returned, so the per-minute table is the
+ * per-minute numbers and the teams table is the summed sides, without this
+ * asking the trailer a second question. `mode` is read only to pick the caption
+ * and how many decimals a figure keeps.
+ */
+export function valueTable(
+  series: ChartSeries[],
+  rows: ChartRow[],
+  shown: { metric: Metric; mode: ChartMode; view: ChartView },
+): ValueTable {
+  const { metric, mode, view } = shown;
+  const question = mode === "perMinute" ? "per minute" : "in total";
+  const lines = view === "teams" ? "by team" : "by player";
+  return {
+    caption: `${metric.label} ${question}, ${lines}, over match time`,
+    columns: series.map((s) => ({ id: s.id, label: s.label, color: s.color })),
+    rows: rows.map((row) => ({
+      timeSec: row.timeSec,
+      time: formatDuration(Math.round(row.timeSec)),
+      cells: series.map((s) => {
+        const value = row[s.id];
+        return typeof value === "number" ? formatTableValue(value) : null;
+      }),
+    })),
+  };
 }

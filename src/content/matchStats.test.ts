@@ -21,12 +21,14 @@ import {
   formatChartValue,
   formatDuration,
   formatRate,
+  formatTableValue,
   formatTotal,
   hasStatistics,
   headlineTotals,
   lastPointIndex,
   matchTotal,
   metricGroups,
+  modeRows,
   PLAYERS_VIEW_MAX_SERIES,
   perMinuteRows,
   resultLabel,
@@ -37,6 +39,7 @@ import {
   teamSeries,
   teamTotal,
   tooltipRows,
+  valueTable,
 } from "./matchStats";
 
 /**
@@ -876,6 +879,26 @@ describe("perMinuteRows", () => {
   });
 });
 
+describe("modeRows", () => {
+  const series = () =>
+    teamSeries(
+      trailer([[at(0, KEY_A, 0), at(450, KEY_A, 90), at(900, KEY_A, 300)]], 15),
+      info(),
+    );
+
+  it("is the running totals the file recorded", () => {
+    const rows = modeRows(series(), KEY_A, 1 / 30, "cumulative");
+    expect(rows).toEqual(chartRows(series(), KEY_A, 1 / 30));
+    expect(rows.map((r) => r.team0)).toEqual([0, 90, 300]);
+  });
+
+  it("is the rate they were rising at when that is the question", () => {
+    const rows = modeRows(series(), KEY_A, 1 / 30, "perMinute");
+    expect(rows).toEqual(perMinuteRows(chartRows(series(), KEY_A, 1 / 30)));
+    expect(rows.map((r) => r.team0)).toEqual([360, 360, 840]);
+  });
+});
+
 describe("tooltipRows", () => {
   /** `count` teams, each ending on a bigger figure than the last. */
   const many = (count: number) =>
@@ -1071,5 +1094,203 @@ describe("formatRate", () => {
     expect(formatRate(360)).toBe("360");
     expect(formatRate(5_900.4)).toBe("5.9k");
     expect(formatRate(1_050_000)).toBe("1.05M");
+  });
+});
+
+describe("formatTableValue", () => {
+  it("prints the figure rather than the chart's shorthand", () => {
+    // The whole point of the table: `1.05M` is the reading the axis already
+    // gives, and it is not a number anybody can quote.
+    expect(formatChartValue(1_050_000)).toBe("1.05M");
+    expect(formatTableValue(1_050_000)).toBe("1,050,000");
+  });
+
+  it("keeps a small figure's decimals", () => {
+    expect(formatTableValue(1.2)).toBe("1.2");
+    expect(formatTableValue(0)).toBe("0");
+  });
+
+  it("stops at two decimals, since the engine records floats", () => {
+    expect(formatTableValue(477.93275451660156)).toBe("477.93");
+  });
+});
+
+describe("valueTable", () => {
+  const shown = { metric: metric(KEY_A, "Damage dealt", true) } as const;
+  const players = { ...shown, mode: "cumulative", view: "players" } as const;
+
+  /** One team, sampled every 15 seconds at 30 frames a second. */
+  const oneTeam = trailer([
+    [at(0, KEY_A, 1), at(450, KEY_A, 4), at(900, KEY_A, 9)],
+  ]);
+
+  const table = (
+    t: DemoTrailer,
+    over: Partial<Parameters<typeof valueTable>[2]> = {},
+    match = info(),
+  ) => {
+    const view = over.view === "teams" ? allySeries : teamSeries;
+    const series = view(t, match);
+    const mode = over.mode ?? "cumulative";
+    const rows = modeRows(series, KEY_A, secondsPerFrame(t), mode);
+    return valueTable(series, rows, { ...players, ...over });
+  };
+
+  describe("its caption, which is the name it is announced under", () => {
+    it("names the metric, the question and the lines", () => {
+      expect(table(oneTeam).caption).toBe(
+        "Damage dealt in total, by player, over match time",
+      );
+    });
+
+    it("says per minute when that is what the figures are", () => {
+      expect(table(oneTeam, { mode: "perMinute" }).caption).toBe(
+        "Damage dealt per minute, by player, over match time",
+      );
+    });
+
+    it("says by team when the sides are what is listed", () => {
+      expect(table(oneTeam, { view: "teams" }).caption).toBe(
+        "Damage dealt in total, by team, over match time",
+      );
+    });
+  });
+
+  describe("its columns", () => {
+    const two = trailer([[at(0, KEY_A, 1)], [at(0, KEY_A, 2)]]);
+    const match = info({
+      players: [
+        { name: "sprung", spectator: false, team: 0, rgbColor: [1, 0, 0] },
+        { name: "mate", spectator: false, team: 1, rgbColor: [0, 0, 1] },
+      ],
+    });
+
+    it("are the chart's own lines, in the order it draws them", () => {
+      expect(table(two, {}, match).columns).toEqual([
+        { id: "team0", label: "sprung", color: "#ff0000" },
+        { id: "team1", label: "mate", color: "#0000ff" },
+      ]);
+    });
+  });
+
+  describe("its rows", () => {
+    it("are labelled with the match time, not the sample number", () => {
+      // Starting at frame 1800 rather than 0, so a row numbered from its index
+      // can't read the same as a row labelled from its time.
+      const late = trailer([
+        [at(1800, KEY_A, 1), at(2250, KEY_A, 2), at(2700, KEY_A, 3)],
+      ]);
+      expect(table(late).rows.map((r) => r.time)).toEqual([
+        "1:00",
+        "1:15",
+        "1:30",
+      ]);
+    });
+
+    it("read the period off the trailer rather than assuming 15 seconds", () => {
+      // The same frames, recorded as a 20-second period: every row is at a
+      // different time, and a hard-coded 15 would report all three wrongly.
+      const slow = trailer(
+        [[at(0, KEY_A, 1), at(450, KEY_A, 2), at(900, KEY_A, 3)]],
+        20,
+      );
+      expect(table(slow).rows.map((r) => r.time)).toEqual([
+        "0:00",
+        "0:20",
+        "0:40",
+      ]);
+      expect(table(slow).rows.map((r) => r.timeSec)).toEqual([0, 20, 40]);
+    });
+
+    it("carry each line's figure at that time", () => {
+      expect(table(oneTeam).rows.map((r) => r.cells)).toEqual([
+        ["1"],
+        ["4"],
+        ["9"],
+      ]);
+    });
+
+    it("have nothing where a line has no reading", () => {
+      // Team 1 stops being recorded, and a zero there would claim a measurement
+      // the file doesn't have.
+      const stops = trailer([
+        [at(0, KEY_A, 1), at(450, KEY_A, 4), at(900, KEY_A, 9)],
+        [at(0, KEY_A, 2), at(450, KEY_A, 5)],
+      ]);
+      expect(table(stops).rows.map((r) => r.cells)).toEqual([
+        ["1", "2"],
+        ["4", "5"],
+        ["9", null],
+      ]);
+    });
+  });
+
+  describe("against a real match", () => {
+    /**
+     * Greenhaven, read out of the decoder: teams 0 and 1 were one side, at four
+     * of the frames the engine sampled. Their sides' figures were added up by
+     * hand from the same two lists, and `allySeries` is held to them above.
+     */
+    const greenhaven = trailer([
+      [
+        at(1800, KEY_A, 177.93333435058594),
+        at(4500, KEY_A, 2847.468505859375),
+        at(9000, KEY_A, 27216.3828125),
+        at(14850, KEY_A, 103667.1640625),
+      ],
+      [
+        at(1800, KEY_A, 299.9994201660156),
+        at(4500, KEY_A, 4576.6015625),
+        at(9000, KEY_A, 46115.00390625),
+        at(14850, KEY_A, 223599.4375),
+      ],
+    ]);
+
+    /** Both teams on one side, so the teams view is one column of sums. */
+    const oneSide = info({
+      players: [
+        { name: "a", spectator: false, team: 0, allyTeam: 0 },
+        { name: "b", spectator: false, team: 1, allyTeam: 0 },
+      ],
+    });
+
+    /**
+     * The frames are 2,700 and 4,500 and 5,850 apart, so the recorded 15-second
+     * period puts them at 10, 25, 50 and 82.5 seconds. Sampling at the engine's
+     * 30 frames a second is what actually happened, so this asks for the frame
+     * times the match had rather than the ones this excerpt implies.
+     */
+    const SEC_PER_FRAME = 1 / 30;
+
+    const sides = () => allySeries(greenhaven, oneSide);
+
+    it("adds a side up the way a person does with a calculator", () => {
+      const rows = modeRows(sides(), KEY_A, SEC_PER_FRAME, "cumulative");
+      const t = valueTable(sides(), rows, { ...players, view: "teams" });
+      expect(t.rows.map((r) => [r.time, ...r.cells])).toEqual([
+        ["1:00", "477.93"],
+        ["2:30", "7,424.07"],
+        ["5:00", "73,331.39"],
+        ["8:15", "327,266.6"],
+      ]);
+    });
+
+    it("turns that into the rise over the minutes between two samples", () => {
+      // 477.93275451660156 to 7424.070068359375 is 6,946.14 over the 90 seconds
+      // from frame 1800 to frame 4500, which is 4,630.76 a minute.
+      const rows = modeRows(sides(), KEY_A, SEC_PER_FRAME, "perMinute");
+      const t = valueTable(sides(), rows, {
+        ...players,
+        mode: "perMinute",
+        view: "teams",
+      });
+      expect(t.rows.map((r) => [r.time, ...r.cells])).toEqual([
+        // The first row has no predecessor, so it is drawn at the second's rate.
+        ["1:00", "4,630.76"],
+        ["2:30", "4,630.76"],
+        ["5:00", "26,362.93"],
+        ["8:15", "78,133.91"],
+      ]);
+    });
   });
 });
