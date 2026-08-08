@@ -55,9 +55,11 @@ import {
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
+import { formatDuration, resultLabel } from "../matchStats";
 import { provenanceLink } from "../replayProvenanceLink";
 import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
+import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
@@ -69,33 +71,12 @@ const BAR_SEARCH_URL = "https://files-cdn.beyondallreason.dev/find";
 
 const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** Seconds → `mm:ss` (or `h:mm:ss`). */
-function formatDuration(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
-  const ss = String(s).padStart(2, "0");
-  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
-
 function playedAt(ms: number): string {
   if (!ms) return "";
   return new Date(ms).toLocaleString(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
   });
-}
-
-/** Human-readable result line from the winning ally-teams. */
-function resultLabel(info: DemoInfo): string {
-  // False either because the recording never reached a game over, or because
-  // its trailer is in a format coilbox doesn't read and there was no demotool
-  // fallback to ask, so this doesn't name a specific reason.
-  if (!info.winnersKnown) return "Unknown";
-  if (info.winningAllyTeams.length === 0) return "Nobody won";
-  const ids = info.winningAllyTeams.map((a) => `Ally ${a}`).join(", ");
-  return `${ids} won`;
 }
 
 /** `rgbColor` (0..1) → a CSS colour for the team swatch. */
@@ -1052,6 +1033,8 @@ export default function ReplayDetailPage() {
               </p>
             )}
           </section>
+
+          {replay && <MatchStatsSection info={info} replayPath={replay.path} />}
         </>
       ) : null}
     </div>

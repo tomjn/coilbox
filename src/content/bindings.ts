@@ -357,6 +357,32 @@ export interface TeamStatSample {
   unitsKilled: number;
 }
 
+/** One team's samples for a whole match, in the order the engine recorded them. */
+export interface TeamStatSeries {
+  /** The `[teamN]` index this series belongs to. */
+  team: number;
+  /** Empty for a team the engine recorded no samples for, which is an answer
+   * ("no statistics") rather than an error. */
+  samples: TeamStatSample[];
+}
+
+/** The records after a replay's demo stream: who won, and how the match went. */
+export interface DemoTrailer {
+  /** The ally teams that won. Empty is a real outcome (a game over with nobody
+   * winning), not a missing answer. */
+  winningAllyTeams: number[];
+  /** Seconds between samples, so a frame can be turned into a time without
+   * assuming a period. */
+  teamStatPeriodSec: number;
+  /** One entry per team, in team order. */
+  teams: TeamStatSeries[];
+  /** One entry per player, indexed by the `[playerN]` id. Absent when the match
+   * recorded no statistics: the bytes are still in the file and still read as
+   * integers, so the decoder withholds them rather than hand over memory that
+   * was never written (issue #1190). */
+  players?: PlayerStats[];
+}
+
 /** A metric's identity: a sample field other than the frame it was taken at. */
 export type MetricKey = Exclude<keyof TeamStatSample, "frame">;
 
@@ -511,6 +537,19 @@ export const contentDemoInfo = defineCommand<
   { enginePath: string; replayPath: string },
   { info: DemoInfo }
 >("coilbox-content", "content_demo_info");
+
+/**
+ * Decode one replay's trailer: the winning ally teams and every team's series of
+ * samples. No engine folder and no subprocess, so it answers for a replay whose
+ * game isn't installed. `replayPath` is a `ReplayFile.path`.
+ *
+ * It reads the whole file, so call it for one replay on demand rather than for a
+ * library.
+ */
+export const contentReplayTrailer = defineCommand<
+  { replayPath: string },
+  { trailer: DemoTrailer }
+>("coilbox-content", "content_replay_trailer");
 
 /**
  * The metric registry: every figure a replay's team statistics carry, named,
