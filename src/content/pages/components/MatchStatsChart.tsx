@@ -118,6 +118,13 @@ function MetricPicker({
  * A pair of buttons rather than a second dropdown, because each of these is a
  * choice between two views of the same match and not a setting: both options
  * stay on screen, and which one is showing is the button that is lit.
+ *
+ * Joined, with one outline around the pair and a shared divider, because two
+ * separated buttons read as two unrelated actions rather than one question with
+ * two answers (#1213). That is what `ToggleGroup` draws by default, so this
+ * asks for the outline variant and then adds nothing to the group itself: the
+ * `gap-2` that used to be here overrode the component's own spacing and split
+ * the pair back apart.
  */
 function Choice<T extends string>({
   value,
@@ -130,20 +137,28 @@ function Choice<T extends string>({
   label: string;
   onChange: (value: T) => void;
 }) {
-  const item =
-    "rounded-md border border-border/60 px-3 py-1 text-xs data-[state=on]:border-primary data-[state=on]:bg-primary/10";
   return (
     <ToggleGroup
       type="single"
+      variant="outline"
+      size="sm"
       value={value}
       // Radix clears the value when the lit button is pressed again, and there
       // is no third option to fall back to, so an empty change is ignored.
       onValueChange={(v) => v && onChange(v as T)}
-      className="gap-2"
       aria-label={label}
     >
       {options.map((o) => (
-        <ToggleGroupItem key={o.value} value={o.value} className={item}>
+        <ToggleGroupItem
+          key={o.value}
+          value={o.value}
+          // A joined group drops every item's left border but the first's, so
+          // the lit one is outlined on three sides and its neighbour's grey
+          // border stands where its fourth should be. The missing edge is drawn
+          // back as an inset line rather than a border: a border there loses to
+          // the component's own more specific rule, and would widen the item.
+          className="px-3 text-xs data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:not-first:shadow-[inset_1px_0_0_var(--color-primary)]"
+        >
           {o.label}
         </ToggleGroupItem>
       ))}
