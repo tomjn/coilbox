@@ -1,8 +1,17 @@
-import { describe, expect, it } from "vitest";
-import { rewriteBrandedCss } from "./welcomeAssets";
+import { describe, expect, it, vi } from "vitest";
+
+// welcomeAssets.ts pulls in refs.ts (defineCommand) whose published dist won't load
+// under Vitest's node resolver. The rewrite is pure, so stub the leaf.
+vi.mock("@picoframe/plugin-sdk", () => ({
+  defineCommand: () => async () => ({}),
+}));
+
+import { classifyMarkdownLink } from "./pageLinks";
+import { rewriteBrandedCss, rewrittenUrl } from "./welcomeAssets";
 
 // rewriteBrandedHtml needs DOMParser (not available under the Node test env), so it
-// is exercised in the live smoke test; the pure CSS rewrite is covered here.
+// is exercised in the live smoke test. Its per-attribute decision is `rewrittenUrl`,
+// which is pure and covered here along with the CSS rewrite that shares it.
 
 describe("rewriteBrandedCss", () => {
   it("rewrites local url() refs to the asset protocol", () => {
@@ -21,5 +30,89 @@ describe("rewriteBrandedCss", () => {
     const css =
       "a { background: url(https://x/y.png); } b { background: url(data:image/png;base64,AAAA); }";
     expect(rewriteBrandedCss(css)).toBe(css);
+  });
+
+  it("resolves a @.coilbox url() to the file it names", () => {
+    expect(
+      rewriteBrandedCss("body { background: url(@.coilbox/images/bg.gif); }"),
+    ).toBe(
+      "body { background: url(coilbox://localhost/portable/images/bg.gif); }",
+    );
+  });
+});
+
+describe("rewrittenUrl", () => {
+  it("rewrites a relative path to the asset protocol", () => {
+    expect(rewrittenUrl("images/logo.webp")).toBe(
+      "coilbox://localhost/portable/images/logo.webp",
+    );
+  });
+
+  it("rewrites a @.coilbox file ref to the path it names", () => {
+    expect(rewrittenUrl("@.coilbox/images/logo.webp")).toBe(
+      "coilbox://localhost/portable/images/logo.webp",
+    );
+  });
+
+  it("leaves a @route/ or @widget/ ref for the app to read", () => {
+    expect(rewrittenUrl("@route/play/replays")).toBeUndefined();
+    expect(rewrittenUrl(" @route/singleplayer ")).toBeUndefined();
+    expect(rewrittenUrl("@widget/build-tree")).toBeUndefined();
+  });
+
+  it("leaves an @ value that is not a reference alone", () => {
+    // Neither a path nor a ref, so an asset URL built from it could only 404.
+    expect(rewrittenUrl("@")).toBeUndefined();
+    expect(rewrittenUrl("@nosuch/thing")).toBeUndefined();
+    expect(rewrittenUrl("@.coilbox/../secret")).toBeUndefined();
+  });
+
+  it("leaves absolute, in-page and app-absolute URLs alone", () => {
+    expect(rewrittenUrl("https://example.org/x.png")).toBeUndefined();
+    expect(rewrittenUrl("data:image/png;base64,AAAA")).toBeUndefined();
+    expect(rewrittenUrl("#/play/skirmish")).toBeUndefined();
+    expect(rewrittenUrl("/downloads/games")).toBeUndefined();
+  });
+});
+
+/**
+ * The `href` half of a navigate marker: what the click handler reads is whatever
+ * the rewrite left on the element, so classify that rather than the source value
+ * (issue #1048). Every `href` form the distribution docs promise, end to end apart
+ * from the DOM parse.
+ */
+describe("the href a navigate marker resolves through", () => {
+  const asClicked = (href: string) =>
+    classifyMarkdownLink(rewrittenUrl(href) ?? href);
+
+  it("resolves a @route/ href to that route", () => {
+    expect(asClicked("@route/play/replays")).toEqual({
+      kind: "route",
+      to: "/play/replays",
+    });
+  });
+
+  it("resolves an app-absolute href to that route", () => {
+    expect(asClicked("/downloads/games")).toEqual({
+      kind: "route",
+      to: "/downloads/games",
+    });
+  });
+
+  it("resolves a .md href to its page route", () => {
+    expect(asClicked("rules.md")).toEqual({
+      kind: "route",
+      to: "/pages/rules",
+    });
+    expect(asClicked("@.coilbox/rules.md")).toEqual({
+      kind: "route",
+      to: "/pages/rules",
+    });
+  });
+
+  it("leaves a hash link to the browser", () => {
+    // Not a route target, so the handler skips preventDefault and the hash
+    // navigates the app itself.
+    expect(asClicked("#/play/skirmish").kind).toBe("anchor");
   });
 });
