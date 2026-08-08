@@ -269,6 +269,14 @@ describe("what resolveHome reports as issues", () => {
       { zones: [{ zone: "cards", before: 7, after: {} }] },
     ],
     [
+      "markup on a custom entry that is not a string",
+      { zones: [{ html: "<p>hi</p>", before: 7 }] },
+    ],
+    [
+      "a key written where nothing reads it",
+      { zones: [{ zone: "cards", title: "Tools", html: "<p>hi</p>" }] },
+    ],
+    [
       "several mistakes at once",
       {
         layout: [],
@@ -440,16 +448,94 @@ describe("a zone's string options", () => {
     expect(warn).toHaveBeenCalled();
   });
 
-  it("says nothing about a key the zone would never read", () => {
-    // A `title` on the tool grid is not rendered whatever its type, so calling
-    // it an ignored value would promise that a string there would have worked.
-    expect(strings({ zone: "cards", title: 7 })).toEqual({});
-    expect(warn).not.toHaveBeenCalled();
-  });
-
   it("keeps the rest of the entry when one option is wrong", () => {
     expect(strings({ zone: "greeting", title: 7, tagline: "Ready" })).toEqual({
       tagline: "Ready",
     });
+  });
+});
+
+/**
+ * A key written where nothing reads it (issue #1094).
+ *
+ * The author's next move is what separates this from a value that is wrong: a
+ * key in the wrong place has to move, a bad value has to be fixed. So the two
+ * complaints do not share a sentence, and the one about placement says nothing
+ * about the value, because a string there would not have worked either.
+ */
+describe("a key the entry does not read", () => {
+  /** Resolve a one-entry page and return what it complained about. */
+  const issuesFor = (entry: Record<string, unknown>) =>
+    resolveHome({ zones: [entry] }).issues;
+
+  it("names a greeting-only key written on another zone", () => {
+    expect(issuesFor({ zone: "cards", title: "Tools" })).toStrictEqual([
+      'home: `title` does nothing on the "cards" zone',
+    ]);
+  });
+
+  it("says the same whatever the value is, because the value is not the fault", () => {
+    expect(issuesFor({ zone: "cards", title: 7 })).toStrictEqual(
+      issuesFor({ zone: "cards", title: "Tools" }),
+    );
+  });
+
+  it("names `html` on a built-in zone, which draws itself", () => {
+    expect(
+      issuesFor({ zone: "cards", html: "@.coilbox/home/feed.html" }),
+    ).toStrictEqual(['home: `html` does nothing on the "cards" zone']);
+  });
+
+  it("does not confuse it with a value that is wrong", () => {
+    const [issue] = issuesFor({ zone: "cards", before: 7 });
+    expect(issue).toContain("expected a string");
+    expect(issue).not.toContain("does nothing");
+  });
+
+  it("says nothing about a key the entry does read", () => {
+    expect(issuesFor({ zone: "greeting", title: "Ironhold" })).toStrictEqual(
+      [],
+    );
+    expect(issuesFor({ html: "<p>hi</p>", before: "<p>b</p>" })).toStrictEqual(
+      [],
+    );
+  });
+
+  it("leaves an author's own keys alone", () => {
+    // `HomeZoneConfig` keeps every other key verbatim for whoever reads it, so
+    // complaining about one would be this module deciding for another.
+    expect(issuesFor({ zone: "cards", art: {}, note: "todo" })).toStrictEqual(
+      [],
+    );
+  });
+});
+
+/**
+ * A custom `html` entry takes `before` and `after` like any other entry (issue
+ * #1094). The layout used to drop them, which is the one place the code
+ * disagreed with what the documentation promises.
+ */
+describe("a custom html entry's string options", () => {
+  /** The strings resolved for a one-entry page. */
+  const strings = (entry: Record<string, unknown>) => {
+    const [first] = resolveHome({ zones: [entry] }).entries;
+    if (first.kind !== "html") throw new Error("expected a custom entry");
+    return first.strings;
+  };
+
+  it("carries the markup around the block", () => {
+    expect(
+      strings({ html: "@.coilbox/feed.html", before: "<p>From the forum</p>" }),
+    ).toEqual({ before: "<p>From the forum</p>" });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("drops a value that is not a string, and names where it was", () => {
+    expect(strings({ html: "<p>x</p>", after: 7 })).toEqual({});
+    expect(warn.mock.calls.join("\n")).toContain("a custom `html` entry");
+  });
+
+  it("does not carry the block itself, which the entry already holds", () => {
+    expect(strings({ html: "<p>x</p>" })).toEqual({});
   });
 });

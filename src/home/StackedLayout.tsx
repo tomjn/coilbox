@@ -236,6 +236,11 @@ function bare(entry: HomeEntry, zone: ZoneId): boolean {
  * nothing about, so any margin picked here would be one its author then has to
  * fight, and their markup can carry its own.
  *
+ * `before` and `after` render around every entry, custom ones included. A custom
+ * entry's markup often lives in its own file, so the sentence introducing it and
+ * the block itself are two different things to edit, and a distribution can keep
+ * the sentence in `profile.json` next to the reference (issue #1094).
+ *
  * A zone's `before` and `after` markup sits inside that zone's spacing wrapper,
  * so an intro sentence takes the gap that separated the zone from what came
  * before it and the zone itself stays tight under the sentence. Two consequences
@@ -255,14 +260,16 @@ function renderEntry(
   index: number,
   zones: ReadonlySet<ZoneId>,
 ): ReactNode {
-  if (entry.kind === "html")
-    return <HomeMarkup key={index} markup={entry.html} />;
   const { before, after } = entry.strings;
-  const spacing = ZONE_SPACING[entry.zone];
+  const spacing = entry.kind === "zone" ? ZONE_SPACING[entry.zone] : undefined;
   const node = (
     <>
       {before !== undefined && <HomeMarkup markup={before} />}
-      {zoneNode(entry, zones)}
+      {entry.kind === "html" ? (
+        <HomeMarkup markup={entry.html} />
+      ) : (
+        zoneNode(entry, zones)
+      )}
       {after !== undefined && <HomeMarkup markup={after} />}
     </>
   );
