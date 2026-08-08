@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 // welcomeAssets.ts pulls in refs.ts (defineCommand) whose published dist won't load
@@ -12,6 +13,31 @@ import { rewriteBrandedCss, rewrittenUrl } from "./welcomeAssets";
 // rewriteBrandedHtml needs DOMParser (not available under the Node test env), so it
 // is exercised in the live smoke test. Its per-attribute decision is `rewrittenUrl`,
 // which is pure and covered here along with the CSS rewrite that shares it.
+
+/**
+ * Which elements a distribution's markup may carry, asserted on the source
+ * because the DOM work it takes to enforce cannot run here (issue #1117).
+ *
+ * Two one-line statements decide the whole policy, and either could be dropped
+ * without a single unit test noticing. Losing the first puts back the split
+ * where a `<style>` or a `<link>` worked or did not depending on which line the
+ * author wrote it on. Losing the second puts back a markup block that can
+ * re-point every relative URL in Coilbox with a trailing `<base href>`.
+ */
+describe("the head elements a zone may carry", () => {
+  const source = readFileSync(
+    new URL("./welcomeAssets.ts", import.meta.url),
+    "utf8",
+  );
+
+  it("moves a leading style and link back into the body", () => {
+    expect(source).toContain('doc.head.querySelectorAll("style, link")');
+  });
+
+  it("strips the app-scoped elements wherever they were written", () => {
+    expect(source).toContain('doc.body.querySelectorAll("base, meta, script")');
+  });
+});
 
 describe("rewriteBrandedCss", () => {
   it("rewrites local url() refs to the asset protocol", () => {
