@@ -2249,6 +2249,74 @@ mod tests {
         assert!(err.contains("negative team count"), "got: {err}");
     }
 
+    /// The bytes of a fixture's trailer, which start straight after the script
+    /// when the fixture has no demo stream.
+    fn trailer_bytes(f: &DemoFixture) -> Vec<u8> {
+        f.bytes()[f.header_size + f.script.len()..].to_vec()
+    }
+
+    /// Why every assertion above names a sample other than the first.
+    ///
+    /// Read with the wrong stride, sample 0 comes out perfect, because it starts
+    /// where the block does. Sample 1 is the first one the stride has had a
+    /// chance to get wrong. A fixture asserted only on its first sample proves
+    /// nothing at all, which is the failure this milestone exists to prevent.
+    #[test]
+    fn a_wrong_stride_is_caught_by_the_second_sample_not_the_first() {
+        let f = DemoFixture {
+            team_stat_elem_size: 88,
+            team_samples: vec![series(5)],
+            ..Default::default()
+        };
+        let block = trailer_bytes(&f);
+        let samples = &block[4..]; // past the one sample count
+
+        // Striding by the 80 bytes we know how to read, rather than the 88 the
+        // header declares.
+        assert_eq!(read_team_stat_sample(&samples[0..]), sample(0));
+        assert_ne!(read_team_stat_sample(&samples[80..]), sample(1));
+
+        // Striding by the declared size gets every one of them.
+        for i in 0..5usize {
+            assert_eq!(read_team_stat_sample(&samples[i * 88..]), sample(i as i32));
+        }
+    }
+
+    /// The synthetic files are only worth anything if they are shaped like a file
+    /// the engine wrote, so this pins them to one that was measured by hand:
+    /// `2026-07-20_02-27-48-248_Greenhaven BAR v1.2_2025.06.21.sdfz`, a 490 second
+    /// 3 team game with 2 players, one winning ally-team, and 34 samples a team.
+    ///
+    /// Its trailer is 8213 bytes: 1 winner, 40 of player statistics, and a
+    /// `teamStatSize` of 8172, which is `3*4 + 3*34*80`. Both figures matched the
+    /// real file to the byte.
+    #[test]
+    fn a_fixture_is_shaped_like_the_file_the_engine_wrote() {
+        let f = DemoFixture {
+            winning_ally_teams: vec![0],
+            player_stats: vec![[163, 163, 416_476, 493, 277], [194, 230, 227_928, 364, 462]],
+            team_samples: vec![series(34), series(34), series(34)],
+            game_time: 490,
+            ..Default::default()
+        };
+        let bytes = f.bytes();
+        let read = |off: usize| i32::from_le_bytes(bytes[off..off + 4].try_into().unwrap());
+        assert_eq!(read(OFF_NUM_PLAYERS), 2);
+        assert_eq!(read(OFF_PLAYER_STAT_SIZE), 40);
+        assert_eq!(read(OFF_NUM_TEAMS), 3);
+        assert_eq!(read(OFF_TEAM_STAT_SIZE), 8172);
+        assert_eq!(read(OFF_WINNING_ALLY_TEAMS_SIZE), 1);
+        assert_eq!(trailer_bytes(&f).len(), 8213);
+
+        // And a player's first int32 is their command count, not their mouse
+        // travel. `PlayerStatistics` derives from `TeamControllerStatistics`, so
+        // the base members come first and this is not the order the header file
+        // declares. Reading it as declared reports 416476 commands over 8 minutes.
+        let players_at = f.header_size + f.script.len() + 1;
+        assert_eq!(read(players_at), 163, "numCommands");
+        assert_eq!(read(players_at + 8), 416_476, "mousePixels");
+    }
+
     /// End-to-end over the real replays in `~/.spring/demos`, which is the check a
     /// synthetic fixture cannot make: that the fixtures agree with a file the
     /// engine wrote. Ignored by default, it needs replays on disk.
