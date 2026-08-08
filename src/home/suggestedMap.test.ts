@@ -83,7 +83,7 @@ vi.mock("./suggestedMap", async (importOriginal) => {
 
 import type { SuggestedMap, SuggestedMapList } from "../content/branding";
 import type { EnqueueInput } from "../downloads/DownloadQueueProvider";
-import { ART_CARD_CLASS } from "./cardShell";
+import { ART_BAND_CLASS, ART_CARD_CLASS } from "./cardShell";
 import * as suggested from "./suggestedMap";
 import SuggestedMapZone, { SuggestedMapCard } from "./zones/SuggestedMap";
 
@@ -806,6 +806,22 @@ describe("the suggested map card", () => {
     expect(html).toContain("Suggested map");
     expect(html).toContain("animate-pulse");
     expect(html).not.toContain("Install");
+  });
+
+  it("reserves the card's height by being the card's parts, not a number", () => {
+    // It was `min-h-40`, the height the card had while it stood alone at the
+    // foot of the page. In the Downloads group it sets the row's height, so 15px
+    // short moved the row and everything under it every time the catalog landed
+    // (issue #1083). Built out of the same art window and band as the card, so
+    // the two cannot drift apart again.
+    const html = render({ loading: true });
+    const settled = render({ art: "https://example.test/thumb.jpg" });
+    expect(html).not.toContain("min-h-40");
+    // The card's shell, the card's art window and the card's band, both sides.
+    for (const part of [ART_CARD_CLASS, ART_BAND_CLASS, "min-h-28"]) {
+      expect(html, part).toContain(part);
+      expect(settled, part).toContain(part);
+    }
   });
 
   it("renders nothing once the catalog is in and curates no maps", () => {
