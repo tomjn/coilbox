@@ -407,6 +407,14 @@ describe("the page settles the cards around the suggested map", () => {
     expect(source).toContain('zones.has("suggested")');
     expect(source).toContain('zones.has("onboarding")');
   });
+
+  it("asks the get-started collector whether onboarding is offering maps", () => {
+    // The other half of the promotion question, and the half that is state
+    // rather than composition (issue #1109). One call, so dropping it would
+    // leave every unit test green and put the coarser condition back.
+    expect(source).toContain("useGetStartedOffer()");
+    expect(source).toMatch(/onboardingMaps:.*offer\.maps\.length > 0/);
+  });
 });
 
 describe("the daily rotation", () => {
@@ -695,7 +703,7 @@ describe("what the card may offer", () => {
 });
 
 describe("where the card goes", () => {
-  const page = { zone: true, onboarding: false };
+  const page = { zone: true, onboardingMaps: false };
   const settled = { page, loading: false, map: map("a"), noMaps: false };
 
   it("sits in the Downloads group when the player has maps", () => {
@@ -708,17 +716,30 @@ describe("where the card goes", () => {
     expect(suggestedMapPlacement({ ...settled, noMaps: true })).toBe("row");
   });
 
-  it("yields the top row to the onboarding zone, which owns first run", () => {
-    // That zone offers curated maps on exactly this condition, and asks for an
-    // engine and a content folder before there is one. Either way the page is
-    // already making the offer, so this card does not make it twice.
+  it("yields the top row while onboarding is offering maps", () => {
+    // `GetStartedCard` lists several with a packs banner under them, which is
+    // the better offer, so this card does not make a worse one beside it.
     expect(
       suggestedMapPlacement({
         ...settled,
         noMaps: true,
-        page: { zone: true, onboarding: true },
+        page: { zone: true, onboardingMaps: true },
       }),
     ).toBe("cards");
+  });
+
+  it("takes the top row when onboarding is on the page and saying nothing", () => {
+    // The state issue #1109 was raised for: the player dismissed "Set up
+    // Coilbox" and has no engine, so the zone is listed and draws nothing. The
+    // coarser question, whether the zone was listed, suppressed the promotion
+    // against no competing offer at all.
+    expect(
+      suggestedMapPlacement({
+        ...settled,
+        noMaps: true,
+        page: { zone: true, onboardingMaps: false },
+      }),
+    ).toBe("row");
   });
 
   it("leaves the page when there is nothing left to offer", () => {
@@ -732,7 +753,7 @@ describe("where the card goes", () => {
     expect(
       suggestedMapPlacement({
         ...settled,
-        page: { zone: false, onboarding: true },
+        page: { zone: false, onboardingMaps: true },
       }),
     ).toBe("absent");
   });
@@ -742,6 +763,19 @@ describe("where the card goes", () => {
     // that appeared in one place and moved to another would be worse than a wait.
     expect(
       suggestedMapPlacement({ ...settled, loading: true, map: null }),
+    ).toBe("cards");
+  });
+
+  it("does not promote on a question onboarding has not answered", () => {
+    // The caller folds an unread offer into `loading`, so this is the second
+    // lock rather than the first. A promotion taken here would be held for the
+    // day by `holdSuggestion`, so guessing costs a whole session.
+    expect(
+      suggestedMapPlacement({
+        ...settled,
+        noMaps: true,
+        page: { zone: true, onboardingMaps: null },
+      }),
     ).toBe("cards");
   });
 });
