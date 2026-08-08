@@ -1034,6 +1034,9 @@ async fn install_recoil_engine(
     })
     .await
     .map_err(|e| format!("extract task failed: {e}"))?;
+    if extracted.is_ok() {
+        restore_exec_bits(&tmp, &dest);
+    }
     let _ = std::fs::remove_file(&tmp);
     extracted?;
     carry_engine_config(&engine_root, &dest);
@@ -1068,6 +1071,53 @@ async fn dl_download_engine_recoil(
         Err(e) => CliResult::err(e),
     }
 }
+
+/// 7-Zip's unix extension bit. When set in an entry's attribute word, the POSIX
+/// mode sits in the top 16 bits.
+#[cfg(unix)]
+const UNIX_EXTENSION: u32 = 0x8000;
+
+/// The execute bits an archive entry asks for, or `None` when it asks for none.
+/// Entries written on Windows carry no mode at all, hence the extension check.
+#[cfg(unix)]
+fn archived_exec_bits(attributes: u32) -> Option<u32> {
+    if attributes & UNIX_EXTENSION == 0 {
+        return None;
+    }
+    let bits = (attributes >> 16) & 0o111;
+    (bits != 0).then_some(bits)
+}
+
+/// Put back the execute bits the archive asked for on the files just extracted
+/// from it.
+///
+/// A Recoil release marks `spring`, `spring-headless` and its own `pr-downloader`
+/// executable, but sevenz-rust2 writes contents only and drops every mode, so on
+/// Linux they land at whatever the umask gives and running one fails with EACCES
+/// ("Permission denied (os error 13)", issue #1013). Re-reading the archive is
+/// cheap here: only the header is parsed, no file data is decompressed again.
+#[cfg(unix)]
+fn restore_exec_bits(archive: &std::path::Path, dest: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let Ok(listing) = sevenz_rust2::Archive::open(archive) else {
+        return;
+    };
+    for entry in listing.files.iter().filter(|e| !e.is_directory) {
+        let Some(bits) = archived_exec_bits(entry.windows_attributes) else {
+            continue;
+        };
+        let path = dest.join(&entry.name);
+        let Ok(meta) = std::fs::metadata(&path) else {
+            continue;
+        };
+        let mode = meta.permissions().mode();
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode | bits));
+    }
+}
+
+/// Windows carries no POSIX modes, so there is nothing to put back.
+#[cfg(not(unix))]
+fn restore_exec_bits(_archive: &std::path::Path, _dest: &std::path::Path) {}
 
 /// Names of the regular files sitting directly in `dir`. Directories are left
 /// out, so the extracted engine folders never appear.
@@ -1313,6 +1363,65 @@ mod tests {
         assert!(
             cancel_registry().lock().unwrap().get(op).is_none(),
             "entry removed after unregister"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn only_entries_the_archive_marked_executable_are_picked_up() {
+        assert_eq!(
+            archived_exec_bits(UNIX_EXTENSION | (0o755 << 16)),
+            Some(0o111)
+        );
+        assert_eq!(archived_exec_bits(UNIX_EXTENSION | (0o644 << 16)), None);
+        // Written on Windows: an attribute word with no mode in it at all. The
+        // 0o755 pattern in the top bits is meaningless without the extension bit.
+        assert_eq!(archived_exec_bits(0x20), None);
+        assert_eq!(archived_exec_bits(0o755 << 16), None);
+    }
+
+    /// The engine ships `spring` and its own `pr-downloader` marked executable.
+    /// They have to come out of the archive that way or nothing can run them
+    /// (issue #1013).
+    #[cfg(unix)]
+    #[test]
+    fn extracting_an_engine_keeps_its_binaries_runnable() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let archive = dir.path().join("engine.7z");
+
+        let entry = |w: &mut sevenz_rust2::ArchiveWriter<std::fs::File>, name: &str, mode: u32| {
+            let mut e = sevenz_rust2::ArchiveEntry::new_file(name);
+            e.has_windows_attributes = true;
+            e.windows_attributes = UNIX_EXTENSION | (mode << 16);
+            w.push_archive_entry(e, Some(&b"content"[..])).unwrap();
+        };
+        let mut writer = sevenz_rust2::ArchiveWriter::create(&archive).unwrap();
+        entry(&mut writer, "spring", 0o755);
+        entry(&mut writer, "springsettings.cfg", 0o644);
+        writer.finish().unwrap();
+
+        let dest = dir.path().join("2026.07.04");
+        sevenz_rust2::decompress_file(&archive, &dest).unwrap();
+        let mode = |name: &str| {
+            std::fs::metadata(dest.join(name))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777
+        };
+        assert_eq!(
+            mode("spring") & 0o111,
+            0,
+            "sevenz-rust2 still drops modes - if it stopped, restore_exec_bits can go"
+        );
+
+        restore_exec_bits(&archive, &dest);
+        assert_eq!(mode("spring") & 0o111, 0o111, "the engine can be run");
+        assert_eq!(
+            mode("springsettings.cfg") & 0o111,
+            0,
+            "a data file is left as it was"
         );
     }
 
