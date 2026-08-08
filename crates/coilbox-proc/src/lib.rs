@@ -1,4 +1,5 @@
-//! Spawning child processes without flashing a console window on Windows.
+//! Spawning child processes: no console window on Windows, and a file we can
+//! actually run on unix.
 //!
 //! Coilbox is a GUI-subsystem app, so it owns no console. When it spawns a
 //! console-mode child (pr-downloader, the unitsync worker, springmapconvng,
@@ -11,7 +12,9 @@
 //! `#[cfg(windows)]` block (four of them had it, three spawn sites didn't),
 //! build children through [`command`] and the flag comes for free.
 //!
-//! Inert off Windows.
+//! The unix side is the same idea for a different problem: coilbox unpacks
+//! engines from archives whose POSIX modes get dropped on the way out, so
+//! [`command`] puts the execute bit back on a file it is about to run.
 
 use std::ffi::OsStr;
 use std::process::Command;
