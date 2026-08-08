@@ -4,11 +4,8 @@ import type { NavGroup, NavItem } from "@picoframe/plugin-sdk";
  * The nav groups the home page offers as tools: the sidebar's groups, minus Home
  * itself and any group that leaves empty.
  *
- * A pure function of the frame's nav, so the Greeting and the tool grid can each
- * answer from the same input. Zones must not read each other's state, and this is
- * what lets the greeting say "No tools available yet." without asking the grid
- * whether it drew anything. The greeting asks {@link homeHasTools} rather than
- * this, because a group can be non-empty and still hold no tools.
+ * A pure function of the frame's nav, so the grid draws exactly the groups the
+ * sidebar shows.
  */
 export function homeToolGroups(nav: readonly NavGroup[]): NavGroup[] {
   return nav
@@ -36,28 +33,14 @@ export interface GroupCards {
  * router `Link` and a button that opens the system browser. It catches both
  * kinds of external item: a distribution's `profile.links`, and the reference
  * links the Animation, Mapconv and Lego plugins declare with `sidebar: false`.
+ *
+ * It is also what makes "the grid drew a tool card" the right question for the
+ * Greeting to ask (#1057, #1066). Only the items this puts in `tools` reach
+ * `ToolCard`, so only they can leave a `data-tool-card` marker behind.
  */
 export function splitGroupItems(items: readonly NavItem[]): GroupCards {
   return {
     tools: items.filter((i) => !i.href),
     links: items.filter((i) => Boolean(i.href)),
   };
-}
-
-/**
- * Whether the home page offers anything to do inside Coilbox.
- *
- * The grid's question is "is there a card to draw?", and a links card is one.
- * The Greeting's question is a different one: "is there a tool to choose?". A
- * link is a way out of the app rather than something to do in it, so a
- * distribution narrowed down to nothing but `profile.links` has no tools, and
- * the Greeting has to say so over a page that still shows those links.
- *
- * It asks {@link splitGroupItems}, the same split the grid uses to decide which
- * card an item belongs in, so the two cannot disagree about what a link is.
- */
-export function homeHasTools(nav: readonly NavGroup[]): boolean {
-  return homeToolGroups(nav).some(
-    (g) => splitGroupItems(g.items).tools.length > 0,
-  );
 }

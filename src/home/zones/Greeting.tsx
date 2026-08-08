@@ -1,10 +1,23 @@
 import { useFrame } from "@picoframe/frame";
 import { useMultiplayer } from "../../multiplayer/store";
 import { useResume } from "../continue";
-import { homeHasTools } from "../nav";
 
-/** The heading and the line under it. */
-export type GreetingCopy = { heading: string; tagline: string };
+/**
+ * The heading and the line under it.
+ *
+ * Two lines when the page itself settles which one is true. See
+ * {@link greetingCopy}.
+ */
+export type GreetingCopy = {
+  heading: string;
+  /** The line under the heading, or the one for a page that drew a tool. */
+  tagline: string;
+  /**
+   * The line for a page whose tool grid drew nothing, or null when the state
+   * already settled which sentence is right.
+   */
+  taglineWithoutTools: string | null;
+};
 
 /** Everything the copy depends on, gathered by the component's hooks. */
 export type GreetingState = {
@@ -14,12 +27,6 @@ export type GreetingState = {
   username: string | null;
   /** Whether anything is waiting to be resumed. */
   hasResume: boolean;
-  /**
-   * Whether there is a tool to choose. External links do not count: they are a
-   * way out of Coilbox rather than something to do in it, so a page showing
-   * nothing but a links card still has no tools.
-   */
-  hasTools: boolean;
 };
 
 /**
@@ -46,21 +53,32 @@ export interface GreetingOverrides {
  * falls back to the app title. The tagline says the most useful true thing:
  * point at what you were doing if there is anything, otherwise send you to the
  * tools, and admit it when there are none.
+ *
+ * Which of those last two is true is not something this function can know, so it
+ * hands back both and the page picks. A distribution's own wording, and a page
+ * with something to resume, settle it here and get `taglineWithoutTools` null.
  */
 export function greetingCopy(
-  { title, username, hasResume, hasTools }: GreetingState,
+  { title, username, hasResume }: GreetingState,
   overrides: GreetingOverrides = {},
 ): GreetingCopy {
-  let tagline: string;
-  if (hasResume) tagline = "Pick up where you left off.";
-  else if (hasTools) tagline = "Choose a tool to get started.";
-  else tagline = "No tools available yet.";
+  const settled = overrides.tagline ?? (hasResume ? RESUME_LINE : null);
   return {
     heading:
       overrides.title ?? (username ? `Welcome back, ${username}` : title),
-    tagline: overrides.tagline ?? tagline,
+    tagline: settled ?? TOOLS_LINE,
+    taglineWithoutTools: settled === null ? NO_TOOLS_LINE : null,
   };
 }
+
+/** There is something waiting, so point at it rather than at the grid. */
+const RESUME_LINE = "Pick up where you left off.";
+
+/** The grid drew at least one tool card. */
+const TOOLS_LINE = "Choose a tool to get started.";
+
+/** It drew none, so the page is a heading and whatever links came with it. */
+const NO_TOOLS_LINE = "No tools available yet.";
 
 /**
  * The name to greet, or null.
@@ -103,6 +121,25 @@ function useHasResume(): boolean {
 }
 
 /**
+ * What each of the two tool sentences waits for.
+ *
+ * `[data-tool-card]` is the marker the tool grid leaves on every card it draws
+ * (see `./ToolCards`). One of these two lines is displayed and the other is not,
+ * so the page says the true one from the first paint, with no second render and
+ * nothing to flash.
+ *
+ * The grid's own sections already answer "did any of my items draw?" this way,
+ * with `hidden has-[[data-nav-item]]:block`. This is the same question one level
+ * up, so it gets the same answer.
+ *
+ * Scoped to `body` rather than to a wrapper, because the marker is left by
+ * another zone and the greeting must not need a particular ancestor to have been
+ * put there by a particular layout. Nothing outside the tool grid sets it.
+ */
+const WITH_TOOLS = "hidden [body:has([data-tool-card])_&]:block";
+const WITHOUT_TOOLS = "[body:has([data-tool-card])_&]:hidden";
+
+/**
  * The page's heading and tagline.
  *
  * Owns the copy the tool grid used to carry, including the empty-grid line, so
@@ -112,24 +149,47 @@ function useHasResume(): boolean {
  * The props are a distribution's own wording, passed in by the layout from the
  * zone's entry rather than read from the profile here, so the zone stays a pure
  * function of what it is given.
+ *
+ * ## Why the tool sentence is chosen in CSS
+ *
+ * It used to be chosen from the nav, and the nav is not the whole answer. A nav
+ * item can define `useVisible`, and the tool card honours it: a gated item draws
+ * nothing. So a distribution narrow enough to gate every item off got "Choose a
+ * tool to get started." over an empty page (#1066), the same failure as #1057
+ * from a different direction.
+ *
+ * The greeting cannot call `useVisible` itself. It is a hook, one per item, over
+ * a list whose length is not the greeting's to depend on, which is why every
+ * other reader of it is a component per item. Nor can the two zones tell each
+ * other: the home page is built on zones that share collectors rather than state,
+ * so that no zone has to render before another can be right.
+ *
+ * So both sentences go on the page and the grid's own markup picks between them.
+ * The thing the two zones share is the card the grid drew, which cannot disagree
+ * with itself: an item that is gated off, or that is a link rather than a tool,
+ * leaves no marker to find.
  */
 export default function Greeting(overrides: GreetingOverrides = {}) {
-  const { title, nav } = useFrame();
+  const { title } = useFrame();
   const username = useLobbyName();
   const hasResume = useHasResume();
-  const { heading, tagline } = greetingCopy(
-    {
-      title,
-      username,
-      hasResume,
-      hasTools: homeHasTools(nav),
-    },
+  const { heading, tagline, taglineWithoutTools } = greetingCopy(
+    { title, username, hasResume },
     overrides,
   );
   return (
     <>
       <h1 className="text-2xl font-semibold">{heading}</h1>
-      <p className="mt-1 text-muted-foreground">{tagline}</p>
+      <p
+        className={`mt-1 text-muted-foreground${taglineWithoutTools === null ? "" : ` ${WITH_TOOLS}`}`}
+      >
+        {tagline}
+      </p>
+      {taglineWithoutTools !== null && (
+        <p className={`mt-1 text-muted-foreground ${WITHOUT_TOOLS}`}>
+          {taglineWithoutTools}
+        </p>
+      )}
     </>
   );
 }
