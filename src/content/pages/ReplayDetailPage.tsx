@@ -107,6 +107,36 @@ function swatch(rgb?: [number, number, number]): string | undefined {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+/**
+ * A seat's actions per minute, with the rest of the trailer's counters behind
+ * it on hover.
+ *
+ * Rendered only when the decoder had statistics to give: a match the engine
+ * recorded none for has no `apm`, and the section says so once rather than
+ * every row showing a placeholder (issue #1190).
+ */
+function Apm({ p }: { p: ReplayPlayer }) {
+  if (p.apm === undefined) return null;
+  const s = p.stats;
+  const detail = s
+    ? [
+        `${s.numCommands} orders given`,
+        `${s.unitCommands} reached a unit`,
+        `${s.mouseClicks} mouse clicks`,
+        `${s.keyPresses} key presses`,
+        `${s.mousePixels} pixels of mouse travel`,
+      ].join(", ")
+    : undefined;
+  return (
+    <span
+      className="shrink-0 text-xs text-muted-foreground tabular-nums"
+      title={detail}
+    >
+      {Math.round(p.apm)} APM
+    </span>
+  );
+}
+
 function PlayerRow({ p, won }: { p: ReplayPlayer; won: boolean }) {
   return (
     <li className="flex items-center gap-2 py-1">
@@ -138,6 +168,7 @@ function PlayerRow({ p, won }: { p: ReplayPlayer; won: boolean }) {
       {p.side && (
         <span className="shrink-0 text-xs text-muted-foreground">{p.side}</span>
       )}
+      <Apm p={p} />
       {won && (
         <Trophy
           className="size-3.5 shrink-0 text-amber-500"
@@ -211,6 +242,12 @@ function Players({ info }: { info: DemoInfo }) {
     push(a.allyTeam ?? -1, { kind: "ai", ai: a });
   }
   const allyTeamIds = [...teams.keys()].sort((a, b) => a - b);
+  // Nobody having an APM means the file carried no statistics: either the
+  // recording never reached a game over, or it ended with the block left
+  // uninitialised (#1190). Said once here rather than as a placeholder on every
+  // row, since it is a fact about the recording and not about the player.
+  const seated = info.players.filter((p) => !p.spectator);
+  const noStats = seated.length > 0 && seated.every((p) => p.apm === undefined);
 
   return (
     <section className="flex flex-col gap-2">
@@ -263,6 +300,12 @@ function Players({ info }: { info: DemoInfo }) {
           );
         })}
       </div>
+      {noStats && (
+        <p className="text-xs text-muted-foreground">
+          The engine recorded no player statistics for this match, so no actions
+          per minute are shown.
+        </p>
+      )}
       {spectators.length > 0 && (
         <p className="text-xs text-muted-foreground">
           Spectators: {spectators.map((s) => s.name).join(", ")}
