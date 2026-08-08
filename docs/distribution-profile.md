@@ -422,7 +422,7 @@ Six zones make up the page. Each one is self-contained and draws nothing when it
 | `continue`   | One card for the thing you were last doing: a Warpath run, the next campaign mission, a conquest, a battle you can still rejoin, or your last skirmish setup. | There is nothing to resume, which includes every fresh install.                            |
 | `resume`     | Up to three runners-up the `continue` card did not take, plus a "log in as" card when you are logged out with a saved login. | There are no runners-up.                                                                   |
 | `cards`      | Every sidebar destination as a card, in the sidebar's own groups. A group's external links share one card at its end.      | The build has no navigation left outside Home.                                             |
-| `suggested`  | One curated map to download that the player does not already have, chosen by date. Sits in the tool grid's Downloads group, or at the top of the page when the player has no maps at all and your list has no `onboarding` zone. | The player already has every curated map, or the catalog offers none that can be installed and pictured. |
+| `suggested`  | One curated map to download that the player does not already have, chosen by date. Sits in the tool grid's Downloads group, or at the top of the page when the player has no maps at all and the `onboarding` zone is offering none. | The player already has every curated map, or the catalog offers none that can be installed and pictured. |
 
 The ids in the first column are what you write in `zones`.
 
@@ -474,7 +474,7 @@ Coilbox does not make an exception for this, and here is the reasoning so you ca
 - The state is reachable three other ways already: [`"onboarding": "off"`](#onboarding-string), the card's own Dismiss button, and a `welcome` that replaces the page. An exception here would close one door of four.
 - "Omitting a zone hides it" is the one rule that makes the zone list explainable in a sentence. A zone that came back when Coilbox decided the install was unhealthy would make it "omitting a zone hides it, sometimes".
 
-There is one thing the zone list does make an exception for, and it goes the other way. On an install with no maps at all, the `suggested` map card moves to the top of the page, ahead of the resume cards, because without a map nothing can be played. It only does that when your list has no `onboarding` zone, since that zone is already offering maps to a player who has none and one page should not ask twice.
+There is one thing that goes the other way. On an install with no maps at all, the `suggested` map card moves to the top of the page, ahead of the resume cards, because without a map nothing can be played. It only does that while the `onboarding` zone is offering no maps of its own, since the get-started card lists several with a packs banner under them and one page should not ask twice. Dropping `onboarding`, or setting it `"off"`, is one way to get the promoted card. So is a player who dismissed "Set up Coilbox" and has no engine, where the zone is on your page and drawing nothing.
 
 So keep `onboarding` in your list unless you mean to remove the offer, and use `"onboarding": "off"` when you do, since that says what you meant and works whether or not you write `zones`.
 
@@ -518,7 +518,7 @@ Every entry takes `before` and `after` markup, and an entry with `html` instead 
 
 One layout consequence worth knowing. Coilbox normally puts the `continue` card and the `resume` rail on one row, and folds the `suggested` map card into the tool grid's Downloads group. An entry carrying `before` or `after` markup stops pairing, so those two zones stack separately instead. Put your markup on a neighbouring entry, or on a custom `html` entry, if you want the pairing kept.
 
-The `suggested` card is promoted into that same row for a player with no maps at all, so markup stops that too: markup on `continue` or `resume` leaves no row to promote into, and markup on `suggested` keeps the card next to the words you wrote about it.
+The `suggested` card is promoted into that same row for a player with no maps at all whom onboarding is offering none, so markup stops that too: markup on `continue` or `resume` leaves no row to promote into, and markup on `suggested` keeps the card next to the words you wrote about it.
 
 #### Card art for one tool
 

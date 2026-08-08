@@ -72,7 +72,7 @@ ResumeRail   the runners-up Continue did not take, capped at 3
 ToolCards    nav-derived, groups preserved, art via resolveCardArt
 SuggestedMap one map you do not have, downloadable
              every candidate installed -> renders nothing
-             no maps at all, no onboarding zone -> promoted to the top row
+             no maps at all, onboarding offering none -> promoted to the top row
 Onboarding   existing SetupCard and GetStartedCard, behaviour unchanged
 Custom       distro markup, plus before and after slots on every zone above
 ```
@@ -102,10 +102,14 @@ Walking forward from the day's place, rather than rotating over a filtered list,
 Three places, decided for the page rather than by the card:
 
 - Downloads group, fourth card, which is the ordinary answer.
-- The top row, ahead of the continue hero and the resume rail, when the player has no maps at all. Without a map nothing can be played, so a first map outranks resuming.
+- The top row, ahead of the continue hero and the resume rail, when the player has no maps at all and onboarding is offering none. Without a map nothing can be played, so a first map outranks resuming.
 - Nowhere, when there is nothing left to offer: every candidate installed, or no candidate the catalog can picture. One outcome, one code path.
 
-The promotion yields to the Onboarding zone, which owns first run. That zone already offers curated maps on exactly the condition that would promote this card, and asks for an engine and a content folder before there is one, so on the default page the promoted card would be a second voice saying the same thing. A distribution that drops the zone, or sets `onboarding: "off"`, has nobody making the offer and gets the promoted card.
+The promotion yields while the Onboarding zone is offering maps. `GetStartedCard` lists several with a packs banner under them, which is the better offer of the two, so the page makes it once. Where that card is drawing nothing, this one takes the top row: a distribution that dropped the zone or set `onboarding: "off"`, and also a player who dismissed "Set up Coilbox" and has no engine, where the zone is on the page and silent.
+
+The question is "is onboarding offering maps", not "is the onboarding zone listed". The coarser one suppressed the promotion against an offer nobody was making (issue #1109). It is answered in two halves, joined in `CoilboxHome`: whether the zone is on the page comes from the layout's own zone list, and whether it is offering maps comes from `useGetStartedOffer`, the shared collector `GetStartedCard` itself draws from. Neither zone reads the other, and there is one predicate rather than two to keep in step.
+
+Being promoted does not make the card able to install. Before there is a download folder the Install button is disabled and the card says where to set one, which is the same thing it says in the Downloads group.
 
 ## Card art
 

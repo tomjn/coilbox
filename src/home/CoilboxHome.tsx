@@ -1,3 +1,4 @@
+import { useGetStartedOffer } from "../content/getStartedOffer";
 import { getOnboardingPlacement, getProfile } from "../profile/profile";
 import { publishArtOverrides } from "./artOverride";
 import BrandedHome from "./BrandedHome";
@@ -60,19 +61,29 @@ export default function CoilboxHome() {
  * between two zones. This is the only place it is resolved, and the zone that
  * draws it reads this answer (issue #1077).
  *
- * Which zones the page carries is part of that answer rather than something the
- * card could work out, because the card can now be promoted to the top of the
- * page and has to know what else is up there: the onboarding zone owns the
- * first-run download offer, and where it is on the page the promotion stands
- * down (issue #1102). The layout is told where the card goes for the same
- * reason it is told everything else, so no zone learns about another.
+ * Whether the card can be promoted to the top of the page is part of that answer
+ * too, and it is one question in two halves, joined here because this is the one
+ * place that sees both.
+ *
+ * - Composition: is the onboarding zone on this page at all. That is the zone
+ *   list `resolveHome` built, the same list the layout renders from.
+ * - State: is that zone offering maps. That is {@link useGetStartedOffer}, the
+ *   collector `GetStartedCard` itself draws from, so the two cannot answer
+ *   differently (issue #1109). It is read here rather than in either zone for
+ *   the same reason everything else here is: no zone learns about another.
+ *
+ * `null` until the collector has read enough to say, which the card's own answer
+ * waits on rather than guessing at.
  */
 function LayoutHome() {
   const { layout, background, entries } = resolveHome(getProfile().home);
   const zones = zonesOnPage(entries);
+  const { offer } = useGetStartedOffer();
+  const onboarding =
+    zones.has("onboarding") && getOnboardingPlacement() !== "off";
   const suggested = useSuggestedMap({
     zone: zones.has("suggested"),
-    onboarding: zones.has("onboarding") && getOnboardingPlacement() !== "off",
+    onboardingMaps: !onboarding ? false : offer && offer.maps.length > 0,
   });
   publishArtOverrides(resolveCardArtOverrides(entries));
   useContentCardArt(suggestedMapClaim(suggested));

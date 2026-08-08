@@ -31,6 +31,7 @@ import {
   useSuggestedMaps,
 } from "../content/branding";
 import { useUnitsyncScan } from "../content/config";
+import { scanSettled } from "../content/scanSettled";
 import { dlInstalledContent } from "../downloads/bindings";
 import { useContentRoots, useWriteRoot } from "../downloads/config";
 import {
@@ -82,7 +83,7 @@ function poolKey(map: SuggestedMap): string {
  *
  * Separate from {@link suggestedMapPool} so that a test can hold the catalog to
  * the rule that everything offered here can be pictured. See
- * `suggestedCatalog.test.ts`.
+ * `suggestedMap.test.ts`.
  */
 export function suggestedMapCandidates(
   maps: SuggestedMap[],
@@ -559,16 +560,21 @@ export interface SuggestedPage {
   /** The page carries the suggested map zone. */
   zone: boolean;
   /**
-   * The page carries the onboarding zone, and it is switched on.
+   * The onboarding section is offering maps, or `null` while that is not known
+   * yet.
    *
-   * That zone owns first run, and what it draws when the player has no maps is
-   * the get-started card's own list of maps to download, or, before there is an
-   * engine to play them with, the "Set up Coilbox" card. Either way the page is
-   * already making the offer this card would be promoted to make, so the
-   * promotion stands down rather than asking twice. See {@link
+   * Not "the page lists the onboarding zone", which is the coarser question and
+   * the one issue #1109 replaced. A zone that is on the page and saying nothing
+   * suppressed a promotion that nothing was competing with, which is exactly the
+   * player who dismissed the setup card and has no engine.
+   *
+   * Two halves, joined in `CoilboxHome`. Whether the zone is on the page at all
+   * is the layout's, from the same list it renders from. Whether it is offering
+   * maps is state, and it comes from `useGetStartedOffer`, the collector the
+   * get-started card itself draws from. Neither zone reads the other. See {@link
    * suggestedMapPlacement}.
    */
-  onboarding: boolean;
+  onboardingMaps: boolean | null;
 }
 
 /**
@@ -578,20 +584,22 @@ export interface SuggestedPage {
  * to be true: the player has no maps at all, and nothing else on the page is
  * already offering them one.
  *
- * The second is not a guess. `GetStartedCard`, which the onboarding zone draws,
- * offers curated maps on exactly the condition that promotes this card, that the
- * player has no maps, and offers them several with a packs banner under them.
- * Before there is an engine it draws nothing and `SetupCard` asks for the engine
- * and the content folder instead, which is both more fundamental and the thing
- * that has to happen before a download has anywhere to go. So on the default
- * page the promoted card would be a second voice saying a version of what
- * onboarding is already saying, and it yields. A distribution that drops the
- * onboarding zone, or sets `onboarding: "off"`, has nobody making the offer, and
- * there the card takes the top row.
+ * The second is not a guess and not a second opinion. `GetStartedCard` lists
+ * curated maps with a packs banner under them, and it is the better offer of the
+ * two, so where it is making it this card stays in the Downloads group. Where it
+ * is not, this card takes the top row. That covers the state a coarser question
+ * missed: a player who dismissed "Set up Coilbox" and has no engine gets nothing
+ * at all from onboarding, and used to get nothing here either because the zone
+ * was still listed.
+ *
+ * Nobody sees both offers, and nobody sees neither.
  *
  * While the answer is still loading the card keeps the place the profile gave
  * it, so the placeholder holds the Downloads row's height (issue #1083) and the
- * card never appears in one place and then moves to another.
+ * card never appears in one place and then moves to another. An unknown
+ * `onboardingMaps` is part of that wait and the caller folds it into `loading`.
+ * The `=== false` here says the same thing again, so a caller that did not
+ * cannot promote on a question nobody has answered.
  */
 export function suggestedMapPlacement(args: {
   page: SuggestedPage;
@@ -603,7 +611,7 @@ export function suggestedMapPlacement(args: {
   if (!args.page.zone) return "absent";
   if (args.loading) return "cards";
   if (!args.map) return "absent";
-  return args.noMaps && !args.page.onboarding ? "row" : "cards";
+  return args.noMaps && args.page.onboardingMaps === false ? "row" : "cards";
 }
 
 /**
@@ -665,7 +673,11 @@ export function useSuggestedMap(page: SuggestedPage): SuggestedMapAnswer {
       suggestedMapPool(maps, mergeMapLists(catalogLists, getProfileMapLists())),
     [maps, catalogLists],
   );
-  const ready = loaded && inventory.known;
+  // The onboarding offer is part of being ready, because the answer is held for
+  // the day the moment it is real and a placement taken before onboarding has
+  // spoken would be held all day. It is the same two reads the inventory waits
+  // on, so on the ordinary path this adds no wait.
+  const ready = loaded && inventory.known && page.onboardingMaps !== null;
   const fresh = useMemo(
     () => suggestedMapFor(pool, mirror.state, today, inventory),
     [pool, mirror.state, today, inventory],
@@ -753,15 +765,14 @@ export function useMapInventory(): MapInventory {
   }, [refresh]);
   useDownloadComplete(refresh);
 
-  // A target that has resolved but not scanned yet is the case to wait for. An
-  // install with no engine has no scan to wait for and never will, so it is
-  // known the moment the content state says there is no target.
-  const hasTarget = !!(target?.enginePath && target?.dataDir);
-  const scanKnown =
-    !targetLoading &&
-    (!hasTarget ||
-      (!scan.loading &&
-        (scan.data !== null || scan.error !== null || scan.cancelled)));
+  // A target that has resolved but not scanned yet is the case to wait for. See
+  // {@link scanSettled}, which the get-started offer waits on too so that the
+  // two cannot disagree about whether the inventory has answered.
+  const scanKnown = scanSettled({
+    targetLoading,
+    hasTarget: !!(target?.enginePath && target?.dataDir),
+    scan,
+  });
 
   return useMemo(
     () => ({
