@@ -8,6 +8,7 @@ import {
   ART_DIM_CLASS,
   ART_FADE_CLASS,
   ART_CARD_CLASS as ART_SHELL_CLASS,
+  CARD_FOCUS_CLASS,
   CARD_SHELL_CLASS,
   CARD_STACK_CLASS,
 } from "../cardShell";
@@ -134,7 +135,7 @@ export function SuggestedMapCard({ heading }: { heading?: boolean }) {
         // link and the band carries no button to nest inside it.
         <Link
           to={`/content/maps/${encodeURIComponent(installedName)}`}
-          className={`${art ? ART_CARD_CLASS : PLAIN_CARD_CLASS} hover:border-ring`}
+          className={`${art ? ART_CARD_CLASS : PLAIN_CARD_CLASS} hover:border-ring ${CARD_FOCUS_CLASS}`}
         >
           {body}
         </Link>
