@@ -12,13 +12,13 @@ import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { saveScenario } from "../storage";
 import { DialoguePanel } from "./components/DialoguePanel";
+import { applyEdit, type ScenarioEdit } from "./components/edits";
 import {
   type EditHistory,
   emptyHistory,
   isRedoKey,
   isTypingTarget,
   isUndoKey,
-  recordEdit,
   redoEdit,
   undoEdit,
 } from "./components/history";
@@ -118,16 +118,17 @@ export default function ScenarioEditPage() {
   }, []);
 
   /** An edit the author made, which is the only kind that goes in the history.
-   *  Every panel and the map itself come through here. */
+   *  Every panel and the map itself come through here. An edit is applied to the
+   *  document as it stands rather than to the one the caller was rendered with,
+   *  so two of them in one tick both land (issue #904). */
   const apply = useCallback(
-    (next: Scenario) => {
+    (edit: ScenarioEdit) => {
       const before = scenarioRef.current;
-      if (before) {
-        const recorded = recordEdit(historyRef.current, before, next);
-        historyRef.current = recorded;
-        setHistory(recorded);
-      }
-      persist(next);
+      if (!before) return;
+      const applied = applyEdit(before, historyRef.current, edit);
+      historyRef.current = applied.history;
+      setHistory(applied.history);
+      persist(applied.document);
     },
     [persist],
   );
@@ -200,7 +201,7 @@ export default function ScenarioEditPage() {
                   param: pick.param,
                 }),
           onPick: (pos: { x: number; z: number }) => {
-            apply(applyPoint(scenario, pick, pos));
+            apply((doc) => applyPoint(doc, pick, pos));
             if (!pointRepeats(pick)) setPick(null);
           },
           onDone: () => setPick(null),

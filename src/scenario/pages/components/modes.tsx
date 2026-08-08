@@ -30,6 +30,7 @@ import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Point, Scenario, ScenarioZone } from "../../model";
 import { addActor, parsePlacementKey } from "./editing";
+import type { ScenarioEdit } from "./edits";
 import {
   addGroup,
   clampCount,
@@ -52,14 +53,24 @@ import {
 /** What a mode is given: the document as it stands, and the way to change it. */
 export interface ModeContext {
   scenario: Scenario;
-  /** Write a new document. Saved by the page, so a mode never persists. */
-  onChange: (next: Scenario) => void;
+  /**
+   * Change the document. Saved by the page, so a mode never persists.
+   *
+   * An edit is written as what to make of the document handed to it rather than
+   * of `scenario`, which is the document this render was given: two clicks can
+   * both be handled before React renders either of them, and the second one
+   * would otherwise be built on the state before the first (issue #904).
+   */
+  onChange: (edit: ScenarioEdit) => void;
   /**
    * What is selected across the whole surface, which for most modes is nothing
    * to do with placing. Prefabs read it: a click adds to the base already
    * selected rather than starting a second one-building base beside it.
    */
   selected: string | null;
+  /** What is selected at the moment of a click rather than at the last render,
+   *  which is what a mode acting on the selection has to go by. */
+  selectedNow: () => string | null;
   /** Select what was just placed, so it can be turned or deleted straight
    *  away. Null clears the selection, which is how a mode lets go of it. */
   onSelect: (key: string | null) => void;
@@ -129,7 +140,7 @@ const zonesMode: EditorMode = {
   label: "Zones",
   icon: Square,
   hint: "Drag anywhere to draw a zone, inside another one if you like. Click a zone to select it, then drag its orange middle handle to move it. Middle-drag pans while this mode is on.",
-  use: ({ scenario, onChange, onSelect }) => {
+  use: ({ onChange, onSelect }) => {
     const [shape, setShape] = useState<ZoneShape>("box");
     const [draft, setDraft] = useState<ScenarioZone | null>(null);
 
@@ -148,15 +159,16 @@ const zonesMode: EditorMode = {
           return;
         }
         setDraft(null);
-        const zone = zoneFromDrag(
-          shape,
-          from,
-          to,
-          crypto.randomUUID(),
-          nextZoneName(scenario.zones),
+        const id = crypto.randomUUID();
+        // Named after the zones the document has when the zone lands, so two
+        // drawn one after the other are not both "Zone 1".
+        onChange((doc) =>
+          addZone(
+            doc,
+            zoneFromDrag(shape, from, to, id, nextZoneName(doc.zones)),
+          ),
         );
-        onChange(addZone(scenario, zone));
-        onSelect(zoneKey(zone.id));
+        onSelect(zoneKey(id));
       },
       controls: (
         <OptionSelect
@@ -205,8 +217,8 @@ const actorsMode: EditorMode = {
       place: unitDef
         ? (pos: Point) => {
             const id = crypto.randomUUID();
-            onChange(
-              addActor(scenario, id, { unitDef, team: owner, pos, facing: 0 }),
+            onChange((doc) =>
+              addActor(doc, id, { unitDef, team: owner, pos, facing: 0 }),
             );
             onSelect(placementKey("actor", id));
           }
@@ -260,8 +272,8 @@ const groupsMode: EditorMode = {
       place: unitDef
         ? (pos: Point) => {
             const id = crypto.randomUUID();
-            onChange(
-              addGroup(scenario, id, {
+            onChange((doc) =>
+              addGroup(doc, id, {
                 team: owner,
                 units: [{ def: unitDef, count }],
                 pos,
@@ -302,6 +314,16 @@ const groupsMode: EditorMode = {
   },
 };
 
+/** The base a placement key belongs to, which is the base a click in Bases mode
+ *  adds to. Null for a key that names anything else, and for no key at all. */
+function selectedBase(scenario: Scenario, key: string | null) {
+  const ref = key ? parsePlacementKey(key) : null;
+  return (
+    (ref?.kind === "prefab" && scenario.prefabs.find((p) => p.id === ref.id)) ||
+    null
+  );
+}
+
 /**
  * A pre-built base: several buildings put down as one cluster.
  *
@@ -322,7 +344,7 @@ const prefabsMode: EditorMode = {
   label: "Bases",
   icon: Factory,
   hint: "Pick a building and click the map. Clicks add to the base you have selected.",
-  use: ({ scenario, onChange, onSelect, selected }) => {
+  use: ({ scenario, onChange, onSelect, selected, selectedNow }) => {
     const [unitDef, setUnitDef] = useState("");
     const [team, setTeam] = useState("");
     const participants = scenario.setup.participants;
@@ -332,19 +354,22 @@ const prefabsMode: EditorMode = {
     const { units, loading } = useGameUnits(scenario.setup.gameName);
     const options = useMemo(() => buildingUnits(units), [units]);
 
-    // What a click adds to, which is whichever base the selection belongs to.
-    const ref = selected ? parsePlacementKey(selected) : null;
-    const base =
-      (ref?.kind === "prefab" &&
-        scenario.prefabs.find((p) => p.id === ref.id)) ||
-      null;
+    // Which base the controls are for, which is whichever the selection belongs
+    // to. A click works it out again from the document it is given.
+    const base = selectedBase(scenario, selected);
 
     return {
       place: unitDef
         ? (pos: Point) => {
-            if (base) {
-              onChange(
-                addBuilding(scenario, base.id, {
+            // Where the click lands is decided against the document and the
+            // selection as they stand: the click before this one can have made
+            // the base and selected it with neither yet rendered (#904).
+            const chosen = { key: "" };
+            onChange((doc) => {
+              const to = selectedBase(doc, selectedNow());
+              if (to) {
+                chosen.key = placementKey("prefab", to.id, to.buildings.length);
+                return addBuilding(doc, to.id, {
                   // Minted here rather than when a trigger first wants one, so
                   // every building the editor puts down can be named after the
                   // fact without moving the base's ids around.
@@ -353,18 +378,15 @@ const prefabsMode: EditorMode = {
                   // Offsets are measured from the base's origin, so what the
                   // document gets is the click less that.
                   offset: {
-                    x: pos.x - base.origin.x,
-                    z: pos.z - base.origin.z,
+                    x: pos.x - to.origin.x,
+                    z: pos.z - to.origin.z,
                   },
                   facing: 0,
-                }),
-              );
-              onSelect(placementKey("prefab", base.id, base.buildings.length));
-              return;
-            }
-            const id = crypto.randomUUID();
-            onChange(
-              addPrefab(scenario, id, {
+                });
+              }
+              const id = crypto.randomUUID();
+              chosen.key = placementKey("prefab", id, 0);
+              return addPrefab(doc, id, {
                 team: owner,
                 origin: pos,
                 buildings: [
@@ -375,9 +397,9 @@ const prefabsMode: EditorMode = {
                     facing: 0,
                   },
                 ],
-              }),
-            );
-            onSelect(placementKey("prefab", id, 0));
+              });
+            });
+            if (chosen.key) onSelect(chosen.key);
           }
         : null,
       controls: (

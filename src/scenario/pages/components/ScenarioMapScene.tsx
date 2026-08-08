@@ -53,6 +53,7 @@ import {
   setActorState,
   turnPlacement,
 } from "./editing";
+import type { ScenarioEdit } from "./edits";
 import { GroupControls } from "./GroupControls";
 import {
   addWaypoint,
@@ -132,6 +133,12 @@ function SurfaceMessage({
  * The surface owns which mode is current and what is selected, because both are
  * answers to something that happened on the map. The document is not owned here:
  * every edit goes out through `onChange` and comes back as a new `scenario`.
+ *
+ * An edit is therefore written as what to make of the document rather than as a
+ * finished one: a click that places something, and the click after it, can both
+ * be handled before React renders either of them, and the second one has to be
+ * built on the first (issue #904). What is selected is read the same way, for
+ * the same reason.
  */
 export function ScenarioMapScene({
   scenario,
@@ -141,7 +148,7 @@ export function ScenarioMapScene({
   history,
 }: {
   scenario: Scenario;
-  onChange: (next: Scenario) => void;
+  onChange: (edit: ScenarioEdit) => void;
   /** The condition and action types the scenario's game declares for itself, so
    *  an action a game declared carrying orders draws its path too (issue #957).
    *  Read once by the page and handed to every panel that needs it. */
@@ -178,7 +185,15 @@ export function ScenarioMapScene({
   const [handle, setHandle] = useState<MapScene3D | null>(null);
   const units = useScenarioUnits(handle, scenario, assets);
   const [modeId, setModeId] = useState(EDITOR_MODES[0].id);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, showSelected] = useState<string | null>(null);
+  // Also held in a ref, because a click that selects something and the click
+  // that acts on that selection can both land before React renders: placing a
+  // building adds it to the base the click before it selected (issue #904).
+  const selectedRef = useRef<string | null>(null);
+  const setSelected = useCallback((key: string | null) => {
+    selectedRef.current = key;
+    showSelected(key);
+  }, []);
   // A fixed panel is too small to author a 12km map on (#886). Expanding takes
   // the whole window rather than opening a second view, so the scene, its
   // camera and everything the modes hold carry straight over.
@@ -199,7 +214,13 @@ export function ScenarioMapScene({
   // each one may hold state of its own.
   const mode = EDITOR_MODES.find((m) => m.id === modeId) ?? EDITOR_MODES[0];
   const behaviours = EDITOR_MODES.map((m) =>
-    m.use({ scenario, onChange, selected, onSelect: setSelected }),
+    m.use({
+      scenario,
+      onChange,
+      selected,
+      selectedNow: () => selectedRef.current,
+      onSelect: setSelected,
+    }),
   );
   const behaviour = behaviours[EDITOR_MODES.indexOf(mode)];
 
@@ -249,7 +270,7 @@ export function ScenarioMapScene({
       const group = groups.some((one) => one.id === line);
       setSelected(group ? placementKey("group", line, 0) : key);
     },
-    [groups],
+    [groups, setSelected],
   );
 
   const picked = units.placements.find((p) => p.key === selected) ?? null;
@@ -314,12 +335,12 @@ export function ScenarioMapScene({
   // a base is being moved to, rather than something new being placed.
   const onPlace = drawingPath
     ? (pos: Point) =>
-        onChange(
-          addWaypoint(scenario, drawingPath.groupId, drawingPath.order, pos),
+        onChange((doc) =>
+          addWaypoint(doc, drawingPath.groupId, drawingPath.order, pos),
         )
     : moving
       ? (pos: Point) => {
-          onChange(setOrigin(scenario, moving, pos));
+          onChange((doc) => setOrigin(doc, moving, pos));
           setMovingBase(null);
         }
       : (picking?.onPick ?? behaviour.place);
@@ -342,10 +363,11 @@ export function ScenarioMapScene({
     onPlace,
     onDragGround: behaviour.draw ?? null,
     onMove: (key, delta) => {
-      if (parseZoneKey(key)) return onChange(moveZone(scenario, key, delta));
+      if (parseZoneKey(key))
+        return onChange((doc) => moveZone(doc, key, delta));
       if (parsePathKey(key))
-        return onChange(movePathWaypoint(scenario, key, delta));
-      onChange(movePlacement(scenario, key, delta));
+        return onChange((doc) => movePathWaypoint(doc, key, delta));
+      onChange((doc) => movePlacement(doc, key, delta));
     },
   });
 
@@ -378,11 +400,11 @@ export function ScenarioMapScene({
       unitsLoading={gameUnits.loading}
       targets={targetOptions(scenario, pickedGroup.id)}
       onEdit={(patch) => {
-        onChange(editGroup(scenario, pickedGroup.id, patch));
+        onChange((doc) => editGroup(doc, pickedGroup.id, patch));
         if (patch.units?.length === 0) setSelected(null);
       }}
       onDelete={() => {
-        onChange(removeGroup(scenario, pickedGroup.id));
+        onChange((doc) => removeGroup(doc, pickedGroup.id));
         setSelected(null);
       }}
       drawing={drawing?.groupId === pickedGroup.id ? drawing.order : null}
@@ -445,7 +467,7 @@ export function ScenarioMapScene({
       setSelected(entry.key);
       focusOn(entry.pos, entry.span);
     },
-    [focusOn],
+    [focusOn, setSelected],
   );
 
   /** Frame the whole map, looking down at its centre. Also the starting view. */
@@ -612,9 +634,9 @@ export function ScenarioMapScene({
         {picked && (
           <SelectionBar
             placement={picked}
-            onTurn={() => onChange(turnPlacement(scenario, picked.key))}
+            onTurn={() => onChange((doc) => turnPlacement(doc, picked.key))}
             onDelete={() => {
-              onChange(removePlacement(scenario, picked.key));
+              onChange((doc) => removePlacement(doc, picked.key));
               setSelected(null);
             }}
           >
@@ -624,10 +646,10 @@ export function ScenarioMapScene({
                 actor={pickedActor}
                 participants={scenario.setup.participants}
                 onEdit={(patch) =>
-                  onChange(editActor(scenario, pickedActor.id, patch))
+                  onChange((doc) => editActor(doc, pickedActor.id, patch))
                 }
                 onState={(state) =>
-                  onChange(setActorState(scenario, pickedActor.id, state))
+                  onChange((doc) => setActorState(doc, pickedActor.id, state))
                 }
               />
             )}
@@ -642,22 +664,16 @@ export function ScenarioMapScene({
                 unitsLoading={gameUnits.loading}
                 moving={moving === pickedPrefab.id}
                 onEdit={(patch) =>
-                  onChange(editPrefab(scenario, pickedPrefab.id, patch))
+                  onChange((doc) => editPrefab(doc, pickedPrefab.id, patch))
                 }
                 onQueue={(queue, repeat) =>
-                  onChange(
-                    setQueue(
-                      scenario,
-                      pickedPrefab.id,
-                      picked.index,
-                      queue,
-                      repeat,
-                    ),
+                  onChange((doc) =>
+                    setQueue(doc, pickedPrefab.id, picked.index, queue, repeat),
                   )
                 }
                 onMove={(on) => setMovingBase(on ? pickedPrefab.id : null)}
                 onDelete={() => {
-                  onChange(removePrefab(scenario, pickedPrefab.id));
+                  onChange((doc) => removePrefab(doc, pickedPrefab.id));
                   setSelected(null);
                 }}
               />
@@ -697,7 +713,7 @@ export function ScenarioMapScene({
             // its other points keep their knobs and a path being drawn is still
             // being drawn.
             onDelete={() => {
-              onChange(removePathWaypoint(scenario, selected));
+              onChange((doc) => removePathWaypoint(doc, selected));
               setSelected(
                 pickedGroup
                   ? placementKey("group", pathRef.groupId, 0)
@@ -719,10 +735,10 @@ export function ScenarioMapScene({
             key={pickedZone.id}
             zone={pickedZone}
             onRename={(name) =>
-              onChange(renameZone(scenario, pickedZone.id, name))
+              onChange((doc) => renameZone(doc, pickedZone.id, name))
             }
             onDelete={() => {
-              onChange(removeZone(scenario, pickedZone.id));
+              onChange((doc) => removeZone(doc, pickedZone.id));
               setSelected(null);
             }}
           />
