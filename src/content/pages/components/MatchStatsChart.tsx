@@ -24,10 +24,14 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { DemoInfo, DemoTrailer, Metric } from "../../bindings";
 import {
+  allySeries,
   type ChartMode,
   type ChartRow,
   type ChartSeries,
+  type ChartView,
+  chartHeight,
   chartRows,
+  defaultChartView,
   defaultMetric,
   END_LABEL_MAX_SERIES,
   type EndPoint,
@@ -44,9 +48,10 @@ import {
 } from "../../matchStats";
 
 /**
- * The match's chart: one line per team over match time, a control that picks
- * which of the registry's metrics it draws, and one that picks whether it draws
- * the running totals the file recorded or the rate they were rising at.
+ * The match's chart: a line per seat or a line per side over match time, a
+ * control that picks which of the registry's metrics it draws, one that picks
+ * whether it draws the running totals the file recorded or the rate they were
+ * rising at, and one that picks which of those two sets of lines it draws.
  *
  * Everything the chart derives is in `matchStats.ts`, because vitest runs in node
  * and can't render a component. This file is the recharts wiring and nothing else.
@@ -107,16 +112,20 @@ function MetricPicker({
 }
 
 /**
- * Cumulative or per minute. A pair of buttons rather than a second dropdown,
- * because it is a choice between two views of the match and not a setting: both
- * options stay on screen, and which one is showing is the button that is lit.
+ * A pair of buttons rather than a second dropdown, because each of these is a
+ * choice between two views of the same match and not a setting: both options
+ * stay on screen, and which one is showing is the button that is lit.
  */
-function ModePicker({
+function Choice<T extends string>({
   value,
+  options,
+  label,
   onChange,
 }: {
-  value: ChartMode;
-  onChange: (mode: ChartMode) => void;
+  value: T;
+  options: { value: T; label: string }[];
+  label: string;
+  onChange: (value: T) => void;
 }) {
   const item =
     "rounded-md border border-border/60 px-3 py-1 text-xs data-[state=on]:border-primary data-[state=on]:bg-primary/10";
@@ -125,20 +134,29 @@ function ModePicker({
       type="single"
       value={value}
       // Radix clears the value when the lit button is pressed again, and there
-      // is no third view to fall back to, so an empty change is ignored.
-      onValueChange={(v) => v && onChange(v as ChartMode)}
+      // is no third option to fall back to, so an empty change is ignored.
+      onValueChange={(v) => v && onChange(v as T)}
       className="gap-2"
-      aria-label="Charted values"
+      aria-label={label}
     >
-      <ToggleGroupItem value="cumulative" className={item}>
-        Cumulative
-      </ToggleGroupItem>
-      <ToggleGroupItem value="perMinute" className={item}>
-        Per minute
-      </ToggleGroupItem>
+      {options.map((o) => (
+        <ToggleGroupItem key={o.value} value={o.value} className={item}>
+          {o.label}
+        </ToggleGroupItem>
+      ))}
     </ToggleGroup>
   );
 }
+
+const MODES: { value: ChartMode; label: string }[] = [
+  { value: "cumulative", label: "Cumulative" },
+  { value: "perMinute", label: "Per minute" },
+];
+
+const VIEWS: { value: ChartView; label: string }[] = [
+  { value: "players", label: "Players" },
+  { value: "teams", label: "Teams" },
+];
 
 /**
  * Every series at the sample under the crosshair, biggest first. recharts clones
@@ -254,9 +272,16 @@ export function MatchStatsChart({
   const opening = defaultMetric(metrics);
   const [key, setKey] = useState(opening?.key ?? "");
   const [mode, setMode] = useState<ChartMode>("cumulative");
+  // Null until the reader picks one, so the opening view follows the match's own
+  // size without an effect that would overwrite what they chose.
+  const [chosen, setChosen] = useState<ChartView | null>(null);
   const metric = metrics.find((m) => m.key === key) ?? opening;
 
-  const series = useMemo(() => teamSeries(trailer, info), [trailer, info]);
+  const players = useMemo(() => teamSeries(trailer, info), [trailer, info]);
+  const sides = useMemo(() => allySeries(trailer, info), [trailer, info]);
+  const view = chosen ?? defaultChartView(players, sides);
+  const series = view === "teams" ? sides : players;
+
   const rows = useMemo(() => {
     if (!metric) return [];
     const totals = chartRows(series, metric.key, secondsPerFrame(trailer));
@@ -272,16 +297,27 @@ export function MatchStatsChart({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
-      {/* The control row. #1138 (players or sides) and #1140 (the value table's
-       * own controls) land beside these: the chart's inputs are all state in
-       * this component, and what they change is which pure function runs over
-       * the trailer rather than anything the chart itself has to know. */}
+      {/* The control row. #1140's value table lands beside these: the chart's
+       * inputs are all state in this component, and what they change is which
+       * pure function runs over the trailer rather than anything the chart
+       * itself has to know. */}
       <div className="flex flex-wrap items-center gap-2">
         <MetricPicker metrics={metrics} value={metric.key} onChange={setKey} />
-        <ModePicker value={mode} onChange={setMode} />
+        <Choice
+          value={mode}
+          options={MODES}
+          label="Charted values"
+          onChange={setMode}
+        />
+        <Choice
+          value={view}
+          options={VIEWS}
+          label="Charted lines"
+          onChange={setChosen}
+        />
       </div>
 
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer width="100%" height={chartHeight(series.length)}>
         <LineChart
           data={rows}
           margin={{
@@ -343,7 +379,8 @@ export function MatchStatsChart({
       </ResponsiveContainer>
 
       {/* The value table (#1140) belongs under the chart, reading the same
-       * `series` and `rows` this does. */}
+       * `series` and `rows` this does, so it shows whichever view and whichever
+       * of the two questions is selected without asking a second time. */}
     </div>
   );
 }

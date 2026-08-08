@@ -155,13 +155,14 @@ export function headlineTotals(
  * Three steps, deliberately separate, because two of them are about to change:
  *
  *   1. which metric is plotted   -> `metricGroups` / `defaultMetric`
- *   2. which series are plotted  -> `teamSeries`, which #1138 gives an ally-side
- *      sibling: a merged series is just another `ChartSeries`
+ *   2. which series are plotted  -> `teamSeries` or `allySeries`, which return
+ *      the same shape, so everything downstream is written once
  *   3. what recharts receives    -> `chartRows`, and `perMinuteRows` over its
  *      result for the rate view
  *
- * So the chart component composes three functions, and neither of those issues
- * has to take it apart.
+ * So the chart component composes three functions, and the value table (#1140)
+ * reads step 3's output for whichever view is showing rather than deriving
+ * anything of its own.
  * ------------------------------------------------------------------------- */
 
 /** What to call a group of metrics. The registry decides which groups exist. */
@@ -259,13 +260,13 @@ function seatsByTeam(info: DemoInfo) {
   return seats;
 }
 
+/** The `dataKey` for one engine team's line. */
+const teamId = (team: number) => `team${team}`;
+
 /**
  * One line per team the engine actually measured. A team with no samples is left
  * out rather than drawn flat at zero, which would claim a reading the file
  * doesn't have.
- *
- * When #1138 lands, its ally-side view is a second function shaped like this
- * one: the sides' samples added together, since every field is a running total.
  */
 export function teamSeries(
   trailer: DemoTrailer,
@@ -281,12 +282,183 @@ export function teamSeries(
       // all, so the label says whose line it also is rather than dropping them.
       const extra = held.length > 1 ? ` +${held.length - 1}` : "";
       return {
-        id: `team${t.team}`,
+        id: teamId(t.team),
         label: first ? `${first.name}${extra}` : `Team ${t.team}`,
         color: seriesColor(first?.rgbColor, t.team),
         samples: t.samples,
       };
     });
+}
+
+/**
+ * Which side each team played for, from the seats that held it. A bot holds a
+ * team and is on a side like anybody else. A team no seat is recorded for isn't
+ * in here at all, and {@link allySeries} leaves it as a line of its own rather
+ * than guessing which side its figures belong to.
+ */
+function allyByTeam(info: DemoInfo): Map<number, number> {
+  const ally = new Map<number, number>();
+  const add = (team?: number, allyTeam?: number) => {
+    if (team !== undefined && allyTeam !== undefined) ally.set(team, allyTeam);
+  };
+  for (const p of info.players) if (!p.spectator) add(p.team, p.allyTeam);
+  for (const a of info.ais) add(a.team, a.allyTeam);
+  return ally;
+}
+
+/**
+ * Several teams' samples as one series: the union of their frames, with each
+ * value added across the teams recorded at that frame.
+ *
+ * A team that stopped being recorded goes on contributing its last figure rather
+ * than dropping out, because every field is a running total. A side whose total
+ * fell when a member stopped would read as a side that un-spent its metal.
+ */
+function mergeSamples(parts: TeamStatSample[][]): TeamStatSample[] {
+  const frames = [...new Set(parts.flatMap((p) => p.map((s) => s.frame)))].sort(
+    (a, b) => a - b,
+  );
+  // One cursor per team, advanced with the frames, as `chartRows` does.
+  const cursors = parts.map(() => 0);
+  return frames.map((frame) => {
+    const present: TeamStatSample[] = [];
+    parts.forEach((p, i) => {
+      while (cursors[i] + 1 < p.length && p[cursors[i] + 1].frame <= frame)
+        cursors[i]++;
+      const current = p[cursors[i]];
+      // Nothing before a team's first sample: it has no running total yet.
+      if (current.frame <= frame) present.push(current);
+    });
+    // Never empty: every frame here is one some team sampled at.
+    const total: TeamStatSample = { ...present[0], frame };
+    for (const s of present.slice(1))
+      for (const k of Object.keys(total) as (keyof TeamStatSample)[])
+        if (k !== "frame") total[k] += s[k];
+    return total;
+  });
+}
+
+/**
+ * What a side is called, with how it did. "Team 1" rather than "Ally team 0"
+ * because that is how a match is talked about and `[allyteam0]` is an index in a
+ * file, and the result is part of the name because the chart is read to find out
+ * how the match went.
+ */
+function sideLabel(ally: number, info: DemoInfo): string {
+  const won = info.winnersKnown && info.winningAllyTeams.includes(ally);
+  return `Team ${ally + 1}${won ? " (won)" : ""}`;
+}
+
+/**
+ * How far apart two `#rrggbb` colours are, added up over the channels. Crude on
+ * purpose: it is here to catch two sides drawn in the same green, not to model
+ * how colour is seen.
+ */
+function colorGap(a: string, b: string): number {
+  let gap = 0;
+  for (let i = 1; i < 7; i += 2)
+    gap += Math.abs(
+      Number.parseInt(a.slice(i, i + 2), 16) -
+        Number.parseInt(b.slice(i, i + 2), 16),
+    );
+  return gap;
+}
+
+/** Closer than this and two lines read as one colour. 765 is the whole range. */
+const MIN_SIDE_COLOR_GAP = 150;
+
+/**
+ * Picks each side a colour, taking one of its own members' where it can.
+ *
+ * A side keeping a member's colour means a line doesn't change colour when the
+ * toggle changes what it is made of. But which member that is comes down to team
+ * numbering, and two sides whose lowest-numbered players both chose green draw
+ * this chart as one line twice: the whole case for the view is that two lines
+ * are two things you can point at. So a side too close to one already given out
+ * takes a palette colour instead.
+ */
+function sideColors(wanted: string[]): string[] {
+  const taken: string[] = [];
+  return wanted.map((want, i) => {
+    const clear = (c: string) =>
+      taken.every((t) => colorGap(c, t) >= MIN_SIDE_COLOR_GAP);
+    const color = clear(want)
+      ? want
+      : (FALLBACK_COLORS.find(clear) ??
+        FALLBACK_COLORS[i % FALLBACK_COLORS.length]);
+    taken.push(color);
+    return color;
+  });
+}
+
+/**
+ * One line per ally side, its teams' samples added together.
+ *
+ * Adding them is valid because every field is a running total and no team is on
+ * two sides, so a side's figure at a moment is its members' figures at that
+ * moment added up. Adding here, before {@link perMinuteRows}, is what lets the
+ * two views compose: summing then differencing and differencing then summing
+ * give the same answer, and `matchStats.test.ts` holds them equal.
+ *
+ * Sides in ally-team order, then any team the file gives no side for, which
+ * keeps the line, the name and the colour {@link teamSeries} gave it.
+ */
+export function allySeries(
+  trailer: DemoTrailer,
+  info: DemoInfo,
+): ChartSeries[] {
+  const side = allyByTeam(info);
+  const lines = new Map(teamSeries(trailer, info).map((s) => [s.id, s]));
+  const sides = new Map<number, ChartSeries[]>();
+  const loose: ChartSeries[] = [];
+  for (const t of trailer.teams) {
+    // Absent for a team the engine measured nothing for, which stays left out.
+    const line = lines.get(teamId(t.team));
+    if (!line) continue;
+    const ally = side.get(t.team);
+    if (ally === undefined) {
+      loose.push(line);
+      continue;
+    }
+    const held = sides.get(ally);
+    if (held) held.push(line);
+    else sides.set(ally, [line]);
+  }
+  const ordered = [...sides.entries()].sort(([a], [b]) => a - b);
+  const colors = sideColors(ordered.map(([, members]) => members[0].color));
+  const merged = ordered.map(([ally, members], i) => ({
+    id: `ally${ally}`,
+    label: sideLabel(ally, info),
+    color: colors[i],
+    samples: mergeSamples(members.map((m) => m.samples)),
+  }));
+  return [...merged, ...loose];
+}
+
+/** Whether the chart draws a line per seat or a line per side. */
+export type ChartView = "players" | "teams";
+
+/**
+ * More lines than this and the chart opens on Teams. At or below it a match is
+ * small enough to read line by line, and a duel must not open on a view that
+ * hides both players behind a side of one.
+ */
+export const PLAYERS_VIEW_MAX_SERIES = 4;
+
+/**
+ * Which view the chart opens on. Teams once there are more lines than anyone can
+ * tell apart by colour, but only when it actually merges something: a 16-player
+ * free-for-all is sixteen sides of one, and drawing it as sixteen lines called
+ * "Team 1" to "Team 16" is the same smear with the names taken off.
+ */
+export function defaultChartView(
+  players: ChartSeries[],
+  sides: ChartSeries[],
+): ChartView {
+  return players.length > PLAYERS_VIEW_MAX_SERIES &&
+    sides.length < players.length
+    ? "teams"
+    : "players";
 }
 
 /** The engine's simulation rate, used only when the trailer can't be measured. */
@@ -470,6 +642,50 @@ export function tooltipRows(
  * difference between a chart you read and one you decode against a key.
  */
 export const END_LABEL_MAX_SERIES = 4;
+
+/** The shortest chart, which is what a small match gets. */
+const CHART_MIN_HEIGHT = 280;
+
+/** One tooltip row: 12px text on a 16px line, plus the list's gap. */
+const TOOLTIP_ROW_PX = 18;
+
+/** The tooltip's heading, its "and N more" line, its padding and its border. */
+const TOOLTIP_CHROME_PX = 56;
+
+/** One row of legend entries under the plot. */
+const LEGEND_ROW_PX = 22;
+
+/**
+ * Legend entries assumed to fit across the plot before the row wraps. A name and
+ * its swatch is about 70px, so a 1,260px chart fits far more than this: the
+ * figure is deliberately low, because over-reserving costs a little empty plot
+ * and under-reserving puts the tooltip back over the legend.
+ */
+const LEGEND_ROW_ENTRIES = 4;
+
+/** Space between the bottom of the tooltip and the bottom of the plot. */
+const TOOLTIP_CLEARANCE = 16;
+
+/**
+ * How tall the chart is drawn, in pixels.
+ *
+ * 280 reads a duel or a 3v3 without eating the page, but the tooltip is as tall
+ * as the number of lines it lists: on a sixteen-seat match twelve rows and a
+ * heading come to more than a 280px plot, so the tooltip ran past the bottom of
+ * it and printed over the legend, which is the one thing a reader with sixteen
+ * lines still needs (#1204). A chart with that many lines is given the room its
+ * own tooltip and its own legend take.
+ */
+export function chartHeight(seriesCount: number): number {
+  const tooltip =
+    Math.min(seriesCount, TOOLTIP_ROW_LIMIT) * TOOLTIP_ROW_PX +
+    TOOLTIP_CHROME_PX;
+  const legend =
+    seriesCount > END_LABEL_MAX_SERIES
+      ? Math.ceil(seriesCount / LEGEND_ROW_ENTRIES) * LEGEND_ROW_PX
+      : 0;
+  return Math.max(CHART_MIN_HEIGHT, tooltip + legend + TOOLTIP_CLEARANCE);
+}
 
 /**
  * The last row a series has a value at, so an end-point label lands on the end
