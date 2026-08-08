@@ -643,6 +643,50 @@ export function tooltipRows(
  */
 export const END_LABEL_MAX_SERIES = 4;
 
+/** The shortest chart, which is what a small match gets. */
+const CHART_MIN_HEIGHT = 280;
+
+/** One tooltip row: 12px text on a 16px line, plus the list's gap. */
+const TOOLTIP_ROW_PX = 18;
+
+/** The tooltip's heading, its "and N more" line, its padding and its border. */
+const TOOLTIP_CHROME_PX = 56;
+
+/** One row of legend entries under the plot. */
+const LEGEND_ROW_PX = 22;
+
+/**
+ * Legend entries assumed to fit across the plot before the row wraps. A name and
+ * its swatch is about 70px, so a 1,260px chart fits far more than this: the
+ * figure is deliberately low, because over-reserving costs a little empty plot
+ * and under-reserving puts the tooltip back over the legend.
+ */
+const LEGEND_ROW_ENTRIES = 4;
+
+/** Space between the bottom of the tooltip and the bottom of the plot. */
+const TOOLTIP_CLEARANCE = 16;
+
+/**
+ * How tall the chart is drawn, in pixels.
+ *
+ * 280 reads a duel or a 3v3 without eating the page, but the tooltip is as tall
+ * as the number of lines it lists: on a sixteen-seat match twelve rows and a
+ * heading come to more than a 280px plot, so the tooltip ran past the bottom of
+ * it and printed over the legend, which is the one thing a reader with sixteen
+ * lines still needs (#1204). A chart with that many lines is given the room its
+ * own tooltip and its own legend take.
+ */
+export function chartHeight(seriesCount: number): number {
+  const tooltip =
+    Math.min(seriesCount, TOOLTIP_ROW_LIMIT) * TOOLTIP_ROW_PX +
+    TOOLTIP_CHROME_PX;
+  const legend =
+    seriesCount > END_LABEL_MAX_SERIES
+      ? Math.ceil(seriesCount / LEGEND_ROW_ENTRIES) * LEGEND_ROW_PX
+      : 0;
+  return Math.max(CHART_MIN_HEIGHT, tooltip + legend + TOOLTIP_CLEARANCE);
+}
+
 /**
  * The last row a series has a value at, so an end-point label lands on the end
  * of its own line rather than the end of the chart. -1 for a series that is null

@@ -29,6 +29,7 @@ import {
   type ChartRow,
   type ChartSeries,
   type ChartView,
+  chartHeight,
   chartRows,
   defaultChartView,
   defaultMetric,
@@ -316,7 +317,7 @@ export function MatchStatsChart({
         />
       </div>
 
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer width="100%" height={chartHeight(series.length)}>
         <LineChart
           data={rows}
           margin={{

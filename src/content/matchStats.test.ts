@@ -12,6 +12,7 @@ import type {
 import {
   allySeries,
   type ChartSeries,
+  chartHeight,
   chartRows,
   defaultChartView,
   defaultMetric,
@@ -655,6 +656,34 @@ describe("defaultChartView", () => {
     expect(defaultChartView(lines(16, "team"), lines(16, "ally"))).toBe(
       "players",
     );
+  });
+});
+
+describe("chartHeight", () => {
+  /**
+   * Measured in a browser on the component itself: a twelve-row tooltip with an
+   * "and 4 more" line under it is 272px, and a legend of sixteen names is 36px
+   * on a 1,126px chart and 90px on a 306px one, which is narrower than the
+   * replay page ever gets. The old fixed 280 minus either legend is less than
+   * 272, which is the overflow #1204 reported.
+   */
+  const TOOLTIP_PX = 272;
+  const WIDEST_LEGEND_PX = 90;
+
+  it("leaves a match small enough to read alone", () => {
+    expect(chartHeight(2)).toBe(280);
+    expect(chartHeight(6)).toBe(280);
+  });
+
+  it("keeps a sixteen-line match's tooltip off its legend", () => {
+    expect(chartHeight(16) - WIDEST_LEGEND_PX).toBeGreaterThanOrEqual(
+      TOOLTIP_PX,
+    );
+  });
+
+  it("never gets shorter as lines are added", () => {
+    const heights = [1, 2, 4, 5, 8, 12, 13, 16, 24].map(chartHeight);
+    expect(heights).toEqual([...heights].sort((a, b) => a - b));
   });
 });
 
