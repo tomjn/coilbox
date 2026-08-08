@@ -211,7 +211,9 @@ pub struct AllyTeamInfo {
     pub color: Option<[f32; 3]>,
 }
 
-/// Decoded replay metadata: native header + start-script, plus demotool's winner.
+/// Decoded replay metadata: native header + start-script + trailer, with
+/// demotool as a fallback for the winner when the trailer's format is one the
+/// decoder refuses.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DemoInfo {
@@ -230,8 +232,10 @@ pub struct DemoInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start_pos_type: Option<i32>,
     pub winning_ally_teams: Vec<u32>,
-    /// False when demotool was absent/failed, so the UI shows "winner unknown"
-    /// rather than implying a draw.
+    /// False when this file has no answer: the recording never reached a
+    /// recorded game over, or its trailer is in a format this decoder
+    /// doesn't know and demotool wasn't there (or couldn't say either). The
+    /// UI shows "winner unknown" rather than implying a draw.
     pub winners_known: bool,
     pub num_ally_teams: u32,
     pub ally_teams: Vec<AllyTeamInfo>,

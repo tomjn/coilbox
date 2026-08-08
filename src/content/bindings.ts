@@ -339,7 +339,8 @@ export interface AllyTeamInfo {
   color?: [number, number, number];
 }
 
-/** Decoded replay metadata (native header + start-script + demotool winner). */
+/** Decoded replay metadata (native header + start-script + trailer, with
+ * demotool as a fallback for a trailer format the decoder refuses). */
 export interface DemoInfo {
   engineVersion: string;
   gameId?: string;
@@ -354,7 +355,9 @@ export interface DemoInfo {
   gameType: string;
   startPosType?: number;
   winningAllyTeams: number[];
-  /** False when demotool was absent/failed — show "winner unknown", not a draw. */
+  /** False when this file has no answer: the recording never reached a game
+   * over, or its trailer's format couldn't be decoded and demotool couldn't
+   * say either. Show "winner unknown", not a draw. */
   winnersKnown: boolean;
   numAllyTeams: number;
   allyTeams: AllyTeamInfo[];

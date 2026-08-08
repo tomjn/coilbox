@@ -62,8 +62,10 @@ pub struct StatRecord {
     pub start_time_ms: u64,
     pub size_bytes: u64,
     pub modified_ms: u64,
-    /// False when demotool was absent/failed, so a view shows "result unknown"
-    /// rather than counting the game as a loss for everyone.
+    /// False when this file has no answer (the recording never reached a
+    /// game over, or its trailer's format could not be decoded and demotool
+    /// couldn't say either), so a view shows "result unknown" rather than
+    /// counting the game as a loss for everyone.
     pub winners_known: bool,
     pub winning_ally_teams: Vec<u32>,
     pub remixed: bool,
@@ -164,9 +166,11 @@ fn unchanged(existing: &StatRecord, entry: &DemoFileEntry) -> bool {
 }
 
 /// Incrementally ingest every demo under `roots` into `store`, decoding only files
-/// that are new or changed since the last pass. `engine_dir` locates `demotool` for
-/// the winner read; when it's absent the native decode still yields map/players/
-/// game (with `winners_known = false`). A file that fails to decode is skipped and
+/// that are new or changed since the last pass. The winner comes from the
+/// replay's own trailer. `engine_dir` locates `demotool` only as a fallback for
+/// a trailer format the decoder refuses, and the native decode still yields
+/// map/players/game either way (with `winners_known = false` when neither path
+/// could answer). A file that fails to decode is skipped and
 /// counted in `failed`, never aborting the pass. Records are keyed by filename, so
 /// re-ingesting the same library is idempotent.
 ///

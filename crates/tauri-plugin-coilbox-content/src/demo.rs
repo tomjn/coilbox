@@ -3,17 +3,20 @@
 //! A Spring/Recoil demo is a gzip-compressed (`.sdfz`) or raw (`.sdf`) file laid
 //! out (see the engine's `rts/System/LoadSave/demofile.h`) as a fixed
 //! `DemoFileHeader`, then a plaintext TDF **start-script** (the full
-//! `[game]{...}` setup), then the demo stream and player/team stats. The data the
-//! Replays screen wants — map, game, players, sides/factions, ally-teams — lives
-//! only in that start-script, which `demotool` never prints. So we read the
-//! header + script natively (a small gunzip of the file's prefix), and shell out
-//! to `demotool` for the one thing the prefix can't cheaply reach: the **winning
-//! ally-teams**, recorded at the very end of the demo stream.
+//! `[game]{...}` setup), then the demo stream, then the **trailer**: the
+//! winning ally-teams and a statistics sample per team every `teamStatPeriod`
+//! seconds, which is the graph the engine drew at the end of the match. The
+//! data the Replays screen wants, map, game, players, sides/factions,
+//! ally-teams, lives in the start-script. The winner lives in the trailer.
+//! Both are read natively: the header + script from a small gunzip of the
+//! file's prefix, the trailer ([`read_trailer`]) from a seek and a struct
+//! read, with header validation that refuses a format it does not recognise
+//! rather than guess.
 //!
-//! Behind the stream sits the **trailer**: the winning ally-teams and a
-//! statistics sample per team every `teamStatPeriod` seconds, which is the graph
-//! the engine drew at the end of the match. [`read_trailer`] decodes it natively
-//! from a seek and a struct read.
+//! `demotool` is only a fallback now. When a replay's trailer is in a shape
+//! this decoder refuses (a future engine version, say), [`demo_info`] shells
+//! out to `demotool --teamstats` for the winner alone, if the tool happens to
+//! ship beside the engine.
 
 use std::collections::HashMap;
 use std::io::Read;
@@ -388,19 +391,32 @@ fn demo_files_in(base: &Path) -> Vec<DemoFileEntry> {
 
 // ---- decoding --------------------------------------------------------------
 
-/// Decode one replay: native header + start-script, plus demotool's winners.
+/// Decode one replay: native header + start-script + trailer, with `demotool`
+/// as a fallback for a trailer the decoder refuses.
 pub fn demo_info(engine_dir: &Path, demo: &Path) -> Result<DemoInfo, String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
-    // A replay of a game nobody ended has no winners to read, and demotool says
-    // the same thing for that as it does for a game over with nobody winning. So
-    // the header decides whether there is an answer, and demotool only says what
-    // it is.
+    // A replay of a game nobody ended has no winners to read, and neither the
+    // trailer nor demotool can tell that case apart from a game over with
+    // nobody winning. So the header decides whether there is an answer, and
+    // the trailer (or its fallback) only says what it is.
     let winners = raw
         .game_over
-        .then(|| demotool_winners(engine_dir, demo))
+        .then(|| read_winners(engine_dir, demo))
         .flatten();
     Ok(build_demo_info(raw, &game, winners))
+}
+
+/// Winners for a game recorded as ended: the trailer decoder first, since it
+/// costs a seek and a struct read and no subprocess, and `demotool` only when
+/// the trailer is in a format this decoder refuses, so a replay from a future
+/// engine version still reports a winner if the tool happens to ship beside
+/// it.
+fn read_winners(engine_dir: &Path, demo: &Path) -> Option<Vec<u32>> {
+    match read_trailer(demo) {
+        Ok(trailer) => Some(trailer.winning_ally_teams),
+        Err(_) => demotool_winners(engine_dir, demo),
+    }
 }
 
 /// Native-only decode (header + start-script, no demotool/winner) used for the
@@ -1481,8 +1497,9 @@ fn parse_chat(out: &str, names: &HashMap<u32, String>) -> Vec<ChatLine> {
 }
 
 /// Run `demotool --teamstats <demo>` and parse its trailing `Winning Allyteams:`
-/// line. Returns `None` when demotool is absent or fails — the caller treats
-/// that as "winner unknown" rather than an error (everything else is native).
+/// line. Only reached from [`read_winners`], once the native trailer decode has
+/// already refused the file. Returns `None` when demotool is absent or fails
+/// too, so the file genuinely has no answer rather than an error.
 fn demotool_winners(engine_dir: &Path, demo: &Path) -> Option<Vec<u32>> {
     let bin = resolve_demotool(engine_dir)?;
     let out = run_demotool(&bin, demo, "--teamstats", DEMOTOOL_TIMEOUT).ok()?;
@@ -1866,8 +1883,10 @@ mod tests {
         assert_eq!(specs.won, None); // spectators never "win"
     }
 
+    /// `build_demo_info` with `None` winners is what both routing failures
+    /// collapse to: neither the trailer nor its `demotool` fallback could say.
     #[test]
-    fn winner_unknown_when_demotool_absent() {
+    fn winner_unknown_when_nothing_can_answer() {
         let raw = read_header_and_script(&write_tmp("u.sdfz", &build_demo(SCRIPT, true))).unwrap();
         let game = find_game(&parse_tdf(&raw.script));
         let info = build_demo_info(raw, &game, None);
@@ -2771,6 +2790,112 @@ mod tests {
         .expect_err("a hanging demotool should time out");
         assert!(err.contains("timed out"), "unexpected error: {err}");
         assert!(start.elapsed() < Duration::from_secs(5));
+    }
+
+    // ---- demo_info routing: trailer first, demotool only as a fallback -----
+
+    /// Plant a fake `demotool` at the exact path `resolve_demotool` looks for
+    /// inside an engine dir, so `demo_info` can find (or be proven not to
+    /// reach for) it without touching `DEMOTOOL_BIN`, which is process-global
+    /// and would race with any test running in parallel.
+    #[cfg(unix)]
+    fn plant_demotool(engine_dir: &Path, body: &str) {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::create_dir_all(engine_dir).unwrap();
+        let path = engine_dir.join(format!("demotool{}", std::env::consts::EXE_SUFFIX));
+        std::fs::write(&path, format!("#!/bin/sh\n{body}")).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    /// A trailer that validates answers on its own. Proven by planting a
+    /// `demotool` that would report a different winner and leave a marker
+    /// file if it ran: neither shows up, so the answer came from the seek and
+    /// struct read, not a subprocess.
+    #[test]
+    #[cfg(unix)]
+    fn demo_info_answers_from_the_trailer_without_touching_demotool() {
+        let engine = std::env::temp_dir().join("coilbox_demo_info_trailer_only_test");
+        let _ = std::fs::remove_dir_all(&engine);
+        let marker = engine.join("called.marker");
+        plant_demotool(
+            &engine,
+            &format!(
+                "touch '{}'\necho 'Winning Allyteams: 9'\n",
+                marker.display()
+            ),
+        );
+
+        let f = DemoFixture {
+            winning_ally_teams: vec![1],
+            team_samples: vec![Vec::new(), Vec::new()],
+            ..Default::default()
+        };
+        let demo = write_tmp("trailer-only.sdfz", &f.gzipped());
+
+        let info = demo_info(&engine, &demo).unwrap();
+        assert!(info.winners_known);
+        assert_eq!(info.winning_ally_teams, vec![1]);
+        assert!(
+            !marker.exists(),
+            "a valid trailer must not shell out to demotool"
+        );
+
+        let _ = std::fs::remove_dir_all(&engine);
+    }
+
+    /// A header the trailer decoder refuses (version 6, a future engine) falls
+    /// back to `demotool`. The demotool script reports a winner the fixture's
+    /// own (unreadable) trailer does not carry, so the only way it can show up
+    /// is through the fallback.
+    #[test]
+    #[cfg(unix)]
+    fn demo_info_falls_back_to_demotool_when_the_trailer_is_refused() {
+        let engine = std::env::temp_dir().join("coilbox_demo_info_fallback_test");
+        let _ = std::fs::remove_dir_all(&engine);
+        let marker = engine.join("called.marker");
+        plant_demotool(
+            &engine,
+            &format!(
+                "touch '{}'\necho 'Winning Allyteams: 2'\n",
+                marker.display()
+            ),
+        );
+
+        let f = DemoFixture {
+            version: 6,
+            winning_ally_teams: vec![1],
+            team_samples: vec![series(3), series(3)],
+            ..Default::default()
+        };
+        let demo = write_tmp("fallback.sdfz", &f.gzipped());
+        assert!(
+            read_trailer(&demo).is_err(),
+            "the fixture must actually be a refusal case"
+        );
+
+        let info = demo_info(&engine, &demo).unwrap();
+        assert!(marker.exists(), "a refused trailer must ask demotool");
+        assert!(info.winners_known);
+        assert_eq!(info.winning_ally_teams, vec![2]);
+
+        let _ = std::fs::remove_dir_all(&engine);
+    }
+
+    /// An aborted recording (no game over recorded in the header) has no
+    /// winners to read from either source, and that must not read as a loss
+    /// for every seated player.
+    #[test]
+    fn demo_info_reports_no_winner_for_an_aborted_recording() {
+        let engine = std::env::temp_dir().join("coilbox_demo_info_aborted_test");
+        let demo = write_tmp("aborted.sdfz", &DemoFixture::default().gzipped());
+
+        let info = demo_info(&engine, &demo).unwrap();
+        assert!(!info.winners_known);
+        assert!(info.winning_ally_teams.is_empty());
+        assert!(
+            info.players.iter().all(|p| p.won.is_none()),
+            "no seated player may be recorded as having lost an unfinished game"
+        );
     }
 
     #[test]

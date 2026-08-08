@@ -884,9 +884,10 @@ async fn content_list_replays(root: String) -> Result<CliResult, ()> {
     }
 }
 
-/// `content_demo_info` — decode one replay: native header + start-script (map,
-/// game, players, sides, ally-teams) plus demotool's winner. `enginePath` is an
-/// `Engine.path` (where `demotool` lives); `replayPath` an absolute demo path.
+/// `content_demo_info`, decode one replay: native header + start-script (map,
+/// game, players, sides, ally-teams) plus the trailer's winner, with `demotool`
+/// as a fallback for a trailer format the decoder refuses. `enginePath` is an
+/// `Engine.path` (where `demotool` lives). `replayPath` is an absolute demo path.
 #[tauri::command]
 async fn content_demo_info(engine_path: String, replay_path: String) -> Result<CliResult, ()> {
     let engine = PathBuf::from(&engine_path);
@@ -913,12 +914,14 @@ async fn content_replay_trailer(replay_path: String) -> Result<CliResult, ()> {
     }
 }
 
-/// `content_stats_ingest` — incrementally parse every replay under `roots` into the
+/// `content_stats_ingest`, incrementally parse every replay under `roots` into the
 /// local stats database, decoding only files new or changed since the last pass
-/// (idempotent, keyed by filename). `enginePath` locates `demotool` for the winner
-/// read; when empty/absent the native decode still records map/players/game. With
-/// `dryRun`, the pass runs but the store isn't written (returns the would-be
-/// summary). `roots` are `ContentRoot.path`s. Runs off the UI thread.
+/// (idempotent, keyed by filename). The winner comes from each replay's own
+/// trailer. `enginePath` locates `demotool` only as a fallback for a trailer
+/// format the decoder refuses, and the native decode still records map/players/
+/// game either way. With `dryRun`, the pass runs but the store isn't written
+/// (returns the would-be summary). `roots` are `ContentRoot.path`s. Runs off the
+/// UI thread.
 #[tauri::command]
 async fn content_stats_ingest<R: Runtime>(
     app: AppHandle<R>,
