@@ -92,6 +92,7 @@ import SuggestedMapZone, { SuggestedMapCard } from "./zones/SuggestedMap";
 
 const {
   battleSuggestedMap,
+  suggestedMapClaim,
   suggestedMapFor,
   suggestedMapPool,
   suggestedMapState,
@@ -163,6 +164,61 @@ describe("the curated pool", () => {
       },
     };
     expect(suggestedMapPool([mirror], [])).toHaveLength(1);
+  });
+});
+
+describe("the map this card takes off the tool cards", () => {
+  it("claims the map it is showing", () => {
+    expect(suggestedMapClaim(map("fallendell", "Fallendell_V4"), true)).toEqual(
+      [{ kind: "map", mapName: "Fallendell_V4" }],
+    );
+  });
+
+  it("claims nothing when the page has no suggested map zone", () => {
+    // A profile that left the zone out has no card holding the map, so a claim
+    // would cost the Maps card a picture and give it to nobody.
+    expect(
+      suggestedMapClaim(map("fallendell", "Fallendell_V4"), false),
+    ).toEqual([]);
+  });
+
+  it("claims nothing when the catalog curates nothing", () => {
+    expect(suggestedMapClaim(null, true)).toEqual([]);
+  });
+
+  it("claims nothing for a map with no spring name", () => {
+    // A direct mirror download installs a file and names no map, so there is no
+    // name a tool card's pick could ever collide with.
+    const mirror: SuggestedMap = {
+      id: "u",
+      title: "u",
+      filename: "u.sd7",
+      download: {
+        kind: "url",
+        url: "https://example.test/u.sd7",
+        filename: "u.sd7",
+      },
+    };
+    expect(suggestedMapClaim(mirror, true)).toEqual([]);
+  });
+});
+
+describe("the page settles the cards around the suggested map", () => {
+  // The claim is a pure function and the wiring that carries it to the pick
+  // layer is one call in `CoilboxHome`. Dropping that call would leave every
+  // unit test green and put the duplicate picture straight back, so the call is
+  // asserted on the source. See issue #1055.
+  const source = readFileSync(
+    new URL("./CoilboxHome.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("hands the claim to the content picks from above the layout", () => {
+    expect(source).toMatch(/useContentCardArt\(suggestedMapClaim\([^)]*\)\)/);
+  });
+
+  it("claims only when the profile's zones include the suggested map", () => {
+    expect(source).toContain('e.zone === "suggested"');
   });
 });
 

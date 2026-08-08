@@ -43,6 +43,7 @@ import type { Battle } from "../multiplayer/bindings";
 import { useMultiplayer } from "../multiplayer/store";
 import { usePreferredTarget } from "../play/config";
 import { getProfileMapLists } from "../profile/profile";
+import type { ContentPick } from "./contentArt";
 
 /**
  * The download kinds a curated map can actually be installed from.
@@ -261,6 +262,35 @@ export function suggestedMapState(args: {
 /** The spring name a curated map installs as, when its download declares one. */
 export function springNameOf(map: SuggestedMap): string | undefined {
   return map.download.kind === "map" ? map.download.springName : undefined;
+}
+
+/**
+ * The map this card has taken, for the tool cards to settle around (issue #1055).
+ *
+ * The tool cards already avoid each other's pictures, and this card was outside
+ * that set, so it could show the same map as the Maps card standing beside it in
+ * the same group. It claims its map instead of joining the priority list because
+ * it has no tool id and no second map to fall back on, and because a card that is
+ * about one named map cannot yield it to a card that stands for a collection.
+ *
+ * Pure, and expressed in `contentArt`'s own currency, so the pick layer learns
+ * nothing about the catalog: it is handed a picture that is spoken for.
+ *
+ * `shown` is whether the page has a suggested map zone at all. A profile that
+ * left it out has no card holding this map, and a claim then would cost the Maps
+ * card a picture for nothing.
+ *
+ * The claim stands whether or not the map is installed. Uninstalled, the card
+ * paints the catalog's thumbnail and no tool card can offer the map anyway,
+ * because those offers come from the unitsync scan. So the claim only bites in
+ * exactly the case that is the defect.
+ */
+export function suggestedMapClaim(
+  map: SuggestedMap | null,
+  shown: boolean,
+): readonly ContentPick[] {
+  const springName = shown && map ? springNameOf(map) : undefined;
+  return springName ? [{ kind: "map", mapName: springName }] : [];
 }
 
 /**
