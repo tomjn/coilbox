@@ -31,6 +31,7 @@ import {
   type ChartSeries,
   type ChartView,
   chartHeight,
+  createTileCache,
   defaultChartView,
   defaultMetric,
   END_LABEL_MAX_SERIES,
@@ -47,6 +48,7 @@ import {
   tooltipRows,
   valueTable,
 } from "../../matchStats";
+import { MatchStatsPicker } from "./MatchStatsPicker";
 import { MatchStatsTable } from "./MatchStatsTable";
 
 /**
@@ -82,8 +84,14 @@ function clip(label: string): string {
     : label;
 }
 
-/** The metric chooser, grouped the way the registry groups its metrics. */
-function MetricPicker({
+/**
+ * The metric chooser for a window too narrow to put the picker beside the plot.
+ * At 600px, the app's smallest, the chart's own box is 376px wide: a column of
+ * tiles down one side of that leaves neither the tiles nor the plot readable, so
+ * under `lg` the picker moves below the chart and this comes back to say which
+ * metric is showing without scrolling past the plot to find the lit tile.
+ */
+function MetricSelect({
   metrics,
   value,
   onChange,
@@ -95,7 +103,11 @@ function MetricPicker({
   const groups = useMemo(() => metricGroups(metrics), [metrics]);
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger size="sm" className="w-56" aria-label="Charted metric">
+      <SelectTrigger
+        size="sm"
+        className="w-56 lg:hidden"
+        aria-label="Charted metric"
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -314,6 +326,21 @@ export function MatchStatsChart({
     [series, metric, trailer, mode],
   );
   const formatValue = mode === "perMinute" ? formatRate : formatChartValue;
+  // One cache for the life of this chart. Every tile is `modeRows` over the same
+  // series the plot draws, so enlarging a different metric changes the plot and
+  // leaves fifteen sparklines' worth of path data exactly as it was.
+  const [tileCache] = useState(createTileCache);
+  const tiles = useMemo(
+    () =>
+      tileCache({
+        metrics,
+        series,
+        secPerFrame: secondsPerFrame(trailer),
+        mode,
+        view,
+      }),
+    [tileCache, metrics, series, trailer, mode, view],
+  );
   // The same rows the plot draws, printed. Nothing is asked of the trailer a
   // second time, so the two can't answer different questions.
   const table = useMemo(
@@ -334,7 +361,7 @@ export function MatchStatsChart({
        * over the trailer, and the last picks whether the answer is drawn or
        * printed, so the table needs nothing the plot didn't already have. */}
       <div className="flex flex-wrap items-center gap-2">
-        <MetricPicker metrics={metrics} value={metric.key} onChange={setKey} />
+        <MetricSelect metrics={metrics} value={metric.key} onChange={setKey} />
         <Choice
           value={mode}
           options={MODES}
@@ -355,70 +382,87 @@ export function MatchStatsChart({
         />
       </div>
 
-      {display === "table" ? (
-        <MatchStatsTable table={table} />
-      ) : (
-        <ResponsiveContainer width="100%" height={chartHeight(series.length)}>
-          <LineChart
-            data={rows}
-            margin={{
-              top: 8,
-              right: labelled ? END_LABEL_GUTTER : 8,
-              bottom: 0,
-              left: 0,
-            }}
-          >
-            {/* Horizontal only. A vertical grid over a time axis adds lines
-             * without adding a reading. */}
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="currentColor"
-              opacity={0.12}
-              vertical={false}
-            />
-            <XAxis
-              dataKey="timeSec"
-              type="number"
-              domain={[0, "dataMax"]}
-              tickFormatter={axisTime}
-              tick={axisTick}
-              tickLine={false}
-              axisLine={false}
-              minTickGap={32}
-            />
-            {/* Anchored at zero. A chart of resources that starts at 40,000 tells
-             * a lie about the first ten minutes. */}
-            <YAxis
-              domain={[0, "auto"]}
-              tickFormatter={formatValue}
-              tick={axisTick}
-              tickLine={false}
-              axisLine={false}
-              width={52}
-            />
-            <Tooltip
-              content={<SeriesTooltip series={series} format={formatValue} />}
-              cursor={{ stroke: "currentColor", strokeOpacity: 0.35 }}
-              isAnimationActive={false}
-            />
-            {!labelled && <Legend wrapperStyle={{ fontSize: 12 }} />}
-            {series.map((s) => (
-              <Line
-                key={s.id}
-                type="monotone"
-                dataKey={s.id}
-                name={s.label}
-                stroke={s.color}
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 3 }}
-                isAnimationActive={false}
-              />
-            ))}
-            {labelled && <EndLabels points={endPoints(series, rows)} />}
-          </LineChart>
-        </ResponsiveContainer>
-      )}
+      {/* The picker and what it enlarges. Beside each other where there is room
+       * for both, and the picker under the plot where there isn't. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+        <MatchStatsPicker
+          groups={tiles}
+          value={metric.key}
+          plotHeight={chartHeight(series.length)}
+          onChange={setKey}
+        />
+        <div className="order-first min-w-0 flex-1 lg:order-last">
+          {display === "table" ? (
+            <MatchStatsTable table={table} />
+          ) : (
+            <ResponsiveContainer
+              width="100%"
+              height={chartHeight(series.length)}
+            >
+              <LineChart
+                data={rows}
+                margin={{
+                  top: 8,
+                  right: labelled ? END_LABEL_GUTTER : 8,
+                  bottom: 0,
+                  left: 0,
+                }}
+              >
+                {/* Horizontal only. A vertical grid over a time axis adds lines
+                 * without adding a reading. */}
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="currentColor"
+                  opacity={0.12}
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="timeSec"
+                  type="number"
+                  domain={[0, "dataMax"]}
+                  tickFormatter={axisTime}
+                  tick={axisTick}
+                  tickLine={false}
+                  axisLine={false}
+                  minTickGap={32}
+                />
+                {/* Anchored at zero. A chart of resources that starts at 40,000 tells
+                 * a lie about the first ten minutes. */}
+                <YAxis
+                  domain={[0, "auto"]}
+                  tickFormatter={formatValue}
+                  tick={axisTick}
+                  tickLine={false}
+                  axisLine={false}
+                  width={52}
+                />
+                <Tooltip
+                  content={
+                    <SeriesTooltip series={series} format={formatValue} />
+                  }
+                  cursor={{ stroke: "currentColor", strokeOpacity: 0.35 }}
+                  isAnimationActive={false}
+                />
+                {!labelled && <Legend wrapperStyle={{ fontSize: 12 }} />}
+                {series.map((s) => (
+                  <Line
+                    key={s.id}
+                    type="monotone"
+                    dataKey={s.id}
+                    name={s.label}
+                    stroke={s.color}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 3 }}
+                    isAnimationActive={false}
+                  />
+                ))}
+                {labelled && <EndLabels points={endPoints(series, rows)} />}
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

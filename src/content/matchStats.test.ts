@@ -11,9 +11,11 @@ import type {
 } from "./bindings";
 import {
   allySeries,
+  type ChartMode,
   type ChartSeries,
   chartHeight,
   chartRows,
+  createTileCache,
   defaultChartView,
   defaultMetric,
   END_LABEL_MAX_SERIES,
@@ -33,7 +35,10 @@ import {
   perMinuteRows,
   seatCount,
   secondsPerFrame,
+  sparkLines,
+  sparklineTiles,
   spreadLabels,
+  type TileRequest,
   TOOLTIP_ROW_LIMIT,
   teamSeries,
   teamTotal,
@@ -672,8 +677,10 @@ describe("chartHeight", () => {
   const WIDEST_LEGEND_PX = 90;
 
   it("leaves a match small enough to read alone", () => {
-    expect(chartHeight(2)).toBe(280);
-    expect(chartHeight(6)).toBe(280);
+    // 420 rather than 280 since the metric picker stands beside it: a plot the
+    // height of four tiles puts twelve of the fifteen metrics out of sight.
+    expect(chartHeight(2)).toBe(420);
+    expect(chartHeight(6)).toBe(420);
   });
 
   it("keeps a sixteen-line match's tooltip off its legend", () => {
@@ -1280,5 +1287,216 @@ describe("valueTable", () => {
         ["8:15", "78,133.91"],
       ]);
     });
+  });
+});
+
+/**
+ * The metric picker (#1141).
+ *
+ * The box is 100 by 24 with a unit kept at the top and bottom, so a reading of
+ * zero is drawn at y=23, the biggest reading in the tile at y=1, and half of it
+ * at y=12. Every expected path below is worked out that way by hand rather than
+ * from the function, which would only prove it agrees with itself.
+ */
+describe("sparkLines", () => {
+  const twoSeats = info({
+    players: [
+      { name: "a", spectator: false, team: 0, allyTeam: 0 },
+      { name: "b", spectator: false, team: 1, allyTeam: 1 },
+    ],
+  });
+
+  /** The tile a metric gets, from the rows the plot would be given. */
+  const drawn = (t: DemoTrailer, mode: ChartMode = "cumulative") => {
+    const series = teamSeries(t, twoSeats);
+    return sparkLines(
+      series,
+      modeRows(series, KEY_A, secondsPerFrame(t), mode),
+    ).map((l) => l.d);
+  };
+
+  it("runs the width of the tile and the height of its biggest reading", () => {
+    const t = trailer([
+      [at(0, KEY_A, 0), at(450, KEY_A, 5), at(900, KEY_A, 10)],
+    ]);
+    expect(drawn(t)).toEqual(["M0,23L50,12L100,1"]);
+  });
+
+  it("puts both lines in a tile on one scale, so they can be compared", () => {
+    const t = trailer([
+      [at(0, KEY_A, 0), at(900, KEY_A, 10)],
+      [at(0, KEY_A, 0), at(900, KEY_A, 5)],
+    ]);
+    // The second team peaks at half the first's, and is drawn at half height,
+    // rather than filling a tile of its own and reading as the same match.
+    expect(drawn(t)).toEqual(["M0,23L100,1", "M0,23L100,12"]);
+  });
+
+  it("stops the line where the file stops measuring, like the plot", () => {
+    const t = trailer([
+      [at(0, KEY_A, 1), at(450, KEY_A, 2), at(900, KEY_A, 3)],
+      [at(0, KEY_A, 1), at(450, KEY_A, 2)],
+    ]);
+    expect(drawn(t)).toEqual(["M0,15.67L50,8.33L100,1", "M0,15.67L50,8.33"]);
+  });
+
+  it("shows a team measured once as a dot rather than nothing", () => {
+    const t = trailer([
+      [at(0, KEY_A, 5)],
+      [at(0, KEY_A, 5), at(450, KEY_A, 10)],
+    ]);
+    expect(drawn(t)).toEqual(["M0,12L0,12", "M0,12L100,1"]);
+  });
+
+  it("draws a match that never moved flat along the bottom", () => {
+    const t = trailer([[at(0, KEY_A, 0), at(450, KEY_A, 0)]]);
+    expect(drawn(t)).toEqual(["M0,23L100,23"]);
+  });
+
+  it("draws the rate when the rate is what the plot is drawing", () => {
+    // A steady climb, so the cumulative tile is a ramp and the per-minute tile
+    // is flat. A tile that kept drawing running totals under the per-minute
+    // view would be the shape above, and would agree with nothing on the page.
+    const steady = trailer([
+      [at(0, KEY_A, 0), at(450, KEY_A, 5), at(900, KEY_A, 10)],
+    ]);
+    expect(drawn(steady, "cumulative")).toEqual(["M0,23L50,12L100,1"]);
+    expect(drawn(steady, "perMinute")).toEqual(["M0,1L50,1L100,1"]);
+  });
+
+  it("draws a real match's own figures", () => {
+    // Greenhaven's two teams as one side, the same four readings the value
+    // table is held to above. 477.93 of 327,266.6 is a fiftieth of the tile.
+    const greenhaven = trailer([
+      [
+        at(1800, KEY_A, 177.93333435058594),
+        at(4500, KEY_A, 2847.468505859375),
+        at(9000, KEY_A, 27216.3828125),
+        at(14850, KEY_A, 103667.1640625),
+      ],
+      [
+        at(1800, KEY_A, 299.9994201660156),
+        at(4500, KEY_A, 4576.6015625),
+        at(9000, KEY_A, 46115.00390625),
+        at(14850, KEY_A, 223599.4375),
+      ],
+    ]);
+    const oneSide = info({
+      players: [
+        { name: "a", spectator: false, team: 0, allyTeam: 0 },
+        { name: "b", spectator: false, team: 1, allyTeam: 0 },
+      ],
+    });
+    const sides = allySeries(greenhaven, oneSide);
+    const rows = modeRows(sides, KEY_A, 1 / 30, "cumulative");
+    expect(sparkLines(sides, rows).map((l) => l.d)).toEqual([
+      "M12.12,22.97L30.3,22.5L60.61,18.07L100,1",
+    ]);
+  });
+});
+
+describe("sparklineTiles", () => {
+  const seats = info({
+    players: [{ name: "a", spectator: false, team: 0, allyTeam: 0 }],
+  });
+  const measured = trailer([
+    [at(0, KEY_A, 0), at(450, KEY_A, 5), at(900, KEY_A, 10)],
+  ]);
+  const shown = [
+    metric(KEY_A, "First", true, "military"),
+    metric(KEY_B, "Second", false, "economy"),
+  ];
+
+  const request = (over: Partial<TileRequest> = {}): TileRequest => ({
+    metrics: shown,
+    series: teamSeries(measured, seats),
+    secPerFrame: secondsPerFrame(measured),
+    mode: "cumulative",
+    view: "players",
+    ...over,
+  });
+
+  it("offers what the registry offers, in the registry's own grouping", () => {
+    expect(
+      sparklineTiles(request()).map((g) => [
+        g.label,
+        ...g.tiles.map((t) => t.metric.label),
+      ]),
+    ).toEqual([
+      ["Military", "First"],
+      ["Economy", "Second"],
+    ]);
+  });
+
+  it("leaves out a metric the registry doesn't surface", () => {
+    const hidden = { ...metric(KEY_B, "Second", false), surfaced: false };
+    const tiles = sparklineTiles(request({ metrics: [shown[0], hidden] }));
+    expect(tiles.flatMap((g) => g.tiles.map((t) => t.metric.label))).toEqual([
+      "First",
+    ]);
+  });
+
+  it("draws every tile in the view the plot is in", () => {
+    const [rate] = sparklineTiles(request({ mode: "perMinute" }));
+    const [total] = sparklineTiles(request());
+    expect(rate.tiles[0].lines.map((l) => l.d)).toEqual(["M0,1L50,1L100,1"]);
+    expect(total.tiles[0].lines.map((l) => l.d)).toEqual(["M0,23L50,12L100,1"]);
+  });
+
+  it("gives every line the colour the plot draws it in", () => {
+    const series = request().series;
+    const [group] = sparklineTiles(request({ series }));
+    expect(group.tiles[0].lines.map((l) => [l.id, l.color])).toEqual(
+      series.map((s) => [s.id, s.color]),
+    );
+  });
+});
+
+describe("createTileCache", () => {
+  const seats = info({
+    players: [{ name: "a", spectator: false, team: 0, allyTeam: 0 }],
+  });
+  const measured = trailer([[at(0, KEY_A, 1), at(450, KEY_A, 2)]]);
+  const shown = [metric(KEY_A, "First", true)];
+  const series = teamSeries(measured, seats);
+
+  const request = (over: Partial<TileRequest> = {}): TileRequest => ({
+    metrics: shown,
+    series,
+    secPerFrame: secondsPerFrame(measured),
+    mode: "cumulative",
+    view: "players",
+    ...over,
+  });
+
+  it("builds one set of tiles for a view and hands the same one back", () => {
+    const cache = createTileCache();
+    const first = cache(request());
+    // A fresh request object saying the same thing: the reader picked a
+    // different metric, which is the case this cache exists for.
+    expect(cache(request())).toBe(first);
+  });
+
+  it("keeps every view it has built, so flipping back costs nothing", () => {
+    const cache = createTileCache();
+    const totals = cache(request());
+    const rates = cache(request({ mode: "perMinute" }));
+    expect(rates).not.toBe(totals);
+    expect(cache(request({ mode: "perMinute" }))).toBe(rates);
+    expect(cache(request())).toBe(totals);
+  });
+
+  it("never shows one match's tiles for another's series", () => {
+    const cache = createTileCache();
+    const first = cache(request());
+    // The same seats and the same ids, from a different trailer: a cache that
+    // only looked at the view and the mode would hand back the first match.
+    const other = teamSeries(
+      trailer([[at(0, KEY_A, 9), at(450, KEY_A, 90)]]),
+      seats,
+    );
+    const tiles = cache(request({ series: other }));
+    expect(tiles).not.toBe(first);
+    expect(tiles[0].tiles[0].lines[0].d).not.toBe(first[0].tiles[0].lines[0].d);
   });
 });
