@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type CardArtRequest,
   type CardArtStep,
+  cardIsIconOnly,
   forgetThemeColor,
   readColorScheme,
   readThemeColor,
@@ -143,6 +144,54 @@ describe("resolveCardArt", () => {
     const warpath = resolveCardArt("warpath", THEME);
     const replays = resolveCardArt("replays", THEME);
     expect(warpath).not.toEqual(replays);
+  });
+});
+
+describe("cardIsIconOnly", () => {
+  it("says so when a source refuses the tool a picture", () => {
+    register("override", false);
+    expect(cardIsIconOnly("replays", THEME, "dark")).toBe(true);
+  });
+
+  it("says no for a tool nothing has spoken for", () => {
+    // The procedural floor draws it, so a fresh install has no icon-only card.
+    expect(cardIsIconOnly("warpath", THEME, "dark")).toBe(false);
+  });
+
+  it("agrees with the card the chain would resolve, every way round", () => {
+    // The row sizes itself off this and the cards in it paint off
+    // `resolveCardArt`, so the two disagreeing is a ragged row. Both orderings
+    // are here because the refusal has to lose to a step above it and win over
+    // one below it.
+    const cases: [string | false | undefined, string | false | undefined][] = [
+      [false, "/art/warpath.svg"],
+      ["/art/warpath.svg", false],
+      [undefined, false],
+      [undefined, undefined],
+      [false, undefined],
+    ];
+    for (const [override, content] of cases) {
+      register("override", override);
+      register("content", content);
+      expect(cardIsIconOnly("warpath", THEME, "dark")).toBe(
+        resolveCardArt("warpath", THEME, "dark").kind === "icon",
+      );
+      while (registered.length) registered.pop()?.();
+    }
+  });
+
+  it("asks each source the same question a card would", () => {
+    const seen: CardArtRequest[] = [];
+    registered.push(
+      registerCardArtSource("override", (request) => {
+        seen.push(request);
+        return undefined;
+      }),
+    );
+    cardIsIconOnly("warpath", THEME, "light");
+    expect(seen).toEqual([
+      { toolId: "warpath", themeColor: THEME, scheme: "light" },
+    ]);
   });
 });
 
