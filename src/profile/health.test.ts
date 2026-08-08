@@ -22,6 +22,7 @@ function base(): HealthInputs {
     settingsIds: ["content-folders", "engines", "uberstress"],
     linkIcons: [],
     validIconNames: ["discord", "globe", "docs"],
+    home: null,
   };
 }
 
@@ -291,6 +292,47 @@ describe("deriveHealthChecks", () => {
 
     it("adds no link-icon row when no link sets an icon", () => {
       expect(maybeById(base(), "linkIcons")).toBeUndefined();
+    });
+  });
+
+  describe("home page readout", () => {
+    const home = (issues: string[] = []) => ({
+      ...base(),
+      home: { summary: 'Layout "stacked", 4 zone(s), pinned', issues },
+    });
+
+    it("adds no row for a profile with no home key", () => {
+      // Nearly every distribution is this one, and a panel that starts talking
+      // at them about a key they never wrote is worse than no panel.
+      expect(maybeById(base(), "home")).toBeUndefined();
+    });
+
+    it("confirms a clean home with what it drew", () => {
+      const c = byId(home(), "home");
+      expect(c.status).toBe("ok");
+      expect(c.label).toContain('Layout "stacked", 4 zone(s), pinned');
+    });
+
+    it("warns and lists every entry the resolver dropped", () => {
+      const c = byId(
+        home([
+          'home: ignoring unknown zone "livestream"',
+          "Could not read @.coilbox/news.html",
+        ]),
+        "home",
+      );
+      expect(c.status).toBe("warn");
+      expect(c.label).toContain("2");
+      expect(c.detail).toContain("livestream");
+      expect(c.detail).toContain("@.coilbox/news.html");
+    });
+
+    it("still says what the page ended up as, because it drew one", () => {
+      const c = byId(
+        home(['home: ignoring unknown zone "livestream"']),
+        "home",
+      );
+      expect(c.hint).toContain('Layout "stacked", 4 zone(s), pinned');
     });
   });
 });

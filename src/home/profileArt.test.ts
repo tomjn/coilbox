@@ -213,3 +213,51 @@ describe("the override step of the chain", () => {
     expect(resolveCardArt("warpath", THEME, "dark").source).toBe("procedural");
   });
 });
+
+/**
+ * The art half of what the profile health panel lists (issue #1080). The panel
+ * passes a collector into the same call the page makes, so a dropped tool is
+ * named there in the words the console got.
+ */
+describe("collecting what the art map dropped", () => {
+  it("collects nothing from a map it accepted whole", () => {
+    const issues: string[] = [];
+    readArtMap(
+      { warpath: "@.coilbox/art/warpath.png", replays: false },
+      issues,
+    );
+    expect(issues).toStrictEqual([]);
+  });
+
+  it("collects one line per tool it dropped, naming the tool", () => {
+    const issues: string[] = [];
+    readArtMap({ warpath: "art/warpath.png", replays: 7 }, issues);
+    expect(issues).toHaveLength(2);
+    expect(issues[0]).toContain("warpath");
+    expect(issues[1]).toContain("replays");
+  });
+
+  it("collects the one complaint when the whole map is wrong", () => {
+    const issues: string[] = [];
+    readArtMap("@.coilbox/art", issues);
+    expect(issues).toHaveLength(1);
+  });
+
+  it("collects exactly what it warned, so the panel cannot drift", () => {
+    const issues: string[] = [];
+    readArtMap({ warpath: 7, replays: [] }, issues);
+    expect(warn.mock.calls).toStrictEqual(issues.map((i) => [i]));
+  });
+
+  it("reaches the art through the page, from the cards zone that survived", () => {
+    const issues: string[] = [];
+    resolveCardArtOverrides(withArt({ warpath: "art/warpath.png" }), issues);
+    expect(issues).toHaveLength(1);
+  });
+
+  it("collects nothing for a distribution with no home key", () => {
+    const issues: string[] = [];
+    resolveCardArtOverrides(entriesOf(undefined), issues);
+    expect(issues).toStrictEqual([]);
+  });
+});

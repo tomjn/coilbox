@@ -97,3 +97,20 @@ export function homeMarkup(value: string): HomeMarkup {
   const ref = value.trim();
   return files.get(ref) ?? { error: `Could not read ${ref}` };
 }
+
+/**
+ * The references in a profile's `home` key that did not resolve, in the words the
+ * page shows in their place.
+ *
+ * For the profile health panel (issue #1080), which cannot read a file itself:
+ * this reports what {@link loadHomeMarkup} found at startup, through the same
+ * {@link homeMarkup} lookup the page renders from. So the panel and the page
+ * agree by construction, and an author reading the panel sees the sentence they
+ * would have found in the gap on the page.
+ */
+export function homeMarkupIssues(home: unknown): string[] {
+  return markupRefs(home).flatMap((ref) => {
+    const { error } = homeMarkup(ref);
+    return error ? [error] : [];
+  });
+}

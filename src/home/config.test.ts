@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_ZONES,
+  describeHome,
   type HomeEntry,
   resolveHome,
   zoneString,
@@ -217,6 +218,116 @@ describe("resolveHome when home itself is wrong", () => {
     expect(zonesOf(home.entries)).toEqual([...DEFAULT_ZONES]);
     expect(home.layout).toBeUndefined();
     expect(warn).toHaveBeenCalled();
+  });
+});
+
+/**
+ * The reported issues and the console warnings are the same list (issue #1080).
+ *
+ * The profile health panel exists because a release build has no console, and it
+ * shows `issues`. If the two could differ, the panel would describe a page the
+ * app did not draw, so the property under test is that they cannot: every warning
+ * is an issue, in the same words and the same order.
+ */
+describe("what resolveHome reports as issues", () => {
+  const malformed: [string, unknown][] = [
+    ["home that is not an object", "stacked"],
+    ["a layout that is not a string", { layout: 3 }],
+    ["zones that are not an array", { zones: { zone: "greeting" } }],
+    ["an empty zone list", { zones: [] }],
+    ["an entry that is not an object", { zones: ["greeting", 3, null] }],
+    ["an unknown zone name", { zones: [{ zone: "livestream" }] }],
+    [
+      "a repeated zone",
+      { zones: [{ zone: "cards" }, { zone: "cards" }, { zone: "greeting" }] },
+    ],
+    ["an inherited Object property", { zones: [{ zone: "constructor" }] }],
+    ["an entry naming neither a zone nor html", { zones: [{ before: "<p>" }] }],
+    [
+      "several mistakes at once",
+      { layout: [], zones: [{ zone: "nope" }, 7, { zone: "cards" }] },
+    ],
+  ];
+
+  it.each(malformed)("reports %s exactly as it warns", (_label, raw) => {
+    const { issues } = resolveHome(raw);
+    expect(issues.length).toBeGreaterThan(0);
+    expect(warn.mock.calls).toStrictEqual(issues.map((i) => [i]));
+  });
+
+  it("reports nothing for a page that resolved as written", () => {
+    const { issues } = resolveHome({
+      layout: "stacked",
+      zones: [{ zone: "greeting" }, { html: "<p>hi</p>" }, { zone: "cards" }],
+    });
+    expect(issues).toStrictEqual([]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("reports nothing for a profile with no home key", () => {
+    expect(resolveHome(undefined).issues).toStrictEqual([]);
+    expect(resolveHome(null).issues).toStrictEqual([]);
+    expect(resolveHome({}).issues).toStrictEqual([]);
+  });
+
+  it("names the entry it dropped, so the author can find it", () => {
+    const { issues } = resolveHome({ zones: [{ zone: "livestream" }] });
+    expect(issues.join("\n")).toContain("livestream");
+  });
+
+  it("quotes a bad value rather than describing it", () => {
+    const { issues } = resolveHome({ zones: [{ zone: "cards" }, 7] });
+    expect(issues.join("\n")).toContain("7");
+  });
+
+  it("truncates a long value so one bad entry cannot fill the panel", () => {
+    const { issues } = resolveHome({ zones: [{ zone: "x".repeat(500) }, 7] });
+    for (const issue of issues) expect(issue.length).toBeLessThan(300);
+  });
+});
+
+describe("pinned", () => {
+  it("is false when no zone list was written", () => {
+    expect(resolveHome(undefined).pinned).toBe(false);
+    expect(resolveHome({ layout: "stacked" }).pinned).toBe(false);
+  });
+
+  it("is true when the author's list survived", () => {
+    expect(resolveHome({ zones: [{ zone: "cards" }] }).pinned).toBe(true);
+  });
+
+  it("is false when the list was written but nothing in it survived", () => {
+    // The page on screen is the Coilbox default, so that is what it says. A
+    // summary reading "pinned" here would be describing the profile rather than
+    // the page.
+    expect(resolveHome({ zones: [{ zone: "nope" }] }).pinned).toBe(false);
+    expect(resolveHome({ zones: "greeting" }).pinned).toBe(false);
+  });
+});
+
+describe("describeHome", () => {
+  it("names the layout, the zone count and the pin", () => {
+    expect(
+      describeHome(
+        resolveHome({
+          layout: "stacked",
+          zones: [{ zone: "greeting" }, { zone: "cards" }],
+        }),
+      ),
+    ).toBe('Layout "stacked", 2 zone(s), pinned');
+  });
+
+  it("says what an unconfigured page tracks", () => {
+    expect(describeHome(resolveHome(undefined))).toBe(
+      `Default layout, ${DEFAULT_ZONES.length} zone(s), tracking the default`,
+    );
+  });
+
+  it("counts the zones that survived, not the ones written", () => {
+    const home = resolveHome({
+      zones: [{ zone: "greeting" }, { zone: "nope" }, { zone: "cards" }],
+    });
+    expect(describeHome(home)).toContain("2 zone(s)");
   });
 });
 

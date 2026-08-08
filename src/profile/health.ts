@@ -31,6 +31,20 @@ export type CampaignFailure = LoadFailure;
 /** One scenario that failed to load (issue #962). */
 export type ScenarioFailure = LoadFailure;
 
+/**
+ * What a profile's `home` key resolved to, as the home resolvers themselves
+ * report it. `null` when the profile has no `home` key, which is most of them.
+ *
+ * Both fields come out of the resolvers rather than from a second reading of the
+ * profile, so this describes the page Coilbox drew (issue #1080).
+ */
+export interface HomeHealth {
+  /** One line: which layout, how many zones, pinned or tracking the default. */
+  summary: string;
+  /** Everything the resolvers dropped or could not read, in their own words. */
+  issues: string[];
+}
+
 /** A writability probe result for one folder (from `dlPathWritable`). */
 export interface WritableResult {
   writable: boolean;
@@ -80,6 +94,8 @@ export interface HealthInputs {
   linkIcons: string[];
   /** The curated icon names links resolve against; others fall back to a generic glyph. */
   validIconNames: string[];
+  /** The resolved `home` key, or null when the profile has none. */
+  home: HomeHealth | null;
 }
 
 /** Strip the trailing `.coilbox` segment to get the app dir the package sits in. */
@@ -192,6 +208,36 @@ export function checkLinkIcons(
     hint: `${unknown
       .map((n) => `link icon '${n}' is unknown — falls back to a generic icon`)
       .join("; ")}.`,
+  };
+}
+
+/**
+ * Report what a profile's `home` key actually did (issue #1080).
+ *
+ * The zone list is the one part of a profile with no readout at all: a dropped
+ * entry, a repeated zone and a markup file that is not there each warn on the
+ * webview console, which a release build does not expose. So this is the only
+ * place the author of a shipped distribution can find out.
+ *
+ * It reports rather than validates. Everything named here was already decided by
+ * the resolvers while they built the page, and passed in verbatim, so the row
+ * cannot describe a page the app did not draw.
+ *
+ * `null` when the profile has no `home` key, in the shape of {@link checkHideIds}:
+ * most distributions have none, and a panel that starts talking at them about a
+ * key they never wrote is worse than no panel.
+ */
+export function checkHome(home: HomeHealth | null): HealthCheck | null {
+  if (!home) return null;
+  if (home.issues.length === 0) {
+    return { id: "home", status: "ok", label: `Home page — ${home.summary}` };
+  }
+  return {
+    id: "home",
+    status: "warn",
+    label: `${home.issues.length} problem(s) in \`home\``,
+    hint: `Coilbox drew the page anyway: ${home.summary}. Each line below is one thing it ignored or could not read.`,
+    detail: home.issues.join("\n"),
   };
 }
 
@@ -460,12 +506,13 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     }
   }
 
-  // 9-11. Profile no-op advisories: configured values that silently do nothing.
+  // 9-12. Profile no-op advisories: configured values that silently do nothing.
   // Each returns null (no row) when its part of the profile is empty.
   for (const c of [
     checkHideIds(i.hide, i.hideableNavIds),
     checkHideSettingsIds(i.hideSettings, i.settingsIds),
     checkLinkIcons(i.linkIcons, i.validIconNames),
+    checkHome(i.home),
   ]) {
     if (c) checks.push(c);
   }

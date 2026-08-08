@@ -8,7 +8,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
 }));
 
-import { homeMarkup, loadHomeMarkup } from "./markup";
+import { homeMarkup, homeMarkupIssues, loadHomeMarkup } from "./markup";
 
 /** A stand-in for the Rust `profile_file` read, over a fixed set of files. */
 const reader = (files: Record<string, string>) =>
@@ -162,5 +162,57 @@ describe("homeMarkup", () => {
     // The parse in `rewriteBrandedHtml` is the browser's own, so an unclosed tag
     // is normalised the way it would be in a page rather than throwing.
     expect(homeMarkup("<p>oops<div>").html).toBe("<p>oops<div>");
+  });
+});
+
+/**
+ * What the profile health panel lists (issue #1080). It reads the same map the
+ * page renders from, so the panel names a file if and only if the page has a gap
+ * where that file should be.
+ */
+describe("homeMarkupIssues", () => {
+  const HOME = {
+    zones: [
+      { zone: "cards", before: "@.coilbox/intro.html" },
+      { html: "@.coilbox/missing.html" },
+      { zone: "suggested", after: "<p>inline</p>" },
+    ],
+  };
+
+  it("says nothing for a profile with no home key", async () => {
+    await loadHomeMarkup(undefined, reader(FILES));
+    expect(homeMarkupIssues(undefined)).toStrictEqual([]);
+  });
+
+  it("says nothing when every reference was read", async () => {
+    const home = { zones: [{ html: "@.coilbox/community.html" }] };
+    await loadHomeMarkup(home, reader(FILES));
+    expect(homeMarkupIssues(home)).toStrictEqual([]);
+  });
+
+  it("names the file that was not there, once", async () => {
+    await loadHomeMarkup(HOME, reader(FILES));
+    expect(homeMarkupIssues(HOME)).toStrictEqual([
+      "Could not read @.coilbox/missing.html",
+    ]);
+  });
+
+  it("says exactly what the page shows in the gap", async () => {
+    await loadHomeMarkup(HOME, reader(FILES));
+    expect(homeMarkupIssues(HOME)).toStrictEqual([
+      homeMarkup("@.coilbox/missing.html").error,
+    ]);
+  });
+
+  it("ignores inline markup, which reads no file", async () => {
+    const home = { zones: [{ zone: "cards", before: "<p>hi</p>" }] };
+    await loadHomeMarkup(home, reader(FILES));
+    expect(homeMarkupIssues(home)).toStrictEqual([]);
+  });
+
+  it("reports a reference that escapes the portable root", async () => {
+    const home = { zones: [{ html: "@.coilbox/../secret" }] };
+    await loadHomeMarkup(home, reader(FILES));
+    expect(homeMarkupIssues(home)).toHaveLength(1);
   });
 });

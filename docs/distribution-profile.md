@@ -181,7 +181,9 @@ The `<game>` arg matches a game's name or shortname (case-insensitive); on a sin
 
 Open **Settings > Distribution profile**. It shows whether a profile is loaded, where it came from (`file` / `default`), and a summary of everything it's changing. If no profile is loaded it reads "No distribution profile loaded — standard Coilbox".
 
-The summary does not yet cover the [`home`](#home-object) key ([#1080](https://github.com/tomjn/coilbox/issues/1080)), so check that one on the page itself: the zones appear in the order you listed, and anything Coilbox could not read is a warning in the webview console.
+The "Home page" row covers the [`home`](#home-object) key: which layout drew the page, how many zones it drew, and whether that was your `zones` list or the default that moves with Coilbox. It reads "Default" for a profile that has no `home` key.
+
+"Validate profile", below the summary, adds a `home` row naming anything Coilbox dropped or could not read. That row is absent when there is nothing wrong, and for a profile with no `home` key at all. See [when a `home` key is wrong](#when-a-home-key-is-wrong).
 
 ## Writing and iterating on a profile
 
@@ -553,7 +555,7 @@ Naming it pins it. If a later Coilbox redesigns the home page, it ships as a new
 
 You write this JSON by hand and nothing checks it before you ship. So a mistake never blanks the page: every bad value falls back to what Coilbox would have done, and says what it dropped and why on the webview console.
 
-A release build does not expose that console, and the profile summary has no readout for `home` yet ([#1080](https://github.com/tomjn/coilbox/issues/1080)), so today the reliable check is a dev build. Otherwise compare the page against your zone list by eye: a zone that is missing, or in the wrong place, is an entry that was dropped.
+A release build does not expose that console, so the same list is in the app: Settings > Distribution profile, "Validate profile". The `home` row names every entry it dropped and every `@.coilbox/` file it could not read, in the words the console got. The summary above it says which layout drew the page, how many zones it drew, and whether that was your list or the tracking default, so a zone list that was thrown away for being empty or all-bad shows as a zone count you did not write.
 
 | You wrote                                          | You get                                                      |
 | -------------------------------------------------- | ------------------------------------------------------------ |

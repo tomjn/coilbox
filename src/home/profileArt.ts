@@ -44,7 +44,7 @@
 import { assetUrl } from "../lib/assetUrl";
 import { parseRef } from "../profile/refs";
 import type { ArtOverrides } from "./artOverride";
-import type { HomeEntry } from "./config";
+import { type HomeEntry, noteHomeIssue, showHomeValue } from "./config";
 
 /** No overrides, which is what every distribution without an `art` map has. */
 const NONE: ArtOverrides = new Map();
@@ -55,12 +55,16 @@ const NONE: ArtOverrides = new Map();
  * Takes the resolved entries rather than the raw profile, so a repeated `cards`
  * zone resolves the same way here as it does on screen: `resolveHome` has
  * already dropped the second one, and this reads whichever survived.
+ *
+ * Pass `issues` to collect what it dropped as well as warn about it, which is how
+ * the profile health panel reports bad art without asking a second question.
  */
 export function resolveCardArtOverrides(
   entries: readonly HomeEntry[],
+  issues?: string[],
 ): ArtOverrides {
   const cards = entries.find((e) => e.kind === "zone" && e.zone === "cards");
-  return cards ? readArtMap(cards.entry.art) : NONE;
+  return cards ? readArtMap(cards.entry.art, issues) : NONE;
 }
 
 /**
@@ -70,15 +74,18 @@ export function resolveCardArtOverrides(
  * `__proto__` is a key like any other rather than a lookup that resolves an
  * inherited Object property.
  */
-export function readArtMap(value: unknown): ArtOverrides {
+export function readArtMap(value: unknown, issues?: string[]): ArtOverrides {
   if (value === undefined || value === null) return NONE;
   if (typeof value !== "object" || Array.isArray(value)) {
-    console.warn("home: ignoring `art`, expected an object, got", value);
+    noteHomeIssue(
+      issues,
+      `home: ignoring \`art\`, expected an object, got ${showHomeValue(value)}`,
+    );
     return NONE;
   }
   const overrides = new Map<string, string | false>();
   for (const [toolId, entry] of Object.entries(value)) {
-    const art = toolArt(toolId, entry);
+    const art = toolArt(toolId, entry, issues);
     if (art !== undefined) overrides.set(toolId, art);
   }
   return overrides;
@@ -88,7 +95,11 @@ export function readArtMap(value: unknown): ArtOverrides {
  * One tool's art: a URL, `false` for the icon-only card, or `undefined` when the
  * author wrote something this cannot honour and the tool should walk the chain.
  */
-function toolArt(toolId: string, value: unknown): string | false | undefined {
+function toolArt(
+  toolId: string,
+  value: unknown,
+  issues?: string[],
+): string | false | undefined {
   if (value === false) return false;
   if (typeof value === "string") {
     // The same `@.coilbox/` scheme and `coilbox://` rewriting the backdrop and
@@ -97,9 +108,9 @@ function toolArt(toolId: string, value: unknown): string | false | undefined {
     const ref = parseRef(value);
     if (ref?.kind === "file") return assetUrl(ref.path);
   }
-  console.warn(
-    `home: ignoring art for "${toolId}", expected an @.coilbox file reference or false, got`,
-    value,
+  noteHomeIssue(
+    issues,
+    `home: ignoring art for ${showHomeValue(toolId)}, expected an @.coilbox file reference or false, got ${showHomeValue(value)}`,
   );
   return undefined;
 }
