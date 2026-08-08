@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // background.ts reuses the profile's `@`-reference parser, which imports
 // defineCommand from @picoframe/plugin-sdk for its file-read binding. That
@@ -15,8 +15,15 @@ import {
   backdropStyle,
   DEFAULT_BACKDROP_GRADIENT,
   type HomeBackdrop,
+  loadHomeBackground,
   resolveHomeBackground,
 } from "./background";
+
+// The probe's verdict lives in the module, so every test starts from a profile
+// that referenced nothing, which is the state a fresh process is in.
+beforeEach(async () => {
+  await loadHomeBackground(undefined);
+});
 
 describe("resolveHomeBackground", () => {
   it("rewrites a file reference onto the coilbox protocol", () => {
@@ -54,6 +61,113 @@ describe("resolveHomeBackground", () => {
     expect(resolveHomeBackground(value)).toEqual({ kind: "default" });
     expect(warn).toHaveBeenCalledOnce();
     warn.mockRestore();
+  });
+});
+
+/**
+ * A reference to a file that is not there (issue #1085).
+ *
+ * The one home mistake that used to have no symptom at all: the URL resolved, the
+ * layer painted nothing, and the page showed the flat theme background, which is
+ * what `"background": false` asks for. So the test that matters is that a typo and
+ * a deliberate switch off no longer look alike.
+ */
+describe("a background file that is not there", () => {
+  const HOME = { background: "@.coilbox/art/bg.jpg" };
+
+  /** A probe that reports every file missing, and records what it was asked. */
+  const missing = (asked: string[]) => async (path: string) => {
+    asked.push(path);
+    return false;
+  };
+
+  it("paints the default wash rather than nothing", async () => {
+    await loadHomeBackground(HOME, async () => false);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(resolveHomeBackground(HOME.background)).toEqual({ kind: "default" });
+    warn.mockRestore();
+  });
+
+  it("looks different from a backdrop switched off on purpose", async () => {
+    await loadHomeBackground(HOME, async () => false);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(resolveHomeBackground(HOME.background)).not.toEqual(
+      resolveHomeBackground(false),
+    );
+    warn.mockRestore();
+  });
+
+  it("names the reference the author wrote", async () => {
+    await loadHomeBackground(HOME, async () => false);
+    const issues: string[] = [];
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    resolveHomeBackground(HOME.background, issues);
+    warn.mockRestore();
+    expect(issues.join("\n")).toContain("@.coilbox/art/bg.jpg");
+  });
+
+  it("probes the path the page would have painted", async () => {
+    const asked: string[] = [];
+    await loadHomeBackground(HOME, missing(asked));
+    expect(asked).toEqual(["art/bg.jpg"]);
+  });
+
+  it("paints a file the probe found", async () => {
+    await loadHomeBackground(HOME, async () => true);
+    expect(resolveHomeBackground(HOME.background).kind).toBe("image");
+  });
+
+  it("paints a reference the probe never saw", async () => {
+    // The probe is a check on top of the page. A profile it never ran against
+    // must not have a working backdrop called broken on its behalf.
+    expect(resolveHomeBackground("@.coilbox/art/other.jpg").kind).toBe("image");
+  });
+
+  it("probes nothing for a profile with no backdrop reference", async () => {
+    const asked: string[] = [];
+    await loadHomeBackground({ background: false }, missing(asked));
+    await loadHomeBackground({ zones: [] }, missing(asked));
+    await loadHomeBackground(undefined, missing(asked));
+    expect(asked).toEqual([]);
+  });
+
+  it("forgets a profile's misses when a new profile is loaded", async () => {
+    await loadHomeBackground(HOME, async () => false);
+    await loadHomeBackground(
+      { background: "@.coilbox/b.jpg" },
+      async () => true,
+    );
+    expect(resolveHomeBackground(HOME.background).kind).toBe("image");
+  });
+});
+
+/**
+ * The reported issues and the console warnings are the same list, which is what
+ * lets the profile health panel print them (issues #1080, #1088).
+ */
+describe("what resolveHomeBackground reports as issues", () => {
+  it.each([
+    ["a bad value", 42, undefined],
+    ["a reference in the wrong namespace", "@route/settings", undefined],
+    ["a file that is not there", "@.coilbox/art/bg.jpg", { probe: false }],
+  ])("reports %s exactly as it warns", async (_case, value, load) => {
+    if (load)
+      await loadHomeBackground({ background: value }, async () => false);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const issues: string[] = [];
+    resolveHomeBackground(value, issues);
+    const calls = warn.mock.calls;
+    warn.mockRestore();
+    expect(issues.length).toBe(1);
+    expect(calls).toStrictEqual(issues.map((i) => [i]));
+  });
+
+  it("reports nothing for a backdrop that resolved as written", async () => {
+    const issues: string[] = [];
+    resolveHomeBackground(undefined, issues);
+    resolveHomeBackground(false, issues);
+    resolveHomeBackground("@.coilbox/art/bg.jpg", issues);
+    expect(issues).toStrictEqual([]);
   });
 });
 

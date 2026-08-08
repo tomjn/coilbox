@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import { plugins } from "./app.plugins";
 import { ErrorBoundary } from "./general/ErrorBoundary";
 import { SPLASH_ENABLED_KEY } from "./general/splash";
+import { loadHomeBackground } from "./home/background";
 import CoilboxHome from "./home/CoilboxHome";
 import { loadHomeMarkup } from "./home/markup";
 import { applyProfilePages } from "./profile/CustomPage";
@@ -77,6 +78,12 @@ await resolveWelcome();
 // intro sentence has to be in memory before the home page draws. A no-op (no file
 // IO at all) for a profile with no `home` key.
 await loadHomeMarkup(profile.home);
+
+// Check the `home.background` file is there, for the reason directly above and
+// one more: an image that is not there paints nothing, which is what switching
+// the backdrop off looks like, so without this a typo in the path has no symptom
+// at all. A no-op for a profile that references no backdrop.
+await loadHomeBackground(profile.home);
 
 // Hide any settings sections the profile lists (uses SettingsSection.useVisible,
 // injected centrally so no plugin needs to opt in). No-op without a profile.

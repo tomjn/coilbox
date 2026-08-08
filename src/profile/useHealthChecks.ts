@@ -6,6 +6,7 @@ import { contentStateLoad } from "../content/bindings";
 import { useUnitsyncScan } from "../content/config";
 import { dlPathWritable } from "../downloads/bindings";
 import { useDownloadsConfig } from "../downloads/config";
+import { resolveHomeBackground } from "../home/background";
 import { describeHome, resolveHome } from "../home/config";
 import { homeMarkupIssues } from "../home/markup";
 import { resolveCardArtOverrides } from "../home/profileArt";
@@ -68,6 +69,10 @@ function homeHealth(home: unknown): HomeHealth | null {
   if (home === undefined || home === null) return null;
   const resolved = resolveHome(home);
   const issues = [...resolved.issues];
+  // Run for the complaints, not the backdrop, which belongs to the page. Includes
+  // a reference to a file that is not there, which the startup probe has already
+  // settled (issue #1085), so this asks nothing the page did not ask.
+  resolveHomeBackground(resolved.background, issues);
   // Run for the complaints, not the overrides, which belong to the page. Art is
   // dropped per tool, so a typo costs one card and says which.
   resolveCardArtOverrides(resolved.entries, issues);

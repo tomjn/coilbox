@@ -26,6 +26,13 @@
  * the same way this module does.
  */
 
+import {
+  DEFAULT_LAYOUT,
+  isLayoutName,
+  LAYOUT_NAMES,
+  type LayoutName,
+} from "./layoutNames";
+
 /** A profile's `home` key. Every field is optional, and an absent key is the default. */
 export interface HomeConfig {
   /**
@@ -100,10 +107,56 @@ const KNOWN_ZONES: ReadonlySet<string> = new Set(DEFAULT_ZONES);
 /** An entry as written by the author, untouched. */
 export type RawEntry = Readonly<Record<string, unknown>>;
 
+/** A per-entry option whose value is a string. */
+export type ZoneStringKey = "before" | "after" | "title" | "tagline";
+
+/** The markup keys every zone takes, in the order they render around it. */
+const MARKUP_KEYS = ["before", "after"] as const;
+
+/**
+ * Which string options each zone reads, which is {@link HomeZoneConfig}'s
+ * documentation made executable.
+ *
+ * The resolver reads them here rather than leaving them to the layout, so that
+ * one walk over the entries decides everything the page acts on and there is
+ * nothing left for a second reader to form its own opinion about (issue #1088).
+ * A layout renders {@link HomeEntry.strings}, so what the profile health panel
+ * lists is what the page was handed.
+ *
+ * The cost of that is this table: a zone that starts reading a new key has to be
+ * added to it, or its author's mistakes stay silent. It lives beside the schema
+ * that already promises which keys a zone takes, so the two are read together.
+ */
+const ZONE_STRING_KEYS: Readonly<Record<ZoneId, readonly ZoneStringKey[]>> = {
+  onboarding: MARKUP_KEYS,
+  // The only zone with options of its own: the heading and the line under it.
+  greeting: [...MARKUP_KEYS, "title", "tagline"],
+  continue: MARKUP_KEYS,
+  resume: MARKUP_KEYS,
+  cards: MARKUP_KEYS,
+  suggested: MARKUP_KEYS,
+};
+
+/**
+ * A zone's string options as resolved, with anything that was not a string
+ * already dropped and reported. A key the author left out is absent, and an
+ * empty string is kept, because a deliberate blank is not the same as no value.
+ */
+export type ZoneStrings = Readonly<Partial<Record<ZoneStringKey, string>>>;
+
+/** No options, which is what an unconfigured zone has. */
+const NO_STRINGS: ZoneStrings = Object.freeze({});
+
 /** One resolved entry of the page. */
 export type HomeEntry =
   /** A built-in zone the layout knows how to render. */
-  | { readonly kind: "zone"; readonly zone: ZoneId; readonly entry: RawEntry }
+  | {
+      readonly kind: "zone";
+      readonly zone: ZoneId;
+      readonly entry: RawEntry;
+      /** The zone's string options, already checked. See {@link ZONE_STRING_KEYS}. */
+      readonly strings: ZoneStrings;
+    }
   /**
    * A distribution's own markup, sitting between zones. `html` is lifted out of
    * the entry because the schema has already checked it is a string, so the
@@ -113,8 +166,11 @@ export type HomeEntry =
 
 /** What the layout needs from the profile, all of it already validated. */
 export interface ResolvedHome {
-  /** The pinned layout name, or undefined to track the Coilbox default. */
-  readonly layout?: string;
+  /**
+   * The pinned layout name, or undefined to track the Coilbox default. A name
+   * this build does not ship reads as undefined, because that is the page drawn.
+   */
+  readonly layout?: LayoutName;
   /** The raw `background` value, for `resolveHomeBackground` to interpret. */
   readonly background: unknown;
   /** The page, in order. Never empty. */
@@ -178,6 +234,7 @@ function defaultEntries(): HomeEntry[] {
     kind: "zone" as const,
     zone,
     entry: NO_KEYS,
+    strings: NO_STRINGS,
   }));
 }
 
@@ -234,16 +291,30 @@ export function describeHome(home: ResolvedHome): string {
 }
 
 /**
- * The pinned layout name, or undefined to track the default. Only the type is
- * checked here. Whether the name exists is the registry's question, because only
- * the registry knows what this build ships (see `./layout`).
+ * The pinned layout name, or undefined to track the default.
+ *
+ * A name this build does not ship is dropped here rather than carried through to
+ * `./layout`, which would fall back to the default anyway. Dropping it is what
+ * lets {@link describeHome} say "Default layout" for a typo, which is the page
+ * the author is looking at, instead of quoting a pin that did nothing (issue
+ * #1088).
+ *
+ * The names come from `./layoutNames`, which holds no components, so asking the
+ * question costs a leaf import rather than the whole home page.
  */
-function layoutName(value: unknown, issues: string[]): string | undefined {
+function layoutName(value: unknown, issues: string[]): LayoutName | undefined {
   if (value === undefined || value === null) return undefined;
-  if (typeof value === "string") return value;
+  if (typeof value !== "string") {
+    noteHomeIssue(
+      issues,
+      `home: ignoring \`layout\`, expected a string, got ${showHomeValue(value)}`,
+    );
+    return undefined;
+  }
+  if (isLayoutName(value)) return value;
   noteHomeIssue(
     issues,
-    `home: ignoring \`layout\`, expected a string, got ${showHomeValue(value)}`,
+    `home: ignoring unknown layout ${showHomeValue(value)}, using "${DEFAULT_LAYOUT}". This build ships: ${LAYOUT_NAMES.join(", ")}`,
   );
   return undefined;
 }
@@ -304,7 +375,12 @@ function resolveEntries(
         continue;
       }
       seen.add(zone);
-      entries.push({ kind: "zone", zone, entry });
+      entries.push({
+        kind: "zone",
+        zone,
+        entry,
+        strings: zoneStrings(zone, entry, issues),
+      });
       continue;
     }
     if (typeof entry.html === "string") {
@@ -327,17 +403,35 @@ function resolveEntries(
 }
 
 /**
- * A string option off a zone entry, or undefined when the author left it out.
+ * The string options a zone reads, checked once, here.
  *
- * The reader of per-entry config this build has, used for the greeting's `title`
- * and `tagline` and for a zone's `before` and `after` markup. A non-string is a
- * distribution bug, so it warns and falls back to what Coilbox would have said
- * rather than rendering an object into the heading.
+ * A non-string is a distribution bug, so it is dropped with a complaint rather
+ * than rendered into the heading, and the zone falls back to what Coilbox would
+ * have said. Only the keys {@link ZONE_STRING_KEYS} lists for this zone are read,
+ * so a `title` on the tool grid, which nothing renders, is not reported as a
+ * value that was ignored: it was never going to be used, string or not.
+ *
+ * The complaint names the zone, because the health panel lists these lines with
+ * nothing else around them.
  */
-export function zoneString(entry: RawEntry, key: string): string | undefined {
-  const value = entry[key];
-  if (value === undefined || value === null) return undefined;
-  if (typeof value === "string") return value;
-  console.warn(`home: ignoring \`${key}\`, expected a string, got`, value);
-  return undefined;
+function zoneStrings(
+  zone: ZoneId,
+  entry: RawEntry,
+  issues: string[],
+): ZoneStrings {
+  let strings: Partial<Record<ZoneStringKey, string>> | undefined;
+  for (const key of ZONE_STRING_KEYS[zone]) {
+    const value = entry[key];
+    if (value === undefined || value === null) continue;
+    if (typeof value !== "string") {
+      noteHomeIssue(
+        issues,
+        `home: ignoring \`${key}\` on the "${zone}" zone, expected a string, got ${showHomeValue(value)}`,
+      );
+      continue;
+    }
+    strings ??= {};
+    strings[key] = value;
+  }
+  return strings ?? NO_STRINGS;
 }
