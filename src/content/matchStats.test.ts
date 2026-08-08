@@ -31,7 +31,6 @@ import {
   modeRows,
   PLAYERS_VIEW_MAX_SERIES,
   perMinuteRows,
-  resultLabel,
   seatCount,
   secondsPerFrame,
   spreadLabels,
@@ -144,20 +143,9 @@ describe("formatDuration", () => {
   });
 });
 
-describe("resultLabel", () => {
-  it("says the winner is unknown rather than calling it a draw", () => {
-    expect(resultLabel(info({ winnersKnown: false }))).toBe("Unknown");
-  });
-
-  it("reports a game over that nobody won", () => {
-    expect(resultLabel(info({ winnersKnown: true }))).toBe("Nobody won");
-  });
-
-  it("names every winning ally team", () => {
-    const decided = info({ winnersKnown: true, winningAllyTeams: [0, 2] });
-    expect(resultLabel(decided)).toBe("Ally 0, Ally 2 won");
-  });
-});
+/* `resultLabel` used to live here, naming the same sides "Ally 0, Ally 2 won"
+ * while every other surface said "Team 1, Team 3 won". Its three cases are now
+ * `teamResultLabel`'s, in `replaySideLabel.test.ts` (#1211). */
 
 describe("seatCount", () => {
   it("counts the bots and leaves the spectators out", () => {

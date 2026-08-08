@@ -8,6 +8,7 @@ import type {
   MetricKey,
   TeamStatSample,
 } from "./bindings";
+import { teamLabel } from "./replaySideLabel";
 
 /**
  * What the match statistics section on replay detail shows, worked out here so
@@ -30,17 +31,6 @@ export function formatDuration(sec: number): string {
   const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
   const ss = String(s).padStart(2, "0");
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
-
-/** Human-readable result line from the winning ally teams. */
-export function resultLabel(info: DemoInfo): string {
-  // False either because the recording never reached a game over, or because
-  // its trailer is in a format coilbox doesn't read and there was no demotool
-  // fallback to ask, so this doesn't name a specific reason.
-  if (!info.winnersKnown) return "Unknown";
-  if (info.winningAllyTeams.length === 0) return "Nobody won";
-  const ids = info.winningAllyTeams.map((a) => `Ally ${a}`).join(", ");
-  return `${ids} won`;
 }
 
 /** How many seats played: humans who weren't spectating, plus every bot. */
@@ -339,14 +329,15 @@ function mergeSamples(parts: TeamStatSample[][]): TeamStatSample[] {
 }
 
 /**
- * What a side is called, with how it did. "Team 1" rather than "Ally team 0"
- * because that is how a match is talked about and `[allyteam0]` is an index in a
- * file, and the result is part of the name because the chart is read to find out
- * how the match went.
+ * What a side is called, with how it did. The name itself is
+ * {@link teamLabel}'s, the one definition of that numbering, so the chart and
+ * the roster beside it cannot drift apart the way they did in #1209. The result
+ * is part of the name here because the chart is read to find out how the match
+ * went.
  */
 function sideLabel(ally: number, info: DemoInfo): string {
   const won = info.winnersKnown && info.winningAllyTeams.includes(ally);
-  return `Team ${ally + 1}${won ? " (won)" : ""}`;
+  return `${teamLabel(ally)}${won ? " (won)" : ""}`;
 }
 
 /**
