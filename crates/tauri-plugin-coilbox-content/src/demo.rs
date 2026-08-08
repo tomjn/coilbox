@@ -27,8 +27,8 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 use flate2::read::GzDecoder;
 
 use crate::model::{
-    AiInfo, AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoTrailer, PlayerInfo, ReplayFile,
-    StartBox, TeamStatSample, TeamStatSeries,
+    AiInfo, AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoTrailer, PlayerInfo, PlayerStats,
+    ReplayFile, StartBox, TeamStatSample, TeamStatSeries,
 };
 
 /// Folders under a write dir that hold client demos. The engine writes to
@@ -73,8 +73,7 @@ const DEMO_VERSION: i32 = 5;
 const HEADER_V5_SIZE: usize = 352;
 /// `TeamStatistics`: 20 fields, `i32 frame` + 12 `f32` + 7 `i32`.
 const TEAM_STAT_ELEM_SIZE: usize = 80;
-/// `PlayerStatistics`: 5 `i32`. Nothing here decodes them yet (issue #1130), but
-/// a different size means a different format.
+/// `PlayerStatistics`: 5 `i32`. A different size means a different format.
 const PLAYER_STAT_ELEM_SIZE: usize = 20;
 
 // ---- listing ---------------------------------------------------------------
@@ -400,23 +399,20 @@ pub fn demo_info(engine_dir: &Path, demo: &Path) -> Result<DemoInfo, String> {
     // trailer nor demotool can tell that case apart from a game over with
     // nobody winning. So the header decides whether there is an answer, and
     // the trailer (or its fallback) only says what it is.
-    let winners = raw
-        .game_over
-        .then(|| read_winners(engine_dir, demo))
-        .flatten();
-    Ok(build_demo_info(raw, &game, winners))
-}
-
-/// Winners for a game recorded as ended: the trailer decoder first, since it
-/// costs a seek and a struct read and no subprocess, and `demotool` only when
-/// the trailer is in a format this decoder refuses, so a replay from a future
-/// engine version still reports a winner if the tool happens to ship beside
-/// it.
-fn read_winners(engine_dir: &Path, demo: &Path) -> Option<Vec<u32>> {
-    match read_trailer(demo) {
-        Ok(trailer) => Some(trailer.winning_ally_teams),
-        Err(_) => demotool_winners(engine_dir, demo),
-    }
+    let trailer = raw.game_over.then(|| read_trailer(demo).ok()).flatten();
+    let winners = match &trailer {
+        // The trailer decoder first: it costs a seek and a struct read, no
+        // subprocess. `demotool` only for a trailer this decoder refuses, so a
+        // replay from a future engine version still reports a winner if the
+        // tool happens to ship beside the engine. That fallback carries no
+        // player statistics, since parsing them out of its text output is a
+        // second decoder for a case that has never been seen.
+        Some(t) => Some(t.winning_ally_teams.clone()),
+        None if raw.game_over => demotool_winners(engine_dir, demo),
+        None => None,
+    };
+    let player_stats = trailer.and_then(|t| t.players);
+    Ok(build_demo_info(raw, &game, winners, player_stats))
 }
 
 /// Native-only decode (header + start-script, no demotool/winner) used for the
@@ -424,7 +420,7 @@ fn read_winners(engine_dir: &Path, demo: &Path) -> Option<Vec<u32>> {
 fn decode_native(demo: &Path) -> Result<DemoInfo, String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
-    Ok(build_demo_info(raw, &game, None))
+    Ok(build_demo_info(raw, &game, None, None))
 }
 
 struct RawDemo {
@@ -711,9 +707,9 @@ fn decode_trailer(bytes: &[u8]) -> Result<DemoTrailer, String> {
     .map(|&b| b as u32)
     .collect();
 
-    // Player statistics are stepped over rather than decoded (issue #1130), but
-    // the block's declared size has to agree with its own element size or the
-    // team statistics behind it are not where we think they are.
+    // The player statistics block's declared size has to agree with its own
+    // element size, or the team statistics behind it are not where we think
+    // they are.
     let players_expect = h
         .num_players
         .checked_mul(h.player_stat_elem_size)
@@ -724,7 +720,14 @@ fn decode_trailer(bytes: &[u8]) -> Result<DemoTrailer, String> {
             h.player_stat_size, h.num_players, h.player_stat_elem_size
         ));
     }
-    take(bytes, &mut at, h.player_stat_size, "player statistics")?;
+    let player_block = take(bytes, &mut at, h.player_stat_size, "player statistics")?;
+    // Strided by the declared element size, not by our own 20, so a struct that
+    // grew at the end still decodes (`require_known_layout` has already refused
+    // one that shrank).
+    let players: Vec<PlayerStats> = player_block
+        .chunks_exact(h.player_stat_elem_size)
+        .map(read_player_stats)
+        .collect();
 
     let block = take(bytes, &mut at, h.team_stat_size, "team statistics")?;
     let teams = decode_team_stats(block, h.num_teams, h.team_stat_elem_size)?;
@@ -732,8 +735,34 @@ fn decode_trailer(bytes: &[u8]) -> Result<DemoTrailer, String> {
     Ok(DemoTrailer {
         winning_ally_teams,
         team_stat_period_sec: h.team_stat_period.max(0) as u32,
+        // A match the engine recorded nothing for says so by giving every team
+        // zero samples, and the player statistics beside them are then whatever
+        // was in that memory rather than a measurement (issue #1190). The check
+        // is here, at the only place the bytes are turned into a value, because
+        // a caller that has the numbers in hand has already lost the argument.
+        players: teams
+            .iter()
+            .any(|t| !t.samples.is_empty())
+            .then_some(players),
         teams,
     })
+}
+
+/// One `PlayerStatistics` row from the first 20 bytes of `raw` (which may be
+/// longer, the same way a team sample may be).
+///
+/// The order is the on-disk one, `numCommands` first. See [`PlayerStats`] for
+/// why that is not the order the engine's header declares.
+fn read_player_stats(raw: &[u8]) -> PlayerStats {
+    let i =
+        |n: usize| i32::from_le_bytes([raw[n * 4], raw[n * 4 + 1], raw[n * 4 + 2], raw[n * 4 + 3]]);
+    PlayerStats {
+        num_commands: i(0),
+        unit_commands: i(1),
+        mouse_pixels: i(2),
+        mouse_clicks: i(3),
+        key_presses: i(4),
+    }
 }
 
 /// Advance `at` past `n` bytes and hand them back, or refuse naming what ran out.
@@ -1269,7 +1298,14 @@ fn index_suffix(name: &str, prefix: &str) -> Option<i32> {
     name.strip_prefix(prefix)?.parse::<i32>().ok()
 }
 
-fn build_demo_info(raw: RawDemo, game: &Section, winners: Option<Vec<u32>>) -> DemoInfo {
+/// `player_stats` is the trailer's block, indexed by player id, or `None` when
+/// this match has none to show (see [`DemoTrailer::players`]).
+fn build_demo_info(
+    raw: RawDemo,
+    game: &Section,
+    winners: Option<Vec<u32>>,
+    player_stats: Option<Vec<PlayerStats>>,
+) -> DemoInfo {
     // teamN -> its [team] section, by index, so a player can resolve its side /
     // ally-team / colour.
     let mut teams: HashMap<i32, &Section> = HashMap::new();
@@ -1308,9 +1344,12 @@ fn build_demo_info(raw: RawDemo, game: &Section, winners: Option<Vec<u32>>) -> D
 
     let mut players: Vec<PlayerInfo> = Vec::new();
     for (name, p) in &game.children {
-        if index_suffix(name, "player").is_none() {
+        // The player id, not this seat's position in the roster: the trailer's
+        // statistics are indexed by the `[playerN]` number, and a script is
+        // under no obligation to declare its sections in order.
+        let Some(id) = index_suffix(name, "player") else {
             continue;
-        }
+        };
         let spectator = p.get("spectator") == Some("1");
         let team = p.get("team").and_then(|v| v.parse::<i32>().ok());
         let team_sec = team.and_then(|t| teams.get(&t).copied());
@@ -1327,6 +1366,9 @@ fn build_demo_info(raw: RawDemo, game: &Section, winners: Option<Vec<u32>>) -> D
         } else {
             None
         };
+        let stats = usize::try_from(id)
+            .ok()
+            .and_then(|n| player_stats.as_ref()?.get(n).copied());
         players.push(PlayerInfo {
             name: p.get("name").unwrap_or("").to_string(),
             team,
@@ -1337,6 +1379,8 @@ fn build_demo_info(raw: RawDemo, game: &Section, winners: Option<Vec<u32>>) -> D
             won,
             skill: p.get("skill").map(str::to_string),
             country_code: p.get("countrycode").map(str::to_string),
+            stats,
+            apm: stats.and_then(|s| apm(s.num_commands, raw.game_time)),
         });
     }
 
@@ -1401,6 +1445,17 @@ fn build_demo_info(raw: RawDemo, game: &Section, winners: Option<Vec<u32>>) -> D
         origin_filename: marker.origin,
         mod_options,
     }
+}
+
+/// Actions per minute: orders given over the match's minutes.
+///
+/// The duration is the header's in-game time, which is the time the counters
+/// accrued over, rather than the wall clock the players sat there for.
+///
+/// `None` for a match with no measured duration, because the division has no
+/// answer there rather than a very large one.
+fn apm(num_commands: i32, duration_sec: u32) -> Option<f32> {
+    (duration_sec > 0).then(|| num_commands as f32 * 60.0 / duration_sec as f32)
 }
 
 /// Parse an ally team's `startrect*` keys into a normalized box, or `None` when
@@ -1905,7 +1960,7 @@ mod tests {
         let raw = read_header_and_script(&write_tmp("w.sdfz", &build_demo(SCRIPT, true))).unwrap();
         let game = find_game(&parse_tdf(&raw.script));
         // Winner = allyteam 1 (Bob's side). Pass winners explicitly (no demotool).
-        let info = build_demo_info(raw, &game, Some(vec![1]));
+        let info = build_demo_info(raw, &game, Some(vec![1]), None);
 
         assert_eq!(info.map_name, "Valles Marineris 2.6.1");
         assert_eq!(info.game_type, "Beyond All Reason test-30018");
@@ -1941,7 +1996,7 @@ mod tests {
     fn ai_info(name: &str, script: &str, winners: Option<Vec<u32>>) -> DemoInfo {
         let raw = read_header_and_script(&write_tmp(name, &build_demo(script, true))).unwrap();
         let game = find_game(&parse_tdf(&raw.script));
-        build_demo_info(raw, &game, winners)
+        build_demo_info(raw, &game, winners, None)
     }
 
     /// The seat a bot occupies is a team like any other, so its faction, colour
@@ -2022,7 +2077,7 @@ mod tests {
     fn winner_unknown_when_nothing_can_answer() {
         let raw = read_header_and_script(&write_tmp("u.sdfz", &build_demo(SCRIPT, true))).unwrap();
         let game = find_game(&parse_tdf(&raw.script));
-        let info = build_demo_info(raw, &game, None);
+        let info = build_demo_info(raw, &game, None, None);
         assert!(!info.winners_known);
         assert!(info.winning_ally_teams.is_empty());
         assert!(info.players.iter().all(|p| p.won.is_none()));
@@ -2060,7 +2115,7 @@ mod tests {
         // that is an answer rather than a missing one.
         let raw = read_header_and_script(&write_tmp("n.sdf", &build_demo(SCRIPT, false))).unwrap();
         let game = find_game(&parse_tdf(&raw.script));
-        let info = build_demo_info(raw, &game, Some(vec![]));
+        let info = build_demo_info(raw, &game, Some(vec![]), None);
         assert!(info.winners_known);
         let alice = info.players.iter().find(|p| p.name == "Alice").unwrap();
         assert_eq!(alice.won, Some(false));
@@ -2184,6 +2239,7 @@ mod tests {
         let t = decode_trailer(&DemoFixture::default().bytes()).unwrap();
         assert!(t.winning_ally_teams.is_empty());
         assert!(t.teams.is_empty());
+        assert!(t.players.is_none());
     }
 
     /// The other zero case, which four of the nine real replays are: the trailer
@@ -2203,6 +2259,104 @@ mod tests {
         assert!(t.teams.iter().all(|s| s.samples.is_empty()));
     }
 
+    /// The five counters, in the order they are on disk rather than the order
+    /// the engine's header declares them. Asserted on the second row as well as
+    /// the first, because a wrong stride reads row 0 perfectly.
+    #[test]
+    fn player_statistics_decode_in_their_true_on_disk_order() {
+        let f = DemoFixture {
+            winning_ally_teams: vec![0],
+            player_stats: vec![[163, 141, 416_476, 493, 277], [194, 230, 227_928, 364, 462]],
+            team_samples: vec![series(3), series(3)],
+            ..Default::default()
+        };
+        let players = decode_trailer(&f.bytes()).unwrap().players.unwrap();
+        assert_eq!(players.len(), 2);
+        assert_eq!(
+            players[0],
+            PlayerStats {
+                num_commands: 163,
+                unit_commands: 141,
+                mouse_pixels: 416_476,
+                mouse_clicks: 493,
+                key_presses: 277,
+            }
+        );
+        assert_eq!(
+            players[1],
+            PlayerStats {
+                num_commands: 194,
+                unit_commands: 230,
+                mouse_pixels: 227_928,
+                mouse_clicks: 364,
+                key_presses: 462,
+            }
+        );
+    }
+
+    /// A `PlayerStatistics` that grew is strided by the size the header
+    /// declares, the same way a team sample is, so the second row is still the
+    /// second player rather than the first one's tail.
+    #[test]
+    fn a_grown_player_statistics_row_is_strided_by_the_size_the_header_declares() {
+        let f = DemoFixture {
+            player_stat_elem_size: 28,
+            player_stats: vec![[1, 2, 3, 4, 5], [11, 12, 13, 14, 15], [21, 22, 23, 24, 25]],
+            team_samples: vec![series(2)],
+            ..Default::default()
+        };
+        let players = decode_trailer(&f.bytes()).unwrap().players.unwrap();
+        assert_eq!(players.len(), 3);
+        assert_eq!(players[2].num_commands, 21);
+        assert_eq!(players[2].key_presses, 25);
+    }
+
+    /// Issue #1190. Three of the nine real replays hold a structurally valid
+    /// trailer, nine teams with no samples, and player statistics that are
+    /// whatever was in that memory: command counts of -335216640 and 1863057408
+    /// which would read as an APM in the millions.
+    ///
+    /// The file's own evidence that it recorded nothing is that every team's
+    /// sample count is zero, so that is what withholds the block.
+    #[test]
+    fn statistics_nobody_recorded_are_not_handed_out_as_numbers() {
+        let f = DemoFixture {
+            winning_ally_teams: vec![1],
+            player_stats: vec![
+                [-335_216_640, 1_863_057_408, 889_389_056, 0, 32_767],
+                [1_863_057_408, -335_216_640, 0, 889_389_056, 1],
+            ],
+            team_samples: vec![Vec::new(); 9],
+            ..Default::default()
+        };
+        let t = decode_trailer(&f.bytes()).unwrap();
+        assert_eq!(
+            t.winning_ally_teams,
+            vec![1],
+            "the winner is still readable"
+        );
+        assert!(
+            t.players.is_none(),
+            "a match with no samples has no statistics to trust"
+        );
+    }
+
+    /// The guard is "the engine recorded nothing", not "somebody scored
+    /// nothing". One team with samples is a recorded match, even when the other
+    /// side has none, so the statistics stand.
+    #[test]
+    fn one_team_with_samples_is_a_recorded_match() {
+        let f = DemoFixture {
+            winning_ally_teams: vec![0],
+            player_stats: vec![[163, 141, 416_476, 493, 277], [0; 5]],
+            team_samples: vec![series(3), Vec::new()],
+            ..Default::default()
+        };
+        let players = decode_trailer(&f.bytes()).unwrap().players.unwrap();
+        assert_eq!(players[0].num_commands, 163);
+        assert_eq!(players[1], PlayerStats::default());
+    }
+
     /// A file that stops before the trailer the header promised is refused, and
     /// the header and roster keep decoding, so the replay still lists its players.
     #[test]
@@ -2219,7 +2373,7 @@ mod tests {
         assert!(err.contains("truncated"), "got: {err}");
 
         let raw = read_header_and_script(&p).unwrap();
-        let info = build_demo_info(raw, &find_game(&parse_tdf(SCRIPT)), None);
+        let info = build_demo_info(raw, &find_game(&parse_tdf(SCRIPT)), None, None);
         assert_eq!(info.map_name, "Valles Marineris 2.6.1");
         assert_eq!(info.players.len(), 3);
     }
@@ -2315,7 +2469,7 @@ mod tests {
 
         let raw = read_header_and_script(&p).unwrap();
         assert_eq!(raw.engine_version, "105.1.2 TEST");
-        let info = build_demo_info(raw, &find_game(&parse_tdf(SCRIPT)), None);
+        let info = build_demo_info(raw, &find_game(&parse_tdf(SCRIPT)), None, None);
         assert_eq!(info.map_name, "Valles Marineris 2.6.1");
         assert_eq!(info.players.len(), 3);
         assert_eq!(
@@ -2538,12 +2692,30 @@ mod tests {
                 panic!("{}: {err}", path.display());
             });
             let total: usize = t.teams.iter().map(|s| s.samples.len()).sum();
+            let info = demo_info(Path::new("/no/such/engine"), &path).unwrap();
             eprintln!(
-                "{}: winners={:?} teams={} samples={total}",
+                "{}: winners={:?} teams={} samples={total} statistics={}",
                 path.file_name().unwrap().to_string_lossy(),
                 t.winning_ally_teams,
                 t.teams.len(),
+                match &t.players {
+                    Some(p) => format!("{} players", p.len()),
+                    None => "none recorded".into(),
+                }
             );
+            for p in &info.players {
+                eprintln!(
+                    "    {:<20} apm={:?} stats={:?}",
+                    p.name,
+                    p.apm.map(|v| v.round()),
+                    p.stats
+                );
+                // Whatever survives the guard has to be a figure a human would
+                // accept. The junk rows read as tens of millions.
+                if let Some(v) = p.apm {
+                    assert!((0.0..1000.0).contains(&v), "{}: {} apm", p.name, v);
+                }
+            }
             for s in &t.teams {
                 // Samples are one every teamStatPeriod seconds at 30 frames a
                 // second, and every figure is a running total.
@@ -3031,6 +3203,119 @@ mod tests {
         );
     }
 
+    /// The roster row a player reads their APM off, end to end: a file on disk,
+    /// through `demo_info`, with no engine folder and no demotool.
+    ///
+    /// 163 commands over a 490 second match is 19.96 a minute, which is the
+    /// figure the real `Greenhaven` replay gives. Written out rather than
+    /// recomputed from the same two numbers the code divides.
+    #[test]
+    fn a_roster_row_carries_the_players_actions_per_minute() {
+        let f = DemoFixture {
+            winning_ally_teams: vec![0],
+            player_stats: vec![
+                [163, 141, 416_476, 493, 277],
+                [194, 230, 227_928, 364, 462],
+                [3, 0, 51_204, 12, 4],
+            ],
+            team_samples: vec![series(34), series(34)],
+            game_time: 490,
+            ..Default::default()
+        };
+        let demo = write_tmp("apm.sdfz", &f.gzipped());
+        let info = demo_info(std::env::temp_dir().join("no_such_engine").as_path(), &demo).unwrap();
+
+        let alice = info.players.iter().find(|p| p.name == "Alice").unwrap();
+        assert_eq!(alice.stats.unwrap().num_commands, 163);
+        assert_eq!(alice.stats.unwrap().unit_commands, 141);
+        assert!(
+            (alice.apm.unwrap() - 19.96).abs() < 0.01,
+            "got {:?}",
+            alice.apm
+        );
+
+        let bob = info.players.iter().find(|p| p.name == "Bob").unwrap();
+        assert_eq!(bob.stats.unwrap().mouse_pixels, 227_928);
+        assert!((bob.apm.unwrap() - 23.75).abs() < 0.01, "got {:?}", bob.apm);
+
+        // The frontend reads these off camelCase keys.
+        let js = serde_json::to_string(&info).unwrap();
+        assert!(js.contains("\"numCommands\":163"), "{js}");
+        assert!(js.contains("\"keyPresses\":277"), "{js}");
+    }
+
+    /// Issue #1190 as the player meets it: a finished match whose statistics
+    /// were never recorded offers no figure at all, rather than a junk one or a
+    /// zero that reads as somebody who did nothing.
+    #[test]
+    fn a_match_with_no_recorded_statistics_offers_no_apm() {
+        let f = DemoFixture {
+            winning_ally_teams: vec![1],
+            player_stats: vec![[-335_216_640, 1_863_057_408, 889_389_056, 0, 32_767]; 3],
+            team_samples: vec![Vec::new(); 9],
+            game_time: 490,
+            ..Default::default()
+        };
+        let demo = write_tmp("uninitialised.sdfz", &f.gzipped());
+        let info = demo_info(std::env::temp_dir().join("no_such_engine").as_path(), &demo).unwrap();
+
+        assert!(info.winners_known, "the winner is still readable");
+        assert!(
+            info.players.iter().all(|p| p.apm.is_none()),
+            "uninitialised memory must not reach a roster row"
+        );
+        assert!(info.players.iter().all(|p| p.stats.is_none()));
+        let js = serde_json::to_string(&info).unwrap();
+        assert!(!js.contains("numCommands"), "{js}");
+        assert!(!js.contains("\"apm\""), "{js}");
+    }
+
+    /// The statistics are indexed by the `[playerN]` id, not by where the seat
+    /// happens to sit in the script. A real recording writes its sections in no
+    /// particular order, so the two differ.
+    #[test]
+    fn player_statistics_follow_the_player_id_not_the_script_order() {
+        let script = "[game]\n{\n\
+            mapname=Valles Marineris 2.6.1;\n\
+            gametype=Beyond All Reason test-30018;\n\
+            [player2]\n{\nname=Third;\nteam=0;\nspectator=0;\n}\n\
+            [player0]\n{\nname=First;\nteam=0;\nspectator=0;\n}\n\
+            [player1]\n{\nname=Second;\nteam=1;\nspectator=0;\n}\n\
+            [team0]\n{\nallyteam=0;\nside=Armada;\n}\n\
+            [team1]\n{\nallyteam=1;\nside=Cortex;\n}\n}\n";
+        let f = DemoFixture {
+            script: script.into(),
+            winning_ally_teams: vec![0],
+            player_stats: vec![[100, 0, 0, 0, 0], [200, 0, 0, 0, 0], [300, 0, 0, 0, 0]],
+            team_samples: vec![series(2), series(2)],
+            game_time: 60,
+            ..Default::default()
+        };
+        let demo = write_tmp("player_ids.sdfz", &f.gzipped());
+        let info = demo_info(std::env::temp_dir().join("no_such_engine").as_path(), &demo).unwrap();
+        let commands = |name: &str| {
+            info.players
+                .iter()
+                .find(|p| p.name == name)
+                .unwrap()
+                .stats
+                .unwrap()
+                .num_commands
+        };
+        assert_eq!(commands("First"), 100);
+        assert_eq!(commands("Second"), 200);
+        assert_eq!(commands("Third"), 300);
+    }
+
+    /// A match with no measured duration has no actions per minute, rather than
+    /// a division that lands on infinity.
+    #[test]
+    fn actions_per_minute_over_no_duration_has_no_answer() {
+        assert_eq!(apm(120, 60), Some(120.0));
+        assert_eq!(apm(0, 60), Some(0.0));
+        assert_eq!(apm(120, 0), None);
+    }
+
     #[test]
     fn parse_skill_reads_leading_number() {
         assert_eq!(parse_skill("[25.0]"), Some(25.0));
@@ -3055,6 +3340,7 @@ mod tests {
             },
             &game,
             None,
+            None,
         );
         // Only Alice has a skill ([25.0]); Bob has none, Specs is a spectator.
         let (min, avg, max) = skill_stats(&info.players);
@@ -3077,6 +3363,7 @@ mod tests {
                 script: SCRIPT.to_string(),
             },
             &game,
+            None,
             None,
         );
         assert_eq!(
@@ -3155,7 +3442,7 @@ mod tests {
         // End-to-end: the decoded DemoInfo carries the fields the UI reads, and they
         // serialize with the camelCase keys the frontend expects.
         let raw = read_header_and_script(&dst).unwrap();
-        let info = build_demo_info(raw, &game, None);
+        let info = build_demo_info(raw, &game, None, None);
         assert!(info.remixed);
         assert_eq!(info.origin_filename.as_deref(), Some("jb_src.sdf"));
         let js = serde_json::to_string(&info).unwrap();
