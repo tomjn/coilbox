@@ -418,7 +418,7 @@ Six zones make up the page. Each one is self-contained and draws nothing when it
 | Zone id      | Draws                                                                                                                     | Draws nothing when                                                                        |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `onboarding` | The "Set up Coilbox" card (content folder and engine) and the get-started download suggestions.                            | Setup is done and content is installed, the player dismissed the card, or [`onboarding`](#onboarding-string) is `"off"`. |
-| `greeting`   | The page heading and the line under it. Greets by lobby name once logged in.                                              | Never. An app always has a title.                                                          |
+| `greeting`   | The page heading and the line under it. Greets by lobby name once logged in.                                              | Never. An app always has a title, though the line under it depends on your other zones. See [What the greeting says depends on the rest of your list](#what-the-greeting-says-depends-on-the-rest-of-your-list). |
 | `continue`   | One card for the thing you were last doing: a Warpath run, the next campaign mission, a conquest, a battle you can still rejoin, or your last skirmish setup. | There is nothing to resume, which includes every fresh install.                            |
 | `resume`     | Up to three runners-up the `continue` card did not take, plus a "log in as" card when you are logged out with a saved login. | There are no runners-up.                                                                   |
 | `cards`      | Every sidebar destination as a card, in the sidebar's own groups. A group's external links share one card at its end.      | The build has no navigation left outside Home.                                             |
@@ -475,6 +475,20 @@ Coilbox does not make an exception for this, and here is the reasoning so you ca
 - "Omitting a zone hides it" is the one rule that makes the zone list explainable in a sentence. A zone that came back when Coilbox decided the install was unhealthy would make it "omitting a zone hides it, sometimes".
 
 So keep `onboarding` in your list unless you mean to remove the offer, and use `"onboarding": "off"` when you do, since that says what you meant and works whether or not you write `zones`.
+
+#### What the greeting says depends on the rest of your list
+
+The greeting is the one zone that talks about the others, so leaving a zone out changes the line under the heading:
+
+| Your list has                     | The line under the heading                                                 |
+| --------------------------------- | -------------------------------------------------------------------------- |
+| `continue` or `resume`, with something waiting | "Pick up where you left off."                                   |
+| `cards`                           | "Choose a tool to get started.", or "No tools available yet." if the grid draws no card |
+| none of those three               | Nothing. The heading stands on its own.                                    |
+
+Every one of those sentences is about a zone. Left on a page that does not carry it, each points at something the player cannot see: a resume that is not offered, or a grid you chose not to show described as an install with no tools in it. So Coilbox drops the sentence rather than the zone.
+
+Write `tagline` when you want a line there anyway. It replaces whatever Coilbox would have said, on any page, including one with none of those zones.
 
 #### Markup around and between zones
 

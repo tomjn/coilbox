@@ -4,6 +4,7 @@ import {
   describeHome,
   type HomeEntry,
   resolveHome,
+  zonesOnPage,
 } from "./config";
 
 // Every malformed case is supposed to say something, so the warnings are part of
@@ -355,6 +356,39 @@ describe("describeHome", () => {
       zones: [{ zone: "greeting" }, { zone: "nope" }, { zone: "cards" }],
     });
     expect(describeHome(home)).toContain("2 zone(s)");
+  });
+});
+
+/**
+ * The greeting is the one zone that says something about the others, so it has to
+ * know which of them the page carries (#1079, #1082). It is told by the layout,
+ * off this list, so the two cannot disagree about what is on the page.
+ */
+describe("zonesOnPage", () => {
+  /** The zones of a resolved page, sorted so the assertion is about the set. */
+  const on = (raw: unknown) =>
+    [...zonesOnPage(resolveHome(raw).entries)].sort();
+
+  it("lists every zone of an unconfigured page", () => {
+    expect(on(undefined)).toEqual([...DEFAULT_ZONES].sort());
+  });
+
+  it("lists only the zones the profile kept", () => {
+    expect(on({ zones: [{ zone: "greeting" }, { zone: "continue" }] })).toEqual(
+      ["continue", "greeting"],
+    );
+  });
+
+  it("ignores custom markup entries, which are not zones", () => {
+    expect(
+      on({ zones: [{ zone: "greeting" }, { html: "<p>hi</p>" }] }),
+    ).toEqual(["greeting"]);
+  });
+
+  it("counts a dropped entry as absent, because the page will not draw it", () => {
+    expect(on({ zones: [{ zone: "greeting" }, { zone: "nope" }] })).toEqual([
+      "greeting",
+    ]);
   });
 });
 

@@ -1,7 +1,7 @@
 import { Slot } from "@picoframe/frame";
 import { Fragment, type ReactNode } from "react";
 import { backdropStyle, resolveHomeBackground } from "./background";
-import type { HomeEntry, ZoneId } from "./config";
+import { type HomeEntry, type ZoneId, zonesOnPage } from "./config";
 import HomeMarkup from "./HomeMarkup";
 import type { HomeLayoutProps } from "./layout";
 import Continue from "./zones/Continue";
@@ -188,8 +188,13 @@ const HERO_WIDTH = "min-w-0 sm:max-w-2xl";
  * renders whether or not its zone drew anything, so in the resume row it would be
  * a third item sitting beside the hero and would hold the row open on a page with
  * nothing to resume, and around the grid it would land inside a group.
+ *
+ * The zone list is read once here and handed to the greeting, which is the one
+ * zone that says something about the others and so has to know which of them the
+ * page carries (see `./zones/Greeting`).
  */
 function renderEntries(entries: readonly HomeEntry[]): ReactNode[] {
+  const zones = zonesOnPage(entries);
   const out: ReactNode[] = [];
   for (let i = 0; i < entries.length; i += 1) {
     const entry = entries[i];
@@ -209,7 +214,7 @@ function renderEntries(entries: readonly HomeEntry[]): ReactNode[] {
       i += 1;
       continue;
     }
-    out.push(renderEntry(entry, i));
+    out.push(renderEntry(entry, i, zones));
   }
   return out;
 }
@@ -245,7 +250,11 @@ function bare(entry: HomeEntry, zone: ZoneId): boolean {
  *   silent zone's gap stops applying to that entry. Same rule, seen from the
  *   layout's side.
  */
-function renderEntry(entry: HomeEntry, index: number): ReactNode {
+function renderEntry(
+  entry: HomeEntry,
+  index: number,
+  zones: ReadonlySet<ZoneId>,
+): ReactNode {
   if (entry.kind === "html")
     return <HomeMarkup key={index} markup={entry.html} />;
   const { before, after } = entry.strings;
@@ -253,7 +262,7 @@ function renderEntry(entry: HomeEntry, index: number): ReactNode {
   const node = (
     <>
       {before !== undefined && <HomeMarkup markup={before} />}
-      {zoneNode(entry)}
+      {zoneNode(entry, zones)}
       {after !== undefined && <HomeMarkup markup={after} />}
     </>
   );
@@ -269,13 +278,20 @@ function renderEntry(entry: HomeEntry, index: number): ReactNode {
 }
 
 /** The component for a built-in zone, with whatever config the entry carries. */
-function zoneNode(entry: Extract<HomeEntry, { kind: "zone" }>): ReactNode {
+function zoneNode(
+  entry: Extract<HomeEntry, { kind: "zone" }>,
+  zones: ReadonlySet<ZoneId>,
+): ReactNode {
   switch (entry.zone) {
     case "onboarding":
       return <Onboarding />;
     case "greeting":
       return (
-        <Greeting title={entry.strings.title} tagline={entry.strings.tagline} />
+        <Greeting
+          title={entry.strings.title}
+          tagline={entry.strings.tagline}
+          zones={zones}
+        />
       );
     case "continue":
       return <Continue className={HERO_WIDTH} />;
