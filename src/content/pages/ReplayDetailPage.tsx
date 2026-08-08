@@ -55,8 +55,9 @@ import {
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
-import { formatDuration, resultLabel } from "../matchStats";
+import { formatDuration } from "../matchStats";
 import { provenanceLink } from "../replayProvenanceLink";
+import { teamLabel, teamResultLabel } from "../replaySideLabel";
 import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
 import { MatchStatsSection } from "./components/MatchStatsSection";
@@ -242,7 +243,7 @@ function Players({ info }: { info: DemoInfo }) {
             >
               <div className="mb-1 flex items-center gap-1.5">
                 <h3 className="text-xs font-semibold text-muted-foreground">
-                  {id === -1 ? "Unassigned" : `Ally team ${id}`}
+                  {id === -1 ? "Unassigned" : teamLabel(id)}
                 </h3>
                 {won && (
                   <Badge
@@ -350,7 +351,7 @@ function ReplayMapPreview({
                         .replace("rgb", "rgba")
                         .replace(")", ", 0.22)"),
                     }}
-                    title={`Ally team ${a.id} start box`}
+                    title={`${teamLabel(a.id)} start box`}
                   >
                     <span
                       className="m-0.5 rounded px-1 text-[10px] font-medium leading-tight text-white"
@@ -360,7 +361,7 @@ function ReplayMapPreview({
                           .replace(")", ", 0.85)"),
                       }}
                     >
-                      {a.id}
+                      {a.id + 1}
                     </span>
                   </span>
                 );
@@ -369,7 +370,7 @@ function ReplayMapPreview({
           </div>
           {boxes.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              Start boxes per ally team.
+              Start boxes per team.
             </p>
           )}
         </div>
@@ -886,7 +887,7 @@ export default function ReplayDetailPage() {
           playedAt(info.startTimeMs) || playedAt(replay?.modifiedMs ?? 0),
         ],
         ["Duration", formatDuration(info.durationSec)],
-        ["Result", resultLabel(info)],
+        ["Result", teamResultLabel(info)],
         ["File size", replay ? formatBytes(replay.sizeBytes) : "—"],
       ]
     : [];

@@ -19,9 +19,9 @@ import {
   formatDuration,
   hasStatistics,
   headlineTotals,
-  resultLabel,
   seatCount,
 } from "../../matchStats";
+import { teamResultLabel } from "../../replaySideLabel";
 import { MatchStatsChart } from "./MatchStatsChart";
 import { StatCard } from "./StatWidgets";
 
@@ -134,7 +134,7 @@ function Headlines({
       <StatCard
         icon={<Trophy className="size-3.5" />}
         label="Result"
-        value={resultLabel(info)}
+        value={teamResultLabel(info)}
       />
       <StatCard
         icon={<Users className="size-3.5" />}
