@@ -125,6 +125,16 @@ describe("Continue zone", () => {
     expect(text(Continue({}))).toContain("Rejoin battle");
   });
 
+  it("names the thing its action resumes, not just the verb", () => {
+    // "Resume run" alone is what a screen reader reads out when it lists the
+    // page's links, and it says nothing about which run. The visible words open
+    // the label so voice control can still ask for what is written on it.
+    resume.mockReturnValue({ candidates: [WARPATH], loading: false });
+    const label = action(Continue({}))?.["aria-label"];
+    expect(label).toBe("Resume run: Kestrel");
+    expect(String(label).startsWith("Resume run")).toBe(true);
+  });
+
   it("renders nothing when there is nothing to resume", () => {
     // A fresh install. The Onboarding zone owns the one call to action there,
     // and a second one would have the page asking twice.
