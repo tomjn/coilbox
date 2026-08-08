@@ -92,7 +92,13 @@ export function MatchStatsPicker({
       // Beside the plot on a wide window and under it on a narrow one, where a
       // column would leave neither readable. Under it, the tiles run across
       // instead of down, so the same fifteen fit in a few rows.
-      className="order-last grid max-h-56 w-full grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] items-stretch gap-1 overflow-y-auto lg:order-first lg:max-h-[var(--plot-h)] lg:w-44 lg:shrink-0 lg:grid-cols-1"
+      //
+      // The cap and the scroll belong to the column only (#1216). Beside the
+      // plot the column is far taller than the plot it sits next to, so it ends
+      // where the plot ends and scrolls. Under it, three rows fit on the page,
+      // and a scrolling box inside a scrolling page hides the group headings
+      // and the very thing the picker is for: seeing all fifteen at once.
+      className="order-last grid w-full grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] items-stretch gap-1 lg:order-first lg:max-h-[var(--plot-h)] lg:w-44 lg:shrink-0 lg:grid-cols-1 lg:overflow-y-auto"
     >
       {groups.map((g) => (
         <Fragment key={g.group}>
@@ -103,9 +109,20 @@ export function MatchStatsPicker({
             <ToggleGroupItem
               key={t.metric.key}
               value={t.metric.key}
-              className="h-auto w-full flex-col items-start gap-0.5 rounded-md border border-border/60 px-2 py-1.5 data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+              // `justify-between` keeps the sparklines on one line of the grid
+              // level with each other when a neighbour's label takes two lines.
+              // Without it the tiles stretch to the tallest in the row and each
+              // shape sits wherever its own label left it.
+              className="h-auto w-full flex-col items-start justify-between gap-0.5 rounded-md border border-border/60 px-2 py-1.5 data-[state=on]:border-primary data-[state=on]:bg-primary/10"
             >
-              <span className="w-full truncate text-left text-xs">
+              {/* Wrapped, not truncated. Six across at 810px leaves 95px for a
+               * label and "Damage received" needs 100px, and a metric whose
+               * name you can't read is a tile nobody clicks. Every label is two
+               * words, so it breaks at the space. `whitespace-normal` is not
+               * spare: the toggle item sets `whitespace-nowrap` on itself and
+               * the span inherits it, so dropping `truncate` alone would spill
+               * the label out of the tile instead of wrapping it. */}
+              <span className="w-full text-left text-xs whitespace-normal">
                 {t.metric.label}
               </span>
               <Spark lines={t.lines} />

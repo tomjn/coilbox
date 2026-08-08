@@ -894,8 +894,14 @@ export default function ReplayDetailPage() {
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
+      {/* The title and the actions share a row until the title has 20rem, and
+       * below that the actions drop to their own line rather than taking the
+       * last of it (#1215). `min-w-0` truncates a long filename, but on its own
+       * it also lets the column shrink to one character wide, because the
+       * button row is `shrink-0` and every pixel the window loses comes out of
+       * the text. The basis is where that column stops giving. */}
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 grow basis-80 flex-col gap-1">
           <Link
             to="/play/replays"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
@@ -943,9 +949,12 @@ export default function ReplayDetailPage() {
           )}
         </div>
         {replay && info && (
-          // Destructive + secondary actions first; the primary CTA (Watch) sits
-          // last so it lands in the top-right corner.
-          <div className="flex shrink-0 items-start gap-2">
+          // Destructive + secondary actions first, and the primary CTA (Watch)
+          // last so it lands in the top-right corner. Once the row wraps there
+          // is no corner left to sit in, and the block lines up with the title's
+          // own left edge instead, which is what reads as the heading's actions
+          // rather than a band floating between two sections.
+          <div className="flex shrink-0 flex-wrap items-start gap-2">
             <DeleteReplayButton
               replayPath={replay.path}
               onDeleted={onDeleted}
