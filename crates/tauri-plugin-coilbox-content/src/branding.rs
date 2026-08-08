@@ -462,10 +462,8 @@ mod tests {
 
     /// A fresh empty directory for one catalog test, named after the test.
     fn catalog_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "coilbox-catalog-test-{}-{tag}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-catalog-test-{}-{tag}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -495,7 +493,10 @@ mod tests {
         backdate(&cache, CATALOG_TTL + Duration::from_secs(60));
         let local = read_local_catalog(Some(&cache), None).unwrap();
         assert_eq!(local.source, "cache");
-        assert!(local.refresh, "past the TTL the cache answers but refetches");
+        assert!(
+            local.refresh,
+            "past the TTL the cache answers but refetches"
+        );
     }
 
     #[test]
