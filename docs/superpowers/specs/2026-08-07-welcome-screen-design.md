@@ -122,7 +122,7 @@ Four sources, tried in order:
 
 Step 4 always succeeds, so no card is ever artless and the milestone is not blocked on commissioning artwork. Step 2 is cheap because #982 moved minimap and header rendering onto the `coilbox://` protocol, so card art is a URL rather than a base64 payload in the home page's first paint.
 
-`art: false` for a tool falls back to the icon-only card, so the current card design survives as a rendering mode.
+`art: false` for a tool means no picture, and how tall that card is drawn is decided for its row rather than for the card. A group where every tool is pictureless draws the icon-only card, so the current card design survives as a rendering mode and the row is simply shorter. A group with a picture anywhere in it, a tool's or the suggested map's, draws the pictureless card at the art card's full size, with a plain panel where the picture goes and the icon and the name in the band at the foot where its neighbours put theirs (issue #1113). A card is never sized to its own content beside cards that are not, which would leave a mixed row ragged.
 
 ## Distribution contract
 

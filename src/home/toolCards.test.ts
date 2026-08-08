@@ -31,7 +31,7 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 import type { NavItem } from "@picoframe/plugin-sdk";
 import { Rocket } from "lucide-react";
 import { type CardArtStep, registerCardArtSource } from "./art";
-import { ART_CARD_CLASS } from "./cardShell";
+import { ART_BAND_CLASS, ART_CARD_CLASS } from "./cardShell";
 import { proceduralCardArt } from "./proceduralArt";
 import ToolCards, { cardArtUrl, ToolCard } from "./zones/ToolCards";
 
@@ -56,6 +56,14 @@ function register(step: CardArtStep, answer: string | false | undefined) {
   registered.push(registerCardArtSource(step, () => answer));
 }
 
+/** A source that answers per tool, for the cases with a mixed group. */
+function registerByTool(
+  step: CardArtStep,
+  answers: Record<string, string | false | undefined>,
+) {
+  registered.push(registerCardArtSource(step, ({ toolId }) => answers[toolId]));
+}
+
 afterEach(() => {
   while (registered.length) registered.pop()?.();
   theme.resolved = "dark";
@@ -63,9 +71,13 @@ afterEach(() => {
 });
 
 /** One card as the markup a browser would get. */
-function render(item: NavItem): string {
+function render(item: NavItem, compact = false): string {
   return renderToStaticMarkup(
-    createElement(MemoryRouter, null, createElement(ToolCard, { item })),
+    createElement(
+      MemoryRouter,
+      null,
+      createElement(ToolCard, { item, compact }),
+    ),
   );
 }
 
@@ -73,6 +85,9 @@ function render(item: NavItem): string {
 function artSrc(html: string): string | null {
   return /<img[^>]*\bsrc="([^"]*)"/.exec(html)?.[1] ?? null;
 }
+
+/** The icon chip only the compact card draws. */
+const CHIP = "bg-muted text-muted-foreground";
 
 describe("tool card rendering modes", () => {
   it("paints a resolved URL edge to edge behind the card", () => {
@@ -94,13 +109,34 @@ describe("tool card rendering modes", () => {
   });
 
   it("falls back to the icon-only card when a source says no art", () => {
-    // `art: false`, the per-tool override of issue #1000.
+    // `art: false`, the per-tool override of issue #1000, in a row where every
+    // other card is pictureless too. The pre-#991 card, unchanged: an icon chip
+    // beside the label, and a card no taller than that.
+    register("override", false);
+    const html = render(SKIRMISH, true);
+    expect(artSrc(html)).toBeNull();
+    expect(html).toContain(CHIP);
+    expect(html).toContain("Skirmish");
+    expect(html).not.toContain("min-h-28");
+  });
+
+  it("keeps the art card's footprint when the row has pictures in it", () => {
+    // The mixed row of issue #1113. The card has no picture and cannot borrow
+    // one, so it takes the art card's shape with a plain panel where the picture
+    // would go, and puts the icon and the name in the band at the foot where the
+    // cards either side of it put theirs.
     register("override", false);
     const html = render(SKIRMISH);
     expect(artSrc(html)).toBeNull();
-    // The pre-#991 card, unchanged: an icon chip beside the label.
-    expect(html).toContain("bg-muted text-muted-foreground");
+    expect(html).toContain(ART_CARD_CLASS);
+    expect(html).toContain(ART_BAND_CLASS);
+    // The panel: the art window's own height, on a surface of its own so it
+    // reads as a choice rather than as a picture that failed to load.
+    expect(html).toContain("relative min-h-28 flex-1 bg-muted");
+    // One icon and one name, in the band. Not the compact card's chip as well.
+    expect(html).not.toContain(CHIP);
     expect(html).toContain("Skirmish");
+    expect(html.match(/lucide-rocket/g)).toHaveLength(1);
   });
 
   it("keeps the icon and the name on the art card", () => {
@@ -199,6 +235,102 @@ describe("what a card navigates to", () => {
     // the grid not also putting an empty box on the page. The mocked frame
     // above has an empty nav.
     expect(renderToStaticMarkup(createElement(ToolCards))).toBe("");
+  });
+});
+
+describe("how tall a row of pictureless cards is", () => {
+  /** A group of two tools, and a second group so the first is not the page. */
+  const REPLAYS: NavItem = {
+    id: "play.replays",
+    label: "Replays",
+    to: "/replays",
+    icon: Rocket,
+  };
+  const NAV = [
+    { id: "play", label: "Play", items: [{ ...SKIRMISH }, { ...REPLAYS }] },
+    {
+      id: "downloads",
+      label: "Downloads",
+      items: [
+        {
+          id: "downloads.maps",
+          label: "Maps",
+          to: "/downloads/maps",
+          icon: Rocket,
+        },
+      ],
+    },
+  ];
+
+  /** The whole grid, optionally with a stand-in for the suggested map card. */
+  function grid(suggested?: string): string {
+    frame.nav = NAV;
+    return renderToStaticMarkup(
+      createElement(
+        MemoryRouter,
+        null,
+        createElement(ToolCards, {
+          suggested: suggested
+            ? createElement("p", null, suggested)
+            : undefined,
+        }),
+      ),
+    );
+  }
+
+  /** One group's section, by group label. */
+  function section(html: string, label: string): string {
+    const found = html
+      .split("<section")
+      .find((part) => part.includes(`>${label}</h2>`));
+    if (!found) throw new Error(`no ${label} section`);
+    return found;
+  }
+
+  it("draws the compact row when every tool in the group is pictureless", () => {
+    // The design's original case, and still right: nothing is wrong with a row
+    // of icon cards not being full height. Only reachable through a
+    // distribution, because the procedural floor never fails.
+    registerByTool("override", { skirmish: false, "play.replays": false });
+    const play = section(grid(), "Play");
+    expect(play.match(new RegExp(CHIP, "g"))).toHaveLength(2);
+    expect(play).not.toContain("min-h-28");
+  });
+
+  it("gives every pictureless card a full footprint when one tool has art", () => {
+    // The mixed row of issue #1113. Skirmish is left to the procedural floor,
+    // so the row has a picture in it and the row is what decides the height.
+    registerByTool("override", { "play.replays": false });
+    const play = section(grid(), "Play");
+    expect(play).not.toContain(CHIP);
+    expect(play.match(/min-h-28/g)).toHaveLength(2);
+  });
+
+  it("counts the suggested map's picture as a picture in its row", () => {
+    // The map card is not a tool card and does not walk the art chain, but it
+    // is a picture in the Downloads row all the same, so the tools beside it
+    // keep their footprint.
+    registerByTool("override", { "downloads.maps": false });
+    const downloads = section(grid("SUGGESTED"), "Downloads");
+    expect(downloads).toContain("SUGGESTED");
+    expect(downloads).not.toContain(CHIP);
+    expect(downloads).toContain("min-h-28");
+  });
+
+  it("draws the compact row where the layout hands over no map card", () => {
+    // The same group on a page that placed the two zones apart. Without the map
+    // card the row is pictureless throughout and may size to its content.
+    registerByTool("override", { "downloads.maps": false });
+    const downloads = section(grid(), "Downloads");
+    expect(downloads).toContain(CHIP);
+    expect(downloads).not.toContain("min-h-28");
+  });
+
+  it("leaves a group with pictures alone", () => {
+    // The control: no override at all, which is every install today.
+    const play = section(grid(), "Play");
+    expect(play).not.toContain(CHIP);
+    expect(play.match(/min-h-28/g)).toHaveLength(2);
   });
 });
 
