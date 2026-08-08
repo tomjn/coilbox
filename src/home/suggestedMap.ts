@@ -1,5 +1,5 @@
 /**
- * The featured map: which curated map the welcome screen promotes today, and
+ * The suggested map: which curated map the welcome screen promotes today, and
  * what the card may say about it.
  *
  * The curated list is the one the map packs already use, the GitHub
@@ -47,7 +47,7 @@ import { getProfileMapLists } from "../profile/profile";
 /**
  * The download kinds a curated map can actually be installed from.
  * `suggestedMapToInput` builds a queue request for these two and nothing else,
- * so anything outside them would be featured with a dead button.
+ * so anything outside them would be offered with a dead button.
  */
 const INSTALLABLE_KINDS = new Set(["map", "url"]);
 
@@ -71,7 +71,7 @@ function poolKey(map: SuggestedMap): string {
  * map to the end of a pack adds it to the end of the cycle. Standalone
  * suggestions come before packs because that is the order the catalog reads in.
  */
-export function featuredMapPool(
+export function suggestedMapPool(
   maps: SuggestedMap[],
   lists: SuggestedMapList[],
 ): SuggestedMap[] {
@@ -107,13 +107,13 @@ export function utcDayIndex(date: Date): number {
  * The map to feature on a given day, or null when there is nothing curated.
  *
  * The day index steps the pool by one, so over any run of `pool.length` days
- * every curated map is featured exactly once and none is favoured. Everyone
+ * every curated map is suggested exactly once and none is favoured. Everyone
  * computes it from the same two inputs, so everyone gets the same answer without
  * asking a server.
  *
  * Takes the date rather than reading the clock, so a test can ask about any day.
  */
-export function pickFeaturedMap(
+export function pickSuggestedMap(
   pool: SuggestedMap[],
   date: Date,
 ): SuggestedMap | null {
@@ -125,12 +125,12 @@ export function pickFeaturedMap(
 }
 
 /**
- * The three fields of the lobby mirror the featured pick reads. A real
+ * The three fields of the lobby mirror the suggested pick reads. A real
  * `LobbyState` satisfies it, and a test writes a room rather than forty fields.
  * Narrow on purpose: this module is allowed to know which maps are in play and
  * nothing else about the lobby.
  */
-export type FeaturedLobbySnapshot = {
+export type SuggestedLobbySnapshot = {
   battles: Record<string, Pick<Battle, "map" | "host" | "members">>;
 };
 
@@ -145,12 +145,12 @@ export type FeaturedLobbySnapshot = {
 const PLAYING_MIN_OCCUPANCY = 2;
 
 /**
- * Where the featured map came from, so the card can say which.
+ * Where the suggested map came from, so the card can say which.
  *
  * The user cannot otherwise tell: both sources put one curated map on one card.
  * Without this the feature would be invisible and so unfalsifiable.
  */
-export type FeaturedSource = "battle" | "curated";
+export type SuggestedSource = "battle" | "curated";
 
 /**
  * The curated map most people are on right now, or null.
@@ -170,9 +170,9 @@ export type FeaturedSource = "battle" | "curated";
  * team game. Ties go to pool order, so the answer is a function of the snapshot
  * and never of the order the server happened to send the rooms in.
  */
-export function battleFeaturedMap(
+export function battleSuggestedMap(
   pool: SuggestedMap[],
-  lobby: FeaturedLobbySnapshot | null,
+  lobby: SuggestedLobbySnapshot | null,
 ): SuggestedMap | null {
   if (!lobby) return null;
   const players = new Map<string, number>();
@@ -210,28 +210,28 @@ export function battleFeaturedMap(
  * through to it. `lobby` is null whenever there is no connection, so a logged-out
  * or offline player takes exactly the branch they took before this existed.
  */
-export function featuredMapFor(
+export function suggestedMapFor(
   pool: SuggestedMap[],
-  lobby: FeaturedLobbySnapshot | null,
+  lobby: SuggestedLobbySnapshot | null,
   date: Date,
-): { map: SuggestedMap | null; source: FeaturedSource } {
-  const battle = battleFeaturedMap(pool, lobby);
+): { map: SuggestedMap | null; source: SuggestedSource } {
+  const battle = battleSuggestedMap(pool, lobby);
   if (battle) return { map: battle, source: "battle" };
-  return { map: pickFeaturedMap(pool, date), source: "curated" };
+  return { map: pickSuggestedMap(pool, date), source: "curated" };
 }
 
 /**
- * What the card may offer for the featured map.
+ * What the card may offer for the suggested map.
  *
  * The map-pack states plus `failed`, which the packs fold into `available`
  * because a pack row can afford to look retryable and say nothing. One card
  * carrying one map cannot: a download that failed silently reads as a button
  * that does nothing.
  */
-export type FeaturedState = PackMapState | "failed";
+export type SuggestedState = PackMapState | "failed";
 
 /**
- * Classify the featured map.
+ * Classify the suggested map.
  *
  * Two independent readings of "already installed", because either alone misses
  * cases. The on-disk file listing does not know a map installed under a
@@ -240,7 +240,7 @@ export type FeaturedState = PackMapState | "failed";
  *
  * Pure, so the states the card can be in are testable without mounting it.
  */
-export function featuredMapState(args: {
+export function suggestedMapState(args: {
   input: EnqueueInput | null;
   filename?: string;
   /** The map's spring name, when its download declares one. */
@@ -250,7 +250,7 @@ export function featuredMapState(args: {
   /** Lowercased map names a settled unitsync scan reported. */
   scanned: Set<string>;
   queueStatus: QueueStatus | null;
-}): FeaturedState {
+}): SuggestedState {
   const { input, filename, springName, installed, scanned, queueStatus } = args;
   if (springName && scanned.has(springName.toLowerCase())) return "installed";
   const base = packMapState({ input, filename, installed, queueStatus });
@@ -264,7 +264,7 @@ export function springNameOf(map: SuggestedMap): string | undefined {
 }
 
 /**
- * Today's featured map.
+ * Today's suggested map.
  *
  * `loading` separates "the catalog has not answered yet" from "the catalog
  * answered and there is nothing curated", which the card needs because it shows
@@ -290,10 +290,10 @@ export function springNameOf(map: SuggestedMap): string | undefined {
  * session old, which for rooms that live tens of minutes is a boundary worth
  * trading for a card that holds still.
  */
-export function useFeaturedMap(): {
+export function useSuggestedMap(): {
   map: SuggestedMap | null;
   loading: boolean;
-  source: FeaturedSource;
+  source: SuggestedSource;
 } {
   const catalogLists = useSuggestedMapLists();
   const maps = useSuggestedMaps();
@@ -302,11 +302,11 @@ export function useFeaturedMap(): {
   const today = useMemo(() => new Date(), []);
   const pool = useMemo(
     () =>
-      featuredMapPool(maps, mergeMapLists(catalogLists, getProfileMapLists())),
+      suggestedMapPool(maps, mergeMapLists(catalogLists, getProfileMapLists())),
     [maps, catalogLists],
   );
   const answer = useMemo(
-    () => featuredMapFor(pool, mirror.state, today),
+    () => suggestedMapFor(pool, mirror.state, today),
     [pool, mirror.state, today],
   );
 
@@ -325,7 +325,7 @@ export function useFeaturedMap(): {
 }
 
 /**
- * The featured map's own picture.
+ * The suggested map's own picture.
  *
  * Deliberately not {@link ./art}'s `resolveCardArt`. That chain answers "what
  * should the card for a *tool* show", keyed by nav id and floored by a
@@ -354,7 +354,7 @@ export function useFeaturedMap(): {
  * Both hooks run on every render, as hooks must. The minimap one is handed a map
  * name only when the map is installed, and does nothing without one.
  */
-export function useFeaturedMapArt(
+export function useSuggestedMapArt(
   map: SuggestedMap | null,
   installed: boolean,
 ): string | undefined {
@@ -379,8 +379,8 @@ export function useFeaturedMapArt(
  * the queue finishes anything, which is what flips the card the moment its own
  * download lands.
  */
-export function useFeaturedMapInstall(map: SuggestedMap | null): {
-  state: FeaturedState;
+export function useSuggestedMapInstall(map: SuggestedMap | null): {
+  state: SuggestedState;
   /** The queue's message for a failed download, when there is one. */
   error: string | null;
   /** False when no write root is set, which is the one thing the user must fix. */
@@ -424,7 +424,7 @@ export function useFeaturedMapInstall(map: SuggestedMap | null): {
   const identity = input ? identityOf(input) : null;
   const queueStatus = identity ? statusFor(identity) : null;
   const state = map
-    ? featuredMapState({
+    ? suggestedMapState({
         input,
         filename: map.filename,
         springName: springNameOf(map),

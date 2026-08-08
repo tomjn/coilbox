@@ -65,7 +65,7 @@ vi.mock("../multiplayer/chat/mentionCue", () => ({
  * exist in node. Everything else in the module is the real thing.
  */
 const hooks = vi.hoisted(() => ({
-  featured: { map: null, loading: false, source: "curated" } as {
+  suggested: { map: null, loading: false, source: "curated" } as {
     map: unknown;
     loading: boolean;
     source: string;
@@ -74,31 +74,31 @@ const hooks = vi.hoisted(() => ({
   art: undefined as string | undefined,
 }));
 
-vi.mock("./featuredMap", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./featuredMap")>();
+vi.mock("./suggestedMap", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./suggestedMap")>();
   return {
     ...actual,
-    useFeaturedMap: () => hooks.featured,
-    useFeaturedMapInstall: () => hooks.install,
-    useFeaturedMapArt: () => hooks.art,
+    useSuggestedMap: () => hooks.suggested,
+    useSuggestedMapInstall: () => hooks.install,
+    useSuggestedMapArt: () => hooks.art,
   };
 });
 
 import type { SuggestedMap, SuggestedMapList } from "../content/branding";
 import type { EnqueueInput } from "../downloads/DownloadQueueProvider";
 import { ART_CARD_CLASS } from "./cardShell";
-import * as featured from "./featuredMap";
-import FeaturedMapZone, { FeaturedMapCard } from "./zones/FeaturedMap";
+import * as suggested from "./suggestedMap";
+import SuggestedMapZone, { SuggestedMapCard } from "./zones/SuggestedMap";
 
 const {
-  battleFeaturedMap,
-  featuredMapFor,
-  featuredMapPool,
-  featuredMapState,
-  pickFeaturedMap,
+  battleSuggestedMap,
+  suggestedMapFor,
+  suggestedMapPool,
+  suggestedMapState,
+  pickSuggestedMap,
   springNameOf,
   utcDayIndex,
-} = featured;
+} = suggested;
 
 /** A curated map downloaded by spring name, the common catalog shape. */
 function map(id: string, springName = id): SuggestedMap {
@@ -116,7 +116,7 @@ function pack(id: string, maps: SuggestedMap[]): SuggestedMapList {
 
 describe("the curated pool", () => {
   it("takes the standalone suggestions and every pack's maps", () => {
-    const pool = featuredMapPool(
+    const pool = suggestedMapPool(
       [map("a")],
       [pack("p", [map("b")]), pack("q", [map("c")])],
     );
@@ -125,14 +125,17 @@ describe("the curated pool", () => {
 
   it("counts a map in both places once, so it is not twice as likely", () => {
     // The catalog's starter pack repeats `suggested.maps` verbatim today.
-    const pool = featuredMapPool([map("a")], [pack("p", [map("a"), map("b")])]);
+    const pool = suggestedMapPool(
+      [map("a")],
+      [pack("p", [map("a"), map("b")])],
+    );
     expect(pool.map((m) => m.id)).toEqual(["a", "b"]);
   });
 
   it("dedupes on the spring name, not the catalog id", () => {
     const one = { ...map("editorial-id", "Shared Map v1") };
     const two = { ...map("legacy-id", "shared map V1") };
-    expect(featuredMapPool([one, two], [])).toHaveLength(1);
+    expect(suggestedMapPool([one, two], [])).toHaveLength(1);
   });
 
   it("drops maps nothing can install, so the card never has a dead button", () => {
@@ -143,7 +146,7 @@ describe("the curated pool", () => {
       title: "r",
       download: { kind: "rapid", tag: "map:latest" },
     };
-    expect(featuredMapPool([rapid, map("a")], []).map((m) => m.id)).toEqual([
+    expect(suggestedMapPool([rapid, map("a")], []).map((m) => m.id)).toEqual([
       "a",
     ]);
   });
@@ -159,13 +162,13 @@ describe("the curated pool", () => {
         filename: "u.sd7",
       },
     };
-    expect(featuredMapPool([mirror], [])).toHaveLength(1);
+    expect(suggestedMapPool([mirror], [])).toHaveLength(1);
   });
 });
 
 describe("the daily rotation", () => {
   const pool = ["a", "b", "c", "d", "e"].map((id) => map(id));
-  const at = (iso: string) => pickFeaturedMap(pool, new Date(iso))?.id;
+  const at = (iso: string) => pickSuggestedMap(pool, new Date(iso))?.id;
 
   it("gives the same map all day", () => {
     expect(at("2026-08-07T00:00:00Z")).toBe(at("2026-08-07T23:59:59Z"));
@@ -180,25 +183,25 @@ describe("the daily rotation", () => {
     const start = Date.parse("2026-08-07T09:00:00Z");
     const seen = Array.from(
       { length: pool.length },
-      (_, i) => pickFeaturedMap(pool, new Date(start + i * 86_400_000))?.id,
+      (_, i) => pickSuggestedMap(pool, new Date(start + i * 86_400_000))?.id,
     );
     expect([...seen].sort()).toEqual(["a", "b", "c", "d", "e"]);
   });
 
   it("keeps cycling past the end of the pool", () => {
     const start = Date.parse("2026-08-07T09:00:00Z");
-    expect(pickFeaturedMap(pool, new Date(start))?.id).toBe(
-      pickFeaturedMap(pool, new Date(start + 5 * 86_400_000))?.id,
+    expect(pickSuggestedMap(pool, new Date(start))?.id).toBe(
+      pickSuggestedMap(pool, new Date(start + 5 * 86_400_000))?.id,
     );
   });
 
   it("has nothing to feature when nothing is curated", () => {
-    expect(pickFeaturedMap([], new Date())).toBeNull();
+    expect(pickSuggestedMap([], new Date())).toBeNull();
   });
 
   it("does not fall off the pool before 1970", () => {
     // JavaScript's `%` keeps the sign of a negative day index.
-    expect(pickFeaturedMap(pool, new Date("1965-01-01T00:00:00Z"))).not.toBe(
+    expect(pickSuggestedMap(pool, new Date("1965-01-01T00:00:00Z"))).not.toBe(
       undefined,
     );
   });
@@ -218,8 +221,8 @@ describe("the rotation and the machine's timezone", () => {
   for (const tz of ["UTC", "Pacific/Kiritimati", "Pacific/Niue"]) {
     it(`answers for the UTC day in ${tz}`, () => {
       process.env.TZ = tz;
-      expect(pickFeaturedMap(pool, new Date(EARLY))?.id).toBe(
-        pickFeaturedMap(pool, new Date(LATE))?.id,
+      expect(pickSuggestedMap(pool, new Date(EARLY))?.id).toBe(
+        pickSuggestedMap(pool, new Date(LATE))?.id,
       );
     });
   }
@@ -256,19 +259,19 @@ describe("what the card may offer", () => {
   };
 
   it("offers the install when the user has neither the file nor the map", () => {
-    expect(featuredMapState(base)).toBe("available");
+    expect(suggestedMapState(base)).toBe("available");
   });
 
   it("reads the file on disk as installed", () => {
     expect(
-      featuredMapState({ ...base, installed: new Set(["fallendell_v4.sd7"]) }),
+      suggestedMapState({ ...base, installed: new Set(["fallendell_v4.sd7"]) }),
     ).toBe("installed");
   });
 
   it("reads a scanned map name as installed, whatever it is filed under", () => {
     // A map fetched by hand sits under a filename the catalog never predicted.
     expect(
-      featuredMapState({
+      suggestedMapState({
         ...base,
         filename: "something_else_entirely.sd7",
         scanned: new Set(["fallendell_v4"]),
@@ -277,12 +280,16 @@ describe("what the card may offer", () => {
   });
 
   it("says so while the download is queued or running", () => {
-    expect(featuredMapState({ ...base, queueStatus: "queued" })).toBe("queued");
-    expect(featuredMapState({ ...base, queueStatus: "active" })).toBe("active");
+    expect(suggestedMapState({ ...base, queueStatus: "queued" })).toBe(
+      "queued",
+    );
+    expect(suggestedMapState({ ...base, queueStatus: "active" })).toBe(
+      "active",
+    );
   });
 
   it("treats a finished download as installed before the disk is re-read", () => {
-    expect(featuredMapState({ ...base, queueStatus: "done" })).toBe(
+    expect(suggestedMapState({ ...base, queueStatus: "done" })).toBe(
       "installed",
     );
   });
@@ -290,18 +297,18 @@ describe("what the card may offer", () => {
   it("distinguishes a failure from a fresh offer, so it can say Retry", () => {
     // The map packs fold this into "available". One card carrying one map
     // cannot, because the failure would then be invisible.
-    expect(featuredMapState({ ...base, queueStatus: "error" })).toBe("failed");
+    expect(suggestedMapState({ ...base, queueStatus: "error" })).toBe("failed");
   });
 
   it("goes back to offering the install after a cancel", () => {
-    expect(featuredMapState({ ...base, queueStatus: "canceled" })).toBe(
+    expect(suggestedMapState({ ...base, queueStatus: "canceled" })).toBe(
       "available",
     );
   });
 
   it("is unavailable when nothing can be queued for it", () => {
     // A direct mirror download with no write root to put the file in.
-    expect(featuredMapState({ ...base, input: null })).toBe("unavailable");
+    expect(suggestedMapState({ ...base, input: null })).toBe("unavailable");
   });
 
   it("reads the spring name off a map download and nothing else", () => {
@@ -335,13 +342,13 @@ function room(mapName: string, players: string[] = ["a"]) {
     map: mapName,
     host: "Autohost",
     members: Object.fromEntries(players.map((p) => [p, {}])),
-  } as unknown as featured.FeaturedLobbySnapshot["battles"][string];
+  } as unknown as suggested.SuggestedLobbySnapshot["battles"][string];
 }
 
 /** A live lobby holding the given rooms. */
 function lobby(
   ...rooms: ReturnType<typeof room>[]
-): featured.FeaturedLobbySnapshot {
+): suggested.SuggestedLobbySnapshot {
   return {
     battles: Object.fromEntries(rooms.map((r, i) => [String(i), r])),
   };
@@ -353,29 +360,29 @@ describe("preferring a map an open battle is using", () => {
   it("falls back to the rotation when no lobby connection is live", () => {
     // `mirror.state` is null until something else connects, so this is the
     // logged-out, offline and never-opened-multiplayer case.
-    expect(battleFeaturedMap(POOL, null)).toBeNull();
-    const answer = featuredMapFor(POOL, null, DAY);
+    expect(battleSuggestedMap(POOL, null)).toBeNull();
+    const answer = suggestedMapFor(POOL, null, DAY);
     expect(answer.source).toBe("curated");
-    expect(answer.map).toBe(pickFeaturedMap(POOL, DAY));
+    expect(answer.map).toBe(pickSuggestedMap(POOL, DAY));
   });
 
   it("prefers a map people are on when a connection is live", () => {
-    const answer = featuredMapFor(POOL, lobby(room("SpeedMetal", ["a"])), DAY);
+    const answer = suggestedMapFor(POOL, lobby(room("SpeedMetal", ["a"])), DAY);
     expect(answer.map?.id).toBe("SpeedMetal");
     expect(answer.source).toBe("battle");
     // Worth having only if it actually differs from what the day would give.
-    expect(answer.map).not.toBe(pickFeaturedMap(POOL, DAY));
+    expect(answer.map).not.toBe(pickSuggestedMap(POOL, DAY));
   });
 
   it("falls back when a live connection has no rooms at all", () => {
-    expect(featuredMapFor(POOL, lobby(), DAY).source).toBe("curated");
+    expect(suggestedMapFor(POOL, lobby(), DAY).source).toBe("curated");
   });
 
   it("falls back when the only room is on a map it cannot offer", () => {
     // Nothing in the pool has a verified download for this, and inventing one
     // would feature a map that may not be downloadable anywhere.
     expect(
-      battleFeaturedMap(POOL, lobby(room("Some Random Map v9"))),
+      battleSuggestedMap(POOL, lobby(room("Some Random Map v9"))),
     ).toBeNull();
   });
 
@@ -384,12 +391,12 @@ describe("preferring a map an open battle is using", () => {
     // map that still would not let the player into that room.
     const pool = [map("Isthmus", "Supreme Isthmus v2.1")];
     expect(
-      battleFeaturedMap(pool, lobby(room("Supreme Isthmus v2.2"))),
+      battleSuggestedMap(pool, lobby(room("Supreme Isthmus v2.2"))),
     ).toBeNull();
   });
 
   it("matches the spring name whatever case the server sends it in", () => {
-    expect(battleFeaturedMap(POOL, lobby(room("fallendell_v4")))?.id).toBe(
+    expect(battleSuggestedMap(POOL, lobby(room("fallendell_v4")))?.id).toBe(
       "Fallendell",
     );
   });
@@ -397,7 +404,7 @@ describe("preferring a map an open battle is using", () => {
   it("ignores an autohost sitting alone in an empty room", () => {
     // The host is always counted, so a room of one is a bot waiting rather than
     // people playing, and the card would be claiming something untrue.
-    expect(battleFeaturedMap(POOL, lobby(room("SpeedMetal", [])))).toBeNull();
+    expect(battleSuggestedMap(POOL, lobby(room("SpeedMetal", [])))).toBeNull();
   });
 
   it("picks the map with the most people, not the most rooms", () => {
@@ -411,7 +418,7 @@ describe("preferring a map an open battle is using", () => {
         Array.from({ length: 15 }, (_, i) => `p${i}`),
       ),
     );
-    expect(battleFeaturedMap(POOL, busy)?.id).toBe("DeltaSiege");
+    expect(battleSuggestedMap(POOL, busy)?.id).toBe("DeltaSiege");
   });
 
   it("adds up the people across every room on the same map", () => {
@@ -421,13 +428,13 @@ describe("preferring a map an open battle is using", () => {
       room("DeltaSiegeDry", ["a", "b", "c", "d", "e"]),
     );
     // 8 on SpeedMetal against 6 on DeltaSiege.
-    expect(battleFeaturedMap(POOL, spread)?.id).toBe("SpeedMetal");
+    expect(battleSuggestedMap(POOL, spread)?.id).toBe("SpeedMetal");
   });
 
   it("breaks a tie by pool order rather than by what the server sent first", () => {
     const tied = [room("DeltaSiegeDry", ["a"]), room("SpeedMetal", ["a"])];
-    const forwards = battleFeaturedMap(POOL, lobby(...tied))?.id;
-    const backwards = battleFeaturedMap(
+    const forwards = battleSuggestedMap(POOL, lobby(...tied))?.id;
+    const backwards = battleSuggestedMap(
       POOL,
       lobby(...[...tied].reverse()),
     )?.id;
@@ -444,11 +451,11 @@ describe("preferring a map an open battle is using", () => {
       ),
       room("DeltaSiegeDry", ["a"]),
     );
-    expect(battleFeaturedMap(POOL, mixed)?.id).toBe("DeltaSiege");
+    expect(battleSuggestedMap(POOL, mixed)?.id).toBe("DeltaSiege");
   });
 
   it("has nothing to prefer when nothing is curated", () => {
-    expect(battleFeaturedMap([], lobby(room("SpeedMetal", ["a"])))).toBeNull();
+    expect(battleSuggestedMap([], lobby(room("SpeedMetal", ["a"])))).toBeNull();
   });
 });
 
@@ -459,8 +466,8 @@ describe("the rotation, with the lobby out of the picture", () => {
     const start = Date.parse("2026-08-07T09:00:00Z");
     for (let i = 0; i < POOL.length * 3; i++) {
       const day = new Date(start + i * 86_400_000);
-      const answer = featuredMapFor(POOL, null, day);
-      expect(answer.map).toBe(pickFeaturedMap(POOL, day));
+      const answer = suggestedMapFor(POOL, null, day);
+      expect(answer.map).toBe(pickSuggestedMap(POOL, day));
       expect(answer.source).toBe("curated");
     }
   });
@@ -471,8 +478,8 @@ describe("the rotation, with the lobby out of the picture", () => {
       room("SpeedMetal", []),
       room("Some Random Map v9", ["a"]),
     );
-    expect(featuredMapFor(POOL, quiet, DAY).map).toBe(
-      pickFeaturedMap(POOL, DAY),
+    expect(suggestedMapFor(POOL, quiet, DAY).map).toBe(
+      pickSuggestedMap(POOL, DAY),
     );
   });
 });
@@ -483,7 +490,7 @@ describe("the zone cannot reach for a connection", () => {
   // opening the login popover from this module, which would make the welcome
   // screen demand an account. This asserts on the source so that edit fails here.
   const source = readFileSync(
-    new URL("./featuredMap.ts", import.meta.url),
+    new URL("./suggestedMap.ts", import.meta.url),
     "utf8",
   );
 
@@ -513,17 +520,17 @@ describe("the zone cannot reach for a connection", () => {
 
 // --- the card ---------------------------------------------------------------
 
-type Install = ReturnType<typeof featured.useFeaturedMapInstall>;
+type Install = ReturnType<typeof suggested.useSuggestedMapInstall>;
 
 /** Render the zone with its three hooks answered directly. */
 function render(args: {
   map?: SuggestedMap | null;
   loading?: boolean;
   art?: string;
-  source?: featured.FeaturedSource;
+  source?: suggested.SuggestedSource;
   install?: Partial<Install>;
 }): string {
-  hooks.featured = {
+  hooks.suggested = {
     map: args.map === undefined ? map("Fallendell", "Fallendell_V4") : args.map,
     loading: args.loading ?? false,
     source: args.source ?? "curated",
@@ -537,14 +544,14 @@ function render(args: {
   };
   hooks.art = args.art;
   return renderToStaticMarkup(
-    createElement(MemoryRouter, null, createElement(FeaturedMapZone)),
+    createElement(MemoryRouter, null, createElement(SuggestedMapZone)),
   );
 }
 
-describe("the featured map card", () => {
+describe("the suggested map card", () => {
   it("holds the card's footprint while the catalog is still loading", () => {
     const html = render({ loading: true });
-    expect(html).toContain("Featured map");
+    expect(html).toContain("Suggested map");
     expect(html).toContain("animate-pulse");
     expect(html).not.toContain("Install");
   });
@@ -660,7 +667,7 @@ describe("the featured map card", () => {
 describe("the card in the Downloads group", () => {
   /** The card as the grid renders it, with no heading of its own. */
   function card(args: Parameters<typeof render>[0] = {}): string {
-    hooks.featured = {
+    hooks.suggested = {
       map:
         args.map === undefined ? map("Fallendell", "Fallendell_V4") : args.map,
       loading: args.loading ?? false,
@@ -675,22 +682,22 @@ describe("the card in the Downloads group", () => {
     };
     hooks.art = args.art;
     return renderToStaticMarkup(
-      createElement(MemoryRouter, null, createElement(FeaturedMapCard, {})),
+      createElement(MemoryRouter, null, createElement(SuggestedMapCard, {})),
     );
   }
 
   it("drops the heading and the section the group already provides", () => {
     // A label inside a labelled group would read as a group within a group.
     const html = card();
-    expect(html).not.toContain("Featured map");
+    expect(html).not.toContain("Suggested map");
     expect(html).not.toContain("<section");
     expect(html).toContain("Fallendell");
   });
 
   it("keeps them when it is standing on its own", () => {
     const html = render({});
-    expect(html).toContain("Featured map");
-    expect(html).toContain('aria-labelledby="featured-map-heading"');
+    expect(html).toContain("Suggested map");
+    expect(html).toContain('aria-labelledby="suggested-map-heading"');
   });
 
   it("takes the tool card's width, so the row is four of one size", () => {

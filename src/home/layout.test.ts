@@ -11,14 +11,14 @@ vi.mock("@picoframe/frame", () => ({
 
 // Same reason for the zones the stacked layout composes: the onboarding cards
 // reach the Tauri API and picoframe's plugin SDK, and the greeting, the continue
-// hero, the resume rail and the featured map reach the lobby connection, which
+// hero, the resume rail and the suggested map reach the lobby connection, which
 // installs window listeners for its audio cues at import time. Nothing here
 // renders any of them.
 vi.mock("./zones/Onboarding", () => ({ default: () => null }));
 vi.mock("./zones/Greeting", () => ({ default: () => null }));
 vi.mock("./zones/Continue", () => ({ default: () => null }));
 vi.mock("./zones/ResumeRail", () => ({ default: () => null }));
-vi.mock("./zones/FeaturedMap", () => ({ default: () => null }));
+vi.mock("./zones/SuggestedMap", () => ({ default: () => null }));
 
 // The stacked layout also resolves the page backdrop, which reaches the
 // profile's `@`-reference parser and through it @picoframe/plugin-sdk. Same

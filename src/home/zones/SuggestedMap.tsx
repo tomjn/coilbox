@@ -12,24 +12,24 @@ import {
   CARD_STACK_CLASS,
 } from "../cardShell";
 import {
-  type FeaturedState,
+  type SuggestedState,
   springNameOf,
-  useFeaturedMap,
-  useFeaturedMapArt,
-  useFeaturedMapInstall,
-} from "../featuredMap";
+  useSuggestedMap,
+  useSuggestedMapArt,
+  useSuggestedMapInstall,
+} from "../suggestedMap";
 
 /**
  * One curated map, promoted for the day, with a button that installs it.
  *
- * Which map is decided in {@link ../featuredMap}: a daily rotation over the maps
+ * Which map is decided in {@link ../suggestedMap}: a daily rotation over the maps
  * the GitHub `catalog.json` already curates for the map packs. This file is only
  * the card.
  *
  * The card is a download card, so on the default page it sits in the tool grid's
  * Downloads group beside Browse Rapid, Maps and Games, at their size. The layout
  * composes that, not this file: {@link ../StackedLayout} hands {@link
- * FeaturedMapCard} to the cards zone whenever the two zones are adjacent, and
+ * SuggestedMapCard} to the cards zone whenever the two zones are adjacent, and
  * falls back to the standalone section below when a profile separates them.
  *
  * The states it can be in, and why each is what it is:
@@ -39,7 +39,7 @@ import {
  * - Catalog back and nothing curated: nothing at all. `catalog.json` ships inside
  *   the app bundle and the Rust side falls back to it, so an offline player still
  *   gets the full curated list. An empty pool therefore means a build with its
- *   catalog stripped, and a card announcing a featured map it does not have is
+ *   catalog stripped, and a card announcing a suggested map it does not have is
  *   worse than the zone standing down, which is what the design has every zone do
  *   when it has nothing.
  * - Already installed: the same map everyone else sees today, because the daily
@@ -49,8 +49,8 @@ import {
  * - Downloading, queued, failed: said plainly on the card, because this card owns
  *   one map and a silent failure reads as a dead button.
  */
-export default function FeaturedMap() {
-  return <FeaturedMapCard heading />;
+export default function SuggestedMap() {
+  return <SuggestedMapCard heading />;
 }
 
 /**
@@ -64,14 +64,14 @@ export default function FeaturedMap() {
  * Inside the Downloads group the heading is off: the group has one already, and a
  * second inside it would read as a group within a group.
  */
-export function FeaturedMapCard({ heading }: { heading?: boolean }) {
-  const { map, loading, source } = useFeaturedMap();
-  const { state, error, canDownload, download } = useFeaturedMapInstall(map);
-  const art = useFeaturedMapArt(map, state === "installed");
+export function SuggestedMapCard({ heading }: { heading?: boolean }) {
+  const { map, loading, source } = useSuggestedMap();
+  const { state, error, canDownload, download } = useSuggestedMapInstall(map);
+  const art = useSuggestedMapArt(map, state === "installed");
 
   const labelled = (node: ReactNode) =>
     heading ? (
-      <section aria-labelledby="featured-map-heading">
+      <section aria-labelledby="suggested-map-heading">
         <Heading />
         {node}
       </section>
@@ -172,10 +172,10 @@ const BATTLE_BLURB = "Being played now";
 function Heading() {
   return (
     <h2
-      id="featured-map-heading"
+      id="suggested-map-heading"
       className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
     >
-      Featured map
+      Suggested map
     </h2>
   );
 }
@@ -203,7 +203,7 @@ function Action({
   onDownload,
   title,
 }: {
-  state: FeaturedState;
+  state: SuggestedState;
   canDownload: boolean;
   onDownload: () => void;
   title: string;

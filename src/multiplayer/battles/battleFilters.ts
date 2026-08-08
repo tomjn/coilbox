@@ -17,7 +17,7 @@ export interface BattleFilters {
  * the founder), so add one for the host unless they are already a member key.
  *
  * Takes the two fields it reads rather than a whole `Battle`, so a caller holding
- * a narrower snapshot of the lobby can ask. `src/home/featuredMap.ts` does.
+ * a narrower snapshot of the lobby can ask. `src/home/suggestedMap.ts` does.
  */
 export function occupancy(b: Pick<Battle, "host" | "members">): number {
   const m = Object.keys(b.members).length;

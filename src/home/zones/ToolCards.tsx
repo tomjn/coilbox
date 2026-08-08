@@ -30,11 +30,11 @@ import LinkCard from "./LinkCard";
  * their own group - see {@link LinkCard} for why there and not somewhere of its
  * own.
  *
- * `suggested` is the featured map's card, handed over by the layout. A map
+ * `suggested` is the suggested map's card, handed over by the layout. A map
  * suggestion is a download, so it belongs in the Downloads group rather than in a
  * section of its own at the foot of the page (issue #1037). The grid places it
  * and never builds it: what it is, and whether there is one at all, stays the
- * featured map zone's business.
+ * suggested map zone's business.
  */
 export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
   const { nav } = useFrame();
