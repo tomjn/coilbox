@@ -14,7 +14,9 @@
  */
 
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useState,
@@ -177,13 +179,12 @@ export function msToNextUtcDay(now: number): number {
  * yesterday's map until the page was revisited, which is a boundary nobody was
  * watching for (issue #1022).
  *
- * One module-level store rather than a timer per hook. The suggested map is
- * resolved twice on every home render, once above the layout for the claim
- * against the tool cards and once in the zone that draws it (issue #1077), and
- * two timers would let those two cross midnight in separate tasks. The card would
- * then paint one map while the claim reserved another. One store notifies both
- * listeners from the same tick, and React batches them into one commit, so they
- * cannot disagree.
+ * One module-level store rather than a timer per hook. That was first written
+ * when the map was resolved twice per render and two timers could have crossed
+ * midnight in separate tasks; {@link SuggestedMapContext} has since made one
+ * resolution the only one there is. The store stays because it is still the
+ * cheaper shape: one timer for the page rather than one per mount, and no timer
+ * at all while nothing is mounted.
  *
  * The tick re-reads the clock rather than adding one to the day, so a machine
  * that slept through midnight lands on the day it woke up on rather than the day
@@ -288,6 +289,19 @@ const PLAYING_MIN_OCCUPANCY = 2;
  * Without this the feature would be invisible and so unfalsifiable.
  */
 export type SuggestedSource = "battle" | "curated";
+
+/**
+ * What the page decided to feature, resolved once and read everywhere.
+ *
+ * `loading` separates "the catalog has not answered yet" from "the catalog
+ * answered and there is nothing curated", which the card needs because it shows
+ * a placeholder for the first and nothing for the second.
+ */
+export type SuggestedMapAnswer = {
+  map: SuggestedMap | null;
+  loading: boolean;
+  source: SuggestedSource;
+};
 
 /**
  * The curated map most people are on right now, or null.
@@ -432,9 +446,9 @@ export function suggestedMapClaim(
 /**
  * Today's suggested map.
  *
- * `loading` separates "the catalog has not answered yet" from "the catalog
- * answered and there is nothing curated", which the card needs because it shows
- * a placeholder for the first and nothing for the second.
+ * Called once, above the layout, and published through
+ * {@link SuggestedMapContext}. See there for why the zone is told the answer
+ * rather than working it out again.
  *
  * The date comes from {@link useUtcDay}, so a session left open across UTC
  * midnight turns the card over where it stands rather than holding yesterday's
@@ -456,11 +470,7 @@ export function suggestedMapClaim(
  * session old, which for rooms that live tens of minutes is a boundary worth
  * trading for a card that holds still.
  */
-export function useSuggestedMap(): {
-  map: SuggestedMap | null;
-  loading: boolean;
-  source: SuggestedSource;
-} {
+export function useSuggestedMap(): SuggestedMapAnswer {
   const catalogLists = useSuggestedMapLists();
   const maps = useSuggestedMaps();
   const loaded = useCatalogLoaded();
@@ -487,11 +497,50 @@ export function useSuggestedMap(): {
     if (answer.source === "battle") setLatched((prev) => prev ?? answer.map);
   }, [answer]);
 
-  return {
-    map: latched ?? answer.map,
-    loading: !loaded,
-    source: latched ? "battle" : answer.source,
-  };
+  return useMemo(
+    () => ({
+      map: latched ?? answer.map,
+      loading: !loaded,
+      source: latched ? "battle" : answer.source,
+    }),
+    [latched, answer, loaded],
+  );
+}
+
+/**
+ * The page's answer, handed to the zone that draws it.
+ *
+ * The map used to be worked out twice on every home render: once above the
+ * layout so its pick could be claimed against the tool cards, and once inside
+ * the zone. Both read the same context in the same commit, so they agreed, but
+ * they agreed by coincidence rather than by construction (issue #1077). The
+ * claim's whole purpose is that two places name one map, and anything that made
+ * either resolution depend on time, on a fetch, or on state that settles later
+ * would have turned that into a race whose failure was silent: the card paints
+ * one map while the claim reserves another, so a tool card moves off a picture
+ * nobody is showing. The battle latch above is exactly that kind of thing, one
+ * mount ahead of the other from its first lobby delta.
+ *
+ * So there is one resolution and the zone is told the answer. A context rather
+ * than a prop, because the layout composes this zone into the tool grid rather
+ * than rendering it in place. A prop would have to be threaded through every
+ * layout that ever draws the zone, and a layout that forgot would quietly have
+ * the seam back.
+ *
+ * `null` when nothing has provided one, which {@link useSuggestedMapAnswer}
+ * refuses rather than papers over. A card that resolved its own map would be the
+ * defect this exists to remove.
+ */
+export const SuggestedMapContext = createContext<SuggestedMapAnswer | null>(
+  null,
+);
+
+/** The map to feature, and why. Must be used under {@link SuggestedMapContext}. */
+export function useSuggestedMapAnswer(): SuggestedMapAnswer {
+  const answer = useContext(SuggestedMapContext);
+  if (!answer)
+    throw new Error("suggested map zone rendered outside SuggestedMapContext");
+  return answer;
 }
 
 /**

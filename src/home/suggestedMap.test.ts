@@ -60,16 +60,14 @@ vi.mock("../multiplayer/chat/mentionCue", () => ({
 }));
 
 /**
- * What the zone's three hooks answer, swapped per case. The hooks themselves
- * read the download queue, the content roots and a unitsync scan, none of which
- * exist in node. Everything else in the module is the real thing.
+ * What the zone's two hooks answer, swapped per case. The hooks themselves read
+ * the download queue, the content roots and a unitsync scan, none of which exist
+ * in node. Everything else in the module is the real thing, including the
+ * context the page's answer arrives through: `render` provides it the way
+ * `CoilboxHome` does, so the card is exercised as the page mounts it rather than
+ * against a stubbed hook (issue #1077).
  */
 const hooks = vi.hoisted(() => ({
-  suggested: { map: null, loading: false, source: "curated" } as {
-    map: unknown;
-    loading: boolean;
-    source: string;
-  },
   install: {} as Record<string, unknown>,
   art: undefined as string | undefined,
 }));
@@ -78,7 +76,6 @@ vi.mock("./suggestedMap", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./suggestedMap")>();
   return {
     ...actual,
-    useSuggestedMap: () => hooks.suggested,
     useSuggestedMapInstall: () => hooks.install,
     useSuggestedMapArt: () => hooks.art,
   };
@@ -761,7 +758,20 @@ describe("the zone cannot reach for a connection", () => {
 
 type Install = ReturnType<typeof suggested.useSuggestedMapInstall>;
 
-/** Render the zone with its three hooks answered directly. */
+/** The page's answer, as `CoilboxHome` publishes it. */
+function answer(args: {
+  map?: SuggestedMap | null;
+  loading?: boolean;
+  source?: suggested.SuggestedSource;
+}): suggested.SuggestedMapAnswer {
+  return {
+    map: args.map === undefined ? map("Fallendell", "Fallendell_V4") : args.map,
+    loading: args.loading ?? false,
+    source: args.source ?? "curated",
+  };
+}
+
+/** Render the zone under the page's answer, with its two hooks answered directly. */
 function render(args: {
   map?: SuggestedMap | null;
   loading?: boolean;
@@ -769,11 +779,6 @@ function render(args: {
   source?: suggested.SuggestedSource;
   install?: Partial<Install>;
 }): string {
-  hooks.suggested = {
-    map: args.map === undefined ? map("Fallendell", "Fallendell_V4") : args.map,
-    loading: args.loading ?? false,
-    source: args.source ?? "curated",
-  };
   hooks.install = {
     state: "available",
     error: null,
@@ -783,7 +788,15 @@ function render(args: {
   };
   hooks.art = args.art;
   return renderToStaticMarkup(
-    createElement(MemoryRouter, null, createElement(SuggestedMapZone)),
+    createElement(
+      MemoryRouter,
+      null,
+      createElement(
+        suggested.SuggestedMapContext,
+        { value: answer(args) },
+        createElement(SuggestedMapZone),
+      ),
+    ),
   );
 }
 
@@ -906,12 +919,6 @@ describe("the suggested map card", () => {
 describe("the card in the Downloads group", () => {
   /** The card as the grid renders it, with no heading of its own. */
   function card(args: Parameters<typeof render>[0] = {}): string {
-    hooks.suggested = {
-      map:
-        args.map === undefined ? map("Fallendell", "Fallendell_V4") : args.map,
-      loading: args.loading ?? false,
-      source: args.source ?? "curated",
-    };
     hooks.install = {
       state: "available",
       error: null,
@@ -921,7 +928,15 @@ describe("the card in the Downloads group", () => {
     };
     hooks.art = args.art;
     return renderToStaticMarkup(
-      createElement(MemoryRouter, null, createElement(SuggestedMapCard, {})),
+      createElement(
+        MemoryRouter,
+        null,
+        createElement(
+          suggested.SuggestedMapContext,
+          { value: answer(args) },
+          createElement(SuggestedMapCard, {}),
+        ),
+      ),
     );
   }
 
@@ -973,5 +988,37 @@ describe("the card in the Downloads group", () => {
     const html = card({ install: { canDownload: false } });
     expect(html).toContain("Downloads settings");
     expect(html).toContain("flex w-full flex-col gap-2 sm:w-64");
+  });
+});
+
+describe("the page's one answer", () => {
+  const zoneSource = readFileSync(
+    new URL("./zones/SuggestedMap.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("refuses to draw a map the page did not decide", () => {
+    // The claim against the tool cards and the card have to name one map. A
+    // second resolution would agree today and could stop agreeing silently, so
+    // the card cannot make one (issue #1077).
+    expect(() =>
+      renderToStaticMarkup(
+        createElement(MemoryRouter, null, createElement(SuggestedMapCard, {})),
+      ),
+    ).toThrow(/SuggestedMapContext/);
+  });
+
+  it("leaves the zone no way to resolve a map of its own", () => {
+    expect(zoneSource).not.toMatch(/useSuggestedMap\s*\(/);
+    expect(zoneSource).toContain("useSuggestedMapAnswer");
+  });
+
+  it("hands the zone whatever the page decided, battle or rotation", () => {
+    const html = render({
+      map: pictured("Isthmus", "Supreme Isthmus v2.1"),
+      source: "battle",
+    });
+    expect(html).toContain("Isthmus");
+    expect(html).toContain("Being played now");
   });
 });

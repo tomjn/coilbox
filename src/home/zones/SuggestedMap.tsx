@@ -15,7 +15,7 @@ import {
 import {
   type SuggestedState,
   springNameOf,
-  useSuggestedMap,
+  useSuggestedMapAnswer,
   useSuggestedMapArt,
   useSuggestedMapInstall,
 } from "../suggestedMap";
@@ -66,7 +66,10 @@ export default function SuggestedMap() {
  * second inside it would read as a group within a group.
  */
 export function SuggestedMapCard({ heading }: { heading?: boolean }) {
-  const { map, loading, source } = useSuggestedMap();
+  // The page's answer, not this card's. `CoilboxHome` resolves it once, above the
+  // layout, because the same map is claimed against the tool cards and two
+  // resolutions could drift apart (issue #1077).
+  const { map, loading, source } = useSuggestedMapAnswer();
   const { state, error, canDownload, download } = useSuggestedMapInstall(map);
   const art = useSuggestedMapArt(map, state === "installed");
 
