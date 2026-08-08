@@ -6,8 +6,8 @@ import { plugins } from "./app.plugins";
 import { ErrorBoundary } from "./general/ErrorBoundary";
 import { SPLASH_ENABLED_KEY } from "./general/splash";
 import { loadHomeBackground } from "./home/background";
-import CoilboxHome from "./home/CoilboxHome";
 import { loadContentArt } from "./home/contentArt";
+import HomeRoute from "./home/HomeRoute";
 import { loadHomeMarkup } from "./home/markup";
 import { applyProfilePages } from "./profile/CustomPage";
 import { applyProfileSettingsHiding } from "./profile/hidden";
@@ -143,7 +143,10 @@ if (profile.theme) {
 // and `home.bottom` slots picoframe plugins inject into. Unconditional because
 // picoframe's launcher is a placeholder we've outgrown, and because leaving it
 // installed for vanilla builds would mean maintaining two homes.
-const home: HomeOverride = { Component: CoilboxHome };
+//
+// `HomeRoute` wraps it with the one thing both arms need collected before either
+// of them draws: the get-started offer (issue #1111).
+const home: HomeOverride = { Component: HomeRoute };
 
 // Resolve the startup splash before first paint (so the image is ready and there's
 // no empty-overlay flash). Skipped when the profile has no splash or the user turned

@@ -59,18 +59,38 @@ const URL_ATTRS = ["src", "href", "poster"];
 /** Rewrite local `src`/`href`/`poster`, inline `style` url()s and `<style>` blocks. */
 export function rewriteBrandedHtml(html: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
-  // Only the body is returned, and the HTML parser puts a `<style>` written before
-  // any markup into `<head>`, so a zone styled the one way a zone can be styled
-  // lost its styling entirely (issue #1112). Move those styles back to the front
-  // of the body, in the order they were written.
+  // Only the body is returned, and the HTML parser puts a `<style>` or a `<link>`
+  // written before any markup into `<head>`, so a zone styled the one way a zone
+  // can be styled lost its styling entirely (issue #1112) and a leading `<link>`
+  // vanished while a trailing one worked (issue #1117). Move both back to the
+  // front of the body, in the order they were written, so where in the source an
+  // author puts them stops deciding whether they arrive.
   //
-  // `<style>` and nothing else. A style already reaches the page when it is
-  // written after the markup, and a whole stylesheet does through the welcome's
-  // `css` key, so this changes where one may sit, not what may be on the page.
-  // Returning the rest of `<head>` would not: `<base>` re-points every relative
-  // URL in the app, `<meta http-equiv="refresh">` navigates the webview away, and
-  // `<link>` fetches. Those stay dropped.
-  doc.body.prepend(...doc.head.querySelectorAll("style"));
+  // The two of them and nothing else. Both already reach the page when they are
+  // written after the markup, so neither is a class of element the page did not
+  // already carry, and neither can do anything the `css` key cannot: it is
+  // injected as a `<style>` with only its `url()`s rewritten, so an `@import` of
+  // a remote stylesheet is already a supported spelling. There is no CSP, and a
+  // remote `<img>` is documented, so the network reach a `<link>` has is reach
+  // this markup already has.
+  //
+  // What a zone may not carry is anything whose effect is on the app rather than
+  // on the zone, and that has to hold wherever it is written. Head routing was
+  // doing that job for the leading position only, so the trailing position was
+  // never covered: injected into the body, a `<base href>` re-points every
+  // relative URL in the whole app, and a `<meta http-equiv="refresh">` navigates
+  // the webview away from Coilbox. Both were measured doing exactly that in
+  // Chromium. A `<script>` cannot run through `innerHTML` and goes with them
+  // because nothing a zone is for needs one.
+  //
+  // `<title>` stays, because `<svg><title>` is how a picture gets an accessible
+  // name and an HTML one in the body does nothing.
+  doc.body.prepend(...doc.head.querySelectorAll("style, link"));
+  for (const el of Array.from(
+    doc.body.querySelectorAll("base, meta, script"),
+  )) {
+    el.remove();
+  }
   for (const el of Array.from(doc.body.querySelectorAll<HTMLElement>("*"))) {
     for (const attr of URL_ATTRS) {
       const value = el.getAttribute(attr);

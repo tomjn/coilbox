@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import type { SuggestedMap } from "./branding";
 
@@ -77,5 +80,35 @@ describe("what the get-started card is offering", () => {
     expect(getStartedOffer({ ...args, complete: false })).toBe(
       getStartedOffer({ ...args, candidates: null }),
     );
+  });
+});
+
+/**
+ * Where the offer is collected, asserted over the whole source tree.
+ *
+ * The collector holds a per-visit snapshot, so a second caller is a second
+ * answer rather than a second read (issue #1111). Everything else reads the one
+ * answer through `GetStartedOfferContext`, which throws where there is none, so
+ * a reader cannot quietly resolve its own. What that leaves unguarded is a new
+ * caller of the collector itself, which no other test would notice.
+ */
+describe("who collects the get-started offer", () => {
+  const src = fileURLToPath(new URL("..", import.meta.url));
+  const collectors = readdirSync(src, { recursive: true, encoding: "utf8" })
+    .filter((f) => /\.tsx?$/.test(f) && !f.includes(".test."))
+    .filter((f) => f !== "content/getStartedOffer.ts")
+    .filter((f) =>
+      readFileSync(join(src, f), "utf8").includes("useCollectGetStartedOffer"),
+    )
+    .sort();
+
+  it("is the home route and the onboarding widget, and nowhere else", () => {
+    // One per page: the `/` route holds it for both arms of the home page, and
+    // the widget body holds it on a distribution's own page, which is not under
+    // that route.
+    expect(collectors).toEqual([
+      "content/pages/components/SetupCard.tsx",
+      "home/HomeRoute.tsx",
+    ]);
   });
 });

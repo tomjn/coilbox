@@ -17,6 +17,10 @@ import { ProgressBar } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
 import { contentCreateStandardRoot, contentRecreateRoot } from "../../bindings";
 import { useSetupStatus } from "../../config";
+import {
+  GetStartedOfferContext,
+  useCollectGetStartedOffer,
+} from "../../getStartedOffer";
 import { GetStartedCard } from "./GetStartedCard";
 
 export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
@@ -224,12 +228,20 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
  * A distribution embedding this widget in its own markup has asked for the cards
  * at that spot, so unlike the home page's Onboarding zone it does not consult
  * the `onboarding` placement.
+ *
+ * It collects the offer itself, because a custom page is not the home route and
+ * so has nothing above it holding one (issue #1111). One collection per page
+ * either way, and the card never resolves its own: {@link useGetStartedOffer}
+ * throws where there is no collection to read.
  */
 export function HomeSetupCard() {
+  const offer = useCollectGetStartedOffer();
   return (
-    <div className="mb-2 flex flex-col gap-4">
-      <SetupCard dismissible />
-      <GetStartedCard />
-    </div>
+    <GetStartedOfferContext value={offer}>
+      <div className="mb-2 flex flex-col gap-4">
+        <SetupCard dismissible />
+        <GetStartedCard />
+      </div>
+    </GetStartedOfferContext>
   );
 }
