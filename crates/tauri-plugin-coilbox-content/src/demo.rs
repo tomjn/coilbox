@@ -41,6 +41,7 @@ const DEMOTOOL_TIMEOUT: Duration = Duration::from_secs(30);
 // i32 headerSize, char versionString[256], u8 gameID[16], u64 unixTime,
 // i32 scriptSize, i32 demoStreamSize, i32 gameTime, i32 wallclockTime, ...
 const MAGIC: &[u8] = b"spring demofile";
+const OFF_VERSION: usize = 16;
 const OFF_HEADER_SIZE: usize = 20;
 const OFF_VERSION_STRING: usize = 24;
 const OFF_GAME_ID: usize = 280;
@@ -63,8 +64,15 @@ const OFF_WINNING_ALLY_TEAMS_SIZE: usize = 348;
 /// header is 352 bytes but reading this prefix is enough to locate the script.
 const MIN_HEADER: usize = OFF_NUM_TEAMS + 4;
 
+/// The only `DemoFileHeader` version this decoder knows the shape of.
+const DEMO_VERSION: i32 = 5;
+/// That version's header size, and so the position of everything behind it.
+const HEADER_V5_SIZE: usize = 352;
 /// `TeamStatistics`: 20 fields, `i32 frame` + 12 `f32` + 7 `i32`.
 const TEAM_STAT_ELEM_SIZE: usize = 80;
+/// `PlayerStatistics`: 5 `i32`. Nothing here decodes them yet (issue #1130), but
+/// a different size means a different format.
+const PLAYER_STAT_ELEM_SIZE: usize = 20;
 
 // ---- listing ---------------------------------------------------------------
 
@@ -523,6 +531,7 @@ fn hex_at(buf: &[u8], off: usize, len: usize) -> String {
 /// The `DemoFileHeader`'s size and count fields, which is everything needed to
 /// seek to the records the engine wrote after the demo stream.
 struct DemoHeader {
+    version: i32,
     header_size: usize,
     script_size: usize,
     demo_stream_size: usize,
@@ -539,6 +548,7 @@ struct DemoHeader {
 impl DemoHeader {
     fn parse(buf: &[u8]) -> Result<Self, String> {
         Ok(DemoHeader {
+            version: i32_at(buf, OFF_VERSION)?,
             header_size: size_at(buf, OFF_HEADER_SIZE, "header size")?,
             script_size: size_at(buf, OFF_SCRIPT_SIZE, "start-script size")?,
             demo_stream_size: size_at(buf, OFF_DEMO_STREAM_SIZE, "demo stream size")?,
@@ -565,6 +575,51 @@ impl DemoHeader {
         })
     }
 
+    /// Refuse a trailer whose shape this decoder does not know, naming the field
+    /// that disagreed.
+    ///
+    /// A packed-struct file read at the wrong offset does not fail. It returns
+    /// numbers, they look exactly like the right ones, and a chart of them is the
+    /// worst outcome available here. So the header is made to state its own shape
+    /// before any offset behind it is trusted.
+    ///
+    /// `version` and `headerSize` are the format's identity and have to match
+    /// exactly, because a different one moves the offsets themselves. The two
+    /// element sizes are minimums: a struct that grew at the end still decodes
+    /// for the fields we understand, as long as the read strides by the declared
+    /// size (see [`decode_team_stats`]). One that shrank does not, because our
+    /// read would run into whatever follows it.
+    ///
+    /// This is the trailer's problem alone. The header and the start script keep
+    /// decoding either way, so a future engine's replay still lists its players.
+    fn require_known_layout(&self) -> Result<(), String> {
+        if self.version != DEMO_VERSION {
+            return Err(unknown_layout("version", self.version, DEMO_VERSION));
+        }
+        if self.header_size != HEADER_V5_SIZE {
+            return Err(unknown_layout(
+                "headerSize",
+                self.header_size,
+                HEADER_V5_SIZE,
+            ));
+        }
+        if self.team_stat_elem_size < TEAM_STAT_ELEM_SIZE {
+            return Err(unknown_layout(
+                "teamStatElemSize",
+                self.team_stat_elem_size,
+                TEAM_STAT_ELEM_SIZE,
+            ));
+        }
+        if self.player_stat_elem_size < PLAYER_STAT_ELEM_SIZE {
+            return Err(unknown_layout(
+                "playerStatElemSize",
+                self.player_stat_elem_size,
+                PLAYER_STAT_ELEM_SIZE,
+            ));
+        }
+        Ok(())
+    }
+
     /// The offset the trailer starts at: past the header, the start script and
     /// the demo stream.
     fn trailer_start(&self) -> Result<usize, String> {
@@ -573,6 +628,18 @@ impl DemoHeader {
             .and_then(|n| n.checked_add(self.demo_stream_size))
             .ok_or_else(|| "demo header reports an impossible file layout".into())
     }
+}
+
+/// The one sentence every layout refusal says, so the reader learns which field
+/// disagreed and that the rest of the replay is unaffected.
+fn unknown_layout(
+    field: &str,
+    got: impl std::fmt::Display,
+    want: impl std::fmt::Display,
+) -> String {
+    format!(
+        "this replay's statistics are in a format coilbox does not read: the header's {field} is {got}, not {want}. The map and the players still decode."
+    )
 }
 
 /// A header count/size field. It is an `i32` on disk and can never sensibly be
@@ -615,6 +682,7 @@ fn decode_trailer(bytes: &[u8]) -> Result<DemoTrailer, String> {
         return Err("not a Spring demo file (bad magic)".into());
     }
     let h = DemoHeader::parse(bytes)?;
+    h.require_known_layout()?;
     let mut at = h.trailer_start()?;
 
     let winning_ally_teams = take(
@@ -682,8 +750,10 @@ fn decode_team_stats(
     elem: usize,
 ) -> Result<Vec<TeamStatSeries>, String> {
     if elem < TEAM_STAT_ELEM_SIZE {
-        return Err(format!(
-            "demo header reports a {elem} byte team statistics element, too small for the {TEAM_STAT_ELEM_SIZE} bytes of TeamStatistics this decodes"
+        return Err(unknown_layout(
+            "teamStatElemSize",
+            elem,
+            TEAM_STAT_ELEM_SIZE,
         ));
     }
     let counts_len = num_teams
@@ -1620,9 +1690,14 @@ mod tests {
             h.extend_from_slice(&self.stream);
             h.extend_from_slice(&self.winning_ally_teams);
             for p in &self.player_stats {
+                // As with a sample, a field past the declared size is dropped
+                // rather than written, so a shrunk element is a struct with its
+                // tail missing.
                 let mut elem = vec![0u8; self.player_stat_elem_size];
                 for (k, v) in p.iter().enumerate() {
-                    put_i32(&mut elem, k * 4, *v);
+                    if k * 4 + 4 <= self.player_stat_elem_size {
+                        put_i32(&mut elem, k * 4, *v);
+                    }
                 }
                 h.extend_from_slice(&elem);
             }
@@ -2021,7 +2096,104 @@ mod tests {
             ..Default::default()
         };
         let err = decode_trailer(&f.bytes()).unwrap_err();
-        assert!(err.contains("team statistics element"), "got: {err}");
+        assert!(err.contains("teamStatElemSize is 72"), "got: {err}");
+    }
+
+    /// Every field the header states its own shape with, and what a replay from a
+    /// format we have not read looks like when it disagrees.
+    ///
+    /// Each case says which field disagreed, because "could not read the
+    /// statistics" is not something anyone can act on.
+    #[test]
+    fn a_header_from_a_format_we_do_not_know_is_refused_by_name() {
+        for (field, f) in [
+            (
+                "version",
+                DemoFixture {
+                    version: 6,
+                    team_samples: vec![series(3), series(3)],
+                    ..Default::default()
+                },
+            ),
+            (
+                "headerSize",
+                DemoFixture {
+                    header_size: 360,
+                    team_samples: vec![series(3), series(3)],
+                    ..Default::default()
+                },
+            ),
+            (
+                "teamStatElemSize",
+                DemoFixture {
+                    team_stat_elem_size: 64,
+                    team_samples: vec![series(3), series(3)],
+                    ..Default::default()
+                },
+            ),
+            (
+                "playerStatElemSize",
+                DemoFixture {
+                    player_stat_elem_size: 16,
+                    player_stats: vec![[1, 2, 3, 4, 0]; 2],
+                    team_samples: vec![series(3), series(3)],
+                    ..Default::default()
+                },
+            ),
+        ] {
+            let err = decode_trailer(&f.bytes())
+                .expect_err("{field} should refuse")
+                .to_string();
+            assert!(err.contains(field), "expected {field} named, got: {err}");
+        }
+    }
+
+    /// Refusing the statistics leaves the rest of the replay alone, so a future
+    /// engine's replay still lists its map, its players and their factions.
+    #[test]
+    fn a_refused_trailer_still_lists_the_map_and_the_roster() {
+        let f = DemoFixture {
+            version: 6,
+            winning_ally_teams: vec![1],
+            team_samples: vec![series(4), series(4)],
+            ..Default::default()
+        };
+        let p = write_tmp("v6.sdfz", &f.gzipped());
+        assert!(read_trailer(&p).is_err());
+
+        let raw = read_header_and_script(&p).unwrap();
+        assert_eq!(raw.engine_version, "105.1.2 TEST");
+        let info = build_demo_info(raw, &find_game(&parse_tdf(SCRIPT)), None);
+        assert_eq!(info.map_name, "Valles Marineris 2.6.1");
+        assert_eq!(info.players.len(), 3);
+        assert_eq!(
+            info.players
+                .iter()
+                .find(|p| p.name == "Alice")
+                .unwrap()
+                .side
+                .as_deref(),
+            Some("Armada")
+        );
+    }
+
+    /// A header that grew both element sizes, but is still version 5 at 352
+    /// bytes, is a struct with fields appended. Striding by the declared sizes
+    /// decodes every sample we understand rather than throwing the match away.
+    #[test]
+    fn elements_that_grew_are_read_rather_than_refused() {
+        let f = DemoFixture {
+            player_stat_elem_size: 24,
+            player_stats: vec![[7, 8, 9, 10, 11]; 3],
+            team_stat_elem_size: 96,
+            winning_ally_teams: vec![0],
+            team_samples: vec![series(6), series(6)],
+            ..Default::default()
+        };
+        let t = decode_trailer(&f.bytes()).unwrap();
+        assert_eq!(t.winning_ally_teams, vec![0]);
+        assert_eq!(t.teams[0].samples, series(6));
+        assert_eq!(t.teams[1].samples, series(6));
     }
 
     /// The whole trailer round-trips through gzip, which is what a `.sdfz` is,
