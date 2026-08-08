@@ -8,6 +8,7 @@ import type {
   MetricKey,
   TeamStatSample,
 } from "./bindings";
+import { teamLabel } from "./replaySideLabel";
 
 /**
  * What the match statistics section on replay detail shows, worked out here so
@@ -30,17 +31,6 @@ export function formatDuration(sec: number): string {
   const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
   const ss = String(s).padStart(2, "0");
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
-
-/** Human-readable result line from the winning ally teams. */
-export function resultLabel(info: DemoInfo): string {
-  // False either because the recording never reached a game over, or because
-  // its trailer is in a format coilbox doesn't read and there was no demotool
-  // fallback to ask, so this doesn't name a specific reason.
-  if (!info.winnersKnown) return "Unknown";
-  if (info.winningAllyTeams.length === 0) return "Nobody won";
-  const ids = info.winningAllyTeams.map((a) => `Ally ${a}`).join(", ");
-  return `${ids} won`;
 }
 
 /** How many seats played: humans who weren't spectating, plus every bot. */
@@ -339,14 +329,15 @@ function mergeSamples(parts: TeamStatSample[][]): TeamStatSample[] {
 }
 
 /**
- * What a side is called, with how it did. "Team 1" rather than "Ally team 0"
- * because that is how a match is talked about and `[allyteam0]` is an index in a
- * file, and the result is part of the name because the chart is read to find out
- * how the match went.
+ * What a side is called, with how it did. The name itself is
+ * {@link teamLabel}'s, the one definition of that numbering, so the chart and
+ * the roster beside it cannot drift apart the way they did in #1209. The result
+ * is part of the name here because the chart is read to find out how the match
+ * went.
  */
 function sideLabel(ally: number, info: DemoInfo): string {
   const won = info.winnersKnown && info.winningAllyTeams.includes(ally);
-  return `Team ${ally + 1}${won ? " (won)" : ""}`;
+  return `${teamLabel(ally)}${won ? " (won)" : ""}`;
 }
 
 /**
@@ -663,8 +654,15 @@ export function tooltipRows(
  */
 export const END_LABEL_MAX_SERIES = 4;
 
-/** The shortest chart, which is what a small match gets. */
-const CHART_MIN_HEIGHT = 280;
+/**
+ * The shortest chart, which is what a small match gets.
+ *
+ * Tall enough to stand a column of metric tiles beside (#1141). At the old 280 a
+ * duel's plot was the height of four tiles, so the picker beside it showed three
+ * metrics of fifteen and everything else was a scroll away, which is most of the
+ * dropdown's problem with extra steps.
+ */
+const CHART_MIN_HEIGHT = 420;
 
 /** One tooltip row: 12px text on a 16px line, plus the list's gap. */
 const TOOLTIP_ROW_PX = 18;
@@ -853,5 +851,184 @@ export function valueTable(
         return typeof value === "number" ? formatTableValue(value) : null;
       }),
     })),
+  };
+}
+
+/* ---------------------------------------------------------------------------
+ * The metric picker (#1141).
+ *
+ * A dropdown names fifteen metrics and shows none of them, so finding the one
+ * that explains a match means opening all fifteen and remembering the last. The
+ * picker draws each metric's own shape instead, and the interesting one is the
+ * one that looks unlike the others.
+ *
+ * Every tile is {@link modeRows} over the series the plot was given, so a tile
+ * is the chart at tile size rather than a second derivation that could disagree
+ * with it. Only the scaling is the tile's own, and only because a shape with no
+ * axis has no numbers to be to scale with.
+ * ------------------------------------------------------------------------- */
+
+/** One series inside a tile, as a path in {@link TILE_BOX}'s own units. */
+export interface SparkLine {
+  id: string;
+  color: string;
+  /** An SVG `d`, broken wherever the series has no reading. */
+  d: string;
+}
+
+/** One metric in the picker: what to call it, and what it looks like. */
+export interface MetricTile {
+  metric: Metric;
+  lines: SparkLine[];
+}
+
+/** One heading in the picker, and the tiles under it. */
+export interface MetricTileGroup {
+  group: MetricGroup;
+  label: string;
+  tiles: MetricTile[];
+}
+
+/**
+ * The box a tile's path is drawn in. Nominal units, not pixels: the svg carries
+ * this as its `viewBox` and stretches to whatever room the picker has, so the
+ * same path data reads at any tile size and the cache doesn't have to know how
+ * wide the column ended up.
+ */
+export const TILE_BOX = { width: 100, height: 24 } as const;
+
+/** Room kept at the top and bottom so a line at the extreme isn't half cut off. */
+const TILE_INSET = 1;
+
+/** Two decimals is finer than any tile is drawn, and keeps the path short. */
+const round = (n: number) => String(Math.round(n * 100) / 100);
+
+/**
+ * One series as a path, in runs: a gap in the series is a gap in the line, the
+ * same as the plot, rather than a straight segment across the missing part.
+ *
+ * A run of a single point has no line to draw, so it repeats its own point and
+ * the round cap shows it as a dot. Without that, a series the file measured
+ * once would be a tile with nothing on it.
+ */
+function sparkPath(
+  rows: ChartRow[],
+  id: string,
+  x: (timeSec: number) => number,
+  y: (value: number) => number,
+): string {
+  const runs: string[][] = [];
+  let run: string[] = [];
+  for (const row of rows) {
+    const value = row[id];
+    if (typeof value !== "number") {
+      if (run.length > 0) runs.push(run);
+      run = [];
+      continue;
+    }
+    run.push(`${round(x(row.timeSec))},${round(y(value))}`);
+  }
+  if (run.length > 0) runs.push(run);
+  return runs
+    .map((r) => `M${r[0]}L${(r.length > 1 ? r.slice(1) : r).join("L")}`)
+    .join("");
+}
+
+/**
+ * A set of rows drawn as one tile's worth of lines.
+ *
+ * Time runs the full width and the value axis starts at zero and ends at the
+ * biggest reading any series has here, which is the plot's own `[0, auto]`
+ * without the axis' rounding to a tick. Every series in a tile shares that
+ * scale, so two lines in a tile can be compared with each other, and no two
+ * tiles share one, because a tile is a shape and not a figure.
+ */
+export function sparkLines(
+  series: ChartSeries[],
+  rows: ChartRow[],
+): SparkLine[] {
+  const lastTime = rows.at(-1)?.timeSec ?? 0;
+  let top = 0;
+  for (const row of rows)
+    for (const s of series) {
+      const value = row[s.id];
+      if (typeof value === "number" && value > top) top = value;
+    }
+  const plot = TILE_BOX.height - TILE_INSET * 2;
+  const x = (timeSec: number) =>
+    lastTime > 0 ? (timeSec / lastTime) * TILE_BOX.width : 0;
+  const y = (value: number) =>
+    TILE_BOX.height - TILE_INSET - (top > 0 ? (value / top) * plot : 0);
+  return series.map((s) => ({
+    id: s.id,
+    color: s.color,
+    d: sparkPath(rows, s.id, x, y),
+  }));
+}
+
+/** Everything a set of tiles is drawn from. The same inputs the plot has. */
+export interface TileRequest {
+  metrics: Metric[];
+  series: ChartSeries[];
+  secPerFrame: number;
+  mode: ChartMode;
+  view: ChartView;
+}
+
+/**
+ * Every metric the registry offers, drawn, grouped the way the dropdown used to
+ * group them. {@link metricGroups} decides which metrics and in what order, so
+ * this file still has no list of its own.
+ */
+export function sparklineTiles(req: TileRequest): MetricTileGroup[] {
+  return metricGroups(req.metrics).map((g) => ({
+    group: g.group,
+    label: g.label,
+    tiles: g.metrics.map((metric) => ({
+      metric,
+      lines: sparkLines(
+        req.series,
+        modeRows(req.series, metric.key, req.secPerFrame, req.mode),
+      ),
+    })),
+  }));
+}
+
+/**
+ * What a set of tiles depends on, besides the series it was drawn from: which
+ * question is being asked, and which lines answer it. The registry is fetched
+ * once for the session and never changes under a mounted chart, so its length
+ * is here only to notice if that ever stops being true.
+ */
+export function tileSignature(req: TileRequest): string {
+  return `${req.view}|${req.mode}|${req.metrics.length}`;
+}
+
+/** Tiles for one request, built once. */
+export type TileCache = (req: TileRequest) => MetricTileGroup[];
+
+/**
+ * Fifteen metrics times sixteen lines times a few hundred samples is a lot of
+ * path data, and none of it changes when the reader enlarges a different
+ * metric. This holds what it built, so picking a metric redraws the plot and
+ * nothing else.
+ *
+ * Keyed on the series array itself as well as the signature, because the two
+ * views are two arrays and a reader flipping between them should get both back,
+ * and because a chart handed a different match must not be shown the last one's
+ * tiles under the same "players, cumulative" name.
+ */
+export function createTileCache(): TileCache {
+  const bySeries = new WeakMap<ChartSeries[], Map<string, MetricTileGroup[]>>();
+  return (req) => {
+    let held = bySeries.get(req.series);
+    if (!held) {
+      held = new Map();
+      bySeries.set(req.series, held);
+    }
+    const signature = tileSignature(req);
+    const built = held.get(signature) ?? sparklineTiles(req);
+    held.set(signature, built);
+    return built;
   };
 }
