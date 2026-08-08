@@ -17,6 +17,7 @@ permissions = [
   "allow-content-list-replays",
   "allow-content-demo-info",
   "allow-content-replay-trailer",
+  "allow-content-metric-registry",
   "allow-content-stats-ingest",
   "allow-content-stats-query",
   "allow-content-stats-watch-start",
