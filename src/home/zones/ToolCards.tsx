@@ -9,6 +9,7 @@ import {
   ART_DIM_CLASS,
   ART_FADE_CLASS,
   ART_CARD_CLASS as ART_SHELL_CLASS,
+  CARD_FOCUS_CLASS,
   CARD_SHELL_CLASS,
 } from "../cardShell";
 import { homeToolGroups, splitGroupItems } from "../nav";
@@ -85,11 +86,11 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
 const SUGGESTED_MAP_GROUP = "downloads";
 
 /**
- * What a tool card adds to the shared shell in both rendering modes. Sizing and
- * the border cue: full width on a phone, a fixed 16rem above that so cards pack
- * left and wrap instead of stretching to fill a grid cell.
+ * What a tool card adds to the shared shell in both rendering modes. Sizing, the
+ * border cue and the focus ring: full width on a phone, a fixed 16rem above that
+ * so cards pack left and wrap instead of stretching to fill a grid cell.
  */
-const TOOL_CARD_CLASS = "transition-colors hover:border-ring sm:w-64";
+const TOOL_CARD_CLASS = `transition-colors hover:border-ring sm:w-64 ${CARD_FOCUS_CLASS}`;
 
 /**
  * The icon-only card: an icon beside a label, on the card surface. What every

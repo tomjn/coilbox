@@ -29,18 +29,32 @@ export type HomeBackdrop =
 /**
  * The strongest any backdrop layer may composite over the theme background.
  *
- * 6% is not a taste call. It is the largest value for which the worst possible
- * supplied image (a flat white or a flat black one) still leaves every text
- * colour on the page with at least 85% of the contrast it has on the flat theme,
- * in both the light and dark ramps and every base preset picoframe ships. Above
- * it, near-black dark backgrounds lose contrast fast, because their luminance is
- * so low that a little added light is a large proportional change.
+ * 5% is not a taste call. It is the bound under which the worst possible supplied
+ * image (a flat white or a flat black one) still leaves every text colour on the
+ * page at or above WCAG AA, in both ramps and every base preset picoframe ships.
+ * Above it, near-black dark backgrounds lose contrast fast, because their
+ * luminance is so low that a little added light is a large proportional change.
+ *
+ * It was 6%, chosen against a *relative* criterion: keep 85% of the contrast the
+ * text has on the flat theme. The accessibility pass (#1003) rendered the backdrop
+ * for the first time and measured the pixels, and 85% turned out not to be enough.
+ * `--muted-foreground` is already the lightest ink that clears AA (#1033), so on
+ * the two bases where it has least room, lime and yellow in the light ramp, it has
+ * only 5.11:1 to spend: 6% over a flat black image took the greeting's tagline and
+ * the tool group labels to 4.48:1, under the 4.5:1 bar. The arithmetic and the
+ * rendered pixels agreed to two decimal places, so the constant was wrong rather
+ * than the model.
+ *
+ * AA holds up to 5.75%. 5% is the round value under that, and the margin matters:
+ * at the ceiling the worst case sits at 4.51:1, where any later nudge to a token
+ * breaks it silently. `background.test.ts` measures the shipped bases against the
+ * absolute bar rather than a relative one, so lowering a token re-opens this.
  *
  * The cost is that the backdrop is a mood layer, not a hero image. A distribution
  * that wants art at full strength already has `welcome.html` plus `welcome.css`,
  * which replace the page wholesale and are the sanctioned escape hatch.
  */
-export const BACKDROP_MAX_ALPHA = 0.06;
+export const BACKDROP_MAX_ALPHA = 0.05;
 
 /**
  * The default wash: a soft glow behind the greeting and a fainter lift at the
@@ -57,9 +71,14 @@ export const BACKDROP_MAX_ALPHA = 0.06;
  * through transparent black and greys the gradient out. The two gradients
  * overlap, so it is their alphas summed, not each on its own, that has to stay
  * within {@link BACKDROP_MAX_ALPHA}.
+ *
+ * The glow is 3% rather than the 4% it shipped at, because the bound moved to 5%
+ * and the pair has to fit under it. The wash was never the failing case: rendered,
+ * it leaves the quietest ink at 4.86:1 either way. One rule for every layer is
+ * worth more than a percentage point of a glow nobody can name the strength of.
  */
 export const DEFAULT_BACKDROP_GRADIENT = [
-  "radial-gradient(120% 70% at 50% 0%, hsl(var(--primary) / 0.04), hsl(var(--primary) / 0) 70%)",
+  "radial-gradient(120% 70% at 50% 0%, hsl(var(--primary) / 0.03), hsl(var(--primary) / 0) 70%)",
   "radial-gradient(90% 60% at 100% 100%, hsl(var(--foreground) / 0.02), hsl(var(--foreground) / 0) 60%)",
 ].join(", ");
 

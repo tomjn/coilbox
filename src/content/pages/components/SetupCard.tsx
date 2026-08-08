@@ -118,6 +118,11 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
     }
   }
 
+  // The three spinners below are `motion-safe:`, so a reader who asked the OS for
+  // less motion gets a still glyph and the button's disabled state as the cue that
+  // something is running. This card is a welcome zone (`home/zones/Onboarding`),
+  // and the suggested map's spinner one card away already made that call, so an
+  // unguarded one here was the same page answering the same question twice.
   return (
     <Card className="gap-3 rounded-lg border-border p-4 shadow-none">
       <div className="space-y-1">
@@ -144,7 +149,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
             </p>
             <Button onClick={recreateFolder} disabled={busy !== null}>
               {busy === "recreate" ? (
-                <Loader2 className="animate-spin" />
+                <Loader2 className="motion-safe:animate-spin" />
               ) : (
                 <FolderPlus />
               )}
@@ -154,7 +159,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
         ) : (
           <Button onClick={createFolder} disabled={busy !== null}>
             {busy === "folder" ? (
-              <Loader2 className="animate-spin" />
+              <Loader2 className="motion-safe:animate-spin" />
             ) : (
               <FolderPlus />
             )}
@@ -172,7 +177,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
               disabled={busy !== null || !writePath}
             >
               {busy === "engine" ? (
-                <Loader2 className="animate-spin" />
+                <Loader2 className="motion-safe:animate-spin" />
               ) : (
                 <Download />
               )}
