@@ -85,14 +85,15 @@
  * `continue.ts` cannot rank because it carries no timestamp but which is the
  * truest statement of what your Singleplayer screen currently holds.
  *
- * ## Bright content under light text
+ * ## Real pictures under card text
  *
- * A minimap of a desert map is bright, and card text sits over it. This module
- * does not darken it, for a reason worth stating: step 1 of the chain is a
- * distribution's own image file (issue #1000), which Coilbox cannot touch at
- * all, so a card that only reads when its art happens to be dark is already
- * broken and no source can fix that from its own side. Legibility over arbitrary
- * art belongs to whatever paints the text over it. {@link CardArt} carries the
+ * A minimap of a desert map is bright, a night map's is nearly black, and card
+ * text sits over both. This module repaints neither, for a reason worth stating:
+ * step 1 of the chain is a distribution's own image file (issue #1000), which
+ * Coilbox cannot touch at all, so a card that only reads when its art happens to
+ * land the right way is already broken and no source can fix that from its own
+ * side. Legibility over arbitrary art belongs to whatever paints the text over
+ * it, and `cardShell.ts` measures it against both ends of what a picture can be. {@link CardArt} carries the
  * step that answered, so a card can tell a photograph from the procedural field
  * and scrim accordingly.
  *

@@ -8,44 +8,55 @@
  * are. Each fact was found in a browser rather than deduced, and each is easy to
  * undo by accident, so they are written down here once instead of in each zone.
  *
- * ## Fact one: Tailwind's colour utilities do not work inside the dark island
+ * ## Fact one: the card is an island, and the island takes the page's ramp
  *
- * Card art is dark whatever the page's colour scheme, so the text over it must be
- * light even on a light page. Rather than hardcode white, an art card declares
- * itself a dark island with picoframe's `dark` class: `.dark` re-declares
- * `--foreground`, `--background` and the rest on this element, so a distribution
- * that themes its dark ramp themes these cards, and in dark mode the class is a
- * no-op so one card renders identically in both schemes.
+ * The card was a permanently dark island: it carried picoframe's `dark` class, so
+ * a light page showed a grid of dark tiles and a card was the one thing on the
+ * page that had not been asked what scheme the app was in. It now takes the
+ * page's ramp, so it is a light card on a light page and the dark card it always
+ * was on a dark one (issues #1044 and #1046). Everything else here is unchanged,
+ * including the measurement, which now runs over both ramps.
  *
- * Everything inside the island must read the raw picoframe triple,
- * `hsl(var(--token))`, and never Tailwind's `bg-background` / `text-foreground`
- * utility. Tailwind v4 substitutes `var(--background)` into `--color-background`
- * at `:root`, so the utility carries the *page's* scheme into the subtree no
- * matter what `.dark` says here. The raw token substitutes on the element that
- * uses it, which is the whole point.
+ * The island is still an island, and everything it paints still reads the raw
+ * picoframe triple, `hsl(var(--token))`, rather than Tailwind's `bg-background` /
+ * `text-foreground` utility. Two reasons, and both survived the change:
+ *
+ * - Tailwind v4 substitutes `var(--background)` into `--color-background` at
+ *   `:root`, so a utility carries the root's ramp into any subtree that
+ *   re-declares one. The card does not re-declare one today. Anything nested
+ *   inside it might, and a scheme context that only half works is worse than
+ *   none.
+ * - The alpha. `bg-background/78` mixes in oklab, and the band's whole
+ *   justification is a contrast figure computed from a straight sRGB composite.
+ *   `hsl(var(--background)/0.78)` is that composite exactly, so the number in
+ *   `cardShell.test.ts` describes the pixels a browser actually paints.
  *
  * ## Fact two: picoframe's outline button hits fact one
  *
- * The variant is `border-input bg-background`, Tailwind utilities both, so an
- * outline button in the band on a light page paints white and keeps the band's
- * light text, reading as blank. {@link ART_BUTTON_CLASS} is the corrected
- * version, so a zone putting a control on card art takes it rather than
- * rediscovering the bug in a screenshot.
+ * The variant is `border-input bg-background`, Tailwind utilities both. That
+ * painted an outline button in the band the page's white while it kept the
+ * band's light text, so on a light page the control read as blank.
+ * {@link ART_BUTTON_CLASS} restates it in raw tokens. With the card on the page's
+ * ramp the two now resolve to the same colours, so this is no longer a bug fix,
+ * but a control in the band still takes its colours from the same place as the
+ * band around it rather than from a second source that could drift.
  *
  * ## Fact three: `text-muted-foreground` is not safe over the band
  *
- * That token is calibrated against a 7% background, and on a vivid base it is a
+ * That token is calibrated against a flat surface, and on a vivid base it is a
  * saturated colour rather than a grey: over this band it measures 2.1:1 against
  * white art, well under AA. {@link ART_DIM_CLASS} steps the foreground's alpha
- * down instead, which keeps the same hierarchy and holds 5.0:1.
+ * down instead, which keeps the same hierarchy and stays above 4.5:1.
  *
- * `cardShell.test.ts` measures the band's two text colours against a pure white
- * pixel in every base ramp picoframe ships, where the worst case is 7.4:1 for the
- * name and 5.0:1 for the line under it. White is the ceiling for an image, so that
- * bound covers every picture any art source can ever hand back: a zone that later
- * shows a bundled illustration or content art inherits the guarantee rather than
- * deriving its own. The alphas come out of the shipped strings below, so weakening
- * one re-runs the measurement instead of leaving it stale.
+ * `cardShell.test.ts` measures the band's two text colours in both ramps, in every
+ * base picoframe ships, over both ends of what an image can be. Black and white
+ * are the floor and the ceiling for a picture, and each ramp's worst case sits at
+ * one of them: 7.4:1 (name) and 5.0:1 (secondary) on the dark ramp over white art,
+ * 8.9:1 and 4.9:1 on the light ramp over black art. That bound covers every
+ * picture any art source can hand back, so a zone showing a bundled illustration
+ * or a minimap inherits the guarantee rather than deriving its own. The alphas
+ * come out of the shipped strings below, so weakening one re-runs the measurement
+ * instead of leaving it stale.
  */
 
 /**
@@ -64,16 +75,17 @@ export const CARD_SHELL_CLASS =
 export const CARD_STACK_CLASS = "relative flex-col overflow-hidden";
 
 /**
- * The art card: a dark island with art edge to edge behind it.
+ * The art card: art edge to edge, on the page's own ramp.
  *
  * `bg-` is a backstop for art that does not cover, whether a transparent
- * illustration or the moment before an image decodes. Without it the light page
- * would show through and take the light text with it.
+ * illustration or the moment before an image decodes. Without it whatever is
+ * behind the card shows through and the band's text loses what it was measured
+ * against.
  *
  * Zones add their own sizing and hover on top. Neither is shared: the tool grid
  * packs fixed-width cards that wrap, and the featured map is one wide card.
  */
-export const ART_CARD_CLASS = `${CARD_SHELL_CLASS} ${CARD_STACK_CLASS} dark bg-[hsl(var(--background))]`;
+export const ART_CARD_CLASS = `${CARD_SHELL_CLASS} ${CARD_STACK_CLASS} bg-[hsl(var(--background))]`;
 
 /**
  * The band at the foot of an art card, dimming what is under it enough for its
@@ -99,8 +111,8 @@ export const ART_DIM_CLASS = "text-[hsl(var(--foreground)/0.75)]";
  *
  * `cn`'s tailwind-merge drops the variant's own versions, since both are
  * background and border utilities. The same string is correct on a card with no
- * art, where there is no `.dark` above it and the tokens are the page's, which is
- * exactly what the variant would have given.
+ * art, which is what it has always resolved to there and what every card
+ * resolves to now.
  */
 export const ART_BUTTON_CLASS =
   "border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]";
