@@ -41,6 +41,16 @@ import { FALLBACK_THEME_COLOR, proceduralCardArt } from "./proceduralArt";
 /** The steps above the procedural floor, in the order they are tried. */
 export type CardArtStep = "override" | "content" | "bundled";
 
+/**
+ * The colour scheme a card is drawn for.
+ *
+ * An art card used to be a dark island whatever the page was doing, so art
+ * Coilbox draws was drawn dark once and used in both schemes. The card now takes
+ * the page's ramp (see `cardShell.ts`), so the art has to know which ramp it is
+ * being painted into.
+ */
+export type CardScheme = "light" | "dark";
+
 /** Which step answered. `procedural` is the floor and is never registered. */
 export type CardArtSourceName = CardArtStep | "procedural";
 
@@ -53,6 +63,12 @@ export interface CardArtRequest {
   toolId: string;
   /** The app's current theme colour, as a CSS colour string. */
   themeColor: string;
+  /**
+   * The scheme the card is in. A source drawing its own art paints for this
+   * ramp. A source handing back a photograph or a minimap ignores it, because
+   * there is nothing to repalette.
+   */
+  scheme: CardScheme;
 }
 
 /**
@@ -90,15 +106,20 @@ export function registerCardArtSource(
 /**
  * Resolve the art for one tool.
  *
- * `themeColor` is read from the document when the caller does not pass one, so
- * every card on a page shares the same theme without the caller threading it
- * through. Tests pass it explicitly and so stay free of a DOM.
+ * `themeColor` and `scheme` are read from the document when the caller does not
+ * pass them, so every card on a page shares the same theme without the caller
+ * threading it through. Tests pass them explicitly and so stay free of a DOM.
+ *
+ * A React caller should pass the scheme rather than take the default: a card
+ * cannot re-render itself when the page flips scheme, so the value has to come
+ * from something it subscribes to. See `ToolCards.tsx`.
  */
 export function resolveCardArt(
   toolId: string,
   themeColor: string = readThemeColor(),
+  scheme: CardScheme = readColorScheme(),
 ): CardArt {
-  const request: CardArtRequest = { toolId, themeColor };
+  const request: CardArtRequest = { toolId, themeColor, scheme };
   for (const step of STEPS) {
     const answer = sources.get(step)?.(request);
     if (answer === false) return { kind: "icon", source: step };
@@ -106,9 +127,26 @@ export function resolveCardArt(
   }
   return {
     kind: "art",
-    url: proceduralCardArt(toolId, themeColor),
+    url: proceduralCardArt(toolId, themeColor, scheme),
     source: "procedural",
   };
+}
+
+/**
+ * Which ramp the page is in, read off the class picoframe's `ThemeProvider`
+ * puts on `<html>`.
+ *
+ * The class rather than the provider's own `resolved`, because the provider only
+ * recomputes that on a render and the system-scheme listener toggles the class
+ * without one. Whatever the page is actually painted in is what the art has to
+ * agree with.
+ *
+ * With no document at all (tests, and any non-browser caller) the answer is
+ * dark, which is the scheme every one of these drawings was authored in.
+ */
+export function readColorScheme(): CardScheme {
+  if (typeof document === "undefined") return "dark";
+  return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
 /** The last probe, memoised against the raw `--primary` it was taken from. */

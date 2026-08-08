@@ -6,10 +6,22 @@ import {
   proceduralCardArtSvg,
 } from "./proceduralArt";
 
+/**
+ * The scheme most of this file works in. The generator draws for the card it
+ * fills, and every property below except the palette is the same either way, so
+ * they are stated once against the dark card the field was authored for.
+ */
+const DARK = "dark" as const;
+const LIGHT = "light" as const;
+
 const BLUE = "hsl(221.2 83.2% 53.3%)";
 const ORANGE = "rgb(240, 130, 30)";
 /** picoframe's default scheme, which resolves to a near-neutral grey. */
 const NEUTRAL = "hsl(240 4% 16%)";
+
+/** A spread of tool ids and themes, for the properties that hold over both. */
+const TOOLS = ["warpath", "replays", "campaigns", "maps", "lobby"];
+const THEMES = [BLUE, ORANGE, NEUTRAL, "#ff0000", "#0f0"];
 
 /** Every `hsl(...)` colour in a fragment of the markup, as components. */
 function colours(markup: string): { h: number; s: number; l: number }[] {
@@ -36,20 +48,20 @@ function fieldColours(svg: string) {
 
 describe("proceduralCardArtSvg", () => {
   it("is deterministic for the same tool and theme", () => {
-    expect(proceduralCardArtSvg("warpath", BLUE)).toBe(
-      proceduralCardArtSvg("warpath", BLUE),
+    expect(proceduralCardArtSvg("warpath", BLUE, DARK)).toBe(
+      proceduralCardArtSvg("warpath", BLUE, DARK),
     );
   });
 
   it("gives different tools different art", () => {
     const ids = ["warpath", "replays", "campaigns", "maps", "conquest"];
-    const art = ids.map((id) => proceduralCardArtSvg(id, BLUE));
+    const art = ids.map((id) => proceduralCardArtSvg(id, BLUE, DARK));
     expect(new Set(art).size).toBe(ids.length);
   });
 
   it("gives the same tool different art under a different theme", () => {
-    expect(proceduralCardArtSvg("warpath", BLUE)).not.toBe(
-      proceduralCardArtSvg("warpath", ORANGE),
+    expect(proceduralCardArtSvg("warpath", BLUE, DARK)).not.toBe(
+      proceduralCardArtSvg("warpath", ORANGE, DARK),
     );
   });
 
@@ -64,7 +76,7 @@ describe("proceduralCardArtSvg", () => {
     // and stays quiet on a change of palette, which is the intended behaviour.
     const themes = [BLUE, ORANGE, NEUTRAL, "#ff0000", "240 calc(1 * 6%) 16%"];
     const shapes = themes.map((theme) =>
-      strip(proceduralCardArtSvg("warpath", theme)),
+      strip(proceduralCardArtSvg("warpath", theme, DARK)),
     );
     expect(new Set(shapes).size).toBe(1);
   });
@@ -73,12 +85,12 @@ describe("proceduralCardArtSvg", () => {
     // The other half of the same property: geometry must depend on the tool id,
     // or seeding off the id alone would give every card one picture.
     const ids = ["warpath", "replays", "campaigns", "maps", "conquest"];
-    const shapes = ids.map((id) => strip(proceduralCardArtSvg(id, BLUE)));
+    const shapes = ids.map((id) => strip(proceduralCardArtSvg(id, BLUE, DARK)));
     expect(new Set(shapes).size).toBe(ids.length);
   });
 
   it("is one svg element with the canvas it was authored against", () => {
-    const svg = proceduralCardArtSvg("warpath", BLUE);
+    const svg = proceduralCardArtSvg("warpath", BLUE, DARK);
     expect(svg.startsWith("<svg ")).toBe(true);
     expect(svg.endsWith("</svg>")).toBe(true);
     expect(svg.match(/<svg /g)).toHaveLength(1);
@@ -86,7 +98,7 @@ describe("proceduralCardArtSvg", () => {
   });
 
   it("defines every gradient it paints with", () => {
-    const svg = proceduralCardArtSvg("warpath", BLUE);
+    const svg = proceduralCardArtSvg("warpath", BLUE, DARK);
     const defined = [...svg.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
     const used = [...svg.matchAll(/url\(#([^)]+)\)/g)].map((m) => m[1]);
     expect(used.length).toBeGreaterThan(0);
@@ -98,24 +110,58 @@ describe("proceduralCardArtSvg", () => {
 
   it("namespaces its ids per tool", () => {
     const idsOf = (tool: string) =>
-      [...proceduralCardArtSvg(tool, BLUE).matchAll(/ id="([^"]+)"/g)].map(
-        (m) => m[1],
-      );
+      [
+        ...proceduralCardArtSvg(tool, BLUE, DARK).matchAll(/ id="([^"]+)"/g),
+      ].map((m) => m[1]);
     expect(idsOf("warpath")).not.toEqual(idsOf("replays"));
   });
 
-  it("keeps the field dark so card text stays legible", () => {
-    for (const tool of ["warpath", "replays", "campaigns", "maps", "lobby"]) {
-      for (const theme of [BLUE, ORANGE, NEUTRAL, "#ff0000", "#0f0"]) {
-        for (const colour of fieldColours(proceduralCardArtSvg(tool, theme))) {
+  it("keeps the field dark on a dark card", () => {
+    for (const tool of TOOLS) {
+      for (const theme of THEMES) {
+        for (const colour of fieldColours(
+          proceduralCardArtSvg(tool, theme, DARK),
+        )) {
           expect(colour.l).toBeLessThanOrEqual(22);
         }
       }
     }
   });
 
+  it("keeps the field light on a light card", () => {
+    // Issue #1044 gave the card the page's ramp, so the field that used to be
+    // dark whatever the page was doing now follows it.
+    for (const tool of TOOLS) {
+      for (const theme of THEMES) {
+        for (const colour of fieldColours(
+          proceduralCardArtSvg(tool, theme, LIGHT),
+        )) {
+          expect(colour.l).toBeGreaterThanOrEqual(78);
+        }
+      }
+    }
+  });
+
+  it("draws one composition and mirrors its lightness, rather than two pictures", () => {
+    // What keeps the two schemes a family: same geometry, same hues, same
+    // saturations, and every lightness reflected about the middle of the ramp.
+    for (const tool of TOOLS) {
+      const dark = colours(proceduralCardArtSvg(tool, BLUE, DARK));
+      const light = colours(proceduralCardArtSvg(tool, BLUE, LIGHT));
+      expect(strip(proceduralCardArtSvg(tool, BLUE, LIGHT))).toBe(
+        strip(proceduralCardArtSvg(tool, BLUE, DARK)),
+      );
+      expect(light).toHaveLength(dark.length);
+      dark.forEach((colour, i) => {
+        expect(light[i].h).toBe(colour.h);
+        expect(light[i].s).toBe(colour.s);
+        expect(light[i].l).toBeCloseTo(100 - colour.l, 6);
+      });
+    }
+  });
+
   it("keeps its marks quiet enough to sit behind an icon and a name", () => {
-    const svg = proceduralCardArtSvg("warpath", BLUE);
+    const svg = proceduralCardArtSvg("warpath", BLUE, DARK);
     expect(svg).toContain('stroke-opacity="0.13"');
     expect(svg).toContain('stop-opacity="0.22"');
     expect(svg).not.toContain('opacity="1"');
@@ -125,7 +171,7 @@ describe("proceduralCardArtSvg", () => {
     // Orange is around 40 degrees, blue around 221. Allowing for the per-card
     // jitter, the two must not land in the same part of the wheel.
     const hue = (theme: string) =>
-      fieldColours(proceduralCardArtSvg("warpath", theme))[0].h;
+      fieldColours(proceduralCardArtSvg("warpath", theme, DARK))[0].h;
     expect(Math.abs(hue(ORANGE) - hue(BLUE))).toBeGreaterThan(90);
   });
 
@@ -133,14 +179,16 @@ describe("proceduralCardArtSvg", () => {
     // Clamping a grey theme's saturation up would give every card a colour the
     // app never chose.
     for (const colour of fieldColours(
-      proceduralCardArtSvg("warpath", NEUTRAL),
+      proceduralCardArtSvg("warpath", NEUTRAL, DARK),
     )) {
       expect(colour.s).toBeLessThanOrEqual(6);
     }
   });
 
   it("saturates a theme that does have a hue", () => {
-    for (const colour of fieldColours(proceduralCardArtSvg("warpath", BLUE))) {
+    for (const colour of fieldColours(
+      proceduralCardArtSvg("warpath", BLUE, DARK),
+    )) {
       expect(colour.s).toBeGreaterThanOrEqual(15);
     }
   });
@@ -149,31 +197,31 @@ describe("proceduralCardArtSvg", () => {
     // What `--primary` computes to under the default scheme, where the calc is
     // left unevaluated.
     const soup = "240 calc(1 * 6%) 16%";
-    expect(proceduralCardArtSvg("warpath", soup)).toContain("<svg ");
-    expect(proceduralCardArtSvg("warpath", soup)).toBe(
-      proceduralCardArtSvg("warpath", soup),
+    expect(proceduralCardArtSvg("warpath", soup, DARK)).toContain("<svg ");
+    expect(proceduralCardArtSvg("warpath", soup, DARK)).toBe(
+      proceduralCardArtSvg("warpath", soup, DARK),
     );
   });
 });
 
 describe("proceduralCardArt", () => {
   it("is an svg data url holding exactly the markup", () => {
-    const url = proceduralCardArt("warpath", BLUE);
+    const url = proceduralCardArt("warpath", BLUE, DARK);
     expect(url.startsWith("data:image/svg+xml,")).toBe(true);
     expect(decodeURIComponent(url.slice("data:image/svg+xml,".length))).toBe(
-      proceduralCardArtSvg("warpath", BLUE),
+      proceduralCardArtSvg("warpath", BLUE, DARK),
     );
   });
 
   it("encodes the characters that would end the url early", () => {
-    const url = proceduralCardArt("warpath", BLUE);
+    const url = proceduralCardArt("warpath", BLUE, DARK);
     expect(url).not.toContain("#");
     expect(url).not.toContain('"');
   });
 
   it("is deterministic", () => {
-    expect(proceduralCardArt("warpath", BLUE)).toBe(
-      proceduralCardArt("warpath", BLUE),
+    expect(proceduralCardArt("warpath", BLUE, DARK)).toBe(
+      proceduralCardArt("warpath", BLUE, DARK),
     );
   });
 });

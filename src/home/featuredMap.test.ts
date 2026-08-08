@@ -563,19 +563,21 @@ describe("the featured map card", () => {
     expect(html).toContain("Fallendell");
   });
 
-  it("takes the shared dark island rather than its own copy of it", () => {
-    // `cardShell.ts` owns why the text over a minimap stays light in both colour
-    // schemes, and measures it against a pure white pixel. This is the card
-    // claiming that guarantee.
+  it("takes the shared card shell rather than its own copy of it", () => {
+    // `cardShell.ts` owns why the text over a minimap clears AA in both colour
+    // schemes, and measures it against a pure white and a pure black pixel. This
+    // is the card claiming that guarantee.
     const html = render({ art: "https://example.test/thumb.jpg" });
     expect(html).toContain(ART_CARD_CLASS);
   });
 
-  it("gives the install button the card's own scheme, not the page's", () => {
+  it("gives the install button the card's own tokens, not Tailwind's", () => {
     // picoframe's outline variant is `bg-background`, which Tailwind v4 resolves
-    // at `:root`. Left alone, the button inside the dark band would be painted
-    // the light page's white and carry the band's light text, so it would read
-    // as blank. The raw token has to be what survives the merge.
+    // at `:root`. While the card was a dark island that painted the button the
+    // light page's white under the band's light text, so it read as blank. The
+    // card takes the page's ramp now, so the two agree, and the raw token still
+    // has to be what survives the merge: the button's colours come from the same
+    // place as the band's rather than from a second source that could drift.
     const html = render({ art: "https://example.test/thumb.jpg" });
     expect(html).toContain("bg-[hsl(var(--background))]");
     expect(html).not.toMatch(/class="[^"]*\bbg-background\b/);

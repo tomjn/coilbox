@@ -28,13 +28,15 @@
  * document, so the `currentColor` trick `src/factions/fallback.ts` uses for
  * inline logos is not available here, and the chain's contract is a URL.
  *
- * Legibility contract: the field is always dark, whatever the colour scheme.
- * Lightness is clamped low and the marks on top are low-opacity light strokes,
- * so a card painting its icon and name over this should use light text in both
- * light and dark mode. Issue #991 owns that side of it.
+ * Legibility contract: the field agrees with the card it fills. On a dark card
+ * it is a dark field lit by low-opacity light marks, and on a light card it is
+ * the same composition with every lightness mirrored, so the marks are dark on a
+ * pale field. `cardShell.ts` owns the card, and `bundledArt.ts` mirrors by the
+ * same rule so a bundled card and a procedural one beside it still match.
  */
 
 import { hashString, mulberry32, pick, type Rng } from "../conquest/rng";
+import type { CardScheme } from "./art";
 
 /** Canvas the pattern is authored against. Cards crop it with `object-fit`. */
 const WIDTH = 320;
@@ -65,6 +67,23 @@ export interface Hsl {
  */
 const ACHROMATIC_SATURATION = 8;
 
+/**
+ * The lightness a mark takes in `scheme`, given the value it has on a dark card.
+ *
+ * The light scheme is the dark one mirrored in lightness and in nothing else.
+ * Hue and saturation are untouched, so a drawing keeps its theme tint and keeps
+ * its internal order (the marks that stood out still stand out) while the field
+ * under them flips from near-black to near-white. One composition with two
+ * ramps, rather than two sets of art that would drift apart.
+ *
+ * Exported because `bundledArt.ts` mirrors by the same rule, which is what keeps
+ * a bundled card and a procedural card beside it reading as one family in both
+ * schemes.
+ */
+export function schemeLightness(scheme: CardScheme, dark: number): number {
+  return scheme === "dark" ? dark : 100 - dark;
+}
+
 /** The four field directions. Never flat, so it reads as art not as a panel. */
 const DIRECTIONS = [
   ["0", "0", "1", "1"],
@@ -80,10 +99,13 @@ const DIRECTIONS = [
 export function proceduralCardArtSvg(
   toolId: string,
   themeColor: string,
+  scheme: CardScheme,
 ): string {
   const seed = hashString(toolId);
   const rand = mulberry32(seed);
   const theme = parseColor(themeColor) ?? FALLBACK_HSL;
+  /** Lightness on a dark card, mirrored when the card is light. */
+  const tone = (dark: number) => schemeLightness(scheme, dark);
 
   // Ids are namespaced by the seed so two of these can share a document without
   // one card's gradient resolving to another card's. As data URLs they are
@@ -97,15 +119,15 @@ export function proceduralCardArtSvg(
   // neutral theme has no hue worth rotating.
   const hue = (offset: number) => (neutral ? theme.h : theme.h + offset);
 
-  const fieldTop = hsl(hue(jitter(rand, 22)), sat, 16 + rand() * 6);
-  const fieldFoot = hsl(hue(jitter(rand, 22)), sat * 0.7, 8 + rand() * 4);
+  const fieldTop = hsl(hue(jitter(rand, 22)), sat, tone(16 + rand() * 6));
+  const fieldFoot = hsl(hue(jitter(rand, 22)), sat * 0.7, tone(8 + rand() * 4));
   const [x1, y1, x2, y2] = pick(rand, DIRECTIONS);
 
   const glows = [0, 1].map((i) => {
     const cx = round(rand() * WIDTH);
     const cy = round(rand() * HEIGHT);
     const r = round(90 + rand() * 70);
-    const colour = hsl(hue(jitter(rand, 26)), Math.min(sat + 12, 70), 58);
+    const colour = hsl(hue(jitter(rand, 26)), Math.min(sat + 12, 70), tone(58));
     return (
       `<radialGradient id="g${ns}${i}" cx="${cx}" cy="${cy}" r="${r}" gradientUnits="userSpaceOnUse">` +
       `<stop offset="0" stop-color="${colour}" stop-opacity="0.22"/>` +
@@ -125,7 +147,11 @@ export function proceduralCardArtSvg(
     { length: ringCount },
     (_, i) => `<circle cx="${cx}" cy="${cy}" r="${round(first + i * gap)}"/>`,
   ).join("");
-  const ringColour = hsl(hue(jitter(rand, 18)), Math.min(sat + 15, 70), 64);
+  const ringColour = hsl(
+    hue(jitter(rand, 18)),
+    Math.min(sat + 15, 70),
+    tone(64),
+  );
   const ringWidth = round(1 + rand());
 
   return (
@@ -151,8 +177,12 @@ export function proceduralCardArtSvg(
  * The pattern as a URL a card can use as an image source. Percent-encoded rather
  * than base64: it is shorter, and it keeps the markup readable in devtools.
  */
-export function proceduralCardArt(toolId: string, themeColor: string): string {
-  const svg = proceduralCardArtSvg(toolId, themeColor);
+export function proceduralCardArt(
+  toolId: string,
+  themeColor: string,
+  scheme: CardScheme,
+): string {
+  const svg = proceduralCardArtSvg(toolId, themeColor, scheme);
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 

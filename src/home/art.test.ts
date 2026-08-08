@@ -3,6 +3,7 @@ import {
   type CardArtRequest,
   type CardArtStep,
   forgetThemeColor,
+  readColorScheme,
   readThemeColor,
   registerCardArtSource,
   resolveCardArt,
@@ -28,9 +29,9 @@ describe("resolveCardArt", () => {
   it("falls through to procedural on a fresh install", () => {
     // Nothing registered is the shipping state today, and the state a
     // distribution with no art of its own stays in.
-    expect(resolveCardArt("warpath", THEME)).toEqual({
+    expect(resolveCardArt("warpath", THEME, "dark")).toEqual({
       kind: "art",
-      url: proceduralCardArt("warpath", THEME),
+      url: proceduralCardArt("warpath", THEME, "dark"),
       source: "procedural",
     });
   });
@@ -92,7 +93,7 @@ describe("resolveCardArt", () => {
     expect(resolveCardArt("warpath", THEME).source).toBe("bundled");
   });
 
-  it("asks each source about the tool and the theme", () => {
+  it("asks each source about the tool, the theme and the scheme", () => {
     const seen: CardArtRequest[] = [];
     registered.push(
       registerCardArtSource("override", (request) => {
@@ -100,8 +101,18 @@ describe("resolveCardArt", () => {
         return undefined;
       }),
     );
-    resolveCardArt("warpath", THEME);
-    expect(seen).toEqual([{ toolId: "warpath", themeColor: THEME }]);
+    resolveCardArt("warpath", THEME, "light");
+    expect(seen).toEqual([
+      { toolId: "warpath", themeColor: THEME, scheme: "light" },
+    ]);
+  });
+
+  it("draws its own art differently for each scheme", () => {
+    // The chain hands the scheme down rather than keeping it to itself, so the
+    // floor paints a light card for a light page.
+    expect(resolveCardArt("warpath", THEME, "light")).not.toEqual(
+      resolveCardArt("warpath", THEME, "dark"),
+    );
   });
 
   it("stops asking once a source has answered", () => {
@@ -144,6 +155,20 @@ describe("readThemeColor", () => {
   it("is what resolveCardArt uses when the caller passes no theme", () => {
     expect(resolveCardArt("warpath")).toEqual(
       resolveCardArt("warpath", readThemeColor()),
+    );
+  });
+});
+
+describe("readColorScheme", () => {
+  it("says dark with no document to read", () => {
+    // Vitest runs in a node environment, so this is the no-DOM branch, and dark
+    // is the scheme every drawing in the chain was authored in.
+    expect(readColorScheme()).toBe("dark");
+  });
+
+  it("is what resolveCardArt uses when the caller passes no scheme", () => {
+    expect(resolveCardArt("warpath", THEME)).toEqual(
+      resolveCardArt("warpath", THEME, readColorScheme()),
     );
   });
 });

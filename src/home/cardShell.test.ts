@@ -13,17 +13,20 @@ import {
  *
  * What this proves: the band across the foot of an art card dims whatever is
  * under it enough that both its text colours clear WCAG AA (4.5:1), in every base
- * ramp picoframe ships. It holds identically in light and dark mode, because the
- * card re-declares the dark ramp on itself, so there is one case to check and not
- * two.
+ * ramp picoframe ships, in both colour schemes, over any picture at all.
+ *
+ * The scheme used to drop out of this: the card pinned itself to the dark ramp,
+ * so there was one case rather than two. Issue #1044 gave the card the page's
+ * ramp, and the two cases are not each other's mirror image. On the dark ramp
+ * light text sits on a dark band, and the picture that hurts is a white one. On
+ * the light ramp dark text sits on a white band, and the picture that hurts is a
+ * black one, because it is what the band lets through that decides how far the
+ * text can be dimmed. Both worst cases are measured, and a scan of the whole
+ * colour cube below shows that neither ramp has anything worse in between.
  *
  * What it does not prove: that any of it was rendered. The zone tests check that
- * the cards wear these classes, and the PRs for #991, #995 and #1021 carry
+ * the cards wear these classes, and the PRs for #991, #995, #1021 and #1044 carry
  * screenshots.
- *
- * This measurement was written twice, once per zone, before the shell existed.
- * It now runs once over the shell's own strings, so a zone that adopts the shell
- * inherits the guarantee instead of deriving a weaker one.
  *
  * The alphas come out of the shipped class strings, so weakening the band in
  * `cardShell.ts` re-runs the measurement instead of leaving it stale.
@@ -79,55 +82,82 @@ function tokenAlpha(className: string, token: string): number {
   return found[1] ? Number(found[1]) : 1;
 }
 
-/**
- * The brightest pixel `proceduralCardArtSvg` can paint, scanned over its whole
- * parameter space.
- *
- * Its layers, from that module: a field at up to 22% lightness and 55%
- * saturation, two glows at 22% opacity of a 58%-lightness colour at up to 70%
- * saturation, and rings at 13% of a 64%-lightness colour. The worst case for
- * text is all of them stacked on the same pixel, at whichever hue carries the
- * most luminance.
- */
-function brightestProceduralPixel(): Rgb {
-  let worst: Rgb = [0, 0, 0];
-  for (let hue = 0; hue < 360; hue += 5) {
-    let pixel = hsl(hue, 0.55, 0.22);
-    pixel = over(pixel, hsl(hue, 0.7, 0.58), 0.22);
-    pixel = over(pixel, hsl(hue, 0.7, 0.58), 0.22);
-    pixel = over(pixel, hsl(hue, 0.7, 0.64), 0.13);
-    if (luminance(pixel) > luminance(worst)) worst = pixel;
-  }
-  return worst;
-}
-
-/** picoframe's `.dark` ramp, transcribed from `@picoframe/frame/src/theme.css`. */
 const BASE_HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
-/** Neutral through the subtle tier to the vivid one, which tops out around 11. */
-const BASE_SATS = [0, 1, 2.6, 6, 11];
+
+/**
+ * The two saturation knobs a base preset moves, paired as the presets pair them.
+ *
+ * `--base-sat` tints surfaces and `--base-sat-text` tints foregrounds. The subtle
+ * tier ties them together and stays under 2.6. The vivid tier pushes surfaces to
+ * between 5.5 and 11 (navy, the hottest) while pinning text back to 2, which is
+ * why body copy on a vivid base is near-black rather than plum. Taking the two
+ * separately would measure a text colour no base ships.
+ */
+const BASE_SATS: readonly (readonly [number, number])[] = [
+  [0, 0],
+  [1, 1],
+  [2.6, 2.6],
+  [6, 2],
+  [11, 2],
+];
+
+/** The two ramps, transcribed from `@picoframe/frame/src/theme.css`. */
+const RAMPS = {
+  dark: {
+    /** `.dark --background`, retinted by the base. */
+    surface: (hue: number, sat: number) => hsl(hue, (sat * 6) / 100, 0.07),
+    /** `.dark --foreground`, a literal near-white the base does not move. */
+    ink: () => hsl(0, 0, 0.95),
+    /** Black is the floor for a picture, white the ceiling. */
+    worstArt: [1, 1, 1] as Rgb,
+  },
+  light: {
+    /** `:root --background`, a literal white the base does not retint. */
+    surface: () => hsl(0, 0, 1),
+    /** `:root --foreground`, near-black and tinted by the text knob. */
+    ink: (hue: number, satText: number) => hsl(hue, (satText * 10) / 100, 0.12),
+    worstArt: [0, 0, 0] as Rgb,
+  },
+} as const;
+
+type Scheme = keyof typeof RAMPS;
+const SCHEMES = Object.keys(RAMPS) as Scheme[];
 
 const bandAlpha = tokenAlpha(ART_BAND_CLASS, "background");
 const textAlpha = tokenAlpha(ART_BAND_CLASS, "foreground");
 const dimAlpha = tokenAlpha(ART_DIM_CLASS, "foreground");
 
+/** The band and its two text colours over `art`, in one base of one ramp. */
+function bandOver(
+  art: Rgb,
+  scheme: Scheme,
+  hue: number,
+  sat: number,
+  satText: number,
+) {
+  const ramp = RAMPS[scheme];
+  const band = over(art, ramp.surface(hue, sat), bandAlpha);
+  const ink = ramp.ink(hue, satText);
+  return {
+    band,
+    name: contrast(over(band, ink, textAlpha), band),
+    secondary: contrast(over(band, ink, dimAlpha), band),
+  };
+}
+
 /** Measure both text colours over `art`, in every base ramp picoframe ships. */
-function measureBandOver(art: Rgb) {
+function measureBandOver(art: Rgb, scheme: Scheme) {
   for (const hue of BASE_HUES) {
-    for (const sat of BASE_SATS) {
-      // The dark ramp's --background, which is what the band is painted in.
-      const scrim = hsl(hue, (sat * 6) / 100, 0.07);
-      const band = over(art, scrim, bandAlpha);
-      // The dark ramp's --foreground is achromatic, so the base does not move it.
-      const ink = over(band, hsl(0, 0, 0.95), textAlpha);
-      const dim = over(band, hsl(0, 0, 0.95), dimAlpha);
-      const label = `base hue ${hue} sat ${sat}`;
+    for (const [sat, satText] of BASE_SATS) {
+      const measured = bandOver(art, scheme, hue, sat, satText);
+      const label = `${scheme} base hue ${hue} sat ${sat}`;
 
       it(`clears AA for the card's name at ${label}`, () => {
-        expect(contrast(ink, band)).toBeGreaterThanOrEqual(4.5);
+        expect(measured.name).toBeGreaterThanOrEqual(4.5);
       });
 
       it(`clears AA for the card's secondary line at ${label}`, () => {
-        expect(contrast(dim, band)).toBeGreaterThanOrEqual(4.5);
+        expect(measured.secondary).toBeGreaterThanOrEqual(4.5);
       });
     }
   }
@@ -150,35 +180,57 @@ describe("text on card art", () => {
  *
  * Issue #989 puts real minimaps and loading-screen art on these cards, #1000 lets
  * a distribution supply any image file at all, and the featured map shows a
- * picture of whatever the mapper made, up to and including a snowfield. Coilbox
- * draws none of that and cannot promise any of it is dark, so the dark contract
- * cannot be what holds the text legible. White is the ceiling for an image, so a
- * band that clears AA over white clears it over every picture a source can hand
- * back, and no source has to darken its own output to be safe here.
+ * picture of whatever the mapper made, up to and including a snowfield and a
+ * night battle. Coilbox draws none of that and can promise nothing about it, so
+ * what holds the text legible has to be the band and not the picture. Black and
+ * white are a picture's floor and ceiling, and each ramp's worst case is one of
+ * them, so a band that clears AA there clears it over every picture a source can
+ * hand back and no source has to tune its own output to be safe here.
  */
 describe("text on art Coilbox did not draw", () => {
-  measureBandOver([1, 1, 1]);
+  for (const scheme of SCHEMES) measureBandOver(RAMPS[scheme].worstArt, scheme);
 });
 
 /**
- * The same measurement over the only art Coilbox generates itself.
+ * That the corner really is the worst case, rather than an assumption about a
+ * composite of four colours that is not obviously monotone.
  *
- * Mathematically implied by the white case, since a darker pixel under the band
- * can only raise the contrast. Kept because it is what states the procedural
- * field's ceiling in numbers, and because the two zones each shipped this
- * measurement before the shell existed: consolidating them into one file is the
- * point, dropping cases is not.
+ * The scan walks the sRGB cube, so it covers the procedural field, every bundled
+ * illustration and every minimap in one measurement. It replaces a case that
+ * measured only the brightest pixel the procedural generator can paint, which
+ * this contains.
  */
-describe("text on the procedural field", () => {
-  measureBandOver(brightestProceduralPixel());
+describe("no picture is worse than the corner", () => {
+  const STEPS = [0, 0.25, 0.5, 0.75, 1];
+
+  for (const scheme of SCHEMES) {
+    it(`holds AA over every colour a picture can be, ${scheme}`, () => {
+      let name = { ratio: Number.POSITIVE_INFINITY, at: "" };
+      let secondary = { ratio: Number.POSITIVE_INFINITY, at: "" };
+      for (const r of STEPS)
+        for (const g of STEPS)
+          for (const b of STEPS)
+            for (const hue of BASE_HUES)
+              for (const [sat, satText] of BASE_SATS) {
+                const m = bandOver([r, g, b], scheme, hue, sat, satText);
+                const at = `rgb(${r} ${g} ${b}) on base ${hue}/${sat}`;
+                if (m.name < name.ratio) name = { ratio: m.name, at };
+                if (m.secondary < secondary.ratio)
+                  secondary = { ratio: m.secondary, at };
+              }
+      expect(name.ratio, name.at).toBeGreaterThanOrEqual(4.5);
+      expect(secondary.ratio, secondary.at).toBeGreaterThanOrEqual(4.5);
+    });
+  }
 });
 
 /**
- * The trap the shell exists to stop a third zone falling into. Neither Tailwind
- * colour utility works inside the dark island, because v4 substitutes the token
- * at `:root`, so nothing painted inside may carry one.
+ * The trap the shell exists to stop a third zone falling into. A Tailwind colour
+ * utility resolves its token at `:root`, and the band's alpha would composite in
+ * oklab rather than in the straight sRGB the measurement above assumes, so
+ * nothing painted inside the card may carry one.
  */
-describe("the dark island reads raw tokens, not Tailwind's utilities", () => {
+describe("the card reads raw tokens, not Tailwind's utilities", () => {
   const inside = {
     "the card surface": ART_CARD_CLASS,
     "the band": ART_BAND_CLASS,
@@ -195,19 +247,21 @@ describe("the dark island reads raw tokens, not Tailwind's utilities", () => {
     });
   }
 
-  it("declares the card a dark island", () => {
-    expect(ART_CARD_CLASS.split(" ")).toContain("dark");
+  it("takes the page's ramp rather than pinning itself to the dark one", () => {
+    // Issue #1044. The card carried picoframe's `dark` class, so a light page
+    // showed a grid of dark tiles. Nothing else in the shell changed.
+    expect(ART_CARD_CLASS.split(" ")).not.toContain("dark");
   });
 
   it("paints a base colour under art that does not cover", () => {
     expect(ART_CARD_CLASS).toContain("bg-[hsl(var(--background))]");
   });
 
-  it("leaves the card's outer edge on the page's scheme, not the island's", () => {
-    // `border-border` is one of the utilities above, resolved at `:root`, so this
-    // hairline is the page's and not the card's. Deliberate, and what both zones
-    // have shipped since #991: the edge is where the card meets the page, so it
-    // belongs to the page. Everything the island paints is inside it.
+  it("draws the card's edge in the same ramp as its inside", () => {
+    // Issue #1046 asked whether the hairline belongs to the page or to the card,
+    // because `border-border` resolves at `:root` and the card was dark. With the
+    // card on the page's ramp the two answers are the same colour, so the
+    // question closes rather than being settled one way.
     expect(ART_CARD_CLASS.split(" ")).toContain("border-border");
   });
 });

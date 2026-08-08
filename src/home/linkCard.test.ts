@@ -21,6 +21,7 @@ vi.mock("@picoframe/frame", async () => {
   const { twMerge } = await import("tailwind-merge");
   return {
     useFrame: () => frame,
+    useTheme: () => ({ resolved: "dark" }),
     cn: (...parts: unknown[]) => twMerge(clsx(parts)),
     Button: ({
       children,

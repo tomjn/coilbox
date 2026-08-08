@@ -218,10 +218,10 @@ function Action({
 const CARD_WIDTH_CLASS = "max-w-[33rem]";
 
 /**
- * The art card: the shared dark island of `cardShell.ts`, which owns why the text
- * over a minimap stays light in both colour schemes. A minimap is whatever colour
- * the map is, including a snowfield, which is the case the shell's measurement
- * bounds.
+ * The art card: the shared shell of `cardShell.ts`, which owns why the text over a
+ * minimap clears AA in both colour schemes. A minimap is whatever colour the map
+ * is, from a snowfield to a night battle, and the shell's measurement bounds both
+ * ends.
  */
 const ART_CARD_CLASS = `${ART_SHELL_CLASS} ${CARD_WIDTH_CLASS}`;
 
