@@ -24,6 +24,7 @@ import {
 import { unitsyncThumbUrl } from "../lib/assetUrl";
 import { useSkirmishDraft } from "../play/drafts";
 import { useScenarios } from "../scenario/scenarios";
+import { overriddenTools } from "./artOverride";
 import {
   type ContentPick,
   contentArtVersion,
@@ -159,6 +160,10 @@ export function useContentCardArt(): void {
     scenarios,
     maps: scan?.maps ?? [],
     games: scan?.games ?? [],
+    // Published by `CoilboxHome` before this hook runs, so a card the
+    // distribution has already given art does not claim a map on its way to
+    // never showing it.
+    overridden: overriddenTools(),
   });
 
   // The picks are rebuilt on every render, so the effect depends on their value

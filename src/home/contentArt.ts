@@ -147,6 +147,17 @@ export interface ContentPickSources {
   maps: readonly NamedContent[];
   /** Every installed game, as the unitsync scan lists them. */
   games: readonly NamedContent[];
+  /**
+   * Tools a distribution has already given art, which take no part in the
+   * sibling set (issue #1000).
+   *
+   * An overridden card will never paint what this module picks for it, because
+   * the override is step 1 and this is step 2. Leaving it in the priority list
+   * would let it take a map off a card that would have shown it, and gain
+   * nobody anything. So an overridden tool makes no offer at all, and the
+   * picture it would have claimed falls to the next card that wants it.
+   */
+  overridden?: ReadonlySet<string>;
 }
 
 /** The map your saved Singleplayer setup is pointed at. */
@@ -275,6 +286,7 @@ export function contentOffers(
 ): Map<string, readonly ContentPick[]> {
   const offers = new Map<string, readonly ContentPick[]>();
   const add = (toolId: string, picks: readonly ContentPick[]) => {
+    if (sources.overridden?.has(toolId)) return;
     if (picks.length > 0) offers.set(toolId, picks);
   };
   const one = (pick: ContentPick | undefined) => (pick ? [pick] : []);
