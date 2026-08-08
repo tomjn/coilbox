@@ -83,7 +83,7 @@ function poolKey(map: SuggestedMap): string {
  *
  * Separate from {@link suggestedMapPool} so that a test can hold the catalog to
  * the rule that everything offered here can be pictured. See
- * `suggestedCatalog.test.ts`.
+ * `suggestedMap.test.ts`.
  */
 export function suggestedMapCandidates(
   maps: SuggestedMap[],
