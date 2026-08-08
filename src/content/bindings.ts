@@ -574,6 +574,19 @@ export interface StatPlayer {
   /** Set only for a decided game where the player wasn't a spectator. */
   won?: boolean;
   skill?: string;
+  /** Actions per minute. Absent when the match measured nothing. */
+  apm?: number;
+}
+
+/**
+ * One team's end-of-match totals, keyed by metric key, for the metrics the
+ * registry marks `roster`. This is all the store keeps of a match's statistics:
+ * the shape of the match over time is read from the replay itself, via
+ * `content_replay_trailer` (#1132).
+ */
+export interface TeamTotals {
+  team: number;
+  totals: Record<string, number>;
 }
 
 /** One skirmish AI as recorded in a stats-database game. */
@@ -613,6 +626,14 @@ export interface StatRecord {
   /** The skirmish AIs the match was played against. Empty on a record ingested
    * before schema 2, until the next pass re-decodes it. */
   ais: StatAi[];
+  /**
+   * False when this replay measured nothing: the recording never reached a game
+   * over, its trailer is in a format coilbox does not read, or the engine
+   * recorded no samples. Show "not measured" rather than a row of zeroes.
+   */
+  statsKnown: boolean;
+  /** Each team's end-of-match totals. Empty when `statsKnown` is false. */
+  teamTotals: TeamTotals[];
   ingestedAt: number;
 }
 

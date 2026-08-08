@@ -26,6 +26,7 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use flate2::read::GzDecoder;
 
+use crate::metrics::{self, TeamTotals};
 use crate::model::{
     AiInfo, AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoTrailer, PlayerInfo, PlayerStats,
     ReplayFile, StartBox, TeamStatSample, TeamStatSeries,
@@ -393,6 +394,25 @@ fn demo_files_in(base: &Path) -> Vec<DemoFileEntry> {
 /// Decode one replay: native header + start-script + trailer, with `demotool`
 /// as a fallback for a trailer the decoder refuses.
 pub fn demo_info(engine_dir: &Path, demo: &Path) -> Result<DemoInfo, String> {
+    Ok(decode(engine_dir, demo)?.0)
+}
+
+/// Decode one replay for the stats store: the same info as [`demo_info`], plus
+/// the match's end-of-match totals, or `None` for a match the engine measured
+/// nothing for.
+///
+/// The samples themselves stay in this function. The store is one JSON file read
+/// and written whole, and a match's series is thousands of numbers, so what
+/// leaves here is a few dozen per match (#1132). A caller that wants the series
+/// reads the replay itself, via [`read_trailer`].
+pub fn demo_info_for_stats(
+    engine_dir: &Path,
+    demo: &Path,
+) -> Result<(DemoInfo, Option<Vec<TeamTotals>>), String> {
+    decode(engine_dir, demo)
+}
+
+fn decode(engine_dir: &Path, demo: &Path) -> Result<(DemoInfo, Option<Vec<TeamTotals>>), String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
     // A replay of a game nobody ended has no winners to read, and neither the
@@ -411,8 +431,15 @@ pub fn demo_info(engine_dir: &Path, demo: &Path) -> Result<DemoInfo, String> {
         None if raw.game_over => demotool_winners(engine_dir, demo),
         None => None,
     };
+    // Measured or not is the decoder's own answer, not a second guess at it:
+    // it withholds the player block for exactly the match that recorded no
+    // samples (see [`DemoTrailer::players`]).
+    let totals = trailer
+        .as_ref()
+        .filter(|t| t.players.is_some())
+        .map(metrics::match_totals);
     let player_stats = trailer.and_then(|t| t.players);
-    Ok(build_demo_info(raw, &game, winners, player_stats))
+    Ok((build_demo_info(raw, &game, winners, player_stats), totals))
 }
 
 /// Native-only decode (header + start-script, no demotool/winner) used for the

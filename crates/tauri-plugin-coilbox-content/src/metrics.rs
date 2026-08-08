@@ -15,7 +15,11 @@
 //! carry [`HIDDEN`]. They stay decoded because the day somebody wants a gifting
 //! chart for a team game, that has to be a flag change and not a decoder change.
 
-use serde::Serialize;
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
+use crate::model::{DemoTrailer, TeamStatSample};
 
 /// Which question a metric answers. The chart's dropdown and the sparkline grid
 /// are grouped by this.
@@ -149,10 +153,62 @@ pub const METRICS: &[Metric] = &[
     metric("unitsKilled", "Units killed", Military, Count, ROSTER),
 ];
 
+/// One team's end-of-match totals for the metrics the registry marks `roster`.
+///
+/// This is everything the stats store keeps of a match's statistics: a few
+/// numbers per team, rather than the sample every fifteen seconds the replay
+/// itself holds (#1132). A surface that wants the shape of the match over time
+/// reads the replay.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamTotals {
+    /// The `[teamN]` index these totals belong to.
+    pub team: i32,
+    /// Keyed by metric key, rounded to whole numbers. The engine counts metal
+    /// and damage in fractions, but a fraction of a metal is not a figure
+    /// anybody sorts a library by, and rounding keeps the store small.
+    pub totals: BTreeMap<String, f64>,
+}
+
+/// The roster metrics' figures in one sample.
+///
+/// Read out of the serialized sample by key rather than field by field, so the
+/// `roster` flag stays the only list of them there is: a metric promoted to the
+/// roster is stored from that change alone.
+fn roster_totals(sample: &TeamStatSample) -> BTreeMap<String, f64> {
+    let Ok(json) = serde_json::to_value(sample) else {
+        return BTreeMap::new();
+    };
+    METRICS
+        .iter()
+        .filter(|m| m.roster)
+        .filter_map(|m| Some((m.key.to_string(), json.get(m.key)?.as_f64()?.round())))
+        .collect()
+}
+
+/// Every team's end-of-match totals, from a decoded trailer.
+///
+/// Every field of a sample is a running total for the match so far, so the final
+/// figure is the last sample and not a sum over them. A team the engine recorded
+/// no samples for has no entry, which is the same answer as "this match measured
+/// nothing" read one team at a time.
+pub fn match_totals(trailer: &DemoTrailer) -> Vec<TeamTotals> {
+    trailer
+        .teams
+        .iter()
+        .filter_map(|t| {
+            Some(TeamTotals {
+                team: t.team,
+                totals: roster_totals(t.samples.last()?),
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::TeamStatSample;
+    use crate::model::{TeamStatSample, TeamStatSeries};
     use std::collections::BTreeSet;
 
     /// The field a sample is plotted *against*, which is not a metric.
@@ -352,5 +408,80 @@ mod tests {
                 "\"metal\"".to_string(),
             ])
         );
+    }
+
+    // ---- end-of-match totals ----------------------------------------------
+
+    fn sample(frame: i32, damage_dealt: f32, units_produced: i32) -> TeamStatSample {
+        TeamStatSample {
+            frame,
+            damage_dealt,
+            units_produced,
+            ..Default::default()
+        }
+    }
+
+    fn trailer(teams: Vec<TeamStatSeries>) -> DemoTrailer {
+        DemoTrailer {
+            winning_ally_teams: vec![0],
+            team_stat_period_sec: 15,
+            teams,
+            players: None,
+        }
+    }
+
+    /// The stored figures are exactly the columns the roster shows, so promoting
+    /// a metric to the roster is the whole change.
+    #[test]
+    fn a_teams_totals_are_the_roster_metrics_and_nothing_else() {
+        let totals = roster_totals(&sample(30, 1.0, 2));
+        let stored: BTreeSet<&str> = totals.keys().map(String::as_str).collect();
+        let roster: BTreeSet<&str> = METRICS.iter().filter(|m| m.roster).map(|m| m.key).collect();
+        assert_eq!(stored, roster);
+    }
+
+    /// Every field is a running total, so the answer is the last sample. Summing
+    /// them would report a match's damage as several times what it was.
+    #[test]
+    fn a_total_is_the_last_sample_rather_than_a_sum_over_them() {
+        let t = trailer(vec![TeamStatSeries {
+            team: 0,
+            samples: vec![sample(30, 100.0, 3), sample(480, 900.0, 11)],
+        }]);
+        let totals = match_totals(&t);
+        assert_eq!(totals.len(), 1);
+        assert_eq!(totals[0].team, 0);
+        assert_eq!(totals[0].totals["damageDealt"], 900.0);
+        assert_eq!(totals[0].totals["unitsProduced"], 11.0);
+    }
+
+    /// A fractional metal figure is noise at this scale, and the rounding is what
+    /// keeps a stored figure one number rather than seventeen digits of one.
+    #[test]
+    fn a_fractional_figure_is_stored_as_a_whole_number() {
+        let mut s = sample(30, 0.0, 0);
+        s.metal_produced = 1234.6;
+        let totals = roster_totals(&s);
+        assert_eq!(totals["metalProduced"], 1235.0);
+        assert_eq!(
+            serde_json::to_string(&totals["metalProduced"]).unwrap(),
+            "1235.0"
+        );
+    }
+
+    #[test]
+    fn a_team_the_engine_measured_nothing_for_has_no_totals() {
+        let t = trailer(vec![
+            TeamStatSeries {
+                team: 0,
+                samples: vec![sample(30, 5.0, 1)],
+            },
+            TeamStatSeries {
+                team: 1,
+                samples: Vec::new(),
+            },
+        ]);
+        let totals = match_totals(&t);
+        assert_eq!(totals.iter().map(|t| t.team).collect::<Vec<_>>(), [0]);
     }
 }

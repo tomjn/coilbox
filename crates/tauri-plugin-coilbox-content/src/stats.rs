@@ -13,6 +13,18 @@
 //! its `(size, mtime)` signature, so a re-ingest re-decodes only files that are new
 //! or changed. A file that fails to decode (corrupt/truncated) is counted and
 //! skipped, never fatal.
+//!
+//! **A record is a fixed handful of numbers and never a series** (#1132). Whole-file
+//! reads and writes are what make a JSON store workable here, and they stop being
+//! workable the moment a record grows with the length of the match it describes: one
+//! 40 minute 16 team match samples about 50,000 figures, and a few hundred of those
+//! is a file rewritten in full every time a replay lands. So the match's shape over
+//! time is read from the replay when a match is opened (`content_replay_trailer`),
+//! and what the store keeps is the end-of-match totals a library list can sort by.
+//! `a_record_is_the_same_size_however_long_the_match_was` and
+//! `a_record_holds_no_samples` are here to fail if that is undone by accident. The
+//! day something genuinely needs every match's series at once is the day to argue
+//! about a database, and it is not this day.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -21,13 +33,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use crate::demo::{self, DemoFileEntry};
+use crate::metrics::TeamTotals;
 use crate::model::DemoInfo;
 
 /// The current stats-store schema. Bumped when the record shape changes in a way a
 /// stale store couldn't be read as (today: a straight re-ingest rebuilds it).
 /// 2: records carry the match's skirmish AIs (`ais`), which the start-script
 /// parser did not read before.
-pub const STATS_SCHEMA_VERSION: u32 = 2;
+/// 3: records carry what the match measured: per-team end-of-match totals
+/// (`teamTotals`), per-player `apm`, and `statsKnown` for whether there was
+/// anything to measure at all.
+pub const STATS_SCHEMA_VERSION: u32 = 3;
 
 /// One player (or spectator) as recorded in a game, flattened from the demo's
 /// start-script. `side` is the faction; `won` is set only for a decided game where
@@ -45,6 +61,10 @@ pub struct StatPlayer {
     pub won: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skill: Option<String>,
+    /// Actions per minute, as the decoder derived it from this seat's command
+    /// count. Absent for a match that measured nothing, and for a spectator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub apm: Option<f32>,
 }
 
 /// One skirmish AI as recorded in a game. `shortName` is the AI's identity (the
@@ -95,6 +115,19 @@ pub struct StatRecord {
     /// count opponents (and so #543's "beat distinct AIs" has something to read).
     #[serde(default)]
     pub ais: Vec<StatAi>,
+    /// False when this replay measured nothing: the recording never reached a
+    /// game over, its trailer is in a format the decoder refuses, or the engine
+    /// recorded no samples (five of the nine replays measured are in one of
+    /// those states). A view shows "not measured" rather than a row of zeroes,
+    /// which is a different claim.
+    #[serde(default)]
+    pub stats_known: bool,
+    /// Each team's end-of-match totals for the roster metrics, so a library list
+    /// can sort by damage dealt without opening 300 files. Empty when
+    /// `stats_known` is false. Totals and not series, deliberately: see the
+    /// module comment.
+    #[serde(default)]
+    pub team_totals: Vec<TeamTotals>,
     /// When this record was written (epoch-ms).
     pub ingested_at: u64,
 }
@@ -151,8 +184,13 @@ pub fn save(path: &Path, store: &StatsStore) -> Result<(), String> {
     std::fs::write(path, json).map_err(|e| format!("could not write stats store: {e}"))
 }
 
-/// Build a record from a decoded demo + its file entry.
-fn record_from(entry: &DemoFileEntry, info: DemoInfo) -> StatRecord {
+/// Build a record from a decoded demo + its file entry. `totals` is the match's
+/// end-of-match figures, or `None` for a match that measured nothing.
+fn record_from(
+    entry: &DemoFileEntry,
+    info: DemoInfo,
+    totals: Option<Vec<TeamTotals>>,
+) -> StatRecord {
     let players = info
         .players
         .into_iter()
@@ -163,6 +201,7 @@ fn record_from(entry: &DemoFileEntry, info: DemoInfo) -> StatRecord {
             spectator: p.spectator,
             won: p.won,
             skill: p.skill,
+            apm: p.apm,
         })
         .collect();
     let ais = info
@@ -193,6 +232,8 @@ fn record_from(entry: &DemoFileEntry, info: DemoInfo) -> StatRecord {
         remixed: info.remixed,
         players,
         ais,
+        stats_known: totals.is_some(),
+        team_totals: totals.unwrap_or_default(),
         ingested_at: now_ms(),
     }
 }
@@ -244,18 +285,18 @@ pub fn ingest(roots: &[PathBuf], engine_dir: &Path, store: &mut StatsStore) -> I
                     summary.skipped += 1;
                     continue;
                 }
-                match demo::demo_info(engine_dir, &entry.path) {
-                    Ok(info) => {
-                        store.records[i] = record_from(&entry, info);
+                match demo::demo_info_for_stats(engine_dir, &entry.path) {
+                    Ok((info, totals)) => {
+                        store.records[i] = record_from(&entry, info, totals);
                         summary.updated += 1;
                     }
                     Err(_) => summary.failed += 1,
                 }
             } else {
-                match demo::demo_info(engine_dir, &entry.path) {
-                    Ok(info) => {
+                match demo::demo_info_for_stats(engine_dir, &entry.path) {
+                    Ok((info, totals)) => {
                         index.insert(entry.filename.clone(), store.records.len());
-                        store.records.push(record_from(&entry, info));
+                        store.records.push(record_from(&entry, info, totals));
                         summary.added += 1;
                     }
                     Err(_) => summary.failed += 1,
@@ -270,7 +311,8 @@ pub fn ingest(roots: &[PathBuf], engine_dir: &Path, store: &mut StatsStore) -> I
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::PlayerInfo;
+    use crate::metrics;
+    use crate::model::{DemoTrailer, PlayerInfo, TeamStatSample, TeamStatSeries};
 
     fn demo_info(map: &str, winners_known: bool, players: Vec<PlayerInfo>) -> DemoInfo {
         DemoInfo {
@@ -307,8 +349,34 @@ mod tests {
             skill: None,
             country_code: None,
             stats: None,
-            apm: None,
+            apm: Some(42.5),
         }
+    }
+
+    /// A match's totals, the way `demo::demo_info_for_stats` hands them over:
+    /// one figure per roster metric per team, computed from a trailer of
+    /// `samples_per_team` samples that always ends on the same figures. Two
+    /// matches of different lengths therefore have identical totals, and any
+    /// difference between the records built from them is the samples leaking in.
+    fn totals(samples_per_team: usize) -> Option<Vec<TeamTotals>> {
+        let sample = |i: usize, last: bool| TeamStatSample {
+            frame: (i as i32 + 1) * 450,
+            damage_dealt: if last { 90_000.0 } else { 100.0 * i as f32 },
+            units_produced: if last { 700 } else { i as i32 },
+            ..Default::default()
+        };
+        let series = |team: i32| TeamStatSeries {
+            team,
+            samples: (0..samples_per_team)
+                .map(|i| sample(i, i + 1 == samples_per_team))
+                .collect(),
+        };
+        Some(metrics::match_totals(&DemoTrailer {
+            winning_ally_teams: vec![0],
+            team_stat_period_sec: 15,
+            teams: vec![series(0), series(1)],
+            players: None,
+        }))
     }
 
     fn entry(name: &str, size: u64, mtime: u64) -> DemoFileEntry {
@@ -330,7 +398,7 @@ mod tests {
                 player("Bob", 1, Some(false)),
             ],
         );
-        let rec = record_from(&entry("a.sdfz", 10, 20), info);
+        let rec = record_from(&entry("a.sdfz", 10, 20), info, totals(3));
         assert_eq!(rec.filename, "a.sdfz");
         assert_eq!(rec.map_name, "Comet");
         assert_eq!(rec.players.len(), 2);
@@ -338,6 +406,90 @@ mod tests {
         assert_eq!(rec.players[0].won, Some(true));
         assert_eq!(rec.size_bytes, 10);
         assert_eq!(rec.modified_ms, 20);
+        // The figure the roster sorts on, carried from the decoder rather than
+        // divided again here.
+        assert_eq!(rec.players[0].apm, Some(42.5));
+    }
+
+    /// What a record keeps of the statistics: a team's closing figures, and the
+    /// fact that there were any.
+    #[test]
+    fn record_from_carries_each_teams_end_of_match_totals() {
+        let info = demo_info("Comet", true, vec![player("Alice", 0, Some(true))]);
+        let rec = record_from(&entry("a.sdfz", 10, 20), info, totals(40));
+        assert!(rec.stats_known);
+        assert_eq!(
+            rec.team_totals.iter().map(|t| t.team).collect::<Vec<_>>(),
+            [0, 1]
+        );
+        assert_eq!(rec.team_totals[0].totals["damageDealt"], 90_000.0);
+        assert_eq!(rec.team_totals[0].totals.len(), 6);
+    }
+
+    /// Five of the nine replays on this machine measured nothing. That is an
+    /// answer, and a row of zeroes would be a different one.
+    #[test]
+    fn a_match_that_measured_nothing_says_so_rather_than_storing_zeroes() {
+        let info = demo_info("Comet", true, vec![player("Alice", 0, Some(true))]);
+        let rec = record_from(&entry("a.sdfz", 10, 20), info, None);
+        assert!(!rec.stats_known);
+        assert!(rec.team_totals.is_empty());
+    }
+
+    /// The size decision this shape exists for (#1132): a record is a fixed
+    /// handful of numbers, so a long match costs the store exactly what a short
+    /// one does. Storing the samples would break this on the first assert.
+    #[test]
+    fn a_record_is_the_same_size_however_long_the_match_was() {
+        let short = record_from(
+            &entry("a.sdfz", 10, 20),
+            demo_info("Comet", true, vec![player("Alice", 0, Some(true))]),
+            totals(2),
+        );
+        let mut long = record_from(
+            &entry("a.sdfz", 10, 20),
+            demo_info("Comet", true, vec![player("Alice", 0, Some(true))]),
+            totals(400),
+        );
+        long.ingested_at = short.ingested_at;
+        let short = serde_json::to_string(&short).unwrap();
+        let long = serde_json::to_string(&long).unwrap();
+        assert_eq!(short.len(), long.len(), "a record grew with the match");
+        assert_eq!(short, long);
+    }
+
+    /// The other half of the same guard, for a shape that happened to be the
+    /// same length: nothing in a record is a sample. Every sample carries the
+    /// frame it was taken at, so one smuggled in anywhere is found here without
+    /// this test having to know the record's fields.
+    #[test]
+    fn a_record_holds_no_samples() {
+        let rec = record_from(
+            &entry("a.sdfz", 10, 20),
+            demo_info("Comet", true, vec![player("Alice", 0, Some(true))]),
+            totals(40),
+        );
+        fn walk(v: &serde_json::Value, path: &str) {
+            match v {
+                serde_json::Value::Object(o) => {
+                    assert!(
+                        !o.contains_key("frame"),
+                        "{path} is a statistics sample: the store keeps totals, \
+                         and the series is read from the replay (#1132)"
+                    );
+                    for (k, child) in o {
+                        walk(child, &format!("{path}.{k}"));
+                    }
+                }
+                serde_json::Value::Array(a) => {
+                    for (i, child) in a.iter().enumerate() {
+                        walk(child, &format!("{path}[{i}]"));
+                    }
+                }
+                _ => {}
+            }
+        }
+        walk(&serde_json::to_value(&rec).unwrap(), "record");
     }
 
     #[test]
@@ -354,7 +506,7 @@ mod tests {
             rgb_color: None,
             won: Some(false),
         }];
-        let rec = record_from(&entry("a.sdfz", 10, 20), info);
+        let rec = record_from(&entry("a.sdfz", 10, 20), info, None);
         // A bot is an opponent, not a name in the player list.
         assert_eq!(rec.players.len(), 1);
         assert_eq!(rec.ais.len(), 1);
@@ -376,9 +528,24 @@ mod tests {
         assert!(store.records[0].ais.is_empty());
     }
 
+    /// Same again for the schema-2 store every machine has today, which carries
+    /// no statistics keys. It must load for the ingest that fills them in to run.
+    #[test]
+    fn a_record_written_before_the_statistics_still_loads() {
+        let json = r#"{"schemaVersion":2,"records":[{"filename":"a.sdfz","path":"/demos/a.sdfz",
+            "mapName":"M","gameType":"G","engineVersion":"105","durationSec":1,"startTimeMs":2,
+            "sizeBytes":3,"modifiedMs":4,"winnersKnown":false,"winningAllyTeams":[],
+            "remixed":false,"players":[{"name":"Alice","spectator":false}],"ais":[],
+            "ingestedAt":5}]}"#;
+        let store: StatsStore = serde_json::from_str(json).unwrap();
+        assert!(!store.records[0].stats_known);
+        assert!(store.records[0].team_totals.is_empty());
+        assert_eq!(store.records[0].players[0].apm, None);
+    }
+
     #[test]
     fn unchanged_matches_signature() {
-        let rec = record_from(&entry("a.sdfz", 10, 20), demo_info("M", true, vec![]));
+        let rec = record_from(&entry("a.sdfz", 10, 20), demo_info("M", true, vec![]), None);
         assert!(unchanged(&rec, &entry("a.sdfz", 10, 20)));
         assert!(!unchanged(&rec, &entry("a.sdfz", 11, 20))); // size changed
         assert!(!unchanged(&rec, &entry("a.sdfz", 10, 21))); // mtime changed
@@ -393,11 +560,17 @@ mod tests {
         store.records.push(record_from(
             &entry("a.sdfz", 1, 2),
             demo_info("M", true, vec![]),
+            totals(3),
         ));
         save(&p, &store).unwrap();
         let back = load(&p).unwrap();
         assert_eq!(back.records.len(), 1);
         assert_eq!(back.records[0].filename, "a.sdfz");
+        assert!(back.records[0].stats_known);
+        assert_eq!(
+            back.records[0].team_totals[1].totals["unitsProduced"],
+            700.0
+        );
     }
 
     #[test]
@@ -477,6 +650,7 @@ mod tests {
         let stale = record_from(
             &entry("a.sdfz", size, mtime),
             demo_info("Stale", true, vec![]),
+            None,
         );
         // Pinned to 1 rather than `STATS_SCHEMA_VERSION - 1`: 1 is the version
         // every store on disk was written at before AIs were parsed, so this
@@ -506,6 +680,48 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// The bump this issue makes. 2 is pinned rather than written as
+    /// `STATS_SCHEMA_VERSION - 1`, which would follow the constant wherever it
+    /// went and pass without re-ingesting anything: 2 is the version every store
+    /// on disk is at today, and leaving the constant there leaves this file on
+    /// the fast path with figures it was never asked for.
+    #[test]
+    fn ingest_redecodes_a_schema_2_record_and_reads_back_what_it_measured() {
+        let dir = std::env::temp_dir().join("coilbox_stats_ingest_schema2");
+        let _ = std::fs::remove_dir_all(&dir);
+        let (size, mtime) = write_test_demo(&dir, "a.sdfz");
+
+        // A record claiming figures the file on disk does not have, with a
+        // signature that already matches it.
+        let stale = record_from(
+            &entry("a.sdfz", size, mtime),
+            demo_info("Stale", true, vec![]),
+            totals(3),
+        );
+        assert!(stale.stats_known);
+        let mut store = StatsStore {
+            schema_version: 2,
+            records: vec![stale],
+        };
+
+        let summary = ingest(
+            std::slice::from_ref(&dir),
+            Path::new("/no/such/engine"),
+            &mut store,
+        );
+
+        assert_eq!(summary.updated, 1);
+        assert_eq!(summary.skipped, 0);
+        assert_eq!(store.records[0].map_name, "TestMap");
+        // The synthetic demo never reached a game over, so the honest answer is
+        // that nothing was measured, and the claimed figures are gone.
+        assert!(!store.records[0].stats_known);
+        assert!(store.records[0].team_totals.is_empty());
+        assert_eq!(store.schema_version, STATS_SCHEMA_VERSION);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn ingest_skips_unchanged_record_already_at_current_schema() {
         let dir = std::env::temp_dir().join("coilbox_stats_ingest_current");
@@ -515,6 +731,7 @@ mod tests {
         let current = record_from(
             &entry("a.sdfz", size, mtime),
             demo_info("Current", true, vec![player("Alice", 0, Some(true))]),
+            totals(3),
         );
         let mut store = StatsStore {
             schema_version: STATS_SCHEMA_VERSION,
@@ -534,5 +751,86 @@ mod tests {
         assert_eq!(store.records[0].map_name, "Current");
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// What the store costs, measured on the machine's own replay library rather
+    /// than argued about (#1132), and the upgrade of a real store proved on the
+    /// same pass. Ignored by default because it needs real replays. Run it with
+    ///
+    /// ```text
+    ///   COILBOX_STATS_STORE=/tmp/copy-of-stats.json \
+    ///     cargo test -p tauri-plugin-coilbox-content real_store_size -- --ignored --nocapture
+    /// ```
+    ///
+    /// `COILBOX_STATS_STORE` is a **copy** of a store to upgrade in place, and
+    /// the pass starts empty without it. `COILBOX_STATS_ROOTS` is a
+    /// colon-separated list of content roots, defaulting to `~/.spring`.
+    #[test]
+    #[ignore]
+    fn real_store_size() {
+        let roots: Vec<PathBuf> = match std::env::var("COILBOX_STATS_ROOTS") {
+            Ok(v) => v.split(':').map(PathBuf::from).collect(),
+            Err(_) => vec![PathBuf::from(std::env::var("HOME").expect("HOME")).join(".spring")],
+        };
+        let copy = std::env::var_os("COILBOX_STATS_STORE").map(PathBuf::from);
+        let mut store = match &copy {
+            Some(p) => load(p).expect("the store loads"),
+            None => StatsStore::default(),
+        };
+        // The file's own length, not a reserialization of it: the store is read
+        // into today's shape, which is a few hundred bytes bigger before a
+        // single record has been re-decoded.
+        let was = copy
+            .as_deref()
+            .and_then(|p| std::fs::metadata(p).ok())
+            .map(|m| m.len())
+            .unwrap_or(0);
+        println!(
+            "before: schema {}, {} records, {was} bytes on disk",
+            store.schema_version,
+            store.records.len(),
+        );
+
+        let summary = ingest(&roots, Path::new("/no/such/engine"), &mut store);
+        let stored = serde_json::to_string(&store).expect("serializes").len();
+        if let Some(p) = &copy {
+            save(p, &store).expect("the store saves");
+        }
+
+        // What the same records would cost carrying their matches' samples.
+        let mut series_bytes = 0usize;
+        let mut measured = 0usize;
+        for r in &store.records {
+            if let Ok(t) = demo::read_trailer(Path::new(&r.path)) {
+                if t.teams.iter().any(|s| !s.samples.is_empty()) {
+                    measured += 1;
+                }
+                series_bytes += serde_json::to_string(&t.teams)
+                    .expect("a series serializes")
+                    .len();
+            }
+        }
+
+        println!(
+            "after: schema {}, {} records ({} measured a match), {stored} bytes",
+            store.schema_version, summary.total, measured
+        );
+        println!(
+            "the same store with every match's series: {} bytes",
+            stored + series_bytes
+        );
+        println!(
+            "added {} updated {} skipped {} failed {}",
+            summary.added, summary.updated, summary.skipped, summary.failed
+        );
+
+        assert_eq!(store.schema_version, STATS_SCHEMA_VERSION);
+        assert_eq!(summary.skipped, 0, "a stale store must not skip anything");
+        // Every record the pass re-decoded is at the new shape: a match that
+        // measured something carries a figure per team, and one that did not
+        // says so rather than carrying zeroes.
+        for r in &store.records {
+            assert_eq!(r.stats_known, !r.team_totals.is_empty(), "{}", r.filename);
+        }
     }
 }

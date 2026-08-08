@@ -34,6 +34,8 @@ function rec(
     winningAllyTeams: [0],
     remixed: opts.remixed ?? false,
     ais: [],
+    statsKnown: false,
+    teamTotals: [],
     ingestedAt: 0,
     players,
   };
