@@ -1,17 +1,22 @@
 import { useFrame } from "@picoframe/frame";
 import { useMultiplayer } from "../../multiplayer/store";
+import type { ZoneId } from "../config";
 import { useResume } from "../continue";
 
 /**
  * The heading and the line under it.
  *
- * Two lines when the page itself settles which one is true. See
- * {@link greetingCopy}.
+ * Two lines when the page itself settles which one is true, and no line at all
+ * when nothing true is left to say. See {@link greetingCopy}.
  */
 export type GreetingCopy = {
   heading: string;
-  /** The line under the heading, or the one for a page that drew a tool. */
-  tagline: string;
+  /**
+   * The line under the heading, or the one for a page that drew a tool. Null on
+   * a page carrying neither the zone the resume line is about nor the one the
+   * tool lines are about, which leaves the greeting a heading.
+   */
+  tagline: string | null;
   /**
    * The line for a page whose tool grid drew nothing, or null when the state
    * already settled which sentence is right.
@@ -19,7 +24,10 @@ export type GreetingCopy = {
   taglineWithoutTools: string | null;
 };
 
-/** Everything the copy depends on, gathered by the component's hooks. */
+/**
+ * Everything the copy depends on: what the component's hooks found, and which
+ * zones the page it is on carries.
+ */
 export type GreetingState = {
   /** The app title, or the distribution's if it renamed the app. */
   title: string;
@@ -27,6 +35,11 @@ export type GreetingState = {
   username: string | null;
   /** Whether anything is waiting to be resumed. */
   hasResume: boolean;
+  /**
+   * The built-in zones on this page, from `resolveHome` by way of the layout.
+   * See `../config`'s `zonesOnPage`.
+   */
+  zones: ReadonlySet<ZoneId>;
 };
 
 /**
@@ -50,25 +63,46 @@ export interface GreetingOverrides {
  * layer over one function rather than over a component's markup.
  *
  * The heading greets by name once the lobby has accepted a login, and otherwise
- * falls back to the app title. The tagline says the most useful true thing:
- * point at what you were doing if there is anything, otherwise send you to the
- * tools, and admit it when there are none.
+ * falls back to the app title. There is always a heading, because an app always
+ * has a title.
  *
- * Which of those last two is true is not something this function can know, so it
- * hands back both and the page picks. A distribution's own wording, and a page
- * with something to resume, settle it here and get `taglineWithoutTools` null.
+ * ## The line under it only speaks about zones the page has
+ *
+ * Every sentence Coilbox can put here is about another zone. "Pick up where you
+ * left off." is about the continue hero and the resume rail, and both tool lines
+ * are about the grid. A distribution's `zones` list can leave any of them out,
+ * and a sentence about a zone that is not on the page is a sentence about
+ * nothing: it points at a hero that was never drawn, or calls a grid the author
+ * chose not to show an install with no tools in it (issues #1079 and #1082).
+ *
+ * So each sentence is offered only if its zone is there, in order of how much it
+ * says, and a page with none of those zones gets the heading on its own. That is
+ * an unusual page by construction, since it is a distribution that listed
+ * `greeting` and little else, and it already has `tagline` for a line of its own.
+ *
+ * Which of the two tool lines is true is not something this function can know,
+ * so when the grid is on the page it hands back both and the browser picks. A
+ * distribution's own wording, and a page with something to resume, settle it
+ * here and get `taglineWithoutTools` null.
  */
 export function greetingCopy(
-  { title, username, hasResume }: GreetingState,
+  { title, username, hasResume, zones }: GreetingState,
   overrides: GreetingOverrides = {},
 ): GreetingCopy {
-  const settled = overrides.tagline ?? (hasResume ? RESUME_LINE : null);
-  return {
-    heading:
-      overrides.title ?? (username ? `Welcome back, ${username}` : title),
-    tagline: settled ?? TOOLS_LINE,
-    taglineWithoutTools: settled === null ? NO_TOOLS_LINE : null,
-  };
+  const heading =
+    overrides.title ?? (username ? `Welcome back, ${username}` : title);
+  const settled = (tagline: string | null): GreetingCopy => ({
+    heading,
+    tagline,
+    taglineWithoutTools: null,
+  });
+  // The author wrote this line about their own page, so it stands whatever is
+  // on it, including an empty string meaning a deliberate blank.
+  if (overrides.tagline !== undefined) return settled(overrides.tagline);
+  if (hasResume && (zones.has("continue") || zones.has("resume")))
+    return settled(RESUME_LINE);
+  if (!zones.has("cards")) return settled(null);
+  return { heading, tagline: TOOLS_LINE, taglineWithoutTools: NO_TOOLS_LINE };
 }
 
 /** There is something waiting, so point at it rather than at the grid. */
@@ -114,6 +148,12 @@ function useLobbyName(): string | null {
  * tagline promised "Pick up where you left off." over a page with nothing on it
  * to pick up, because the greeting answered off a half-read set while the two
  * zones that would show it were still waiting (#1002).
+ *
+ * This is only half the question, and it is the half about state. Whether either
+ * zone is on the page at all is the other half, and it comes from the layout
+ * rather than from here (#1082). No marker like the grid's is needed for this
+ * one: the hero and the rail draw from this same collector, so a marker would be
+ * a second way to ask a question the shared answer already settles.
  */
 function useHasResume(): boolean {
   const { candidates, loading } = useResume();
@@ -139,16 +179,30 @@ function useHasResume(): boolean {
 const WITH_TOOLS = "hidden [body:has([data-tool-card])_&]:block";
 const WITHOUT_TOOLS = "[body:has([data-tool-card])_&]:hidden";
 
+/** What the layout hands the greeting. */
+export interface GreetingProps extends GreetingOverrides {
+  /**
+   * The built-in zones on this page, so the greeting speaks only about zones the
+   * player can see. See `../config`'s `zonesOnPage`, and {@link greetingCopy} for
+   * what it changes.
+   *
+   * Required rather than defaulted to the full page, because a layout that
+   * forgot it would put the old wrong sentences back and nothing would say so.
+   */
+  zones: ReadonlySet<ZoneId>;
+}
+
 /**
  * The page's heading and tagline.
  *
  * Owns the copy the tool grid used to carry, including the empty-grid line, so
  * that the one sentence under the heading is decided in one place. It never
- * renders nothing: an app always has a title, so there is always a greeting.
+ * renders nothing: an app always has a title, so there is always a heading.
  *
- * The props are a distribution's own wording, passed in by the layout from the
+ * The wording props are a distribution's own, passed in by the layout from the
  * zone's entry rather than read from the profile here, so the zone stays a pure
- * function of what it is given.
+ * function of what it is given. `zones` arrives the same way and for the same
+ * reason: the page's own composition is the layout's to hand down.
  *
  * ## Why the tool sentence is chosen in CSS
  *
@@ -169,22 +223,24 @@ const WITHOUT_TOOLS = "[body:has([data-tool-card])_&]:hidden";
  * with itself: an item that is gated off, or that is a link rather than a tool,
  * leaves no marker to find.
  */
-export default function Greeting(overrides: GreetingOverrides = {}) {
+export default function Greeting({ zones, ...overrides }: GreetingProps) {
   const { title } = useFrame();
   const username = useLobbyName();
   const hasResume = useHasResume();
   const { heading, tagline, taglineWithoutTools } = greetingCopy(
-    { title, username, hasResume },
+    { title, username, hasResume, zones },
     overrides,
   );
   return (
     <>
       <h1 className="text-2xl font-semibold">{heading}</h1>
-      <p
-        className={`mt-1 text-muted-foreground${taglineWithoutTools === null ? "" : ` ${WITH_TOOLS}`}`}
-      >
-        {tagline}
-      </p>
+      {tagline !== null && (
+        <p
+          className={`mt-1 text-muted-foreground${taglineWithoutTools === null ? "" : ` ${WITH_TOOLS}`}`}
+        >
+          {tagline}
+        </p>
+      )}
       {taglineWithoutTools !== null && (
         <p className={`mt-1 text-muted-foreground ${WITHOUT_TOOLS}`}>
           {taglineWithoutTools}

@@ -60,12 +60,13 @@ export interface HomeZoneConfig {
   zone?: string;
   /**
    * A custom entry's own markup, inline or an `@.coilbox/<path>` reference. An
-   * entry naming a `zone` is a built-in zone and ignores this. See `./markup`.
+   * entry naming a `zone` is a built-in zone and draws itself, so writing this
+   * there is reported as a key that does nothing. See `./markup`.
    */
   html?: string;
-  /** Markup at the head of the zone, same two forms as {@link html}. */
+  /** Markup at the head of the entry, same two forms as {@link html}. */
   before?: string;
-  /** Markup at the foot of the zone, same two forms as {@link html}. */
+  /** Markup at the foot of the entry, same two forms as {@link html}. */
   after?: string;
   /** Greeting only: the heading, replacing the greeting Coilbox would choose. */
   title?: string;
@@ -107,15 +108,24 @@ const KNOWN_ZONES: ReadonlySet<string> = new Set(DEFAULT_ZONES);
 /** An entry as written by the author, untouched. */
 export type RawEntry = Readonly<Record<string, unknown>>;
 
-/** A per-entry option whose value is a string. */
-export type ZoneStringKey = "before" | "after" | "title" | "tagline";
+/** An entry key whose value is markup: inline, or a `@.coilbox/<path>` reference. */
+export type MarkupKey = "html" | "before" | "after";
 
-/** The markup keys every zone takes, in the order they render around it. */
+/** A per-entry option this module resolves into {@link EntryStrings}. */
+export type EntryStringKey = "before" | "after" | "title" | "tagline";
+
+/** Every string option Coilbox gives an entry meaning for. */
+const ENTRY_KEYS = ["html", "before", "after", "title", "tagline"] as const;
+
+/** The markup keys every entry takes, in the order they render around it. */
 const MARKUP_KEYS = ["before", "after"] as const;
 
+/** How an entry as written renders: which built-in zone, or markup of its own. */
+type EntryKind = ZoneId | "html";
+
 /**
- * Which string options each zone reads, which is {@link HomeZoneConfig}'s
- * documentation made executable.
+ * Which string options each kind of entry reads, which is {@link
+ * HomeZoneConfig}'s documentation made executable.
  *
  * The resolver reads them here rather than leaving them to the layout, so that
  * one walk over the entries decides everything the page acts on and there is
@@ -123,11 +133,21 @@ const MARKUP_KEYS = ["before", "after"] as const;
  * A layout renders {@link HomeEntry.strings}, so what the profile health panel
  * lists is what the page was handed.
  *
- * The cost of that is this table: a zone that starts reading a new key has to be
- * added to it, or its author's mistakes stay silent. It lives beside the schema
- * that already promises which keys a zone takes, so the two are read together.
+ * This table is also what an entry key written in the wrong place is measured
+ * against. A key an entry does not read is named as doing nothing, which is a
+ * different complaint from a value that is wrong: the first says move it, the
+ * second says fix it, and neither promises the other would have worked.
+ *
+ * The cost of that is this table: an entry kind that starts reading a new key
+ * has to be added to it, or its author's mistakes stay silent. It lives beside
+ * the schema that already promises which keys an entry takes, so the two are
+ * read together.
  */
-const ZONE_STRING_KEYS: Readonly<Record<ZoneId, readonly ZoneStringKey[]>> = {
+const ENTRY_STRING_KEYS: Readonly<
+  Record<EntryKind, readonly (typeof ENTRY_KEYS)[number][]>
+> = {
+  // A custom entry is markup, and takes markup around it like any other entry.
+  html: ["html", ...MARKUP_KEYS],
   onboarding: MARKUP_KEYS,
   // The only zone with options of its own: the heading and the line under it.
   greeting: [...MARKUP_KEYS, "title", "tagline"],
@@ -138,14 +158,17 @@ const ZONE_STRING_KEYS: Readonly<Record<ZoneId, readonly ZoneStringKey[]>> = {
 };
 
 /**
- * A zone's string options as resolved, with anything that was not a string
+ * An entry's string options as resolved, with anything that was not a string
  * already dropped and reported. A key the author left out is absent, and an
  * empty string is kept, because a deliberate blank is not the same as no value.
+ *
+ * A custom entry's own `html` is not here. It is lifted onto {@link HomeEntry},
+ * because the schema has to read it to tell the two kinds of entry apart.
  */
-export type ZoneStrings = Readonly<Partial<Record<ZoneStringKey, string>>>;
+export type EntryStrings = Readonly<Partial<Record<EntryStringKey, string>>>;
 
-/** No options, which is what an unconfigured zone has. */
-const NO_STRINGS: ZoneStrings = Object.freeze({});
+/** No options, which is what an unconfigured entry has. */
+const NO_STRINGS: EntryStrings = Object.freeze({});
 
 /** One resolved entry of the page. */
 export type HomeEntry =
@@ -154,15 +177,21 @@ export type HomeEntry =
       readonly kind: "zone";
       readonly zone: ZoneId;
       readonly entry: RawEntry;
-      /** The zone's string options, already checked. See {@link ZONE_STRING_KEYS}. */
-      readonly strings: ZoneStrings;
+      /** The entry's string options, already checked. See {@link ENTRY_STRING_KEYS}. */
+      readonly strings: EntryStrings;
     }
   /**
    * A distribution's own markup, sitting between zones. `html` is lifted out of
    * the entry because the schema has already checked it is a string, so the
    * layout does not repeat the check.
    */
-  | { readonly kind: "html"; readonly html: string; readonly entry: RawEntry };
+  | {
+      readonly kind: "html";
+      readonly html: string;
+      readonly entry: RawEntry;
+      /** As above. A custom entry takes `before` and `after` like any other. */
+      readonly strings: EntryStrings;
+    };
 
 /** What the layout needs from the profile, all of it already validated. */
 export interface ResolvedHome {
@@ -228,6 +257,44 @@ function asObject(value: unknown): RawEntry | null {
     : null;
 }
 
+/**
+ * How an entry as written will be rendered, or null for one the page drops.
+ *
+ * The one predicate that tells the two kinds of entry apart. {@link
+ * resolveEntries} builds the page from it and {@link entryMarkupKeys} decides
+ * which files are worth reading from it, so a rule about custom entries cannot
+ * be true on the page and false at startup.
+ *
+ * A zone name this build does not ship is dropped, so it is neither kind.
+ */
+function entryKind(entry: RawEntry): EntryKind | null {
+  if (typeof entry.zone === "string")
+    return KNOWN_ZONES.has(entry.zone) ? (entry.zone as ZoneId) : null;
+  return typeof entry.html === "string" ? "html" : null;
+}
+
+/**
+ * The markup keys an entry as written renders, which is what makes a `@`
+ * reference in one of them worth reading from disk.
+ *
+ * For `./markup`, which reads those files at startup and lists the ones it could
+ * not read in the profile health panel. Reading the rest would cost a disk read
+ * for markup nothing renders, and worse, would let the panel report a missing
+ * file for a key that was never going to be drawn: that promises the author a
+ * file at that path would have worked.
+ *
+ * Silent, and takes the raw value, so `./markup` can ask before the page is
+ * resolved without a second copy of every complaint on the console.
+ */
+export function entryMarkupKeys(raw: unknown): readonly MarkupKey[] {
+  const entry = asObject(raw);
+  const kind = entry && entryKind(entry);
+  if (!kind) return [];
+  return ENTRY_STRING_KEYS[kind].filter(
+    (key): key is MarkupKey => key !== "title" && key !== "tagline",
+  );
+}
+
 /** The Coilbox page: every built-in zone, in the default order, unconfigured. */
 function defaultEntries(): HomeEntry[] {
   return DEFAULT_ZONES.map((zone) => ({
@@ -288,6 +355,26 @@ export function describeHome(home: ResolvedHome): string {
   const layout = home.layout ? `Layout "${home.layout}"` : "Default layout";
   const tracking = home.pinned ? "pinned" : "tracking the default";
   return `${layout}, ${home.entries.length} zone(s), ${tracking}`;
+}
+
+/**
+ * The built-in zones this page carries.
+ *
+ * Derived from {@link ResolvedHome.entries} rather than stored beside them, so
+ * the page has one list of zones and nothing to keep a second one in step with.
+ *
+ * The greeting reads it to decide which of its sentences are about anything the
+ * player can see (issues #1079 and #1082). That is the page's composition, which
+ * is the layout's to know and is settled before any zone renders. It is not
+ * another zone's state: whether the grid drew a card, or whether there is a run
+ * waiting, still belongs to the zone that draws it.
+ */
+export function zonesOnPage(
+  entries: readonly HomeEntry[],
+): ReadonlySet<ZoneId> {
+  const zones = new Set<ZoneId>();
+  for (const entry of entries) if (entry.kind === "zone") zones.add(entry.zone);
+  return zones;
 }
 
 /**
@@ -356,41 +443,42 @@ function resolveEntries(
       );
       continue;
     }
-    if (typeof entry.zone === "string") {
-      if (!KNOWN_ZONES.has(entry.zone)) {
-        // Quoted through the shared formatter, so a name long enough to fill the
-        // health panel is cut to length like any other bad value.
-        noteHomeIssue(
-          issues,
-          `home: ignoring unknown zone ${showHomeValue(entry.zone)}`,
-        );
-        continue;
-      }
-      const zone = entry.zone as ZoneId;
-      if (seen.has(zone)) {
-        // Two greetings or two tool grids reads as a bug to whoever sees the
-        // page, and a repeated zone is nearly always a copy-paste slip. Keeping
-        // the first leaves the author a page plus a warning naming the zone.
-        noteHomeIssue(issues, `home: ignoring a repeated "${zone}" zone`);
-        continue;
-      }
-      seen.add(zone);
+    const kind = entryKind(entry);
+    if (kind === null) {
+      noteHomeIssue(
+        issues,
+        typeof entry.zone === "string"
+          ? // Quoted through the shared formatter, so a name long enough to fill
+            // the health panel is cut to length like any other bad value.
+            `home: ignoring unknown zone ${showHomeValue(entry.zone)}`
+          : `home: ignoring a zone entry with no \`zone\` name or \`html\`: ${showHomeValue(raw)}`,
+      );
+      continue;
+    }
+    if (kind === "html") {
       entries.push({
-        kind: "zone",
-        zone,
+        kind,
+        // A string, which is what `entryKind` read to answer "html" at all.
+        html: entry.html as string,
         entry,
-        strings: zoneStrings(zone, entry, issues),
+        strings: entryStrings(kind, entry, issues),
       });
       continue;
     }
-    if (typeof entry.html === "string") {
-      entries.push({ kind: "html", html: entry.html, entry });
+    if (seen.has(kind)) {
+      // Two greetings or two tool grids reads as a bug to whoever sees the
+      // page, and a repeated zone is nearly always a copy-paste slip. Keeping
+      // the first leaves the author a page plus a warning naming the zone.
+      noteHomeIssue(issues, `home: ignoring a repeated "${kind}" zone`);
       continue;
     }
-    noteHomeIssue(
-      issues,
-      `home: ignoring a zone entry with no \`zone\` name or \`html\`: ${showHomeValue(raw)}`,
-    );
+    seen.add(kind);
+    entries.push({
+      kind: "zone",
+      zone: kind,
+      entry,
+      strings: entryStrings(kind, entry, issues),
+    });
   }
   if (entries.length === 0) {
     noteHomeIssue(
@@ -403,30 +491,44 @@ function resolveEntries(
 }
 
 /**
- * The string options a zone reads, checked once, here.
+ * The string options an entry reads, checked once, here.
  *
- * A non-string is a distribution bug, so it is dropped with a complaint rather
- * than rendered into the heading, and the zone falls back to what Coilbox would
- * have said. Only the keys {@link ZONE_STRING_KEYS} lists for this zone are read,
- * so a `title` on the tool grid, which nothing renders, is not reported as a
- * value that was ignored: it was never going to be used, string or not.
+ * Two different mistakes, told apart because the author's next move differs:
  *
- * The complaint names the zone, because the health panel lists these lines with
- * nothing else around them.
+ * - A key this kind of entry does not read does nothing where it was written.
+ *   `title` belongs to the greeting and `html` to a custom entry, so the answer
+ *   is to move it, and saying "expected a string" would send the author off to
+ *   fix a value that was never going to be read.
+ * - A key it does read, whose value is not a string, is a value to fix. It is
+ *   dropped rather than rendered into the heading, and the entry falls back to
+ *   what Coilbox would have drawn.
+ *
+ * Both name where they were found, because the health panel lists these lines
+ * with nothing else around them.
  */
-function zoneStrings(
-  zone: ZoneId,
+function entryStrings(
+  kind: EntryKind,
   entry: RawEntry,
   issues: string[],
-): ZoneStrings {
-  let strings: Partial<Record<ZoneStringKey, string>> | undefined;
-  for (const key of ZONE_STRING_KEYS[zone]) {
+): EntryStrings {
+  const reads = ENTRY_STRING_KEYS[kind];
+  const where =
+    kind === "html" ? "a custom `html` entry" : `the "${kind}" zone`;
+  let strings: Partial<Record<EntryStringKey, string>> | undefined;
+  for (const key of ENTRY_KEYS) {
     const value = entry[key];
     if (value === undefined || value === null) continue;
+    if (!reads.includes(key)) {
+      noteHomeIssue(issues, `home: \`${key}\` does nothing on ${where}`);
+      continue;
+    }
+    // The custom entry's own markup, already lifted onto the entry by the walk
+    // that had to read it to know this was a custom entry at all.
+    if (key === "html") continue;
     if (typeof value !== "string") {
       noteHomeIssue(
         issues,
-        `home: ignoring \`${key}\` on the "${zone}" zone, expected a string, got ${showHomeValue(value)}`,
+        `home: ignoring \`${key}\` on ${where}, expected a string, got ${showHomeValue(value)}`,
       );
       continue;
     }

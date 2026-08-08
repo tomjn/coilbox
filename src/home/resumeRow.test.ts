@@ -144,7 +144,7 @@ describe("the resume row", () => {
     });
     const html = page();
     const row = html.indexOf(ROW);
-    const hero = html.indexOf('aria-labelledby="home-continue-title"');
+    const hero = html.indexOf('aria-labelledby="home-continue-heading"');
     const rail = html.indexOf('aria-label="More to pick up"');
     expect(row).toBeGreaterThan(-1);
     expect(row).toBeLessThan(hero);
@@ -190,7 +190,7 @@ describe("the resume row with one half missing", () => {
   it("holds the hero alone when there is only one thing to resume", () => {
     resume.mockReturnValue({ candidates: [HERO], loading: false });
     const html = page();
-    expect(html).toContain('aria-labelledby="home-continue-title"');
+    expect(html).toContain('aria-labelledby="home-continue-heading"');
     expect(html).not.toContain('aria-label="More to pick up"');
     expect(html).toContain(ROW);
   });
@@ -202,7 +202,7 @@ describe("the resume row with one half missing", () => {
     lobby.mockReturnValue({ connected: false, busy: false });
     accounts.mockReturnValue([SAVED]);
     const html = page();
-    expect(html).not.toContain('aria-labelledby="home-continue-title"');
+    expect(html).not.toContain('aria-labelledby="home-continue-heading"');
     expect(html).toContain('aria-label="More to pick up"');
     expect(text()).toBe("Multiplayer AF_ Beyond All Reason Log in");
   });

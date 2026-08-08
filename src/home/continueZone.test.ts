@@ -135,6 +135,37 @@ describe("Continue zone", () => {
     expect(String(label).startsWith("Resume run")).toBe(true);
   });
 
+  it("heads the card with the kind rather than the run's name", () => {
+    // Every heading on the home page names a section except this one, which
+    // named a run and so said nothing about what sort of thing it was out of its
+    // visual context (#1091). The name is in the link list instead, on the
+    // action beside it.
+    resume.mockReturnValue({ candidates: [WARPATH], loading: false });
+    const headings = nodes(Continue({})).filter((n) => n.type === "h2");
+    expect(headings).toHaveLength(1);
+    expect(headings[0].props.children).toBe("Warpath run");
+    expect(headings[0].props.id).toBe("home-continue-heading");
+  });
+
+  it("changes nothing on screen by moving the heading", () => {
+    // The label already carried the tool grid's group-heading styling, so the
+    // page was drawing it as a section heading and only the tag was wrong.
+    resume.mockReturnValue({ candidates: [WARPATH], loading: false });
+    const all = nodes(Continue({}));
+    expect(all.find((n) => n.type === "h2")?.props.className).toBe(
+      "text-xs font-medium uppercase tracking-wide text-muted-foreground",
+    );
+    expect(
+      all.find((n) => n.props.children === "Kestrel")?.props.className,
+    ).toBe("text-xl font-semibold");
+  });
+
+  it("names its section by that heading", () => {
+    resume.mockReturnValue({ candidates: [WARPATH], loading: false });
+    const section = nodes(Continue({})).find((n) => n.type === "section");
+    expect(section?.props["aria-labelledby"]).toBe("home-continue-heading");
+  });
+
   it("renders nothing when there is nothing to resume", () => {
     // A fresh install. The Onboarding zone owns the one call to action there,
     // and a second one would have the page asking twice.
