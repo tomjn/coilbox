@@ -22,6 +22,7 @@ import {
   resultLabel,
   seatCount,
 } from "../../matchStats";
+import { MatchStatsChart } from "./MatchStatsChart";
 import { StatCard } from "./StatWidgets";
 
 /**
@@ -187,12 +188,14 @@ export function MatchStatsSection({
     return (
       <>
         <Headlines info={info} trailer={data.trailer} metrics={data.metrics} />
-        {/* The chart block belongs here (#1136), with its metric picker, its
-         * per-minute view and its readout in #1137, #1138 and #1140. What it
-         * needs is in scope already: `data.trailer.teams` is one series of
-         * running totals per team against `frame`, `teamStatPeriodSec` turns a
-         * frame into a time, `data.metrics` is the registry it chooses from,
-         * and `info` names, colours and sides every team. */}
+        {/* The chart owns its own controls, so the per-minute view (#1137), the
+         * players/sides view (#1138) and the value table (#1140) go in there
+         * rather than here. */}
+        <MatchStatsChart
+          info={info}
+          trailer={data.trailer}
+          metrics={data.metrics}
+        />
       </>
     );
   }

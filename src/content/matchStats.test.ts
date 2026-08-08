@@ -1,21 +1,32 @@
 import { describe, expect, it } from "vitest";
+import { PALETTE, rgbToHex } from "@/play/participants";
 import type {
   DemoInfo,
   DemoTrailer,
   Metric,
+  MetricGroup,
   MetricKey,
   ReplayPlayer,
   TeamStatSample,
 } from "./bindings";
 import {
+  chartRows,
+  defaultMetric,
+  END_LABEL_MAX_SERIES,
   formatDuration,
   formatTotal,
   hasStatistics,
   headlineTotals,
+  lastPointIndex,
   matchTotal,
+  metricGroups,
   resultLabel,
   seatCount,
+  secondsPerFrame,
+  TOOLTIP_ROW_LIMIT,
+  teamSeries,
   teamTotal,
+  tooltipRows,
 } from "./matchStats";
 
 /**
@@ -60,19 +71,24 @@ function at(frame: number, key: MetricKey, value: number): TeamStatSample {
   return s;
 }
 
-function trailer(teams: TeamStatSample[][]): DemoTrailer {
+function trailer(teams: TeamStatSample[][], periodSec = 15): DemoTrailer {
   return {
     winningAllyTeams: [],
-    teamStatPeriodSec: 15,
+    teamStatPeriodSec: periodSec,
     teams: teams.map((samples, team) => ({ team, samples })),
   };
 }
 
-function metric(key: MetricKey, label: string, headline: boolean): Metric {
+function metric(
+  key: MetricKey,
+  label: string,
+  headline: boolean,
+  group: MetricGroup = "military",
+): Metric {
   return {
     key,
     label,
-    group: "military",
+    group,
     unit: "count",
     roster: true,
     headline,
@@ -215,5 +231,296 @@ describe("headlineTotals", () => {
   it("skips a metric the registry publishes but hides", () => {
     const hidden = [{ ...metric(KEY_A, "Alpha", true), surfaced: false }];
     expect(headlineTotals(t, hidden)).toEqual([]);
+  });
+});
+
+describe("metricGroups", () => {
+  const registry = [
+    metric(KEY_A, "Alpha", false, "economy"),
+    metric(KEY_B, "Beta", true, "military"),
+    metric(KEYS[2], "Gamma", false, "economy"),
+    metric(KEYS[3], "Delta", false, "units"),
+  ];
+
+  it("orders groups by where the registry first mentions them", () => {
+    expect(metricGroups(registry).map((g) => g.group)).toEqual([
+      "economy",
+      "military",
+      "units",
+    ]);
+  });
+
+  it("keeps registry order inside a group", () => {
+    const economy = metricGroups(registry)[0];
+    expect(economy.metrics.map((m) => m.label)).toEqual(["Alpha", "Gamma"]);
+  });
+
+  it("gives every group a heading", () => {
+    expect(metricGroups(registry).map((g) => g.label)).toEqual([
+      "Economy",
+      "Military",
+      "Units",
+    ]);
+  });
+
+  it("leaves out a metric the registry hides", () => {
+    const hidden = registry.map((m) =>
+      m.group === "units" ? { ...m, surfaced: false } : m,
+    );
+    expect(metricGroups(hidden).map((g) => g.group)).toEqual([
+      "economy",
+      "military",
+    ]);
+  });
+});
+
+describe("defaultMetric", () => {
+  it("opens on the first headline, which the tiles already lead with", () => {
+    const registry = [
+      metric(KEY_A, "Alpha", false),
+      metric(KEY_B, "Beta", true),
+      metric(KEYS[2], "Gamma", true),
+    ];
+    expect(defaultMetric(registry)?.label).toBe("Beta");
+  });
+
+  it("falls back to the first offered metric when none is a headline", () => {
+    expect(defaultMetric([metric(KEY_A, "Alpha", false)])?.label).toBe("Alpha");
+  });
+
+  it("skips a hidden metric even when it is the only headline", () => {
+    const registry = [
+      { ...metric(KEY_A, "Alpha", true), surfaced: false },
+      metric(KEY_B, "Beta", false),
+    ];
+    expect(defaultMetric(registry)?.label).toBe("Beta");
+  });
+
+  it("is undefined when the registry offers nothing", () => {
+    expect(defaultMetric([])).toBeUndefined();
+  });
+});
+
+describe("teamSeries", () => {
+  const measured = trailer([
+    [at(0, KEY_A, 1), at(450, KEY_A, 5)],
+    [],
+    [at(0, KEY_A, 2), at(450, KEY_A, 9)],
+  ]);
+
+  it("leaves out a team the engine measured nothing for", () => {
+    expect(teamSeries(measured, info()).map((s) => s.id)).toEqual([
+      "team0",
+      "team2",
+    ]);
+  });
+
+  it("names a line after the seat that held the team", () => {
+    const match = info({
+      players: [{ name: "sprung", spectator: false, team: 0 }],
+      ais: [{ name: "AI 1", shortName: "BARb", team: 2 }],
+    });
+    expect(teamSeries(measured, match).map((s) => s.label)).toEqual([
+      "sprung",
+      "BARb",
+    ]);
+  });
+
+  it("says how many other seats share a line under shared control", () => {
+    const match = info({
+      players: [
+        { name: "sprung", spectator: false, team: 0 },
+        { name: "mate", spectator: false, team: 0 },
+      ],
+    });
+    expect(teamSeries(measured, match)[0].label).toBe("sprung +1");
+  });
+
+  it("ignores a spectator, who held no team", () => {
+    const match = info({
+      players: [
+        { name: "cast", spectator: true, team: 0 },
+        { name: "sprung", spectator: false, team: 0 },
+      ],
+    });
+    expect(teamSeries(measured, match)[0].label).toBe("sprung");
+  });
+
+  it("falls back to the team number when nobody is recorded on it", () => {
+    expect(teamSeries(measured, info())[1].label).toBe("Team 2");
+  });
+
+  it("takes the line's colour from the seat", () => {
+    const match = info({
+      players: [
+        { name: "sprung", spectator: false, team: 0, rgbColor: [1, 0, 0] },
+      ],
+    });
+    expect(teamSeries(measured, match)[0].color).toBe("#ff0000");
+  });
+
+  it("replaces a team recorded as black, which is nobody's choice", () => {
+    const match = info({
+      players: [
+        { name: "sprung", spectator: false, team: 0, rgbColor: [0, 0, 0] },
+      ],
+    });
+    expect(teamSeries(measured, match)[0].color).toBe(rgbToHex(PALETTE[0]));
+  });
+
+  it("gives a team with no recorded colour a palette one", () => {
+    const colors = teamSeries(measured, info()).map((s) => s.color);
+    expect(colors).toEqual([rgbToHex(PALETTE[0]), rgbToHex(PALETTE[2])]);
+  });
+});
+
+describe("secondsPerFrame", () => {
+  it("measures the frame step against the recorded period", () => {
+    const t = trailer([[sample(0), sample(450)]], 15);
+    expect(secondsPerFrame(t)).toBeCloseTo(1 / 30);
+  });
+
+  it("reads a period the engine was not run at 30 frames a second for", () => {
+    const t = trailer([[sample(0), sample(300)]], 15);
+    expect(secondsPerFrame(t)).toBeCloseTo(1 / 20);
+  });
+
+  it("falls back to the engine's rate when there is no step to measure", () => {
+    expect(secondsPerFrame(trailer([[sample(0)]], 15))).toBeCloseTo(1 / 30);
+    expect(secondsPerFrame(trailer([[sample(0), sample(450)]], 0))).toBeCloseTo(
+      1 / 30,
+    );
+  });
+});
+
+describe("chartRows", () => {
+  const series = () =>
+    teamSeries(
+      trailer([
+        [at(0, KEY_A, 1), at(450, KEY_A, 4), at(900, KEY_A, 9)],
+        [at(0, KEY_A, 2), at(900, KEY_A, 20)],
+      ]),
+      info(),
+    );
+
+  it("puts each sample frame at its match time", () => {
+    const rows = chartRows(series(), KEY_A, 1 / 30);
+    expect(rows.map((r) => r.timeSec)).toEqual([0, 15, 30]);
+  });
+
+  it("carries a running total across a frame the series never sampled", () => {
+    const rows = chartRows(series(), KEY_A, 1 / 30);
+    expect(rows.map((r) => r.team0)).toEqual([1, 4, 9]);
+    // team1 has no sample at frame 450, and its running total there is still 2.
+    expect(rows.map((r) => r.team1)).toEqual([2, 2, 20]);
+  });
+
+  it("stops a line rather than running it on flat past its last sample", () => {
+    const short = teamSeries(
+      trailer([
+        [at(0, KEY_A, 1), at(450, KEY_A, 4), at(900, KEY_A, 9)],
+        [at(0, KEY_A, 2), at(450, KEY_A, 5)],
+      ]),
+      info(),
+    );
+    expect(chartRows(short, KEY_A, 1 / 30).map((r) => r.team1)).toEqual([
+      2,
+      5,
+      null,
+    ]);
+  });
+
+  it("has no line before a series' first sample", () => {
+    const late = teamSeries(
+      trailer([[at(0, KEY_A, 1), at(450, KEY_A, 4)], [at(450, KEY_A, 7)]]),
+      info(),
+    );
+    expect(chartRows(late, KEY_A, 1 / 30).map((r) => r.team1)).toEqual([
+      null,
+      7,
+    ]);
+  });
+
+  it("is empty when nothing is plotted", () => {
+    expect(chartRows([], KEY_A, 1 / 30)).toEqual([]);
+  });
+});
+
+describe("tooltipRows", () => {
+  /** `count` teams, each ending on a bigger figure than the last. */
+  const many = (count: number) =>
+    teamSeries(
+      trailer(
+        Array.from({ length: count }, (_, i) => [at(0, KEY_A, (i + 1) * 10)]),
+      ),
+      info(),
+    );
+
+  it("reads down from whoever is winning the metric", () => {
+    const series = many(3);
+    const [row] = chartRows(series, KEY_A, 1 / 30);
+    expect(tooltipRows(series, row).rows.map((r) => r.value)).toEqual([
+      30, 20, 10,
+    ]);
+  });
+
+  it("caps a big match at a dozen rows and counts the rest", () => {
+    const series = many(16);
+    const [row] = chartRows(series, KEY_A, 1 / 30);
+    const { rows, hidden } = tooltipRows(series, row);
+    expect(rows).toHaveLength(TOOLTIP_ROW_LIMIT);
+    expect(hidden).toBe(16 - TOOLTIP_ROW_LIMIT);
+    // The cap keeps the top of the list, which is the part being read.
+    expect(rows[0].value).toBe(160);
+  });
+
+  it("leaves out a series with no value at that moment", () => {
+    const series = teamSeries(
+      trailer([[at(0, KEY_A, 3), at(450, KEY_A, 6)], [at(450, KEY_A, 9)]]),
+      info(),
+    );
+    const [first] = chartRows(series, KEY_A, 1 / 30);
+    expect(tooltipRows(series, first).rows.map((r) => r.id)).toEqual(["team0"]);
+  });
+
+  it("carries the line's own colour and name", () => {
+    const match = info({
+      players: [
+        { name: "sprung", spectator: false, team: 0, rgbColor: [0, 0, 1] },
+      ],
+    });
+    const series = teamSeries(trailer([[at(0, KEY_A, 3)]]), match);
+    const [row] = chartRows(series, KEY_A, 1 / 30);
+    expect(tooltipRows(series, row).rows[0]).toEqual({
+      id: "team0",
+      label: "sprung",
+      color: "#0000ff",
+      value: 3,
+    });
+  });
+});
+
+describe("the end-point labels", () => {
+  it("are for a duel or a small team game, not a 16-player FFA", () => {
+    // The issue's wording, kept as a number the chart reads rather than a
+    // threshold typed into the component.
+    expect(END_LABEL_MAX_SERIES).toBe(4);
+  });
+
+  it("land on the end of a line, not the end of the chart", () => {
+    const series = teamSeries(
+      trailer([
+        [at(0, KEY_A, 1), at(450, KEY_A, 4), at(900, KEY_A, 9)],
+        [at(0, KEY_A, 2), at(450, KEY_A, 5)],
+      ]),
+      info(),
+    );
+    const rows = chartRows(series, KEY_A, 1 / 30);
+    expect(lastPointIndex(rows, "team0")).toBe(2);
+    expect(lastPointIndex(rows, "team1")).toBe(1);
+  });
+
+  it("has nowhere to land for a line that is never drawn", () => {
+    expect(lastPointIndex([], "team0")).toBe(-1);
   });
 });
