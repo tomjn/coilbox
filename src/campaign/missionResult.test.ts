@@ -56,6 +56,7 @@ function missionDemo(opts: {
         won: opts.won,
       },
     ],
+    ais: [],
     modOptions: { coilbox_mission: "siege" },
   };
 }

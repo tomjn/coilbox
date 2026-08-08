@@ -64,6 +64,7 @@ function demoInfo(overrides: Partial<DemoInfo> = {}): DemoInfo {
     numAllyTeams: 2,
     allyTeams: [],
     players: [],
+    ais: [],
     modOptions: {},
     ...overrides,
   };
