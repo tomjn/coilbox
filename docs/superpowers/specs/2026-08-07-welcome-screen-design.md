@@ -70,7 +70,9 @@ ResumeRail   the runners-up Continue did not take, capped at 3
              logged out with a saved login -> "Log in as <lastUser>" card
              empty -> renders nothing
 ToolCards    nav-derived, groups preserved, art via resolveCardArt
-SuggestedMap one map, always
+SuggestedMap one map you do not have, downloadable
+             every candidate installed -> renders nothing
+             no maps at all, no onboarding zone -> promoted to the top row
 Onboarding   existing SetupCard and GetStartedCard, behaviour unchanged
 Custom       distro markup, plus before and after slots on every zone above
 ```
@@ -87,9 +89,23 @@ Continue renders nothing when there is nothing to resume. The Onboarding zone al
 
 ### Suggested map
 
-A curated list in the GitHub `catalog.json` already used for map packs, rotated deterministically by date so everyone sees the same map on the same day. When a lobby connection happens to be live, a map an open battle is using is preferred. The card installs the map.
+A curated list in the GitHub `catalog.json` already used for map packs, rotated deterministically by date. When a lobby connection happens to be live, a map an open battle is using is preferred. The card installs the map.
 
 This works offline and logged out, and keeps promotion under editorial control.
+
+The card only ever offers a map the player does not have. The day's index picks a place in the list and the card takes the first map from there that is not installed, so two players with the same maps see the same map and a player who already has the day's map sees the next one along. Everyone seeing the same map on the same day was the earlier rule, and it is what this gives up: a card you cannot act on is not worth the space on a launcher.
+
+Walking forward from the day's place, rather than rotating over a filtered list, is what keeps the card still while the page is open. A filtered list is numbered by its own length, so installing anything at all would renumber it.
+
+### Suggested map placement
+
+Three places, decided for the page rather than by the card:
+
+- Downloads group, fourth card, which is the ordinary answer.
+- The top row, ahead of the continue hero and the resume rail, when the player has no maps at all. Without a map nothing can be played, so a first map outranks resuming.
+- Nowhere, when there is nothing left to offer: every candidate installed, or no candidate the catalog can picture. One outcome, one code path.
+
+The promotion yields to the Onboarding zone, which owns first run. That zone already offers curated maps on exactly the condition that would promote this card, and asks for an engine and a content folder before there is one, so on the default page the promoted card would be a second voice saying the same thing. A distribution that drops the zone, or sets `onboarding: "off"`, has nobody making the offer and gets the promoted card.
 
 ## Card art
 
