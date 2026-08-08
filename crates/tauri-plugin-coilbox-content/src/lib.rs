@@ -15,6 +15,7 @@ mod build_tree_export;
 mod caches;
 mod demo;
 mod engine;
+mod metrics;
 mod model;
 mod path_validity;
 mod paths;
@@ -914,6 +915,17 @@ async fn content_replay_trailer(replay_path: String) -> Result<CliResult, ()> {
     }
 }
 
+/// `content_metric_registry`: what every `TeamStatistics` field decoded by
+/// `content_replay_trailer` is called, which group it belongs to, what it
+/// counts, and whether it belongs on the roster or in a headline tile. Static
+/// data, no file access. Every match-statistics surface builds itself from this
+/// rather than from a list of its own, so adding a metric is one line in
+/// `metrics.rs`. See [`metrics::METRICS`].
+#[tauri::command]
+async fn content_metric_registry() -> Result<CliResult, ()> {
+    Ok(CliResult::ok(json!({ "metrics": metrics::METRICS })))
+}
+
 /// `content_stats_ingest`, incrementally parse every replay under `roots` into the
 /// local stats database, decoding only files new or changed since the last pass
 /// (idempotent, keyed by filename). The winner comes from each replay's own
@@ -1414,6 +1426,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_list_replays,
             content_demo_info,
             content_replay_trailer,
+            content_metric_registry,
             content_stats_ingest,
             content_stats_query,
             content_stats_watch_start,

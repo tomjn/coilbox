@@ -18,6 +18,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-list-replays`
 - `allow-content-demo-info`
 - `allow-content-replay-trailer`
+- `allow-content-metric-registry`
 - `allow-content-stats-ingest`
 - `allow-content-stats-query`
 - `allow-content-stats-watch-start`
@@ -675,6 +676,32 @@ Enables the content_list_saves command without any pre-configured scope.
 <td>
 
 Denies the content_list_saves command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-metric-registry`
+
+</td>
+<td>
+
+Enables the content_metric_registry command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-metric-registry`
+
+</td>
+<td>
+
+Denies the content_metric_registry command without any pre-configured scope.
 
 </td>
 </tr>
