@@ -476,8 +476,11 @@ mod tests {
             &entry("a.sdfz", size, mtime),
             demo_info("Stale", true, vec![]),
         );
+        // Pinned to 1 rather than `STATS_SCHEMA_VERSION - 1`: 1 is the version
+        // every store on disk was written at before AIs were parsed, so this
+        // fails if the constant is left where it is when the shape changes.
         let mut store = StatsStore {
-            schema_version: STATS_SCHEMA_VERSION - 1,
+            schema_version: 1,
             records: vec![stale],
         };
 
