@@ -14,10 +14,18 @@ use std::time::{Duration, SystemTime};
 /// missing until a version-salt bump.
 const NEGATIVE_MARKER_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 
-/// How long a disk-cached catalog is served without hitting the network. A fresh
-/// cache short-circuits the fetch (fast, and bounds how stale offline data can be);
-/// once stale we refetch and only fall back to the stale copy when offline.
+/// How long a disk-cached catalog is trusted before we go back to the network. It
+/// no longer decides how long the caller waits, because the copy on disk always
+/// answers straight away. It decides how often a launch kicks off a refetch behind
+/// that answer.
 const CATALOG_TTL: Duration = Duration::from_secs(6 * 60 * 60);
+
+/// Bound the catalog fetch. Without this a network that black-holes packets rather
+/// than refusing them hangs the request for the OS TCP timeout, about 75 seconds on
+/// macOS. The catalog is a few tens of kilobytes, so 10 seconds covers a slow
+/// tethered link, and nothing user-visible waits on it: the answer comes off disk
+/// and the fetch runs behind it.
+const CATALOG_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// True when a file modified at `modified` is older than `ttl` relative to `now`.
 /// A modification time in the future (clock skew) counts as fresh.
@@ -157,9 +165,14 @@ pub(crate) fn image_cache_files(
     )
 }
 
-/// Fetch the catalog JSON text over HTTP. Errors carry the reqwest message.
+/// Fetch the catalog JSON text over HTTP, giving up after `CATALOG_FETCH_TIMEOUT`.
+/// Errors carry the reqwest message.
 pub(crate) async fn fetch_catalog_text(url: &str) -> Result<String, String> {
-    let resp = reqwest::get(url).await.map_err(|e| e.to_string())?;
+    let client = reqwest::Client::builder()
+        .timeout(CATALOG_FETCH_TIMEOUT)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
     let resp = resp.error_for_status().map_err(|e| e.to_string())?;
     resp.text().await.map_err(|e| e.to_string())
 }
@@ -173,25 +186,75 @@ pub(crate) struct CatalogResult {
     pub errors: Vec<String>,
 }
 
-/// Fetch → cache → seed. Never hard-fails: on network error, returns the disk
-/// cache, then the bundled seed, then an empty catalog with the errors attached.
+/// The catalog copy already on disk, and whether it is due to be replaced.
+struct LocalCatalog {
+    json: String,
+    source: &'static str,
+    refresh: bool,
+}
+
+/// Read a catalog file, rejecting one that does not parse as JSON. A cache
+/// truncated by a crash would otherwise be served in place of the good bundled
+/// seed, and the frontend would see an unparseable catalog as an empty one.
+fn read_catalog_file(path: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str::<serde_json::Value>(&text).ok()?;
+    Some(text)
+}
+
+/// What the disk can answer with right now: the cache when it is readable and
+/// parses, else the bundled seed. `refresh` is set for anything but a within-TTL
+/// cache, so a stale, missing or unreadable cache sends us back to the network.
+fn read_local_catalog(cache_file: Option<&Path>, seed_file: Option<&Path>) -> Option<LocalCatalog> {
+    if let Some(f) = cache_file {
+        if let Some(json) = read_catalog_file(f) {
+            return Some(LocalCatalog {
+                json,
+                source: "cache",
+                refresh: path_is_stale(f, CATALOG_TTL),
+            });
+        }
+    }
+    let json = read_catalog_file(seed_file?)?;
+    Some(LocalCatalog {
+        json,
+        source: "seed",
+        refresh: true,
+    })
+}
+
+/// Fetch the catalog and write it to the disk cache, creating the directory.
+async fn refresh_catalog_cache(url: String, cache_file: PathBuf) {
+    let Ok(text) = fetch_catalog_text(&url).await else {
+        return;
+    };
+    if let Some(dir) = cache_file.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(&cache_file, &text);
+}
+
+/// Disk → network. Whatever is on disk answers immediately, the cache first and
+/// then the bundled seed, and a stale copy is refetched in the background so the
+/// next launch gets the newer one. Only a machine with neither a cache nor a seed
+/// waits for the network, and that wait is bounded. Never hard-fails: with nothing
+/// on disk and no network, the result is an empty catalog with the error attached.
 pub(crate) async fn resolve_catalog(
     url: &str,
     cache_file: Option<PathBuf>,
     seed_file: Option<PathBuf>,
 ) -> CatalogResult {
-    // A fresh (within-TTL) disk cache is served without a network round-trip: this
-    // bounds how stale offline data can be and skips a redundant fetch each launch.
-    if let Some(f) = &cache_file {
-        if !path_is_stale(f, CATALOG_TTL) {
-            if let Ok(text) = std::fs::read_to_string(f) {
-                return CatalogResult {
-                    json: text,
-                    source: "cache".into(),
-                    errors: vec![],
-                };
+    if let Some(local) = read_local_catalog(cache_file.as_deref(), seed_file.as_deref()) {
+        if local.refresh {
+            if let Some(f) = cache_file {
+                tauri::async_runtime::spawn(refresh_catalog_cache(url.to_string(), f));
             }
         }
+        return CatalogResult {
+            json: local.json,
+            source: local.source.into(),
+            errors: vec![],
+        };
     }
     match fetch_catalog_text(url).await {
         Ok(text) => {
@@ -207,31 +270,11 @@ pub(crate) async fn resolve_catalog(
                 errors: vec![],
             }
         }
-        Err(e) => {
-            if let Some(f) = &cache_file {
-                if let Ok(text) = std::fs::read_to_string(f) {
-                    return CatalogResult {
-                        json: text,
-                        source: "cache".into(),
-                        errors: vec![e],
-                    };
-                }
-            }
-            if let Some(f) = &seed_file {
-                if let Ok(text) = std::fs::read_to_string(f) {
-                    return CatalogResult {
-                        json: text,
-                        source: "seed".into(),
-                        errors: vec![e],
-                    };
-                }
-            }
-            CatalogResult {
-                json: r#"{"version":1,"entries":[]}"#.into(),
-                source: "error".into(),
-                errors: vec![e],
-            }
-        }
+        Err(e) => CatalogResult {
+            json: r#"{"version":1,"entries":[]}"#.into(),
+            source: "error".into(),
+            errors: vec![e],
+        },
     }
 }
 
@@ -415,6 +458,97 @@ mod tests {
     fn path_is_stale_when_file_is_missing() {
         let missing = std::path::Path::new("/no/such/branding/cache/file.none");
         assert!(path_is_stale(missing, Duration::from_secs(3600)));
+    }
+
+    /// A fresh empty directory for one catalog test, named after the test.
+    fn catalog_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "coilbox-catalog-test-{}-{tag}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// Backdate a file so `path_is_stale` sees it as past the TTL.
+    fn backdate(path: &Path, by: Duration) {
+        let f = std::fs::File::options().write(true).open(path).unwrap();
+        f.set_modified(SystemTime::now() - by).unwrap();
+    }
+
+    #[test]
+    fn fresh_cache_answers_and_needs_no_refresh() {
+        let dir = catalog_dir("fresh");
+        let cache = dir.join("catalog.json");
+        std::fs::write(&cache, r#"{"version":1,"entries":[]}"#).unwrap();
+        let local = read_local_catalog(Some(&cache), None).unwrap();
+        assert_eq!(local.source, "cache");
+        assert!(!local.refresh);
+    }
+
+    #[test]
+    fn stale_cache_still_answers_and_asks_for_a_refresh() {
+        let dir = catalog_dir("stale");
+        let cache = dir.join("catalog.json");
+        std::fs::write(&cache, r#"{"version":1,"entries":[]}"#).unwrap();
+        backdate(&cache, CATALOG_TTL + Duration::from_secs(60));
+        let local = read_local_catalog(Some(&cache), None).unwrap();
+        assert_eq!(local.source, "cache");
+        assert!(local.refresh, "past the TTL the cache answers but refetches");
+    }
+
+    #[test]
+    fn missing_or_corrupt_cache_falls_through_to_the_seed() {
+        let dir = catalog_dir("seed");
+        let cache = dir.join("catalog.json");
+        let seed = dir.join("seed.json");
+        std::fs::write(&seed, r#"{"version":1,"entries":[{"id":"s"}]}"#).unwrap();
+
+        let local = read_local_catalog(Some(&cache), Some(&seed)).unwrap();
+        assert_eq!(local.source, "seed");
+        assert!(local.refresh);
+
+        // A half-written cache must not shadow the seed.
+        std::fs::write(&cache, r#"{"version":1,"entr"#).unwrap();
+        let local = read_local_catalog(Some(&cache), Some(&seed)).unwrap();
+        assert_eq!(local.source, "seed");
+        assert!(local.json.contains("\"s\""));
+    }
+
+    #[test]
+    fn no_cache_and_no_seed_leaves_the_network_as_the_only_answer() {
+        let dir = catalog_dir("empty");
+        assert!(read_local_catalog(Some(&dir.join("nope.json")), None).is_none());
+        assert!(read_local_catalog(None, None).is_none());
+    }
+
+    /// The regression this guards: `resolve_catalog` used to fetch first once the
+    /// cache was past its TTL, so a network that black-holes packets held the call
+    /// for the OS TCP timeout while a perfectly good catalog sat on disk. 192.0.2.1
+    /// is TEST-NET-1 (RFC 5737): routable, assigned to nobody, so the connect hangs
+    /// rather than being refused. The answer must not wait on it.
+    #[test]
+    fn a_black_holed_network_does_not_delay_the_disk_answer() {
+        let dir = catalog_dir("blackhole");
+        let cache = dir.join("catalog.json");
+        std::fs::write(&cache, r#"{"version":1,"entries":[]}"#).unwrap();
+        backdate(&cache, CATALOG_TTL + Duration::from_secs(60));
+
+        let started = std::time::Instant::now();
+        let res = tauri::async_runtime::block_on(resolve_catalog(
+            "http://192.0.2.1/catalog.json",
+            Some(cache),
+            None,
+        ));
+        let waited = started.elapsed();
+
+        assert_eq!(res.source, "cache");
+        assert!(res.errors.is_empty());
+        assert!(
+            waited < Duration::from_secs(1),
+            "answered from disk in {waited:?}, so it waited on the network"
+        );
     }
 
     #[test]
