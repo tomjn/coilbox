@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Check, Download, Loader2, Map as MapIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 import {
   ART_BAND_CLASS,
@@ -13,6 +13,7 @@ import {
   CARD_STACK_CLASS,
 } from "../cardShell";
 import {
+  forgetSuggestedMapArt,
   type SuggestedState,
   springNameOf,
   useSuggestedMapAnswer,
@@ -71,7 +72,10 @@ export function SuggestedMapCard({ heading }: { heading?: boolean }) {
   // resolutions could drift apart (issue #1077).
   const { map, loading, source } = useSuggestedMapAnswer();
   const { state, error, canDownload, download } = useSuggestedMapInstall(map);
-  const art = useSuggestedMapArt(map, state === "installed");
+  // The URL that failed, not a flag, so a later answer gets its own chance
+  // rather than inheriting the verdict on the URL it replaced.
+  const [broken, setBroken] = useState<string | null>(null);
+  const art = useSuggestedMapArt(map, state === "installed", broken);
 
   const labelled = (node: ReactNode) =>
     heading ? (
@@ -95,6 +99,15 @@ export function SuggestedMapCard({ heading }: { heading?: boolean }) {
             src={art}
             alt=""
             className="absolute inset-0 size-full object-cover"
+            onError={() => {
+              // Told to the module as well as remembered here. This may be the
+              // minimap the last launch painted, out of a cache something has
+              // since evicted, and only the module that offered it can withdraw
+              // it, which is what lets the card fall through to the catalog's
+              // thumbnail rather than to its bare glyph.
+              forgetSuggestedMapArt(art);
+              setBroken(art);
+            }}
           />
           {/* The art window. Grows with the card, so the picture reaches the
               band however deep the band gets. */}

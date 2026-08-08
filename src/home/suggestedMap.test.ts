@@ -1022,3 +1022,136 @@ describe("the page's one answer", () => {
     expect(html).toContain("Being played now");
   });
 });
+
+describe("the picture the card settles on", () => {
+  const {
+    decodeSuggestedMapArt,
+    forgetSuggestedMapArt,
+    rememberedArtFor,
+    rememberedSuggestedMapArt,
+    rememberSuggestedMapArt,
+    seedSuggestedMapArt,
+    suggestedArtUrl,
+  } = suggested;
+
+  const MINIMAP = "coilbox://localhost/unitsyncthumb/abc-0.png";
+  const REMEMBERED = "coilbox://localhost/unitsyncthumb/last-launch.png";
+  const THUMB = "data:image/webp;base64,AAAA";
+
+  beforeEach(() => {
+    seedSuggestedMapArt(null);
+  });
+
+  it("prefers the archive the player has over the catalog's image", () => {
+    expect(
+      suggestedArtUrl({ minimap: MINIMAP, thumb: THUMB, broken: null }),
+    ).toBe(MINIMAP);
+  });
+
+  it("paints what the last launch found while this one is still looking", () => {
+    // The whole point: the thumbnail resolves about 230ms before the minimap, so
+    // without this the card paints one picture of the map and then another
+    // picture of the same map (issue #1095).
+    expect(
+      suggestedArtUrl({ remembered: REMEMBERED, thumb: THUMB, broken: null }),
+    ).toBe(REMEMBERED);
+  });
+
+  it("yields to this launch's own answer", () => {
+    expect(
+      suggestedArtUrl({
+        minimap: MINIMAP,
+        remembered: REMEMBERED,
+        thumb: THUMB,
+        broken: null,
+      }),
+    ).toBe(MINIMAP);
+  });
+
+  it("falls to the catalog's image when there is nothing remembered", () => {
+    expect(suggestedArtUrl({ thumb: THUMB, broken: null })).toBe(THUMB);
+  });
+
+  it("steps past a picture that would not load", () => {
+    // An evicted cache file. The thumbnail is a real picture of the map, and the
+    // card's bare glyph is not, so the refusal has to fall through rather than
+    // stop.
+    expect(
+      suggestedArtUrl({
+        remembered: REMEMBERED,
+        thumb: THUMB,
+        broken: REMEMBERED,
+      }),
+    ).toBe(THUMB);
+  });
+
+  it("has nothing left to offer when every answer is refused", () => {
+    expect(suggestedArtUrl({ thumb: THUMB, broken: THUMB })).toBeUndefined();
+  });
+
+  it("only answers for the map it is a picture of", () => {
+    const entry = { mapName: "Supreme Isthmus v2.1", url: REMEMBERED };
+    expect(rememberedArtFor(entry, "Supreme Isthmus v2.1")).toBe(REMEMBERED);
+    expect(rememberedArtFor(entry, "Fallendell_V4")).toBeUndefined();
+    expect(rememberedArtFor(null, "Supreme Isthmus v2.1")).toBeUndefined();
+    expect(rememberedArtFor(entry, undefined)).toBeUndefined();
+  });
+
+  it("matches a name whatever case each side was written in", () => {
+    // A spring name reaches this module from the catalog in one case and from a
+    // unitsync scan in another, exactly as `poolKey` has to reconcile them.
+    const entry = { mapName: "Supreme Isthmus v2.1", url: REMEMBERED };
+    expect(rememberedArtFor(entry, "SUPREME ISTHMUS V2.1")).toBe(REMEMBERED);
+  });
+
+  it("holds what this launch resolved, for the next launch to read", () => {
+    rememberSuggestedMapArt("Fallendell_V4", MINIMAP);
+    expect(rememberedSuggestedMapArt()).toEqual({
+      mapName: "Fallendell_V4",
+      url: MINIMAP,
+    });
+  });
+
+  it("drops a picture the card could not paint", () => {
+    rememberSuggestedMapArt("Fallendell_V4", MINIMAP);
+    forgetSuggestedMapArt(MINIMAP);
+    expect(rememberedSuggestedMapArt()).toBeNull();
+  });
+
+  it("says nothing about a picture it never offered", () => {
+    rememberSuggestedMapArt("Fallendell_V4", MINIMAP);
+    forgetSuggestedMapArt(
+      "coilbox://localhost/unitsyncthumb/somewhere-else.png",
+    );
+    expect(rememberedSuggestedMapArt()?.url).toBe(MINIMAP);
+  });
+
+  it("round trips through storage", () => {
+    rememberSuggestedMapArt("Fallendell_V4", MINIMAP);
+    const text = JSON.stringify({
+      version: 1,
+      mapName: "Fallendell_V4",
+      url: MINIMAP,
+    });
+    expect(decodeSuggestedMapArt(text)).toEqual({
+      mapName: "Fallendell_V4",
+      url: MINIMAP,
+    });
+  });
+
+  it("reads nothing at all rather than half an answer", () => {
+    for (const text of [
+      null,
+      "",
+      "{",
+      "[]",
+      '{"version":2,"mapName":"M","url":"u"}',
+      '{"version":1,"mapName":"M"}',
+      '{"version":1,"url":"u"}',
+      '{"version":1,"mapName":"","url":"u"}',
+      '{"version":1,"mapName":"M","url":""}',
+    ]) {
+      expect(decodeSuggestedMapArt(text), String(text)).toBeNull();
+    }
+  });
+});

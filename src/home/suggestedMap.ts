@@ -572,10 +572,51 @@ export function useSuggestedMapAnswer(): SuggestedMapAnswer {
  *
  * Both hooks run on every render, as hooks must. The minimap one is handed a map
  * name only when the map is installed, and does nothing without one.
+ *
+ * ## Why the middle step exists
+ *
+ * For a map you have, both sources answer, and they answer at different times:
+ * the thumbnail at about 760ms and the minimap at about 990ms. The card painted
+ * the first and then changed to the second, and since both are pictures of the
+ * same map the change said nothing the first one did not (issue #1095).
+ *
+ * The two are not interchangeable, so the fix is not to drop one. The minimap is
+ * the archive the player actually has, rendered by their own engine and needing
+ * no network. The thumbnail is the catalog's own image of the map, and a mirror
+ * is exactly the thing that hands back a different map under a name (issue
+ * #1067). Preferring whichever arrived first would have made which picture you
+ * get a function of which cache happened to be warm, which is a different card
+ * on two launches of the same app on the same map.
+ *
+ * Nor does swapping the preference settle it. Whichever source is preferred, the
+ * other can still resolve first and be replaced, so an ordering alone only moves
+ * the swap to the run where the caches warm the other way round.
+ *
+ * So the answer is written down and read back, the way the tool cards' is (PR
+ * #1096): {@link rememberedSuggestedMapArt} holds the minimap this card settled
+ * on last launch, read from `localStorage` while this module loads, and it
+ * stands in front of the thumbnail until this launch's own minimap arrives. That
+ * is the same URL in the ordinary case, so the picture on the card never
+ * changes.
+ *
+ * Only the minimap is remembered. The thumbnail resolves to a `data:` URL of the
+ * image itself, about 140KB for the map on the card as this was written, so
+ * there is nothing short to write down. That is no loss: a map you do not have
+ * is a map the minimap is never asked for, so its card shows the thumbnail from
+ * its first paint and has no swap to remove.
+ *
+ * A remembered entry can only ever be early, never wrong about its subject. It
+ * names the map it is a picture of and is ignored for any other, and both
+ * pictures this card can show are pictures of that one map. So there is no
+ * pruning here of the kind `contentArt` needs, where a stale entry could put one
+ * card's map on another card. The one thing that can go stale is the file, which
+ * is a cache entry something else may evict, and the card withdraws it through
+ * {@link forgetSuggestedMapArt} when the image will not load.
  */
 export function useSuggestedMapArt(
   map: SuggestedMap | null,
   installed: boolean,
+  broken: string | null = null,
 ): string | undefined {
   const { target } = usePreferredTarget();
   const springName = map ? springNameOf(map) : undefined;
@@ -585,8 +626,165 @@ export function useSuggestedMapArt(
     installed ? springName : undefined,
   );
   const thumb = useCachedImage(map?.thumb, true);
-  return minimap.url ?? thumb;
+  const url = minimap.url;
+  useEffect(() => {
+    if (springName && url) rememberSuggestedMapArt(springName, url);
+  }, [springName, url]);
+  return suggestedArtUrl({
+    minimap: url,
+    remembered: rememberedArtFor(remembered, springName),
+    thumb,
+    broken,
+  });
 }
+
+/**
+ * Which of the three answers the card paints, in preference order, skipping any
+ * the card has already refused.
+ *
+ * Pure, so the order and the fall-through are testable without a DOM or a
+ * unitsync worker.
+ */
+export function suggestedArtUrl(args: {
+  minimap?: string | null;
+  remembered?: string;
+  thumb?: string;
+  broken: string | null;
+}): string | undefined {
+  for (const url of [args.minimap, args.remembered, args.thumb])
+    if (url && url !== args.broken) return url;
+  return undefined;
+}
+
+/* -------------------------------------------------------------------------- *
+ * What the card painted last launch, so this launch paints it at once.
+ * -------------------------------------------------------------------------- */
+
+/** The minimap this card settled on, and the map it is a picture of. */
+export interface RememberedMapArt {
+  mapName: string;
+  url: string;
+}
+
+/** Where the snapshot is kept, alongside the tool cards' and the theme's. */
+const ART_STORAGE_KEY = "coilbox.home.suggestedMapArt";
+
+/**
+ * What the last launch painted.
+ *
+ * Declared here rather than beside the rest of the snapshot code at the foot of
+ * the file. A `let` is unreachable until its declaration runs, and Vite's hot
+ * reload can re-evaluate a module while React is part way through a render,
+ * which would put {@link useSuggestedMapArt} between the two.
+ */
+let remembered: RememberedMapArt | null = null;
+
+/** The text last written, so an unchanged snapshot is not written again. */
+let writtenArt: string | undefined;
+
+/** What the last launch painted. For tests, and for the card's own error path. */
+export function rememberedSuggestedMapArt(): RememberedMapArt | null {
+  return remembered;
+}
+
+/**
+ * Take a snapshot as the starting point, without writing it back. What the
+ * module does at load with the stored text, and what a test does by hand.
+ */
+export function seedSuggestedMapArt(entry: RememberedMapArt | null): void {
+  remembered = entry;
+}
+
+/**
+ * The remembered URL for this map, if it is a picture of this map.
+ *
+ * Case-insensitive, for the reason every other name comparison here is: a spring
+ * name reaches this module from the catalog in one case and from a unitsync scan
+ * in another.
+ */
+export function rememberedArtFor(
+  entry: RememberedMapArt | null,
+  mapName: string | undefined,
+): string | undefined {
+  if (!entry || !mapName) return undefined;
+  return entry.mapName.toLowerCase() === mapName.toLowerCase()
+    ? entry.url
+    : undefined;
+}
+
+/** Hold what this launch resolved and write it down, if it says anything new. */
+export function rememberSuggestedMapArt(mapName: string, url: string): void {
+  remembered = { mapName, url };
+  const text = JSON.stringify({ version: 1, ...remembered });
+  if (text === writtenArt) return;
+  writtenArt = text;
+  try {
+    localStorage.setItem(ART_STORAGE_KEY, text);
+  } catch {
+    // No storage (a test's node environment, or a webview with it switched off).
+    // Everything above still works, this launch simply teaches the next one
+    // nothing.
+  }
+}
+
+/**
+ * Forget a picture that would not load.
+ *
+ * A remembered URL names a file in a cache something else is free to evict, and
+ * an evicted file is indistinguishable from a working one until the card tries
+ * to paint it. Dropping it here rather than only in the card is what lets the
+ * card fall through to the catalog's thumbnail instead of to its bare map glyph.
+ */
+export function forgetSuggestedMapArt(url: string): void {
+  if (remembered?.url !== url) return;
+  remembered = null;
+  writtenArt = undefined;
+  try {
+    localStorage.removeItem(ART_STORAGE_KEY);
+  } catch {
+    // As above.
+  }
+}
+
+/**
+ * Read a snapshot back.
+ *
+ * Anything it does not recognise is nothing at all. The cost of answering
+ * nothing is one launch of the behaviour every launch had before this existed.
+ */
+export function decodeSuggestedMapArt(
+  text: string | null,
+): RememberedMapArt | null {
+  if (!text) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const { version, mapName, url } = parsed as Record<string, unknown>;
+  if (version !== 1) return null;
+  if (typeof mapName !== "string" || typeof url !== "string") return null;
+  if (!mapName || !url) return null;
+  return { mapName, url };
+}
+
+/** The stored snapshot, or nothing where there is no storage to read. */
+function readRememberedArt(): RememberedMapArt | null {
+  try {
+    const text = localStorage.getItem(ART_STORAGE_KEY);
+    writtenArt = text ?? undefined;
+    return decodeSuggestedMapArt(text);
+  } catch {
+    return null;
+  }
+}
+
+// Read while the module loads, which is before anything renders. Synchronous on
+// purpose: this is the value first paint needs, and a promise would arrive after
+// exactly the paint it exists to fill.
+remembered = readRememberedArt();
 
 /**
  * Whether the user already has this map, whether a download is under way, and
