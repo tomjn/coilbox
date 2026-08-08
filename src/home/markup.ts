@@ -1,8 +1,9 @@
 import { readProfileFile, resolveFileRef } from "../profile/refs";
+import { entryMarkupKeys } from "./config";
 
 /**
- * Distribution markup on the home page: the `before` and `after` strings on a
- * built-in zone, and the `html` of a custom entry between zones (issue #999).
+ * Distribution markup on the home page: the `before` and `after` strings around
+ * any entry, and the `html` of a custom entry between zones (issue #999).
  *
  * Both keys take the same two forms the welcome's `html` takes, and mean the same
  * thing in both places:
@@ -31,9 +32,6 @@ export interface HomeMarkup {
   error?: string;
 }
 
-/** The markup keys an author may attach to an entry, in the order they render. */
-const MARKUP_KEYS = ["before", "html", "after"] as const;
-
 /** Whether a configured value is a `@`-reference rather than inline markup. */
 function isRef(value: string): boolean {
   return value.trim().startsWith("@");
@@ -45,14 +43,22 @@ function isRef(value: string): boolean {
 // behind that the edited profile no longer names.
 let files = new Map<string, HomeMarkup>();
 
-/** Every distinct `@`-reference the raw `home` key names, in the order found. */
+/**
+ * Every distinct `@`-reference the raw `home` key names and will render, in the
+ * order found.
+ *
+ * Which keys those are is `./config`'s answer, per entry, because an entry that
+ * renders none of them is one the page drops and a key its kind does not read is
+ * one the page never draws (issue #1094). Reading either would cost a disk read
+ * for nothing, and would let {@link homeMarkupIssues} name a file the page had no
+ * intention of using.
+ */
 function markupRefs(home: unknown): string[] {
   const zones = (home as { zones?: unknown } | null | undefined)?.zones;
   if (!Array.isArray(zones)) return [];
   const refs = new Set<string>();
   for (const entry of zones) {
-    if (typeof entry !== "object" || entry === null) continue;
-    for (const key of MARKUP_KEYS) {
+    for (const key of entryMarkupKeys(entry)) {
       const value = (entry as Record<string, unknown>)[key];
       if (typeof value === "string" && isRef(value)) refs.add(value.trim());
     }
@@ -64,8 +70,9 @@ function markupRefs(home: unknown): string[] {
  * Read the markup files a profile's `home` key references into memory.
  *
  * Walks the raw value rather than the resolved page, so a malformed `zones` list
- * warns once, when the page is resolved, rather than a second time here. The cost
- * is reading a file for an entry that is later dropped, which no one sees.
+ * warns once, when the page is resolved, rather than a second time here. It still
+ * reaches the same answer about which markup renders, because both ask
+ * `entryMarkupKeys`.
  *
  * A no-op for a profile with no `home` key, so an unbranded install does no file
  * IO at startup and renders exactly as before.

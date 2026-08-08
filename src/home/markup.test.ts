@@ -62,6 +62,40 @@ describe("loadHomeMarkup", () => {
     ]);
   });
 
+  it("reads the markup around a custom entry, which renders it", async () => {
+    const read = reader(FILES);
+    await loadHomeMarkup(
+      { zones: [{ html: "<p>Feed</p>", before: "@.coilbox/intro.html" }] },
+      read,
+    );
+    expect(read.mock.calls.map(([p]) => p)).toEqual(["intro.html"]);
+  });
+
+  it("reads no file for a key the entry does not render", async () => {
+    // `html` on a built-in zone is not drawn, so reading it would cost a disk
+    // read for markup nobody sees (issue #1094).
+    const read = reader(FILES);
+    await loadHomeMarkup(
+      { zones: [{ zone: "cards", html: "@.coilbox/community.html" }] },
+      read,
+    );
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("reads no file for an entry the page drops", async () => {
+    const read = reader(FILES);
+    await loadHomeMarkup(
+      {
+        zones: [
+          { zone: "livestream", before: "@.coilbox/intro.html" },
+          { before: "@.coilbox/community.html" },
+        ],
+      },
+      read,
+    );
+    expect(read).not.toHaveBeenCalled();
+  });
+
   it("reads a reference used twice only once", async () => {
     const read = reader(FILES);
     await loadHomeMarkup(
@@ -214,5 +248,15 @@ describe("homeMarkupIssues", () => {
     const home = { zones: [{ html: "@.coilbox/../secret" }] };
     await loadHomeMarkup(home, reader(FILES));
     expect(homeMarkupIssues(home)).toHaveLength(1);
+  });
+
+  it("says nothing about a file named by a key the page never draws", async () => {
+    // Naming it would tell the author a file at that path would have worked,
+    // and nothing renders `html` on a built-in zone whether it is there or not
+    // (issue #1094). The panel says the key does nothing instead, from the
+    // resolver, which is the complaint that has a fix in it.
+    const home = { zones: [{ zone: "cards", html: "@.coilbox/missing.html" }] };
+    await loadHomeMarkup(home, reader(FILES));
+    expect(homeMarkupIssues(home)).toStrictEqual([]);
   });
 });
