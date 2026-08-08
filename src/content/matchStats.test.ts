@@ -509,14 +509,24 @@ describe("allySeries", () => {
   });
 
   it("ignores a spectator, who is on a side but holds no team", () => {
+    // The caster's team is one no player is on, so this can't pass because the
+    // players happen to be listed after them and overwrite what they claimed.
+    const three = trailer([
+      [at(0, KEY_A, 3)],
+      [at(0, KEY_A, 5)],
+      [at(0, KEY_A, 7)],
+    ]);
     const cast = info({
       players: [
-        { name: "cast", spectator: true, team: 0, allyTeam: 1 },
+        { name: "cast", spectator: true, team: 2, allyTeam: 1 },
         { name: "a", spectator: false, team: 0, allyTeam: 0 },
         { name: "b", spectator: false, team: 1, allyTeam: 0 },
       ],
     });
-    expect(allySeries(pair, cast).map((s) => s.id)).toEqual(["ally0"]);
+    expect(allySeries(three, cast).map((s) => s.id)).toEqual([
+      "ally0",
+      "team2",
+    ]);
   });
 
   it("leaves out a team the engine measured nothing for", () => {
