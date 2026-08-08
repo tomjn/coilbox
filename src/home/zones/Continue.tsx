@@ -29,6 +29,20 @@ import { RESUME_KIND_COPY, RESUME_KIND_ICON, useResume } from "../continue";
  * hero renders in the icon-only mode the chain already supports and earns its
  * weight from size, the accent border and a plain action.
  *
+ * ## The action sits next to the text
+ *
+ * Not pinned to the far edge. `justify-between` put the icon, label, title and
+ * detail on the left and the button on the right, so how far apart they ended up
+ * was whatever the card had spare. On a 1256px page that measured 166px with two
+ * rail cards beside it, 434px with one and 702px with none (#1059), so the page
+ * with a single thing to resume, the page the hero matters most on, was the one
+ * that looked the emptiest.
+ *
+ * Packed left, the action is the same short step from the words it acts on at
+ * every width, and the card's spare room is one space at its end rather than a
+ * hole through its middle. The card is sized to its content by the layout, so on
+ * most pages there is no spare room to see.
+ *
  * Layout-agnostic: no page-level spacing or width of its own, because the
  * `stacked` layout is a compatibility contract and a later layout has to be able
  * to put this card somewhere else. How wide the card is arrives as `className`
@@ -51,7 +65,7 @@ export default function Continue({ className }: { className?: string }) {
     <section
       aria-labelledby="home-continue-title"
       className={cn(
-        "flex flex-wrap items-center justify-between gap-4 rounded-lg border border-primary/40 bg-card p-5 text-card-foreground",
+        "flex flex-wrap items-center gap-4 rounded-lg border border-primary/40 bg-card p-5 text-card-foreground",
         className,
       )}
     >

@@ -318,8 +318,19 @@ describe("StackedLayout resume row", () => {
     const rendered = render(resolveHome(undefined).entries);
     const hero = rendered.find((r) => r.name === "continue");
     const rail = rendered.find((r) => r.name === "resume");
-    expect(hero?.props.className).toBe("min-w-0 sm:flex-[1_1_32rem]");
+    expect(hero?.props.className).toBe("min-w-0 sm:max-w-2xl");
     expect(rail?.props).toEqual({});
+  });
+
+  it("caps a lone hero as well as one sharing the row", () => {
+    // A profile that separated the zones asked for them apart, not for a card as
+    // wide as the window with its action out at the far edge (#1059).
+    const rendered = render(
+      resolveHome({ zones: [{ zone: "continue" }] }).entries,
+    );
+    expect(rendered.find((r) => r.name === "continue")?.props.className).toBe(
+      "min-w-0 sm:max-w-2xl",
+    );
   });
 
   it("leaves them stacked when the profile separates them", () => {

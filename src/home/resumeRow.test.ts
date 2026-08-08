@@ -160,7 +160,17 @@ describe("the resume row", () => {
 
   it("gives the hero the width the layout chose", () => {
     resume.mockReturnValue({ candidates: [HERO], loading: false });
-    expect(page()).toContain("min-w-0 sm:flex-[1_1_32rem]");
+    expect(page()).toContain("min-w-0 sm:max-w-2xl");
+  });
+
+  it("leaves the hero no room to push its action away from its text", () => {
+    // The gap the action used to sit in was whatever the rail left over, so the
+    // page with one thing to resume showed the widest one (#1059). A card with no
+    // grow and no `justify-between` has neither the room nor the instruction.
+    resume.mockReturnValue({ candidates: [HERO], loading: false });
+    const html = page();
+    expect(html).not.toContain("justify-between");
+    expect(html).not.toContain("flex-[1_1_32rem]");
   });
 
   it("shows the hero and the runners-up together", () => {
