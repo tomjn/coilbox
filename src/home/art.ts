@@ -120,16 +120,56 @@ export function resolveCardArt(
   scheme: CardScheme = readColorScheme(),
 ): CardArt {
   const request: CardArtRequest = { toolId, themeColor, scheme };
-  for (const step of STEPS) {
-    const answer = sources.get(step)?.(request);
-    if (answer === false) return { kind: "icon", source: step };
-    if (answer) return { kind: "art", url: answer, source: step };
-  }
+  const spoken = firstAnswer(request);
+  if (spoken)
+    return spoken.answer === false
+      ? { kind: "icon", source: spoken.step }
+      : { kind: "art", url: spoken.answer, source: spoken.step };
   return {
     kind: "art",
     url: proceduralCardArt(toolId, themeColor, scheme),
     source: "procedural",
   };
+}
+
+/**
+ * Whether the chain refuses this tool a picture outright.
+ *
+ * The same question {@link resolveCardArt} answers, asked without generating the
+ * pattern the answer would otherwise be. That matters because the caller is a
+ * row rather than a card: the tool grid asks it of every tool in a group to
+ * decide how tall that group's cards are (see `zones/ToolCards.tsx`), and a card
+ * that does have art then generates its pattern once, when it draws.
+ *
+ * A tool nothing has spoken for is `false` here, because the procedural floor
+ * below the chain always succeeds. So today this is exactly the distribution's
+ * `art: false`, and it stays correct if some later source refuses a tool for a
+ * reason of its own.
+ */
+export function cardIsIconOnly(
+  toolId: string,
+  themeColor: string = readThemeColor(),
+  scheme: CardScheme = readColorScheme(),
+): boolean {
+  return firstAnswer({ toolId, themeColor, scheme })?.answer === false;
+}
+
+/**
+ * The first step with something to say, and what it said. `undefined` means the
+ * whole chain fell through, which is the procedural floor's case.
+ *
+ * Shared by the two questions above so they cannot disagree about priority: a
+ * second copy of this loop is how a row would end up sizing itself off one
+ * ordering while the cards in it painted another.
+ */
+function firstAnswer(
+  request: CardArtRequest,
+): { step: CardArtStep; answer: string | false } | undefined {
+  for (const step of STEPS) {
+    const answer = sources.get(step)?.(request);
+    if (answer === false || answer) return { step, answer };
+  }
+  return undefined;
 }
 
 /**

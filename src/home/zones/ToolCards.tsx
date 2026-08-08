@@ -3,7 +3,7 @@ import type { NavItem } from "@picoframe/plugin-sdk";
 import { ExternalLink } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
-import { type CardArt, resolveCardArt } from "../art";
+import { type CardArt, cardIsIconOnly, resolveCardArt } from "../art";
 import {
   ART_BAND_CLASS,
   ART_DIM_CLASS,
@@ -37,9 +37,33 @@ import LinkCard from "./LinkCard";
  * section of its own at the foot of the page (issue #1037). The grid places it
  * and never builds it: what it is, and whether there is one at all, stays the
  * suggested map zone's business.
+ *
+ * ## How tall a card is, is the row's decision
+ *
+ * A card the distribution set `art: false` has no picture, and how it should be
+ * drawn depends on what is beside it rather than on anything about the card. In
+ * a row where everything is pictureless the compact card is right and the row is
+ * simply shorter, which is what the design was written around. In a row with
+ * pictures in it the same card has to hold its own footprint or the row goes
+ * ragged (issue #1113).
+ *
+ * That is a fact about the group, so the group settles it and hands it down,
+ * exactly as the page settles art above the layout and settles the suggested
+ * map in `CoilboxHome`. No card is asked what its neighbour drew.
+ *
+ * It is answered from the chain rather than from what the cards rendered, so it
+ * is available before any of them render. That leaves one seam: a tool hidden by
+ * `useVisible` is counted, because visibility is a hook the row cannot call, and
+ * the grid resolves it a component per item for that reason. The error only ever
+ * runs one way. A hidden tool with a picture makes an otherwise pictureless row
+ * draw at full height, which is even and looks deliberate, and a row with a
+ * picture in it can never be mistaken for a pictureless one.
  */
 export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
   const { nav } = useFrame();
+  // The scheme the cards will be drawn for, so the row asks the chain the same
+  // question its cards will. See `ToolCard` for why it comes from the theme.
+  const { resolved } = useTheme();
   // Groups as composeNav sorted them, minus Home and anything left empty, so the
   // grid mirrors the sidebar. Shared with the Greeting, which needs the same
   // answer to decide whether to say there are no tools.
@@ -50,6 +74,12 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
     <div className="mt-6 space-y-8">
       {groups.map((group) => {
         const { tools, links } = splitGroupItems(group.items);
+        // The suggested map's card is a picture of a map, so a group holding it
+        // has a picture in it whatever its tools resolved to.
+        const withSuggested = group.id === SUGGESTED_MAP_GROUP && suggested;
+        const compact =
+          !withSuggested &&
+          tools.every((item) => cardIsIconOnly(item.id, undefined, resolved));
         return (
           <section
             key={group.id}
@@ -62,9 +92,9 @@ export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
             )}
             <div className="flex flex-wrap gap-3">
               {tools.map((item) => (
-                <ToolCard key={item.id} item={item} />
+                <ToolCard key={item.id} item={item} compact={compact} />
               ))}
-              {group.id === SUGGESTED_MAP_GROUP && suggested}
+              {withSuggested}
               {links.length > 0 && <LinkCard items={links} />}
             </div>
           </section>
@@ -99,6 +129,9 @@ const TOOL_CARD_CLASS = `transition-colors hover:border-ring sm:w-64 ${CARD_FOCU
  * a distribution can switch art off per tool (issue #1000), and because it is
  * the floor when every URL the chain offers fails to load. No art, so none of
  * the band applies.
+ *
+ * Only drawn where the whole row is pictureless, so the row is short together
+ * rather than one card short of its neighbours. See {@link ToolCards}.
  */
 const ICON_CARD_CLASS = `${CARD_SHELL_CLASS} ${TOOL_CARD_CLASS} items-center gap-3 bg-card p-4 text-card-foreground hover:bg-accent`;
 
@@ -109,8 +142,31 @@ const ICON_CARD_CLASS = `${CARD_SHELL_CLASS} ${TOOL_CARD_CLASS} items-center gap
  * The hover cue is a shadow and a slow push into the art, because the icon
  * card's `hover:bg-accent` is invisible under a full-bleed image. The shadow
  * matches the game and map cards elsewhere in the app.
+ *
+ * Worn by the pictureless card in a row that has pictures in it too, which is
+ * the same card with a plain panel where the picture goes.
  */
 const ART_CARD_CLASS = `${ART_SHELL_CLASS} ${TOOL_CARD_CLASS} hover:shadow-md`;
+
+/**
+ * The art window: everything above the band, growing with the card so a row of
+ * cards whose names wrap to different depths still shows art edge to edge under
+ * all of them.
+ */
+const ART_WINDOW_CLASS = "relative min-h-28 flex-1";
+
+/**
+ * The window with no picture in it: `bg-muted`, the one surface the card design
+ * already uses for a panel that holds an icon rather than content.
+ *
+ * A tone of its own is the whole point. Left on the card's own background the
+ * card is a rectangle of flat page colour with a label at the foot, which is
+ * what a picture that failed to load looks like. A muted panel is evidently a
+ * surface somebody chose, and it is the same tone the compact card puts behind
+ * its icon, so a distribution's pictureless tool is drawn in one colour whether
+ * its row is short or full height.
+ */
+const BLANK_WINDOW_CLASS = `${ART_WINDOW_CLASS} bg-muted`;
 
 /**
  * Which art a card should paint, given what the chain resolved and which URL (if
@@ -144,7 +200,22 @@ export function cardArtUrl(art: CardArt, broken: string | null): string | null {
  * tool to choose. `./Greeting` explains why that sentence has to be answered from
  * what the grid drew rather than from the nav it drew off.
  */
-export function ToolCard({ item }: { item: NavItem }) {
+export function ToolCard({
+  item,
+  compact = false,
+}: {
+  item: NavItem;
+  /**
+   * Whether every card in this card's row is pictureless, in which case a card
+   * with no art of its own may size to its content and the row is short
+   * together. {@link ToolCards} decides it for the whole group and hands it
+   * down, so no card learns what its neighbours drew.
+   *
+   * Defaults to false, the shape of every row that has a picture in it, so a
+   * caller with no row to speak of gets the card that keeps a full footprint.
+   */
+  compact?: boolean;
+}) {
   // Mirror the sidebar: an item gated off via `useVisible` is hidden everywhere,
   // this grid included. Resolved unconditionally (per-item component, so
   // hook-safe) before the early return. A card that stands down leaves neither
@@ -162,66 +233,87 @@ export function ToolCard({ item }: { item: NavItem }) {
   if (!visible) return null;
 
   const art = cardArtUrl(resolveCardArt(item.id, undefined, resolved), broken);
-  const inner = art ? (
-    <>
-      <img
-        src={art}
-        alt=""
-        className="absolute inset-0 size-full object-cover transition-transform duration-300 motion-safe:group-hover:scale-105"
-        onError={() => {
-          // Told to the content step as well as remembered here. That URL may be
-          // a cache file the last launch painted and something has since
-          // evicted, and only the step that offered it can withdraw it, which is
-          // what lets the chain answer with an illustration rather than leaving
-          // this card on its icon.
-          forgetContentArt(art);
-          setBroken(art);
-        }}
-      />
-      {/* The art window. Grows with the card so a row of cards whose names wrap
-          to different depths still shows art edge to edge under all of them. */}
-      <span aria-hidden="true" className="relative min-h-28 flex-1" />
-      <span className={ART_BAND_CLASS}>
-        <span aria-hidden="true" className={ART_FADE_CLASS} />
-        {Icon && <Icon size={20} className="shrink-0" />}
-        <span className="min-w-0 flex-1">
-          {/* Wraps to two lines rather than truncating: the band has the room,
-              and a long tool name reads better broken than clipped. No `block`,
-              because `line-clamp` sets its own display and the two fight. */}
-          <span className="line-clamp-2 font-medium">{label}</span>
-          {description != null && (
-            <span className={`block truncate text-xs ${ART_DIM_CLASS}`}>
-              {description}
-            </span>
-          )}
-        </span>
-        {item.href && (
-          <ExternalLink size={16} className={`shrink-0 ${ART_DIM_CLASS}`} />
-        )}
-      </span>
-    </>
-  ) : (
-    <>
-      {Icon && (
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors group-hover:bg-background">
-          <Icon size={20} />
-        </span>
-      )}
+  // The band across the foot, and the only thing in either full-size card that
+  // carries text. One copy, so a pictureless card in a row of pictures reads at
+  // the same height and in the same colours as the cards either side of it
+  // rather than resembling them.
+  const band = (
+    <span className={ART_BAND_CLASS}>
+      <span aria-hidden="true" className={ART_FADE_CLASS} />
+      {Icon && <Icon size={20} className="shrink-0" />}
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">{label}</span>
+        {/* Wraps to two lines rather than truncating: the band has the room,
+            and a long tool name reads better broken than clipped. No `block`,
+            because `line-clamp` sets its own display and the two fight. */}
+        <span className="line-clamp-2 font-medium">{label}</span>
         {description != null && (
-          <span className="block truncate text-xs text-muted-foreground">
+          <span className={`block truncate text-xs ${ART_DIM_CLASS}`}>
             {description}
           </span>
         )}
       </span>
       {item.href && (
-        <ExternalLink size={16} className="shrink-0 text-muted-foreground" />
+        <ExternalLink size={16} className={`shrink-0 ${ART_DIM_CLASS}`} />
       )}
-    </>
+    </span>
   );
 
-  const cardClass = art ? ART_CARD_CLASS : ICON_CARD_CLASS;
+  let inner: ReactNode;
+  if (art) {
+    inner = (
+      <>
+        <img
+          src={art}
+          alt=""
+          className="absolute inset-0 size-full object-cover transition-transform duration-300 motion-safe:group-hover:scale-105"
+          onError={() => {
+            // Told to the content step as well as remembered here. That URL may
+            // be a cache file the last launch painted and something has since
+            // evicted, and only the step that offered it can withdraw it, which
+            // is what lets the chain answer with an illustration rather than
+            // leaving this card on its icon.
+            forgetContentArt(art);
+            setBroken(art);
+          }}
+        />
+        <span aria-hidden="true" className={ART_WINDOW_CLASS} />
+        {band}
+      </>
+    );
+  } else if (compact) {
+    inner = (
+      <>
+        {Icon && (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors group-hover:bg-background">
+            <Icon size={20} />
+          </span>
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium">{label}</span>
+          {description != null && (
+            <span className="block truncate text-xs text-muted-foreground">
+              {description}
+            </span>
+          )}
+        </span>
+        {item.href && (
+          <ExternalLink size={16} className="shrink-0 text-muted-foreground" />
+        )}
+      </>
+    );
+  } else {
+    // Pictureless in a row that has pictures in it: the art card with a plain
+    // panel where the picture goes, so the row stays even and the icon and the
+    // name sit at the foot where every other card in the row puts them.
+    inner = (
+      <>
+        <span aria-hidden="true" className={BLANK_WINDOW_CLASS} />
+        {band}
+      </>
+    );
+  }
+
+  const cardClass = art || !compact ? ART_CARD_CLASS : ICON_CARD_CLASS;
   if (item.href) {
     const href = item.href;
     return (
