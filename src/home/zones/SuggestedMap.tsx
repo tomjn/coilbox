@@ -13,7 +13,6 @@ import {
   CARD_STACK_CLASS,
 } from "../cardShell";
 import {
-  forgetSuggestedMapArt,
   type SuggestedState,
   springNameOf,
   useSuggestedMapAnswer,
@@ -36,50 +35,59 @@ import {
  *
  * The states it can be in, and why each is what it is:
  *
- * - Catalog not back yet: a placeholder the size of the card, so the page below
- *   does not jump when it arrives.
- * - Catalog back and nothing curated: nothing at all. `catalog.json` ships inside
- *   the app bundle and the Rust side falls back to it, so an offline player still
- *   gets the full curated list. An empty pool therefore means a build with its
- *   catalog stripped, and a card announcing a suggested map it does not have is
- *   worse than the zone standing down, which is what the design has every zone do
- *   when it has nothing.
- * - Already installed: the same map everyone else sees today, because the daily
- *   rotation is the whole point and skipping to one the player lacks would break
- *   it. What changes is the offer: the card links to the map instead of selling a
- *   download the player already made.
+ * - Catalog or inventory not back yet: a placeholder the size of the card, so
+ *   the page below does not jump when the answer arrives.
+ * - Nothing left to offer: nothing at all. Either the catalog curates no map
+ *   this card can picture, or the player already has every one it does. Both are
+ *   the same outcome and are decided in one place (see `../suggestedMap`), and a
+ *   card announcing a map it cannot offer is worse than the zone standing down,
+ *   which is what the design has every zone do when it has nothing.
+ * - Already installed: only ever the map this card's own button just fetched.
+ *   The rotation offers a map you do not have, so the way to reach this state is
+ *   to press Install and watch it land. The card holds the map it was showing
+ *   and links to it rather than skipping to the next map under the reader.
  * - Downloading, queued, failed: said plainly on the card, because this card owns
  *   one map and a silent failure reads as a dead button.
  */
 export default function SuggestedMap() {
-  return <SuggestedMapCard heading />;
+  return <SuggestedMapCard variant="section" />;
 }
 
 /**
- * The card, with the section and label around it only when it is standing on its
- * own.
+ * The card, named for whoever it is standing among.
  *
- * The heading travels with the card rather than sitting in a wrapper above it,
- * because the zone renders nothing at all when the catalog curates no maps and a
- * label over an absent card would be the one thing left on the page.
- *
- * Inside the Downloads group the heading is off: the group has one already, and a
- * second inside it would read as a group within a group.
+ * - `group`: inside the tool grid's Downloads group. No heading, because the
+ *   group has one already and a second inside it would read as a group within a
+ *   group.
+ * - `section`: standing on its own, which is what a profile that separated the
+ *   zones asked for. The heading travels with the card rather than sitting in a
+ *   wrapper above it, because the zone renders nothing at all when there is no
+ *   map to offer and a label over an absent card would be the one thing left on
+ *   the page.
+ * - `row`: promoted into the resume row, where it is one card beside the hero
+ *   and the rail. A visible heading there would split a row that reads as one
+ *   block, so it carries the same kind of label the rail does instead, and the
+ *   label goes on the card's own element because the row's children may not be
+ *   wrapped (see `../StackedLayout`).
  */
-export function SuggestedMapCard({ heading }: { heading?: boolean }) {
+export function SuggestedMapCard({
+  variant = "group",
+}: {
+  variant?: "group" | "section" | "row";
+}) {
   // The page's answer, not this card's. `CoilboxHome` resolves it once, above the
   // layout, because the same map is claimed against the tool cards and two
   // resolutions could drift apart (issue #1077).
-  const { map, loading, source } = useSuggestedMapAnswer();
+  const { map, loading, source, inventory } = useSuggestedMapAnswer();
   const { state, error, canDownload, noWriteRoot, download } =
-    useSuggestedMapInstall(map);
+    useSuggestedMapInstall(map, inventory);
   // The URL that failed, not a flag, so a later answer gets its own chance
   // rather than inheriting the verdict on the URL it replaced.
   const [broken, setBroken] = useState<string | null>(null);
-  const art = useSuggestedMapArt(map, state === "installed", broken);
+  const art = useSuggestedMapArt(map, broken);
 
   const labelled = (node: ReactNode) =>
-    heading ? (
+    variant === "section" ? (
       <section aria-labelledby="suggested-map-heading">
         <Heading />
         {node}
@@ -100,15 +108,7 @@ export function SuggestedMapCard({ heading }: { heading?: boolean }) {
             src={art}
             alt=""
             className="absolute inset-0 size-full object-cover"
-            onError={() => {
-              // Told to the module as well as remembered here. This may be the
-              // minimap the last launch painted, out of a cache something has
-              // since evicted, and only the module that offered it can withdraw
-              // it, which is what lets the card fall through to the catalog's
-              // thumbnail rather than to its bare glyph.
-              forgetSuggestedMapArt(art);
-              setBroken(art);
-            }}
+            onError={() => setBroken(art)}
           />
           {/* The art window. Grows with the card, so the picture reaches the
               band however deep the band gets. */}
@@ -145,8 +145,17 @@ export function SuggestedMapCard({ heading }: { heading?: boolean }) {
     </>
   );
 
+  // A `section` with a label in the resume row, where the card stands among
+  // zones rather than among cards and is otherwise the only thing up there with
+  // nothing saying what it is. A plain div everywhere else: in the Downloads
+  // group the group's heading already says it, and the `section` variant has one
+  // of its own wrapped around this.
+  const Column = variant === "row" ? "section" : "div";
   return labelled(
-    <div className={COLUMN_CLASS}>
+    <Column
+      className={COLUMN_CLASS}
+      aria-label={variant === "row" ? "Suggested map" : undefined}
+    >
       {installedName ? (
         // Installed: the card is the way to the map, so the whole surface is the
         // link and the band carries no button to nest inside it.
@@ -176,7 +185,7 @@ export function SuggestedMapCard({ heading }: { heading?: boolean }) {
           to install it.
         </p>
       )}
-    </div>,
+    </Column>,
   );
 }
 

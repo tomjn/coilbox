@@ -37,6 +37,7 @@ vi.mock("./background", () => ({
 }));
 
 import StackedLayout from "./StackedLayout";
+import type { SuggestedPlacement } from "./suggestedMap";
 
 /** A rendered zone: which one, what the layout wrapped it in, what it was given. */
 type Rendered = {
@@ -78,9 +79,13 @@ function collect(node: unknown, wrapper: string | null, out: Rendered[]): void {
 }
 
 /** Render the layout for a set of entries and list what came out. */
-function render(entries: readonly HomeEntry[], bg: unknown = undefined) {
+function render(
+  entries: readonly HomeEntry[],
+  bg: unknown = undefined,
+  suggested?: SuggestedPlacement,
+) {
   const out: Rendered[] = [];
-  collect(StackedLayout({ entries, background: bg }), null, out);
+  collect(StackedLayout({ entries, background: bg, suggested }), null, out);
   return out;
 }
 
@@ -489,6 +494,100 @@ describe("StackedLayout suggested map", () => {
       COLUMN,
       COLUMN,
     ]);
+  });
+});
+
+describe("StackedLayout promoting the suggested map", () => {
+  /** What the layout rendered, by name, with the card promoted to the top row. */
+  const page = (zones: unknown[]) =>
+    render(resolveHome({ zones }).entries, undefined, "row").map((r) => r.name);
+
+  /** The default page, with the card promoted. */
+  const promotedDefault = () =>
+    render(resolveHome(undefined).entries, undefined, "row");
+
+  it("puts the card in the resume row, ahead of the hero and the rail", () => {
+    // Getting a first map installed outranks resuming a run.
+    const names = promotedDefault().map((r) => r.name);
+    expect(names.indexOf("suggested-card")).toBe(names.indexOf("continue") - 1);
+    expect(names.indexOf("continue")).toBe(names.indexOf("resume") - 1);
+  });
+
+  it("makes it a direct child of the row, like the two zones it joins", () => {
+    // The row collapses on `empty:hidden`, which needs every child to be a
+    // participant that can render nothing rather than a wrapper around one.
+    const row = promotedDefault().filter((r) => r.wrapper === RESUME_ROW);
+    expect(row.map((r) => r.name)).toEqual([
+      "suggested-card",
+      "continue",
+      "resume",
+    ]);
+  });
+
+  it("takes the card out of the Downloads group it would have been in", () => {
+    const names = promotedDefault().map((r) => r.name);
+    expect(names.filter((n) => n.startsWith("suggested"))).toEqual([
+      "suggested-card",
+    ]);
+  });
+
+  it("draws nothing where the zone was listed, rather than twice", () => {
+    expect(
+      page([{ zone: "continue" }, { zone: "resume" }, { zone: "suggested" }]),
+    ).toEqual(["slot", "suggested-card", "continue", "resume", "slot"]);
+  });
+
+  it("leaves the card where the profile put it when there is no row to join", () => {
+    // A profile that separated the hero and the rail, reversed them, or hung
+    // markup on either wrote the order it wanted, and there is no row.
+    expect(
+      page([
+        { zone: "resume" },
+        { zone: "continue" },
+        { zone: "cards" },
+        { zone: "suggested" },
+      ]),
+    ).toEqual([
+      "slot",
+      "resume",
+      "continue",
+      "cards",
+      "suggested-card",
+      "slot",
+    ]);
+    expect(
+      page([
+        { zone: "continue", after: "<p>A</p>" },
+        { zone: "resume" },
+        { zone: "suggested" },
+      ]),
+    ).toEqual(["slot", "continue", "markup", "resume", "suggested", "slot"]);
+  });
+
+  it("leaves a zone carrying markup of its own where its markup is", () => {
+    // Promoting it would carry the card into the row and leave the sentence
+    // introducing it behind, three zones down the page.
+    expect(
+      page([
+        { zone: "continue" },
+        { zone: "resume" },
+        { zone: "suggested", before: "<p>B</p>" },
+      ]),
+    ).toEqual(["slot", "continue", "resume", "markup", "suggested", "slot"]);
+  });
+
+  it("conjures no card for a profile that left the zone out", () => {
+    expect(page([{ zone: "continue" }, { zone: "resume" }])).toEqual([
+      "slot",
+      "continue",
+      "resume",
+      "slot",
+    ]);
+  });
+
+  it("keeps the card in the group when the page did not promote it", () => {
+    const names = render(resolveHome(undefined).entries).map((r) => r.name);
+    expect(names.at(-2)).toBe("suggested-card");
   });
 });
 
