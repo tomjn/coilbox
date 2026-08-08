@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { DemoInfo } from "../content/bindings";
-import { diffNewReplays, pickNewestReplay, resultFromDemoInfo } from "./detect";
+import {
+  diffNewReplays,
+  engineFailureMessage,
+  pickNewestReplay,
+  resultFromDemoInfo,
+} from "./detect";
 
 function replay(path: string, modifiedMs: number) {
   return { filename: path, path, sizeBytes: 0, modifiedMs };
@@ -116,5 +121,23 @@ describe("resultFromDemoInfo", () => {
       ],
     });
     expect(resultFromDemoInfo(info, "You")).toBe("victory");
+  });
+});
+
+describe("engineFailureMessage", () => {
+  it("reports failure for a nonzero exit with no replay found", () => {
+    expect(engineFailureMessage(1, false)).toBe("Engine exited with code 1.");
+  });
+
+  it("stays silent for a nonzero exit when a replay was found", () => {
+    expect(engineFailureMessage(1, true)).toBeNull();
+  });
+
+  it("stays silent for a zero exit with no replay found", () => {
+    expect(engineFailureMessage(0, false)).toBeNull();
+  });
+
+  it("stays silent for a zero exit when a replay was found", () => {
+    expect(engineFailureMessage(0, true)).toBeNull();
   });
 });

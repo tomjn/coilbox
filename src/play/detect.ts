@@ -47,3 +47,20 @@ export function resultFromDemoInfo(
   if (player.won === false) return "defeat";
   return "ambiguous";
 }
+
+/**
+ * Whether a just-finished launch should be reported as an engine failure
+ * instead of falling through to the manual result prompt. A nonzero exit
+ * code and no newly-written replay together are a stronger signal than
+ * either alone: the engine died before anything was recorded, so there is
+ * nothing ambiguous to ask the player about. A nonzero exit code alongside a
+ * fresh replay is left alone, since the engine can exit nonzero after a
+ * completed game, and that replay is real evidence not to discard.
+ */
+export function engineFailureMessage(
+  exitCode: number,
+  replayFound: boolean,
+): string | null {
+  if (exitCode === 0 || replayFound) return null;
+  return `Engine exited with code ${exitCode}.`;
+}

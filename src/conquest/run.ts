@@ -17,6 +17,7 @@ import {
 import {
   type DetectedResult,
   diffNewReplays,
+  engineFailureMessage,
   pickNewestReplay,
   resultFromDemoInfo,
 } from "../play/detect";
@@ -243,7 +244,15 @@ export function useConquestBattleRun(
       });
       // Cancelled before the game started: no turn consumed, no detection.
       if (res.exitCode === null) return;
+      const exitCode = res.exitCode;
       if (beforePaths === null) {
+        // No baseline to detect a replay against, so a nonzero exit is read
+        // the same way as "no replay found" below.
+        const failure = engineFailureMessage(exitCode, false);
+        if (failure) {
+          setError(failure);
+          return;
+        }
         setPhase("result");
         return;
       }
@@ -264,6 +273,18 @@ export function useConquestBattleRun(
           galaxyId: galaxy.id,
           nodeId: node.id,
         });
+      }
+      // A nonzero exit with no new replay is stronger than either signal
+      // alone: the engine died before anything was recorded, so this says so
+      // directly rather than asking the player to guess how the battle ended.
+      // A nonzero exit alongside a replay is left to detection below, since
+      // the engine can exit nonzero after a completed battle, and that
+      // replay is real evidence not to discard.
+      const failure = engineFailureMessage(exitCode, replay !== null);
+      if (failure) {
+        setError(failure);
+        setPhase("briefing");
+        return;
       }
       if (outcome === "ambiguous") {
         setPhase("result");
