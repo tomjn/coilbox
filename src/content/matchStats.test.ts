@@ -238,40 +238,43 @@ describe("headlineTotals", () => {
 });
 
 describe("metricGroups", () => {
+  // Deliberately not in alphabetical order: the real registry's groups happen to
+  // come out economy, military, units either way, so a fixture in that order
+  // can't tell "registry order" from "sorted".
   const registry = [
-    metric(KEY_A, "Alpha", false, "economy"),
-    metric(KEY_B, "Beta", true, "military"),
-    metric(KEYS[2], "Gamma", false, "economy"),
-    metric(KEYS[3], "Delta", false, "units"),
+    metric(KEY_A, "Alpha", false, "units"),
+    metric(KEY_B, "Beta", true, "economy"),
+    metric(KEYS[2], "Gamma", false, "units"),
+    metric(KEYS[3], "Delta", false, "military"),
   ];
 
   it("orders groups by where the registry first mentions them", () => {
     expect(metricGroups(registry).map((g) => g.group)).toEqual([
+      "units",
       "economy",
       "military",
-      "units",
     ]);
   });
 
   it("keeps registry order inside a group", () => {
-    const economy = metricGroups(registry)[0];
-    expect(economy.metrics.map((m) => m.label)).toEqual(["Alpha", "Gamma"]);
+    const units = metricGroups(registry)[0];
+    expect(units.metrics.map((m) => m.label)).toEqual(["Alpha", "Gamma"]);
   });
 
   it("gives every group a heading", () => {
     expect(metricGroups(registry).map((g) => g.label)).toEqual([
+      "Units",
       "Economy",
       "Military",
-      "Units",
     ]);
   });
 
   it("leaves out a metric the registry hides", () => {
     const hidden = registry.map((m) =>
-      m.group === "units" ? { ...m, surfaced: false } : m,
+      m.group === "economy" ? { ...m, surfaced: false } : m,
     );
     expect(metricGroups(hidden).map((g) => g.group)).toEqual([
-      "economy",
+      "units",
       "military",
     ]);
   });
