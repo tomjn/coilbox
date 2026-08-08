@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Check, Download, Loader2, Map as MapIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 import {
   ART_BAND_CLASS,
@@ -13,9 +13,10 @@ import {
   CARD_STACK_CLASS,
 } from "../cardShell";
 import {
+  forgetSuggestedMapArt,
   type SuggestedState,
   springNameOf,
-  useSuggestedMap,
+  useSuggestedMapAnswer,
   useSuggestedMapArt,
   useSuggestedMapInstall,
 } from "../suggestedMap";
@@ -66,9 +67,15 @@ export default function SuggestedMap() {
  * second inside it would read as a group within a group.
  */
 export function SuggestedMapCard({ heading }: { heading?: boolean }) {
-  const { map, loading, source } = useSuggestedMap();
+  // The page's answer, not this card's. `CoilboxHome` resolves it once, above the
+  // layout, because the same map is claimed against the tool cards and two
+  // resolutions could drift apart (issue #1077).
+  const { map, loading, source } = useSuggestedMapAnswer();
   const { state, error, canDownload, download } = useSuggestedMapInstall(map);
-  const art = useSuggestedMapArt(map, state === "installed");
+  // The URL that failed, not a flag, so a later answer gets its own chance
+  // rather than inheriting the verdict on the URL it replaced.
+  const [broken, setBroken] = useState<string | null>(null);
+  const art = useSuggestedMapArt(map, state === "installed", broken);
 
   const labelled = (node: ReactNode) =>
     heading ? (
@@ -92,6 +99,15 @@ export function SuggestedMapCard({ heading }: { heading?: boolean }) {
             src={art}
             alt=""
             className="absolute inset-0 size-full object-cover"
+            onError={() => {
+              // Told to the module as well as remembered here. This may be the
+              // minimap the last launch painted, out of a cache something has
+              // since evicted, and only the module that offered it can withdraw
+              // it, which is what lets the card fall through to the catalog's
+              // thumbnail rather than to its bare glyph.
+              forgetSuggestedMapArt(art);
+              setBroken(art);
+            }}
           />
           {/* The art window. Grows with the card, so the picture reaches the
               band however deep the band gets. */}
@@ -182,17 +198,47 @@ function Heading() {
 }
 
 /**
- * The card's footprint while the catalog is still loading. Not a spinner: the
- * catalog usually comes off disk and resolves in a frame or two, and a spinner
- * that flashes is worse than a shape that settles.
+ * The card's footprint while the catalog is still loading.
+ *
+ * Not a spinner, and not skeleton bars either: the catalog usually comes off
+ * disk and resolves in a frame or two, and anything that flashes there is worse
+ * than a shape that settles. What it draws is the pulse and nothing else.
+ *
+ * What it is, though, is the card's own parts with no words in them, so its
+ * height is the card's height rather than a number that once matched it. It was
+ * `min-h-40`, 160px, which was the card's height while the card stood alone at
+ * the foot of the page. Since #1069 put it in the Downloads group it is the
+ * tallest thing in that row and sets the row's height, so being 15px short moved
+ * the row and everything below it every time the catalog landed (issue #1083).
+ *
+ * Derived rather than declared, because the two must not drift again: the same
+ * art window, the same band, and a blank line of each of the band's two type
+ * sizes. It holds the shape of the card *with* art, which is 1px shorter than
+ * the one without, because since #1070 the rotation only offers maps the catalog
+ * can picture. That comes out at the card's 177px.
+ *
+ * A title that wraps to two lines still makes the card 201px, and no placeholder
+ * can know whether it will, because the title is the thing the catalog has not
+ * said yet. Reserving two lines instead would trade a jump on the six curated
+ * maps whose titles wrap for a blank line under the other eighteen, every day.
+ * So the common case is the one reserved, and the uncommon one costs 24px rather
+ * than the 39px both cost before.
  */
 function Placeholder() {
   return (
     <div className={COLUMN_CLASS}>
       <div
         aria-hidden="true"
-        className={`${PLAIN_CARD_CLASS} min-h-40 motion-safe:animate-pulse`}
-      />
+        className={`${ART_CARD_CLASS} motion-safe:animate-pulse`}
+      >
+        <span className={ART_WINDOW_CLASS} />
+        <span className={ART_BAND_CLASS}>
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium">&nbsp;</span>
+            <span className="block truncate text-xs">&nbsp;</span>
+          </span>
+        </span>
+      </div>
     </div>
   );
 }

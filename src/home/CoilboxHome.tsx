@@ -4,7 +4,11 @@ import BrandedHome from "./BrandedHome";
 import { resolveHome } from "./config";
 import { homeMode, resolveLayout } from "./layout";
 import { resolveCardArtOverrides } from "./profileArt";
-import { suggestedMapClaim, useSuggestedMap } from "./suggestedMap";
+import {
+  SuggestedMapContext,
+  suggestedMapClaim,
+  useSuggestedMap,
+} from "./suggestedMap";
 import { useContentCardArt } from "./useContentCardArt";
 
 /**
@@ -53,17 +57,21 @@ export default function CoilboxHome() {
  * a tool card and is not in the grid, but the map it shows is a picture on this
  * page, so the tool cards have to settle around it (issue #1055). Deciding it
  * above the layout is what keeps that a page-wide answer rather than a race
- * between two zones. The zone below resolves the same map from the same inputs
- * and renders it; nothing is passed down.
+ * between two zones. This is the only place it is resolved, and the zone that
+ * draws it reads this answer (issue #1077).
  */
 function LayoutHome() {
   const { layout, background, entries } = resolveHome(getProfile().home);
-  const { map } = useSuggestedMap();
+  const suggested = useSuggestedMap();
   const shown = entries.some(
     (e) => e.kind === "zone" && e.zone === "suggested",
   );
   publishArtOverrides(resolveCardArtOverrides(entries));
-  useContentCardArt(suggestedMapClaim(map, shown));
+  useContentCardArt(suggestedMapClaim(suggested.map, shown));
   const Layout = resolveLayout(layout);
-  return <Layout entries={entries} background={background} />;
+  return (
+    <SuggestedMapContext value={suggested}>
+      <Layout entries={entries} background={background} />
+    </SuggestedMapContext>
+  );
 }
