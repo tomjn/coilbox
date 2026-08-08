@@ -1590,8 +1590,9 @@ export function useSaves(rootPath?: string) {
 const demoInfoCache = new Map<string, DemoInfo>();
 
 /**
- * Lazily decode one replay (native header + start-script, plus demotool's
- * winner). Cached for the session — decoding re-reads the file and runs demotool.
+ * Lazily decode one replay (native header, start-script and trailer, with
+ * demotool asked only as a fallback for a trailer format the decoder
+ * refuses). Cached for the session, decoding re-reads the file.
  */
 export function useDemoInfo(enginePath?: string, replayPath?: string) {
   const [info, setInfo] = useState<DemoInfo | null>(null);

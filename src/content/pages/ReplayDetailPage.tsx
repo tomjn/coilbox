@@ -93,8 +93,9 @@ function swatch(rgb?: [number, number, number]): string | undefined {
  * it on hover.
  *
  * Rendered only when the decoder had statistics to give: a match the engine
- * recorded none for has no `apm`, and the section says so once rather than
- * every row showing a placeholder (issue #1190).
+ * recorded none for has no `apm`, and the row leaves the figure off rather
+ * than showing a placeholder (issue #1190). The absence itself is explained
+ * once, by the Match statistics section below rather than here (#1199).
  */
 function Apm({ p }: { p: ReplayPlayer }) {
   if (p.apm === undefined) return null;
@@ -223,12 +224,6 @@ function Players({ info }: { info: DemoInfo }) {
     push(a.allyTeam ?? -1, { kind: "ai", ai: a });
   }
   const allyTeamIds = [...teams.keys()].sort((a, b) => a - b);
-  // Nobody having an APM means the file carried no statistics: either the
-  // recording never reached a game over, or it ended with the block left
-  // uninitialised (#1190). Said once here rather than as a placeholder on every
-  // row, since it is a fact about the recording and not about the player.
-  const seated = info.players.filter((p) => !p.spectator);
-  const noStats = seated.length > 0 && seated.every((p) => p.apm === undefined);
 
   return (
     <section className="flex flex-col gap-2">
@@ -281,12 +276,6 @@ function Players({ info }: { info: DemoInfo }) {
           );
         })}
       </div>
-      {noStats && (
-        <p className="text-xs text-muted-foreground">
-          The engine recorded no player statistics for this match, so no actions
-          per minute are shown.
-        </p>
-      )}
       {spectators.length > 0 && (
         <p className="text-xs text-muted-foreground">
           Spectators: {spectators.map((s) => s.name).join(", ")}
