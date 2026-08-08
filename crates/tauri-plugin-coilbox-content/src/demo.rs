@@ -9,6 +9,11 @@
 //! header + script natively (a small gunzip of the file's prefix), and shell out
 //! to `demotool` for the one thing the prefix can't cheaply reach: the **winning
 //! ally-teams**, recorded at the very end of the demo stream.
+//!
+//! Behind the stream sits the **trailer**: the winning ally-teams and a
+//! statistics sample per team every `teamStatPeriod` seconds, which is the graph
+//! the engine drew at the end of the match. [`read_trailer`] decodes it natively
+//! from a seek and a struct read.
 
 use std::collections::HashMap;
 use std::io::Read;
@@ -18,7 +23,10 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use flate2::read::GzDecoder;
 
-use crate::model::{AllyTeamInfo, ChatLine, DemoChat, DemoInfo, PlayerInfo, ReplayFile, StartBox};
+use crate::model::{
+    AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoTrailer, PlayerInfo, ReplayFile, StartBox,
+    TeamStatSample, TeamStatSeries,
+};
 
 /// Folders under a write dir that hold client demos. The engine writes to
 /// `demos/` (`DemoRecorder.cpp`), and some lobbies/users use `replays/`.
@@ -38,14 +46,25 @@ const OFF_VERSION_STRING: usize = 24;
 const OFF_GAME_ID: usize = 280;
 const OFF_UNIX_TIME: usize = 296;
 const OFF_SCRIPT_SIZE: usize = 304;
+const OFF_DEMO_STREAM_SIZE: usize = 308;
 const OFF_GAME_TIME: usize = 312;
 const OFF_WALLCLOCK: usize = 316;
+const OFF_NUM_PLAYERS: usize = 320;
+const OFF_PLAYER_STAT_SIZE: usize = 324;
+const OFF_PLAYER_STAT_ELEM_SIZE: usize = 328;
 /// `numTeams`, how many teams the end-of-game statistics block covers. Written
 /// only when the game actually ended, see [`RawDemo::game_over`].
 const OFF_NUM_TEAMS: usize = 332;
+const OFF_TEAM_STAT_SIZE: usize = 336;
+const OFF_TEAM_STAT_ELEM_SIZE: usize = 340;
+const OFF_TEAM_STAT_PERIOD: usize = 344;
+const OFF_WINNING_ALLY_TEAMS_SIZE: usize = 348;
 /// We only need the header up to (and including) the team-count field. The v5
 /// header is 352 bytes but reading this prefix is enough to locate the script.
 const MIN_HEADER: usize = OFF_NUM_TEAMS + 4;
+
+/// `TeamStatistics`: 20 fields, `i32 frame` + 12 `f32` + 7 `i32`.
+const TEAM_STAT_ELEM_SIZE: usize = 80;
 
 // ---- listing ---------------------------------------------------------------
 
@@ -497,6 +516,241 @@ fn hex_at(buf: &[u8], off: usize, len: usize) -> String {
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect()
+}
+
+// ---- trailer (winners + per-team statistics) -------------------------------
+
+/// The `DemoFileHeader`'s size and count fields, which is everything needed to
+/// seek to the records the engine wrote after the demo stream.
+struct DemoHeader {
+    header_size: usize,
+    script_size: usize,
+    demo_stream_size: usize,
+    num_players: usize,
+    player_stat_size: usize,
+    player_stat_elem_size: usize,
+    num_teams: usize,
+    team_stat_size: usize,
+    team_stat_elem_size: usize,
+    team_stat_period: i32,
+    winning_ally_teams_size: usize,
+}
+
+impl DemoHeader {
+    fn parse(buf: &[u8]) -> Result<Self, String> {
+        Ok(DemoHeader {
+            header_size: size_at(buf, OFF_HEADER_SIZE, "header size")?,
+            script_size: size_at(buf, OFF_SCRIPT_SIZE, "start-script size")?,
+            demo_stream_size: size_at(buf, OFF_DEMO_STREAM_SIZE, "demo stream size")?,
+            num_players: size_at(buf, OFF_NUM_PLAYERS, "player count")?,
+            player_stat_size: size_at(buf, OFF_PLAYER_STAT_SIZE, "player statistics size")?,
+            player_stat_elem_size: size_at(
+                buf,
+                OFF_PLAYER_STAT_ELEM_SIZE,
+                "player statistics element size",
+            )?,
+            num_teams: size_at(buf, OFF_NUM_TEAMS, "team count")?,
+            team_stat_size: size_at(buf, OFF_TEAM_STAT_SIZE, "team statistics size")?,
+            team_stat_elem_size: size_at(
+                buf,
+                OFF_TEAM_STAT_ELEM_SIZE,
+                "team statistics element size",
+            )?,
+            team_stat_period: i32_at(buf, OFF_TEAM_STAT_PERIOD)?,
+            winning_ally_teams_size: size_at(
+                buf,
+                OFF_WINNING_ALLY_TEAMS_SIZE,
+                "winning ally-teams size",
+            )?,
+        })
+    }
+
+    /// The offset the trailer starts at: past the header, the start script and
+    /// the demo stream.
+    fn trailer_start(&self) -> Result<usize, String> {
+        self.header_size
+            .checked_add(self.script_size)
+            .and_then(|n| n.checked_add(self.demo_stream_size))
+            .ok_or_else(|| "demo header reports an impossible file layout".into())
+    }
+}
+
+/// A header count/size field. It is an `i32` on disk and can never sensibly be
+/// negative, so a negative one is a refusal rather than a cast.
+fn size_at(buf: &[u8], off: usize, what: &str) -> Result<usize, String> {
+    let v = i32_at(buf, off)?;
+    usize::try_from(v).map_err(|_| format!("demo header reports a negative {what} ({v})"))
+}
+
+/// Read a replay's trailer: the winning ally-teams and every team's statistics
+/// samples, with no engine folder and no subprocess.
+///
+/// The whole file is read because the trailer is at the end of it. That is the
+/// cost of the data, and it is paid on demand for one replay rather than during
+/// listing.
+pub fn read_trailer(demo: &Path) -> Result<DemoTrailer, String> {
+    let (bytes, _) = read_all_maybe_gzip(demo)?;
+    decode_trailer(&bytes)
+}
+
+/// The trailer's layout, verified by hand-decoding the replays in `~/.spring/demos`
+/// rather than read off a header file:
+///
+/// ```text
+/// [winningAllyTeamsSize bytes]      one byte per winning ally-team
+/// [playerStatSize bytes]            numPlayers * playerStatElemSize
+/// [numTeams * i32]                  every team's sample count, all of them first
+/// [the samples]                     team by team, teamStatElemSize each
+/// ```
+///
+/// The sample counts come as one run *before* any samples, not interleaved with
+/// them. Read interleaved, they either overrun the file or stop short of it on
+/// every real replay measured, and put the next team's count where the first
+/// sample's frame belongs.
+///
+/// `teamStatSize` covers the counts and the samples together, so on a 3 team 490
+/// second game it is `12 + 3*34*80 = 8172`, which matched to the byte.
+fn decode_trailer(bytes: &[u8]) -> Result<DemoTrailer, String> {
+    if bytes.len() < MIN_HEADER || &bytes[..MAGIC.len()] != MAGIC {
+        return Err("not a Spring demo file (bad magic)".into());
+    }
+    let h = DemoHeader::parse(bytes)?;
+    let mut at = h.trailer_start()?;
+
+    let winning_ally_teams = take(
+        bytes,
+        &mut at,
+        h.winning_ally_teams_size,
+        "winning ally-teams",
+    )?
+    .iter()
+    .map(|&b| b as u32)
+    .collect();
+
+    // Player statistics are stepped over rather than decoded (issue #1130), but
+    // the block's declared size has to agree with its own element size or the
+    // team statistics behind it are not where we think they are.
+    let players_expect = h
+        .num_players
+        .checked_mul(h.player_stat_elem_size)
+        .ok_or("demo header reports an impossible player statistics size")?;
+    if h.player_stat_size != players_expect {
+        return Err(format!(
+            "demo header disagrees with itself: playerStatSize is {} but {} players of {} bytes is {players_expect}",
+            h.player_stat_size, h.num_players, h.player_stat_elem_size
+        ));
+    }
+    take(bytes, &mut at, h.player_stat_size, "player statistics")?;
+
+    let block = take(bytes, &mut at, h.team_stat_size, "team statistics")?;
+    let teams = decode_team_stats(block, h.num_teams, h.team_stat_elem_size)?;
+
+    Ok(DemoTrailer {
+        winning_ally_teams,
+        team_stat_period_sec: h.team_stat_period.max(0) as u32,
+        teams,
+    })
+}
+
+/// Advance `at` past `n` bytes and hand them back, or refuse naming what ran out.
+/// A trailer shorter than the header says is the one thing a packed-struct read
+/// cannot recover from, because every later field would then be read from
+/// whatever happens to be there.
+fn take<'a>(bytes: &'a [u8], at: &mut usize, n: usize, what: &str) -> Result<&'a [u8], String> {
+    let end = at
+        .checked_add(n)
+        .ok_or_else(|| format!("demo header reports an impossible {what} size"))?;
+    let slice = bytes.get(*at..end).ok_or_else(|| {
+        format!(
+            "demo file is truncated: {what} needs {n} bytes at offset {at}, the file ends at {}",
+            bytes.len()
+        )
+    })?;
+    *at = end;
+    Ok(slice)
+}
+
+/// Split the team statistics block into one series per team.
+///
+/// `elem` is the header's declared element size and is what the read strides by,
+/// which is not necessarily the 80 bytes we know how to read: a struct that grew
+/// at the end still decodes correctly for the fields we understand. It may not be
+/// *smaller* than that, because then our own read would run into the next sample.
+fn decode_team_stats(
+    block: &[u8],
+    num_teams: usize,
+    elem: usize,
+) -> Result<Vec<TeamStatSeries>, String> {
+    if elem < TEAM_STAT_ELEM_SIZE {
+        return Err(format!(
+            "demo header reports a {elem} byte team statistics element, too small for the {TEAM_STAT_ELEM_SIZE} bytes of TeamStatistics this decodes"
+        ));
+    }
+    let counts_len = num_teams
+        .checked_mul(4)
+        .ok_or("demo header reports an impossible team count")?;
+    let counts = block
+        .get(..counts_len)
+        .ok_or("demo file is truncated: the team statistics block has no room for its counts")?;
+
+    let mut at = counts_len;
+    let mut teams = Vec::with_capacity(num_teams);
+    for team in 0..num_teams {
+        let n = size_at(counts, team * 4, "team sample count")?;
+        // Sized before it is allocated, so a count the file does not back cannot
+        // ask for the memory first and fail afterwards.
+        let need = n
+            .checked_mul(elem)
+            .ok_or("demo header reports an impossible sample count")?;
+        let raw = block.get(at..at + need).ok_or_else(|| {
+            format!(
+                "demo file is truncated: team {team} claims {n} statistics samples, the file holds {}",
+                (block.len() - at) / elem
+            )
+        })?;
+        at += need;
+        teams.push(TeamStatSeries {
+            team: team as i32,
+            samples: raw.chunks_exact(elem).map(read_team_stat_sample).collect(),
+        });
+    }
+    if at != block.len() {
+        return Err(format!(
+            "demo header disagrees with itself: teamStatSize is {} but its counts add up to {at}",
+            block.len()
+        ));
+    }
+    Ok(teams)
+}
+
+/// One `TeamStatistics` sample from the first 80 bytes of `raw` (which may be
+/// longer, see [`decode_team_stats`]): `i32 frame`, 12 `f32`, 7 `i32`.
+fn read_team_stat_sample(raw: &[u8]) -> TeamStatSample {
+    let word = |n: usize| [raw[n * 4], raw[n * 4 + 1], raw[n * 4 + 2], raw[n * 4 + 3]];
+    let i = |n: usize| i32::from_le_bytes(word(n));
+    let f = |n: usize| f32::from_le_bytes(word(n));
+    TeamStatSample {
+        frame: i(0),
+        metal_used: f(1),
+        energy_used: f(2),
+        metal_produced: f(3),
+        energy_produced: f(4),
+        metal_excess: f(5),
+        energy_excess: f(6),
+        metal_received: f(7),
+        energy_received: f(8),
+        metal_sent: f(9),
+        energy_sent: f(10),
+        damage_dealt: f(11),
+        damage_received: f(12),
+        units_produced: i(13),
+        units_died: i(14),
+        units_received: i(15),
+        units_sent: i(16),
+        units_captured: i(17),
+        units_out_captured: i(18),
+        units_killed: i(19),
+    }
 }
 
 // ---- rewrite ("remix" onto a different game build) -------------------------
@@ -1252,43 +1506,215 @@ mod tests {
         b[off..off + 8].copy_from_slice(&v.to_le_bytes());
     }
 
+    /// A synthetic replay, built byte by byte.
+    ///
+    /// A packed-struct file read at the wrong offset does not fail. It returns
+    /// numbers, and they look exactly like the right ones, so the only thing that
+    /// proves an offset is a file whose every byte a test chose. A real replay
+    /// proves one engine version and hides which byte mattered.
+    ///
+    /// The default is the smallest valid v5 file: a header, a start script, and
+    /// an empty trailer, which is what the engine leaves behind when a recording
+    /// is aborted. Every other case sets one field and changes nothing else.
+    struct DemoFixture {
+        version: i32,
+        /// Also where the start script begins, so a header that grew moves every
+        /// offset behind it.
+        header_size: usize,
+        engine_version: String,
+        script: String,
+        /// Stands in for the recorded packet stream, which nothing here decodes.
+        stream: Vec<u8>,
+        /// One ally-team id per byte.
+        winning_ally_teams: Vec<u8>,
+        /// Per player, the five `i32` in their true on-disk order: `numCommands`,
+        /// `unitCommands`, `mousePixels`, `mouseClicks`, `keyPresses`.
+        /// `PlayerStatistics` derives from `TeamControllerStatistics`, so the base
+        /// members come first and this is not the order the header file declares.
+        player_stats: Vec<[i32; 5]>,
+        player_stat_elem_size: usize,
+        /// Per team, its samples in recording order.
+        team_samples: Vec<Vec<TeamStatSample>>,
+        team_stat_elem_size: usize,
+        team_stat_period: i32,
+        game_time: i32,
+        wallclock: i32,
+        /// Bytes chopped off the end once everything is written, for a file that
+        /// stops before the trailer the header promised.
+        truncate_by: usize,
+    }
+
+    impl Default for DemoFixture {
+        fn default() -> Self {
+            DemoFixture {
+                version: 5,
+                header_size: 352,
+                engine_version: "105.1.2 TEST".into(),
+                script: SCRIPT.into(),
+                stream: Vec::new(),
+                winning_ally_teams: Vec::new(),
+                player_stats: Vec::new(),
+                player_stat_elem_size: 20,
+                team_samples: Vec::new(),
+                team_stat_elem_size: 80,
+                team_stat_period: 15,
+                game_time: 2356,
+                wallclock: 2531,
+                truncate_by: 0,
+            }
+        }
+    }
+
+    /// Filler written into the part of a sample past the 80 bytes we know how to
+    /// read, so a decoder that strides by its own idea of the size reads this
+    /// rather than the next sample and is caught rather than plausible.
+    const SAMPLE_PADDING: u8 = 0xEE;
+
+    impl DemoFixture {
+        fn bytes(&self) -> Vec<u8> {
+            let mut h = vec![0u8; self.header_size];
+            h[..MAGIC.len()].copy_from_slice(MAGIC);
+            put_i32(&mut h, 16, self.version);
+            put_i32(&mut h, OFF_HEADER_SIZE, self.header_size as i32);
+            let ver = self.engine_version.as_bytes();
+            h[OFF_VERSION_STRING..OFF_VERSION_STRING + ver.len()].copy_from_slice(ver);
+            for (k, b) in (0..16).zip(0xA0u8..) {
+                h[OFF_GAME_ID + k] = b;
+            }
+            put_u64(&mut h, OFF_UNIX_TIME, 1_777_320_845);
+            put_i32(&mut h, OFF_SCRIPT_SIZE, self.script.len() as i32);
+            put_i32(&mut h, OFF_DEMO_STREAM_SIZE, self.stream.len() as i32);
+            put_i32(&mut h, OFF_GAME_TIME, self.game_time);
+            put_i32(&mut h, OFF_WALLCLOCK, self.wallclock);
+            put_i32(&mut h, OFF_NUM_PLAYERS, self.player_stats.len() as i32);
+            put_i32(
+                &mut h,
+                OFF_PLAYER_STAT_SIZE,
+                (self.player_stats.len() * self.player_stat_elem_size) as i32,
+            );
+            put_i32(
+                &mut h,
+                OFF_PLAYER_STAT_ELEM_SIZE,
+                self.player_stat_elem_size as i32,
+            );
+            put_i32(&mut h, OFF_NUM_TEAMS, self.team_samples.len() as i32);
+            let total: usize = self.team_samples.iter().map(Vec::len).sum();
+            put_i32(
+                &mut h,
+                OFF_TEAM_STAT_SIZE,
+                (self.team_samples.len() * 4 + total * self.team_stat_elem_size) as i32,
+            );
+            put_i32(
+                &mut h,
+                OFF_TEAM_STAT_ELEM_SIZE,
+                self.team_stat_elem_size as i32,
+            );
+            put_i32(&mut h, OFF_TEAM_STAT_PERIOD, self.team_stat_period);
+            put_i32(
+                &mut h,
+                OFF_WINNING_ALLY_TEAMS_SIZE,
+                self.winning_ally_teams.len() as i32,
+            );
+
+            h.extend_from_slice(self.script.as_bytes());
+            h.extend_from_slice(&self.stream);
+            h.extend_from_slice(&self.winning_ally_teams);
+            for p in &self.player_stats {
+                let mut elem = vec![0u8; self.player_stat_elem_size];
+                for (k, v) in p.iter().enumerate() {
+                    put_i32(&mut elem, k * 4, *v);
+                }
+                h.extend_from_slice(&elem);
+            }
+            // Every team's sample count first, as one run, then every team's
+            // samples behind them. Measured on real replays, not inferred.
+            for team in &self.team_samples {
+                let mut n = [0u8; 4];
+                put_i32(&mut n, 0, team.len() as i32);
+                h.extend_from_slice(&n);
+            }
+            for team in &self.team_samples {
+                for s in team {
+                    h.extend_from_slice(&self.sample_bytes(s));
+                }
+            }
+            h.truncate(h.len() - self.truncate_by.min(h.len()));
+            h
+        }
+
+        /// One sample: `i32 frame`, 12 `f32`, 7 `i32`, then padding out to the
+        /// declared element size.
+        ///
+        /// A field past the declared size is dropped rather than written, so an
+        /// element smaller than 80 bytes is a struct with its tail missing, which
+        /// is what a shrunk `TeamStatistics` would look like.
+        fn sample_bytes(&self, s: &TeamStatSample) -> Vec<u8> {
+            let mut b = vec![SAMPLE_PADDING; self.team_stat_elem_size];
+            let fits = |n: usize| n * 4 + 4 <= self.team_stat_elem_size;
+            let ints = [
+                (0, s.frame),
+                (13, s.units_produced),
+                (14, s.units_died),
+                (15, s.units_received),
+                (16, s.units_sent),
+                (17, s.units_captured),
+                (18, s.units_out_captured),
+                (19, s.units_killed),
+            ];
+            for (n, v) in ints.into_iter().filter(|(n, _)| fits(*n)) {
+                put_i32(&mut b, n * 4, v);
+            }
+            let floats = [
+                (1, s.metal_used),
+                (2, s.energy_used),
+                (3, s.metal_produced),
+                (4, s.energy_produced),
+                (5, s.metal_excess),
+                (6, s.energy_excess),
+                (7, s.metal_received),
+                (8, s.energy_received),
+                (9, s.metal_sent),
+                (10, s.energy_sent),
+                (11, s.damage_dealt),
+                (12, s.damage_received),
+            ];
+            for (n, v) in floats.into_iter().filter(|(n, _)| fits(*n)) {
+                b[n * 4..n * 4 + 4].copy_from_slice(&v.to_le_bytes());
+            }
+            b
+        }
+
+        fn gzipped(&self) -> Vec<u8> {
+            let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+            enc.write_all(&self.bytes()).unwrap();
+            enc.finish().unwrap()
+        }
+    }
+
     /// Build a minimal v5 demo (352-byte header + script), optionally gzipped.
     /// The header carries the end-of-game statistics counts, so it reads as a
     /// game that ended. `build_unfinished_demo` is the one that did not.
     fn build_demo(script: &str, gzip: bool) -> Vec<u8> {
-        let mut h = build_demo_bytes(script, 2);
-        if !gzip {
-            return h;
+        let f = DemoFixture {
+            script: script.into(),
+            team_samples: vec![Vec::new(), Vec::new()],
+            ..Default::default()
+        };
+        if gzip {
+            f.gzipped()
+        } else {
+            f.bytes()
         }
-        let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
-        enc.write_all(&h).unwrap();
-        h = enc.finish().unwrap();
-        h
     }
 
     /// A demo of a game that never reached a game over: the engine leaves every
     /// end-of-game statistics count at zero, `numTeams` among them.
     fn build_unfinished_demo(script: &str) -> Vec<u8> {
-        build_demo_bytes(script, 0)
-    }
-
-    fn build_demo_bytes(script: &str, num_teams: i32) -> Vec<u8> {
-        let mut h = vec![0u8; 352];
-        h[..MAGIC.len()].copy_from_slice(MAGIC);
-        put_i32(&mut h, 16, 5); // version
-        put_i32(&mut h, OFF_HEADER_SIZE, 352);
-        let ver = b"105.1.2 TEST";
-        h[OFF_VERSION_STRING..OFF_VERSION_STRING + ver.len()].copy_from_slice(ver);
-        for (k, b) in (0..16).zip(0xA0u8..) {
-            h[OFF_GAME_ID + k] = b;
+        DemoFixture {
+            script: script.into(),
+            ..Default::default()
         }
-        put_u64(&mut h, OFF_UNIX_TIME, 1_777_320_845);
-        put_i32(&mut h, OFF_SCRIPT_SIZE, script.len() as i32);
-        put_i32(&mut h, OFF_GAME_TIME, 2356);
-        put_i32(&mut h, OFF_WALLCLOCK, 2531);
-        put_i32(&mut h, OFF_NUM_TEAMS, num_teams);
-        h.extend_from_slice(script.as_bytes());
-        h
+        .bytes()
     }
 
     fn write_tmp(name: &str, bytes: &[u8]) -> PathBuf {
@@ -1411,6 +1837,286 @@ mod tests {
         assert!(info.winners_known);
         let alice = info.players.iter().find(|p| p.name == "Alice").unwrap();
         assert_eq!(alice.won, Some(false));
+    }
+
+    // ---- trailer -----------------------------------------------------------
+
+    /// A sample whose every field is a different, index-derived number, so a
+    /// decoder that reads the right bytes in the wrong order, or strides by the
+    /// wrong amount, produces a value no assertion here accepts.
+    ///
+    /// Values grow with `i` because the engine's figures are running totals.
+    fn sample(i: i32) -> TeamStatSample {
+        let n = i as f32;
+        TeamStatSample {
+            frame: i * 450,
+            metal_used: 100.0 * n,
+            energy_used: 200.0 * n,
+            metal_produced: 300.0 * n,
+            energy_produced: 400.0 * n,
+            metal_excess: 500.0 * n,
+            energy_excess: 600.0 * n,
+            metal_received: 700.0 * n,
+            energy_received: 800.0 * n,
+            metal_sent: 900.0 * n,
+            energy_sent: 1000.0 * n,
+            damage_dealt: 1100.0 * n,
+            damage_received: 1200.0 * n,
+            units_produced: 13 * i,
+            units_died: 14 * i,
+            units_received: 15 * i,
+            units_sent: 16 * i,
+            units_captured: 17 * i,
+            units_out_captured: 18 * i,
+            units_killed: 19 * i,
+        }
+    }
+
+    fn series(n: i32) -> Vec<TeamStatSample> {
+        (0..n).map(sample).collect()
+    }
+
+    /// A finished two-sided match, which is the case every chart in this
+    /// milestone is drawn from.
+    #[test]
+    fn a_finished_match_decodes_its_winners_and_every_sample() {
+        let f = DemoFixture {
+            stream: vec![0x77; 1024],
+            winning_ally_teams: vec![1],
+            player_stats: vec![[163, 163, 416_476, 493, 277], [194, 230, 227_928, 364, 462]],
+            team_samples: vec![series(5), series(5)],
+            ..Default::default()
+        };
+        let t = decode_trailer(&f.bytes()).unwrap();
+
+        assert_eq!(t.winning_ally_teams, vec![1]);
+        assert_eq!(t.team_stat_period_sec, 15);
+        assert_eq!(t.teams.len(), 2);
+        for (i, team) in t.teams.iter().enumerate() {
+            assert_eq!(team.team, i as i32);
+            assert_eq!(team.samples, series(5), "team {i}");
+        }
+        // Spelled out for the one sample a wrong stride lands on first: sample 0
+        // reads correctly under any stride, sample 1 does not.
+        let s1 = &t.teams[0].samples[1];
+        assert_eq!(s1.frame, 450);
+        assert_eq!(s1.metal_produced, 300.0);
+        assert_eq!(s1.damage_dealt, 1100.0);
+        assert_eq!(s1.units_produced, 13);
+        assert_eq!(s1.units_killed, 19);
+    }
+
+    /// The counts are one run in front of the samples, not one before each
+    /// team's. Read interleaved, team 0's second sample would be team 1's count.
+    #[test]
+    fn every_teams_sample_count_comes_before_any_samples() {
+        let f = DemoFixture {
+            team_samples: vec![series(3), series(3), series(3)],
+            ..Default::default()
+        };
+        let bytes = f.bytes();
+        let at = 352 + SCRIPT.len();
+        assert_eq!(
+            &bytes[at..at + 12],
+            &[3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0],
+            "three counts, back to back, then the samples"
+        );
+        // And the whole block is the size the header claims.
+        let team_stat_size = i32::from_le_bytes(
+            bytes[OFF_TEAM_STAT_SIZE..OFF_TEAM_STAT_SIZE + 4]
+                .try_into()
+                .unwrap(),
+        );
+        assert_eq!(team_stat_size, 12 + 9 * 80);
+        assert_eq!(bytes.len(), at + team_stat_size as usize);
+    }
+
+    /// A team that never scored is a flat line, not missing data. Every sample is
+    /// present and every figure is zero.
+    #[test]
+    fn an_ally_side_that_never_scored_is_zeroes_rather_than_nothing() {
+        let f = DemoFixture {
+            winning_ally_teams: vec![0],
+            team_samples: vec![series(4), vec![TeamStatSample::default(); 4]],
+            ..Default::default()
+        };
+        let t = decode_trailer(&f.bytes()).unwrap();
+        assert_eq!(t.teams[1].samples.len(), 4);
+        assert!(t.teams[1]
+            .samples
+            .iter()
+            .all(|s| *s == TeamStatSample::default()));
+        assert_eq!(t.teams[0].samples.len(), 4);
+    }
+
+    /// A recording the engine never got to finish: a valid header, zeroed counts,
+    /// no samples. That is "no statistics", not an error and not a match everyone
+    /// lost. Both of the small replays in `~/.spring/demos` are this file.
+    #[test]
+    fn an_aborted_recording_reads_as_no_statistics() {
+        let t = decode_trailer(&DemoFixture::default().bytes()).unwrap();
+        assert!(t.winning_ally_teams.is_empty());
+        assert!(t.teams.is_empty());
+    }
+
+    /// The other zero case, which four of the nine real replays are: the trailer
+    /// is fully formed, names a winner, and holds nine teams with no samples
+    /// between them.
+    #[test]
+    fn a_finished_match_with_no_samples_is_still_a_winner() {
+        let f = DemoFixture {
+            winning_ally_teams: vec![1],
+            player_stats: vec![[0; 5]; 14],
+            team_samples: vec![Vec::new(); 9],
+            ..Default::default()
+        };
+        let t = decode_trailer(&f.bytes()).unwrap();
+        assert_eq!(t.winning_ally_teams, vec![1]);
+        assert_eq!(t.teams.len(), 9);
+        assert!(t.teams.iter().all(|s| s.samples.is_empty()));
+    }
+
+    /// A file that stops before the trailer the header promised is refused, and
+    /// the header and roster keep decoding, so the replay still lists its players.
+    #[test]
+    fn a_truncated_trailer_is_refused_and_the_roster_survives() {
+        let f = DemoFixture {
+            winning_ally_teams: vec![0],
+            team_samples: vec![series(6), series(6)],
+            truncate_by: 200,
+            ..Default::default()
+        };
+        let p = write_tmp("truncated.sdf", &f.bytes());
+
+        let err = read_trailer(&p).unwrap_err();
+        assert!(err.contains("truncated"), "got: {err}");
+
+        let raw = read_header_and_script(&p).unwrap();
+        let info = build_demo_info(raw, &find_game(&parse_tdf(SCRIPT)), None);
+        assert_eq!(info.map_name, "Valles Marineris 2.6.1");
+        assert_eq!(info.players.len(), 3);
+    }
+
+    /// A team statistics element that grew is strided by its declared size, so a
+    /// struct with fields appended still decodes for the fields we understand.
+    /// Striding by our own 80 would read the padding as the second sample.
+    #[test]
+    fn a_grown_sample_is_strided_by_the_size_the_header_declares() {
+        let f = DemoFixture {
+            team_stat_elem_size: 88,
+            team_samples: vec![series(4)],
+            ..Default::default()
+        };
+        let t = decode_trailer(&f.bytes()).unwrap();
+        assert_eq!(t.teams[0].samples, series(4));
+    }
+
+    /// The reverse: an element too small to hold what we read is refused, because
+    /// our own read would run into the next sample.
+    #[test]
+    fn a_sample_smaller_than_we_read_is_refused() {
+        let f = DemoFixture {
+            team_stat_elem_size: 72,
+            team_samples: vec![series(2)],
+            ..Default::default()
+        };
+        let err = decode_trailer(&f.bytes()).unwrap_err();
+        assert!(err.contains("team statistics element"), "got: {err}");
+    }
+
+    /// The whole trailer round-trips through gzip, which is what a `.sdfz` is,
+    /// and through the command's own entry point.
+    #[test]
+    fn a_gzipped_replay_decodes_its_trailer() {
+        let f = DemoFixture {
+            stream: vec![0x11; 4096],
+            winning_ally_teams: vec![0, 2],
+            player_stats: vec![[1, 2, 3, 4, 5]],
+            team_samples: vec![series(3), series(3)],
+            ..Default::default()
+        };
+        let p = write_tmp("trailer.sdfz", &f.gzipped());
+        let t = read_trailer(&p).unwrap();
+        assert_eq!(t.winning_ally_teams, vec![0, 2]);
+        assert_eq!(t.teams.len(), 2);
+        assert_eq!(t.teams[1].samples, series(3));
+
+        // The frontend reads camelCase keys off this.
+        let js = serde_json::to_string(&t).unwrap();
+        assert!(js.contains("\"winningAllyTeams\":[0,2]"), "{js}");
+        assert!(js.contains("\"teamStatPeriodSec\":15"), "{js}");
+        assert!(js.contains("\"metalProduced\""), "{js}");
+    }
+
+    /// A header whose own numbers contradict each other is refused rather than
+    /// read from wherever the arithmetic lands.
+    #[test]
+    fn a_header_that_disagrees_with_itself_is_refused() {
+        let mut bytes = DemoFixture {
+            player_stats: vec![[1, 2, 3, 4, 5]; 2],
+            team_samples: vec![series(2)],
+            ..Default::default()
+        }
+        .bytes();
+        // Claim three players' worth of statistics in a block sized for two.
+        put_i32(&mut bytes, OFF_NUM_PLAYERS, 3);
+        let err = decode_trailer(&bytes).unwrap_err();
+        assert!(err.contains("playerStatSize"), "got: {err}");
+    }
+
+    /// A negative count is a corrupt file, not a huge unsigned one.
+    #[test]
+    fn a_negative_count_is_refused_rather_than_cast() {
+        let mut bytes = DemoFixture {
+            team_samples: vec![series(2)],
+            ..Default::default()
+        }
+        .bytes();
+        put_i32(&mut bytes, OFF_NUM_TEAMS, -1);
+        let err = decode_trailer(&bytes).unwrap_err();
+        assert!(err.contains("negative team count"), "got: {err}");
+    }
+
+    /// End-to-end over the real replays in `~/.spring/demos`, which is the check a
+    /// synthetic fixture cannot make: that the fixtures agree with a file the
+    /// engine wrote. Ignored by default, it needs replays on disk.
+    ///
+    ///   COILBOX_REAL_DEMO_DIR=~/.spring/demos \
+    ///   cargo test -p tauri-plugin-coilbox-content real_demo_trailers -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn real_demo_trailers() {
+        let dir = std::env::var("COILBOX_REAL_DEMO_DIR").expect("set COILBOX_REAL_DEMO_DIR");
+        let mut seen = 0;
+        for e in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = e.path();
+            if !is_replay_path(&path) {
+                continue;
+            }
+            seen += 1;
+            let t = read_trailer(&path).unwrap_or_else(|err| {
+                panic!("{}: {err}", path.display());
+            });
+            let total: usize = t.teams.iter().map(|s| s.samples.len()).sum();
+            eprintln!(
+                "{}: winners={:?} teams={} samples={total}",
+                path.file_name().unwrap().to_string_lossy(),
+                t.winning_ally_teams,
+                t.teams.len(),
+            );
+            for s in &t.teams {
+                // Samples are one every teamStatPeriod seconds at 30 frames a
+                // second, and every figure is a running total.
+                let step = (t.team_stat_period_sec * 30) as i32;
+                for w in s.samples.windows(2) {
+                    assert_eq!(w[1].frame - w[0].frame, step, "{}", path.display());
+                    assert!(w[1].metal_produced >= w[0].metal_produced);
+                    assert!(w[1].damage_dealt >= w[0].damage_dealt);
+                    assert!(w[1].units_produced >= w[0].units_produced);
+                }
+            }
+        }
+        assert!(seen > 0, "no replays in {dir}");
     }
 
     #[test]
@@ -1859,6 +2565,9 @@ mod tests {
         let mut demo = build_demo(SCRIPT, false);
         let tail: &[u8] = b"\x00\x01\x02DEMO-STREAM-TAIL\xff\xfe";
         demo.extend_from_slice(tail);
+        // Everything past the start script is copied byte for byte: this
+        // fixture's empty team-statistics counts, then the tail.
+        let verbatim = demo[352 + SCRIPT.len()..].to_vec();
         let src = write_tmp("jb_src.sdf", &demo);
         let before = std::fs::read(&src).unwrap();
 
@@ -1888,7 +2597,7 @@ mod tests {
         assert!(script.contains("source=Beyond All Reason test-30018;"));
         assert!(script.contains("origin=jb_src.sdf;"));
         assert!(script.contains("mapname=Valles Marineris 2.6.1")); // map untouched
-        assert_eq!(&out[hs + ss..], tail); // stream tail byte-identical
+        assert_eq!(&out[hs + ss..], &verbatim[..]); // stream tail byte-identical
 
         // Re-reading detects the remix, its source gametype, and its origin file.
         let game = find_game(&parse_tdf(script));

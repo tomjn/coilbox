@@ -17,6 +17,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-open-path`
 - `allow-content-list-replays`
 - `allow-content-demo-info`
+- `allow-content-replay-trailer`
 - `allow-content-stats-ingest`
 - `allow-content-stats-query`
 - `allow-content-stats-watch-start`
@@ -804,6 +805,32 @@ Enables the content_remove_root command without any pre-configured scope.
 <td>
 
 Denies the content_remove_root command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-replay-trailer`
+
+</td>
+<td>
+
+Enables the content_replay_trailer command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-replay-trailer`
+
+</td>
+<td>
+
+Denies the content_replay_trailer command without any pre-configured scope.
 
 </td>
 </tr>

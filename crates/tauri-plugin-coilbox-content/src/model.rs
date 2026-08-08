@@ -253,6 +253,66 @@ pub struct DemoInfo {
     pub origin_filename: Option<String>,
 }
 
+/// One `TeamStatistics` sample: 20 fields, 80 bytes, written every
+/// `teamStatPeriod` seconds of a match.
+///
+/// Every figure except `frame` is a running total for the whole match so far, so
+/// a per-minute view is the difference between two consecutive samples and needs
+/// no second series.
+///
+/// Field order is the engine's `rts/Sim/Misc/TeamStatistics.h` declaration order,
+/// which is also the on-disk order: `frame`, twelve `f32`, seven `i32`.
+#[derive(Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamStatSample {
+    /// Sim frame the sample was taken at. 30 frames is one second.
+    pub frame: i32,
+    pub metal_used: f32,
+    pub energy_used: f32,
+    pub metal_produced: f32,
+    pub energy_produced: f32,
+    pub metal_excess: f32,
+    pub energy_excess: f32,
+    pub metal_received: f32,
+    pub energy_received: f32,
+    pub metal_sent: f32,
+    pub energy_sent: f32,
+    pub damage_dealt: f32,
+    pub damage_received: f32,
+    pub units_produced: i32,
+    pub units_died: i32,
+    pub units_received: i32,
+    pub units_sent: i32,
+    pub units_captured: i32,
+    pub units_out_captured: i32,
+    pub units_killed: i32,
+}
+
+/// One team's samples for a whole match, in the order the engine recorded them.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamStatSeries {
+    /// The `[teamN]` index this series belongs to.
+    pub team: i32,
+    /// Empty for a team the engine recorded no samples for, which is an answer
+    /// ("no statistics") rather than an error.
+    pub samples: Vec<TeamStatSample>,
+}
+
+/// What the fixed-size records after a replay's demo stream hold.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoTrailer {
+    /// The ally-teams that won, straight from the file. Empty is a real outcome
+    /// (a game over with nobody winning), not a missing answer.
+    pub winning_ally_teams: Vec<u32>,
+    /// Seconds between samples, so a caller can turn a frame into a time without
+    /// assuming 15.
+    pub team_stat_period_sec: u32,
+    /// One entry per team the header counts, in team order.
+    pub teams: Vec<TeamStatSeries>,
+}
+
 pub const SCHEMA_VERSION: u32 = 1;
 
 /// Read the store from `path`, returning a default (empty) store if it's absent.
