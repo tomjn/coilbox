@@ -568,6 +568,66 @@ describe("contentPicks", () => {
       expect(PICK_PRIORITY, toolId).toContain(toolId);
     }
   });
+
+  it("takes a claimed map off every card, however strong its claim", () => {
+    // Issue #1055. The suggested map's card is showing this map and is not in
+    // the grid, so no card in the grid may show it too. Singleplayer has the
+    // top rank and still yields.
+    const picks = contentPicks({
+      ...populated,
+      claimed: [{ kind: "map", mapName: SHARED }],
+    });
+    expect(picks.has("play.skirmish")).toBe(false);
+    expect(picks.has("play.replays")).toBe(false);
+    expect(picks.get("content.maps")).toEqual({
+      kind: "map",
+      mapName: "Isthmus v3",
+    });
+  });
+
+  it("matches a claim to a card's pick whatever case each was written in", () => {
+    // The claim is the catalog's spring name and the offer is a unitsync scan
+    // name. Nothing makes the two agree on case, and a claim that missed would
+    // be the defect back with no test failing.
+    const picks = contentPicks({
+      ...populated,
+      claimed: [{ kind: "map", mapName: SHARED.toUpperCase() }],
+    });
+    expect(picks.has("play.skirmish")).toBe(false);
+  });
+
+  it("leaves the map alone when the claim is for something else", () => {
+    const picks = contentPicks({
+      ...populated,
+      claimed: [{ kind: "map", mapName: "Somewhere Else v1" }],
+    });
+    expect(picks.get("play.skirmish")).toEqual({
+      kind: "map",
+      mapName: SHARED,
+    });
+    expect(picks.get("content.maps")).toEqual({
+      kind: "map",
+      mapName: "Isthmus v3",
+    });
+  });
+
+  it("does not let a claimed map name take a game of the same name", () => {
+    const picks = contentPicks({
+      ...populated,
+      claimed: [{ kind: "map", mapName: "Metal Factions v2.58" }],
+    });
+    expect(picks.get("content.games")).toEqual({
+      kind: "game",
+      gameName: "Metal Factions v2.58",
+    });
+  });
+
+  it("leaves every card in the running when nothing is claimed", () => {
+    // The page with no suggested map zone, and every page before #1055.
+    expect([...contentPicks({ ...populated, claimed: [] })]).toEqual([
+      ...contentPicks(populated),
+    ]);
+  });
 });
 
 describe("picksKey", () => {

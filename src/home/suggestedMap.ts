@@ -43,6 +43,7 @@ import type { Battle } from "../multiplayer/bindings";
 import { useMultiplayer } from "../multiplayer/store";
 import { usePreferredTarget } from "../play/config";
 import { getProfileMapLists } from "../profile/profile";
+import type { ContentPick } from "./contentArt";
 
 /**
  * The download kinds a curated map can actually be installed from.
@@ -70,21 +71,63 @@ function poolKey(map: SuggestedMap): string {
  * Order matters, because the rotation walks the pool in it: an editor adding a
  * map to the end of a pack adds it to the end of the cycle. Standalone
  * suggestions come before packs because that is the order the catalog reads in.
+ *
+ * Separate from {@link suggestedMapPool} so that a test can hold the catalog to
+ * the rule that everything offered here can be pictured. See
+ * `suggestedCatalog.test.ts`.
  */
-export function suggestedMapPool(
+export function suggestedMapCandidates(
   maps: SuggestedMap[],
   lists: SuggestedMapList[],
 ): SuggestedMap[] {
   const seen = new Set<string>();
-  const pool: SuggestedMap[] = [];
+  const candidates: SuggestedMap[] = [];
   for (const map of [...maps, ...lists.flatMap((l) => l.maps)]) {
     if (!INSTALLABLE_KINDS.has(map.download.kind)) continue;
     const key = poolKey(map);
     if (seen.has(key)) continue;
     seen.add(key);
-    pool.push(map);
+    candidates.push(map);
   }
-  return pool;
+  return candidates;
+}
+
+/** Whether the catalog gives this map a picture the card can paint. */
+function picturable(map: SuggestedMap): boolean {
+  return (map.thumb?.length ?? 0) > 0;
+}
+
+/**
+ * The maps the rotation runs over: the candidates the catalog can picture.
+ *
+ * `thumb` is optional on a curated map, and a pack's maps were written without
+ * one because a pack row on the Maps page shows no picture. The pool takes the
+ * packs too, so for most of the rotation there was nothing to paint and the card
+ * came up blank (issue #1037). What to do about the next one is issue #1070, and
+ * this is the answer: pass over it.
+ *
+ * A card with no picture standing beside three that have one reads as a card
+ * that failed rather than as a map, and there is no honest substitute to draw. A
+ * procedural field would be a picture of nothing under a named map, and the
+ * spring name is exactly what a mirror will hand back the wrong map for (issue
+ * #1067). The next map in the rotation is a real picture of a real map, so the
+ * rotation moves on and the missing thumbnail costs a reader nothing.
+ *
+ * Skipping is install-independent on purpose, so everyone still gets the same
+ * map on the same day. A player who has the map installed would have got its
+ * minimap, and gives that up to keep the rotation the same everywhere.
+ *
+ * Unless it would empty the rotation. A distribution's own `mapLists` join this
+ * pool, and one that curates maps without thumbnails would otherwise lose the
+ * zone altogether and never be told why. A card with a glyph beats no card.
+ */
+export function suggestedMapPool(
+  maps: SuggestedMap[],
+  lists: SuggestedMapList[],
+): SuggestedMap[] {
+  const candidates = suggestedMapCandidates(maps, lists);
+  const pictured = candidates.filter(picturable);
+  return pictured.length > 0 ? pictured : candidates;
 }
 
 /** Milliseconds in a day. */
@@ -264,6 +307,35 @@ export function springNameOf(map: SuggestedMap): string | undefined {
 }
 
 /**
+ * The map this card has taken, for the tool cards to settle around (issue #1055).
+ *
+ * The tool cards already avoid each other's pictures, and this card was outside
+ * that set, so it could show the same map as the Maps card standing beside it in
+ * the same group. It claims its map instead of joining the priority list because
+ * it has no tool id and no second map to fall back on, and because a card that is
+ * about one named map cannot yield it to a card that stands for a collection.
+ *
+ * Pure, and expressed in `contentArt`'s own currency, so the pick layer learns
+ * nothing about the catalog: it is handed a picture that is spoken for.
+ *
+ * `shown` is whether the page has a suggested map zone at all. A profile that
+ * left it out has no card holding this map, and a claim then would cost the Maps
+ * card a picture for nothing.
+ *
+ * The claim stands whether or not the map is installed. Uninstalled, the card
+ * paints the catalog's thumbnail and no tool card can offer the map anyway,
+ * because those offers come from the unitsync scan. So the claim only bites in
+ * exactly the case that is the defect.
+ */
+export function suggestedMapClaim(
+  map: SuggestedMap | null,
+  shown: boolean,
+): readonly ContentPick[] {
+  const springName = shown && map ? springNameOf(map) : undefined;
+  return springName ? [{ kind: "map", mapName: springName }] : [];
+}
+
+/**
  * Today's suggested map.
  *
  * `loading` separates "the catalog has not answered yet" from "the catalog
@@ -341,11 +413,11 @@ export function useSuggestedMap(): {
  * 2. Not installed: the catalog's `thumb`, through the same Rust image proxy and
  *    disk cache the download browsers use. Fetched once, then offline too.
  *
- * `thumb` is optional on a curated map, and the map packs were written without
- * one because a pack row shows no picture. The pool takes the packs' maps too, so
- * for most of the rotation there was nothing for this to resolve and the card came
- * up blank (issue #1037). The catalog now carries a picture for every map in the
- * pool, so a map added to a pack without one is a card with no art on its day.
+ * `thumb` is optional on a curated map, and a map that arrived through a pack had
+ * none, so for most of the rotation there was nothing for this to resolve and the
+ * card came up blank (issue #1037). {@link suggestedMapPool} now passes over a map
+ * the catalog cannot picture, so a thumbnail the editor forgot costs a map its turn
+ * in the rotation rather than costing a reader their card (issue #1070).
  *
  * Neither source is available on a cold offline first run for a map the player
  * does not have. The card then renders without art, which the component handles by
