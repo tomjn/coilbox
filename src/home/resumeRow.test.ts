@@ -99,7 +99,7 @@ const CONQUEST = candidate("conquest", "Orion Reach");
 
 /** The row's class, repeated here so a change to it has to be deliberate. */
 const ROW =
-  'class="mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap"';
+  'class="mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap sm:items-start"';
 
 /**
  * The two zones on a page of their own, as the markup a browser would get.

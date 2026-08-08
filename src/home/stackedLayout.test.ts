@@ -51,7 +51,7 @@ const COLUMN = "relative p-8";
 
 /** The class on the row the continue hero and the resume rail share. */
 const RESUME_ROW =
-  "mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap";
+  "mt-6 flex flex-col gap-3 empty:hidden sm:flex-row sm:flex-wrap sm:items-start";
 
 /** Walk an element tree and list the stubbed zones it reached, in order. */
 function collect(node: unknown, wrapper: string | null, out: Rendered[]): void {
@@ -310,6 +310,15 @@ describe("StackedLayout resume row", () => {
     // whole block leave no gap when both zones stand down.
     expect(RESUME_ROW).toContain("mt-6");
     expect(RESUME_ROW).toContain("empty:hidden");
+  });
+
+  it("lets the rail keep its own height next to a taller hero", () => {
+    // A flex row stretches its items, so a hero whose title wrapped pulled the
+    // rail's cards to its own depth and left 84px between each card's detail and
+    // the action pinned to its foot (#1074). Only from `sm`: below that the row
+    // is a column and this would be a width.
+    expect(RESUME_ROW).toContain("sm:items-start");
+    expect(RESUME_ROW).not.toContain(" items-start");
   });
 
   it("tells the hero how wide to be, and the rail nothing", () => {
