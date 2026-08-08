@@ -12,6 +12,7 @@ import type {
 import {
   allySeries,
   type ChartMode,
+  type ChartRow,
   type ChartSeries,
   chartHeight,
   chartRows,
@@ -1338,6 +1339,25 @@ describe("sparkLines", () => {
       [at(0, KEY_A, 1), at(450, KEY_A, 2)],
     ]);
     expect(drawn(t)).toEqual(["M0,15.67L50,8.33L100,1", "M0,15.67L50,8.33"]);
+  });
+
+  it("breaks the line at a hole rather than drawing across it", () => {
+    // Rows by hand, because `chartRows` carries a running total forward and so
+    // never leaves a hole in the middle of a line: only the ends. The plot
+    // breaks at one, and a tile that joined across it would be the one shape on
+    // the page claiming a reading. A series that merely stops, above, is the
+    // same path either way, so it cannot stand in for this.
+    const holed: ChartRow[] = [
+      { timeSec: 0, team0: 0 },
+      { timeSec: 15, team0: null },
+      { timeSec: 30, team0: 10 },
+    ];
+    const line: ChartSeries[] = [
+      { id: "team0", label: "a", color: "#ffffff", samples: [] },
+    ];
+    expect(sparkLines(line, holed).map((l) => l.d)).toEqual([
+      "M0,23L0,23M100,1L100,1",
+    ]);
   });
 
   it("shows a team measured once as a dot rather than nothing", () => {
