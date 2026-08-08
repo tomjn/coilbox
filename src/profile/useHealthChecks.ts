@@ -6,6 +6,9 @@ import { contentStateLoad } from "../content/bindings";
 import { useUnitsyncScan } from "../content/config";
 import { dlPathWritable } from "../downloads/bindings";
 import { useDownloadsConfig } from "../downloads/config";
+import { describeHome, resolveHome } from "../home/config";
+import { homeMarkupIssues } from "../home/markup";
+import { resolveCardArtOverrides } from "../home/profileArt";
 import { usePreferredTarget } from "../play/config";
 import { scenarioList } from "../scenario/bindings";
 import { parseStoredScenario } from "../scenario/storage";
@@ -15,6 +18,7 @@ import {
   deriveHealthChecks,
   type HealthCheck,
   type HealthInputs,
+  type HomeHealth,
   type ScenarioFailure,
 } from "./health";
 import { HIDEABLE_NAV_IDS } from "./hidden";
@@ -48,6 +52,27 @@ function campaignError(json: string): string {
     return describeJsonError(json, e).message;
   }
   return "valid JSON but does not match the campaign schema";
+}
+
+/**
+ * What the profile's `home` key resolved to, or null when it has no `home` key.
+ *
+ * The page is resolved a second time here rather than read off the rendered home,
+ * because Settings can be open on a build where the home page has never been
+ * drawn. It is the same call the page makes, over the same raw value, so it
+ * reaches the same answer and collects the same complaints. The markup half is
+ * read out of what startup loaded, so a file that is genuinely missing reports
+ * missing here without a second attempt to read it.
+ */
+function homeHealth(home: unknown): HomeHealth | null {
+  if (home === undefined || home === null) return null;
+  const resolved = resolveHome(home);
+  const issues = [...resolved.issues];
+  // Run for the complaints, not the overrides, which belong to the page. Art is
+  // dropped per tool, so a typo costs one card and says which.
+  resolveCardArtOverrides(resolved.entries, issues);
+  issues.push(...homeMarkupIssues(home));
+  return { summary: describeHome(resolved), issues };
 }
 
 /** Assemble health-check inputs and derive the checklist. Fails soft: any input
@@ -164,6 +189,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         settingsIds,
         linkIcons,
         validIconNames: linkIconNames(),
+        home: homeHealth(profile.home),
       };
       setChecks(deriveHealthChecks(inputs));
       setLoading(false);

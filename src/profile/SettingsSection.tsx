@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useUnitsyncScan } from "../content/config";
 import { useAdvancedModeSetting } from "../general/advanced";
 import { useFullscreenSetting } from "../general/fullscreen";
+import { describeHome, resolveHome } from "../home/config";
 import { usePreferredTarget } from "../play/config";
 import {
   buildScaffoldProfile,
@@ -57,6 +58,12 @@ export default function ProfileSettings() {
     ? [filter.regex, ...(filter.names ?? [])].filter(Boolean).join(", ")
     : null;
   const themeCount = profile.theme ? Object.keys(profile.theme).length : 0;
+  // Described by the resolver that built the page, so the row counts the zones
+  // that were drawn rather than the ones that were written (issue #1080). A
+  // profile with no `home` key says so in one word, like the welcome row above.
+  const homeSummary = profile.home
+    ? describeHome(resolveHome(profile.home))
+    : "Default";
 
   return (
     <div className="space-y-8">
@@ -94,6 +101,7 @@ export default function ProfileSettings() {
             label="Welcome screen"
             value={profile.welcome ? "Custom" : "Default"}
           />
+          <Row label="Home page" value={homeSummary} />
           <Row
             label="Theme overrides"
             value={themeCount ? `${themeCount} variable(s)` : "None"}
@@ -110,7 +118,9 @@ export default function ProfileSettings() {
  * On-demand profile validation. A "Validate profile" button runs the health checks
  * against the current profile and reveals the results inline — including the no-op
  * advisories (a `hide`/`hideSettings` id that matches nothing, an unknown link icon,
- * a zero-match game filter) that otherwise fail silently. Remounting the checklist on
+ * a zero-match game filter, a `home` entry that was dropped) that otherwise fail
+ * silently — on a release build, with no console, this is the only place they show.
+ * Remounting the checklist on
  * each click (via the `run` key) re-runs it, so it doubles as a manual refresh.
  */
 function ProfileValidation() {
