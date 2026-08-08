@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
+import { twMerge } from "tailwind-merge";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LobbyAccount, LobbyServer } from "../lobby-servers/config";
 import { resolveHome } from "./config";
@@ -30,7 +31,9 @@ vi.mock("@picoframe/frame", () => ({
   Slot: () => null,
   useSetting: () => [{}, () => {}],
   buttonVariants: () => "button",
-  cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "),
+  // The real `cn`, because one of the claims below is about which of two
+  // competing border utilities survives the merge.
+  cn: (...parts: unknown[]) => twMerge(parts.filter(Boolean).join(" ")),
 }));
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
@@ -38,7 +41,10 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 vi.mock("./zones/Onboarding", () => ({ default: () => null }));
 vi.mock("./zones/Greeting", () => ({ default: () => null }));
 vi.mock("./zones/ToolCards", () => ({ default: () => null }));
-vi.mock("./zones/SuggestedMap", () => ({ default: () => null }));
+vi.mock("./zones/SuggestedMap", () => ({
+  default: () => null,
+  SuggestedMapCard: () => null,
+}));
 vi.mock("./HomeMarkup", () => ({ default: () => null }));
 // No backdrop, so the page is the column and what the layout put in it. What the
 // backdrop resolves to is `background.test.ts`'s subject.
@@ -122,6 +128,25 @@ function page(): string {
   );
 }
 
+/** The same page, with the suggested map card promoted into the row. */
+function promotedPage(): string {
+  // The suggested zone has to be on the page for there to be a card to promote.
+  const { entries } = resolveHome({
+    zones: [{ zone: "continue" }, { zone: "resume" }, { zone: "suggested" }],
+  });
+  return renderToStaticMarkup(
+    createElement(
+      MemoryRouter,
+      null,
+      createElement(StackedLayout, {
+        entries,
+        background: undefined,
+        suggested: "row",
+      }),
+    ),
+  );
+}
+
 /** The visible text of the page, tags stripped. */
 function text(): string {
   return page()
@@ -161,6 +186,16 @@ describe("the resume row", () => {
   it("gives the hero the width the layout chose", () => {
     resume.mockReturnValue({ candidates: [HERO], loading: false });
     expect(page()).toContain("min-w-0 sm:max-w-2xl");
+  });
+
+  it("takes the accent off the hero when the map card is promoted", () => {
+    // The row reads left to right and the promoted card is first because it
+    // outranks the hero, but the hero wore the only accent on the page, which
+    // said the opposite (issue #1114). The card picks it up: see
+    // `suggestedMap.test.ts`.
+    resume.mockReturnValue({ candidates: [HERO], loading: false });
+    expect(page()).toContain("border-primary/40");
+    expect(promotedPage()).not.toContain("border-primary/40");
   });
 
   it("leaves the hero no room to push its action away from its text", () => {

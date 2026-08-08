@@ -47,9 +47,6 @@ import {
   packMapState,
   suggestedMapToInput,
 } from "../downloads/mapLists";
-import { occupancy } from "../multiplayer/battles/battleFilters";
-import type { Battle } from "../multiplayer/bindings";
-import { useMultiplayer } from "../multiplayer/store";
 import { usePreferredTarget } from "../play/config";
 import { getProfileMapLists } from "../profile/profile";
 import type { ContentPick } from "./contentArt";
@@ -338,34 +335,6 @@ export function pickSuggestedMap(
 }
 
 /**
- * The three fields of the lobby mirror the suggested pick reads. A real
- * `LobbyState` satisfies it, and a test writes a room rather than forty fields.
- * Narrow on purpose: this module is allowed to know which maps are in play and
- * nothing else about the lobby.
- */
-export type SuggestedLobbySnapshot = {
-  battles: Record<string, Pick<Battle, "map" | "host" | "members">>;
-};
-
-/**
- * Occupants a room needs before it counts as people playing.
- *
- * Lobby servers are full of autohosts sitting alone in an empty room, and the
- * host is always counted, so a room of one is a bot waiting rather than a game.
- * Featuring its map would make the card's claim false, and false is worse than
- * the rotation.
- */
-const PLAYING_MIN_OCCUPANCY = 2;
-
-/**
- * Where the suggested map came from, so the card can say which.
- *
- * The user cannot otherwise tell: both sources put one curated map on one card.
- * Without this the feature would be invisible and so unfalsifiable.
- */
-export type SuggestedSource = "battle" | "curated";
-
-/**
  * What the page decided to feature, resolved once and read everywhere.
  *
  * `loading` separates "the catalog has not answered yet" from "the catalog
@@ -375,7 +344,6 @@ export type SuggestedSource = "battle" | "curated";
 export type SuggestedMapAnswer = {
   map: SuggestedMap | null;
   loading: boolean;
-  source: SuggestedSource;
   /** Where on the page the card goes, or that there is no card. */
   placement: SuggestedPlacement;
   /**
@@ -388,81 +356,6 @@ export type SuggestedMapAnswer = {
    */
   inventory: MapInventory;
 };
-
-/**
- * The curated map most people are on right now, or null.
- *
- * Deliberately restricted to the pool. The pool is the set of maps this card can
- * honestly offer: each has a verified spring name and a download that works, and
- * the catalog carries a picture of it. Synthesising an entry for any map a battle
- * happens to name would drop the card to a bare name over a glyph for a map that
- * may not be downloadable anywhere, which is a worse home page than the rotation.
- * So a battle on an uncurated map is no answer, and the rotation stands.
- *
- * That makes this a re-ordering of the curated rotation rather than a new source
- * of maps, which is what "prefer a map an open battle is using *over the curated
- * rotation*" asks for.
- *
- * Ranked by heads, not rooms: three idle autohosts should not outrank one full
- * team game. Ties go to pool order, so the answer is a function of the snapshot
- * and never of the order the server happened to send the rooms in.
- *
- * A map the player already has is no answer either, for the same reason the
- * rotation passes over one: this card offers a download. The busiest map they do
- * not have still beats the rotation.
- */
-export function battleSuggestedMap(
-  pool: SuggestedMap[],
-  lobby: SuggestedLobbySnapshot | null,
-  inventory: MapInventory,
-): SuggestedMap | null {
-  if (!lobby) return null;
-  const players = new Map<string, number>();
-  for (const battle of Object.values(lobby.battles)) {
-    const heads = occupancy(battle);
-    if (heads < PLAYING_MIN_OCCUPANCY) continue;
-    const key = battle.map.toLowerCase();
-    players.set(key, (players.get(key) ?? 0) + heads);
-  }
-  if (players.size === 0) return null;
-
-  let best: SuggestedMap | null = null;
-  let bestHeads = 0;
-  for (const map of pool) {
-    const springName = springNameOf(map);
-    if (!springName) continue;
-    if (suggestedMapInstalled(map, inventory)) continue;
-    // Exact spring name, lowercased, the same identity `poolKey` uses. Not a
-    // fuzzy match on the version suffix: "Supreme Isthmus v2.1" and v2.2 are
-    // different archives, and offering the curated one because a battle is on
-    // the other would feature a map that still would not let you into it.
-    const heads = players.get(springName.toLowerCase()) ?? 0;
-    // Strictly greater, so the first in pool order wins a tie.
-    if (heads > bestHeads) {
-      best = map;
-      bestHeads = heads;
-    }
-  }
-  return best;
-}
-
-/**
- * The map to feature, and why.
- *
- * A live lobby's answer beats the day's rotation, and everything else falls
- * through to it. `lobby` is null whenever there is no connection, so a logged-out
- * or offline player takes exactly the branch they took before this existed.
- */
-export function suggestedMapFor(
-  pool: SuggestedMap[],
-  lobby: SuggestedLobbySnapshot | null,
-  date: Date,
-  inventory: MapInventory,
-): { map: SuggestedMap | null; source: SuggestedSource } {
-  const battle = battleSuggestedMap(pool, lobby, inventory);
-  if (battle) return { map: battle, source: "battle" };
-  return { map: pickSuggestedMap(pool, date, inventory), source: "curated" };
-}
 
 /**
  * What the card may offer for the suggested map.
@@ -625,25 +518,14 @@ export function suggestedMapPlacement(args: {
  * midnight turns the card over where it stands rather than holding yesterday's
  * map until the page is next visited (issue #1022).
  *
- * When a lobby connection happens to be live, a map people are on beats the
- * rotation (issue #996). Reading it is passive: `useMultiplayer` is a plain
- * `useContext` on a provider `app.plugins.ts` already mounts app-wide and two
- * other home zones already read. Nothing here can open a connection, read a
- * credential or raise a login prompt, and `mirror.state` is null until something
- * else connects, so a logged-out or offline player gets the rotation and only the
- * rotation.
- *
  * The answer is held for the day, once it is a real answer.
  *
- * Three things move under this card while it is on screen, and it should sit
- * still through all of them. `mirror.state.battles` changes every time anyone
- * anywhere joins or leaves a room, which on a busy server is several times a
- * second. The inventory changes the moment any download lands, including the
- * card's own. And the pool the two are read against changes with them. An
- * unheld card would swap its picture, name and blurb under a reader who is
- * looking at it, and worst of all it would do that the instant they pressed
- * Install, which is the one moment the card owes them an answer about the map
- * they just asked for.
+ * Two things move under this card while it is on screen, and it should sit still
+ * through both. The inventory changes the moment any download lands, including
+ * the card's own, and the pool it is read against changes with it. An unheld card
+ * would swap its picture, name and blurb under a reader who is looking at it, and
+ * worst of all it would do that the instant they pressed Install, which is the one
+ * moment the card owes them an answer about the map they just asked for.
  *
  * So the first real answer of the day is kept, and the day is what releases it:
  * {@link useUtcDay} turns the card over at UTC midnight where it stands (issue
@@ -651,18 +533,27 @@ export function suggestedMapPlacement(args: {
  * the inventory have both answered, because a held guess is a guess kept all
  * session.
  *
- * The one thing that may still replace a held answer is the lobby's, once, and
- * only over the rotation's. A connection settles seconds after the page paints,
- * so an unheld first answer would otherwise mean the card could never prefer a
- * map people are on (issue #996). After that first upgrade the lobby is ignored,
- * which is what stops the card following the server's churn.
+ * ## The card no longer prefers a map people are playing
+ *
+ * It did, over the rotation, whenever a lobby connection happened to be live
+ * (issue #996), and issue #1029 is the decision to take it out again. Four things
+ * had to line up at once: a live connection, a room of two or more, on a map in
+ * the curated pool at exactly the curated spring name and version, that the
+ * player did not already have. The last two pull against each other, because the
+ * maps people play are the maps players have.
+ *
+ * Measured on 2026-08-08 against `lobby.recoilengine.org`, across eight snapshots:
+ * five users, two rooms, never once a room with two people in it. The branch could
+ * not have fired at all. It also took the card's only present-tense claim, "Being
+ * played now", which outlived the room it was read from and outlived the
+ * connection (issue #1028), and it was the one thing that could replace an answer
+ * already held for the day.
  */
 export function useSuggestedMap(page: SuggestedPage): SuggestedMapAnswer {
   const catalogLists = useSuggestedMapLists();
   const maps = useSuggestedMaps();
   const loaded = useCatalogLoaded();
   const inventory = useMapInventory();
-  const { mirror } = useMultiplayer();
   const day = useUtcDay();
   // The rotation reads nothing off a date but its UTC day, so the day's own
   // first instant stands for every instant in it. Built here rather than passed
@@ -679,13 +570,13 @@ export function useSuggestedMap(page: SuggestedPage): SuggestedMapAnswer {
   // on, so on the ordinary path this adds no wait.
   const ready = loaded && inventory.known && page.onboardingMaps !== null;
   const fresh = useMemo(
-    () => suggestedMapFor(pool, mirror.state, today, inventory),
-    [pool, mirror.state, today, inventory],
+    () => pickSuggestedMap(pool, today, inventory),
+    [pool, today, inventory],
   );
   const placement = suggestedMapPlacement({
     page,
     loading: !ready,
-    map: fresh.map,
+    map: fresh,
     noMaps: noMapsInstalled(inventory),
   });
 
@@ -693,16 +584,15 @@ export function useSuggestedMap(page: SuggestedPage): SuggestedMapAnswer {
   useEffect(() => {
     if (!ready) return;
     // Returning `prev` unchanged lets React bail out of the re-render for every
-    // lobby delta and every download that lands.
-    setHeld((prev) => holdSuggestion(prev, day, { ...fresh, placement }));
+    // download that lands.
+    setHeld((prev) => holdSuggestion(prev, day, { map: fresh, placement }));
   }, [ready, day, fresh, placement]);
 
   const settled = held?.day === day ? held : null;
   return useMemo(
     () => ({
-      map: ready ? (settled?.map ?? fresh.map) : null,
+      map: ready ? (settled?.map ?? fresh) : null,
       loading: !ready,
-      source: settled?.source ?? fresh.source,
       placement: settled?.placement ?? placement,
       inventory,
     }),
@@ -714,23 +604,24 @@ export function useSuggestedMap(page: SuggestedPage): SuggestedMapAnswer {
 interface Held {
   day: number;
   map: SuggestedMap | null;
-  source: SuggestedSource;
   placement: SuggestedPlacement;
 }
 
 /**
- * Keep what is held, or take the new answer. Pure, so the day boundary and the
- * one lobby upgrade are testable without a clock or a connection.
+ * Keep what is held, or take the new answer. Pure, so the day boundary is
+ * testable without a clock.
+ *
+ * Nothing replaces an answer within a day any more. The lobby's used to, once, so
+ * that a connection settling after the page painted could still put a map people
+ * were on in front of the rotation. See {@link useSuggestedMap} for why that is
+ * gone (issue #1029).
  */
 export function holdSuggestion(
   prev: Held | null,
   day: number,
   answer: Omit<Held, "day">,
 ): Held {
-  if (!prev || prev.day !== day) return { day, ...answer };
-  if (prev.source !== "battle" && answer.source === "battle")
-    return { day, ...answer };
-  return prev;
+  return !prev || prev.day !== day ? { day, ...answer } : prev;
 }
 
 /**
