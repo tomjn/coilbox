@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { twMerge } from "tailwind-merge";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * picoframe's `outline`/`sm` button, transcribed from
@@ -92,6 +92,8 @@ import SuggestedMapZone, { SuggestedMapCard } from "./zones/SuggestedMap";
 
 const {
   battleSuggestedMap,
+  msToNextUtcDay,
+  subscribeUtcDay,
   suggestedMapCandidates,
   suggestedMapClaim,
   suggestedMapFor,
@@ -100,6 +102,7 @@ const {
   pickSuggestedMap,
   springNameOf,
   utcDayIndex,
+  utcDayNow,
 } = suggested;
 
 /** A curated map downloaded by spring name, the common catalog shape. */
@@ -400,6 +403,82 @@ describe("the rotation and the machine's timezone", () => {
     expect(utcDayIndex(new Date("1970-01-01T00:00:00Z"))).toBe(0);
     expect(utcDayIndex(new Date("1970-01-02T00:00:00Z"))).toBe(1);
     expect(utcDayIndex(new Date("1969-12-31T23:59:59Z"))).toBe(-1);
+  });
+});
+
+describe("the rotation turning over under an open window", () => {
+  const DAY_MS = 86_400_000;
+  const HOUR_MS = 3_600_000;
+  const NOON = Date.parse("2026-08-07T12:00:00Z");
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOON);
+  });
+  // Every case unsubscribes its own listeners, so no timer outlives the fake
+  // clock. `getTimerCount` is asserted below, which is what would catch one.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("waits for the instant the day index changes", () => {
+    expect(msToNextUtcDay(Date.parse("2026-08-07T23:00:00Z"))).toBe(HOUR_MS);
+    expect(msToNextUtcDay(Date.parse("2026-08-07T00:00:00Z"))).toBe(DAY_MS);
+  });
+
+  it("waits a second rather than spinning when it fires a hair early", () => {
+    expect(msToNextUtcDay(Date.parse("2026-08-08T00:00:00Z") - 1)).toBe(1_000);
+  });
+
+  it("turns over where it stands, without the page being revisited", () => {
+    const seen: number[] = [];
+    const stop = subscribeUtcDay(() => seen.push(utcDayNow()));
+    const start = utcDayNow();
+    vi.advanceTimersByTime(12 * HOUR_MS);
+    stop();
+    expect(seen).toEqual([start + 1]);
+  });
+
+  it("keeps stepping on every following midnight", () => {
+    const seen: number[] = [];
+    const stop = subscribeUtcDay(() => seen.push(utcDayNow()));
+    const start = utcDayNow();
+    vi.advanceTimersByTime(12 * HOUR_MS + 2 * DAY_MS);
+    stop();
+    expect(seen).toEqual([start + 1, start + 2, start + 3]);
+  });
+
+  it("hands every reader the same day from the one tick", () => {
+    // The point of the store. The suggested map is resolved twice per render,
+    // once for the claim and once for the card (issue #1077), and a timer each
+    // would let them cross midnight in separate tasks.
+    const seen: number[] = [];
+    const first = subscribeUtcDay(() => seen.push(utcDayNow()));
+    const second = subscribeUtcDay(() => seen.push(utcDayNow()));
+    expect(vi.getTimerCount()).toBe(1);
+    vi.advanceTimersByTime(12 * HOUR_MS);
+    first();
+    second();
+    expect(seen).toEqual([utcDayNow(), utcDayNow()]);
+  });
+
+  it("runs no timer while nothing is reading it", () => {
+    const first = subscribeUtcDay(() => {});
+    const second = subscribeUtcDay(() => {});
+    first();
+    expect(vi.getTimerCount()).toBe(1);
+    second();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("is right on its first frame after a day passed with nothing mounted", () => {
+    const warm = subscribeUtcDay(() => {});
+    const start = utcDayNow();
+    warm();
+    vi.setSystemTime(NOON + 2 * DAY_MS);
+    const stop = subscribeUtcDay(() => {});
+    expect(utcDayNow()).toBe(start + 2);
+    stop();
   });
 });
 
