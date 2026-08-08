@@ -89,7 +89,7 @@ export function formatTotal(value: number): string {
 }
 
 /**
- * A figure on the chart: on an axis tick or in the tooltip.
+ * A figure on the cumulative chart: on an axis tick or in the tooltip.
  *
  * Two decimals rather than {@link formatTotal}'s one, because a tick at
  * 1,050,000 labelled `1.1M` makes evenly spaced gridlines read as uneven ones.
@@ -105,6 +105,23 @@ export function formatChartValue(value: number): string {
   // `toFixed` always leaves a point, so trimming zeros can't eat a whole number.
   const text = n.toFixed(2).replace(/\.?0+$/, "");
   return `${text}${million ? "M" : "k"}`;
+}
+
+/**
+ * A figure on the per-minute chart.
+ *
+ * A rate is a different magnitude from the running total it came from: a team
+ * that killed twenty units in eight minutes is plotted in single digits, and
+ * recharts then picks fractional gridlines. {@link formatChartValue} rounds, so
+ * an axis of 0, 1.2, 2.4, 3.6 reads there as 0, 1, 2, 4. Under a hundred this
+ * keeps enough decimals to tell those ticks apart. Above it, a rate is big
+ * enough that the cumulative formatter reads correctly and the two agree.
+ */
+export function formatRate(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 100 || value === 0) return formatChartValue(value);
+  // `toFixed` always leaves a point, so trimming zeros can't eat a whole number.
+  return value.toFixed(abs < 10 ? 2 : 1).replace(/\.?0+$/, "");
 }
 
 /** A headline tile: one registry metric, totalled across the match. */
@@ -140,8 +157,8 @@ export function headlineTotals(
  *   1. which metric is plotted   -> `metricGroups` / `defaultMetric`
  *   2. which series are plotted  -> `teamSeries`, which #1138 gives an ally-side
  *      sibling: a merged series is just another `ChartSeries`
- *   3. what recharts receives    -> `chartRows`, which #1137 gives a per-minute
- *      mode: the same rows, differenced
+ *   3. what recharts receives    -> `chartRows`, and `perMinuteRows` over its
+ *      result for the rate view
  *
  * So the chart component composes three functions, and neither of those issues
  * has to take it apart.
@@ -303,9 +320,8 @@ export interface ChartRow {
  * What recharts plots: the union of every series' sample frames, each carrying
  * one value per series.
  *
- * This is the step #1137 changes. A per-minute view is these rows with each
- * value replaced by its rise since the row before, over the minutes between
- * them, so it belongs here and not in a component.
+ * Every value here is a running total, which is what the file recorded.
+ * {@link perMinuteRows} turns that into a rate.
  */
 export function chartRows(
   series: ChartSeries[],
@@ -333,6 +349,79 @@ export function chartRows(
     });
     return row;
   });
+}
+
+/**
+ * Which question the chart answers: how much in total, or how much a minute.
+ * Not a display option. A cumulative line only ever goes up, so the minute a
+ * player was crippled is a change of slope nobody can see, and the same figures
+ * as a rate are the shape of the match.
+ */
+export type ChartMode = "cumulative" | "perMinute";
+
+const SEC_PER_MINUTE = 60;
+
+/** Every series a set of rows carries: their keys, minus the x axis. */
+function seriesIds(rows: ChartRow[]): string[] {
+  return [...new Set(rows.flatMap((r) => Object.keys(r)))].filter(
+    (k) => k !== "timeSec",
+  );
+}
+
+/**
+ * The rate a series' first point is drawn at: its second point's. It has no
+ * predecessor of its own, and a zero at the first point reads as a stall in
+ * exactly the chart this view exists to expose. Null for a series with a single
+ * point, which has no rate at all to show.
+ */
+function openingRate(
+  rates: ChartRow[],
+  id: string,
+  first: number,
+): number | null {
+  for (let i = first + 1; i < rates.length; i++) {
+    const rate = rates[i][id];
+    if (typeof rate === "number") return rate;
+  }
+  return null;
+}
+
+/**
+ * The same rows as a rate: each value is its rise since the row before, over the
+ * minutes between the two. The interval comes from the rows' own times, which
+ * {@link chartRows} took from the trailer's recorded period, so nothing here
+ * assumes how often the engine sampled.
+ *
+ * A pure function over rows on purpose. The value table (#1140) shows these
+ * figures rather than re-deriving them, and the ally-side view (#1138) sums
+ * running totals before this runs: summing then differencing and differencing
+ * then summing give the same answer, but only while this stays out of the chart.
+ */
+export function perMinuteRows(rows: ChartRow[]): ChartRow[] {
+  const rates: ChartRow[] = rows.map((r) => ({ timeSec: r.timeSec }));
+  for (const id of seriesIds(rows)) {
+    let previous: { timeSec: number; value: number } | null = null;
+    let first = -1;
+    for (let i = 0; i < rows.length; i++) {
+      const value = rows[i][id];
+      // Null before a series starts and after it stops, and it stays null: a
+      // team that is no longer recorded has no rate either.
+      if (typeof value !== "number") {
+        rates[i][id] = null;
+        continue;
+      }
+      if (previous === null) {
+        first = i;
+        rates[i][id] = null;
+      } else {
+        const minutes = (rows[i].timeSec - previous.timeSec) / SEC_PER_MINUTE;
+        rates[i][id] = minutes > 0 ? (value - previous.value) / minutes : 0;
+      }
+      previous = { timeSec: rows[i].timeSec, value };
+    }
+    if (first >= 0) rates[first][id] = openingRate(rates, id, first);
+  }
+  return rates;
 }
 
 /** One line of the tooltip. */

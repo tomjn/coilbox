@@ -10,18 +10,21 @@ import type {
   TeamStatSample,
 } from "./bindings";
 import {
+  type ChartSeries,
   chartRows,
   defaultMetric,
   END_LABEL_MAX_SERIES,
   endPoints,
   formatChartValue,
   formatDuration,
+  formatRate,
   formatTotal,
   hasStatistics,
   headlineTotals,
   lastPointIndex,
   matchTotal,
   metricGroups,
+  perMinuteRows,
   resultLabel,
   seatCount,
   secondsPerFrame,
@@ -452,6 +455,113 @@ describe("chartRows", () => {
   });
 });
 
+describe("perMinuteRows", () => {
+  /** One team, sampled every 15 seconds at 30 frames a second. */
+  const quarterMinute = (values: number[]) =>
+    teamSeries(
+      trailer([values.map((v, i) => at(i * 450, KEY_A, v))], 15),
+      info(),
+    );
+
+  const rates = (series: ChartSeries[], secPerFrame = 1 / 30) =>
+    perMinuteRows(chartRows(series, KEY_A, secPerFrame));
+
+  it("is the rise since the sample before, scaled to a minute", () => {
+    // 90 in a quarter of a minute is 360 a minute.
+    const rows = rates(quarterMinute([1006, 1096, 1300]));
+    expect(rows.map((r) => r.team0)).toEqual([360, 360, 816]);
+  });
+
+  it("reads the period rather than assuming one", () => {
+    // Sampled every 30 seconds instead of every 15: the same rise is half the
+    // rate. A fixed 15-second period would report double.
+    const half = trailer(
+      [[at(0, KEY_A, 0), at(900, KEY_A, 90), at(1800, KEY_A, 300)]],
+      30,
+    );
+    const rows = rates(teamSeries(half, info()), secondsPerFrame(half));
+    expect(rows.map((r) => r.timeSec)).toEqual([0, 30, 60]);
+    expect(rows.map((r) => r.team0)).toEqual([180, 180, 420]);
+  });
+
+  it("gives the first point the second's rate, not a zero", () => {
+    // A zero at minute zero reads as a stall, in the one chart that exists to
+    // show a stall.
+    const rows = rates(quarterMinute([0, 200, 260]));
+    expect(rows[0].team0).toBe(800);
+    expect(rows[0].team0).toBe(rows[1].team0);
+  });
+
+  it("gives a line that starts late its own second rate", () => {
+    const late = teamSeries(
+      trailer(
+        [
+          [at(0, KEY_A, 1), at(450, KEY_A, 2), at(900, KEY_A, 3)],
+          [at(450, KEY_A, 10), at(900, KEY_A, 40)],
+        ],
+        15,
+      ),
+      info(),
+    );
+    expect(rates(late).map((r) => r.team1)).toEqual([null, 120, 120]);
+  });
+
+  it("has no rate after a line stops being recorded", () => {
+    const stops = teamSeries(
+      trailer(
+        [
+          [at(0, KEY_A, 1), at(450, KEY_A, 2), at(900, KEY_A, 3)],
+          [at(0, KEY_A, 10), at(450, KEY_A, 20)],
+        ],
+        15,
+      ),
+      info(),
+    );
+    expect(rates(stops).map((r) => r.team1)).toEqual([40, 40, null]);
+  });
+
+  it("has nothing to show for a series sampled once", () => {
+    // One sample is no rate at all, and a zero would claim it was measured.
+    expect(rates(quarterMinute([5])).map((r) => r.team0)).toEqual([null]);
+  });
+
+  it("keeps the times it was given and leaves the totals alone", () => {
+    const totals = chartRows(quarterMinute([1, 5, 20]), KEY_A, 1 / 30);
+    const before = JSON.stringify(totals);
+    const derived = perMinuteRows(totals);
+    expect(derived.map((r) => r.timeSec)).toEqual([0, 15, 30]);
+    expect(JSON.stringify(totals)).toBe(before);
+  });
+
+  it("gives the same answer whether sides are summed before or after", () => {
+    // What #1138 needs: it adds two teams' running totals into one series, and
+    // that has to be the same line as adding their two rates.
+    const both = teamSeries(
+      trailer(
+        [
+          [at(0, KEY_A, 0), at(450, KEY_A, 30), at(900, KEY_A, 100)],
+          [at(0, KEY_A, 5), at(450, KEY_A, 45), at(900, KEY_A, 60)],
+        ],
+        15,
+      ),
+      info(),
+    );
+    const apart = rates(both);
+    const summed = rates([
+      {
+        ...both[0],
+        id: "side",
+        samples: both[0].samples.map((s, i) =>
+          at(s.frame, KEY_A, s[KEY_A] + both[1].samples[i][KEY_A]),
+        ),
+      },
+    ]);
+    expect(summed.map((r) => r.side)).toEqual(
+      apart.map((r) => (r.team0 as number) + (r.team1 as number)),
+    );
+  });
+});
+
 describe("tooltipRows", () => {
   /** `count` teams, each ending on a bigger figure than the last. */
   const many = (count: number) =>
@@ -617,5 +727,35 @@ describe("formatChartValue", () => {
   it("leaves a figure small enough to read", () => {
     expect(formatChartValue(0)).toBe("0");
     expect(formatChartValue(276)).toBe("276");
+  });
+});
+
+describe("formatRate", () => {
+  it("keeps a small rate's gridlines apart", () => {
+    // A team that killed twenty units in eight minutes is plotted in single
+    // digits, and the cumulative formatter rounds those ticks together.
+    expect([0, 1.2, 2.4, 3.6].map(formatChartValue)).toEqual([
+      "0",
+      "1",
+      "2",
+      "4",
+    ]);
+    expect([0, 1.2, 2.4, 3.6].map(formatRate)).toEqual([
+      "0",
+      "1.2",
+      "2.4",
+      "3.6",
+    ]);
+  });
+
+  it("does not print decimals a whole figure hasn't got", () => {
+    expect(formatRate(4)).toBe("4");
+    expect(formatRate(12)).toBe("12");
+  });
+
+  it("reads a big rate the way the rest of the chart does", () => {
+    expect(formatRate(360)).toBe("360");
+    expect(formatRate(5_900.4)).toBe("5.9k");
+    expect(formatRate(1_050_000)).toBe("1.05M");
   });
 });
