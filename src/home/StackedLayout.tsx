@@ -1,7 +1,7 @@
 import { Slot } from "@picoframe/frame";
 import { Fragment, type ReactNode } from "react";
 import { backdropStyle, resolveHomeBackground } from "./background";
-import { type HomeEntry, type ZoneId, zoneString } from "./config";
+import type { HomeEntry, ZoneId } from "./config";
 import HomeMarkup from "./HomeMarkup";
 import type { HomeLayoutProps } from "./layout";
 import Continue from "./zones/Continue";
@@ -219,8 +219,8 @@ function bare(entry: HomeEntry, zone: ZoneId): boolean {
   return (
     entry.kind === "zone" &&
     entry.zone === zone &&
-    zoneString(entry.entry, "before") === undefined &&
-    zoneString(entry.entry, "after") === undefined
+    entry.strings.before === undefined &&
+    entry.strings.after === undefined
   );
 }
 
@@ -248,8 +248,7 @@ function bare(entry: HomeEntry, zone: ZoneId): boolean {
 function renderEntry(entry: HomeEntry, index: number): ReactNode {
   if (entry.kind === "html")
     return <HomeMarkup key={index} markup={entry.html} />;
-  const before = zoneString(entry.entry, "before");
-  const after = zoneString(entry.entry, "after");
+  const { before, after } = entry.strings;
   const spacing = ZONE_SPACING[entry.zone];
   const node = (
     <>
@@ -276,10 +275,7 @@ function zoneNode(entry: Extract<HomeEntry, { kind: "zone" }>): ReactNode {
       return <Onboarding />;
     case "greeting":
       return (
-        <Greeting
-          title={zoneString(entry.entry, "title")}
-          tagline={zoneString(entry.entry, "tagline")}
-        />
+        <Greeting title={entry.strings.title} tagline={entry.strings.tagline} />
       );
     case "continue":
       return <Continue className={HERO_WIDTH} />;

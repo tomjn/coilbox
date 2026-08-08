@@ -4,7 +4,6 @@ import {
   describeHome,
   type HomeEntry,
   resolveHome,
-  zoneString,
 } from "./config";
 
 // Every malformed case is supposed to say something, so the warnings are part of
@@ -58,16 +57,31 @@ describe("resolveHome with no home key", () => {
 });
 
 describe("resolveHome layout", () => {
-  it("passes a pinned name through", () => {
-    // Unrecognised names are the registry's business, so any string reaches it.
+  it("passes a name this build ships through", () => {
     expect(resolveHome({ layout: "stacked" }).layout).toBe("stacked");
-    expect(resolveHome({ layout: "mosaic" }).layout).toBe("mosaic");
     expect(warn).not.toHaveBeenCalled();
   });
 
   it("ignores a layout that is not a string", () => {
     expect(resolveHome({ layout: 3 }).layout).toBeUndefined();
     expect(warn).toHaveBeenCalled();
+  });
+
+  it("drops a name this build does not ship, and says which", () => {
+    // The page drawn is the default one, so the pin reads as unset. A summary
+    // that quoted "mosaic" would be describing a pin that did nothing (#1088).
+    expect(resolveHome({ layout: "mosaic" }).layout).toBeUndefined();
+    expect(warn.mock.calls.join("\n")).toContain("mosaic");
+  });
+
+  it("lists what the build does ship, so the author can correct it", () => {
+    const { issues } = resolveHome({ layout: "mosaic" });
+    expect(issues.join("\n")).toContain("stacked");
+  });
+
+  it("does not resolve an inherited Object property as a layout", () => {
+    expect(resolveHome({ layout: "toString" }).layout).toBeUndefined();
+    expect(resolveHome({ layout: "constructor" }).layout).toBeUndefined();
   });
 });
 
@@ -111,7 +125,7 @@ describe("resolveHome zones", () => {
       art: { warpath: "@.coilbox/art/warpath.png" },
     };
     const [resolved] = resolveHome({ zones: [entry] }).entries;
-    expect(resolved).toEqual({ kind: "zone", zone: "cards", entry });
+    expect(resolved).toMatchObject({ kind: "zone", zone: "cards", entry });
   });
 
   it("recognises a custom html entry and keeps its position", () => {
@@ -243,9 +257,22 @@ describe("what resolveHome reports as issues", () => {
     ],
     ["an inherited Object property", { zones: [{ zone: "constructor" }] }],
     ["an entry naming neither a zone nor html", { zones: [{ before: "<p>" }] }],
+    ["a layout this build does not ship", { layout: "mosaic" }],
+    ["a layout named after an Object property", { layout: "constructor" }],
+    [
+      "a zone option that is not a string",
+      { zones: [{ zone: "greeting", title: 7, tagline: ["a"] }] },
+    ],
+    [
+      "markup on a zone that is not a string",
+      { zones: [{ zone: "cards", before: 7, after: {} }] },
+    ],
     [
       "several mistakes at once",
-      { layout: [], zones: [{ zone: "nope" }, 7, { zone: "cards" }] },
+      {
+        layout: [],
+        zones: [{ zone: "nope" }, 7, { zone: "greeting", title: 7 }],
+      },
     ],
   ];
 
@@ -331,25 +358,64 @@ describe("describeHome", () => {
   });
 });
 
-describe("zoneString", () => {
-  it("returns the author's string", () => {
-    expect(zoneString({ title: "Splinter Faction" }, "title")).toBe(
-      "Splinter Faction",
-    );
+/**
+ * A zone's `title`, `tagline`, `before` and `after` are resolved here rather than
+ * read by the layout at render time (issue #1088).
+ *
+ * That is what puts them in the same list as everything else the resolver
+ * dropped, without a second walk over the raw entries: the walk that builds the
+ * page is the walk that checks them, and the layout renders what it was handed.
+ */
+describe("a zone's string options", () => {
+  /** The strings resolved for the first entry of a one-zone page. */
+  const strings = (entry: Record<string, unknown>) => {
+    const [first] = resolveHome({ zones: [entry] }).entries;
+    if (first.kind !== "zone") throw new Error("expected a zone entry");
+    return first.strings;
+  };
+
+  it("carries the author's strings on the entry", () => {
+    expect(strings({ zone: "greeting", title: "Splinter Faction" })).toEqual({
+      title: "Splinter Faction",
+    });
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it("returns undefined for a key the author left out", () => {
-    expect(zoneString({}, "title")).toBeUndefined();
+  it("leaves out a key the author did not write", () => {
+    expect(strings({ zone: "greeting" })).toEqual({});
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it("keeps an empty string, which is a deliberate blank line", () => {
-    expect(zoneString({ tagline: "" }, "tagline")).toBe("");
+  it("keeps an empty string, which is a deliberate blank", () => {
+    expect(strings({ zone: "greeting", tagline: "" }).tagline).toBe("");
+    expect(warn).not.toHaveBeenCalled();
   });
 
-  it("ignores a value that is not a string", () => {
-    expect(zoneString({ title: { text: "hi" } }, "title")).toBeUndefined();
+  it("treats null as a key left out rather than as a mistake", () => {
+    expect(strings({ zone: "greeting", title: null })).toEqual({});
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("drops a value that is not a string, and names the zone", () => {
+    expect(strings({ zone: "greeting", title: { text: "hi" } })).toEqual({});
+    expect(warn.mock.calls.join("\n")).toContain("greeting");
+  });
+
+  it("checks the markup keys on every zone, not just the greeting", () => {
+    expect(strings({ zone: "cards", before: 7 })).toEqual({});
     expect(warn).toHaveBeenCalled();
+  });
+
+  it("says nothing about a key the zone would never read", () => {
+    // A `title` on the tool grid is not rendered whatever its type, so calling
+    // it an ignored value would promise that a string there would have worked.
+    expect(strings({ zone: "cards", title: 7 })).toEqual({});
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("keeps the rest of the entry when one option is wrong", () => {
+    expect(strings({ zone: "greeting", title: 7, tagline: "Ready" })).toEqual({
+      tagline: "Ready",
+    });
   });
 });
