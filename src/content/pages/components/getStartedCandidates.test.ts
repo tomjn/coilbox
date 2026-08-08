@@ -7,7 +7,9 @@ vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
 }));
 
-const { getStartedCandidates } = await import("./getStartedCandidates");
+const { getStartedCandidates, installedMapCount, MAPS_ENOUGH } = await import(
+  "./getStartedCandidates"
+);
 
 const game = (id: string): SuggestedGame => ({
   id,
@@ -43,10 +45,15 @@ const generated = (folder: string) =>
 
 const empty = { games: new Set<string>(), maps: new Set<string>() };
 
+// Enough maps to end the offer, named by the rule rather than by a literal, so
+// the tests still say what they mean if the number moves.
+const enoughMaps = () =>
+  new Set(Array.from({ length: MAPS_ENOUGH }, (_, i) => `m${i}.sd7`));
+
 describe("getStartedCandidates (issue #534)", () => {
-  it("offers nothing to a user who already has a game and a map", () => {
+  it("offers nothing to a user who already has a game and enough maps", () => {
     const result = getStartedCandidates({
-      installed: { games: new Set(), maps: new Set(["a"]) },
+      installed: { games: new Set(), maps: enoughMaps() },
       scanned: scanned(["Some Game"], []),
       scopedGames: [game("bar")],
       entries: [],
@@ -70,7 +77,7 @@ describe("getStartedCandidates (issue #534)", () => {
 
   it("offers a game to a user with maps but no games", () => {
     const result = getStartedCandidates({
-      installed: { games: new Set(), maps: new Set(["a"]) },
+      installed: { games: new Set(), maps: enoughMaps() },
       scanned: scanned([], []),
       scopedGames: [game("bar")],
       entries: [],
@@ -137,11 +144,80 @@ describe("getStartedCandidates undecided cases", () => {
   it("counts maps unitsync can see but the file listing missed", () => {
     const result = getStartedCandidates({
       installed: empty,
-      scanned: scanned(["Some Game"], ["Some Map"]),
+      scanned: scanned(["Some Game"], ["One", "Two", "Three"]),
       scopedGames: [game("bar")],
       entries: [],
       suggestedMaps: [map("a")],
     });
     expect(result?.maps).toHaveLength(0);
+  });
+});
+
+// Issue #1116. The offer used to end the moment the player took one map, so a
+// revisit after a single download came back to a page with no offer on it. It
+// now ends when the player has a library rather than when it has been used.
+describe("the offer stands until the player has enough maps", () => {
+  const suggestedMaps = [map("a"), map("b"), map("c"), map("d")];
+  const withMaps = (n: number) =>
+    getStartedCandidates({
+      installed: {
+        games: new Set(),
+        maps: new Set(Array.from({ length: n }, (_, i) => `have${i}.sd7`)),
+      },
+      scanned: scanned(["Some Game"], []),
+      scopedGames: [game("bar")],
+      entries: [],
+      suggestedMaps,
+    });
+
+  it("keeps offering after the first download", () => {
+    expect(withMaps(1)?.maps.map((m) => m.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("still offers one short of enough", () => {
+    expect(withMaps(MAPS_ENOUGH - 1)?.maps).not.toHaveLength(0);
+  });
+
+  it("stands down at enough", () => {
+    expect(withMaps(MAPS_ENOUGH)?.maps).toHaveLength(0);
+  });
+
+  it("drops a map the player took from the list it offers next", () => {
+    const result = getStartedCandidates({
+      installed: { games: new Set(), maps: new Set() },
+      scanned: scanned(["Some Game"], ["a"]),
+      scopedGames: [game("bar")],
+      entries: [],
+      suggestedMaps,
+    });
+    expect(result?.maps.map((m) => m.id)).toEqual(["b", "c", "d"]);
+  });
+});
+
+describe("installedMapCount", () => {
+  // The two readings name the same map differently, so a player with three maps
+  // that both readings can see has three, not six.
+  it("does not add the two readings together", () => {
+    expect(
+      installedMapCount({
+        installed: { maps: new Set(["a.sd7", "b.sd7", "c.sd7"]) },
+        scanned: scanned([], ["A", "B", "C"]),
+      }),
+    ).toBe(3);
+  });
+
+  it("takes whichever reading saw more", () => {
+    expect(
+      installedMapCount({
+        installed: { maps: new Set(["a.sd7"]) },
+        scanned: scanned([], ["A", "B"]),
+      }),
+    ).toBe(2);
+    expect(
+      installedMapCount({
+        installed: { maps: new Set(["a.sd7", "b.sd7"]) },
+        scanned: scanned([], ["A"]),
+      }),
+    ).toBe(2);
   });
 });
