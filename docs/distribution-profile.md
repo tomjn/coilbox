@@ -438,7 +438,7 @@ Each entry is an object naming one zone, plus whatever that zone takes:
 | `tagline`  | `greeting`      | The line under the heading.                                                    |
 | `art`      | `cards`         | Per-tool card pictures. See [Card art for one tool](#card-art-for-one-tool).   |
 
-A key on a zone that does not take it is ignored, so `title` on `cards` does nothing.
+A key written on an entry that does not take it is ignored, so `title` on `cards` does nothing, and `html` on an entry that names a `zone` does nothing either. Coilbox says which key and which entry, on the console and in the profile panel, and says it whatever the value is: the fix is to move the key, not to correct it.
 
 #### The zone list
 
@@ -511,6 +511,7 @@ Every entry takes `before` and `after` markup, and an entry with `html` instead 
 - Markup renders whether or not the zone beside it drew anything. A `before` on `continue` still shows on a fresh install with nothing to resume. Tying it to the zone would make it mean "sometimes", and would leave no way at all to say "always". So write markup that reads correctly next to an empty zone.
 - The markup goes through the same trusted path as [`welcome.html`](#welcome-object): relative asset URLs resolve against your `.coilbox/` folder, `<style>` blocks are rewritten the same way, `data-coilbox-action` markers work, and there is no JavaScript.
 - Coilbox puts your markup in a `div.coilbox-home-markup` and styles it in no other way. A custom `html` entry gets no margin at all, because the layout has no idea whether the block is a hairline or a feed. Bring your own spacing.
+- `before` and `after` work on a custom entry too, and are worth reaching for when its `html` is a file: `{ "html": "@.coilbox/home/feed.html", "before": "<p>From the forum</p>" }` keeps the sentence in `profile.json` next to the reference, and leaves the file to whatever generates it.
 - A reference that cannot be read renders a visible error in place, rather than blanking.
 
 One layout consequence worth knowing. Coilbox normally puts the `continue` card and the `resume` rail on one row, and folds the `suggested` map card into the tool grid's Downloads group. An entry carrying `before` or `after` markup stops pairing, so those two zones stack separately instead. Put your markup on a neighbouring entry, or on a custom `html` entry, if you want the pairing kept.
@@ -583,7 +584,8 @@ A release build does not expose that console, so the same list is in the app: Se
 | The same zone twice                                 | The first kept, the second dropped.                          |
 | An entry with neither `zone` nor `html`             | That entry dropped.                                          |
 | Every entry bad                                     | The stock page.                                              |
-| `title`, `tagline`, `before` or `after` that is not a string | That key ignored, the zone drawn as Coilbox would draw it. |
+| `title`, `tagline`, `before` or `after` that is not a string | That key ignored, the entry drawn as Coilbox would draw it. |
+| A key on an entry that does not take it, such as `title` on `cards` or `html` beside a `zone` | Nothing, and a line saying so rather than one about its value. A `@.coilbox/` file it names is not read either. |
 | `art` that is not an object                         | The whole map ignored, every card walks the chain.           |
 | An `art` value that is neither a `@.coilbox/` reference nor `false` | That tool dropped from the map and walking the chain, the rest of the map kept. |
 | `background` that is neither a `@.coilbox/` reference nor `false` | The default wash.                                |

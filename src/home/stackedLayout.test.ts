@@ -256,11 +256,31 @@ describe("StackedLayout distribution markup", () => {
     warn.mockRestore();
   });
 
-  it("ignores before and after on a custom entry, which is markup already", () => {
-    expect(page([{ html: "<p>x</p>", before: "<p>b</p>" }])).toEqual([
+  it("renders before and after around a custom entry too", () => {
+    // Every entry takes them, which is what the documentation has always said.
+    // A custom entry's block is usually a file, so the sentence introducing it
+    // is a different thing to edit and belongs where the reference is written.
+    expect(
+      page([{ html: "<p>x</p>", before: "<p>b</p>", after: "<p>a</p>" }]),
+    ).toEqual([
       "slot",
+      "markup:<p>b</p>",
       "markup:<p>x</p>",
+      "markup:<p>a</p>",
       "slot",
+    ]);
+  });
+
+  it("still gives a custom entry's markup no spacing of the layout's own", () => {
+    const rendered = render(
+      resolveHome({ zones: [{ html: "<p>x</p>", before: "<p>b</p>" }] })
+        .entries,
+    );
+    expect(rendered.map((r) => r.wrapper)).toEqual([
+      COLUMN,
+      COLUMN,
+      COLUMN,
+      COLUMN,
     ]);
   });
 });
