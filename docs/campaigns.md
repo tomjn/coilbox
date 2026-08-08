@@ -112,7 +112,7 @@ One exception: a bundled campaign whose missions carry a [scenario](scenarios.md
 After a mission's game exits (and wasn't cancelled), Coilbox tries to work out the result automatically instead of asking:
 
 1. It snapshots the replay files present before launch, then diffs against the list after exit to find the new replay this run wrote (retrying briefly if the filesystem hasn't flushed it yet).
-2. It decodes that replay with the engine's `demotool` and looks up your player entry by name.
+2. It decodes that replay and looks up your player entry by name.
 3. If the demo has a known winner and you're in it as a non-spectator, the result (Victory/Defeat) is applied automatically — you land straight on the result screen with a small "Result detected from the replay" note, no confirmation needed.
 
 If any step fails — no new replay found, the winner isn't known, or you're not found in the decoded players — Coilbox falls back to asking directly with the familiar **Victory** / **Defeat** buttons. This manual path is always available; automatic detection is a convenience layered on top of it, never a requirement.

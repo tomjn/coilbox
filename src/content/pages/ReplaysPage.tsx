@@ -288,8 +288,7 @@ export default function ReplaysPage() {
         <header className="flex flex-col gap-1">
           <h1 className="text-lg font-semibold">Replays</h1>
           <p className="text-sm text-muted-foreground">
-            Demo files in your content folder, decoded with the engine's
-            demotool.
+            Demo files in your content folder.
           </p>
         </header>
 
