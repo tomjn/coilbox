@@ -611,13 +611,20 @@ export function ScenarioMapScene({
       />
 
       <div className="absolute left-2 top-2 flex max-w-[calc(100%-21rem)] flex-col gap-1.5">
-        <div className="flex flex-wrap items-center gap-1.5">
+        {/* The whole row shares one backdrop rather than each control finding
+            its own: a mode's `controls` are arbitrary (selects, a count field,
+            a button), so painting the panel once is what makes every one of
+            them opaque over the map, present ones and any added later, rather
+            than a fix repeated per control. Same fill and blur as the mode
+            strip itself carried before this row grew one, so the toolbar
+            reads as one panel rather than a solid strip beside naked
+            controls (issue #1188). */}
+        <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card/80 p-1 backdrop-blur">
           <ToggleGroup
             type="single"
             variant="outline"
             value={mode.id}
             onValueChange={(next) => next && setModeId(next)}
-            className="bg-card/80 backdrop-blur"
             aria-label="Placement mode"
           >
             {EDITOR_MODES.map((m) => (
