@@ -10,8 +10,10 @@ import type {
   TeamStatSample,
 } from "./bindings";
 import {
+  allySeries,
   type ChartSeries,
   chartRows,
+  defaultChartView,
   defaultMetric,
   END_LABEL_MAX_SERIES,
   endPoints,
@@ -24,6 +26,7 @@ import {
   lastPointIndex,
   matchTotal,
   metricGroups,
+  PLAYERS_VIEW_MAX_SERIES,
   perMinuteRows,
   resultLabel,
   seatCount,
@@ -380,6 +383,278 @@ describe("teamSeries", () => {
   it("gives a team with no recorded colour a palette one", () => {
     const colors = teamSeries(measured, info()).map((s) => s.color);
     expect(colors).toEqual([rgbToHex(PALETTE[0]), rgbToHex(PALETTE[2])]);
+  });
+});
+
+describe("allySeries", () => {
+  /**
+   * A 2v2 with the sides interleaved through the team numbering, and every team
+   * on a different power of two, so no wrong grouping can add up to a right
+   * answer and a fixture in team order can't pass by accident.
+   */
+  const twoOnTwo = trailer([
+    [at(0, KEY_A, 1), at(450, KEY_A, 10)],
+    [at(0, KEY_A, 2), at(450, KEY_A, 20)],
+    [at(0, KEY_A, 4), at(450, KEY_A, 40)],
+    [at(0, KEY_A, 8), at(450, KEY_A, 80)],
+  ]);
+
+  /** Teams 0 and 2 against teams 1 and 3. */
+  const fourSeats = (over: Partial<DemoInfo> = {}) =>
+    info({
+      players: [
+        { name: "a", spectator: false, team: 0, allyTeam: 0 },
+        { name: "b", spectator: false, team: 1, allyTeam: 1 },
+        { name: "c", spectator: false, team: 2, allyTeam: 0 },
+        { name: "d", spectator: false, team: 3, allyTeam: 1 },
+      ],
+      ...over,
+    });
+
+  /** Two measured teams, for the cases about one side or one seat. */
+  const pair = trailer([[at(0, KEY_A, 3)], [at(0, KEY_A, 5)]]);
+
+  /** Both of `pair`'s teams on the same side. */
+  const oneSide = info({
+    players: [
+      { name: "a", spectator: false, team: 0, allyTeam: 0 },
+      { name: "b", spectator: false, team: 1, allyTeam: 0 },
+    ],
+  });
+
+  it("adds up the teams on a side, and only those", () => {
+    const sides = allySeries(twoOnTwo, fourSeats());
+    expect(sides.map((s) => s.id)).toEqual(["ally0", "ally1"]);
+    expect(sides.map((s) => s.samples.map((p) => p[KEY_A]))).toEqual([
+      [5, 50],
+      [10, 100],
+    ]);
+  });
+
+  it("adds up a real match the way a person does with a calculator", () => {
+    // Greenhaven, read out of the decoder: teams 0 and 1 were one side, and
+    // these are their figures at four of the frames the engine sampled. The
+    // expected column was added up by hand from the same two lists.
+    const real = trailer([
+      [
+        at(1800, KEY_A, 177.93333435058594),
+        at(4500, KEY_A, 2847.468505859375),
+        at(9000, KEY_A, 27216.3828125),
+        at(14850, KEY_A, 103667.1640625),
+      ],
+      [
+        at(1800, KEY_A, 299.9994201660156),
+        at(4500, KEY_A, 4576.6015625),
+        at(9000, KEY_A, 46115.00390625),
+        at(14850, KEY_A, 223599.4375),
+      ],
+    ]);
+    expect(allySeries(real, oneSide)[0].samples.map((s) => s[KEY_A])).toEqual([
+      477.93275451660156, 7424.070068359375, 73331.38671875, 327266.6015625,
+    ]);
+  });
+
+  it("adds every field, not only the one being charted", () => {
+    const carry = (frame: number, a: number, b: number) => {
+      const s = at(frame, KEY_A, a);
+      s[KEY_B] = b;
+      return s;
+    };
+    const two = trailer([[carry(450, 1, 5)], [carry(450, 2, 7)]]);
+    const merged = allySeries(two, oneSide)[0].samples[0];
+    expect([merged.frame, merged[KEY_A], merged[KEY_B]]).toEqual([450, 3, 12]);
+  });
+
+  it("names a side by how the match went for it", () => {
+    const decided = fourSeats({ winnersKnown: true, winningAllyTeams: [1] });
+    expect(allySeries(twoOnTwo, decided).map((s) => s.label)).toEqual([
+      "Team 1",
+      "Team 2 (won)",
+    ]);
+  });
+
+  it("claims no result the file doesn't know", () => {
+    expect(allySeries(twoOnTwo, fourSeats()).map((s) => s.label)).toEqual([
+      "Team 1",
+      "Team 2",
+    ]);
+  });
+
+  it("puts the sides in ally-team order whatever the teams are numbered", () => {
+    const reversed = fourSeats({
+      players: [
+        { name: "a", spectator: false, team: 0, allyTeam: 1 },
+        { name: "b", spectator: false, team: 1, allyTeam: 0 },
+        { name: "c", spectator: false, team: 2, allyTeam: 1 },
+        { name: "d", spectator: false, team: 3, allyTeam: 0 },
+      ],
+    });
+    expect(allySeries(twoOnTwo, reversed).map((s) => s.id)).toEqual([
+      "ally0",
+      "ally1",
+    ]);
+    // Ally 0 is teams 1 and 3 here, so its figures are the other pair's.
+    expect(allySeries(twoOnTwo, reversed)[0].samples[0][KEY_A]).toBe(10);
+  });
+
+  it("counts a bot, which holds a team and a side like anybody else", () => {
+    const vsBot = info({
+      players: [{ name: "a", spectator: false, team: 0, allyTeam: 0 }],
+      ais: [{ name: "AI 1", shortName: "BARb", team: 1, allyTeam: 0 }],
+    });
+    const sides = allySeries(pair, vsBot);
+    expect(sides.map((s) => s.id)).toEqual(["ally0"]);
+    expect(sides[0].samples[0][KEY_A]).toBe(8);
+  });
+
+  it("ignores a spectator, who is on a side but holds no team", () => {
+    const cast = info({
+      players: [
+        { name: "cast", spectator: true, team: 0, allyTeam: 1 },
+        { name: "a", spectator: false, team: 0, allyTeam: 0 },
+        { name: "b", spectator: false, team: 1, allyTeam: 0 },
+      ],
+    });
+    expect(allySeries(pair, cast).map((s) => s.id)).toEqual(["ally0"]);
+  });
+
+  it("leaves out a team the engine measured nothing for", () => {
+    const partial = trailer([[at(0, KEY_A, 1)], [], [at(0, KEY_A, 4)], []]);
+    const sides = allySeries(partial, fourSeats());
+    expect(sides.map((s) => s.id)).toEqual(["ally0"]);
+    expect(sides[0].samples[0][KEY_A]).toBe(5);
+  });
+
+  it("keeps a team the file gives no side for as a line of its own", () => {
+    const missing = fourSeats({
+      players: [
+        { name: "a", spectator: false, team: 0, allyTeam: 0 },
+        { name: "b", spectator: false, team: 1, allyTeam: 1 },
+        { name: "c", spectator: false, team: 2, allyTeam: 0 },
+      ],
+    });
+    const sides = allySeries(twoOnTwo, missing);
+    expect(sides.map((s) => s.id)).toEqual(["ally0", "ally1", "team3"]);
+    expect(sides[2].label).toBe("Team 3");
+    // Its own samples, not a copy and not merged into anybody.
+    expect(sides[2].samples).toBe(twoOnTwo.teams[3].samples);
+  });
+
+  it("holds a member's last figure once it stops being recorded", () => {
+    const stops = trailer([
+      [at(0, KEY_A, 1), at(450, KEY_A, 2), at(900, KEY_A, 3)],
+      [at(0, KEY_A, 10), at(450, KEY_A, 20)],
+    ]);
+    // A running total can't fall. Dropping the stopped team would read as a
+    // side that un-spent what it had already spent.
+    expect(allySeries(stops, oneSide)[0].samples.map((s) => s[KEY_A])).toEqual([
+      11, 22, 23,
+    ]);
+  });
+
+  it("has nothing from a member before its first sample", () => {
+    const late = trailer([
+      [at(0, KEY_A, 1), at(450, KEY_A, 2)],
+      [at(450, KEY_A, 20)],
+    ]);
+    expect(allySeries(late, oneSide)[0].samples.map((s) => s[KEY_A])).toEqual([
+      1, 22,
+    ]);
+  });
+
+  it("takes a side's colour from one of its own members", () => {
+    const colored = info({
+      players: [
+        {
+          name: "a",
+          spectator: false,
+          team: 0,
+          allyTeam: 0,
+          rgbColor: [1, 0, 0],
+        },
+        {
+          name: "b",
+          spectator: false,
+          team: 1,
+          allyTeam: 1,
+          rgbColor: [0, 0, 1],
+        },
+      ],
+    });
+    expect(allySeries(pair, colored).map((s) => s.color)).toEqual([
+      "#ff0000",
+      "#0000ff",
+    ]);
+  });
+
+  it("does not draw two sides in the same green", () => {
+    // Which member a side's colour comes from is down to team numbering, and
+    // these two are a chart with one line on it drawn twice.
+    const sameish = info({
+      players: [
+        {
+          name: "a",
+          spectator: false,
+          team: 0,
+          allyTeam: 0,
+          rgbColor: [0.05, 0.95, 0.5],
+        },
+        {
+          name: "b",
+          spectator: false,
+          team: 1,
+          allyTeam: 1,
+          rgbColor: [0.05, 0.83, 0.62],
+        },
+      ],
+    });
+    const [first, second] = allySeries(pair, sameish);
+    expect(first.color).toBe("#0df280");
+    expect(second.color).toBe(rgbToHex(PALETTE[0]));
+  });
+});
+
+describe("defaultChartView", () => {
+  const lines = (count: number, prefix: string): ChartSeries[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `${prefix}${i}`,
+      label: "",
+      color: "#000000",
+      samples: [],
+    }));
+
+  it("is for a match with more lines than anyone can tell apart", () => {
+    // The issue's wording, kept as a number the chart reads rather than a
+    // threshold typed into the component.
+    expect(PLAYERS_VIEW_MAX_SERIES).toBe(4);
+  });
+
+  it("opens a duel on the players, not on two sides of one", () => {
+    expect(defaultChartView(lines(2, "team"), lines(2, "ally"))).toBe(
+      "players",
+    );
+  });
+
+  it("opens a 2v2 on the players, which is still four readable lines", () => {
+    expect(defaultChartView(lines(4, "team"), lines(2, "ally"))).toBe(
+      "players",
+    );
+  });
+
+  it("opens a 3v3 on the sides", () => {
+    expect(defaultChartView(lines(6, "team"), lines(2, "ally"))).toBe("teams");
+  });
+
+  it("opens an 8v8 on the sides", () => {
+    expect(defaultChartView(lines(16, "team"), lines(2, "ally"))).toBe("teams");
+  });
+
+  it("opens a free-for-all on the players, since sides of one merge nothing", () => {
+    // Sixteen lines called "Team 1" to "Team 16" is the same smear with the
+    // names taken off it.
+    expect(defaultChartView(lines(16, "team"), lines(16, "ally"))).toBe(
+      "players",
+    );
   });
 });
 
