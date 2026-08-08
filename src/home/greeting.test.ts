@@ -9,16 +9,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // relative imports the node resolver won't load, so both are stubbed and the
 // component is called as a function (same approach as layout.test.ts).
 //
-// `cn` and `Button` are stubbed too, because one case here renders the tool grid
-// off the same nav the greeting read, to check the two zones agree about a page
-// with links and no tools. Same stubs as linkCard.test.ts, and `cn` is the real
-// tailwind-merge for the same reason.
+// The theme, `cn` and `Button` are stubbed too, because the last block here
+// renders the tool grid off the same nav the greeting read. That pair is the
+// subject: the two zones have to agree about which pages have a tool on them.
+// Same stubs as linkCard.test.ts, and `cn` is the real tailwind-merge for the
+// same reason.
 const frame = vi.fn<() => { title: string; nav: NavGroup[] }>();
 vi.mock("@picoframe/frame", async () => {
   const { clsx } = await import("clsx");
   const { twMerge } = await import("tailwind-merge");
   return {
     useFrame: () => frame(),
+    // A tool card asks which scheme it is drawing art for. Nothing here looks at
+    // the art, so the answer only has to be one of the two.
+    useTheme: () => ({ resolved: "dark" }),
     cn: (...parts: unknown[]) => twMerge(clsx(parts)),
     Button: ({
       children,
@@ -88,13 +92,38 @@ function online(name: string): Lobby {
   };
 }
 
-/** The heading and tagline the rendered zone puts on the page. */
+/** One of the greeting's rendered elements, or the `false` of an unrendered one. */
+type Line = false | { props: { children: string; className: string } };
+
+/**
+ * The heading and the line (or lines) the rendered zone puts on the page.
+ *
+ * `tagline` is the one a page with a tool card shows. `taglineWithoutTools` is
+ * the alternative, null when the state already settled which sentence is right
+ * and only one is on the page.
+ */
 function render(overrides?: GreetingOverrides) {
   const node = Greeting(overrides) as unknown as {
-    props: { children: { props: { children: string } }[] };
+    props: { children: [{ props: { children: string } }, Line, Line] };
   };
-  const [heading, tagline] = node.props.children;
-  return { heading: heading.props.children, tagline: tagline.props.children };
+  const [heading, tagline, without] = node.props.children;
+  return {
+    heading: heading.props.children,
+    tagline: tagline ? tagline.props.children : null,
+    taglineWithoutTools: without ? without.props.children : null,
+    /** The classes that decide which of the two the browser shows. */
+    classes: [tagline, without]
+      .filter((p): p is Exclude<Line, false> => p !== false)
+      .map((p) => p.props.className)
+      .join(" "),
+  };
+}
+
+/** The tool grid off the same nav the greeting read, as markup. */
+function grid(): string {
+  return renderToStaticMarkup(
+    createElement(MemoryRouter, null, createElement(ToolCards)),
+  );
 }
 
 beforeEach(() => {
@@ -109,7 +138,6 @@ describe("greetingCopy", () => {
       title: "Coilbox",
       username: "Zephyr",
       hasResume: false,
-      hasTools: true,
     });
     expect(heading).toBe("Welcome back, Zephyr");
   });
@@ -119,61 +147,37 @@ describe("greetingCopy", () => {
       title: "Beyond All Reason",
       username: null,
       hasResume: false,
-      hasTools: true,
     });
     expect(heading).toBe("Beyond All Reason");
   });
 
   it("points at what you were doing when there is something to resume", () => {
-    const { tagline } = greetingCopy({
+    const copy = greetingCopy({
       title: "Coilbox",
       username: null,
       hasResume: true,
-      hasTools: true,
     });
-    expect(tagline).toBe("Pick up where you left off.");
+    expect(copy.tagline).toBe("Pick up where you left off.");
+    // Settled here, so the page carries one sentence and needs no second.
+    expect(copy.taglineWithoutTools).toBeNull();
   });
 
-  it("sends you to the tools when there is nothing to resume", () => {
-    const { tagline } = greetingCopy({
+  it("hands back both tool lines when there is nothing to resume", () => {
+    // Which is true depends on what the grid drew, and the grid draws after a
+    // per-item `useVisible` this function cannot call (#1066). So both go on the
+    // page and the browser picks.
+    const copy = greetingCopy({
       title: "Coilbox",
       username: null,
       hasResume: false,
-      hasTools: true,
     });
-    expect(tagline).toBe("Choose a tool to get started.");
-  });
-
-  it("says so when there are no tools to choose from", () => {
-    // The line picoframe's launcher showed for an empty grid. The greeting owns
-    // it now, so the page never invites you to choose from nothing.
-    const { tagline } = greetingCopy({
-      title: "Coilbox",
-      username: null,
-      hasResume: false,
-      hasTools: false,
-    });
-    expect(tagline).toBe("No tools available yet.");
-  });
-
-  it("prefers the resume line over the empty-grid line", () => {
-    const { tagline } = greetingCopy({
-      title: "Coilbox",
-      username: null,
-      hasResume: true,
-      hasTools: false,
-    });
-    expect(tagline).toBe("Pick up where you left off.");
+    expect(copy.tagline).toBe("Choose a tool to get started.");
+    expect(copy.taglineWithoutTools).toBe("No tools available yet.");
   });
 });
 
 describe("greetingCopy with a distribution's own wording", () => {
-  const state = {
-    title: "Coilbox",
-    username: "Zephyr",
-    hasResume: true,
-    hasTools: true,
-  };
+  const state = { title: "Coilbox", username: "Zephyr", hasResume: true };
 
   it("replaces the heading even for a logged-in player", () => {
     // A distribution that names its own front door means it, so the name
@@ -184,9 +188,14 @@ describe("greetingCopy with a distribution's own wording", () => {
   });
 
   it("replaces the tagline whatever the state would have said", () => {
-    expect(greetingCopy(state, { tagline: "Fight on." }).tagline).toBe(
-      "Fight on.",
+    const copy = greetingCopy(
+      { ...state, hasResume: false },
+      { tagline: "Fight on." },
     );
+    expect(copy.tagline).toBe("Fight on.");
+    // The distribution wrote one sentence, so the page shows that one and does
+    // not go looking at the grid for a second opinion.
+    expect(copy.taglineWithoutTools).toBeNull();
   });
 
   it("overrides each line independently", () => {
@@ -201,10 +210,9 @@ describe("greetingCopy with a distribution's own wording", () => {
 
 describe("Greeting zone", () => {
   it("shows the app title and the action line when logged out", () => {
-    expect(render()).toEqual({
-      heading: "Coilbox",
-      tagline: "Choose a tool to get started.",
-    });
+    const r = render();
+    expect(r.heading).toBe("Coilbox");
+    expect(r.tagline).toBe("Choose a tool to get started.");
   });
 
   it("shows the distribution's title, not a hardcoded one", () => {
@@ -235,44 +243,6 @@ describe("Greeting zone", () => {
     expect(render().heading).toBe("Coilbox");
   });
 
-  it("says there are no tools when the nav lists only Home", () => {
-    frame.mockReturnValue({ title: "Coilbox", nav: HOME_ONLY });
-    expect(render().tagline).toBe("No tools available yet.");
-  });
-
-  it("says there are no tools when the nav is external links and nothing else", () => {
-    // The group is not empty, so counting groups said there were tools and the
-    // page went out with a heading, a strip of links and no sentence about
-    // either (#1057). A link is a way out of Coilbox, not something to do in it.
-    frame.mockReturnValue({ title: "Coilbox", nav: LINKS_ONLY });
-    expect(render().tagline).toBe("No tools available yet.");
-  });
-
-  it("still sends you to the tools when a group mixes tools and links", () => {
-    // The reference links the Animation, Mapconv and Lego plugins declare sit in
-    // the same group as the tools they are references for. One tool in the group
-    // is enough: there is something to choose.
-    frame.mockReturnValue({
-      title: "Coilbox",
-      nav: [
-        {
-          id: "animation",
-          label: "Animation",
-          items: [
-            { id: "animation.cob", label: "COB tools", to: "/animation/cob" },
-            {
-              id: "animation.skeletor-s3o",
-              label: "Skeletor S3O",
-              href: "https://github.com/Beherith/Skeletor_S3O",
-              sidebar: false,
-            },
-          ],
-        },
-      ],
-    });
-    expect(render().tagline).toBe("Choose a tool to get started.");
-  });
-
   it("offers to resume when the collector found something", () => {
     resume.mockReturnValue({
       candidates: [{ id: "warpath:run-1" }],
@@ -299,26 +269,102 @@ describe("Greeting zone", () => {
     expect(render().tagline).toBe("Choose a tool to get started.");
   });
 
-  it("does not take the links off the page to say it", () => {
-    // Both zones off the one nav: only the sentence changes. The links are the
-    // only thing a distribution narrowed this far has left, and the fix would be
-    // a worse bug if the page lost them.
-    frame.mockReturnValue({ title: "Coilbox", nav: LINKS_ONLY });
-    expect(render().tagline).toBe("No tools available yet.");
-    const grid = renderToStaticMarkup(
-      createElement(MemoryRouter, null, createElement(ToolCards)),
-    );
-    expect(grid).toContain("data-link-card");
-    expect(grid).toContain("Discord");
-    expect(grid).toContain("Forum");
-  });
-
   it("says what the zone entry told it to", () => {
     // The layout hands these down from `{ "zone": "greeting", ... }`, so the
     // zone stays a pure function of what it is given and never reads a profile.
     lobby.mockReturnValue(online("Zephyr"));
-    expect(render({ title: "Splinter Faction", tagline: "Fight on." })).toEqual(
-      { heading: "Splinter Faction", tagline: "Fight on." },
-    );
+    const r = render({ title: "Splinter Faction", tagline: "Fight on." });
+    expect(r.heading).toBe("Splinter Faction");
+    expect(r.tagline).toBe("Fight on.");
+    expect(r.taglineWithoutTools).toBeNull();
+  });
+});
+
+/**
+ * The one fact the greeting and the tool grid share: the marker a drawn tool card
+ * leaves behind.
+ *
+ * Every case here renders both zones off the one nav and checks they agree. The
+ * greeting carries both sentences and names the marker in the classes that hide
+ * one of them, so "does the page say there are tools?" is answered by whether the
+ * grid left a marker to find, and nothing else. Counting the nav could not answer
+ * it: a nav item's `useVisible` is a hook, and only the card that calls it knows
+ * whether it drew (#1066).
+ */
+describe("the greeting and the tool grid", () => {
+  /** The marker the grid leaves, and the greeting waits for. */
+  const MARKER = "data-tool-card";
+
+  it("names the same marker in both zones", () => {
+    expect(grid()).toContain(MARKER);
+    expect(render().classes).toContain(`[${MARKER}]`);
+  });
+
+  it("draws no marker when every tool in the nav is gated off", () => {
+    // The case the app cannot reach, because Skirmish is never gated. A
+    // distribution can: `useAdvancedMode` gates every item in the Animation and
+    // Mapconv groups, and `profile.hide` gates several more.
+    frame.mockReturnValue({
+      title: "Coilbox",
+      nav: [
+        {
+          id: "animation",
+          label: "Animation",
+          items: [
+            {
+              id: "animation.cob",
+              label: "COB tools",
+              to: "/animation/cob",
+              useVisible: () => false,
+            },
+          ],
+        },
+      ],
+    });
+    expect(grid()).not.toContain(MARKER);
+    expect(render().taglineWithoutTools).toBe("No tools available yet.");
+  });
+
+  it("draws no marker for a nav of external links and nothing else", () => {
+    // #1057, and still true: a link is a way out of Coilbox rather than
+    // something to do in it, so it gets a chip in the links card and no marker.
+    frame.mockReturnValue({ title: "Coilbox", nav: LINKS_ONLY });
+    const html = grid();
+    expect(html).not.toContain(MARKER);
+    expect(html).toContain("data-link-card");
+    // The links are the only thing a distribution narrowed this far has left,
+    // and the fix would be a worse bug if the page lost them.
+    expect(html).toContain("Discord");
+    expect(html).toContain("Forum");
+  });
+
+  it("draws no marker when the nav lists only Home", () => {
+    frame.mockReturnValue({ title: "Coilbox", nav: HOME_ONLY });
+    expect(grid()).toBe("");
+  });
+
+  it("draws a marker when a group mixes tools and links", () => {
+    // The reference links the Animation, Mapconv and Lego plugins declare sit in
+    // the same group as the tools they are references for. One visible tool in
+    // the group is enough: there is something to choose.
+    frame.mockReturnValue({
+      title: "Coilbox",
+      nav: [
+        {
+          id: "animation",
+          label: "Animation",
+          items: [
+            { id: "animation.cob", label: "COB tools", to: "/animation/cob" },
+            {
+              id: "animation.skeletor-s3o",
+              label: "Skeletor S3O",
+              href: "https://github.com/Beherith/Skeletor_S3O",
+              sidebar: false,
+            },
+          ],
+        },
+      ],
+    });
+    expect(grid()).toContain(MARKER);
   });
 });

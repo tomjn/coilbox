@@ -122,11 +122,27 @@ export function cardArtUrl(art: CardArt, broken: string | null): string | null {
   return art.url === broken ? null : art.url;
 }
 
+/**
+ * One tool as a card.
+ *
+ * ## The two markers a drawn card leaves
+ *
+ * - `data-nav-item`, which its group's section looks for to decide whether to
+ *   draw itself at all. The links card's chips carry it too, so a group with
+ *   nothing but links still gets its heading.
+ * - `data-tool-card`, which says this particular card is a way *into* Coilbox.
+ *   Only {@link ToolCard} sets it, and {@link splitGroupItems} is what decides
+ *   which items reach here, so it means exactly "the grid drew a tool".
+ *
+ * The Greeting reads the second one, in CSS, to decide whether to say there is a
+ * tool to choose. `./Greeting` explains why that sentence has to be answered from
+ * what the grid drew rather than from the nav it drew off.
+ */
 export function ToolCard({ item }: { item: NavItem }) {
   // Mirror the sidebar: an item gated off via `useVisible` is hidden everywhere,
   // this grid included. Resolved unconditionally (per-item component, so
-  // hook-safe) before the early return. Visible cards carry `data-nav-item` so
-  // their section stays shown.
+  // hook-safe) before the early return. A card that stands down leaves neither
+  // marker, which is what makes both of them mean "drawn" rather than "listed".
   const { visible, label, icon: Icon, description } = useResolvedNavItem(item);
   // The URL that failed, not a flag, so art arriving later (a source whose cache
   // warms mid-session) gets its own chance rather than inheriting the verdict on
@@ -198,6 +214,7 @@ export function ToolCard({ item }: { item: NavItem }) {
       <button
         type="button"
         data-nav-item=""
+        data-tool-card=""
         onClick={() => openExternal(href)}
         className={cardClass}
       >
@@ -206,7 +223,12 @@ export function ToolCard({ item }: { item: NavItem }) {
     );
   }
   return (
-    <Link to={item.to ?? "/"} data-nav-item="" className={cardClass}>
+    <Link
+      to={item.to ?? "/"}
+      data-nav-item=""
+      data-tool-card=""
+      className={cardClass}
+    >
       {inner}
     </Link>
   );
