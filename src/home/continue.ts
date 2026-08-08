@@ -397,6 +397,16 @@ export function collectCandidates(
  * `loading` is true until every source stored on disk has answered. A zone that
  * renders on the first frame would otherwise show an empty rail and then fill it.
  *
+ * Two sources are deliberately not in that flag, which the audit in #1002 asked
+ * about:
+ *
+ * - The skirmish draft and the saved presets are settings, and `main.tsx` awaits
+ *   the settings cache before it renders anything, so `useSetting` answers from
+ *   the first frame and there is no half-read state to wait for.
+ * - The lobby is a connection rather than a load. It has no settled point to wait
+ *   for, and a battle that becomes rejoinable while the page sits open is new
+ *   information rather than a late answer, so it arrives when it arrives.
+ *
  * No memo: five candidates and a sort is less work than the bookkeeping, and a
  * dependency array would have to lie about `Date.now()`.
  */
