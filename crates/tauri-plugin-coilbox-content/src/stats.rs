@@ -306,6 +306,8 @@ mod tests {
             won,
             skill: None,
             country_code: None,
+            stats: None,
+            apm: None,
         }
     }
 

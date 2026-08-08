@@ -189,6 +189,19 @@ pub struct PlayerInfo {
     pub skill: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub country_code: Option<String>,
+    /// This seat's five counters from the trailer. Absent when the recording
+    /// never reached a game over, when the trailer is in a format the decoder
+    /// refuses, and when the engine recorded no statistics at all (see
+    /// [`DemoTrailer::players`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stats: Option<PlayerStats>,
+    /// Actions per minute: `stats.num_commands` over the match's minutes.
+    ///
+    /// Derived here rather than in each surface that shows it, so the one
+    /// division and the "there is no answer" case are decided once. Absent
+    /// exactly when `stats` is, plus for a match with no measured duration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub apm: Option<f32>,
 }
 
 /// One skirmish AI from a demo's start-script `[aiN]` section, with the
@@ -343,6 +356,28 @@ pub struct TeamStatSeries {
     pub samples: Vec<TeamStatSample>,
 }
 
+/// One player's `PlayerStatistics`: five `i32` counters for the whole match,
+/// written once per `[playerN]` seat when the game ended.
+///
+/// The on-disk order is the one here, which is *not* the order the engine's
+/// `rts/Game/Players/PlayerStatistics.h` declares its own members in:
+/// `PlayerStatistics` derives from `TeamControllerStatistics`, so the base
+/// class's `num_commands`/`unit_commands` come first. Read as declared, a real
+/// row reports 416,476 commands over eight minutes instead of 163.
+#[derive(Serialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerStats {
+    /// Orders the player gave. Over the match's minutes this is actions per
+    /// minute, the number every RTS player quotes at each other.
+    pub num_commands: i32,
+    /// Orders that reached a unit, as opposed to orders given. The gap between
+    /// this and `num_commands` is a real signal about how someone plays.
+    pub unit_commands: i32,
+    pub mouse_pixels: i32,
+    pub mouse_clicks: i32,
+    pub key_presses: i32,
+}
+
 /// What the fixed-size records after a replay's demo stream hold.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -355,6 +390,17 @@ pub struct DemoTrailer {
     pub team_stat_period_sec: u32,
     /// One entry per team the header counts, in team order.
     pub teams: Vec<TeamStatSeries>,
+    /// One entry per player the header counts, indexed by the player id the
+    /// start-script's `[playerN]` sections use.
+    ///
+    /// `None` when this match's statistics were never recorded, which the file
+    /// says by giving every team zero samples. The bytes are still there and
+    /// they still read as integers, but they are whatever was in that memory
+    /// (issue #1190): three of the nine replays measured hold command counts
+    /// like -335216640 next to nine empty sample series. So the presence of the
+    /// block is not evidence, and the decoder refuses to hand it over rather
+    /// than leave every caller to remember why.
+    pub players: Option<Vec<PlayerStats>>,
 }
 
 pub const SCHEMA_VERSION: u32 = 1;

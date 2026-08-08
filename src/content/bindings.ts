@@ -307,6 +307,24 @@ export interface ReplayFile {
   remixed?: boolean;
 }
 
+/**
+ * One player's five counters from the replay's trailer, for the whole match.
+ *
+ * Present only when the engine actually recorded statistics: a match it
+ * recorded none for still carries a block of bytes, and those bytes read as
+ * plausible integers (issue #1190), so the decoder withholds them rather than
+ * leaving each surface to remember why.
+ */
+export interface PlayerStats {
+  /** Orders given. Over the match's minutes this is `apm`. */
+  numCommands: number;
+  /** Orders that reached a unit, as opposed to orders given. */
+  unitCommands: number;
+  mousePixels: number;
+  mouseClicks: number;
+  keyPresses: number;
+}
+
 /** One player/spectator from a demo, with side + ally-team resolved from their team. */
 export interface ReplayPlayer {
   name: string;
@@ -321,6 +339,12 @@ export interface ReplayPlayer {
   won?: boolean;
   skill?: string;
   countryCode?: string;
+  /** This seat's counters, absent when the match has none to show. */
+  stats?: PlayerStats;
+  /** Actions per minute: `stats.numCommands` over the match's minutes, worked
+   * out by the decoder so every surface divides it the same way and nobody
+   * shows a figure for a match that recorded none. Absent whenever `stats` is. */
+  apm?: number;
 }
 
 /**
