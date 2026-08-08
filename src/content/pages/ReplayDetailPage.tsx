@@ -1008,6 +1008,11 @@ export default function ReplayDetailPage() {
 
           <Players info={info} />
 
+          {/* Directly under the roster (#1200). The roster is where a player is
+           * already reading per-seat numbers, and the chart answers the question
+           * the roster raises. */}
+          {replay && <MatchStatsSection info={info} replayPath={replay.path} />}
+
           <ReplayNotes filename={filename} />
 
           {selected && replay && (
@@ -1033,8 +1038,6 @@ export default function ReplayDetailPage() {
               </p>
             )}
           </section>
-
-          {replay && <MatchStatsSection info={info} replayPath={replay.path} />}
         </>
       ) : null}
     </div>
