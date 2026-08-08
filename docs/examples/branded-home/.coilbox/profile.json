@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "title": "Ironhold",
+  "mode": "dark",
+  "accent": "amber",
+  "background": "hsl(28 18% 7%)",
+  "home": {
+    "layout": "stacked",
+    "background": "@.coilbox/art/backdrop.svg",
+    "zones": [
+      { "zone": "onboarding" },
+      {
+        "zone": "greeting",
+        "title": "Ironhold",
+        "tagline": "Hold the line.",
+        "before": "<p style=\"margin:0;font-size:0.75rem;letter-spacing:0.12em;text-transform:uppercase;opacity:0.65\">Ironhold Command</p>"
+      },
+      { "zone": "continue" },
+      { "zone": "resume" },
+      {
+        "zone": "cards",
+        "art": {
+          "runlite.list": "@.coilbox/art/warpath.svg",
+          "play.replays": false
+        }
+      },
+      { "zone": "suggested" },
+      { "html": "@.coilbox/home/community.html" }
+    ]
+  },
+  "links": [
+    {
+      "label": "Discord",
+      "href": "https://discord.gg/example",
+      "icon": "discord"
+    }
+  ]
+}

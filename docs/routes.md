@@ -1,6 +1,8 @@
 # Routes and nav ids
 
-A reference for the internal locations you can link to and the ids you can hide, so the [distribution profile](distribution-profile.md) `hide`, `hideSettings`, `welcome` and `links` fields have something concrete to point at.
+A reference for the internal locations you can link to and the ids you can hide, so the [distribution profile](distribution-profile.md) `hide`, `hideSettings`, `welcome`, `links` and `home` fields have something concrete to point at.
+
+The **nav id** column is also the key a profile's [`home.zones` art map](distribution-profile.md#home-object) uses to give one tool its own card picture.
 
 Coilbox uses **hash routing**: every screen is a URL fragment beginning with `#/`. That's what makes in-app links work from a profile's welcome HTML — `<a href="#/play/skirmish">` navigates without a page reload.
 
@@ -12,8 +14,11 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | ------------- | ------------- | -------------------- | ------------------ | -------- |
 | Play          | Singleplayer  | `#/play/skirmish`    | `play.skirmish`    | no       |
 | Play          | Campaigns     | `#/campaign`         | `campaign.list`    | no¹      |
+| Play          | Conquest      | `#/conquest`         | `conquest.list`    | **yes**  |
+| Play          | Warpath       | `#/warpath`          | `runlite.list`     | **yes**  |
 | Play          | Scenarios     | `#/scenarios`        | `scenario.list`    | no¹      |
 | Play          | Replays       | `#/play/replays`     | `play.replays`     | no       |
+| Play          | Save Games    | `#/play/savegames`   | `play.savegames`   | no       |
 | Multiplayer   | Login         | `#/lobby`            | `multiplayer.lobby`| no²      |
 | Multiplayer   | Chat          | `#/chat`             | `multiplayer.chat` | no²      |
 | Multiplayer   | Battles       | `#/battles`          | `multiplayer.battles` | no²   |
@@ -21,6 +26,7 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Multiplayer   | Player stats  | `#/stats`            | `multiplayer.stats`   | **yes** |
 | Content       | Maps          | `#/content/maps`     | `content.maps`     | no       |
 | Content       | Games         | `#/content/games`    | `content.games`    | **yes**  |
+| Content       | Setup packs   | `#/content/setup-packs` | `content.setupPacks` | **yes** |
 | Downloads     | Browse Rapid  | `#/downloads`        | `downloads.browse` | **yes**  |
 | Downloads     | Maps          | `#/downloads/maps`   | `downloads.maps`   | no       |
 | Downloads     | Games         | `#/downloads/games`  | `downloads.games`  | **yes**  |
@@ -29,7 +35,7 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 
 ² **Multiplayer** items appear contextually, not via the profile: **Login** shows only while logged out; **Chat** and **Battles** appear after the first connect; **Battle Room** only while you're in a battle.
 
-> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin — ask and the list can grow. Today only `content.games`, `downloads.browse`, `downloads.games` and `multiplayer.stats` are wired for hiding.
+> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin — ask and the list can grow. Today `campaign.builder`, `conquest.list`, `content.games`, `content.setupPacks`, `downloads.browse`, `downloads.games`, `multiplayer.stats` and `runlite.list` are wired for hiding.
 
 > **Old paths**: `#/content/replays(/:name)` and `#/content/stats(/:name)` redirect to `#/play/replays(/:name)` and `#/stats(/:name)` respectively, so existing bookmarks and links keep working (#467).
 
@@ -37,19 +43,20 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 
 These are hidden unless **Advanced mode** is on (Settings > General). They're modding/authoring tools, not player-facing, so a game distribution usually leaves Advanced mode off and never sees them.
 
-| Sidebar group    | Item        | Link (`href`)          |
-| ---------------- | ----------- | ---------------------- |
-| Content          | Archives    | `#/content/archives`   |
-| uberstress       | Run         | `#/uberstress`         |
-| uberstress       | History     | `#/uberstress/history` |
-| Campaign Builder | Builder     | `#/campaign-builder`   |
-| Scenario Builder | Builder     | `#/scenario-builder`   |
-| mapconv          | Projects    | `#/mapconv/projects`   |
-| mapconv          | Compile     | `#/mapconv`            |
-| mapconv          | Decompile   | `#/mapconv/decompile`  |
-| animation        | BOS → Lua   | `#/animation`          |
-| animation        | COB tools   | `#/animation/cob`      |
-| unit builder     | Lego Parts  | `#/lego/parts`         |
+| Sidebar group    | Item        | Link (`href`)          | Nav id                 |
+| ---------------- | ----------- | ---------------------- | ---------------------- |
+| Content          | Archives    | `#/content/archives`   | `content.archives`     |
+| uberstress       | Run         | `#/uberstress`         | `uberstress.run`       |
+| uberstress       | History     | `#/uberstress/history` | `uberstress.history`   |
+| Campaign Builder | Builder     | `#/campaign-builder`   | `campaign.builder`     |
+| Scenario Builder | Builder     | `#/scenario-builder`   | `scenario.builder`     |
+| mapconv          | Projects    | `#/mapconv/projects`   | `mapconv.projects`     |
+| mapconv          | Compile     | `#/mapconv`            | `mapconv.compile`      |
+| mapconv          | Decompile   | `#/mapconv/decompile`  | `mapconv.decompile`    |
+| animation        | BOS → Lua   | `#/animation`          | `animation.bos2lua`    |
+| animation        | COB tools   | `#/animation/cob`      | `animation.cob`        |
+| unit builder     | Units       | `#/lego`               | `lego.units`           |
+| unit builder     | Lego Parts  | `#/lego/parts`         | `lego.parts`           |
 
 (mapconv and animation also add a few external-link items — wiki/tool guides — that open in the browser rather than routing in-app.)
 

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 160" width="256" height="160" role="img" aria-label="Warpath">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b1d0d" />
+      <stop offset="1" stop-color="#0d0906" />
+    </linearGradient>
+  </defs>
+  <rect width="256" height="160" fill="url(#sky)" />
+  <circle cx="196" cy="44" r="18" fill="#f0a935" opacity="0.85" />
+  <path d="M0 132 L52 96 L96 118 L146 78 L196 108 L256 74 L256 160 L0 160 Z" fill="#1c1409" />
+  <path d="M0 148 L64 124 L120 142 L182 118 L256 138 L256 160 L0 160 Z" fill="#120c06" />
+</svg>

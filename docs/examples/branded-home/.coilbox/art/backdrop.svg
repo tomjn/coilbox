@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="Ironhold backdrop">
+  <defs>
+    <radialGradient id="glow" cx="0.5" cy="0.15" r="0.8">
+      <stop offset="0" stop-color="#f0a935" stop-opacity="0.9" />
+      <stop offset="1" stop-color="#f0a935" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="900" fill="#100b06" />
+  <rect width="1600" height="900" fill="url(#glow)" />
+  <path d="M0 700 L260 560 L520 660 L820 470 L1120 620 L1600 480 L1600 900 L0 900 Z" fill="#1c1409" />
+</svg>
