@@ -32,6 +32,7 @@ import {
   picksKey,
   publishContentArt,
   subscribeContentArt,
+  validateRememberedArt,
 } from "./contentArt";
 
 /** Session cache of resolved minimap URLs, keyed by root, engine and map. */
@@ -127,6 +128,11 @@ export async function resolvePicks(
  * listing, so the added cost of the home page knowing what you played is the
  * minimap renders themselves, and those are cached on disk across launches.
  *
+ * It also settles what the last launch remembered. The picks are the only thing
+ * that can say whether a remembered picture is still the right one, and this is
+ * where they are worked out, so this is where the snapshot is checked and where
+ * the resolved URLs are handed back with the picks that explain them.
+ *
  * `claimed` is whatever the page is already showing outside the tool cards,
  * which today is the suggested map's card. It arrives as a parameter rather than
  * being read here, because resolving it reaches the branding catalog and the
@@ -174,6 +180,14 @@ export function useContentCardArt(claimed: readonly ContentPick[] = []): void {
     claimed,
   });
 
+  // What the last launch painted is standing in for these until they resolve, so
+  // check it against them here, where both are in hand. Anything they contradict
+  // goes now rather than when the resolve lands, so a card whose map has changed
+  // never shows the old one as though it were current (issue #1056). During the
+  // render rather than in an effect, because the cards render below this in the
+  // same pass and would otherwise paint the contradicted picture once first.
+  validateRememberedArt(picks, claimed);
+
   // The picks are rebuilt on every render, so the effect depends on their value
   // through `key` rather than on the Map's identity, which would re-run it
   // forever. The ref is how the effect then reads the value that key describes.
@@ -188,7 +202,9 @@ export function useContentCardArt(claimed: readonly ContentPick[] = []): void {
     let cancelled = false;
     resolvePicks(picksRef.current, enginePath, dataDir, headers)
       .then((resolved) => {
-        if (!cancelled) publishContentArt(resolved);
+        // The picks go with the URLs so the next launch can check them before it
+        // paints them.
+        if (!cancelled) publishContentArt(resolved, picksRef.current);
       })
       .catch(() => {
         // A failed resolve leaves the previous answer in place. Every card has a

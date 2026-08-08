@@ -37,7 +37,9 @@
  *    never starts work, and answers `undefined` while the cache is cold, which
  *    the chain treats as "nothing from me" and falls through to the bundled
  *    illustration and then to the procedural floor. So first paint is never held
- *    up, and a cold cache is invisible rather than blank.
+ *    up, and a cold cache is invisible rather than blank. On the second and every
+ *    later launch it answers from {@link rememberContentArt} instead of nothing,
+ *    which is what stops the cards changing picture a beat after they paint.
  * 2. `useContentCardArt` in {@link ./useContentCardArt} does the asynchronous
  *    half. It reads the stores that know what you played, resolves each pick to
  *    a URL, and calls {@link publishContentArt}.
@@ -58,6 +60,41 @@
  * Splitting it this way also keeps the interesting part testable. Which content
  * each tool shows is {@link contentPicks}, a pure function of plain data, so
  * "this install has no replays" is a unit test rather than a mocked IPC bridge.
+ *
+ * ## Remembering what the last launch painted
+ *
+ * That chain costs a visible change on every launch: the cards paint their
+ * illustrations, then a unitsync worker renders a minimap and they swap (issue
+ * #1056). The pictures are the same pictures nearly every time, so the page has
+ * the right answer already and is just not allowed to say it yet.
+ *
+ * So it is written down. {@link rememberContentArt} holds what the last launch
+ * resolved, read from `localStorage` while the module loads, and
+ * {@link contentCardArt} answers from it until this launch's own resolve lands.
+ * `localStorage` is synchronous and already in memory by the time a module runs,
+ * which is what makes this legal at all: the rule that first paint must never
+ * wait on a disk read still holds, and `index.html` and `profile.ts` already read
+ * the boot background the same way.
+ *
+ * A remembered URL is last launch's answer, and last launch is not this one, so
+ * it is a claim to be checked rather than a fact:
+ *
+ * - {@link pruneRemembered} drops an entry the moment this launch's own picks
+ *   disagree with it. A card whose map changed shows its illustration and then
+ *   the new map, which is the old behaviour, rather than showing the old map as
+ *   though it were current. Wrong is worse than late: that is the whole reason a
+ *   plain URL cache was rejected.
+ * - It drops an entry whose picture this launch has given to another card, or
+ *   which the suggested map has claimed, so a warm start cannot put one picture
+ *   on two cards where a cold start would not. Priority stays
+ *   {@link PICK_PRIORITY} and never render order.
+ * - {@link forgetContentArt} drops an entry whose image fails to load, which is
+ *   what an evicted cache file looks like from here. The card falls back through
+ *   the chain to its illustration rather than to the icon-only card.
+ *
+ * Nothing here is a second opinion about which card shows what. The snapshot is
+ * one past {@link contentPicks} assignment, and every rule above is a reason to
+ * stop trusting part of it.
  *
  * ## Where a card learns what its siblings picked
  *
@@ -396,8 +433,22 @@ export function picksKey(picks: ReadonlyMap<string, ContentPick>): string {
  * The cache the synchronous source reads.
  * -------------------------------------------------------------------------- */
 
-/** Tool id to resolved art URL. The only thing {@link contentCardArt} reads. */
+/** Tool id to resolved art URL, as this launch resolved it. */
 let urls: ReadonlyMap<string, string> = new Map();
+
+/**
+ * What the last launch painted, which stands in until this one has an answer.
+ * Filled at the foot of this file, where everything that reads it also lives.
+ *
+ * Declared here, above {@link contentCardArt}, rather than beside the rest of
+ * it. A `let` is unreachable until its declaration runs, and Vite's hot reload
+ * can re-evaluate this module while React is part way through a render, which
+ * put a card's render between the two and threw.
+ */
+let remembered: ReadonlyMap<string, RememberedArt> = new Map();
+
+/** The text last written, so an unchanged snapshot is not written again. */
+let written: string | undefined;
 
 /** Bumped whenever the cache changes value, for the store subscription. */
 let version = 0;
@@ -407,23 +458,33 @@ const listeners = new Set<() => void>();
 /**
  * Step 2 of the chain.
  *
- * Deliberately does nothing but a map lookup. It runs during a card's render, so
- * anything else here would be work on the paint path. `undefined` before the
- * cache is warm, and for every tool this module has no answer for.
+ * Deliberately does nothing but two map lookups. It runs during a card's render,
+ * so anything else here would be work on the paint path. This launch's own answer
+ * wins, and the remembered one stands in until it arrives. `undefined` when
+ * neither has anything, and for every tool this module has no answer for.
  */
-export const contentCardArt: CardArtSource = ({ toolId }) => urls.get(toolId);
+export const contentCardArt: CardArtSource = ({ toolId }) =>
+  urls.get(toolId) ?? remembered.get(toolId)?.url;
 
 /**
  * Replace the cache and wake the subscribers.
  *
  * Compared by value first. The effect that publishes runs after the render it
  * caused, so waking on an unchanged answer would loop forever.
+ *
+ * `picks` is what the URLs are pictures of, which is what makes them worth
+ * writing down, because a URL alone cannot be checked against a later launch. A
+ * caller with no picks to declare publishes nothing new to remember and carries
+ * the existing snapshot forward.
  */
-export function publishContentArt(next: ReadonlyMap<string, string>): void {
+export function publishContentArt(
+  next: ReadonlyMap<string, string>,
+  picks: ReadonlyMap<string, ContentPick> = new Map(),
+): void {
+  remember(rememberedFrom(next, picks, remembered));
   if (sameUrls(urls, next)) return;
   urls = next;
-  version += 1;
-  for (const listener of listeners) listener();
+  wake();
 }
 
 function sameUrls(
@@ -435,9 +496,23 @@ function sameUrls(
   return true;
 }
 
-/** Empty the cache. For tests, and for a hard content refresh. */
+/**
+ * Empty the cache and the snapshot it was standing on. For tests, and for a hard
+ * content refresh.
+ *
+ * Stored text is left alone. Emptying memory is a request to resolve everything
+ * again, and the resolve writes the snapshot back, so deleting it here would only
+ * cost the next launch its first paint if this one never finished.
+ */
 export function resetContentArt(): void {
   urls = new Map();
+  remembered = new Map();
+  written = undefined;
+  wake();
+}
+
+/** Bump the version and wake the subscribers. */
+function wake(): void {
   version += 1;
   for (const listener of listeners) listener();
 }
@@ -454,3 +529,246 @@ export function subscribeContentArt(listener: () => void): () => void {
 export function contentArtVersion(): number {
   return version;
 }
+
+/* -------------------------------------------------------------------------- *
+ * What the last launch painted, so this one paints it at once.
+ * -------------------------------------------------------------------------- */
+
+/** A picture a card painted last launch, and what it was a picture of. */
+export interface RememberedArt {
+  pick: ContentPick;
+  url: string;
+}
+
+/** Where the snapshot is kept, alongside the theme and the boot background. */
+const STORAGE_KEY = "coilbox.home.contentArt";
+
+/** What the last launch painted. For the hook that prunes it, and for tests. */
+export function rememberedContentArt(): ReadonlyMap<string, RememberedArt> {
+  return remembered;
+}
+
+/**
+ * Take a snapshot as the starting point, without writing it back.
+ *
+ * What the module does at load with the stored text, and what a test does with a
+ * snapshot it wrote by hand.
+ */
+export function rememberContentArt(
+  entries: ReadonlyMap<string, RememberedArt>,
+): void {
+  remembered = entries;
+  wake();
+}
+
+/** Hold a snapshot and write it down, if it says anything new. */
+function remember(entries: ReadonlyMap<string, RememberedArt>): void {
+  remembered = entries;
+  const text = encodeRemembered(entries);
+  if (text === written) return;
+  written = text;
+  try {
+    localStorage.setItem(STORAGE_KEY, text);
+  } catch {
+    // No storage (a test's node environment, or a webview with it switched
+    // off). Everything above still works, this launch simply teaches the next
+    // one nothing.
+  }
+}
+
+/**
+ * Drop everything in the snapshot this launch has since contradicted.
+ *
+ * Called from a render rather than an effect, and does not wake the subscribers.
+ * It is called above the layout, so the cards render after it in the same pass
+ * and see the pruned answer without a second render. That is what keeps a
+ * contradicted picture from ever being painted once the contradiction is known,
+ * which is the whole point of pruning rather than just caching. Safe from a
+ * render for the reason `publishArtOverrides` is: it only ever removes, so
+ * running it twice on one value gives the same answer as running it once.
+ *
+ * Not written back to storage. The resolve that follows publishes and writes the
+ * whole snapshot anyway, and a launch that never gets that far has learned
+ * nothing worth teaching the next one.
+ */
+export function validateRememberedArt(
+  picks: ReadonlyMap<string, ContentPick>,
+  claimed: readonly ContentPick[] = [],
+): void {
+  if (remembered.size === 0) return;
+  const kept = pruneRemembered(remembered, picks, claimed);
+  if (kept.size !== remembered.size) remembered = kept;
+}
+
+/**
+ * Which remembered entries this launch has not contradicted.
+ *
+ * Three ways to lose one, and all three are the snapshot being checked against
+ * the answer this launch worked out for itself rather than a fourth opinion
+ * about who shows what:
+ *
+ * 1. The card has picked something else. Its map changed, so the remembered one
+ *    is last launch's answer being shown as though it were this one's.
+ * 2. Another card has been given that picture. Priority is
+ *    {@link PICK_PRIORITY}, so this is the same collision `assignPicks` settles,
+ *    caught on the way in.
+ * 3. The suggested map has claimed it, which is the same exclusion again from
+ *    outside the grid.
+ *
+ * A card this launch has no pick for yet keeps its picture. That is the ordinary
+ * state of the first few hundred milliseconds, when the stores behind the picks
+ * have not answered, and it is the case the whole snapshot exists for.
+ */
+export function pruneRemembered(
+  entries: ReadonlyMap<string, RememberedArt>,
+  picks: ReadonlyMap<string, ContentPick>,
+  claimed: readonly ContentPick[] = [],
+): Map<string, RememberedArt> {
+  const owner = new Map<string, string>();
+  for (const [toolId, pick] of picks) owner.set(contentKey(pick), toolId);
+  const spoken = new Set(claimed.map(contentKey));
+  const kept = new Map<string, RememberedArt>();
+  for (const [toolId, entry] of entries) {
+    const key = contentKey(entry.pick);
+    if (spoken.has(key)) continue;
+    const now = owner.get(key);
+    if (now !== undefined && now !== toolId) continue;
+    const fresh = picks.get(toolId);
+    if (fresh && contentKey(fresh) !== key) continue;
+    kept.set(toolId, entry);
+  }
+  return kept;
+}
+
+/**
+ * The snapshot to keep, given what this launch has just resolved.
+ *
+ * What it resolved, plus whatever the old snapshot still holds for a card it has
+ * not answered for. The carry-forward matters because the stores behind the
+ * picks settle at different times, so the first publish of a launch is often one
+ * card, and overwriting the snapshot with it would cost every other card its
+ * head start on the launch after.
+ *
+ * A picture goes in once. This launch's answers are one {@link contentPicks}
+ * assignment and so already agree with each other, and a carried entry yields to
+ * them, so the snapshot cannot hand two cards the same picture next launch.
+ */
+export function rememberedFrom(
+  resolved: ReadonlyMap<string, string>,
+  picks: ReadonlyMap<string, ContentPick>,
+  entries: ReadonlyMap<string, RememberedArt>,
+): Map<string, RememberedArt> {
+  const next = new Map<string, RememberedArt>();
+  const taken = new Set<string>();
+  for (const [toolId, url] of resolved) {
+    const pick = picks.get(toolId);
+    // A URL with no pick behind it cannot be checked next launch, so it is not
+    // worth remembering.
+    if (!pick) continue;
+    next.set(toolId, { pick, url });
+    taken.add(contentKey(pick));
+  }
+  for (const [toolId, entry] of entries) {
+    if (next.has(toolId)) continue;
+    const key = contentKey(entry.pick);
+    if (taken.has(key)) continue;
+    next.set(toolId, entry);
+    taken.add(key);
+  }
+  return next;
+}
+
+/**
+ * Forget a picture that would not load.
+ *
+ * A remembered URL names a file in a cache that something else is free to
+ * evict, and an evicted file is indistinguishable from a working one until the
+ * card tries to paint it. Dropping it here rather than in the card is what sends
+ * that card back through the chain to its illustration, instead of to the
+ * icon-only card the card's own fallback would leave it on.
+ *
+ * This launch's own answers are dropped too. They are rendered on demand and so
+ * are almost never the ones that fail, but a URL that does not load is not art
+ * whichever half of this module produced it.
+ */
+export function forgetContentArt(url: string): void {
+  const keptUrls = new Map([...urls].filter(([, u]) => u !== url));
+  const keptEntries = new Map(
+    [...remembered].filter(([, entry]) => entry.url !== url),
+  );
+  if (keptUrls.size === urls.size && keptEntries.size === remembered.size)
+    return;
+  urls = keptUrls;
+  remember(keptEntries);
+  wake();
+}
+
+/** The snapshot as one line of JSON. */
+export function encodeRemembered(
+  entries: ReadonlyMap<string, RememberedArt>,
+): string {
+  return JSON.stringify({
+    version: 1,
+    entries: [...entries].map(([tool, { pick, url }]) => ({
+      tool,
+      kind: pick.kind,
+      name: pick.kind === "map" ? pick.mapName : pick.gameName,
+      url,
+    })),
+  });
+}
+
+/**
+ * Read a snapshot back.
+ *
+ * Anything it does not recognise is nothing at all rather than a partial answer.
+ * The whole snapshot is one page's worth of pictures that agree with each other,
+ * so half of one is not a safer version of it, and the cost of answering nothing
+ * is one launch of the behaviour every launch had before this existed.
+ */
+export function decodeRemembered(
+  text: string | null,
+): Map<string, RememberedArt> {
+  const empty = () => new Map<string, RememberedArt>();
+  if (!text) return empty();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return empty();
+  }
+  if (typeof parsed !== "object" || parsed === null) return empty();
+  const { version: v, entries } = parsed as {
+    version?: unknown;
+    entries?: unknown;
+  };
+  if (v !== 1 || !Array.isArray(entries)) return empty();
+  const out = empty();
+  for (const raw of entries) {
+    if (typeof raw !== "object" || raw === null) return empty();
+    const { tool, kind, name, url } = raw as Record<string, unknown>;
+    if (typeof tool !== "string" || typeof name !== "string") return empty();
+    if (typeof url !== "string" || !tool || !name || !url) return empty();
+    if (kind === "map") out.set(tool, { pick: { kind, mapName: name }, url });
+    else if (kind === "game")
+      out.set(tool, { pick: { kind, gameName: name }, url });
+    else return empty();
+  }
+  return out;
+}
+
+/** The stored snapshot, or nothing where there is no storage to read. */
+function readRemembered(): Map<string, RememberedArt> {
+  try {
+    const text = localStorage.getItem(STORAGE_KEY);
+    written = text ?? undefined;
+    return decodeRemembered(text);
+  } catch {
+    return new Map();
+  }
+}
+
+// Read while the module loads, which is before anything renders. Synchronous on
+// purpose: this is the value first paint needs, and a promise would arrive after
+// exactly the paint it exists to fill.
+remembered = readRemembered();
