@@ -12,6 +12,7 @@ import {
   useLobbyAccounts,
 } from "../../lobby-servers/config";
 import { useMultiplayer } from "../../multiplayer/store";
+import { CARD_FOCUS_CLASS } from "../cardShell";
 import {
   RESUME_KIND_COPY,
   RESUME_KIND_ICON,
@@ -163,7 +164,8 @@ export const RAIL_DIM_CLASS = "text-muted-foreground";
  * cards to fill a grid.
  */
 export const RAIL_CARD_CLASS =
-  "group flex w-full flex-col gap-0.5 rounded-lg border border-border bg-card p-3 text-card-foreground transition-colors hover:border-ring hover:shadow-sm sm:w-64";
+  "group flex w-full flex-col gap-0.5 rounded-lg border border-border bg-card p-3 text-card-foreground transition-colors hover:border-ring hover:shadow-sm sm:w-64 " +
+  CARD_FOCUS_CLASS;
 
 /**
  * The runners-up the Continue hero did not take, as small cards.

@@ -83,7 +83,18 @@ export default function Continue({ className }: { className?: string }) {
           <p className="text-sm text-muted-foreground">{top.detail}</p>
         </div>
       </div>
-      <Link to={top.to} className={cn(buttonVariants(), "shrink-0")}>
+      {/* Named for the thing it resumes, not just for the verb. The rail's cards
+          are links wrapping their whole card, so each one reads out what it goes
+          back to. This action is a button beside the title, and read on its own it
+          was "Open setup" with no setup named, so a screen reader listing the
+          page's links (which is how many people navigate one) had the page's most
+          important control saying the least. The visible words open the label, so
+          voice control still reaches it by what is written on it. */}
+      <Link
+        to={top.to}
+        aria-label={`${action}: ${top.title}`}
+        className={cn(buttonVariants(), "shrink-0")}
+      >
         <Play className="size-4" aria-hidden />
         {action}
       </Link>
