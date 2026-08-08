@@ -2317,6 +2317,54 @@ mod tests {
         assert_eq!(read(players_at + 8), 416_476, "mousePixels");
     }
 
+    /// [`decode_team_stats`] checks the element size again on its own account,
+    /// because it is the thing that would index past the end of a sample, and a
+    /// panic is a worse answer than a refusal. Reached directly, since
+    /// [`DemoHeader::require_known_layout`] gets there first on a whole file.
+    #[test]
+    fn splitting_samples_refuses_an_element_too_small_to_hold_one() {
+        let err = decode_team_stats(&[0u8; 44], 1, 40).unwrap_err();
+        assert!(err.contains("teamStatElemSize is 40"), "got: {err}");
+    }
+
+    /// A file that stops inside the player statistics, with no team statistics
+    /// behind them, is the truncation that reads as an answer: every later block
+    /// is empty either way, so nothing downstream notices. It has to be refused
+    /// where it is found.
+    #[test]
+    fn a_file_that_stops_inside_the_player_statistics_is_refused() {
+        let f = DemoFixture {
+            winning_ally_teams: vec![0],
+            player_stats: vec![[1, 2, 3, 4, 5]; 3],
+            truncate_by: 20,
+            ..Default::default()
+        };
+        let err = decode_trailer(&f.bytes()).unwrap_err();
+        assert!(err.contains("player statistics"), "got: {err}");
+        assert!(err.contains("truncated"), "got: {err}");
+    }
+
+    /// A `teamStatSize` bigger than its own sample counts account for means the
+    /// counts and the block disagree, so one of them is not what we think.
+    #[test]
+    fn a_team_statistics_block_bigger_than_its_counts_is_refused() {
+        let f = DemoFixture {
+            team_samples: vec![series(3), series(3)],
+            ..Default::default()
+        };
+        let mut bytes = f.bytes();
+        let declared = i32::from_le_bytes(
+            bytes[OFF_TEAM_STAT_SIZE..OFF_TEAM_STAT_SIZE + 4]
+                .try_into()
+                .unwrap(),
+        );
+        put_i32(&mut bytes, OFF_TEAM_STAT_SIZE, declared + 80);
+        bytes.extend_from_slice(&[0u8; 80]);
+
+        let err = decode_trailer(&bytes).unwrap_err();
+        assert!(err.contains("teamStatSize"), "got: {err}");
+    }
+
     /// End-to-end over the real replays in `~/.spring/demos`, which is the check a
     /// synthetic fixture cannot make: that the fixtures agree with a file the
     /// engine wrote. Ignored by default, it needs replays on disk.
