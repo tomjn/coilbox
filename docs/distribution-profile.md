@@ -181,7 +181,7 @@ The `<game>` arg matches a game's name or shortname (case-insensitive); on a sin
 
 Open **Settings > Distribution profile**. It shows whether a profile is loaded, where it came from (`file` / `default`), and a summary of everything it's changing. If no profile is loaded it reads "No distribution profile loaded — standard Coilbox".
 
-The "Home page" row covers the [`home`](#home-object) key: which layout drew the page, how many zones it drew, and whether that was your `zones` list or the default that moves with Coilbox. It reads "Default" for a profile that has no `home` key.
+The "Home page" row covers the [`home`](#home-object) key: which layout drew the page, how many zones it drew, and whether that was your `zones` list or the default that moves with Coilbox. It reads "Default" for a profile that has no `home` key. A `layout` name this build does not ship reads as "Default layout" here, because that is the page you are looking at, and the name you wrote is named in the validation row instead.
 
 "Validate profile", below the summary, adds a `home` row naming anything Coilbox dropped or could not read. That row is absent when there is nothing wrong, and for a profile with no `home` key at all. See [when a `home` key is wrong](#when-a-home-key-is-wrong).
 
@@ -539,6 +539,8 @@ It is a mood layer rather than a hero image. Coilbox composites it over the them
 
 `false` removes the backdrop entirely and leaves the flat theme background. Omitting it gives a soft wash built from your own `--primary` and `--foreground`, so a distribution that only sets [`accent`](#accent-string) already gets a backdrop in its colours.
 
+Coilbox checks the file is there at startup. If it is not, you get the default wash and a line in the profile panel, rather than the flat background a typo used to give you, which was indistinguishable from writing `false`.
+
 The backdrop applies to Coilbox's page only. A profile with a `welcome` is on the other arm and paints its own background in `welcome.css`.
 
 #### Pinning a layout
@@ -571,9 +573,11 @@ A release build does not expose that console, so the same list is in the app: Se
 | `art` that is not an object                         | The whole map ignored, every card walks the chain.           |
 | An `art` value that is neither a `@.coilbox/` reference nor `false` | That tool dropped from the map and walking the chain, the rest of the map kept. |
 | `background` that is neither a `@.coilbox/` reference nor `false` | The default wash.                                |
-| A `@.coilbox/` file that is not there               | A visible error block for markup, and a card that falls back to the icon for art. |
+| A `@.coilbox/` file that is not there               | A visible error block for markup, a card that falls back to the icon for art, and the default wash for the backdrop. |
 
 The rule behind the table is that one mistake costs the thing it was written for and nothing else.
+
+Every row of the table reaches the profile panel. How loudly a mistake shows on the page itself varies with what it cost you: markup you wrote to be read gets an error block where it should have been, while a backdrop that is decoration at 6% strength gets the default wash and says the rest in the panel.
 
 #### A worked example
 
