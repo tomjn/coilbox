@@ -75,12 +75,21 @@ const OFFERS_NOTHING: GetStartedOffer = { games: [], maps: [] };
  *   will not be one, so the card draws nothing. See {@link scanSettled}, which is
  *   the same reading the home page's own map inventory waits on.
  *
- * ## The per-visit snapshot
+ * ## When the offer ends, and when the list merely holds still
  *
- * The list is captured the moment it is first answerable and held for the rest of
- * the mount (issue #526). Downloading one suggestion refreshes `installed`, and
- * re-deriving from that would shrink or empty the list under a reader mid-visit.
- * Navigating away unmounts the page, so the next visit asks again from scratch.
+ * Two different questions, and they were once answered by the same thing, which
+ * is what issue #1116 is.
+ *
+ * The list holds still for the mount. It is captured the moment it is first
+ * answerable and held for the rest of the visit (issue #526), because
+ * downloading a suggestion refreshes `installed` and re-deriving from that would
+ * take the row the player just clicked out from under them.
+ *
+ * The offer ends when the player has enough maps, which is
+ * {@link ../content/pages/components/getStartedCandidates MAPS_ENOUGH} and not
+ * this hook's business. That is why the mount ending no longer ends the offer: a
+ * player who downloads one map, goes to look at it and comes back is asked from
+ * scratch and gets the same offer back, minus the map they took.
  *
  * The setup gate is live over the top of the snapshot, so completing setup while
  * the page is open reveals the card with the list already captured.

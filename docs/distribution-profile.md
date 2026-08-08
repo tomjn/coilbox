@@ -360,7 +360,7 @@ The HTML is trusted (it ships inside your distribution): apart from rewriting re
 
 ### `onboarding` (string)
 
-Where the first-run onboarding sits on the branded home. The onboarding is the "Set up Coilbox" card (offers to create a content folder / download an engine) plus the get-started card (curated game/map download suggestions); both self-hide once setup is complete and content is installed.
+Where the first-run onboarding sits on the branded home. The onboarding is the "Set up Coilbox" card (offers to create a content folder / download an engine) plus the get-started card (curated game/map download suggestions). Both self-hide once setup is complete, the player has a game, and they have at least three maps.
 
 Your `welcome` is **always** shown and is never replaced by the onboarding — this field only positions the cards relative to it:
 
@@ -417,7 +417,7 @@ Six zones make up the page. Each one is self-contained and draws nothing when it
 
 | Zone id      | Draws                                                                                                                     | Draws nothing when                                                                        |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `onboarding` | The "Set up Coilbox" card (content folder and engine) and the get-started download suggestions.                            | Setup is done and content is installed, the player dismissed the card, or [`onboarding`](#onboarding-string) is `"off"`. |
+| `onboarding` | The "Set up Coilbox" card (content folder and engine) and the get-started download suggestions.                            | Setup is done, the player has a game and at least three maps, the player dismissed the card, or [`onboarding`](#onboarding-string) is `"off"`. |
 | `greeting`   | The page heading and the line under it. Greets by lobby name once logged in.                                              | Never. An app always has a title, though the line under it depends on your other zones. See [What the greeting says depends on the rest of your list](#what-the-greeting-says-depends-on-the-rest-of-your-list). |
 | `continue`   | One card for the thing you were last doing: a Warpath run, the next campaign mission, a conquest, a battle you can still rejoin, or your last skirmish setup. | There is nothing to resume, which includes every fresh install.                            |
 | `resume`     | Up to three runners-up the `continue` card did not take, plus a "log in as" card when you are logged out with a saved login. | There are no runners-up.                                                                   |
