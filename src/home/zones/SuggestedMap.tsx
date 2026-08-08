@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Check, Download, Loader2, Map as MapIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import {
   ART_BAND_CLASS,
@@ -11,19 +12,25 @@ import {
   CARD_STACK_CLASS,
 } from "../cardShell";
 import {
-  type FeaturedState,
+  type SuggestedState,
   springNameOf,
-  useFeaturedMap,
-  useFeaturedMapArt,
-  useFeaturedMapInstall,
-} from "../featuredMap";
+  useSuggestedMap,
+  useSuggestedMapArt,
+  useSuggestedMapInstall,
+} from "../suggestedMap";
 
 /**
  * One curated map, promoted for the day, with a button that installs it.
  *
- * Which map is decided in {@link ../featuredMap}: a daily rotation over the maps
+ * Which map is decided in {@link ../suggestedMap}: a daily rotation over the maps
  * the GitHub `catalog.json` already curates for the map packs. This file is only
  * the card.
+ *
+ * The card is a download card, so on the default page it sits in the tool grid's
+ * Downloads group beside Browse Rapid, Maps and Games, at their size. The layout
+ * composes that, not this file: {@link ../StackedLayout} hands {@link
+ * SuggestedMapCard} to the cards zone whenever the two zones are adjacent, and
+ * falls back to the standalone section below when a profile separates them.
  *
  * The states it can be in, and why each is what it is:
  *
@@ -32,7 +39,7 @@ import {
  * - Catalog back and nothing curated: nothing at all. `catalog.json` ships inside
  *   the app bundle and the Rust side falls back to it, so an offline player still
  *   gets the full curated list. An empty pool therefore means a build with its
- *   catalog stripped, and a card announcing a featured map it does not have is
+ *   catalog stripped, and a card announcing a suggested map it does not have is
  *   worse than the zone standing down, which is what the design has every zone do
  *   when it has nothing.
  * - Already installed: the same map everyone else sees today, because the daily
@@ -42,12 +49,37 @@ import {
  * - Downloading, queued, failed: said plainly on the card, because this card owns
  *   one map and a silent failure reads as a dead button.
  */
-export default function FeaturedMap() {
-  const { map, loading, source } = useFeaturedMap();
-  const { state, error, canDownload, download } = useFeaturedMapInstall(map);
-  const art = useFeaturedMapArt(map, state === "installed");
+export default function SuggestedMap() {
+  return <SuggestedMapCard heading />;
+}
 
-  if (loading) return <Placeholder />;
+/**
+ * The card, with the section and label around it only when it is standing on its
+ * own.
+ *
+ * The heading travels with the card rather than sitting in a wrapper above it,
+ * because the zone renders nothing at all when the catalog curates no maps and a
+ * label over an absent card would be the one thing left on the page.
+ *
+ * Inside the Downloads group the heading is off: the group has one already, and a
+ * second inside it would read as a group within a group.
+ */
+export function SuggestedMapCard({ heading }: { heading?: boolean }) {
+  const { map, loading, source } = useSuggestedMap();
+  const { state, error, canDownload, download } = useSuggestedMapInstall(map);
+  const art = useSuggestedMapArt(map, state === "installed");
+
+  const labelled = (node: ReactNode) =>
+    heading ? (
+      <section aria-labelledby="suggested-map-heading">
+        <Heading />
+        {node}
+      </section>
+    ) : (
+      node
+    );
+
+  if (loading) return labelled(<Placeholder />);
   if (!map) return null;
 
   const installedName = state === "installed" ? springNameOf(map) : undefined;
@@ -62,12 +94,12 @@ export default function FeaturedMap() {
           />
           {/* The art window. Grows with the card, so the picture reaches the
               band however deep the band gets. */}
-          <span aria-hidden="true" className="relative min-h-40 flex-1" />
+          <span aria-hidden="true" className={ART_WINDOW_CLASS} />
         </>
       ) : (
         <span
           aria-hidden="true"
-          className="flex min-h-40 flex-1 items-center justify-center"
+          className={`flex items-center justify-center ${ART_WINDOW_CLASS}`}
         >
           <MapIcon size={32} className="text-muted-foreground" />
         </span>
@@ -95,9 +127,8 @@ export default function FeaturedMap() {
     </>
   );
 
-  return (
-    <section aria-labelledby="featured-map-heading">
-      <Heading />
+  return labelled(
+    <div className={COLUMN_CLASS}>
       {installedName ? (
         // Installed: the card is the way to the map, so the whole surface is the
         // link and the band carries no button to nest inside it.
@@ -111,7 +142,7 @@ export default function FeaturedMap() {
         <div className={art ? ART_CARD_CLASS : PLAIN_CARD_CLASS}>{body}</div>
       )}
       {!canDownload && state !== "installed" && (
-        <p className="mt-2 max-w-[33rem] text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Set a download folder in{" "}
           <Link
             className="underline underline-offset-4"
@@ -122,7 +153,7 @@ export default function FeaturedMap() {
           to install it.
         </p>
       )}
-    </section>
+    </div>,
   );
 }
 
@@ -141,10 +172,10 @@ const BATTLE_BLURB = "Being played now";
 function Heading() {
   return (
     <h2
-      id="featured-map-heading"
+      id="suggested-map-heading"
       className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
     >
-      Featured map
+      Suggested map
     </h2>
   );
 }
@@ -156,13 +187,12 @@ function Heading() {
  */
 function Placeholder() {
   return (
-    <section aria-labelledby="featured-map-heading">
-      <Heading />
+    <div className={COLUMN_CLASS}>
       <div
         aria-hidden="true"
-        className={`${PLAIN_CARD_CLASS} min-h-52 motion-safe:animate-pulse`}
+        className={`${PLAIN_CARD_CLASS} min-h-40 motion-safe:animate-pulse`}
       />
-    </section>
+    </div>
   );
 }
 
@@ -173,7 +203,7 @@ function Action({
   onDownload,
   title,
 }: {
-  state: FeaturedState;
+  state: SuggestedState;
   canDownload: boolean;
   onDownload: () => void;
   title: string;
@@ -212,10 +242,22 @@ function Action({
 }
 
 /**
- * How wide the card gets. Wide enough for a map to be worth looking at, capped so
- * it does not stretch across a wide window, and full width below that.
+ * The column the card sits in: the card, and under it the one line that only
+ * appears when there is nowhere to download to.
+ *
+ * It carries the width, so the card and that line agree on it. `sm:w-64` is the
+ * tool card's own width, because this is a fourth card in the Downloads group and
+ * a card wider than its neighbours would read as a different kind of thing. The
+ * card was `max-w-[33rem]`, which was the right answer while it stood alone at the
+ * foot of the page and the wrong one beside three cards (issue #1037).
  */
-const CARD_WIDTH_CLASS = "max-w-[33rem]";
+const COLUMN_CLASS = "flex w-full flex-col gap-2 sm:w-64";
+
+/**
+ * How deep the picture is. The tool card's own art window, for the same reason
+ * the width is: four cards in a row, one of them taller, reads as a mistake.
+ */
+const ART_WINDOW_CLASS = "relative min-h-28 flex-1";
 
 /**
  * The art card: the shared shell of `cardShell.ts`, which owns why the text over a
@@ -223,10 +265,10 @@ const CARD_WIDTH_CLASS = "max-w-[33rem]";
  * is, from a snowfield to a night battle, and the shell's measurement bounds both
  * ends.
  */
-const ART_CARD_CLASS = `${ART_SHELL_CLASS} ${CARD_WIDTH_CLASS}`;
+const ART_CARD_CLASS = ART_SHELL_CLASS;
 
 /** The no-art card: the ordinary card surface, with the map icon in place of art. */
-const PLAIN_CARD_CLASS = `${CARD_SHELL_CLASS} ${CARD_STACK_CLASS} ${CARD_WIDTH_CLASS} bg-card text-card-foreground`;
+const PLAIN_CARD_CLASS = `${CARD_SHELL_CLASS} ${CARD_STACK_CLASS} bg-card text-card-foreground`;
 
 /** The band on the no-art card, where the ordinary card colours apply. */
 const PLAIN_BAND_CLASS =

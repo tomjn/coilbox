@@ -1,7 +1,7 @@
 import { useFrame, useTheme } from "@picoframe/frame";
 import type { NavItem } from "@picoframe/plugin-sdk";
 import { ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
 import { type CardArt, resolveCardArt } from "../art";
 import {
@@ -29,8 +29,14 @@ import LinkCard from "./LinkCard";
  * A group's external links do not each get a card. They share one, at the end of
  * their own group - see {@link LinkCard} for why there and not somewhere of its
  * own.
+ *
+ * `suggested` is the suggested map's card, handed over by the layout. A map
+ * suggestion is a download, so it belongs in the Downloads group rather than in a
+ * section of its own at the foot of the page (issue #1037). The grid places it
+ * and never builds it: what it is, and whether there is one at all, stays the
+ * suggested map zone's business.
  */
-export default function ToolCards() {
+export default function ToolCards({ suggested }: { suggested?: ReactNode }) {
   const { nav } = useFrame();
   // Groups as composeNav sorted them, minus Home and anything left empty, so the
   // grid mirrors the sidebar. Shared with the Greeting, which needs the same
@@ -56,6 +62,7 @@ export default function ToolCards() {
               {tools.map((item) => (
                 <ToolCard key={item.id} item={item} />
               ))}
+              {group.id === SUGGESTED_MAP_GROUP && suggested}
               {links.length > 0 && <LinkCard items={links} />}
             </div>
           </section>
@@ -64,6 +71,18 @@ export default function ToolCards() {
     </div>
   );
 }
+
+/**
+ * The nav group the suggested map's card joins.
+ *
+ * The downloads plugin's group id. It is always there: plugins are registered in
+ * `app.plugins.ts` rather than configured, and of its three items a profile can
+ * hide Browse Rapid and Games but not Maps, so the group never empties.
+ *
+ * After the tools and before the shared links card. Links leave the app, so they
+ * stay last, which is the order {@link LinkCard} already argues for.
+ */
+const SUGGESTED_MAP_GROUP = "downloads";
 
 /**
  * What a tool card adds to the shared shell in both rendering modes. Sizing and

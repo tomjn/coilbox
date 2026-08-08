@@ -76,7 +76,7 @@ export const DEFAULT_ZONES = [
   "continue",
   "resume",
   "cards",
-  "featured",
+  "suggested",
 ] as const;
 
 /** A built-in zone id. */

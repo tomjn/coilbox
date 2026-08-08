@@ -68,7 +68,7 @@ describe("loadHomeMarkup", () => {
       {
         zones: [
           { zone: "cards", after: "@.coilbox/intro.html" },
-          { zone: "featured", before: " @.coilbox/intro.html " },
+          { zone: "suggested", before: " @.coilbox/intro.html " },
         ],
       },
       read,

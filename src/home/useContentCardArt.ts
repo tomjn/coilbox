@@ -143,7 +143,7 @@ export function useContentCardArt(): void {
     selected?.enginePath,
     selected?.rootPath,
   );
-  // What is installed, for the Maps and Games cards. The Featured Map zone
+  // What is installed, for the Maps and Games cards. The Suggested map zone
   // already mounts this same hook on the same target, and the scan is cached
   // per target, so the collection picks cost the home page nothing new.
   const { data: scan } = useUnitsyncScan(

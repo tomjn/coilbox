@@ -179,7 +179,7 @@ describe("text on card art", () => {
  * The guarantee the shell carries, and the reason it is the strict one.
  *
  * Issue #989 puts real minimaps and loading-screen art on these cards, #1000 lets
- * a distribution supply any image file at all, and the featured map shows a
+ * a distribution supply any image file at all, and the suggested map shows a
  * picture of whatever the mapper made, up to and including a snowfield and a
  * night battle. Coilbox draws none of that and can promise nothing about it, so
  * what holds the text legible has to be the band and not the picture. Black and

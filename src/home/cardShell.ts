@@ -2,7 +2,7 @@
  * The card treatment the welcome zones share when they put text on artwork.
  *
  * Art fills the card, and a band across the foot carries the text over it. The
- * tool grid and the featured map both do this. They were written in parallel and
+ * tool grid and the suggested map both do this. They were written in parallel and
  * arrived at the same four class strings independently, so this module is where
  * those strings now live, along with the three facts that make them what they
  * are. Each fact was found in a browser rather than deduced, and each is easy to
@@ -82,8 +82,9 @@ export const CARD_STACK_CLASS = "relative flex-col overflow-hidden";
  * behind the card shows through and the band's text loses what it was measured
  * against.
  *
- * Zones add their own sizing and hover on top. Neither is shared: the tool grid
- * packs fixed-width cards that wrap, and the featured map is one wide card.
+ * Zones add their own sizing and hover on top. Neither is shared, even though
+ * the tool grid and the suggested map now agree on a width: the grid's cards are
+ * whole links with a hover cue, and the map card is an offer with a button in it.
  */
 export const ART_CARD_CLASS = `${CARD_SHELL_CLASS} ${CARD_STACK_CLASS} bg-[hsl(var(--background))]`;
 

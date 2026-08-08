@@ -20,7 +20,7 @@ src/home/
   layout.ts            layout registry, resolves profile config over defaults
   zones/
     Greeting.tsx  Continue.tsx  ResumeRail.tsx  ToolCards.tsx
-    FeaturedMap.tsx  Onboarding.tsx  Custom.tsx
+    SuggestedMap.tsx  Onboarding.tsx  Custom.tsx
   art.ts               resolveCardArt(toolId) -> url
   continue.ts          ranks resume candidates
   background.ts        page backdrop resolution
@@ -70,7 +70,7 @@ ResumeRail   the runners-up Continue did not take, capped at 3
              logged out with a saved login -> "Log in as <lastUser>" card
              empty -> renders nothing
 ToolCards    nav-derived, groups preserved, art via resolveCardArt
-FeaturedMap  one map, always
+SuggestedMap one map, always
 Onboarding   existing SetupCard and GetStartedCard, behaviour unchanged
 Custom       distro markup, plus before and after slots on every zone above
 ```
@@ -85,7 +85,7 @@ Two rules, each explainable in a sentence, and the ranking is a pure function ov
 
 Continue renders nothing when there is nothing to resume. The Onboarding zone already owns first run, and a new user should see one call to action rather than two competing ones.
 
-### Featured map
+### Suggested map
 
 A curated list in the GitHub `catalog.json` already used for map packs, rotated deterministically by date so everyone sees the same map on the same day. When a lobby connection happens to be live, a map an open battle is using is preferred. The card installs the map.
 
@@ -120,7 +120,7 @@ Step 4 always succeeds, so no card is ever artless and the milestone is not bloc
       { "zone": "cards",
         "art": { "warpath": "@.coilbox/art/warpath.png", "replays": false } },
       { "html": "@.coilbox/community.html" },   // custom zone, any position
-      { "zone": "featured", "before": "<p>This week's pick</p>" }
+      { "zone": "suggested", "before": "<p>This week's pick</p>" }
     ]
   }
 }
@@ -173,8 +173,8 @@ CONTINUE
  9  Continue hero zone.                                           [needs 1, 8]
 10  Resume rail zone, capped at 3, plus the log-in-as card.       [needs 8, 9]
 
-FEATURED AND BACKGROUND
-11  Featured map zone: curated list, daily rotation, install.     [needs 1]
+SUGGESTED MAP AND BACKGROUND
+11  Suggested map zone: curated list, daily rotation, install.     [needs 1]
 12  Prefer a map an open battle is using when connected.          [needs 11]
 13  Page background resolution and default backdrop.              [needs 1]
 

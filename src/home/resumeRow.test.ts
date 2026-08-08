@@ -38,7 +38,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 vi.mock("./zones/Onboarding", () => ({ default: () => null }));
 vi.mock("./zones/Greeting", () => ({ default: () => null }));
 vi.mock("./zones/ToolCards", () => ({ default: () => null }));
-vi.mock("./zones/FeaturedMap", () => ({ default: () => null }));
+vi.mock("./zones/SuggestedMap", () => ({ default: () => null }));
 vi.mock("./HomeMarkup", () => ({ default: () => null }));
 // No backdrop, so the page is the column and what the layout put in it. What the
 // backdrop resolves to is `background.test.ts`'s subject.

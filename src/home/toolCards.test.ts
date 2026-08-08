@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
+import { twMerge } from "tailwind-merge";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The zone reads the frame's nav and opens external links through Tauri. Vitest
@@ -11,9 +12,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // because it is what the generators answer with no document, so a card and a test
 // calling a generator directly agree without either of them naming a scheme.
 const theme = vi.hoisted(() => ({ resolved: "dark" as "dark" | "light" }));
+// The frame's nav, swapped by the cases that render the whole grid. Empty by
+// default, which is what the single-card cases below want.
+const frame = vi.hoisted(() => ({ nav: [] as unknown[] }));
 vi.mock("@picoframe/frame", () => ({
-  useFrame: () => ({ nav: [] }),
+  useFrame: () => frame,
   useTheme: () => theme,
+  // The shared links card merges class lists through it. The real
+  // tailwind-merge, because which of two competing utilities wins is the point.
+  cn: (...parts: unknown[]) => twMerge(parts.filter(Boolean).join(" ")),
+  // The links card's chips. Only that they render matters here, so this is the
+  // element without the variant classes.
+  Button: ({ children }: { children?: unknown }) =>
+    createElement("button", { type: "button" }, children as never),
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 
@@ -48,6 +59,7 @@ function register(step: CardArtStep, answer: string | false | undefined) {
 afterEach(() => {
   while (registered.length) registered.pop()?.();
   theme.resolved = "dark";
+  frame.nav = [];
 });
 
 /** One card as the markup a browser would get. */
@@ -187,5 +199,75 @@ describe("what a card navigates to", () => {
     // the grid not also putting an empty box on the page. The mocked frame
     // above has an empty nav.
     expect(renderToStaticMarkup(createElement(ToolCards))).toBe("");
+  });
+});
+
+describe("where the suggested map's card goes", () => {
+  /** The nav Coilbox has: a Downloads group, and another group either side. */
+  const NAV = [
+    { id: "play", label: "Play", items: [{ ...SKIRMISH }] },
+    {
+      id: "downloads",
+      label: "Downloads",
+      items: [
+        { id: "downloads.maps", label: "Maps", to: "/downloads/maps" },
+        { ...DOCS },
+      ],
+    },
+    { id: "content", label: "Content", items: [{ ...SKIRMISH, id: "c" }] },
+  ];
+
+  /** The grid, with a recognisable stand-in for the map card. */
+  function grid(): string {
+    frame.nav = NAV;
+    return renderToStaticMarkup(
+      createElement(
+        MemoryRouter,
+        null,
+        createElement(ToolCards, {
+          suggested: createElement("p", null, "SUGGESTED"),
+        }),
+      ),
+    );
+  }
+
+  /** The markup of one group's section, by group label. */
+  function section(html: string, label: string): string {
+    const parts = html.split("<section");
+    const found = parts.find((p) => p.includes(`>${label}</h2>`));
+    if (!found) throw new Error(`no ${label} section`);
+    return found;
+  }
+
+  it("puts it in the Downloads group and nowhere else", () => {
+    // A map suggestion is a download, so it belongs beside Browse Rapid, Maps
+    // and Games rather than in a section of its own at the foot of the page.
+    const html = grid();
+    expect(html.match(/SUGGESTED/g)).toHaveLength(1);
+    expect(section(html, "Downloads")).toContain("SUGGESTED");
+    expect(section(html, "Play")).not.toContain("SUGGESTED");
+    expect(section(html, "Content")).not.toContain("SUGGESTED");
+  });
+
+  it("puts it after the tools and before the shared links card", () => {
+    // Links leave the app, so they stay last whatever else joins the group.
+    const downloads = section(grid(), "Downloads");
+    expect(downloads.indexOf("Maps")).toBeLessThan(
+      downloads.indexOf("SUGGESTED"),
+    );
+    expect(downloads.indexOf("SUGGESTED")).toBeLessThan(
+      downloads.indexOf("lucide-external-link"),
+    );
+  });
+
+  it("draws the same groups when the layout hands it no card", () => {
+    // A profile that placed the two zones apart, and every layout that never
+    // pairs them. The grid is unchanged rather than short of a group.
+    frame.nav = NAV;
+    const without = renderToStaticMarkup(
+      createElement(MemoryRouter, null, createElement(ToolCards)),
+    );
+    expect(without).not.toContain("SUGGESTED");
+    expect(without.split("<section")).toHaveLength(4);
   });
 });
