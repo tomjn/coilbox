@@ -535,7 +535,7 @@ Any image is safe to put under a card: the label sits in a band measured to stay
 { "version": 1, "home": { "background": "@.coilbox/art/backdrop.jpg" } }
 ```
 
-It is a mood layer rather than a hero image. Coilbox composites it over the theme background at 6% strength, which is the strongest setting where the worst possible image still leaves every piece of text on the page readable. If you want art at full strength, use [`welcome`](#welcome-object), which replaces the page and lets your own CSS decide.
+It is a mood layer rather than a hero image. Coilbox composites it over the theme background at 5% strength, which is the strongest setting where the worst possible image still leaves every piece of text on the page readable. If you want art at full strength, use [`welcome`](#welcome-object), which replaces the page and lets your own CSS decide.
 
 `false` removes the backdrop entirely and leaves the flat theme background. Omitting it gives a soft wash built from your own `--primary` and `--foreground`, so a distribution that only sets [`accent`](#accent-string) already gets a backdrop in its colours.
 
@@ -577,7 +577,7 @@ A release build does not expose that console, so the same list is in the app: Se
 
 The rule behind the table is that one mistake costs the thing it was written for and nothing else.
 
-Every row of the table reaches the profile panel. How loudly a mistake shows on the page itself varies with what it cost you: markup you wrote to be read gets an error block where it should have been, while a backdrop that is decoration at 6% strength gets the default wash and says the rest in the panel.
+Every row of the table reaches the profile panel. How loudly a mistake shows on the page itself varies with what it cost you: markup you wrote to be read gets an error block where it should have been, while a backdrop that is decoration at 5% strength gets the default wash and says the rest in the panel.
 
 #### A worked example
 

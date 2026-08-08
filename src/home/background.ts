@@ -132,7 +132,8 @@ async function probeAsset(path: string): Promise<boolean> {
  * `"background": false` asks for. So a typo in the path and a deliberate switch
  * off looked the same, on the page and on the console.
  *
- * This is the quiet half of the answer. The backdrop composites at 6% alpha, so an
+ * This is the quiet half of the answer. The backdrop composites at
+ * {@link BACKDROP_MAX_ALPHA}, so an
  * error box across the page, which is what distribution markup gets, would be far
  * louder than the thing that failed. Instead the reference is probed once at
  * startup, beside the markup load, and a miss falls back to the default wash with
