@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The hook half of `contentArt` reaches @picoframe/frame and, through the content
 // bindings, @picoframe/plugin-sdk. Both published dists use extensionless relative
@@ -35,6 +35,7 @@ import {
   type ContentPick,
   campaignPick,
   collectionPicks,
+  contentArtStorageKey,
   contentArtVersion,
   contentCardArt,
   contentOffers,
@@ -43,6 +44,7 @@ import {
   encodeRemembered,
   forgetContentArt,
   gamePick,
+  loadContentArt,
   PICK_PRIORITY,
   picksKey,
   pruneRemembered,
@@ -1047,6 +1049,85 @@ describe("painting from the snapshot", () => {
       pick: mapPick("A"),
       url: "coilbox://fresh",
     });
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * One snapshot per install (issue #1115).
+ * -------------------------------------------------------------------------- */
+
+describe("where the snapshot is kept", () => {
+  const VANILLA = "coilbox.home.contentArt";
+  const PACKAGE = "coilbox.home.contentArt:/pkg/.coilbox";
+
+  // The node test env has no localStorage at all, so the whole store is a Map.
+  const store = new Map<string, string>();
+
+  beforeEach(() => {
+    store.clear();
+    resetContentArt();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value);
+      },
+      removeItem: (key: string) => {
+        store.delete(key);
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    // Put the module's key back, so a later suite writing through `remember`
+    // does not write under a portable root this one made up.
+    loadContentArt("");
+  });
+
+  it("keeps the bare key for an ordinary install", () => {
+    expect(contentArtStorageKey("")).toBe(VANILLA);
+  });
+
+  it("names the portable root for a distribution shipped in a game", () => {
+    expect(contentArtStorageKey("/pkg/.coilbox")).toBe(PACKAGE);
+  });
+
+  it("reads back what this install wrote, not the other one's", () => {
+    store.set(
+      VANILLA,
+      encodeRemembered(snapshot([["play.skirmish", mapPick("A"), "vanilla"]])),
+    );
+    store.set(
+      PACKAGE,
+      encodeRemembered(snapshot([["content.maps", mapPick("B"), "package"]])),
+    );
+    loadContentArt("/pkg/.coilbox");
+    expect([...rememberedContentArt().keys()]).toEqual(["content.maps"]);
+  });
+
+  it("starts a portable package empty rather than on the other install's picks", () => {
+    store.set(
+      VANILLA,
+      encodeRemembered(snapshot([["play.skirmish", mapPick("A"), "vanilla"]])),
+    );
+    loadContentArt("/pkg/.coilbox");
+    expect(rememberedContentArt().size).toBe(0);
+  });
+
+  it("leaves the other install's snapshot alone when it prunes its own", () => {
+    // The reported symptom: a package with an empty inventory ran once and the
+    // ordinary install's next launch was three pictures short.
+    const vanilla = encodeRemembered(
+      snapshot([
+        ["play.skirmish", mapPick("A"), "vanilla-a"],
+        ["content.maps", mapPick("B"), "vanilla-b"],
+      ]),
+    );
+    store.set(VANILLA, vanilla);
+    loadContentArt("/pkg/.coilbox");
+    publishContentArt(new Map(), new Map());
+    expect(store.get(VANILLA)).toBe(vanilla);
+    expect(store.get(PACKAGE)).toBe(encodeRemembered(new Map()));
   });
 });
 

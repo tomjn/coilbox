@@ -7,6 +7,7 @@ import { ErrorBoundary } from "./general/ErrorBoundary";
 import { SPLASH_ENABLED_KEY } from "./general/splash";
 import { loadHomeBackground } from "./home/background";
 import CoilboxHome from "./home/CoilboxHome";
+import { loadContentArt } from "./home/contentArt";
 import { loadHomeMarkup } from "./home/markup";
 import { applyProfilePages } from "./profile/CustomPage";
 import { applyProfileSettingsHiding } from "./profile/hidden";
@@ -17,6 +18,7 @@ import {
   applyBootBackground,
   applyProfileSidebarSeed,
   forceProfileTheme,
+  getProfileRoot,
   loadProfile,
   resolveProfileImage,
   resolveSplashSrc,
@@ -51,6 +53,12 @@ forceProfileTheme();
 // Seed the sidebar-collapsed state from the profile (only when the user has no
 // stored value), before render so the sidebar starts in the intended state.
 applyProfileSidebarSeed();
+
+// Read back the card art this install painted last launch, so the home page paints
+// it at first render instead of a beat later. Synchronous, and here rather than at
+// module load because the key is the portable root and only the profile knows it.
+// Two installs on one machine share localStorage but share no content (issue #1115).
+loadContentArt(getProfileRoot());
 
 // Resolve the profile's layout images (popover menu logo + the three top-bar slot
 // logos) before first render, like the splash — a `.coilbox`-relative path round-

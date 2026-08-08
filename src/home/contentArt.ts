@@ -69,12 +69,13 @@
  * the right answer already and is just not allowed to say it yet.
  *
  * So it is written down. {@link rememberContentArt} holds what the last launch
- * resolved, read from `localStorage` while the module loads, and
+ * resolved, read from `localStorage` by {@link loadContentArt} during boot, and
  * {@link contentCardArt} answers from it until this launch's own resolve lands.
- * `localStorage` is synchronous and already in memory by the time a module runs,
- * which is what makes this legal at all: the rule that first paint must never
- * wait on a disk read still holds, and `index.html` and `profile.ts` already read
- * the boot background the same way.
+ * `localStorage` is synchronous and already in memory, which is what makes this
+ * legal at all: the rule that first paint must never wait on a disk read still
+ * holds, and `index.html` and `profile.ts` already read the boot background the
+ * same way. The key is per install, because two installs on one machine share
+ * `localStorage` but share no content. See {@link contentArtStorageKey}.
  *
  * A remembered URL is last launch's answer, and last launch is not this one, so
  * it is a claim to be checked rather than a fact:
@@ -543,6 +544,29 @@ export interface RememberedArt {
 /** Where the snapshot is kept, alongside the theme and the boot background. */
 const STORAGE_KEY = "coilbox.home.contentArt";
 
+/**
+ * The key this install keeps its snapshot under.
+ *
+ * `localStorage` is keyed by the app identifier and is not redirected by portable
+ * mode, the same fact `profile.ts` records for the theme keys. So a distribution
+ * shipped inside a game and the player's ordinary install share one store while
+ * sharing no content at all, and each pruned the other down to what it could see:
+ * one launch of a portable package with an empty inventory left the ordinary
+ * install's next launch three pictures short (issue #1115).
+ *
+ * The theme keys live with that sharing by rewriting authoritatively every
+ * launch, so the distribution's brand simply always wins. A cache has no such
+ * answer, because both installs are right about their own content, so it gets a
+ * key each instead. A non-portable install keeps the bare key, so nothing already
+ * remembered is lost to this.
+ */
+export function contentArtStorageKey(portableRoot: string): string {
+  return portableRoot ? `${STORAGE_KEY}:${portableRoot}` : STORAGE_KEY;
+}
+
+/** The resolved key, set by {@link loadContentArt} before the first render. */
+let storageKey = STORAGE_KEY;
+
 /** What the last launch painted. For the hook that prunes it, and for tests. */
 export function rememberedContentArt(): ReadonlyMap<string, RememberedArt> {
   return remembered;
@@ -568,7 +592,7 @@ function remember(entries: ReadonlyMap<string, RememberedArt>): void {
   if (text === written) return;
   written = text;
   try {
-    localStorage.setItem(STORAGE_KEY, text);
+    localStorage.setItem(storageKey, text);
   } catch {
     // No storage (a test's node environment, or a webview with it switched
     // off). Everything above still works, this launch simply teaches the next
@@ -760,7 +784,7 @@ export function decodeRemembered(
 /** The stored snapshot, or nothing where there is no storage to read. */
 function readRemembered(): Map<string, RememberedArt> {
   try {
-    const text = localStorage.getItem(STORAGE_KEY);
+    const text = localStorage.getItem(storageKey);
     written = text ?? undefined;
     return decodeRemembered(text);
   } catch {
@@ -768,7 +792,23 @@ function readRemembered(): Map<string, RememberedArt> {
   }
 }
 
-// Read while the module loads, which is before anything renders. Synchronous on
-// purpose: this is the value first paint needs, and a promise would arrive after
-// exactly the paint it exists to fill.
-remembered = readRemembered();
+/**
+ * Read back what this install painted last launch, under the key that is its own.
+ *
+ * Called once from `main.tsx`, before the first render. Still synchronous, which
+ * is the point: this is the value first paint needs, and a promise would arrive
+ * after exactly the paint it exists to fill. What moved is only where in the boot
+ * it happens. It used to run while this module loaded, which is earlier than the
+ * profile has said which install this is, and reading the other install's
+ * snapshot is the bug (issue #1115). The profile load already sits well before
+ * the render, so the read still lands before first paint with nothing awaited in
+ * between.
+ *
+ * A launch that never calls this simply remembers nothing, which is the behaviour
+ * every launch had before the snapshot existed.
+ */
+export function loadContentArt(portableRoot: string): void {
+  storageKey = contentArtStorageKey(portableRoot);
+  remembered = readRemembered();
+  wake();
+}
