@@ -493,6 +493,31 @@ export interface SuggestedPage {
  * `onboardingMaps` is part of that wait and the caller folds it into `loading`.
  * The `=== false` here says the same thing again, so a caller that did not
  * cannot promote on a question nobody has answered.
+ *
+ * ## None at all, and not the three the get-started offer stands down at
+ *
+ * The get-started offer goes on listing maps until the player has three
+ * ({@link ../content/pages/components/getStartedCandidates MAPS_ENOUGH}), and
+ * this promotes only at none. Issue #1124 is whether that is one rule written
+ * twice with one of the numbers wrong. It is not: the two answer different
+ * questions, and only one of them is about the size of a library.
+ *
+ * `MAPS_ENOUGH` asks whether the player has a library yet. Its card is a band of
+ * its own at the head of the page, competing with nothing, so it can go on
+ * offering until one map has become a few.
+ *
+ * Promotion asks whether a map offer outranks what the player was doing. It only
+ * exists inside the resume row, and all it does there is sit in front of the
+ * continue hero and the resume rail (see `StackedLayout`). A player with no maps
+ * has nothing to resume, so the promoted card takes a row that would otherwise
+ * be empty. The first map is what gives them something to come back to, and from
+ * there the card would be pushing their own history aside rather than filling a
+ * gap. So the first map ends the promotion.
+ *
+ * Standing down is not stopping. The card returns to the Downloads group and
+ * goes on offering a map a day, and where onboarding is on the page it picks the
+ * player up again under `MAPS_ENOUGH` as soon as setup is complete enough for it
+ * to speak. Nothing about the offer ends at one map. Only its rank does.
  */
 export function suggestedMapPlacement(args: {
   page: SuggestedPage;

@@ -477,6 +477,8 @@ Coilbox does not make an exception for this, and here is the reasoning so you ca
 
 There is one thing that goes the other way. On an install with no maps at all, the `suggested` map card moves to the top of the page, ahead of the resume cards, because without a map nothing can be played. It only does that while the `onboarding` zone is offering no maps of its own, since the get-started card lists several with a packs banner under them and one page should not ask twice. Dropping `onboarding`, or setting it `"off"`, is one way to get the promoted card. So is a player who dismissed "Set up Coilbox" and has no engine, where the zone is on your page and drawing nothing.
 
+The card gives that place up at the player's first map, and not at the three the get-started card counts to. The two numbers measure different things: the get-started card is asking whether the player has a library, and the top row is asking whether a map is worth more right now than the run they were in the middle of. Once they have a map there is something to come back to. The card carries on offering from the Downloads group either way, a map a day, so what ends at one map is where it sits and not what it offers.
+
 So keep `onboarding` in your list unless you mean to remove the offer, and use `"onboarding": "off"` when you do, since that says what you meant and works whether or not you write `zones`.
 
 #### What the greeting says depends on the rest of your list

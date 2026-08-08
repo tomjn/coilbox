@@ -56,6 +56,13 @@ export function installedMapCount(input: {
  * whole ruleset and you play one at a time, so a second game is a
  * multi-gigabyte download for a different game rather than more of the one you
  * already have.
+ *
+ * Not the number the suggested map card is promoted to the top of the welcome
+ * screen at, which is none at all. That is issue #1124, and the two numbers are
+ * a decision rather than one rule written twice: this one measures the player's
+ * library, and the promotion ranks a map offer against the player's own
+ * history. See `suggestedMapPlacement` in {@link ../../../home/suggestedMap},
+ * where the reasoning is written out.
  */
 export const MAPS_ENOUGH = 3;
 
