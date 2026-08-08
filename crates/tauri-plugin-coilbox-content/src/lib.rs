@@ -1164,19 +1164,21 @@ async fn content_import_challenge(src: String) -> Result<CliResult, ()> {
     })
 }
 
-/// `branding_catalog` — fetch the remote branding catalog JSON, disk-cache it, and
-/// fall back to the cache then the bundled seed on network failure. Returns the
-/// raw JSON text; the frontend parses/matches it (Rust stays schema-agnostic).
+/// `branding_catalog`, answer with the branding catalog JSON already on disk (the
+/// cache, else the bundled seed), refetching in the background when that copy is
+/// past its TTL. Returns the raw JSON text. The frontend parses and matches it, so
+/// Rust stays schema-agnostic.
 #[tauri::command]
 async fn branding_catalog<R: Runtime>(app: AppHandle<R>, url: String) -> Result<CliResult, ()> {
     let cache_file = coilbox_portable::cache_dir(&app)
         .ok()
         .map(|d| d.join("coilbox-branding").join("catalog.json"));
     // The bundled seed. `catalog.json` moved to the repo root and is bundled via the
-    // `../catalog.json` resource entry; the exact in-bundle location can vary by
+    // `../catalog.json` resource entry. The exact in-bundle location can vary by
     // bundler, so probe a few candidates and take the first that exists (the old
-    // `branding/` layout is kept last for older installs). Missing => None (the
-    // fetch is network-first anyway, with the disk cache in between).
+    // `branding/` layout is kept last for older installs). This is what makes a
+    // cold offline first run answer at all, so a miss here is the one case that
+    // waits on the network.
     let seed_file = app.path().resource_dir().ok().and_then(|d| {
         ["catalog.json", "_up_/catalog.json", "branding/catalog.json"]
             .into_iter()

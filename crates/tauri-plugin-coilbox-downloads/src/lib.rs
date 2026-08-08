@@ -1327,13 +1327,30 @@ mod tests {
             .is_none());
     }
 
+    /// Can `dl_cancel` reach this flag? Asked by identity rather than by counting
+    /// the registry, so entries other tests hold at the same moment cannot change
+    /// the answer (issue #1103).
+    fn reachable_from_registry(flag: &Arc<AtomicBool>) -> bool {
+        cancel_registry()
+            .lock()
+            .unwrap()
+            .values()
+            .any(|h| Arc::ptr_eq(&h.flag, flag))
+    }
+
     #[test]
     fn no_op_id_yields_unregistered_slots() {
-        let before = cancel_registry().lock().unwrap().len();
         let (flag, _child) = cancel_slots(&None);
         // Standalone slots are not in the registry, so dl_cancel can't reach them.
-        assert_eq!(before, cancel_registry().lock().unwrap().len());
+        assert!(!reachable_from_registry(&flag));
         assert!(!flag.load(Ordering::Relaxed));
+
+        // The same question of a slot that did supply an id, so the check above is
+        // answering "not registered" rather than "never finds anything".
+        let op = "dl-test-op-2";
+        let (registered, _child) = cancel_slots(&Some(op.to_string()));
+        assert!(reachable_from_registry(&registered));
+        unregister_cancel(op);
     }
 }
 
