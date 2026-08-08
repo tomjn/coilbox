@@ -12,6 +12,7 @@ import { toBattleConfig, usePreferredTarget } from "../play/config";
 import {
   type DetectedResult,
   diffNewReplays,
+  engineFailureMessage,
   pickNewestReplay,
   resultFromDemoInfo,
 } from "../play/detect";
@@ -255,6 +256,13 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
       // written, no detection. Drop straight back to the briefing.
       if (exitCode === null) return;
       if (beforePaths === null) {
+        // No baseline to detect a replay against, so a nonzero exit is read
+        // the same way as "no replay found" below.
+        const failure = engineFailureMessage(exitCode, false);
+        if (failure) {
+          setError(failure);
+          return;
+        }
         setPhase("result");
         return;
       }
@@ -277,6 +285,18 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           campaignId: campaign.id,
           missionId: mission.id,
         });
+      }
+      // A nonzero exit with no new replay is stronger than either signal
+      // alone: the engine died before anything was recorded, so this says so
+      // directly rather than asking the player to guess how the mission
+      // ended. A nonzero exit alongside a replay is left to detection below,
+      // since the engine can exit nonzero after a completed mission, and
+      // that replay is real evidence not to discard.
+      const failure = engineFailureMessage(exitCode, replay !== null);
+      if (failure) {
+        setError(failure);
+        setPhase("briefing");
+        return;
       }
       if (outcome === "ambiguous") {
         setPhase("result");
