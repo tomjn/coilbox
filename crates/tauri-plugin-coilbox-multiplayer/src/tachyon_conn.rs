@@ -356,7 +356,7 @@ fn leave(client: TachyonClient, sink: EventSink, outcome: mpsc::UnboundedSender<
                     &sink,
                     LobbyEvent::Console {
                         direction: "in".into(),
-                        line: format!("lobby/leave failed: {error}"),
+                        line: format!("lobby/leave: {error}"),
                     },
                 );
             }
@@ -415,7 +415,11 @@ fn ask(client: TachyonClient, sink: EventSink, command: &'static str, data: Opti
                 &sink,
                 LobbyEvent::Console {
                     direction: "in".into(),
-                    line: format!("{command} failed: {error}"),
+                    // Not "failed", because an unsupported command reads as
+                    // "lobby/subscribeList failed: this server does not support
+                    // that command", which says the same thing twice and blames
+                    // the request rather than the server.
+                    line: format!("{command}: {error}"),
                 },
             );
         }
