@@ -1,9 +1,76 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTachyonRequest,
   consoleView,
   MAX_FRAME_CHARS,
   parseTachyonEntry,
 } from "./tachyonConsole";
+
+describe("buildTachyonRequest", () => {
+  it("turns a command id and a data object into what the command takes", () => {
+    const built = buildTachyonRequest(
+      "lobby/join",
+      '{ "id": "75bfc493-2b9d-495d-a453-06722fdca2ea" }',
+    );
+
+    expect(built).toEqual({
+      ok: true,
+      request: {
+        commandId: "lobby/join",
+        data: { id: "75bfc493-2b9d-495d-a453-06722fdca2ea" },
+      },
+    });
+  });
+
+  it("sends no data at all when the data box is empty", () => {
+    // 17 of the 68 requests in the schema have no data property, so an empty box
+    // has to mean none rather than an empty object.
+    expect(buildTachyonRequest("lobby/list", "")).toEqual({
+      ok: true,
+      request: { commandId: "lobby/list", data: null },
+    });
+    expect(buildTachyonRequest("lobby/list", "  \n ")).toEqual({
+      ok: true,
+      request: { commandId: "lobby/list", data: null },
+    });
+  });
+
+  it("trims the command id", () => {
+    const built = buildTachyonRequest("  party/create  ", "");
+
+    expect(built).toEqual({
+      ok: true,
+      request: { commandId: "party/create", data: null },
+    });
+  });
+
+  it("refuses data that is not JSON, before anything is sent", () => {
+    const built = buildTachyonRequest("lobby/join", "{ id: nope }");
+
+    expect(built.ok).toBe(false);
+    if (built.ok) throw new Error("expected a refusal");
+    expect(built.error).toMatch(/^Data is not JSON: /);
+  });
+
+  it("refuses JSON that is not an object", () => {
+    // Every data in the schema is an object. Teiserver answers anything else
+    // with invalid_request at best, so it is refused here instead.
+    for (const text of ["[1, 2]", '"a string"', "42", "null"]) {
+      const built = buildTachyonRequest("lobby/join", text);
+      expect(built).toEqual({
+        ok: false,
+        error: "Data has to be a JSON object.",
+      });
+    }
+  });
+
+  it("refuses an empty command id", () => {
+    expect(buildTachyonRequest("   ", '{ "id": "a" }')).toEqual({
+      ok: false,
+      error: "Enter a command id.",
+    });
+  });
+});
 
 describe("consoleView", () => {
   it("keeps the wire log a TASServer connection has always shown", () => {

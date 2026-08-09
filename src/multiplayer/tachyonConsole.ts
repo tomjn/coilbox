@@ -1,10 +1,16 @@
 /**
- * Reading one console entry on a Tachyon connection.
+ * Reading and writing one console entry on a Tachyon connection.
  *
  * The console log holds one string per frame, carrying the direction as the same
  * `>>` and `<<` prefix the TASServer view shows (see `mirrorReducer`). A Tachyon
  * frame is JSON, so the drawer wants the envelope fields a reader scans for, plus
  * the frame laid out over several lines rather than one long one.
+ *
+ * The send box works the other way, turning a command id and a typed data object
+ * into the arguments `mpTachyonRequest` takes. It stops at the arguments: the
+ * envelope and its `messageId` are built by `TachyonClient::request` on the Rust
+ * side, the same call every other request goes through, so the drawer cannot grow
+ * a second way of building a frame.
  *
  * The decisions live here rather than in the component because the frontend suite
  * runs with no renderer (issue #1252), so this is the part that can be tested.
@@ -124,4 +130,49 @@ export function parseTachyonEntry(line: string): TachyonConsoleEntry {
     ...cut(JSON.stringify(frame, null, 2)),
     json: true,
   };
+}
+
+/** What the send box makes of what was typed into it. */
+export type TachyonRequest =
+  | {
+      ok: true;
+      /** The arguments for `mpTachyonRequest`, ready to send. */
+      request: { commandId: string; data: unknown };
+    }
+  | { ok: false; error: string };
+
+/**
+ * Turn a typed command id and data object into a request, or say why not.
+ *
+ * An empty data box means a request with no payload, which 17 of the 68 requests
+ * in the schema are. Anything else has to be a JSON object, because every `data`
+ * in the schema is one, and a server that is sent an array or a bare number
+ * answers `invalid_request` at best and closes the connection at worst. Catching
+ * it here means the user is told what is wrong with what they typed, rather than
+ * a round trip later in terms of the server's own vocabulary.
+ *
+ * The command id is only checked for being there. A wrong one comes back as
+ * `command_unimplemented` from the server, which is a more useful answer than
+ * anything a guess here could give.
+ */
+export function buildTachyonRequest(
+  commandId: string,
+  dataText: string,
+): TachyonRequest {
+  const command = commandId.trim();
+  if (!command) return { ok: false, error: "Enter a command id." };
+
+  const text = dataText.trim();
+  if (!text) return { ok: true, request: { commandId: command, data: null } };
+
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    return { ok: false, error: `Data is not JSON: ${(e as Error).message}` };
+  }
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return { ok: false, error: "Data has to be a JSON object." };
+  }
+  return { ok: true, request: { commandId: command, data } };
 }

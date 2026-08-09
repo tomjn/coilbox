@@ -324,6 +324,21 @@ export const mpTachyonSignOut = defineCommand<
 >("coilbox-multiplayer", "mp_tachyon_sign_out");
 
 /**
+ * Send one Tachyon request over a live connection and wait for its answer. Only
+ * the protocol console drawer uses this: every other command sends what it needs
+ * from the connection task, where it can act on the reply.
+ *
+ * The Rust side builds the envelope and the `messageId`, so a frame sent here goes
+ * out the same way every other request does. Rejects when the key names no live
+ * Tachyon connection, when the server refuses the command, and when the request
+ * timed out or was never sent.
+ */
+export const mpTachyonRequest = defineCommand<
+  { serverKey: string; commandId: string; data: unknown },
+  { response: string }
+>("coilbox-multiplayer", "mp_tachyon_request");
+
+/**
  * Register a new account on a server, then disconnect. Streams `LobbyEvent`s over
  * `onEvent`; success is the `registered` phase, denial arrives as `disconnected`
  * with the server's reason. Does NOT log in — connect normally afterwards.

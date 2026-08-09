@@ -8,10 +8,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import type { LobbyProtocol } from "../lobby-servers/config";
-import { mpSend } from "./bindings";
+import { mpSend, mpTachyonRequest } from "./bindings";
 import { useMultiplayer } from "./store";
 import {
+  buildTachyonRequest,
   consoleView,
   MAX_FRAME_CHARS,
   parseTachyonEntry,
@@ -29,13 +32,13 @@ import {
  * of the window bottom. Motion is disabled under prefers-reduced-motion via the
  * `motion-reduce:` variants.
  *
- * The log has two views, chosen by the protocol the live connection speaks. A
- * TASServer connection carries wire lines, so they are shown as they arrive. A
- * Tachyon connection carries JSON frames, which read as noise on one line, so each
- * frame gets a row naming what it is and expands to the frame in full. The send box
- * belongs to the line protocol and is left out of the Tachyon view, because a wire
- * line means nothing to a Tachyon server: the connection task drops it and writes a
- * note saying so.
+ * Both halves have two views, chosen by the protocol the live connection speaks.
+ *
+ * A TASServer connection carries wire lines, so they are shown as they arrive,
+ * under a box that sends one line. A Tachyon connection carries JSON frames, which
+ * read as noise on one line, so each frame gets a row naming what it is and expands
+ * to the frame in full, under a box that takes a command id and a data object. A
+ * wire line means nothing to a Tachyon server, so that box is not offered there.
  */
 export function ConsoleDrawer({
   open,
@@ -82,7 +85,7 @@ export function ConsoleDrawer({
         <div className="flex-1 overflow-auto">
           <ConsoleLog lines={lines} protocol={protocol} />
         </div>
-        {consoleView(protocol) === "lines" && (
+        {consoleView(protocol) === "lines" ? (
           <form
             onSubmit={send}
             className="flex gap-2 border-t border-border p-3"
@@ -100,10 +103,97 @@ export function ConsoleDrawer({
               Send
             </Button>
           </form>
+        ) : (
+          <TachyonSendBox serverKey={activeKey} />
         )}
       </aside>
     </>,
     document.body,
+  );
+}
+
+/**
+ * The Tachyon send box: a command id, a data object, and what came back.
+ *
+ * It builds nothing itself. `buildTachyonRequest` turns what was typed into the
+ * two arguments `mpTachyonRequest` takes, and the envelope and its `messageId` are
+ * built by the same Rust call every other request goes through.
+ *
+ * The outcome is shown here rather than left to the log, because the outcomes that
+ * matter most are the ones the log cannot show. A frame that went out and came back
+ * is already two rows above. A request that was refused before it was sent, or that
+ * the server never answered, crossed no socket, so this line is the only sign of
+ * it. The wording is the Rust side's, which tells those two apart: a refused
+ * request reached nobody, so sending it again is safe.
+ */
+function TachyonSendBox({ serverKey }: { serverKey: string | null }) {
+  const [commandId, setCommandId] = useState("");
+  const [dataText, setDataText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  function send(e: React.FormEvent) {
+    e.preventDefault();
+    if (!serverKey || sending) return;
+
+    const built = buildTachyonRequest(commandId, dataText);
+    if (!built.ok) {
+      setError(built.error);
+      return;
+    }
+
+    setError(null);
+    setSending(true);
+    mpTachyonRequest({ serverKey, ...built.request })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : `${e}`))
+      .finally(() => setSending(false));
+  }
+
+  return (
+    <form onSubmit={send} className="space-y-2 border-t border-border p-3">
+      <div className="space-y-1">
+        <Label htmlFor="tachyon-command-id" className="text-xs">
+          Command id
+        </Label>
+        <Input
+          id="tachyon-command-id"
+          value={commandId}
+          onChange={(e) => setCommandId(e.target.value)}
+          placeholder="lobby/list"
+          disabled={!serverKey}
+          className="font-mono text-xs"
+        />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="tachyon-data" className="text-xs">
+          Data
+        </Label>
+        <Textarea
+          id="tachyon-data"
+          value={dataText}
+          onChange={(e) => setDataText(e.target.value)}
+          placeholder={'{ "id": "…" }, or leave empty'}
+          disabled={!serverKey}
+          rows={3}
+          className="font-mono text-xs"
+        />
+      </div>
+      {error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={!serverKey || sending}>
+          {sending ? "Sending…" : "Send"}
+        </Button>
+        {!serverKey ? (
+          <span className="text-xs text-muted-foreground">
+            Connect to send a request.
+          </span>
+        ) : null}
+      </div>
+    </form>
   );
 }
 
