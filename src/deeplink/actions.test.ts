@@ -62,6 +62,19 @@ describe("prepareImport", () => {
     if (r.ok) expect(r.plan.route).toContain("/content/setup-packs?import=");
   });
 
+  it("routes a scenario to the player-facing Scenarios list", () => {
+    const code = encodeContainerCode("scenario", 1, {
+      scenario: { triggers: [], zones: [] },
+      media: {},
+    });
+    const r = prepareImport(code);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.plan.kind).toBe("scenario");
+      expect(r.plan.route).toContain("/scenarios?import=");
+    }
+  });
+
   it("warns on a newer-version payload but still routes it", () => {
     const code = encodeContainerCode("preset", 99, presetPayload);
     const r = prepareImport(code);
