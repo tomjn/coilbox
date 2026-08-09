@@ -122,6 +122,31 @@ describe("scenario container round trip", () => {
     expect(id.compatibility).toBe("ok");
     expect(id.warnings).toEqual([]);
   });
+
+  it("names the game both ways when the exporting machine has it", () => {
+    const text = encodeScenarioExport(exported(), [
+      { name: "BAR", info: { shortname: "byar" } },
+    ]);
+
+    expect(identify(text).game).toEqual({ name: "BAR", shortname: "byar" });
+    expect(readScenarioExport(text).ok).toBe(true);
+  });
+
+  it("names the game by archive name alone when it isn't installed here", () => {
+    expect(identify(encodeScenarioExport(exported())).game).toEqual({
+      name: "BAR",
+    });
+  });
+
+  it("reads the game out of a scenario shared before the shared field", () => {
+    const json = encodeContainerJson("scenario", 1, {
+      scenario: scenario(),
+      media: {},
+    });
+
+    expect(identify(json).game).toEqual({ name: "BAR" });
+    expect(readScenarioExport(json).ok).toBe(true);
+  });
 });
 
 describe("readScenarioExport rejections", () => {

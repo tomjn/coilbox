@@ -4,6 +4,12 @@ import {
   CONTAINER_VERSION,
   decodeContainerText,
 } from "../container/container";
+import {
+  type GameIdentity,
+  gameIdentityForName,
+  type InstalledGameInfo,
+  parseGameIdentity,
+} from "../container/gameIdentity";
 import type { BattleRestrictions, SkirmishDraft } from "./drafts";
 
 /** Payload schema version for a preset container. */
@@ -60,6 +66,29 @@ export function useSkirmishPresets() {
   }
 
   return { presets, savePreset, touchPreset, removePreset };
+}
+
+/**
+ * What a shared preset's container payload holds: the preset, plus the game it
+ * targets in the shape every container kind uses (issue #1335).
+ *
+ * The draft's own `gameName` stays exactly where it was. It is the field the
+ * app reads and the only one a coilbox older than #1335 knows, so dropping it
+ * would break every reader for the sake of tidiness.
+ */
+export interface PresetPayload extends SkirmishPreset {
+  game?: GameIdentity;
+}
+
+/** Wrap a preset for sharing, naming its game the shared way. The shortname
+ * comes from the exporting machine's modinfo, so it is absent when the preset
+ * names a game this machine does not have. */
+export function presetPayload(
+  preset: SkirmishPreset,
+  installed: readonly InstalledGameInfo[] = [],
+): PresetPayload {
+  const game = gameIdentityForName(preset.gameName, installed);
+  return { ...preset, ...(game ? { game } : {}) };
 }
 
 /**
@@ -146,9 +175,16 @@ export function parsePresetJson(
   }
   if (typeof value !== "object" || value === null) return null;
   const d = value as Record<string, unknown>;
+  // `gameName` is what every preset written by coilbox carries. The shared
+  // `game` field is the fallback, so a preset written by something that only
+  // knows the newer spelling still imports.
+  const gameName =
+    typeof d.gameName === "string"
+      ? d.gameName
+      : parseGameIdentity(d.game)?.name;
   if (
     !Array.isArray(d.participants) ||
-    typeof d.gameName !== "string" ||
+    typeof gameName !== "string" ||
     typeof d.mapName !== "string" ||
     typeof d.startPosType !== "number" ||
     typeof d.modOptionValues !== "object" ||
@@ -157,7 +193,7 @@ export function parsePresetJson(
     return null;
   return {
     participants: d.participants as SkirmishDraft["participants"],
-    gameName: d.gameName,
+    gameName,
     mapName: d.mapName,
     startPosType: d.startPosType,
     modOptionValues: d.modOptionValues as SkirmishDraft["modOptionValues"],

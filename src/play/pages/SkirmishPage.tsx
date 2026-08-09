@@ -80,6 +80,7 @@ import { usePlay } from "../PlayProvider";
 import {
   PRESET_KIND_VERSION,
   parsePresetJson,
+  presetPayload,
   type SkirmishPreset,
   useSkirmishPresets,
 } from "../presets";
@@ -593,7 +594,11 @@ export default function SkirmishPage() {
       });
       if (!dest) return;
       await playExportPreset({
-        json: encodeContainerJson("preset", PRESET_KIND_VERSION, preset),
+        json: encodeContainerJson(
+          "preset",
+          PRESET_KIND_VERSION,
+          presetPayload(preset, games),
+        ),
         dest,
       });
     } catch (e) {
@@ -604,7 +609,11 @@ export default function SkirmishPage() {
   // Copy a preset as a coilbox://import?code= link (issue #498), an addition
   // alongside the file-export share action above, not a replacement for it.
   function onCopyPresetLink(preset: SkirmishPreset) {
-    const code = encodeContainerCode("preset", PRESET_KIND_VERSION, preset);
+    const code = encodeContainerCode(
+      "preset",
+      PRESET_KIND_VERSION,
+      presetPayload(preset, games),
+    );
     void copyDeepLink(buildImportCodeLink(code));
   }
 

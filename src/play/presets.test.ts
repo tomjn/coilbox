@@ -7,10 +7,13 @@ vi.mock("@picoframe/frame", () => ({
   useSetting: () => [undefined, () => {}],
 }));
 
+import { encodeContainerCode, identify } from "../container/container";
 import type { SkirmishDraft } from "./drafts";
 import {
+  PRESET_KIND_VERSION,
   parsePresetJson,
   presetMatchesDraft,
+  presetPayload,
   type SkirmishPreset,
 } from "./presets";
 
@@ -163,6 +166,48 @@ const asPreset = (draft: SkirmishDraft, name = "Saved"): SkirmishPreset => ({
   name,
   createdAt: "2020-01-01T00:00:00.000Z",
   lastUsedAt: "2020-01-01T00:00:00.000Z",
+});
+
+describe("presetPayload", () => {
+  const preset: SkirmishPreset = {
+    ...base,
+    id: "id-1",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    lastUsedAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  it("round-trips a shared preset that names its game both ways", () => {
+    const code = encodeContainerCode(
+      "preset",
+      PRESET_KIND_VERSION,
+      presetPayload(preset, [
+        { name: base.gameName, info: { shortname: "SF" } },
+      ]),
+    );
+    expect(identify(code).game).toEqual({
+      name: base.gameName,
+      shortname: "SF",
+    });
+    expect(parsePresetJson(code)?.gameName).toBe(base.gameName);
+  });
+
+  it("names the game by archive name alone when it isn't installed here", () => {
+    expect(presetPayload(preset, []).game).toEqual({ name: base.gameName });
+  });
+
+  it("reads the game out of a preset shared before the shared field", () => {
+    const code = encodeContainerCode("preset", 1, base);
+    expect(identify(code).game).toEqual({ name: base.gameName });
+    expect(parsePresetJson(code)?.gameName).toBe(base.gameName);
+  });
+
+  it("reads a preset that names its game only the shared way", () => {
+    const { gameName: _gameName, ...rest } = base;
+    const parsed = parsePresetJson(
+      JSON.stringify({ ...rest, game: { name: "BAR 1.2", shortname: "BAR" } }),
+    );
+    expect(parsed?.gameName).toBe("BAR 1.2");
+  });
 });
 
 describe("presetMatchesDraft", () => {

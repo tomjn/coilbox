@@ -1,3 +1,4 @@
+import type { InstalledGameInfo } from "../container/gameIdentity";
 import {
   type MediaSweepSummary,
   scenarioDelete,
@@ -205,8 +206,14 @@ export async function sweepScenarioMedia(
  * document plus every dialogue clip it references, read back off disk and
  * inlined. A clip that cannot be read is left out rather than sinking the
  * export, the way a campaign export drops a broken image.
+ *
+ * `installed` is this machine's games, used only to name the scenario's game
+ * with its modinfo shortname as well as its archive name (issue #1335).
  */
-export async function exportScenario(scenario: Scenario): Promise<string> {
+export async function exportScenario(
+  scenario: Scenario,
+  installed: readonly InstalledGameInfo[] = [],
+): Promise<string> {
   const media: Record<string, string> = {};
   await Promise.all(
     scenarioMediaFiles(scenario).map(async (file) => {
@@ -221,7 +228,7 @@ export async function exportScenario(scenario: Scenario): Promise<string> {
       }
     }),
   );
-  return encodeScenarioExport({ scenario, media });
+  return encodeScenarioExport({ scenario, media }, installed);
 }
 
 /**
