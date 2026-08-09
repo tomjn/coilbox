@@ -37,6 +37,17 @@ export function serverProtocol(server: {
   return server.protocol ?? "tasserver";
 }
 
+/**
+ * Whether a server can be offered to the user yet. Temporary scaffolding: nothing
+ * in the app can connect over Tachyon, so the Tachyon entry is defined but kept out
+ * of the catalog rather than shown as a row that fails when clicked. Delete this
+ * function and the `.filter` in {@link buildCatalog} when issue #1224 lands the
+ * Tachyon connection.
+ */
+export function serverOfferable(server: LobbyServer): boolean {
+  return serverProtocol(server) !== "tachyon";
+}
+
 /** The id assigned to an inline profile-defined official server (no natural id). */
 export const OFFICIAL_ID = "profile-official";
 
@@ -161,7 +172,8 @@ export function buildCatalog(
   const list: LobbyServer[] = [];
   if (rules.official) list.push({ ...rules.official, builtin: true });
   list.push(...builtins, ...custom);
-  return list;
+  // Temporary, see serverOfferable. Goes away with issue #1224.
+  return list.filter(serverOfferable);
 }
 
 /**

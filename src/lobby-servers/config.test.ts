@@ -27,6 +27,7 @@ import {
   OFFICIAL_ID,
   resolveProfileServerRules,
   resolveServer,
+  serverOfferable,
   serverProtocol,
   sortAccountsByRecency,
 } from "./config";
@@ -42,11 +43,10 @@ const custom: LobbyServer = {
 
 describe("allServers", () => {
   it("puts built-ins first, tagged builtin, then custom servers", () => {
+    const offered = BUILTIN_SERVERS.filter(serverOfferable);
     const all = allServers([custom]);
-    expect(all).toHaveLength(BUILTIN_SERVERS.length + 1);
-    expect(all.slice(0, BUILTIN_SERVERS.length).every((s) => s.builtin)).toBe(
-      true,
-    );
+    expect(all).toHaveLength(offered.length + 1);
+    expect(all.slice(0, offered.length).every((s) => s.builtin)).toBe(true);
     expect(all[all.length - 1]).toMatchObject({ id: "custom-1" });
   });
 
@@ -65,16 +65,6 @@ describe("resolveServer", () => {
   });
   it("returns undefined for an unknown id", () => {
     expect(resolveServer("nope", [custom])).toBeUndefined();
-  });
-
-  it("finds the BAR Tachyon built-in by id", () => {
-    const s = resolveServer("bar-tachyon", []);
-    expect(s).toMatchObject({
-      host: "server4.beyondallreason.info",
-      port: 443,
-      tls: true,
-      protocol: "tachyon",
-    });
   });
 });
 
@@ -102,8 +92,49 @@ describe("serverProtocol", () => {
       servers: [{ ...custom, id: "custom-tachyon", protocol: "tachyon" }],
     };
     const loaded: CustomServersConfig = JSON.parse(JSON.stringify(saved));
-    const server = resolveServer("custom-tachyon", loaded.servers);
-    expect(server && serverProtocol(server)).toBe("tachyon");
+    expect(serverProtocol(loaded.servers[0])).toBe("tachyon");
+  });
+});
+
+// Temporary scaffolding, see serverOfferable in config.ts. Issue #1224 lands the
+// Tachyon connection, deletes the filter, and these cases go with it.
+describe("the Tachyon built-in, defined but not offered", () => {
+  it("is in the built-in list with the Tachyon shape", () => {
+    expect(BUILTIN_SERVERS.find((s) => s.id === "bar-tachyon")).toMatchObject({
+      host: "server4.beyondallreason.info",
+      port: 443,
+      tls: true,
+      protocol: "tachyon",
+    });
+  });
+
+  it("is kept out of the catalog, so no user can select it", () => {
+    expect(allServers([]).some((s) => s.id === "bar-tachyon")).toBe(false);
+    expect(resolveServer("bar-tachyon", [])).toBeUndefined();
+  });
+
+  it("stays out when a profile preset names it", () => {
+    const out = buildCatalog([], { presets: ["bar", "bar-tachyon"] });
+    expect(out.map((s) => s.id)).toEqual(["bar"]);
+  });
+
+  it("stays out when a profile promotes it as the official server", () => {
+    const rules = resolveProfileServerRules({ official: "bar-tachyon" });
+    // The promotion still carries the protocol. Only the catalog hides it.
+    expect(rules.official).toMatchObject({ protocol: "tachyon" });
+    const out = buildCatalog([], rules);
+    expect(out.some((s) => s.id === "bar-tachyon")).toBe(false);
+  });
+
+  it("hides a hand-written custom Tachyon server too", () => {
+    const tachyonCustom: LobbyServer = {
+      ...custom,
+      id: "custom-tachyon",
+      protocol: "tachyon",
+    };
+    expect(allServers([tachyonCustom, custom]).map((s) => s.id)).not.toContain(
+      "custom-tachyon",
+    );
   });
 });
 
@@ -205,28 +236,9 @@ describe("buildCatalog", () => {
     expect(out.map((s) => s.id)).toEqual(["techa", "bar"]);
   });
 
-  it("keeps the protocol when a preset allows the Tachyon built-in", () => {
-    const out = buildCatalog([], { presets: ["bar", "bar-tachyon"] });
-    expect(out.map((s) => s.id)).toEqual(["bar", "bar-tachyon"]);
-    expect(out.map(serverProtocol)).toEqual(["tasserver", "tachyon"]);
-  });
-
-  it("drops the Tachyon built-in from a preset list that omits it", () => {
-    const out = buildCatalog([], { presets: ["bar"] });
-    expect(out.map((s) => s.id)).toEqual(["bar"]);
-  });
-
-  it("keeps the protocol when a profile promotes the Tachyon built-in", () => {
-    const rules = resolveProfileServerRules({ official: "bar-tachyon" });
-    expect(rules.official).toMatchObject({ protocol: "tachyon" });
-    const out = buildCatalog([], rules);
-    expect(out[0]).toMatchObject({
-      id: "bar-tachyon",
-      protocol: "tachyon",
-      official: true,
-      builtin: true,
-    });
-    expect(out.filter((s) => s.id === "bar-tachyon")).toHaveLength(1);
+  it("keeps the protocol on the entries it does offer", () => {
+    const out = buildCatalog([], { presets: ["bar", "techa"] });
+    expect(out.map(serverProtocol)).toEqual(["tasserver", "tasserver"]);
   });
 
   it("does not list a promoted built-in twice", () => {
