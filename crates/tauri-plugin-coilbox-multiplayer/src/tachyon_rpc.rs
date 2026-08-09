@@ -28,6 +28,16 @@
 //! their own on top, so a failed response comes back as a [`Failure`] the caller
 //! can match on rather than as a string it has to read.
 //!
+//! `command_unimplemented` is not one of those failures. Teiserver answers it for
+//! every part of the spec it has not built, which today is the whole `clan`
+//! service and a handful of other commands, so it says the feature is absent
+//! rather than that the request went wrong. It comes back as
+//! [`RequestError::Unsupported`], and the connection remembers the command so a
+//! second caller is told at once rather than after another round trip. Remembered
+//! rather than listed, because a list in the source would be wrong as soon as
+//! Teiserver caught up, and the memory lives and dies with the connection so a
+//! server that has caught up is believed on the next one.
+//!
 //! The send path is a queue rather than a straight line. The socket holds sends
 //! to eight a second against Teiserver's ten, so a burst of user actions reaches
 //! the socket faster than it can leave, and Teiserver answers a burst that gets
@@ -36,7 +46,7 @@
 //! every queued frame carries the point past which sending it is worse than not
 //! sending it.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -166,6 +176,12 @@ impl std::fmt::Display for Failure {
 /// Why a request we sent did not produce a success response.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RequestError {
+    /// This server has not built the command. Separate from
+    /// [`Failed`](Self::Failed) because nothing went wrong: the feature is
+    /// absent, so the surface that asked should hide or disable itself rather
+    /// than report an error. Also returned without going to the server at all
+    /// once this connection has seen the answer once.
+    Unsupported,
     /// The server answered, and the answer was no.
     Failed(Failure),
     /// No answer arrived inside [`REQUEST_TIMEOUT`].
@@ -184,6 +200,7 @@ pub enum RequestError {
 impl std::fmt::Display for RequestError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Unsupported => write!(f, "this server does not support that command"),
             Self::Failed(failure) => write!(f, "{failure}"),
             Self::TimedOut => write!(f, "the server did not answer in time"),
             Self::NotSent => write!(
@@ -248,6 +265,12 @@ impl Handlers {
 /// resolves it.
 type Pending = Arc<Mutex<HashMap<String, oneshot::Sender<Result<String, RequestError>>>>>;
 
+/// The commands this server has answered `command_unimplemented` for, by command
+/// id. Shared, because one caller finding out should spare every other caller the
+/// round trip, and it starts empty on every connection so a server that has
+/// caught up is asked again.
+type Unsupported = Arc<Mutex<HashSet<String>>>;
+
 /// A frame waiting for the socket.
 ///
 /// `send_by` is the point past which the connection task refuses it rather than
@@ -265,6 +288,7 @@ struct Outgoing {
 pub struct TachyonClient {
     outbound: mpsc::Sender<Outgoing>,
     pending: Pending,
+    unsupported: Unsupported,
     next_id: Arc<AtomicU64>,
 }
 
@@ -287,6 +311,12 @@ impl TachyonClient {
         command_id: &str,
         data: Option<Value>,
     ) -> Result<String, RequestError> {
+        // Asking again would cost a round trip, a place in the send queue and a
+        // token from the rate limiter, to be told the same thing.
+        if self.is_unsupported(command_id) {
+            return Err(RequestError::Unsupported);
+        }
+
         let deadline = Instant::now() + REQUEST_TIMEOUT;
         let send_by = deadline - MIN_ANSWER_WINDOW;
 
@@ -334,6 +364,19 @@ impl TachyonClient {
         }
     }
 
+    /// Whether this server has already said it has not built `command_id`.
+    ///
+    /// This is how a surface turns itself off without making the user find out
+    /// the hard way, so a screen whose one command is unsupported can hide
+    /// instead of showing an error. It only knows what the connection has been
+    /// told, so it is false until something asks once. Tachyon has no command
+    /// that lists what a server implements, so the alternative would be a probe
+    /// request per feature at connect time, which is a round trip and a rate
+    /// limit token each to learn something the first real use learns for free.
+    pub fn is_unsupported(&self, command_id: &str) -> bool {
+        lock_or_recover(&self.unsupported).contains(command_id)
+    }
+
     /// How many requests are waiting for an answer. Tests use this to prove an
     /// abandoned request leaves nothing behind.
     #[cfg(test)]
@@ -372,12 +415,21 @@ pub fn spawn(
 ) -> (TachyonClient, JoinHandle<WsError>) {
     let (tx, rx) = mpsc::channel::<Outgoing>(SEND_QUEUE_DEPTH);
     let pending: Pending = Arc::new(Mutex::new(HashMap::new()));
+    let unsupported: Unsupported = Arc::new(Mutex::new(HashSet::new()));
     let client = TachyonClient {
         outbound: tx,
         pending: pending.clone(),
+        unsupported: unsupported.clone(),
         next_id: Arc::new(AtomicU64::new(1)),
     };
-    let task = tokio::spawn(run_loop(socket, handlers, inbound, pending, rx));
+    let task = tokio::spawn(run_loop(
+        socket,
+        handlers,
+        inbound,
+        pending,
+        unsupported,
+        rx,
+    ));
     (client, task)
 }
 
@@ -392,6 +444,7 @@ async fn run_loop(
     handlers: Handlers,
     inbound: mpsc::UnboundedSender<String>,
     pending: Pending,
+    unsupported: Unsupported,
     mut outbound: mpsc::Receiver<Outgoing>,
 ) -> WsError {
     let ended = loop {
@@ -402,7 +455,7 @@ async fn run_loop(
                     Ok(raw) => raw,
                     Err(e) => break e,
                 };
-                if let Some(answer) = route(&raw, &pending, &handlers, &inbound) {
+                if let Some(answer) = route(&raw, &pending, &unsupported, &handlers, &inbound) {
                     if let Err(e) = socket.send(&answer).await {
                         break e;
                     }
@@ -438,6 +491,7 @@ async fn run_loop(
 fn route(
     raw: &str,
     pending: &Pending,
+    unsupported: &Unsupported,
     handlers: &Handlers,
     inbound: &mpsc::UnboundedSender<String>,
 ) -> Option<String> {
@@ -450,12 +504,19 @@ fn route(
 
     match envelope.kind {
         MessageKind::Response => {
+            let outcome = outcome(raw);
+            // Note it before looking the caller up, so a command the user gave up
+            // waiting on still teaches the connection that this server has not
+            // built it.
+            if outcome == Err(RequestError::Unsupported) {
+                lock_or_recover(unsupported).insert(envelope.command_id);
+            }
             // A response for an id we are not waiting on is dropped. That is the
             // normal outcome once a request of ours has timed out.
             if let Some(waiting) = lock_or_recover(pending).remove(&envelope.message_id) {
                 // The receiver is gone if the caller stopped waiting, which is
                 // not our problem.
-                let _ = waiting.send(outcome(raw));
+                let _ = waiting.send(outcome);
             }
             None
         }
@@ -518,12 +579,28 @@ fn fail_pending(pending: &Pending, ended: &WsError) {
 /// Only a well-formed failure becomes a [`Failure`]. Everything else is handed
 /// over whole, including a response we cannot make sense of, because the caller
 /// knows the command and its generated type will say what is wrong with it.
+///
+/// `command_unimplemented` leaves here as [`RequestError::Unsupported`] instead,
+/// which is why a caller never sees it as a [`FailureReason`]. The two say
+/// different things and a caller acts differently on each, so there is one way to
+/// say each of them.
+///
+/// The reason is read as the string it is on the wire, so a reason a newer server
+/// has and we have never heard of arrives as
+/// [`FailureReason::Other`](FailureReason::Other) with the response intact. The
+/// generated per-command types cannot do that: their reason enums are closed, so
+/// an unknown value fails the whole parse.
 fn outcome(raw: &str) -> Result<String, RequestError> {
     match serde_json::from_str::<FailedResponse>(raw) {
-        Ok(failed) if failed.status == "failed" => Err(RequestError::Failed(Failure {
-            reason: FailureReason::from_wire(&failed.reason),
-            details: failed.details,
-        })),
+        Ok(failed) if failed.status == "failed" => {
+            Err(match FailureReason::from_wire(&failed.reason) {
+                FailureReason::CommandUnimplemented => RequestError::Unsupported,
+                reason => RequestError::Failed(Failure {
+                    reason,
+                    details: failed.details,
+                }),
+            })
+        }
         _ => Ok(raw.to_string()),
     }
 }
@@ -781,6 +858,45 @@ mod tests {
             })
         );
         assert_eq!(client.pending_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_reason_a_newer_server_invented_still_arrives_as_a_failure() {
+        // Teiserver is free to be ahead of the vendored schema. A reason we have
+        // never heard of has to reach the caller as the refusal it is, with the
+        // server's own words for it, rather than as an unreadable response.
+        let url = serve(|mut ws| async move {
+            let request = next_json(&mut ws).await;
+            ws.send(Message::text(
+                json!({
+                    "type": "response",
+                    "messageId": request["messageId"],
+                    "commandId": "lobby/join",
+                    "status": "failed",
+                    "reason": "lobby_hibernating",
+                    "details": "try again in a moment",
+                })
+                .to_string(),
+            ))
+            .await
+            .unwrap();
+            std::future::pending::<()>().await;
+        })
+        .await;
+
+        let (client, _task, _inbound) = start(&url, Handlers::new()).await;
+        let err = client.request("lobby/join", None).await.unwrap_err();
+        assert_eq!(
+            err,
+            RequestError::Failed(Failure {
+                reason: FailureReason::Other("lobby_hibernating".into()),
+                details: Some("try again in a moment".into()),
+            })
+        );
+        assert_eq!(err.to_string(), "lobby_hibernating: try again in a moment");
+        // A reason nobody planned for is still a failure of that command, not a
+        // reason to stop asking for it.
+        assert!(!client.is_unsupported("lobby/join"));
     }
 
     #[test]
@@ -1198,5 +1314,76 @@ mod tests {
         assert_eq!(answer["messageId"], "srv-2");
         assert_eq!(answer["status"], "failed");
         assert_eq!(answer["reason"], "command_unimplemented");
+    }
+
+    /// A server behind the spec: it answers `command_unimplemented` to
+    /// everything, and reports each command id so a test can count the round
+    /// trips it cost.
+    async fn unimplementing_server(seen: mpsc::UnboundedSender<String>) -> String {
+        serve(|mut ws| async move {
+            while let Some(Ok(frame)) = ws.next().await {
+                let Message::Text(text) = frame else { continue };
+                let request: Value = serde_json::from_str(&text).unwrap();
+                let _ = seen.send(request["commandId"].as_str().unwrap().to_string());
+                ws.send(Message::text(
+                    json!({
+                        "type": "response",
+                        "messageId": request["messageId"],
+                        "commandId": request["commandId"],
+                        "status": "failed",
+                        "reason": "command_unimplemented",
+                    })
+                    .to_string(),
+                ))
+                .await
+                .unwrap();
+            }
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn a_command_the_server_has_not_built_is_its_own_outcome() {
+        // Teiserver answers this for the whole clan service and a handful of
+        // other commands. It is the feature being absent, not the request going
+        // wrong, and a caller acts differently on each.
+        let (seen_tx, _seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = unimplementing_server(seen_tx).await;
+        let (client, _task, _inbound) = start(&url, Handlers::new()).await;
+
+        assert!(!client.is_unsupported("clan/create"));
+        let err = client.request("clan/create", None).await.unwrap_err();
+        assert_eq!(err, RequestError::Unsupported);
+        assert_eq!(err.to_string(), "this server does not support that command");
+        assert!(client.pending_count() == 0);
+        // Which the connection now knows, so a surface can hide itself rather
+        // than wait for the user to try it again.
+        assert!(client.is_unsupported("clan/create"));
+    }
+
+    #[tokio::test]
+    async fn a_command_already_answered_unsupported_is_not_asked_again() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = unimplementing_server(seen_tx).await;
+        let (client, _task, _inbound) = start(&url, Handlers::new()).await;
+
+        let first = client.request("clan/create", None).await;
+        assert_eq!(first, Err(RequestError::Unsupported));
+        assert_eq!(soon(&mut seen_rx).await, "clan/create");
+
+        // The same answer, without the round trip or the rate limit token it
+        // would have cost.
+        let again = client.request("clan/create", None).await;
+        assert_eq!(again, Err(RequestError::Unsupported));
+
+        // Only that command, though. Another one is still asked, so one absent
+        // feature cannot switch off the rest.
+        let other = client.request("user/report", None).await;
+        assert_eq!(other, Err(RequestError::Unsupported));
+        assert_eq!(soon(&mut seen_rx).await, "user/report");
+        assert!(
+            seen_rx.try_recv().is_err(),
+            "the second clan/create went to the server after all"
+        );
     }
 }
