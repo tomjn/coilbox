@@ -33,11 +33,16 @@ function BattlesPage() {
   const {
     mirror,
     activeKey,
+    protocol,
     busy,
     lastJoinError,
     clearJoinError,
     openLoginPopover,
   } = useMultiplayer();
+  // Under Tachyon the server allocates a dedicated autohost and a client cannot
+  // open a battle at all, so the host popover goes rather than failing on use.
+  // See `docs/tachyon-protocol.md`.
+  const canHost = protocol !== "tachyon";
   const [filters, setFilters] = useBattleFilters();
 
   const all = useMemo(
@@ -216,14 +221,16 @@ function BattlesPage() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <HostBattlePopover
-            disabled={!canJoin}
-            onHost={onHost}
-            initialMap={hostDraft?.mapName ?? hostMap}
-            initialGame={hostDraft?.gameName}
-            initialTitle={hostState?.hostTitle}
-            autoOpen={!!hostMap || !!hostDraft}
-          />
+          {canHost && (
+            <HostBattlePopover
+              disabled={!canJoin}
+              onHost={onHost}
+              initialMap={hostDraft?.mapName ?? hostMap}
+              initialGame={hostDraft?.gameName}
+              initialTitle={hostState?.hostTitle}
+              autoOpen={!!hostMap || !!hostDraft}
+            />
+          )}
           <BattleFilterPopover filters={filters} setFilters={setFilters} />
         </div>
       </header>

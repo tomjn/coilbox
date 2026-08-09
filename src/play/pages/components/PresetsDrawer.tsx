@@ -63,8 +63,9 @@ export function PresetsDrawer({
    * current Skirmish setup. */
   onSaveFromReplay: (name: string, draft: SkirmishDraft) => void;
   /** "Host as battle" (#373): take this preset online without loading it into
-   * the page first. */
-  onHostAsBattle: (preset: SkirmishPreset) => void;
+   * the page first. Absent where hosting is impossible, which is what hides the
+   * action on a Tachyon connection (see `docs/tachyon-protocol.md`). */
+  onHostAsBattle?: (preset: SkirmishPreset) => void;
   disabled?: boolean;
 }) {
   const [naming, setNaming] = useState(false);
@@ -229,16 +230,18 @@ export function PresetsDrawer({
                           </div>
                         </button>
                         <div className="flex items-center gap-1 pr-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => onHostAsBattle(p)}
-                            disabled={disabled}
-                            aria-label={`Host ${p.name} as a battle`}
-                            title="Host as battle"
-                          >
-                            <Swords className="size-4" />
-                          </Button>
+                          {onHostAsBattle && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onHostAsBattle(p)}
+                              disabled={disabled}
+                              aria-label={`Host ${p.name} as a battle`}
+                              title="Host as battle"
+                            >
+                              <Swords className="size-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
