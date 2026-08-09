@@ -4,6 +4,7 @@ import { computeMissingRequirements } from "../content/resolveContent";
 import { parseScenario, type Scenario } from "./model";
 import {
   dropMissingDialogueMedia,
+  encodeScenarioCode,
   encodeScenarioExport,
   readScenarioExport,
   scenarioContentRequirements,
@@ -121,6 +122,76 @@ describe("scenario container round trip", () => {
     expect(id.kind).toBe("scenario");
     expect(id.compatibility).toBe("ok");
     expect(id.warnings).toEqual([]);
+  });
+});
+
+describe("encodeScenarioCode", () => {
+  /** A clip of `bytes` real bytes, as random as an already-compressed one. */
+  function clip(bytes: number): string {
+    const buf = new Uint8Array(bytes);
+    for (let i = 0; i < bytes; i += 65536) {
+      crypto.getRandomValues(buf.subarray(i, Math.min(i + 65536, bytes)));
+    }
+    return `data:audio/ogg;base64,${Buffer.from(buf).toString("base64")}`;
+  }
+
+  it("produces a code that reads back as the same scenario", () => {
+    const result = encodeScenarioCode(exported());
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.code.startsWith("cbz1.")).toBe(true);
+    const read = readScenarioExport(result.code);
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.payload.scenario).toEqual(scenario());
+    expect(read.payload.media).toEqual({ "a.png": PORTRAIT, "a.ogg": VOICE });
+  });
+
+  it("identifies a pasted code as a scenario", () => {
+    const result = encodeScenarioCode(exported());
+    if (!result.ok) throw new Error("expected a code");
+
+    expect(identify(result.code).kind).toBe("scenario");
+  });
+
+  // The point of the check: a scenario whose clips push it past the ceiling
+  // must be refused while the author can still choose the file instead, not
+  // handed out as a code that fails to inflate on someone else's machine.
+  it("refuses a scenario whose dialogue clips are too big, and says why", () => {
+    const result = encodeScenarioCode({
+      scenario: scenario(),
+      media: { "a.png": PORTRAIT, "a.ogg": clip(400 * 1024) },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.message).toContain("2 dialogue clips");
+    expect(result.message).toContain("512 KB");
+    expect(result.message).toContain("file");
+  });
+
+  it("blames nothing but the size when the scenario carries no clips", () => {
+    const result = encodeScenarioCode({
+      scenario: scenario({
+        description: "x".repeat(600 * 1024),
+        dialogue: [],
+      }),
+      media: {},
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.message).not.toContain("dialogue");
+  });
+
+  it("still encodes a scenario whose clips sit just under the ceiling", () => {
+    const result = encodeScenarioCode({
+      scenario: scenario({ dialogue: [] }),
+      media: { "a.ogg": clip(300 * 1024) },
+    });
+
+    expect(result.ok).toBe(true);
   });
 });
 

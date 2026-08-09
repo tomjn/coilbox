@@ -4,12 +4,14 @@ import {
   type OpenError,
   type OpenResult,
   readContainer,
+  tryEncodeContainerCode,
 } from "../container/container";
 import {
   type ContentRequirement,
   exactGameRequirement,
   exactMapRequirement,
 } from "../content/resolveContent";
+import { formatBytes } from "../content/rapidPool";
 import { parseScenario, type Scenario } from "./model";
 
 /**
@@ -133,6 +135,49 @@ export function parseScenarioPayload(value: unknown): ScenarioExport | null {
 /** Serialize a scenario and its dialogue media as an export file's text. */
 export function encodeScenarioExport(exported: ScenarioExport): string {
   return encodeContainerJson("scenario", SCENARIO_KIND_VERSION, exported);
+}
+
+/** A pasteable scenario code, or why this scenario cannot have one. */
+export type ScenarioCode =
+  | { ok: true; code: string }
+  | { ok: false; message: string };
+
+/**
+ * Encode a scenario as a pasteable code, the way a preset, a challenge and a
+ * setup pack all are (issue #1336), or refuse when the result would be too big
+ * to decode.
+ *
+ * Scenarios are the one shareable kind with no upper bound on size, because the
+ * export carries the dialogue portraits and voice clips inline as `data:` URIs.
+ * Measured against the Silence the Jericho mission: the document alone is 7,146
+ * bytes and a 3,128 character code, and the same document copied out to 581
+ * triggers and 332 zones is still only an 18,000 character code. Prose and ids
+ * compress roughly 30 to 1, so no realistic amount of authoring reaches the
+ * ceiling. Media does: 380 KB of clips passes it on its own, because base64
+ * costs a third on top and a portrait or a voice clip is already compressed, so
+ * DEFLATE wins nothing back.
+ *
+ * So the refusal is real rather than theoretical, and it has to happen here
+ * rather than on import. A code that has already been pasted into Discord is
+ * past the point where anyone can fix it.
+ */
+export function encodeScenarioCode(exported: ScenarioExport): ScenarioCode {
+  const result = tryEncodeContainerCode(
+    "scenario",
+    SCENARIO_KIND_VERSION,
+    exported,
+  );
+  if (result.ok) return result;
+
+  const clips = Object.keys(exported.media).length;
+  const because =
+    clips > 0
+      ? ` Its ${clips} dialogue ${clips === 1 ? "clip travels" : "clips travel"} inside the export, which is most of that.`
+      : "";
+  return {
+    ok: false,
+    message: `This scenario is ${formatBytes(result.bytes)}, past the ${formatBytes(result.limit)} a share code can carry.${because} Export it as a file and send that instead.`,
+  };
 }
 
 /**
