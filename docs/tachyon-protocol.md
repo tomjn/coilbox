@@ -389,7 +389,9 @@ The pipeline mirrors the TASServer one, with one extra step.
 3. `reduce_at(&mut LobbyState, TachyonMessage, now_ms) -> Vec<Delta>` folds it into the shared state and reports what moved.
 4. Each `Delta` goes down the existing `tauri::ipc::Channel<LobbyEvent>` and the React store calls `mp_snapshot`.
 
-The merge patch application sits inside step 3, not step 2. Parsing produces the patch as a typed structure. Reduction applies it against the current `LobbyState`, because that is where the current state lives and where the resulting deltas can be computed by comparing before and after.
+The merge patch application sits inside step 3, not step 2. Parsing produces the patch as a typed structure, and reduction applies it, because that is where the deltas can be worked out by comparing before and after.
+
+The patch is applied to the Tachyon lobby type, the generated counterpart of `lobbyDetails`, which the connection holds as the authoritative Tachyon-side lobby. It is not applied to `LobbyState` directly. A patch is shaped exactly like `lobbyDetails` and nothing like our `Battle` struct, so patching `LobbyState` would mean translating every field by hand. Projecting the Tachyon lobby into `LobbyState` is a separate step, and a separate function that can be tested on its own.
 
 Apply merge patches directly against our own typed state, not against a stored `serde_json::Value` mirror. Keeping a shadow JSON document and re-deserialising it on every event would be simpler to write and much harder to reason about, and it would put an untyped copy of the lobby next to the typed one. Instead, each patch type from `tachyon:src/schema/lobby/updated.ts` is a struct of `Option` fields where the RFC 7386 `null` becomes an explicit "remove" case. That distinction, absent field versus present-and-null, is the whole trick, and needs a small helper type since `Option<Option<T>>` with serde does not express it correctly by default.
 
