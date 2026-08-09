@@ -1529,6 +1529,23 @@ mod tests {
         .await
     }
 
+    /// Wait until `users` can name `name`. A message is addressed by user id,
+    /// so a send queued before the server has said who anyone is has nobody to
+    /// address.
+    async fn wait_for_user(
+        registry: &Registry,
+        rx: &mut mpsc::UnboundedReceiver<Value>,
+        name: &str,
+    ) {
+        loop {
+            let state = lock_or_recover(registry)["alice@bar:443"].state.clone();
+            if lock_or_recover(&state).users.contains_key(name) {
+                return;
+            }
+            wait_for(rx, "delta").await;
+        }
+    }
+
     /// The thread `dms` holds for `peer`, once it has something in it.
     async fn thread_for(
         registry: &Registry,
@@ -1551,7 +1568,7 @@ mod tests {
         let url = chat_server(seen_tx, json!({ "type": "response", "status": "success" })).await;
         let registry = Registry::default();
         let mut rx = connect(&registry, "alice@bar:443", &url).await;
-        wait_for(&mut rx, "phase").await;
+        wait_for_user(&registry, &mut rx, "bob").await;
 
         sender(&registry, "alice@bar:443")
             .send(Outbound::Tachyon(TachyonAction::Say {
@@ -1583,7 +1600,7 @@ mod tests {
         .await;
         let registry = Registry::default();
         let mut rx = connect(&registry, "alice@bar:443", &url).await;
-        wait_for(&mut rx, "phase").await;
+        wait_for_user(&registry, &mut rx, "bob").await;
 
         sender(&registry, "alice@bar:443")
             .send(Outbound::Tachyon(TachyonAction::Say {
