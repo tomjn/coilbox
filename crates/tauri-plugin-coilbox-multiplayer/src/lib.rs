@@ -15,6 +15,7 @@ mod probe;
 /// The OAuth browser sign-in that produces a Tachyon bearer token.
 pub mod tachyon_auth;
 mod tachyon_conn;
+mod tachyon_lobbies;
 /// Matching Tachyon responses to requests, over the transport below.
 pub mod tachyon_rpc;
 mod tachyon_users;
