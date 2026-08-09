@@ -125,7 +125,7 @@ function playReverb() {
 // The gong + shake are non-verbal, so announce the ring to assistive tech via a
 // single reused visually-hidden live region.
 let liveRegion: HTMLElement | null = null;
-function announce(from?: string) {
+function announce(text: string) {
   if (!liveRegion) {
     liveRegion = document.createElement("div");
     liveRegion.setAttribute("aria-live", "assertive");
@@ -134,7 +134,7 @@ function announce(from?: string) {
       "position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;";
     document.body.appendChild(liveRegion);
   }
-  liveRegion.textContent = from ? `Rung by ${from}` : "Rung by the host";
+  liveRegion.textContent = text;
 }
 
 function flashTaskbar() {
@@ -146,14 +146,23 @@ function flashTaskbar() {
 }
 
 /**
+ * Fire every ring affordance, saying what for. Anything that has to reach a
+ * player who may have wandered off uses this: an autohost ring, and a
+ * matchmaking match found, which runs on a countdown nobody can afford to miss.
+ */
+export function triggerAttention(announcement: string) {
+  playGong();
+  playReverb();
+  flashTaskbar();
+  announce(announcement);
+}
+
+/**
  * Fire every ring affordance. Called from the lobby event handler on a `Delta::Ring`.
  * `from` is the ringing user (usually the autohost).
  */
 export function triggerRing(from?: string) {
-  playGong();
-  playReverb();
-  flashTaskbar();
-  announce(from);
+  triggerAttention(from ? `Rung by ${from}` : "Rung by the host");
 }
 
 // Dev-only hook so the effect can be exercised from devtools / tauri-mcp `execute_js`

@@ -195,6 +195,50 @@ export interface Party {
   maxMembers: number;
 }
 
+/** One queue a player can search in (mirrors `MatchQueue`). */
+export interface MatchQueue {
+  /** The server's id, which is what a search names. */
+  id: string;
+  /** What to call it on screen, such as "Duel". */
+  name: string;
+  /** How many teams play, and how many players are on each. */
+  teams: number;
+  teamSize: number;
+  /** Whether a result here counts towards a rating. */
+  ranked: boolean;
+  /** What a match out of this queue can be played on, by the names the content
+   * scan knows them under. */
+  maps: string[];
+  games: string[];
+  engines: string[];
+}
+
+/** A match the server has put together and is waiting on (mirrors `MatchFound`). */
+export interface MatchFound {
+  queueId: string;
+  /** Unix millis by which every player has to have accepted. */
+  readyBy: number;
+  /** How many have accepted so far, from `matchmaking/foundUpdate`. */
+  readyCount: number;
+  /** Whether we have accepted. */
+  readied: boolean;
+}
+
+/**
+ * Where this connection is in matchmaking (mirrors `Matchmaking`). Tachyon only,
+ * so a TASServer connection leaves it at its default.
+ */
+export interface Matchmaking {
+  /** False once the server has answered `command_unimplemented`, which is how one
+   * that has not built matchmaking says so. */
+  supported: boolean;
+  queues: MatchQueue[];
+  /** The ids of the queues we are searching in. A party member's search puts us
+   * in queues we never asked about. */
+  searching: string[];
+  found: MatchFound | null;
+}
+
 export interface LobbyState {
   myUsername: string | null;
   compflags: string[];
@@ -220,6 +264,8 @@ export interface LobbyState {
   party: Party | null;
   /** The parties we have been invited to and not yet answered. */
   partyInvites: Party[];
+  /** Where we are in matchmaking. At its default on TASServer, which has none. */
+  matchmaking: Matchmaking;
 }
 
 /**
@@ -287,7 +333,8 @@ export type Delta =
   | { kind: "serverIgnoreList"; ignores: string[] }
   | { kind: "friendsChanged" }
   | { kind: "friendRequestsChanged" }
-  | { kind: "partyChanged" };
+  | { kind: "partyChanged" }
+  | { kind: "matchmakingChanged" };
 
 /** An event streamed over the connect `Channel` (mirrors `LobbyEvent`). */
 export type LobbyEvent =
@@ -651,6 +698,32 @@ export const mpPartyDeclineInvite = defineCommand<
   { serverKey: string; partyId: string },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_party_decline_invite");
+
+/** Tachyon only: fetch the queues on offer. The connection asks once as it comes
+ * up, so this is the screen asking again. */
+export const mpMatchmakingList = defineCommand<
+  { serverKey: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_matchmaking_list");
+
+/** Tachyon only: start searching in one queue. A party searches as one, so this
+ * puts every member of yours in it. */
+export const mpMatchmakingQueue = defineCommand<
+  { serverKey: string; queueId: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_matchmaking_queue");
+
+/** Tachyon only: accept the match the server has found. */
+export const mpMatchmakingReady = defineCommand<
+  { serverKey: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_matchmaking_ready");
+
+/** Tachyon only: stop searching, or turn down a match that has been found. */
+export const mpMatchmakingCancel = defineCommand<
+  { serverKey: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_matchmaking_cancel");
 
 export const mpJoinBattle = defineCommand<
   {

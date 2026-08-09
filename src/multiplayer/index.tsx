@@ -2,6 +2,7 @@ import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   AtSign,
   BarChart3,
+  Crosshair,
   Download,
   Gamepad2,
   LogIn,
@@ -20,6 +21,7 @@ import {
   useBattleRoomLabel,
   useMpDisconnected,
   useMpInBattle,
+  useMpMatchmaking,
   useMpRevealed,
 } from "./store";
 
@@ -76,12 +78,22 @@ const multiplayerPlugin: FramePlugin = {
           useVisible: useMpRevealed,
         },
         {
+          id: "multiplayer.matchmaking",
+          label: "Matchmaking",
+          to: "/matchmaking",
+          end: true,
+          order: 3,
+          icon: Crosshair,
+          // Tachyon only, because TASServer has no matchmaking at all.
+          useVisible: useMpMatchmaking,
+        },
+        {
           id: "multiplayer.battle",
           // Static fallback; the live battle title comes from `useLabel`.
           label: "Battle Room",
           to: "/battle",
           end: true,
-          order: 3,
+          order: 4,
           icon: Gamepad2,
           // Only while in a battle; label tracks the joined battle's title.
           useVisible: useMpInBattle,
@@ -93,7 +105,7 @@ const multiplayerPlugin: FramePlugin = {
           id: "multiplayer.stats",
           label: "Player stats",
           to: "/stats",
-          order: 4,
+          order: 5,
           icon: BarChart3,
           // A distribution profile can hide the stats view like any other nav item.
           useVisible: () => !isProfileHidden("multiplayer.stats"),
@@ -116,6 +128,11 @@ const multiplayerPlugin: FramePlugin = {
       path: "battles",
       lazy: () => import("./pages/BattlesPage"),
       crumb: "Battles",
+    },
+    {
+      path: "matchmaking",
+      lazy: () => import("./pages/MatchmakingPage"),
+      crumb: "Matchmaking",
     },
     {
       path: "chatlogs",
