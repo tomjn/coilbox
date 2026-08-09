@@ -93,7 +93,9 @@ describe("container envelope", () => {
     const result = tryEncodeContainerCode("scenario", 1, { hello: "world" });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.code).toBe(encodeContainerCode("scenario", 1, { hello: "world" }));
+    expect(result.code).toBe(
+      encodeContainerCode("scenario", 1, { hello: "world" }),
+    );
     expect(asContainer(decodeContainerText(result.code))?.payload).toEqual({
       hello: "world",
     });
