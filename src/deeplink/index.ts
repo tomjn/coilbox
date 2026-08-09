@@ -15,8 +15,9 @@ import ImportSection from "./pages/ImportSection";
  *
  * The box is a settings section at `/settings/import` rather than a sidebar
  * item. Importing a shared thing is a rare, one-off act, and the sidebar is
- * where you go to do the thing you came for. When coilbox grows a hub screen of
- * its own, the box belongs there and this stops being the front door.
+ * where you go to do the thing you came for. It stays here now the hub screen
+ * exists (issue #1347): a profile can switch the hub off, and somebody handed a
+ * link still needs somewhere to paste it when it is.
  *
  * The settings Component is imported eagerly (not lazy): the frame settings page
  * renders it directly without a Suspense boundary.
