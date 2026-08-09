@@ -1194,6 +1194,21 @@ async fn content_import_challenge(src: String) -> Result<CliResult, ()> {
     })
 }
 
+/// `content_import_container`, read whatever coilbox `.json` the user picked in
+/// the one import box (issue #1333) and hand its raw text back.
+///
+/// The box does not know what kind the file holds until the frontend's
+/// `identify()` has looked at it, so this cannot be any one kind's import
+/// command. It is the same read as `content_import_challenge` without the
+/// assumption about what is inside.
+#[tauri::command]
+async fn content_import_container(src: String) -> Result<CliResult, ()> {
+    Ok(match std::fs::read_to_string(&src) {
+        Ok(text) => CliResult::ok(json!({ "text": text })),
+        Err(e) => CliResult::err(format!("could not read that file: {e}")),
+    })
+}
+
 /// `branding_catalog`, answer with the branding catalog JSON already on disk (the
 /// cache, else the bundled seed), refetching in the background when that copy is
 /// past its TTL. Returns the raw JSON text. The frontend parses and matches it, so
@@ -1452,6 +1467,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_export_build_tree_zip,
             content_export_challenge,
             content_import_challenge,
+            content_import_container,
             branding_catalog,
             branding_image
         ])
