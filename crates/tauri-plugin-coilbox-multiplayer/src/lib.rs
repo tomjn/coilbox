@@ -18,6 +18,8 @@ mod tachyon_conn;
 /// The console drawer's send path, the one place a request is sent by hand.
 mod tachyon_debug;
 mod tachyon_lobbies;
+/// Direct messages and lobby chat, which is all the chat Tachyon has.
+mod tachyon_messaging;
 /// The lobby we are in, held as Tachyon describes it and projected into the
 /// battle room.
 mod tachyon_room;
@@ -44,6 +46,8 @@ use coilbox_lobby_protocol::{
 use conn::{spawn_connection, LobbyEvent, Outbound, Registry, TachyonAction};
 use picoframe_core::CliResult;
 use serde_json::{json, Value};
+use tachyon_conn::TachyonMarkers;
+use tachyon_messaging::Conversation;
 use tachyon_room::RoomAction;
 use tauri::{
     ipc::Channel,
@@ -329,6 +333,7 @@ async fn mp_register<R: Runtime>(
 async fn mp_connect_tachyon(
     registry: State<'_, Registry>,
     pending: State<'_, PendingConnects>,
+    markers: State<'_, TachyonMarkers>,
     server_key: String,
     host: String,
     port: u16,
@@ -376,7 +381,13 @@ async fn mp_connect_tachyon(
         Err(e) => return Ok(CliResult::err(e.to_string())),
     };
 
-    tachyon_conn::spawn_connection(registry.inner().clone(), server_key, socket, on_event);
+    tachyon_conn::spawn_connection(
+        registry.inner().clone(),
+        server_key,
+        socket,
+        on_event,
+        markers.inner().clone(),
+    );
     Ok(CliResult::ok(json!({ "connected": true })))
 }
 
@@ -507,6 +518,18 @@ fn mp_say_private(
     username: String,
     message: String,
 ) -> CliResult {
+    // On a Tachyon connection this becomes `messaging/send` to the player, and
+    // the line is recorded once the server has taken it rather than before.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Say {
+            conversation: Conversation::Peer(username.clone()),
+            text: message.clone(),
+        },
+    ) {
+        return result;
+    }
     let map = lock_or_recover(&registry);
     match map.get(&server_key) {
         Some(conn) => match conn.tx.send(Outbound::SayPrivate {
@@ -525,6 +548,18 @@ fn mp_say_private(
 /// which the reducer parks in the battle's synthetic `__battle__<id>` bucket.
 #[tauri::command]
 fn mp_say_battle(registry: State<'_, Registry>, server_key: String, message: String) -> CliResult {
+    // On a Tachyon connection this becomes `messaging/send` to the lobby, which
+    // is the nearest thing it has to battle chat.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Say {
+            conversation: Conversation::Lobby,
+            text: message.clone(),
+        },
+    ) {
+        return result;
+    }
     enqueue(registry.inner(), &server_key, command::say_battle(&message))
 }
 
@@ -552,6 +587,18 @@ fn mp_say_battle_ex(
     server_key: String,
     message: String,
 ) -> CliResult {
+    // Tachyon has one kind of message and no action form, so a `/me` goes out
+    // as its body and reads the same to everyone, us included.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Say {
+            conversation: Conversation::Lobby,
+            text: message.clone(),
+        },
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -569,6 +616,17 @@ fn mp_say_private_ex(
     username: String,
     message: String,
 ) -> CliResult {
+    // Tachyon has no action form, so a private `/me` is sent as its body.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Say {
+            conversation: Conversation::Peer(username.clone()),
+            text: message.clone(),
+        },
+    ) {
+        return result;
+    }
     let map = lock_or_recover(&registry);
     match map.get(&server_key) {
         Some(conn) => match conn.tx.send(Outbound::SayPrivateEx {
@@ -1636,6 +1694,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .setup(|app, _api| {
             app.manage(Registry::default());
             app.manage(PendingConnects::default());
+            app.manage(TachyonMarkers::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

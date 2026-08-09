@@ -899,7 +899,13 @@ fn parse_chanserv_info(
     Some((channel, founder, operators))
 }
 
-fn push_chat(state: &mut LobbyState, channel: &str, msg: ChatMsg) -> Vec<Delta> {
+/// Append a message to a channel's log, creating the channel bucket if it is not
+/// there, and emit the delta naming where it landed.
+///
+/// Public because Tachyon has no channels and no `SAID` echo, so
+/// `tauri-plugin-coilbox-multiplayer` puts lobby chat into the joined battle's
+/// synthetic bucket itself rather than through a line.
+pub fn push_chat(state: &mut LobbyState, channel: &str, msg: ChatMsg) -> Vec<Delta> {
     let ch = state
         .channels
         .entry(channel.to_string())
@@ -917,7 +923,11 @@ fn push_chat(state: &mut LobbyState, channel: &str, msg: ChatMsg) -> Vec<Delta> 
 
 /// Append a message to a DM thread keyed by `peer` (the other party), emitting a
 /// `PrivateMessage` delta naming that thread.
-fn push_dm(state: &mut LobbyState, peer: &str, msg: ChatMsg) -> Vec<Delta> {
+///
+/// Public for the same reason as [`push_chat`]: a Tachyon direct message arrives
+/// as a `messaging/received` event rather than as a line, so the plugin files it
+/// into the thread itself.
+pub fn push_dm(state: &mut LobbyState, peer: &str, msg: ChatMsg) -> Vec<Delta> {
     state.dms.entry(peer.to_string()).or_default().push(msg);
     vec![Delta::PrivateMessage {
         from: peer.to_string(),

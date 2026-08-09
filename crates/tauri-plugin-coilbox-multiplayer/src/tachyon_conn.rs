@@ -17,14 +17,17 @@
 //! the correlator hands up is folded through [`crate::tachyon_users`], which
 //! populates `users` and `my_username`, through [`crate::tachyon_lobbies`],
 //! which populates `battles`, and through [`crate::tachyon_room`], which
-//! populates `current_battle` and the joined lobby's detail. Chat and friends
-//! are issues #1232 onward, so the rest of the state is still empty.
+//! populates `current_battle` and the joined lobby's detail, and through
+//! [`crate::tachyon_messaging`], which populates the direct message threads and
+//! the joined lobby's chat. Friends come later, so the rest of the state is
+//! still empty.
 //!
 //! Every queued action other than a shutdown and the lobby ones is a
 //! TASServer wire line with no Tachyon equivalent. Issue #1235 hides the
 //! surfaces that offer them, and until then they are dropped and noted in the
 //! console rather than put on the socket.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -35,12 +38,14 @@ use tauri::ipc::Channel;
 use tokio::sync::mpsc;
 
 use crate::conn::{
-    emit, EventSink, LobbyEvent, Outbound, Registry, ServerConn, TachyonAction, TachyonHandle,
+    emit, now_ms, EventSink, LobbyEvent, Outbound, Registry, ServerConn, TachyonAction,
+    TachyonHandle,
 };
 use crate::lock_or_recover;
+use crate::tachyon_messaging::Conversation;
 use crate::tachyon_rpc::{spawn as spawn_rpc, Handlers, RequestError, TachyonClient};
 use crate::tachyon_ws::{TachyonSocket, WsError};
-use crate::{tachyon_lobbies, tachyon_room, tachyon_users};
+use crate::{tachyon_lobbies, tachyon_messaging, tachyon_room, tachyon_users};
 
 /// The path the WebSocket sits at. The specification carries an open question about
 /// advertising it in the OAuth metadata, and nothing advertises it today, so this
@@ -51,6 +56,15 @@ const TACHYON_PATH: &str = "/tachyon";
 /// socket. The user has already left, so a server that never answers must not hold
 /// the task open behind them.
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(2);
+
+/// Where each Tachyon server's chat history got to, by `serverKey`.
+///
+/// `messaging/subscribeReceived` takes an opaque marker and replays from it, so
+/// a reconnect can pick up what arrived while the socket was down. The marker
+/// outlives the connection that learned it, which is why it is held here rather
+/// than on the connection, and it is held for the run rather than on disk,
+/// because the server keeps a limited window of history anyway.
+pub(crate) type TachyonMarkers = Arc<Mutex<HashMap<String, String>>>;
 
 /// The two URLs a Tachyon server entry resolves to: the origin its OAuth discovery
 /// document sits under, and the WebSocket endpoint itself.
@@ -85,6 +99,7 @@ pub fn spawn_connection(
     server_key: String,
     socket: TachyonSocket,
     on_event: Channel<LobbyEvent>,
+    markers: TachyonMarkers,
 ) {
     let (tx, rx) = mpsc::unbounded_channel::<Outbound>();
     let state = Arc::new(Mutex::new(LobbyState::new()));
@@ -102,6 +117,7 @@ pub fn spawn_connection(
         rx,
         state.clone(),
         tachyon.clone(),
+        markers,
     ));
 
     lock_or_recover(&registry).insert(
@@ -123,6 +139,7 @@ pub fn spawn_connection(
 /// The connection event loop. Interleaves the frames the correlator hands up, the
 /// actions commands queue, and the correlator's own ending. On exit it reports the
 /// reason and evicts itself from the registry.
+#[allow(clippy::too_many_arguments)]
 async fn run_loop(
     registry: Registry,
     server_key: String,
@@ -131,6 +148,7 @@ async fn run_loop(
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
     tachyon: TachyonHandle,
+    markers: TachyonMarkers,
 ) {
     // The console is fed from the socket rather than from here, because the socket
     // is the one place every frame passes through in both directions. Watching from
@@ -173,6 +191,18 @@ async fn run_loop(
     // connection asks as soon as it is up. The answer is an ack: the list itself
     // follows as `lobby/listReset`.
     ask(client.clone(), sink.clone(), "lobby/subscribeList", None);
+    // Chat is a subscription too, and it resumes: the marker an earlier
+    // connection to this server got to is what makes a reconnect replay the
+    // messages that arrived while it was down.
+    let resume = lock_or_recover(&markers).get(&server_key).cloned();
+    subscribe_messages(client.clone(), sink.clone(), resume);
+
+    // One task sends the chat messages, in the order the loop hands them over.
+    // Each carries its own client handle, so between messages the task holds
+    // nothing and a shutdown is not waiting on it.
+    let (say_tx, say_rx) = mpsc::unbounded_channel::<Say>();
+    let (sent_tx, mut sent_rx) = mpsc::unbounded_channel::<SendOutcome>();
+    tokio::spawn(sending(say_rx, sent_tx));
     let mut client = Some(client);
 
     // The lobby we are in, written here and nowhere else, exactly as the state
@@ -191,12 +221,32 @@ async fn run_loop(
                 let deltas = {
                     let mut state = lock_or_recover(&state);
                     let mut deltas = tachyon_users::reduce(&mut state, &message);
+                    // A name that has just arrived may be the name of a thread
+                    // filed under a user id, so this follows the user fold.
+                    deltas.extend(tachyon_messaging::rename_threads(&mut state));
                     deltas.extend(tachyon_lobbies::reduce(&mut state, &message));
                     deltas.extend(tachyon_room::reduce(&mut room, &mut state, &message));
+                    deltas.extend(tachyon_messaging::reduce(&mut state, &message, now_ms()));
                     deltas
                 };
                 for delta in deltas {
                     emit(&sink, LobbyEvent::Delta { delta });
+                }
+                // Where this server's history has got to, so a reconnect asks
+                // to resume from here.
+                if let Some(marker) = tachyon_messaging::marker_of(&message) {
+                    lock_or_recover(&markers)
+                        .insert(server_key.clone(), marker.to_owned());
+                }
+                // A direct message from someone we cannot name leaves the
+                // thread filed under their user id until we can.
+                if let Some(id) = tachyon_messaging::sender_to_subscribe(
+                    &lock_or_recover(&state),
+                    &message,
+                ) {
+                    if let Some(client) = client.clone() {
+                        subscribe(client, sink.clone(), vec![id]);
+                    }
                 }
                 // `user/self` names our friends, ignores and party by id alone.
                 // Subscribing is what turns those ids into names in `users`.
@@ -231,6 +281,14 @@ async fn run_loop(
                 // server throwing us out and worth telling the user about.
                 LeaveOutcome::Failed => tachyon_room::mark_leaving(&mut room, false),
             },
+            // A chat message the server has answered for. The conversation is
+            // the state's, so the sending task reports back rather than writing.
+            Some(outcome) = sent_rx.recv() => {
+                let deltas = record(&state, &outcome.conversation, &outcome.text, outcome.problem);
+                for delta in deltas {
+                    emit(&sink, LobbyEvent::Delta { delta });
+                }
+            }
             Some(out) = rx.recv() => match out {
                 Outbound::Tachyon(TachyonAction::JoinLobby { battle }) => {
                     let lobby = lock_or_recover(&state)
@@ -266,6 +324,31 @@ async fn run_loop(
                         if let Some(client) = client.clone() {
                             act(client, sink.clone(), request);
                         }
+                    }
+                }
+                Outbound::Tachyon(TachyonAction::Say { conversation, text }) => {
+                    let body = {
+                        let state = lock_or_recover(&state);
+                        tachyon_messaging::send_request(&state, &conversation, &text)
+                    };
+                    match (body, client.clone()) {
+                        (Ok(data), Some(client)) => {
+                            let _ = say_tx.send(Say { client, conversation, text, data });
+                        }
+                        // Nothing reached the server, so the message is put in
+                        // front of the user rather than lost.
+                        (Err(refusal), _) => {
+                            let deltas = record(
+                                &state,
+                                &conversation,
+                                &text,
+                                Some(refusal.text()),
+                            );
+                            for delta in deltas {
+                                emit(&sink, LobbyEvent::Delta { delta });
+                            }
+                        }
+                        (_, None) => {}
                     }
                 }
                 Outbound::Shutdown => {
@@ -321,6 +404,112 @@ fn joined(message: &TachyonMessage) -> bool {
             coilbox_tachyon_protocol::types::LobbyJoinResponse::Success { .. }
         )
     )
+}
+
+/// One chat message waiting for the sending task, with the client it goes out
+/// over.
+struct Say {
+    client: TachyonClient,
+    conversation: Conversation,
+    text: String,
+    data: Value,
+}
+
+/// What became of a chat message we sent. `problem` is `None` when the server
+/// took it.
+struct SendOutcome {
+    conversation: Conversation,
+    text: String,
+    problem: Option<String>,
+}
+
+/// Send the queued chat messages one at a time, reporting each outcome.
+///
+/// One at a time because the order lines appear in is the order they were
+/// typed, and a task per message would race: a burst of them waits on the send
+/// queue and the answers would come back in whichever order they finished.
+async fn sending(
+    mut queue: mpsc::UnboundedReceiver<Say>,
+    outcome: mpsc::UnboundedSender<SendOutcome>,
+) {
+    while let Some(say) = queue.recv().await {
+        let problem = match say.client.request("messaging/send", Some(say.data)).await {
+            Ok(_) => None,
+            Err(error) => Some(refusal(&error)),
+        };
+        let sent = SendOutcome {
+            conversation: say.conversation,
+            text: say.text,
+            problem,
+        };
+        if outcome.send(sent).is_err() {
+            return;
+        }
+    }
+}
+
+/// Put a chat message, or the note that it did not go, into its conversation.
+fn record(
+    state: &Arc<Mutex<LobbyState>>,
+    conversation: &Conversation,
+    text: &str,
+    problem: Option<String>,
+) -> Vec<Delta> {
+    let mut state = lock_or_recover(state);
+    let now = now_ms();
+    match problem {
+        None => tachyon_messaging::record_sent(&mut state, conversation, text, now),
+        Some(why) => tachyon_messaging::record_not_sent(&mut state, conversation, text, &why, now),
+    }
+}
+
+/// Subscribe to the chat this account is sent, off the connection loop.
+///
+/// A marker that the server no longer holds history for means there is a gap,
+/// which is worth saying: the alternative is a conversation that silently skips
+/// what was said while we were away.
+fn subscribe_messages(client: TachyonClient, sink: EventSink, marker: Option<String>) {
+    tokio::spawn(async move {
+        let data = tachyon_messaging::subscribe_request(marker.as_deref());
+        let answer = client
+            .request("messaging/subscribeReceived", Some(data))
+            .await;
+        let response = match answer {
+            Ok(response) => response,
+            Err(error) => {
+                emit(
+                    &sink,
+                    LobbyEvent::Console {
+                        direction: "in".into(),
+                        line: format!("messaging/subscribeReceived: {error}"),
+                    },
+                );
+                return;
+            }
+        };
+        let missed = matches!(
+            parse_frame(&response),
+            TachyonMessage::MessagingSubscribeReceivedResponse(
+                coilbox_tachyon_protocol::types::MessagingSubscribeReceivedResponse::Success {
+                    ref data,
+                    ..
+                },
+            ) if data.has_missed_messages
+        );
+        if missed && marker.is_some() {
+            emit(
+                &sink,
+                LobbyEvent::Delta {
+                    delta: Delta::ServerMessage {
+                        text: "Some messages sent while you were away have not been kept by the \
+                               server."
+                            .into(),
+                        boxed: false,
+                    },
+                },
+            );
+        }
+    });
 }
 
 /// Ask to join a lobby, off the connection loop.
@@ -450,6 +639,8 @@ fn refusal(error: &RequestError) -> String {
         "not_in_lobby" => "You are not in this lobby.",
         "not_a_player" => "Only a player can do that.",
         "bosses_not_allowed" => "This lobby does not allow bosses.",
+        "message_too_long" => "The message is too long.",
+        "invalid_target" => "That person or lobby cannot be messaged.",
         "banned" => "You are banned from this battle.",
         "unauthorized" => "The server did not allow that.",
         "internal_error" => "The server failed on its own side.",
@@ -610,11 +801,22 @@ mod tests {
             .unwrap_or_else(|_| panic!("no {command} frame arrived within 5 seconds"))
     }
 
-    /// Open a connection to `url` and register it under `server_key`.
+    /// Open a connection to `url` and register it under `server_key`, with no
+    /// chat history behind it.
     async fn connect(
         registry: &Registry,
         server_key: &str,
         url: &str,
+    ) -> mpsc::UnboundedReceiver<Value> {
+        connect_with(registry, server_key, url, TachyonMarkers::default()).await
+    }
+
+    /// The same, carrying whatever earlier connections to these servers got to.
+    async fn connect_with(
+        registry: &Registry,
+        server_key: &str,
+        url: &str,
+        markers: TachyonMarkers,
     ) -> mpsc::UnboundedReceiver<Value> {
         let socket = crate::tachyon_ws::connect(
             url,
@@ -625,7 +827,13 @@ mod tests {
         .await
         .unwrap_or_else(|e| panic!("connect failed: {e}"));
         let (channel, rx) = recording();
-        spawn_connection(registry.clone(), server_key.to_owned(), socket, channel);
+        spawn_connection(
+            registry.clone(),
+            server_key.to_owned(),
+            socket,
+            channel,
+            markers,
+        );
         rx
     }
 
@@ -1206,6 +1414,239 @@ mod tests {
         wait_for_sent(&mut seen_rx, "lobby/joinQueue").await;
     }
 
+    /// The `user/updated` that gives user 2 a name, so a message from them
+    /// lands under it rather than under the id.
+    fn bob_frame() -> Message {
+        Message::text(
+            json!({
+                "type": "event",
+                "messageId": "0",
+                "commandId": "user/updated",
+                "data": { "users": [
+                    { "userId": "2", "username": "bob", "status": "menu" },
+                ] },
+            })
+            .to_string(),
+        )
+    }
+
+    /// A `messaging/received` from user 2.
+    fn chat_frame() -> Message {
+        Message::text(
+            json!({
+                "type": "event",
+                "messageId": "3",
+                "commandId": "messaging/received",
+                "data": {
+                    "message": "are you playing",
+                    "source": { "type": "player", "userId": "2" },
+                    "timestamp": 1_705_432_698_000_000_i64,
+                    "marker": "m-2",
+                },
+            })
+            .to_string(),
+        )
+    }
+
+    /// The chat reduction is tested a frame at a time in
+    /// [`crate::tachyon_messaging`]. This is the wiring: a real message off a
+    /// real socket reaches the thread, and the marker it carried is kept for the
+    /// next connection to resume from.
+    #[tokio::test]
+    async fn a_direct_message_off_the_socket_reaches_its_thread_and_leaves_a_marker() {
+        let url = serve(move |mut ws| async move {
+            ws.send(self_frame()).await.unwrap();
+            ws.send(bob_frame()).await.unwrap();
+            ws.send(chat_frame()).await.unwrap();
+            std::future::pending::<()>().await;
+        })
+        .await;
+        let registry = Registry::default();
+        let markers = TachyonMarkers::default();
+        let mut rx = connect_with(&registry, "alice@bar:443", &url, markers.clone()).await;
+
+        let state = loop {
+            wait_for(&mut rx, "delta").await;
+            let state = lock_or_recover(&registry)["alice@bar:443"].state.clone();
+            if lock_or_recover(&state).dms.contains_key("bob") {
+                break state;
+            }
+        };
+        let state = lock_or_recover(&state);
+        assert_eq!(state.dms["bob"][0].text, "are you playing");
+        assert_eq!(state.dms["bob"][0].from, "bob");
+        assert_eq!(
+            lock_or_recover(&markers).get("alice@bar:443").cloned(),
+            Some("m-2".into())
+        );
+    }
+
+    /// A reconnect asks the server to replay from where the last one got to.
+    #[tokio::test]
+    async fn the_connection_subscribes_to_chat_from_the_marker_it_was_given() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = serve(move |mut ws| async move {
+            while let Some(Ok(msg)) = ws.next().await {
+                if let Message::Text(text) = msg {
+                    let _ = seen_tx.send(text.to_string());
+                }
+            }
+        })
+        .await;
+        let markers = TachyonMarkers::default();
+        lock_or_recover(&markers).insert("alice@bar:443".into(), "m-1".into());
+        let mut rx = connect_with(&Registry::default(), "alice@bar:443", &url, markers).await;
+        wait_for(&mut rx, "phase").await;
+
+        let frame = wait_for_sent(&mut seen_rx, "messaging/subscribeReceived").await;
+        assert_eq!(
+            frame["data"]["since"],
+            json!({ "type": "marker", "value": "m-1" })
+        );
+    }
+
+    /// A server that names us and bob, then answers `messaging/send` with
+    /// `answer`, reporting every frame it reads.
+    async fn chat_server(seen: mpsc::UnboundedSender<String>, answer: Value) -> String {
+        serve(move |mut ws| async move {
+            ws.send(self_frame()).await.unwrap();
+            ws.send(bob_frame()).await.unwrap();
+            while let Some(Ok(msg)) = ws.next().await {
+                let Message::Text(text) = msg else { continue };
+                let _ = seen.send(text.to_string());
+                let request: Value = serde_json::from_str(&text).unwrap();
+                let mut response = if request["commandId"] == "messaging/send" {
+                    answer.clone()
+                } else {
+                    json!({ "type": "response", "status": "success" })
+                };
+                let body = response.as_object_mut().unwrap();
+                body.insert("messageId".into(), request["messageId"].clone());
+                body.insert("commandId".into(), request["commandId"].clone());
+                ws.send(Message::text(response.to_string())).await.unwrap();
+            }
+        })
+        .await
+    }
+
+    /// Wait until `users` can name `name`. A message is addressed by user id,
+    /// so a send queued before the server has said who anyone is has nobody to
+    /// address.
+    async fn wait_for_user(
+        registry: &Registry,
+        rx: &mut mpsc::UnboundedReceiver<Value>,
+        name: &str,
+    ) {
+        loop {
+            let state = lock_or_recover(registry)["alice@bar:443"].state.clone();
+            if lock_or_recover(&state).users.contains_key(name) {
+                return;
+            }
+            wait_for(rx, "delta").await;
+        }
+    }
+
+    /// The thread `dms` holds for `peer`, once it has something in it.
+    async fn thread_for(
+        registry: &Registry,
+        rx: &mut mpsc::UnboundedReceiver<Value>,
+        peer: &str,
+    ) -> Vec<coilbox_lobby_protocol::ChatMsg> {
+        loop {
+            wait_for(rx, "delta").await;
+            let state = lock_or_recover(registry)["alice@bar:443"].state.clone();
+            let thread = lock_or_recover(&state).dms.get(peer).cloned();
+            if let Some(thread) = thread.filter(|thread| !thread.is_empty()) {
+                return thread;
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn sending_a_direct_message_asks_the_server_and_records_what_it_took() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = chat_server(seen_tx, json!({ "type": "response", "status": "success" })).await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+        wait_for_user(&registry, &mut rx, "bob").await;
+
+        sender(&registry, "alice@bar:443")
+            .send(Outbound::Tachyon(TachyonAction::Say {
+                conversation: Conversation::Peer("bob".into()),
+                text: "hello".into(),
+            }))
+            .unwrap();
+
+        let frame = wait_for_sent(&mut seen_rx, "messaging/send").await;
+        assert_eq!(
+            frame["data"],
+            json!({ "target": { "type": "player", "userId": "2" }, "message": "hello" })
+        );
+
+        let thread = thread_for(&registry, &mut rx, "bob").await;
+        assert_eq!(thread[0].from, "alice");
+        assert_eq!(thread[0].text, "hello");
+    }
+
+    /// A message the server would not take has to be visible as one, or the
+    /// user is left thinking they said something they did not.
+    #[tokio::test]
+    async fn a_refused_message_is_shown_as_unsent_rather_than_lost() {
+        let (seen_tx, _seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = chat_server(
+            seen_tx,
+            json!({ "type": "response", "status": "failed", "reason": "invalid_target" }),
+        )
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+        wait_for_user(&registry, &mut rx, "bob").await;
+
+        sender(&registry, "alice@bar:443")
+            .send(Outbound::Tachyon(TachyonAction::Say {
+                conversation: Conversation::Peer("bob".into()),
+                text: "hello".into(),
+            }))
+            .unwrap();
+
+        let thread = thread_for(&registry, &mut rx, "bob").await;
+        assert_eq!(thread.len(), 1);
+        assert_eq!(thread[0].kind, coilbox_lobby_protocol::ChatKind::System);
+        assert!(
+            thread[0].text.contains("hello"),
+            "the message was lost: {}",
+            thread[0].text
+        );
+    }
+
+    /// The limit is the schema's, so nothing longer is worth a round trip and
+    /// the send budget it costs.
+    #[tokio::test]
+    async fn a_message_over_the_limit_never_reaches_the_server() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = chat_server(seen_tx, json!({ "type": "response", "status": "success" })).await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+        wait_for(&mut rx, "phase").await;
+
+        let long = "a".repeat(crate::tachyon_messaging::MESSAGE_LIMIT + 1);
+        sender(&registry, "alice@bar:443")
+            .send(Outbound::Tachyon(TachyonAction::Say {
+                conversation: Conversation::Peer("bob".into()),
+                text: long.clone(),
+            }))
+            .unwrap();
+
+        let thread = thread_for(&registry, &mut rx, "bob").await;
+        assert_eq!(thread[0].kind, coilbox_lobby_protocol::ChatKind::System);
+        assert!(thread[0].text.contains(&long), "the message was lost");
+        assert!(
+            std::iter::from_fn(|| seen_rx.try_recv().ok())
+                .all(|frame| !frame.contains("messaging/send")),
+            "the message reached the server"
+        );
+    }
+
     #[tokio::test]
     async fn a_server_close_ends_the_connection_and_frees_its_key() {
         let url = serve(|mut ws| async move {
@@ -1247,16 +1688,10 @@ mod tests {
         let mut rx = connect(&registry, "alice@bar:443", &url).await;
         wait_for(&mut rx, "phase").await;
 
-        // The subscription the connection sends on its own goes first, so read
-        // past it before asking for anything.
-        let first: Value = serde_json::from_str(
-            &tokio::time::timeout(Duration::from_secs(5), seen_rx.recv())
-                .await
-                .expect("nothing was sent within 5 seconds")
-                .expect("the server task ended first"),
-        )
-        .unwrap();
-        assert_eq!(first["commandId"], "lobby/subscribeList");
+        // The subscriptions the connection sends on its own go first, so read
+        // past them before asking for anything.
+        wait_for_sent(&mut seen_rx, "lobby/subscribeList").await;
+        wait_for_sent(&mut seen_rx, "messaging/subscribeReceived").await;
 
         let client = lock_or_recover(&lock_or_recover(&registry)["alice@bar:443"].tachyon)
             .clone()
@@ -1264,15 +1699,8 @@ mod tests {
         // The answer never comes, so this is only about what left the machine.
         let asking = tokio::spawn(async move { client.request("lobby/list", None).await });
 
-        let sent: Value = serde_json::from_str(
-            &tokio::time::timeout(Duration::from_secs(5), seen_rx.recv())
-                .await
-                .expect("the request was not sent within 5 seconds")
-                .expect("the server task ended first"),
-        )
-        .unwrap();
+        let sent = wait_for_sent(&mut seen_rx, "lobby/list").await;
         assert_eq!(sent["type"], "request");
-        assert_eq!(sent["commandId"], "lobby/list");
         asking.abort();
     }
 

@@ -156,6 +156,9 @@ export interface ChatPaneProps {
   /** Nick candidates for Tab-completion (channel/battle members, DM peer).
    * Omit to disable completion (Tab keeps its default focus behaviour). */
   completions?: string[];
+  /** The longest one message may be on this connection, where the protocol
+   * caps it (Tachyon does, at 512). Omit where it does not. */
+  maxChars?: number | null;
 }
 
 /**
@@ -179,6 +182,7 @@ export function ChatPane({
   emptyState,
   disabled = false,
   completions,
+  maxChars = null,
 }: ChatPaneProps) {
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
@@ -360,7 +364,7 @@ export function ChatPane({
 
   async function submit() {
     if (disabled) return;
-    const composed = composeDraft(draft);
+    const composed = composeDraft(draft, maxChars);
     if (composed.kind === "error") {
       setSendError(composed.reason);
       return;

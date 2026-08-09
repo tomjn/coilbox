@@ -13,7 +13,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 }));
 
 import { BUILTIN_SERVERS, type LobbyServer } from "../lobby-servers/config";
-import { protocolForKey, syncsOnReady } from "./protocol";
+import { messageLimit, protocolForKey, syncsOnReady } from "./protocol";
 
 /** A built-in server by id, failing loudly if the catalog entry is renamed. */
 function builtin(id: string): LobbyServer {
@@ -91,5 +91,15 @@ describe("syncsOnReady", () => {
   it("skips the ready-time sync for a live Tachyon connection", () => {
     const key = `player@${tachyon.host}:${tachyon.port}`;
     expect(syncsOnReady(protocolForKey(key, BUILTIN_SERVERS))).toBe(false);
+  });
+});
+
+describe("messageLimit", () => {
+  it("caps a Tachyon message at what the schema allows", () => {
+    expect(messageLimit("tachyon")).toBe(512);
+  });
+
+  it("sets no limit on TASServer, which publishes none", () => {
+    expect(messageLimit("tasserver")).toBeNull();
   });
 });
