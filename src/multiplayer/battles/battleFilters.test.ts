@@ -10,6 +10,7 @@ import {
 function mk(p: Partial<Battle>): Battle {
   return {
     id: 1,
+    tachyonId: null,
     host: "host",
     ip: "",
     port: "",
@@ -20,6 +21,7 @@ function mk(p: Partial<Battle>): Battle {
     engine: "",
     version: "",
     maxPlayers: 8,
+    playerCount: null,
     passworded: false,
     locked: false,
     spectatorCount: 0,
@@ -54,6 +56,12 @@ describe("occupancy", () => {
     expect(
       occupancy(mk({ host: "host", members: { host: M, alice: M } })),
     ).toBe(2);
+  });
+
+  it("takes the server's own count where there is one", () => {
+    // A Tachyon lobby list carries a player count and no roster at all.
+    expect(occupancy(mk({ playerCount: 9, host: "", members: {} }))).toBe(9);
+    expect(occupancy(mk({ playerCount: 0, host: "", members: {} }))).toBe(0);
   });
 
   it("counts a host whose name collides with an Object.prototype key", () => {
