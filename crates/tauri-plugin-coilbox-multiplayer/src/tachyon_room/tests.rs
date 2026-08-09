@@ -1114,7 +1114,10 @@ fn a_started_battle_fills_every_field_the_play_plugin_requires() {
 
 #[test]
 fn a_port_that_is_not_a_port_is_left_out_rather_than_wrapped() {
-    assert_eq!(config_for(json!({ "port": 70000 }))["hostPort"], Value::Null);
+    assert_eq!(
+        config_for(json!({ "port": 70000 }))["hostPort"],
+        Value::Null
+    );
     assert_eq!(config_for(json!({ "port": -1 }))["hostPort"], Value::Null);
     assert_eq!(config_for(json!({ "port": 65535 }))["hostPort"], 65535);
 }
