@@ -576,6 +576,15 @@ mod tests {
         (client, task, inbound_rx)
     }
 
+    /// Wait for something the connection task should produce. Bounded, so a
+    /// task that never produces it fails the test rather than hanging it.
+    async fn soon<T>(rx: &mut mpsc::UnboundedReceiver<T>) -> T {
+        tokio::time::timeout(Duration::from_secs(5), rx.recv())
+            .await
+            .expect("nothing arrived within 5 seconds")
+            .expect("the sender went away")
+    }
+
     /// The next text frame the server receives, as JSON.
     async fn next_json(ws: &mut WebSocketStream<TcpStream>) -> Value {
         loop {
@@ -799,7 +808,7 @@ mod tests {
         assert_eq!(response["type"], "response");
         assert_eq!(response["data"]["name"], "the response");
 
-        let event: Value = serde_json::from_str(&inbound.recv().await.unwrap()).unwrap();
+        let event: Value = serde_json::from_str(&soon(&mut inbound).await).unwrap();
         assert_eq!(event["commandId"], "lobby/updated");
     }
 
@@ -862,10 +871,10 @@ mod tests {
         });
         let (_client, _task, _inbound) = start(&url, handlers).await;
 
-        let data = handled_rx.recv().await.unwrap();
+        let data = soon(&mut handled_rx).await;
         assert_eq!(data["port"], 8452);
 
-        let answer = seen_rx.recv().await.unwrap();
+        let answer = soon(&mut seen_rx).await;
         assert_eq!(answer["type"], "response");
         assert_eq!(answer["messageId"], "srv-1");
         assert_eq!(answer["commandId"], "battle/start");
@@ -896,7 +905,7 @@ mod tests {
         .await;
 
         let (_client, _task, _inbound) = start(&url, Handlers::new()).await;
-        let answer = seen_rx.recv().await.unwrap();
+        let answer = soon(&mut seen_rx).await;
         assert_eq!(answer["messageId"], "srv-2");
         assert_eq!(answer["status"], "failed");
         assert_eq!(answer["reason"], "command_unimplemented");
