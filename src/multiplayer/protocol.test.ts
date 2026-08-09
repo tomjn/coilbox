@@ -15,8 +15,15 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import { BUILTIN_SERVERS, type LobbyServer } from "../lobby-servers/config";
 import { protocolForKey, syncsOnReady } from "./protocol";
 
-const bar = BUILTIN_SERVERS.find((s) => s.id === "bar")!;
-const tachyon = BUILTIN_SERVERS.find((s) => s.id === "bar-tachyon")!;
+/** A built-in server by id, failing loudly if the catalog entry is renamed. */
+function builtin(id: string): LobbyServer {
+  const server = BUILTIN_SERVERS.find((s) => s.id === id);
+  if (!server) throw new Error(`no built-in server with id ${id}`);
+  return server;
+}
+
+const bar = builtin("bar");
+const tachyon = builtin("bar-tachyon");
 
 describe("protocolForKey", () => {
   it("reads a Tachyon connection off its server key", () => {
