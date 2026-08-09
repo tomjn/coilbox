@@ -205,6 +205,75 @@ pub struct Party {
     pub max_members: u32,
 }
 
+/// Where this connection is in matchmaking: what the server offers, what we are
+/// searching for, and the match it has found.
+///
+/// Tachyon only, like [`Party`]. TASServer has no matchmaking, so a connection to
+/// one leaves this at its default and the surface is hidden.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Matchmaking {
+    /// Whether this server has matchmaking, as far as it has told us. True until
+    /// it answers `matchmaking/list` with `command_unimplemented`, which is how a
+    /// server that has not built the feature says so.
+    pub supported: bool,
+    /// The queues the server offers, in the order it listed them. Empty until
+    /// `matchmaking/list` has been answered.
+    pub queues: Vec<MatchQueue>,
+    /// The ids of the queues we are searching in. A queue id we hold no
+    /// [`MatchQueue`] for is still listed, because a party member's search puts us
+    /// in queues we never asked the server about.
+    pub searching: Vec<String>,
+    /// The match the server has found and is waiting on everybody to accept.
+    pub found: Option<MatchFound>,
+}
+
+impl Default for Matchmaking {
+    fn default() -> Self {
+        Self {
+            supported: true,
+            queues: Vec::new(),
+            searching: Vec::new(),
+            found: None,
+        }
+    }
+}
+
+/// One queue a player can search in.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchQueue {
+    /// The server's id, which is what a request to search names.
+    pub id: String,
+    /// What to call it on screen, such as "Duel".
+    pub name: String,
+    /// How many teams play, and how many players are on each.
+    pub teams: u32,
+    pub team_size: u32,
+    /// Whether a result here counts towards a rating.
+    pub ranked: bool,
+    /// The maps, games and engines a match from this queue can be played on, by
+    /// the names the content scan knows them under.
+    pub maps: Vec<String>,
+    pub games: Vec<String>,
+    pub engines: Vec<String>,
+}
+
+/// A match the server has put together and is waiting on.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchFound {
+    /// The queue it came out of.
+    pub queue_id: String,
+    /// Unix millis by which every player has to have accepted. Everybody who did
+    /// not is dropped and the rest go back to searching.
+    pub ready_by: u64,
+    /// How many players have accepted so far, from `matchmaking/foundUpdate`.
+    pub ready_count: u32,
+    /// Whether we have accepted.
+    pub readied: bool,
+}
+
 /// A public channel as advertised by the server's `CHANNELS` directory.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -251,6 +320,9 @@ pub struct LobbyState {
     /// The parties we have been invited to and not yet answered, in the order the
     /// server listed them. Always empty on a TASServer connection.
     pub party_invites: Vec<Party>,
+    /// Where we are in matchmaking. Always at its default on a TASServer
+    /// connection, which has no matchmaking.
+    pub matchmaking: Matchmaking,
     /// A live SPADS autohost vote in the current battle, or `None` when none is
     /// open. Parsed from the bot's battle chat; drives the vote panel.
     pub current_vote: Option<Vote>,

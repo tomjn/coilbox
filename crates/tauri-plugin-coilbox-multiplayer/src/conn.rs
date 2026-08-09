@@ -81,6 +81,10 @@ pub enum TachyonAction {
     /// it shows a person under into the user id every party command uses, and
     /// applies what the request did once the server has taken it.
     Party(crate::tachyon_parties::PartyAction),
+    /// Something the matchmaking screen asks of the server. The task turns the
+    /// queue id it names into the id and opaque version a search request needs,
+    /// and applies what the request did once the server has taken it.
+    Matchmaking(crate::tachyon_matchmaking::MatchmakingAction),
     /// One chat message, to a person or to the lobby. The task records it once
     /// the server has taken it, so a message the server refused is never shown
     /// as sent.

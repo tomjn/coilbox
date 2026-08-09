@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-matchmaking-list"
+description = "Enables the mp_matchmaking_list command without any pre-configured scope."
+commands.allow = ["mp_matchmaking_list"]
+
+[[permission]]
+identifier = "deny-mp-matchmaking-list"
+description = "Denies the mp_matchmaking_list command without any pre-configured scope."
+commands.deny = ["mp_matchmaking_list"]
