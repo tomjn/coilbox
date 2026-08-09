@@ -51,6 +51,36 @@ describe("reconnectDelay backoff", () => {
   });
 });
 
+describe("mirrorReducer Tachyon phases", () => {
+  it("records the two phases a Tachyon connect reports before its socket exists", () => {
+    let m = mirrorReducer(initialMirror, { type: "connecting" });
+    expect(m.phase).toBeNull();
+    for (const phase of ["tachyonAuthorizing", "tachyonOpening"] as const) {
+      m = mirrorReducer(m, {
+        type: "event",
+        ev: { kind: "phase", phase, agreement: null },
+      });
+      expect(m.phase).toBe(phase);
+    }
+    // Then straight to ready, because a socket that opened is already
+    // authenticated. Everything that gates on a live connection reads this.
+    m = mirrorReducer(m, {
+      type: "event",
+      ev: { kind: "phase", phase: "ready", agreement: null },
+    });
+    expect(m.phase).toBe("ready");
+  });
+
+  it("puts a Tachyon frame in the console the way a wire line goes there", () => {
+    const frame = '{"type":"event","commandId":"user/updated"}';
+    const m = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: { kind: "console", direction: "in", line: frame },
+    });
+    expect(m.consoleLines).toEqual([`<< ${frame}`]);
+  });
+});
+
 describe("mirrorReducer join-failure handling", () => {
   it("sets lastJoinError from a joinBattleFailed delta", () => {
     const m = mirrorReducer(initialMirror, {
