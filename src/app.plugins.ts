@@ -8,6 +8,7 @@ import deepLinkPlugin from "./deeplink";
 import downloadsPlugin from "./downloads";
 import gameUpdatesPlugin from "./game-updates";
 import generalPlugin from "./general";
+import hubPlugin from "./hub";
 import legoPlugin from "./lego";
 import lobbyServersPlugin from "./lobby-servers";
 import mapconvPlugin from "./mapconv";
@@ -26,6 +27,7 @@ export const plugins: FramePlugin[] = [
   framePlugin,
   // picoframe:plugins-start
   downloadsPlugin,
+  hubPlugin,
   uberstressPlugin,
   mapconvPlugin,
   animationPlugin,
