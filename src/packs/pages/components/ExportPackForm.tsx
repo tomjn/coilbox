@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { ChallengeCodeView } from "../../../challenge/ChallengeCodeView";
+import { gameIdentityForName } from "../../../container/gameIdentity";
 import { useUnitsyncScan } from "../../../content/config";
 import { isRealEngineVersion } from "../../../content/engineVersion";
 import { ErrorBanner } from "../../../content/pages/components/states";
@@ -130,6 +131,9 @@ export function ExportPackForm({ target }: { target: PlayTarget }) {
         ? { engineVersion: target.engineVersion }
         : {}),
       game: {
+        // Fills in the modinfo shortname when this machine has the game, so a
+        // recipient can tell this pack targets the same game as a challenge.
+        ...gameIdentityForName(gameName, games),
         name: gameName,
         ...(rapidTag.trim() ? { rapidTag: rapidTag.trim() } : {}),
       },
