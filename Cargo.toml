@@ -7,6 +7,7 @@ members = [
   "crates/coilbox-s3o",
   "crates/coilbox-3do",
   "crates/coilbox-lobby-protocol",
+  "crates/coilbox-tachyon-protocol",
   "crates/coilbox-springlua",
   "crates/coilbox-thumb-cache",
   "crates/coilbox-unitsync-worker",
