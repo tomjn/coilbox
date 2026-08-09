@@ -6,6 +6,11 @@ import {
   readContainer,
   tryEncodeContainerCode,
 } from "../container/container";
+import {
+  type GameIdentity,
+  gameIdentityForName,
+  type InstalledGameInfo,
+} from "../container/gameIdentity";
 import { formatBytes } from "../content/rapidPool";
 import {
   type ContentRequirement,
@@ -132,9 +137,34 @@ export function parseScenarioPayload(value: unknown): ScenarioExport | null {
   return { scenario, media };
 }
 
+/**
+ * The payload both share routes write: the document, its clips, and the game
+ * named the shared way (issue #1335), derived from the setup the document
+ * already carries. `installed` is this machine's games, read only for the
+ * modinfo shortname, so an export made where the game is missing simply names it
+ * by archive name alone.
+ *
+ * One builder for the file and the code, so the two can never disagree about
+ * what a scenario says its game is.
+ */
+function scenarioPayload(
+  exported: ScenarioExport,
+  installed: readonly InstalledGameInfo[],
+): ScenarioExport & { game?: GameIdentity } {
+  const game = gameIdentityForName(exported.scenario.setup.gameName, installed);
+  return { ...exported, ...(game ? { game } : {}) };
+}
+
 /** Serialize a scenario and its dialogue media as an export file's text. */
-export function encodeScenarioExport(exported: ScenarioExport): string {
-  return encodeContainerJson("scenario", SCENARIO_KIND_VERSION, exported);
+export function encodeScenarioExport(
+  exported: ScenarioExport,
+  installed: readonly InstalledGameInfo[] = [],
+): string {
+  return encodeContainerJson(
+    "scenario",
+    SCENARIO_KIND_VERSION,
+    scenarioPayload(exported, installed),
+  );
 }
 
 /** A pasteable scenario code, or why this scenario cannot have one. */
@@ -149,8 +179,8 @@ export type ScenarioCode =
  *
  * Scenarios are the one shareable kind with no upper bound on size, because the
  * export carries the dialogue portraits and voice clips inline as `data:` URIs.
- * Measured against the Silence the Jericho mission: the document alone is 7,146
- * bytes and a 3,128 character code, and the same document copied out to 581
+ * Measured against the Silence the Jericho mission: the document alone is 7,287
+ * bytes and a 3,155 character code, and the same document copied out to 581
  * triggers and 332 zones is still only an 18,000 character code. Text and ids
  * compress roughly 30 to 1, so no realistic amount of authoring reaches the
  * ceiling. Media does: 380 KB of clips passes it on its own, because base64
@@ -161,11 +191,14 @@ export type ScenarioCode =
  * rather than on import. A code that has already been pasted into Discord is
  * past the point where anyone can fix it.
  */
-export function encodeScenarioCode(exported: ScenarioExport): ScenarioCode {
+export function encodeScenarioCode(
+  exported: ScenarioExport,
+  installed: readonly InstalledGameInfo[] = [],
+): ScenarioCode {
   const result = tryEncodeContainerCode(
     "scenario",
     SCENARIO_KIND_VERSION,
-    exported,
+    scenarioPayload(exported, installed),
   );
   if (result.ok) return result;
 

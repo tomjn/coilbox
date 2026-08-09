@@ -8,6 +8,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { useUnitsyncScan } from "@/content/config";
+import { usePreferredTarget } from "@/play/config";
 import { useCampaigns } from "../../campaign/campaigns";
 import { scenarioIsAttached } from "../../campaign/missionScenario";
 import {
@@ -35,6 +37,10 @@ import { ScenarioImportButton } from "./components/ScenarioImportButton";
 export default function ScenarioBuilderPage() {
   const { scenarios, loading, error, refresh } = useScenarios();
   const { campaigns } = useCampaigns();
+  // Read only for the modinfo shortname an export records beside the game's
+  // archive name (issue #1335).
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const navigate = useNavigate();
   const drawer = useDrawer();
   const [rescanning, setRescanning] = useState(false);
@@ -65,6 +71,8 @@ export default function ScenarioBuilderPage() {
 
   // Share: a code, a link or a file (issue #1336). The drawer owns all three,
   // and says so when the scenario's dialogue clips make it too big for a code.
+  // The scanned games go with it only so the export can name the scenario's game
+  // by its modinfo shortname as well as its archive name (issue #1335).
   const openShare = async (scenario: Scenario) => {
     const { ShareScenarioForm } = await import(
       "./components/ShareScenarioForm"
@@ -72,7 +80,12 @@ export default function ScenarioBuilderPage() {
     drawer.open({
       title: `Share ${scenario.name}`,
       width: "28rem",
-      content: <ShareScenarioForm scenario={scenario} />,
+      content: (
+        <ShareScenarioForm
+          scenario={scenario}
+          installed={scan.data?.games ?? []}
+        />
+      ),
     });
   };
 

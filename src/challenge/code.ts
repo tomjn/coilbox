@@ -28,6 +28,10 @@ import {
   encodeContainerCode,
   encodeContainerJson,
 } from "../container/container";
+import {
+  type GameIdentity,
+  parseGameIdentity,
+} from "../container/gameIdentity";
 
 /** Payload schema version for a challenge container. */
 export const CHALLENGE_KIND_VERSION = 1;
@@ -36,10 +40,36 @@ export const CHALLENGE_KIND_VERSION = 1;
 const LEGACY_CHALLENGE_FORMAT = "coilbox-challenge";
 const LEGACY_CHALLENGE_FORMAT_VERSION = 1;
 
-/** The container payload: the game mode plus that mode's settings. */
+/**
+ * The container payload: the game mode, that mode's settings, and the game the
+ * challenge targets.
+ *
+ * `game` repeats what `settings.game` already says. It is written anyway so
+ * every container kind names its game in the same field in the same place
+ * (issue #1335), rather than a reader having to know that a challenge buries it
+ * one level down in a mode-specific settings shape. `settings.game` stays
+ * because it is the generator's input, and it stays the only spelling an older
+ * coilbox reads.
+ */
 interface ChallengePayload<S> {
   mode: string;
   settings: S;
+  game?: GameIdentity;
+}
+
+/**
+ * Build the payload for a challenge. Both modes hold a `GameRef` at
+ * `settings.game`, so the shared identity is derived from it rather than passed
+ * in separately, which keeps the two from ever disagreeing.
+ */
+function challengePayload<K extends string, S>(
+  kind: K,
+  settings: S,
+): ChallengePayload<S> {
+  const game = parseGameIdentity(
+    (settings as { game?: unknown } | null)?.game ?? null,
+  );
+  return { mode: kind, settings, ...(game ? { game } : {}) };
 }
 
 /** Encode a challenge's settings into a pasteable code. */
@@ -47,8 +77,11 @@ export function encodeChallenge<K extends string, S>(
   kind: K,
   settings: S,
 ): string {
-  const payload: ChallengePayload<S> = { mode: kind, settings };
-  return encodeContainerCode("challenge", CHALLENGE_KIND_VERSION, payload);
+  return encodeContainerCode(
+    "challenge",
+    CHALLENGE_KIND_VERSION,
+    challengePayload(kind, settings),
+  );
 }
 
 /** Encode a challenge's settings as pretty-printed JSON text, for a `.json`
@@ -57,8 +90,11 @@ export function encodeChallengeFile<K extends string, S>(
   kind: K,
   settings: S,
 ): string {
-  const payload: ChallengePayload<S> = { mode: kind, settings };
-  return encodeContainerJson("challenge", CHALLENGE_KIND_VERSION, payload);
+  return encodeContainerJson(
+    "challenge",
+    CHALLENGE_KIND_VERSION,
+    challengePayload(kind, settings),
+  );
 }
 
 /** Why a pasted code was rejected — surfaced as a friendly inline message. */

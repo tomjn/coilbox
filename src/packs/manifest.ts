@@ -1,3 +1,7 @@
+import {
+  type GameIdentity,
+  parseGameIdentity,
+} from "../container/gameIdentity";
 import { isRealEngineVersion } from "../content/engineVersion";
 import {
   type ContentRequirement,
@@ -20,10 +24,11 @@ import {
  * chat. Importing resolves every reference through issue #387's
  * `ResolveContentGate` before anything is applied.
  */
-export interface SetupPackGame {
+export interface SetupPackGame extends GameIdentity {
   /** The exact installed archive/game name, matched the same way presets and
    * campaigns already do (`exactGameRequirement`'s convention). Used as the
-   * download key too when `rapidTag` isn't given (best-effort by name). */
+   * download key too when `rapidTag` isn't given (best-effort by name). A pack
+   * pins a build, so unlike the shared shape this is always present. */
   name: string;
   /** Rapid tag to fetch this game by, when known. Lets the recipient pull the
    * exact intended build rather than guessing from `name`. */
@@ -77,8 +82,12 @@ export function parseSetupPackManifest(
   const g = d.game as Record<string, unknown>;
   if (typeof g.name !== "string" || !g.name.trim()) return null;
   if (g.rapidTag !== undefined && typeof g.rapidTag !== "string") return null;
+  // A pack shared before issue #1335 carries no shortname, which reads as an
+  // identity with only a name rather than a malformed pack.
+  const identity = parseGameIdentity(g) ?? {};
   const game: SetupPackGame = {
     name: g.name,
+    ...(identity.shortname ? { shortname: identity.shortname } : {}),
     ...(typeof g.rapidTag === "string" && g.rapidTag.trim()
       ? { rapidTag: g.rapidTag }
       : {}),

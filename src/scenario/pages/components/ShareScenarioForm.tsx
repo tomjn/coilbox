@@ -18,6 +18,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { Download, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ChallengeCodeView } from "@/challenge/ChallengeCodeView";
+import type { InstalledGameInfo } from "@/container/gameIdentity";
 import { ErrorBanner } from "@/content/pages/components/states";
 import { scenarioExport } from "../../bindings";
 import type { Scenario } from "../../model";
@@ -28,7 +29,16 @@ import {
   type ScenarioExport,
 } from "../../transfer";
 
-export function ShareScenarioForm({ scenario }: { scenario: Scenario }) {
+export function ShareScenarioForm({
+  scenario,
+  installed,
+}: {
+  scenario: Scenario;
+  /** This machine's games, read only for the modinfo shortname the payload
+   * records beside the archive name (issue #1335). The code and the file are
+   * built from the same payload, so both carry it or neither does. */
+  installed: readonly InstalledGameInfo[];
+}) {
   const [gathered, setGathered] = useState<ScenarioExport | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +64,10 @@ export function ShareScenarioForm({ scenario }: { scenario: Scenario }) {
       filters: [{ name: "Coilbox scenario", extensions: ["json"] }],
     });
     if (!dest) return;
-    await scenarioExport({ text: encodeScenarioExport(gathered), dest });
+    await scenarioExport({
+      text: encodeScenarioExport(gathered, installed),
+      dest,
+    });
   };
 
   if (error) {
@@ -74,7 +87,7 @@ export function ShareScenarioForm({ scenario }: { scenario: Scenario }) {
     );
   }
 
-  const result = encodeScenarioCode(gathered);
+  const result = encodeScenarioCode(gathered, installed);
   if (result.ok) {
     return (
       <ChallengeCodeView

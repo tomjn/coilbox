@@ -42,6 +42,7 @@ describe("the committed Silence the Jericho export", () => {
       version: 1,
       compatibility: "ok",
       warnings: [],
+      game: { name: "SplinterFaction $VERSION" },
     });
   });
 

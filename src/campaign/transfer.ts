@@ -5,6 +5,12 @@ import {
   decodeContainerText,
   makeContainer,
 } from "../container/container";
+import {
+  type GameIdentity,
+  gameIdentityForName,
+  gameIdentityFromPayload,
+  type InstalledGameInfo,
+} from "../container/gameIdentity";
 import { type Campaign, parseCampaignJson } from "./model";
 
 /**
@@ -58,6 +64,25 @@ export type CampaignScenarioMedia = Record<string, Record<string, string>>;
 export interface CampaignExport {
   campaign: Campaign;
   media: CampaignScenarioMedia;
+  game?: GameIdentity;
+}
+
+/** A `kindVersion: 1` payload: the document itself, with the game it targets
+ * named alongside. */
+export type CampaignExportPlain = Campaign & { game?: GameIdentity };
+
+/**
+ * The game a campaign targets, in the shape every container kind uses (issue
+ * #1335). A campaign has no game of its own, every mission carries its own
+ * skirmish snapshot, so this is only written when the missions agree on one.
+ * `installed` is this machine's games, read only for the modinfo shortname.
+ */
+function campaignGameIdentity(
+  campaign: Campaign,
+  installed: readonly InstalledGameInfo[],
+): GameIdentity | null {
+  const named = gameIdentityFromPayload("campaign", campaign)?.name;
+  return named ? gameIdentityForName(named, installed) : null;
 }
 
 /**
@@ -78,16 +103,27 @@ export function campaignCarriesScenarios(campaign: Campaign): boolean {
 
 /**
  * Wrap a campaign (panoramas already inlined as data URIs) as an export file,
- * carrying `media` when the campaign has scenarios to carry it for.
+ * carrying `media` when the campaign has scenarios to carry it for, and naming
+ * the game its missions target the way every container kind does.
  */
 export function wrapCampaignForExport(
   campaign: Campaign,
   media: CampaignScenarioMedia = {},
-): Container<Campaign | CampaignExport> {
+  installed: readonly InstalledGameInfo[] = [],
+): Container<CampaignExportPlain | CampaignExport> {
+  const identity = campaignGameIdentity(campaign, installed);
+  const game = identity ? { game: identity } : {};
   if (!campaignCarriesScenarios(campaign)) {
-    return makeContainer("campaign", CAMPAIGN_KIND_VERSION_PLAIN, campaign);
+    return makeContainer("campaign", CAMPAIGN_KIND_VERSION_PLAIN, {
+      ...campaign,
+      ...game,
+    });
   }
-  return makeContainer("campaign", CAMPAIGN_KIND_VERSION, { campaign, media });
+  return makeContainer("campaign", CAMPAIGN_KIND_VERSION, {
+    campaign,
+    media,
+    ...game,
+  });
 }
 
 /**

@@ -123,6 +123,31 @@ describe("scenario container round trip", () => {
     expect(id.compatibility).toBe("ok");
     expect(id.warnings).toEqual([]);
   });
+
+  it("names the game both ways when the exporting machine has it", () => {
+    const text = encodeScenarioExport(exported(), [
+      { name: "BAR", info: { shortname: "byar" } },
+    ]);
+
+    expect(identify(text).game).toEqual({ name: "BAR", shortname: "byar" });
+    expect(readScenarioExport(text).ok).toBe(true);
+  });
+
+  it("names the game by archive name alone when it isn't installed here", () => {
+    expect(identify(encodeScenarioExport(exported())).game).toEqual({
+      name: "BAR",
+    });
+  });
+
+  it("reads the game out of a scenario shared before the shared field", () => {
+    const json = encodeContainerJson("scenario", 1, {
+      scenario: scenario(),
+      media: {},
+    });
+
+    expect(identify(json).game).toEqual({ name: "BAR" });
+    expect(readScenarioExport(json).ok).toBe(true);
+  });
 });
 
 describe("encodeScenarioCode", () => {
@@ -153,6 +178,22 @@ describe("encodeScenarioCode", () => {
     if (!result.ok) throw new Error("expected a code");
 
     expect(identify(result.code).kind).toBe("scenario");
+  });
+
+  // The two routes must not disagree about what a scenario says its game is
+  // (issue #1335), so they build the same payload and this pins that down.
+  it("names the game exactly as the file export does", () => {
+    const installed = [{ name: "BAR", info: { shortname: "byar" } }];
+    const result = encodeScenarioCode(exported(), installed);
+    if (!result.ok) throw new Error("expected a code");
+
+    expect(identify(result.code).game).toEqual({
+      name: "BAR",
+      shortname: "byar",
+    });
+    expect(identify(result.code).game).toEqual(
+      identify(encodeScenarioExport(exported(), installed)).game,
+    );
   });
 
   // The point of the check: a scenario whose clips push it past the ceiling

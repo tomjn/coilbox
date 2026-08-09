@@ -208,7 +208,8 @@ export async function sweepScenarioMedia(
  * This gathers rather than serializing, because the same value feeds both share
  * routes, a file and a code (issue #1336), and reading the clips is the
  * expensive part. A share drawer that offered both would otherwise read them
- * twice.
+ * twice. Naming the game (issue #1335) happens at the serialize step, so both
+ * routes get it from the one place.
  */
 export async function gatherScenarioExport(
   scenario: Scenario,

@@ -645,6 +645,9 @@
       "createdAt": "2026-08-01T13:49:00.676Z",
       "updatedAt": "2026-08-01T14:54:03.277Z"
     },
-    "media": {}
+    "media": {},
+    "game": {
+      "name": "SplinterFaction $VERSION"
+    }
   }
 }

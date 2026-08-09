@@ -8,7 +8,7 @@ vi.mock("@picoframe/frame", () => ({
   useSetting: () => [undefined, () => {}],
 }));
 
-import { encodeContainerCode } from "../container/container";
+import { encodeContainerCode, identify } from "../container/container";
 import type { InstalledContentSnapshot } from "../content/resolveContent";
 import type { SkirmishPreset } from "../play/presets";
 import {
@@ -144,6 +144,29 @@ describe("encodeSetupPack / decodeSetupPack", () => {
     const code = encodeContainerCode("setup-pack", 1, legacyPayload);
     const result = decodeSetupPack(code);
     expect(result).toEqual({ ok: true, settings: rest });
+  });
+
+  it("round-trips the game's shortname beside its archive name", () => {
+    const m = manifest({
+      game: { name: "Beyond All Reason test-27000", shortname: "byar" },
+    });
+    const result = decodeSetupPack(encodeSetupPack(m));
+    expect(result).toEqual({ ok: true, settings: m });
+  });
+
+  it("reads a legacy pack that names its game without a shortname", () => {
+    const legacyPayload = {
+      ...manifest(),
+      game: { name: "Beyond All Reason test-27000" },
+    };
+    const code = encodeContainerCode("setup-pack", 1, legacyPayload);
+    expect(decodeSetupPack(code)).toEqual({
+      ok: true,
+      settings: legacyPayload,
+    });
+    expect(identify(code).game).toEqual({
+      name: "Beyond All Reason test-27000",
+    });
   });
 
   it("rejects a corrupted code cleanly", () => {
