@@ -57,6 +57,7 @@ import {
   mpRegister,
   mpSetStatus,
   mpSnapshot,
+  mpTachyonSignedIn,
   mpTachyonSignIn,
 } from "./bindings";
 import {
@@ -126,6 +127,30 @@ export const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 20000];
 export function reconnectDelay(attempt: number): number {
   const i = Math.min(Math.max(attempt, 0), RECONNECT_DELAYS_MS.length - 1);
   return RECONNECT_DELAYS_MS[i];
+}
+
+/**
+ * Whether a failed connect needs a new browser sign-in rather than another try.
+ *
+ * Only a Tachyon connect can, and only once the server has refused the stored
+ * sign-in. A TASServer login has a password behind it and a Tachyon sign-in that
+ * is merely unreachable is worth retrying, so both answer false and take the
+ * backoff. So does a question the Rust side could not answer.
+ */
+async function needsSignIn(
+  server: LobbyServer,
+  username: string,
+): Promise<boolean> {
+  if (serverProtocol(server) !== "tachyon") return false;
+  try {
+    const { signedIn } = await mpTachyonSignedIn({
+      serverId: server.id,
+      username,
+    });
+    return !signedIn;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -1125,6 +1150,18 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         void notify({ title: "Reconnected to multiplayer", level: "success" });
       } catch {
         if (reconnectGenRef.current !== gen) return;
+        // A Tachyon sign-in the server has refused will be refused again, so
+        // retrying it only delays the one thing that can fix it: another trip
+        // through the browser, which a reconnect must never open by itself.
+        if (await needsSignIn(ctx.server, ctx.username)) {
+          if (reconnectGenRef.current !== gen) return;
+          void notify({
+            title: "Signed out of multiplayer",
+            body: "The server no longer accepts your sign-in. Log in again from the topbar to sign in with your browser.",
+            level: "error",
+          });
+          return;
+        }
         const attempt = ++reconnectAttemptRef.current;
         if (attempt >= RECONNECT_DELAYS_MS.length) {
           void notify({
