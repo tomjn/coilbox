@@ -1,13 +1,11 @@
-import { Button } from "@picoframe/frame";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
-import { AlertTriangle, ExternalLink, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -15,6 +13,7 @@ import { dlFetchText } from "../downloads/bindings";
 import { notify } from "../notify/notify";
 import { describeOpen, type ImportPlan, prepareImport } from "./actions";
 import { setDeepLinkHandler } from "./bus";
+import { ConfirmDialog, type Pending } from "./ConfirmDialog";
 import { type FetchText, fetchImportPlan } from "./fetchImport";
 import { openScreenRoute, parseDeepLink } from "./parse";
 
@@ -59,16 +58,6 @@ const fetchImportText: FetchText = async (url) => {
  * response applies nothing.
  */
 
-/** A confirmed action, held while the dialog is open. */
-interface Pending {
-  title: string;
-  /** One line per fact the user is agreeing to. */
-  lines: string[];
-  warnings: string[];
-  confirmLabel: string;
-  run: () => void;
-}
-
 export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [pending, setPending] = useState<Pending | null>(null);
@@ -85,7 +74,8 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         host
           ? `Import a ${plan.label} downloaded from ${host}?`
           : `Import a ${plan.label} shared with you?`,
-        "It opens in the importer, which resolves any missing content before saving.",
+        plan.detail ??
+          "It opens in the importer, which resolves any missing content before saving.",
       ],
       warnings: plan.warnings,
       confirmLabel: "Continue",
@@ -241,12 +231,6 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
     };
   }, [handleUrl]);
 
-  const confirm = () => {
-    const p = pending;
-    setPending(null);
-    p?.run();
-  };
-
   return (
     <>
       {children}
@@ -263,46 +247,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
           </DialogHeader>
         </DialogContent>
       </Dialog>
-      <Dialog
-        open={pending !== null}
-        onOpenChange={(open) => !open && setPending(null)}
-      >
-        {pending && (
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <ExternalLink className="size-4 text-muted-foreground" />
-                {pending.title}
-              </DialogTitle>
-              <DialogDescription className="sr-only">
-                Confirm this coilbox link before it runs.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="flex flex-col gap-2 text-sm">
-              {pending.lines.map((line) => (
-                <p key={line}>{line}</p>
-              ))}
-              {pending.warnings.map((w) => (
-                <p
-                  key={w}
-                  className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-muted-foreground"
-                >
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                  {w}
-                </p>
-              ))}
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setPending(null)}>
-                Cancel
-              </Button>
-              <Button onClick={confirm}>{pending.confirmLabel}</Button>
-            </DialogFooter>
-          </DialogContent>
-        )}
-      </Dialog>
+      <ConfirmDialog pending={pending} setPending={setPending} />
     </>
   );
 }
