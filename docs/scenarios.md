@@ -251,9 +251,11 @@ A player is told the same facts as an author in different words. "Install it fro
 
 ## Share a scenario
 
-**Export** writes a single `.json` file. It is a coilbox container, `"kind": "scenario"`, and it carries the document plus every portrait and voice clip the dialogue names, inlined as `data:` URIs beside the document.
+**Share** offers three ways out, the same three a preset, a challenge and a setup pack offer. **Copy code** puts a `cbz1.` code on the clipboard to paste into chat. **Copy link** wraps that code as a `coilbox://` link. **Export as file** writes a single `.json`. All three carry the same thing: a coilbox container, `"kind": "scenario"`, holding the document plus every portrait and voice clip the dialogue names, inlined as `data:` URIs beside the document.
 
-**Import** reads one back, from either **Play > Scenarios** or the builder. It **always makes a new copy**: importing your own export gives you a second scenario with a new id, never an overwrite. A file that is not a coilbox scenario, is damaged, or was made by a newer coilbox is rejected with a reason rather than half-read. A clip an import cannot write, one over 16 MB for instance, is skipped and the line that named it loses it, rather than the whole scenario being refused.
+A scenario is the one shareable thing with no upper bound on size, because those clips travel inside it. A code is capped at 512 KB of content, which no amount of authoring will reach on its own (the Silence the Jericho mission below is a 3,128 character code, and copying it out to 581 triggers still only makes an 18,000 character one), but which 380 KB of portraits and voice clips passes by itself. When a scenario is past it, Share says so and offers the file alone, rather than handing you a code that would fail on the other end. A link is capped lower still, so a scenario with any real amount of media gets a code and a file but no link.
+
+**Import** reads any of them back, from either **Play > Scenarios** or the builder: paste a code into the box, or press **Import from file…**. It **always makes a new copy**: importing your own export gives you a second scenario with a new id, never an overwrite. Something that is not a coilbox scenario, is damaged, or was made by a newer coilbox is rejected with a reason rather than half-read. A clip an import cannot write, one over 16 MB for instance, is skipped and the line that named it loses it, rather than the whole scenario being refused.
 
 If the scenario is played on a game or a map you do not have, import offers to download them first, the same way importing a campaign does. Nothing is written until they are both here, so cancelling leaves you with nothing to clean up.
 
@@ -261,13 +263,13 @@ The other way to ship one is to attach it to a campaign mission and bundle the c
 
 ## Ship a scenario in a distribution
 
-A [distribution profile](distribution-profile.md) can hand out scenarios the same way it hands out campaigns. Export the scenario and drop the `.json` into the portable `.coilbox/scenarios/` folder beside the executable, with any name you like. Coilbox lists it alongside the player's own, marked **Bundled**.
+A [distribution profile](distribution-profile.md) can hand out scenarios the same way it hands out campaigns. Share the scenario, choose **Export as file**, and drop the `.json` into the portable `.coilbox/scenarios/` folder beside the executable, with any name you like. Coilbox lists it alongside the player's own, marked **Bundled**.
 
 A bundled scenario is read-only:
 
 - It plays from **Play > Scenarios** exactly as any other scenario does. Its dialogue portraits and voice clips travel inside the export file and are written out the first time it is played, so its radio messages have their pictures and voices.
 - It cannot be edited or deleted. Opening its editor route says so instead of opening the editor, and the Scenario Builder row has no Edit and no Delete.
-- It can still be **Exported**. Import that file back and you have a local copy that is yours to change.
+- It can still be **Shared**. Import the code or the file back and you have a local copy that is yours to change.
 
 Coilbox never writes into `.coilbox/`, so removing a bundled scenario means removing the file from the package. Its clips are cleaned up on the next start once it is gone.
 
@@ -275,7 +277,7 @@ Coilbox never writes into `.coilbox/`, so removing a bundled scenario means remo
 
 **Silence the Jericho** is the first mission authored end to end in the Scenario Builder, and you can download it as an export: [silence-the-jericho.json](/scenarios/silence-the-jericho.json).
 
-Importing it takes nothing but coilbox. Open **Play > Scenarios**, press **Import** and pick the file. With Advanced mode on you can do the same from **Scenario Builder > Builder** and get a scenario you can read and edit like any other.
+Importing it takes nothing but coilbox. Open **Play > Scenarios**, press **Import**, then **Import from file…** and pick it. With Advanced mode on you can do the same from **Scenario Builder > Builder** and get a scenario you can read and edit like any other.
 
 Playing it needs the game it was written for. That machine also needs, in this order:
 
