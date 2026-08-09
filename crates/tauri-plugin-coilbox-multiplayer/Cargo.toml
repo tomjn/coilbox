@@ -18,6 +18,7 @@ serde_json = "1"
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 coilbox-lobby-protocol = { path = "../coilbox-lobby-protocol" }
+coilbox-tachyon-protocol = { path = "../coilbox-tachyon-protocol" }
 tokio = { version = "1", features = ["net", "io-util", "sync", "rt", "macros", "time"] }
 tokio-util = { version = "0.7", features = ["codec", "rt"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"] }

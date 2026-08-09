@@ -5057,6 +5057,7 @@ version = "0.0.0"
 dependencies = [
  "coilbox-lobby-protocol",
  "coilbox-portable",
+ "coilbox-tachyon-protocol",
  "futures-util",
  "picoframe-core",
  "rustls",
