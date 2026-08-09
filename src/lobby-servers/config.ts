@@ -2,6 +2,9 @@ import { useSetting } from "@picoframe/frame";
 import type { ProfileLobby } from "../profile/profile";
 import { getProfile } from "../profile/profile";
 
+/** The wire protocol a lobby server speaks. See `docs/tachyon-protocol.md`. */
+export type LobbyProtocol = "tasserver" | "tachyon";
+
 /**
  * A lobby server (connection target). Secrets are NOT stored here — passwords live
  * in the OS keychain keyed by `{serverId, username}` (see `bindings.ts`). Built-in
@@ -15,10 +18,34 @@ export interface LobbyServer {
   tls: boolean;
   /** Accept a self-signed server cert (uberserver ships one; teiserver does not). */
   allowSelfSigned: boolean;
+  /**
+   * The wire protocol. Absent means `tasserver`, so a server stored before this
+   * field existed keeps working with no migration. Read it through
+   * {@link serverProtocol} rather than reaching for it directly.
+   */
+  protocol?: LobbyProtocol;
   /** True for built-in catalog entries. Absent on user-defined custom servers. */
   builtin?: boolean;
   /** The distribution's preferred server (profile `lobby.official`): badged + first. */
   official?: boolean;
+}
+
+/** The protocol a server speaks, reading an absent field as `tasserver`. Pure. */
+export function serverProtocol(server: {
+  protocol?: LobbyProtocol;
+}): LobbyProtocol {
+  return server.protocol ?? "tasserver";
+}
+
+/**
+ * Whether a server can be offered to the user yet. Temporary scaffolding: nothing
+ * in the app can connect over Tachyon, so the Tachyon entry is defined but kept out
+ * of the catalog rather than shown as a row that fails when clicked. Delete this
+ * function and the `.filter` in {@link buildCatalog} when issue #1224 lands the
+ * Tachyon connection.
+ */
+export function serverOfferable(server: LobbyServer): boolean {
+  return serverProtocol(server) !== "tachyon";
 }
 
 /** The id assigned to an inline profile-defined official server (no natural id). */
@@ -28,6 +55,8 @@ export const OFFICIAL_ID = "profile-official";
  * The well-known public lobby servers, taken from SkyLobby's `default-servers`
  * (graal/clj/skylobby/util.clj). Read-only; users add logins against these. BAR's
  * plain (8200) and SSL (8201) endpoints are kept as two entries, mirroring SkyLobby.
+ * BAR's Tachyon endpoint is a third entry, because the same server runs both
+ * protocols and TASServer has no announced sunset.
  */
 export const BUILTIN_SERVERS: LobbyServer[] = [
   {
@@ -70,6 +99,19 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     port: 8201,
     tls: true,
     allowSelfSigned: false,
+  },
+  {
+    id: "bar-tachyon",
+    name: "Beyond All Reason (Tachyon)",
+    host: "server4.beyondallreason.info",
+    // The endpoint is wss://server4.beyondallreason.info/tachyon, so this server's
+    // real identity is a URL origin, not a host and port. Storing the HTTPS port is
+    // deliberate: it keeps the derived serverKey `${username}@${host}:${port}` unique
+    // per entry, so no consumer of that key has to change. See docs/tachyon-protocol.md.
+    port: 443,
+    tls: true,
+    allowSelfSigned: false,
+    protocol: "tachyon",
   },
 ];
 
@@ -130,7 +172,8 @@ export function buildCatalog(
   const list: LobbyServer[] = [];
   if (rules.official) list.push({ ...rules.official, builtin: true });
   list.push(...builtins, ...custom);
-  return list;
+  // Temporary, see serverOfferable. Goes away with issue #1224.
+  return list.filter(serverOfferable);
 }
 
 /**

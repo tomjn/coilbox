@@ -103,6 +103,28 @@ describe("planMigration", () => {
     expect(plan.accounts[0].serverId).toBe("bar-ssl");
   });
 
+  it("never matches the Tachyon built-in, keeping such a row custom", () => {
+    // The old directory only ever held TASServer connections, so a row on the BAR
+    // host and port 443 is a user's own entry, not the Tachyon endpoint.
+    const plan = planMigration(
+      {
+        servers: [
+          row({
+            id: "odd-1",
+            host: "server4.beyondallreason.info",
+            port: 443,
+            tls: true,
+            username: "dave",
+          }),
+        ],
+      },
+      ids(),
+    );
+    expect(plan.customServers[0]).toMatchObject({ id: "odd-1", port: 443 });
+    expect(plan.accounts[0].serverId).toBe("odd-1");
+    expect(plan.reKey).toEqual([]);
+  });
+
   it("emits a server but no account when the row has no username", () => {
     const plan = planMigration(
       { servers: [row({ id: "lan-2", host: "10.0.0.6" })] },
