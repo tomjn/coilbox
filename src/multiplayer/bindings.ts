@@ -161,18 +161,21 @@ export interface Battle {
 }
 
 /**
- * A live SPADS autohost vote in the current battle (mirrors `Vote`). Present only
- * while a vote is open; drives the one-click vote panel.
+ * A live vote in the current battle (mirrors `Vote`). Present only while a vote
+ * is open, and drives the one-click vote panel. Scraped out of chat on a
+ * TASServer connection and read off the lobby on a Tachyon one.
  */
 export interface Vote {
   subject: string;
   caller: string;
   yes: number;
   no: number;
+  /** Yes votes needed to pass, 0 when the server has not said. */
   yesNeeded: number;
+  /** No votes needed to fail, 0 when the server has not said. */
   noNeeded: number;
   allowAbstain: boolean;
-  /** Unix-millis deadline from the progress line's "Ns remaining" (0 if unknown). */
+  /** Unix-millis deadline (0 if unknown). */
   endsAt: number;
 }
 
@@ -188,7 +191,7 @@ export interface LobbyState {
   /** The UDP port the server assigned for a battle we host (`HOSTPORT`). */
   hostPort: number | null;
   channelDirectory: DirChannel[];
-  /** A live SPADS autohost vote in the current battle, or null when none is open. */
+  /** A live vote in the current battle, or null when none is open. */
   currentVote: Vote | null;
   /** Server-confirmed ignores (from `IGNORELIST` and IGNORE/UNIGNORE acks). The
    * local ignore list drives client-side hiding; this mirrors the server's set. */
@@ -707,6 +710,19 @@ export const mpKick = defineCommand<
   { serverKey: string; username: string },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_kick");
+
+/** How a member votes, in the words `lobby/voteSubmit` uses. */
+export type VoteChoice = "yes" | "no" | "abstain";
+
+/**
+ * Vote in the battle's open vote. Tachyon holds the vote itself, so this is
+ * `lobby/voteSubmit`. SPADS has no command for it, so there it is `!vote` in
+ * battle chat, which is what the scraper reads back.
+ */
+export const mpCastVote = defineCommand<
+  { serverKey: string; choice: VoteChoice },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_cast_vote");
 
 /** Tachyon only: make a member a boss, so they may change the lobby. */
 export const mpAppointBoss = defineCommand<

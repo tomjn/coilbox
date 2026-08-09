@@ -14,10 +14,11 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "@/play/config";
-import type { Battle, MemberStatus, Vote } from "../bindings";
+import type { Battle, MemberStatus, Vote, VoteChoice } from "../bindings";
 import {
   mpAddBot,
   mpAppointBoss,
+  mpCastVote,
   mpForceAlly,
   mpForceColor,
   mpForceSpectator,
@@ -146,11 +147,14 @@ export interface BattleRoomView {
   /** Whether the battle host (autohost) is in-game — i.e. the match has started. */
   hostIngame: boolean;
   /**
-   * The live SPADS autohost vote in this battle, or null. Only ever set for
-   * autohost battles (a bot host posts the vote lines we parse); drives the
-   * one-click vote panel. Vote with `autohostSend("!vote y|n|b")`.
+   * The live vote in this battle, or null. Drives the one-click vote panel.
+   * Scraped out of the autohost's chat lines on a TASServer connection, so it is
+   * only ever set for autohost battles there, and read off the lobby on a
+   * Tachyon one. Vote with `castVote`.
    */
   currentVote: Vote | null;
+  /** Vote in the open vote. */
+  castVote: (choice: VoteChoice) => Promise<void>;
   /** Whether the match can start: a playing participant (human or bot) exists and
    * every non-spectator human is ready (see `battleStartable`). */
   allReady: boolean;
@@ -755,6 +759,17 @@ export function useBattleRoom(): BattleRoomView {
     [activeKey, clearErr, setErr],
   );
 
+  // Vote in the open vote. The fork between `lobby/voteSubmit` and an `!vote`
+  // chat line to the autohost is the Rust side's, because only it knows which
+  // vote the lobby is holding.
+  const castVote = useCallback(
+    async (choice: VoteChoice) => {
+      if (!activeKey) return;
+      await mpCastVote({ serverKey: activeKey, choice }).then(clearErr, setErr);
+    },
+    [activeKey, clearErr, setErr],
+  );
+
   // Route one option edit. Founder: set the script tag directly. Autohost battle:
   // send `!bSet <name> <value>`; the autohost validates + echoes SETSCRIPTTAGS.
   const sendOption = useCallback(
@@ -921,6 +936,7 @@ export function useBattleRoom(): BattleRoomView {
     actionError,
     hostIngame,
     currentVote,
+    castVote,
     allReady,
     serverKey: activeKey,
     contentNonce,
