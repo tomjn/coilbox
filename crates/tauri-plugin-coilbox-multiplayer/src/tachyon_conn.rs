@@ -250,17 +250,16 @@ async fn run_loop(
     // connection asks as soon as it is up. A server that has not built
     // matchmaking answers `command_unimplemented`, which turns the screen off
     // rather than showing an error.
-    if let Some(client) = client.clone() {
+    if let (Some(client), Ok(request)) = (
+        client.clone(),
+        tachyon_matchmaking::request_for(&queues, &tachyon_matchmaking::MatchmakingAction::List),
+    ) {
         matchmake(
             client,
             sink.clone(),
             queues_tx.clone(),
             queued_tx.clone(),
-            tachyon_matchmaking::Request {
-                command: "matchmaking/list",
-                data: None,
-                effect: None,
-            },
+            request,
         );
     }
 
