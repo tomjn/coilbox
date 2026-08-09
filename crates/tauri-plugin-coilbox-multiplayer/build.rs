@@ -46,6 +46,8 @@ const COMMANDS: &[&str] = &[
     "mp_force_color",
     "mp_force_spectator",
     "mp_kick",
+    "mp_appoint_boss",
+    "mp_unboss",
     "mp_set_start_rect",
     "mp_remove_start_rect",
     "mp_set_script_tags",

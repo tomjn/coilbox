@@ -127,14 +127,47 @@ fn known(state: &mut LobbyState, id: &str, name: &str) {
     );
 }
 
-/// A room with both players named, which is the ordinary case.
+/// A room with both players named, which is the ordinary case. We are alice,
+/// so the seat controls have someone to act for.
 fn joined_room() -> (Option<Room>, LobbyState) {
+    joined_as(details(json!({})))
+}
+
+/// A room built from `details`, joined as alice.
+fn joined_as(details: Value) -> (Option<Room>, LobbyState) {
     let mut state = LobbyState::new();
+    state.my_username = Some("alice".into());
     known(&mut state, "1", "alice");
     known(&mut state, "2", "bob");
     let mut room = None;
-    feed(&mut room, &mut state, &join_frame(details(json!({}))));
+    feed(&mut room, &mut state, &join_frame(details));
     (room, state)
+}
+
+/// The seat the room pushes: a player on ally 0, ready, with the content.
+fn seated() -> BattleStatus {
+    BattleStatus {
+        ready: true,
+        team_id: 0,
+        ally: 0,
+        mode: true,
+        handicap: 0,
+        sync: 1,
+        side: 0,
+    }
+}
+
+/// What one control's action asks of the server.
+fn asked(room: &Option<Room>, state: &LobbyState, action: RoomAction) -> Vec<(String, Value)> {
+    requests_for(room, state, &action)
+        .into_iter()
+        .map(|request| {
+            (
+                request.command.to_owned(),
+                request.data.unwrap_or(Value::Null),
+            )
+        })
+        .collect()
 }
 
 /// The battle the room reads.
@@ -540,6 +573,424 @@ fn a_subscription_asks_for_no_more_than_the_schema_allows() {
     );
 
     assert_eq!(ids_to_subscribe(&state, &room).len(), SUBSCRIBE_LIMIT);
+}
+
+#[test]
+fn the_bosses_reach_the_roster_under_their_names() {
+    let (_room, state) = joined_as(details(
+        json!({ "areBossesEnabled": true, "bosses": { "2": {}, "9": {} } }),
+    ));
+
+    let battle = battle(&state);
+    assert!(battle.bosses_enabled);
+    // 9 is nobody we can name yet, so they stand under their id until a
+    // subscription answers, exactly as a member does.
+    assert_eq!(battle.bosses, vec!["bob".to_owned(), "9".to_owned()]);
+}
+
+#[test]
+fn a_lobby_with_no_bosses_says_so() {
+    let (_room, state) = joined_room();
+
+    assert!(!battle(&state).bosses_enabled);
+    assert!(battle(&state).bosses.is_empty());
+}
+
+#[test]
+fn turning_off_the_player_toggle_asks_to_spectate() {
+    let (room, state) = joined_room();
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::OwnStatus(BattleStatus {
+            mode: false,
+            ..seated()
+        }),
+    );
+
+    assert_eq!(asked, vec![("lobby/spectate".to_owned(), Value::Null)]);
+}
+
+#[test]
+fn a_spectator_asked_to_spectate_again_asks_for_nothing() {
+    let (room, state) = joined_as(details(json!({
+        "players": {},
+        "spectators": { "01": { "id": "1" } },
+    })));
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::OwnStatus(BattleStatus {
+            mode: false,
+            ..seated()
+        }),
+    );
+
+    assert!(asked.is_empty(), "{asked:?}");
+}
+
+#[test]
+fn the_ally_picker_names_the_ally_team_the_index_stands_for() {
+    let (room, state) = joined_room();
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::OwnStatus(BattleStatus {
+            ally: 1,
+            ..seated()
+        }),
+    );
+
+    assert_eq!(
+        asked,
+        vec![("lobby/joinAllyTeam".to_owned(), json!({ "allyTeam": "02" }))]
+    );
+}
+
+#[test]
+fn a_seat_push_that_changes_nothing_asks_for_nothing() {
+    // Every control pushes the whole status, so most pushes carry no news. One
+    // request each would spend the server's ten a second on nothing.
+    let (room, state) = joined_room();
+
+    let asked = asked(&room, &state, RoomAction::OwnStatus(seated()));
+
+    assert!(asked.is_empty(), "{asked:?}");
+}
+
+#[test]
+fn a_spectator_taking_a_seat_asks_for_the_ally_team_alone() {
+    // The server has no assets on file for someone who was not playing, so
+    // reporting them is the room's next push rather than this one.
+    let (room, state) = joined_as(details(json!({
+        "players": {},
+        "spectators": { "01": { "id": "1" } },
+    })));
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::OwnStatus(BattleStatus {
+            ready: false,
+            sync: 2,
+            ..seated()
+        }),
+    );
+
+    assert_eq!(
+        asked,
+        vec![("lobby/joinAllyTeam".to_owned(), json!({ "allyTeam": "01" }))]
+    );
+}
+
+#[test]
+fn the_ready_toggle_reports_our_assets_with_it() {
+    // Both travel on one command, and the room knows whether the map and game
+    // are installed, so it says so rather than leaving the server to guess.
+    let (room, state) = joined_room();
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::OwnStatus(BattleStatus {
+            ready: false,
+            ..seated()
+        }),
+    );
+
+    assert_eq!(
+        asked,
+        vec![(
+            "lobby/updateClientStatus".to_owned(),
+            json!({ "isReady": false, "assetStatus": "complete" })
+        )]
+    );
+}
+
+#[test]
+fn missing_content_is_reported_as_missing_assets() {
+    let (room, state) = joined_room();
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::OwnStatus(BattleStatus {
+            sync: 2,
+            ..seated()
+        }),
+    );
+
+    assert_eq!(
+        asked,
+        vec![(
+            "lobby/updateClientStatus".to_owned(),
+            json!({ "isReady": true, "assetStatus": "missing" })
+        )]
+    );
+}
+
+#[test]
+fn a_seat_control_with_nobody_signed_in_asks_for_nothing() {
+    let (room, mut state) = joined_room();
+    state.my_username = None;
+
+    assert!(asked(&room, &state, RoomAction::OwnStatus(seated())).is_empty());
+}
+
+#[test]
+fn adding_a_bot_names_the_ally_team_and_the_ai() {
+    let (room, state) = joined_room();
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::AddBot {
+            name: "BARb1".into(),
+            ally: 1,
+            ai: "BARb".into(),
+        },
+    );
+
+    assert_eq!(
+        asked,
+        vec![(
+            "lobby/addBot".to_owned(),
+            json!({ "allyTeam": "02", "name": "BARb1", "shortName": "BARb" })
+        )]
+    );
+}
+
+#[test]
+fn adding_a_bot_to_an_ally_team_the_lobby_lacks_asks_for_nothing() {
+    let (room, state) = joined_room();
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::AddBot {
+            name: "BARb1".into(),
+            ally: 9,
+            ai: "BARb".into(),
+        },
+    );
+
+    assert!(asked.is_empty(), "{asked:?}");
+}
+
+/// A lobby holding one bot, which the roster shows as Barbarian.
+fn with_a_bot() -> Value {
+    details(json!({
+        "bots": { "01": {
+            "id": "bot-1",
+            "hostUserId": "1",
+            "allyTeam": "02",
+            "team": "01",
+            "player": "01",
+            "shortName": "BARb",
+            "name": "Barbarian",
+        } },
+    }))
+}
+
+#[test]
+fn changing_a_bots_ai_names_the_bot_by_the_id_the_server_gave_it() {
+    // The TASServer path removes the bot and adds it back, because its protocol
+    // carries the AI on the add alone. Tachyon changes it in place, which is one
+    // request rather than two and keeps the bot's seat.
+    let (room, state) = joined_as(with_a_bot());
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::ChangeBotAi {
+            name: "Barbarian".into(),
+            ai: "NullAI".into(),
+        },
+    );
+
+    assert_eq!(
+        asked,
+        vec![(
+            "lobby/updateBot".to_owned(),
+            json!({ "id": "bot-1", "shortName": "NullAI", "name": "Barbarian" })
+        )]
+    );
+}
+
+#[test]
+fn removing_a_bot_names_the_bot_by_the_id_the_server_gave_it() {
+    let (room, state) = joined_as(with_a_bot());
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::RemoveBot {
+            name: "Barbarian".into(),
+        },
+    );
+
+    assert_eq!(
+        asked,
+        vec![("lobby/removeBot".to_owned(), json!({ "id": "bot-1" }))]
+    );
+}
+
+#[test]
+fn a_bot_the_roster_had_to_key_by_id_is_still_the_one_removed() {
+    // Two bots share a display name, so the roster files the second under its
+    // id. A control naming that row has to reach that bot and not the first.
+    let bot = |id: &str, ally: &str| {
+        json!({
+            "id": id, "hostUserId": "1", "allyTeam": ally, "team": "01",
+            "player": "01", "shortName": "BARb", "name": "Barbarian",
+        })
+    };
+    let (room, state) = joined_as(details(json!({
+        "bots": { "01": bot("bot-1", "01"), "02": bot("bot-2", "02") },
+    })));
+
+    assert_eq!(
+        battle(&state)
+            .bots
+            .keys()
+            .collect::<std::collections::BTreeSet<_>>(),
+        ["Barbarian".to_owned(), "bot-2".to_owned()]
+            .iter()
+            .collect()
+    );
+    assert_eq!(
+        asked(
+            &room,
+            &state,
+            RoomAction::RemoveBot {
+                name: "bot-2".into()
+            }
+        ),
+        vec![("lobby/removeBot".to_owned(), json!({ "id": "bot-2" }))]
+    );
+}
+
+#[test]
+fn kicking_names_the_member_by_their_user_id() {
+    // No `banUntil`, which is what makes it a kick rather than a ban.
+    let (room, state) = joined_room();
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::Kick {
+            username: "bob".into(),
+        },
+    );
+
+    assert_eq!(
+        asked,
+        vec![("lobby/kickban".to_owned(), json!({ "userId": "2" }))]
+    );
+}
+
+#[test]
+fn kicking_someone_we_cannot_name_asks_for_nothing() {
+    let (room, state) = joined_room();
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::Kick {
+            username: "nobody".into(),
+        },
+    );
+
+    assert!(asked.is_empty(), "{asked:?}");
+}
+
+#[test]
+fn changing_the_map_carries_the_map_alone() {
+    // `lobby/update` also carries the lobby's name, its ally team config and its
+    // game options, and a field it does not name is left alone.
+    let (room, state) = joined_room();
+
+    let asked = asked(
+        &room,
+        &state,
+        RoomAction::SetMap {
+            map: "Red Comet Remake 1.8".into(),
+        },
+    );
+
+    assert_eq!(
+        asked,
+        vec![(
+            "lobby/update".to_owned(),
+            json!({ "mapName": "Red Comet Remake 1.8" })
+        )]
+    );
+}
+
+#[test]
+fn appointing_and_standing_down_a_boss_name_them_by_user_id() {
+    let (room, state) = joined_room();
+
+    assert_eq!(
+        asked(
+            &room,
+            &state,
+            RoomAction::AppointBoss {
+                username: "bob".into()
+            }
+        ),
+        vec![("lobby/appointBoss".to_owned(), json!({ "userId": "2" }))]
+    );
+    assert_eq!(
+        asked(
+            &room,
+            &state,
+            RoomAction::Unboss {
+                username: "bob".into()
+            }
+        ),
+        vec![("lobby/unboss".to_owned(), json!({ "userId": "2" }))]
+    );
+}
+
+#[test]
+fn a_control_outside_a_lobby_asks_for_nothing() {
+    let state = LobbyState::new();
+
+    assert!(asked(&None, &state, RoomAction::OwnStatus(seated())).is_empty());
+}
+
+#[test]
+fn a_patch_moving_us_changes_what_the_next_seat_push_asks_for() {
+    // The requests are read off the lobby we hold, so a patch that moves us has
+    // to change them. Otherwise a control would keep asking for a move already
+    // made, or stop asking for one still needed.
+    let (mut room, mut state) = joined_room();
+    feed(
+        &mut room,
+        &mut state,
+        &updated_frame(json!({
+            "id": "lobby-a",
+            "players": { "01": { "id": "1", "allyTeam": "02" } },
+        })),
+    );
+
+    assert!(asked(
+        &room,
+        &state,
+        RoomAction::OwnStatus(BattleStatus {
+            ally: 1,
+            ..seated()
+        })
+    )
+    .is_empty());
+    assert_eq!(
+        asked(&room, &state, RoomAction::OwnStatus(seated())),
+        vec![("lobby/joinAllyTeam".to_owned(), json!({ "allyTeam": "01" }))]
+    );
 }
 
 #[test]

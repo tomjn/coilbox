@@ -47,6 +47,8 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-force-color`
 - `allow-mp-force-spectator`
 - `allow-mp-kick`
+- `allow-mp-appoint-boss`
+- `allow-mp-unboss`
 - `allow-mp-set-start-rect`
 - `allow-mp-remove-start-rect`
 - `allow-mp-set-script-tags`
@@ -143,6 +145,32 @@ Enables the mp_add_bot command without any pre-configured scope.
 <td>
 
 Denies the mp_add_bot command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-appoint-boss`
+
+</td>
+<td>
+
+Enables the mp_appoint_boss command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-appoint-boss`
+
+</td>
+<td>
+
+Denies the mp_appoint_boss command without any pre-configured scope.
 
 </td>
 </tr>
@@ -1391,6 +1419,32 @@ Enables the mp_tachyon_sign_out command without any pre-configured scope.
 <td>
 
 Denies the mp_tachyon_sign_out command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-unboss`
+
+</td>
+<td>
+
+Enables the mp_unboss command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-unboss`
+
+</td>
+<td>
+
+Denies the mp_unboss command without any pre-configured scope.
 
 </td>
 </tr>

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-unboss"
+description = "Enables the mp_unboss command without any pre-configured scope."
+commands.allow = ["mp_unboss"]
+
+[[permission]]
+identifier = "deny-mp-unboss"
+description = "Denies the mp_unboss command without any pre-configured scope."
+commands.deny = ["mp_unboss"]

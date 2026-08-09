@@ -18,9 +18,9 @@
 //! populates `users` and `my_username`, through [`crate::tachyon_lobbies`],
 //! which populates `battles`, and through [`crate::tachyon_room`], which
 //! populates `current_battle` and the joined lobby's detail. Chat and friends
-//! are issues #1230 onward, so the rest of the state is still empty.
+//! are issues #1232 onward, so the rest of the state is still empty.
 //!
-//! Every queued action other than a shutdown and the two lobby ones is a
+//! Every queued action other than a shutdown and the lobby ones is a
 //! TASServer wire line with no Tachyon equivalent. Issue #1235 hides the
 //! surfaces that offer them, and until then they are dropped and noted in the
 //! console rather than put on the socket.
@@ -257,6 +257,17 @@ async fn run_loop(
                         leave(client, sink.clone(), left_tx.clone());
                     }
                 }
+                Outbound::Tachyon(TachyonAction::Room(action)) => {
+                    let requests = {
+                        let state = lock_or_recover(&state);
+                        tachyon_room::requests_for(&room, &state, &action)
+                    };
+                    for request in requests {
+                        if let Some(client) = client.clone() {
+                            act(client, sink.clone(), request);
+                        }
+                    }
+                }
                 Outbound::Shutdown => {
                     // Letting the last client handle go is what asks the correlator
                     // to close politely, so the registry's copy has to go with ours
@@ -335,7 +346,7 @@ fn join(
                 &sink,
                 LobbyEvent::Delta {
                     delta: Delta::JoinBattleFailed {
-                        reason: join_failure(&error),
+                        reason: refusal(&error),
                     },
                 },
             ),
@@ -364,22 +375,86 @@ fn leave(client: TachyonClient, sink: EventSink, outcome: mpsc::UnboundedSender<
     });
 }
 
-/// Why a join did not happen, in words the user can act on.
+/// Carry out one battle room control's request, off the connection loop.
 ///
-/// `lobby/join` adds `lobby_full` and `banned` to the four reasons every command
-/// can fail with, and the frontend puts this straight in front of the user, so
-/// each one is spelled out rather than shown as its wire value.
-fn join_failure(error: &RequestError) -> String {
+/// A refusal goes in front of the user rather than only into the console. The
+/// command the control called returned as soon as the action was queued, so
+/// there is nothing left for it to report back to.
+///
+/// An ally team that is full is the one refusal the room can still do something
+/// about. Tachyon has a queue for that case, so a seat request that finds the
+/// ally team full asks for a place in the queue instead. Two requests on one
+/// click at worst, and only after the first was refused.
+fn act(client: TachyonClient, sink: EventSink, request: tachyon_room::Request) {
+    tokio::spawn(async move {
+        let Err(error) = client.request(request.command, request.data).await else {
+            return;
+        };
+        if request.command == "lobby/joinAllyTeam" && is_full(&error) {
+            ask(client, sink, "lobby/joinQueue", None);
+            return;
+        }
+        refused(&sink, request.command, &error);
+    });
+}
+
+/// Whether a refusal was "there is no room on that ally team".
+fn is_full(error: &RequestError) -> bool {
+    matches!(error, RequestError::Failed(failure) if failure.reason.as_wire() == "ally_team_full")
+}
+
+/// Tell the user a room action did not happen, and why.
+fn refused(sink: &EventSink, command: &str, error: &RequestError) {
+    emit(
+        sink,
+        LobbyEvent::Delta {
+            delta: Delta::ServerMessage {
+                text: format!("{} failed. {}", what(command), refusal(error)),
+                boxed: false,
+            },
+        },
+    );
+}
+
+/// What a lobby command does, in the words the control that sent it uses.
+fn what(command: &str) -> &str {
+    match command {
+        "lobby/spectate" => "Moving to the spectators",
+        "lobby/joinAllyTeam" => "Taking a seat",
+        "lobby/joinQueue" => "Joining the queue for a seat",
+        "lobby/updateClientStatus" => "Reporting your status",
+        "lobby/addBot" => "Adding the bot",
+        "lobby/updateBot" => "Changing the bot",
+        "lobby/removeBot" => "Removing the bot",
+        "lobby/kickban" => "Kicking that player",
+        "lobby/update" => "Changing the lobby",
+        "lobby/appointBoss" => "Making that player a boss",
+        "lobby/unboss" => "Standing that boss down",
+        other => other,
+    }
+}
+
+/// Why a request was refused, in words the user can act on.
+///
+/// The frontend puts this straight in front of the user, so a reason is spelled
+/// out rather than shown as its wire value. Each lobby command adds its own
+/// reasons to the four every command can fail with, and no two commands give the
+/// same reason a different meaning, so one table covers them all.
+fn refusal(error: &RequestError) -> String {
     let RequestError::Failed(failure) = error else {
         return error.to_string();
     };
     let reason = match failure.reason.as_wire() {
         "lobby_full" => "The battle is full.",
+        "ally_team_full" => "That ally team is full.",
+        "not_in_lobby" => "You are not in this lobby.",
+        "not_a_player" => "Only a player can do that.",
+        "bosses_not_allowed" => "This lobby does not allow bosses.",
         "banned" => "You are banned from this battle.",
-        "unauthorized" => "The server did not let you in.",
+        "unauthorized" => "The server did not allow that.",
         "internal_error" => "The server failed on its own side.",
         "invalid_request" => "The server rejected the request.",
-        "command_unimplemented" => "This server cannot join battles yet.",
+        "command_unimplemented" => "This server cannot do that yet.",
         other => other,
     };
     match &failure.details {
@@ -1025,6 +1100,106 @@ mod tests {
             }
         }
         assert!(lock_or_recover(&state).battles[&handle].members.is_empty());
+    }
+
+    /// The `user/self` event that tells the connection we are alice, user 1,
+    /// which is the first player in [`lobby_details`].
+    fn self_frame() -> Message {
+        Message::text(
+            json!({
+                "type": "event",
+                "messageId": "0",
+                "commandId": "user/self",
+                "data": { "user": {
+                    "userId": "1",
+                    "username": "alice",
+                    "displayName": "Alice",
+                    "clanBaseData": null,
+                    "status": "menu",
+                    "party": null,
+                    "invitedToParties": [],
+                    "friendIds": [],
+                    "outgoingFriendRequest": [],
+                    "incomingFriendRequest": [],
+                    "ignoreIds": [],
+                    "currentLobby": null,
+                    "clanInvites": [],
+                    "matchmaking": { "state": "no_matchmaking" },
+                } },
+            })
+            .to_string(),
+        )
+    }
+
+    /// A seat control's push moving us to the second ally team, reaching the
+    /// server through the same path a click does.
+    ///
+    /// A full ally team is the one refusal the room can still do something
+    /// about, so this proves the fallback: the seat request is refused and a
+    /// queue place is asked for instead, without the user clicking again.
+    #[tokio::test]
+    async fn a_seat_request_refused_for_a_full_ally_team_asks_for_a_queue_place() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = serve(move |mut ws| async move {
+            // The list first, so the first delta is the one `listed_handle`
+            // waits for.
+            ws.send(list_reset()).await.unwrap();
+            ws.send(self_frame()).await.unwrap();
+            while let Some(Ok(msg)) = ws.next().await {
+                let Message::Text(text) = msg else { continue };
+                let _ = seen_tx.send(text.to_string());
+                let request: Value = serde_json::from_str(&text).unwrap();
+                let mut response = match request["commandId"].as_str() {
+                    Some("lobby/join") => {
+                        json!({ "type": "response", "status": "success", "data": lobby_details() })
+                    }
+                    Some("lobby/joinAllyTeam") => {
+                        json!({ "type": "response", "status": "failed", "reason": "ally_team_full" })
+                    }
+                    _ => json!({ "type": "response", "status": "success" }),
+                };
+                let body = response.as_object_mut().unwrap();
+                body.insert("messageId".into(), request["messageId"].clone());
+                body.insert("commandId".into(), request["commandId"].clone());
+                ws.send(Message::text(response.to_string())).await.unwrap();
+            }
+        })
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+        let handle = listed_handle(&registry, &mut rx).await;
+        let sender = sender(&registry, "alice@bar:443");
+
+        sender
+            .send(Outbound::Tachyon(TachyonAction::JoinLobby {
+                battle: handle,
+            }))
+            .unwrap();
+        wait_for_sent(&mut seen_rx, "lobby/join").await;
+        loop {
+            if wait_for(&mut rx, "delta").await["delta"]["kind"] == "enteredBattle" {
+                break;
+            }
+        }
+
+        // Alice sits on the first ally team, so ally 1 is a move.
+        sender
+            .send(Outbound::Tachyon(TachyonAction::Room(
+                crate::tachyon_room::RoomAction::OwnStatus(coilbox_lobby_protocol::BattleStatus {
+                    ready: true,
+                    team_id: 0,
+                    ally: 1,
+                    mode: true,
+                    handicap: 0,
+                    sync: 1,
+                    side: 0,
+                }),
+            )))
+            .unwrap();
+
+        let frame = wait_for_sent(&mut seen_rx, "lobby/joinAllyTeam").await;
+        assert_eq!(frame["data"]["allyTeam"], "02");
+        wait_for_sent(&mut seen_rx, "lobby/joinQueue").await;
     }
 
     #[tokio::test]
