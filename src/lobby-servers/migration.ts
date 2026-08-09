@@ -1,4 +1,9 @@
-import { BUILTIN_SERVERS, type LobbyAccount, type LobbyServer } from "./config";
+import {
+  BUILTIN_SERVERS,
+  type LobbyAccount,
+  type LobbyServer,
+  serverProtocol,
+} from "./config";
 
 /** The old conflated server+username row, stored under `lobbyServers.directory`. */
 export interface LegacyLobbyServer {
@@ -31,8 +36,10 @@ export interface MigrationPlan {
  * described in `reKey` for the driver to apply, not performed here. `newId` supplies
  * account ids (injected so tests are deterministic).
  *
- * Per row: a host+port match against `BUILTIN_SERVERS` points the account at the
- * built-in id (and re-keys the secret from the old row id to the built-in id).
+ * Per row: a host+port match against the TASServer entries in `BUILTIN_SERVERS`
+ * points the account at the built-in id (and re-keys the secret from the old row id
+ * to the built-in id). Tachyon entries are never matched, because the old directory
+ * only ever held TASServer connections.
  * Otherwise a custom server is created reusing the row's id, so its keychain secret
  * needs no move. Rows without a username produce no account.
  */
@@ -46,7 +53,10 @@ export function planMigration(
 
   for (const row of old.servers ?? []) {
     const match = BUILTIN_SERVERS.find(
-      (b) => b.host === row.host && b.port === row.port,
+      (b) =>
+        serverProtocol(b) === "tasserver" &&
+        b.host === row.host &&
+        b.port === row.port,
     );
     let serverId: string;
     if (match) {
