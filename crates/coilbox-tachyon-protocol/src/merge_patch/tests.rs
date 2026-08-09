@@ -319,28 +319,76 @@ fn patches_in_sequence_reach_the_same_state_as_the_single_patch() {
     );
 }
 
+/// One entry of a `lobby/listUpdated`, read through the real parse path.
+fn list_entry(entry: &str) -> LobbyOverviewPatch {
+    let raw = format!(
+        r#"{{"type":"event","messageId":"m1","commandId":"lobby/listUpdated",
+            "data":{{"lobbies":{{"lobby-1":{entry}}}}}}}"#
+    );
+    match crate::parse_frame(&raw) {
+        crate::TachyonMessage::LobbyListUpdatedEvent(mut event) => event
+            .data
+            .lobbies
+            .remove("lobby-1")
+            .expect("the patch carries the lobby it was given")
+            .expect("the lobby is not a null"),
+        other => panic!("expected a lobby/listUpdated event, got {other:?}"),
+    }
+}
+
+/// The pair that matters for the list. Both patches are the same size on the
+/// wire and they have to mean different things: a lobby whose battle is still
+/// running against one whose battle has just ended.
 #[test]
-fn the_patch_types_name_every_field_the_schema_has() {
-    // Top level only. This is a guard against a re-vendored schema growing a
-    // field the hand-written patch types would drop in silence.
+fn a_listed_battle_tells_an_absent_field_from_a_null_one() {
+    assert!(matches!(
+        list_entry(r#"{"id":"lobby-1","playerCount":4}"#).current_battle,
+        Patched::Absent
+    ));
+    assert!(matches!(
+        list_entry(r#"{"id":"lobby-1","currentBattle":null}"#).current_battle,
+        Patched::Null
+    ));
+
+    let started = list_entry(r#"{"id":"lobby-1","currentBattle":{"startedAt":1705432698}}"#);
+    let Patched::Set(battle) = started.current_battle else {
+        panic!("the battle did not read as set");
+    };
+    assert_eq!(*battle.started_at, 1705432698);
+}
+
+/// The schema of one member of the bundle's top-level `anyOf`, by title.
+fn schema(title: &str) -> Value {
     let text =
         std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/schema/compiled.json"))
             .expect("read the vendored schema");
     let bundle: Value = serde_json::from_str(&text).expect("parse the vendored schema");
-    let event = bundle["anyOf"]
+    bundle["anyOf"]
         .as_array()
         .expect("the bundle is a top-level anyOf")
         .iter()
-        .find(|member| member["title"] == "LobbyUpdatedEvent")
-        .expect("the bundle has lobby/updated");
+        .find(|member| member["title"] == title)
+        .unwrap_or_else(|| panic!("the bundle has {title}"))
+        .clone()
+}
 
-    let mut fields: Vec<&str> = event["properties"]["data"]["properties"]
+/// The field names of an object schema, sorted.
+fn field_names(node: &Value) -> Vec<String> {
+    let mut fields: Vec<String> = node["properties"]
         .as_object()
-        .expect("the event data is an object")
+        .expect("the node is an object schema")
         .keys()
-        .map(String::as_str)
+        .cloned()
         .collect();
     fields.sort_unstable();
+    fields
+}
+
+#[test]
+fn the_patch_types_name_every_field_the_schema_has() {
+    // Top level only. This is a guard against a re-vendored schema growing a
+    // field the hand-written patch types would drop in silence.
+    let fields = field_names(&schema("LobbyUpdatedEvent")["properties"]["data"]);
 
     assert_eq!(
         fields,
@@ -361,6 +409,32 @@ fn the_patch_types_name_every_field_the_schema_has() {
             "spectators",
             "tags",
             "voteHistory",
+        ]
+    );
+}
+
+/// The same guard for the list patch, whose entry is a lobby rather than the
+/// event data.
+#[test]
+fn the_list_patch_type_names_every_field_the_schema_has() {
+    let event = schema("LobbyListUpdatedEvent");
+    // The entry is either a lobby or a null, and the first arm is the lobby.
+    let entry = &event["properties"]["data"]["properties"]["lobbies"]["patternProperties"]["^.*$"]
+        ["anyOf"][0];
+
+    assert_eq!(
+        field_names(entry),
+        [
+            "areBossesEnabled",
+            "currentBattle",
+            "engineVersion",
+            "gameVersion",
+            "id",
+            "mapName",
+            "maxPlayerCount",
+            "name",
+            "playerCount",
+            "tags",
         ]
     );
 }
