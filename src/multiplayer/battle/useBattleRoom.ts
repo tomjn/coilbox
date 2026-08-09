@@ -146,6 +146,12 @@ export interface BattleRoomView {
   /** Whether the battle host (autohost) is in-game — i.e. the match has started. */
   hostIngame: boolean;
   /**
+   * Bumped each time a Tachyon server tells us where the match is. That is the
+   * launch signal on a Tachyon lobby, which has no host to go in-game: the
+   * server picks an autohost and sends every player its address.
+   */
+  battleStartSeq: number;
+  /**
    * The live SPADS autohost vote in this battle, or null. Only ever set for
    * autohost battles (a bot host posts the vote lines we parse); drives the
    * one-click vote panel. Vote with `autohostSend("!vote y|n|b")`.
@@ -920,6 +926,7 @@ export function useBattleRoom(): BattleRoomView {
     sync,
     actionError,
     hostIngame,
+    battleStartSeq: mirror.battleStartSeq,
     currentVote,
     allReady,
     serverKey: activeKey,

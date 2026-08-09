@@ -73,7 +73,7 @@ fn client_for(registry: &Registry, server_key: &str) -> Option<TachyonClient> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::conn::{EventSink, Outbound, ServerConn, TachyonHandle};
+    use crate::conn::{EventSink, Outbound, ServerConn, StartedBattle, TachyonHandle};
     use coilbox_lobby_protocol::{LobbyState, LoginPhase};
     use std::sync::{Arc, Mutex};
     use tauri::ipc::Channel;
@@ -94,6 +94,7 @@ mod tests {
                 phase: Arc::new(Mutex::new(LoginPhase::Ready)),
                 agreement: Arc::new(Mutex::new(None)),
                 tachyon: TachyonHandle::default(),
+                started: StartedBattle::default(),
             },
         );
         rx

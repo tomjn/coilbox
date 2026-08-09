@@ -1564,10 +1564,23 @@ fn mp_build_host_config(registry: State<'_, Registry>, server_key: String) -> Cl
 }
 
 /// `mp_build_battle_config` — return the current battle as a `play` `BattleConfig`.
+///
+/// A Tachyon battle is not built from the lobby at all. The server picks an
+/// autohost and tells each player where to connect in a `battle/start` request,
+/// so the config the connection built from that request is the only one there
+/// is, and until one arrives there is nothing to launch.
 #[tauri::command]
 fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> CliResult {
     let map = lock_or_recover(&registry);
     match map.get(&server_key) {
+        Some(conn) if lock_or_recover(&conn.tachyon).is_some() => {
+            match lock_or_recover(&conn.started).clone() {
+                // Nothing needs opening through a router: the address is the
+                // server's own autohost.
+                Some(config) => CliResult::ok(json!({ "config": config, "natType": "0" })),
+                None => CliResult::err("this lobby has not started a battle"),
+            }
+        }
         Some(conn) => {
             let state = lock_or_recover(&conn.state);
             match battle_to_config(&state) {

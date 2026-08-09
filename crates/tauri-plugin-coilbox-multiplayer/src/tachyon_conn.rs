@@ -38,8 +38,8 @@ use tauri::ipc::Channel;
 use tokio::sync::mpsc;
 
 use crate::conn::{
-    emit, now_ms, EventSink, LobbyEvent, Outbound, Registry, ServerConn, TachyonAction,
-    TachyonHandle,
+    emit, now_ms, EventSink, LobbyEvent, Outbound, Registry, ServerConn, StartedBattle,
+    TachyonAction, TachyonHandle,
 };
 use crate::lock_or_recover;
 use crate::tachyon_messaging::Conversation;
@@ -108,6 +108,9 @@ pub fn spawn_connection(
     // than waited for, so the connection is reachable by key from the moment this
     // returns, exactly as it was before.
     let tachyon = TachyonHandle::default();
+    // Filled when the server starts a match, and read by the command that builds
+    // the launch config.
+    let started = StartedBattle::default();
 
     tokio::spawn(run_loop(
         registry.clone(),
@@ -117,6 +120,7 @@ pub fn spawn_connection(
         rx,
         state.clone(),
         tachyon.clone(),
+        started.clone(),
         markers,
     ));
 
@@ -127,6 +131,7 @@ pub fn spawn_connection(
             state,
             sink,
             tachyon,
+            started,
             // The socket is open, so the connection is past every phase there is.
             phase: Arc::new(Mutex::new(LoginPhase::Ready)),
             // Tachyon has no agreement handshake. The terms are accepted in the
@@ -148,6 +153,7 @@ async fn run_loop(
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
     tachyon: TachyonHandle,
+    started: StartedBattle,
     markers: TachyonMarkers,
 ) {
     // The console is fed from the socket rather than from here, because the socket
@@ -177,11 +183,16 @@ async fn run_loop(
     // The `lobby/join` response is folded like any other frame, so the task that
     // asks for one puts it back on this channel.
     let joined_tx = inbound_tx.clone();
-    // No handlers yet. A server-to-client request is answered
+    // `battle/start` is answered on the connection task, because Teiserver closes
+    // the connection if it waits, and the match itself comes down here to be
+    // launched. Every other server-to-client request is answered
     // `command_unimplemented`, which is a real protocol answer, so an unhandled
-    // command costs a rejection rather than the connection. `battle/start` gets its
-    // handler with the battle launch work.
-    let (client, mut task) = spawn_rpc(socket, Handlers::new(), inbound_tx);
+    // command costs a rejection rather than the connection.
+    let (launch_tx, mut launch_rx) = mpsc::unbounded_channel();
+    let handlers = Handlers::new().on("battle/start", move |data| {
+        tachyon_room::battle_start(data, &launch_tx)
+    });
+    let (client, mut task) = spawn_rpc(socket, handlers, inbound_tx);
     // Hand the client to the registry, so a command can send a request over this
     // connection. Cleared below when the connection ends, so a request that lands
     // in the moment before the registry entry goes is refused rather than queued
@@ -264,9 +275,27 @@ async fn run_loop(
                 if joined(&message) {
                     let ids = tachyon_room::ids_to_subscribe(&lock_or_recover(&state), &room);
                     if let Some(client) = client.clone() {
-                        subscribe(client, sink.clone(), ids);
+                        subscribe(client.clone(), sink.clone(), ids);
+                        // Joining a lobby whose match is already under way is how
+                        // you watch one live. The server sends `battle/start` off
+                        // the back of this rather than off the join, so without it
+                        // a late joiner sits in the room and never gets in.
+                        if tachyon_room::match_running(&room) {
+                            ask(client, sink.clone(), "lobby/joinBattle", None);
+                        }
                     }
                 }
+                // The lobby we were in has gone, so where its match was is no
+                // longer somewhere to launch.
+                if room.is_none() {
+                    lock_or_recover(&started).take();
+                }
+            }
+            // The server has told us where the match is. The handler answered it
+            // on the connection task already, so all that is left is to say so.
+            Some(private) = launch_rx.recv() => {
+                *lock_or_recover(&started) = Some(tachyon_room::battle_config(&private));
+                emit(&sink, LobbyEvent::BattleStarting);
             }
             // Our own `lobby/leave` finished. The room is the loop's, so the task
             // that asked reports the outcome rather than acting on it.
@@ -276,6 +305,7 @@ async fn run_loop(
                     for delta in deltas {
                         emit(&sink, LobbyEvent::Delta { delta });
                     }
+                    lock_or_recover(&started).take();
                 }
                 // Still in the lobby, so a `lobby/left` from here on is the
                 // server throwing us out and worth telling the user about.
