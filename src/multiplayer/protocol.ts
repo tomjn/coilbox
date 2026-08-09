@@ -19,7 +19,9 @@ export function protocolForKey(
   servers: LobbyServer[],
 ): LobbyProtocol {
   if (serverKey == null) return "tasserver";
-  const server = servers.find((s) => serverKey.endsWith(`@${s.host}:${s.port}`));
+  const server = servers.find((s) =>
+    serverKey.endsWith(`@${s.host}:${s.port}`),
+  );
   return server ? serverProtocol(server) : "tasserver";
 }
 
