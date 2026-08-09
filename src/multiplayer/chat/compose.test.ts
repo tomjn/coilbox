@@ -102,7 +102,9 @@ describe("composeDraft", () => {
   it("counts characters rather than bytes", () => {
     // Four bytes each, so 512 of them is 2048 bytes and still one message.
     expect(composeDraft("🙂".repeat(512), 512)).toMatchObject({ kind: "send" });
-    expect(composeDraft("🙂".repeat(513), 512)).toMatchObject({ kind: "error" });
+    expect(composeDraft("🙂".repeat(513), 512)).toMatchObject({
+      kind: "error",
+    });
   });
 
   it("applies the limit per line, because each line is its own message", () => {
