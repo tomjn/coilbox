@@ -41,6 +41,19 @@ export function compareEngineVersions(a: string, b: string): number {
   return pa.commits - pb.commits;
 }
 
+/**
+ * Whether a string is plausible as a real Spring/Recoil engine version, rather
+ * than a leaked path fragment. A dot-prefixed string is never a real version,
+ * it's the naming convention for a hidden directory, most commonly the default
+ * `.spring` data root, so a folder-derived "version" that turns out to be one
+ * signals a detection bug upstream, not a real value (issue #1334).
+ */
+export function isRealEngineVersion(version: string | undefined): boolean {
+  if (version === undefined) return false;
+  const trimmed = version.trim();
+  return trimmed !== "" && !trimmed.startsWith(".");
+}
+
 /** The `id` of the highest-versioned engine, with input order as a stable tiebreak. */
 export function newestEngineId(
   engines: { id: string; version: string; syncVersion?: string }[],
