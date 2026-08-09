@@ -239,6 +239,30 @@ Teiserver's values, from `teiserver:lib/teiserver/o_auth.ex`.
 
 The refresh token is effectively permanent. The code comment reads "there's no real recourse when the refresh token expires and it's quite annoying, so make it 'never' expire". So a user signs in through the browser once and stays signed in.
 
+### An open connection outlives the token that opened it
+
+The 30 minute access token sounds like a deadline on a long session. It is not. Teiserver checks the token once, on the HTTP upgrade, and never again.
+
+`/tachyon` is a plain controller route rather than a Phoenix socket, guarded by `OAuthAuthenticatedPlug` (`teiserver:lib/teiserver_web/controllers/tachyon.ex` line 12), and that plug is the only thing in the request path that calls `OAuth.get_valid_token/2`, which is where expiry is enforced. The handler's `connect/1` then takes the account off the token and drops the token itself, so the connection process does not hold the token, its id, or its expiry. There is no watchdog either: the only timers in `teiserver:lib/teiserver/tachyon/transport.ex` are the keepalive ping and a per-request response timeout, and no `handle_info` clause mentions the token.
+
+Even an explicit revoke through the web interface only deletes database rows. It sends nothing to a live socket.
+
+So a token is refreshed to open a connection, not to keep one alive. There is no in-band re-authentication, and nothing needs one. A session that stays connected for a day never notices its token expiring, and a reconnect gets a fresh token from the stored refresh token with no browser trip.
+
+### Signing out cannot reach the server
+
+`tachyon:docs/authorization.md` line 73 requires RFC 7009 token revocation and says clients must use it to revoke refresh tokens on sign out. Teiserver does not implement it. There is no revocation route in its router, and its metadata document lists no `revocation_endpoint`.
+
+So signing out deletes our stored refresh token and any access token in memory, and stops there. The server keeps a valid refresh token for its full hundred years. The wording in the app says exactly that rather than implying the sign-in has been withdrawn.
+
+### Telling a refusal from an outage
+
+A reconnect that cannot get a token is either worth retrying or not, and the two need different endings. A server that is down comes back. A refresh token the server will not take never starts working.
+
+Teiserver gives us little to go on: every refresh failure is an HTTP 400 with `error: invalid_request`, whatever the cause, so a revoked token, a banned account and a bad client id look the same. The shape of the answer is what separates them. An OAuth error body means the request or the grant was refused, and RFC 6749 gives every one of those a cause the client cannot fix. A transport failure or a 5xx is the server, not us.
+
+Coilbox goes on that. A refusal is remembered for the run and reported to the frontend through `mp_tachyon_signed_in`, which is what stops the auto-reconnect loop and puts a browser sign-in in front of the user instead. It is remembered rather than acted on: a revoked token and a server that has misread one are indistinguishable from here, and deleting somebody's sign-in on that guess is not ours to do.
+
 ### A browser is required
 
 There is no device code flow, no password grant, and no way to collect credentials inside the app. Teiserver's token endpoint accepts exactly three grant types and rejects everything else with `unsupported_grant_type`. The specification also describes a Steam token exchange flow (RFC 8693) for clients running under the Steam client, but Teiserver does not implement it.
@@ -530,7 +554,6 @@ Every future lobby feature has to be considered twice, or explicitly declared to
 
 These are genuinely unresolved. Each is small, and each could change a stage 1 or stage 2 decision.
 
-- Is token revocation implemented? `tachyon:docs/authorization.md` line 73 requires RFC 7009 token revocation and says clients must use it to revoke refresh tokens on sign out. I found no revocation route in Teiserver's router and none in the production metadata document. If it is not implemented, "sign out" can only mean deleting our stored refresh token, which leaves a valid 100-year token on the server. Worth confirming before writing the sign-out path.
 - Is the WebSocket endpoint discoverable? The specification carries an open TODO at line 37 asking whether the Tachyon WebSocket endpoint should be advertised in the OAuth metadata under a custom key. It is not today, so the `/tachyon` path is a convention we have to hardcode. If that changes, our server configuration gets simpler.
 - Does Chobby speak Tachyon? I found no evidence either way and did not read the Chobby source. It matters only for judging how settled the protocol is.
 - Is `beyond-all-reason/tachyon-client` still maintained? It is a TypeScript client library at version 11.0.0, last pushed 2026-03-23, five months stale. The reference client `bar-lobby` has its own in-tree implementation, so the standalone library may be abandoned. It matters only as a reference for reading.

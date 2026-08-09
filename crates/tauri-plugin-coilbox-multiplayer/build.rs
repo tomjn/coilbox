@@ -59,6 +59,7 @@ const COMMANDS: &[&str] = &[
     "mp_chat_log_open",
     "mp_tachyon_sign_in",
     "mp_tachyon_sign_out",
+    "mp_tachyon_signed_in",
     "mp_tachyon_request",
 ];
 
