@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { identify } from "../container/container";
+import { encodeContainerJson, identify } from "../container/container";
 import type { Scenario } from "../scenario/model";
 import { type Campaign, parseCampaignJson } from "./model";
 import {
@@ -62,6 +62,25 @@ function scenario(): Scenario {
   };
 }
 
+/** A campaign with one plain mission, so it names a game but carries no
+ * scenario and still exports at kindVersion 1. */
+function withMission(gameName = "BAR"): Campaign {
+  return {
+    ...campaign,
+    missions: [
+      {
+        id: "m1",
+        title: "Mission 1",
+        briefing: "",
+        objectives: [],
+        snapshot: { ...scenario().setup, gameName },
+        disabledUnits: [],
+        skippable: false,
+      },
+    ],
+  };
+}
+
 /** A campaign whose one mission carries the scenario above. */
 function withScenario(): Campaign {
   return {
@@ -86,23 +105,54 @@ const media: CampaignScenarioMedia = {
 };
 
 describe("wrapCampaignForExport", () => {
-  it("wraps a scenario-free campaign exactly as before, at kindVersion 1", () => {
-    const file = wrapCampaignForExport(campaign);
+  it("wraps a scenario-free campaign as the document, at kindVersion 1", () => {
+    const withMissions = withMission();
+    const file = wrapCampaignForExport(withMissions);
     expect(file.format).toBe("coilbox");
     expect(file.kind).toBe("campaign");
     expect(file.kindVersion).toBe(1);
-    expect(file.payload).toBe(campaign);
+    expect(file.payload).toEqual({ ...withMissions, game: { name: "BAR" } });
   });
 
   it("ignores media offered for a campaign with no scenarios", () => {
-    expect(wrapCampaignForExport(campaign, media).payload).toBe(campaign);
+    expect(wrapCampaignForExport(campaign, media).payload).toEqual(campaign);
   });
 
   it("carries the document beside its clips at kindVersion 2", () => {
     const withScenarios = withScenario();
     const file = wrapCampaignForExport(withScenarios, media);
     expect(file.kindVersion).toBe(CAMPAIGN_KIND_VERSION);
-    expect(file.payload).toEqual({ campaign: withScenarios, media });
+    expect(file.payload).toEqual({
+      campaign: withScenarios,
+      media,
+      game: { name: "BAR" },
+    });
+  });
+
+  it("names the game both ways when the exporting machine has it", () => {
+    const file = wrapCampaignForExport(withMission(), {}, [
+      { name: "BAR", info: { shortname: "byar" } },
+    ]);
+    expect(identify(file).game).toEqual({ name: "BAR", shortname: "byar" });
+  });
+
+  it("names no game when the missions disagree on one", () => {
+    const first = withMission("BAR").missions[0];
+    const mixed: Campaign = {
+      ...campaign,
+      missions: [first, { ...withMission("BA V12.1").missions[0], id: "m2" }],
+    };
+    expect(identify(wrapCampaignForExport(mixed)).game).toBeUndefined();
+  });
+
+  it("reads the game out of a campaign shared before the shared field", () => {
+    const withMissions = withMission();
+    const legacy = encodeContainerJson("campaign", 1, withMissions);
+    expect(identify(legacy).game).toEqual({ name: "BAR" });
+    expect(parseCampaignExport(legacy)).toEqual({
+      campaign: withMissions,
+      media: null,
+    });
   });
 });
 

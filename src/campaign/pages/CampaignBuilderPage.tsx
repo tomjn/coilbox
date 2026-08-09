@@ -17,6 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { useUnitsyncScan } from "../../content/config";
 import { ResolveContentGate } from "../../content/pages/components/ResolveContentDrawer";
 import {
   EmptyState,
@@ -110,6 +111,9 @@ export default function CampaignBuilderPage() {
   const [pendingCampaign, setPendingCampaign] =
     useState<CampaignExportContents | null>(null);
   const { target } = usePreferredTarget();
+  // Read only for the modinfo shortname an export records beside the game's
+  // archive name (issue #1335).
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
 
   // Mint a fresh id so importing never collides with an existing campaign,
   // materialize every inlined (data-URI) image (icon, background and each
@@ -185,7 +189,7 @@ export default function CampaignBuilderPage() {
         inlineCampaignImages(campaign),
         collectCampaignScenarioMedia(campaign),
       ]);
-      const file = wrapCampaignForExport(inlined, media);
+      const file = wrapCampaignForExport(inlined, media, scan.data?.games ?? []);
       const dest = await save({
         title: "Export campaign",
         defaultPath: `${campaign.title || "campaign"}.json`,
