@@ -27,7 +27,7 @@ use crate::tachyon_rpc::TachyonClient;
 use crate::tls::AsyncReadWrite;
 
 /// Unix-millis now, saturating to 0 on the (impossible) pre-epoch case.
-fn now_ms() -> u64 {
+pub(crate) fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
@@ -68,6 +68,13 @@ pub enum TachyonAction {
     /// only thing that can name an ally team, a bot or a member the way Tachyon
     /// does.
     Room(crate::tachyon_room::RoomAction),
+    /// One chat message, to a person or to the lobby. The task records it once
+    /// the server has taken it, so a message the server refused is never shown
+    /// as sent.
+    Say {
+        conversation: crate::tachyon_messaging::Conversation,
+        text: String,
+    },
 }
 
 /// The frontend event channel, wrapped so a webview reload can swap in a fresh

@@ -342,12 +342,16 @@ pub(crate) fn left(room: &mut Option<Room>, state: &mut LobbyState) -> Vec<Delta
     state.current_battle = None;
     state.my_intended_battle_status = None;
     state.current_vote = None;
+    // Lobby chat is the room's, as it is on the line protocol, where leaving
+    // the battle takes us out of its channel.
+    state.channels.remove(&chat_channel(handle));
 
     // The lobby is still listed, so only the parts the room filled in go. The
     // list keeps it up to date from here.
     let Some(battle) = state.battles.get_mut(&handle) else {
         return vec![];
     };
+    battle.channel = None;
     battle.members.clear();
     battle.bots.clear();
     battle.start_rects.clear();
@@ -455,6 +459,7 @@ fn project(room: Option<&Room>, state: &mut LobbyState) -> Vec<Delta> {
     let before = battle.clone();
     battle.id = handle;
     battle.tachyon_id = Some(details.id.clone());
+    battle.channel = Some(chat_channel(handle));
     battle.title = details.name.clone();
     battle.map = details.map_name.clone();
     battle.version = details.engine_version.clone();
@@ -474,6 +479,17 @@ fn project(room: Option<&Room>, state: &mut LobbyState) -> Vec<Delta> {
         (true, true) => vec![Delta::BattleInfoChanged { id: handle }],
         (true, false) => vec![],
     }
+}
+
+/// The bucket the lobby's chat lives in.
+///
+/// Tachyon has no channels, so nothing on the wire names one. The battle room
+/// and the chat sidebar both read a battle's chat out of `LobbyState::channels`
+/// under `Battle::channel`, and both already know a `__battle__` name is a
+/// battle's own rather than a channel to list, so this follows the TASServer
+/// convention rather than inventing a second one.
+pub(crate) fn chat_channel(handle: u32) -> String {
+    format!("__battle__{handle}")
 }
 
 /// The players and the spectators, under the names the roster shows.
