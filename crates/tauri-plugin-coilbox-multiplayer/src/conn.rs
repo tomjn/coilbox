@@ -23,6 +23,7 @@ use tokio_util::codec::{Framed, LinesCodec};
 
 use crate::dmlog::DmLog;
 use crate::lock_or_recover;
+use crate::tachyon_rpc::TachyonClient;
 use crate::tls::AsyncReadWrite;
 
 /// Unix-millis now, saturating to 0 on the (impossible) pre-epoch case.
@@ -55,6 +56,12 @@ pub enum Outbound {
 /// `Channel` (via `mp_reattach`) without disturbing the running connection task.
 pub type EventSink = Arc<Mutex<Channel<LobbyEvent>>>;
 
+/// A slot for the Tachyon request client, shared because the connection task fills
+/// it after registering and a command reads it later. Empty on a line-protocol
+/// connection, and on a Tachyon one for the moment between registering and the
+/// correlator starting.
+pub type TachyonHandle = Arc<Mutex<Option<TachyonClient>>>;
+
 /// Send one event to the current frontend channel, ignoring a detached/dead one.
 pub(crate) fn emit(sink: &EventSink, ev: LobbyEvent) {
     let _ = lock_or_recover(sink).send(ev);
@@ -69,6 +76,10 @@ pub struct ServerConn {
     pub state: Arc<Mutex<LobbyState>>,
     pub sink: EventSink,
     pub phase: Arc<Mutex<LoginPhase>>,
+    /// The Tachyon request client, on a connection that has one. Set by
+    /// [`crate::tachyon_conn`] once the correlator is running, and left empty on a
+    /// line-protocol connection, which is what tells the two apart from a command.
+    pub tachyon: TachyonHandle,
     /// The agreement text sent by the server while parked on `AwaitAgreement`, so
     /// `mp_reattach` can replay it alongside the phase after a webview reload.
     pub agreement: Arc<Mutex<Option<String>>>,
@@ -149,6 +160,9 @@ pub fn spawn_connection(
             sink,
             phase,
             agreement,
+            // The line protocol has no Tachyon client, and that empty slot is what
+            // a Tachyon-only command reads to refuse this connection.
+            tachyon: TachyonHandle::default(),
         },
     );
 }
