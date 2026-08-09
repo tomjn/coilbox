@@ -6,6 +6,10 @@ import {
   readContainer,
 } from "../container/container";
 import {
+  gameIdentityForName,
+  type InstalledGameInfo,
+} from "../container/gameIdentity";
+import {
   type ContentRequirement,
   exactGameRequirement,
   exactMapRequirement,
@@ -130,9 +134,23 @@ export function parseScenarioPayload(value: unknown): ScenarioExport | null {
   return { scenario, media };
 }
 
-/** Serialize a scenario and its dialogue media as an export file's text. */
-export function encodeScenarioExport(exported: ScenarioExport): string {
-  return encodeContainerJson("scenario", SCENARIO_KIND_VERSION, exported);
+/**
+ * Serialize a scenario and its dialogue media as an export file's text.
+ *
+ * The payload also names the game the shared way (issue #1335), derived from
+ * the setup the document already carries. `installed` is this machine's games,
+ * read only for the modinfo shortname, so an export made where the game is
+ * missing simply names it by archive name alone.
+ */
+export function encodeScenarioExport(
+  exported: ScenarioExport,
+  installed: readonly InstalledGameInfo[] = [],
+): string {
+  const game = gameIdentityForName(exported.scenario.setup.gameName, installed);
+  return encodeContainerJson("scenario", SCENARIO_KIND_VERSION, {
+    ...exported,
+    ...(game ? { game } : {}),
+  });
 }
 
 /**

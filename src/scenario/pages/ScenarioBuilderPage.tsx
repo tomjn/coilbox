@@ -9,6 +9,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { useUnitsyncScan } from "@/content/config";
+import { usePreferredTarget } from "@/play/config";
 import { useCampaigns } from "../../campaign/campaigns";
 import { scenarioIsAttached } from "../../campaign/missionScenario";
 import {
@@ -37,6 +39,10 @@ import { ScenarioImportButton } from "./components/ScenarioImportButton";
 export default function ScenarioBuilderPage() {
   const { scenarios, loading, error, refresh } = useScenarios();
   const { campaigns } = useCampaigns();
+  // Read only for the modinfo shortname an export records beside the game's
+  // archive name (issue #1335).
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const navigate = useNavigate();
   const drawer = useDrawer();
   const [rescanning, setRescanning] = useState(false);
@@ -68,7 +74,7 @@ export default function ScenarioBuilderPage() {
   const exportFile = async (scenario: Scenario) => {
     setActionError(null);
     try {
-      const text = await exportScenario(scenario);
+      const text = await exportScenario(scenario, scan.data?.games ?? []);
       const dest = await save({
         title: "Export scenario",
         defaultPath: `${scenario.name || "scenario"}.json`,
