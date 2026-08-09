@@ -236,8 +236,13 @@ export interface BattleRoomView {
 }
 
 export function useBattleRoom(): BattleRoomView {
-  const { mirror, activeKey, setIngame } = useMultiplayer();
+  const { mirror, activeKey, protocol, setIngame } = useMultiplayer();
   const state = mirror.state;
+  // Tachyon owns our seat. It reports our own sync from the assets the server
+  // knows we have, and it assigns team colours when the match starts, so the two
+  // effects below that push a seat of ours must not run there: the line they
+  // send has no Tachyon equivalent and would be dropped on every snapshot.
+  const seatIsOurs = protocol !== "tachyon";
 
   // The team colour we remember across battles and app restarts. Empty means
   // "never picked" — we assign a random colour the first time we need one.
@@ -435,10 +440,18 @@ export function useBattleRoom(): BattleRoomView {
   // on whether the map+game are installed locally, once that's known. The server
   // echoes the change back (→ snapshot), so this settles after one push.
   useEffect(() => {
-    if (!activeKey || !myStatus || !contentKnown) return;
+    if (!activeKey || !myStatus || !contentKnown || !seatIsOurs) return;
     const desired = mapMissing || gameMissing ? 2 : 1;
     if (myStatus.battleStatus.sync !== desired) pushStatus({ sync: desired });
-  }, [activeKey, myStatus, contentKnown, mapMissing, gameMissing, pushStatus]);
+  }, [
+    activeKey,
+    myStatus,
+    contentKnown,
+    mapMissing,
+    gameMissing,
+    pushStatus,
+    seatIsOurs,
+  ]);
 
   // Assign our team colour on join. The seat opens at teamColor 0 (the protocol's
   // "unset", rendered black) both when we join someone else's battle and when the
@@ -449,7 +462,7 @@ export function useBattleRoom(): BattleRoomView {
   // (or a host force-recolour) as authoritative and just track it.
   const assignedBattleRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!activeKey || !battle || !myStatus) return;
+    if (!activeKey || !battle || !myStatus || !seatIsOurs) return;
     if (myStatus.teamColor !== 0) {
       // Authoritative echoed/forced colour — keep intendedColorRef in sync so the
       // pushStatus fill-in never reverts it.
@@ -470,7 +483,16 @@ export function useBattleRoom(): BattleRoomView {
     // Persist only when there was no usable remembered colour; a per-battle
     // collision adjustment must not overwrite the user's remembered choice.
     if (!savedColor || isBlackHex(savedColor)) setSavedColor(hex);
-  }, [activeKey, battle, myStatus, me, savedColor, setSavedColor, pushStatus]);
+  }, [
+    activeKey,
+    battle,
+    myStatus,
+    me,
+    savedColor,
+    setSavedColor,
+    pushStatus,
+    seatIsOurs,
+  ]);
 
   const leave = useCallback(async () => {
     if (!activeKey) return;

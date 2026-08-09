@@ -13,30 +13,34 @@
 //! [`LoginPhase::Ready`]. The phases before that belong to the connect command,
 //! which emits them while it is still getting a token and opening the socket.
 //!
-//! The state carries users and the battle list. Every frame the correlator hands
-//! up is folded through [`crate::tachyon_users`], which populates `users` and
-//! `my_username`, and through [`crate::tachyon_lobbies`], which populates
-//! `battles`. The lobby room, chat and friends are issues #1229 onward, so the
-//! rest of the state is still empty.
+//! The state carries users, the battle list and the lobby we are in. Every frame
+//! the correlator hands up is folded through [`crate::tachyon_users`], which
+//! populates `users` and `my_username`, through [`crate::tachyon_lobbies`],
+//! which populates `battles`, and through [`crate::tachyon_room`], which
+//! populates `current_battle` and the joined lobby's detail. Chat and friends
+//! are issues #1230 onward, so the rest of the state is still empty.
 //!
-//! Every queued action other than a shutdown is a TASServer wire line with no
-//! Tachyon equivalent. Issue #1235 hides the surfaces that offer them, and until
-//! then they are dropped and noted in the console rather than put on the socket.
+//! Every queued action other than a shutdown and the two lobby ones is a
+//! TASServer wire line with no Tachyon equivalent. Issue #1235 hides the
+//! surfaces that offer them, and until then they are dropped and noted in the
+//! console rather than put on the socket.
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use coilbox_lobby_protocol::{LobbyState, LoginPhase};
+use coilbox_lobby_protocol::{Delta, LobbyState, LoginPhase};
 use coilbox_tachyon_protocol::{parse_frame, TachyonMessage};
 use serde_json::{json, Value};
 use tauri::ipc::Channel;
 use tokio::sync::mpsc;
 
-use crate::conn::{emit, EventSink, LobbyEvent, Outbound, Registry, ServerConn, TachyonHandle};
+use crate::conn::{
+    emit, EventSink, LobbyEvent, Outbound, Registry, ServerConn, TachyonAction, TachyonHandle,
+};
 use crate::lock_or_recover;
-use crate::tachyon_rpc::{spawn as spawn_rpc, Handlers, TachyonClient};
+use crate::tachyon_rpc::{spawn as spawn_rpc, Handlers, RequestError, TachyonClient};
 use crate::tachyon_ws::{TachyonSocket, WsError};
-use crate::{tachyon_lobbies, tachyon_users};
+use crate::{tachyon_lobbies, tachyon_room, tachyon_users};
 
 /// The path the WebSocket sits at. The specification carries an open question about
 /// advertising it in the OAuth metadata, and nothing advertises it today, so this
@@ -152,6 +156,9 @@ async fn run_loop(
     );
 
     let (inbound_tx, mut inbound_rx) = mpsc::unbounded_channel::<String>();
+    // The `lobby/join` response is folded like any other frame, so the task that
+    // asks for one puts it back on this channel.
+    let joined_tx = inbound_tx.clone();
     // No handlers yet. A server-to-client request is answered
     // `command_unimplemented`, which is a real protocol answer, so an unhandled
     // command costs a rejection rather than the connection. `battle/start` gets its
@@ -168,16 +175,24 @@ async fn run_loop(
     ask(client.clone(), sink.clone(), "lobby/subscribeList", None);
     let mut client = Some(client);
 
+    // The lobby we are in, written here and nowhere else, exactly as the state
+    // is. A request that finishes off the loop reports back rather than writing.
+    let mut room = None;
+    let (left_tx, mut left_rx) = mpsc::unbounded_channel::<LeaveOutcome>();
+
     let reason: Option<String> = loop {
         tokio::select! {
             // Every frame the correlator did not consume: the events, and anything
             // it could not place. The console already has them, from the tap above.
+            // The `lobby/join` response comes back through here too, put on this
+            // channel by the task that asked for it.
             Some(frame) = inbound_rx.recv() => {
                 let message = parse_frame(&frame);
                 let deltas = {
                     let mut state = lock_or_recover(&state);
                     let mut deltas = tachyon_users::reduce(&mut state, &message);
                     deltas.extend(tachyon_lobbies::reduce(&mut state, &message));
+                    deltas.extend(tachyon_room::reduce(&mut room, &mut state, &message));
                     deltas
                 };
                 for delta in deltas {
@@ -194,8 +209,54 @@ async fn run_loop(
                         subscribe(client, sink.clone(), ids);
                     }
                 }
+                // A lobby names its members by id, and an offline one is not in
+                // `users` at all, so the roster needs the same subscription.
+                if joined(&message) {
+                    let ids = tachyon_room::ids_to_subscribe(&lock_or_recover(&state), &room);
+                    if let Some(client) = client.clone() {
+                        subscribe(client, sink.clone(), ids);
+                    }
+                }
             }
+            // Our own `lobby/leave` finished. The room is the loop's, so the task
+            // that asked reports the outcome rather than acting on it.
+            Some(outcome) = left_rx.recv() => match outcome {
+                LeaveOutcome::Done => {
+                    let deltas = tachyon_room::left(&mut room, &mut lock_or_recover(&state));
+                    for delta in deltas {
+                        emit(&sink, LobbyEvent::Delta { delta });
+                    }
+                }
+                // Still in the lobby, so a `lobby/left` from here on is the
+                // server throwing us out and worth telling the user about.
+                LeaveOutcome::Failed => tachyon_room::mark_leaving(&mut room, false),
+            },
             Some(out) = rx.recv() => match out {
+                Outbound::Tachyon(TachyonAction::JoinLobby { battle }) => {
+                    let lobby = lock_or_recover(&state)
+                        .battles
+                        .get(&battle)
+                        .and_then(|battle| battle.tachyon_id.clone());
+                    match (lobby, client.clone()) {
+                        (Some(lobby), Some(client)) => {
+                            join(client, sink.clone(), joined_tx.clone(), lobby);
+                        }
+                        // The list moved under the click, so the lobby the user
+                        // chose is not one we can name any more.
+                        (None, _) => emit(&sink, LobbyEvent::Delta {
+                            delta: Delta::JoinBattleFailed {
+                                reason: "That battle is no longer open.".into(),
+                            },
+                        }),
+                        (_, None) => {}
+                    }
+                }
+                Outbound::Tachyon(TachyonAction::LeaveLobby) => {
+                    tachyon_room::mark_leaving(&mut room, true);
+                    if let Some(client) = client.clone() {
+                        leave(client, sink.clone(), left_tx.clone());
+                    }
+                }
                 Outbound::Shutdown => {
                     // Letting the last client handle go is what asks the correlator
                     // to close politely, so the registry's copy has to go with ours
@@ -229,6 +290,102 @@ async fn run_loop(
     lock_or_recover(&tachyon).take();
     emit(&sink, LobbyEvent::Disconnected { reason });
     lock_or_recover(&registry).remove(&server_key);
+}
+
+/// What our own `lobby/leave` did, reported back because the connection loop
+/// owns the room.
+enum LeaveOutcome {
+    /// The server took us out, so the room is gone.
+    Done,
+    /// The request did not succeed, so we are still in the lobby.
+    Failed,
+}
+
+/// Whether a message is the answer to a `lobby/join` we sent, which is the one
+/// that puts us in a room.
+fn joined(message: &TachyonMessage) -> bool {
+    matches!(
+        message,
+        TachyonMessage::LobbyJoinResponse(
+            coilbox_tachyon_protocol::types::LobbyJoinResponse::Success { .. }
+        )
+    )
+}
+
+/// Ask to join a lobby, off the connection loop.
+///
+/// The whole lobby comes back in the response, so the answer goes onto the
+/// inbound channel and is folded by the loop like any other frame. That keeps
+/// the loop the only writer of the room.
+fn join(
+    client: TachyonClient,
+    sink: EventSink,
+    inbound: mpsc::UnboundedSender<String>,
+    lobby: String,
+) {
+    tokio::spawn(async move {
+        match client
+            .request("lobby/join", Some(json!({ "id": lobby })))
+            .await
+        {
+            Ok(response) => {
+                let _ = inbound.send(response);
+            }
+            Err(error) => emit(
+                &sink,
+                LobbyEvent::Delta {
+                    delta: Delta::JoinBattleFailed {
+                        reason: join_failure(&error),
+                    },
+                },
+            ),
+        }
+    });
+}
+
+/// Ask to leave the lobby, off the connection loop.
+fn leave(client: TachyonClient, sink: EventSink, outcome: mpsc::UnboundedSender<LeaveOutcome>) {
+    tokio::spawn(async move {
+        match client.request("lobby/leave", None).await {
+            Ok(_) => {
+                let _ = outcome.send(LeaveOutcome::Done);
+            }
+            Err(error) => {
+                let _ = outcome.send(LeaveOutcome::Failed);
+                emit(
+                    &sink,
+                    LobbyEvent::Console {
+                        direction: "in".into(),
+                        line: format!("lobby/leave failed: {error}"),
+                    },
+                );
+            }
+        }
+    });
+}
+
+/// Why a join did not happen, in words the user can act on.
+///
+/// `lobby/join` adds `lobby_full` and `banned` to the four reasons every command
+/// can fail with, and the frontend puts this straight in front of the user, so
+/// each one is spelled out rather than shown as its wire value.
+fn join_failure(error: &RequestError) -> String {
+    let RequestError::Failed(failure) = error else {
+        return error.to_string();
+    };
+    let reason = match failure.reason.as_wire() {
+        "lobby_full" => "The battle is full.",
+        "banned" => "You are banned from this battle.",
+        "unauthorized" => "The server did not let you in.",
+        "internal_error" => "The server failed on its own side.",
+        "invalid_request" => "The server rejected the request.",
+        "command_unimplemented" => "This server cannot join battles yet.",
+        other => other,
+    };
+    match &failure.details {
+        Some(details) => format!("{reason} {details}"),
+        None => reason.to_owned(),
+    }
 }
 
 /// Ask the server to send us updates about `ids`, off the connection loop.
@@ -651,6 +808,223 @@ mod tests {
         assert_eq!(battle.tachyon_id.as_deref(), Some("lobby-a"));
         assert_eq!(battle.title, "Comet Catcher 8v8");
         assert_eq!(battle.player_count, Some(3));
+    }
+
+    /// The whole lobby, as `lobby/join` answers with it: two players, one of
+    /// whom the connection has never been told a name for.
+    fn lobby_details() -> Value {
+        json!({
+            "id": "lobby-a",
+            "name": "Comet Catcher 8v8",
+            "mapName": "Comet Catcher Remake 1.8",
+            "engineVersion": "2025.01.4",
+            "gameVersion": "Beyond All Reason test-1234",
+            "areBossesEnabled": false,
+            "gameOptions": {},
+            "bosses": {},
+            "bots": {},
+            "spectators": {},
+            "players": {
+                "01": {
+                    "id": "1", "allyTeam": "01", "team": "01", "player": "01",
+                    "isReady": true, "assetStatus": "complete",
+                },
+                "02": {
+                    "id": "2", "allyTeam": "02", "team": "01", "player": "01",
+                    "isReady": false, "assetStatus": "missing",
+                },
+            },
+            "allyTeamConfig": {
+                "01": {
+                    "maxTeams": 1,
+                    "startBox": { "left": 0.0, "top": 0.0, "right": 0.25, "bottom": 1.0 },
+                    "teams": { "01": { "maxPlayers": 8 } },
+                },
+                "02": {
+                    "maxTeams": 1,
+                    "startBox": { "left": 0.75, "top": 0.0, "right": 1.0, "bottom": 1.0 },
+                    "teams": { "01": { "maxPlayers": 8 } },
+                },
+            },
+        })
+    }
+
+    /// The `lobby/listReset` the connection's own subscription answers with, so
+    /// a test has a battle handle to join by.
+    fn list_reset() -> Message {
+        Message::text(
+            json!({
+                "type": "event",
+                "messageId": "1",
+                "commandId": "lobby/listReset",
+                "data": { "lobbies": { "lobby-a": {
+                    "id": "lobby-a",
+                    "name": "Comet Catcher 8v8",
+                    "playerCount": 2,
+                    "maxPlayerCount": 16,
+                    "mapName": "Comet Catcher Remake 1.8",
+                    "engineVersion": "2025.01.4",
+                    "gameVersion": "Beyond All Reason test-1234",
+                    "currentBattle": null,
+                } } },
+            })
+            .to_string(),
+        )
+    }
+
+    /// A server that lists one lobby and then answers `lobby/join` and
+    /// `lobby/leave` with `answer`, reporting every frame it reads.
+    async fn lobby_server(seen: mpsc::UnboundedSender<String>, answer: Value) -> String {
+        serve(move |mut ws| async move {
+            ws.send(list_reset()).await.unwrap();
+            while let Some(Ok(msg)) = ws.next().await {
+                let Message::Text(text) = msg else { continue };
+                let _ = seen.send(text.to_string());
+                let request: Value = serde_json::from_str(&text).unwrap();
+                let mut response = answer.clone();
+                let body = response.as_object_mut().unwrap();
+                body.insert("messageId".into(), request["messageId"].clone());
+                body.insert("commandId".into(), request["commandId"].clone());
+                ws.send(Message::text(response.to_string())).await.unwrap();
+            }
+        })
+        .await
+    }
+
+    /// The handle the lobby list filed `lobby-a` under, once it has arrived.
+    async fn listed_handle(registry: &Registry, rx: &mut mpsc::UnboundedReceiver<Value>) -> u32 {
+        let delta = wait_for(rx, "delta").await;
+        assert_eq!(delta["delta"]["kind"], "battleOpened");
+        let state = lock_or_recover(registry)["alice@bar:443"].state.clone();
+        let state = lock_or_recover(&state);
+        state
+            .battles
+            .values()
+            .find(|battle| battle.tachyon_id.as_deref() == Some("lobby-a"))
+            .expect("the lobby was not listed")
+            .id
+    }
+
+    /// The reduction is tested a frame at a time in [`crate::tachyon_room`].
+    /// This is the wiring: a queued join reaches the server as `lobby/join`, its
+    /// answer reaches the state, and the members it named by id alone are
+    /// subscribed to.
+    #[tokio::test]
+    async fn joining_a_lobby_asks_the_server_and_folds_what_comes_back() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = lobby_server(
+            seen_tx,
+            json!({ "type": "response", "status": "success", "data": lobby_details() }),
+        )
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+        let handle = listed_handle(&registry, &mut rx).await;
+
+        sender(&registry, "alice@bar:443")
+            .send(Outbound::Tachyon(TachyonAction::JoinLobby {
+                battle: handle,
+            }))
+            .unwrap();
+
+        let frame = wait_for_sent(&mut seen_rx, "lobby/join").await;
+        assert_eq!(frame["data"]["id"], "lobby-a");
+        loop {
+            let delta = wait_for(&mut rx, "delta").await;
+            if delta["delta"]["kind"] == "enteredBattle" {
+                assert_eq!(delta["delta"]["id"], handle);
+                break;
+            }
+        }
+
+        let held = lock_or_recover(&registry)["alice@bar:443"].state.clone();
+        {
+            let state = lock_or_recover(&held);
+            assert_eq!(state.current_battle, Some(handle));
+            let battle = &state.battles[&handle];
+            // The list's own field survived the join, and the roster arrived.
+            assert_eq!(battle.max_players, 16);
+            assert_eq!(battle.members.len(), 2);
+        }
+
+        // Nobody in the lobby has a name yet, so both ids are asked about.
+        let frame = wait_for_sent(&mut seen_rx, "user/subscribeUpdates").await;
+        assert_eq!(frame["data"]["userIds"], json!(["1", "2"]));
+    }
+
+    #[tokio::test]
+    async fn a_refused_join_says_why_rather_than_failing_silently() {
+        let (seen_tx, _seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = lobby_server(
+            seen_tx,
+            json!({ "type": "response", "status": "failed", "reason": "lobby_full" }),
+        )
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+        let handle = listed_handle(&registry, &mut rx).await;
+
+        sender(&registry, "alice@bar:443")
+            .send(Outbound::Tachyon(TachyonAction::JoinLobby {
+                battle: handle,
+            }))
+            .unwrap();
+
+        let delta = loop {
+            let delta = wait_for(&mut rx, "delta").await;
+            if delta["delta"]["kind"] == "joinBattleFailed" {
+                break delta;
+            }
+        };
+        assert_eq!(delta["delta"]["reason"], "The battle is full.");
+        assert_eq!(
+            lock_or_recover(&lock_or_recover(&registry)["alice@bar:443"].state).current_battle,
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn leaving_a_lobby_asks_the_server_and_clears_the_room() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        // The same answer serves both requests: `lobby/join` reads the data and
+        // `lobby/leave` has none to read.
+        let url = lobby_server(
+            seen_tx,
+            json!({ "type": "response", "status": "success", "data": lobby_details() }),
+        )
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+        let handle = listed_handle(&registry, &mut rx).await;
+        let sender = sender(&registry, "alice@bar:443");
+
+        sender
+            .send(Outbound::Tachyon(TachyonAction::JoinLobby {
+                battle: handle,
+            }))
+            .unwrap();
+        wait_for_sent(&mut seen_rx, "lobby/join").await;
+        loop {
+            if wait_for(&mut rx, "delta").await["delta"]["kind"] == "enteredBattle" {
+                break;
+            }
+        }
+
+        sender
+            .send(Outbound::Tachyon(TachyonAction::LeaveLobby))
+            .unwrap();
+        wait_for_sent(&mut seen_rx, "lobby/leave").await;
+
+        let state = lock_or_recover(&registry)["alice@bar:443"].state.clone();
+        // The room is cleared on the connection task, so wait for the delta that
+        // says so rather than reading the state straight away.
+        loop {
+            wait_for(&mut rx, "delta").await;
+            if lock_or_recover(&state).current_battle.is_none() {
+                break;
+            }
+        }
+        assert!(lock_or_recover(&state).battles[&handle].members.is_empty());
     }
 
     #[tokio::test]

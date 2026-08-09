@@ -192,7 +192,7 @@ fn whole(handle: u32, id: &str, fields: &Fields<'_>) -> Option<Battle> {
 /// A lobby already in the list keeps the handle it has, whatever it is, so a
 /// lobby that survives a reset does not move. Otherwise it is the hash of the
 /// uuid, stepped past any handle another lobby is already using.
-fn handle_for(id: &str, battles: &HashMap<u32, Battle>) -> u32 {
+pub(crate) fn handle_for(id: &str, battles: &HashMap<u32, Battle>) -> u32 {
     if let Some((handle, _)) = battles
         .iter()
         .find(|(_, battle)| battle.tachyon_id.as_deref() == Some(id))

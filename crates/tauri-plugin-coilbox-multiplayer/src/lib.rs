@@ -18,6 +18,9 @@ mod tachyon_conn;
 /// The console drawer's send path, the one place a request is sent by hand.
 mod tachyon_debug;
 mod tachyon_lobbies;
+/// The lobby we are in, held as Tachyon describes it and projected into the
+/// battle room.
+mod tachyon_room;
 /// Matching Tachyon responses to requests, over the transport below.
 pub mod tachyon_rpc;
 mod tachyon_users;
@@ -34,7 +37,7 @@ use coilbox_lobby_protocol::{
     command, default_battle_status, password_hash, team_color_rgb, BattleStatus, ClientStatus,
     LobbyState, LoginConfig, LoginMode, LoginPhase,
 };
-use conn::{spawn_connection, LobbyEvent, Outbound, Registry};
+use conn::{spawn_connection, LobbyEvent, Outbound, Registry, TachyonAction};
 use picoframe_core::CliResult;
 use serde_json::{json, Value};
 use tauri::{
@@ -96,6 +99,25 @@ fn enqueue(registry: &Registry, server_key: &str, line: String) -> CliResult {
         },
         None => CliResult::err(format!("not connected: {server_key}")),
     }
+}
+
+/// Queue a lobby action on a Tachyon connection, or `None` when this connection
+/// is not one and the caller should send its TASServer line instead.
+///
+/// Having a request client is what makes a connection a Tachyon one, which is
+/// the same test `mp_tachyon_request` makes.
+fn tachyon_action(
+    registry: &Registry,
+    server_key: &str,
+    action: TachyonAction,
+) -> Option<CliResult> {
+    let map = lock_or_recover(registry);
+    let conn = map.get(server_key)?;
+    lock_or_recover(&conn.tachyon).as_ref()?;
+    Some(match conn.tx.send(Outbound::Tachyon(action)) {
+        Ok(()) => CliResult::ok(json!({ "sent": true })),
+        Err(_) => CliResult::err("connection is closed"),
+    })
 }
 
 /// Record our intended battle status on the connection's state so the
@@ -700,6 +722,16 @@ fn mp_join_battle(
     key: Option<String>,
     script_password: Option<String>,
 ) -> CliResult {
+    // On a Tachyon connection this becomes `lobby/join`, which names the lobby
+    // by its uuid and takes neither a key nor a script password: the schema has
+    // no passworded lobby, so both are dropped there.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::JoinLobby { battle: id },
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -710,6 +742,9 @@ fn mp_join_battle(
 /// `mp_leave_battle` — leave the current battle.
 #[tauri::command]
 fn mp_leave_battle(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    if let Some(result) = tachyon_action(registry.inner(), &server_key, TachyonAction::LeaveLobby) {
+        return result;
+    }
     enqueue(registry.inner(), &server_key, command::leave_battle())
 }
 
