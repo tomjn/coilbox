@@ -22,14 +22,15 @@ import { getProfile } from "./profile";
  *
  * KEEP IN SYNC with the `isProfileHidden(...)` call sites (see `content/index.ts`,
  * `downloads/index.ts`, `multiplayer/index.tsx`, `conquest/index.ts`,
- * `runlite/index.ts` and `campaign/index.ts`): add an id here whenever a nav item
- * opts into hiding.
+ * `runlite/index.ts`, `campaign/index.ts` and `hub/index.tsx`): add an id here
+ * whenever a nav item opts into hiding.
  */
 export const HIDEABLE_NAV_IDS: string[] = [
   "content.games",
   "content.setupPacks",
   "downloads.browse",
   "downloads.games",
+  "hub.browse",
   "multiplayer.stats",
   "conquest.list",
   "runlite.list",
