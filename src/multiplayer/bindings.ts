@@ -265,6 +265,12 @@ export type LobbyEvent =
   | { kind: "phase"; phase: LoginPhase; agreement: string | null }
   | { kind: "delta"; delta: Delta }
   | { kind: "console"; direction: "in" | "out"; line: string }
+  /**
+   * A Tachyon server has told us where the match is and the connection has said
+   * we will be there. The room launches off this. The config comes from
+   * `mpBuildBattleConfig`, so a relaunch after our engine exits reads the same one.
+   */
+  | { kind: "battleStarting" }
   | { kind: "disconnected"; reason: string | null };
 
 // ---------------------------------------------------------------------------

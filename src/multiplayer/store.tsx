@@ -165,6 +165,13 @@ export interface LobbyMirror {
    */
   serverIgnoreList: string[];
   serverIgnoreListSeq: number;
+  /**
+   * Monotonic count of `battleStarting` events: a Tachyon server telling us
+   * where the match is. There is no state behind it, because the connection has
+   * already promised the server we will be there, so the room watches this
+   * advance and launches.
+   */
+  battleStartSeq: number;
 }
 
 const CONSOLE_CAP = 500;
@@ -180,6 +187,7 @@ export const initialMirror: LobbyMirror = {
   channelListReceivedSeq: 0,
   serverIgnoreList: [],
   serverIgnoreListSeq: 0,
+  battleStartSeq: 0,
 };
 
 export type MirrorAction =
@@ -223,6 +231,8 @@ export function mirrorReducer(
               next.length > CONSOLE_CAP ? next.slice(-CONSOLE_CAP) : next,
           };
         }
+        case "battleStarting":
+          return { ...m, battleStartSeq: m.battleStartSeq + 1 };
         case "disconnected":
           return { ...m, connected: false, error: ev.reason ?? null };
         case "delta": {
