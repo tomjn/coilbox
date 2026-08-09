@@ -90,7 +90,9 @@ export function BattleRow({
           </span>
         </p>
         <p className="truncate text-xs text-muted-foreground">
-          {battle.map} · {battle.modname} · host {battle.host}
+          {battle.map} · {battle.modname}
+          {/* Tachyon's lobby list names no founder, so there is no host to name. */}
+          {battle.host && ` · host ${battle.host}`}
         </p>
       </div>
     </>

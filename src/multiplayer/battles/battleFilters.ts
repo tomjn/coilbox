@@ -12,14 +12,20 @@ export interface BattleFilters {
 }
 
 /**
- * Total occupants of a battle. The founder is tracked in `host` and is not
- * guaranteed to appear in `members` (classic TASServer sends no JOINEDBATTLE for
- * the founder), so add one for the host unless they are already a member key.
+ * Total occupants of a battle. A server that counts them for us says so in
+ * `playerCount`, which is the only thing a Tachyon lobby list carries: it has no
+ * roster until you are in the lobby. Otherwise the count comes from the roster,
+ * where the founder is tracked in `host` and is not guaranteed to appear in
+ * `members` (classic TASServer sends no JOINEDBATTLE for the founder), so add
+ * one for the host unless they are already a member key.
  *
- * Takes the two fields it reads rather than a whole `Battle`, so a caller holding
- * a narrower snapshot of the lobby can ask. `src/home/suggestedMap.ts` does.
+ * Takes the fields it reads rather than a whole `Battle`, so a caller holding a
+ * narrower snapshot of the lobby can ask. `src/home/suggestedMap.ts` does.
  */
-export function occupancy(b: Pick<Battle, "host" | "members">): number {
+export function occupancy(
+  b: Pick<Battle, "host" | "members" | "playerCount">,
+): number {
+  if (b.playerCount !== null) return b.playerCount;
   const m = Object.keys(b.members).length;
   return Object.hasOwn(b.members, b.host) ? m : m + 1;
 }

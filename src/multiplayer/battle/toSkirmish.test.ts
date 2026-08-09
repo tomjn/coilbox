@@ -35,6 +35,7 @@ const bot = (p: Partial<Bot> = {}): Bot => ({
 function mkBattle(p: Partial<Battle> = {}): Battle {
   return {
     id: 7,
+    tachyonId: null,
     host: "host",
     ip: "",
     port: "",
@@ -45,6 +46,7 @@ function mkBattle(p: Partial<Battle> = {}): Battle {
     engine: "",
     version: "",
     maxPlayers: 8,
+    playerCount: null,
     passworded: false,
     locked: false,
     spectatorCount: 0,

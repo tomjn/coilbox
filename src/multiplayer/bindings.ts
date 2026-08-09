@@ -108,6 +108,12 @@ export interface StartRect {
 
 export interface Battle {
   id: number;
+  /**
+   * The Tachyon lobby id this battle came from, or `null` on a TASServer
+   * connection. Tachyon names a lobby by a string uuid and `id` is a number, so
+   * `id` is a handle derived from this and this is what a join has to name.
+   */
+  tachyonId: string | null;
   host: string;
   ip: string;
   port: string;
@@ -122,6 +128,12 @@ export interface Battle {
   engine: string;
   version: string;
   maxPlayers: number;
+  /**
+   * How many players the server says are in the battle, where the server counts
+   * them for us. TASServer does not, so it is `null` there and the count comes
+   * from `members` and `host` instead.
+   */
+  playerCount: number | null;
   passworded: boolean;
   locked: boolean;
   spectatorCount: number;

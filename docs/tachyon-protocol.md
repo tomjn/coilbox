@@ -463,7 +463,7 @@ Unlocks: the reasons a Beyond All Reason player would prefer coilbox over the of
 - Connecting needs OAuth, the transport, and the `protocol` discriminator.
 - Everything in stage 2 needs connecting.
 - The lobby room needs the merge patch applier.
-- The lobby list needs the merge patch applier.
+- The lobby list needs nothing from the merge patch applier, which turned out to be wrong when it was built (#1228). The applier folds a `lobby/updated` patch into a `lobbyDetails`, and the list carries `lobbyOverview`, a different and much smaller shape with one nullable field we do not map. So the list folds its own patches straight into the battle list.
 - Lobby actions need the lobby room.
 - Votes need the lobby room.
 - Battle launch needs request correlation, because `battle/start` is a server-to-client request we must answer.
