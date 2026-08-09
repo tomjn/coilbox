@@ -37,3 +37,17 @@ export function protocolForKey(
 export function syncsOnReady(protocol: LobbyProtocol): boolean {
   return protocol === "tasserver";
 }
+
+/** How many characters one Tachyon message may carry, from the schema for
+ * `messaging/send`. A longer one comes back as `message_too_long`. */
+export const TACHYON_MESSAGE_LIMIT = 512;
+
+/**
+ * The longest message this connection will carry, or null where the protocol
+ * sets no limit we know of. Pure.
+ *
+ * TASServer has no published cap, so a limit there would be one we invented.
+ */
+export function messageLimit(protocol: LobbyProtocol): number | null {
+  return protocol === "tachyon" ? TACHYON_MESSAGE_LIMIT : null;
+}

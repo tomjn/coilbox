@@ -315,6 +315,7 @@ function ChatPage() {
           isBot={isBot}
           isHighlighted={isHighlighted}
           completions={completions}
+          maxChars={conv.maxChars}
           onSend={conv.send}
           headerActions={
             active.kind === "dm" ? (

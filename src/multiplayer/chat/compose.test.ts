@@ -80,4 +80,43 @@ describe("composeDraft", () => {
       lines: ["/method", "foo"],
     });
   });
+
+  it("has no character limit unless one is given", () => {
+    expect(composeDraft("a".repeat(5000))).toMatchObject({ kind: "send" });
+  });
+
+  it("accepts a line exactly at the character limit", () => {
+    expect(composeDraft("a".repeat(512), 512)).toEqual({
+      kind: "send",
+      lines: ["a".repeat(512)],
+    });
+  });
+
+  it("refuses a line past the character limit, saying by how much", () => {
+    const out = composeDraft("a".repeat(513), 512);
+    expect(out.kind).toBe("error");
+    expect(out.kind === "error" && out.reason).toContain("512");
+    expect(out.kind === "error" && out.reason).toContain("513");
+  });
+
+  it("counts characters rather than bytes", () => {
+    // Four bytes each, so 512 of them is 2048 bytes and still one message.
+    expect(composeDraft("🙂".repeat(512), 512)).toMatchObject({ kind: "send" });
+    expect(composeDraft("🙂".repeat(513), 512)).toMatchObject({ kind: "error" });
+  });
+
+  it("applies the limit per line, because each line is its own message", () => {
+    expect(composeDraft(`short\n${"a".repeat(600)}`, 512)).toMatchObject({
+      kind: "error",
+    });
+    expect(composeDraft("short\nalso short", 512)).toMatchObject({
+      kind: "send",
+    });
+  });
+
+  it("refuses an emote past the character limit", () => {
+    expect(composeDraft(`/me ${"a".repeat(600)}`, 512)).toMatchObject({
+      kind: "error",
+    });
+  });
 });

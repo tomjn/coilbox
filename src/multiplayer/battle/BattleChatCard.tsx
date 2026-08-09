@@ -54,6 +54,7 @@ export function BattleChatCard({ battle }: { battle: Battle }) {
         currentUser={me}
         senderColor={senderColor}
         isBot={isBot}
+        maxChars={conv.maxChars}
         onSend={conv.send}
       />
     </div>
