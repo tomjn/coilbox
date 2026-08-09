@@ -326,11 +326,27 @@ export const mpTachyonSignIn = defineCommand<
   Record<string, never>
 >("coilbox-multiplayer", "mp_tachyon_sign_in");
 
-/** Forget a Tachyon sign-in, both the stored refresh token and any access token. */
+/**
+ * Forget a Tachyon sign-in on this machine, both the stored refresh token and any
+ * access token.
+ *
+ * This machine is as far as it goes. Teiserver has no token revocation endpoint,
+ * so the refresh token stays valid on the server whatever we do here.
+ */
 export const mpTachyonSignOut = defineCommand<
   { serverId: string; username: string },
   Record<string, never>
 >("coilbox-multiplayer", "mp_tachyon_sign_out");
+
+/**
+ * Whether a connect for this account can get a token without opening a browser.
+ * False once the server has refused the stored sign-in, which is what tells the
+ * auto-reconnect loop to stop rather than retry.
+ */
+export const mpTachyonSignedIn = defineCommand<
+  { serverId: string; username: string },
+  { signedIn: boolean }
+>("coilbox-multiplayer", "mp_tachyon_signed_in");
 
 /**
  * Send one Tachyon request over a live connection and wait for its answer. Only
