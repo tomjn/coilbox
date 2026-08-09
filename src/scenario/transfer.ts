@@ -6,12 +6,12 @@ import {
   readContainer,
   tryEncodeContainerCode,
 } from "../container/container";
+import { formatBytes } from "../content/rapidPool";
 import {
   type ContentRequirement,
   exactGameRequirement,
   exactMapRequirement,
 } from "../content/resolveContent";
-import { formatBytes } from "../content/rapidPool";
 import { parseScenario, type Scenario } from "./model";
 
 /**
@@ -151,7 +151,7 @@ export type ScenarioCode =
  * export carries the dialogue portraits and voice clips inline as `data:` URIs.
  * Measured against the Silence the Jericho mission: the document alone is 7,146
  * bytes and a 3,128 character code, and the same document copied out to 581
- * triggers and 332 zones is still only an 18,000 character code. Prose and ids
+ * triggers and 332 zones is still only an 18,000 character code. Text and ids
  * compress roughly 30 to 1, so no realistic amount of authoring reaches the
  * ceiling. Media does: 380 KB of clips passes it on its own, because base64
  * costs a third on top and a portrait or a voice clip is already compressed, so
