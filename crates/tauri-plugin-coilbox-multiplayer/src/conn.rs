@@ -44,12 +44,25 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 /// `Shutdown` requests a graceful logout (write `EXIT`, flush, then exit);
 /// `ConfirmAgreement` resumes a login parked awaiting the emailed verification
 /// code by driving the login machine (`CONFIRMAGREEMENT` + re-`LOGIN`).
+/// `Tachyon` is an action with no wire line at all, carried out by the Tachyon
+/// task in [`crate::tachyon_conn`].
 pub enum Outbound {
     Line(String),
     SayPrivate { peer: String, text: String },
     SayPrivateEx { peer: String, text: String },
     ConfirmAgreement { code: Option<String> },
+    Tachyon(TachyonAction),
     Shutdown,
+}
+
+/// An action only a Tachyon connection can carry out, because it is a request
+/// rather than a line and its answer has to reach the task that owns the state.
+pub enum TachyonAction {
+    /// Join the lobby the battle handle names. The task turns the handle back
+    /// into the lobby's uuid, which is what `lobby/join` names.
+    JoinLobby { battle: u32 },
+    /// Leave the lobby we are in.
+    LeaveLobby,
 }
 
 /// The frontend event channel, wrapped so a webview reload can swap in a fresh
@@ -338,6 +351,9 @@ async fn run_loop(
                         );
                     }
                 }
+                // Only queued for a connection that has a Tachyon client, so a
+                // line-protocol one never sees it.
+                Outbound::Tachyon(_) => {}
                 Outbound::Shutdown => {
                     outbound.push(command::exit(None));
                     shutdown = true;
