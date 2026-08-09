@@ -165,8 +165,18 @@ fn is_nullable(schema: &serde_json::Value) -> bool {
 }
 
 fn write_types(text: &str, out: &PathBuf) {
+    let mut bundle: serde_json::Value =
+        serde_json::from_str(text).expect("parse the schema as JSON");
+    let loosened = loosen_failure_reasons(&mut bundle);
+    assert!(
+        loosened > 0,
+        "no failed response in the bundle has an enum of reasons, so either the shape of a \
+         response has changed or this transform no longer finds them. See \
+         loosen_failure_reasons."
+    );
+
     let schema: schemars::schema::RootSchema =
-        serde_json::from_str(text).expect("parse the schema as draft-07");
+        serde_json::from_value(bundle).expect("parse the schema as draft-07");
 
     let mut space = typify::TypeSpace::new(&typify::TypeSpaceSettings::default());
     space
@@ -174,6 +184,54 @@ fn write_types(text: &str, out: &PathBuf) {
         .expect("turn the schema into a type space");
 
     write_rust(out, &space.to_stream().to_string());
+}
+
+/// Turns each failed response's `reason` from a closed enum into a plain string,
+/// and reports how many it changed.
+///
+/// Teiserver is free to be ahead of the vendored bundle, and a reason we have
+/// never heard of is still a reason we can show. A generated enum cannot read
+/// one, so the whole response would fail to parse and a legible refusal would
+/// arrive as an unreadable frame. That is the failure this loses.
+///
+/// Nothing is given up by it. The reasons are inlined per command, so typify
+/// makes 68 near-duplicate enums out of them whose names move on every schema
+/// refresh, which is why `tachyon_rpc.rs` matches a reason by its wire value
+/// rather than by type. A string is what that code wants anyway.
+fn loosen_failure_reasons(node: &mut serde_json::Value) -> usize {
+    let mut loosened = 0;
+
+    if let Some(properties) = node
+        .get_mut("properties")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        let failed = properties
+            .get("status")
+            .is_some_and(|status| status["const"].as_str() == Some("failed"));
+        if failed {
+            if let Some(reason) = properties.get_mut("reason") {
+                if reason.get("enum").is_some() {
+                    *reason = serde_json::json!({ "type": "string" });
+                    loosened += 1;
+                }
+            }
+        }
+    }
+
+    match node {
+        serde_json::Value::Object(fields) => {
+            for value in fields.values_mut() {
+                loosened += loosen_failure_reasons(value);
+            }
+        }
+        serde_json::Value::Array(members) => {
+            for member in members {
+                loosened += loosen_failure_reasons(member);
+            }
+        }
+        _ => {}
+    }
+    loosened
 }
 
 /// One member of the bundle's top-level `anyOf`, which is one Tachyon command

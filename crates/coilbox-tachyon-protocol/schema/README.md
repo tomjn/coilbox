@@ -41,7 +41,7 @@ Only `src/` is hand-edited upstream. Everything under `schema/` and `docs/` ther
 
 ## What the build stops you on
 
-Three things are quiet enough to be worth failing the build for. All three live in `build.rs`.
+Four things are quiet enough to be worth failing the build for. All four live in `build.rs`.
 
 The patch marker. A bundle without `x-coilbox-patched` has lost the `privateBattle.ip` patch, and `battle/start` would stop parsing.
 
@@ -49,10 +49,14 @@ An optional and nullable field that `nullable-optional.txt` does not list. Typif
 
 An `OVERRIDES` entry naming a schema title the bundle no longer has. Upstream renaming a command would otherwise send it back to the lossy generated type without a word.
 
+A bundle in which no failed response lists its reasons as an enum. `loosen_failure_reasons` rewrites those lists to plain strings before generating, and finding none means the shape of a response has changed under it.
+
 ## What makes a refresh safe
 
-`parse_frame` is total. A command id the bundle does not have lands in `TachyonMessage::Unknown` with the frame kept raw, and a body we cannot read lands in `TachyonMessage::Invalid` the same way, so a server ahead of the vendored bundle does not stop the connection. An enum value the schema does not list, such as a new failure reason, makes that one message `Invalid` rather than breaking anything else.
+`parse_frame` is total. A command id the bundle does not have lands in `TachyonMessage::Unknown` with the frame kept raw, and a body we cannot read lands in `TachyonMessage::Invalid` the same way, so a server ahead of the vendored bundle does not stop the connection.
 
-Match a failure reason by its wire value, never by the generated type name. Typify numbers the `TachyonCommandSubtypeNNNReason` types by position, so the names move whenever the bundle does.
+A failure reason the bundle does not list still reads, because the reasons are loosened to strings at build time. Other enum values are not: a new `assetStatus`, say, makes that one message `Invalid` rather than breaking anything else. Loosening those too would cost the type safety the code actually relies on, and typify has no way to say "or anything else" for one.
+
+Match a failure reason by its wire value. That is all there is now, and it is what the code wanted anyway.
 
 Teiserver lags the spec, so a command that exists in a newer bundle may still answer `command_unimplemented` on the live server.
