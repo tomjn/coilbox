@@ -820,6 +820,14 @@ With the updater off there's no check at launch, so no "Update available" pill i
 
 This is separate from [`release`](#release-object): your own game archive keeps updating from your repo either way.
 
+### `hub` (boolean)
+
+Turns off the community hub. On by default. Set it to `false` if you're shipping a modded game to your own community and don't want a button pointing players at a public gallery of other people's content.
+
+```json
+{ "version": 1, "hub": false }
+```
+
 ### `authoring` (boolean)
 
 Removes the [profile authoring tools](#writing-and-iterating-on-a-profile) from Settings > Distribution profile. On by default. Set it to `false` in the profile you ship, so a player can't reload or replace your branding by accident.
