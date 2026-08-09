@@ -9,12 +9,17 @@ import { BattleFilterPopover } from "../battles/BattleFilterPopover";
 import { BattleList } from "../battles/BattleList";
 import { filterSortBattles } from "../battles/battleFilters";
 import {
+  type CreateLobbyArgs,
+  CreateLobbyPopover,
+} from "../battles/CreateLobbyPopover";
+import {
   HostBattlePopover,
   type OpenBattleArgs,
 } from "../battles/HostBattlePopover";
 import { useBattleFilters } from "../battles/useBattleFilters";
 import {
   type Battle,
+  mpCreateLobby,
   mpJoinBattle,
   mpLeaveBattle,
   mpOpenBattle,
@@ -40,7 +45,8 @@ function BattlesPage() {
     openLoginPopover,
   } = useMultiplayer();
   // Under Tachyon the server allocates a dedicated autohost and a client cannot
-  // open a battle at all, so the host popover goes rather than failing on use.
+  // host a battle at all. What it can do is create a lobby, which is a different
+  // thing with its own popover, so the two swap rather than one being hidden.
   // See `docs/tachyon-protocol.md`.
   const canHost = protocol !== "tachyon";
   const [filters, setFilters] = useBattleFilters();
@@ -192,6 +198,21 @@ function BattlesPage() {
     }
   }
 
+  // Create a lobby on a Tachyon server. The response is the whole lobby and it
+  // puts us in it, so it sets `currentBattle` exactly as a join does and the
+  // effect above takes us to the room. Nothing here hosts anything.
+  async function onCreate(args: CreateLobbyArgs) {
+    if (!activeKey) return;
+    clearJoinError();
+    hostingFromDraftRef.current = false;
+    joiningRef.current = true;
+    try {
+      await mpCreateLobby({ serverKey: activeKey, ...args });
+    } catch {
+      joiningRef.current = false;
+    }
+  }
+
   async function leave() {
     if (!activeKey) return;
     await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
@@ -221,13 +242,20 @@ function BattlesPage() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {canHost && (
+          {canHost ? (
             <HostBattlePopover
               disabled={!canJoin}
               onHost={onHost}
               initialMap={hostDraft?.mapName ?? hostMap}
               initialGame={hostDraft?.gameName}
               initialTitle={hostState?.hostTitle}
+              autoOpen={!!hostMap || !!hostDraft}
+            />
+          ) : (
+            <CreateLobbyPopover
+              disabled={!canJoin}
+              onCreate={onCreate}
+              initialMap={hostDraft?.mapName ?? hostMap}
               autoOpen={!!hostMap || !!hostDraft}
             />
           )}

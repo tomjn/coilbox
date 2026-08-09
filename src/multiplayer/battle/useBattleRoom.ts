@@ -32,6 +32,7 @@ import {
   mpSetBattleStatus,
   mpSetScriptTags,
   mpSetStartRect,
+  mpStartBattle,
   mpUnboss,
   mpUpdateBattleInfo,
   mpUpdateBot,
@@ -252,7 +253,10 @@ export interface BattleRoomView {
   addBot: (aiShortName: string) => void;
   leave: () => Promise<void>;
   autohostSend: (command: string) => Promise<void>;
-  /** Ask the autohost to start the match (`!start`). */
+  /**
+   * Ask for the match to begin. On Tachyon that is `lobby/startBattle`, open to
+   * any member, and on the line protocol it is `!start` to the autohost.
+   */
   startGame: () => Promise<void>;
   /** Ask the autohost to switch to a map (`!map <name>`). */
   suggestMap: (name: string) => Promise<void>;
@@ -765,6 +769,15 @@ export function useBattleRoom(): BattleRoomView {
     [activeKey, clearErr, setErr],
   );
 
+  // Ask for the match to begin. The fork is the Rust side's: on Tachyon this is
+  // `lobby/startBattle`, after which the server allocates a machine to run the
+  // match and sends every player its address, and on the line protocol it stays
+  // `!start` in battle chat for the autohost bot in the room to read.
+  const startGame = useCallback(async () => {
+    if (!activeKey) return;
+    await mpStartBattle({ serverKey: activeKey }).then(clearErr, setErr);
+  }, [activeKey, clearErr, setErr]);
+
   // Vote in the open vote. The fork between `lobby/voteSubmit` and an `!vote`
   // chat line to the autohost is the Rust side's, because only it knows which
   // vote the lobby is holding.
@@ -985,7 +998,7 @@ export function useBattleRoom(): BattleRoomView {
     addBot,
     leave,
     autohostSend,
-    startGame: () => autohostSend("!start"),
+    startGame,
     suggestMap: (name) => autohostSend(`!map ${name}`),
     setMap,
     setLocked,

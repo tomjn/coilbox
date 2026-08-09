@@ -44,6 +44,8 @@ const COMMANDS: &[&str] = &[
     "mp_set_status",
     "mp_set_battle_status",
     "mp_open_battle",
+    "mp_create_lobby",
+    "mp_start_battle",
     "mp_update_battle_info",
     "mp_add_bot",
     "mp_remove_bot",

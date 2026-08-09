@@ -55,7 +55,7 @@ use tachyon_conn::TachyonMarkers;
 use tachyon_friends::FriendAction;
 use tachyon_messaging::Conversation;
 use tachyon_parties::PartyAction;
-use tachyon_room::{RoomAction, VoteChoice};
+use tachyon_room::{NewLobby, RoomAction, VoteChoice};
 use tauri::{
     ipc::Channel,
     plugin::{Builder, TauriPlugin},
@@ -1055,6 +1055,53 @@ fn mp_open_battle(
     enqueue(registry.inner(), &server_key, line)
 }
 
+/// `mp_create_lobby`, Tachyon only: make a lobby of our own.
+///
+/// A lobby is not a battle this machine hosts. It is a room the server owns,
+/// which we are put in as its first player, and the match only gets a machine to
+/// run on when a member asks for it to start. So there is no port, no NAT mode
+/// and no content hash to send, and nothing here seats us as a host.
+#[tauri::command]
+fn mp_create_lobby(
+    registry: State<'_, Registry>,
+    server_key: String,
+    name: String,
+    map_name: String,
+    ally_teams: u8,
+    players_per_team: u8,
+    bosses_enabled: bool,
+) -> CliResult {
+    tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::CreateLobby(NewLobby {
+            name,
+            map_name,
+            ally_teams,
+            players_per_team,
+            bosses_enabled,
+        }),
+    )
+    .unwrap_or_else(|| CliResult::err("this server hosts battles rather than lobbies"))
+}
+
+/// `mp_start_battle`: ask for the match to begin.
+#[tauri::command]
+fn mp_start_battle(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    // On Tachyon any member may ask, and the server allocates a machine to run
+    // the match and sends every player its address. SPADS has no command for it,
+    // so on the line protocol this stays `!start` in battle chat for the
+    // autohost bot in the room to read.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Room(RoomAction::StartBattle),
+    ) {
+        return result;
+    }
+    enqueue(registry.inner(), &server_key, command::say_battle("!start"))
+}
+
 /// `mp_update_battle_info` — host: change the open battle's map, lock flag, and
 /// advertised spectator count via `UPDATEBATTLEINFO`. The four fields travel
 /// together, so callers resend the current values for whichever they aren't
@@ -1935,6 +1982,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_set_status,
             mp_set_battle_status,
             mp_open_battle,
+            mp_create_lobby,
+            mp_start_battle,
             mp_update_battle_info,
             mp_add_bot,
             mp_remove_bot,
