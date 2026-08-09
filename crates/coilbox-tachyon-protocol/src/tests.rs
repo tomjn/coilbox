@@ -77,7 +77,7 @@ fn success_response_carries_its_data() {
 }
 
 #[test]
-fn failure_response_carries_a_typed_reason() {
+fn failure_response_carries_its_reason_and_details() {
     let raw = r#"{
         "type": "response",
         "messageId": "m3",
@@ -93,11 +93,36 @@ fn failure_response_carries_a_typed_reason() {
     else {
         panic!("expected a failed lobby/join response");
     };
-    // The reason enum is compared through Display rather than by name. Typify
-    // numbers these types by position, so the name moves when the schema is
-    // re-vendored while the wire value does not.
-    assert_eq!(reason.to_string(), "lobby_full");
+    // The reason is the wire value, which is what callers match on. The schema
+    // lists the reasons per command, but the build loosens those lists to
+    // strings so an unknown one does not fail the parse.
+    assert_eq!(reason, "lobby_full");
     assert_eq!(details.as_deref(), Some("the lobby is full"));
+}
+
+#[test]
+fn a_failure_reason_the_schema_does_not_list_still_reads() {
+    // Teiserver is free to be ahead of the vendored bundle. A reason we have
+    // never heard of has to arrive as a refusal we can show, not as an
+    // unreadable frame, so the closed enum the schema asks for is loosened at
+    // build time.
+    let raw = r#"{
+        "type": "response",
+        "messageId": "m9",
+        "commandId": "lobby/join",
+        "status": "failed",
+        "reason": "lobby_hibernating",
+        "details": "try again in a moment"
+    }"#;
+
+    let TachyonMessage::LobbyJoinResponse(types::LobbyJoinResponse::Failed {
+        reason, details, ..
+    }) = parse_frame(raw)
+    else {
+        panic!("expected a failed lobby/join response");
+    };
+    assert_eq!(reason, "lobby_hibernating");
+    assert_eq!(details.as_deref(), Some("try again in a moment"));
 }
 
 #[test]

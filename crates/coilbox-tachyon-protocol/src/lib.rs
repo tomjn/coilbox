@@ -15,15 +15,23 @@
 //!
 //! The bundle is one top-level `anyOf` of 166 command schemas. Typify turns
 //! that into [`types::TachyonCommand`], a struct of 166 flattened `Option`
-//! fields, and it emits 68 near-duplicate `TachyonCommandSubtypeNNNReason`
-//! enums, one per response, because each failure reason enum is inlined and
-//! most of them list the same four reasons.
+//! fields.
 //!
 //! That is expected typify behaviour for a large top-level `anyOf`, not a
 //! broken build. `TachyonCommand` cannot discriminate anything, so nothing
 //! should reference it. Use [`parse_frame`] and the per-command types instead,
 //! which are the good part of the same output: `LobbyJoinRequest` is a struct,
 //! and `LobbyJoinResponse` is an enum over the success and failure shapes.
+//!
+//! # A failed response carries its reason as a string
+//!
+//! The schema lists the reasons each command can fail with, but `build.rs`
+//! loosens those lists to plain strings before generating. A generated enum is
+//! closed, so a reason a newer server has and the vendored bundle does not
+//! would fail the whole response, turning a refusal we could have shown into an
+//! unreadable frame. It also removed 68 near-duplicate enums, one per response,
+//! because the reasons are inlined per command and most list the same four. See
+//! `loosen_failure_reasons` in `build.rs`.
 //!
 //! # Surface
 //!

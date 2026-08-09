@@ -488,6 +488,8 @@ The server does not implement clans, `user/report`, `battle/ended`, `matchmaking
 
 Mitigation: implement against the spec, gate features on what the server actually answers, and handle `command_unimplemented` as a soft degradation everywhere.
 
+Built in #1243. A command answered `command_unimplemented` comes back as `RequestError::Unsupported` rather than as a failure, and the connection remembers it, so `TachyonClient::is_unsupported` tells a surface to hide itself and a second caller is answered without a round trip. The memory is per connection, so a server that has caught up is asked again on the next one. There is no list of unimplemented commands in the source, and no way to know before asking once: Tachyon has no command that says what a server implements, so the alternative would be a probe request per feature at connect time.
+
 ### Two spec bugs to work around
 
 `privateBattle.ip` is declared as a reference to `battleId`, which is `{"type": "string", "format": "uuid"}` (`tachyon:src/schema/definitions/privateBattle.ts` line 7). So the schema says the game server's IP address must be a UUID. Teiserver's older bundled copy has a plain string and the live server sends a real IP address. A strict client generated from `compiled.json` will fail to parse `battle/start`, which is the single most important message in the whole protocol for us. This was introduced by the commit "battleId is a uuid" on 2026-06-16. We patch it locally in the vendored schema and report it upstream.
@@ -496,7 +498,9 @@ Mitigation: implement against the spec, gate features on what the server actuall
 
 ### The flattened root codegen trap
 
-Typify turns the top-level `anyOf` into a struct with 166 flattened `Option` fields rather than a tagged enum. It compiles, it serialises, and it is useless. It also generates 68 near-duplicate `TachyonCommandSubtypeNNNReason` enums, one per response, because each failure reason enum is inlined and most of them list the same four reasons. Those numbers move when the schema is re-vendored, so match on a reason by its wire value rather than by generated type name. Anyone opening the generated file for the first time will reasonably assume the codegen failed.
+Typify turns the top-level `anyOf` into a struct with 166 flattened `Option` fields rather than a tagged enum. It compiles, it serialises, and it is useless. Anyone opening the generated file for the first time will reasonably assume the codegen failed.
+
+It also generated 68 near-duplicate `TachyonCommandSubtypeNNNReason` enums, one per response, because each failure reason enum is inlined and most of them list the same four reasons. Those are gone since #1243. A generated enum is closed, so a reason a newer server has and the vendored bundle does not would fail the whole response, and `build.rs` now rewrites each failed response's list of reasons to a plain string before generating. Match a reason by its wire value, which is now the only thing there is to match.
 
 Mitigation: document this at the top of the generated crate, hand-write the envelope, and never reference the generated root type.
 
