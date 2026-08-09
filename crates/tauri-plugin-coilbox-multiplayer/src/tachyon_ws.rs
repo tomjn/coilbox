@@ -46,7 +46,8 @@ pub const SUBPROTOCOL: &str = "v0.tachyon";
 /// on the first breach, so we sit under both rather than at them. This is a floor
 /// under the send path, not a queueing policy: a caller that wants ordering or
 /// backoff builds it on top.
-const SEND_RATE_PER_SEC: f64 = 8.0;
+/// [`crate::tachyon_rpc`] is that caller, and it sizes its queue from this rate.
+pub(crate) const SEND_RATE_PER_SEC: f64 = 8.0;
 const SEND_BURST: f64 = 15.0;
 const _: () = assert!(SEND_RATE_PER_SEC < 10.0 && SEND_BURST < 20.0);
 
