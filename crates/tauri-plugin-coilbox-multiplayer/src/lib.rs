@@ -23,6 +23,10 @@ mod tachyon_lobbies;
 mod tachyon_room;
 /// Matching Tachyon responses to requests, over the transport below.
 pub mod tachyon_rpc;
+/// A whole Tachyon session through parse and reduce, asserting the state it
+/// builds. The counterpart of the line protocol's `login_transcript` test.
+#[cfg(test)]
+mod tachyon_transcript;
 mod tachyon_users;
 /// The WebSocket transport for the newer Tachyon protocol, built alongside the
 /// line protocol above.
