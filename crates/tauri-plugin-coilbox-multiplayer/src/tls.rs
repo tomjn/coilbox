@@ -117,7 +117,7 @@ pub async fn connect_stream_cancellable(
 /// bundle; only when the user has explicitly ticked "allow self-signed" (uberserver
 /// ships a self-signed cert; teiserver does not) do we swap in the accept-anything
 /// [`NoVerify`] verifier.
-fn client_config(allow_self_signed: bool) -> Result<rustls::ClientConfig, String> {
+pub(crate) fn client_config(allow_self_signed: bool) -> Result<rustls::ClientConfig, String> {
     // Pin the ring provider explicitly rather than relying on a process-wide
     // default being installed elsewhere in the app.
     let provider = Arc::new(rustls::crypto::ring::default_provider());
