@@ -44,7 +44,12 @@
 //!   stays 0 rather than carrying a guess the engine would then contradict. The
 //!   room shows an unset swatch rather than a black one, because 0 is black.
 //! - `currentBattle`, the match in progress. Launching is #1233.
-//! - `currentVote` and `voteHistory`. Votes are #1231.
+//! - a vote's quorum and majority. Both arrive on a `lobby/updated` patch and
+//!   neither is on the lobby we join with, so anyone who joined mid-vote would
+//!   never learn them. `Vote::yes_needed` and `Vote::no_needed` stay 0 and the
+//!   panel shows the tally with no target rather than a target of nothing.
+//! - `voteHistory`, beyond naming a vote that has just ended. Nothing shows a
+//!   lobby's past votes.
 //! - `joinQueuePosition` on a spectator, the `player` slot on a player and a
 //!   bot, and a bot's `version` and `options`.
 //! - `gameOptions`. `Battle::script_tags` is the engine's start-script key space
@@ -64,13 +69,33 @@
 //! a short list on purpose. Teiserver disconnects a client that sends more than
 //! ten requests a second, so a control that pushes our whole seat on every click
 //! asks only for the parts that actually differ from the seat we hold.
+//!
+//! # A vote is data here, not chat
+//!
+//! On TASServer a vote is SPADS announcing itself in battle chat, and
+//! `coilbox_lobby_protocol::vote` scrapes those lines. Tachyon holds the vote on
+//! the lobby, so the panel is fed from `currentVote` instead: the projection
+//! turns it into the same [`Vote`] the panel already reads, and the panel's
+//! buttons come back as [`RoomAction::CastVote`], which is `lobby/voteSubmit`
+//! against the vote the lobby is holding.
+//!
+//! A vote ends in two ways that look alike and are not. `lobby/updated` setting
+//! `currentVote` to null is the vote going, and a patch that does not mention
+//! `currentVote` at all leaves it exactly as it was. `Patched` in
+//! `coilbox_tachyon_protocol::merge_patch` is what keeps those apart, so nothing
+//! here has to. `lobby/voteEnded` is the separate news of how it finished, and
+//! it clears the vote itself rather than waiting for the patch, because the two
+//! can arrive in either order.
 
 use std::collections::HashMap;
 
-use coilbox_lobby_protocol::{BattleStatus, Bot, Delta, LobbyState, MemberStatus, StartRect, User};
+use coilbox_lobby_protocol::{
+    BattleStatus, Bot, Delta, LobbyState, MemberStatus, StartRect, User, Vote,
+};
 use coilbox_tachyon_protocol::merge_patch;
 use coilbox_tachyon_protocol::types::{self, LobbyDetails, LobbyJoinResponse};
 use coilbox_tachyon_protocol::TachyonMessage;
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::tachyon_lobbies::handle_for;
@@ -125,6 +150,30 @@ pub(crate) enum RoomAction {
     Unboss {
         username: String,
     },
+    /// Vote in whatever vote the lobby is holding.
+    CastVote {
+        choice: VoteChoice,
+    },
+}
+
+/// How a member votes, in the words `lobby/voteSubmit` uses.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum VoteChoice {
+    Yes,
+    No,
+    Abstain,
+}
+
+impl VoteChoice {
+    /// The value the request carries.
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Yes => "yes",
+            Self::No => "no",
+            Self::Abstain => "abstain",
+        }
+    }
 }
 
 /// The requests a control's action comes to on the lobby we hold.
@@ -168,6 +217,15 @@ pub(crate) fn requests_for(
         RoomAction::Unboss { username } => {
             one(user_id(state, username).map(|id| request("lobby/unboss", json!({ "userId": id }))))
         }
+        // The vote id is the lobby's, not the panel's, so the panel sends a
+        // choice and this names the vote. A vote that closed under the click is
+        // nothing to ask for.
+        RoomAction::CastVote { choice } => one(details.current_vote.as_ref().map(|vote| {
+            request(
+                "lobby/voteSubmit",
+                json!({ "id": vote.id, "vote": choice.as_str() }),
+            )
+        })),
     }
 }
 
@@ -316,6 +374,7 @@ pub(crate) fn reduce(
             vec![]
         }
         TachyonMessage::LobbyLeftEvent(event) => left_event(room, state, &event.data),
+        TachyonMessage::LobbyVoteEndedEvent(event) => vote_ended(room, state, &event.data),
         _ => vec![],
     };
     // The projection goes first, so a delta the frontend acts on, such as
@@ -443,6 +502,61 @@ fn left_event(
     deltas
 }
 
+/// The `lobby/voteEnded` event, which says how a vote finished.
+///
+/// The vote is cleared here rather than left to the patch that nulls it, so the
+/// panel closes on the news itself and the two can arrive in either order. When
+/// the patch came first the action is gone from `currentVote`, and the history
+/// is where it still is.
+///
+/// The outcome is put in front of the user because Tachyon has nothing like the
+/// line SPADS posts in chat, so a vote would otherwise simply vanish.
+fn vote_ended(
+    room: &mut Option<Room>,
+    state: &LobbyState,
+    event: &types::LobbyVoteEndedEventData,
+) -> Vec<Delta> {
+    let Some(room) = room.as_mut() else {
+        return vec![];
+    };
+    let held = room
+        .details
+        .current_vote
+        .as_ref()
+        .is_some_and(|vote| vote.id == event.id);
+    let action = if held {
+        room.details.current_vote.take().map(|vote| vote.action)
+    } else {
+        finished_action(&room.details, &event.id)
+    };
+
+    let outcome = match event.outcome {
+        types::VoteOutcomes::Passed => "passed",
+        types::VoteOutcomes::Failed => "failed",
+        types::VoteOutcomes::Cancelled => "was cancelled",
+        types::VoteOutcomes::Timeout => "ran out of time",
+    };
+    let names = names_by_id(&state.users);
+    let text = match action {
+        Some(action) => format!("The vote to {} {outcome}.", describe(&action, &names)),
+        None => format!("The vote {outcome}."),
+    };
+    vec![Delta::ServerMessage { text, boxed: false }]
+}
+
+/// What a finished vote was about, out of the lobby's vote history.
+///
+/// The history is keyed by the vote id, so a vote the patch nulled before the
+/// event arrived can still be named. A server that keys it some other way costs
+/// the wording rather than the message.
+fn finished_action(details: &LobbyDetails, id: &str) -> Option<types::VoteActions> {
+    details
+        .vote_history
+        .iter()
+        .find(|(key, _)| key.as_str() == id)
+        .map(|(_, finished)| finished.vote.clone())
+}
+
 /// Fold the lobby we hold into the battle the room reads, reporting whether
 /// anything moved.
 fn project(room: Option<&Room>, state: &mut LobbyState) -> Vec<Delta> {
@@ -471,10 +585,17 @@ fn project(room: Option<&Room>, state: &mut LobbyState) -> Vec<Delta> {
     battle.start_rects = start_rects(details);
     battle.bosses = bosses(details, &names);
     battle.bosses_enabled = details.are_bosses_enabled;
+
+    // The vote is on the state rather than on the battle, so it is compared on
+    // its own. A patch that only moved a voter still has to reach the panel.
+    let vote = vote_of(details, &names);
+    let voted = state.current_vote != vote;
+    state.current_vote = vote;
+
     let changed = battle != before;
     state.battles.insert(handle, battle);
 
-    match (known, changed) {
+    match (known, changed || voted) {
         (false, _) => vec![Delta::BattleOpened { id: handle }],
         (true, true) => vec![Delta::BattleInfoChanged { id: handle }],
         (true, false) => vec![],
@@ -589,6 +710,57 @@ fn bosses(details: &LobbyDetails, names: &HashMap<&str, &str>) -> Vec<String> {
         .collect()
 }
 
+/// The open vote, as the panel reads one.
+///
+/// The tally is counted off the voters, because that is the only place Tachyon
+/// puts it. Abstain is always offered: `lobby/voteSubmit` takes it whatever the
+/// vote is about, where SPADS only accepts it when the autohost advertised it.
+fn vote_of(details: &LobbyDetails, names: &HashMap<&str, &str>) -> Option<Vote> {
+    let vote = details.current_vote.as_ref()?;
+    let cast = |choice| {
+        count(
+            vote.voters
+                .values()
+                .filter(|voter| voter.vote == choice)
+                .count(),
+        )
+    };
+    Some(Vote {
+        subject: describe(&vote.action, names),
+        caller: name_of(&vote.initiator, names),
+        yes: cast(types::LobbyDetailsCurrentVoteVotersValueVote::Yes),
+        no: cast(types::LobbyDetailsCurrentVoteVotersValueVote::No),
+        // The quorum and the majority are on the patch and not on the lobby, so
+        // there is no target to show. The panel shows the tally alone for 0.
+        yes_needed: 0,
+        no_needed: 0,
+        allow_abstain: true,
+        ends_at: millis(&vote.until),
+    })
+}
+
+/// What a vote is asking for, in the words the panel shows after "Vote".
+///
+/// Tachyon types the action, so this reads it rather than echoing a sentence
+/// the way the SPADS scraper has to. A ban and a kick are the one action, told
+/// apart by whether it carries a date to ban until.
+fn describe(action: &types::VoteActions, names: &HashMap<&str, &str>) -> String {
+    match action {
+        types::VoteActions::Start => "start the match".to_owned(),
+        types::VoteActions::ChangeMap { new_map_name } => {
+            format!("change the map to {new_map_name}")
+        }
+        types::VoteActions::AppointBoss { boss_id } => {
+            format!("make {} boss", name_of(boss_id, names))
+        }
+        types::VoteActions::Kickban {
+            user_id,
+            ban_until: None,
+        } => format!("kick {}", name_of(user_id, names)),
+        types::VoteActions::Kickban { user_id, .. } => format!("ban {}", name_of(user_id, names)),
+    }
+}
+
 /// The per-ally start boxes, in the 0 to 200 space `Battle` uses.
 fn start_rects(details: &LobbyDetails) -> HashMap<u8, StartRect> {
     sorted(&details.ally_team_config)
@@ -690,6 +862,13 @@ fn sync_of(status: types::LobbyDetailsPlayersValueAssetStatus) -> u8 {
 fn scale(edge: f64) -> i32 {
     let scaled = (edge * START_RECT_SCALE).round();
     scaled.clamp(0.0, START_RECT_SCALE) as i32
+}
+
+/// A Tachyon timestamp, which is microseconds, as the milliseconds `Vote` holds.
+/// A time before the epoch is not a deadline, and 0 is what the panel reads as
+/// having none.
+fn millis(at: &types::UnixTime) -> u64 {
+    u64::try_from(at.0 / 1000).unwrap_or(0)
 }
 
 /// A count off the wire. More members than a `u32` can hold is not a lobby.
