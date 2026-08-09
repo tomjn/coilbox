@@ -44,6 +44,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-export-build-tree-zip`
 - `allow-content-export-challenge`
 - `allow-content-import-challenge`
+- `allow-content-import-container`
 - `allow-branding-catalog`
 - `allow-branding-image`
 
@@ -598,6 +599,32 @@ Enables the content_import_challenge command without any pre-configured scope.
 <td>
 
 Denies the content_import_challenge command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-import-container`
+
+</td>
+<td>
+
+Enables the content_import_container command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-import-container`
+
+</td>
+<td>
+
+Denies the content_import_container command without any pre-configured scope.
 
 </td>
 </tr>

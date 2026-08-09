@@ -43,6 +43,7 @@ const COMMANDS: &[&str] = &[
     "content_export_build_tree_zip",
     "content_export_challenge",
     "content_import_challenge",
+    "content_import_container",
     "branding_catalog",
     "branding_image",
 ];
