@@ -35,7 +35,8 @@
 use std::collections::{HashMap, HashSet};
 
 use coilbox_lobby_protocol::{Battle, Delta, LobbyState};
-use coilbox_tachyon_protocol::types::{LobbyListUpdatedEventDataLobbiesValue, LobbyOverview};
+use coilbox_tachyon_protocol::merge_patch::{LobbyOverviewPatch, Patched};
+use coilbox_tachyon_protocol::types::LobbyOverview;
 use coilbox_tachyon_protocol::TachyonMessage;
 
 /// The part of a Tachyon lobby overview that has a home in [`Battle`].
@@ -49,6 +50,7 @@ struct Fields<'a> {
     game_version: Option<&'a str>,
     player_count: Option<i64>,
     max_player_count: Option<i64>,
+    in_progress: Option<bool>,
 }
 
 /// Apply a Tachyon message to the lobby state, returning the deltas produced.
@@ -129,6 +131,9 @@ fn put(state: &mut LobbyState, id: &str, fields: &Fields<'_>) -> Vec<Delta> {
     if let Some(max_player_count) = fields.max_player_count {
         battle.max_players = count(max_player_count);
     }
+    if let Some(in_progress) = fields.in_progress {
+        battle.in_progress = in_progress;
+    }
     let changed = battle != before;
     state.battles.insert(handle, battle);
 
@@ -170,8 +175,10 @@ fn close_all_but(state: &mut LobbyState, kept: &HashSet<u32>) -> Vec<Delta> {
 /// A battle to fold a first patch into, or `None` when the patch carries too
 /// little to list a lobby at all.
 ///
-/// The bar is every field `lobbyOverview` requires and we map, so a partial
-/// patch for a lobby we have never seen is skipped rather than half applied.
+/// The bar is every field a row shows, so a partial patch for a lobby we have
+/// never seen is skipped rather than half applied. Whether a battle is running
+/// is not part of the bar, because a lobby starts out with none and a patch
+/// that does not mention one leaves it that way.
 fn whole(handle: u32, id: &str, fields: &Fields<'_>) -> Option<Battle> {
     let complete = fields.name.is_some()
         && fields.map_name.is_some()
@@ -239,11 +246,16 @@ fn from_overview(overview: &LobbyOverview) -> Fields<'_> {
         game_version: Some(&overview.game_version),
         player_count: Some(overview.player_count),
         max_player_count: Some(overview.max_player_count),
+        in_progress: Some(overview.current_battle.is_some()),
     }
 }
 
 /// One entry of a `lobby/listUpdated`, where every field but the id is optional.
-fn from_patch(entry: &LobbyListUpdatedEventDataLobbiesValue) -> Fields<'_> {
+///
+/// `currentBattle` is the one field where absent and null part company, which is
+/// why the entry is read through the hand-written patch type. A battle set to
+/// null has ended, and an entry that does not name it says nothing either way.
+fn from_patch(entry: &LobbyOverviewPatch) -> Fields<'_> {
     Fields {
         name: entry.name.as_deref(),
         map_name: entry.map_name.as_deref(),
@@ -251,6 +263,11 @@ fn from_patch(entry: &LobbyListUpdatedEventDataLobbiesValue) -> Fields<'_> {
         game_version: entry.game_version.as_deref(),
         player_count: entry.player_count,
         max_player_count: entry.max_player_count,
+        in_progress: match entry.current_battle {
+            Patched::Absent => None,
+            Patched::Null => Some(false),
+            Patched::Set(_) => Some(true),
+        },
     }
 }
 
@@ -403,6 +420,75 @@ mod tests {
         assert_eq!(battle.title, "Comet Catcher 8v8");
         assert_eq!(battle.map, "Comet Catcher Remake 1.8");
         assert_eq!(battle.max_players, 16);
+        assert_eq!(deltas, vec![Delta::BattleInfoChanged { id: battle.id }]);
+    }
+
+    /// A running battle is what makes a row offer Watch live rather than Join.
+    #[test]
+    fn a_reset_says_which_lobbies_have_a_battle_running() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            &reset_frame(json!({
+                "lobby-a": overview(
+                    "lobby-a",
+                    json!({ "currentBattle": { "startedAt": 1705432698 } }),
+                ),
+                "lobby-b": overview("lobby-b", json!({})),
+            })),
+        );
+
+        assert!(battle_for(&state, "lobby-a").in_progress);
+        assert!(!battle_for(&state, "lobby-b").in_progress);
+    }
+
+    /// The pair the hand-written patch type exists for. A patch that leaves
+    /// `currentBattle` out says nothing about it, and one that sets it to null
+    /// says the battle has ended. Both are the same size on the wire.
+    #[test]
+    fn a_battle_ends_on_a_null_and_survives_a_patch_that_leaves_it_out() {
+        let running = reset_frame(json!({
+            "lobby-a": overview("lobby-a", json!({ "currentBattle": { "startedAt": 1705432698 } })),
+        }));
+
+        let mut left_out = LobbyState::new();
+        feed(&mut left_out, &running);
+        let deltas = feed(
+            &mut left_out,
+            &updated_frame(json!({ "lobby-a": { "id": "lobby-a", "playerCount": 11 } })),
+        );
+        let battle = battle_for(&left_out, "lobby-a");
+        assert!(battle.in_progress, "the battle ended without being told to");
+        assert_eq!(deltas, vec![Delta::BattleInfoChanged { id: battle.id }]);
+
+        let mut nulled = LobbyState::new();
+        feed(&mut nulled, &running);
+        let deltas = feed(
+            &mut nulled,
+            &updated_frame(json!({ "lobby-a": { "id": "lobby-a", "currentBattle": null } })),
+        );
+        let battle = battle_for(&nulled, "lobby-a");
+        assert!(!battle.in_progress, "the battle survived a null");
+        assert_eq!(deltas, vec![Delta::BattleInfoChanged { id: battle.id }]);
+    }
+
+    #[test]
+    fn a_patch_that_names_a_battle_starts_one() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            &reset_frame(json!({ "lobby-a": overview("lobby-a", json!({})) })),
+        );
+
+        let deltas = feed(
+            &mut state,
+            &updated_frame(json!({
+                "lobby-a": { "id": "lobby-a", "currentBattle": { "startedAt": 1705432698 } },
+            })),
+        );
+
+        let battle = battle_for(&state, "lobby-a");
+        assert!(battle.in_progress);
         assert_eq!(deltas, vec![Delta::BattleInfoChanged { id: battle.id }]);
     }
 

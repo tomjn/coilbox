@@ -147,16 +147,16 @@ function BattlesPage() {
     void onJoin(target, deeplinkJoin.password);
   }, [deeplinkJoin, ready, activeKey, all]);
 
-  // A battle is "in progress" when its host is in-game; BattleList groups on this
-  // (open first, in-progress last). The joined battle is pinned separately so its
-  // Leave button is always reachable even inside a collapsed group.
+  // A battle is "in progress" when the server says so on the lobby, which is what
+  // Tachyon does, or when its host is in-game, which is all TASServer gives us.
+  // BattleList groups on this (open first, in-progress last). The joined battle is
+  // pinned separately so its Leave button is always reachable even inside a
+  // collapsed group.
   const users = mirror.state?.users;
   const inProgressIds = useMemo(() => {
     const ids = new Set<number>();
-    if (users) {
-      for (const b of all) {
-        if (users[b.host]?.status.ingame) ids.add(b.id);
-      }
+    for (const b of all) {
+      if (b.inProgress || users?.[b.host]?.status.ingame) ids.add(b.id);
     }
     return ids;
   }, [all, users]);
