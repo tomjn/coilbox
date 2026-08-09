@@ -12,6 +12,10 @@
 mod conn;
 mod dmlog;
 mod probe;
+/// The WebSocket transport for the newer Tachyon protocol, built alongside the
+/// line protocol above. Public because nothing in this crate calls it yet, and a
+/// later stage wires it to commands of its own.
+pub mod tachyon_ws;
 mod tls;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
