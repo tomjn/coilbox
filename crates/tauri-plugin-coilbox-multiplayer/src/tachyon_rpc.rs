@@ -97,9 +97,9 @@ const SEND_QUEUE_DEPTH: usize = 32;
 ///
 /// The four named reasons are added to every command in the schema. Anything
 /// else is a reason that command adds on its own, such as `lobby_full` on
-/// `lobby/join`, and it is carried by its wire value: the generated per-command
-/// reason enums are 68 near-duplicate types whose names move whenever the schema
-/// is re-vendored, so matching on the string is the stable option.
+/// `lobby/join`, and it is carried by its wire value, which is the only thing a
+/// server behind or ahead of the vendored schema is guaranteed to agree with us
+/// about.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FailureReason {
     /// The credentials do not allow this command.
@@ -587,9 +587,8 @@ fn fail_pending(pending: &Pending, ended: &WsError) {
 ///
 /// The reason is read as the string it is on the wire, so a reason a newer server
 /// has and we have never heard of arrives as
-/// [`FailureReason::Other`](FailureReason::Other) with the response intact. The
-/// generated per-command types cannot do that: their reason enums are closed, so
-/// an unknown value fails the whole parse.
+/// [`FailureReason::Other`](FailureReason::Other) with the response intact rather
+/// than failing the parse.
 fn outcome(raw: &str) -> Result<String, RequestError> {
     match serde_json::from_str::<FailedResponse>(raw) {
         Ok(failed) if failed.status == "failed" => {
