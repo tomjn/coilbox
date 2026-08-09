@@ -6,13 +6,16 @@
 //! `keyring` crate. Registered as `"coilbox-lobby-servers"`; the frontend invokes
 //! `plugin:coilbox-lobby-servers|<cmd>`.
 
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Mutex, OnceLock},
+};
 
 use picoframe_core::CliResult;
 use serde_json::json;
 use tauri::{
     plugin::{Builder, TauriPlugin},
-    Manager, Runtime, State,
+    Runtime,
 };
 
 /// Keychain service name shared by every stored lobby secret.
@@ -23,8 +26,15 @@ const SERVICE: &str = "coilbox-lobby";
 /// reloads and reconnect loops, so the OS keychain (and its macOS auth
 /// prompt) is hit at most once per `{server, username}` per app run. See
 /// `read_via_security_tool` for why macOS dev builds need more than that.
-#[derive(Default)]
-struct CredCache(Mutex<HashMap<String, String>>);
+///
+/// A process-wide static rather than Tauri managed state, because the Rust-side
+/// callers below have no `AppHandle` to reach managed state through, and two caches
+/// over one keychain would mean two macOS prompts.
+static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+fn cache() -> &'static Mutex<HashMap<String, String>> {
+    CACHE.get_or_init(Default::default)
+}
 
 /// Keychain account key for a `{server, username}` pair. Kept as a pure function so
 /// it can be unit-tested without touching the OS keychain.
@@ -39,29 +49,30 @@ fn entry(server_id: &str, username: &str) -> Result<keyring::Entry, String> {
         .map_err(|e| format!("keychain entry error: {e}"))
 }
 
-/// `ls_store_credential` — store (or replace) a login secret for `{server, username}`
-/// in the OS keychain (and the in-process cache).
+/// Store (or replace) a login secret for `{server, username}` in the OS keychain
+/// and the in-process cache.
+pub fn store_credential(server_id: &str, username: &str, secret: &str) -> Result<(), String> {
+    let entry = entry(server_id, username)?;
+    entry
+        .set_password(secret)
+        .map_err(|e| format!("failed to store credential: {e}"))?;
+    cache()
+        .lock()
+        .unwrap()
+        .insert(account_key(server_id, username), secret.to_owned());
+    Ok(())
+}
+
+/// `ls_store_credential`: [`store_credential`] over IPC.
 #[tauri::command]
 async fn ls_store_credential(
-    cache: State<'_, CredCache>,
     server_id: String,
     username: String,
     secret: String,
 ) -> Result<CliResult, ()> {
-    let entry = match entry(&server_id, &username) {
-        Ok(e) => e,
-        Err(e) => return Ok(CliResult::err(e)),
-    };
-    Ok(match entry.set_password(&secret) {
-        Ok(()) => {
-            cache
-                .0
-                .lock()
-                .unwrap()
-                .insert(account_key(&server_id, &username), secret);
-            CliResult::ok(json!({}))
-        }
-        Err(e) => CliResult::err(format!("failed to store credential: {e}")),
+    Ok(match store_credential(&server_id, &username, &secret) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e),
     })
 }
 
@@ -92,67 +103,65 @@ fn read_via_security_tool(account: &str) -> Option<String> {
     Some(secret.strip_suffix('\n').unwrap_or(&secret).to_owned())
 }
 
-/// `ls_get_credential` — read a stored secret, serving repeats from the cache. A
-/// missing entry is not an error; it resolves with `{ "secret": null }`.
-#[tauri::command]
-async fn ls_get_credential(
-    cache: State<'_, CredCache>,
-    server_id: String,
-    username: String,
-) -> Result<CliResult, ()> {
-    let key = account_key(&server_id, &username);
-    if let Some(secret) = cache.0.lock().unwrap().get(&key) {
-        return Ok(CliResult::ok(json!({ "secret": secret })));
+/// Read a stored secret, serving repeats from the cache. A missing entry is not an
+/// error, it is `Ok(None)`.
+pub fn get_credential(server_id: &str, username: &str) -> Result<Option<String>, String> {
+    let key = account_key(server_id, username);
+    if let Some(secret) = cache().lock().unwrap().get(&key) {
+        return Ok(Some(secret.clone()));
     }
     #[cfg(all(target_os = "macos", debug_assertions))]
     if let Some(secret) = read_via_security_tool(&key) {
-        cache.0.lock().unwrap().insert(key, secret.clone());
-        return Ok(CliResult::ok(json!({ "secret": secret })));
+        cache().lock().unwrap().insert(key, secret.clone());
+        return Ok(Some(secret));
     }
-    let entry = match entry(&server_id, &username) {
-        Ok(e) => e,
-        Err(e) => return Ok(CliResult::err(e)),
-    };
-    Ok(match entry.get_password() {
+    let entry = entry(server_id, username)?;
+    match entry.get_password() {
         Ok(pw) => {
-            cache.0.lock().unwrap().insert(key, pw.clone());
-            CliResult::ok(json!({ "secret": pw }))
+            cache().lock().unwrap().insert(key, pw.clone());
+            Ok(Some(pw))
         }
-        Err(keyring::Error::NoEntry) => CliResult::ok(json!({ "secret": null })),
-        Err(e) => CliResult::err(format!("failed to read credential: {e}")),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(format!("failed to read credential: {e}")),
+    }
+}
+
+/// `ls_get_credential`: [`get_credential`] over IPC. A missing entry resolves with
+/// `{ "secret": null }`.
+#[tauri::command]
+async fn ls_get_credential(server_id: String, username: String) -> Result<CliResult, ()> {
+    Ok(match get_credential(&server_id, &username) {
+        Ok(secret) => CliResult::ok(json!({ "secret": secret })),
+        Err(e) => CliResult::err(e),
     })
 }
 
-/// `ls_delete_credential` — delete a stored secret (keychain and cache). A missing
-/// entry is treated as success (idempotent cleanup).
-#[tauri::command]
-async fn ls_delete_credential(
-    cache: State<'_, CredCache>,
-    server_id: String,
-    username: String,
-) -> Result<CliResult, ()> {
-    cache
-        .0
+/// Delete a stored secret from the keychain and the cache. A missing entry is
+/// treated as success, so this can be re-run safely.
+pub fn delete_credential(server_id: &str, username: &str) -> Result<(), String> {
+    cache()
         .lock()
         .unwrap()
-        .remove(&account_key(&server_id, &username));
-    let entry = match entry(&server_id, &username) {
-        Ok(e) => e,
-        Err(e) => return Ok(CliResult::err(e)),
-    };
-    Ok(match entry.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(format!("failed to delete credential: {e}")),
+        .remove(&account_key(server_id, username));
+    let entry = entry(server_id, username)?;
+    match entry.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(format!("failed to delete credential: {e}")),
+    }
+}
+
+/// `ls_delete_credential`: [`delete_credential`] over IPC.
+#[tauri::command]
+async fn ls_delete_credential(server_id: String, username: String) -> Result<CliResult, ()> {
+    Ok(match delete_credential(&server_id, &username) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e),
     })
 }
 
 /// Build the plugin. Registered as `"coilbox-lobby-servers"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-lobby-servers")
-        .setup(|app, _| {
-            app.manage(CredCache::default());
-            Ok(())
-        })
         .invoke_handler(tauri::generate_handler![
             ls_store_credential,
             ls_get_credential,
