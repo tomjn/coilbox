@@ -15,6 +15,8 @@ mod probe;
 /// The OAuth browser sign-in that produces a Tachyon bearer token.
 pub mod tachyon_auth;
 mod tachyon_conn;
+/// The console drawer's send path, the one place a request is sent by hand.
+mod tachyon_debug;
 mod tachyon_lobbies;
 /// Matching Tachyon responses to requests, over the transport below.
 pub mod tachyon_rpc;
@@ -1554,6 +1556,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_chat_log_open,
             mp_tachyon_sign_in,
             mp_tachyon_sign_out,
+            tachyon_debug::mp_tachyon_request,
         ])
         .build()
 }

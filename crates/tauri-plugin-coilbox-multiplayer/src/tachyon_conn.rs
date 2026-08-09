@@ -32,7 +32,7 @@ use serde_json::{json, Value};
 use tauri::ipc::Channel;
 use tokio::sync::mpsc;
 
-use crate::conn::{emit, EventSink, LobbyEvent, Outbound, Registry, ServerConn};
+use crate::conn::{emit, EventSink, LobbyEvent, Outbound, Registry, ServerConn, TachyonHandle};
 use crate::lock_or_recover;
 use crate::tachyon_rpc::{spawn as spawn_rpc, Handlers, TachyonClient};
 use crate::tachyon_ws::{TachyonSocket, WsError};
@@ -85,6 +85,10 @@ pub fn spawn_connection(
     let (tx, rx) = mpsc::unbounded_channel::<Outbound>();
     let state = Arc::new(Mutex::new(LobbyState::new()));
     let sink: EventSink = Arc::new(Mutex::new(on_event));
+    // Filled by the task once the correlator is running. Registered empty rather
+    // than waited for, so the connection is reachable by key from the moment this
+    // returns, exactly as it was before.
+    let tachyon = TachyonHandle::default();
 
     tokio::spawn(run_loop(
         registry.clone(),
@@ -93,6 +97,7 @@ pub fn spawn_connection(
         sink.clone(),
         rx,
         state.clone(),
+        tachyon.clone(),
     ));
 
     lock_or_recover(&registry).insert(
@@ -101,6 +106,7 @@ pub fn spawn_connection(
             tx,
             state,
             sink,
+            tachyon,
             // The socket is open, so the connection is past every phase there is.
             phase: Arc::new(Mutex::new(LoginPhase::Ready)),
             // Tachyon has no agreement handshake. The terms are accepted in the
@@ -120,6 +126,7 @@ async fn run_loop(
     sink: EventSink,
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
+    tachyon: TachyonHandle,
 ) {
     // The console is fed from the socket rather than from here, because the socket
     // is the one place every frame passes through in both directions. Watching from
@@ -150,6 +157,11 @@ async fn run_loop(
     // command costs a rejection rather than the connection. `battle/start` gets its
     // handler with the battle launch work.
     let (client, mut task) = spawn_rpc(socket, Handlers::new(), inbound_tx);
+    // Hand the client to the registry, so a command can send a request over this
+    // connection. Cleared below when the connection ends, so a request that lands
+    // in the moment before the registry entry goes is refused rather than queued
+    // for a socket that has closed.
+    *lock_or_recover(&tachyon) = Some(client.clone());
     // The battle list is a subscription, and nothing else asks for it, so the
     // connection asks as soon as it is up. The answer is an ack: the list itself
     // follows as `lobby/listReset`.
@@ -186,8 +198,11 @@ async fn run_loop(
             Some(out) = rx.recv() => match out {
                 Outbound::Shutdown => {
                     // Letting the last client handle go is what asks the correlator
-                    // to close politely. Bounded, so a server that never answers the
-                    // close cannot hold this task open.
+                    // to close politely, so the registry's copy has to go with ours
+                    // or the close would wait out the grace period every time.
+                    // Bounded either way, so a server that never answers the close
+                    // cannot hold this task open.
+                    lock_or_recover(&tachyon).take();
                     let _ = client.take();
                     let _ = tokio::time::timeout(SHUTDOWN_GRACE, &mut task).await;
                     break None;
@@ -209,6 +224,9 @@ async fn run_loop(
         }
     };
 
+    // Drop the shared client before the registry entry goes, so a command holding
+    // the handle cannot send over a connection that has ended.
+    lock_or_recover(&tachyon).take();
     emit(&sink, LobbyEvent::Disconnected { reason });
     lock_or_recover(&registry).remove(&server_key);
 }
@@ -658,6 +676,53 @@ mod tests {
         );
     }
 
+    /// The console drawer's send path reads the client off the registry, so a live
+    /// Tachyon connection has to publish one and a request over it has to reach
+    /// the server.
+    #[tokio::test]
+    async fn the_registry_carries_a_client_a_command_can_send_over() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = serve(move |mut ws| async move {
+            while let Some(Ok(msg)) = ws.next().await {
+                if let Message::Text(text) = msg {
+                    let _ = seen_tx.send(text.to_string());
+                }
+            }
+        })
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+        wait_for(&mut rx, "phase").await;
+
+        // The subscription the connection sends on its own goes first, so read
+        // past it before asking for anything.
+        let first: Value = serde_json::from_str(
+            &tokio::time::timeout(Duration::from_secs(5), seen_rx.recv())
+                .await
+                .expect("nothing was sent within 5 seconds")
+                .expect("the server task ended first"),
+        )
+        .unwrap();
+        assert_eq!(first["commandId"], "lobby/subscribeList");
+
+        let client = lock_or_recover(&lock_or_recover(&registry)["alice@bar:443"].tachyon)
+            .clone()
+            .expect("the connection published no client");
+        // The answer never comes, so this is only about what left the machine.
+        let asking = tokio::spawn(async move { client.request("lobby/list", None).await });
+
+        let sent: Value = serde_json::from_str(
+            &tokio::time::timeout(Duration::from_secs(5), seen_rx.recv())
+                .await
+                .expect("the request was not sent within 5 seconds")
+                .expect("the server task ended first"),
+        )
+        .unwrap();
+        assert_eq!(sent["type"], "request");
+        assert_eq!(sent["commandId"], "lobby/list");
+        asking.abort();
+    }
+
     #[tokio::test]
     async fn a_shutdown_closes_the_socket_and_evicts_the_connection() {
         let (closed_tx, mut closed_rx) = mpsc::unbounded_channel::<()>();
@@ -695,6 +760,7 @@ mod tests {
         let mut rx = connect(&registry, "alice@bar:443", &url).await;
         wait_for(&mut rx, "phase").await;
 
+        let asked = tokio::time::Instant::now();
         sender(&registry, "alice@bar:443")
             .send(Outbound::Shutdown)
             .unwrap();
@@ -703,6 +769,14 @@ mod tests {
             .await
             .expect("the socket was never closed")
             .expect("the server task ended first");
+        // Politely, rather than by waiting out the grace period. Anything still
+        // holding a client handle, the registry's copy included, would show up
+        // here as a shutdown that took the full two seconds.
+        assert!(
+            asked.elapsed() < SHUTDOWN_GRACE,
+            "the shutdown waited {:?}, so something was still holding a client",
+            asked.elapsed()
+        );
         assert_eq!(
             wait_for(&mut rx, "disconnected").await["reason"],
             Value::Null

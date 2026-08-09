@@ -58,6 +58,7 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-chat-log-open`
 - `allow-mp-tachyon-sign-in`
 - `allow-mp-tachyon-sign-out`
+- `allow-mp-tachyon-request`
 
 ## Permission Table
 
@@ -1312,6 +1313,32 @@ Enables the mp_snapshot command without any pre-configured scope.
 <td>
 
 Denies the mp_snapshot command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-tachyon-request`
+
+</td>
+<td>
+
+Enables the mp_tachyon_request command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-tachyon-request`
+
+</td>
+<td>
+
+Denies the mp_tachyon_request command without any pre-configured scope.
 
 </td>
 </tr>
