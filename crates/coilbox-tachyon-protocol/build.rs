@@ -17,6 +17,16 @@ use std::path::PathBuf;
 /// Marks the local patch described in `schema/README.md`.
 const PATCH_MARKER: &str = "x-coilbox-patched";
 
+/// Commands that decode into a hand-written type rather than the generated one,
+/// keyed on the schema title.
+///
+/// `lobby/updated` is an RFC 7386 merge patch, where a field set to `null`
+/// means remove and a field left out means leave alone. Typify writes both as
+/// `Option<T>`, so the generated type cannot tell them apart. See
+/// `src/merge_patch.rs`.
+const OVERRIDES: &[(&str, &str)] =
+    &[("LobbyUpdatedEvent", "crate::merge_patch::LobbyUpdatedEvent")];
+
 fn main() {
     let schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schema/compiled.json");
     println!("cargo:rerun-if-changed={}", schema_path.display());
@@ -106,6 +116,7 @@ fn write_dispatch(text: &str, out: &PathBuf) {
     let mut arms = String::new();
     for ((command_id, _), command) in &commands {
         let title = &command.title;
+        let path = decoded_type(title);
         let kind = match command.kind.as_str() {
             "request" => "Request",
             "response" => "Response",
@@ -113,12 +124,12 @@ fn write_dispatch(text: &str, out: &PathBuf) {
             other => panic!("unexpected envelope type {other}"),
         };
         variants.push_str(&format!(
-            "    /// `{command_id}`, as a {}.\n    {title}(crate::types::{title}),\n",
+            "    /// `{command_id}`, as a {}.\n    {title}({path}),\n",
             command.kind
         ));
         arms.push_str(&format!(
             "            (\"{command_id}\", MessageKind::{kind}) => ::serde_json::from_str::\
-             <crate::types::{title}>(raw).map(TachyonMessage::{title}),\n"
+             <{path}>(raw).map(TachyonMessage::{title}),\n"
         ));
     }
 
@@ -158,6 +169,17 @@ impl TachyonMessage {{
     );
 
     write_rust(out, &source);
+}
+
+/// The type a command decodes into, generated unless [`OVERRIDES`] names it.
+fn decoded_type(title: &str) -> String {
+    OVERRIDES
+        .iter()
+        .find(|(schema_title, _)| *schema_title == title)
+        .map_or_else(
+            || format!("crate::types::{title}"),
+            |(_, path)| (*path).to_string(),
+        )
 }
 
 /// Writes Rust source, formatted, so a compiler error in generated code points

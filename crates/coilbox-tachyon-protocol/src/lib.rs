@@ -31,8 +31,13 @@
 //! - [`Envelope`] is the hand-written first pass, the three fields every
 //!   message carries.
 //! - [`types`] holds the generated per-command types.
+//! - [`merge_patch`] holds the `lobby/updated` patch types, which are hand
+//!   written because typify cannot express them, and the function that applies
+//!   one to a lobby.
 
 use serde::{Deserialize, Serialize};
+
+pub mod merge_patch;
 
 /// Types generated from the vendored schema bundle. See the note above about
 /// [`types::TachyonCommand`].
