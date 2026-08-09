@@ -295,6 +295,12 @@ export interface Profile {
    * updating either way.
    */
   updater?: boolean;
+  /**
+   * Whether the community hub is offered. Defaults to true. Set false in a
+   * profile for a modded game whose distributor doesn't want a button pointing
+   * players at a public gallery of other people's content.
+   */
+  hub?: boolean;
   /** GitHub repo ("owner/name") whose latest release ships this game's archive. */
   release?: { repo: string };
   /**
@@ -579,6 +585,15 @@ export function getProfileSource(): ProfileSource {
  */
 export function isUpdaterEnabled(): boolean {
   return loaded.updater !== false;
+}
+
+/**
+ * Whether the community hub is offered (profile `hub`, default true), so a
+ * distributor shipping a modded game can withhold a button pointing at a
+ * public gallery of other people's content.
+ */
+export function isHubEnabled(): boolean {
+  return loaded.hub !== false;
 }
 
 /**
