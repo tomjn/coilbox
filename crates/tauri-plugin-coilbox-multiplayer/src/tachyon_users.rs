@@ -69,6 +69,29 @@ pub(crate) fn reduce(state: &mut LobbyState, msg: &TachyonMessage) -> Vec<Delta>
     }
 }
 
+/// Every user id and username a message names, in the order it named them.
+///
+/// The three shapes that carry a user record all say who somebody is, whether or
+/// not [`reduce`] keeps the record. Offline people are dropped from
+/// [`LobbyState::users`] but still named here, which is what lets
+/// [`crate::tachyon_friends`] show a friend who is not signed in.
+pub(crate) fn names_in(msg: &TachyonMessage) -> Vec<(&str, &str)> {
+    let fields: Vec<Fields<'_>> = match msg {
+        TachyonMessage::UserSelfEvent(event) => vec![from_private(&event.data.user)],
+        TachyonMessage::UserUpdatedEvent(event) => {
+            event.data.users.iter().filter_map(from_updated).collect()
+        }
+        TachyonMessage::UserInfoResponse(UserInfoResponse::Success { data, .. }) => {
+            vec![from_user(data)]
+        }
+        _ => vec![],
+    };
+    fields
+        .into_iter()
+        .filter_map(|fields| Some((fields.user_id, fields.username?)))
+        .collect()
+}
+
 /// The user ids `user/self` named that we have no record for, in the order the
 /// event listed them, capped at what one subscription may ask for.
 ///
