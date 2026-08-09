@@ -19,8 +19,8 @@
 //! which populates `battles`, and through [`crate::tachyon_room`], which
 //! populates `current_battle` and the joined lobby's detail, and through
 //! [`crate::tachyon_messaging`], which populates the direct message threads and
-//! the joined lobby's chat. Friends come later, so the rest of the state is
-//! still empty.
+//! the joined lobby's chat, and through [`crate::tachyon_friends`], which
+//! populates the friends and the pending friend requests.
 //!
 //! Every queued action other than a shutdown and the lobby ones is a
 //! TASServer wire line with no Tachyon equivalent. Issue #1235 hides the
@@ -45,7 +45,7 @@ use crate::lock_or_recover;
 use crate::tachyon_messaging::Conversation;
 use crate::tachyon_rpc::{spawn as spawn_rpc, Handlers, RequestError, TachyonClient};
 use crate::tachyon_ws::{TachyonSocket, WsError};
-use crate::{tachyon_lobbies, tachyon_messaging, tachyon_room, tachyon_users};
+use crate::{tachyon_friends, tachyon_lobbies, tachyon_messaging, tachyon_room, tachyon_users};
 
 /// The path the WebSocket sits at. The specification carries an open question about
 /// advertising it in the OAuth metadata, and nothing advertises it today, so this
@@ -221,6 +221,12 @@ async fn run_loop(
     let mut room = None;
     let (left_tx, mut left_rx) = mpsc::unbounded_channel::<LeaveOutcome>();
 
+    // Who our friends are, held by user id beside the room for the same reason:
+    // the loop is the only writer, and a request that finishes off the loop
+    // reports what it did rather than writing it.
+    let mut friends = tachyon_friends::Friends::default();
+    let (befriended_tx, mut befriended_rx) = mpsc::unbounded_channel::<tachyon_friends::Effect>();
+
     let reason: Option<String> = loop {
         tokio::select! {
             // Every frame the correlator did not consume: the events, and anything
@@ -238,6 +244,9 @@ async fn run_loop(
                     deltas.extend(tachyon_lobbies::reduce(&mut state, &message));
                     deltas.extend(tachyon_room::reduce(&mut room, &mut state, &message));
                     deltas.extend(tachyon_messaging::reduce(&mut state, &message, now_ms()));
+                    // After the user fold, because a name that has just arrived
+                    // is what turns a friend id into a friend name.
+                    deltas.extend(tachyon_friends::reduce(&mut friends, &mut state, &message));
                     deltas
                 };
                 for delta in deltas {
@@ -266,6 +275,14 @@ async fn run_loop(
                         &lock_or_recover(&state),
                         &event.data.user,
                     );
+                    if let Some(client) = client.clone() {
+                        subscribe(client, sink.clone(), ids);
+                    }
+                }
+                // A friend event names one person by id, and a friend we cannot
+                // name would sit in the list as a number.
+                {
+                    let ids = tachyon_friends::ids_to_subscribe(&friends, &message);
                     if let Some(client) = client.clone() {
                         subscribe(client, sink.clone(), ids);
                     }
@@ -311,6 +328,18 @@ async fn run_loop(
                 // server throwing us out and worth telling the user about.
                 LeaveOutcome::Failed => tachyon_room::mark_leaving(&mut room, false),
             },
+            // One of our own friend requests the server has taken. Tachyon tells
+            // the other party and not us, so this is what moves the list.
+            Some(effect) = befriended_rx.recv() => {
+                let deltas = tachyon_friends::applied(
+                    &mut friends,
+                    &mut lock_or_recover(&state),
+                    &effect,
+                );
+                for delta in deltas {
+                    emit(&sink, LobbyEvent::Delta { delta });
+                }
+            }
             // A chat message the server has answered for. The conversation is
             // the state's, so the sending task reports back rather than writing.
             Some(outcome) = sent_rx.recv() => {
@@ -354,6 +383,18 @@ async fn run_loop(
                         if let Some(client) = client.clone() {
                             act(client, sink.clone(), request);
                         }
+                    }
+                }
+                Outbound::Tachyon(TachyonAction::Friend(action)) => {
+                    match tachyon_friends::request_for(&friends, &action) {
+                        Ok(request) => if let Some(client) = client.clone() {
+                            befriend(client, sink.clone(), befriended_tx.clone(), request);
+                        },
+                        // Nothing reached the server, so the click is answered
+                        // rather than swallowed.
+                        Err(why) => emit(&sink, LobbyEvent::Delta {
+                            delta: Delta::ServerMessage { text: why, boxed: false },
+                        }),
                     }
                 }
                 Outbound::Tachyon(TachyonAction::Say { conversation, text }) => {
@@ -617,12 +658,36 @@ fn act(client: TachyonClient, sink: EventSink, request: tachyon_room::Request) {
     });
 }
 
+/// Carry out one Friends control's request, off the connection loop.
+///
+/// The friend state is the loop's, so what the request did is reported back
+/// rather than written here. A refusal goes in front of the user, because the
+/// command the control called returned as soon as the action was queued and has
+/// nothing left to report to.
+fn befriend(
+    client: TachyonClient,
+    sink: EventSink,
+    done: mpsc::UnboundedSender<tachyon_friends::Effect>,
+    request: tachyon_friends::Request,
+) {
+    tokio::spawn(async move {
+        match client.request(request.command, request.data).await {
+            Ok(_) => {
+                if let Some(effect) = request.effect {
+                    let _ = done.send(effect);
+                }
+            }
+            Err(error) => refused(&sink, request.command, &error),
+        }
+    });
+}
+
 /// Whether a refusal was "there is no room on that ally team".
 fn is_full(error: &RequestError) -> bool {
     matches!(error, RequestError::Failed(failure) if failure.reason.as_wire() == "ally_team_full")
 }
 
-/// Tell the user a room action did not happen, and why.
+/// Tell the user an action did not happen, and why.
 fn refused(sink: &EventSink, command: &str, error: &RequestError) {
     emit(
         sink,
@@ -635,9 +700,15 @@ fn refused(sink: &EventSink, command: &str, error: &RequestError) {
     );
 }
 
-/// What a lobby command does, in the words the control that sent it uses.
+/// What a command does, in the words the control that sent it uses.
 fn what(command: &str) -> &str {
     match command {
+        "friend/sendRequest" => "Sending the friend request",
+        "friend/acceptRequest" => "Accepting the friend request",
+        "friend/rejectRequest" => "Turning down the friend request",
+        "friend/cancelRequest" => "Withdrawing the friend request",
+        "friend/remove" => "Removing that friend",
+        "friend/list" => "Fetching your friends",
         "lobby/spectate" => "Moving to the spectators",
         "lobby/joinAllyTeam" => "Taking a seat",
         "lobby/joinQueue" => "Joining the queue for a seat",
@@ -665,6 +736,14 @@ fn refusal(error: &RequestError) -> String {
     };
     let reason = match failure.reason.as_wire() {
         "lobby_full" => "The battle is full.",
+        "invalid_user" => "The server has no such user.",
+        "no_pending_request" => "There is no request from that person to answer.",
+        "not_in_friendlist" => "That person is not one of your friends.",
+        "already_in_friendlist" => "That person is already one of your friends.",
+        "outgoing_capacity_reached" => {
+            "You have as many requests outstanding as the server allows."
+        }
+        "incoming_capacity_reached" => "That person has as many requests as the server allows.",
         "ally_team_full" => "That ally team is full.",
         "not_in_lobby" => "You are not in this lobby.",
         "not_a_player" => "Only a player can do that.",
@@ -1675,6 +1754,88 @@ mod tests {
                 .all(|frame| !frame.contains("messaging/send")),
             "the message reached the server"
         );
+    }
+
+    /// The reduction is tested a frame at a time in [`crate::tachyon_friends`].
+    /// This is the wiring: `user/self` names a friend by id alone, the record
+    /// that follows puts them in the list under their name, and removing them
+    /// reaches the server and empties it again.
+    #[tokio::test]
+    async fn a_friend_reaches_the_list_and_removing_them_reaches_the_server() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = serve(move |mut ws| async move {
+            ws.send(Message::text(
+                json!({
+                    "type": "event",
+                    "messageId": "0",
+                    "commandId": "user/self",
+                    "data": { "user": {
+                        "userId": "1",
+                        "username": "alice",
+                        "displayName": "Alice",
+                        "clanBaseData": null,
+                        "status": "menu",
+                        "party": null,
+                        "invitedToParties": [],
+                        "friendIds": ["2"],
+                        "outgoingFriendRequest": [],
+                        "incomingFriendRequest": [],
+                        "ignoreIds": [],
+                        "currentLobby": null,
+                        "clanInvites": [],
+                        "matchmaking": { "state": "no_matchmaking" },
+                    } },
+                })
+                .to_string(),
+            ))
+            .await
+            .unwrap();
+            ws.send(bob_frame()).await.unwrap();
+            while let Some(Ok(msg)) = ws.next().await {
+                let Message::Text(text) = msg else { continue };
+                let _ = seen_tx.send(text.to_string());
+                let request: Value = serde_json::from_str(&text).unwrap();
+                ws.send(Message::text(
+                    json!({
+                        "type": "response",
+                        "messageId": request["messageId"],
+                        "commandId": request["commandId"],
+                        "status": "success",
+                    })
+                    .to_string(),
+                ))
+                .await
+                .unwrap();
+            }
+        })
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+
+        let state = lock_or_recover(&registry)["alice@bar:443"].state.clone();
+        loop {
+            wait_for(&mut rx, "delta").await;
+            if lock_or_recover(&state).friends.contains("bob") {
+                break;
+            }
+        }
+
+        sender(&registry, "alice@bar:443")
+            .send(Outbound::Tachyon(TachyonAction::Friend(
+                crate::tachyon_friends::FriendAction::Remove("bob".into()),
+            )))
+            .unwrap();
+
+        let frame = wait_for_sent(&mut seen_rx, "friend/remove").await;
+        assert_eq!(frame["data"]["userId"], "2");
+        // The list moves on our own request, because Tachyon tells the other
+        // party about it and not us.
+        loop {
+            wait_for(&mut rx, "delta").await;
+            if lock_or_recover(&state).friends.is_empty() {
+                break;
+            }
+        }
     }
 
     #[tokio::test]

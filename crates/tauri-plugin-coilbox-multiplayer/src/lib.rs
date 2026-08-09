@@ -17,6 +17,8 @@ pub mod tachyon_auth;
 mod tachyon_conn;
 /// The console drawer's send path, the one place a request is sent by hand.
 mod tachyon_debug;
+/// Who our friends are on a Tachyon connection, and who has asked to be.
+mod tachyon_friends;
 mod tachyon_lobbies;
 /// Direct messages and lobby chat, which is all the chat Tachyon has.
 mod tachyon_messaging;
@@ -47,6 +49,7 @@ use conn::{spawn_connection, LobbyEvent, Outbound, Registry, TachyonAction};
 use picoframe_core::CliResult;
 use serde_json::{json, Value};
 use tachyon_conn::TachyonMarkers;
+use tachyon_friends::FriendAction;
 use tachyon_messaging::Conversation;
 use tachyon_room::RoomAction;
 use tauri::{
@@ -717,6 +720,15 @@ fn mp_friend_request(
     username: String,
     message: Option<String>,
 ) -> CliResult {
+    // `friend/sendRequest` names the person and nothing else, so the note the
+    // line protocol can carry is dropped on a Tachyon connection.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Friend(FriendAction::Send(username.clone())),
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -731,6 +743,13 @@ fn mp_accept_friend_request(
     server_key: String,
     username: String,
 ) -> CliResult {
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Friend(FriendAction::Accept(username.clone())),
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -745,6 +764,13 @@ fn mp_decline_friend_request(
     server_key: String,
     username: String,
 ) -> CliResult {
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Friend(FriendAction::Reject(username.clone())),
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -755,6 +781,16 @@ fn mp_decline_friend_request(
 /// `mp_unfriend` — remove an existing friendship.
 #[tauri::command]
 fn mp_unfriend(registry: State<'_, Registry>, server_key: String, username: String) -> CliResult {
+    // Tachyon splits this in two: a friendship ends with `friend/remove` and a
+    // request we sent is withdrawn with `friend/cancelRequest`. The connection
+    // holds which of the two this person is, so it picks.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Friend(FriendAction::Remove(username.clone())),
+    ) {
+        return result;
+    }
     enqueue(registry.inner(), &server_key, command::unfriend(&username))
 }
 
@@ -762,6 +798,13 @@ fn mp_unfriend(registry: State<'_, Registry>, server_key: String, username: Stri
 /// `FRIENDLISTBEGIN..FRIENDLISTEND`). No-ops on servers without friend support.
 #[tauri::command]
 fn mp_friend_list(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Friend(FriendAction::List),
+    ) {
+        return result;
+    }
     enqueue(registry.inner(), &server_key, command::friend_list())
 }
 
@@ -769,6 +812,15 @@ fn mp_friend_list(registry: State<'_, Registry>, server_key: String) -> CliResul
 /// `FRIENDREQUESTLISTBEGIN..FRIENDREQUESTLISTEND`).
 #[tauri::command]
 fn mp_friend_request_list(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    // One Tachyon request answers both this and `mp_friend_list`: `friend/list`
+    // carries the friends and the pending requests together.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Friend(FriendAction::List),
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
