@@ -354,7 +354,7 @@ We vendor `tachyon:schema/compiled.json` into a new `coilbox-tachyon-protocol` c
 
 We do not depend on `tachyon-rs-types`. It is three schema minors behind at 1.20.3 against a spec at 1.23.0, it has 48 total downloads, and its stated repository URL returns 404, so it is deleted or private with no issue tracker. Generating in-tree also lets us patch the `privateBattle.ip` bug described in the risks section.
 
-The known-good toolchain, taken from that crate's `build.rs`, is `schemars` 0.8.22 to parse the draft-07 root schema, `typify` 0.6.1 to build the type space, and `prettyplease` with `syn` to emit. Generated code needs `serde`, `serde_json`, `uuid` for the `format: uuid` on `battleId`, and `regress` for `pattern` constraints such as the `^[0-9a-zA-Z .+-]+$` on `engineVersion`.
+The known-good toolchain is `schemars` 0.8.22 to parse the draft-07 root schema, `typify` 0.7.0 to build the type space, and `prettyplease` with `syn` to emit. The `tachyon-rs-types` crate uses typify 0.6.1, but 0.7.0 is current, still builds on schemars 0.8.22, and generates clean code. Generated code needs `serde`, `serde_json`, `uuid` for the `format: uuid` on `battleId`, and `regress` for `pattern` constraints such as the `^[0-9a-zA-Z .+-]+$` on `engineVersion`.
 
 Ignore the generated root type. Typify turns the 166-member top-level `anyOf` into a struct with 166 `Option` fields flattened with serde, one per command, which cannot discriminate anything. The per-command types it generates are good, `LobbyJoinRequest` as a struct and `LobbyJoinResponse` as a two-variant enum. We hand-write the envelope and dispatch on the pair `(commandId, type)` into the named per-command types.
 
@@ -490,7 +490,7 @@ Mitigation: implement against the spec, gate features on what the server actuall
 
 ### The flattened root codegen trap
 
-Typify turns the top-level `anyOf` into a struct with 166 flattened `Option` fields rather than a tagged enum. It compiles, it serialises, and it is useless. It also generates 520 duplicate `TachyonCommandSubtypeNNNReason` enums, one per response, because each failure reason enum is inlined. Anyone opening the generated file for the first time will reasonably assume the codegen failed.
+Typify turns the top-level `anyOf` into a struct with 166 flattened `Option` fields rather than a tagged enum. It compiles, it serialises, and it is useless. It also generates 68 near-duplicate `TachyonCommandSubtypeNNNReason` enums, one per response, because each failure reason enum is inlined and most of them list the same four reasons. Those numbers move when the schema is re-vendored, so match on a reason by its wire value rather than by generated type name. Anyone opening the generated file for the first time will reasonably assume the codegen failed.
 
 Mitigation: document this at the top of the generated crate, hand-write the envelope, and never reference the generated root type.
 
