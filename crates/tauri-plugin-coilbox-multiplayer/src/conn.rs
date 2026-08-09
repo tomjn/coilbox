@@ -77,6 +77,10 @@ pub enum TachyonAction {
     /// username it names into the user id every friend command uses, and applies
     /// what the request did once the server has taken it.
     Friend(crate::tachyon_friends::FriendAction),
+    /// Something the Party section asks of the server. The task turns the name
+    /// it shows a person under into the user id every party command uses, and
+    /// applies what the request did once the server has taken it.
+    Party(crate::tachyon_parties::PartyAction),
     /// One chat message, to a person or to the lobby. The task records it once
     /// the server has taken it, so a message the server refused is never shown
     /// as sent.
