@@ -152,6 +152,12 @@ export interface Battle {
   /** Whether this lobby allows bosses at all. A lobby with them off refuses to
    *  appoint one, so the room offers it only when this is set. */
   bossesEnabled: boolean;
+  /**
+   * Whether a battle is running in this lobby, so the row offers Watch live
+   * rather than Join. Tachyon says so on the lobby itself. Always false on a
+   * TASServer connection, where the list reads the host's ingame bit instead.
+   */
+  inProgress: boolean;
 }
 
 /**

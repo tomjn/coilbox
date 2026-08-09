@@ -61,6 +61,7 @@ function mkBattle(p: Partial<Battle> = {}): Battle {
     startRects: {},
     bosses: [],
     bossesEnabled: false,
+    inProgress: false,
     ...p,
   };
 }
