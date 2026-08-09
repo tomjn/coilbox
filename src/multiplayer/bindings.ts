@@ -649,6 +649,34 @@ export const mpOpenBattle = defineCommand<
 >("coilbox-multiplayer", "mp_open_battle");
 
 /**
+ * Tachyon only: create a lobby, which is a room the server owns and puts us in
+ * as its first player. It is not hosting. Nothing runs on this machine until a
+ * member starts the match and the server hands out an autohost's address, so
+ * there is no port, no NAT mode and no content hash to send.
+ */
+export const mpCreateLobby = defineCommand<
+  {
+    serverKey: string;
+    name: string;
+    mapName: string;
+    allyTeams: number;
+    playersPerTeam: number;
+    bossesEnabled: boolean;
+  },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_create_lobby");
+
+/**
+ * Ask for the match to begin. On Tachyon that is `lobby/startBattle`, which any
+ * member may send. SPADS has no command for it, so on the line protocol it is
+ * `!start` in battle chat for the autohost bot in the room to read.
+ */
+export const mpStartBattle = defineCommand<
+  { serverKey: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_start_battle");
+
+/**
  * Host: change the open battle's map, lock flag and advertised spectator count
  * (`UPDATEBATTLEINFO`). The four fields travel together, so resend the current
  * values for whatever isn't changing. `maphash` is the signed 32-bit map CRC.

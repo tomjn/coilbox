@@ -63,6 +63,11 @@ pub enum TachyonAction {
     JoinLobby { battle: u32 },
     /// Leave the lobby we are in.
     LeaveLobby,
+    /// Make a lobby of our own. The answer carries the whole lobby, so the task
+    /// folds it exactly as it folds a join and we end up in the room we asked
+    /// for. It is not hosting: nothing runs here until the server allocates an
+    /// autohost and sends everyone its address.
+    CreateLobby(crate::tachyon_room::NewLobby),
     /// Something a battle room control asks of the lobby we are in. The task
     /// turns it into requests against the lobby it holds, because that is the
     /// only thing that can name an ally team, a bot or a member the way Tachyon

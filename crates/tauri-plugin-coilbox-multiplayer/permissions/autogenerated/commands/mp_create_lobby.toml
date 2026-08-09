@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-create-lobby"
+description = "Enables the mp_create_lobby command without any pre-configured scope."
+commands.allow = ["mp_create_lobby"]
+
+[[permission]]
+identifier = "deny-mp-create-lobby"
+description = "Denies the mp_create_lobby command without any pre-configured scope."
+commands.deny = ["mp_create_lobby"]

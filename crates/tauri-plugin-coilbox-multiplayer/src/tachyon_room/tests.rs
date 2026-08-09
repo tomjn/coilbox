@@ -1408,3 +1408,159 @@ fn a_lobby_with_no_match_is_not_asked_to_join_one() {
     assert!(!match_running(&room));
     assert!(!match_running(&None));
 }
+
+/// The `lobby/create` response, which carries the whole lobby exactly as a
+/// join's does.
+fn create_frame(details: Value) -> String {
+    json!({
+        "type": "response",
+        "messageId": "1",
+        "commandId": "lobby/create",
+        "status": "success",
+        "data": details,
+    })
+    .to_string()
+}
+
+/// A filled-in create form: two sides of eight, bosses allowed.
+fn new_lobby() -> NewLobby {
+    NewLobby {
+        name: "Comet Catcher 8v8".into(),
+        map_name: "Comet Catcher Remake 1.8".into(),
+        ally_teams: 2,
+        players_per_team: 8,
+        bosses_enabled: true,
+    }
+}
+
+#[test]
+fn creating_a_lobby_asks_for_the_sides_and_the_seats_the_form_collected() {
+    let request = create_request(&new_lobby());
+    let data = request.data.expect("the request carries no data");
+
+    assert_eq!(request.command, "lobby/create");
+    assert_eq!(data["name"], "Comet Catcher 8v8");
+    assert_eq!(data["mapName"], "Comet Catcher Remake 1.8");
+    assert_eq!(data["areBossesEnabled"], true);
+
+    let allies = data["allyTeamConfig"].as_array().expect("not an array");
+    assert_eq!(allies.len(), 2);
+    // Eight seats on each side, each player on a team of their own so they
+    // command separately rather than sharing.
+    assert_eq!(allies[0]["maxTeams"], 8);
+    assert_eq!(allies[0]["teams"].as_array().unwrap().len(), 8);
+    assert_eq!(allies[0]["teams"][0], json!({ "maxPlayers": 1 }));
+
+    // The two sides get the outer quarters of the map, facing each other.
+    assert_eq!(
+        allies[0]["startBox"],
+        json!({ "left": 0.0, "top": 0.0, "right": 0.25, "bottom": 1.0 })
+    );
+    assert_eq!(
+        allies[1]["startBox"],
+        json!({ "left": 0.75, "top": 0.0, "right": 1.0, "bottom": 1.0 })
+    );
+    // The game and the engine are the server's to pick, so the request says
+    // nothing about either.
+    assert!(data.get("gameVersion").is_none());
+    assert!(data.get("engineVersion").is_none());
+}
+
+#[test]
+fn every_side_gets_a_start_box_inside_the_map_and_clear_of_the_others() {
+    for allies in 2..=8u8 {
+        let request = create_request(&NewLobby {
+            ally_teams: allies,
+            ..new_lobby()
+        });
+        let data = request.data.unwrap();
+        let boxes = data["allyTeamConfig"].as_array().unwrap().clone();
+        assert_eq!(boxes.len(), usize::from(allies));
+
+        let mut last_right = 0.0;
+        for (index, ally) in boxes.iter().enumerate() {
+            let left = ally["startBox"]["left"].as_f64().unwrap();
+            let right = ally["startBox"]["right"].as_f64().unwrap();
+            // The schema's range, so a box outside it is a frame the server
+            // refuses rather than a lobby.
+            assert!(
+                (0.0..=1.0).contains(&left) && (0.0..=1.0).contains(&right),
+                "side {index} of {allies} is outside the map: {left} to {right}"
+            );
+            assert!(right > left, "side {index} of {allies} has no width");
+            if index > 0 {
+                assert!(
+                    left >= last_right,
+                    "side {index} of {allies} overlaps the one before it"
+                );
+            }
+            last_right = right;
+        }
+    }
+}
+
+#[test]
+fn a_lobby_of_fewer_sides_than_can_be_played_is_raised_to_two() {
+    // The form holds this too, so this is the frame never carrying a shape the
+    // server would refuse whatever reached the command.
+    for asked in [0, 1] {
+        let request = create_request(&NewLobby {
+            ally_teams: asked,
+            players_per_team: 0,
+            ..new_lobby()
+        });
+        let data = request.data.unwrap();
+        let allies = data["allyTeamConfig"].as_array().unwrap();
+
+        assert_eq!(allies.len(), 2, "{asked} sides is not a match");
+        assert_eq!(allies[0]["maxTeams"], 1, "{asked} left a side with no seat");
+        assert_eq!(allies[0]["teams"].as_array().unwrap().len(), 1);
+    }
+}
+
+#[test]
+fn a_created_lobby_puts_us_in_the_room_the_way_a_join_does() {
+    let mut state = LobbyState::new();
+    state.my_username = Some("alice".into());
+    known(&mut state, "1", "alice");
+    known(&mut state, "2", "bob");
+    let mut room = None;
+
+    let deltas = feed(&mut room, &mut state, &create_frame(details(json!({}))));
+
+    let id = state.current_battle.expect("we are not in a battle");
+    assert_eq!(
+        deltas,
+        vec![
+            Delta::BattleOpened { id },
+            Delta::EnteredBattle { id, own: false },
+        ],
+        "creating a lobby is not hosting one, so it enters the room as a join does"
+    );
+    let battle = battle(&state);
+    assert_eq!(battle.tachyon_id.as_deref(), Some("lobby-a"));
+    assert_eq!(battle.title, "Comet Catcher 8v8");
+    assert_eq!(battle.members.len(), 2);
+    // Tachyon has no founder, so nothing here claims we are one.
+    assert_eq!(battle.host, "");
+}
+
+#[test]
+fn starting_the_match_asks_for_it_and_says_nothing_else() {
+    let (room, state) = joined_room();
+
+    assert_eq!(
+        requests_for(&room, &state, &RoomAction::StartBattle),
+        vec![Request {
+            command: "lobby/startBattle",
+            data: None,
+        }]
+    );
+}
+
+#[test]
+fn starting_a_match_we_are_not_in_a_lobby_for_asks_for_nothing() {
+    let state = LobbyState::new();
+
+    assert!(requests_for(&None, &state, &RoomAction::StartBattle).is_empty());
+}

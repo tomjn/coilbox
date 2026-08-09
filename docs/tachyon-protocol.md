@@ -337,7 +337,7 @@ Under Tachyon, `lobby/create` creates a lobby, not a battle. When a member sends
 
 Becoming an autohost is a separate actor with separate credentials. `tachyon:src/tachyon-constants.ts` defines three actors, `server`, `user`, and `autohost`. Every autohost command is server-to-autohost or autohost-to-server, and there is no user-to-autohost path. Teiserver routes on the token: a token with an `owner_id` gets the player handler, a token with a `bot_id` gets the autohost handler (`teiserver:lib/teiserver_web/controllers/tachyon.ex` lines 63 to 69). Bot tokens come from the `client_credentials` grant with a client id and secret issued by the server operator.
 
-We are not solving this in this milestone. On a Tachyon connection the Host button is hidden, the same way it is already hidden when logged out. `SkirmishPage.tsx` already gates it on being connected, so the gate widens rather than moves.
+Creating a lobby is done, in `CreateLobbyPopover.tsx`, and it is deliberately not called hosting. Hosting is what we are not solving in this milestone. On a Tachyon connection the Host button is replaced by Create a lobby, and the copy in the popover says who runs the match.
 
 What solving it would take, for a later milestone:
 
