@@ -113,6 +113,11 @@ pub struct StartRect {
 #[serde(rename_all = "camelCase")]
 pub struct Battle {
     pub id: u32,
+    /// The Tachyon lobby id this battle came from, or `None` on a TASServer
+    /// connection. Tachyon names a lobby by a string uuid and `id` is a `u32`,
+    /// so `id` is a handle derived from this and this is what a later
+    /// `lobby/join` has to name.
+    pub tachyon_id: Option<String>,
     pub host: String,
     pub ip: String,
     pub port: String,
@@ -127,6 +132,10 @@ pub struct Battle {
     pub engine: String,
     pub version: String,
     pub max_players: u32,
+    /// How many players the server says are in the battle, where the server
+    /// counts them for us. TASServer does not, so it stays `None` there and the
+    /// count is worked out from `members` and `host` instead.
+    pub player_count: Option<u32>,
     pub passworded: bool,
     pub locked: bool,
     pub spectator_count: u32,
