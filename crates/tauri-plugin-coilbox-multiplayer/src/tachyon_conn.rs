@@ -13,10 +13,11 @@
 //! [`LoginPhase::Ready`]. The phases before that belong to the connect command,
 //! which emits them while it is still getting a token and opening the socket.
 //!
-//! The state carries users only. Every frame the correlator hands up is folded
-//! through [`crate::tachyon_users`], which populates `users` and `my_username`.
-//! Lobbies, chat, friends and battles are issues #1228 onward, so the rest of
-//! the state is still empty.
+//! The state carries users and the battle list. Every frame the correlator hands
+//! up is folded through [`crate::tachyon_users`], which populates `users` and
+//! `my_username`, and through [`crate::tachyon_lobbies`], which populates
+//! `battles`. The lobby room, chat and friends are issues #1229 onward, so the
+//! rest of the state is still empty.
 //!
 //! Every queued action other than a shutdown is a TASServer wire line with no
 //! Tachyon equivalent. Issue #1235 hides the surfaces that offer them, and until
@@ -27,15 +28,15 @@ use std::time::Duration;
 
 use coilbox_lobby_protocol::{LobbyState, LoginPhase};
 use coilbox_tachyon_protocol::{parse_frame, TachyonMessage};
-use serde_json::json;
+use serde_json::{json, Value};
 use tauri::ipc::Channel;
 use tokio::sync::mpsc;
 
 use crate::conn::{emit, EventSink, LobbyEvent, Outbound, Registry, ServerConn};
 use crate::lock_or_recover;
 use crate::tachyon_rpc::{spawn as spawn_rpc, Handlers, TachyonClient};
-use crate::tachyon_users;
 use crate::tachyon_ws::{TachyonSocket, WsError};
+use crate::{tachyon_lobbies, tachyon_users};
 
 /// The path the WebSocket sits at. The specification carries an open question about
 /// advertising it in the OAuth metadata, and nothing advertises it today, so this
@@ -149,6 +150,10 @@ async fn run_loop(
     // command costs a rejection rather than the connection. `battle/start` gets its
     // handler with the battle launch work.
     let (client, mut task) = spawn_rpc(socket, Handlers::new(), inbound_tx);
+    // The battle list is a subscription, and nothing else asks for it, so the
+    // connection asks as soon as it is up. The answer is an ack: the list itself
+    // follows as `lobby/listReset`.
+    ask(client.clone(), sink.clone(), "lobby/subscribeList", None);
     let mut client = Some(client);
 
     let reason: Option<String> = loop {
@@ -157,7 +162,12 @@ async fn run_loop(
             // it could not place. The console already has them, from the tap above.
             Some(frame) = inbound_rx.recv() => {
                 let message = parse_frame(&frame);
-                let deltas = tachyon_users::reduce(&mut lock_or_recover(&state), &message);
+                let deltas = {
+                    let mut state = lock_or_recover(&state);
+                    let mut deltas = tachyon_users::reduce(&mut state, &message);
+                    deltas.extend(tachyon_lobbies::reduce(&mut state, &message));
+                    deltas
+                };
                 for delta in deltas {
                     emit(&sink, LobbyEvent::Delta { delta });
                 }
@@ -207,23 +217,30 @@ async fn run_loop(
 ///
 /// Teiserver answers a subscription with the current state of each user, offline
 /// ones included, so this is how a friend or party member the server named by id
-/// alone gets a name. It runs in its own task because a request waits up to 15
-/// seconds for its answer and the loop has frames to read in the meantime. The
-/// task holds a client handle, so a disconnect during those seconds falls back
-/// to the bounded wait in [`SHUTDOWN_GRACE`] rather than a polite close.
+/// alone gets a name.
 fn subscribe(client: TachyonClient, sink: EventSink, ids: Vec<String>) {
     // The schema requires at least one id, so an empty list is nothing to ask.
     if ids.is_empty() {
         return;
     }
+    let data = json!({ "userIds": ids });
+    ask(client, sink, "user/subscribeUpdates", Some(data));
+}
+
+/// Send a request off the connection loop, noting a failure in the console.
+///
+/// It runs in its own task because a request waits up to 15 seconds for its
+/// answer and the loop has frames to read in the meantime. The task holds a
+/// client handle, so a disconnect during those seconds falls back to the bounded
+/// wait in [`SHUTDOWN_GRACE`] rather than a polite close.
+fn ask(client: TachyonClient, sink: EventSink, command: &'static str, data: Option<Value>) {
     tokio::spawn(async move {
-        let data = json!({ "userIds": ids });
-        if let Err(error) = client.request("user/subscribeUpdates", Some(data)).await {
+        if let Err(error) = client.request(command, data).await {
             emit(
                 &sink,
                 LobbyEvent::Console {
                     direction: "in".into(),
-                    line: format!("user/subscribeUpdates failed: {error}"),
+                    line: format!("{command} failed: {error}"),
                 },
             );
         }
@@ -320,6 +337,23 @@ mod tests {
         tokio::time::timeout(Duration::from_secs(5), find)
             .await
             .unwrap_or_else(|_| panic!("no {kind} event arrived within 5 seconds"))
+    }
+
+    /// Wait for the first frame the connection sends for `command`, giving up
+    /// rather than hanging if none arrives.
+    async fn wait_for_sent(rx: &mut mpsc::UnboundedReceiver<String>, command: &str) -> Value {
+        let find = async {
+            while let Some(text) = rx.recv().await {
+                let frame: Value = serde_json::from_str(&text).unwrap();
+                if frame["commandId"] == command {
+                    return frame;
+                }
+            }
+            panic!("the server task ended before a {command} frame arrived");
+        };
+        tokio::time::timeout(Duration::from_secs(5), find)
+            .await
+            .unwrap_or_else(|_| panic!("no {command} frame arrived within 5 seconds"))
     }
 
     /// Open a connection to `url` and register it under `server_key`.
@@ -480,8 +514,13 @@ mod tests {
         .await;
         let mut rx = connect(&Registry::default(), "alice@bar:443", &url).await;
 
-        let console = wait_for(&mut rx, "console").await;
-        assert_eq!(console["direction"], "in");
+        // Past our own subscriptions, which the same tap reports going out.
+        let console = loop {
+            let event = wait_for(&mut rx, "console").await;
+            if event["direction"] == "in" {
+                break event;
+            }
+        };
         assert!(
             console["line"].as_str().unwrap().contains("user/updated"),
             "unexpected console line: {console}"
@@ -536,18 +575,64 @@ mod tests {
             "alice"
         );
 
-        let subscribe = tokio::time::timeout(Duration::from_secs(5), seen_rx.recv())
-            .await
-            .expect("no subscription was sent within 5 seconds")
-            .expect("the server task ended first");
-        let frame: Value = serde_json::from_str(&subscribe).unwrap();
-        assert_eq!(frame["commandId"], "user/subscribeUpdates");
+        let frame = wait_for_sent(&mut seen_rx, "user/subscribeUpdates").await;
         assert_eq!(frame["data"]["userIds"], json!(["2"]));
 
         let state = lock_or_recover(&registry)["alice@bar:443"].state.clone();
         let state = lock_or_recover(&state);
         assert_eq!(state.my_username.as_deref(), Some("alice"));
         assert_eq!(state.users["alice"].user_id, "1");
+    }
+
+    /// The reduction is tested a frame at a time in [`crate::tachyon_lobbies`].
+    /// This is the wiring: the connection asks for the list, and the list it
+    /// gets back reaches the state and the frontend.
+    #[tokio::test]
+    async fn the_connection_subscribes_to_the_lobby_list_and_folds_what_comes_back() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = serve(move |mut ws| async move {
+            ws.send(Message::text(
+                json!({
+                    "type": "event",
+                    "messageId": "1",
+                    "commandId": "lobby/listReset",
+                    "data": { "lobbies": { "lobby-a": {
+                        "id": "lobby-a",
+                        "name": "Comet Catcher 8v8",
+                        "playerCount": 3,
+                        "maxPlayerCount": 16,
+                        "mapName": "Comet Catcher Remake 1.8",
+                        "engineVersion": "2025.01.4",
+                        "gameVersion": "Beyond All Reason test-1234",
+                        "currentBattle": null,
+                    } } },
+                })
+                .to_string(),
+            ))
+            .await
+            .unwrap();
+            while let Some(Ok(msg)) = ws.next().await {
+                if let Message::Text(text) = msg {
+                    let _ = seen_tx.send(text.to_string());
+                }
+            }
+        })
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+
+        wait_for_sent(&mut seen_rx, "lobby/subscribeList").await;
+        assert_eq!(
+            wait_for(&mut rx, "delta").await["delta"]["kind"],
+            "battleOpened"
+        );
+
+        let state = lock_or_recover(&registry)["alice@bar:443"].state.clone();
+        let state = lock_or_recover(&state);
+        let battle = state.battles.values().next().expect("the list is empty");
+        assert_eq!(battle.tachyon_id.as_deref(), Some("lobby-a"));
+        assert_eq!(battle.title, "Comet Catcher 8v8");
+        assert_eq!(battle.player_count, Some(3));
     }
 
     #[tokio::test]
@@ -578,9 +663,29 @@ mod tests {
         let (closed_tx, mut closed_rx) = mpsc::unbounded_channel::<()>();
         let url = serve(move |mut ws| async move {
             while let Some(Ok(msg)) = ws.next().await {
-                if matches!(msg, Message::Close(_)) {
-                    let _ = closed_tx.send(());
-                    break;
+                match msg {
+                    Message::Close(_) => {
+                        let _ = closed_tx.send(());
+                        break;
+                    }
+                    // Answering the connection's own subscriptions lets their
+                    // tasks let go of their client handles, so the shutdown is
+                    // the last one and the close is the polite kind.
+                    Message::Text(text) => {
+                        let request: Value = serde_json::from_str(&text).unwrap();
+                        ws.send(Message::text(
+                            json!({
+                                "type": "response",
+                                "messageId": request["messageId"],
+                                "commandId": request["commandId"],
+                                "status": "success",
+                            })
+                            .to_string(),
+                        ))
+                        .await
+                        .unwrap();
+                    }
+                    _ => {}
                 }
             }
             std::future::pending::<()>().await;
@@ -627,14 +732,23 @@ mod tests {
             .send(Outbound::Line("JOIN #main".into()))
             .unwrap();
 
-        let console = wait_for(&mut rx, "console").await;
+        // Past our own subscriptions, which the console tap also reports as out.
+        let console = loop {
+            let event = wait_for(&mut rx, "console").await;
+            if event["line"]
+                .as_str()
+                .is_some_and(|line| line.starts_with("not sent"))
+            {
+                break event;
+            }
+        };
         assert_eq!(console["direction"], "out");
         assert_eq!(
             console["line"],
             "not sent, this server speaks Tachyon: JOIN #main"
         );
         assert!(
-            matches!(seen_rx.try_recv(), Err(mpsc::error::TryRecvError::Empty)),
+            std::iter::from_fn(|| seen_rx.try_recv().ok()).all(|frame| !frame.contains("JOIN")),
             "the line reached the server"
         );
     }
