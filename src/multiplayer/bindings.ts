@@ -179,6 +179,22 @@ export interface Vote {
   endsAt: number;
 }
 
+/**
+ * A party: a small group that stays together across battles (mirrors `Party`).
+ * Tachyon only, so a TASServer connection never has one.
+ *
+ * People are named the way the rest of the app names them. Somebody the server
+ * has not named yet appears under their user id, as they do in a battle roster.
+ */
+export interface Party {
+  /** The server's id, which is what an answer to an invitation names. */
+  id: string;
+  members: string[];
+  /** The people invited and yet to answer. */
+  invited: string[];
+  maxMembers: number;
+}
+
 export interface LobbyState {
   myUsername: string | null;
   compflags: string[];
@@ -200,6 +216,10 @@ export interface LobbyState {
   friends: string[];
   /** Incoming pending friend requests awaiting accept/decline. */
   friendRequests: string[];
+  /** The party we are in, or null when we are in none. Always null on TASServer. */
+  party: Party | null;
+  /** The parties we have been invited to and not yet answered. */
+  partyInvites: Party[];
 }
 
 /**
@@ -266,7 +286,8 @@ export type Delta =
   | { kind: "unignored"; name: string }
   | { kind: "serverIgnoreList"; ignores: string[] }
   | { kind: "friendsChanged" }
-  | { kind: "friendRequestsChanged" };
+  | { kind: "friendRequestsChanged" }
+  | { kind: "partyChanged" };
 
 /** An event streamed over the connect `Channel` (mirrors `LobbyEvent`). */
 export type LobbyEvent =
@@ -587,6 +608,49 @@ export const mpFriendRequestList = defineCommand<
   { serverKey: string },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_friend_request_list");
+
+/** Tachyon only: start a party of your own. */
+export const mpPartyCreate = defineCommand<
+  { serverKey: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_party_create");
+
+/** Tachyon only: leave the party you are in. */
+export const mpPartyLeave = defineCommand<
+  { serverKey: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_party_leave");
+
+/** Tachyon only: ask `username` into your party. */
+export const mpPartyInvite = defineCommand<
+  { serverKey: string; username: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_party_invite");
+
+/** Tachyon only: withdraw the invitation you sent `username`. */
+export const mpPartyCancelInvite = defineCommand<
+  { serverKey: string; username: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_party_cancel_invite");
+
+/** Tachyon only: put `username` out of your party. */
+export const mpPartyKickMember = defineCommand<
+  { serverKey: string; username: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_party_kick_member");
+
+/** Tachyon only: take up an invitation. A party has no name, so it is named by
+ * the id `state.partyInvites` carries. */
+export const mpPartyAcceptInvite = defineCommand<
+  { serverKey: string; partyId: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_party_accept_invite");
+
+/** Tachyon only: turn an invitation down. */
+export const mpPartyDeclineInvite = defineCommand<
+  { serverKey: string; partyId: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_party_decline_invite");
 
 export const mpJoinBattle = defineCommand<
   {
