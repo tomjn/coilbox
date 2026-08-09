@@ -57,6 +57,7 @@ import {
   mpRegister,
   mpSetStatus,
   mpSnapshot,
+  mpTachyonSignedIn,
   mpTachyonSignIn,
 } from "./bindings";
 import {
@@ -129,6 +130,30 @@ export function reconnectDelay(attempt: number): number {
 }
 
 /**
+ * Whether a failed connect needs a new browser sign-in rather than another try.
+ *
+ * Only a Tachyon connect can, and only once the server has refused the stored
+ * sign-in. A TASServer login has a password behind it and a Tachyon sign-in that
+ * is merely unreachable is worth retrying, so both answer false and take the
+ * backoff. So does a question the Rust side could not answer.
+ */
+async function needsSignIn(
+  server: LobbyServer,
+  username: string,
+): Promise<boolean> {
+  if (serverProtocol(server) !== "tachyon") return false;
+  try {
+    const { signedIn } = await mpTachyonSignedIn({
+      serverId: server.id,
+      username,
+    });
+    return !signedIn;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * A per-connection mirror of the Rust-side lobby state. The Rust plugin owns the
  * authoritative parse; this mirror is refreshed wholesale from `mpSnapshot` on each
  * `delta` event (correctness over incremental cleverness) while `phase` and
@@ -165,6 +190,13 @@ export interface LobbyMirror {
    */
   serverIgnoreList: string[];
   serverIgnoreListSeq: number;
+  /**
+   * Monotonic count of `battleStarting` events: a Tachyon server telling us
+   * where the match is. There is no state behind it, because the connection has
+   * already promised the server we will be there, so the room watches this
+   * advance and launches.
+   */
+  battleStartSeq: number;
 }
 
 const CONSOLE_CAP = 500;
@@ -180,6 +212,7 @@ export const initialMirror: LobbyMirror = {
   channelListReceivedSeq: 0,
   serverIgnoreList: [],
   serverIgnoreListSeq: 0,
+  battleStartSeq: 0,
 };
 
 export type MirrorAction =
@@ -223,6 +256,8 @@ export function mirrorReducer(
               next.length > CONSOLE_CAP ? next.slice(-CONSOLE_CAP) : next,
           };
         }
+        case "battleStarting":
+          return { ...m, battleStartSeq: m.battleStartSeq + 1 };
         case "disconnected":
           return { ...m, connected: false, error: ev.reason ?? null };
         case "delta": {
@@ -1125,6 +1160,18 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         void notify({ title: "Reconnected to multiplayer", level: "success" });
       } catch {
         if (reconnectGenRef.current !== gen) return;
+        // A Tachyon sign-in the server has refused will be refused again, so
+        // retrying it only delays the one thing that can fix it: another trip
+        // through the browser, which a reconnect must never open by itself.
+        if (await needsSignIn(ctx.server, ctx.username)) {
+          if (reconnectGenRef.current !== gen) return;
+          void notify({
+            title: "Signed out of multiplayer",
+            body: "The server no longer accepts your sign-in. Log in again from the topbar to sign in with your browser.",
+            level: "error",
+          });
+          return;
+        }
         const attempt = ++reconnectAttemptRef.current;
         if (attempt >= RECONNECT_DELAYS_MS.length) {
           void notify({

@@ -1616,10 +1616,23 @@ fn mp_build_host_config(registry: State<'_, Registry>, server_key: String) -> Cl
 }
 
 /// `mp_build_battle_config` — return the current battle as a `play` `BattleConfig`.
+///
+/// A Tachyon battle is not built from the lobby at all. The server picks an
+/// autohost and tells each player where to connect in a `battle/start` request,
+/// so the config the connection built from that request is the only one there
+/// is, and until one arrives there is nothing to launch.
 #[tauri::command]
 fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> CliResult {
     let map = lock_or_recover(&registry);
     match map.get(&server_key) {
+        Some(conn) if lock_or_recover(&conn.tachyon).is_some() => {
+            match lock_or_recover(&conn.started).clone() {
+                // Nothing needs opening through a router: the address is the
+                // server's own autohost.
+                Some(config) => CliResult::ok(json!({ "config": config, "natType": "0" })),
+                None => CliResult::err("this lobby has not started a battle"),
+            }
+        }
         Some(conn) => {
             let state = lock_or_recover(&conn.state);
             match battle_to_config(&state) {
@@ -1730,12 +1743,29 @@ async fn mp_tachyon_sign_in(base_url: String, server_id: String, username: Strin
     }
 }
 
-/// `mp_tachyon_sign_out`: forget a Tachyon account, both the stored refresh token
-/// and any access token still in memory.
+/// `mp_tachyon_sign_out`: forget a Tachyon account on this machine, both the stored
+/// refresh token and any access token still in memory.
+///
+/// It cannot go further than this machine. Teiserver has no RFC 7009 revocation
+/// endpoint, so nothing can tell the server to throw its own copy away and the
+/// refresh token stays valid there. Say that rather than promise more.
 #[tauri::command]
 async fn mp_tachyon_sign_out(server_id: String, username: String) -> CliResult {
     match tachyon_auth::sign_out(&server_id, &username) {
         Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e.to_string()),
+    }
+}
+
+/// `mp_tachyon_signed_in`: whether a connect for this account can get a token
+/// without opening a browser.
+///
+/// False once the server has refused the stored sign-in, which is what tells an
+/// auto-reconnect to stop rather than retry a refusal that will not change.
+#[tauri::command]
+async fn mp_tachyon_signed_in(server_id: String, username: String) -> CliResult {
+    match tachyon_auth::signed_in(&server_id, &username) {
+        Ok(signed_in) => CliResult::ok(json!({ "signedIn": signed_in })),
         Err(e) => CliResult::err(e.to_string()),
     }
 }
@@ -1806,6 +1836,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_chat_log_open,
             mp_tachyon_sign_in,
             mp_tachyon_sign_out,
+            mp_tachyon_signed_in,
             tachyon_debug::mp_tachyon_request,
         ])
         .build()

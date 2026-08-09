@@ -26,7 +26,7 @@
 //! the three crosses the Tauri IPC boundary. [`Tokens`] redacts itself when printed
 //! so a stray `{:?}` cannot leak one either.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -101,6 +101,29 @@ pub enum AuthError {
     /// There is no stored refresh token for this account, so the user has to sign
     /// in through the browser again.
     NotSignedIn,
+    /// The server would not take the stored refresh token, so it is of no further
+    /// use and the user has to sign in through the browser again.
+    SignInRefused(String),
+}
+
+impl AuthError {
+    /// Whether the only way past this failure is another trip through the browser.
+    ///
+    /// This is what separates a connect worth retrying from one that never will
+    /// be. A refresh grant is refused with an HTTP 400 and an OAuth error body,
+    /// and RFC 6749 gives every one of those a cause the client cannot fix:
+    /// the grant is expired, revoked, or was never ours. Teiserver flattens them
+    /// all to `invalid_request`, so the error name is no help and the shape of
+    /// the answer is what we go on.
+    ///
+    /// Everything else stays retryable. A server that is down, slow, or answering
+    /// 5xx will work again on its own.
+    pub fn needs_sign_in(&self) -> bool {
+        matches!(
+            self,
+            Self::NotSignedIn | Self::SignInRefused(_) | Self::Token { .. }
+        )
+    }
 }
 
 impl std::fmt::Display for AuthError {
@@ -125,6 +148,9 @@ impl std::fmt::Display for AuthError {
             },
             Self::Storage(m) => write!(f, "keychain error: {m}"),
             Self::NotSignedIn => write!(f, "not signed in to this server"),
+            Self::SignInRefused(m) => {
+                write!(f, "the server would not accept your sign-in: {m}")
+            }
         }
     }
 }
@@ -455,6 +481,16 @@ async fn post_token(
         .map_err(|e| AuthError::Http(e.to_string()))?;
     let doc: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
 
+    // A 5xx is the server failing on its own side, not our request being wrong.
+    // Checked before the error body, because reading it as a refusal would send
+    // the user back to the browser over a fault that clears itself.
+    if status.is_server_error() {
+        return Err(AuthError::Http(format!(
+            "the token endpoint answered HTTP {}",
+            status.as_u16()
+        )));
+    }
+
     if let Some(error) = doc.get("error").and_then(Value::as_str) {
         return Err(AuthError::Token {
             error: error.to_owned(),
@@ -628,6 +664,46 @@ fn access_tokens() -> &'static Mutex<HashMap<String, Tokens>> {
     ACCESS_TOKENS.get_or_init(Default::default)
 }
 
+/// Accounts whose stored refresh token the server has refused, keyed the way the
+/// keychain is.
+///
+/// The refusal is remembered rather than acted on, because we cannot tell a
+/// revoked token from a server that has misread one, and deleting somebody's
+/// sign-in on a bad guess is not ours to do. Remembering it is enough: it stops a
+/// reconnect loop retrying a grant that will be refused again, and
+/// [`signed_in`] reports the account as needing the browser. A fresh sign-in
+/// clears it, and so does a restart.
+static REFUSED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+
+fn refused() -> &'static Mutex<HashSet<String>> {
+    REFUSED.get_or_init(Default::default)
+}
+
+/// Whether a connect can get a token without opening a browser: something is
+/// stored for this account and the server has not refused it.
+///
+/// This is what tells an auto-reconnect to stop rather than retry. A dropped
+/// connection is worth another go, a sign-in the server will not take is not.
+pub fn signed_in(server_id: &str, username: &str) -> Result<bool, AuthError> {
+    let key = format!("{server_id}:{username}");
+    if refused().lock().unwrap().contains(&key) {
+        return Ok(false);
+    }
+    let stored = tauri_plugin_coilbox_lobby_servers::get_credential(server_id, username)
+        .map_err(AuthError::Storage)?;
+    Ok(stored.is_some())
+}
+
+/// Whether an access token has enough life left to open a connection with.
+///
+/// [`REFRESH_MARGIN`] is the gap, so a token that is about to lapse is refreshed
+/// rather than handed to an upgrade that then fails. Teiserver only checks the
+/// token on that upgrade and never again, so a connection that opens outlives
+/// the token that opened it and this margin is the only deadline that matters.
+fn usable(tokens: &Tokens, now: Instant) -> bool {
+    tokens.expires_at > now + REFRESH_MARGIN
+}
+
 /// Sign in and keep the result: the refresh token to the OS keychain, the access
 /// token to memory. Neither is returned to the caller.
 pub async fn sign_in_and_store<F>(
@@ -640,21 +716,27 @@ where
     F: FnOnce(&str) -> Result<(), String>,
 {
     let tokens = sign_in(base_url, open_browser).await?;
+    let key = format!("{server_id}:{username}");
     tauri_plugin_coilbox_lobby_servers::store_credential(server_id, username, &tokens.refresh)
         .map_err(AuthError::Storage)?;
-    access_tokens()
-        .lock()
-        .unwrap()
-        .insert(format!("{server_id}:{username}"), tokens);
+    // A refusal is about the token that has just been replaced, so it goes with it.
+    refused().lock().unwrap().remove(&key);
+    access_tokens().lock().unwrap().insert(key, tokens);
     Ok(())
 }
 
-/// Forget an account: the stored refresh token and any access token in memory.
+/// Forget an account here: the stored refresh token and any access token in
+/// memory.
+///
+/// Here is as far as it goes. RFC 7009 revocation is what would tell the server
+/// to throw its copy away, and Teiserver implements no revocation endpoint and
+/// advertises none in its metadata, so the refresh token stays valid on the
+/// server for its full hundred years. Signing out means this machine can no
+/// longer use it, not that it has stopped working.
 pub fn sign_out(server_id: &str, username: &str) -> Result<(), AuthError> {
-    access_tokens()
-        .lock()
-        .unwrap()
-        .remove(&format!("{server_id}:{username}"));
+    let key = format!("{server_id}:{username}");
+    access_tokens().lock().unwrap().remove(&key);
+    refused().lock().unwrap().remove(&key);
     tauri_plugin_coilbox_lobby_servers::delete_credential(server_id, username)
         .map_err(AuthError::Storage)
 }
@@ -662,7 +744,11 @@ pub fn sign_out(server_id: &str, username: &str) -> Result<(), AuthError> {
 /// An access token good for the next minute at least, refreshed from the stored
 /// refresh token if the one in memory is spent or missing.
 ///
-/// This is what `mp_connect_tachyon` calls for the bearer token on the upgrade.
+/// This is what `mp_connect_tachyon` calls for the bearer token on the upgrade,
+/// on the first connect and on every reconnect after it. The browser is never
+/// opened from here: a stored refresh token is all a reconnect needs, and an
+/// account that has none is told to sign in rather than sent to the browser
+/// behind the user's back.
 pub async fn access_token(
     base_url: &str,
     server_id: &str,
@@ -670,15 +756,28 @@ pub async fn access_token(
 ) -> Result<String, AuthError> {
     let key = format!("{server_id}:{username}");
     if let Some(tokens) = access_tokens().lock().unwrap().get(&key) {
-        if tokens.expires_at > Instant::now() + REFRESH_MARGIN {
+        if usable(tokens, Instant::now()) {
             return Ok(tokens.access.clone());
         }
+    }
+    if refused().lock().unwrap().contains(&key) {
+        return Err(AuthError::SignInRefused(
+            "it was refused earlier this session".into(),
+        ));
     }
     let stored = tauri_plugin_coilbox_lobby_servers::get_credential(server_id, username)
         .map_err(AuthError::Storage)?
         .ok_or(AuthError::NotSignedIn)?;
     let endpoints = discover(base_url).await?;
-    let tokens = refresh(&endpoints.token, &stored).await?;
+    let tokens = refresh(&endpoints.token, &stored).await.map_err(|error| {
+        // A refused grant is refused for good, so remember it rather than let a
+        // reconnect loop ask again every few seconds until it gives up.
+        if error.needs_sign_in() {
+            refused().lock().unwrap().insert(key.clone());
+            return AuthError::SignInRefused(error.to_string());
+        }
+        error
+    })?;
     // Teiserver's refresh tokens do not rotate today, but a server that starts
     // rotating them would otherwise leave us holding a dead one.
     if tokens.refresh != stored {
@@ -719,6 +818,8 @@ mod tests {
         token_form: HashMap<String, String>,
         /// Makes the token endpoint answer with this OAuth error instead.
         token_error: Option<&'static str>,
+        /// Makes the token endpoint fail on its own side with an HTTP 500.
+        token_fault: bool,
         /// Makes the token endpoint leave `refresh_token` out of its answer.
         omit_refresh: bool,
     }
@@ -819,6 +920,10 @@ mod tests {
                         return;
                     }
                     if target.starts_with("/oauth/token") {
+                        if shared.lock().unwrap().token_fault {
+                            write_response(&mut sock, "500 Internal Server Error", "", "{}").await;
+                            return;
+                        }
                         let form: HashMap<String, String> =
                             url::form_urlencoded::parse(body.as_bytes())
                                 .into_owned()
@@ -1129,6 +1234,75 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(tokens.refresh, "the-stored-refresh-token");
+    }
+
+    /// The refusal a dead refresh token gets. Teiserver answers every refresh
+    /// failure with an HTTP 400 and `invalid_request`, whatever the cause, so a
+    /// revoked token and a banned account look the same from here. What matters
+    /// is that neither is worth trying again.
+    #[tokio::test]
+    async fn a_refused_refresh_ends_in_signing_in_again_rather_than_another_try() {
+        let shared = Shared::default();
+        shared.lock().unwrap().token_error = Some("invalid_request");
+        let base = start(shared.clone()).await;
+        let endpoints = discover(&base).await.unwrap();
+        let err = refresh(&endpoints.token, "a-revoked-refresh-token")
+            .await
+            .unwrap_err();
+        assert!(err.needs_sign_in(), "{err:?}");
+    }
+
+    /// The other half of that call. A server failing on its own side says nothing
+    /// about the sign-in, so reading it as a refusal would send the user to the
+    /// browser over a fault that clears itself.
+    #[tokio::test]
+    async fn a_server_fault_leaves_the_sign_in_alone() {
+        let shared = Shared::default();
+        shared.lock().unwrap().token_fault = true;
+        let base = start(shared.clone()).await;
+        let endpoints = discover(&base).await.unwrap();
+        let err = refresh(&endpoints.token, "a-good-refresh-token")
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, AuthError::Http(m) if m.contains("500")),
+            "{err:?}"
+        );
+        assert!(!err.needs_sign_in(), "{err:?}");
+    }
+
+    /// So does a server nobody can reach, which is the ordinary case a reconnect
+    /// loop exists for.
+    #[tokio::test]
+    async fn a_token_endpoint_that_answers_nothing_leaves_the_sign_in_alone() {
+        // Bound and drop a listener, so the port is one nothing is listening on.
+        let dead = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = dead.local_addr().unwrap().port();
+        drop(dead);
+        let err = refresh(&format!("http://127.0.0.1:{port}/oauth/token"), "a-token")
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AuthError::Http(_)), "{err:?}");
+        assert!(!err.needs_sign_in(), "{err:?}");
+    }
+
+    /// The only deadline that matters. Teiserver checks the token on the HTTP
+    /// upgrade and never again, so a token is refreshed to open a connection with,
+    /// not to keep one alive.
+    #[test]
+    fn a_token_inside_the_margin_is_refreshed_rather_than_used() {
+        let now = Instant::now();
+        let token = |life: Duration| Tokens {
+            access: "an-access-token".into(),
+            refresh: "a-refresh-token".into(),
+            expires_at: now + life,
+        };
+        // What a fresh Teiserver access token looks like.
+        assert!(usable(&token(Duration::from_secs(1800)), now));
+        assert!(usable(&token(REFRESH_MARGIN * 2), now));
+        // Still valid, but not for long enough to hand to a connect.
+        assert!(!usable(&token(REFRESH_MARGIN / 2), now));
+        assert!(!usable(&token(Duration::ZERO), now));
     }
 
     #[test]

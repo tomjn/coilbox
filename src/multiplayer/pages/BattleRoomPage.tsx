@@ -25,6 +25,7 @@ import { battleOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
 import { MissingContentCard } from "../battle/MissingContentCard";
+import { matchStartAction } from "../battle/matchStart";
 import { canRejoinMatch } from "../battle/rejoin";
 import {
   StartBoxControls,
@@ -255,6 +256,46 @@ function BattleRoomPage() {
     launchedRef.current = true;
     doLaunch().finally(() => setLaunchSettled(true));
   }, [room.selfHost, room.hostIngame, canRun, doLaunch]);
+
+  // A Tachyon lobby has no host to go in-game. The server picks an autohost and
+  // sends every player its address, which the connection answers and reports by
+  // advancing `battleStartSeq`, so that is the launch signal here.
+  //
+  // Missing content holds the launch rather than dropping it: `canRun` is a
+  // dependency, so a map or game that arrives later starts the engine then. The
+  // server has already been told we are coming, because it closes the connection
+  // if the answer waits on a download.
+  const startedRef = useRef(room.battleStartSeq);
+  const startNoticeRef = useRef(room.battleStartSeq);
+  const { battleStartSeq, contentKnown } = room;
+  useEffect(() => {
+    const action = matchStartAction({
+      seq: battleStartSeq,
+      actedOn: startedRef.current,
+      canRun,
+    });
+    if (action === "ignore") {
+      startedRef.current = battleStartSeq;
+      startNoticeRef.current = battleStartSeq;
+      return;
+    }
+    if (action === "wait") {
+      // Say so once. A room that sits still while its match runs without us
+      // needs explaining, and the missing-content cards below say what to get.
+      if (contentKnown && startNoticeRef.current !== battleStartSeq) {
+        startNoticeRef.current = battleStartSeq;
+        void notify({
+          title: "The match has started",
+          body: "Coilbox will join as soon as the map, game and engine it needs are ready.",
+          level: "error",
+        });
+      }
+      return;
+    }
+    startedRef.current = battleStartSeq;
+    setLaunchSettled(false);
+    doLaunch().finally(() => setLaunchSettled(true));
+  }, [battleStartSeq, contentKnown, canRun, doLaunch]);
 
   // Never automatic: an engine that exited may have exited on purpose, so
   // getting back in has to be a deliberate click.

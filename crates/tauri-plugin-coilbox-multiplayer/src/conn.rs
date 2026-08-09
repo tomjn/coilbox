@@ -91,6 +91,16 @@ pub type EventSink = Arc<Mutex<Channel<LobbyEvent>>>;
 /// correlator starting.
 pub type TachyonHandle = Arc<Mutex<Option<TachyonClient>>>;
 
+/// A slot for the `BattleConfig` of the match a Tachyon server has told us to
+/// play, shared because the connection task fills it from a `battle/start`
+/// request and the command that builds a launch config reads it.
+///
+/// It outlives the request, so an engine that exited mid-match can be launched
+/// again from the room, and it is emptied when the lobby it belongs to goes.
+/// Always empty on a line-protocol connection, where the battle carries the
+/// host's address itself.
+pub type StartedBattle = Arc<Mutex<Option<serde_json::Value>>>;
+
 /// Send one event to the current frontend channel, ignoring a detached/dead one.
 pub(crate) fn emit(sink: &EventSink, ev: LobbyEvent) {
     let _ = lock_or_recover(sink).send(ev);
@@ -109,6 +119,9 @@ pub struct ServerConn {
     /// [`crate::tachyon_conn`] once the correlator is running, and left empty on a
     /// line-protocol connection, which is what tells the two apart from a command.
     pub tachyon: TachyonHandle,
+    /// Where the match this connection is playing wants the engine pointed, as a
+    /// `play` `BattleConfig`. Only ever filled on a Tachyon connection.
+    pub started: StartedBattle,
     /// The agreement text sent by the server while parked on `AwaitAgreement`, so
     /// `mp_reattach` can replay it alongside the phase after a webview reload.
     pub agreement: Arc<Mutex<Option<String>>>,
@@ -138,6 +151,11 @@ pub enum LobbyEvent {
         direction: String,
         line: String,
     },
+    /// A Tachyon server has told us where the match is and we have said we will
+    /// be there, so the room launches the engine. The config itself is fetched
+    /// with `mp_build_battle_config` rather than carried here, so a room that
+    /// launches again after our engine exits reads the same one.
+    BattleStarting,
     Disconnected {
         reason: Option<String>,
     },
@@ -192,6 +210,9 @@ pub fn spawn_connection(
             // The line protocol has no Tachyon client, and that empty slot is what
             // a Tachyon-only command reads to refuse this connection.
             tachyon: TachyonHandle::default(),
+            // Nothing tells a line-protocol client where to connect out of band:
+            // the battle it joined carries the host's address.
+            started: StartedBattle::default(),
         },
     );
 }
