@@ -7,6 +7,12 @@
 //! authoritative Tachyon-side lobby. Projecting it into coilbox's own
 //! `LobbyState` is a separate job.
 //!
+//! The lobby list works the same way, with `lobby/listReset` for the whole of
+//! it and `lobby/listUpdated` for a patch. [`LobbyListUpdatedEvent`] is that
+//! patch. There is no `apply` for it, because the list has no authoritative
+//! Tachyon-side struct to fold into: a patch goes straight into the battle
+//! list, in `tauri-plugin-coilbox-multiplayer`.
+//!
 //! # Absent is not null
 //!
 //! A field missing from a patch means leave the current value alone. The same
@@ -24,9 +30,10 @@
 //! Everything else in this crate is generated from the vendored schema. These
 //! types are not, because typify writes `Option<T>` for a field that is both
 //! optional and nullable, which is exactly the distinction a merge patch turns
-//! on. The build script points the `lobby/updated` arm of the dispatch at
-//! [`LobbyUpdatedEvent`] below, so parsing produces the lossless type and the
-//! generated `types::LobbyUpdatedEvent` is left unused.
+//! on. The build script points the `lobby/updated` and `lobby/listUpdated` arms
+//! of the dispatch at the types below, so parsing produces the lossless type
+//! and the generated `types::LobbyUpdatedEvent` and
+//! `types::LobbyListUpdatedEvent` are left unused.
 //!
 //! A test asserts that these structs name every field the vendored schema has,
 //! so re-vendoring a schema that has grown a field fails the build rather than
@@ -249,6 +256,70 @@ pub struct CurrentVotePatch {
 pub struct VoterPatch {
     #[serde(default)]
     pub vote: Option<types::LobbyDetailsCurrentVoteVotersValueVote>,
+}
+
+/// A `lobby/listUpdated` event, the frame that carries a merge patch for the
+/// lobby list.
+///
+/// The list is a separate patch from [`LobbyUpdatedEvent`] and a much smaller
+/// one. It carries the fields a battle list row shows, for every lobby on the
+/// server, where `lobby/updated` carries the whole of the one lobby you are in.
+#[derive(Clone, Debug, Deserialize)]
+pub struct LobbyListUpdatedEvent {
+    /// Correlates a response with its request. Unique per connection.
+    #[serde(rename = "messageId")]
+    pub message_id: String,
+    /// The patch itself.
+    pub data: LobbyListPatch,
+}
+
+/// A merge patch for the lobby list, the `data` of a `lobby/listUpdated` event.
+///
+/// Keyed by lobby id. A lobby set to `null` has gone from the list, and a lobby
+/// the patch does not name is untouched.
+#[derive(Clone, Debug, Deserialize)]
+pub struct LobbyListPatch {
+    pub lobbies: HashMap<String, Option<LobbyOverviewPatch>>,
+}
+
+/// One lobby of a `lobby/listUpdated`. Only the id is required, so the rest is
+/// a partial update.
+#[derive(Clone, Debug, Deserialize)]
+pub struct LobbyOverviewPatch {
+    /// Repeats the key this entry is filed under.
+    pub id: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(rename = "playerCount", default)]
+    pub player_count: Option<i64>,
+    #[serde(rename = "maxPlayerCount", default)]
+    pub max_player_count: Option<i64>,
+    #[serde(rename = "mapName", default)]
+    pub map_name: Option<String>,
+    #[serde(rename = "engineVersion", default)]
+    pub engine_version: Option<String>,
+    #[serde(rename = "gameVersion", default)]
+    pub game_version: Option<String>,
+    /// Read but not applied. A row does not show it, and the lobby room reads
+    /// it from `lobbyDetails` instead.
+    #[serde(rename = "areBossesEnabled", default)]
+    pub are_bosses_enabled: Option<bool>,
+    /// Read but not applied, because a row has no field for them.
+    #[serde(default)]
+    pub tags: HashMap<String, Option<Map<String, Value>>>,
+    #[serde(rename = "currentBattle", default)]
+    pub current_battle: Patched<ListCurrentBattlePatch>,
+}
+
+/// The battle in progress, as the list carries it. The one field is required,
+/// so this is always whole.
+///
+/// The list gives the time and not the battle id, where `lobbyDetails` gives
+/// both. A row only needs to know that there is one.
+#[derive(Clone, Debug, Deserialize)]
+pub struct ListCurrentBattlePatch {
+    #[serde(rename = "startedAt")]
+    pub started_at: types::UnixTime,
 }
 
 /// One finished vote.

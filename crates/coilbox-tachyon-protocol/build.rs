@@ -25,12 +25,17 @@ const NULLABLE_OPTIONAL: &str = "schema/nullable-optional.txt";
 /// Commands that decode into a hand-written type rather than the generated one,
 /// keyed on the schema title.
 ///
-/// `lobby/updated` is an RFC 7386 merge patch, where a field set to `null`
-/// means remove and a field left out means leave alone. Typify writes both as
-/// `Option<T>`, so the generated type cannot tell them apart. See
-/// `src/merge_patch.rs`.
-const OVERRIDES: &[(&str, &str)] =
-    &[("LobbyUpdatedEvent", "crate::merge_patch::LobbyUpdatedEvent")];
+/// `lobby/updated` and `lobby/listUpdated` are RFC 7386 merge patches, where a
+/// field set to `null` means remove and a field left out means leave alone.
+/// Typify writes both as `Option<T>`, so the generated type cannot tell them
+/// apart. See `src/merge_patch.rs`.
+const OVERRIDES: &[(&str, &str)] = &[
+    ("LobbyUpdatedEvent", "crate::merge_patch::LobbyUpdatedEvent"),
+    (
+        "LobbyListUpdatedEvent",
+        "crate::merge_patch::LobbyListUpdatedEvent",
+    ),
+];
 
 fn main() {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
