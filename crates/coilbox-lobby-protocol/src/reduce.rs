@@ -162,6 +162,10 @@ pub enum Delta {
     /// The party we are in, or the invitations to one, changed. Only ever produced
     /// on a Tachyon connection, which is the only protocol with parties.
     PartyChanged,
+    /// The queues on offer, the ones we are searching in, or the match the server
+    /// has found changed. Only ever produced on a Tachyon connection, which is the
+    /// only protocol with matchmaking.
+    MatchmakingChanged,
 }
 
 /// Apply a server message to the lobby state, returning the deltas produced.

@@ -679,6 +679,54 @@
           "markdownDescription": "Denies the mp_list_channels command without any pre-configured scope."
         },
         {
+          "description": "Enables the mp_matchmaking_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-matchmaking-cancel",
+          "markdownDescription": "Enables the mp_matchmaking_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_matchmaking_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-matchmaking-cancel",
+          "markdownDescription": "Denies the mp_matchmaking_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_matchmaking_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-matchmaking-list",
+          "markdownDescription": "Enables the mp_matchmaking_list command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_matchmaking_list command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-matchmaking-list",
+          "markdownDescription": "Denies the mp_matchmaking_list command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_matchmaking_queue command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-matchmaking-queue",
+          "markdownDescription": "Enables the mp_matchmaking_queue command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_matchmaking_queue command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-matchmaking-queue",
+          "markdownDescription": "Denies the mp_matchmaking_queue command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the mp_matchmaking_ready command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-mp-matchmaking-ready",
+          "markdownDescription": "Enables the mp_matchmaking_ready command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the mp_matchmaking_ready command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-mp-matchmaking-ready",
+          "markdownDescription": "Denies the mp_matchmaking_ready command without any pre-configured scope."
+        },
+        {
           "description": "Enables the mp_open_battle command without any pre-configured scope.",
           "type": "string",
           "const": "allow-mp-open-battle",
@@ -1111,10 +1159,10 @@
           "markdownDescription": "Denies the mp_update_bot command without any pre-configured scope."
         },
         {
-          "description": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-connect-tachyon`\n- `allow-mp-register`\n- `allow-mp-confirm-agreement`\n- `allow-mp-disconnect`\n- `allow-mp-cancel-connect`\n- `allow-mp-reattach`\n- `allow-mp-active-keys`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-say-battle`\n- `allow-mp-say-ex`\n- `allow-mp-say-battle-ex`\n- `allow-mp-say-private-ex`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-list-channels`\n- `allow-mp-ignore`\n- `allow-mp-unignore`\n- `allow-mp-ignore-list`\n- `allow-mp-friend-request`\n- `allow-mp-accept-friend-request`\n- `allow-mp-decline-friend-request`\n- `allow-mp-unfriend`\n- `allow-mp-friend-list`\n- `allow-mp-friend-request-list`\n- `allow-mp-party-create`\n- `allow-mp-party-leave`\n- `allow-mp-party-invite`\n- `allow-mp-party-cancel-invite`\n- `allow-mp-party-kick-member`\n- `allow-mp-party-accept-invite`\n- `allow-mp-party-decline-invite`\n- `allow-mp-join-battle`\n- `allow-mp-join-battle-deny`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-create-lobby`\n- `allow-mp-start-battle`\n- `allow-mp-update-battle-info`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-cast-vote`\n- `allow-mp-appoint-boss`\n- `allow-mp-unboss`\n- `allow-mp-set-start-rect`\n- `allow-mp-remove-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-remove-script-tags`\n- `allow-mp-build-battle-config`\n- `allow-mp-build-host-config`\n- `allow-mp-probe-host`\n- `allow-mp-chat-logs`\n- `allow-mp-chat-log-open`\n- `allow-mp-tachyon-sign-in`\n- `allow-mp-tachyon-sign-out`\n- `allow-mp-tachyon-signed-in`\n- `allow-mp-tachyon-request`",
+          "description": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-connect-tachyon`\n- `allow-mp-register`\n- `allow-mp-confirm-agreement`\n- `allow-mp-disconnect`\n- `allow-mp-cancel-connect`\n- `allow-mp-reattach`\n- `allow-mp-active-keys`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-say-battle`\n- `allow-mp-say-ex`\n- `allow-mp-say-battle-ex`\n- `allow-mp-say-private-ex`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-list-channels`\n- `allow-mp-ignore`\n- `allow-mp-unignore`\n- `allow-mp-ignore-list`\n- `allow-mp-friend-request`\n- `allow-mp-accept-friend-request`\n- `allow-mp-decline-friend-request`\n- `allow-mp-unfriend`\n- `allow-mp-friend-list`\n- `allow-mp-friend-request-list`\n- `allow-mp-party-create`\n- `allow-mp-party-leave`\n- `allow-mp-party-invite`\n- `allow-mp-party-cancel-invite`\n- `allow-mp-party-kick-member`\n- `allow-mp-party-accept-invite`\n- `allow-mp-party-decline-invite`\n- `allow-mp-matchmaking-list`\n- `allow-mp-matchmaking-queue`\n- `allow-mp-matchmaking-ready`\n- `allow-mp-matchmaking-cancel`\n- `allow-mp-join-battle`\n- `allow-mp-join-battle-deny`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-create-lobby`\n- `allow-mp-start-battle`\n- `allow-mp-update-battle-info`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-cast-vote`\n- `allow-mp-appoint-boss`\n- `allow-mp-unboss`\n- `allow-mp-set-start-rect`\n- `allow-mp-remove-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-remove-script-tags`\n- `allow-mp-build-battle-config`\n- `allow-mp-build-host-config`\n- `allow-mp-probe-host`\n- `allow-mp-chat-logs`\n- `allow-mp-chat-log-open`\n- `allow-mp-tachyon-sign-in`\n- `allow-mp-tachyon-sign-out`\n- `allow-mp-tachyon-signed-in`\n- `allow-mp-tachyon-request`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-connect-tachyon`\n- `allow-mp-register`\n- `allow-mp-confirm-agreement`\n- `allow-mp-disconnect`\n- `allow-mp-cancel-connect`\n- `allow-mp-reattach`\n- `allow-mp-active-keys`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-say-battle`\n- `allow-mp-say-ex`\n- `allow-mp-say-battle-ex`\n- `allow-mp-say-private-ex`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-list-channels`\n- `allow-mp-ignore`\n- `allow-mp-unignore`\n- `allow-mp-ignore-list`\n- `allow-mp-friend-request`\n- `allow-mp-accept-friend-request`\n- `allow-mp-decline-friend-request`\n- `allow-mp-unfriend`\n- `allow-mp-friend-list`\n- `allow-mp-friend-request-list`\n- `allow-mp-party-create`\n- `allow-mp-party-leave`\n- `allow-mp-party-invite`\n- `allow-mp-party-cancel-invite`\n- `allow-mp-party-kick-member`\n- `allow-mp-party-accept-invite`\n- `allow-mp-party-decline-invite`\n- `allow-mp-join-battle`\n- `allow-mp-join-battle-deny`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-create-lobby`\n- `allow-mp-start-battle`\n- `allow-mp-update-battle-info`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-cast-vote`\n- `allow-mp-appoint-boss`\n- `allow-mp-unboss`\n- `allow-mp-set-start-rect`\n- `allow-mp-remove-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-remove-script-tags`\n- `allow-mp-build-battle-config`\n- `allow-mp-build-host-config`\n- `allow-mp-probe-host`\n- `allow-mp-chat-logs`\n- `allow-mp-chat-log-open`\n- `allow-mp-tachyon-sign-in`\n- `allow-mp-tachyon-sign-out`\n- `allow-mp-tachyon-signed-in`\n- `allow-mp-tachyon-request`"
+          "markdownDescription": "Allows the multiplayer lobby client's connection, state, chat, battle and hosting commands.\n#### This default permission set includes:\n\n- `allow-mp-connect`\n- `allow-mp-connect-tachyon`\n- `allow-mp-register`\n- `allow-mp-confirm-agreement`\n- `allow-mp-disconnect`\n- `allow-mp-cancel-connect`\n- `allow-mp-reattach`\n- `allow-mp-active-keys`\n- `allow-mp-snapshot`\n- `allow-mp-send`\n- `allow-mp-say`\n- `allow-mp-say-private`\n- `allow-mp-say-battle`\n- `allow-mp-say-ex`\n- `allow-mp-say-battle-ex`\n- `allow-mp-say-private-ex`\n- `allow-mp-join-channel`\n- `allow-mp-leave-channel`\n- `allow-mp-list-channels`\n- `allow-mp-ignore`\n- `allow-mp-unignore`\n- `allow-mp-ignore-list`\n- `allow-mp-friend-request`\n- `allow-mp-accept-friend-request`\n- `allow-mp-decline-friend-request`\n- `allow-mp-unfriend`\n- `allow-mp-friend-list`\n- `allow-mp-friend-request-list`\n- `allow-mp-party-create`\n- `allow-mp-party-leave`\n- `allow-mp-party-invite`\n- `allow-mp-party-cancel-invite`\n- `allow-mp-party-kick-member`\n- `allow-mp-party-accept-invite`\n- `allow-mp-party-decline-invite`\n- `allow-mp-matchmaking-list`\n- `allow-mp-matchmaking-queue`\n- `allow-mp-matchmaking-ready`\n- `allow-mp-matchmaking-cancel`\n- `allow-mp-join-battle`\n- `allow-mp-join-battle-deny`\n- `allow-mp-leave-battle`\n- `allow-mp-set-status`\n- `allow-mp-set-battle-status`\n- `allow-mp-open-battle`\n- `allow-mp-create-lobby`\n- `allow-mp-start-battle`\n- `allow-mp-update-battle-info`\n- `allow-mp-add-bot`\n- `allow-mp-remove-bot`\n- `allow-mp-update-bot`\n- `allow-mp-force-team`\n- `allow-mp-force-ally`\n- `allow-mp-force-color`\n- `allow-mp-force-spectator`\n- `allow-mp-kick`\n- `allow-mp-cast-vote`\n- `allow-mp-appoint-boss`\n- `allow-mp-unboss`\n- `allow-mp-set-start-rect`\n- `allow-mp-remove-start-rect`\n- `allow-mp-set-script-tags`\n- `allow-mp-remove-script-tags`\n- `allow-mp-build-battle-config`\n- `allow-mp-build-host-config`\n- `allow-mp-probe-host`\n- `allow-mp-chat-logs`\n- `allow-mp-chat-log-open`\n- `allow-mp-tachyon-sign-in`\n- `allow-mp-tachyon-sign-out`\n- `allow-mp-tachyon-signed-in`\n- `allow-mp-tachyon-request`"
         }
       ]
     }

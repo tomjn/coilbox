@@ -22,7 +22,8 @@
 //! the joined lobby's chat, and through [`crate::tachyon_friends`], which
 //! populates the friends and the pending friend requests, and through
 //! [`crate::tachyon_parties`], which populates the party we are in and the
-//! invitations to one.
+//! invitations to one, and through [`crate::tachyon_matchmaking`], which
+//! populates the queues, the search and the match the server has found.
 //!
 //! Every queued action other than a shutdown and the lobby ones is a
 //! TASServer wire line with no Tachyon equivalent. Issue #1235 hides the
@@ -48,8 +49,8 @@ use crate::tachyon_messaging::Conversation;
 use crate::tachyon_rpc::{spawn as spawn_rpc, Handlers, RequestError, TachyonClient};
 use crate::tachyon_ws::{TachyonSocket, WsError};
 use crate::{
-    tachyon_friends, tachyon_lobbies, tachyon_messaging, tachyon_parties, tachyon_room,
-    tachyon_users,
+    tachyon_friends, tachyon_lobbies, tachyon_matchmaking, tachyon_messaging, tachyon_parties,
+    tachyon_room, tachyon_users,
 };
 
 /// The path the WebSocket sits at. The specification carries an open question about
@@ -191,6 +192,9 @@ async fn run_loop(
     // `party/create` answers with the whole party, so that answer comes back
     // here too and is folded like any other frame.
     let party_tx = inbound_tx.clone();
+    // `matchmaking/list` answers with the queues, so its answer is folded the
+    // same way.
+    let queues_tx = inbound_tx.clone();
     // `battle/start` is answered on the connection task, because Teiserver closes
     // the connection if it waits, and the match itself comes down here to be
     // launched. Every other server-to-client request is answered
@@ -239,6 +243,26 @@ async fn run_loop(
     let mut parties = tachyon_parties::Parties::default();
     let (partied_tx, mut partied_rx) = mpsc::unbounded_channel::<tachyon_parties::Effect>();
 
+    // The queues this server matches players in, held the same way again.
+    let mut queues = tachyon_matchmaking::Queues::default();
+    let (queued_tx, mut queued_rx) = mpsc::unbounded_channel::<tachyon_matchmaking::Effect>();
+    // The queues are not a subscription and nothing else asks for them, so the
+    // connection asks as soon as it is up. A server that has not built
+    // matchmaking answers `command_unimplemented`, which turns the screen off
+    // rather than showing an error.
+    if let (Some(client), Ok(request)) = (
+        client.clone(),
+        tachyon_matchmaking::request_for(&queues, &tachyon_matchmaking::MatchmakingAction::List),
+    ) {
+        matchmake(
+            client,
+            sink.clone(),
+            queues_tx.clone(),
+            queued_tx.clone(),
+            request,
+        );
+    }
+
     let reason: Option<String> = loop {
         tokio::select! {
             // Every frame the correlator did not consume: the events, and anything
@@ -247,6 +271,10 @@ async fn run_loop(
             // channel by the task that asked for it.
             Some(frame) = inbound_rx.recv() => {
                 let message = parse_frame(&frame);
+                // Read before the fold, because what clears a started battle
+                // below is leaving the lobby it belonged to rather than simply
+                // not being in one. A match from matchmaking has no lobby at all.
+                let was_in_room = room.is_some();
                 let deltas = {
                     let mut state = lock_or_recover(&state);
                     let mut deltas = tachyon_users::reduce(&mut state, &message);
@@ -263,6 +291,12 @@ async fn run_loop(
                     // that has just arrived is what turns a member id into a
                     // member name.
                     deltas.extend(tachyon_parties::reduce(&mut parties, &mut state, &message));
+                    deltas.extend(tachyon_matchmaking::reduce(
+                        &mut queues,
+                        &mut state,
+                        &message,
+                        now_ms(),
+                    ));
                     deltas
                 };
                 for delta in deltas {
@@ -328,7 +362,7 @@ async fn run_loop(
                 }
                 // The lobby we were in has gone, so where its match was is no
                 // longer somewhere to launch.
-                if room.is_none() {
+                if was_in_room && room.is_none() {
                     lock_or_recover(&started).take();
                 }
             }
@@ -370,6 +404,19 @@ async fn run_loop(
             Some(effect) = partied_rx.recv() => {
                 let deltas = tachyon_parties::applied(
                     &mut parties,
+                    &mut lock_or_recover(&state),
+                    &effect,
+                );
+                for delta in deltas {
+                    emit(&sink, LobbyEvent::Delta { delta });
+                }
+            }
+            // One of our own matchmaking requests the server has taken. Three of
+            // the four answer with a bare success, so this is what moves the
+            // screen.
+            Some(effect) = queued_rx.recv() => {
+                let deltas = tachyon_matchmaking::applied(
+                    &mut queues,
                     &mut lock_or_recover(&state),
                     &effect,
                 );
@@ -448,6 +495,24 @@ async fn run_loop(
                                 sink.clone(),
                                 party_tx.clone(),
                                 partied_tx.clone(),
+                                request,
+                            );
+                        },
+                        // Nothing reached the server, so the click is answered
+                        // rather than swallowed.
+                        Err(why) => emit(&sink, LobbyEvent::Delta {
+                            delta: Delta::ServerMessage { text: why, boxed: false },
+                        }),
+                    }
+                }
+                Outbound::Tachyon(TachyonAction::Matchmaking(action)) => {
+                    match tachyon_matchmaking::request_for(&queues, &action) {
+                        Ok(request) => if let Some(client) = client.clone() {
+                            matchmake(
+                                client,
+                                sink.clone(),
+                                queues_tx.clone(),
+                                queued_tx.clone(),
                                 request,
                             );
                         },
@@ -798,6 +863,46 @@ fn party(
     });
 }
 
+/// Carry out one matchmaking request, off the connection loop.
+///
+/// Two shapes of answer, as the party path has. `matchmaking/list` sends the
+/// queues back, so its response goes on the inbound channel and is folded like
+/// any other frame, which keeps the loop the only writer. The other three answer
+/// with a bare success and carry an effect instead.
+///
+/// A server that has not built matchmaking turns the screen off rather than
+/// putting an error in front of the user, and the connection remembers, so a
+/// later click is answered here without another round trip or another of the ten
+/// requests a second the server allows.
+fn matchmake(
+    client: TachyonClient,
+    sink: EventSink,
+    inbound: mpsc::UnboundedSender<String>,
+    done: mpsc::UnboundedSender<tachyon_matchmaking::Effect>,
+    request: tachyon_matchmaking::Request,
+) {
+    if client.is_unsupported(request.command) {
+        let _ = done.send(tachyon_matchmaking::Effect::Unsupported);
+        return;
+    }
+    tokio::spawn(async move {
+        match client.request(request.command, request.data).await {
+            Ok(response) => match request.effect {
+                Some(effect) => {
+                    let _ = done.send(effect);
+                }
+                None => {
+                    let _ = inbound.send(response);
+                }
+            },
+            Err(RequestError::Unsupported) => {
+                let _ = done.send(tachyon_matchmaking::Effect::Unsupported);
+            }
+            Err(error) => refused(&sink, request.command, &error),
+        }
+    });
+}
+
 /// Whether a refusal was "there is no room on that ally team".
 fn is_full(error: &RequestError) -> bool {
     matches!(error, RequestError::Failed(failure) if failure.reason.as_wire() == "ally_team_full")
@@ -845,6 +950,10 @@ fn what(command: &str) -> &str {
         "lobby/unboss" => "Standing that boss down",
         "lobby/create" => "Creating the lobby",
         "lobby/startBattle" => "Starting the match",
+        "matchmaking/list" => "Fetching the queues",
+        "matchmaking/queue" => "Starting the search",
+        "matchmaking/ready" => "Accepting the match",
+        "matchmaking/cancel" => "Stopping the search",
         other => other,
     }
 }
@@ -877,6 +986,13 @@ fn refusal(error: &RequestError) -> String {
         "bosses_not_allowed" => "This lobby does not allow bosses.",
         "message_too_long" => "The message is too long.",
         "invalid_target" => "That person or lobby cannot be messaged.",
+        "invalid_queue_specified" => "The server has no such queue.",
+        "already_queued" => "You are already searching.",
+        "already_in_battle" => "You are already in a match.",
+        "not_queued" => "You are not searching.",
+        "no_match" => "There is no match to accept.",
+        "version_mismatch" => "The queue changed while you were reading it. Try again.",
+        "party_missing_asset" => "Somebody in your party does not have the map or the game.",
         "banned" => "You are banned from this battle.",
         "unauthorized" => "The server did not allow that.",
         "internal_error" => "The server failed on its own side.",
@@ -2045,6 +2161,118 @@ mod tests {
         loop {
             wait_for(&mut rx, "delta").await;
             if lock_or_recover(&state).friends.is_empty() {
+                break;
+            }
+        }
+    }
+
+    /// The fold is tested a frame at a time in [`crate::tachyon_matchmaking`].
+    /// This is the wiring: the connection asks for the queues as it comes up,
+    /// the answer reaches the state, and a search asked for by the screen
+    /// reaches the server naming the version that answer carried.
+    #[tokio::test]
+    async fn the_connection_asks_for_the_queues_and_a_search_names_what_came_back() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = serve(move |mut ws| async move {
+            while let Some(Ok(msg)) = ws.next().await {
+                let Message::Text(text) = msg else { continue };
+                let _ = seen_tx.send(text.to_string());
+                let request: Value = serde_json::from_str(&text).unwrap();
+                let data = if request["commandId"] == "matchmaking/list" {
+                    json!({ "playlists": [{
+                        "id": "1v1",
+                        "version": "27n6cr76nyfqic73647c1328c94",
+                        "name": "Duel",
+                        "numOfTeams": 2,
+                        "teamSize": 1,
+                        "ranked": true,
+                        "engines": [{ "version": "2025.01.6" }],
+                        "games": [{ "springName": "Beyond All Reason test-27414" }],
+                        "maps": [{ "springName": "Theta Crystals 1.3" }],
+                    }] })
+                } else {
+                    json!({})
+                };
+                ws.send(Message::text(
+                    json!({
+                        "type": "response",
+                        "messageId": request["messageId"],
+                        "commandId": request["commandId"],
+                        "status": "success",
+                        "data": data,
+                    })
+                    .to_string(),
+                ))
+                .await
+                .unwrap();
+            }
+        })
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+
+        wait_for_sent(&mut seen_rx, "matchmaking/list").await;
+        let state = lock_or_recover(&registry)["alice@bar:443"].state.clone();
+        loop {
+            wait_for(&mut rx, "delta").await;
+            if !lock_or_recover(&state).matchmaking.queues.is_empty() {
+                break;
+            }
+        }
+        assert_eq!(lock_or_recover(&state).matchmaking.queues[0].name, "Duel");
+
+        sender(&registry, "alice@bar:443")
+            .send(Outbound::Tachyon(TachyonAction::Matchmaking(
+                crate::tachyon_matchmaking::MatchmakingAction::Search("1v1".into()),
+            )))
+            .unwrap();
+
+        let frame = wait_for_sent(&mut seen_rx, "matchmaking/queue").await;
+        assert_eq!(frame["data"]["queues"][0]["id"], "1v1");
+        assert_eq!(
+            frame["data"]["queues"][0]["version"],
+            "27n6cr76nyfqic73647c1328c94"
+        );
+        // The answer is bare, so the search only shows once the request reports
+        // what it did.
+        loop {
+            wait_for(&mut rx, "delta").await;
+            if !lock_or_recover(&state).matchmaking.searching.is_empty() {
+                break;
+            }
+        }
+    }
+
+    /// A server with no matchmaking turns the screen off rather than leaving it
+    /// waiting for queues that will never arrive.
+    #[tokio::test]
+    async fn a_server_that_has_not_built_matchmaking_switches_the_screen_off() {
+        let url = serve(move |mut ws| async move {
+            while let Some(Ok(msg)) = ws.next().await {
+                let Message::Text(text) = msg else { continue };
+                let request: Value = serde_json::from_str(&text).unwrap();
+                ws.send(Message::text(
+                    json!({
+                        "type": "response",
+                        "messageId": request["messageId"],
+                        "commandId": request["commandId"],
+                        "status": "failed",
+                        "reason": "command_unimplemented",
+                    })
+                    .to_string(),
+                ))
+                .await
+                .unwrap();
+            }
+        })
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+
+        let state = lock_or_recover(&registry)["alice@bar:443"].state.clone();
+        loop {
+            wait_for(&mut rx, "delta").await;
+            if !lock_or_recover(&state).matchmaking.supported {
                 break;
             }
         }

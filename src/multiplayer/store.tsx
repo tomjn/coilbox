@@ -78,6 +78,7 @@ import { triggerMentionCue } from "./chat/mentionCue";
 import { favouritesFor, useFavourites } from "./friends";
 import { addIgnore, ignoredFor, useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
+import { MatchFoundPanel } from "./MatchFoundPanel";
 import { protocolForKey, syncsOnReady } from "./protocol";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
@@ -1449,6 +1450,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     >
       {children}
       <VerificationCodeDialog />
+      <MatchFoundPanel />
       <ServerMessageBoxDialog
         text={serverMsgBoxes[0] ?? null}
         onDismiss={() => setServerMsgBoxes((q) => q.slice(1))}
@@ -1480,6 +1482,16 @@ export function useMpRevealed(): boolean {
  */
 export function useMpDisconnected(): boolean {
   return !useMultiplayer().connected;
+}
+
+/**
+ * Nav/route predicate: does the live connection have matchmaking? Gates the
+ * Matchmaking sidebar item and route. Tachyon only, and only while connected,
+ * because the queues come from the server rather than from anything stored.
+ */
+export function useMpMatchmaking(): boolean {
+  const { connected, protocol } = useMultiplayer();
+  return connected && protocol === "tachyon";
 }
 
 /**

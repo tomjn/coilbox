@@ -39,6 +39,10 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-party-kick-member`
 - `allow-mp-party-accept-invite`
 - `allow-mp-party-decline-invite`
+- `allow-mp-matchmaking-list`
+- `allow-mp-matchmaking-queue`
+- `allow-mp-matchmaking-ready`
+- `allow-mp-matchmaking-cancel`
 - `allow-mp-join-battle`
 - `allow-mp-join-battle-deny`
 - `allow-mp-leave-battle`
@@ -910,6 +914,110 @@ Enables the mp_list_channels command without any pre-configured scope.
 <td>
 
 Denies the mp_list_channels command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-matchmaking-cancel`
+
+</td>
+<td>
+
+Enables the mp_matchmaking_cancel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-matchmaking-cancel`
+
+</td>
+<td>
+
+Denies the mp_matchmaking_cancel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-matchmaking-list`
+
+</td>
+<td>
+
+Enables the mp_matchmaking_list command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-matchmaking-list`
+
+</td>
+<td>
+
+Denies the mp_matchmaking_list command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-matchmaking-queue`
+
+</td>
+<td>
+
+Enables the mp_matchmaking_queue command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-matchmaking-queue`
+
+</td>
+<td>
+
+Denies the mp_matchmaking_queue command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-matchmaking-ready`
+
+</td>
+<td>
+
+Enables the mp_matchmaking_ready command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-matchmaking-ready`
+
+</td>
+<td>
+
+Denies the mp_matchmaking_ready command without any pre-configured scope.
 
 </td>
 </tr>
