@@ -828,6 +828,16 @@ Turns off the community hub. On by default. Set it to `false` if you're shipping
 { "version": 1, "hub": false }
 ```
 
+### `hubUrl` (string)
+
+Points the community hub at a server you run yourself, instead of the built-in `https://coilbox-hub.vercel.app`. Separate from [`hub`](#hub-boolean), which only turns the feature on or off.
+
+```json
+{ "version": 1, "hubUrl": "https://hub.example.com" }
+```
+
+A player can still override this with a setting of their own. This only changes the default they start from.
+
 ### `authoring` (boolean)
 
 Removes the [profile authoring tools](#writing-and-iterating-on-a-profile) from Settings > Distribution profile. On by default. Set it to `false` in the profile you ship, so a player can't reload or replace your branding by accident.
