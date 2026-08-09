@@ -74,8 +74,18 @@ function IconTip({ label, children }: { label: string; children: ReactNode }) {
  * wrapper below); before that, the route redirects to Login.
  */
 function ChatPage() {
-  const { mirror, activeKey, markSeen, forgetChannel, openLoginPopover } =
-    useMultiplayer();
+  const {
+    mirror,
+    activeKey,
+    protocol,
+    markSeen,
+    forgetChannel,
+    openLoginPopover,
+  } = useMultiplayer();
+  // Named channels, and with them every ChanServ and moderator command below, exist
+  // only on TASServer. On Tachyon the chat surface is direct messages plus battle
+  // chat, and the sidebar says so. See `docs/tachyon-protocol.md`.
+  const hasChannels = protocol !== "tachyon";
   const [favourites, setFavourites] = useFavourites();
   const navigate = useNavigate();
   const [active, setActive] = useState<ConversationDescriptor | null>(null);
@@ -138,17 +148,19 @@ function ChatPage() {
   // a raw line via mpSend so our own query isn't recorded as a ChanServ DM.
   const infoAsked = useRef<Set<string>>(new Set());
   useEffect(() => {
+    if (!hasChannels) return;
     if (!activeKey || active?.kind !== "channel") return;
     const name = active.name;
     if (infoAsked.current.has(name)) return;
     infoAsked.current.add(name);
     mpSend({ serverKey: activeKey, line: chanServInfo(name) }).catch(() => {});
-  }, [activeKey, active]);
+  }, [activeKey, active, hasChannels]);
 
   // A per-member `⋮` moderation menu, shown only in a channel where we hold
   // privileges (server mod, or this channel's founder/op) and never on our own row.
   const renderMemberActions = useCallback(
     (username: string) => {
+      if (!hasChannels) return null;
       if (active?.kind !== "channel" || !activeKey) return null;
       if (!iAmChannelOp && !iAmServerMod) return null;
       if (username === me) return null;
@@ -165,7 +177,15 @@ function ChatPage() {
         />
       );
     },
-    [active, activeKey, iAmChannelOp, iAmServerMod, me, activeChannel],
+    [
+      active,
+      activeKey,
+      hasChannels,
+      iAmChannelOp,
+      iAmServerMod,
+      me,
+      activeChannel,
+    ],
   );
 
   // Flag messages that mention a highlight word or our own username (issue #193).
@@ -366,7 +386,7 @@ function ChatPage() {
                 </IconTip>
                 {active.kind === "channel" ? (
                   <>
-                    {iAmChannelOp && (
+                    {hasChannels && iAmChannelOp && (
                       <ChannelTopicMenu
                         channel={active.name}
                         currentTopic={conv.subtitle}
@@ -410,7 +430,9 @@ function ChatPage() {
         />
       ) : (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-          Select a conversation, or browse channels to join one.
+          {hasChannels
+            ? "Select a conversation, or browse channels to join one."
+            : "Select a conversation."}
         </div>
       )}
 
@@ -430,11 +452,13 @@ function ChatPage() {
           />
         )}
 
-      <ChannelBrowser
-        open={browserOpen}
-        onClose={() => setBrowserOpen(false)}
-        onJoined={(name) => setActive({ kind: "channel", name })}
-      />
+      {hasChannels && (
+        <ChannelBrowser
+          open={browserOpen}
+          onClose={() => setBrowserOpen(false)}
+          onJoined={(name) => setActive({ kind: "channel", name })}
+        />
+      )}
     </main>
   );
 }

@@ -15,6 +15,8 @@ import { lsGetCredential } from "../lobby-servers/bindings";
 import {
   allServers,
   autoConnectTarget,
+  BUILTIN_SERVERS,
+  type LobbyProtocol,
   type LobbyServer,
   profileOfficialServer,
   serverProtocol,
@@ -75,6 +77,7 @@ import { triggerMentionCue } from "./chat/mentionCue";
 import { favouritesFor, useFavourites } from "./friends";
 import { addIgnore, ignoredFor, useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
+import { protocolForKey, syncsOnReady } from "./protocol";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
 import { useIdle } from "./useIdle";
@@ -276,6 +279,12 @@ interface MultiplayerContextValue {
   /** Whether a connection is currently live (`activeKey != null`). */
   connected: boolean;
   /**
+   * The wire protocol the live connection speaks, `tasserver` when there is none.
+   * Surfaces with no Tachyon equivalent read this and hide themselves: named
+   * channels, moderation, and hosting a battle. See `docs/tachyon-protocol.md`.
+   */
+  protocol: LobbyProtocol;
+  /**
    * Session-sticky: `true` once the user has connected at least once this app run,
    * and never cleared by a later disconnect/logout. Gates the Chat/Battles sidebar
    * items so they appear on first connect and stay until the app is closed.
@@ -424,6 +433,18 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (activeKey != null) setRevealed(true);
   }, [activeKey]);
+
+  // The protocol the live connection speaks. Read back from its key against the
+  // built-in catalog plus the user's own servers rather than the profile-filtered
+  // list, so a profile that hides a server can't quietly turn a Tachyon connection
+  // into a TASServer one. Everything TASServer has and Tachyon does not gates on
+  // this: see `docs/tachyon-protocol.md`.
+  const [customCfg] = useCustomServers();
+  const protocol = useMemo(
+    () => protocolForKey(activeKey, [...BUILTIN_SERVERS, ...customCfg.servers]),
+    [activeKey, customCfg.servers],
+  );
+
   const [loginPopoverOpen, setLoginPopoverOpen] = useState(false);
   const openLoginPopover = useCallback(() => setLoginPopoverOpen(true), []);
   const closeLoginPopover = useCallback(() => setLoginPopoverOpen(false), []);
@@ -549,11 +570,15 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // `ready` phase (JOIN before ACCEPTED would be rejected). The ref guards against
   // re-firing when `joinedChannels` changes mid-session (e.g. the user joins one).
   // Each entry may carry a key/password, passed straight through to JOIN.
+  //
+  // A Tachyon server has no named channels and no ignore list, so it gets neither
+  // (see `syncsOnReady`). The auto-join list is hidden in settings to match.
   useEffect(() => {
     if (activeKey == null) {
       rejoinedForRef.current = null;
       return;
     }
+    if (!syncsOnReady(protocol)) return;
     if (mirror.phase === "ready" && rejoinedForRef.current !== activeKey) {
       rejoinedForRef.current = activeKey;
       // First-ever connect for this login (no stored list yet) to the profile's
@@ -586,6 +611,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     }
   }, [
     activeKey,
+    protocol,
     mirror.phase,
     joinedChannels,
     requestJoinChannel,
@@ -639,18 +665,21 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // login reaches `ready`. These commands are a no-op on servers without friend
   // support (they just ignore the line), so failure is swallowed and never blocks
   // the UI — local favourites keep working regardless.
+  // Tachyon has friends of its own, but not over these commands, so it sends
+  // neither of them (see `syncsOnReady`).
   const friendsSyncedForRef = useRef<string | null>(null);
   useEffect(() => {
     if (activeKey == null) {
       friendsSyncedForRef.current = null;
       return;
     }
+    if (!syncsOnReady(protocol)) return;
     if (mirror.phase === "ready" && friendsSyncedForRef.current !== activeKey) {
       friendsSyncedForRef.current = activeKey;
       mpFriendList({ serverKey: activeKey }).catch(() => {});
       mpFriendRequestList({ serverKey: activeKey }).catch(() => {});
     }
-  }, [activeKey, mirror.phase]);
+  }, [activeKey, protocol, mirror.phase]);
 
   // Notify when a friend (server-side or a client-local favourite) comes online or
   // goes offline. The lobby has no friend presence event, so this is derived from
@@ -719,15 +748,18 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     setManualAway(false);
   }, [activeKey]);
 
+  // Tachyon carries readiness per lobby rather than as a client-wide status, so a
+  // Tachyon connection publishes nothing here (see `syncsOnReady`).
   useEffect(() => {
     if (activeKey == null || mirror.phase !== "ready") return;
+    if (!syncsOnReady(protocol)) return;
     const sent = sentStatusRef.current;
     if (sent && sameStatus(sent, status)) return;
     sentStatusRef.current = status;
     mpSetStatus({ serverKey: activeKey, ...status }).catch((e) =>
       console.warn("multiplayer: MYSTATUS failed", e),
     );
-  }, [activeKey, mirror.phase, status]);
+  }, [activeKey, protocol, mirror.phase, status]);
 
   // --- Auto-rejoin on unexpected server drop (issue #192) --------------------
   // Distinct from the reload-reattach path above: this handles a genuine server-
@@ -747,7 +779,6 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const [autoConnect] = useSetting<boolean>("multiplayer.autoConnect", false);
   const [lastLogin, setLastLogin] = useLastLogin();
   const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
-  const [customCfg] = useCustomServers();
   const setLastLoginRef = useRef(setLastLogin);
   useEffect(() => {
     setLastLoginRef.current = setLastLogin;
@@ -1340,6 +1371,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         mirror,
         activeKey,
         connected: activeKey != null,
+        protocol,
         revealed,
         busy,
         connect,

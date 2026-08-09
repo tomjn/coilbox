@@ -164,7 +164,13 @@ export default function SkirmishPage() {
 
   // Whether Host is offered at all (issue #514): hosting needs a live multiplayer
   // login, so the button is hidden rather than shown disabled when logged out.
-  const { connected: mpConnected } = useMultiplayer();
+  // Under Tachyon the server allocates a dedicated autohost from its own pool and a
+  // client cannot host at all, so the same button is hidden while connected to one
+  // (see `docs/tachyon-protocol.md`).
+  const { connected: mpConnected, protocol: mpProtocol } = useMultiplayer();
+  // Logged out this stays true, so the preset drawer's "Host as battle" keeps
+  // showing the way it does today. Only a live Tachyon connection removes it.
+  const hostingPossible = mpProtocol !== "tachyon";
 
   // Header overflow fix (issue #514): the Continue affordance goes icon-only,
   // with its full "Continue: <preset name>" text moved into this popover so a
@@ -717,7 +723,7 @@ export default function SkirmishPage() {
               </TooltipTrigger>
               <TooltipContent>Presets</TooltipContent>
             </Tooltip>
-            {mpConnected && (
+            {mpConnected && hostingPossible && (
               <Button
                 variant="outline"
                 onClick={() =>
@@ -751,7 +757,9 @@ export default function SkirmishPage() {
         onCopyPresetLink={onCopyPresetLink}
         onImport={onImportPreset}
         onSaveFromReplay={saveFromReplay}
-        onHostAsBattle={(p) => hostAsBattle(p, p.name)}
+        onHostAsBattle={
+          hostingPossible ? (p) => hostAsBattle(p, p.name) : undefined
+        }
         disabled={running}
       />
 
