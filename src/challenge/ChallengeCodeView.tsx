@@ -12,7 +12,7 @@ import { ErrorBanner } from "../content/pages/components/states";
  * a "Copy link" action that wraps the same code as a `coilbox://import?code=`
  * link (issue #498), for pasting somewhere a raw code would be mistaken for
  * noise - the link is an addition alongside the raw-code copy, not a
- * replacement for it.
+ * replacement for it, and it is dropped when the code is too long for one.
  *
  * `onExportFile` (issue #476) adds a third action that saves the container as
  * a `.json` file instead, for larger payloads or where pasting a long code is
@@ -35,6 +35,13 @@ export function ChallengeCodeView({
   const [copied, setCopied] = useState(false);
   const [fileBusy, setFileBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+
+  // A link caps the code at `MAX_CODE_LENGTH`, well below what a pasted code may
+  // be, because a URL passes through software that truncates long ones. A
+  // scenario carrying dialogue clips clears the code ceiling and misses this one
+  // routinely (issue #1336), so the button goes rather than handing out a link
+  // that would not parse back.
+  const link = buildImportCodeLink(code);
 
   const copy = async () => {
     try {
@@ -82,14 +89,22 @@ export function ChallengeCodeView({
             </>
           )}
         </Button>
-        <Button
-          variant="outline"
-          className="flex-1"
-          onClick={() => copyDeepLink(buildImportCodeLink(code))}
-        >
-          <LinkIcon className="mr-1.5 size-4" aria-hidden /> Copy link
-        </Button>
+        {link && (
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => copyDeepLink(link)}
+          >
+            <LinkIcon className="mr-1.5 size-4" aria-hidden /> Copy link
+          </Button>
+        )}
       </div>
+      {!link && (
+        <p className="text-xs text-muted-foreground">
+          Too long to share as a <code>coilbox://</code> link. Copy the code
+          itself, or export it as a file.
+        </p>
+      )}
       {onExportFile && (
         <Button variant="outline" onClick={exportFile} disabled={fileBusy}>
           <Download className="mr-1.5 size-4" aria-hidden />

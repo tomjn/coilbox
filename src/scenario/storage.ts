@@ -1,4 +1,3 @@
-import type { InstalledGameInfo } from "../container/gameIdentity";
 import {
   type MediaSweepSummary,
   scenarioDelete,
@@ -14,7 +13,6 @@ import { requiredRuntimeVersion } from "./gating";
 import { parseScenarioJson, type Scenario } from "./model";
 import {
   dropMissingDialogueMedia,
-  encodeScenarioExport,
   readScenarioExport,
   type ScenarioExport,
   scenarioMediaFiles,
@@ -202,18 +200,20 @@ export async function sweepScenarioMedia(
 }
 
 /**
- * Export a scenario as the text of one self-contained container file: the
- * document plus every dialogue clip it references, read back off disk and
- * inlined. A clip that cannot be read is left out rather than sinking the
- * export, the way a campaign export drops a broken image.
+ * Gather everything one self-contained export holds: the document plus every
+ * dialogue clip it references, read back off disk and inlined. A clip that
+ * cannot be read is left out rather than sinking the export, the way a campaign
+ * export drops a broken image.
  *
- * `installed` is this machine's games, used only to name the scenario's game
- * with its modinfo shortname as well as its archive name (issue #1335).
+ * This gathers rather than serializing, because the same value feeds both share
+ * routes, a file and a code (issue #1336), and reading the clips is the
+ * expensive part. A share drawer that offered both would otherwise read them
+ * twice. Naming the game (issue #1335) happens at the serialize step, so both
+ * routes get it from the one place.
  */
-export async function exportScenario(
+export async function gatherScenarioExport(
   scenario: Scenario,
-  installed: readonly InstalledGameInfo[] = [],
-): Promise<string> {
+): Promise<ScenarioExport> {
   const media: Record<string, string> = {};
   await Promise.all(
     scenarioMediaFiles(scenario).map(async (file) => {
@@ -228,7 +228,7 @@ export async function exportScenario(
       }
     }),
   );
-  return encodeScenarioExport({ scenario, media }, installed);
+  return { scenario, media };
 }
 
 /**

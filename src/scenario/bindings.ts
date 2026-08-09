@@ -71,7 +71,7 @@ export const scenarioMediaWrite = defineCommand<
 
 /**
  * Write an exported scenario's text to a path the user picked in the save
- * dialog. Opaque: the container text comes from {@link exportScenario}.
+ * dialog. Opaque: the container text comes from `encodeScenarioExport`.
  */
 export const scenarioExport = defineCommand<
   { text: string; dest: string },

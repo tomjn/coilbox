@@ -1,8 +1,9 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Play } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { toast } from "sonner";
 import { useUnitsyncScan } from "@/content/config";
+import { useImportParam } from "@/deeplink/useImportParam";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import {
@@ -31,8 +32,8 @@ import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
  * and says why, since "install that game" is something the player can act on.
  *
  * Import is here as well as on the builder (issue #861). A player handed a
- * scenario file has nowhere else to take it, because the builder is
- * advanced-only.
+ * scenario file or code has nowhere else to take it, because the builder is
+ * advanced-only, which is also why a scenario deep link routes here.
  */
 export default function ScenariosPage() {
   const { scenarios, loading, error } = useScenarios();
@@ -40,7 +41,9 @@ export default function ScenariosPage() {
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const play = usePlay();
   const drawer = useDrawer();
-  const [importError, setImportError] = useState<string | null>(null);
+  // A confirmed `coilbox://import` deep link carrying a scenario code lands
+  // here, because this page is not advanced-gated and the builder is.
+  const importCode = useImportParam();
 
   // Documents only: a bundled scenario is played exactly as a local one is, and
   // where it came from only matters where it can be edited.
@@ -91,13 +94,12 @@ export default function ScenariosPage() {
         </div>
         <div className="shrink-0">
           <ScenarioImportButton
+            initialCode={importCode}
             onImported={imported}
-            onError={setImportError}
           />
         </div>
       </header>
 
-      {importError && <ErrorBanner message={importError} />}
       {error && <ErrorBanner message={error} />}
 
       {loading ? (

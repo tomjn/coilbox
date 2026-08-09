@@ -27,7 +27,7 @@ import {
   deleteScenario,
   deleteScenarioMedia,
   ensureBundledScenarioMedia,
-  exportScenario,
+  gatherScenarioExport,
   importScenarioMedia,
   listScenarios,
   saveScenario,
@@ -261,9 +261,10 @@ describe("deleteScenario and media", () => {
   });
 });
 
-describe("exportScenario", () => {
+describe("gatherScenarioExport", () => {
   it("inlines every referenced clip into the container", async () => {
-    const read = readScenarioExport(await exportScenario(withPortrait()));
+    const gathered = await gatherScenarioExport(withPortrait());
+    const read = readScenarioExport(encodeScenarioExport(gathered));
 
     expect(mediaReadMock).toHaveBeenCalledWith({
       scenarioId: "s1",
@@ -279,11 +280,9 @@ describe("exportScenario", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mediaReadMock.mockRejectedValue(new Error("gone"));
 
-    const read = readScenarioExport(await exportScenario(withPortrait()));
+    const gathered = await gatherScenarioExport(withPortrait());
 
-    expect(read.ok).toBe(true);
-    if (!read.ok) return;
-    expect(read.payload.media).toEqual({});
+    expect(gathered.media).toEqual({});
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });

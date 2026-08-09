@@ -1,6 +1,5 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { save } from "@tauri-apps/plugin-dialog";
-import { Loader2, Pencil, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
+import { Loader2, Pencil, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -18,12 +17,11 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
-import { scenarioExport } from "../bindings";
 import { newScenario } from "../create";
 import { scenarioContents } from "../listing";
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
-import { deleteScenario, exportScenario, saveScenario } from "../storage";
+import { deleteScenario, saveScenario } from "../storage";
 import { ReclaimClipsButton } from "./components/ReclaimClipsButton";
 import { ScenarioImportButton } from "./components/ScenarioImportButton";
 
@@ -71,20 +69,24 @@ export default function ScenarioBuilderPage() {
     }
   };
 
-  const exportFile = async (scenario: Scenario) => {
-    setActionError(null);
-    try {
-      const text = await exportScenario(scenario, scan.data?.games ?? []);
-      const dest = await save({
-        title: "Export scenario",
-        defaultPath: `${scenario.name || "scenario"}.json`,
-        filters: [{ name: "Coilbox scenario", extensions: ["json"] }],
-      });
-      if (!dest) return;
-      await scenarioExport({ text, dest });
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
-    }
+  // Share: a code, a link or a file (issue #1336). The drawer owns all three,
+  // and says so when the scenario's dialogue clips make it too big for a code.
+  // The scanned games go with it only so the export can name the scenario's game
+  // by its modinfo shortname as well as its archive name (issue #1335).
+  const openShare = async (scenario: Scenario) => {
+    const { ShareScenarioForm } = await import(
+      "./components/ShareScenarioForm"
+    );
+    drawer.open({
+      title: `Share ${scenario.name}`,
+      width: "28rem",
+      content: (
+        <ShareScenarioForm
+          scenario={scenario}
+          installed={scan.data?.games ?? []}
+        />
+      ),
+    });
   };
 
   // A campaign mission that attached this scenario carries the document but
@@ -137,7 +139,6 @@ export default function ScenarioBuilderPage() {
             onImported={(scenario) =>
               navigate(`/scenario-builder/${scenario.id}`)
             }
-            onError={setActionError}
           />
           <Button className="gap-1.5" onClick={openNew}>
             <Plus className="size-4" /> New scenario
@@ -200,9 +201,9 @@ export default function ScenarioBuilderPage() {
                     size="sm"
                     variant="outline"
                     className="gap-1.5"
-                    onClick={() => void exportFile(scenario)}
+                    onClick={() => void openShare(scenario)}
                   >
-                    <Upload className="size-4" /> Export
+                    <Share2 className="size-4" /> Share
                   </Button>
                   {!bundled && (
                     <Popover>

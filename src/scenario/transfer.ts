@@ -4,11 +4,14 @@ import {
   type OpenError,
   type OpenResult,
   readContainer,
+  tryEncodeContainerCode,
 } from "../container/container";
 import {
+  type GameIdentity,
   gameIdentityForName,
   type InstalledGameInfo,
 } from "../container/gameIdentity";
+import { formatBytes } from "../content/rapidPool";
 import {
   type ContentRequirement,
   exactGameRequirement,
@@ -135,22 +138,79 @@ export function parseScenarioPayload(value: unknown): ScenarioExport | null {
 }
 
 /**
- * Serialize a scenario and its dialogue media as an export file's text.
+ * The payload both share routes write: the document, its clips, and the game
+ * named the shared way (issue #1335), derived from the setup the document
+ * already carries. `installed` is this machine's games, read only for the
+ * modinfo shortname, so an export made where the game is missing simply names it
+ * by archive name alone.
  *
- * The payload also names the game the shared way (issue #1335), derived from
- * the setup the document already carries. `installed` is this machine's games,
- * read only for the modinfo shortname, so an export made where the game is
- * missing simply names it by archive name alone.
+ * One builder for the file and the code, so the two can never disagree about
+ * what a scenario says its game is.
  */
+function scenarioPayload(
+  exported: ScenarioExport,
+  installed: readonly InstalledGameInfo[],
+): ScenarioExport & { game?: GameIdentity } {
+  const game = gameIdentityForName(exported.scenario.setup.gameName, installed);
+  return { ...exported, ...(game ? { game } : {}) };
+}
+
+/** Serialize a scenario and its dialogue media as an export file's text. */
 export function encodeScenarioExport(
   exported: ScenarioExport,
   installed: readonly InstalledGameInfo[] = [],
 ): string {
-  const game = gameIdentityForName(exported.scenario.setup.gameName, installed);
-  return encodeContainerJson("scenario", SCENARIO_KIND_VERSION, {
-    ...exported,
-    ...(game ? { game } : {}),
-  });
+  return encodeContainerJson(
+    "scenario",
+    SCENARIO_KIND_VERSION,
+    scenarioPayload(exported, installed),
+  );
+}
+
+/** A pasteable scenario code, or why this scenario cannot have one. */
+export type ScenarioCode =
+  | { ok: true; code: string }
+  | { ok: false; message: string };
+
+/**
+ * Encode a scenario as a pasteable code, the way a preset, a challenge and a
+ * setup pack all are (issue #1336), or refuse when the result would be too big
+ * to decode.
+ *
+ * Scenarios are the one shareable kind with no upper bound on size, because the
+ * export carries the dialogue portraits and voice clips inline as `data:` URIs.
+ * Measured against the Silence the Jericho mission: the document alone is 7,287
+ * bytes and a 3,155 character code, and the same document copied out to 581
+ * triggers and 332 zones is still only an 18,000 character code. Text and ids
+ * compress roughly 30 to 1, so no realistic amount of authoring reaches the
+ * ceiling. Media does: 380 KB of clips passes it on its own, because base64
+ * costs a third on top and a portrait or a voice clip is already compressed, so
+ * DEFLATE wins nothing back.
+ *
+ * So the refusal is real rather than theoretical, and it has to happen here
+ * rather than on import. A code that has already been pasted into Discord is
+ * past the point where anyone can fix it.
+ */
+export function encodeScenarioCode(
+  exported: ScenarioExport,
+  installed: readonly InstalledGameInfo[] = [],
+): ScenarioCode {
+  const result = tryEncodeContainerCode(
+    "scenario",
+    SCENARIO_KIND_VERSION,
+    scenarioPayload(exported, installed),
+  );
+  if (result.ok) return result;
+
+  const clips = Object.keys(exported.media).length;
+  const because =
+    clips > 0
+      ? ` Its ${clips} dialogue ${clips === 1 ? "clip travels" : "clips travel"} inside the export, which is most of that.`
+      : "";
+  return {
+    ok: false,
+    message: `This scenario is ${formatBytes(result.bytes)}, past the ${formatBytes(result.limit)} a share code can carry.${because} Export it as a file and send that instead.`,
+  };
 }
 
 /**

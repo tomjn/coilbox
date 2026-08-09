@@ -57,9 +57,13 @@ function importRoute(base: string, code: string): string {
 /**
  * Gate an inline import code and resolve where it should go. Rejects an
  * unrecognised or unsupported payload, warns on a newer-version one, and maps a
- * recognised payload to its importer route. `campaign` and `scenario` are
- * recognised but have no code-import screen (both import from a file), so they
- * are rejected with a clear message rather than routed nowhere.
+ * recognised payload to its importer route. `campaign` is recognised but has no
+ * code-import screen (it imports from a file), so it is rejected with a clear
+ * message rather than routed nowhere.
+ *
+ * A scenario routes to the player-facing Scenarios list rather than the builder,
+ * because the builder is advanced-gated and a player handed a link has no reason
+ * to be an author (issue #1336, following #861).
  */
 export function prepareImport(code: string): PrepareImportResult {
   const id = identify(code);
@@ -131,8 +135,12 @@ export function prepareImport(code: string): PrepareImportResult {
       };
     case "scenario":
       return {
-        ok: false,
-        reason: "Scenarios import from a file, not a link.",
+        ok: true,
+        plan: {
+          ...(base as ImportPlan),
+          route: importRoute("/scenarios", code),
+          label: "scenario",
+        },
       };
   }
 }
