@@ -1143,6 +1143,24 @@ mod tests {
         assert!(!printed.contains("secret"), "{printed}");
     }
 
+    /// Read the real Beyond All Reason server's discovery document. It needs no
+    /// account and opens nothing, but it does need the internet, so it is ignored
+    /// rather than run in CI.
+    ///
+    /// ```text
+    /// cargo test -p tauri-plugin-coilbox-multiplayer live_discovery -- --ignored --nocapture
+    /// ```
+    #[tokio::test]
+    #[ignore = "reaches the live server, so it cannot run in CI"]
+    async fn live_discovery() {
+        let endpoints = discover("https://server4.beyondallreason.info")
+            .await
+            .expect("discovery failed");
+        println!("{endpoints:#?}");
+        assert!(endpoints.authorization.starts_with("https://"));
+        assert!(endpoints.token.starts_with("https://"));
+    }
+
     /// The one test that needs a real Beyond All Reason account. It opens your
     /// browser, waits for you to sign in, and prints whether a token came back.
     /// Nothing is stored and no token is printed.
