@@ -1270,3 +1270,141 @@ fn a_message_that_carries_no_lobby_leaves_the_room_alone() {
     assert_eq!(deltas, vec![]);
     assert!(room.is_some());
 }
+
+/// What `battle/start` carries: where the game server is, and the name and
+/// password to present to it.
+fn private_battle(patch: Value) -> Value {
+    let mut base = json!({
+        "username": "alice",
+        "password": "s3cret",
+        "ip": "203.0.113.7",
+        "port": 8452,
+        "engine": { "version": "2025.01.4" },
+        "game": { "springName": "Beyond All Reason test-1234" },
+        "map": { "springName": "Comet Catcher Remake 1.8" },
+    });
+    merge(&mut base, patch);
+    base
+}
+
+/// Answer a `battle/start` the way the connection does, reporting the answer
+/// and the match it handed on.
+fn started(data: Value) -> (HandlerResult, Option<types::PrivateBattle>) {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let answer = battle_start(&data, &tx);
+    (answer, rx.try_recv().ok())
+}
+
+#[test]
+fn a_battle_start_is_answered_before_anything_launches() {
+    // The answer is what keeps the connection open, so it cannot wait on the
+    // launch. Nothing has read the channel at the point the answer is made, and
+    // the match is still waiting on it afterwards.
+    let (tx, mut rx) = mpsc::unbounded_channel();
+
+    let answer = battle_start(&private_battle(json!({})), &tx);
+
+    // A successful battle/start response has no data at all.
+    assert_eq!(answer, Ok(None));
+    let handed_on = rx.try_recv().expect("the match was not handed on");
+    assert_eq!(handed_on.ip, "203.0.113.7");
+}
+
+#[test]
+fn a_battle_start_we_cannot_read_is_refused_rather_than_taken() {
+    let (answer, handed_on) = started(json!({ "username": "alice" }));
+
+    assert_eq!(
+        answer,
+        Err(Failure::new(FailureReason::InvalidRequest)),
+        "an unreadable payload was taken",
+    );
+    assert!(handed_on.is_none());
+}
+
+#[test]
+fn a_battle_start_reads_an_address_where_the_spec_says_uuid() {
+    // The upstream schema types `privateBattle.ip` as a reference to `battleId`,
+    // which is a uuid, while the live server sends an address. This parses only
+    // because the vendored schema is patched, and it is the one message that
+    // breaks without it.
+    let (answer, handed_on) = started(private_battle(json!({ "ip": "203.0.113.7" })));
+
+    assert_eq!(answer, Ok(None));
+    assert_eq!(handed_on.expect("no match").ip, "203.0.113.7");
+}
+
+/// The launch config a `battle/start` payload comes to.
+fn config_for(patch: Value) -> Value {
+    let private: types::PrivateBattle =
+        serde_json::from_value(private_battle(patch)).expect("the payload does not parse");
+    battle_config(&private)
+}
+
+#[test]
+fn a_started_battle_becomes_a_config_the_engine_can_join_with() {
+    let config = config_for(json!({}));
+
+    // Everything a client start script holds, straight off the wire.
+    assert_eq!(config["isHost"], false);
+    assert_eq!(config["myPlayerName"], "alice");
+    assert_eq!(config["hostIp"], "203.0.113.7");
+    assert_eq!(config["hostPort"], 8452);
+    assert_eq!(config["myPasswd"], "s3cret");
+    assert_eq!(config["mapName"], "Comet Catcher Remake 1.8");
+    assert_eq!(config["gameType"], "Beyond All Reason test-1234");
+}
+
+#[test]
+fn a_started_battle_fills_every_field_the_play_plugin_requires() {
+    // `BattleConfig` defaults the rest, but these seven have no default, so a
+    // config missing one of them is refused before it reaches the engine.
+    let config = config_for(json!({}));
+
+    for field in [
+        "mapName",
+        "gameType",
+        "myPlayerName",
+        "startPosType",
+        "players",
+        "teams",
+        "allyTeams",
+    ] {
+        assert!(config.get(field).is_some(), "{field} is missing: {config}");
+    }
+    // The game server relays the real layout once the engine connects, and
+    // nothing on the wire names it, so the three lists go out empty rather than
+    // carrying a guess.
+    assert_eq!(config["players"], json!([]));
+    assert_eq!(config["teams"], json!([]));
+    assert_eq!(config["allyTeams"], json!([]));
+}
+
+#[test]
+fn a_port_that_is_not_a_port_is_left_out_rather_than_wrapped() {
+    assert_eq!(
+        config_for(json!({ "port": 70000 }))["hostPort"],
+        Value::Null
+    );
+    assert_eq!(config_for(json!({ "port": -1 }))["hostPort"], Value::Null);
+    assert_eq!(config_for(json!({ "port": 65535 }))["hostPort"], 65535);
+}
+
+#[test]
+fn a_lobby_playing_a_match_is_one_to_ask_to_join() {
+    // A late joiner is sent no `battle/start` off the back of joining the lobby,
+    // so this is what tells the connection to ask with `lobby/joinBattle`.
+    let (room, _state) = joined_as(details(json!({
+        "currentBattle": { "id": "battle-a", "startedAt": 1_754_000_000 },
+    })));
+
+    assert!(match_running(&room));
+}
+
+#[test]
+fn a_lobby_with_no_match_is_not_asked_to_join_one() {
+    let (room, _state) = joined_room();
+
+    assert!(!match_running(&room));
+    assert!(!match_running(&None));
+}

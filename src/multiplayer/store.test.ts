@@ -207,3 +207,43 @@ describe("mirrorReducer channel-list completion", () => {
     ).toBe(3);
   });
 });
+
+describe("mirrorReducer Tachyon battle start", () => {
+  it("starts the counter at zero", () => {
+    expect(initialMirror.battleStartSeq).toBe(0);
+  });
+
+  it("advances the counter each time the server says where the match is", () => {
+    const once = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: { kind: "battleStarting" },
+    });
+    expect(once.battleStartSeq).toBe(1);
+    // A second match in the same lobby has to read as a second launch, not as
+    // the first one still standing.
+    const twice = mirrorReducer(once, {
+      type: "event",
+      ev: { kind: "battleStarting" },
+    });
+    expect(twice.battleStartSeq).toBe(2);
+  });
+
+  it("survives the snapshot the room fetches after it", () => {
+    const started = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: { kind: "battleStarting" },
+    });
+    expect(
+      mirrorReducer(started, { type: "snapshot", state: emptyState })
+        .battleStartSeq,
+    ).toBe(1);
+  });
+
+  it("leaves the counter alone for everything else", () => {
+    const m = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: { kind: "delta", delta: { kind: "battleOpened", id: 4 } },
+    });
+    expect(m.battleStartSeq).toBe(0);
+  });
+});

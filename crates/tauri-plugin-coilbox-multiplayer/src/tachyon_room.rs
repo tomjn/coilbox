@@ -43,7 +43,6 @@
 //! - team colours. Tachyon assigns them when the match starts, so `team_color`
 //!   stays 0 rather than carrying a guess the engine would then contradict. The
 //!   room shows an unset swatch rather than a black one, because 0 is black.
-//! - `currentBattle`, the match in progress. Launching is #1233.
 //! - a vote's quorum and majority. Both arrive on a `lobby/updated` patch and
 //!   neither is on the lobby we join with, so anyone who joined mid-vote would
 //!   never learn them. `Vote::yes_needed` and `Vote::no_needed` stay 0 and the
@@ -86,6 +85,14 @@
 //! here has to. `lobby/voteEnded` is the separate news of how it finished, and
 //! it clears the vote itself rather than waiting for the patch, because the two
 //! can arrive in either order.
+//!
+//! # Starting the match
+//!
+//! The lobby does not host the game. The server picks an autohost and sends each
+//! player a `battle/start` request naming where to connect, so [`battle_start`]
+//! is what answers it and [`battle_config`] is what the engine launches with.
+//! Nothing in that config comes from the lobby, which is why the mapping reads
+//! only the request.
 
 use std::collections::HashMap;
 
@@ -97,8 +104,10 @@ use coilbox_tachyon_protocol::types::{self, LobbyDetails, LobbyJoinResponse};
 use coilbox_tachyon_protocol::TachyonMessage;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use tokio::sync::mpsc;
 
 use crate::tachyon_lobbies::handle_for;
+use crate::tachyon_rpc::{Failure, FailureReason, HandlerResult};
 use crate::tachyon_users::SUBSCRIBE_LIMIT;
 
 /// The start rect space `Battle::start_rects` is in. Tachyon's start box is in
@@ -336,6 +345,83 @@ fn request(command: &'static str, data: Value) -> Request {
 /// A request that may not exist, as the list [`requests_for`] returns.
 fn one(request: Option<Request>) -> Vec<Request> {
     request.into_iter().collect()
+}
+
+/// Answer the server's `battle/start` request, handing the match on to be
+/// launched.
+///
+/// The answer means "I have taken this", not "the game is running". Teiserver
+/// closes the connection with code 1008 if a request of its own goes
+/// unanswered, and working out whether the map and the game are on disk, then
+/// starting an engine, takes far longer than that. So this parses the payload,
+/// passes it to the connection loop, and answers at once. A player who turns out
+/// to be missing the content launches when the download finishes.
+///
+/// The only failure it can report is one of the four every command has. None of
+/// them means "I do not have the map", so a payload we understand is always
+/// taken.
+pub(crate) fn battle_start(
+    data: &Value,
+    launch: &mpsc::UnboundedSender<types::PrivateBattle>,
+) -> HandlerResult {
+    // `privateBattle.ip` is typed upstream as a uuid while the live server sends
+    // an address, so this parses only because the vendored schema is patched.
+    // See `crates/coilbox-tachyon-protocol/schema/README.md`.
+    let Ok(private) = serde_json::from_value::<types::PrivateBattle>(data.clone()) else {
+        return Err(Failure::new(FailureReason::InvalidRequest));
+    };
+    if launch.send(private).is_err() {
+        // The connection loop has gone, so nothing will launch this and saying
+        // otherwise would be a lie the server acts on.
+        return Err(Failure::new(FailureReason::InternalError));
+    }
+    // A successful battle/start response has no data at all.
+    Ok(None)
+}
+
+/// Map a `battle/start` payload into the play plugin's `BattleConfig`.
+///
+/// A joining client gets a minimal start script holding its name, the address
+/// and its password, because the game server relays the real layout once the
+/// engine connects. So `players`, `teams` and `allyTeams` go out empty: the play
+/// plugin requires the fields, and nothing on the wire fills them.
+///
+/// Two parts of the payload have no slot in a `BattleConfig`. `engine.version`
+/// does not, because which engine runs is chosen before the launch, from the
+/// lobby's own engine version. `map.springName` and `game.springName` do, and
+/// are carried, though a client script leaves both out.
+pub(crate) fn battle_config(private: &types::PrivateBattle) -> Value {
+    json!({
+        "mapName": private.map.spring_name,
+        "gameType": private.game.spring_name,
+        "myPlayerName": private.username,
+        // Where players start is the game server's business on a client script,
+        // so this is the field's default rather than a claim about the match.
+        "startPosType": 0,
+        "players": [],
+        "teams": [],
+        "allyTeams": [],
+        "isHost": false,
+        "hostIp": private.ip,
+        "hostPort": port(private.port),
+        "myPasswd": private.password,
+    })
+}
+
+/// The port to connect on. It is a JSON number on the wire and a port is a
+/// `u16`, so anything outside that range is not one.
+fn port(value: f64) -> Option<u16> {
+    let rounded = value.round();
+    (rounded >= 0.0 && rounded <= f64::from(u16::MAX)).then_some(rounded as u16)
+}
+
+/// Whether the lobby we have just joined is already playing a match.
+///
+/// A late joiner is not sent `battle/start` off the back of joining the lobby,
+/// so this is what tells the connection to ask for it with `lobby/joinBattle`.
+pub(crate) fn match_running(room: &Option<Room>) -> bool {
+    room.as_ref()
+        .is_some_and(|room| room.details.current_battle.is_some())
 }
 
 /// The lobby we are in.

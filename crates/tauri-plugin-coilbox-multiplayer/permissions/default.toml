@@ -60,5 +60,6 @@ permissions = [
   "allow-mp-chat-log-open",
   "allow-mp-tachyon-sign-in",
   "allow-mp-tachyon-sign-out",
+  "allow-mp-tachyon-signed-in",
   "allow-mp-tachyon-request",
 ]

@@ -61,6 +61,7 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-chat-log-open`
 - `allow-mp-tachyon-sign-in`
 - `allow-mp-tachyon-sign-out`
+- `allow-mp-tachyon-signed-in`
 - `allow-mp-tachyon-request`
 
 ## Permission Table
@@ -1446,6 +1447,32 @@ Enables the mp_tachyon_sign_out command without any pre-configured scope.
 <td>
 
 Denies the mp_tachyon_sign_out command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-tachyon-signed-in`
+
+</td>
+<td>
+
+Enables the mp_tachyon_signed_in command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-tachyon-signed-in`
+
+</td>
+<td>
+
+Denies the mp_tachyon_signed_in command without any pre-configured scope.
 
 </td>
 </tr>

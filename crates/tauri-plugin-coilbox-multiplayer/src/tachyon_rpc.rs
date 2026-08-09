@@ -1081,6 +1081,56 @@ mod tests {
         assert!(answer.get("data").is_none(), "unexpected data: {answer}");
     }
 
+    #[tokio::test]
+    async fn the_real_battle_start_handler_answers_before_the_match_is_read() {
+        // The handler the connection registers, over a real socket. Nothing
+        // reads the match it hands on until after the answer has arrived, so a
+        // handler that waited on the launch would fail this rather than pass it
+        // slowly.
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<Value>();
+        let url = serve(|mut ws| async move {
+            ws.send(Message::text(
+                json!({
+                    "type": "request",
+                    "messageId": "srv-9",
+                    "commandId": "battle/start",
+                    "data": {
+                        "username": "alice",
+                        "password": "s3cret",
+                        "ip": "203.0.113.7",
+                        "port": 8452,
+                        "engine": { "version": "2025.01.4" },
+                        "game": { "springName": "Beyond All Reason test-1234" },
+                        "map": { "springName": "Comet Catcher Remake 1.8" },
+                    },
+                })
+                .to_string(),
+            ))
+            .await
+            .unwrap();
+            let answer = next_json(&mut ws).await;
+            seen_tx.send(answer).unwrap();
+            std::future::pending::<()>().await;
+        })
+        .await;
+
+        let (launch_tx, mut launch_rx) = mpsc::unbounded_channel();
+        let handlers = Handlers::new().on("battle/start", move |data| {
+            crate::tachyon_room::battle_start(data, &launch_tx)
+        });
+        let (_client, _task, _inbound) = start(&url, handlers).await;
+
+        let answer = soon(&mut seen_rx).await;
+        assert_eq!(answer["messageId"], "srv-9");
+        assert_eq!(answer["commandId"], "battle/start");
+        assert_eq!(answer["status"], "success");
+        assert!(answer.get("data").is_none(), "unexpected data: {answer}");
+
+        // Only now is the match read, and it is still there.
+        let private = soon(&mut launch_rx).await;
+        assert_eq!(private.ip, "203.0.113.7");
+    }
+
     /// A server that answers every request the moment it reads it, and reports
     /// the command id of each one, so a test can see what actually went out.
     async fn answering_server(seen: mpsc::UnboundedSender<String>) -> String {
