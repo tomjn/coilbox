@@ -54,6 +54,8 @@ const COMMANDS: &[&str] = &[
     "mp_probe_host",
     "mp_chat_logs",
     "mp_chat_log_open",
+    "mp_tachyon_sign_in",
+    "mp_tachyon_sign_out",
 ];
 
 fn main() {

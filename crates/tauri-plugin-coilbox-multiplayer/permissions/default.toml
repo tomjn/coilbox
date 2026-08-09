@@ -54,4 +54,6 @@ permissions = [
   "allow-mp-probe-host",
   "allow-mp-chat-logs",
   "allow-mp-chat-log-open",
+  "allow-mp-tachyon-sign-in",
+  "allow-mp-tachyon-sign-out",
 ]
