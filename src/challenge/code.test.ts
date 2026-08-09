@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { encodeContainerCode, identify } from "../container/container";
 import { decodeChallenge, encodeChallenge, encodeChallengeFile } from "./code";
 
 interface Settings {
@@ -26,6 +27,27 @@ describe("challenge code", () => {
     const code = encodeChallenge("warpath", settings);
     const result = decodeChallenge(code, "warpath", parseSettings);
     expect(result).toEqual({ ok: true, settings });
+  });
+
+  it("names the game at the top of the payload, from the mode's settings", () => {
+    const code = encodeChallenge("conquest", {
+      seed: 1,
+      name: "x",
+      game: { shortname: "BA", pinnedName: "BA V12.1" },
+    });
+    expect(identify(code).game).toEqual({ name: "BA V12.1", shortname: "BA" });
+  });
+
+  it("reads the game out of a challenge shared before the shared field", () => {
+    const legacy = encodeContainerCode("challenge", 1, {
+      mode: "conquest",
+      settings: { seed: 1, name: "x", game: { shortname: "BA" } },
+    });
+    expect(identify(legacy).game).toEqual({ shortname: "BA" });
+    expect(decodeChallenge(legacy, "conquest", parseSettings)).toEqual({
+      ok: true,
+      settings: { seed: 1, name: "x" },
+    });
   });
 
   it("produces a URL-safe code with no padding", () => {
