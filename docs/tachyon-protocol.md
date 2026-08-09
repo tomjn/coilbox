@@ -466,7 +466,7 @@ Unlocks: Tachyon is a usable lobby.
 Features Tachyon has that TASServer does not. Gated on the discriminator.
 
 - Parties. `party/create`, `invite`, `acceptInvite`, `declineInvite`, `cancelInvite`, `kickMember`, and `leave`, plus the `party/invited`, `party/updated`, and `party/removed` events. Party state already arrives in `privateUser`, so stage 2 will have populated some of this.
-- Matchmaking. `matchmaking/list`, `queue`, `ready`, and `cancel`, plus the `found`, `foundUpdate`, `lost`, `cancelled`, and `queuesJoined` events. Note that `queueUpdate` and `checkAssets` are in the spec but not on the server, so the search-progress display and party asset checking degrade until Teiserver catches up.
+- Matchmaking. `matchmaking/list`, `queue`, `ready`, and `cancel`, plus the `found`, `foundUpdate`, `lost`, `cancelled`, and `queuesJoined` events. Built in #1238. `queueUpdate` and `checkAssets` are in the spec but not on the server, so neither is implemented: the screen states that this server does not report how many players are searching, and there is no `checkAssets` handler, because answering has to be synchronous on the connection task while whether the content is on disk is a unitsync scan the frontend owns, and the request is party-aware so it cannot be answered from a value the searching member supplied either. With no handler the correlator answers `command_unimplemented`, which is true.
 
 Clans are excluded. The server does not implement them.
 
