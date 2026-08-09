@@ -153,6 +153,11 @@ pub struct Battle {
     /// Whether this lobby allows bosses at all. A lobby with them switched off
     /// refuses `lobby/appointBoss`, so the room offers it only when this is set.
     pub bosses_enabled: bool,
+    /// Whether a battle is running in this lobby, so the row offers Watch live
+    /// rather than Join. Tachyon says so on the lobby itself. Always false on a
+    /// TASServer connection, which says nothing about the battle and where the
+    /// list reads the host's ingame bit instead.
+    pub in_progress: bool,
 }
 
 /// A transient SPADS autohost vote in the current battle, surfaced so the UI can
