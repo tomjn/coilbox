@@ -383,6 +383,9 @@ function BattleRoomPage() {
             maxSlots={battle.maxPlayers}
             startPosType={room.startPosType}
             selfHost={room.selfHost}
+            serverAssignsSeat={room.serverAssignsSeat}
+            canKick={room.canKick}
+            canBoss={room.canBoss}
             canAddBot={room.canAddBot}
             hostControls={room.hostControls}
             addableAis={room.addableAis}
@@ -412,7 +415,7 @@ function BattleRoomPage() {
             localMap={room.localMap}
             mapMissing={room.mapMissing}
             startPosType={room.startPosType}
-            selfHost={room.selfHost}
+            canChangeMap={room.canChangeMap}
             canEditBoxes={room.canEditBoxes}
             activeAlly={boxAllies.activeAlly}
             onSetBox={room.setStartBox}

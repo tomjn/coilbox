@@ -35,6 +35,9 @@ export function BattleMembersTable({
   maxSlots,
   startPosType,
   selfHost,
+  serverAssignsSeat,
+  canKick,
+  canBoss,
   canAddBot,
   hostControls,
   addableAis,
@@ -60,6 +63,15 @@ export function BattleMembersTable({
   startPosType?: number;
   /** When true, the viewer hosts this battle and may force/kick other members. */
   selfHost: boolean;
+  /**
+   * The server assigns colour, faction and team, so those cells are read-only
+   * for everyone. True on a Tachyon connection, see `useBattleRoom`.
+   */
+  serverAssignsSeat: boolean;
+  /** The viewer may kick another member, which on Tachyon calls a vote. */
+  canKick: boolean;
+  /** The viewer may appoint and stand down bosses in this lobby. */
+  canBoss: boolean;
   /** When true, the viewer may add a bot (any seated member — see `useBattleRoom`). */
   canAddBot: boolean;
   hostControls: {
@@ -68,6 +80,8 @@ export function BattleMembersTable({
     forceColor: (user: string, hex: string) => void;
     forceSpectator: (user: string) => void;
     kick: (user: string) => void;
+    appointBoss: (user: string) => void;
+    unboss: (user: string) => void;
     removeBot: (name: string) => void;
     updateBot: (
       name: string,
@@ -117,7 +131,7 @@ export function BattleMembersTable({
   // the founder. `self` marks our own row, so the roster already names us.
   const me = rows.find((r) => r.self)?.name;
   const ownsABot = rows.some((r) => r.kind === "bot" && r.owner === me);
-  const showActions = selfHost || ownsABot;
+  const showActions = selfHost || ownsABot || canKick || canBoss;
 
   const slots = Math.max(2, Math.min(maxSlots || 0, 16));
   // First seated member per team, in row order: the "leader" whose colour marks
@@ -238,23 +252,44 @@ export function BattleMembersTable({
               // own row stays the self-editable path. Outside a battle we host, we
               // still control the bots we added.
               let control: MemberControls | null = null;
-              if (selfHost && row.kind === "human" && !row.self) {
+              if (row.kind === "human" && !row.self && (selfHost || canKick)) {
                 control = {
-                  onForceTeam: (t) => hostControls.forceTeam(row.name, t),
-                  onForceAlly: (a) => hostControls.forceAlly(row.name, a),
-                  onForceColor: (c) => hostControls.forceColor(row.name, c),
-                  onForceSpectator: () => hostControls.forceSpectator(row.name),
+                  // Only a host forces another member's seat. Tachyon has no
+                  // such command, so a member there gets the menu for the
+                  // lobby-scoped actions alone.
+                  onForceTeam: selfHost
+                    ? (t) => hostControls.forceTeam(row.name, t)
+                    : undefined,
+                  onForceAlly: selfHost
+                    ? (a) => hostControls.forceAlly(row.name, a)
+                    : undefined,
+                  onForceColor: selfHost
+                    ? (c) => hostControls.forceColor(row.name, c)
+                    : undefined,
+                  onForceSpectator: selfHost
+                    ? () => hostControls.forceSpectator(row.name)
+                    : undefined,
                   onKick: () => hostControls.kick(row.name),
+                  onAppointBoss:
+                    canBoss && !row.boss
+                      ? () => hostControls.appointBoss(row.name)
+                      : undefined,
+                  onUnboss:
+                    canBoss && row.boss
+                      ? () => hostControls.unboss(row.name)
+                      : undefined,
                 };
               } else if (row.kind === "bot" && (selfHost || row.owner === me)) {
-                const noop = () => {};
                 control = {
-                  onForceTeam: (t) =>
-                    hostControls.updateBot(row.name, { teamId: t }),
-                  onForceAlly: (a) =>
-                    hostControls.updateBot(row.name, { ally: a }),
-                  onForceColor: noop,
-                  onForceSpectator: noop,
+                  // Tachyon's bot update carries the AI, the name and the bot's
+                  // options, and nothing about where it sits, so a bot's seat is
+                  // the server's there.
+                  onForceTeam: serverAssignsSeat
+                    ? undefined
+                    : (t) => hostControls.updateBot(row.name, { teamId: t }),
+                  onForceAlly: serverAssignsSeat
+                    ? undefined
+                    : (a) => hostControls.updateBot(row.name, { ally: a }),
                   onKick: () => hostControls.removeBot(row.name),
                   onChangeAi: (ai) => hostControls.changeBotAi(row.name, ai),
                 };
@@ -277,6 +312,7 @@ export function BattleMembersTable({
                   control={control}
                   sharedWith={sharedWith}
                   showActions={showActions}
+                  serverAssignsSeat={serverAssignsSeat}
                   flashIngame={justWentIngame.has(row.name)}
                   sideOptions={sideOptions}
                   teamOptions={teamOptions}

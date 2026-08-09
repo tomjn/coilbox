@@ -63,6 +63,11 @@ pub enum TachyonAction {
     JoinLobby { battle: u32 },
     /// Leave the lobby we are in.
     LeaveLobby,
+    /// Something a battle room control asks of the lobby we are in. The task
+    /// turns it into requests against the lobby it holds, because that is the
+    /// only thing that can name an ally team, a bot or a member the way Tachyon
+    /// does.
+    Room(crate::tachyon_room::RoomAction),
 }
 
 /// The frontend event channel, wrapped so a webview reload can swap in a fresh

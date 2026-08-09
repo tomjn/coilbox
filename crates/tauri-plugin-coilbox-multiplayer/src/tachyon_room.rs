@@ -37,18 +37,33 @@
 //! `Battle` came from the TASServer protocol and Tachyon's lobby is richer, so
 //! these are read and not projected rather than being invented a field:
 //!
-//! - the founder. Tachyon has no host or founder, so `Battle::host` stays empty
-//!   and the room reads as nobody's.
+//! - the founder. Tachyon has no host or founder, so `Battle::host` stays empty.
+//!   `Battle::bosses` carries the nearest thing the protocol has instead: who
+//!   may change the lobby.
 //! - team colours. Tachyon assigns them when the match starts, so `team_color`
-//!   stays 0 rather than carrying a guess the engine would then contradict.
+//!   stays 0 rather than carrying a guess the engine would then contradict. The
+//!   room shows an unset swatch rather than a black one, because 0 is black.
 //! - `currentBattle`, the match in progress. Launching is #1233.
 //! - `currentVote` and `voteHistory`. Votes are #1231.
-//! - `bosses` and `areBossesEnabled`, `joinQueuePosition` on a spectator, the
-//!   `player` slot on a player and a bot, and a bot's `version` and `options`.
+//! - `joinQueuePosition` on a spectator, the `player` slot on a player and a
+//!   bot, and a bot's `version` and `options`.
 //! - `gameOptions`. `Battle::script_tags` is the engine's start-script key space
 //!   and nothing says Tachyon's option keys are the same one, so mapping them
-//!   would put unverified keys in front of the options editor. Editing options
-//!   is #1230.
+//!   would put unverified keys in front of the options editor.
+//!
+//! # Turning a control into a request
+//!
+//! The battle room's controls were built for TASServer, so they name an ally team
+//! by index, a bot by the name on screen and a member by their username. Tachyon
+//! names all three by a server-assigned string. [`requests_for`] is the one place
+//! that translation happens, because the lobby we hold is the only thing that can
+//! do it, and it is pure so each control's request can be read off a test rather
+//! than off a live server.
+//!
+//! It returns a list because one control can move more than one thing, and it is
+//! a short list on purpose. Teiserver disconnects a client that sends more than
+//! ten requests a second, so a control that pushes our whole seat on every click
+//! asks only for the parts that actually differ from the seat we hold.
 
 use std::collections::HashMap;
 
@@ -56,6 +71,7 @@ use coilbox_lobby_protocol::{BattleStatus, Bot, Delta, LobbyState, MemberStatus,
 use coilbox_tachyon_protocol::merge_patch;
 use coilbox_tachyon_protocol::types::{self, LobbyDetails, LobbyJoinResponse};
 use coilbox_tachyon_protocol::TachyonMessage;
+use serde_json::{json, Value};
 
 use crate::tachyon_lobbies::handle_for;
 use crate::tachyon_users::SUBSCRIBE_LIMIT;
@@ -63,6 +79,206 @@ use crate::tachyon_users::SUBSCRIBE_LIMIT;
 /// The start rect space `Battle::start_rects` is in. Tachyon's start box is in
 /// fractions of the map, so the two differ by this factor.
 const START_RECT_SCALE: f64 = 200.0;
+
+/// One Tachyon request a battle room control asks for.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Request {
+    pub command: &'static str,
+    pub data: Option<Value>,
+}
+
+/// What a battle room control asks of the lobby, in the terms the control
+/// speaks. The room's pickers name an ally team by index, a bot by the name on
+/// screen and a member by their username, because that is what the TASServer
+/// protocol they were built for uses. Tachyon names all three by a string the
+/// server assigned, so [`requests_for`] translates.
+pub(crate) enum RoomAction {
+    /// Our own seat, as the room pushes it: the whole battle status with one
+    /// field changed.
+    OwnStatus(BattleStatus),
+    /// Add a bot on the ally team the index names.
+    AddBot {
+        name: String,
+        ally: u8,
+        ai: String,
+    },
+    /// Change the AI a bot runs, keeping its seat.
+    ChangeBotAi {
+        name: String,
+        ai: String,
+    },
+    RemoveBot {
+        name: String,
+    },
+    /// Kick a member out. Lobby-scoped and open to any member subject to a
+    /// vote, so it is not the moderation surface the TASServer path has.
+    Kick {
+        username: String,
+    },
+    /// Change the lobby's map.
+    SetMap {
+        map: String,
+    },
+    AppointBoss {
+        username: String,
+    },
+    Unboss {
+        username: String,
+    },
+}
+
+/// The requests a control's action comes to on the lobby we hold.
+///
+/// Empty means there is nothing to ask for: we are in no lobby, the action
+/// names something the lobby does not have, or the seat already reads the way
+/// the control wants it.
+pub(crate) fn requests_for(
+    room: &Option<Room>,
+    state: &LobbyState,
+    action: &RoomAction,
+) -> Vec<Request> {
+    let Some(room) = room else {
+        return vec![];
+    };
+    let details = &room.details;
+    match action {
+        RoomAction::OwnStatus(status) => own_status(details, state, *status),
+        RoomAction::AddBot { name, ally, ai } => one(ally_key_at(details, *ally).map(|ally| {
+            request(
+                "lobby/addBot",
+                json!({ "allyTeam": ally, "name": name, "shortName": ai }),
+            )
+        })),
+        RoomAction::ChangeBotAi { name, ai } => one(bot_id(details, name).map(|id| {
+            request(
+                "lobby/updateBot",
+                json!({ "id": id, "shortName": ai, "name": name }),
+            )
+        })),
+        RoomAction::RemoveBot { name } => {
+            one(bot_id(details, name).map(|id| request("lobby/removeBot", json!({ "id": id }))))
+        }
+        RoomAction::Kick { username } => {
+            one(user_id(state, username)
+                .map(|id| request("lobby/kickban", json!({ "userId": id }))))
+        }
+        RoomAction::SetMap { map } => vec![request("lobby/update", json!({ "mapName": map }))],
+        RoomAction::AppointBoss { username } => one(user_id(state, username)
+            .map(|id| request("lobby/appointBoss", json!({ "userId": id })))),
+        RoomAction::Unboss { username } => {
+            one(user_id(state, username).map(|id| request("lobby/unboss", json!({ "userId": id }))))
+        }
+    }
+}
+
+/// The requests our own seat controls come to.
+///
+/// The room pushes the whole battle status on every click, so this asks only
+/// for what differs from the seat we hold. Teiserver disconnects a client that
+/// sends more than ten requests a second, and a control that sent three every
+/// time would spend that budget on nothing.
+///
+/// A spectator has no ready flag and no assets to report, and
+/// `lobby/updateClientStatus` refuses one with `not_a_player`, so the ready and
+/// asset request is only ever sent while we are already a player. Taking a seat
+/// and then reporting our assets is two clicks' worth of requests on one click,
+/// so the seat move goes on its own and the room's own asset effect reports the
+/// assets once the lobby comes back with us in it.
+fn own_status(details: &LobbyDetails, state: &LobbyState, wanted: BattleStatus) -> Vec<Request> {
+    let Some(me) = my_user_id(state) else {
+        return vec![];
+    };
+    let player = details
+        .players
+        .values()
+        .find(|player| player.id.as_str() == me);
+    let spectating = details
+        .spectators
+        .values()
+        .any(|spectator| spectator.id.as_str() == me);
+
+    if !wanted.mode {
+        // Already watching, so there is nothing to ask for.
+        return one(player.map(|_| Request {
+            command: "lobby/spectate",
+            data: None,
+        }));
+    }
+
+    let mut requests = Vec::new();
+    if let Some(ally) = ally_key_at(details, wanted.ally) {
+        let moving = player.is_none_or(|player| player.ally_team != ally);
+        if moving && (player.is_some() || spectating) {
+            requests.push(request("lobby/joinAllyTeam", json!({ "allyTeam": ally })));
+        }
+    }
+    if let Some(player) = player {
+        let assets = asset_status(wanted.sync);
+        if player.is_ready != wanted.ready || player.asset_status != assets {
+            requests.push(request(
+                "lobby/updateClientStatus",
+                json!({ "isReady": wanted.ready, "assetStatus": assets.to_string() }),
+            ));
+        }
+    }
+    requests
+}
+
+/// What the room's sync field says about our assets.
+///
+/// The room works out whether the map and the game are installed from its own
+/// unitsync scan and reports it as the engine's sync field: 1 is synced and
+/// anything else is not. `downloading` is never reported, because the room's
+/// two-state signal cannot say it: whether a download is running is held inside
+/// the missing-content cards rather than anywhere the seat can read.
+fn asset_status(sync: u8) -> types::LobbyDetailsPlayersValueAssetStatus {
+    if sync == 1 {
+        types::LobbyDetailsPlayersValueAssetStatus::Complete
+    } else {
+        types::LobbyDetailsPlayersValueAssetStatus::Missing
+    }
+}
+
+/// The ally team key an ally index names, or `None` when the lobby has no such
+/// ally team. The index is the key's place in the sorted list, which is the same
+/// order the projection groups the roster by.
+fn ally_key_at(details: &LobbyDetails, index: u8) -> Option<&str> {
+    sorted(&details.ally_team_config)
+        .get(usize::from(index))
+        .map(|(key, _)| *key)
+}
+
+/// The server's id for the bot the roster shows under `name`.
+fn bot_id<'a>(details: &'a LobbyDetails, name: &str) -> Option<&'a str> {
+    bot_keys(details)
+        .into_iter()
+        .find(|(key, _)| key == name)
+        .map(|(_, bot)| bot.id.as_str())
+}
+
+/// The user id behind a username, which is how Tachyon names a member.
+fn user_id<'a>(state: &'a LobbyState, username: &str) -> Option<&'a str> {
+    state.users.get(username).map(|user| user.user_id.as_str())
+}
+
+/// Our own user id, which every seat request needs and which the room only has
+/// once we are signed in and named.
+fn my_user_id(state: &LobbyState) -> Option<&str> {
+    let name = state.my_username.as_deref()?;
+    user_id(state, name)
+}
+
+fn request(command: &'static str, data: Value) -> Request {
+    Request {
+        command,
+        data: Some(data),
+    }
+}
+
+/// A request that may not exist, as the list [`requests_for`] returns.
+fn one(request: Option<Request>) -> Vec<Request> {
+    request.into_iter().collect()
+}
 
 /// The lobby we are in.
 pub(crate) struct Room {
@@ -135,6 +351,8 @@ pub(crate) fn left(room: &mut Option<Room>, state: &mut LobbyState) -> Vec<Delta
     battle.members.clear();
     battle.bots.clear();
     battle.start_rects.clear();
+    battle.bosses.clear();
+    battle.bosses_enabled = false;
     vec![Delta::BattleInfoChanged { id: handle }]
 }
 
@@ -246,6 +464,8 @@ fn project(room: Option<&Room>, state: &mut LobbyState) -> Vec<Delta> {
     battle.members = members(details, &names);
     battle.bots = bots(details, &names);
     battle.start_rects = start_rects(details);
+    battle.bosses = bosses(details, &names);
+    battle.bosses_enabled = details.are_bosses_enabled;
     let changed = battle != before;
     state.battles.insert(handle, battle);
 
@@ -289,25 +509,33 @@ fn members(details: &LobbyDetails, names: &HashMap<&str, &str>) -> HashMap<Strin
     members
 }
 
-/// The bots, keyed the way the roster reads them: by the name it shows.
-fn bots(details: &LobbyDetails, names: &HashMap<&str, &str>) -> HashMap<String, Bot> {
-    let allies = ally_indices(details);
-    let teams = team_indices(details);
-    let mut bots: HashMap<String, Bot> = HashMap::new();
-
+/// The key the roster reads each bot by: the name it shows, or the id the server
+/// gave it.
+///
+/// Tachyon lets two bots share a display name and the roster is keyed by it, so
+/// the second one falls back to its id rather than replacing the first. This is
+/// also how a control naming a bot on screen finds the bot a request has to
+/// name, so the two cannot drift apart.
+fn bot_keys(details: &LobbyDetails) -> Vec<(String, &types::LobbyDetailsBotsValue)> {
+    let mut keys: Vec<(String, &types::LobbyDetailsBotsValue)> = Vec::new();
     for (_, bot) in sorted(&details.bots) {
         let shown = bot
             .name
             .as_ref()
             .map_or_else(|| bot.short_name.to_string(), |name| name.to_string());
-        // Tachyon lets two bots share a display name and the roster is keyed by
-        // it, so the second one falls back to the id the server assigned it
-        // rather than replacing the first.
-        let key = if bots.contains_key(&shown) {
-            bot.id.clone()
-        } else {
-            shown
-        };
+        let taken = keys.iter().any(|(key, _)| *key == shown);
+        keys.push((if taken { bot.id.clone() } else { shown }, bot));
+    }
+    keys
+}
+
+/// The bots, keyed the way the roster reads them.
+fn bots(details: &LobbyDetails, names: &HashMap<&str, &str>) -> HashMap<String, Bot> {
+    let allies = ally_indices(details);
+    let teams = team_indices(details);
+    let mut bots: HashMap<String, Bot> = HashMap::new();
+
+    for (key, bot) in bot_keys(details) {
         bots.insert(
             key.clone(),
             Bot {
@@ -328,6 +556,21 @@ fn bots(details: &LobbyDetails, names: &HashMap<&str, &str>) -> HashMap<String, 
         );
     }
     bots
+}
+
+/// The bosses, under the names the roster shows, in a stable order.
+///
+/// A boss is the nearest thing a Tachyon lobby has to a host: the lobby has no
+/// founder, and this is who may change it. `bosses` is keyed by user id.
+fn bosses(details: &LobbyDetails, names: &HashMap<&str, &str>) -> Vec<String> {
+    sorted(&details.bosses)
+        .into_iter()
+        .map(|(id, _)| {
+            names
+                .get(id)
+                .map_or_else(|| id.to_owned(), |name| (*name).to_owned())
+        })
+        .collect()
 }
 
 /// The per-ally start boxes, in the 0 to 200 space `Battle` uses.

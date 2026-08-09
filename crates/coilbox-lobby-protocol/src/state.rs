@@ -145,6 +145,14 @@ pub struct Battle {
     pub bots: HashMap<String, Bot>,
     pub script_tags: BTreeMap<String, String>,
     pub start_rects: HashMap<u8, StartRect>,
+    /// The members who may change the lobby, by the name the roster shows them
+    /// under. Tachyon's answer to a host: a lobby has no founder, and a boss is
+    /// appointed by a vote rather than by opening the battle. Always empty on a
+    /// TASServer connection, where `host` is who may change things.
+    pub bosses: Vec<String>,
+    /// Whether this lobby allows bosses at all. A lobby with them switched off
+    /// refuses `lobby/appointBoss`, so the room offers it only when this is set.
+    pub bosses_enabled: bool,
 }
 
 /// A transient SPADS autohost vote in the current battle, surfaced so the UI can

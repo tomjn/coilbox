@@ -46,6 +46,8 @@ permissions = [
   "allow-mp-force-color",
   "allow-mp-force-spectator",
   "allow-mp-kick",
+  "allow-mp-appoint-boss",
+  "allow-mp-unboss",
   "allow-mp-set-start-rect",
   "allow-mp-remove-start-rect",
   "allow-mp-set-script-tags",

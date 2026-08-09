@@ -105,6 +105,11 @@ export interface MemberRow {
   self: boolean;
   /** This row is the battle's founder/host (usually the autohost bot). */
   host: boolean;
+  /**
+   * This row is a boss of the lobby, so they may change it. Tachyon only: a
+   * lobby has no founder, and a boss is what it has in place of one.
+   */
+  boss: boolean;
   ready: boolean;
   /** 0 unknown, 1 synced, 2 unsynced. */
   sync: number;
@@ -130,13 +135,14 @@ function rowFromStatus(
   kind: "human" | "bot",
   s: BattleStatus,
   teamColor: number,
-  flags: { self: boolean; host: boolean },
+  flags: { self: boolean; host: boolean; boss?: boolean },
 ): MemberRow {
   return {
     name,
     kind,
     self: flags.self,
     host: flags.host,
+    boss: !!flags.boss,
     ready: s.ready,
     sync: s.sync,
     spectator: !s.mode,
@@ -167,6 +173,7 @@ export function membersToRows(
         ...rowFromStatus(name, "human", m.battleStatus, m.teamColor, {
           self: name === me,
           host: name === battle.host,
+          boss: battle.bosses.includes(name),
         }),
         country: u?.country,
         rank: u?.status.rank,

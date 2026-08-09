@@ -40,6 +40,7 @@ use coilbox_lobby_protocol::{
 use conn::{spawn_connection, LobbyEvent, Outbound, Registry, TachyonAction};
 use picoframe_core::CliResult;
 use serde_json::{json, Value};
+use tachyon_room::RoomAction;
 use tauri::{
     ipc::Channel,
     plugin::{Builder, TauriPlugin},
@@ -791,6 +792,17 @@ fn mp_set_battle_status(
         sync,
         side,
     };
+    // On a Tachyon connection the seat is three separate requests, so the task
+    // works out which of them this push actually changed. Colour, faction and
+    // handicap have no Tachyon equivalent and the room hides those controls
+    // there, so nothing is lost by a push that carries them.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Room(RoomAction::OwnStatus(status)),
+    ) {
+        return result;
+    }
     set_intended_battle_status(registry.inner(), &server_key, status, color);
     enqueue(
         registry.inner(),
@@ -859,6 +871,15 @@ fn mp_update_battle_info(
     maphash: i32,
     map: String,
 ) -> CliResult {
+    // `lobby/update` changes one field at a time and has no lock, so only the
+    // map crosses over. The room hides the lock toggle on a Tachyon connection.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Room(RoomAction::SetMap { map: map.clone() }),
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -908,6 +929,19 @@ fn mp_add_bot(
         sync,
         side,
     };
+    // `lobby/addBot` seats a bot on an ally team and lets the server pick the
+    // team within it, so the ally index is the only part of the status it takes.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Room(RoomAction::AddBot {
+            name: name.clone(),
+            ally,
+            ai: ai_dll.clone(),
+        }),
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -930,6 +964,7 @@ fn mp_update_bot(
     sync: u8,
     side: u8,
     color: u32,
+    ai_dll: Option<String>,
 ) -> CliResult {
     let status = BattleStatus {
         ready,
@@ -940,6 +975,23 @@ fn mp_update_bot(
         sync,
         side,
     };
+    // `lobby/updateBot` carries the AI, the display name and the bot's options,
+    // and nothing about where the bot sits, so the room hides a bot's team and
+    // ally pickers on a Tachyon connection and only an AI change comes through.
+    // On a TASServer connection there is no such command, so the caller changes
+    // a bot's AI by removing it and adding it back (see `changeBotAi`).
+    if let Some(ai) = ai_dll {
+        if let Some(result) = tachyon_action(
+            registry.inner(),
+            &server_key,
+            TachyonAction::Room(RoomAction::ChangeBotAi {
+                name: name.clone(),
+                ai,
+            }),
+        ) {
+            return result;
+        }
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -950,6 +1002,13 @@ fn mp_update_bot(
 /// `mp_remove_bot` — remove a bot.
 #[tauri::command]
 fn mp_remove_bot(registry: State<'_, Registry>, server_key: String, name: String) -> CliResult {
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Room(RoomAction::RemoveBot { name: name.clone() }),
+    ) {
+        return result;
+    }
     enqueue(registry.inner(), &server_key, command::remove_bot(&name))
 }
 
@@ -1015,11 +1074,50 @@ fn mp_force_spectator(
 /// `mp_kick` — host: kick a user from the battle.
 #[tauri::command]
 fn mp_kick(registry: State<'_, Registry>, server_key: String, username: String) -> CliResult {
+    // `lobby/kickban` is lobby-scoped and open to any member subject to a vote,
+    // so on a Tachyon connection this is not a host power and the room offers it
+    // to everyone. Sent without `banUntil`, which is what makes it a kick.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Room(RoomAction::Kick {
+            username: username.clone(),
+        }),
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
         command::kick_from_battle(&username),
     )
+}
+
+/// `mp_appoint_boss`, Tachyon only: make a member a boss, so they may change the
+/// lobby. Tachyon has no founder, and a boss is the nearest thing it has.
+#[tauri::command]
+fn mp_appoint_boss(
+    registry: State<'_, Registry>,
+    server_key: String,
+    username: String,
+) -> CliResult {
+    tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Room(RoomAction::AppointBoss { username }),
+    )
+    .unwrap_or_else(|| CliResult::err("this server does not have bosses"))
+}
+
+/// `mp_unboss`, Tachyon only: stand a boss down.
+#[tauri::command]
+fn mp_unboss(registry: State<'_, Registry>, server_key: String, username: String) -> CliResult {
+    tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Room(RoomAction::Unboss { username }),
+    )
+    .unwrap_or_else(|| CliResult::err("this server does not have bosses"))
 }
 
 /// `mp_set_start_rect` — host: set an ally team's start rectangle.
@@ -1580,6 +1678,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_force_color,
             mp_force_spectator,
             mp_kick,
+            mp_appoint_boss,
+            mp_unboss,
             mp_set_start_rect,
             mp_remove_start_rect,
             mp_set_script_tags,
