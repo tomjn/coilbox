@@ -1,0 +1,19 @@
+[package]
+name = "coilbox-tachyon-protocol"
+version = "0.0.0"
+description = "Pure, IO-free Tachyon lobby protocol types: the vendored JSON Schema, the Rust types generated from it, and a total envelope parser. No Tauri, no tokio, no WebSocket."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+regress = "0.11"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["serde"] }
+
+[build-dependencies]
+prettyplease = "0.2"
+schemars = "0.8.22"
+serde_json = "1"
+syn = "2"
+typify = "0.7"
