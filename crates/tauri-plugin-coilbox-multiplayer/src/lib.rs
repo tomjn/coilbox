@@ -17,6 +17,7 @@ pub mod tachyon_auth;
 mod tachyon_conn;
 /// Matching Tachyon responses to requests, over the transport below.
 pub mod tachyon_rpc;
+mod tachyon_users;
 /// The WebSocket transport for the newer Tachyon protocol, built alongside the
 /// line protocol above.
 pub mod tachyon_ws;
