@@ -20,7 +20,9 @@
 //! populates `current_battle` and the joined lobby's detail, and through
 //! [`crate::tachyon_messaging`], which populates the direct message threads and
 //! the joined lobby's chat, and through [`crate::tachyon_friends`], which
-//! populates the friends and the pending friend requests.
+//! populates the friends and the pending friend requests, and through
+//! [`crate::tachyon_parties`], which populates the party we are in and the
+//! invitations to one.
 //!
 //! Every queued action other than a shutdown and the lobby ones is a
 //! TASServer wire line with no Tachyon equivalent. Issue #1235 hides the
@@ -45,7 +47,10 @@ use crate::lock_or_recover;
 use crate::tachyon_messaging::Conversation;
 use crate::tachyon_rpc::{spawn as spawn_rpc, Handlers, RequestError, TachyonClient};
 use crate::tachyon_ws::{TachyonSocket, WsError};
-use crate::{tachyon_friends, tachyon_lobbies, tachyon_messaging, tachyon_room, tachyon_users};
+use crate::{
+    tachyon_friends, tachyon_lobbies, tachyon_messaging, tachyon_parties, tachyon_room,
+    tachyon_users,
+};
 
 /// The path the WebSocket sits at. The specification carries an open question about
 /// advertising it in the OAuth metadata, and nothing advertises it today, so this
@@ -183,6 +188,9 @@ async fn run_loop(
     // The `lobby/join` response is folded like any other frame, so the task that
     // asks for one puts it back on this channel.
     let joined_tx = inbound_tx.clone();
+    // `party/create` answers with the whole party, so that answer comes back
+    // here too and is folded like any other frame.
+    let party_tx = inbound_tx.clone();
     // `battle/start` is answered on the connection task, because Teiserver closes
     // the connection if it waits, and the match itself comes down here to be
     // launched. Every other server-to-client request is answered
@@ -227,6 +235,10 @@ async fn run_loop(
     let mut friends = tachyon_friends::Friends::default();
     let (befriended_tx, mut befriended_rx) = mpsc::unbounded_channel::<tachyon_friends::Effect>();
 
+    // The party we are in, held the same way and for the same reason.
+    let mut parties = tachyon_parties::Parties::default();
+    let (partied_tx, mut partied_rx) = mpsc::unbounded_channel::<tachyon_parties::Effect>();
+
     let reason: Option<String> = loop {
         tokio::select! {
             // Every frame the correlator did not consume: the events, and anything
@@ -247,6 +259,10 @@ async fn run_loop(
                     // After the user fold, because a name that has just arrived
                     // is what turns a friend id into a friend name.
                     deltas.extend(tachyon_friends::reduce(&mut friends, &mut state, &message));
+                    // After the user fold too, and for the same reason: a name
+                    // that has just arrived is what turns a member id into a
+                    // member name.
+                    deltas.extend(tachyon_parties::reduce(&mut parties, &mut state, &message));
                     deltas
                 };
                 for delta in deltas {
@@ -283,6 +299,14 @@ async fn run_loop(
                 // name would sit in the list as a number.
                 {
                     let ids = tachyon_friends::ids_to_subscribe(&friends, &message);
+                    if let Some(client) = client.clone() {
+                        subscribe(client, sink.clone(), ids);
+                    }
+                }
+                // A party names its members and invitees by id, and an offline
+                // one is not in `users` at all, so the section needs the same.
+                {
+                    let ids = tachyon_parties::ids_to_subscribe(&parties, &message);
                     if let Some(client) = client.clone() {
                         subscribe(client, sink.clone(), ids);
                     }
@@ -340,6 +364,19 @@ async fn run_loop(
                     emit(&sink, LobbyEvent::Delta { delta });
                 }
             }
+            // One of our own party requests the server has taken. Six of the
+            // seven answer with a bare success, so this is what moves the
+            // section.
+            Some(effect) = partied_rx.recv() => {
+                let deltas = tachyon_parties::applied(
+                    &mut parties,
+                    &mut lock_or_recover(&state),
+                    &effect,
+                );
+                for delta in deltas {
+                    emit(&sink, LobbyEvent::Delta { delta });
+                }
+            }
             // A chat message the server has answered for. The conversation is
             // the state's, so the sending task reports back rather than writing.
             Some(outcome) = sent_rx.recv() => {
@@ -389,6 +426,24 @@ async fn run_loop(
                     match tachyon_friends::request_for(&friends, &action) {
                         Ok(request) => if let Some(client) = client.clone() {
                             befriend(client, sink.clone(), befriended_tx.clone(), request);
+                        },
+                        // Nothing reached the server, so the click is answered
+                        // rather than swallowed.
+                        Err(why) => emit(&sink, LobbyEvent::Delta {
+                            delta: Delta::ServerMessage { text: why, boxed: false },
+                        }),
+                    }
+                }
+                Outbound::Tachyon(TachyonAction::Party(action)) => {
+                    match tachyon_parties::request_for(&parties, &action) {
+                        Ok(request) => if let Some(client) = client.clone() {
+                            party(
+                                client,
+                                sink.clone(),
+                                party_tx.clone(),
+                                partied_tx.clone(),
+                                request,
+                            );
                         },
                         // Nothing reached the server, so the click is answered
                         // rather than swallowed.
@@ -682,6 +737,34 @@ fn befriend(
     });
 }
 
+/// Carry out one Party control's request, off the connection loop.
+///
+/// Two shapes of answer. `party/create` sends the whole party back, so its
+/// response goes on the inbound channel and is folded like any other frame,
+/// which keeps the loop the only writer. The other six answer with a bare
+/// success and carry an effect instead, reported back for the loop to apply.
+fn party(
+    client: TachyonClient,
+    sink: EventSink,
+    inbound: mpsc::UnboundedSender<String>,
+    done: mpsc::UnboundedSender<tachyon_parties::Effect>,
+    request: tachyon_parties::Request,
+) {
+    tokio::spawn(async move {
+        match client.request(request.command, request.data).await {
+            Ok(response) => match request.effect {
+                Some(effect) => {
+                    let _ = done.send(effect);
+                }
+                None => {
+                    let _ = inbound.send(response);
+                }
+            },
+            Err(error) => refused(&sink, request.command, &error),
+        }
+    });
+}
+
 /// Whether a refusal was "there is no room on that ally team".
 fn is_full(error: &RequestError) -> bool {
     matches!(error, RequestError::Failed(failure) if failure.reason.as_wire() == "ally_team_full")
@@ -709,6 +792,13 @@ fn what(command: &str) -> &str {
         "friend/cancelRequest" => "Withdrawing the friend request",
         "friend/remove" => "Removing that friend",
         "friend/list" => "Fetching your friends",
+        "party/create" => "Starting a party",
+        "party/leave" => "Leaving the party",
+        "party/invite" => "Inviting them to your party",
+        "party/acceptInvite" => "Joining that party",
+        "party/declineInvite" => "Turning down that invitation",
+        "party/cancelInvite" => "Withdrawing that invitation",
+        "party/kickMember" => "Putting them out of your party",
         "lobby/spectate" => "Moving to the spectators",
         "lobby/joinAllyTeam" => "Taking a seat",
         "lobby/joinQueue" => "Joining the queue for a seat",
@@ -744,6 +834,8 @@ fn refusal(error: &RequestError) -> String {
             "You have as many requests outstanding as the server allows."
         }
         "incoming_capacity_reached" => "That person has as many requests as the server allows.",
+        "invalid_invite" => "That invitation is no longer open.",
+        "not_in_party" => "You are not in a party.",
         "ally_team_full" => "That ally team is full.",
         "not_in_lobby" => "You are not in this lobby.",
         "not_a_player" => "Only a player can do that.",

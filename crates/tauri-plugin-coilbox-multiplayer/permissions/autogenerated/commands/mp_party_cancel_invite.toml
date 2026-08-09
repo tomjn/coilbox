@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-mp-party-cancel-invite"
+description = "Enables the mp_party_cancel_invite command without any pre-configured scope."
+commands.allow = ["mp_party_cancel_invite"]
+
+[[permission]]
+identifier = "deny-mp-party-cancel-invite"
+description = "Denies the mp_party_cancel_invite command without any pre-configured scope."
+commands.deny = ["mp_party_cancel_invite"]

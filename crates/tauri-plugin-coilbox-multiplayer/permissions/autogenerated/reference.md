@@ -32,6 +32,13 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-unfriend`
 - `allow-mp-friend-list`
 - `allow-mp-friend-request-list`
+- `allow-mp-party-create`
+- `allow-mp-party-leave`
+- `allow-mp-party-invite`
+- `allow-mp-party-cancel-invite`
+- `allow-mp-party-kick-member`
+- `allow-mp-party-accept-invite`
+- `allow-mp-party-decline-invite`
 - `allow-mp-join-battle`
 - `allow-mp-join-battle-deny`
 - `allow-mp-leave-battle`
@@ -901,6 +908,188 @@ Enables the mp_open_battle command without any pre-configured scope.
 <td>
 
 Denies the mp_open_battle command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-party-accept-invite`
+
+</td>
+<td>
+
+Enables the mp_party_accept_invite command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-party-accept-invite`
+
+</td>
+<td>
+
+Denies the mp_party_accept_invite command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-party-cancel-invite`
+
+</td>
+<td>
+
+Enables the mp_party_cancel_invite command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-party-cancel-invite`
+
+</td>
+<td>
+
+Denies the mp_party_cancel_invite command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-party-create`
+
+</td>
+<td>
+
+Enables the mp_party_create command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-party-create`
+
+</td>
+<td>
+
+Denies the mp_party_create command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-party-decline-invite`
+
+</td>
+<td>
+
+Enables the mp_party_decline_invite command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-party-decline-invite`
+
+</td>
+<td>
+
+Denies the mp_party_decline_invite command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-party-invite`
+
+</td>
+<td>
+
+Enables the mp_party_invite command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-party-invite`
+
+</td>
+<td>
+
+Denies the mp_party_invite command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-party-kick-member`
+
+</td>
+<td>
+
+Enables the mp_party_kick_member command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-party-kick-member`
+
+</td>
+<td>
+
+Denies the mp_party_kick_member command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-party-leave`
+
+</td>
+<td>
+
+Enables the mp_party_leave command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-party-leave`
+
+</td>
+<td>
+
+Denies the mp_party_leave command without any pre-configured scope.
 
 </td>
 </tr>
