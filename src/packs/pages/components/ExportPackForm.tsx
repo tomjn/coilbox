@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { ChallengeCodeView } from "../../../challenge/ChallengeCodeView";
 import { useUnitsyncScan } from "../../../content/config";
+import { isRealEngineVersion } from "../../../content/engineVersion";
 import { ErrorBanner } from "../../../content/pages/components/states";
 import type { PlayTarget } from "../../../play/config";
 import { useSkirmishDraft } from "../../../play/drafts";
@@ -125,7 +126,9 @@ export function ExportPackForm({ target }: { target: PlayTarget }) {
         }) => rest,
       );
     return {
-      engineVersion: target.engineVersion,
+      ...(isRealEngineVersion(target.engineVersion)
+        ? { engineVersion: target.engineVersion }
+        : {}),
       game: {
         name: gameName,
         ...(rapidTag.trim() ? { rapidTag: rapidTag.trim() } : {}),

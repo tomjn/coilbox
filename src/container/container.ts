@@ -270,7 +270,7 @@ export function sniffPayloadKind(payload: unknown): ContainerKind | null {
     if (Array.isArray(s.triggers) && Array.isArray(s.zones)) return "scenario";
   }
   if (
-    typeof p.engineVersion === "string" &&
+    (p.engineVersion === undefined || typeof p.engineVersion === "string") &&
     Array.isArray(p.maps) &&
     typeof p.game === "object" &&
     p.game !== null

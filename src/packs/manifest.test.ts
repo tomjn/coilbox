@@ -8,6 +8,7 @@ vi.mock("@picoframe/frame", () => ({
   useSetting: () => [undefined, () => {}],
 }));
 
+import { encodeContainerCode } from "../container/container";
 import type { InstalledContentSnapshot } from "../content/resolveContent";
 import type { SkirmishPreset } from "../play/presets";
 import {
@@ -51,6 +52,23 @@ describe("parseSetupPackManifest", () => {
     expect(parseSetupPackManifest(manifest())).toEqual(manifest());
   });
 
+  it("accepts a manifest with no engine pinned", () => {
+    const { engineVersion: _engineVersion, ...rest } = manifest();
+    expect(parseSetupPackManifest(rest)).toEqual(rest);
+  });
+
+  it("treats a blank engineVersion as no engine pinned", () => {
+    const m = manifest({ engineVersion: "  " });
+    const { engineVersion: _engineVersion, ...expected } = manifest();
+    expect(parseSetupPackManifest(m)).toEqual(expected);
+  });
+
+  it("treats a legacy .spring engineVersion as no engine pinned", () => {
+    const m = manifest({ engineVersion: ".spring" });
+    const { engineVersion: _engineVersion, ...expected } = manifest();
+    expect(parseSetupPackManifest(m)).toEqual(expected);
+  });
+
   it("accepts a manifest with a rapid tag and presets", () => {
     const m = manifest({
       game: { name: "Beyond All Reason test-27000", rapidTag: "byar:test" },
@@ -71,8 +89,7 @@ describe("parseSetupPackManifest", () => {
   it.each([
     ["not an object", null],
     ["a string", "hello"],
-    ["missing engineVersion", { ...manifest(), engineVersion: undefined }],
-    ["blank engineVersion", { ...manifest(), engineVersion: "  " }],
+    ["a non-string engineVersion", { ...manifest(), engineVersion: 1 }],
     ["missing game", { ...manifest(), game: undefined }],
     ["game without a name", { ...manifest(), game: { name: "" } }],
     [
@@ -109,10 +126,24 @@ describe("parseSetupPackManifest", () => {
 });
 
 describe("encodeSetupPack / decodeSetupPack", () => {
-  it("round-trips a manifest", () => {
+  it("round-trips a manifest with a pinned engine", () => {
     const m = manifest();
     const result = decodeSetupPack(encodeSetupPack(m));
     expect(result).toEqual({ ok: true, settings: m });
+  });
+
+  it("round-trips a manifest with no engine pinned", () => {
+    const { engineVersion: _engineVersion, ...m } = manifest();
+    const result = decodeSetupPack(encodeSetupPack(m));
+    expect(result).toEqual({ ok: true, settings: m });
+  });
+
+  it("reads a legacy pack carrying the literal .spring as no engine pinned", () => {
+    const { engineVersion: _engineVersion, ...rest } = manifest();
+    const legacyPayload = { ...rest, engineVersion: ".spring" };
+    const code = encodeContainerCode("setup-pack", 1, legacyPayload);
+    const result = decodeSetupPack(code);
+    expect(result).toEqual({ ok: true, settings: rest });
   });
 
   it("rejects a corrupted code cleanly", () => {
@@ -143,6 +174,13 @@ describe("requirementsForPack", () => {
     expect(byKind.engine.isInstalled(installed)).toBe(false);
     expect(byKind.game.isInstalled(installed)).toBe(true);
     expect(byKind.map.isInstalled(installed)).toBe(false);
+  });
+
+  it("omits the engine requirement when the pack pins no engine", () => {
+    const { engineVersion: _engineVersion, ...noEngine } = manifest();
+    const reqs = requirementsForPack(noEngine);
+    expect(reqs.some((r) => r.kind === "engine")).toBe(false);
+    expect(reqs.map((r) => r.kind)).toEqual(["game", "map"]);
   });
 
   it("uses the rapid tag as the download key when given", () => {

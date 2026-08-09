@@ -1,3 +1,4 @@
+import { isRealEngineVersion } from "../content/engineVersion";
 import {
   type ContentRequirement,
   dedupeRequirements,
@@ -39,7 +40,11 @@ export type SetupPackPreset = NonNullable<
 };
 
 export interface SetupPackManifest {
-  engineVersion: string;
+  /** Absent when the pack pins no engine, including when the source value
+   * couldn't be read as a real version. That covers a legacy pack carrying
+   * the literal path fragment `.spring` (issue #1334), read as "no engine
+   * pinned" rather than an engine version to resolve. */
+  engineVersion?: string;
   game: SetupPackGame;
   /** springNames to include. Must be non-empty. A pack with nothing to play on
    * is rejected rather than imported empty. */
@@ -58,9 +63,15 @@ export function parseSetupPackManifest(
   if (typeof value !== "object" || value === null) return null;
   const d = value as Record<string, unknown>;
 
-  if (typeof d.engineVersion !== "string" || !d.engineVersion.trim()) {
+  if (d.engineVersion !== undefined && typeof d.engineVersion !== "string") {
     return null;
   }
+  // A present-but-unreal engineVersion (blank, or a leaked path fragment such
+  // as the legacy `.spring`) reads as "no engine pinned" rather than a
+  // malformed pack (issue #1334).
+  const engineVersion = isRealEngineVersion(d.engineVersion as string)
+    ? (d.engineVersion as string).trim()
+    : undefined;
 
   if (typeof d.game !== "object" || d.game === null) return null;
   const g = d.game as Record<string, unknown>;
@@ -95,7 +106,7 @@ export function parseSetupPackManifest(
   }
 
   return {
-    engineVersion: d.engineVersion,
+    ...(engineVersion ? { engineVersion } : {}),
     game,
     maps,
     ...(presets ? { presets } : {}),
@@ -127,13 +138,15 @@ function gameRequirementForPack(game: SetupPackGame): ContentRequirement {
 }
 
 /** Every requirement a pack needs resolved before it can be applied: the
- * engine, the game, and each of its maps (issue #387's list-of-requirements
- * step). */
+ * engine (when the pack pins one), the game, and each of its maps (issue
+ * #387's list-of-requirements step). */
 export function requirementsForPack(
   manifest: SetupPackManifest,
 ): ContentRequirement[] {
   return dedupeRequirements([
-    engineVersionRequirement(manifest.engineVersion),
+    ...(manifest.engineVersion
+      ? [engineVersionRequirement(manifest.engineVersion)]
+      : []),
     gameRequirementForPack(manifest.game),
     ...manifest.maps.map(exactMapRequirement),
   ]);
