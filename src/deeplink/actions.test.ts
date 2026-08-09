@@ -85,14 +85,18 @@ describe("prepareImport", () => {
     }
   });
 
-  it("rejects a campaign, which has no code importer", () => {
+  it("sends a campaign to the import box, which has no code importer", () => {
     const code = encodeContainerCode("campaign", 1, {
       type: "ta",
       missions: [],
     });
     const r = prepareImport(code);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toMatch(/file/i);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.plan.kind).toBe("campaign");
+      expect(r.plan.route).toContain("/settings/import?import=");
+      expect(r.plan.detail).toMatch(/import box/i);
+    }
   });
 });
 

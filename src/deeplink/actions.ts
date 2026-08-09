@@ -32,6 +32,10 @@ export interface ImportPlan {
   route: string;
   /** A friendly noun for the confirm dialog, for example "warpath challenge". */
   label: string;
+  /** What happens after the user agrees, when it is not the usual "the importer
+   * resolves missing content and saves". Set for a kind that lands in the import
+   * box instead of an importer. */
+  detail?: string;
 }
 
 export type PrepareImportResult =
@@ -58,8 +62,8 @@ function importRoute(base: string, code: string): string {
  * Gate an inline import code and resolve where it should go. Rejects an
  * unrecognised or unsupported payload, warns on a newer-version one, and maps a
  * recognised payload to its importer route. `campaign` is recognised but has no
- * code-import screen (it imports from a file), so it is rejected with a clear
- * message rather than routed nowhere.
+ * code-import screen (it imports from a file), so it routes to the import box
+ * (issue #1333), which names it and says where a campaign goes.
  *
  * A scenario routes to the player-facing Scenarios list rather than the builder,
  * because the builder is advanced-gated and a player handed a link has no reason
@@ -128,10 +132,19 @@ export function prepareImport(code: string): PrepareImportResult {
         },
       };
     case "campaign":
+      // A campaign has no code importer, so it lands in the import box (issue
+      // #1333), which names it and says where a campaign file goes. That beats
+      // the toast this used to be: a toast disappears and takes the code with
+      // it, and the box keeps both on screen.
       return {
-        ok: false,
-        reason:
-          "Campaigns import from a file, not a link. Use Campaigns > Import.",
+        ok: true,
+        plan: {
+          ...(base as ImportPlan),
+          route: importRoute("/settings/import", code),
+          label: "campaign",
+          detail:
+            "It opens in the import box, which says where a campaign goes.",
+        },
       };
     case "scenario":
       return {
