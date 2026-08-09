@@ -2,7 +2,7 @@ import { Button, Input } from "@picoframe/frame";
 import { type FormEvent, useState } from "react";
 import { useMultiplayer } from "../multiplayer/store";
 import { lsStoreCredential } from "./bindings";
-import { type LobbyServer, useLobbyAccounts } from "./config";
+import { type LobbyServer, serverProtocol, useLobbyAccounts } from "./config";
 import { Field } from "./pages/components/Field";
 import { OptionSelect } from "./pages/components/OptionSelect";
 
@@ -28,8 +28,12 @@ export function RegisterForm({
 }) {
   const { register, busy } = useMultiplayer();
   const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
+  // Registering is a TASServer exchange. A Tachyon server has no account for
+  // Coilbox to create, because signing in there happens on the server's own page
+  // in the browser, so those servers are not offered here.
+  const registrable = servers.filter((s) => serverProtocol(s) !== "tachyon");
   const [serverId, setServerId] = useState(
-    defaultServerId ?? servers[0]?.id ?? "",
+    defaultServerId ?? registrable[0]?.id ?? "",
   );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -47,7 +51,7 @@ export function RegisterForm({
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const server = servers.find((s) => s.id === serverId);
+    const server = registrable.find((s) => s.id === serverId);
     if (!server) {
       setError("Select a server.");
       return;
@@ -92,7 +96,7 @@ export function RegisterForm({
         <OptionSelect
           value={serverId}
           onValueChange={setServerId}
-          options={servers.map((s) => ({
+          options={registrable.map((s) => ({
             value: s.id,
             label: s.builtin ? s.name : `${s.name || s.host} (custom)`,
           }))}
