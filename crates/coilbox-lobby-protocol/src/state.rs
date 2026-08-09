@@ -183,6 +183,28 @@ pub struct Vote {
     pub ends_at: u64,
 }
 
+/// A party: a small group that stays together across battles and, once
+/// matchmaking is built, queues as one.
+///
+/// Tachyon only. TASServer has no such thing, so a connection to one leaves
+/// [`LobbyState::party`] empty, the way it leaves `bosses` and `in_progress`
+/// empty on a battle.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Party {
+    /// The server's id for this party, which is what an answer to an invitation
+    /// names.
+    pub id: String,
+    /// The members, by the name the rest of the app shows them under, in the
+    /// order the server listed them. Somebody the server has not named yet is
+    /// under their user id, as they are in a battle roster.
+    pub members: Vec<String>,
+    /// The people invited and yet to answer, named the same way.
+    pub invited: Vec<String>,
+    /// How many members the server will let this party hold.
+    pub max_members: u32,
+}
+
 /// A public channel as advertised by the server's `CHANNELS` directory.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -223,6 +245,12 @@ pub struct LobbyState {
     /// Incoming pending friend requests (`FRIENDREQUEST` / `FRIENDREQUESTLIST`),
     /// awaiting our accept/decline. Sorted; empty on unsupported servers.
     pub friend_requests: BTreeSet<String>,
+    /// The party we are in, or `None` when we are in none. Always `None` on a
+    /// TASServer connection, which has no parties.
+    pub party: Option<Party>,
+    /// The parties we have been invited to and not yet answered, in the order the
+    /// server listed them. Always empty on a TASServer connection.
+    pub party_invites: Vec<Party>,
     /// A live SPADS autohost vote in the current battle, or `None` when none is
     /// open. Parsed from the bot's battle chat; drives the vote panel.
     pub current_vote: Option<Vote>,

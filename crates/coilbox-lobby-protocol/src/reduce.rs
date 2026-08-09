@@ -159,6 +159,9 @@ pub enum Delta {
     /// The incoming friend-request set changed (`FRIENDREQUEST`, an accept clearing
     /// one, or a `FRIENDREQUESTLIST` rebuild).
     FriendRequestsChanged,
+    /// The party we are in, or the invitations to one, changed. Only ever produced
+    /// on a Tachyon connection, which is the only protocol with parties.
+    PartyChanged,
 }
 
 /// Apply a server message to the lobby state, returning the deltas produced.
