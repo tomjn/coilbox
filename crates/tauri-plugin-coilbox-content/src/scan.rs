@@ -185,7 +185,20 @@ pub fn discover_engines(root: &Path) -> Vec<Engine> {
         .into_iter()
         .filter_map(|(dir, platform)| {
             let bin = spring_binary_in(&dir)?;
-            let version = file_name(&dir);
+            let name = file_name(&dir);
+            // A dot-prefixed directory name is never a real engine version, it's
+            // the naming convention for a hidden directory. It shows up here for
+            // the single-folder/portable case when `dir` is the data root itself
+            // and that root happens to be the default `.spring` data directory
+            // (issue #1334, an exported setup pack carried the literal `.spring`
+            // as its engine version). Leave `version` empty rather than exporting
+            // a bogus label. A real value is filled in once the engine is
+            // verified (`sync_version`).
+            let version = if name.starts_with('.') {
+                String::new()
+            } else {
+                name
+            };
             Some(make_engine(root, &dir, &bin, platform, version))
         })
         .collect()
@@ -198,6 +211,15 @@ mod tests {
 
     fn tmp(name: &str) -> PathBuf {
         let p = std::env::temp_dir().join(format!("content_scan_test_{name}"));
+        let _ = fs::remove_dir_all(&p);
+        fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    /// A directory whose own name starts with a dot, standing in for the
+    /// default `.spring` data root (issue #1334).
+    fn dot_tmp(name: &str) -> PathBuf {
+        let p = std::env::temp_dir().join(format!(".content_scan_test_{name}"));
         let _ = fs::remove_dir_all(&p);
         fs::create_dir_all(&p).unwrap();
         p
@@ -233,6 +255,22 @@ mod tests {
         // and the binary in the root is discovered as an engine
         let engines = discover_engines(&d);
         assert_eq!(engines.len(), 1);
+    }
+
+    #[test]
+    fn portable_install_in_dot_named_root_has_no_bogus_version() {
+        // Reproduces issue #1334: a portable install placed directly inside the
+        // default `.spring` data directory used to surface its own dot-prefixed
+        // name as the engine "version", which then leaked into an exported setup
+        // pack. The engine is still discovered, but its version is left empty
+        // rather than the leaked directory name.
+        let d = dot_tmp("portable_dotdir");
+        fs::write(d.join("spring"), b"#!/bin/true").unwrap();
+        fs::write(d.join("springsettings.cfg"), b"").unwrap();
+        let engines = discover_engines(&d);
+        assert_eq!(engines.len(), 1);
+        assert_eq!(engines[0].version, "");
+        assert_ne!(engines[0].version, ".spring");
     }
 
     #[test]
