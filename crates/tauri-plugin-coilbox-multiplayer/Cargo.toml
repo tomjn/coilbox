@@ -11,6 +11,11 @@ links = "tauri-plugin-coilbox-multiplayer"
 [build-dependencies]
 tauri-plugin = { version = "2", features = ["build"] }
 
+[dev-dependencies]
+# Paused time, so the test for the request timeout does not wait out the real
+# fifteen seconds.
+tokio = { version = "1", features = ["test-util"] }
+
 [dependencies]
 tauri = { version = "2" }
 serde = { version = "1", features = ["derive"] }

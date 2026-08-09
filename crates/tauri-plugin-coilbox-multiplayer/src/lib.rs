@@ -12,6 +12,9 @@
 mod conn;
 mod dmlog;
 mod probe;
+/// Matching Tachyon responses to requests, over the transport below. Public for
+/// the same reason it is.
+pub mod tachyon_rpc;
 /// The WebSocket transport for the newer Tachyon protocol, built alongside the
 /// line protocol above. Public because nothing in this crate calls it yet, and a
 /// later stage wires it to commands of its own.
