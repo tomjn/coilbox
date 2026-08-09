@@ -49,7 +49,7 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
 use crate::lock_or_recover;
-use crate::tachyon_ws::{TachyonSocket, WsError, SEND_RATE_PER_SEC};
+use crate::tachyon_ws::{TachyonSocket, WsError};
 
 /// How long a request has, counted from the call rather than from the send.
 ///
@@ -75,27 +75,13 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 /// and the honest one: nothing reached the server, so nothing happened there.
 const MIN_ANSWER_WINDOW: Duration = Duration::from_secs(1);
 
-/// The longest a frame can sit in the queue, which is the depth divided by the
-/// socket's send rate.
-///
-/// A caller stops offering work this far before the point where sending would be
-/// pointless, so anything that does get a place is still worth sending by the
-/// time it reaches the front. Without that, a caller admitted late could wait out
-/// its own budget in the queue and be told the server did not answer, when in
-/// fact we never asked it.
-const MAX_QUEUE_WAIT: Duration = Duration::from_secs(4);
-
 /// How many frames may wait for the socket before callers are held back.
 ///
-/// This is a backstop rather than the thing that paces sending. The socket's own
-/// limiter sets the rate and the deadlines decide how long waiting is worth it,
-/// so the depth only has to stop a runaway caller from queueing without limit.
+/// This is where the backing off happens. The socket's limiter sets the rate and
+/// each frame's deadline decides how long waiting is worth it, so the depth only
+/// has to stop a runaway caller from queueing without limit. Thirty two is four
+/// seconds of sending at the socket's eight a second.
 const SEND_QUEUE_DEPTH: usize = 32;
-
-const _: () =
-    assert!(SEND_QUEUE_DEPTH as f64 <= MAX_QUEUE_WAIT.as_secs() as f64 * SEND_RATE_PER_SEC);
-const _: () =
-    assert!(MIN_ANSWER_WINDOW.as_secs() + MAX_QUEUE_WAIT.as_secs() < REQUEST_TIMEOUT.as_secs());
 
 /// Why a response says a command failed.
 ///
@@ -293,9 +279,9 @@ impl TachyonClient {
     /// requests in the schema have no `data` property.
     ///
     /// A busy send path makes this wait rather than fail: the queue is bounded,
-    /// so a caller with no place in it holds until one frees up. It stops
-    /// offering while enough of the budget is left for the queue to drain, and
-    /// answers [`RequestError::NotSent`], which says the frame never went out.
+    /// so a caller with no place in it holds until one frees up. It waits for a
+    /// place only while sending would still be worth it, so a send path that is
+    /// wedged cannot hold a caller past its own budget.
     pub async fn request(
         &self,
         command_id: &str,
@@ -303,7 +289,6 @@ impl TachyonClient {
     ) -> Result<String, RequestError> {
         let deadline = Instant::now() + REQUEST_TIMEOUT;
         let send_by = deadline - MIN_ANSWER_WINDOW;
-        let offer_by = send_by - MAX_QUEUE_WAIT;
 
         // Unique per connection is all the schema asks of a message id, and the
         // pending table lives and dies with the connection, so a counter does.
@@ -323,7 +308,7 @@ impl TachyonClient {
             message_id,
             send_by,
         };
-        match tokio::time::timeout_at(offer_by, self.outbound.send(queued)).await {
+        match tokio::time::timeout_at(send_by, self.outbound.send(queued)).await {
             Ok(Ok(())) => {}
             // The connection task has gone, so it will never read this.
             Ok(Err(_)) => {
@@ -1101,6 +1086,11 @@ mod tests {
             fired.push(fire(&client, format!("cmd/{n}")).await);
         }
 
+        // The queue is full, so most of those callers are waiting for a place in
+        // it rather than having handed over a frame. That is the backing off.
+        assert_eq!(client.outbound.capacity(), 0);
+        assert_eq!(client.outbound.max_capacity(), SEND_QUEUE_DEPTH);
+
         let mut answered = Vec::new();
         let mut refused = Vec::new();
         for handle in fired {
@@ -1137,11 +1127,12 @@ mod tests {
 
     #[tokio::test]
     async fn a_frame_that_went_stale_in_the_queue_is_refused_rather_than_sent_late() {
-        // A caller cannot produce this on its own, because it stops offering
-        // work while there is still room for the queue to drain. It happens when
-        // the socket sends slower than the limiter allows, for example while the
-        // connection task is busy answering the server's own requests. Queueing
-        // the stale frame directly is simpler than arranging that.
+        // A plain backlog rarely produces this, because a refusal costs no
+        // limiter token, so the moment frames start going stale the queue in
+        // front of one empties at once. It takes a socket sending slower than
+        // the limiter allows, for example while the connection task is busy
+        // answering the server's own requests. Queueing the stale frame directly
+        // is simpler than arranging that.
         let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
         let url = answering_server(seen_tx).await;
         let (client, _task, _inbound) = start(&url, Handlers::new()).await;
