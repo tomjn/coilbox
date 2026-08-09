@@ -38,6 +38,8 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-set-status`
 - `allow-mp-set-battle-status`
 - `allow-mp-open-battle`
+- `allow-mp-create-lobby`
+- `allow-mp-start-battle`
 - `allow-mp-update-battle-info`
 - `allow-mp-add-bot`
 - `allow-mp-remove-bot`
@@ -407,6 +409,32 @@ Enables the mp_connect_tachyon command without any pre-configured scope.
 <td>
 
 Denies the mp_connect_tachyon command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-create-lobby`
+
+</td>
+<td>
+
+Enables the mp_create_lobby command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-create-lobby`
+
+</td>
+<td>
+
+Denies the mp_create_lobby command without any pre-configured scope.
 
 </td>
 </tr>
@@ -1369,6 +1397,32 @@ Enables the mp_snapshot command without any pre-configured scope.
 <td>
 
 Denies the mp_snapshot command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-start-battle`
+
+</td>
+<td>
+
+Enables the mp_start_battle command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-start-battle`
+
+</td>
+<td>
+
+Denies the mp_start_battle command without any pre-configured scope.
 
 </td>
 </tr>

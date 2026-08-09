@@ -368,6 +368,12 @@ async fn run_loop(
                         (_, None) => {}
                     }
                 }
+                Outbound::Tachyon(TachyonAction::CreateLobby(lobby)) => {
+                    if let Some(client) = client.clone() {
+                        let request = tachyon_room::create_request(&lobby);
+                        create(client, sink.clone(), joined_tx.clone(), request);
+                    }
+                }
                 Outbound::Tachyon(TachyonAction::LeaveLobby) => {
                     tachyon_room::mark_leaving(&mut room, true);
                     if let Some(client) = client.clone() {
@@ -466,13 +472,15 @@ enum LeaveOutcome {
     Failed,
 }
 
-/// Whether a message is the answer to a `lobby/join` we sent, which is the one
-/// that puts us in a room.
+/// Whether a message is the answer to a `lobby/join` or a `lobby/create` we
+/// sent, which are the two that put us in a room.
 fn joined(message: &TachyonMessage) -> bool {
     matches!(
         message,
         TachyonMessage::LobbyJoinResponse(
             coilbox_tachyon_protocol::types::LobbyJoinResponse::Success { .. }
+        ) | TachyonMessage::LobbyCreateResponse(
+            coilbox_tachyon_protocol::types::LobbyCreateResponse::Success { .. }
         )
     )
 }
@@ -614,6 +622,31 @@ fn join(
     });
 }
 
+/// Ask the server to make a lobby, off the connection loop.
+///
+/// The answer is the whole lobby, as a join's is, so it goes onto the inbound
+/// channel and the loop folds it. That is what puts us in the room we asked for,
+/// and it keeps the loop the only writer of it.
+///
+/// A refusal goes in front of the user as a message rather than into the console
+/// alone, because the command the form called returned as soon as the action was
+/// queued and has nothing left to report to.
+fn create(
+    client: TachyonClient,
+    sink: EventSink,
+    inbound: mpsc::UnboundedSender<String>,
+    request: tachyon_room::Request,
+) {
+    tokio::spawn(async move {
+        match client.request(request.command, request.data).await {
+            Ok(response) => {
+                let _ = inbound.send(response);
+            }
+            Err(error) => refused(&sink, request.command, &error),
+        }
+    });
+}
+
 /// Ask to leave the lobby, off the connection loop.
 fn leave(client: TachyonClient, sink: EventSink, outcome: mpsc::UnboundedSender<LeaveOutcome>) {
     tokio::spawn(async move {
@@ -720,6 +753,8 @@ fn what(command: &str) -> &str {
         "lobby/update" => "Changing the lobby",
         "lobby/appointBoss" => "Making that player a boss",
         "lobby/unboss" => "Standing that boss down",
+        "lobby/create" => "Creating the lobby",
+        "lobby/startBattle" => "Starting the match",
         other => other,
     }
 }
@@ -1346,6 +1381,91 @@ mod tests {
         // Nobody in the lobby has a name yet, so both ids are asked about.
         let frame = wait_for_sent(&mut seen_rx, "user/subscribeUpdates").await;
         assert_eq!(frame["data"]["userIds"], json!(["1", "2"]));
+    }
+
+    /// The request building is tested on its own in [`crate::tachyon_room`].
+    /// This is the wiring: a queued create reaches the server as `lobby/create`,
+    /// and the lobby it answers with is the room we end up in.
+    #[tokio::test]
+    async fn creating_a_lobby_asks_the_server_and_puts_us_in_what_comes_back() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = lobby_server(
+            seen_tx,
+            json!({ "type": "response", "status": "success", "data": lobby_details() }),
+        )
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+        wait_for(&mut rx, "phase").await;
+
+        sender(&registry, "alice@bar:443")
+            .send(Outbound::Tachyon(TachyonAction::CreateLobby(
+                crate::tachyon_room::NewLobby {
+                    name: "Comet Catcher 8v8".into(),
+                    map_name: "Comet Catcher Remake 1.8".into(),
+                    ally_teams: 2,
+                    players_per_team: 8,
+                    bosses_enabled: true,
+                },
+            )))
+            .unwrap();
+
+        let frame = wait_for_sent(&mut seen_rx, "lobby/create").await;
+        assert_eq!(frame["data"]["name"], "Comet Catcher 8v8");
+        assert_eq!(frame["data"]["allyTeamConfig"].as_array().unwrap().len(), 2);
+
+        loop {
+            let delta = wait_for(&mut rx, "delta").await;
+            if delta["delta"]["kind"] == "enteredBattle" {
+                break;
+            }
+        }
+        let state = lock_or_recover(&registry)["alice@bar:443"].state.clone();
+        let state = lock_or_recover(&state);
+        let handle = state.current_battle.expect("we are in no lobby");
+        assert_eq!(
+            state.battles[&handle].tachyon_id.as_deref(),
+            Some("lobby-a")
+        );
+    }
+
+    /// Any member may ask for the match to start, and the request carries
+    /// nothing at all: the lobby the server holds is what it builds the match
+    /// from.
+    #[tokio::test]
+    async fn starting_the_match_reaches_the_server_with_no_data() {
+        let (seen_tx, mut seen_rx) = mpsc::unbounded_channel::<String>();
+        let url = lobby_server(
+            seen_tx,
+            json!({ "type": "response", "status": "success", "data": lobby_details() }),
+        )
+        .await;
+        let registry = Registry::default();
+        let mut rx = connect(&registry, "alice@bar:443", &url).await;
+        let handle = listed_handle(&registry, &mut rx).await;
+        let sender = sender(&registry, "alice@bar:443");
+
+        sender
+            .send(Outbound::Tachyon(TachyonAction::JoinLobby {
+                battle: handle,
+            }))
+            .unwrap();
+        wait_for_sent(&mut seen_rx, "lobby/join").await;
+        loop {
+            if wait_for(&mut rx, "delta").await["delta"]["kind"] == "enteredBattle" {
+                break;
+            }
+        }
+
+        sender
+            .send(Outbound::Tachyon(TachyonAction::Room(
+                crate::tachyon_room::RoomAction::StartBattle,
+            )))
+            .unwrap();
+
+        let frame = wait_for_sent(&mut seen_rx, "lobby/startBattle").await;
+        assert_eq!(frame["type"], "request");
+        assert_eq!(frame.get("data"), None);
     }
 
     #[tokio::test]

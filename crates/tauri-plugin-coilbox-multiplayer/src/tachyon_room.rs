@@ -93,6 +93,18 @@
 //! is what answers it and [`battle_config`] is what the engine launches with.
 //! Nothing in that config comes from the lobby, which is why the mapping reads
 //! only the request.
+//!
+//! Asking for that to happen is [`RoomAction::StartBattle`], which any member
+//! may send. It carries no data at all: the lobby the server has is what the
+//! match is built from.
+//!
+//! # Making a lobby
+//!
+//! [`create_request`] builds `lobby/create`, and its answer is the whole lobby,
+//! exactly as a join's is, so [`reduce`] folds the two the same way. Creating a
+//! lobby is not hosting a battle. It makes a room and puts us in it as the first
+//! player, and nothing runs on this machine until the server hands out an
+//! address.
 
 use std::collections::HashMap;
 
@@ -100,7 +112,7 @@ use coilbox_lobby_protocol::{
     BattleStatus, Bot, Delta, LobbyState, MemberStatus, StartRect, User, Vote,
 };
 use coilbox_tachyon_protocol::merge_patch;
-use coilbox_tachyon_protocol::types::{self, LobbyDetails, LobbyJoinResponse};
+use coilbox_tachyon_protocol::types::{self, LobbyCreateResponse, LobbyDetails, LobbyJoinResponse};
 use coilbox_tachyon_protocol::TachyonMessage;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -163,6 +175,9 @@ pub(crate) enum RoomAction {
     CastVote {
         choice: VoteChoice,
     },
+    /// Ask for the match to begin. Any member may, not only whoever made the
+    /// lobby, and the server is what allocates a machine to run it.
+    StartBattle,
 }
 
 /// How a member votes, in the words `lobby/voteSubmit` uses.
@@ -235,7 +250,82 @@ pub(crate) fn requests_for(
                 json!({ "id": vote.id, "vote": choice.as_str() }),
             )
         })),
+        // The lobby the server holds is what the match is built from, so there
+        // is nothing to send with it.
+        RoomAction::StartBattle => vec![Request {
+            command: "lobby/startBattle",
+            data: None,
+        }],
     }
+}
+
+/// The lobby a user has asked for, in the terms the create form collects.
+///
+/// Tachyon shapes a lobby as ally teams holding teams holding players, and the
+/// form asks for the two numbers that describe the ordinary case: how many sides
+/// there are and how many players play on each. Each of those players gets a
+/// team of their own, which is what makes them separate commanders rather than
+/// people sharing one.
+pub(crate) struct NewLobby {
+    pub name: String,
+    pub map_name: String,
+    pub ally_teams: u8,
+    pub players_per_team: u8,
+    pub bosses_enabled: bool,
+}
+
+/// The `lobby/create` request a filled-in form comes to.
+///
+/// The counts are held to the schema's minimums here as well as in the form, so
+/// a frame this builds is one the server can read whatever reached it. The game
+/// and the engine are not asked for, because `lobby/create` has nowhere to put
+/// them: the server picks both and reports them back on the lobby.
+pub(crate) fn create_request(lobby: &NewLobby) -> Request {
+    let allies = lobby.ally_teams.max(MIN_ALLY_TEAMS);
+    let per_team = lobby.players_per_team.max(1);
+    let config: Vec<Value> = (0..allies)
+        .map(|index| {
+            json!({
+                "maxTeams": per_team,
+                "startBox": start_box(index, allies),
+                "teams": vec![json!({ "maxPlayers": 1 }); usize::from(per_team)],
+            })
+        })
+        .collect();
+    request(
+        "lobby/create",
+        json!({
+            "name": lobby.name,
+            "mapName": lobby.map_name,
+            "allyTeamConfig": config,
+            "areBossesEnabled": lobby.bosses_enabled,
+        }),
+    )
+}
+
+/// The fewest ally teams a lobby can be played with. One side has nobody to
+/// play, and the start boxes below need a gap to spread across.
+const MIN_ALLY_TEAMS: u8 = 2;
+
+/// Where one ally team starts, as a fraction of the map.
+///
+/// Each box is half of an ally team's share of the map wide, and the boxes are
+/// spread evenly from the left edge to the right edge. Two ally teams get the
+/// outer quarters, which is the shape nearly every lobby is played on. Full
+/// height, because the form asks about sides and not about the other axis, and
+/// the boxes can be moved once the lobby exists.
+fn start_box(index: u8, allies: u8) -> Value {
+    let width = 1.0 / (2.0 * f64::from(allies));
+    let gap = (1.0 - width) / f64::from(allies - 1);
+    let left = f64::from(index) * gap;
+    json!({
+        "left": left,
+        "top": 0.0,
+        // Rounding can carry the last box a hair past the right edge, and the
+        // schema's ceiling is 1.
+        "right": (left + width).min(1.0),
+        "bottom": 1.0,
+    })
 }
 
 /// The requests our own seat controls come to.
@@ -445,6 +535,12 @@ pub(crate) fn reduce(
 ) -> Vec<Delta> {
     let mut deltas = match msg {
         TachyonMessage::LobbyJoinResponse(LobbyJoinResponse::Success { data, .. }) => {
+            joined(room, state, data)
+        }
+        // Creating a lobby answers with the whole lobby too, and it puts us in
+        // it as its first player, so it lands in the room the same way a join
+        // does.
+        TachyonMessage::LobbyCreateResponse(LobbyCreateResponse::Success { data, .. }) => {
             joined(room, state, data)
         }
         TachyonMessage::LobbyUpdatedEvent(event) => {
