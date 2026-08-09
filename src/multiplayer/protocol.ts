@@ -30,9 +30,12 @@ export function protocolForKey(
  * configured channels, pulling the server ignore list, pulling the friend list and
  * pending friend requests, and publishing our status bits.
  *
- * Each of those is a TASServer command with no Tachyon equivalent. A Tachyon
- * connection skips them here rather than queueing them for the connection task to
- * drop, which is what put four "not sent" lines in the console on every connect.
+ * Each of those is a TASServer command with no Tachyon equivalent, bar the friend
+ * list: Tachyon has `friend/list`, but `user/self` has already handed the friends
+ * and the pending requests over by the time a connection is ready, so asking is a
+ * round trip for what we hold. A Tachyon connection skips them all here rather
+ * than queueing them for the connection task to drop, which is what put four "not
+ * sent" lines in the console on every connect.
  */
 export function syncsOnReady(protocol: LobbyProtocol): boolean {
   return protocol === "tasserver";
