@@ -9,6 +9,7 @@ import {
   mpSayPrivateEx,
 } from "../bindings";
 import { isIgnored, useIgnored } from "../ignore";
+import { messageLimit } from "../protocol";
 import { useMultiplayer } from "../store";
 import { coalesceMessages } from "./coalesce";
 import {
@@ -24,6 +25,9 @@ export interface ConversationView {
   members: User[];
   /** Send text to this conversation (no-op when not connected/empty). */
   send: (text: string) => Promise<void>;
+  /** The longest one message may be on this connection, or null where the
+   * protocol sets no limit. */
+  maxChars: number | null;
 }
 
 /**
@@ -35,7 +39,7 @@ export interface ConversationView {
 export function useConversation(
   desc: ConversationDescriptor | null,
 ): ConversationView {
-  const { mirror, activeKey } = useMultiplayer();
+  const { mirror, activeKey, protocol } = useMultiplayer();
   const state = mirror.state;
   const [ignored] = useIgnored();
 
@@ -122,5 +126,12 @@ export function useConversation(
         ? (battle?.map ?? undefined)
         : undefined;
 
-  return { title, subtitle, messages, members, send };
+  return {
+    title,
+    subtitle,
+    messages,
+    members,
+    send,
+    maxChars: messageLimit(protocol),
+  };
 }

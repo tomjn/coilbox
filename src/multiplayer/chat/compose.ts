@@ -24,7 +24,18 @@ export type Compose =
 /** `/me <text>`, the IRC-style action. Mirrors `useConversation`'s routing. */
 const ACTION = /^\/me(\s|$)/;
 
-export function composeDraft(draft: string): Compose {
+/**
+ * The lines to send, or why the draft can't be sent.
+ *
+ * `maxChars` is the protocol's own limit on one message, where it has one
+ * (Tachyon caps a message at 512). Over it, the draft is refused with the count
+ * rather than truncated: a message cut off mid-sentence is worse than one the
+ * user is asked to shorten.
+ */
+export function composeDraft(
+  draft: string,
+  maxChars: number | null = null,
+): Compose {
   const text = draft.trim();
   if (text === "") return { kind: "send", lines: [] };
 
@@ -35,7 +46,7 @@ export function composeDraft(draft: string): Compose {
     if (text.includes("\n")) {
       return { kind: "error", reason: "an emote can't span multiple lines" };
     }
-    return { kind: "send", lines: [text] };
+    return tooLong([text], maxChars) ?? { kind: "send", lines: [text] };
   }
 
   // Blank lines are dropped rather than sent: an empty SAY body is not
@@ -52,5 +63,19 @@ export function composeDraft(draft: string): Compose {
       reason: `a message can be at most ${MAX_COMPOSE_LINES} lines (this one is ${lines.length})`,
     };
   }
-  return { kind: "send", lines };
+  return tooLong(lines, maxChars) ?? { kind: "send", lines };
+}
+
+/** The refusal for the first line over `maxChars`, or null when every line fits.
+ *
+ * Each line is sent as its own message, so the limit is per line rather than
+ * per draft. Characters, not bytes, because that is what the schema counts. */
+function tooLong(lines: string[], maxChars: number | null): Compose | null {
+  if (maxChars == null) return null;
+  const over = lines.find((line) => [...line].length > maxChars);
+  if (over == null) return null;
+  return {
+    kind: "error",
+    reason: `a message can be at most ${maxChars} characters (this one is ${[...over].length})`,
+  };
 }
