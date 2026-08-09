@@ -57,6 +57,12 @@ pub struct LoginConfig {
 }
 
 /// The phases of the login handshake.
+///
+/// The first ten are the TASServer exchange this module drives. The two Tachyon
+/// ones are set by the multiplayer plugin instead, because Tachyon presents its
+/// token on the HTTP upgrade and so has no login exchange to drive: by the time
+/// its socket opens we are already authenticated. Both protocols end on
+/// [`LoginPhase::Ready`], which is what the whole frontend gates on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LoginPhase {
@@ -74,6 +80,11 @@ pub enum LoginPhase {
     /// Register mode: `REGISTRATIONACCEPTED` received (terminal success).
     Registered,
     Denied,
+    /// Tachyon: getting a bearer token for the upgrade, refreshed from the stored
+    /// sign-in when the one held in memory is spent.
+    TachyonAuthorizing,
+    /// Tachyon: the WebSocket upgrade is in flight.
+    TachyonOpening,
 }
 
 /// The login handshake driver.

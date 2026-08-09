@@ -56,7 +56,7 @@ pub enum Outbound {
 pub type EventSink = Arc<Mutex<Channel<LobbyEvent>>>;
 
 /// Send one event to the current frontend channel, ignoring a detached/dead one.
-fn emit(sink: &EventSink, ev: LobbyEvent) {
+pub(crate) fn emit(sink: &EventSink, ev: LobbyEvent) {
     let _ = lock_or_recover(sink).send(ev);
 }
 

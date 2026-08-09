@@ -12,15 +12,13 @@
 mod conn;
 mod dmlog;
 mod probe;
-/// The OAuth browser sign-in that produces a Tachyon bearer token. Public so the
-/// stage that opens the socket can ask it for one.
+/// The OAuth browser sign-in that produces a Tachyon bearer token.
 pub mod tachyon_auth;
-/// Matching Tachyon responses to requests, over the transport below. Public for
-/// the same reason it is.
+mod tachyon_conn;
+/// Matching Tachyon responses to requests, over the transport below.
 pub mod tachyon_rpc;
 /// The WebSocket transport for the newer Tachyon protocol, built alongside the
-/// line protocol above. Public because nothing in this crate calls it yet, and a
-/// later stage wires it to commands of its own.
+/// line protocol above.
 pub mod tachyon_ws;
 mod tls;
 
@@ -30,7 +28,7 @@ use std::time::Duration;
 
 use coilbox_lobby_protocol::{
     command, default_battle_status, password_hash, team_color_rgb, BattleStatus, ClientStatus,
-    LobbyState, LoginConfig, LoginMode,
+    LobbyState, LoginConfig, LoginMode, LoginPhase,
 };
 use conn::{spawn_connection, LobbyEvent, Outbound, Registry};
 use picoframe_core::CliResult;
@@ -279,6 +277,76 @@ async fn mp_register<R: Runtime>(
         on_event,
     )
     .await)
+}
+
+/// `mp_connect_tachyon`: open a lobby connection to a Tachyon server.
+///
+/// The counterpart to [`mp_connect`], and deliberately a separate command. There is
+/// no password, no compatibility flags and no handshake to run, and the credential
+/// never crosses this boundary in either direction: it is a bearer token, held on
+/// the Rust side, presented as an HTTP header on the upgrade.
+///
+/// Two phases go out over `on_event` before the connection exists, so the UI can
+/// say which part is slow: getting a token, then opening the socket. A connection
+/// that opens at all is already authenticated, so it starts at `ready`.
+///
+/// The user has to have signed in through the browser first (`mp_tachyon_sign_in`).
+/// This only ever refreshes the token that sign-in stored, so a reconnect never
+/// opens a browser.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn mp_connect_tachyon(
+    registry: State<'_, Registry>,
+    pending: State<'_, PendingConnects>,
+    server_key: String,
+    host: String,
+    port: u16,
+    tls: bool,
+    server_id: String,
+    username: String,
+    on_event: Channel<LobbyEvent>,
+) -> Result<CliResult, ()> {
+    if lock_or_recover(&registry).contains_key(&server_key) {
+        return Ok(CliResult::err(format!("already connected: {server_key}")));
+    }
+    let (base_url, ws_url) = tachyon_conn::urls(&host, port, tls);
+
+    // The same cancel token the line protocol publishes, so `mp_cancel_connect`
+    // reaches a Tachyon connect that is still opening.
+    let token = CancellationToken::new();
+    {
+        let mut map = lock_or_recover(&pending);
+        if map.contains_key(&server_key) {
+            return Ok(CliResult::err(format!("already connecting: {server_key}")));
+        }
+        map.insert(server_key.clone(), token.clone());
+    }
+    let phase = |phase| {
+        let _ = on_event.send(LobbyEvent::Phase {
+            phase,
+            agreement: None,
+        });
+    };
+
+    phase(LoginPhase::TachyonAuthorizing);
+    let access = match tachyon_auth::access_token(&base_url, &server_id, &username).await {
+        Ok(token) => token,
+        Err(e) => {
+            lock_or_recover(&pending).remove(&server_key);
+            return Ok(CliResult::err(e.to_string()));
+        }
+    };
+
+    phase(LoginPhase::TachyonOpening);
+    let opened = tachyon_ws::connect(&ws_url, &access, CONNECT_TIMEOUT, &token).await;
+    lock_or_recover(&pending).remove(&server_key);
+    let socket = match opened {
+        Ok(socket) => socket,
+        Err(e) => return Ok(CliResult::err(e.to_string())),
+    };
+
+    tachyon_conn::spawn_connection(registry.inner().clone(), server_key, socket, on_event);
+    Ok(CliResult::ok(json!({ "connected": true })))
 }
 
 /// `mp_confirm_agreement` — resume a login parked awaiting the emailed verification
@@ -1431,6 +1499,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         })
         .invoke_handler(tauri::generate_handler![
             mp_connect,
+            mp_connect_tachyon,
             mp_register,
             mp_confirm_agreement,
             mp_disconnect,
