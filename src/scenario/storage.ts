@@ -13,7 +13,6 @@ import { requiredRuntimeVersion } from "./gating";
 import { parseScenarioJson, type Scenario } from "./model";
 import {
   dropMissingDialogueMedia,
-  encodeScenarioExport,
   readScenarioExport,
   type ScenarioExport,
   scenarioMediaFiles,
@@ -201,12 +200,19 @@ export async function sweepScenarioMedia(
 }
 
 /**
- * Export a scenario as the text of one self-contained container file: the
- * document plus every dialogue clip it references, read back off disk and
- * inlined. A clip that cannot be read is left out rather than sinking the
- * export, the way a campaign export drops a broken image.
+ * Gather everything one self-contained export holds: the document plus every
+ * dialogue clip it references, read back off disk and inlined. A clip that
+ * cannot be read is left out rather than sinking the export, the way a campaign
+ * export drops a broken image.
+ *
+ * This gathers rather than serializing, because the same value feeds both share
+ * routes, a file and a code (issue #1336), and reading the clips is the
+ * expensive part. A share drawer that offered both would otherwise read them
+ * twice.
  */
-export async function exportScenario(scenario: Scenario): Promise<string> {
+export async function gatherScenarioExport(
+  scenario: Scenario,
+): Promise<ScenarioExport> {
   const media: Record<string, string> = {};
   await Promise.all(
     scenarioMediaFiles(scenario).map(async (file) => {
@@ -221,7 +227,7 @@ export async function exportScenario(scenario: Scenario): Promise<string> {
       }
     }),
   );
-  return encodeScenarioExport({ scenario, media });
+  return { scenario, media };
 }
 
 /**
