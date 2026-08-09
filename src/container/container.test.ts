@@ -275,6 +275,14 @@ describe("sniffPayloadKind", () => {
         game: { name: "x" },
       }),
     ).toBe("setup-pack");
+    // engineVersion is optional (issue #1334): a pack pinning no engine still
+    // sniffs correctly from its other fields.
+    expect(
+      sniffPayloadKind({
+        maps: ["a"],
+        game: { name: "x" },
+      }),
+    ).toBe("setup-pack");
     expect(sniffPayloadKind({ mode: "warpath", settings: {} })).toBe(
       "challenge",
     );
