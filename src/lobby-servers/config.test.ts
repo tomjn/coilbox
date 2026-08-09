@@ -20,12 +20,14 @@ import {
   autoConnectTarget,
   BUILTIN_SERVERS,
   buildCatalog,
+  type CustomServersConfig,
   isLastLogin,
   type LobbyAccount,
   type LobbyServer,
   OFFICIAL_ID,
   resolveProfileServerRules,
   resolveServer,
+  serverProtocol,
   sortAccountsByRecency,
 } from "./config";
 
@@ -63,6 +65,45 @@ describe("resolveServer", () => {
   });
   it("returns undefined for an unknown id", () => {
     expect(resolveServer("nope", [custom])).toBeUndefined();
+  });
+
+  it("finds the BAR Tachyon built-in by id", () => {
+    const s = resolveServer("bar-tachyon", []);
+    expect(s).toMatchObject({
+      host: "server4.beyondallreason.info",
+      port: 443,
+      tls: true,
+      protocol: "tachyon",
+    });
+  });
+});
+
+describe("serverProtocol", () => {
+  it("reads a server stored before the field existed as tasserver", () => {
+    // Exactly the JSON a pre-Tachyon build wrote under `lobbyServers.servers`.
+    const stored: LobbyServer = JSON.parse(
+      '{"id":"lan-1","name":"LAN","host":"10.0.0.5","port":8200,"tls":false,"allowSelfSigned":false}',
+    );
+    expect(stored.protocol).toBeUndefined();
+    expect(serverProtocol(stored)).toBe("tasserver");
+  });
+
+  it("reads every TASServer built-in as tasserver", () => {
+    const tas = BUILTIN_SERVERS.filter((s) => s.id !== "bar-tachyon");
+    expect(tas.map(serverProtocol)).toEqual(tas.map(() => "tasserver"));
+  });
+
+  it("reads an explicit tachyon value back", () => {
+    expect(serverProtocol({ protocol: "tachyon" })).toBe("tachyon");
+  });
+
+  it("survives a round trip through the stored custom-server settings", () => {
+    const saved: CustomServersConfig = {
+      servers: [{ ...custom, id: "custom-tachyon", protocol: "tachyon" }],
+    };
+    const loaded: CustomServersConfig = JSON.parse(JSON.stringify(saved));
+    const server = resolveServer("custom-tachyon", loaded.servers);
+    expect(server && serverProtocol(server)).toBe("tachyon");
   });
 });
 
@@ -123,6 +164,15 @@ describe("resolveProfileServerRules", () => {
     ).toBeUndefined();
   });
 
+  it("gives an inline official server the default protocol", () => {
+    // The profile schema has no protocol key, so an inline server is TASServer.
+    // A profile wanting Tachyon promotes the `bar-tachyon` built-in by id.
+    const { official } = resolveProfileServerRules({
+      official: { host: "lobby.example.org" },
+    });
+    expect(official && serverProtocol(official)).toBe("tasserver");
+  });
+
   it("passes the preset allow-list through", () => {
     expect(resolveProfileServerRules({ presets: ["bar"] }).presets).toEqual([
       "bar",
@@ -153,6 +203,30 @@ describe("buildCatalog", () => {
   it("narrows built-ins to the allow-list", () => {
     const out = buildCatalog([], { presets: ["bar", "techa"] });
     expect(out.map((s) => s.id)).toEqual(["techa", "bar"]);
+  });
+
+  it("keeps the protocol when a preset allows the Tachyon built-in", () => {
+    const out = buildCatalog([], { presets: ["bar", "bar-tachyon"] });
+    expect(out.map((s) => s.id)).toEqual(["bar", "bar-tachyon"]);
+    expect(out.map(serverProtocol)).toEqual(["tasserver", "tachyon"]);
+  });
+
+  it("drops the Tachyon built-in from a preset list that omits it", () => {
+    const out = buildCatalog([], { presets: ["bar"] });
+    expect(out.map((s) => s.id)).toEqual(["bar"]);
+  });
+
+  it("keeps the protocol when a profile promotes the Tachyon built-in", () => {
+    const rules = resolveProfileServerRules({ official: "bar-tachyon" });
+    expect(rules.official).toMatchObject({ protocol: "tachyon" });
+    const out = buildCatalog([], rules);
+    expect(out[0]).toMatchObject({
+      id: "bar-tachyon",
+      protocol: "tachyon",
+      official: true,
+      builtin: true,
+    });
+    expect(out.filter((s) => s.id === "bar-tachyon")).toHaveLength(1);
   });
 
   it("does not list a promoted built-in twice", () => {
