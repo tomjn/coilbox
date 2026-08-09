@@ -169,6 +169,41 @@ export function encodeContainerCode<P>(
   return COMPRESSED_CODE_PREFIX + bytesToBase64Url(bytes);
 }
 
+/** A code that is safe to hand out, or the measurement showing why it is not. */
+export type ContainerCodeResult =
+  | { ok: true; code: string }
+  | { ok: false; bytes: number; limit: number };
+
+/**
+ * Encode a payload as a code only when the far end could read it back, and
+ * otherwise report how big it came out and how big a code may be.
+ *
+ * The ceiling is {@link MAX_INFLATED_BYTES}, the decompression-bomb guard on the
+ * decode side. Nothing rounds it down on the way out, so without this check a
+ * kind whose payload can grow past it (a scenario carrying dialogue portraits
+ * and voice clips, issue #1336) produces a code that copies fine, pastes fine,
+ * and then fails to inflate as "corrupted" on someone else's machine. Refusing
+ * at the point of copying is the only place the author can still do something
+ * about it.
+ *
+ * Use this wherever a payload has no fixed upper size. {@link encodeContainerCode}
+ * stays for the kinds that are bounded by their own shape (a preset, a challenge,
+ * a setup pack), where a check would only ever answer yes.
+ */
+export function tryEncodeContainerCode<P>(
+  kind: ContainerKind,
+  kindVersion: number,
+  payload: P,
+): ContainerCodeResult {
+  const json = JSON.stringify(makeContainer(kind, kindVersion, payload));
+  // UTF-8 bytes, not characters: that is what the inflate buffer holds.
+  const bytes = strToU8(json).length;
+  if (bytes > MAX_INFLATED_BYTES) {
+    return { ok: false, bytes, limit: MAX_INFLATED_BYTES };
+  }
+  return { ok: true, code: encodeContainerCode(kind, kindVersion, payload) };
+}
+
 /** Inflate a `cbz1.` code back to its JSON text, or `null` if it is corrupt,
  * truncated, or larger than {@link MAX_INFLATED_BYTES}. */
 function inflateCode(code: string): string | null {

@@ -13,6 +13,7 @@ import {
   makeContainer,
   readContainer,
   sniffPayloadKind,
+  tryEncodeContainerCode,
 } from "./container";
 
 describe("container envelope", () => {
@@ -67,6 +68,44 @@ describe("container envelope", () => {
       JSON.stringify(makeContainer("setup-pack", 1, { maps: ["a"] })),
     );
     expect(asContainer(decodeContainerText(legacy))?.kind).toBe("setup-pack");
+  });
+
+  it("refuses to encode a code larger than the decode side can inflate", () => {
+    // Random bytes, because that is what an already-compressed portrait or
+    // voice clip looks like to DEFLATE. A compressible payload of the same
+    // length would inflate back under the ceiling and is allowed.
+    const bytes = new Uint8Array(600 * 1024);
+    for (let i = 0; i < bytes.length; i += 65536) {
+      crypto.getRandomValues(
+        bytes.subarray(i, Math.min(i + 65536, bytes.length)),
+      );
+    }
+    const result = tryEncodeContainerCode("scenario", 1, {
+      blob: Buffer.from(bytes).toString("base64"),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.limit).toBe(512 * 1024);
+    expect(result.bytes).toBeGreaterThan(result.limit);
+  });
+
+  it("encodes a payload that fits, and it round-trips", () => {
+    const result = tryEncodeContainerCode("scenario", 1, { hello: "world" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.code).toBe(encodeContainerCode("scenario", 1, { hello: "world" }));
+    expect(asContainer(decodeContainerText(result.code))?.payload).toEqual({
+      hello: "world",
+    });
+  });
+
+  it("measures the ceiling in UTF-8 bytes, not characters", () => {
+    // Each of these is three bytes and one character, so a payload that fits by
+    // character count can still be over the ceiling the inflate buffer enforces.
+    const payload = { text: "星".repeat(200 * 1024) };
+    expect(JSON.stringify(payload).length).toBeLessThan(512 * 1024);
+    const result = tryEncodeContainerCode("scenario", 1, payload);
+    expect(result.ok).toBe(false);
   });
 
   it("reports a corrupted compressed code as unreadable, never throws", () => {
