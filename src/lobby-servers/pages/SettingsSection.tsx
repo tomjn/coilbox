@@ -577,9 +577,13 @@ function AccountForm({
           />
         </Field>
       )}
-      {server && a.username.trim() !== "" && (
-        <AutojoinChannels serverKey={serverKeyFor(server, a.username)} />
-      )}
+      {/* A Tachyon server has no named channels, so there is nothing to auto-join
+          (see `docs/tachyon-protocol.md`). */}
+      {server &&
+        serverProtocol(server) !== "tachyon" &&
+        a.username.trim() !== "" && (
+          <AutojoinChannels serverKey={serverKeyFor(server, a.username)} />
+        )}
       <div className="border-t border-border pt-3">
         <Button
           variant="outline"
