@@ -12,6 +12,9 @@
 mod conn;
 mod dmlog;
 mod probe;
+/// The OAuth browser sign-in that produces a Tachyon bearer token. Public so the
+/// stage that opens the socket can ask it for one.
+pub mod tachyon_auth;
 /// Matching Tachyon responses to requests, over the transport below. Public for
 /// the same reason it is.
 pub mod tachyon_rpc;
@@ -1387,6 +1390,37 @@ fn mp_chat_log_open<R: Runtime>(
     CliResult::ok(json!({ "messages": log.thread(&name) }))
 }
 
+/// `mp_tachyon_sign_in`: run the OAuth browser sign-in against a Tachyon server and
+/// keep the result.
+///
+/// `base_url` is the server's own origin, for example
+/// `https://server4.beyondallreason.info`. Nothing below it is hardcoded: the
+/// endpoints come from the server's discovery document.
+///
+/// This resolves only once the user has finished in the browser, which can take a
+/// minute, or fails if they never do. No token comes back over IPC. The refresh
+/// token goes to the OS keychain under `{serverId}:{username}` and the access token
+/// stays in memory on the Rust side.
+#[tauri::command]
+async fn mp_tachyon_sign_in(base_url: String, server_id: String, username: String) -> CliResult {
+    let open =
+        |url: &str| tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string());
+    match tachyon_auth::sign_in_and_store(&base_url, &server_id, &username, open).await {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e.to_string()),
+    }
+}
+
+/// `mp_tachyon_sign_out`: forget a Tachyon account, both the stored refresh token
+/// and any access token still in memory.
+#[tauri::command]
+async fn mp_tachyon_sign_out(server_id: String, username: String) -> CliResult {
+    match tachyon_auth::sign_out(&server_id, &username) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e.to_string()),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-multiplayer"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-multiplayer")
@@ -1447,6 +1481,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_probe_host,
             mp_chat_logs,
             mp_chat_log_open,
+            mp_tachyon_sign_in,
+            mp_tachyon_sign_out,
         ])
         .build()
 }
