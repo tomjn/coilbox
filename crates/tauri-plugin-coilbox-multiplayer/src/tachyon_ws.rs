@@ -574,8 +574,16 @@ mod tests {
         socket.send("{}").await.unwrap();
         socket.recv().await.unwrap();
 
-        assert_eq!(rx.recv().await.unwrap(), ("out".into(), "{}".into()));
-        assert_eq!(rx.recv().await.unwrap(), ("in".into(), "echo:{}".into()));
+        // Bounded, so a watcher that is never called fails this rather than
+        // hanging the suite on it.
+        async fn next(rx: &mut mpsc::UnboundedReceiver<(String, String)>) -> (String, String) {
+            tokio::time::timeout(Duration::from_secs(5), rx.recv())
+                .await
+                .expect("the watcher was not called within 5 seconds")
+                .expect("the watcher was dropped")
+        }
+        assert_eq!(next(&mut rx).await, ("out".into(), "{}".into()));
+        assert_eq!(next(&mut rx).await, ("in".into(), "echo:{}".into()));
     }
 
     #[tokio::test]
