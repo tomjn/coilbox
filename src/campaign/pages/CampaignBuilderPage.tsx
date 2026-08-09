@@ -189,7 +189,11 @@ export default function CampaignBuilderPage() {
         inlineCampaignImages(campaign),
         collectCampaignScenarioMedia(campaign),
       ]);
-      const file = wrapCampaignForExport(inlined, media, scan.data?.games ?? []);
+      const file = wrapCampaignForExport(
+        inlined,
+        media,
+        scan.data?.games ?? [],
+      );
       const dest = await save({
         title: "Export campaign",
         defaultPath: `${campaign.title || "campaign"}.json`,

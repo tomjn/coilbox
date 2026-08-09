@@ -10,9 +10,9 @@ vi.mock("@picoframe/frame", () => ({
 import { encodeContainerCode, identify } from "../container/container";
 import type { SkirmishDraft } from "./drafts";
 import {
+  PRESET_KIND_VERSION,
   parsePresetJson,
   presetMatchesDraft,
-  PRESET_KIND_VERSION,
   presetPayload,
   type SkirmishPreset,
 } from "./presets";

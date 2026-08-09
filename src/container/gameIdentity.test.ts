@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   gameIdentityForName,
   gameIdentityFromPayload,
+  type InstalledGameInfo,
   parseGameIdentity,
 } from "./gameIdentity";
 
@@ -24,9 +25,9 @@ describe("parseGameIdentity", () => {
     expect(parseGameIdentity({ gameName: "BAR 1.2" })).toEqual({
       name: "BAR 1.2",
     });
-    expect(parseGameIdentity({ shortname: "BA", pinnedName: "BA V12" })).toEqual(
-      { name: "BA V12", shortname: "BA" },
-    );
+    expect(
+      parseGameIdentity({ shortname: "BA", pinnedName: "BA V12" }),
+    ).toEqual({ name: "BA V12", shortname: "BA" });
   });
 
   it("rejects a value naming no game", () => {
@@ -38,7 +39,7 @@ describe("parseGameIdentity", () => {
 });
 
 describe("gameIdentityForName", () => {
-  const installed = [
+  const installed: InstalledGameInfo[] = [
     { name: "BAR 1.2", info: { shortname: "BAR", version: "1.2" } },
     { name: "No modinfo", info: {} },
   ];
