@@ -2,7 +2,6 @@ import { Button, cn } from "@picoframe/frame";
 import {
   Bot,
   Check,
-  ChevronRight,
   Hash,
   History,
   MessageSquare,
@@ -16,11 +15,6 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   type ChatMsg,
   mpAcceptFriendRequest,
@@ -42,8 +36,10 @@ import {
   convId,
   isBattleChannel,
 } from "./conversation";
-import { DmPicker } from "./DmPicker";
+import { PartySection } from "./PartySection";
 import { PRESENCE_META, userPresence } from "./presence";
+import { Section } from "./Section";
+import { UserPicker } from "./UserPicker";
 
 function Badge({ n }: { n: number }) {
   if (n <= 0) return null;
@@ -116,32 +112,6 @@ function FriendAction({
   );
 }
 
-/** A collapsible sidebar section with a chevron toggle and an optional header action. */
-function Section({
-  title,
-  defaultOpen = true,
-  action,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <Collapsible defaultOpen={defaultOpen}>
-      <div className="flex items-center gap-1 px-3 py-2">
-        <CollapsibleTrigger className="group flex flex-1 items-center gap-1 text-left text-sm font-semibold hover:text-foreground/80">
-          <ChevronRight className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
-          {title}
-        </CollapsibleTrigger>
-        {action}
-      </div>
-      <CollapsibleContent>{children}</CollapsibleContent>
-    </Collapsible>
-  );
-}
-
 /**
  * The left rail: collapsible Channels and Direct messages sections with unread
  * badges. New DMs are started either from the "+" picker here (search online
@@ -161,6 +131,9 @@ export function ConversationSidebar({
   // channels to list or browse. Upstream means this, so the section is replaced by
   // a standing note rather than left empty. See `docs/tachyon-protocol.md`.
   const hasChannels = protocol !== "tachyon";
+  // Parties are the other way round: Tachyon has them and TASServer has nothing
+  // like them, so the section is only there on a Tachyon connection.
+  const hasParties = protocol === "tachyon";
   const navigate = useNavigate();
   const [ignored] = useIgnored();
   const [favourites, setFavourites] = useFavourites();
@@ -341,6 +314,8 @@ export function ConversationSidebar({
           </Section>
         )}
 
+        {hasParties && <PartySection />}
+
         {(friendNames.length > 0 || friendRequests.length > 0) && (
           <Section title="Friends">
             {friendRequests.length > 0 && (
@@ -449,7 +424,7 @@ export function ConversationSidebar({
         <Section
           title="Direct messages"
           action={
-            <DmPicker onPick={(peer) => onSelect({ kind: "dm", peer })} />
+            <UserPicker onPick={(peer) => onSelect({ kind: "dm", peer })} />
           }
         >
           <ul className="flex flex-col gap-0.5 px-2">

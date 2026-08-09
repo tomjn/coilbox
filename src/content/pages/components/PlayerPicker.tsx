@@ -20,7 +20,7 @@ export interface PlayerPickerOption {
  * Replaces a plain `Select` dropdown, which becomes unusable once a library's
  * player list runs into the hundreds. Filtering reuses the pure
  * {@link filterPlayers} helper from `stats.ts` so it stays unit-testable
- * without a DOM. Modelled on the existing `DmPicker` combobox (popover +
+ * without a DOM. Modelled on the existing `UserPicker` combobox (popover +
  * search input + button list), the closest match already in the codebase, so
  * this reuses that pattern rather than adding the shadcn `command` component.
  */

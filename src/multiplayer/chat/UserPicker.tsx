@@ -10,15 +10,26 @@ import { useMultiplayer } from "../store";
 import { PRESENCE_META, userPresence } from "./presence";
 
 /**
- * The "+" next to Direct messages: a popover that searches the users currently
- * online on the connected server and opens a DM with the one you pick. This is the
- * only free-text way to start a DM (channel member lists remain the other entry).
+ * A "+" that opens a popover, searches the users currently online on the
+ * connected server and hands back the one you pick. Next to Direct messages it
+ * starts a DM (channel member lists remain the other entry), and in the Party
+ * section it sends an invitation.
  *
  * Presence data only covers the live connection, so the list is exactly
- * `mirror.state.users` minus yourself; there is no server-side user directory to
- * search beyond who is online right now.
+ * `mirror.state.users` minus yourself and minus `exclude`. There is no
+ * server-side user directory to search beyond who is online right now.
  */
-export function DmPicker({ onPick }: { onPick: (username: string) => void }) {
+export function UserPicker({
+  onPick,
+  label = "New direct message",
+  exclude = [],
+}: {
+  onPick: (username: string) => void;
+  /** What the "+" is for, read out to screen readers. */
+  label?: string;
+  /** Names to leave out, such as the people already in your party. */
+  exclude?: string[];
+}) {
   const { mirror, activeKey } = useMultiplayer();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -29,11 +40,12 @@ export function DmPicker({ onPick }: { onPick: (username: string) => void }) {
   const matches = useMemo(() => {
     const users = mirror.state ? Object.values(mirror.state.users) : [];
     const q = query.trim().toLowerCase();
+    const leftOut = new Set(exclude);
     return users
-      .filter((u) => u.name !== self)
+      .filter((u) => u.name !== self && !leftOut.has(u.name))
       .filter((u) => (q ? u.name.toLowerCase().includes(q) : true))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [mirror.state, self, query]);
+  }, [mirror.state, self, query, exclude]);
 
   function pick(username: string) {
     onPick(username);
@@ -50,11 +62,7 @@ export function DmPicker({ onPick }: { onPick: (username: string) => void }) {
       }}
     >
       <PopoverTrigger asChild>
-        <Button
-          variant="secondary"
-          aria-label="New direct message"
-          className="h-7 px-2"
-        >
+        <Button variant="secondary" aria-label={label} className="h-7 px-2">
           <Plus className="size-4" />
         </Button>
       </PopoverTrigger>
