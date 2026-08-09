@@ -56,6 +56,8 @@ function mkBattle(p: Partial<Battle> = {}): Battle {
     bots: {},
     scriptTags: {},
     startRects: {},
+    bosses: [],
+    bossesEnabled: false,
     ...p,
   };
 }

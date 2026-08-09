@@ -17,6 +17,7 @@ import {
 import type { Battle, MemberStatus, Vote } from "../bindings";
 import {
   mpAddBot,
+  mpAppointBoss,
   mpForceAlly,
   mpForceColor,
   mpForceSpectator,
@@ -30,6 +31,7 @@ import {
   mpSetBattleStatus,
   mpSetScriptTags,
   mpSetStartRect,
+  mpUnboss,
   mpUpdateBattleInfo,
   mpUpdateBot,
 } from "../bindings";
@@ -179,13 +181,33 @@ export interface BattleRoomView {
   /** Set our own in-game flag: the host flips this to start the match. Sending is
    *  the provider's job, since MYSTATUS carries the away bit on the same line. */
   setIngame: (ingame: boolean) => void;
-  /** Host controls over another member (self-hosted battles only; no-op otherwise). */
+  /**
+   * Whether the server, not the room, decides our colour, faction and team. True
+   * on a Tachyon connection, where colours are assigned when the match starts
+   * and the server seats a player within their ally team. The controls for those
+   * three have nothing to send, so the roster shows them read-only.
+   */
+  serverAssignsSeat: boolean;
+  /**
+   * Whether we may kick a member: the founder, or anyone in a Tachyon lobby,
+   * where kicking is put to a vote rather than ordered.
+   */
+  canKick: boolean;
+  /** Whether we may appoint and stand down bosses in this lobby. */
+  canBoss: boolean;
+  /** Whether we may change the map: the founder, or a boss of a Tachyon lobby. */
+  canChangeMap: boolean;
+  /** Host controls over another member (self-hosted battles only, no-op otherwise). */
   hostControls: {
     forceTeam: (user: string, team: number) => void;
     forceAlly: (user: string, ally: number) => void;
     forceColor: (user: string, hex: string) => void;
     forceSpectator: (user: string) => void;
     kick: (user: string) => void;
+    /** Tachyon only: make a member a boss, so they may change the lobby. */
+    appointBoss: (user: string) => void;
+    /** Tachyon only: stand a boss down. */
+    unboss: (user: string) => void;
     removeBot: (name: string) => void;
     /** Change a bot we own/host (team/ally) via UPDATEBOT; colour stays read-only. */
     updateBot: (
@@ -238,11 +260,12 @@ export interface BattleRoomView {
 export function useBattleRoom(): BattleRoomView {
   const { mirror, activeKey, protocol, setIngame } = useMultiplayer();
   const state = mirror.state;
-  // Tachyon owns our seat. It reports our own sync from the assets the server
-  // knows we have, and it assigns team colours when the match starts, so the two
-  // effects below that push a seat of ours must not run there: the line they
-  // send has no Tachyon equivalent and would be dropped on every snapshot.
-  const seatIsOurs = protocol !== "tachyon";
+  // Tachyon assigns team colours when the match starts, and picks a member's
+  // team within their ally team itself, so the colour, faction, team and
+  // handicap controls have nothing to send there. Our assets are the other way
+  // round: only the client knows whether the map and game are installed, and
+  // Tachyon has a command for saying so, so that push runs on both.
+  const serverAssignsSeat = protocol === "tachyon";
 
   // The team colour we remember across battles and app restarts. Empty means
   // "never picked" — we assign a random colour the first time we need one.
@@ -282,6 +305,15 @@ export function useBattleRoom(): BattleRoomView {
   // drive the roster/options over the protocol and launch the game as founder.
   const selfHost = isFounder && !hostIsBot;
   const canAddBot = !!battle && !!myStatus;
+  // Who may change a Tachyon lobby. It has no founder, so a boss is what it has
+  // instead, and the lobby says whether it allows bosses at all.
+  const iAmBoss = !!me && !!battle?.bosses.includes(me);
+  const canChangeMap = selfHost || iAmBoss;
+  // Kicking is a host power on TASServer and a lobby-scoped one on Tachyon: any
+  // member may ask, and the server puts it to a vote. So the room offers it to
+  // anyone seated there rather than to the founder alone.
+  const canKick = selfHost || (serverAssignsSeat && !!myStatus);
+  const canBoss = serverAssignsSeat && !!myStatus && !!battle?.bossesEnabled;
 
   // AIs the host can add as bots. The game-scoped query already applies the game's
   // `validais.lua` whitelist and includes its own Lua AIs (from `LuaAI.lua`) — both
@@ -438,20 +470,14 @@ export function useBattleRoom(): BattleRoomView {
 
   // Keep the server's view of OUR sync honest: report synced(1)/unsynced(2) based
   // on whether the map+game are installed locally, once that's known. The server
-  // echoes the change back (→ snapshot), so this settles after one push.
+  // echoes the change back (→ snapshot), so this settles after one push. On a
+  // Tachyon connection the same push becomes the asset status matchmaking will
+  // later read, so it matters just as much there.
   useEffect(() => {
-    if (!activeKey || !myStatus || !contentKnown || !seatIsOurs) return;
+    if (!activeKey || !myStatus || !contentKnown) return;
     const desired = mapMissing || gameMissing ? 2 : 1;
     if (myStatus.battleStatus.sync !== desired) pushStatus({ sync: desired });
-  }, [
-    activeKey,
-    myStatus,
-    contentKnown,
-    mapMissing,
-    gameMissing,
-    pushStatus,
-    seatIsOurs,
-  ]);
+  }, [activeKey, myStatus, contentKnown, mapMissing, gameMissing, pushStatus]);
 
   // Assign our team colour on join. The seat opens at teamColor 0 (the protocol's
   // "unset", rendered black) both when we join someone else's battle and when the
@@ -462,7 +488,7 @@ export function useBattleRoom(): BattleRoomView {
   // (or a host force-recolour) as authoritative and just track it.
   const assignedBattleRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!activeKey || !battle || !myStatus || !seatIsOurs) return;
+    if (!activeKey || !battle || !myStatus || serverAssignsSeat) return;
     if (myStatus.teamColor !== 0) {
       // Authoritative echoed/forced colour — keep intendedColorRef in sync so the
       // pushStatus fill-in never reverts it.
@@ -491,7 +517,7 @@ export function useBattleRoom(): BattleRoomView {
     savedColor,
     setSavedColor,
     pushStatus,
-    seatIsOurs,
+    serverAssignsSeat,
   ]);
 
   const leave = useCallback(async () => {
@@ -603,14 +629,46 @@ export function useBattleRoom(): BattleRoomView {
           color: bot.teamColor,
         }).then(clearErr, setErr);
       },
-      // Change a bot's AI (issue #532). The protocol carries the aiDll only on
-      // ADDBOT, so we remove the bot and re-add it with the same seat under the
-      // new AI. Awaited in order so the re-add lands after the removal.
+      appointBoss: (user: string) => {
+        if (activeKey)
+          mpAppointBoss({ serverKey: activeKey, username: user }).then(
+            clearErr,
+            setErr,
+          );
+      },
+      unboss: (user: string) => {
+        if (activeKey)
+          mpUnboss({ serverKey: activeKey, username: user }).then(
+            clearErr,
+            setErr,
+          );
+      },
+      // Change a bot's AI (issue #532). The TASServer protocol carries the aiDll
+      // only on ADDBOT, so we remove the bot and re-add it with the same seat
+      // under the new AI. Awaited in order so the re-add lands after the
+      // removal. Tachyon changes it in place, which is one request rather than
+      // two and keeps the seat the server gave the bot.
       changeBotAi: (name: string, aiShortName: string) => {
         if (!activeKey || !battle) return;
         const bot = battle.bots[name];
         if (!bot) return;
         const bs = bot.battleStatus;
+        if (serverAssignsSeat) {
+          mpUpdateBot({
+            serverKey: activeKey,
+            name,
+            ready: bs.ready,
+            teamId: bs.teamId,
+            ally: bs.ally,
+            mode: bs.mode,
+            handicap: bs.handicap,
+            sync: bs.sync,
+            side: bs.side,
+            color: bot.teamColor,
+            aiDll: aiShortName,
+          }).then(clearErr, setErr);
+          return;
+        }
         mpRemoveBot({ serverKey: activeKey, name })
           .then(() =>
             mpAddBot({
@@ -630,7 +688,7 @@ export function useBattleRoom(): BattleRoomView {
           .then(clearErr, setErr);
       },
     }),
-    [activeKey, battle, debounceColor, setErr, clearErr],
+    [activeKey, battle, debounceColor, serverAssignsSeat, setErr, clearErr],
   );
 
   // Add a native AI bot on the first free team/ally, with a fresh colour and a name
@@ -829,6 +887,10 @@ export function useBattleRoom(): BattleRoomView {
     isFounder,
     selfHost,
     canAddBot,
+    serverAssignsSeat,
+    canKick,
+    canBoss,
+    canChangeMap,
     target,
     targetLoading,
     enginePath,

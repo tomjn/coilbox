@@ -39,7 +39,7 @@ export function BattleMapCard({
   localMap,
   mapMissing,
   startPosType,
-  selfHost,
+  canChangeMap,
   canEditBoxes,
   activeAlly,
   onSetBox,
@@ -57,8 +57,9 @@ export function BattleMapCard({
   localMap: MapItem | undefined;
   mapMissing: boolean;
   startPosType: number;
-  /** We host this battle: the picker changes the map instead of suggesting it. */
-  selfHost: boolean;
+  /** We may change the map directly, rather than only suggesting it: the
+   *  founder, or a boss of a Tachyon lobby. */
+  canChangeMap: boolean;
   /** Host may draw/clear boxes (host privilege AND choose-in-game mode). */
   canEditBoxes: boolean;
   /** The ally (0-based) the next drawn box belongs to (`useStartBoxAllies`). */
@@ -152,9 +153,9 @@ export function BattleMapCard({
         // Dim the base minimap while a terrain overlay is shown so the metal /
         // height layer reads clearly over it.
         dimBase={!!overlayUrl}
-        onSelectMap={selfHost ? setPendingMap : onSuggestMap}
+        onSelectMap={canChangeMap ? setPendingMap : onSuggestMap}
         selectLabel={
-          selfHost
+          canChangeMap
             ? pendingMap
               ? "Changing map…"
               : "Change map"

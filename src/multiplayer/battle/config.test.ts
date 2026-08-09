@@ -59,6 +59,8 @@ function mkBattle(p: Partial<Battle> = {}): Battle {
     bots: {},
     scriptTags: {},
     startRects: {},
+    bosses: [],
+    bossesEnabled: false,
     ...p,
   };
 }
@@ -351,6 +353,7 @@ const row = (p: Partial<MemberRow> = {}): MemberRow => ({
   kind: "human",
   self: false,
   host: false,
+  boss: false,
   ready: false,
   sync: 1,
   spectator: false,

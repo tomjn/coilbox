@@ -143,6 +143,15 @@ export interface Battle {
   bots: Record<string, Bot>;
   scriptTags: Record<string, string>;
   startRects: Record<string, StartRect>;
+  /**
+   * The members who may change the lobby, by the name the roster shows. Tachyon's
+   * answer to a host: a lobby has no founder, and a boss is appointed by a vote
+   * rather than by opening the battle. Always empty on a TASServer connection.
+   */
+  bosses: string[];
+  /** Whether this lobby allows bosses at all. A lobby with them off refuses to
+   *  appoint one, so the room offers it only when this is set. */
+  bossesEnabled: boolean;
 }
 
 /**
@@ -653,6 +662,12 @@ export const mpUpdateBot = defineCommand<
     sync: number;
     side: number;
     color: number;
+    /**
+     * Change which AI the bot runs, keeping its seat. Tachyon only: the
+     * TASServer protocol carries the AI on the add alone, so there the caller
+     * removes the bot and adds it back instead.
+     */
+    aiDll?: string;
   },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_update_bot");
@@ -686,6 +701,18 @@ export const mpKick = defineCommand<
   { serverKey: string; username: string },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_kick");
+
+/** Tachyon only: make a member a boss, so they may change the lobby. */
+export const mpAppointBoss = defineCommand<
+  { serverKey: string; username: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_appoint_boss");
+
+/** Tachyon only: stand a boss down. */
+export const mpUnboss = defineCommand<
+  { serverKey: string; username: string },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_unboss");
 
 export const mpSetStartRect = defineCommand<
   {

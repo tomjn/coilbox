@@ -29,15 +29,24 @@ import { NoteButton } from "../NoteButton";
 import { CountryFlag, RankBadge } from "../UserBadges";
 import { allyLetter, type MemberRow as Row } from "./config";
 
-/** Actions over another member (host) or over a bot we own, bound to its name. */
+/**
+ * Actions over another member (host) or over a bot we own, bound to its name.
+ * Each one is optional because what a member may do to another depends on the
+ * protocol: Tachyon has no way to force a seat, and it appoints bosses where
+ * TASServer has a founder.
+ */
 export interface MemberControls {
-  onForceTeam: (team: number) => void;
-  onForceAlly: (ally: number) => void;
-  onForceColor: (hex: string) => void;
-  onForceSpectator: () => void;
+  onForceTeam?: (team: number) => void;
+  onForceAlly?: (ally: number) => void;
+  onForceColor?: (hex: string) => void;
+  onForceSpectator?: () => void;
   onKick: () => void;
   /** Bots we own/host only: change the bot's AI in place (issue #532). */
   onChangeAi?: (aiShortName: string) => void;
+  /** Make this member a boss of the lobby, so they may change it. */
+  onAppointBoss?: () => void;
+  /** Stand this boss down. */
+  onUnboss?: () => void;
 }
 
 /** Ready state as a round check/cross; spectators show an eye (always "ready"). */
@@ -73,6 +82,7 @@ export function MemberRow({
   control,
   sharedWith,
   showActions,
+  serverAssignsSeat,
   flashIngame,
   sideOptions,
   teamOptions,
@@ -98,6 +108,13 @@ export function MemberRow({
    * stays live so they can leave. */
   sharedWith?: Row;
   showActions: boolean;
+  /**
+   * The server picks colours, factions and teams, so those three cells are
+   * read-only whoever is looking. True on a Tachyon connection, where a colour
+   * is assigned when the match starts, so the swatch shows unset rather than the
+   * black that colour 0 would otherwise paint.
+   */
+  serverAssignsSeat: boolean;
   /** Briefly highlight this row because the player just launched the game. */
   flashIngame?: boolean;
   sideOptions: { value: string; label: string; icon?: ReactNode }[];
@@ -124,23 +141,32 @@ export function MemberRow({
   onColor: (hex: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const canSpectate = row.kind === "human" && !row.spectator;
+  const canSpectate =
+    row.kind === "human" && !row.spectator && !!control?.onForceSpectator;
   const subtitle = row.host
     ? "Host"
-    : row.kind === "bot"
-      ? `Bot · ${row.aiDll ?? "AI"}`
-      : row.self
-        ? "You"
-        : "Player";
+    : row.boss
+      ? "Boss"
+      : row.kind === "bot"
+        ? `Bot · ${row.aiDll ?? "AI"}`
+        : row.self
+          ? "You"
+          : "Player";
 
   // Colour is settable by us on our own row (MYBATTLESTATUS) or by the host on
   // another HUMAN's row (FORCETEAMCOLOR). Bots keep a read-only swatch: a bot
   // colour input would be a second colour-picker drag surface (flood risk), and
   // colour isn't what the host needs to change on a bot.
-  const canEditColor = editable || (!!control && row.kind === "human");
-  // Team/ally are settable on any controlled row — humans via FORCE*, bots via
-  // UPDATEBOT (both routed through `control`); discrete dropdowns, no flood risk.
-  const canEditTeamAlly = editable || !!control;
+  const canEditColor =
+    !serverAssignsSeat &&
+    (editable || (!!control?.onForceColor && row.kind === "human"));
+  // Faction and team are ours on our own row and the host's on another, and a
+  // server that assigns them takes both away. The ally team is the one seat
+  // field every protocol lets a player choose, so it is gated on its own.
+  const canEditSide = editable && !serverAssignsSeat;
+  const canEditTeam =
+    (editable && !serverAssignsSeat) || !!control?.onForceTeam;
+  const canEditAlly = editable || !!control?.onForceAlly;
   // A bot we own/host can have its AI changed in place (issue #532), offered
   // from the same list as the Add AI dropdown. Complements the invalid-AI flag
   // (#501): the host can now fix a bot carrying an AI this game doesn't offer.
@@ -150,11 +176,11 @@ export function MemberRow({
     !!aiOptions &&
     aiOptions.length > 0;
   const setTeam = (v: number) =>
-    editable ? onTeam(v) : control?.onForceTeam(v);
+    editable ? onTeam(v) : control?.onForceTeam?.(v);
   const setAlly = (v: number) =>
-    editable ? onAlly(v) : control?.onForceAlly(v);
+    editable ? onAlly(v) : control?.onForceAlly?.(v);
   const setColor = (hex: string) =>
-    editable ? onColor(hex) : control?.onForceColor(hex);
+    editable ? onColor(hex) : control?.onForceColor?.(hex);
   const sharedTitle = sharedWith
     ? `Shares a team with ${sharedWith.name} — team settings come from the first member`
     : undefined;
@@ -193,6 +219,14 @@ export function MemberRow({
                 style={{ borderColor: sharedWith.colorHex }}
               />
             </span>
+          ) : serverAssignsSeat ? (
+            // Colour 0 is black, and this seat has no colour yet rather than a
+            // black one, so the swatch reads as unset.
+            <span
+              aria-hidden
+              title="Team colours are assigned when the match starts"
+              className="size-6 shrink-0 rounded border border-dashed border-muted-foreground/50"
+            />
           ) : canEditColor ? (
             <input
               type="color"
@@ -210,7 +244,9 @@ export function MemberRow({
           )}
           <div className="min-w-0 leading-tight">
             <div className="flex items-center gap-1 truncate">
-              {row.host && <Crown className="size-3.5 text-amber-500" />}
+              {(row.host || row.boss) && (
+                <Crown className="size-3.5 text-amber-500" />
+              )}
               {row.kind === "bot" && (
                 <BotIcon className="size-3.5 text-muted-foreground" />
               )}
@@ -275,7 +311,7 @@ export function MemberRow({
           >
             Co-player
           </Badge>
-        ) : editable ? (
+        ) : canEditSide ? (
           <OptionSelect
             value={String(row.side)}
             size="sm"
@@ -300,7 +336,7 @@ export function MemberRow({
       <TableCell className="px-2 py-2">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
-        ) : canEditTeamAlly ? (
+        ) : canEditTeam ? (
           <Select
             value={String(row.teamId)}
             onValueChange={(v) => setTeam(Number(v))}
@@ -331,7 +367,7 @@ export function MemberRow({
       <TableCell className="px-2 py-2">
         {row.spectator ? (
           <span className="text-xs text-muted-foreground">–</span>
-        ) : sharedWith ? null : canEditTeamAlly ? (
+        ) : sharedWith ? null : canEditAlly ? (
           <OptionSelect
             value={String(row.ally)}
             size="sm"
@@ -363,12 +399,38 @@ export function MemberRow({
                     type="button"
                     onClick={() => {
                       setMenuOpen(false);
-                      control.onForceSpectator();
+                      control.onForceSpectator?.();
                     }}
                     className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
                   >
                     <Eye className="size-4" />
                     Force spectate
+                  </button>
+                )}
+                {control.onAppointBoss && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      control.onAppointBoss?.();
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                  >
+                    <Crown className="size-4" />
+                    Make boss
+                  </button>
+                )}
+                {control.onUnboss && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      control.onUnboss?.();
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+                  >
+                    <Crown className="size-4" />
+                    Stand boss down
                   </button>
                 )}
                 <button
