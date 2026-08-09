@@ -254,9 +254,11 @@ Every piece already has a home in coilbox.
 - Token storage is the existing keychain plugin, `crates/tauri-plugin-coilbox-lobby-servers`. We store the refresh token where we store a password today, under the same `{serverId}:{username}` key shape and the same `coilbox-lobby` service, keeping the process-lifetime cache that stops macOS re-prompting.
 - The access token is never persisted. It lives in memory for 30 minutes and is refreshed from the stored refresh token.
 
-The existing login state machine is already shaped for this. `crates/tauri-plugin-coilbox-multiplayer/src/login.rs:121-124` contains the comment `// TODO(teiserver): token auth branch here`, and the module documentation at lines 3 to 5 says the machine was built reply-driven so a token branch can slot in.
+The `TODO(teiserver)` comment in `login.rs` looks like the place for this, but it is not. That branch point is about TASServer token auth advertised through `COMPFLAGS`, which is a different mechanism. Tachyon has no reply-driven exchange to branch on at all, so the comment stays where it is and the Tachyon path does not touch `LoginMachine`.
 
-One wrinkle: under Tachyon there is no login exchange at all. The token is presented on the HTTP upgrade, so by the time the WebSocket opens we are already authenticated. The Tachyon backend's "login" phase is really "acquire a token", and the phase machine collapses from ten states to something closer to four: discovering, awaiting browser, exchanging code, connected.
+One wrinkle: under Tachyon there is no login exchange at all. The token is presented on the HTTP upgrade, so by the time the WebSocket opens we are already authenticated. The Tachyon backend's "login" phase is really "acquire a token", and the phase machine collapses from ten states to three: `tachyonAuthorizing` while a token is fetched or refreshed, `tachyonOpening` while the upgrade is in flight, then the existing `ready`.
+
+The browser handoff has no phase of its own because it is a separate command with no connection and no event channel behind it. It resolves when the user finishes in the browser. Reusing `ready` as the end state is what keeps every frontend gate working unchanged.
 
 Our `password_hash` helper at `crates/coilbox-lobby-protocol/src/hash.rs:12` computes `base64(md5(pw))` and is TASServer-only. It stays, unused by the Tachyon path.
 
@@ -277,7 +279,7 @@ Going surface by surface through coilbox as it stands.
 
 ### Changes shape
 
-- The connection task in `crates/tauri-plugin-coilbox-multiplayer/src/conn.rs`. Today it is `Framed::new(stream, LinesCodec::new())` at line 175. A Tachyon connection is a WebSocket stream, so the transport becomes an enum with two variants behind a common "next message" interface. The `Arc<Mutex<LobbyState>>` with one writer stays exactly as it is.
+- The connection task. `conn.rs` keeps the line protocol, and Tachyon gets a task of its own in `tachyon_conn.rs` rather than the two sharing one loop behind a transport enum. They have almost nothing in common: no login machine, no line reducer, no command builders, and opposite handling of every queued action, so one `match` would just hold two unrelated bodies. What they do share is the shape: one task owning the socket, sole writer of an `Arc<Mutex<LobbyState>>`, reporting through the same `LobbyEvent` channel into the same registry keyed by `serverKey`.
 - The `LobbyEvent` channel and its five kinds. `console` currently carries raw wire lines in both directions for the debug drawer. It keeps doing that, carrying pretty-printed JSON frames instead of newline-delimited text.
 - The login phase machine, as described above.
 - `LobbyServer` in `src/lobby-servers/config.ts`, which gains a `protocol` field.

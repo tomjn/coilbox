@@ -5,6 +5,7 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 #### This default permission set includes the following:
 
 - `allow-mp-connect`
+- `allow-mp-connect-tachyon`
 - `allow-mp-register`
 - `allow-mp-confirm-agreement`
 - `allow-mp-disconnect`
@@ -323,6 +324,32 @@ Enables the mp_connect command without any pre-configured scope.
 <td>
 
 Denies the mp_connect command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-connect-tachyon`
+
+</td>
+<td>
+
+Enables the mp_connect_tachyon command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-connect-tachyon`
+
+</td>
+<td>
+
+Denies the mp_connect_tachyon command without any pre-configured scope.
 
 </td>
 </tr>

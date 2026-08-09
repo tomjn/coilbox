@@ -38,14 +38,25 @@ export function serverProtocol(server: {
 }
 
 /**
- * Whether a server can be offered to the user yet. Temporary scaffolding: nothing
- * in the app can connect over Tachyon, so the Tachyon entry is defined but kept out
- * of the catalog rather than shown as a row that fails when clicked. Delete this
- * function and the `.filter` in {@link buildCatalog} when issue #1224 lands the
- * Tachyon connection.
+ * The origin a Tachyon server's OAuth discovery document sits under, which is what
+ * the browser sign-in is started against. Pure.
+ *
+ * A server entry stores a host, a port and a TLS flag, because that is what the
+ * line protocol needs and every consumer of `serverKey` already assumes, so the
+ * origin is rebuilt from those three. The default port is left out so this matches
+ * the origin the server names in its own discovery document. The Rust side rebuilds
+ * the WebSocket URL the same way (`tachyon_conn::urls`).
  */
-export function serverOfferable(server: LobbyServer): boolean {
-  return serverProtocol(server) !== "tachyon";
+export function tachyonBaseUrl(server: {
+  host: string;
+  port: number;
+  tls: boolean;
+}): string {
+  const authority =
+    server.port === (server.tls ? 443 : 80)
+      ? server.host
+      : `${server.host}:${server.port}`;
+  return `${server.tls ? "https" : "http"}://${authority}`;
 }
 
 /** The id assigned to an inline profile-defined official server (no natural id). */
@@ -172,8 +183,7 @@ export function buildCatalog(
   const list: LobbyServer[] = [];
   if (rules.official) list.push({ ...rules.official, builtin: true });
   list.push(...builtins, ...custom);
-  // Temporary, see serverOfferable. Goes away with issue #1224.
-  return list.filter(serverOfferable);
+  return list;
 }
 
 /**

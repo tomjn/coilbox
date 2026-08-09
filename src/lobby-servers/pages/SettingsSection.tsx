@@ -1,5 +1,6 @@
 import { Button, cn, Input, useSetting } from "@picoframe/frame";
 import {
+  ExternalLink,
   Plus,
   RefreshCw,
   Server,
@@ -19,6 +20,7 @@ import {
   MAX_AUTO_AWAY_MINUTES,
   MIN_AUTO_AWAY_MINUTES,
 } from "../../multiplayer/awayStatus";
+import { mpTachyonSignOut } from "../../multiplayer/bindings";
 import { ConsoleDrawer } from "../../multiplayer/ConsoleDrawer";
 import { serverKeyFor, useMultiplayer } from "../../multiplayer/store";
 import {
@@ -30,6 +32,7 @@ import {
   allServers,
   type LobbyAccount,
   type LobbyServer,
+  serverProtocol,
   useCustomServers,
   useLobbyAccounts,
 } from "../config";
@@ -548,20 +551,32 @@ function AccountForm({
           onChange={(e) => onChange({ username: e.target.value })}
         />
       </Field>
-      <Field
-        label="Password"
-        hint={
-          saved == null ? undefined : saved ? "Saved in keychain" : "Not set"
-        }
-      >
-        <Input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onBlur={savePassword}
-          placeholder={saved ? "•••••••• (saved)" : ""}
+      {serverProtocol(server ?? {}) === "tachyon" ? (
+        <TachyonSignIn
+          account={a}
+          server={server}
+          signedIn={saved}
+          onChanged={(exists) => {
+            setSaved(exists);
+            onChange({ hasSecret: exists });
+          }}
         />
-      </Field>
+      ) : (
+        <Field
+          label="Password"
+          hint={
+            saved == null ? undefined : saved ? "Saved in keychain" : "Not set"
+          }
+        >
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onBlur={savePassword}
+            placeholder={saved ? "•••••••• (saved)" : ""}
+          />
+        </Field>
+      )}
       {server && a.username.trim() !== "" && (
         <AutojoinChannels serverKey={serverKeyFor(server, a.username)} />
       )}
@@ -575,6 +590,91 @@ function AccountForm({
           <Trash2 /> Remove login
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The Tachyon half of the login editor, in place of the password field.
+ *
+ * There is nothing to type. The user signs in on the server's own page in their
+ * browser and Coilbox keeps what comes back, so the username here is a label for
+ * the login rather than a credential, and it has to be set before signing in
+ * because it is half the key the token is stored under.
+ *
+ * Signing out forgets the stored token. That is all a client can do, because the
+ * server offers no revocation endpoint (see `docs/tachyon-protocol.md`).
+ */
+function TachyonSignIn({
+  account: a,
+  server,
+  signedIn,
+  onChanged,
+}: {
+  account: LobbyAccount;
+  server: LobbyServer | undefined;
+  /** Whether a sign-in is stored, or undefined while that is still unknown. */
+  signedIn: boolean | undefined;
+  onChanged: (signedIn: boolean) => void;
+}) {
+  const { signIn, busy } = useMultiplayer();
+  const [error, setError] = useState<string | null>(null);
+  const named = a.username.trim() !== "";
+
+  const run = async (action: Promise<unknown>, outcome: boolean) => {
+    setError(null);
+    try {
+      await action;
+      onChanged(outcome);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 text-sm">
+      <span className="font-medium leading-none">Sign-in</span>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy || server == null || !named}
+          onClick={() => {
+            if (server) void run(signIn(server, a.username), true);
+          }}
+        >
+          <ExternalLink />
+          {signedIn ? "Sign in again" : "Sign in with your browser"}
+        </Button>
+        {signedIn && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                mpTachyonSignOut({
+                  serverId: a.serverId,
+                  username: a.username,
+                }),
+                false,
+              )
+            }
+          >
+            Sign out
+          </Button>
+        )}
+      </div>
+      <span className="text-xs leading-snug text-muted-foreground">
+        {!named
+          ? "Give this login a username first, so the sign-in has something to belong to."
+          : signedIn == null
+            ? "Checking whether you are signed in."
+            : signedIn
+              ? "Signed in. Coilbox holds a token for this login, not a password."
+              : "This server has no password. Signing in opens its own page in your browser."}
+      </span>
+      {error && <span className="text-xs text-destructive">{error}</span>}
     </div>
   );
 }

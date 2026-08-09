@@ -172,7 +172,13 @@ export interface LobbyState {
   friendRequests: string[];
 }
 
-/** The phases of the login handshake (mirrors `LoginPhase`). */
+/**
+ * The phases of the login handshake (mirrors `LoginPhase`). The first ten are the
+ * TASServer exchange. Tachyon has no login exchange at all, because it presents
+ * its token on the HTTP upgrade, so it has only the two steps that happen before
+ * its socket exists and then goes straight to `ready`, which is what the rest of
+ * the app gates on.
+ */
 export type LoginPhase =
   | "awaitGreeting"
   | "tlsUpgrade"
@@ -183,7 +189,9 @@ export type LoginPhase =
   | "streamingState"
   | "ready"
   | "registered"
-  | "denied";
+  | "denied"
+  | "tachyonAuthorizing"
+  | "tachyonOpening";
 
 // ---------------------------------------------------------------------------
 // Deltas and events (tagged unions on `kind`).
@@ -260,6 +268,48 @@ export const mpConnect = defineCommand<
   },
   { connected: boolean }
 >("coilbox-multiplayer", "mp_connect");
+
+/**
+ * Open a lobby connection to a Tachyon server. Streams the same `LobbyEvent`s over
+ * `onEvent` as `mpConnect` does, so everything above the connection is unchanged.
+ *
+ * There is no password. The credential is a bearer token the Rust side holds and
+ * presents on the HTTP upgrade, refreshed from the sign-in `mpTachyonSignIn`
+ * stored, so this never opens a browser. It fails if the user has not signed in.
+ */
+export const mpConnectTachyon = defineCommand<
+  {
+    serverKey: string;
+    host: string;
+    port: number;
+    tls: boolean;
+    /** The server entry's id, which is half the key the sign-in is stored under. */
+    serverId: string;
+    username: string;
+    onEvent: Channel<LobbyEvent>;
+  },
+  { connected: boolean }
+>("coilbox-multiplayer", "mp_connect_tachyon");
+
+/**
+ * Sign in to a Tachyon server through the system browser, and keep the result.
+ * Resolves only once the user has finished there, which can take a minute, and
+ * rejects if they never do.
+ *
+ * `baseUrl` is the server's own origin (see `tachyonBaseUrl`). No token comes back
+ * over IPC: the refresh token goes to the OS keychain and the access token stays
+ * in memory on the Rust side.
+ */
+export const mpTachyonSignIn = defineCommand<
+  { baseUrl: string; serverId: string; username: string },
+  Record<string, never>
+>("coilbox-multiplayer", "mp_tachyon_sign_in");
+
+/** Forget a Tachyon sign-in, both the stored refresh token and any access token. */
+export const mpTachyonSignOut = defineCommand<
+  { serverId: string; username: string },
+  Record<string, never>
+>("coilbox-multiplayer", "mp_tachyon_sign_out");
 
 /**
  * Register a new account on a server, then disconnect. Streams `LobbyEvent`s over

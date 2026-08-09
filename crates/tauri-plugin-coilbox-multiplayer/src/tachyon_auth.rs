@@ -662,8 +662,7 @@ pub fn sign_out(server_id: &str, username: &str) -> Result<(), AuthError> {
 /// An access token good for the next minute at least, refreshed from the stored
 /// refresh token if the one in memory is spent or missing.
 ///
-/// This is what the WebSocket transport will call when it needs a bearer token.
-#[allow(dead_code, reason = "the transport wires this up in a later stage")]
+/// This is what `mp_connect_tachyon` calls for the bearer token on the upgrade.
 pub async fn access_token(
     base_url: &str,
     server_id: &str,

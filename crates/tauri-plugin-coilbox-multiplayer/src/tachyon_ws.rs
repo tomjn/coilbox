@@ -129,6 +129,13 @@ impl std::fmt::Display for WsError {
     }
 }
 
+/// Watches every text frame crossing a socket, for the protocol console. The
+/// first argument is the direction, `"in"` or `"out"`, and the second the frame.
+///
+/// Frames are safe to show. The bearer token is presented as an HTTP header on
+/// the upgrade and never appears in one.
+pub type WireTap = Box<dyn Fn(&str, &str) + Send + Sync>;
+
 /// A live Tachyon WebSocket.
 ///
 /// Text frames only, in both directions. Pings are answered without the caller
@@ -138,6 +145,7 @@ pub struct TachyonSocket {
     ws: WebSocketStream<Box<dyn AsyncReadWrite>>,
     limiter: RateLimiter,
     subprotocol: String,
+    tap: Option<WireTap>,
 }
 
 impl TachyonSocket {
@@ -147,9 +155,19 @@ impl TachyonSocket {
         &self.subprotocol
     }
 
+    /// Watch every frame this socket carries. Set on the socket rather than on
+    /// whatever sits above it, because this is the one place both directions pass
+    /// through, so a console fed from here cannot miss a frame.
+    pub fn watch(&mut self, tap: WireTap) {
+        self.tap = Some(tap);
+    }
+
     /// Send one text frame, waiting first for the rate limiter to allow it.
     pub async fn send(&mut self, text: &str) -> Result<(), WsError> {
         self.limiter.acquire().await;
+        if let Some(tap) = &self.tap {
+            tap("out", text);
+        }
         self.ws.send(Message::text(text)).await.map_err(from_lib)
     }
 
@@ -166,7 +184,12 @@ impl TachyonSocket {
     pub async fn recv(&mut self) -> Result<String, WsError> {
         loop {
             match self.ws.next().await {
-                Some(Ok(Message::Text(text))) => return Ok(text.to_string()),
+                Some(Ok(Message::Text(text))) => {
+                    if let Some(tap) = &self.tap {
+                        tap("in", &text);
+                    }
+                    return Ok(text.to_string());
+                }
                 Some(Ok(Message::Ping(_) | Message::Pong(_))) => continue,
                 Some(Ok(Message::Binary(_))) => {
                     return Err(WsError::Protocol(
@@ -276,6 +299,7 @@ async fn do_connect(url: &str, token: &str) -> Result<TachyonSocket, WsConnectEr
         ws,
         limiter: RateLimiter::new(SEND_BURST, SEND_RATE_PER_SEC),
         subprotocol,
+        tap: None,
     })
 }
 
@@ -529,6 +553,37 @@ mod tests {
         let (auth, offered) = rx.recv().await.unwrap();
         assert_eq!(auth, "Bearer test-token");
         assert_eq!(offered, SUBPROTOCOL);
+    }
+
+    #[tokio::test]
+    async fn a_watcher_sees_both_directions() {
+        let url = serve(Some(SUBPROTOCOL), |mut ws| async move {
+            let got = ws.next().await.unwrap().unwrap();
+            ws.send(Message::text(format!("echo:{}", got.into_text().unwrap())))
+                .await
+                .unwrap();
+            std::future::pending::<()>().await;
+        })
+        .await;
+
+        let (tx, mut rx) = mpsc::unbounded_channel::<(String, String)>();
+        let mut socket = open(&url).await.unwrap();
+        socket.watch(Box::new(move |direction, frame| {
+            let _ = tx.send((direction.to_string(), frame.to_string()));
+        }));
+        socket.send("{}").await.unwrap();
+        socket.recv().await.unwrap();
+
+        // Bounded, so a watcher that is never called fails this rather than
+        // hanging the suite on it.
+        async fn next(rx: &mut mpsc::UnboundedReceiver<(String, String)>) -> (String, String) {
+            tokio::time::timeout(Duration::from_secs(5), rx.recv())
+                .await
+                .expect("the watcher was not called within 5 seconds")
+                .expect("the watcher was dropped")
+        }
+        assert_eq!(next(&mut rx).await, ("out".into(), "{}".into()));
+        assert_eq!(next(&mut rx).await, ("in".into(), "echo:{}".into()));
     }
 
     #[tokio::test]

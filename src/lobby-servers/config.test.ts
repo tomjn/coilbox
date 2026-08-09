@@ -27,9 +27,9 @@ import {
   OFFICIAL_ID,
   resolveProfileServerRules,
   resolveServer,
-  serverOfferable,
   serverProtocol,
   sortAccountsByRecency,
+  tachyonBaseUrl,
 } from "./config";
 
 const custom: LobbyServer = {
@@ -43,10 +43,10 @@ const custom: LobbyServer = {
 
 describe("allServers", () => {
   it("puts built-ins first, tagged builtin, then custom servers", () => {
-    const offered = BUILTIN_SERVERS.filter(serverOfferable);
+    const n = BUILTIN_SERVERS.length;
     const all = allServers([custom]);
-    expect(all).toHaveLength(offered.length + 1);
-    expect(all.slice(0, offered.length).every((s) => s.builtin)).toBe(true);
+    expect(all).toHaveLength(n + 1);
+    expect(all.slice(0, n).every((s) => s.builtin)).toBe(true);
     expect(all[all.length - 1]).toMatchObject({ id: "custom-1" });
   });
 
@@ -96,9 +96,7 @@ describe("serverProtocol", () => {
   });
 });
 
-// Temporary scaffolding, see serverOfferable in config.ts. Issue #1224 lands the
-// Tachyon connection, deletes the filter, and these cases go with it.
-describe("the Tachyon built-in, defined but not offered", () => {
+describe("the Tachyon built-in, offered like any other server", () => {
   it("is in the built-in list with the Tachyon shape", () => {
     expect(BUILTIN_SERVERS.find((s) => s.id === "bar-tachyon")).toMatchObject({
       host: "server4.beyondallreason.info",
@@ -108,32 +106,59 @@ describe("the Tachyon built-in, defined but not offered", () => {
     });
   });
 
-  it("is kept out of the catalog, so no user can select it", () => {
-    expect(allServers([]).some((s) => s.id === "bar-tachyon")).toBe(false);
-    expect(resolveServer("bar-tachyon", [])).toBeUndefined();
+  it("is in the catalog, so a user can select it", () => {
+    expect(allServers([]).some((s) => s.id === "bar-tachyon")).toBe(true);
+    expect(resolveServer("bar-tachyon", [])).toMatchObject({
+      protocol: "tachyon",
+    });
   });
 
-  it("stays out when a profile preset names it", () => {
+  it("is kept when a profile preset names it", () => {
     const out = buildCatalog([], { presets: ["bar", "bar-tachyon"] });
-    expect(out.map((s) => s.id)).toEqual(["bar"]);
+    expect(out.map((s) => s.id)).toEqual(["bar", "bar-tachyon"]);
   });
 
-  it("stays out when a profile promotes it as the official server", () => {
+  it("can be a profile's official server", () => {
     const rules = resolveProfileServerRules({ official: "bar-tachyon" });
-    // The promotion still carries the protocol. Only the catalog hides it.
     expect(rules.official).toMatchObject({ protocol: "tachyon" });
     const out = buildCatalog([], rules);
-    expect(out.some((s) => s.id === "bar-tachyon")).toBe(false);
+    expect(out[0]).toMatchObject({ id: "bar-tachyon", official: true });
+    // Promoted to official, so it appears once rather than twice.
+    expect(out.filter((s) => s.id === "bar-tachyon")).toHaveLength(1);
   });
 
-  it("hides a hand-written custom Tachyon server too", () => {
+  it("keeps a hand-written custom Tachyon server too", () => {
     const tachyonCustom: LobbyServer = {
       ...custom,
       id: "custom-tachyon",
       protocol: "tachyon",
     };
-    expect(allServers([tachyonCustom, custom]).map((s) => s.id)).not.toContain(
+    expect(allServers([tachyonCustom, custom]).map((s) => s.id)).toContain(
       "custom-tachyon",
+    );
+  });
+});
+
+describe("tachyonBaseUrl", () => {
+  it("drops the default port, so it matches the server's own origin", () => {
+    const bar = BUILTIN_SERVERS.find((s) => s.id === "bar-tachyon");
+    expect(bar && tachyonBaseUrl(bar)).toBe(
+      "https://server4.beyondallreason.info",
+    );
+  });
+
+  it("keeps a port that is not the default", () => {
+    expect(
+      tachyonBaseUrl({ host: "teiserver.example", port: 8443, tls: true }),
+    ).toBe("https://teiserver.example:8443");
+  });
+
+  it("uses http for a server without TLS", () => {
+    expect(tachyonBaseUrl({ host: "localhost", port: 4000, tls: false })).toBe(
+      "http://localhost:4000",
+    );
+    expect(tachyonBaseUrl({ host: "localhost", port: 80, tls: false })).toBe(
+      "http://localhost",
     );
   });
 });

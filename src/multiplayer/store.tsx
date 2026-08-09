@@ -17,6 +17,8 @@ import {
   autoConnectTarget,
   type LobbyServer,
   profileOfficialServer,
+  serverProtocol,
+  tachyonBaseUrl,
   useCustomServers,
   useLastLogin,
   useLobbyAccounts,
@@ -41,6 +43,7 @@ import {
   mpCancelConnect,
   mpConfirmAgreement,
   mpConnect,
+  mpConnectTachyon,
   mpDisconnect,
   mpFriendList,
   mpFriendRequestList,
@@ -52,6 +55,7 @@ import {
   mpRegister,
   mpSetStatus,
   mpSnapshot,
+  mpTachyonSignIn,
 } from "./bindings";
 import {
   addChannel,
@@ -280,6 +284,13 @@ interface MultiplayerContextValue {
   busy: boolean;
   /** Open a connection as `username` to `server` (throws if no stored password). */
   connect: (server: LobbyServer, username: string) => Promise<void>;
+  /**
+   * Sign in to a Tachyon server through the system browser, storing the result so
+   * `connect` can use it. Resolves once the user has finished in the browser, and
+   * rejects if they never do. This is the only path in the app that opens one, so
+   * an automatic reconnect cannot.
+   */
+  signIn: (server: LobbyServer, username: string) => Promise<void>;
   /**
    * Register a new account on `server`. Resolves once the server accepts it (the
    * connection is then closed); rejects with the server's reason on denial. Does
@@ -980,27 +991,41 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       const serverKey = serverKeyFor(server, username);
       connectingKeyRef.current = serverKey;
       try {
-        const cred = await lsGetCredential({ serverId: server.id, username });
-        if (!cred.secret) {
-          throw new Error(
-            "No stored password for this login (set one in Settings).",
-          );
-        }
-
         const onEvent = openChannel(serverKey);
-
-        dispatch({ type: "connecting" });
-        await mpConnect({
-          serverKey,
-          host: server.host,
-          port: server.port,
-          tls: server.tls,
-          allowSelfSigned: server.allowSelfSigned,
-          username,
-          password: cred.secret,
-          compatFlags: ["u", "sp"],
-          onEvent,
-        });
+        if (serverProtocol(server) === "tachyon") {
+          // No password to read and no handshake to run. The Rust side refreshes
+          // the token the browser sign-in stored, so this never opens a browser,
+          // which is what makes an auto-reconnect safe on a Tachyon server.
+          dispatch({ type: "connecting" });
+          await mpConnectTachyon({
+            serverKey,
+            host: server.host,
+            port: server.port,
+            tls: server.tls,
+            serverId: server.id,
+            username,
+            onEvent,
+          });
+        } else {
+          const cred = await lsGetCredential({ serverId: server.id, username });
+          if (!cred.secret) {
+            throw new Error(
+              "No stored password for this login (set one in Settings).",
+            );
+          }
+          dispatch({ type: "connecting" });
+          await mpConnect({
+            serverKey,
+            host: server.host,
+            port: server.port,
+            tls: server.tls,
+            allowSelfSigned: server.allowSelfSigned,
+            username,
+            password: cred.secret,
+            compatFlags: ["u", "sp"],
+            onEvent,
+          });
+        }
         const snap = await mpSnapshot({ serverKey });
         dispatch({ type: "snapshot", state: snap.state });
         setActiveKey(serverKey);
@@ -1026,6 +1051,23 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     },
     [openChannel],
   );
+
+  // The browser sign-in that gives a Tachyon connect something to refresh. Kept
+  // out of `connect` deliberately: a reconnect must never put a browser window in
+  // front of someone who has walked away from a dropped connection.
+  const signIn = useCallback(async (server: LobbyServer, username: string) => {
+    setBusy(true);
+    try {
+      await mpTachyonSignIn({
+        baseUrl: tachyonBaseUrl(server),
+        serverId: server.id,
+        username,
+      });
+      markAccountUsedRef.current(server.id, username);
+    } finally {
+      setBusy(false);
+    }
+  }, []);
 
   // Public connect: a manual login supersedes any in-flight auto-reconnect loop.
   const connect = useCallback(
@@ -1301,6 +1343,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         revealed,
         busy,
         connect,
+        signIn,
         register,
         disconnect,
         cancelConnect,

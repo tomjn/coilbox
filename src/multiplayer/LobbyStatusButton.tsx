@@ -1,5 +1,12 @@
 import { Button, useSetting } from "@picoframe/frame";
-import { Loader2, Plus, RefreshCw, UserPlus, Users } from "lucide-react";
+import {
+  ExternalLink,
+  Loader2,
+  Plus,
+  RefreshCw,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import {
@@ -15,12 +22,14 @@ import {
   type LobbyAccount,
   resolveLastLogin,
   resolveServer,
+  serverProtocol,
   sortAccountsByRecency,
   useCustomServers,
   useLastLogin,
   useLobbyAccounts,
 } from "../lobby-servers/config";
 import { RegisterForm } from "../lobby-servers/RegisterForm";
+import type { LoginPhase } from "./bindings";
 import { useMultiplayer } from "./store";
 
 type DotStatus = "off" | "connecting" | "on" | "away" | "error";
@@ -100,6 +109,16 @@ export default function LobbyStatusButton() {
   );
 }
 
+/**
+ * What the Tachyon connect is doing, for the panel's waiting view. The TASServer
+ * phases are not listed: that connect is one step from the user's side, and its
+ * ten phases pass too fast to read.
+ */
+const PHASE_LABEL: Partial<Record<LoginPhase, string>> = {
+  tachyonAuthorizing: "Checking your sign-in",
+  tachyonOpening: "Opening the connection",
+};
+
 export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   const [accountsCfg] = useLobbyAccounts();
   const [customCfg] = useCustomServers();
@@ -110,6 +129,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
     revealed,
     busy,
     connect,
+    signIn,
     disconnect,
     cancelConnect,
     status,
@@ -123,6 +143,14 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<LobbyAccount | null>(null);
   const [registering, setRegistering] = useState(false);
+  // True while the user is off in their browser, which reads nothing like the
+  // rest of a connect and takes as long as they take.
+  const [signingIn, setSigningIn] = useState(false);
+  // The Tachyon login whose connect just failed. A sign-in that is gone or no
+  // longer accepted is the one cause the user can do something about, so the
+  // panel offers the browser as the way out rather than leaving them with a
+  // message and nothing to press.
+  const [needsSignIn, setNeedsSignIn] = useState<LobbyAccount | null>(null);
 
   // A one-click "reconnect" shortcut to the last-used account, earned only after a
   // genuine connection this session (`revealed`) — on a fresh open it would just
@@ -138,19 +166,35 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   // dedicated connect button.
   const sortedAccounts = sortAccountsByRecency(accounts, lastLogin);
 
-  async function connectTo(account: LobbyAccount) {
+  /**
+   * Connect as `account`. A Tachyon login has no password, so the first connect
+   * for one sends the user to their browser first, and `signInFirst` sends them
+   * again when the stored sign-in turned out not to work.
+   */
+  async function connectTo(account: LobbyAccount, signInFirst = false) {
     setError(null);
+    setNeedsSignIn(null);
     setPending(account);
+    const server = resolveServer(account.serverId, customCfg.servers);
+    const tachyon = server != null && serverProtocol(server) === "tachyon";
     try {
-      const server = resolveServer(account.serverId, customCfg.servers);
       if (!server) {
         throw new Error(
           "This login's server no longer exists (check Settings).",
         );
       }
+      if (tachyon && (signInFirst || account.hasSecret !== true)) {
+        setSigningIn(true);
+        try {
+          await signIn(server, account.username);
+        } finally {
+          setSigningIn(false);
+        }
+      }
       await connect(server, account.username);
     } catch (e) {
       setError(String(e));
+      if (tachyon) setNeedsSignIn(account);
     } finally {
       setPending(null);
     }
@@ -231,17 +275,27 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
   }
 
   if (busy) {
-    const label = pending?.username ?? "server";
+    const phase = mirror.phase ? PHASE_LABEL[mirror.phase] : undefined;
     return (
       <div className="flex flex-col items-center gap-3 py-4">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
         <div className="text-center">
-          <p className="text-sm font-medium">Connecting…</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-sm font-medium">
+            {signingIn ? "Waiting for your browser" : "Connecting…"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {signingIn
+              ? "Sign in on the page Coilbox opened, then come back."
+              : (phase ?? pending?.username ?? "server")}
+          </p>
         </div>
-        <Button onClick={() => void cancelConnect()} className="h-8 w-full">
-          Cancel
-        </Button>
+        {/* Nothing can call off a sign-in that is happening in someone else's
+            browser. It gives up on its own after a minute. */}
+        {!signingIn && (
+          <Button onClick={() => void cancelConnect()} className="h-8 w-full">
+            Cancel
+          </Button>
+        )}
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
     );
@@ -264,6 +318,12 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
       )}
       {sortedAccounts.map((a) => {
         const server = resolveServer(a.serverId, customCfg.servers);
+        // A Tachyon login with no sign-in stored takes the user to their browser
+        // when they press it, so say so before they press it.
+        const opensBrowser =
+          server != null &&
+          serverProtocol(server) === "tachyon" &&
+          a.hasSecret !== true;
         return (
           <button
             key={a.id}
@@ -282,6 +342,7 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
             </span>
             <span className="text-xs text-muted-foreground">
               {server?.name ?? "Unknown server"}
+              {opensBrowser && " · signs in with your browser"}
             </span>
           </button>
         );
@@ -303,6 +364,15 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
         Register a new account
       </button>
       {error && <p className="px-2 pt-1 text-xs text-destructive">{error}</p>}
+      {needsSignIn && (
+        <Button
+          onClick={() => void connectTo(needsSignIn, true)}
+          className="mt-1 h-9 justify-start gap-2"
+        >
+          <ExternalLink className="size-4" />
+          Sign in with your browser
+        </Button>
+      )}
       {mirror.loginError ? (
         <p className="px-2 pt-1 text-xs text-destructive">
           Login failed: {mirror.loginError}
