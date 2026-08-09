@@ -993,6 +993,274 @@ fn a_patch_moving_us_changes_what_the_next_seat_push_asks_for() {
     );
 }
 
+/// A `currentVote` as `lobbyDetails` carries one: alice has called a vote to
+/// change the map and voted yes, and bob has not voted yet.
+fn a_vote() -> Value {
+    json!({
+        "id": "vote-1",
+        "action": { "type": "changeMap", "newMapName": "Red Comet Remake 1.8" },
+        "initiator": "1",
+        "until": 1_705_432_800_000_000i64,
+        "voters": {
+            "1": { "vote": "yes" },
+            "2": { "vote": "pending" },
+        },
+    })
+}
+
+/// A `lobby/voteEnded` event, which says how a vote finished.
+fn vote_ended_frame(id: &str, outcome: &str) -> String {
+    json!({
+        "type": "event",
+        "messageId": "5",
+        "commandId": "lobby/voteEnded",
+        "data": { "id": id, "outcome": outcome },
+    })
+    .to_string()
+}
+
+/// A room holding [`a_vote`], joined as alice.
+fn voting_room() -> (Option<Room>, LobbyState) {
+    joined_as(details(json!({ "currentVote": a_vote() })))
+}
+
+/// What the panel says a vote asking for `action` is about.
+fn subject(action: Value) -> String {
+    let mut vote = a_vote();
+    vote["action"] = action;
+    let (_room, state) = joined_as(details(json!({ "currentVote": vote })));
+    state.current_vote.expect("no vote").subject
+}
+
+/// What a vote ending with `outcome` tells the user.
+fn ending(outcome: &str) -> String {
+    let (mut room, mut state) = voting_room();
+    feed(&mut room, &mut state, &vote_ended_frame("vote-1", outcome))
+        .into_iter()
+        .find_map(|delta| match delta {
+            Delta::ServerMessage { text, .. } => Some(text),
+            _ => None,
+        })
+        .expect("nothing said how the vote went")
+}
+
+#[test]
+fn a_join_with_a_vote_open_fills_the_panel() {
+    let (_room, state) = voting_room();
+
+    let vote = state.current_vote.expect("no vote");
+    assert_eq!(vote.subject, "change the map to Red Comet Remake 1.8");
+    assert_eq!(vote.caller, "alice");
+    assert_eq!(vote.yes, 1);
+    assert_eq!(vote.no, 0, "a pending voter has not voted no");
+    assert!(vote.allow_abstain, "voteSubmit always takes abstain");
+    assert_eq!(vote.ends_at, 1_705_432_800_000, "microseconds to millis");
+}
+
+#[test]
+fn a_patch_changes_one_voter_and_leaves_the_others() {
+    let (mut room, mut state) = voting_room();
+    let id = state.current_battle.expect("we are not in a battle");
+
+    let deltas = feed(
+        &mut room,
+        &mut state,
+        &updated_frame(json!({
+            "id": "lobby-a",
+            "currentVote": { "id": "vote-1", "voters": { "2": { "vote": "no" } } },
+        })),
+    );
+
+    let vote = state.current_vote.expect("the vote has gone");
+    assert_eq!(vote.no, 1);
+    assert_eq!(vote.yes, 1, "alice's yes went with bob's no");
+    assert_eq!(vote.caller, "alice");
+    assert_eq!(vote.subject, "change the map to Red Comet Remake 1.8");
+    // The vote is not on the battle, so without this the panel would never hear
+    // that a voter moved.
+    assert_eq!(deltas, vec![Delta::BattleInfoChanged { id }]);
+}
+
+#[test]
+fn a_patch_with_a_null_ends_the_vote() {
+    let (mut room, mut state) = voting_room();
+
+    feed(
+        &mut room,
+        &mut state,
+        &updated_frame(json!({ "id": "lobby-a", "currentVote": null })),
+    );
+
+    assert!(state.current_vote.is_none());
+}
+
+#[test]
+fn a_patch_that_does_not_mention_the_vote_leaves_it_alone() {
+    // Absent is not null. A patch about the map says nothing about the vote, so
+    // the panel stays exactly as it was.
+    let (mut room, mut state) = voting_room();
+
+    feed(
+        &mut room,
+        &mut state,
+        &updated_frame(json!({ "id": "lobby-a", "mapName": "Supreme Isthmus V2" })),
+    );
+
+    let vote = state.current_vote.expect("the vote has gone");
+    assert_eq!(vote.yes, 1);
+    assert_eq!(vote.subject, "change the map to Red Comet Remake 1.8");
+}
+
+#[test]
+fn a_typed_action_reads_as_what_it_asks_for() {
+    assert_eq!(subject(json!({ "type": "start" })), "start the match");
+    assert_eq!(
+        subject(json!({ "type": "appointBoss", "bossId": "2" })),
+        "make bob boss"
+    );
+    assert_eq!(
+        subject(json!({ "type": "kickban", "userId": "2" })),
+        "kick bob"
+    );
+    assert_eq!(
+        subject(json!({ "type": "kickban", "userId": "2", "banUntil": 1_705_432_800_000_000i64 })),
+        "ban bob",
+        "a date to ban until is what makes it a ban"
+    );
+}
+
+#[test]
+fn voting_names_the_vote_the_lobby_is_holding() {
+    let (room, state) = voting_room();
+
+    assert_eq!(
+        asked(
+            &room,
+            &state,
+            RoomAction::CastVote {
+                choice: VoteChoice::Yes
+            }
+        ),
+        vec![(
+            "lobby/voteSubmit".to_owned(),
+            json!({ "id": "vote-1", "vote": "yes" })
+        )]
+    );
+    assert_eq!(
+        asked(
+            &room,
+            &state,
+            RoomAction::CastVote {
+                choice: VoteChoice::Abstain
+            }
+        ),
+        vec![(
+            "lobby/voteSubmit".to_owned(),
+            json!({ "id": "vote-1", "vote": "abstain" })
+        )]
+    );
+}
+
+#[test]
+fn voting_with_no_vote_open_asks_for_nothing() {
+    let (room, state) = joined_room();
+
+    assert!(asked(
+        &room,
+        &state,
+        RoomAction::CastVote {
+            choice: VoteChoice::No
+        }
+    )
+    .is_empty());
+}
+
+#[test]
+fn a_vote_ending_closes_the_panel_and_says_how_it_went() {
+    let (mut room, mut state) = voting_room();
+
+    let deltas = feed(&mut room, &mut state, &vote_ended_frame("vote-1", "passed"));
+
+    assert!(state.current_vote.is_none());
+    assert!(
+        deltas.contains(&Delta::ServerMessage {
+            text: "The vote to change the map to Red Comet Remake 1.8 passed.".into(),
+            boxed: false,
+        }),
+        "{deltas:?}"
+    );
+}
+
+#[test]
+fn every_outcome_of_a_vote_is_reported() {
+    assert!(
+        ending("passed").ends_with(" passed."),
+        "{}",
+        ending("passed")
+    );
+    assert!(
+        ending("failed").ends_with(" failed."),
+        "{}",
+        ending("failed")
+    );
+    assert!(
+        ending("cancelled").ends_with(" was cancelled."),
+        "{}",
+        ending("cancelled")
+    );
+    assert!(
+        ending("timeout").ends_with(" ran out of time."),
+        "{}",
+        ending("timeout")
+    );
+}
+
+#[test]
+fn a_vote_ending_after_the_patch_is_named_from_the_history() {
+    // The null and the event can arrive in either order. When the patch went
+    // first the action is only in the history.
+    let (mut room, mut state) = voting_room();
+    feed(
+        &mut room,
+        &mut state,
+        &updated_frame(json!({
+            "id": "lobby-a",
+            "currentVote": null,
+            "voteHistory": { "vote-1": {
+                "vote": { "type": "changeMap", "newMapName": "Red Comet Remake 1.8" },
+                "outcome": "passed",
+                "finishedAt": 1_705_432_800_000_000i64,
+            } },
+        })),
+    );
+
+    let deltas = feed(&mut room, &mut state, &vote_ended_frame("vote-1", "passed"));
+
+    assert!(
+        deltas.contains(&Delta::ServerMessage {
+            text: "The vote to change the map to Red Comet Remake 1.8 passed.".into(),
+            boxed: false,
+        }),
+        "{deltas:?}"
+    );
+}
+
+#[test]
+fn a_vote_ending_that_names_another_vote_leaves_the_open_one() {
+    let (mut room, mut state) = voting_room();
+
+    let deltas = feed(&mut room, &mut state, &vote_ended_frame("vote-2", "failed"));
+
+    assert!(state.current_vote.is_some(), "the open vote went with it");
+    assert!(
+        deltas.contains(&Delta::ServerMessage {
+            text: "The vote failed.".into(),
+            boxed: false,
+        }),
+        "{deltas:?}"
+    );
+}
+
 #[test]
 fn a_message_that_carries_no_lobby_leaves_the_room_alone() {
     let (mut room, mut state) = joined_room();

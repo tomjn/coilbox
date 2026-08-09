@@ -1,7 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Check, Minus, Vote as VoteIcon, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { Vote } from "../bindings";
+import type { Vote, VoteChoice } from "../bindings";
 
 /**
  * Live seconds remaining from a unix-millis deadline, or null when the deadline is
@@ -20,19 +20,20 @@ function useCountdown(endsAt: number): number | null {
 }
 
 /**
- * The transient panel for a live SPADS autohost vote. Shows what's being voted on,
- * the running yes/no tally (with how many each side needs), a countdown, and
- * one-click Yes / No / Abstain — so players don't have to read chat and type
- * `!vote`. Abstain only appears when the autohost advertised it. The panel is
- * mounted only while `room.currentVote` is set; the reducer clears that when the
- * vote passes, fails, is cancelled, or we leave, which unmounts this.
+ * The transient panel for a live vote. Shows what's being voted on, the running
+ * yes/no tally, a countdown, and one-click Yes / No / Abstain, so players don't
+ * have to read chat and type `!vote`. Each side's tally carries how many votes
+ * it needs only when the server has said. Abstain only appears when the server
+ * takes it. The panel is mounted only while `room.currentVote` is set, and the
+ * reducer clears that when the vote passes, fails, is cancelled, or we leave,
+ * which unmounts this.
  */
 export function VotePanel({
   vote,
   onVote,
 }: {
   vote: Vote;
-  onVote: (choice: "y" | "n" | "b") => void;
+  onVote: (choice: VoteChoice) => void;
 }) {
   const secondsLeft = useCountdown(vote.endsAt);
 
@@ -80,26 +81,32 @@ export function VotePanel({
             aria-live="polite"
           >
             <span className="text-emerald-600 dark:text-emerald-400">
-              y {vote.yes}/{vote.yesNeeded}
+              y {vote.yes}
+              {vote.yesNeeded > 0 && `/${vote.yesNeeded}`}
             </span>
             {" · "}
             <span className="text-destructive">
-              n {vote.no}/{vote.noNeeded}
+              n {vote.no}
+              {vote.noNeeded > 0 && `/${vote.noNeeded}`}
             </span>
           </span>
         </div>
 
         <div className="flex shrink-0 gap-2">
-          <Button size="sm" onClick={() => onVote("y")}>
+          <Button size="sm" onClick={() => onVote("yes")}>
             <Check className="size-4" />
             Yes
           </Button>
-          <Button size="sm" variant="destructive" onClick={() => onVote("n")}>
+          <Button size="sm" variant="destructive" onClick={() => onVote("no")}>
             <X className="size-4" />
             No
           </Button>
           {vote.allowAbstain && (
-            <Button size="sm" variant="outline" onClick={() => onVote("b")}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onVote("abstain")}
+            >
               <Minus className="size-4" />
               Abstain
             </Button>

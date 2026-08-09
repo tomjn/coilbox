@@ -47,6 +47,7 @@ Allows the multiplayer lobby client's connection, state, chat, battle and hostin
 - `allow-mp-force-color`
 - `allow-mp-force-spectator`
 - `allow-mp-kick`
+- `allow-mp-cast-vote`
 - `allow-mp-appoint-boss`
 - `allow-mp-unboss`
 - `allow-mp-set-start-rect`
@@ -250,6 +251,32 @@ Enables the mp_cancel_connect command without any pre-configured scope.
 <td>
 
 Denies the mp_cancel_connect command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:allow-mp-cast-vote`
+
+</td>
+<td>
+
+Enables the mp_cast_vote command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-multiplayer:deny-mp-cast-vote`
+
+</td>
+<td>
+
+Denies the mp_cast_vote command without any pre-configured scope.
 
 </td>
 </tr>

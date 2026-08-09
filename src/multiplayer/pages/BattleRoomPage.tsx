@@ -376,10 +376,7 @@ function BattleRoomPage() {
       />
 
       {room.currentVote && (
-        <VotePanel
-          vote={room.currentVote}
-          onVote={(choice) => room.autohostSend(`!vote ${choice}`)}
-        />
+        <VotePanel vote={room.currentVote} onVote={room.castVote} />
       )}
 
       {launch.error && (

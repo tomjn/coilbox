@@ -51,7 +51,7 @@ use serde_json::{json, Value};
 use tachyon_conn::TachyonMarkers;
 use tachyon_friends::FriendAction;
 use tachyon_messaging::Conversation;
-use tachyon_room::RoomAction;
+use tachyon_room::{RoomAction, VoteChoice};
 use tauri::{
     ipc::Channel,
     plugin::{Builder, TauriPlugin},
@@ -1207,6 +1207,35 @@ fn mp_kick(registry: State<'_, Registry>, server_key: String, username: String) 
     )
 }
 
+/// `mp_cast_vote`: vote yes, no or abstain in the battle's open vote.
+#[tauri::command]
+fn mp_cast_vote(
+    registry: State<'_, Registry>,
+    server_key: String,
+    choice: VoteChoice,
+) -> CliResult {
+    // Tachyon holds the vote itself, so this is `lobby/voteSubmit` against the
+    // vote the lobby is holding. SPADS has no command for it: a vote there is
+    // battle chat to the autohost, which is what the scraper reads back.
+    if let Some(result) = tachyon_action(
+        registry.inner(),
+        &server_key,
+        TachyonAction::Room(RoomAction::CastVote { choice }),
+    ) {
+        return result;
+    }
+    let letter = match choice {
+        VoteChoice::Yes => "y",
+        VoteChoice::No => "n",
+        VoteChoice::Abstain => "b",
+    };
+    enqueue(
+        registry.inner(),
+        &server_key,
+        command::say_battle(&format!("!vote {letter}")),
+    )
+}
+
 /// `mp_appoint_boss`, Tachyon only: make a member a boss, so they may change the
 /// lobby. Tachyon has no founder, and a boss is the nearest thing it has.
 #[tauri::command]
@@ -1823,6 +1852,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_force_color,
             mp_force_spectator,
             mp_kick,
+            mp_cast_vote,
             mp_appoint_boss,
             mp_unboss,
             mp_set_start_rect,
