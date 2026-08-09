@@ -358,6 +358,8 @@ We do not depend on `tachyon-rs-types`. It is three schema minors behind at 1.20
 
 The known-good toolchain is `schemars` 0.8.22 to parse the draft-07 root schema, `typify` 0.7.0 to build the type space, and `prettyplease` with `syn` to emit. The `tachyon-rs-types` crate uses typify 0.6.1, but 0.7.0 is current, still builds on schemars 0.8.22, and generates clean code. Generated code needs `serde`, `serde_json`, `uuid` for the `format: uuid` on `battleId`, and `regress` for `pattern` constraints such as the `^[0-9a-zA-Z .+-]+$` on `engineVersion`.
 
+The vendored bundle is pinned to an upstream tag and refreshing it is routine work, a few times a year. `crates/coilbox-tachyon-protocol/schema/README.md` holds the procedure, the one local patch, and the three things `build.rs` fails the build on.
+
 Ignore the generated root type. Typify turns the 166-member top-level `anyOf` into a struct with 166 `Option` fields flattened with serde, one per command, which cannot discriminate anything. The per-command types it generates are good, `LobbyJoinRequest` as a struct and `LobbyJoinResponse` as a two-variant enum. We hand-write the envelope and dispatch on the pair `(commandId, type)` into the named per-command types.
 
 The envelope we write by hand looks like this.

@@ -11,11 +11,16 @@
 //! 166 commands. A hand-written match of that size would be wrong within one
 //! schema refresh, and it would be wrong silently.
 
-use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 
 /// Marks the local patch described in `schema/README.md`.
 const PATCH_MARKER: &str = "x-coilbox-patched";
+
+/// Every field in the bundle that is both optional and nullable, recorded so
+/// that a schema refresh adding one has to be looked at. See
+/// [`check_nullable_optional`].
+const NULLABLE_OPTIONAL: &str = "schema/nullable-optional.txt";
 
 /// Commands that decode into a hand-written type rather than the generated one,
 /// keyed on the schema title.
@@ -28,11 +33,13 @@ const OVERRIDES: &[(&str, &str)] =
     &[("LobbyUpdatedEvent", "crate::merge_patch::LobbyUpdatedEvent")];
 
 fn main() {
-    let schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("schema/compiled.json");
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let schema_path = manifest.join("schema/compiled.json");
     println!("cargo:rerun-if-changed={}", schema_path.display());
 
     let text = std::fs::read_to_string(&schema_path).expect("read the vendored schema");
     check_patch(&text);
+    check_nullable_optional(&text, &manifest);
 
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR is set"));
     write_types(&text, &out_dir.join("types.rs"));
@@ -50,6 +57,111 @@ fn check_patch(text: &str) {
          Re-apply the patch described in crates/coilbox-tachyon-protocol/schema/README.md, or \
          delete this check if upstream has fixed it."
     );
+}
+
+/// Fails the build when the bundle holds an optional and nullable field that
+/// [`NULLABLE_OPTIONAL`] does not already list.
+///
+/// Typify writes both "the field is absent" and "the field is present and null"
+/// as `Option<T>`, so a generated type cannot tell leave alone from remove.
+/// That is the whole reason `lobby/updated` is hand written, and a field
+/// arriving with a schema refresh would generate quietly and read wrongly. The
+/// recorded list turns that into a build failure.
+fn check_nullable_optional(text: &str, manifest: &Path) {
+    let bundle: serde_json::Value = serde_json::from_str(text).expect("parse the schema as JSON");
+    let mut found = BTreeSet::new();
+    for member in bundle["anyOf"]
+        .as_array()
+        .expect("the bundle is a top-level anyOf")
+    {
+        let title = member["title"].as_str().expect("every member has a title");
+        walk(member, title, &mut found);
+    }
+    for (name, definition) in bundle["definitions"]
+        .as_object()
+        .expect("the bundle has shared definitions")
+    {
+        walk(definition, name, &mut found);
+    }
+
+    let path = manifest.join(NULLABLE_OPTIONAL);
+    println!("cargo:rerun-if-changed={}", path.display());
+    let recorded: BTreeSet<String> = std::fs::read_to_string(&path)
+        .expect("read the recorded optional and nullable fields")
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(str::to_string)
+        .collect();
+
+    let new: Vec<&String> = found.difference(&recorded).collect();
+    let gone: Vec<&String> = recorded.difference(&found).collect();
+    assert!(
+        new.is_empty() && gone.is_empty(),
+        "the bundle's optional and nullable fields have moved.\n  new: {new:#?}\n  gone: \
+         {gone:#?}\nFor each new one, absent and null mean different things on the wire and the \
+         generated Option<T> cannot tell them apart. Decide whether the command needs a \
+         hand-written type in src/merge_patch.rs with an OVERRIDES entry, then record the field \
+         in {NULLABLE_OPTIONAL}."
+    );
+}
+
+/// Records every field of `node` that is optional and nullable, then walks into
+/// each field's own schema. A `$ref` is not followed, because the definition it
+/// points at is walked on its own.
+fn walk(node: &serde_json::Value, path: &str, found: &mut BTreeSet<String>) {
+    if let Some(properties) = node
+        .get("properties")
+        .and_then(serde_json::Value::as_object)
+    {
+        let required = node.get("required").and_then(serde_json::Value::as_array);
+        for (name, schema) in properties {
+            let field = format!("{path}.{name}");
+            let required = required
+                .is_some_and(|list| list.iter().any(|item| item.as_str() == Some(name.as_str())));
+            if !required && is_nullable(schema) {
+                found.insert(field.clone());
+            }
+            walk(schema, &field, found);
+        }
+    }
+    // A member of one of these is the same field, so the path does not grow.
+    for key in ["anyOf", "allOf", "oneOf"] {
+        if let Some(members) = node.get(key).and_then(serde_json::Value::as_array) {
+            for member in members {
+                walk(member, path, found);
+            }
+        }
+    }
+    if let Some(items) = node.get("items") {
+        walk(items, &format!("{path}[]"), found);
+    }
+    if let Some(patterned) = node
+        .get("patternProperties")
+        .and_then(serde_json::Value::as_object)
+    {
+        for schema in patterned.values() {
+            walk(schema, &format!("{path}.*"), found);
+        }
+    }
+}
+
+/// Whether the schema admits null, either as one arm of an `anyOf` or as one of
+/// a list of types.
+fn is_nullable(schema: &serde_json::Value) -> bool {
+    if schema["type"].as_str() == Some("null") {
+        return true;
+    }
+    if let Some(types) = schema["type"].as_array() {
+        if types.iter().any(|name| name.as_str() == Some("null")) {
+            return true;
+        }
+    }
+    ["anyOf", "oneOf"].iter().any(|key| {
+        schema[*key]
+            .as_array()
+            .is_some_and(|members| members.iter().any(is_nullable))
+    })
 }
 
 fn write_types(text: &str, out: &PathBuf) {
@@ -109,6 +221,17 @@ fn write_dispatch(text: &str, out: &PathBuf) {
             previous.is_none(),
             "two schemas share the command id {command_id} and the type {kind}, so the envelope \
              cannot tell them apart"
+        );
+    }
+
+    // A refresh that renames a schema would otherwise leave the override
+    // pointing at nothing, and the command would quietly go back to the
+    // generated type.
+    for (title, path) in OVERRIDES {
+        assert!(
+            commands.values().any(|command| command.title == *title),
+            "OVERRIDES decodes {title} into {path}, but no schema in the bundle has that title, \
+             so the hand-written type is unreachable"
         );
     }
 
