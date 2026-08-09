@@ -301,6 +301,13 @@ export interface Profile {
    * players at a public gallery of other people's content.
    */
   hub?: boolean;
+  /**
+   * Base URL of the community hub a distributor runs themselves, in place of the
+   * built-in `https://coilbox-hub.vercel.app`. A separate concern from {@link
+   * Profile.hub}, which only turns the feature on or off. Read through
+   * `useHubUrl` (see `../hub/config`), which layers a user setting on top of this.
+   */
+  hubUrl?: string;
   /** GitHub repo ("owner/name") whose latest release ships this game's archive. */
   release?: { repo: string };
   /**
