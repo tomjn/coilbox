@@ -1,0 +1,25 @@
+# Every field in compiled.json that is both optional and nullable, one per line,
+# as the schema title followed by the path to the field. `*` is a
+# patternProperties key and `[]` is an array item.
+#
+# build.rs works the same list out of the bundle and fails the build if it does
+# not match this file, so a schema refresh that adds one has to be looked at
+# rather than generated over. See README.md.
+
+# Read through the hand-written merge patch types, which keep absent and null
+# apart. See src/merge_patch.rs.
+LobbyUpdatedEvent.data.bots.*.name
+LobbyUpdatedEvent.data.currentBattle
+LobbyUpdatedEvent.data.currentVote
+LobbyUpdatedEvent.data.spectators.*.joinQueuePosition
+
+# lobby/listUpdated is a merge patch as well, and this field is read through the
+# generated type, which cannot tell absent from null. Nothing reads it today,
+# see from_patch in tauri-plugin-coilbox-multiplayer/src/tachyon_lobbies.rs.
+LobbyListUpdatedEvent.data.lobbies.*.currentBattle
+
+# Ours to send rather than to read, so the ambiguity is ours to avoid.
+LobbyUpdateBotRequest.data.version
+
+# Clans are in the spec and not on the server, so nothing reads this.
+UserUpdatedEvent.data.users[].clanBaseData
