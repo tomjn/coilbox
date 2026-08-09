@@ -156,7 +156,11 @@ export function ConversationSidebar({
   onSelect: (d: ConversationDescriptor) => void;
   onBrowse: () => void;
 }) {
-  const { mirror, unreadFor, activeKey } = useMultiplayer();
+  const { mirror, unreadFor, activeKey, protocol } = useMultiplayer();
+  // Tachyon can only address a player, a party or a lobby, so there are no named
+  // channels to list or browse. Upstream means this, so the section is replaced by
+  // a standing note rather than left empty. See `docs/tachyon-protocol.md`.
+  const hasChannels = protocol !== "tachyon";
   const navigate = useNavigate();
   const [ignored] = useIgnored();
   const [favourites, setFavourites] = useFavourites();
@@ -282,52 +286,60 @@ export function ConversationSidebar({
           </Section>
         )}
 
-        <Section
-          title="Channels"
-          action={
-            <Button
-              variant="secondary"
-              onClick={onBrowse}
-              aria-label="Browse channels"
-              className="h-7 px-2"
-            >
-              <Plus className="size-4" />
-            </Button>
-          }
-        >
-          <ul className="flex flex-col gap-0.5 px-2">
-            {channels.map((name) => {
-              const id = `channel:${name}`;
-              const msgs = state?.channels[name].messages ?? [];
-              const topic = state?.channels[name].topic;
-              return (
-                <li key={id}>
-                  <button
-                    type="button"
-                    className={rowClass(id)}
-                    onClick={() => onSelect({ kind: "channel", name })}
-                  >
-                    <Hash className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate">{name}</span>
-                      {topic && (
-                        <span className="truncate text-xs font-normal text-muted-foreground">
-                          {topic}
-                        </span>
-                      )}
-                    </span>
-                    <Badge n={unreadBadge(id, msgs)} />
-                  </button>
+        {!hasChannels && (
+          <p className="px-3 py-2 text-xs text-muted-foreground">
+            This server has direct messages and battle chat, but no channels.
+          </p>
+        )}
+
+        {hasChannels && (
+          <Section
+            title="Channels"
+            action={
+              <Button
+                variant="secondary"
+                onClick={onBrowse}
+                aria-label="Browse channels"
+                className="h-7 px-2"
+              >
+                <Plus className="size-4" />
+              </Button>
+            }
+          >
+            <ul className="flex flex-col gap-0.5 px-2">
+              {channels.map((name) => {
+                const id = `channel:${name}`;
+                const msgs = state?.channels[name].messages ?? [];
+                const topic = state?.channels[name].topic;
+                return (
+                  <li key={id}>
+                    <button
+                      type="button"
+                      className={rowClass(id)}
+                      onClick={() => onSelect({ kind: "channel", name })}
+                    >
+                      <Hash className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate">{name}</span>
+                        {topic && (
+                          <span className="truncate text-xs font-normal text-muted-foreground">
+                            {topic}
+                          </span>
+                        )}
+                      </span>
+                      <Badge n={unreadBadge(id, msgs)} />
+                    </button>
+                  </li>
+                );
+              })}
+              {channels.length === 0 && (
+                <li className="px-2 py-1.5 text-xs text-muted-foreground">
+                  No channels joined. Browse to join one.
                 </li>
-              );
-            })}
-            {channels.length === 0 && (
-              <li className="px-2 py-1.5 text-xs text-muted-foreground">
-                No channels joined. Browse to join one.
-              </li>
-            )}
-          </ul>
-        </Section>
+              )}
+            </ul>
+          </Section>
+        )}
 
         {(friendNames.length > 0 || friendRequests.length > 0) && (
           <Section title="Friends">
