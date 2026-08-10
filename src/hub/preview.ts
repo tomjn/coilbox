@@ -170,18 +170,21 @@ function css(color: Rgb | undefined): string {
 /** A pack has no picture in it. What it has is a list of what it will install,
  * and saying that plainly is more use than a diagram of nothing. */
 function setupPackPreview(payload: Record<string, unknown>): HubPreview | null {
-  const game = payload.game as { name?: string } | undefined;
+  const games = gameNames(payload);
   const maps = (Array.isArray(payload.maps) ? payload.maps : []).filter(
     (m): m is string => typeof m === "string",
   );
   const engine =
     typeof payload.engineVersion === "string" ? payload.engineVersion : "";
-  if (!game?.name && maps.length === 0 && !engine) return null;
+  if (games.length === 0 && maps.length === 0 && !engine) return null;
 
   return {
     kind: "setup-pack",
     stats: [
-      { label: "Game", value: game?.name ?? "None" },
+      {
+        label: games.length === 1 ? "Game" : "Games",
+        value: games.length === 0 ? "None" : games.join(", "),
+      },
       // ".spring" is the placeholder a pack carries when it does not pin an
       // engine, which means whatever the importer already has.
       {
@@ -194,6 +197,23 @@ function setupPackPreview(payload: Record<string, unknown>): HubPreview | null {
       },
     ],
   };
+}
+
+/** The names of a pack's games, reading the collection shape (`games`) and
+ * falling back to the single-game shape (`game`) every pack carried before it
+ * became a collection. */
+function gameNames(payload: Record<string, unknown>): string[] {
+  if (Array.isArray(payload.games)) {
+    return payload.games
+      .map((g) =>
+        typeof g === "object" && g !== null
+          ? (g as { name?: unknown }).name
+          : undefined,
+      )
+      .filter((name): name is string => typeof name === "string" && !!name);
+  }
+  const game = payload.game as { name?: string } | undefined;
+  return game?.name ? [game.name] : [];
 }
 
 /**

@@ -147,6 +147,57 @@ describe("readPreview", () => {
     expect(readPreview(container("setup-pack", { maps: [] }))).toBeNull();
   });
 
+  it("lists every game a collection pack names, not just one", () => {
+    const preview = readPreview(
+      container("setup-pack", {
+        games: [{ name: "Splinter Faction 1.0" }, { name: "BAR" }],
+        maps: ["Comet Catcher Redux"],
+      }),
+    );
+    expect(preview).toMatchObject({
+      stats: [
+        { label: "Games", value: "Splinter Faction 1.0, BAR" },
+        { label: "Engine", value: "Whatever you have" },
+        { label: "Map", value: "Comet Catcher Redux" },
+      ],
+    });
+  });
+
+  it("previews a pack that names only games", () => {
+    const preview = readPreview(
+      container("setup-pack", {
+        games: [{ name: "BAR" }],
+      }),
+    );
+    expect(preview).toEqual({
+      kind: "setup-pack",
+      stats: [
+        { label: "Game", value: "BAR" },
+        { label: "Engine", value: "Whatever you have" },
+        { label: "Maps", value: "None" },
+      ],
+    });
+  });
+
+  it("previews a pack that names only maps", () => {
+    const preview = readPreview(
+      container("setup-pack", {
+        maps: ["Comet Catcher Redux", "Supreme Isthmus"],
+      }),
+    );
+    expect(preview).toEqual({
+      kind: "setup-pack",
+      stats: [
+        { label: "Games", value: "None" },
+        { label: "Engine", value: "Whatever you have" },
+        {
+          label: "Maps",
+          value: "Comet Catcher Redux, Supreme Isthmus",
+        },
+      ],
+    });
+  });
+
   it("rebuilds a conquest challenge's galaxy from its seed", () => {
     const preview = readPreview(
       container("challenge", { mode: "conquest", settings: CONQUEST }),
