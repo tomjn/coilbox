@@ -17,6 +17,7 @@ import { presetRoute, useSkirmishPresets } from "@/play/presets";
 import { useRuns } from "@/runlite/runs";
 import { scenarioRoute, useScenarios } from "@/scenario/scenarios";
 import type { HubItem } from "./api";
+import { useReportHubImport } from "./importCount";
 import {
   HUB_IMPORTS_KEY,
   type HubImportRecord,
@@ -29,12 +30,18 @@ import {
  * Record what an import produced, for the importers to call once they have
  * saved. `hubItemId` is undefined for every import that did not come from the
  * browse screen (a pasted code, a file), and those record nothing.
+ *
+ * This is also where the hub is told the import happened (issue #1361), because
+ * this is the one point that knows both that an import completed and which item
+ * it was. The report is sent once per completed import and cannot affect it: see
+ * `./importCount`.
  */
 export function useRecordHubImport() {
   const [records, setRecords] = useSetting<HubImportRecord[]>(
     HUB_IMPORTS_KEY,
     [],
   );
+  const reportImport = useReportHubImport();
   // An importer holds this callback for as long as its drawer is open, so read
   // the list through a ref rather than closing over one render's copy of it.
   const latest = useRef(records);
@@ -50,8 +57,9 @@ export function useRecordHubImport() {
           at: new Date().toISOString(),
         }),
       );
+      reportImport(hubItemId);
     },
-    [setRecords],
+    [setRecords, reportImport],
   );
 }
 
