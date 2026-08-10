@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { dlFetchText } from "../downloads/bindings";
+import { isHubOrigin, useTrustedHubUrl } from "../hub/config";
 import { notify } from "../notify/notify";
 import { describeOpen, type ImportPlan, prepareImport } from "./actions";
 import { setDeepLinkHandler } from "./bus";
@@ -56,10 +57,22 @@ const fetchImportText: FetchText = async (url) => {
  * through `identify()` (via `fetchImportPlan`), and only on a recognised
  * container asks a second time to apply what was found. A rejected or oversized
  * response applies nothing.
+ *
+ * One host is not a stranger: the Coilbox hub this install is configured against
+ * (issue #1367). The player either accepted the built-in default or typed the
+ * address in themselves, and the browse screen is already talking to it. So a URL
+ * on that origin skips the first confirmation, the one about contacting a host,
+ * and keeps the second, the one showing what came back. Contacting a host coilbox
+ * already contacts tells the user nothing; what a stranger uploaded to it is still
+ * a decision, and it is still theirs. The match is by origin against
+ * `useTrustedHubUrl()`, which is null when a profile switched the hub off, and it
+ * changes only how much is explained: every check the import already ran still
+ * runs.
  */
 
 export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
+  const trustedHubUrl = useTrustedHubUrl();
   const [pending, setPending] = useState<Pending | null>(null);
   // Set while a fetch-URL import is downloading, so the user sees progress and
   // cannot fire a second fetch. Holds the host being contacted.
@@ -162,6 +175,13 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         } catch {
           host = url;
         }
+        // The configured hub is a host coilbox is already talking to, so asking
+        // permission to contact it is ceremony. Fetch straight away and let the
+        // apply confirmation, which is untouched, carry the decision.
+        if (isHubOrigin(url, trustedHubUrl)) {
+          void runFetch(url, host);
+          return;
+        }
         setPending({
           title: "Download an import",
           lines: [
@@ -188,7 +208,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
 
       setPending(buildImportPending(plan.plan));
     },
-    [navigate, runFetch, buildImportPending],
+    [navigate, runFetch, buildImportPending, trustedHubUrl],
   );
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useSetting } from "@picoframe/frame";
-import { getProfile } from "../profile/profile";
+import { getProfile, isHubEnabled } from "../profile/profile";
 
 /**
  * The Coilbox hub base URL: three layers, the same shape as
@@ -57,4 +57,46 @@ export function isValidHubUrl(url: string): boolean {
 export function useHubUrl(): string {
   const [userUrl] = useHubUrlSetting();
   return resolveHubUrl(userUrl, getProfile().hubUrl);
+}
+
+/**
+ * The hub this session actually trusts, or null when there isn't one. That is
+ * {@link useHubUrl}, except a profile that switched the hub off (`isHubEnabled`)
+ * has no configured hub at all, so a `coilbox://` link pointing at the address it
+ * used to use is a stranger's link like any other.
+ *
+ * Callers that only need an address to fetch from want {@link useHubUrl}. This is
+ * for the ones deciding how much to trust something, and it pairs with
+ * {@link isHubOrigin} (issue #1367).
+ */
+export function useTrustedHubUrl(): string | null {
+  const hubUrl = useHubUrl();
+  return isHubEnabled() ? hubUrl : null;
+}
+
+/**
+ * Is `url` served by `hubUrl`? Compares parsed origins - scheme, host and port -
+ * never string prefixes, because a prefix test hands the hub's name to anybody who
+ * can register a longer one. `https://coilbox-hub.vercel.app.evil.test/` is a
+ * different host, `https://coilbox-hub.vercel.app@evil.test/` is `evil.test` with
+ * the hub's name as a username, and `http://` is not `https://`. All three are a
+ * different origin, so all three are false.
+ *
+ * A null or unparseable `hubUrl` means there is no configured hub, which trusts
+ * nothing. Only http and https origins can match, so a `file:` or `data:` URL
+ * (whose origin is the opaque string "null") can never pair up with another.
+ */
+export function isHubOrigin(
+  url: string,
+  hubUrl: string | null | undefined,
+): boolean {
+  if (!hubUrl) return false;
+  try {
+    const target = new URL(url);
+    const hub = new URL(hubUrl);
+    if (hub.protocol !== "http:" && hub.protocol !== "https:") return false;
+    return target.origin === hub.origin;
+  } catch {
+    return false;
+  }
 }

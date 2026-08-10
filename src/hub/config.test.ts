@@ -12,7 +12,12 @@ vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
 }));
 
-import { DEFAULT_HUB_URL, isValidHubUrl, resolveHubUrl } from "./config";
+import {
+  DEFAULT_HUB_URL,
+  isHubOrigin,
+  isValidHubUrl,
+  resolveHubUrl,
+} from "./config";
 
 describe("resolveHubUrl", () => {
   it("falls back to the built-in default when neither layer is set", () => {
@@ -59,5 +64,62 @@ describe("isValidHubUrl", () => {
   it("rejects text that doesn't parse as a URL at all", () => {
     expect(isValidHubUrl("not a url")).toBe(false);
     expect(isValidHubUrl("example.com")).toBe(false);
+  });
+});
+
+describe("isHubOrigin", () => {
+  const hub = DEFAULT_HUB_URL;
+
+  it("matches a URL on the configured hub, whatever its path", () => {
+    expect(isHubOrigin(`${hub}/api/v1/containers/abc.json`, hub)).toBe(true);
+    expect(isHubOrigin(hub, hub)).toBe(true);
+  });
+
+  it("matches whatever hub is configured, not a hardcoded one", () => {
+    const distro = "https://distro-hub.example.com";
+    expect(isHubOrigin(`${distro}/api/v1/containers/abc.json`, distro)).toBe(
+      true,
+    );
+    expect(isHubOrigin(`${hub}/api/v1/containers/abc.json`, distro)).toBe(
+      false,
+    );
+  });
+
+  it("rejects a host that only starts with the hub's name", () => {
+    expect(isHubOrigin("https://coilbox-hub.vercel.app.evil.test/x", hub)).toBe(
+      false,
+    );
+  });
+
+  it("rejects the hub's name used as a userinfo prefix", () => {
+    expect(isHubOrigin("https://coilbox-hub.vercel.app@evil.test/x", hub)).toBe(
+      false,
+    );
+  });
+
+  it("rejects http where the hub is https", () => {
+    expect(isHubOrigin("http://coilbox-hub.vercel.app/x", hub)).toBe(false);
+  });
+
+  it("rejects a different port on the right host", () => {
+    expect(isHubOrigin("https://coilbox-hub.vercel.app:8443/x", hub)).toBe(
+      false,
+    );
+  });
+
+  it("trusts nothing when there is no configured hub", () => {
+    expect(isHubOrigin(`${hub}/x`, null)).toBe(false);
+    expect(isHubOrigin(`${hub}/x`, "")).toBe(false);
+    expect(isHubOrigin(`${hub}/x`, undefined)).toBe(false);
+  });
+
+  it("rejects an unparseable URL on either side", () => {
+    expect(isHubOrigin("not a url", hub)).toBe(false);
+    expect(isHubOrigin(`${hub}/x`, "not a url")).toBe(false);
+  });
+
+  it("never pairs up two opaque origins", () => {
+    expect(isHubOrigin("file:///etc/passwd", "file:///etc/passwd")).toBe(false);
+    expect(isHubOrigin("data:text/plain,hi", "data:text/plain,hi")).toBe(false);
   });
 });
