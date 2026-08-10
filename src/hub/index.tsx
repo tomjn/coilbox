@@ -1,7 +1,7 @@
 import { NavGate } from "@picoframe/frame";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Globe } from "lucide-react";
 import type { ComponentType } from "react";
+import { CoilboxGlyph } from "../components/CoilboxGlyph";
 import { isProfileHidden } from "../profile/hidden";
 import { isHubEnabled } from "../profile/profile";
 import HubSettings from "./pages/SettingsSection";
@@ -53,7 +53,7 @@ const hubPlugin: FramePlugin = {
     {
       id: "hub",
       title: "Coilbox hub",
-      icon: Globe,
+      icon: CoilboxGlyph,
       Component: HubSettings,
       useVisible: isHubEnabled,
     },
@@ -69,7 +69,7 @@ const hubPlugin: FramePlugin = {
           label: "Coilbox hub",
           to: "/hub",
           end: true,
-          icon: Globe,
+          icon: CoilboxGlyph,
           useVisible: visible,
         },
       ],
