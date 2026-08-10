@@ -296,13 +296,13 @@ export interface Profile {
    */
   updater?: boolean;
   /**
-   * Whether the community hub is offered. Defaults to true. Set false in a
+   * Whether the Coilbox hub is offered. Defaults to true. Set false in a
    * profile for a modded game whose distributor doesn't want a button pointing
    * players at a public gallery of other people's content.
    */
   hub?: boolean;
   /**
-   * Base URL of the community hub a distributor runs themselves, in place of the
+   * Base URL of the Coilbox hub a distributor runs themselves, in place of the
    * built-in `https://coilbox-hub.vercel.app`. A separate concern from {@link
    * Profile.hub}, which only turns the feature on or off. Read through
    * `useHubUrl` (see `../hub/config`), which layers a user setting on top of this.
@@ -595,7 +595,7 @@ export function isUpdaterEnabled(): boolean {
 }
 
 /**
- * Whether the community hub is offered (profile `hub`, default true), so a
+ * Whether the Coilbox hub is offered (profile `hub`, default true), so a
  * distributor shipping a modded game can withhold a button pointing at a
  * public gallery of other people's content.
  */

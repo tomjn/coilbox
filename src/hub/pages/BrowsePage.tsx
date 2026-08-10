@@ -153,7 +153,7 @@ export default function BrowsePage() {
     <div className="flex h-full flex-col">
       <header className="flex flex-col gap-3 border-b border-border px-6 py-4">
         <div className="space-y-1">
-          <h1 className="text-lg font-semibold leading-none">Community hub</h1>
+          <h1 className="text-lg font-semibold leading-none">Coilbox hub</h1>
           <p className="max-w-prose text-sm text-muted-foreground">
             Presets, challenges, setup packs and scenarios shared by other
             players. Importing needs no account, and nothing is imported until

@@ -822,7 +822,7 @@ This is separate from [`release`](#release-object): your own game archive keeps 
 
 ### `hub` (boolean)
 
-Turns off the community hub. On by default. Set it to `false` if you're shipping a modded game to your own community and don't want a button pointing players at a public gallery of other people's content.
+Turns off the Coilbox hub. On by default. Set it to `false` if you're shipping a modded game to your own community and don't want a button pointing players at a public gallery of other people's content.
 
 ```json
 { "version": 1, "hub": false }
@@ -830,7 +830,7 @@ Turns off the community hub. On by default. Set it to `false` if you're shipping
 
 ### `hubUrl` (string)
 
-Points the community hub at a server you run yourself, instead of the built-in `https://coilbox-hub.vercel.app`. Separate from [`hub`](#hub-boolean), which only turns the feature on or off.
+Points the Coilbox hub at a server you run yourself, instead of the built-in `https://coilbox-hub.vercel.app`. Separate from [`hub`](#hub-boolean), which only turns the feature on or off.
 
 ```json
 { "version": 1, "hubUrl": "https://hub.example.com" }
