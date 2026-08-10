@@ -541,7 +541,9 @@ function AccountForm({
           onValueChange={(v) => onChange({ serverId: v })}
           options={servers.map((s) => ({
             value: s.id,
-            label: s.builtin ? s.name : `${s.name || s.host} (custom)`,
+            label: `${s.builtin ? s.name : `${s.name || s.host} (custom)`}${
+              s.alpha ? " (alpha)" : ""
+            }`,
           }))}
           placeholder="Select a server"
         />
@@ -699,6 +701,18 @@ function BuiltinServerRow({ server: s }: { server: LobbyServer }) {
         {s.host}:{s.port}
       </span>
       {s.tls && <span className={tag}>TLS</span>}
+      {s.alpha && (
+        // Deliberately not the muted `tag` the neighbours use: this one is a
+        // warning, so it reads the same here as in the login list.
+        <span
+          className={cn(
+            tag,
+            "border border-destructive/40 bg-destructive/15 text-destructive",
+          )}
+        >
+          Alpha
+        </span>
+      )}
       {s.official ? (
         <span
           className={cn(

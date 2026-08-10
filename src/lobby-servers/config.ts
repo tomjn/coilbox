@@ -47,6 +47,8 @@ export interface LobbyServer {
   protocol?: LobbyProtocol;
   /** True for built-in catalog entries. Absent on user-defined custom servers. */
   builtin?: boolean;
+  /** Our support for this server is alpha, which the UI badges wherever it lists it. */
+  alpha?: boolean;
   /** The distribution's preferred server (profile `lobby.official`): badged + first. */
   official?: boolean;
 }
@@ -159,6 +161,7 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     tls: true,
     allowSelfSigned: false,
     protocol: "tachyon",
+    alpha: true,
   },
 ];
 
