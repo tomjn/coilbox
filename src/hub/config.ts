@@ -101,3 +101,40 @@ export function isHubOrigin(
     return false;
   }
 }
+
+/**
+ * Which hub item `url` is the share address of, or null when it is not one
+ * (issue #1366). The website's Import button emits
+ * `coilbox://import?url=<hub>/i/<id>`, and coilbox opens its own page for that
+ * item rather than fetching blind, so this is how the link is recognised.
+ *
+ * Origin first, through {@link isHubOrigin}, so only the configured hub is read
+ * this way. Then the path, which must be exactly `/i/<one segment>` under the
+ * configured base - a hub served under a path prefix keeps that prefix, the same
+ * way `hubItemsUrl` builds its addresses. Every other address on the hub, its
+ * home page, its gallery, its API, is not an item address and gets null, which
+ * leaves the caller on the flow it would have taken anyway.
+ */
+export function hubItemIdFromUrl(
+  url: string,
+  hubUrl: string | null | undefined,
+): string | null {
+  if (!hubUrl || !isHubOrigin(url, hubUrl)) return null;
+  try {
+    const target = new URL(url);
+    const prefix = `${new URL(hubUrl).pathname.replace(/\/+$/, "")}/i/`;
+    if (!target.pathname.startsWith(prefix)) return null;
+    const segment = target.pathname.slice(prefix.length);
+    if (!segment || segment.includes("/")) return null;
+    return decodeURIComponent(segment).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Where an item's page lives in the app. Here rather than in the plugin's
+ * `index.tsx`, so the deep-link handler can address it without importing a
+ * plugin definition to get at one string. */
+export function hubItemRoute(id: string): string {
+  return `/hub/${encodeURIComponent(id)}`;
+}

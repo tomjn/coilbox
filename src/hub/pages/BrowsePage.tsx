@@ -29,7 +29,7 @@ import {
   type HubItemsPage,
   kindLabelPlural,
 } from "../api";
-import { useHubUrl } from "../config";
+import { hubItemRoute, useHubUrl } from "../config";
 import { type HubItemPresence, noteHubContainer } from "../importRecord";
 import { useHubItemPresence } from "../imports";
 import { FilterCombobox } from "./components/FilterCombobox";
@@ -58,6 +58,11 @@ import { FilterCombobox } from "./components/FilterCombobox";
  * (issue #1368). The answer comes from `../importRecord.ts`, which keeps a
  * record of what each hub import produced, and checks that the produced thing
  * is still there before it says you have it.
+ *
+ * A card is a summary, so pressing its title opens the item's own page
+ * (`./ItemPage.tsx`, issue #1366), which has room for the whole description and
+ * imports without a dialog. Import stays on the card for somebody who has
+ * already read enough here.
  *
  * Game and map need a way in that doesn't depend on the right card already being
  * on the page (issue #1357), so they get a text box too, with a suggestion list
@@ -328,27 +333,36 @@ export default function BrowsePage() {
                   key={item.id}
                   className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
                 >
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">
-                      {describeItem(item.kind, item.mode)}
-                    </Badge>
-                    {presence.state === "here" && (
-                      <Badge variant="outline" className="gap-1">
-                        <Check className="size-3" aria-hidden /> Imported
+                  <button
+                    type="button"
+                    className="group flex w-full flex-col gap-2 text-left"
+                    onClick={() => navigate(hubItemRoute(item.id))}
+                  >
+                    <span className="flex w-full items-center gap-2">
+                      <Badge variant="secondary">
+                        {describeItem(item.kind, item.mode)}
                       </Badge>
-                    )}
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {formatDate(item.created_at)}
+                      {presence.state === "here" && (
+                        <Badge variant="outline" className="gap-1">
+                          <Check className="size-3" aria-hidden /> Imported
+                        </Badge>
+                      )}
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {formatDate(item.created_at)}
+                      </span>
                     </span>
-                  </div>
-                  <p className="text-sm font-medium" title={item.title}>
-                    {item.title}
-                  </p>
-                  {item.description && (
-                    <p className="line-clamp-3 text-xs text-muted-foreground">
-                      {item.description}
-                    </p>
-                  )}
+                    <span
+                      className="text-sm font-medium group-hover:underline"
+                      title={item.title}
+                    >
+                      {item.title}
+                    </span>
+                    {item.description && (
+                      <span className="line-clamp-3 text-xs text-muted-foreground">
+                        {item.description}
+                      </span>
+                    )}
+                  </button>
                   <div className="flex flex-wrap gap-1.5 text-xs">
                     {item.game_name && (
                       <FilterChip
