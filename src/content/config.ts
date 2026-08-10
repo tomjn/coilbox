@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { rememberShortnames } from "../container/shortnames";
 import { unitsyncHeaderUrl, unitsyncThumbUrl } from "../lib/assetUrl";
 import type { MapAppearance } from "../mapconv/bindings";
 import {
@@ -291,6 +292,11 @@ export async function primeScan(
     try {
       const res = await unitsyncScan({ enginePath, dataDir, opId });
       scanCache.set(key, res);
+      // The one place every game modinfo this machine reads goes through, so it
+      // is where the shortnames are picked up. They outlive the build they came
+      // from, so an export pinned to a superseded build still knows its game's
+      // shortname (issue #1364).
+      rememberShortnames(res.games);
       return res;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
