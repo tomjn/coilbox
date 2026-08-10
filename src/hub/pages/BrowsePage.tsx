@@ -20,6 +20,7 @@ import { buildDeepLink } from "@/deeplink/build";
 import { dispatchDeepLink } from "@/deeplink/bus";
 import { EmptyState } from "@/downloads/pages/components/states";
 import { getGameMatcher, getProfile } from "@/profile/profile";
+import { KindIcon } from "../components/KindIcon";
 import {
   describeItem,
   fetchHubItem,
@@ -368,7 +369,8 @@ export default function BrowsePage() {
                     onClick={() => navigate(hubItemRoute(item.id))}
                   >
                     <span className="flex w-full items-center gap-2">
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="gap-1">
+                        <KindIcon kind={item.kind} mode={item.mode} />
                         {describeItem(item.kind, item.mode)}
                       </Badge>
                       {presence.state === "here" && (

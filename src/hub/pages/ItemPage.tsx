@@ -24,6 +24,7 @@ import { fetchImportPlan } from "@/deeplink/fetchImport";
 import { fetchImportText } from "@/deeplink/fetchText";
 import { getGameMatcher, getProfile } from "@/profile/profile";
 import { describeItem, fetchHubItem, type HubItemDetail } from "../api";
+import { KindIcon } from "../components/KindIcon";
 import { describePinnedGame, matchesPinnedGame } from "../browse";
 import { useHubUrl } from "../config";
 import { type HubItemPresence, withHubItem } from "../importRecord";
@@ -170,7 +171,8 @@ export default function ItemPage() {
         {item && (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">
+              <Badge variant="secondary" className="gap-1">
+                <KindIcon kind={item.kind} mode={item.mode} />
                 {describeItem(item.kind, item.mode)}
               </Badge>
               {presence.state === "here" && (
