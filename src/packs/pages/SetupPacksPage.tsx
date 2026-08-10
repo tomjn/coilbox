@@ -2,6 +2,7 @@ import { Button, useDrawer } from "@picoframe/frame";
 import { Download, Package2 } from "lucide-react";
 import { useEffect } from "react";
 import { useImportParam } from "../../deeplink/useImportParam";
+import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
 import { usePlayReadiness } from "../../play/config";
 import { presetRoute } from "../../play/presets";
@@ -39,7 +40,10 @@ export default function SetupPacksPage() {
       title: "Import a setup pack",
       width: "26rem",
       content: (
+        // A fresh form every time, because the last one may still be mounted
+        // and would keep the code it already ran (issue #1395).
         <ImportPackForm
+          key={nextDrawerKey()}
           initialCode={initialCode}
           // A pack leaves its bundled presets behind and nothing else, so those
           // are what says whether this one is still here. A pack with none
