@@ -124,12 +124,19 @@ export function withRecord(
  * those addresses existed names only the list screen. Without it, the recorded
  * route stands, which is what a conquest or warpath challenge wants since its
  * route already names the galaxy or the run.
+ *
+ * `contentRoute` is where to send Open when none of the recorded ids survived
+ * but the content case below still says the item is here. The recorded route
+ * can name a preset from that same import, and a pack that bundled both
+ * presets and content still reads as here once its presets are gone as long
+ * as the content is, so that route would address something deleted.
  */
 export function presenceOf(
   record: HubImportRecord | undefined,
   local: ReadonlySet<string> | null,
   routeFor?: (ref: string) => string,
   installed?: { games: ReadonlySet<string>; maps: ReadonlySet<string> } | null,
+  contentRoute?: string,
 ): HubItemPresence {
   if (!record) return { state: "none" };
   if (!local) return { state: "unknown" };
@@ -146,7 +153,9 @@ export function presenceOf(
       const hasAll =
         record.content.games.every((g) => installed.games.has(g)) &&
         record.content.maps.every((m) => installed.maps.has(m));
-      if (hasAll) return { state: "here", route: record.route };
+      if (hasAll) {
+        return { state: "here", route: contentRoute ?? record.route };
+      }
     }
   }
   return { state: "gone" };

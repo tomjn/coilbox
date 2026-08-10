@@ -131,16 +131,26 @@ export function useHubItemPresence(): (item: HubItem) => HubItemPresence {
               presetIds;
       // A challenge's recorded route already names its galaxy or its run, so
       // only the other kinds need an address building for them (issue #1372).
-      // A setup pack opens the first of its presets that is still here: the
-      // presets are all it left behind, and they are what says it is here at
-      // all, so Open lands on the same thing that answer is about.
+      // A setup pack opens the first of its bundled presets that is still
+      // here. When none of its presets survive but the games and maps it
+      // named are still installed, Open needs somewhere else real to land:
+      // the recorded route can name a preset from that same import, which is
+      // exactly the one just found to be gone.
       const routeFor =
         item.kind === "scenario"
           ? scenarioRoute
           : item.kind === "challenge"
             ? undefined
             : presetRoute;
-      return presenceOf(byId.get(item.id), local, routeFor, installed);
+      const contentRoute =
+        item.kind === "setup-pack" ? "/downloads/maps" : undefined;
+      return presenceOf(
+        byId.get(item.id),
+        local,
+        routeFor,
+        installed,
+        contentRoute,
+      );
     },
     [byId, presetIds, galaxyIds, runIds, scenarioIds, installed],
   );

@@ -176,4 +176,21 @@ describe("a pack that left only content behind", () => {
       ),
     ).toEqual({ state: "here", route: "/downloads/maps" });
   });
+
+  it("uses the given content route once its own preset is gone, not the stale recorded one", () => {
+    const withDeletedPreset = {
+      ...record,
+      refs: ["preset-1"],
+      route: "/skirmish?preset=preset-1",
+    };
+    expect(
+      presenceOf(
+        withDeletedPreset,
+        new Set(), // preset-1 no longer exists locally
+        undefined,
+        { games: new Set(["Game A"]), maps: new Set(["Map One", "Map Two"]) },
+        "/downloads/maps",
+      ),
+    ).toEqual({ state: "here", route: "/downloads/maps" });
+  });
 });
