@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
 import { buildDeepLink } from "@/deeplink/build";
 import { dispatchDeepLink } from "@/deeplink/bus";
 import { EmptyState } from "@/downloads/pages/components/states";
@@ -26,6 +27,7 @@ import {
   kindLabelPlural,
 } from "../api";
 import { useHubUrl } from "../config";
+import { FilterCombobox } from "./components/FilterCombobox";
 
 /**
  * Browse what other players have shared on Coilbox Hub (issue #1347), without
@@ -42,9 +44,16 @@ import { useHubUrl } from "../config";
  * then confirm applying it. This screen never imports anything itself.
  *
  * Filtering follows the website's shape rather than growing a row of boxes. Kind
- * is a set of chips, the search box is the API's `q`, and game, map, author and
- * tag are set by clicking them on a card - the API offers no list of what values
- * exist, and a page's worth of rows is not that list.
+ * is a set of chips, the search box is the API's `q`, and author and tag are set
+ * by clicking them on a card - the API offers no list of what values exist, and
+ * a page's worth of rows is not that list.
+ *
+ * Game and map need a way in that doesn't depend on the right card already being
+ * on the page (issue #1357), so they get a text box too, with a suggestion list
+ * built from the games and maps coilbox finds installed locally rather than a new
+ * hub endpoint. A locally installed name will not always match what the hub
+ * carries, so the box always accepts whatever is typed - the list is a shortcut
+ * into it, not the only way in.
  */
 
 /** How long to sit on a keystroke before asking the hub. Each search is a round
@@ -113,6 +122,31 @@ export default function BrowsePage() {
     setFilters((f) => ({ ...f, [key]: value, page: 1 }));
   }, []);
 
+  // Games and maps installed locally, for the game/map filter suggestions. The
+  // same scan the Games and Maps pages already run and cache, so opening this
+  // page is a cache hit whenever the app's startup warm-up has already primed
+  // the default engine. A game's/map's `name` (from modinfo/mapinfo) is already
+  // "Name version", the same shape the hub stores its own values in.
+  const { selected: scanTarget } = useScanTargetSelection();
+  const { data: scanData } = useUnitsyncScan(
+    scanTarget?.enginePath,
+    scanTarget?.rootPath,
+  );
+  const installedGames = useMemo(
+    () =>
+      [...new Set((scanData?.games ?? []).map((g) => g.name))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [scanData],
+  );
+  const installedMaps = useMemo(
+    () =>
+      [...new Set((scanData?.maps ?? []).map((m) => m.name))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [scanData],
+  );
+
   // Fetch the item for its container address, then hand that to the deep-link
   // handler. It asks before contacting the host and again before applying, so
   // nothing is imported by pressing this.
@@ -175,6 +209,22 @@ export default function BrowsePage() {
               className="h-9 pl-7"
             />
           </div>
+          <FilterCombobox
+            value={filters.game ?? ""}
+            onCommit={(v) => setFilter("game", v)}
+            options={installedGames}
+            placeholder="Game"
+            ariaLabel="Filter by game"
+            className="h-9 w-36"
+          />
+          <FilterCombobox
+            value={filters.map ?? ""}
+            onCommit={(v) => setFilter("map", v)}
+            options={installedMaps}
+            placeholder="Map"
+            ariaLabel="Filter by map"
+            className="h-9 w-36"
+          />
           <ToggleGroup
             type="single"
             variant="outline"
