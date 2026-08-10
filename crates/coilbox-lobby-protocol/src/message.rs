@@ -14,6 +14,10 @@
 
 use serde::Serialize;
 
+/// The marker teiserver puts in front of its extension announcement, which it
+/// sends as a `SERVERMSG` rather than a command of its own.
+const PROTOCOL_EXTENSIONS_PREFIX: &str = "@PROTOCOL_EXTENSIONS@";
+
 /// A typed inbound server message.
 ///
 /// Every string field is owned so a `ServerMessage` is `'static` and can be
@@ -206,6 +210,11 @@ pub enum ServerMessage {
     Ring { username: String },
     /// `SERVERMSG <text>`
     ServerMsg { text: String },
+    /// teiserver's extension announcement, sent on login as
+    /// `SERVERMSG @PROTOCOL_EXTENSIONS@ {"ring:originator":1}`. It is addressed to
+    /// the client, not the player, so it is kept apart from [`Self::ServerMsg`] to
+    /// stay out of the notification the user sees. Nothing reads `json` yet.
+    ProtocolExtensions { json: String },
     /// `SERVERMSGBOX <text>`
     ServerMsgBox { text: String },
     /// `FAILED cmd=..\tmsg=..`
@@ -634,8 +643,13 @@ pub fn parse_line(line: &str) -> ServerMessage {
         "RING" => ServerMessage::Ring {
             username: rest.to_string(),
         },
-        "SERVERMSG" => ServerMessage::ServerMsg {
-            text: rest.to_string(),
+        "SERVERMSG" => match rest.strip_prefix(PROTOCOL_EXTENSIONS_PREFIX) {
+            Some(json) => ServerMessage::ProtocolExtensions {
+                json: json.trim().to_string(),
+            },
+            None => ServerMessage::ServerMsg {
+                text: rest.to_string(),
+            },
         },
         "SERVERMSGBOX" => ServerMessage::ServerMsgBox {
             text: rest.to_string(),
