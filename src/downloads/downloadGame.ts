@@ -15,6 +15,7 @@ import {
   norm,
 } from "./gameRepos";
 import { type GameSource, gameSourceOrder } from "./gameSources";
+import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -93,9 +94,29 @@ async function downloadGameAnySourceImpl(opts: {
       }
       // rapid: pr-downloader resolves the long name to a tag via the master
       // index. The last resort.
-      case "rapid":
-        await dlDownloadRaw({ tag: gameName, writePath, opId, onProgress });
-        return "rapid";
+      //
+      // Every configured master is tried, because pr-downloader only ever
+      // searches the one it is given and games are spread across several. BAR
+      // publishes its own (`repos-cdn.beyondallreason.dev`), so on the springrts
+      // default every BAR game comes back as "no source could provide".
+      case "rapid": {
+        const rapidErrors: string[] = [];
+        for (const master of DEFAULT_RAPID_MASTERS) {
+          try {
+            await dlDownloadRaw({
+              tag: gameName,
+              masterUrl: master.url,
+              writePath,
+              opId,
+              onProgress,
+            });
+            return "rapid";
+          } catch (e) {
+            rapidErrors.push(`${master.name}: ${msg(e)}`);
+          }
+        }
+        throw new Error(rapidErrors.join("; "));
+      }
     }
   };
 

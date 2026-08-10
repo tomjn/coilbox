@@ -1,11 +1,12 @@
 import { Button, useSetting } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
 import { AlertTriangle, Download, RefreshCw } from "lucide-react";
-import { useState } from "react";
-import type { DownloadProgress } from "@/downloads/bindings";
+import { useEffect, useState } from "react";
 import { useWriteRootPath } from "@/downloads/config";
-import { useDownloadQueue } from "@/downloads/DownloadQueueProvider";
-import { downloadGameAnySource } from "@/downloads/downloadGame";
+import {
+  type EnqueueInput,
+  identityOf,
+  useDownloadQueue,
+} from "@/downloads/DownloadQueueProvider";
 import { ProgressBar } from "@/downloads/pages/components/ProgressBar";
 import { errMessage } from "@/downloads/pages/components/states";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
@@ -29,29 +30,41 @@ export function MissingContentCard({
   onRescan: () => Promise<void>;
 }) {
   const writePath = useWriteRootPath();
-  const { active, queued } = useDownloadQueue();
+  const { active, queued, items, enqueue, onComplete } = useDownloadQueue();
   const [autoEnabled] = useSetting<boolean>(AUTO_DOWNLOAD_ON_JOIN_KEY, true);
-  const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [rescanning, setRescanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Downloads go through the app-wide queue rather than being run here, so this
+  // one appears in the download widget like every other, cannot run alongside a
+  // download writing the same content dir, and gets the scan invalidation and
+  // pool warm the queue does on completion.
+  const input: EnqueueInput = {
+    kind: "game",
+    label: gameName,
+    args: { gameName, writePath },
+  };
+  const identity = identityOf(input);
+  const item = items.find((i) => i.identity === identity) ?? null;
+  const downloading = item?.status === "queued" || item?.status === "active";
+  const progress = item?.progress ?? null;
+
   async function downloadGame() {
-    setDownloading(true);
-    setProgress(null);
     setError(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = (p) => setProgress(p);
-    try {
-      await downloadGameAnySource({ gameName, writePath, onProgress });
-      await onRescan();
-    } catch (e) {
-      setError(errMessage(e));
-    } finally {
-      setDownloading(false);
-      setProgress(null);
-    }
+    enqueue(input);
   }
+
+  // The queue owns the download, so the card learns it finished by subscribing
+  // rather than by awaiting it. Rescanning is still this screen's job: it is
+  // what swaps these cards for the real ones.
+  useEffect(
+    () =>
+      onComplete((done) => {
+        if (done.identity !== identity) return;
+        onRescan().catch((e) => setError(errMessage(e)));
+      }),
+    [onComplete, identity, onRescan],
+  );
 
   async function rescan() {
     setRescanning(true);
@@ -91,7 +104,13 @@ export function MissingContentCard({
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" disabled={downloading} onClick={downloadGame}>
             <Download className="size-4" />
-            {downloading ? "Downloading…" : "Download"}
+            {/* Queued is worth saying: the queue runs one download at a time, so
+                waiting behind another is not the same as making no progress. */}
+            {item?.status === "queued"
+              ? "Queued…"
+              : downloading
+                ? "Downloading…"
+                : "Download"}
           </Button>
           <Button
             variant="secondary"

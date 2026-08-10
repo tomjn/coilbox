@@ -1250,14 +1250,33 @@ export function useUnitsyncGameHeaders(enginePath?: string, dataDir?: string) {
   return { headers, loading };
 }
 
-/** Session cache of minimap results, keyed by `dataDir::enginePath::mapName`. */
+/**
+ * Session cache of minimap results, keyed by
+ * `dataDir::enginePath::mapName::mip`. The mip is part of the key because the
+ * same map is rendered at two sizes: a list thumbnail and a full preview.
+ */
 const minimapCache = new Map<string, MinimapResult>();
 
-/** Lazily render and cache a map's minimap + start positions for the detail page. */
+/**
+ * The mip a list of small thumbnails should ask for: `1024 >> 3` = 128px, ample
+ * for the ~56 CSS px a row draws at 2× density. Extracting the full 1024px
+ * texture for these costs the same as it does for the preview, which a screen
+ * showing hundreds of rows pays hundreds of times over.
+ */
+export const THUMB_MINIMAP_MIP = 3;
+
+/**
+ * Lazily render and cache a map's minimap + start positions for the detail page.
+ *
+ * `mip` picks the resolution as `1024 >> mip`, defaulting to the full 1024px the
+ * 3D preview drapes over its terrain. Anything drawing a small thumbnail should
+ * pass {@link THUMB_MINIMAP_MIP} instead.
+ */
 export function useUnitsyncMinimap(
   enginePath?: string,
   dataDir?: string,
   mapName?: string,
+  mip = 0,
 ) {
   const [url, setUrl] = useState<string | null>(null);
   const [startPositions, setStartPositions] = useState<StartPos[]>([]);
@@ -1281,7 +1300,7 @@ export function useUnitsyncMinimap(
       setAppearance(null);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${mapName}`;
+    const key = `${dataDir}::${enginePath}::${mapName}::${mip}`;
     const apply = (res: MinimapResult) => {
       const url = renderedUrl(res, unitsyncThumbUrl);
       setUrl(url);
@@ -1327,12 +1346,17 @@ export function useUnitsyncMinimap(
     let cancelled = false;
     setLoading(true);
     setError(null);
-    // mip 0 = 1024px, the engine's minimap ceiling — it's the diffuse texture
-    // draped over the 3D preview (and the 2D minimap), so take the full res.
-    unitsyncMinimap({ enginePath, dataDir, mapName, mip: 0 })
+    // mip 0 = 1024px, the engine's minimap ceiling. That is what the 3D preview
+    // needs, because the minimap is the diffuse texture draped over its terrain.
+    unitsyncMinimap({ enginePath, dataDir, mapName, mip })
       .then((res) => {
         if (cancelled) return;
-        minimapCache.set(key, res);
+        // Only remember a render that produced an image. A map unitsync cannot
+        // see yet answers successfully with nothing, and caching that pins the
+        // blank box for the rest of the session: asking for a map mid-download,
+        // or before the rescan that follows it, would leave it without a
+        // minimap even after it had installed.
+        if (renderedUrl(res, unitsyncThumbUrl)) minimapCache.set(key, res);
         apply(res);
       })
       .catch((e) => {
@@ -1344,7 +1368,7 @@ export function useUnitsyncMinimap(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, mapName, recordAppearance]);
+  }, [enginePath, dataDir, mapName, mip, recordAppearance]);
 
   return { url, startPositions, env, appearance, loading, error };
 }
@@ -1366,7 +1390,13 @@ export function invalidateMapPreview(
   mapName: string,
 ) {
   const key = `${dataDir}::${enginePath}::${mapName}`;
-  minimapCache.delete(key);
+  // The minimap is cached per mip, so drop every size of this map rather than
+  // the one key: a thumbnail left behind would outlive the map it describes.
+  for (const cached of minimapCache.keys()) {
+    if (cached === key || cached.startsWith(`${key}::`)) {
+      minimapCache.delete(cached);
+    }
+  }
   heightmapCache.delete(key);
   metalmapCache.delete(key);
 }
@@ -1406,7 +1436,8 @@ export function useUnitsyncHeightmap(
     unitsyncHeightmap({ enginePath, dataDir, mapName })
       .then((res) => {
         if (cancelled) return;
-        heightmapCache.set(key, res);
+        // Same rule as the minimap: an empty render is a state, not an answer.
+        if (renderedUrl(res, unitsyncThumbUrl)) heightmapCache.set(key, res);
         apply(res);
       })
       .catch((e) => {
@@ -1458,7 +1489,8 @@ export function useUnitsyncMetalmap(
     unitsyncMetalmap({ enginePath, dataDir, mapName })
       .then((res) => {
         if (cancelled) return;
-        metalmapCache.set(key, res);
+        // Same rule as the minimap: an empty render is a state, not an answer.
+        if (renderedUrl(res, unitsyncThumbUrl)) metalmapCache.set(key, res);
         apply(res);
       })
       .catch((e) => {

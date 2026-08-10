@@ -127,6 +127,13 @@ function incomingChatMsg(d: Delta, state: LobbyState): ChatMsg | null {
  */
 export const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 20000];
 
+/**
+ * How long deltas accumulate before the mirror is refreshed once for all of
+ * them. Short enough to read as immediate, long enough that a server announcing
+ * a few hundred status changes at once costs one snapshot rather than hundreds.
+ */
+export const SNAPSHOT_BATCH_MS = 50;
+
 /** The backoff delay for a 0-based attempt, clamped to the final (capped) value. */
 export function reconnectDelay(attempt: number): number {
   const i = Math.min(Math.max(attempt, 0), RECONNECT_DELAYS_MS.length - 1);
@@ -909,6 +916,54 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // connect screen while keeping the reason.
   const openChannel = useCallback((serverKey: string) => {
     const onEvent = new Channel<LobbyEvent>();
+    // The Rust side emits one delta per server line, and the mirror is rebuilt
+    // wholesale from a snapshot, so on a busy server (hundreds of battles, a few
+    // thousand users) a delta per event means a full serialise of every battle,
+    // user and channel across IPC many times a second. Batch instead: a burst of
+    // deltas costs one snapshot, which caps the rate at one per SNAPSHOT_BATCH_MS
+    // however loud the server gets. The deltas themselves still act immediately
+    // in the handler below. Only the state refresh waits.
+    let pendingDeltas: Delta[] = [];
+    let flushTimer: number | null = null;
+    const flush = () => {
+      flushTimer = null;
+      const batch = pendingDeltas;
+      pendingDeltas = [];
+      mpSnapshot({ serverKey })
+        .then((r) => {
+          dispatch({ type: "snapshot", state: r.state });
+          // A chat/private message that mentions a highlight word or our own
+          // username fires the mention cue (a soft ping + taskbar flash), gated
+          // behind the sound setting. Skip our own messages and non-chat lines
+          // (join/leave/system). The text lives in the snapshot, not the delta.
+          // Skip replayed channel history too (`id != null`): joining a channel
+          // would otherwise ping once per past mention in its backlog.
+          const hl = highlightRef.current;
+          if (!hl.sound) return;
+          for (const d of batch) {
+            const msg = incomingChatMsg(d, r.state);
+            if (
+              msg &&
+              msg.id == null &&
+              msg.from !== r.state.myUsername &&
+              (msg.kind === "said" ||
+                msg.kind === "saidEx" ||
+                msg.kind === "saidBattle" ||
+                msg.kind === "private") &&
+              matchesHighlight(msg.text, hl.words, r.state.myUsername, hl.own)
+            ) {
+              triggerMentionCue(msg.from);
+            }
+          }
+        })
+        .catch(() => {});
+    };
+    const queueSnapshot = (d: Delta) => {
+      pendingDeltas.push(d);
+      if (flushTimer == null) {
+        flushTimer = window.setTimeout(flush, SNAPSHOT_BATCH_MS);
+      }
+    };
     onEvent.onmessage = (ev) => {
       dispatch({ type: "event", ev });
       if (ev.kind === "delta") {
@@ -1006,32 +1061,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             else void notify({ title: "Server message", body: d.text });
           }
         }
-        mpSnapshot({ serverKey })
-          .then((r) => {
-            dispatch({ type: "snapshot", state: r.state });
-            // A chat/private message that mentions a highlight word or our own
-            // username fires the mention cue (a soft ping + taskbar flash), gated
-            // behind the sound setting. Skip our own messages and non-chat lines
-            // (join/leave/system). The text lives in the snapshot, not the delta.
-            // Skip replayed channel history too (`id != null`): joining a channel
-            // would otherwise ping once per past mention in its backlog.
-            const msg = incomingChatMsg(d, r.state);
-            const hl = highlightRef.current;
-            if (
-              hl.sound &&
-              msg &&
-              msg.id == null &&
-              msg.from !== r.state.myUsername &&
-              (msg.kind === "said" ||
-                msg.kind === "saidEx" ||
-                msg.kind === "saidBattle" ||
-                msg.kind === "private") &&
-              matchesHighlight(msg.text, hl.words, r.state.myUsername, hl.own)
-            ) {
-              triggerMentionCue(msg.from);
-            }
-          })
-          .catch(() => {});
+        queueSnapshot(d);
       }
       // The server can pause a new account's first login on the agreement/
       // verification-code handshake; surface that so the dialog can prompt. Any
@@ -1049,6 +1079,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         );
       }
       if (ev.kind === "disconnected") {
+        // Nothing left to snapshot: the Rust side has already evicted this
+        // connection, so a pending refresh would only fetch a dead key.
+        if (flushTimer != null) {
+          window.clearTimeout(flushTimer);
+          flushTimer = null;
+          pendingDeltas = [];
+        }
         setActiveKey(null);
         setPendingAgreement((p) => (p?.serverKey === serverKey ? null : p));
         handleUnexpectedDropRef.current();
