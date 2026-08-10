@@ -61,10 +61,10 @@ import {
   mpTachyonSignIn,
 } from "./bindings";
 import {
-  addChannel,
+  forgetJoinedChannel,
   normalizeChannelList,
   profileDefaultChannels,
-  removeChannel,
+  rememberJoinedChannel,
   useJoinedChannels,
 } from "./channels";
 import { backfilledCounts, conversationCounts } from "./chat/conversation";
@@ -540,30 +540,23 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const rememberChannel = useCallback(
     (name: string, key?: string) => {
       if (!activeKey) return;
-      const cur = normalizeChannelList(joinedChannels[activeKey]);
-      setJoinedChannels({
-        ...joinedChannels,
-        [activeKey]: addChannel(cur, name, key),
-      });
+      rememberJoinedChannel(activeKey, name, key, setJoinedChannels);
     },
-    [activeKey, joinedChannels, setJoinedChannels],
+    [activeKey, setJoinedChannels],
   );
 
   const forgetChannel = useCallback(
     (name: string) => {
       if (!activeKey) return;
-      const cur = normalizeChannelList(joinedChannels[activeKey]);
-      setJoinedChannels({
-        ...joinedChannels,
-        [activeKey]: removeChannel(cur, name),
-      });
+      forgetJoinedChannel(activeKey, name, setJoinedChannels);
     },
-    [activeKey, joinedChannels, setJoinedChannels],
+    [activeKey, setJoinedChannels],
   );
 
   // The frozen event handler (openChannel) can't close over `rememberChannel`
-  // directly — it would capture a stale `joinedChannels`. Route through a ref so a
-  // `channelJoined` confirm can persist the channel using the latest list.
+  // directly, so route through a ref to reach the current `activeKey`. The list
+  // itself no longer comes from a render (issue #1375), so a confirm that lands
+  // before the next one has rendered still sees the channel it added.
   const rememberChannelRef = useRef(rememberChannel);
   useEffect(() => {
     rememberChannelRef.current = rememberChannel;

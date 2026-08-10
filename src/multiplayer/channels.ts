@@ -1,4 +1,5 @@
 import { useSetting } from "@picoframe/frame";
+import { updateStoredSetting } from "../lib/storedSetting";
 import type { ProfileLobby } from "../profile/profile";
 import { getProfile } from "../profile/profile";
 
@@ -90,8 +91,52 @@ export function profileDefaultChannels(): JoinedChannel[] {
  * The value tolerates the legacy `string[]` shape on read via `normalizeChannelList`.
  */
 export function useJoinedChannels() {
-  return useSetting<Record<string, StoredChannel[]>>(
-    "multiplayer.joinedChannels",
+  return useSetting<JoinedChannels>(JOINED_CHANNELS_KEY, {});
+}
+
+export const JOINED_CHANNELS_KEY = "multiplayer.joinedChannels";
+
+/** The stored autojoin lists, keyed by `serverKey`. */
+export type JoinedChannels = Record<string, StoredChannel[]>;
+
+/**
+ * Add a channel to a server's stored list, folding it into the lists as stored
+ * rather than the lists a render read. Joins are persisted one confirmation at a
+ * time, so a first connect that joins several channels writes several times
+ * before anything re-renders. Folding over the render's copy remembered only the
+ * last channel (issue #1375). `write` is the setter `useJoinedChannels` returns.
+ */
+export function rememberJoinedChannel(
+  serverKey: string,
+  name: string,
+  key: string | undefined,
+  write: (next: JoinedChannels) => void,
+) {
+  updateStoredSetting<JoinedChannels>(
+    JOINED_CHANNELS_KEY,
     {},
+    write,
+    (all) => ({
+      ...all,
+      [serverKey]: addChannel(normalizeChannelList(all[serverKey]), name, key),
+    }),
+  );
+}
+
+/** Drop a channel from a server's stored list. Folds over storage, as
+ * {@link rememberJoinedChannel} does and for the same reason. */
+export function forgetJoinedChannel(
+  serverKey: string,
+  name: string,
+  write: (next: JoinedChannels) => void,
+) {
+  updateStoredSetting<JoinedChannels>(
+    JOINED_CHANNELS_KEY,
+    {},
+    write,
+    (all) => ({
+      ...all,
+      [serverKey]: removeChannel(normalizeChannelList(all[serverKey]), name),
+    }),
   );
 }
