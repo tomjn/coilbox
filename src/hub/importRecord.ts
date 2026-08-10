@@ -6,10 +6,10 @@
  * A hub item is a container, and each kind lands somewhere different once
  * imported: a preset in the presets setting, a conquest challenge as a galaxy
  * document, a warpath challenge as a run, a scenario as a scenario document, a
- * setup pack as whatever presets it bundled. None of those carry a hub id, and
- * an item's hub title is written by whoever published it, so it does not match
- * the name the artefact ends up with. There is nothing to compare an item
- * against.
+ * setup pack as whatever presets it bundled plus the games and maps it named.
+ * None of those carry a hub id, and an item's hub title is written by whoever
+ * published it, so it does not match the name the artefact ends up with.
+ * There is nothing to compare an item against.
  *
  * So this keeps a record, and never believes it on its own. The record says
  * which local ids one import produced. The answer to "do I have this" is
