@@ -81,6 +81,14 @@ const hubPlugin: FramePlugin = {
       lazy: gated(() => import("./pages/BrowsePage")),
       crumb: "Coilbox hub",
     },
+    {
+      // One item in full, and where a `<hub>/i/<id>` link lands (issue #1366).
+      // The id is an opaque uuid and the title is only known once the page has
+      // fetched it, so the crumb is the generic word.
+      path: "hub/:id",
+      lazy: gated(() => import("./pages/ItemPage")),
+      crumb: "Item",
+    },
   ],
 };
 
