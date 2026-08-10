@@ -1,28 +1,38 @@
-import { Input } from "@picoframe/frame";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@picoframe/frame";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { useState } from "react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Popover,
-  PopoverAnchor,
   PopoverContent,
+  PopoverTrigger,
 } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 /**
- * A text filter with a suggestion list under it, for the hub filters (issue
- * #1357) that have no server-side facet to draw a dropdown from: game and map.
- * The hub offers no list of the values it carries, so the suggestions are built
- * from what coilbox knows is installed locally instead - which is also more
- * useful to a player than every value the gallery has ever seen.
+ * A filter with a suggestion list, for the hub filters (issue #1357) that have
+ * no server-side facet to draw a dropdown from: game and map. The hub offers no
+ * list of the values it carries, so the suggestions are built from what coilbox
+ * knows is installed locally instead - which is also more useful to a player
+ * than every value the gallery has ever seen.
  *
- * A locally installed name will not always match what the hub stores. Typing is
- * always what gets sent, and the list is a shortcut into it, never the only way
- * in. Picking a suggestion commits immediately, typing commits on blur or Enter.
+ * This is shadcn's combobox: a button that opens a popover holding a `Command`
+ * (see `ui.shadcn.com/docs/components/radix/combobox`). It replaced a
+ * hand-rolled text box with a popover anchored to it, which fought Radix over
+ * focus - opening the list and closing it again in the same gesture - and had
+ * no keyboard handling of its own. Filtering, keyboard navigation and dismissal
+ * are all cmdk's and Radix's here, none of them ours.
  *
- * The box is an anchor rather than a trigger, because it is a text field first
- * and the list follows what is typed in it. That means Radix counts a press on
- * the box itself as a press outside the list: focus opens the list and the same
- * press closes it again, which read as a flicker rather than as a dropdown. So
- * a press that started inside the anchor is not an outside press, and the list
- * stays up. Everything that should close it still does.
+ * A locally installed name will not always match what the hub stores, so
+ * whatever is typed can still be sent: the last row offers it verbatim. The
+ * list is a shortcut into the box, never the only way in.
  */
 export function FilterCombobox({
   value,
@@ -39,80 +49,89 @@ export function FilterCombobox({
   ariaLabel: string;
   className?: string;
 }) {
-  const [draft, setDraft] = useState(value);
   const [open, setOpen] = useState(false);
-  const anchor = useRef<HTMLDivElement>(null);
-
-  // Stay in sync when the filter changes from elsewhere - a card's game/map
-  // badge, or the chip's own "X", both of which set the filter directly.
-  useEffect(() => setDraft(value), [value]);
-
-  const matches = useMemo(() => {
-    const q = draft.trim().toLowerCase();
-    const list = q
-      ? options.filter((o) => o.toLowerCase().includes(q))
-      : options;
-    return list.slice(0, 50);
-  }, [options, draft]);
+  const [search, setSearch] = useState("");
 
   function commit(next: string) {
-    setDraft(next);
     setOpen(false);
+    setSearch("");
     if (next.trim() !== value.trim()) onCommit(next);
   }
 
+  const typed = search.trim();
+  // Only worth offering when it is not already one of the rows below it.
+  const offerTyped =
+    typed !== "" &&
+    !options.some((o) => o.toLowerCase() === typed.toLowerCase());
+
   return (
-    <Popover open={open && options.length > 0} onOpenChange={setOpen}>
-      <PopoverAnchor ref={anchor}>
-        <Input
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              commit(draft);
-              e.currentTarget.blur();
-            } else if (e.key === "Escape") {
-              setOpen(false);
-            }
-          }}
-          onBlur={() => commit(draft)}
-          placeholder={placeholder}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          // The trigger carries the filter's name, because the button's own
+          // text is the chosen value once there is one.
           aria-label={ariaLabel}
-          className={className}
-        />
-      </PopoverAnchor>
-      <PopoverContent
-        align="start"
-        className="w-64 p-1"
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-        onPointerDownOutside={(e) => {
-          if (anchor.current?.contains(e.target as Node)) e.preventDefault();
-        }}
-      >
-        <ul className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
-          {matches.map((o) => (
-            <li key={o}>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => commit(o)}
-                className="w-full truncate rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
-              >
-                {o}
-              </button>
-            </li>
-          ))}
-          {matches.length === 0 && (
-            <li className="px-2 py-1.5 text-xs text-muted-foreground">
-              No installed match for &quot;{draft}&quot;.
-            </li>
-          )}
-        </ul>
+          aria-expanded={open}
+          className={cn("justify-between font-normal", className)}
+        >
+          <span className={cn("truncate", !value && "text-muted-foreground")}>
+            {value || placeholder}
+          </span>
+          <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-0">
+        <Command>
+          <CommandInput
+            placeholder={`Search ${placeholder.toLowerCase()}s…`}
+            value={search}
+            onValueChange={setSearch}
+          />
+          <CommandList>
+            <CommandEmpty>Nothing installed matches that.</CommandEmpty>
+            {value && (
+              <CommandGroup>
+                {/* Its own words are its `value`, so cmdk filters it the way it
+                    filters everything else. An empty value would be a row the
+                    filter cannot match at all. */}
+                <CommandItem
+                  value={`Any ${placeholder}`}
+                  onSelect={() => commit("")}
+                >
+                  Any {placeholder.toLowerCase()}
+                </CommandItem>
+              </CommandGroup>
+            )}
+            {offerTyped && (
+              <CommandGroup>
+                {/* The typed value is its own `value`, so cmdk's filter always
+                    keeps this row: it is the one thing the list must never
+                    hide. */}
+                <CommandItem value={typed} onSelect={() => commit(typed)}>
+                  Filter by “{typed}”
+                </CommandItem>
+              </CommandGroup>
+            )}
+            <CommandGroup heading="Installed">
+              {options.map((option) => (
+                <CommandItem
+                  key={option}
+                  value={option}
+                  onSelect={() => commit(option)}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 size-4",
+                      option === value ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  {option}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
       </PopoverContent>
     </Popover>
   );

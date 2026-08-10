@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Check,
   Download,
-  ExternalLink,
   Globe,
   Loader2,
   RotateCw,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { CoilboxGlyph } from "@/components/CoilboxGlyph";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -73,11 +73,11 @@ import { HeaderAccount } from "./components/HeaderAccount";
  * already read enough here.
  *
  * Game and map need a way in that doesn't depend on the right card already being
- * on the page (issue #1357), so they get a text box too, with a suggestion list
- * built from the games and maps coilbox finds installed locally rather than a new
- * hub endpoint. A locally installed name will not always match what the hub
- * carries, so the box always accepts whatever is typed - the list is a shortcut
- * into it, not the only way in.
+ * on the page (issue #1357), so they get a combobox each, listing the games and
+ * maps coilbox finds installed locally rather than asking a new hub endpoint. A
+ * locally installed name will not always match what the hub carries, so the box
+ * still accepts whatever is typed - the list is a shortcut into it, not the only
+ * way in.
  *
  * The website the gallery is served from is a button in the header rather than a
  * sidebar entry: an external link sitting among the download sources would read
@@ -249,14 +249,14 @@ export default function BrowsePage() {
               </p>
             )}
           </div>
-          <div className="flex flex-wrap items-start gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <HeaderAccount hubUrl={hubUrl} />
             <Button
               variant="outline"
               size="sm"
               onClick={() => void openUrl(hubUrl)}
             >
-              <ExternalLink /> Hub website
+              <CoilboxGlyph size={16} /> Hub website
             </Button>
           </div>
         </div>
@@ -530,7 +530,6 @@ function ItemActions({
         <Button
           variant="outline"
           size="sm"
-          className="flex-1"
           onClick={() => onOpen(presence.route)}
           aria-label={`Open ${item.title}`}
         >
@@ -550,7 +549,7 @@ function ItemActions({
       <Button
         variant="outline"
         size="sm"
-        className="w-full"
+        className="self-start"
         onClick={onImport}
         disabled={busy}
         aria-label={`Import ${item.title}`}
