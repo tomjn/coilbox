@@ -1,5 +1,11 @@
 import { defineConfig } from "vitepress";
 
+// The public gallery, where people share what they make in Coilbox. Kept as one
+// constant because it is linked from the nav, the sidebar and two places on the
+// homepage. Matches DEFAULT_HUB_URL in src/hub/config.ts, which is where the app
+// itself points.
+const HUB_URL = "https://coilbox-hub.vercel.app";
+
 // The public documentation site (issue #168), published to GitHub Pages at
 // tomjn.github.io/coilbox/. It renders the user guides in `docs/`; internal design
 // artifacts (superpowers plans/specs), mockups, and idea drafts are excluded.
@@ -25,6 +31,7 @@ export default defineConfig({
     outline: { level: [2, 3], label: "On this page" },
     nav: [
       { text: "Guides", link: "/portable-mode" },
+      { text: "Hub", link: HUB_URL },
       {
         text: "Download",
         link: "https://github.com/tomjn/coilbox/releases/latest",
@@ -33,7 +40,10 @@ export default defineConfig({
     sidebar: [
       {
         text: "Getting started",
-        items: [{ text: "Overview", link: "/" }],
+        items: [
+          { text: "Overview", link: "/" },
+          { text: "Community hub", link: HUB_URL },
+        ],
       },
       {
         text: "Guides",

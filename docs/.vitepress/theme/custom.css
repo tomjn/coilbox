@@ -1,3 +1,76 @@
+/*
+ * The illustration behind a page (see ArtBackdrop.vue). Fixed to the viewport
+ * rather than the page, so it stays put while the content scrolls over it.
+ *
+ * Negative z-index puts it behind everything in the page without needing any
+ * of that content to opt in with a z-index of its own. The root background
+ * still paints first, so the drawing sits between the page colour and the
+ * text. VitePress paints its own background on the content column, so that is
+ * cleared here. The nav and sidebar keep theirs, which is what stops the art
+ * running under the controls.
+ *
+ * The mask is the fade: full strength along the bottom of the viewport,
+ * nothing at the top, so the drawing never competes with a heading.
+ */
+.art-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to top, black, transparent);
+  mask-image: linear-gradient(to top, black, transparent);
+}
+
+.art-backdrop svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * Twinkling stars, on the homepage only (see backdrops.ts).
+ *
+ * Animating `opacity` rather than `fill-opacity` is what keeps the starfield
+ * varied: each star already carries its own `fill-opacity` as its brightness,
+ * and the two multiply, so a faint star stays faint through the cycle instead
+ * of every star pulsing between the same two values.
+ *
+ * ArtBackdrop.vue sets the per-star delay and duration, since the stagger has
+ * to differ across 46 elements and nth-child buckets would repeat visibly.
+ */
+@keyframes coil-twinkle {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/*
+ * A star rests dim and flares up, rather than resting bright and dipping. The
+ * peak is the star's own brightness, since `opacity` multiplies the
+ * `fill-opacity` it already carries and cannot push past it, so the way to
+ * make one look brighter is to give it somewhere to rise from.
+ */
+.art-backdrop .art-star {
+  animation-name: coil-twinkle;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .art-backdrop .art-star {
+    animation: none;
+  }
+}
+
+.VPContent {
+  background-color: transparent;
+}
+
 /* Homepage screenshot gallery: responsive thumbnail grid. */
 .screenshot-gallery {
   display: grid;
