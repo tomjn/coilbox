@@ -1,14 +1,16 @@
 //! Coilbox hub account (Rust half).
 //!
-//! Three commands, all of them about who is signed in to the hub and none of them
-//! handing a token out. Registered as `"coilbox-hub"`, so the frontend invokes
-//! `plugin:coilbox-hub|<cmd>`. The flow they sit on is [`auth`].
+//! Four commands: three about who is signed in to the hub, and one that publishes
+//! as them. None of them hands a token out. Registered as `"coilbox-hub"`, so the
+//! frontend invokes `plugin:coilbox-hub|<cmd>`. The flow they sit on is [`auth`],
+//! and the request that uses its token is [`publish`].
 //!
 //! Every command takes the hub address rather than knowing one. It is a user
 //! setting layered over a distribution profile's own (`src/hub/config.ts`), so the
 //! frontend is the only place that can resolve it.
 
 pub mod auth;
+pub mod publish;
 
 use picoframe_core::CliResult;
 use serde_json::{json, Value};
@@ -87,13 +89,44 @@ async fn hub_account(hub_url: String) -> CliResult {
     }
 }
 
+/// `hub_publish`: publish a share code to a hub, as whoever is signed in.
+///
+/// The request is made here because the access token is here. What comes back is
+/// the hub's own answer, `status` and `body`, rather than a verdict: which status
+/// means what is the hub's API talking, and `src/hub/publish.ts` already owns that
+/// vocabulary for the read side. An error is only for what the frontend cannot see
+/// for itself - no usable sign-in, or the hub never answering.
+#[tauri::command]
+async fn hub_publish(
+    hub_url: String,
+    code: String,
+    title: String,
+    description: String,
+    tags: Vec<String>,
+) -> CliResult {
+    let publication = publish::Publication {
+        code,
+        title,
+        description,
+        tags,
+    };
+    match publish::publish(&hub_url, &publication).await {
+        Ok(answer) => CliResult::ok(json!({
+            "status": answer.status,
+            "body": answer.body.unwrap_or(Value::Null),
+        })),
+        Err(said) => CliResult::err(said),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-hub"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-hub")
         .invoke_handler(tauri::generate_handler![
             hub_sign_in,
             hub_sign_out,
-            hub_account
+            hub_account,
+            hub_publish
         ])
         .build()
 }

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-hub-publish"
+description = "Enables the hub_publish command without any pre-configured scope."
+commands.allow = ["hub_publish"]
+
+[[permission]]
+identifier = "deny-hub-publish"
+description = "Denies the hub_publish command without any pre-configured scope."
+commands.deny = ["hub_publish"]
