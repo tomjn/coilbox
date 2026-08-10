@@ -16,6 +16,8 @@
  * `useResolveContent.ts`.
  */
 
+import type { ScanReading } from "./scanSettled";
+
 export type ContentRequirementKind = "game" | "map" | "engine";
 
 /** A snapshot of what's installed, built from a unitsync scan (games/maps) plus
@@ -192,4 +194,56 @@ export function computeMissingRequirements(
   installed: InstalledContentSnapshot,
 ): ContentRequirement[] {
   return dedupeRequirements(reqs).filter((r) => !r.isInstalled(installed));
+}
+
+/** Every reading the resolve gate decides from, as plain values. */
+export interface ResolveReadings {
+  requirements: readonly ContentRequirement[];
+  /** What this machine has, as far as the readings below can vouch for. */
+  installed: InstalledContentSnapshot;
+  /** The target read that says which engine and data dir to scan is still in
+   * flight, so `installed` carries no games or maps yet. */
+  targetLoading: boolean;
+  /** There is an engine and a data dir to scan. */
+  hasTarget: boolean;
+  scan: ScanReading;
+  /** The content roots read that supplies the installed engine versions has
+   * not landed. */
+  enginesLoading: boolean;
+  /** These requirements name an engine, and the release catalogs that say
+   * whether it can be fetched have not landed. */
+  engineCatalogPending: boolean;
+}
+
+/** What the resolve gate should say right now: whether it still has a question
+ * outstanding, and what it can offer to download once it does not. */
+export interface ResolveVerdict {
+  loading: boolean;
+  missing: ContentRequirement[];
+  resolved: boolean;
+}
+
+/**
+ * The gate's whole decision, kept pure so the "is this knowable yet" half can
+ * be read on its own.
+ *
+ * The empty install snapshot the readings start on is a placeholder, not a
+ * report of a machine with nothing on it. Judging requirements against it is
+ * how the gate ends up offering to download content already on disk, so
+ * `missing` stays empty until every reading has answered.
+ *
+ * Deliberately stricter than `./scanSettled`, which the home page's inventory
+ * reads: there, a scan that failed has answered, because the worst it costs is
+ * a card that draws nothing. Here it would cost the reader a download of
+ * something already on disk, so a scan that has not produced a result is not an
+ * answer whatever state it ended in.
+ */
+export function resolveVerdict(r: ResolveReadings): ResolveVerdict {
+  const installKnown =
+    !r.targetLoading && (!r.hasTarget || r.scan.data !== null);
+  const loading = !installKnown || r.enginesLoading || r.engineCatalogPending;
+  const missing = loading
+    ? []
+    : computeMissingRequirements(r.requirements, r.installed);
+  return { loading, missing, resolved: !loading && missing.length === 0 };
 }

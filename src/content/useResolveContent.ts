@@ -16,8 +16,8 @@ import {
 import { useContentTargets, useUnitsyncScan } from "./config";
 import {
   type ContentRequirement,
-  computeMissingRequirements,
   type InstalledContentSnapshot,
+  resolveVerdict,
 } from "./resolveContent";
 
 /** Live state of resolving a set of requirements against the recipient's own
@@ -52,10 +52,16 @@ export interface ResolveContentState {
  * anything missing via the app-wide queue. Re-scans after every queue
  * completion so a just-downloaded item clears from `missing` without a manual
  * refresh.
+ *
+ * `targetLoading` is the caller's own target read still being in flight. Pass
+ * it, or a caller that reaches here before its engine is known reads as a
+ * machine with nothing installed and gets offered downloads for content it
+ * already has (issue #1377).
  */
 export function useResolveContent(
   requirements: ContentRequirement[],
   target: { enginePath?: string; dataDir?: string } | undefined,
+  targetLoading = false,
 ): ResolveContentState {
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const contentTargets = useContentTargets();
@@ -91,10 +97,6 @@ export function useResolveContent(
     contentTargets.refresh();
   });
 
-  const scanReady = !target?.enginePath || !target?.dataDir || !!scan.data;
-  const loading =
-    !scanReady || contentTargets.loading || (hasEngineReq && !engineCatalog);
-
   const installed: InstalledContentSnapshot = useMemo(
     () => ({
       games: (scan.data?.games ?? []).map((g) => ({
@@ -108,10 +110,15 @@ export function useResolveContent(
     [scan.data, contentTargets.targets],
   );
 
-  const missing = useMemo(
-    () => (loading ? [] : computeMissingRequirements(requirements, installed)),
-    [loading, requirements, installed],
-  );
+  const { loading, missing, resolved } = resolveVerdict({
+    requirements,
+    installed,
+    targetLoading,
+    hasTarget: !!target?.enginePath && !!target?.dataDir,
+    scan,
+    enginesLoading: contentTargets.loading,
+    engineCatalogPending: hasEngineReq && !engineCatalog,
+  });
 
   const enqueueInputFor = useCallback(
     (req: ContentRequirement) => {
@@ -204,7 +211,7 @@ export function useResolveContent(
   return {
     loading,
     missing,
-    resolved: !loading && missing.length === 0,
+    resolved,
     download,
     statusFor,
     progressFor,

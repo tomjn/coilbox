@@ -878,7 +878,7 @@ function ImportChallengeForm({
   /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
   initialCode?: string;
 }) {
-  const { target } = usePreferredTarget();
+  const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const brandingEntries = useBrandingCatalog();
   const { eligible } = useMapEligibility();
@@ -977,6 +977,7 @@ function ImportChallengeForm({
           title="Set up this challenge"
           requirements={[shortnameGameRequirement(pending.game)]}
           target={target ?? undefined}
+          targetLoading={targetLoading}
           onContinue={() => finishImport(pending).then(() => setPending(null))}
           onCancel={() => setPending(null)}
         />

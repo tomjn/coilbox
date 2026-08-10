@@ -39,7 +39,7 @@ export function ImportScenarioForm({
   onImported: (scenario: Scenario) => void;
 }) {
   const [pending, setPending] = useState<ScenarioExport | null>(null);
-  const { target } = usePreferredTarget();
+  const { target, loading: targetLoading } = usePreferredTarget();
 
   const decode = async (text: string) => {
     const read = readScenarioExport(text);
@@ -97,6 +97,7 @@ export function ImportScenarioForm({
           description="This scenario is played on a game or a map you don't have. Download what is missing below, or cancel. Nothing is imported until it is all here."
           requirements={scenarioContentRequirements(pending.scenario)}
           target={target ?? undefined}
+          targetLoading={targetLoading}
           onContinue={() => store(pending)}
           onCancel={() => setPending(null)}
         />

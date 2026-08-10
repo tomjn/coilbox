@@ -95,6 +95,7 @@ function RequirementRow({
 export function ResolveContentGate({
   requirements,
   target,
+  targetLoading,
   title,
   description,
   onContinue,
@@ -102,6 +103,10 @@ export function ResolveContentGate({
 }: {
   requirements: ContentRequirement[];
   target: { enginePath?: string; dataDir?: string } | undefined;
+  /** The caller's target read is still in flight, so `target` being undefined
+   * does not yet mean there is no engine. The gate waits rather than reading it
+   * as a machine with nothing installed (issue #1377). */
+  targetLoading?: boolean;
   title: string;
   description?: string;
   /** Runs once every requirement is satisfied. May throw — the error is shown
@@ -109,7 +114,7 @@ export function ResolveContentGate({
   onContinue: () => void | Promise<void>;
   onCancel: () => void;
 }) {
-  const resolve = useResolveContent(requirements, target);
+  const resolve = useResolveContent(requirements, target, targetLoading);
   const [continuing, setContinuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const firedRef = useRef(false);

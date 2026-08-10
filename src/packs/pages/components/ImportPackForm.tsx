@@ -6,7 +6,7 @@ import { identify } from "../../../container/container";
 import { useUnitsyncScan } from "../../../content/config";
 import { ResolveContentGate } from "../../../content/pages/components/ResolveContentDrawer";
 import { notify } from "../../../notify/notify";
-import { type PlayTarget, useSkirmishAis } from "../../../play/config";
+import { usePreferredTarget, useSkirmishAis } from "../../../play/config";
 import { useSkirmishPresets } from "../../../play/presets";
 import { packDecodeErrorMessage } from "../../envelope";
 import {
@@ -24,11 +24,9 @@ import {
  * than overwriting an existing preset.
  */
 export function ImportPackForm({
-  target,
   initialCode,
   onImported,
 }: {
-  target: PlayTarget | null;
   /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
   initialCode?: string;
   /** Called with the ids of the presets the pack added, which is empty for a
@@ -38,6 +36,13 @@ export function ImportPackForm({
 }) {
   const { presets, savePreset } = useSkirmishPresets();
   const [pending, setPending] = useState<SetupPackManifest | null>(null);
+
+  // Read the target here rather than taking it from the page. A drawer's
+  // content is built once, when the button is pressed, so a target passed in as
+  // a prop is whatever was known at that moment - null on a page opened before
+  // the engine read landed, and null for as long as the drawer stays open
+  // (issue #1377).
+  const { target, loading: targetLoading } = usePreferredTarget();
 
   // The pack's game AI list, so a bundled preset's AI picks can be reconciled
   // against the recipient's installed version before saving (#501): a pack is
@@ -125,6 +130,7 @@ export function ImportPackForm({
           title="Set up this pack"
           requirements={requirementsForPack(pending)}
           target={target ?? undefined}
+          targetLoading={targetLoading}
           onContinue={applyPack}
           onCancel={() => setPending(null)}
         />

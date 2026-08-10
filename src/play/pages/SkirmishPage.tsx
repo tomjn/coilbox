@@ -120,7 +120,7 @@ function restrictionSummary(r: BattleRestrictions): string {
  * launch the engine. Uses the preferred engine silently (no picker). */
 export default function SkirmishPage() {
   const navigate = useNavigate();
-  const { target } = usePreferredTarget();
+  const { target, loading: targetLoading } = usePreferredTarget();
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
   const { running, launch } = usePlay();
@@ -811,6 +811,7 @@ export default function SkirmishPage() {
             exactMapRequirement(pendingPreset.mapName),
           ]}
           target={target ?? undefined}
+          targetLoading={targetLoading}
           onContinue={() => {
             const saved = savePreset(
               pendingPreset.name?.trim() || "Imported preset",
@@ -831,6 +832,7 @@ export default function SkirmishPage() {
             exactMapRequirement(pendingHost.draft.mapName),
           ]}
           target={target ?? undefined}
+          targetLoading={targetLoading}
           onContinue={() => {
             navigate("/battles", {
               state: {
