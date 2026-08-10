@@ -158,10 +158,12 @@ describe("resolveVerdict", () => {
     expect(verdict.missing).toEqual([]);
   });
 
-  it("does not read a scan that failed as an empty machine", () => {
+  it("says the install could not be read when the scan failed (issue #1386)", () => {
     // Stricter than `scanSettled`, which the home page reads: a failed scan has
     // stopped, but it has not said what is on disk, and guessing costs a
-    // download of something the reader already has.
+    // download of something the reader already has. So nothing is offered, and
+    // nothing resolves on its own. The reader is told the check did not happen
+    // and decides.
     const verdict = resolveVerdict(
       readings({
         requirements: [exactGameRequirement("Beyond All Reason")],
@@ -169,8 +171,55 @@ describe("resolveVerdict", () => {
         scan: { ...SCANNING, loading: false, error: "no libunitsync found" },
       }),
     );
-    expect(verdict.loading).toBe(true);
+    expect(verdict.unreadable).toBe(true);
+    expect(verdict.unreadableReason).toBe("no libunitsync found");
+    expect(verdict.loading).toBe(false);
     expect(verdict.missing).toEqual([]);
+    expect(verdict.resolved).toBe(false);
+  });
+
+  it("says the install could not be read when the scan was cancelled", () => {
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [exactGameRequirement("Beyond All Reason")],
+        installed: nothingYet,
+        scan: { ...SCANNING, loading: false, cancelled: true },
+      }),
+    );
+    expect(verdict.unreadable).toBe(true);
+    expect(verdict.unreadableReason).toBe(null);
+    expect(verdict.missing).toEqual([]);
+  });
+
+  it("keeps waiting on a failed scan while another reading is still out", () => {
+    // The install is unreadable, but the engine catalogs have not landed, so
+    // the gate has not finished asking. Saying so now would replace one wait
+    // with a claim it is about to add to.
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [engineVersionRequirement("105.1.1-2511")],
+        installed: nothingYet,
+        scan: { ...SCANNING, loading: false, error: "no libunitsync found" },
+        engineCatalogPending: true,
+      }),
+    );
+    expect(verdict.loading).toBe(true);
+    expect(verdict.unreadable).toBe(false);
+  });
+
+  it("does not call a machine with no engine unreadable", () => {
+    // Nothing failed. There is no engine, which is an answer in itself, and the
+    // gate offers the engine rather than telling the reader a check broke.
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [exactGameRequirement("Beyond All Reason")],
+        installed: nothingYet,
+        hasTarget: false,
+        scan: { ...SCANNING, loading: false },
+      }),
+    );
+    expect(verdict.unreadable).toBe(false);
+    expect(verdict.missing.map((r) => r.label)).toEqual(["Beyond All Reason"]);
   });
 
   it("offers the missing content once every reading has answered", () => {
