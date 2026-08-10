@@ -17,6 +17,7 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Download } from "lucide-react";
 import { useEffect } from "react";
+import { nextDrawerKey } from "@/general/drawerKey";
 import type { Scenario } from "../../model";
 
 export function ScenarioImportButton({
@@ -37,7 +38,10 @@ export function ScenarioImportButton({
       title: "Import a scenario",
       width: "28rem",
       content: (
+        // A fresh form every time, because the last one may still be mounted
+        // and would keep the code it already ran (issue #1395).
         <ImportScenarioForm
+          key={nextDrawerKey()}
           initialCode={code}
           onImported={(scenario) => {
             drawer.close();

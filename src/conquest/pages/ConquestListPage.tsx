@@ -39,6 +39,7 @@ import {
 import type { ContentRequirement } from "../../content/resolveContent";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
+import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
 import {
   usePlayReadiness,
@@ -154,7 +155,10 @@ export default function ConquestListPage() {
       title: "Import challenge",
       width: "26rem",
       content: (
+        // A fresh form every time, because the last one may still be mounted
+        // and would keep the code it already ran (issue #1395).
         <ImportChallengeForm
+          key={nextDrawerKey()}
           initialCode={initialCode}
           onImported={(id) => {
             const route = `/conquest/${encodeURIComponent(id)}`;
