@@ -308,6 +308,14 @@ export interface Profile {
    * `useHubUrl` (see `../hub/config`), which layers a user setting on top of this.
    */
   hubUrl?: string;
+  /**
+   * Whether Coilbox tells the hub that an import from a hub link finished, so
+   * the hub can show an import count (issue #1361). Defaults to true. The
+   * request carries the item id and nothing else, and a player can turn it off
+   * under Settings > Coilbox hub. Set this false to make that choice for a
+   * distribution, in which case the player's toggle is not offered at all.
+   */
+  hubImportCounts?: boolean;
   /** GitHub repo ("owner/name") whose latest release ships this game's archive. */
   release?: { repo: string };
   /**
@@ -601,6 +609,16 @@ export function isUpdaterEnabled(): boolean {
  */
 export function isHubEnabled(): boolean {
   return loaded.hub !== false;
+}
+
+/**
+ * Whether Coilbox may tell the hub that an import finished (profile
+ * `hubImportCounts`, default true). A lock, not a seed: a distribution that
+ * turns it off gets no request and no toggle to turn back on, which is why the
+ * hub settings section reads this before offering the player's own switch.
+ */
+export function isHubImportCountEnabled(): boolean {
+  return loaded.hubImportCounts !== false;
 }
 
 /**
