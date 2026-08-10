@@ -4,6 +4,7 @@ import type { ContentState } from "../content/bindings";
 import { contentStateLoad } from "../content/bindings";
 import { getProfileRoot } from "../profile/profile";
 import { dlBarMaps, dlSetEngineDirs } from "./bindings";
+import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 import { healWriteRoot, packageDirOf } from "./writeRoot";
 
 /** A user-configured rapid master. `url` is the base; `dl_repos` appends `/repos.gz`. */
@@ -24,16 +25,9 @@ export interface DownloadsConfig {
   writeRootId?: string;
 }
 
-/** Spring + BAR rapid masters ship pre-configured; the user can add more. */
+/** Spring + BAR rapid masters ship pre-configured, and the user can add more. */
 export const defaultConfig: DownloadsConfig = {
-  rapidRepos: [
-    { id: "spring", name: "Spring", url: "https://repos.springrts.com" },
-    {
-      id: "bar",
-      name: "Beyond All Reason",
-      url: "https://repos-cdn.beyondallreason.dev",
-    },
-  ],
+  rapidRepos: [...DEFAULT_RAPID_MASTERS],
 };
 
 export function useDownloadsConfig() {
