@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  carriedShortname,
   loadShortnames,
+  rememberCarriedShortname,
   rememberedShortname,
   rememberedShortnames,
   rememberShortnames,
@@ -8,6 +10,7 @@ import {
 } from "./shortnames";
 
 const STORAGE_KEY = "coilbox.container.shortnames";
+const CARRIED_KEY = "coilbox.container.shortnames.carried";
 
 // The node test env has no localStorage at all, so the whole store is a Map.
 const store = new Map<string, string>();
@@ -74,7 +77,58 @@ describe("rememberShortnames", () => {
   });
 });
 
+describe("rememberCarriedShortname", () => {
+  it("holds the shortname a shared container named its game with", () => {
+    rememberCarriedShortname({
+      name: "SplinterFaction 0.1.60",
+      shortname: "SF",
+    });
+    expect(carriedShortname("SplinterFaction 0.1.60")).toBe("SF");
+  });
+
+  it("keeps a carried shortname out of what coilbox read itself", () => {
+    rememberCarriedShortname({ name: "Never installed 1.0", shortname: "NI" });
+    expect(rememberedShortname("Never installed 1.0")).toBeUndefined();
+    expect(rememberedShortnames().size).toBe(0);
+  });
+
+  it("learns nothing from an identity naming only one of the two", () => {
+    rememberCarriedShortname({ shortname: "BA" });
+    rememberCarriedShortname({ name: "BAR 1.2" });
+    rememberCarriedShortname(null);
+    rememberCarriedShortname(undefined);
+    expect(store.has(CARRIED_KEY)).toBe(false);
+  });
+
+  it("learns nothing about an archive coilbox has read the modinfo of", () => {
+    rememberShortnames([{ name: "BAR 1.2", info: { shortname: "BAR" } }]);
+    rememberCarriedShortname({ name: "BAR 1.2", shortname: "Imposter" });
+    expect(carriedShortname("BAR 1.2")).toBeUndefined();
+  });
+
+  it("takes the newest claim for a name two containers disagree on", () => {
+    rememberCarriedShortname({ name: "Mystery 1.0", shortname: "first" });
+    rememberCarriedShortname({ name: "Mystery 1.0", shortname: "second" });
+    expect(carriedShortname("Mystery 1.0")).toBe("second");
+  });
+
+  it("writes nothing when the container says nothing new", () => {
+    rememberCarriedShortname({ name: "Mystery 1.0", shortname: "MY" });
+    store.delete(CARRIED_KEY);
+    rememberCarriedShortname({ name: "Mystery 1.0", shortname: "MY" });
+    expect(store.has(CARRIED_KEY)).toBe(false);
+  });
+});
+
 describe("what carries over between sessions", () => {
+  it("reads back what an earlier session was told", () => {
+    rememberCarriedShortname({ name: "Mystery 1.0", shortname: "MY" });
+    resetShortnames();
+    expect(carriedShortname("Mystery 1.0")).toBeUndefined();
+    loadShortnames();
+    expect(carriedShortname("Mystery 1.0")).toBe("MY");
+  });
+
   it("reads back what an earlier session wrote", () => {
     rememberShortnames([
       { name: "SplinterFaction 0.1.77", info: { shortname: "SF" } },

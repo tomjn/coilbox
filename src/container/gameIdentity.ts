@@ -22,9 +22,10 @@
  * always knowable. A challenge that pins no build has no `name`. An item whose
  * game coilbox has never read a modinfo for has no `shortname`, since the
  * shortname only exists in the game's modinfo and coilbox reads that from an
- * installed archive. It does not have to be installed right now: `./shortnames`
- * keeps every shortname read here, so a build that has since been superseded
- * still gets one.
+ * installed archive. It does not have to be installed right now, and it does not
+ * have to have been installed at all: `./shortnames` keeps every shortname read
+ * here and every one a shared container carried, so a superseded build and a
+ * build this machine has never had both still get one.
  *
  * The shape sits at the top of each kind's payload as `game`, so a consumer
  * reads one field in one place whatever the kind. Payloads shared before this
@@ -32,7 +33,7 @@
  * spelling and returns the same shape.
  */
 
-import { rememberedShortname } from "./shortnames";
+import { carriedShortname, rememberedShortname } from "./shortnames";
 
 export interface GameIdentity {
   /** Exact installed archive name, e.g. "SplinterFaction 0.1.78". Absent when
@@ -92,6 +93,10 @@ export function parseGameIdentity(value: unknown): GameIdentity | null {
  * otherwise from the shortnames coilbox has already read here (issue #1364),
  * which is what a build that has since been superseded falls back on. Both are
  * modinfo this machine read, the live one being the more recent of the two.
+ *
+ * Last comes a shortname a shared container claimed (issue #1383), which is all
+ * a build this machine has never had ever gets. It is a claim rather than a
+ * reading, so it only answers where there is no reading to answer instead.
  */
 export function gameIdentityForName(
   name: string,
@@ -101,7 +106,8 @@ export function gameIdentityForName(
   if (!trimmed) return null;
   const shortname =
     trimmedString(installed.find((g) => g.name === trimmed)?.info?.shortname) ??
-    trimmedString(rememberedShortname(trimmed));
+    trimmedString(rememberedShortname(trimmed)) ??
+    trimmedString(carriedShortname(trimmed));
   return { name: trimmed, ...(shortname ? { shortname } : {}) };
 }
 
