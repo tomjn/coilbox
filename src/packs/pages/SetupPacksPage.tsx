@@ -2,6 +2,7 @@ import { Button, useDrawer } from "@picoframe/frame";
 import { Download, Package2 } from "lucide-react";
 import { useEffect } from "react";
 import { useImportParam } from "../../deeplink/useImportParam";
+import { useRecordHubImport } from "../../hub/imports";
 import { usePlayReadiness } from "../../play/config";
 
 /**
@@ -25,18 +26,33 @@ export default function SetupPacksPage() {
     });
   };
 
+  // A confirmed `coilbox://import` deep link (issue #388) lands here with the
+  // pack code in the query string, and with the hub item it came from alongside
+  // it when the hub browse screen started it (issue #1368).
+  const { code: importCode, hubItemId } = useImportParam();
+  const recordHubImport = useRecordHubImport();
+
   const openImport = async (initialCode?: string) => {
     const { ImportPackForm } = await import("./components/ImportPackForm");
     drawer.open({
       title: "Import a setup pack",
       width: "26rem",
-      content: <ImportPackForm target={target} initialCode={initialCode} />,
+      content: (
+        <ImportPackForm
+          target={target}
+          initialCode={initialCode}
+          // A pack leaves its bundled presets behind and nothing else, so those
+          // are what says whether this one is still here. A pack with none
+          // records no ids and reads as imported before, never as still here.
+          onImported={(presetIds) =>
+            recordHubImport(hubItemId, presetIds, "/play/skirmish")
+          }
+        />
+      ),
     });
   };
 
-  // A confirmed `coilbox://import` deep link (issue #388) lands here with the
-  // pack code in the query string. Open the import drawer with it prefilled.
-  const importCode = useImportParam();
+  // Open the import drawer with the deep link's code prefilled.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the deep-link code arrives, not on every drawer identity change
   useEffect(() => {
     if (importCode) void openImport(importCode);

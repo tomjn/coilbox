@@ -47,6 +47,7 @@ import { useReplayUserState } from "../../content/replayUserState";
 import { buildImportCodeLink } from "../../deeplink/build";
 import { copyDeepLink } from "../../deeplink/copyLink";
 import { useImportParam } from "../../deeplink/useImportParam";
+import { useRecordHubImport } from "../../hub/imports";
 import { getProfile } from "../../profile/profile";
 import type { BattleConfig } from "../bindings";
 import { playExportPreset, playImportPreset } from "../bindings";
@@ -649,7 +650,8 @@ export default function SkirmishPage() {
   // A confirmed `coilbox://import` deep link (issue #388) lands here with a
   // preset code in the query string. Decode it with the same validator as a file
   // import, then hand off to the content-resolution gate below.
-  const presetImportCode = useImportParam();
+  const { code: presetImportCode, hubItemId } = useImportParam();
+  const recordHubImport = useRecordHubImport();
   useEffect(() => {
     if (!presetImportCode) return;
     const parsed = parsePresetJson(presetImportCode);
@@ -781,10 +783,11 @@ export default function SkirmishPage() {
           ]}
           target={target ?? undefined}
           onContinue={() => {
-            savePreset(
+            const saved = savePreset(
               pendingPreset.name?.trim() || "Imported preset",
               pendingPreset,
             );
+            recordHubImport(hubItemId, [saved.id], "/play/skirmish");
             setPendingPreset(null);
           }}
           onCancel={() => setPendingPreset(null)}

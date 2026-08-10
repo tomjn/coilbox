@@ -37,6 +37,7 @@ import {
 import type { ContentRequirement } from "../../content/resolveContent";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
+import { useRecordHubImport } from "../../hub/imports";
 import {
   usePlayReadiness,
   usePreferredTarget,
@@ -125,6 +126,12 @@ export default function ConquestListPage() {
     [runs, file],
   );
 
+  // A confirmed `coilbox://import` deep link (issue #388) lands here with the
+  // challenge code in the query string, and with the hub item it came from
+  // alongside it when the hub browse screen started it (issue #1368).
+  const { code: importCode, hubItemId } = useImportParam();
+  const recordHubImport = useRecordHubImport();
+
   const openGenerate = (initialGameName?: string) =>
     drawer.open({
       title: "Generate a galaxy",
@@ -148,17 +155,17 @@ export default function ConquestListPage() {
         <ImportChallengeForm
           initialCode={initialCode}
           onImported={(id) => {
+            const route = `/conquest/${encodeURIComponent(id)}`;
+            recordHubImport(hubItemId, [id], route);
             drawer.close();
-            navigate(`/conquest/${encodeURIComponent(id)}`);
+            navigate(route);
           }}
         />
       ),
     });
 
-  // A confirmed `coilbox://import` deep link (issue #388) lands here with the
-  // challenge code in the query string. Open the import drawer with it prefilled,
-  // so the same decode plus content-resolution flow runs as a manual paste.
-  const importCode = useImportParam();
+  // Open the import drawer with the deep link's code prefilled, so the same
+  // decode plus content-resolution flow runs as a manual paste.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the deep-link code arrives, not on every drawer identity change
   useEffect(() => {
     if (importCode) openImportChallenge(importCode);

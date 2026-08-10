@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { toast } from "sonner";
 import { useUnitsyncScan } from "@/content/config";
 import { useImportParam } from "@/deeplink/useImportParam";
+import { useRecordHubImport } from "@/hub/imports";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import {
@@ -42,8 +43,10 @@ export default function ScenariosPage() {
   const play = usePlay();
   const drawer = useDrawer();
   // A confirmed `coilbox://import` deep link carrying a scenario code lands
-  // here, because this page is not advanced-gated and the builder is.
-  const importCode = useImportParam();
+  // here, because this page is not advanced-gated and the builder is. It names
+  // the hub item it came from when the hub browse screen started it (#1368).
+  const { code: importCode, hubItemId } = useImportParam();
+  const recordHubImport = useRecordHubImport();
 
   // Documents only: a bundled scenario is played exactly as a local one is, and
   // where it came from only matters where it can be edited.
@@ -55,12 +58,14 @@ export default function ScenariosPage() {
   // An imported scenario lands in the list behind the toast. One that names no
   // game and map is not listed here at all, so say that rather than leave the
   // player looking for a row that never arrives.
-  const imported = (scenario: Scenario) =>
-    isSetUp(scenario)
+  const imported = (scenario: Scenario) => {
+    recordHubImport(hubItemId, [scenario.id], "/scenarios");
+    return isSetUp(scenario)
       ? toast.success(`${scenario.name} is ready to play.`)
       : toast.warning(
           `${scenario.name} was imported, but it names no game and map, so there is nothing to play yet.`,
         );
+  };
 
   // The same refusal the drawer's button carries, shown a step earlier so the
   // player does not open a drawer to find out they cannot play anything.

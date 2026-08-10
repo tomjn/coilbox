@@ -26,10 +26,15 @@ import {
 export function ImportPackForm({
   target,
   initialCode,
+  onImported,
 }: {
   target: PlayTarget | null;
   /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
   initialCode?: string;
+  /** Called with the ids of the presets the pack added, which is empty for a
+   * pack that bundles none. Lets the caller record what the import produced
+   * (issue #1368). */
+  onImported?: (presetIds: string[]) => void;
 }) {
   const { presets, savePreset } = useSkirmishPresets();
   const [pending, setPending] = useState<SetupPackManifest | null>(null);
@@ -71,6 +76,7 @@ export function ImportPackForm({
   const applyPack = () => {
     if (!pending) return;
     const bundled = pending.presets ?? [];
+    const savedIds: string[] = [];
     if (bundled.length > 0) {
       const names = namesForPackPresets(presets, bundled);
       const allSubs: { from: string; to: string }[] = [];
@@ -82,7 +88,9 @@ export function ImportPackForm({
         // to be reconciled later when it meets the game on the Skirmish page.
         const res = reconcileParticipantAis(draft.participants, ais, aisReady);
         allSubs.push(...res.substitutions);
-        savePreset(names[i], { ...draft, participants: res.participants });
+        savedIds.push(
+          savePreset(names[i], { ...draft, participants: res.participants }).id,
+        );
       });
       const subNotice = summarizeSubstitutions(allSubs);
       const base = `${bundled.length} preset${bundled.length === 1 ? "" : "s"} added. Load ${bundled.length === 1 ? "it" : "one"} from Singleplayer → Presets.`;
@@ -98,6 +106,7 @@ export function ImportPackForm({
         level: "success",
       });
     }
+    onImported?.(savedIds);
     setPending(null);
   };
 
