@@ -43,7 +43,11 @@ export type FetchTextResult =
   | { ok: false; reason: string };
 
 export type FetchImportResult =
-  | { ok: true; plan: ImportPlan; host: string }
+  /** `text` is the body the plan was read from, for a caller that wants the
+   * container itself rather than what to do with it. The hub's item page draws
+   * a preview from it (`src/hub/preview.ts`) and would otherwise have to fetch
+   * the same bytes a second time. */
+  | { ok: true; plan: ImportPlan; host: string; text: string }
   | { ok: false; reason: string };
 
 /** Pull the host out of a URL for user-facing messages, or the raw URL if it
@@ -88,5 +92,5 @@ export async function fetchImportPlan(
   if (!prepared.ok) {
     return { ok: false, reason: prepared.reason };
   }
-  return { ok: true, plan: prepared.plan, host };
+  return { ok: true, plan: prepared.plan, host, text: fetched.text };
 }

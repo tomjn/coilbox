@@ -66,7 +66,15 @@ export function challengeSettingsFromGalaxy(
   };
 }
 
-function parseConquestChallengeSettings(
+/**
+ * Validate a challenge payload's `settings` object, clamping every knob to the
+ * range the generator is willing to be handed.
+ *
+ * Exported for the hub's item preview (`src/hub/preview.ts`), which rebuilds a
+ * shared galaxy to draw it. It reads the same published settings this reads, so
+ * a separate copy of these bounds would be a second answer to the same question.
+ */
+export function parseConquestChallengeSettings(
   value: unknown,
 ): ConquestChallengeSettings | null {
   if (typeof value !== "object" || value === null) return null;
