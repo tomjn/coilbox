@@ -1,7 +1,10 @@
 import { Button, Input } from "@picoframe/frame";
 import { Hash, Plus, Trash2 } from "lucide-react";
+import { updateStoredSetting } from "../../../lib/storedSetting";
 import {
+  JOINED_CHANNELS_KEY,
   type JoinedChannel,
+  type JoinedChannels,
   normalizeChannelList,
   useJoinedChannels,
 } from "../../../multiplayer/channels";
@@ -24,8 +27,16 @@ export function AutojoinChannels({ serverKey }: { serverKey: string }) {
   const { activeKey, channelJoinFailures } = useMultiplayer();
   const failures = serverKey === activeKey ? channelJoinFailures : {};
 
+  // Only this account's list is edited here, so fold it into the other accounts'
+  // lists as stored. A join confirmed while this editor is open writes the same
+  // key (issue #1375), and folding over the render's copy would drop it.
   const persist = (next: JoinedChannel[]) =>
-    setAll({ ...all, [serverKey]: next });
+    updateStoredSetting<JoinedChannels>(
+      JOINED_CHANNELS_KEY,
+      {},
+      setAll,
+      (stored) => ({ ...stored, [serverKey]: next }),
+    );
 
   const updateRow = (i: number, patch: Partial<JoinedChannel>) =>
     persist(list.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
