@@ -20,6 +20,7 @@ import {
   parsePresetJson,
   presetMatchesDraft,
   presetPayload,
+  presetRoute,
   type SkirmishPreset,
   useSkirmishPresets,
 } from "./presets";
@@ -277,5 +278,15 @@ describe("useSkirmishPresets", () => {
     const drop = savePreset("Drop", draftWith(["rl0", "rl1"]));
     removePreset(drop.id);
     expect(stored().map((p) => p.name)).toEqual(["Keep"]);
+  });
+});
+
+describe("presetRoute", () => {
+  it("names the preset on the Singleplayer page", () => {
+    expect(presetRoute("abc")).toBe("/play/skirmish?preset=abc");
+  });
+
+  it("encodes an id that would otherwise break the query string", () => {
+    expect(presetRoute("a&b=c")).toBe("/play/skirmish?preset=a%26b%3Dc");
   });
 });

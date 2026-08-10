@@ -30,6 +30,19 @@ export interface SkirmishPreset extends SkirmishDraft {
   lastUsedAt: string;
 }
 
+/**
+ * Where to send someone who wants to open one preset (issue #1372): the
+ * Singleplayer page with that preset loaded into the setup, ready to start.
+ *
+ * A preset has no screen of its own. It is a setup, and the setup screen is
+ * where it belongs, so the address is the list screen plus which one rather
+ * than a route of its own. `SkirmishPage` reads the param back and loads it,
+ * and says so when the id names a preset that is no longer here.
+ */
+export function presetRoute(id: string): string {
+  return `/play/skirmish?preset=${encodeURIComponent(id)}`;
+}
+
 export function useSkirmishPresets() {
   const [presets, setPresets] = useSetting<SkirmishPreset[]>(
     "play.presets",

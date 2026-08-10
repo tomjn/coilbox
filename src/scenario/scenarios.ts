@@ -90,6 +90,19 @@ export function useHasScenarios(): boolean {
 }
 
 /**
+ * Where to send someone who wants to open one scenario (issue #1372): the
+ * Scenarios list with that scenario's play drawer open.
+ *
+ * `/scenario-builder/:id` is the only route that names a single scenario today
+ * and it is advanced-gated, so an ordinary player cannot be sent there. This is
+ * the same address the player-facing list already answers to, plus which
+ * scenario, which is why it is a param and not a route of its own.
+ */
+export function scenarioRoute(id: string): string {
+  return `/scenarios?scenario=${encodeURIComponent(id)}`;
+}
+
+/**
  * A loaded scenario straight from the session cache, or `undefined` when the
  * list has not loaded yet. For non-React callers that need a best-effort name
  * now, chiefly the breadcrumb resolver, which only has the route's id.

@@ -3,6 +3,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { Bookmark, History, Play, Swords } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Popover,
@@ -47,6 +48,7 @@ import { useReplayUserState } from "../../content/replayUserState";
 import { buildImportCodeLink } from "../../deeplink/build";
 import { copyDeepLink } from "../../deeplink/copyLink";
 import { useImportParam } from "../../deeplink/useImportParam";
+import { useOneShotParam } from "../../deeplink/useOneShotParam";
 import { useRecordHubImport } from "../../hub/imports";
 import { getProfile } from "../../profile/profile";
 import type { BattleConfig } from "../bindings";
@@ -82,6 +84,7 @@ import {
   PRESET_KIND_VERSION,
   parsePresetJson,
   presetPayload,
+  presetRoute,
   type SkirmishPreset,
   useSkirmishPresets,
 } from "../presets";
@@ -662,6 +665,32 @@ export default function SkirmishPage() {
     setPendingPreset(parsed);
   }, [presetImportCode]);
 
+  // Opening one saved preset by address (issue #1372, `presetRoute`). Loads it
+  // into the setup, which is what the drawer's own Load does, so arriving by
+  // link and picking the row end in the same place.
+  //
+  // Waits for the content scan, because the defaulting passes above move the
+  // game and map to the first installed one as it lands, and would drag the
+  // preset's picks along with them. A preset the link names but this install no
+  // longer has is said out loud rather than leaving the page looking untouched.
+  const openPresetId = useOneShotParam("preset");
+  const openedPreset = useRef<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `loadPreset` is rebuilt every render, and the ref guard is what keeps this to one run
+  useEffect(() => {
+    if (!openPresetId || scan.loading) return;
+    if (openedPreset.current === openPresetId) return;
+    openedPreset.current = openPresetId;
+    const preset = presets.find((p) => p.id === openPresetId);
+    if (!preset) {
+      toast.warning(
+        "That preset isn't here any more. It may have been deleted.",
+      );
+      return;
+    }
+    loadPreset(preset);
+    toast.success(`Loaded the preset "${preset.name}".`);
+  }, [openPresetId, scan.loading, presets]);
+
   return (
     <div className="flex flex-col gap-5 p-4">
       <TooltipProvider>
@@ -787,7 +816,7 @@ export default function SkirmishPage() {
               pendingPreset.name?.trim() || "Imported preset",
               pendingPreset,
             );
-            recordHubImport(hubItemId, [saved.id], "/play/skirmish");
+            recordHubImport(hubItemId, [saved.id], presetRoute(saved.id));
             setPendingPreset(null);
           }}
           onCancel={() => setPendingPreset(null)}
