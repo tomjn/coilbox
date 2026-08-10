@@ -387,25 +387,23 @@ export default function BrowsePage() {
                     className="group flex w-full flex-col gap-2 text-left"
                     onClick={() => navigate(hubItemRoute(item.id))}
                   >
-                    <span className="flex w-full items-center gap-2">
-                      <Badge variant="secondary" className="gap-1">
-                        <KindIcon kind={item.kind} mode={item.mode} />
-                        {describeItem(item.kind, item.mode)}
-                      </Badge>
-                      {presence.state === "here" && (
-                        <Badge variant="outline" className="gap-1">
-                          <Check className="size-3" aria-hidden /> Imported
-                        </Badge>
-                      )}
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        {formatDate(item.created_at)}
-                      </span>
-                    </span>
                     <span
                       className="text-sm font-medium group-hover:underline"
                       title={item.title}
                     >
                       {item.title}
+                    </span>
+                    {/* Under the title, and free to wrap. Beside each other on
+                        one line, a narrow card squeezed the date until it broke
+                        across three lines and set the row's height. */}
+                    <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+                      <Badge variant="secondary" className="gap-1">
+                        <KindIcon kind={item.kind} mode={item.mode} />
+                        {describeItem(item.kind, item.mode)}
+                      </Badge>
+                      <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                        {formatDate(item.created_at)}
+                      </span>
                     </span>
                     {item.description && (
                       <span className="line-clamp-3 text-xs text-muted-foreground">
@@ -526,7 +524,9 @@ function ItemActions({
 
   if (presence.state === "here") {
     return (
-      <div className="mt-auto flex gap-2">
+      // "Imported" sits with the button rather than up in the header, because
+      // it is about what pressing it does, not about what the item is.
+      <div className="mt-auto flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
           size="sm"
@@ -535,6 +535,9 @@ function ItemActions({
         >
           <ArrowRight /> Open
         </Button>
+        <Badge variant="outline" className="gap-1">
+          <Check className="size-3" aria-hidden /> Imported
+        </Badge>
       </div>
     );
   }
