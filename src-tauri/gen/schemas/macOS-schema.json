@@ -1395,6 +1395,48 @@
           "markdownDescription": "Denies the dl_versions command without any pre-configured scope."
         },
         {
+          "description": "Allows signing in to the Coilbox hub with Discord, signing out again, and reading who is signed in.\n#### This default permission set includes:\n\n- `allow-hub-sign-in`\n- `allow-hub-sign-out`\n- `allow-hub-account`",
+          "type": "string",
+          "const": "coilbox-hub:default",
+          "markdownDescription": "Allows signing in to the Coilbox hub with Discord, signing out again, and reading who is signed in.\n#### This default permission set includes:\n\n- `allow-hub-sign-in`\n- `allow-hub-sign-out`\n- `allow-hub-account`"
+        },
+        {
+          "description": "Enables the hub_account command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-hub:allow-hub-account",
+          "markdownDescription": "Enables the hub_account command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the hub_sign_in command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-hub:allow-hub-sign-in",
+          "markdownDescription": "Enables the hub_sign_in command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the hub_sign_out command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-hub:allow-hub-sign-out",
+          "markdownDescription": "Enables the hub_sign_out command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the hub_account command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-hub:deny-hub-account",
+          "markdownDescription": "Denies the hub_account command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the hub_sign_in command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-hub:deny-hub-sign-in",
+          "markdownDescription": "Denies the hub_sign_in command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the hub_sign_out command without any pre-configured scope.",
+          "type": "string",
+          "const": "coilbox-hub:deny-hub-sign-out",
+          "markdownDescription": "Denies the hub_sign_out command without any pre-configured scope."
+        },
+        {
           "description": "Allows the unit builder's project storage, thumbnail, reveal and test-game commands.\n#### This default permission set includes:\n\n- `allow-lego-list`\n- `allow-lego-save`\n- `allow-lego-delete`\n- `allow-lego-thumb-save`\n- `allow-lego-open-path`\n- `allow-lego-packs`\n- `allow-lego-read-s3o`\n- `allow-lego-import-s3o`\n- `allow-lego-texture-import`\n- `allow-lego-texture-prune`\n- `allow-lego-export`\n- `allow-lego-export-glb`\n- `allow-lego-export-obj`\n- `allow-lego-scratch-game`\n- `allow-lego-run-script`",
           "type": "string",
           "const": "coilbox-lego:default",

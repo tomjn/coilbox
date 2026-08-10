@@ -590,6 +590,7 @@ dependencies = [
  "tauri-plugin-coilbox-conquest",
  "tauri-plugin-coilbox-content",
  "tauri-plugin-coilbox-downloads",
+ "tauri-plugin-coilbox-hub",
  "tauri-plugin-coilbox-lego",
  "tauri-plugin-coilbox-lobby-servers",
  "tauri-plugin-coilbox-mapconv",
@@ -5015,6 +5016,22 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "tempfile",
+]
+
+[[package]]
+name = "tauri-plugin-coilbox-hub"
+version = "0.0.0"
+dependencies = [
+ "coilbox-oauth",
+ "picoframe-core",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-plugin-opener",
+ "tokio",
+ "url",
 ]
 
 [[package]]

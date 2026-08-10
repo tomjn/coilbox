@@ -7,6 +7,7 @@ import {
   resolveHubUrl,
   useHubUrlSetting,
 } from "../config";
+import { AccountControl } from "./components/AccountControl";
 import { Field } from "./components/Field";
 
 /**
@@ -24,6 +25,10 @@ import { Field } from "./components/Field";
  * hub request. Clearing the field is not enough to fall back on its own, since an
  * empty *draft* is a valid URL fragment, so the button makes the intent explicit
  * rather than relying on the user backspacing everything by hand.
+ *
+ * Signing in (issue #1348) sits under the address, because which hub you are
+ * pointed at decides which account you have. Changing the address above asks the
+ * new hub who you are there.
  */
 export default function HubSettings() {
   const [userUrl, setUserUrl] = useHubUrlSetting();
@@ -81,6 +86,7 @@ export default function HubSettings() {
         </div>
       </Field>
       {error && <p className="text-sm text-destructive">{error}</p>}
+      <AccountControl hubUrl={effective} />
     </div>
   );
 }

@@ -184,6 +184,7 @@ fn main() {
     builder = builder.plugin(tauri_plugin_coilbox_profile::init());
     builder = builder.plugin(tauri_plugin_coilbox_lobby_servers::init());
     builder = builder.plugin(tauri_plugin_coilbox_multiplayer::init());
+    builder = builder.plugin(tauri_plugin_coilbox_hub::init());
     // picoframe:plugins-end
 
     // In a dev (non-bundled) build the OS has no record of the `coilbox://`
