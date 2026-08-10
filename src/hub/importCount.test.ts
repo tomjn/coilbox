@@ -41,7 +41,7 @@ describe("importCountUrl", () => {
     expect(importCountUrl("item-1", null, true)).toBeNull();
   });
 
-  it("reports nothing when counting is switched off", () => {
+  it("reports nothing for a distribution that switched counting off", () => {
     expect(importCountUrl("item-1", HUB, false)).toBeNull();
   });
 });

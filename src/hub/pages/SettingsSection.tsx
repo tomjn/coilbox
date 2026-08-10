@@ -1,14 +1,12 @@
 import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
-import { Switch } from "@/components/ui/switch";
-import { getProfile, isHubImportCountEnabled } from "../../profile/profile";
+import { getProfile } from "../../profile/profile";
 import {
   DEFAULT_HUB_URL,
   isValidHubUrl,
   resolveHubUrl,
   useHubUrlSetting,
 } from "../config";
-import { useCountHubImportsSetting } from "../importCount";
 import { AccountControl } from "./components/AccountControl";
 import { Field } from "./components/Field";
 
@@ -32,17 +30,16 @@ import { Field } from "./components/Field";
  * pointed at decides which account you have. Changing the address above asks the
  * new hub who you are there.
  *
- * The import count (issue #1361) is the one thing coilbox sends to the hub
- * without being asked to, so the switch for it is here rather than buried in a
- * privacy screen that does not exist. A distribution that turned it off
- * (`hubImportCounts`) is not offered the switch at all, since it would not
- * change anything.
+ * The import count (issue #1361) had a switch here and no longer does. It read
+ * as a preference rather than as the one thing coilbox sends home, and what it
+ * withheld was an item id the hub had just served, with no account and nothing
+ * that points at the reader. See `../importCount.ts`. A distribution can still
+ * switch the whole thing off with `hubImportCounts`.
  */
 export default function HubSettings() {
   const [userUrl, setUserUrl] = useHubUrlSetting();
   const [draft, setDraft] = useState(userUrl);
   const [error, setError] = useState<string | null>(null);
-  const [counting, setCounting] = useCountHubImportsSetting();
 
   const profileUrl = getProfile().hubUrl?.trim();
   const effective = resolveHubUrl(userUrl, profileUrl);
@@ -71,7 +68,9 @@ export default function HubSettings() {
   };
 
   return (
-    <div className="space-y-3">
+    // Each thing here is its own errand - which hub, and who you are on it - so
+    // they are spaced as sections rather than as lines of one block.
+    <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
         Coilbox is using <span className="font-mono text-xs">{effective}</span>,{" "}
         {source}.
@@ -95,27 +94,6 @@ export default function HubSettings() {
         </div>
       </Field>
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {isHubImportCountEnabled() && (
-        <label
-          htmlFor="hub-count-imports"
-          className="flex items-center justify-between gap-4"
-        >
-          <span className="flex flex-col">
-            <span className="text-sm font-medium">Count your imports</span>
-            <span className="text-xs text-muted-foreground">
-              When you import something from the hub, tell the hub it worked, so
-              it can show how many times that item has been imported. It sends
-              the item's id and nothing else, with no account and no way back to
-              you.
-            </span>
-          </span>
-          <Switch
-            id="hub-count-imports"
-            checked={counting}
-            onCheckedChange={setCounting}
-          />
-        </label>
-      )}
       <AccountControl hubUrl={effective} />
     </div>
   );

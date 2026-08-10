@@ -21,7 +21,13 @@
  *   and an imported file carry none, and there is nothing to invent.
  * - There is a hub this session trusts. A profile that switched the hub off has
  *   no configured hub, and a link to the address it used to use is a stranger's.
- * - Counting is switched on, by both the reader and the distribution.
+ * - The distribution has not switched counting off (`hubImportCounts`).
+ *
+ * There is no reader-facing switch. There was one, and it was a settings row
+ * nobody could read as being about telemetry, offering to withhold a number that
+ * says nothing about anybody: the item's own id, which the hub already served,
+ * with no account, no identifier and no way back to the reader. A choice that
+ * cannot protect anything is a choice not worth asking anybody to make.
  *
  * The request runs in the webview, like the reads in `./api` and unlike the
  * publish in `./publish`. Publishing goes through Rust because that is where the
@@ -30,18 +36,9 @@
  * `access-control-allow-origin: *`, so a plain fetch is the honest shape for it.
  */
 
-import { useSetting } from "@picoframe/frame";
 import { useCallback, useRef } from "react";
 import { isHubImportCountEnabled } from "@/profile/profile";
 import { useTrustedHubUrl } from "./config";
-
-/** The setting the reader's choice persists under. On unless turned off. */
-export const HUB_COUNT_IMPORTS_KEY = "hub.countImports";
-
-/** The reader's "tell the hub when an import finishes" setting. */
-export function useCountHubImportsSetting() {
-  return useSetting<boolean>(HUB_COUNT_IMPORTS_KEY, true);
-}
 
 /**
  * Where to report an import of `hubItemId`, or null when there is nothing to
@@ -56,9 +53,9 @@ export function useCountHubImportsSetting() {
 export function importCountUrl(
   hubItemId: string | undefined,
   hubUrl: string | null,
-  counting: boolean,
+  allowed: boolean,
 ): string | null {
-  if (!hubItemId || !hubUrl || !counting) return null;
+  if (!hubItemId || !hubUrl || !allowed) return null;
   const base = hubUrl.replace(/\/+$/, "");
   return `${base}/api/v1/items/${encodeURIComponent(hubItemId)}/imported`;
 }
@@ -80,18 +77,17 @@ export function reportImport(url: string | null): void {
  * rather than doing it, because the hub address and the settings are React state
  * and the import finishes inside a callback.
  *
- * The address and the setting are read through a ref, so this function keeps the
- * same identity for as long as an importer's drawer holds it, for the same
- * reason `useRecordHubImport` does it.
+ * The address is read through a ref, so this function keeps the same identity
+ * for as long as an importer's drawer holds it, for the same reason
+ * `useRecordHubImport` does it.
  */
 export function useReportHubImport(): (hubItemId: string | undefined) => void {
   const hubUrl = useTrustedHubUrl();
-  const [counting] = useCountHubImportsSetting();
-  const latest = useRef({ hubUrl, counting });
-  latest.current = { hubUrl, counting };
+  const latest = useRef(hubUrl);
+  latest.current = hubUrl;
   return useCallback((hubItemId: string | undefined) => {
-    const { hubUrl, counting } = latest.current;
-    const allowed = counting && isHubImportCountEnabled();
-    reportImport(importCountUrl(hubItemId, hubUrl, allowed));
+    reportImport(
+      importCountUrl(hubItemId, latest.current, isHubImportCountEnabled()),
+    );
   }, []);
 }

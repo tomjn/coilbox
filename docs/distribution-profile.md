@@ -854,7 +854,7 @@ Stops Coilbox telling the hub when an import from a hub link finished. On by def
 
 This is the only thing Coilbox sends to the hub without being asked to, and it exists because the hub can't work it out for itself: it sees the container being fetched, but Coilbox asks the player to confirm before applying anything, so a fetch that ends at the confirm dialog isn't an import. The request is a `POST` to the item's address carrying the item's id and nothing else, with no body, no account and no identifier of any kind, and Coilbox never reads what comes back.
 
-A player can turn it off for themselves under Settings > Coilbox hub, where it's on by default. Setting this to `false` makes that choice for your distribution: nothing is sent, and the switch isn't offered. Turning the hub off with [`hub`](#hub-boolean) also stops it, since there's then no hub to import from.
+This is the only switch for it. There's no per-player one: what it would withhold is an item id the hub had just served, with no account and nothing that points back at the player, so there's nothing to ask anybody about. Setting this to `false` means nothing is sent. Turning the hub off with [`hub`](#hub-boolean) also stops it, since there's then no hub to import from.
 
 ### `authoring` (boolean)
 
