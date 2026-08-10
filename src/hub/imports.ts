@@ -4,15 +4,17 @@
  * `./importRecord.ts`, which has no stores in it so the deep-link handler can
  * use the same record without pulling every play surface in behind it.
  *
- * A setup pack that bundles no presets leaves nothing behind at all, so its
- * record has no ids in it and reads as "imported before", never as "you have
- * this". That is the honest answer: its engine, game and maps may well still be
- * installed, but the pack itself left nothing to point at.
+ * A setup pack that bundles no presets leaves no ids behind, so its record
+ * carries the games and maps it asked for instead, by name, and reads as
+ * "here" only once the installed content scan confirms every one of them is
+ * still installed.
  */
 
 import { useSetting } from "@picoframe/frame";
 import { useCallback, useMemo, useRef } from "react";
 import { useGalaxies } from "@/conquest/conquests";
+import { useUnitsyncScan } from "@/content/config";
+import { usePreferredTarget } from "@/play/config";
 import { presetRoute, useSkirmishPresets } from "@/play/presets";
 import { useRuns } from "@/runlite/runs";
 import { scenarioRoute, useScenarios } from "@/scenario/scenarios";
@@ -47,7 +49,12 @@ export function useRecordHubImport() {
   const latest = useRef(records);
   latest.current = records;
   return useCallback(
-    (hubItemId: string | undefined, refs: string[], route: string) => {
+    (
+      hubItemId: string | undefined,
+      refs: string[],
+      route: string,
+      content?: { games: string[]; maps: string[] },
+    ) => {
       if (!hubItemId) return;
       setRecords(
         withRecord(latest.current, {
@@ -55,6 +62,7 @@ export function useRecordHubImport() {
           refs,
           route,
           at: new Date().toISOString(),
+          content,
         }),
       );
       reportImport(hubItemId);
@@ -77,8 +85,20 @@ export function useHubItemPresence(): (item: HubItem) => HubItemPresence {
   const { runs, loading: runsLoading } = useRuns();
   const { scenarios, loading: scenariosLoading } = useScenarios();
   const [records] = useSetting<HubImportRecord[]>(HUB_IMPORTS_KEY, []);
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
 
   const presetIds = useMemo(() => new Set(presets.map((p) => p.id)), [presets]);
+  const installed = useMemo(
+    () =>
+      scan.data
+        ? {
+            games: new Set(scan.data.games.map((g) => g.name)),
+            maps: new Set(scan.data.maps.map((m) => m.name)),
+          }
+        : null,
+    [scan.data],
+  );
   const galaxyIds = useMemo(
     () => (galaxiesLoading ? null : new Set(galaxies.map((g) => g.galaxy.id))),
     [galaxies, galaxiesLoading],
@@ -120,8 +140,8 @@ export function useHubItemPresence(): (item: HubItem) => HubItemPresence {
           : item.kind === "challenge"
             ? undefined
             : presetRoute;
-      return presenceOf(byId.get(item.id), local, routeFor);
+      return presenceOf(byId.get(item.id), local, routeFor, installed);
     },
-    [byId, presetIds, galaxyIds, runIds, scenarioIds],
+    [byId, presetIds, galaxyIds, runIds, scenarioIds, installed],
   );
 }

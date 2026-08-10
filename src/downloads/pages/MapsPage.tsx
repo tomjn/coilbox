@@ -133,7 +133,9 @@ export default function MapsPage() {
 
   // A confirmed `coilbox://import` deep link for a setup pack (issue #388)
   // lands here with the pack code in the query string, since `downloads.maps`
-  // is the one content screen no distribution profile can hide.
+  // is the one content screen no distribution profile can hide: it is not in
+  // `HIDEABLE_NAV_IDS`, so a profile cannot take it away, unlike the hub
+  // screen, which redirects home when the hub is off.
   const { code: importCode, hubItemId } = useImportParam();
   const recordHubImport = useRecordHubImport();
   const drawer = useDrawer();
@@ -151,11 +153,12 @@ export default function MapsPage() {
         <ImportPackForm
           key={nextDrawerKey()}
           initialCode={initialCode}
-          onImported={(presetIds) =>
+          onImported={(presetIds, content) =>
             recordHubImport(
               hubItemId,
               presetIds,
               presetIds[0] ? presetRoute(presetIds[0]) : "/downloads/maps",
+              content,
             )
           }
         />

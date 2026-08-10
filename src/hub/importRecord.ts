@@ -36,6 +36,10 @@ export interface HubImportRecord {
   route: string;
   /** When it was imported, ISO 8601. */
   at: string;
+  /** The content this import asked to be installed, for a pack that bundled no
+   * presets and so created no local ids. Names, not ids: a map and a game are
+   * known by name in every store that holds them. */
+  content?: { games: string[]; maps: string[] };
 }
 
 /** The settings key the records live under. */
@@ -125,12 +129,25 @@ export function presenceOf(
   record: HubImportRecord | undefined,
   local: ReadonlySet<string> | null,
   routeFor?: (ref: string) => string,
+  installed?: { games: ReadonlySet<string>; maps: ReadonlySet<string> } | null,
 ): HubItemPresence {
   if (!record) return { state: "none" };
   if (!local) return { state: "unknown" };
   const alive = record.refs.find((ref) => local.has(ref));
   if (alive !== undefined) {
     return { state: "here", route: routeFor ? routeFor(alive) : record.route };
+  }
+  // A pack that bundled no presets left no ids behind, so what it asked for is
+  // the only evidence it is still here. All of it, because a collection half
+  // installed is not the collection somebody shared.
+  if (record.content) {
+    if (installed === null) return { state: "unknown" };
+    if (installed) {
+      const hasAll =
+        record.content.games.every((g) => installed.games.has(g)) &&
+        record.content.maps.every((m) => installed.maps.has(m));
+      if (hasAll) return { state: "here", route: record.route };
+    }
   }
   return { state: "gone" };
 }

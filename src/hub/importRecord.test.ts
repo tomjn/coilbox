@@ -132,3 +132,48 @@ describe("presenceOf", () => {
     ).toEqual({ state: "here", route: "/here/kept" });
   });
 });
+
+describe("a pack that left only content behind", () => {
+  const record = {
+    id: "item-1",
+    refs: [],
+    route: "/downloads/maps",
+    at: "2026-01-01T00:00:00.000Z",
+    content: { games: ["Game A"], maps: ["Map One", "Map Two"] },
+  };
+
+  it("is here when every map and game it named is installed", () => {
+    expect(
+      presenceOf(record, new Set(), undefined, {
+        games: new Set(["Game A"]),
+        maps: new Set(["Map One", "Map Two"]),
+      }),
+    ).toEqual({ state: "here", route: "/downloads/maps" });
+  });
+
+  it("is gone when one of its maps is missing", () => {
+    expect(
+      presenceOf(record, new Set(), undefined, {
+        games: new Set(["Game A"]),
+        maps: new Set(["Map One"]),
+      }),
+    ).toEqual({ state: "gone" });
+  });
+
+  it("waits while the installed content is unknown", () => {
+    expect(presenceOf(record, new Set(), undefined, null)).toEqual({
+      state: "unknown",
+    });
+  });
+
+  it("is here on a surviving preset even with its content deleted", () => {
+    expect(
+      presenceOf(
+        { ...record, refs: ["preset-1"] },
+        new Set(["preset-1"]),
+        undefined,
+        { games: new Set(), maps: new Set() },
+      ),
+    ).toEqual({ state: "here", route: "/downloads/maps" });
+  });
+});

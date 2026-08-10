@@ -32,9 +32,13 @@ export function ImportPackForm({
   /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
   initialCode?: string;
   /** Called with the ids of the presets the pack added, which is empty for a
-   * pack that bundles none. Lets the caller record what the import produced
-   * (issue #1368). */
-  onImported?: (presetIds: string[]) => void;
+   * pack that bundles none, and the games and maps the pack named regardless
+   * of whether it also bundled presets. Lets the caller record what the
+   * import produced (issue #1368). */
+  onImported?: (
+    presetIds: string[],
+    content: { games: string[]; maps: string[] },
+  ) => void;
 }) {
   const { presets, savePreset } = useSkirmishPresets();
   const [pending, setPending] = useState<SetupPackManifest | null>(null);
@@ -124,7 +128,10 @@ export function ImportPackForm({
         level: "success",
       });
     }
-    onImported?.(savedIds);
+    onImported?.(savedIds, {
+      games: (pending.games ?? []).map((g) => g.name),
+      maps: pending.maps ?? [],
+    });
     setPending(null);
   };
 
