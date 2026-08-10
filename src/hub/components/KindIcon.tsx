@@ -111,7 +111,7 @@ export function KindIcon({
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
-      aria-hidden
+      aria-hidden="true"
     >
       {glyph}
     </svg>
