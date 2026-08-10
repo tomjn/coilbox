@@ -10,6 +10,7 @@ import {
   type InstalledGameInfo,
   parseGameIdentity,
 } from "../container/gameIdentity";
+import { updateStoredSetting } from "../lib/storedSetting";
 import type { BattleRestrictions, SkirmishDraft } from "./drafts";
 
 /** Payload schema version for a preset container. */
@@ -43,24 +44,16 @@ export function presetRoute(id: string): string {
   return `/play/skirmish?preset=${encodeURIComponent(id)}`;
 }
 
-export function useSkirmishPresets() {
-  const [presets, setPresets] = useSetting<SkirmishPreset[]>(
-    "play.presets",
-    [],
-  );
+export const PRESETS_KEY = "play.presets";
 
-  // The setting's setter takes a value, not an updater, and `presets` is fixed
-  // for the life of a render. Two writes in one pass, as when importing a setup
-  // pack saves each bundled preset in turn, would both fold over the list as it
-  // was before either, so only the last would survive (issue #1371). So hold the
-  // list in a box each write updates, and read the box rather than `presets`.
-  // A write re-renders this hook with what the store now holds, giving the next
-  // pass a fresh box.
-  const latest = { current: presets };
-  function write(next: SkirmishPreset[]) {
-    latest.current = next;
-    setPresets(next);
-  }
+export function useSkirmishPresets() {
+  const [presets, setPresets] = useSetting<SkirmishPreset[]>(PRESETS_KEY, []);
+
+  // Every write folds over the stored list rather than `presets`, which is fixed
+  // for the life of a render. Importing a setup pack saves each bundled preset in
+  // turn, and folding over the render's list kept only the last (issue #1371).
+  const write = (change: (prev: SkirmishPreset[]) => SkirmishPreset[]) =>
+    updateStoredSetting<SkirmishPreset[]>(PRESETS_KEY, [], setPresets, change);
 
   /** Save the given setup under a name as a new preset, prepended to the list. */
   function savePreset(name: string, draft: SkirmishDraft): SkirmishPreset {
@@ -72,23 +65,25 @@ export function useSkirmishPresets() {
       createdAt: now,
       lastUsedAt: now,
     };
-    write([preset, ...latest.current]);
+    write((prev) => [preset, ...prev]);
     return preset;
   }
 
   /** Bump `lastUsedAt` and move the preset to the front (called on load). */
   function touchPreset(id: string) {
     const now = new Date().toISOString();
-    const target = latest.current.find((p) => p.id === id);
-    if (!target) return;
-    write([
-      { ...target, lastUsedAt: now },
-      ...latest.current.filter((p) => p.id !== id),
-    ]);
+    write((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (!target) return prev;
+      return [
+        { ...target, lastUsedAt: now },
+        ...prev.filter((p) => p.id !== id),
+      ];
+    });
   }
 
   function removePreset(id: string) {
-    write(latest.current.filter((p) => p.id !== id));
+    write((prev) => prev.filter((p) => p.id !== id));
   }
 
   return { presets, savePreset, touchPreset, removePreset };
