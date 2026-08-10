@@ -22,6 +22,8 @@ import { challengeExport, challengeImport } from "../../challenge/bindings";
 import { ChallengeCodeInput } from "../../challenge/ChallengeCodeInput";
 import { ChallengeCodeView } from "../../challenge/ChallengeCodeView";
 import { challengeDecodeErrorMessage } from "../../challenge/code";
+import { identify } from "../../container/container";
+import { rememberCarriedShortname } from "../../container/shortnames";
 import { unitsyncSkirmishAis } from "../../content/bindings";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
@@ -947,6 +949,9 @@ function ImportChallengeForm({
     if (!result.ok) {
       throw new Error(challengeDecodeErrorMessage(result.error));
     }
+    // A challenge that pins a build names it both ways, so take its word for
+    // the shortname (issue #1383). One that pins none teaches nothing.
+    rememberCarriedShortname(identify(code).game);
     setPending(result.settings);
   };
 

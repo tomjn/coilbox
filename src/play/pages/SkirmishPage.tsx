@@ -21,7 +21,9 @@ import { summarizeSubstitutions } from "@/conquest/ai";
 import {
   encodeContainerCode,
   encodeContainerJson,
+  identify,
 } from "@/container/container";
+import { rememberCarriedShortname } from "@/container/shortnames";
 import {
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
@@ -644,6 +646,9 @@ export default function SkirmishPage() {
         setError("That file isn't a valid coilbox preset.");
         return;
       }
+      // Take the preset's word for the shortname of the build it pins, so a
+      // re-share from here carries it on (issue #1383).
+      rememberCarriedShortname(identify(json).game);
       setPendingPreset(parsed);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -662,6 +667,7 @@ export default function SkirmishPage() {
       setError("That link isn't a valid coilbox preset.");
       return;
     }
+    rememberCarriedShortname(identify(presetImportCode).game);
     setPendingPreset(parsed);
   }, [presetImportCode]);
 

@@ -3,6 +3,7 @@ import { summarizeSubstitutions } from "@/conquest/ai";
 import { reconcileParticipantAis } from "@/play/reconcileAi";
 import { ChallengeCodeInput } from "../../../challenge/ChallengeCodeInput";
 import { identify } from "../../../container/container";
+import { rememberCarriedShortname } from "../../../container/shortnames";
 import { useUnitsyncScan } from "../../../content/config";
 import { ResolveContentGate } from "../../../content/pages/components/ResolveContentDrawer";
 import { notify } from "../../../notify/notify";
@@ -75,6 +76,9 @@ export function ImportPackForm({
       }
       throw new Error(packDecodeErrorMessage(result.error));
     }
+    // Take the pack's word for the shortname of the build it pins, so a re-share
+    // from here carries it on (issue #1383).
+    rememberCarriedShortname(identify(code).game);
     setPending(result.settings);
   };
 
