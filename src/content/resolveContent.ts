@@ -219,6 +219,13 @@ export interface ResolveReadings {
  * outstanding, and what it can offer to download once it does not. */
 export interface ResolveVerdict {
   loading: boolean;
+  /** The install read stopped without saying what is on disk, and will not try
+   * again on its own. Nothing is offered and nothing resolves: the reader is
+   * told the check did not happen and decides (issue #1386). */
+  unreadable: boolean;
+  /** What the install read said when it stopped, when it said anything. Names
+   * the engine that could not be read, so the reader can go and fix it. */
+  unreadableReason: string | null;
   missing: ContentRequirement[];
   resolved: boolean;
 }
@@ -237,13 +244,52 @@ export interface ResolveVerdict {
  * a card that draws nothing. Here it would cost the reader a download of
  * something already on disk, so a scan that has not produced a result is not an
  * answer whatever state it ended in.
+ *
+ * That leaves a read which stopped without an answer, on a machine whose
+ * preferred engine has no libunitsync in it. Waiting is still right - the gate
+ * has not been told the machine is empty - but waiting for a read that will
+ * never come is a spinner with no end, so it is a state of its own:
+ * `unreadable`, offering nothing and resolving nothing, for the reader to
+ * decide from (issue #1386).
  */
 export function resolveVerdict(r: ResolveReadings): ResolveVerdict {
   const installKnown =
     !r.targetLoading && (!r.hasTarget || r.scan.data !== null);
-  const loading = !installKnown || r.enginesLoading || r.engineCatalogPending;
-  const missing = loading
-    ? []
-    : computeMissingRequirements(r.requirements, r.installed);
-  return { loading, missing, resolved: !loading && missing.length === 0 };
+  // A scan that has stopped without data is not going to run again by itself.
+  const installUnreadable =
+    !r.targetLoading &&
+    r.hasTarget &&
+    !r.scan.loading &&
+    r.scan.data === null &&
+    (r.scan.error !== null || r.scan.cancelled);
+  const loading =
+    (!installKnown && !installUnreadable) ||
+    r.enginesLoading ||
+    r.engineCatalogPending;
+  if (loading) {
+    return {
+      loading: true,
+      unreadable: false,
+      unreadableReason: null,
+      missing: [],
+      resolved: false,
+    };
+  }
+  if (installUnreadable) {
+    return {
+      loading: false,
+      unreadable: true,
+      unreadableReason: r.scan.error,
+      missing: [],
+      resolved: false,
+    };
+  }
+  const missing = computeMissingRequirements(r.requirements, r.installed);
+  return {
+    loading: false,
+    unreadable: false,
+    unreadableReason: null,
+    missing,
+    resolved: missing.length === 0,
+  };
 }

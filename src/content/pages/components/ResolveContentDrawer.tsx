@@ -91,6 +91,12 @@ function RequirementRow({
  * resolve. Closing the drawer (Cancel or the backdrop) calls `onCancel` and
  * the import never runs — nothing is saved until every requirement clears, so
  * an import can't half-apply.
+ *
+ * A third state covers the install that can't be read at all — a preferred
+ * engine with no libunitsync in it (issue #1386). The gate can't say what's
+ * missing and won't guess, so it says the check didn't happen and offers
+ * "Continue anyway" beside Cancel. Without it the reader is left on the
+ * spinner with Cancel as the only way out, which throws the import away.
  */
 export function ResolveContentGate({
   requirements,
@@ -190,6 +196,28 @@ export function ResolveContentGate({
           </div>
 
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+            {resolve.unreadable && (
+              <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <p className="text-xs text-muted-foreground">
+                    Coilbox could not read what is installed, so it has not
+                    checked whether you already have what this needs.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    The engine set as preferred could not be read. Pick another
+                    in Settings → Engines and try this again, or continue
+                    without the check and find out when you play.
+                  </p>
+                  {resolve.unreadableReason && (
+                    <p className="break-words font-mono text-xs text-muted-foreground">
+                      {resolve.unreadableReason}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {resolve.missing.length > 0 && (
               <>
                 <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
@@ -231,6 +259,11 @@ export function ResolveContentGate({
             <Button variant="outline" onClick={onCancel}>
               Cancel
             </Button>
+            {resolve.unreadable && !error && (
+              <Button onClick={runContinue} disabled={continuing}>
+                {continuing ? "Setting up…" : "Continue anyway"}
+              </Button>
+            )}
             {error && resolve.missing.length === 0 && (
               <Button onClick={runContinue}>Try again</Button>
             )}

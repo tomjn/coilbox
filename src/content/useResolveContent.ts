@@ -27,6 +27,12 @@ export interface ResolveContentState {
   /** True while the install scan (or, for engine requirements, the engine
    * catalogs) hasn't reported back yet. */
   loading: boolean;
+  /** True when the install read stopped without saying what is installed, so
+   * the check never happened and never will without the reader fixing the
+   * engine (issue #1386). Nothing is `missing` and nothing is `resolved`. */
+  unreadable: boolean;
+  /** What the install read said when it stopped, when it said anything. */
+  unreadableReason: string | null;
   /** Every requirement not yet satisfied, deduped. */
   missing: ContentRequirement[];
   /** True once every requirement is satisfied (including no requirements at
@@ -110,15 +116,16 @@ export function useResolveContent(
     [scan.data, contentTargets.targets],
   );
 
-  const { loading, missing, resolved } = resolveVerdict({
-    requirements,
-    installed,
-    targetLoading,
-    hasTarget: !!target?.enginePath && !!target?.dataDir,
-    scan,
-    enginesLoading: contentTargets.loading,
-    engineCatalogPending: hasEngineReq && !engineCatalog,
-  });
+  const { loading, unreadable, unreadableReason, missing, resolved } =
+    resolveVerdict({
+      requirements,
+      installed,
+      targetLoading,
+      hasTarget: !!target?.enginePath && !!target?.dataDir,
+      scan,
+      enginesLoading: contentTargets.loading,
+      engineCatalogPending: hasEngineReq && !engineCatalog,
+    });
 
   const enqueueInputFor = useCallback(
     (req: ContentRequirement) => {
@@ -210,6 +217,8 @@ export function useResolveContent(
 
   return {
     loading,
+    unreadable,
+    unreadableReason,
     missing,
     resolved,
     download,
