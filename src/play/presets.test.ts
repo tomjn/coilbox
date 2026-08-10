@@ -2,22 +2,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `presets.ts` pulls in `useSetting` from the frame package, whose `AppFrame`
 // subpath doesn't resolve under vitest's node resolver, so stub it. The stub
-// copies the real hook's behaviour that matters here: the setter writes the
-// given value straight to the store, and the value a caller holds is the one
-// read when the hook ran, so it doesn't move under a later write.
-const { store } = vi.hoisted(() => ({ store: new Map<string, unknown>() }));
+// copies the real hook's behaviour that matters here: it writes through to the
+// storage the app installs, while the value a caller holds is the one read when
+// the hook ran, so it doesn't move under a later write.
 vi.mock("@picoframe/frame", () => ({
-  useSetting: (key: string, fallback: unknown) => {
-    const value = store.has(key) ? store.get(key) : fallback;
-    return [value, (next: unknown) => store.set(key, next)];
-  },
+  useSetting: (key: string, fallback: unknown) => [
+    readStoredSetting(key, fallback),
+    (next: unknown) => storage.set(key, JSON.stringify(next)),
+  ],
 }));
 
 import { encodeContainerCode, identify } from "../container/container";
 import { rememberShortnames, resetShortnames } from "../container/shortnames";
+import {
+  installSettingsStorage,
+  memorySettingsStorage,
+  readStoredSetting,
+} from "../lib/storedSetting";
 import type { SkirmishDraft } from "./drafts";
 import {
   PRESET_KIND_VERSION,
+  PRESETS_KEY,
   parsePresetJson,
   presetMatchesDraft,
   presetPayload,
@@ -25,6 +30,10 @@ import {
   type SkirmishPreset,
   useSkirmishPresets,
 } from "./presets";
+
+/** The store the frame stub above reads and writes, replaced per test. */
+let storage = memorySettingsStorage();
+installSettingsStorage(storage);
 
 const base = {
   name: "My battle",
@@ -271,9 +280,12 @@ describe("presetMatchesDraft", () => {
 });
 
 describe("useSkirmishPresets", () => {
-  beforeEach(() => store.clear());
+  beforeEach(() => {
+    storage = memorySettingsStorage();
+    installSettingsStorage(storage);
+  });
 
-  const stored = () => (store.get("play.presets") ?? []) as SkirmishPreset[];
+  const stored = () => readStoredSetting<SkirmishPreset[]>(PRESETS_KEY, []);
 
   it("keeps every preset when several are saved in one pass", () => {
     // What importing a setup pack that bundles three presets does: one pass over

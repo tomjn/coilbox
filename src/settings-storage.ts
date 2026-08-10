@@ -1,4 +1,5 @@
 import type { SettingsStorage } from "@picoframe/frame";
+import { installSettingsStorage } from "./lib/storedSetting";
 import { usSettingsLoad, usSettingsSave } from "./uberstress/bindings";
 
 /**
@@ -29,11 +30,13 @@ export async function createTauriSettingsStorage(): Promise<SettingsStorage> {
     );
   };
 
-  return {
+  const storage: SettingsStorage = {
     get: (key) => cache.get(key) ?? null,
     set: (key, value) => {
       cache.set(key, value);
       persist();
     },
   };
+  installSettingsStorage(storage);
+  return storage;
 }
