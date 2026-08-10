@@ -19,16 +19,20 @@ import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
 import { buildDeepLink } from "@/deeplink/build";
 import { dispatchDeepLink } from "@/deeplink/bus";
 import { EmptyState } from "@/downloads/pages/components/states";
+import { getGameMatcher, getProfile } from "@/profile/profile";
 import {
   describeItem,
   fetchHubItem,
-  fetchHubItems,
   HUB_KINDS,
   type HubFilters,
   type HubItem,
-  type HubItemsPage,
   kindLabelPlural,
 } from "../api";
+import {
+  type BrowseResult,
+  describePinnedGame,
+  loadBrowsePage,
+} from "../browse";
 import { hubItemRoute, useHubUrl } from "../config";
 import { type HubItemPresence, noteHubContainer } from "../importRecord";
 import { useHubItemPresence } from "../imports";
@@ -70,6 +74,12 @@ import { FilterCombobox } from "./components/FilterCombobox";
  * hub endpoint. A locally installed name will not always match what the hub
  * carries, so the box always accepts whatever is typed - the list is a shortcut
  * into it, not the only way in.
+ *
+ * A distribution that pins coilbox to its own game pins this list too (issue
+ * #1362, applied in `../browse.ts`). The header says so, and the game box and the
+ * cards' game chips go with it: the pin has already answered which game, so a
+ * control offering to answer it again would be offering a choice that changes
+ * nothing.
  */
 
 /** How long to sit on a keystroke before asking the hub. Each search is a round
@@ -99,7 +109,7 @@ export default function BrowsePage() {
   const presenceOf = useHubItemPresence();
   const [filters, setFilters] = useState<HubFilters>({ page: 1 });
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState<HubItemsPage | null>(null);
+  const [page, setPage] = useState<BrowseResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState<string | null>(null);
@@ -114,22 +124,33 @@ export default function BrowsePage() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  // The distribution's own game pin, if it set one. Read once: the profile is
+  // loaded at startup and never changes, and a fresh predicate every render would
+  // refetch the list every render.
+  const pinnedMatcher = useMemo(() => getGameMatcher(), []);
+  const pinnedGame = useMemo(
+    () => describePinnedGame(getProfile().gameFilter),
+    [],
+  );
+
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    fetchHubItems(hubUrl, filters, controller.signal).then((result) => {
-      if (controller.signal.aborted) return;
-      setLoading(false);
-      if (result.ok) {
-        setPage(result.value);
-      } else {
-        setPage(null);
-        setError(result.reason);
-      }
-    });
+    loadBrowsePage(hubUrl, filters, pinnedMatcher, controller.signal).then(
+      (result) => {
+        if (controller.signal.aborted) return;
+        setLoading(false);
+        if (result.ok) {
+          setPage(result.value);
+        } else {
+          setPage(null);
+          setError(result.reason);
+        }
+      },
+    );
     return () => controller.abort();
-  }, [hubUrl, filters]);
+  }, [hubUrl, filters, pinnedMatcher]);
 
   /** Ask the hub again after a failure. A fresh object with the same filters in
    * it is what re-runs the fetch, so there is no second reason to re-run it. */
@@ -199,10 +220,8 @@ export default function BrowsePage() {
     [filters],
   );
 
-  const lastPage = page
-    ? Math.max(1, Math.ceil(page.total / Math.max(1, page.pageSize)))
-    : 1;
-  const current = filters.page ?? 1;
+  const lastPage = page?.lastPage ?? 1;
+  const current = page?.page ?? filters.page ?? 1;
 
   return (
     <div className="flex h-full flex-col">
@@ -214,6 +233,12 @@ export default function BrowsePage() {
             players. Importing needs no account, and nothing is imported until
             you have seen what it is and said yes.
           </p>
+          {pinnedMatcher && (
+            <p className="max-w-prose text-sm text-muted-foreground">
+              This copy of Coilbox is set up for {pinnedGame ?? "one game"}, so
+              the hub shows its things, plus anything not tied to a game.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative max-w-xs flex-1">
@@ -230,14 +255,16 @@ export default function BrowsePage() {
               className="h-9 pl-7"
             />
           </div>
-          <FilterCombobox
-            value={filters.game ?? ""}
-            onCommit={(v) => setFilter("game", v)}
-            options={installedGames}
-            placeholder="Game"
-            ariaLabel="Filter by game"
-            className="h-9 w-36"
-          />
+          {!pinnedMatcher && (
+            <FilterCombobox
+              value={filters.game ?? ""}
+              onCommit={(v) => setFilter("game", v)}
+              options={installedGames}
+              placeholder="Game"
+              ariaLabel="Filter by game"
+              className="h-9 w-36"
+            />
+          )}
           <FilterCombobox
             value={filters.map ?? ""}
             onCommit={(v) => setFilter("map", v)}
@@ -319,9 +346,11 @@ export default function BrowsePage() {
         )}
         {!loading && !error && page && page.items.length === 0 && (
           <EmptyState icon={Globe}>
-            {active.length > 0 || filters.kind || filters.q?.trim()
-              ? "Nothing on the hub matches those filters yet."
-              : "The hub has nothing on it yet. Anything you share will show up here."}
+            {emptyReason(
+              active.length > 0 || !!filters.kind || !!filters.q?.trim(),
+              pinnedMatcher !== null,
+              pinnedGame,
+            )}
           </EmptyState>
         )}
         {!loading && page && page.items.length > 0 && (
@@ -364,12 +393,17 @@ export default function BrowsePage() {
                     )}
                   </button>
                   <div className="flex flex-wrap gap-1.5 text-xs">
-                    {item.game_name && (
-                      <FilterChip
-                        label={item.game_name}
-                        onClick={() => setFilter("game", item.game_name ?? "")}
-                      />
-                    )}
+                    {item.game_name &&
+                      (pinnedMatcher ? (
+                        <span className={CHIP_CLASS}>{item.game_name}</span>
+                      ) : (
+                        <FilterChip
+                          label={item.game_name}
+                          onClick={() =>
+                            setFilter("game", item.game_name ?? "")
+                          }
+                        />
+                      ))}
                     {item.map_name && (
                       <FilterChip
                         label={item.map_name}
@@ -400,6 +434,13 @@ export default function BrowsePage() {
               );
             })}
           </ul>
+        )}
+        {!loading && page?.truncated && (
+          <p className="mt-4 max-w-prose text-xs text-muted-foreground">
+            Only the first {page.truncated.scanned} items on the hub were read,
+            so there may be more for this game than are listed here. Search to
+            narrow it down.
+          </p>
         )}
         {!loading && page && lastPage > 1 && (
           <div className="mt-4 flex items-center justify-center gap-3">
@@ -507,6 +548,28 @@ function ItemActions({
   );
 }
 
+/**
+ * Why the list is empty, in the reader's terms. A distribution that pinned the
+ * hub to its own game is the likeliest reason a hub with things on it looks
+ * bare, so it is worth saying rather than leaving "nothing here" to be read as a
+ * dead service.
+ */
+function emptyReason(
+  filtered: boolean,
+  pinned: boolean,
+  pinnedGame: string | null,
+): string {
+  if (filtered) return "Nothing on the hub matches those filters yet.";
+  if (pinned) {
+    return `The hub has nothing for ${pinnedGame ?? "this game"} yet. This copy of Coilbox lists only that game's things, so there may be other games' things on the hub.`;
+  }
+  return "The hub has nothing on it yet. Anything you share will show up here.";
+}
+
+/** How a card's game, map, author and tag are drawn, pressable or not. */
+const CHIP_CLASS =
+  "rounded-full border border-border/60 px-2 py-0.5 text-xs text-muted-foreground";
+
 /** A card's game, map, author or tag, which filters the list when pressed. */
 function FilterChip({
   label,
@@ -519,7 +582,7 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full border border-border/60 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+      className={`${CHIP_CLASS} transition-colors hover:border-foreground/30 hover:text-foreground`}
     >
       {label}
     </button>
