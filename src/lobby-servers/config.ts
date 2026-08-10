@@ -6,6 +6,21 @@ import { getProfile } from "../profile/profile";
 export type LobbyProtocol = "tasserver" | "tachyon";
 
 /**
+ * How an encrypted TASServer connection starts, which the two server families do
+ * differently and incompatibly.
+ *
+ * `stls` connects in plaintext and upgrades in-band with `STLS`, which is what
+ * uberserver offers on 8200. `direct` is TLS from the first byte, which is what
+ * teiserver offers on 8201. Trying one against the other fails: uberserver resets
+ * a direct handshake, and teiserver's 8201 never sends the plaintext greeting the
+ * `STLS` dance waits for.
+ */
+export type TlsStyle = "stls" | "direct";
+
+/** What the Rust side is told: the style, or that there is no TLS at all. */
+export type TlsMode = "none" | TlsStyle;
+
+/**
  * A lobby server (connection target). Secrets are NOT stored here — passwords live
  * in the OS keychain keyed by `{serverId, username}` (see `bindings.ts`). Built-in
  * catalog entries carry `builtin: true` (set when merging); custom servers do not.
@@ -16,6 +31,12 @@ export interface LobbyServer {
   host: string;
   port: number;
   tls: boolean;
+  /**
+   * How TLS starts when `tls` is set. Absent means `stls`, so a server stored
+   * before this field existed keeps its old behaviour with no migration. Read it
+   * through {@link tlsModeFor} rather than reaching for it directly.
+   */
+  tlsStyle?: TlsStyle;
   /** Accept a self-signed server cert (uberserver ships one; teiserver does not). */
   allowSelfSigned: boolean;
   /**
@@ -28,6 +49,18 @@ export interface LobbyServer {
   builtin?: boolean;
   /** The distribution's preferred server (profile `lobby.official`): badged + first. */
   official?: boolean;
+}
+
+/**
+ * How the Rust side should open this server's connection, reading an absent
+ * `tlsStyle` as `stls` (what every entry did before the field existed). Pure.
+ */
+export function tlsModeFor(server: {
+  tls: boolean;
+  tlsStyle?: TlsStyle;
+}): TlsMode {
+  if (!server.tls) return "none";
+  return server.tlsStyle ?? "stls";
 }
 
 /** The protocol a server speaks, reading an absent field as `tasserver`. Pure. */
@@ -109,6 +142,9 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     host: "server4.beyondallreason.info",
     port: 8201,
     tls: true,
+    // teiserver's SSL port is TLS from the first byte, unlike uberserver's in-band
+    // STLS upgrade on 8200.
+    tlsStyle: "direct",
     allowSelfSigned: false,
   },
   {
@@ -157,6 +193,7 @@ export function resolveProfileServerRules(
       host: o.host,
       port: o.port ?? 8200,
       tls: o.tls ?? false,
+      tlsStyle: o.tlsStyle,
       allowSelfSigned: o.allowSelfSigned ?? false,
       official: true,
     };

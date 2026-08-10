@@ -1,5 +1,6 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { Channel } from "@tauri-apps/api/core";
+import type { TlsMode } from "../lobby-servers/config";
 import type { BattleConfig } from "../play/bindings";
 
 /**
@@ -363,10 +364,12 @@ export const mpConnect = defineCommand<
     serverKey: string;
     host: string;
     port: number;
-    tls: boolean;
+    tlsMode: TlsMode;
     allowSelfSigned: boolean;
     username: string;
     password: string;
+    /** The per-install `LOGIN` userID (see `clientId.ts`). */
+    clientId: string;
     compatFlags: string[];
     onEvent: Channel<LobbyEvent>;
   },
@@ -456,11 +459,12 @@ export const mpRegister = defineCommand<
     serverKey: string;
     host: string;
     port: number;
-    tls: boolean;
+    tlsMode: TlsMode;
     allowSelfSigned: boolean;
     username: string;
     password: string;
     email: string | null;
+    clientId: string;
     compatFlags: string[];
     onEvent: Channel<LobbyEvent>;
   },

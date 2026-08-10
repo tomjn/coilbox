@@ -1,19 +1,39 @@
 //! Socket setup and the STLS/TLS upgrade.
 //!
-//! The lobby protocol runs over a plain TCP line stream. uberserver (and Recoil's
-//! Chobby ecosystem) negotiate TLS *in-band* via `STLS`: the server sends its
-//! plaintext greeting, the client replies `STLS`, the server acknowledges with
-//! `OK cmd=STLS` and then expects the TLS ClientHello on the same socket. We do
-//! this upgrade up-front here so the main read loop always sees a clean,
+//! The lobby protocol runs over a plain TCP line stream, and there are two ways it
+//! gets encrypted. uberserver (and Recoil's Chobby ecosystem) negotiate TLS
+//! *in-band* via `STLS`: the server sends its plaintext greeting, the client replies
+//! `STLS`, the server acknowledges with `OK cmd=STLS` and then expects the TLS
+//! ClientHello on the same socket. teiserver also offers a port that is TLS from the
+//! first byte, with no greeting and no `STLS`.
+//!
+//! The two are not interchangeable, which is why [`TlsMode`] is a three-way choice
+//! rather than a boolean: uberserver resets a direct handshake on its plaintext port,
+//! and teiserver's direct port never sends the greeting the STLS dance waits for.
+//! Either upgrade happens up-front here, so the main read loop always sees a clean,
 //! already-secured stream and never has to special-case the handshake.
 
 use std::sync::Arc;
 use std::time::Duration;
 
+use serde::Deserialize;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use tokio_util::sync::CancellationToken;
+
+/// How a connection gets its TLS, chosen per server entry by the frontend.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TlsMode {
+    /// Plaintext throughout.
+    #[default]
+    None,
+    /// Connect in plaintext, then upgrade in-band with `STLS` (uberserver).
+    Stls,
+    /// TLS from the first byte, with no plaintext prelude (teiserver port 8201).
+    Direct,
+}
 
 /// A boxed, object-safe duplex byte stream. Both the plain-TCP and the TLS cases
 /// erase to this so `conn.rs` can frame either identically. tokio provides the
@@ -22,47 +42,25 @@ use tokio_util::sync::CancellationToken;
 pub trait AsyncReadWrite: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> AsyncReadWrite for T {}
 
-/// Connect to `host:port`, optionally performing the STLS upgrade, returning a
-/// ready-to-frame byte stream.
+/// Connect to `host:port` in `mode`, returning a ready-to-frame byte stream.
 ///
-/// When `tls` is set we drive the uberserver STLS dance: read and discard the
-/// plaintext greeting, send `STLS`, read and discard the `OK cmd=STLS` line, then
-/// hand the raw socket to rustls. The server re-sends a fresh greeting on the
-/// encrypted channel, which the caller's read loop consumes normally.
+/// After an STLS upgrade the server re-sends a fresh greeting on the encrypted
+/// channel, which the caller's read loop consumes normally.
 pub async fn connect_stream(
     host: &str,
     port: u16,
-    tls: bool,
+    mode: TlsMode,
     allow_self_signed: bool,
 ) -> Result<Box<dyn AsyncReadWrite>, String> {
     let tcp = TcpStream::connect((host, port))
         .await
         .map_err(|e| format!("connect {host}:{port} failed: {e}"))?;
 
-    if !tls {
-        return Ok(Box::new(tcp));
-    }
-
-    // STLS handshake over the plaintext socket. We buffer only to `read_line` the
-    // two control lines; the server stays silent after `OK cmd=STLS` until it
-    // receives our TLS ClientHello, so nothing is buffered past that line and
-    // `into_inner()` cannot drop unread application bytes.
-    let mut buf = BufReader::new(tcp);
-    let mut line = String::new();
-    buf.read_line(&mut line)
-        .await
-        .map_err(|e| format!("reading greeting failed: {e}"))?;
-    buf.write_all(b"STLS\n")
-        .await
-        .map_err(|e| format!("sending STLS failed: {e}"))?;
-    buf.flush()
-        .await
-        .map_err(|e| format!("flushing STLS failed: {e}"))?;
-    line.clear();
-    buf.read_line(&mut line)
-        .await
-        .map_err(|e| format!("reading STLS ack failed: {e}"))?;
-    let tcp = buf.into_inner();
+    let tcp = match mode {
+        TlsMode::None => return Ok(Box::new(tcp)),
+        TlsMode::Direct => tcp,
+        TlsMode::Stls => stls_upgrade(tcp).await?,
+    };
 
     let connector = TlsConnector::from(Arc::new(client_config(allow_self_signed)?));
     let server_name = rustls::pki_types::ServerName::try_from(host.to_string())
@@ -72,6 +70,45 @@ pub async fn connect_stream(
         .await
         .map_err(|e| format!("TLS handshake failed: {e}"))?;
     Ok(Box::new(tls_stream))
+}
+
+/// Drive the in-band `STLS` dance and hand back the raw socket, positioned at the
+/// point the server expects the ClientHello.
+///
+/// We buffer only to `read_line` the two control lines. The server stays silent
+/// after `OK cmd=STLS` until it receives our ClientHello, so nothing is buffered
+/// past that line and `into_inner()` cannot drop unread application bytes.
+async fn stls_upgrade(tcp: TcpStream) -> Result<TcpStream, String> {
+    let mut buf = BufReader::new(tcp);
+    read_control_line(&mut buf, "greeting").await?;
+    buf.write_all(b"STLS\n")
+        .await
+        .map_err(|e| format!("sending STLS failed: {e}"))?;
+    buf.flush()
+        .await
+        .map_err(|e| format!("flushing STLS failed: {e}"))?;
+    read_control_line(&mut buf, "STLS ack").await?;
+    Ok(buf.into_inner())
+}
+
+/// Read one plaintext control line, treating a closed connection as the error it is.
+///
+/// `read_line` reports end-of-stream as `Ok(0)` rather than an error, so without this
+/// check a server that hung up flows through the whole dance and only surfaces later
+/// as a rustls handshake error against a dead socket. A port that is TLS from the
+/// first byte behaves exactly this way, so the message names that case.
+async fn read_control_line(buf: &mut BufReader<TcpStream>, what: &str) -> Result<(), String> {
+    let mut line = String::new();
+    let read = buf
+        .read_line(&mut line)
+        .await
+        .map_err(|e| format!("reading {what} failed: {e}"))?;
+    if read == 0 {
+        return Err(format!(
+            "server closed the connection before the {what}. If this port expects TLS from the first byte, set the server's TLS mode to direct."
+        ));
+    }
+    Ok(())
 }
 
 /// Why an in-flight connect ended without a stream. `Cancelled` and `TimedOut` are
@@ -95,7 +132,7 @@ pub enum ConnectError {
 pub async fn connect_stream_cancellable(
     host: &str,
     port: u16,
-    tls: bool,
+    mode: TlsMode,
     allow_self_signed: bool,
     timeout: Duration,
     cancel: &CancellationToken,
@@ -103,7 +140,7 @@ pub async fn connect_stream_cancellable(
     tokio::select! {
         biased;
         _ = cancel.cancelled() => Err(ConnectError::Cancelled),
-        res = tokio::time::timeout(timeout, connect_stream(host, port, tls, allow_self_signed)) => {
+        res = tokio::time::timeout(timeout, connect_stream(host, port, mode, allow_self_signed)) => {
             match res {
                 Ok(Ok(stream)) => Ok(stream),
                 Ok(Err(e)) => Err(ConnectError::Failed(e)),
@@ -200,6 +237,43 @@ mod tests {
         port
     }
 
+    /// A listener that accepts one connection and drops it. This is how a port that
+    /// wants TLS from the first byte answers a plaintext read, so it stands in for
+    /// teiserver's 8201. Returns the bound port.
+    async fn closing_server() -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            drop(listener.accept().await);
+        });
+        port
+    }
+
+    #[tokio::test]
+    async fn stls_names_a_closed_connection_instead_of_handshaking_a_dead_socket() {
+        let port = closing_server().await;
+        let err = connect_stream("127.0.0.1", port, TlsMode::Stls, true)
+            .await
+            .err()
+            .expect("connect should have failed");
+        assert!(
+            err.contains("closed the connection before the greeting"),
+            "{err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_mode_skips_the_stls_prelude() {
+        let port = closing_server().await;
+        let err = connect_stream("127.0.0.1", port, TlsMode::Direct, true)
+            .await
+            .err()
+            .expect("connect should have failed");
+        // Straight to the handshake: no greeting was waited for, so the failure is
+        // rustls meeting a closed socket rather than the missing plaintext line.
+        assert!(err.starts_with("TLS handshake failed"), "{err}");
+    }
+
     #[tokio::test]
     async fn connect_times_out_on_a_stalled_handshake() {
         let port = stalled_server().await;
@@ -207,7 +281,7 @@ mod tests {
         let res = connect_stream_cancellable(
             "127.0.0.1",
             port,
-            true,
+            TlsMode::Stls,
             true,
             Duration::from_millis(150),
             &token,
@@ -230,7 +304,7 @@ mod tests {
         let res = connect_stream_cancellable(
             "127.0.0.1",
             port,
-            true,
+            TlsMode::Stls,
             true,
             Duration::from_secs(30),
             &token,
@@ -247,7 +321,7 @@ mod tests {
         let res = connect_stream_cancellable(
             "127.0.0.1",
             port,
-            true,
+            TlsMode::Stls,
             true,
             Duration::from_secs(30),
             &token,

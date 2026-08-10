@@ -33,6 +33,7 @@ import {
   type LobbyAccount,
   type LobbyServer,
   serverProtocol,
+  type TlsStyle,
   useCustomServers,
   useLobbyAccounts,
 } from "../config";
@@ -765,6 +766,21 @@ function CustomServerRow({
           checked={s.tls}
           onChange={(v) => onChange({ tls: v })}
         />
+        {s.tls && (
+          <Field
+            label="TLS mode"
+            hint="uberserver upgrades in-band on its plain port. teiserver's 8201 is encrypted from the first byte."
+          >
+            <OptionSelect
+              value={s.tlsStyle ?? "stls"}
+              onValueChange={(v) => onChange({ tlsStyle: v as TlsStyle })}
+              options={[
+                { value: "stls", label: "Upgrade with STLS" },
+                { value: "direct", label: "Direct (TLS from the first byte)" },
+              ]}
+            />
+          </Field>
+        )}
         <CheckField
           label="Allow self-signed certificate"
           hint="uberserver ships one; teiserver does not."

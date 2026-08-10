@@ -30,6 +30,7 @@ import {
   serverProtocol,
   sortAccountsByRecency,
   tachyonBaseUrl,
+  tlsModeFor,
 } from "./config";
 
 const custom: LobbyServer = {
@@ -65,6 +66,25 @@ describe("resolveServer", () => {
   });
   it("returns undefined for an unknown id", () => {
     expect(resolveServer("nope", [custom])).toBeUndefined();
+  });
+});
+
+describe("tlsModeFor", () => {
+  it("reads a server stored before the field existed as the STLS upgrade", () => {
+    // Exactly the JSON a pre-tlsStyle build wrote under `lobbyServers.servers`.
+    const stored: LobbyServer = JSON.parse(
+      '{"id":"lan-1","name":"LAN","host":"10.0.0.5","port":8200,"tls":true,"allowSelfSigned":true}',
+    );
+    expect(tlsModeFor(stored)).toBe("stls");
+  });
+
+  it("is none when the server is plaintext", () => {
+    expect(tlsModeFor(custom)).toBe("none");
+  });
+
+  it("keeps teiserver's SSL port on direct TLS", () => {
+    const bar = BUILTIN_SERVERS.find((s) => s.id === "bar-ssl");
+    expect(tlsModeFor(bar as LobbyServer)).toBe("direct");
   });
 });
 

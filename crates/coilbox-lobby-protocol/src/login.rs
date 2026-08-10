@@ -49,6 +49,9 @@ pub struct LoginConfig {
     pub password_hash: String,
     pub local_ip: String,
     pub agent: String,
+    /// The per-install id sent as the `LOGIN` userID field. teiserver stores it as
+    /// the account's lobby hash and refuses a login that leaves it empty or `0`, so
+    /// this has to be a real value that stays the same between connections.
     pub client_id: String,
     pub compat_flags: Vec<String>,
     pub use_stls: bool,
@@ -231,7 +234,7 @@ mod tests {
             password_hash: "aGFzaA==".into(),
             local_ip: "192.168.0.5".into(),
             agent: "Coilbox 0.1".into(),
-            client_id: "0".into(),
+            client_id: "7654321".into(),
             compat_flags: vec!["u".into(), "sp".into()],
             use_stls,
             mode: LoginMode::Login,
@@ -250,7 +253,7 @@ mod tests {
         let out = m.on_message(&parse_line("COMPFLAGS u sp b"));
         assert_eq!(
             out,
-            vec!["LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t0\tu sp"]
+            vec!["LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp"]
         );
         assert_eq!(m.phase(), LoginPhase::AwaitAccepted);
 
@@ -315,7 +318,7 @@ mod tests {
             out,
             vec![
                 "CONFIRMAGREEMENT 1234".to_string(),
-                "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t0\tu sp".to_string(),
+                "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp".to_string(),
             ]
         );
         assert_eq!(m.phase(), LoginPhase::AwaitAccepted);

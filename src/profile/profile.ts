@@ -150,6 +150,11 @@ export interface ProfileLobbyServer {
   port?: number;
   /** Connect over TLS. Defaults to false. */
   tls?: boolean;
+  /**
+   * How TLS starts: "stls" for uberserver's in-band upgrade, "direct" for a port
+   * that is TLS from the first byte (teiserver's 8201). Defaults to "stls".
+   */
+  tlsStyle?: "stls" | "direct";
   /** Accept a self-signed server cert (uberserver ships one). Defaults to false. */
   allowSelfSigned?: boolean;
 }

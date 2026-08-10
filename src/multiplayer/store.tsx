@@ -21,6 +21,7 @@ import {
   profileOfficialServer,
   serverProtocol,
   tachyonBaseUrl,
+  tlsModeFor,
   useCustomServers,
   useLastLogin,
   useLobbyAccounts,
@@ -75,6 +76,7 @@ import {
   matchesHighlight,
 } from "./chat/highlight";
 import { triggerMentionCue } from "./chat/mentionCue";
+import { CLIENT_ID_KEY, newClientId } from "./clientId";
 import { favouritesFor, useFavourites } from "./friends";
 import { addIgnore, ignoredFor, useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
@@ -801,6 +803,21 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     autoRejoinRef.current = autoRejoin;
   }, [autoRejoin]);
 
+  // The `LOGIN` userID, generated on first use and kept from then on. Declared
+  // before the boot auto-connect effect below so the ref is filled by the time
+  // anything can connect.
+  const [clientId, setClientId] = useSetting<string>(CLIENT_ID_KEY, "");
+  const clientIdRef = useRef(clientId);
+  useEffect(() => {
+    if (clientId) {
+      clientIdRef.current = clientId;
+      return;
+    }
+    const fresh = newClientId();
+    clientIdRef.current = fresh;
+    setClientId(fresh);
+  }, [clientId, setClientId]);
+
   // Startup auto-connect (issue #404, opt-in, default off) + one-click reconnect.
   // The last-used login is written on every successful connect and read once at
   // boot. The decision inputs are mirrored into a ref so the once-only boot effect
@@ -1078,10 +1095,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             serverKey,
             host: server.host,
             port: server.port,
-            tls: server.tls,
+            tlsMode: tlsModeFor(server),
             allowSelfSigned: server.allowSelfSigned,
             username,
             password: cred.secret,
+            clientId: clientIdRef.current,
             compatFlags: ["u", "sp"],
             onEvent,
           });
@@ -1291,11 +1309,12 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             serverKey,
             host: server.host,
             port: server.port,
-            tls: server.tls,
+            tlsMode: tlsModeFor(server),
             allowSelfSigned: server.allowSelfSigned,
             username,
             password,
             email: email ?? null,
+            clientId: clientIdRef.current,
             compatFlags: ["u", "sp"],
             onEvent,
           }).catch(reject);

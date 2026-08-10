@@ -25,6 +25,9 @@ pub fn is_wire_safe(line: &str) -> bool {
 /// `pw_hash` is the already-computed `BASE64(MD5(password))`. `cpu` is fixed at
 /// `0`. The final field is tab-structured: `agent\tclient_id\tflags` with flags
 /// space-separated.
+///
+/// `client_id` is the field teiserver reads as the account's lobby hash. It refuses
+/// a login that leaves it empty or `0`, so pass a real per-install value.
 pub fn login(
     user: &str,
     pw_hash: &str,
@@ -352,12 +355,12 @@ mod tests {
             "aGFzaA==",
             "192.168.0.5",
             "Coilbox 0.1",
-            "0",
+            "7654321",
             &["u", "sp", "b"],
         );
         assert_eq!(
             l,
-            "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t0\tu sp b"
+            "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp b"
         );
     }
 
