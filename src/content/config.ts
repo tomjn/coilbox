@@ -1250,14 +1250,33 @@ export function useUnitsyncGameHeaders(enginePath?: string, dataDir?: string) {
   return { headers, loading };
 }
 
-/** Session cache of minimap results, keyed by `dataDir::enginePath::mapName`. */
+/**
+ * Session cache of minimap results, keyed by
+ * `dataDir::enginePath::mapName::mip`. The mip is part of the key because the
+ * same map is rendered at two sizes: a list thumbnail and a full preview.
+ */
 const minimapCache = new Map<string, MinimapResult>();
 
-/** Lazily render and cache a map's minimap + start positions for the detail page. */
+/**
+ * The mip a list of small thumbnails should ask for: `1024 >> 3` = 128px, ample
+ * for the ~56 CSS px a row draws at 2× density. Extracting the full 1024px
+ * texture for these costs the same as it does for the preview, which a screen
+ * showing hundreds of rows pays hundreds of times over.
+ */
+export const THUMB_MINIMAP_MIP = 3;
+
+/**
+ * Lazily render and cache a map's minimap + start positions for the detail page.
+ *
+ * `mip` picks the resolution as `1024 >> mip`, defaulting to the full 1024px the
+ * 3D preview drapes over its terrain. Anything drawing a small thumbnail should
+ * pass {@link THUMB_MINIMAP_MIP} instead.
+ */
 export function useUnitsyncMinimap(
   enginePath?: string,
   dataDir?: string,
   mapName?: string,
+  mip = 0,
 ) {
   const [url, setUrl] = useState<string | null>(null);
   const [startPositions, setStartPositions] = useState<StartPos[]>([]);
@@ -1281,7 +1300,7 @@ export function useUnitsyncMinimap(
       setAppearance(null);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${mapName}`;
+    const key = `${dataDir}::${enginePath}::${mapName}::${mip}`;
     const apply = (res: MinimapResult) => {
       const url = renderedUrl(res, unitsyncThumbUrl);
       setUrl(url);
@@ -1327,9 +1346,9 @@ export function useUnitsyncMinimap(
     let cancelled = false;
     setLoading(true);
     setError(null);
-    // mip 0 = 1024px, the engine's minimap ceiling — it's the diffuse texture
-    // draped over the 3D preview (and the 2D minimap), so take the full res.
-    unitsyncMinimap({ enginePath, dataDir, mapName, mip: 0 })
+    // mip 0 = 1024px, the engine's minimap ceiling. That is what the 3D preview
+    // needs, because the minimap is the diffuse texture draped over its terrain.
+    unitsyncMinimap({ enginePath, dataDir, mapName, mip })
       .then((res) => {
         if (cancelled) return;
         minimapCache.set(key, res);
@@ -1344,7 +1363,7 @@ export function useUnitsyncMinimap(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, mapName, recordAppearance]);
+  }, [enginePath, dataDir, mapName, mip, recordAppearance]);
 
   return { url, startPositions, env, appearance, loading, error };
 }

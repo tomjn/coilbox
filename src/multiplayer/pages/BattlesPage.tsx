@@ -1,5 +1,5 @@
 import { Button, NavGate } from "@picoframe/frame";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 import type { SkirmishDraft } from "@/play/drafts";
 import { useScanTargetSelection } from "../../content/config";
@@ -171,23 +171,28 @@ function BattlesPage() {
   // `key` is supplied by the row's password popover for passworded battles. A
   // battle in progress is joined the same way — the server places a late joiner as
   // a spectator, and the room auto-launches the engine to watch the running game.
-  async function onJoin(b: Battle, key?: string) {
-    if (!activeKey) return;
-    clearJoinError();
-    hostingFromDraftRef.current = false;
-    joiningRef.current = true;
-    try {
-      await mpJoinBattle({
-        serverKey: activeKey,
-        id: b.id,
-        key,
-        scriptPassword: newScriptPassword(),
-      });
-    } catch {
-      // Wire-level failures surface via lastJoinError or a disconnect.
-      joiningRef.current = false;
-    }
-  }
+  // Wrapped so the identity is stable: it reaches every row, and a new function
+  // each render would re-render all of them (see `BattleRow`'s memo).
+  const onJoin = useCallback(
+    async (b: Battle, key?: string) => {
+      if (!activeKey) return;
+      clearJoinError();
+      hostingFromDraftRef.current = false;
+      joiningRef.current = true;
+      try {
+        await mpJoinBattle({
+          serverKey: activeKey,
+          id: b.id,
+          key,
+          scriptPassword: newScriptPassword(),
+        });
+      } catch {
+        // Wire-level failures surface via lastJoinError or a disconnect.
+        joiningRef.current = false;
+      }
+    },
+    [activeKey, clearJoinError],
+  );
 
   // Open a battle we host. The OPENBATTLE ack sets `currentBattle`, which the join
   // effect above turns into navigation to the room (same path as joining).
@@ -219,10 +224,10 @@ function BattlesPage() {
     }
   }
 
-  async function leave() {
+  const leave = useCallback(async () => {
     if (!activeKey) return;
     await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
-  }
+  }, [activeKey]);
 
   if (!activeKey) {
     return (

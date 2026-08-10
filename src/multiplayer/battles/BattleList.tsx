@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Battle } from "../bindings";
 import { BattleRow } from "./BattleRow";
 
@@ -47,14 +47,12 @@ export function BattleList({
   serverAddress?: string;
 }) {
   const [collapsed, setCollapsed] = useState({ open: false, running: false });
-  const rowProps: RowProps = {
-    canJoin,
-    onJoin,
-    onLeave,
-    enginePath,
-    dataDir,
-    serverAddress,
-  };
+  // Rebuilding this object every render would defeat `BattleRow`'s memo, since
+  // it spreads into every row's props.
+  const rowProps: RowProps = useMemo(
+    () => ({ canJoin, onJoin, onLeave, enginePath, dataDir, serverAddress }),
+    [canJoin, onJoin, onLeave, enginePath, dataDir, serverAddress],
+  );
 
   const rest = battles.filter((b) => b.id !== joinedId);
   const open = rest.filter((b) => !inProgressIds.has(b.id));

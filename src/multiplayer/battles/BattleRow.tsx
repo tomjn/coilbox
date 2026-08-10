@@ -1,7 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Link as LinkIcon, Lock, LogOut, Users } from "lucide-react";
-import { useState } from "react";
-import { useUnitsyncMinimap } from "../../content/config";
+import { memo, useState } from "react";
+import { THUMB_MINIMAP_MIP, useUnitsyncMinimap } from "../../content/config";
 import { MapThumb } from "../../content/pages/components/MapThumb";
 import { buildJoinLink } from "../../deeplink/build";
 import { copyDeepLink } from "../../deeplink/copyLink";
@@ -25,7 +25,7 @@ import { JoinBattlePopover } from "./JoinBattlePopover";
  * to MapThumb's placeholder icon — we deliberately don't substitute a remote or
  * browse-cached thumbnail here.
  */
-export function BattleRow({
+function BattleRowInner({
   battle,
   joined,
   canJoin,
@@ -57,7 +57,12 @@ export function BattleRow({
   const action = battleRowAction(battle, { canJoin, inProgress });
   const disabled = joined || action.disabled;
   const [pwOpen, setPwOpen] = useState(false);
-  const { url, loading } = useUnitsyncMinimap(enginePath, dataDir, battle.map);
+  const { url, loading } = useUnitsyncMinimap(
+    enginePath,
+    dataDir,
+    battle.map,
+    THUMB_MINIMAP_MIP,
+  );
 
   // Clicking the minimap/title is a second path to the same action as the button:
   // passworded battles open the password popover, others act directly (join, or
@@ -168,3 +173,15 @@ export function BattleRow({
     </li>
   );
 }
+
+/**
+ * Memoised, because the store replaces the whole state mirror on every server
+ * event and a busy server sends them constantly. Without this, one player
+ * changing status re-renders every row on screen. The battle objects come from
+ * that mirror, so a row only re-renders when its own battle is replaced.
+ *
+ * This only holds while the callbacks and the strings around them keep their
+ * identity between renders, which is what `BattleList`'s memoised `rowProps` and
+ * the page's `useCallback`s are for.
+ */
+export const BattleRow = memo(BattleRowInner);
