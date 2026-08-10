@@ -380,11 +380,14 @@ export default function BrowsePage() {
               return (
                 <li
                   key={item.id}
-                  className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
+                  // Three groups with room between them - what it is, what it is
+                  // for, what to do about it - rather than five evenly spaced
+                  // lines, which read as one undifferentiated block.
+                  className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
                 >
                   <button
                     type="button"
-                    className="group flex w-full flex-col gap-2 text-left"
+                    className="group flex w-full flex-col gap-1.5 text-left"
                     onClick={() => navigate(hubItemRoute(item.id))}
                   >
                     <span
@@ -406,7 +409,7 @@ export default function BrowsePage() {
                       </span>
                     </span>
                     {item.description && (
-                      <span className="line-clamp-3 text-xs text-muted-foreground">
+                      <span className="mt-1 line-clamp-3 text-xs text-muted-foreground">
                         {item.description}
                       </span>
                     )}
@@ -498,6 +501,11 @@ export default function BrowsePage() {
  * is a new preset with no tie back to the hub item, so "import again" answered a
  * question nobody had. Somebody who does want a fresh copy can remove theirs
  * from the item's own page and import it.
+ *
+ * An item imported before and since deleted offers Import, and the card says
+ * nothing about the history. It read as a third paragraph on a card that already
+ * had a description, and a card is a summary. The item's own page has room to
+ * say it, and does.
  */
 function ItemActions({
   item,
@@ -543,16 +551,10 @@ function ItemActions({
   }
 
   return (
-    <div className="mt-auto flex flex-col gap-1.5">
-      {presence.state === "gone" && (
-        <p className="text-xs text-muted-foreground">
-          You imported this before. Nothing of it is here now.
-        </p>
-      )}
+    <div className="mt-auto flex flex-wrap items-center gap-2">
       <Button
         variant="outline"
         size="sm"
-        className="self-start"
         onClick={onImport}
         disabled={busy}
         aria-label={`Import ${item.title}`}
