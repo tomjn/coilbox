@@ -9,7 +9,7 @@ fn config(use_stls: bool) -> LoginConfig {
         password_hash: "X03MO1qnZdYdgyfeuILPmQ==".into(),
         local_ip: "192.168.0.5".into(),
         agent: "Coilbox 0.1".into(),
-        client_id: "0".into(),
+        client_id: "7654321".into(),
         compat_flags: vec!["u".into(), "sp".into()],
         use_stls,
         mode: LoginMode::Login,
@@ -35,7 +35,8 @@ fn full_plain_handshake_line_order() {
         emitted,
         vec![
             "LISTCOMPFLAGS".to_string(),
-            "LOGIN alice X03MO1qnZdYdgyfeuILPmQ== 0 192.168.0.5 Coilbox 0.1\t0\tu sp".to_string(),
+            "LOGIN alice X03MO1qnZdYdgyfeuILPmQ== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp"
+                .to_string(),
         ]
     );
     assert_eq!(m.phase(), LoginPhase::Ready);

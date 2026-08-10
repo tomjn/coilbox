@@ -25,6 +25,9 @@ pub fn is_wire_safe(line: &str) -> bool {
 /// `pw_hash` is the already-computed `BASE64(MD5(password))`. `cpu` is fixed at
 /// `0`. The final field is tab-structured: `agent\tclient_id\tflags` with flags
 /// space-separated.
+///
+/// `client_id` is the field teiserver reads as the account's lobby hash. It refuses
+/// a login that leaves it empty or `0`, so pass a real per-install value.
 pub fn login(
     user: &str,
     pw_hash: &str,
@@ -139,6 +142,10 @@ pub fn say_battle_ex(msg: &str) -> String {
 ///
 /// When a script password is present but no key, uberserver expects `*` in the
 /// key slot as a placeholder.
+///
+/// Callers should always pass a script password. uberserver takes a bare
+/// `JOINBATTLE <id>`, but teiserver only matches the three-field form and answers
+/// "No incomming match for JOINBATTLE" to anything shorter.
 pub fn join_battle(id: u32, key: Option<&str>, script_pw: Option<&str>) -> String {
     match (key, script_pw) {
         (Some(k), Some(sp)) => format!("JOINBATTLE {id} {k} {sp}"),
@@ -352,12 +359,12 @@ mod tests {
             "aGFzaA==",
             "192.168.0.5",
             "Coilbox 0.1",
-            "0",
+            "7654321",
             &["u", "sp", "b"],
         );
         assert_eq!(
             l,
-            "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t0\tu sp b"
+            "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp b"
         );
     }
 

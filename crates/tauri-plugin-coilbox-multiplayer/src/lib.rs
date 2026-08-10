@@ -64,7 +64,7 @@ use tauri::{
     plugin::{Builder, TauriPlugin},
     Manager, Runtime, State,
 };
-use tls::ConnectError;
+use tls::{ConnectError, TlsMode};
 use tokio_util::sync::CancellationToken;
 
 /// Hard ceiling on a single connect attempt (TCP + STLS + TLS handshake). A stuck
@@ -168,10 +168,11 @@ async fn open_and_spawn<R: Runtime>(
     server_key: String,
     host: String,
     port: u16,
-    tls: bool,
+    tls_mode: TlsMode,
     allow_self_signed: bool,
     username: String,
     password: String,
+    client_id: String,
     compat_flags: Vec<String>,
     mode: LoginMode,
     on_event: Channel<LobbyEvent>,
@@ -203,7 +204,7 @@ async fn open_and_spawn<R: Runtime>(
     let result = tls::connect_stream_cancellable(
         &host,
         port,
-        tls,
+        tls_mode,
         allow_self_signed,
         CONNECT_TIMEOUT,
         &token,
@@ -229,7 +230,7 @@ async fn open_and_spawn<R: Runtime>(
         // wildcard is accepted and avoids leaking a real LAN IP.
         local_ip: "*".into(),
         agent: format!("Coilbox {}", env!("CARGO_PKG_VERSION")),
-        client_id: "0".into(),
+        client_id,
         compat_flags,
         // TLS was already upgraded up-front in `connect_stream`, so the login
         // machine drives a plain greeting on the already-secured stream.
@@ -259,10 +260,11 @@ async fn mp_connect<R: Runtime>(
     server_key: String,
     host: String,
     port: u16,
-    tls: bool,
+    tls_mode: TlsMode,
     allow_self_signed: bool,
     username: String,
     password: String,
+    client_id: String,
     compat_flags: Vec<String>,
     on_event: Channel<LobbyEvent>,
 ) -> Result<CliResult, ()> {
@@ -273,10 +275,11 @@ async fn mp_connect<R: Runtime>(
         server_key,
         host,
         port,
-        tls,
+        tls_mode,
         allow_self_signed,
         username,
         password,
+        client_id,
         compat_flags,
         LoginMode::Login,
         on_event,
@@ -298,11 +301,12 @@ async fn mp_register<R: Runtime>(
     server_key: String,
     host: String,
     port: u16,
-    tls: bool,
+    tls_mode: TlsMode,
     allow_self_signed: bool,
     username: String,
     password: String,
     email: Option<String>,
+    client_id: String,
     compat_flags: Vec<String>,
     on_event: Channel<LobbyEvent>,
 ) -> Result<CliResult, ()> {
@@ -313,10 +317,11 @@ async fn mp_register<R: Runtime>(
         server_key,
         host,
         port,
-        tls,
+        tls_mode,
         allow_self_signed,
         username,
         password,
+        client_id,
         compat_flags,
         LoginMode::Register { email },
         on_event,

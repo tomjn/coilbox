@@ -719,6 +719,9 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
         ServerMessage::ServerMsg { text } => {
             vec![Delta::ServerMessage { text, boxed: false }]
         }
+        // Client-to-client bookkeeping, not an announcement to show. The raw line
+        // is still in the protocol console for anyone who wants it.
+        ServerMessage::ProtocolExtensions { .. } => vec![],
         ServerMessage::ServerMsgBox { text } => {
             vec![Delta::ServerMessage { text, boxed: true }]
         }
@@ -1302,6 +1305,16 @@ mod tests {
                 boxed: true,
             }]
         );
+    }
+
+    #[test]
+    fn teiservers_extension_announcement_reaches_nobody() {
+        let mut s = LobbyState::new();
+        let out = reduce(
+            &mut s,
+            parse_line("SERVERMSG @PROTOCOL_EXTENSIONS@ {\"ring:originator\":1}"),
+        );
+        assert!(out.is_empty(), "{out:?}");
     }
 
     #[test]

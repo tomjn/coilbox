@@ -340,10 +340,22 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
                 </span>
               )}
             </span>
+            {/* The name and its badge are one inline run so a long name wraps
+                through the badge rather than pushing it into a column. The
+                sign-in note takes its own line under both. */}
             <span className="text-xs text-muted-foreground">
               {server?.name ?? "Unknown server"}
-              {opensBrowser && " · signs in with your browser"}
+              {server?.alpha && (
+                <span className="ml-1.5 rounded border border-destructive/40 bg-destructive/15 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
+                  Alpha
+                </span>
+              )}
             </span>
+            {opensBrowser && (
+              <span className="text-xs text-muted-foreground">
+                Signs in with your browser
+              </span>
+            )}
           </button>
         );
       })}

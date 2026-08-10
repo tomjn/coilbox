@@ -24,6 +24,7 @@ import {
   mpLeaveBattle,
   mpOpenBattle,
 } from "../bindings";
+import { newScriptPassword } from "../scriptPassword";
 import { serverAddressFromKey, useMpRevealed, useMultiplayer } from "../store";
 
 /**
@@ -176,7 +177,12 @@ function BattlesPage() {
     hostingFromDraftRef.current = false;
     joiningRef.current = true;
     try {
-      await mpJoinBattle({ serverKey: activeKey, id: b.id, key });
+      await mpJoinBattle({
+        serverKey: activeKey,
+        id: b.id,
+        key,
+        scriptPassword: newScriptPassword(),
+      });
     } catch {
       // Wire-level failures surface via lastJoinError or a disconnect.
       joiningRef.current = false;

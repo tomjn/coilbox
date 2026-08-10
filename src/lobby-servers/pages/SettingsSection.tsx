@@ -33,6 +33,7 @@ import {
   type LobbyAccount,
   type LobbyServer,
   serverProtocol,
+  type TlsStyle,
   useCustomServers,
   useLobbyAccounts,
 } from "../config";
@@ -540,7 +541,9 @@ function AccountForm({
           onValueChange={(v) => onChange({ serverId: v })}
           options={servers.map((s) => ({
             value: s.id,
-            label: s.builtin ? s.name : `${s.name || s.host} (custom)`,
+            label: `${s.builtin ? s.name : `${s.name || s.host} (custom)`}${
+              s.alpha ? " (alpha)" : ""
+            }`,
           }))}
           placeholder="Select a server"
         />
@@ -698,6 +701,18 @@ function BuiltinServerRow({ server: s }: { server: LobbyServer }) {
         {s.host}:{s.port}
       </span>
       {s.tls && <span className={tag}>TLS</span>}
+      {s.alpha && (
+        // Deliberately not the muted `tag` the neighbours use: this one is a
+        // warning, so it reads the same here as in the login list.
+        <span
+          className={cn(
+            tag,
+            "border border-destructive/40 bg-destructive/15 text-destructive",
+          )}
+        >
+          Alpha
+        </span>
+      )}
       {s.official ? (
         <span
           className={cn(
@@ -765,6 +780,21 @@ function CustomServerRow({
           checked={s.tls}
           onChange={(v) => onChange({ tls: v })}
         />
+        {s.tls && (
+          <Field
+            label="TLS mode"
+            hint="uberserver upgrades in-band on its plain port. teiserver's 8201 is encrypted from the first byte."
+          >
+            <OptionSelect
+              value={s.tlsStyle ?? "stls"}
+              onValueChange={(v) => onChange({ tlsStyle: v as TlsStyle })}
+              options={[
+                { value: "stls", label: "Upgrade with STLS" },
+                { value: "direct", label: "Direct (TLS from the first byte)" },
+              ]}
+            />
+          </Field>
+        )}
         <CheckField
           label="Allow self-signed certificate"
           hint="uberserver ships one; teiserver does not."
