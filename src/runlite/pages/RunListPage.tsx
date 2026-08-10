@@ -14,6 +14,7 @@ import { useUnitsyncScan } from "../../content/config";
 import { EmptyState } from "../../content/pages/components/states";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
+import { useRecordHubImport } from "../../hub/imports";
 import { usePlayReadiness, usePreferredTarget } from "../../play/config";
 import {
   encodeWarpathChallenge,
@@ -55,6 +56,12 @@ export default function RunListPage() {
     [runEntries],
   );
 
+  // A confirmed `coilbox://import` deep link (issue #388) lands here with the
+  // challenge code in the query string, and with the hub item it came from
+  // alongside it when the hub browse screen started it (issue #1368).
+  const { code: importCode, hubItemId } = useImportParam();
+  const recordHubImport = useRecordHubImport();
+
   const openSetup = (initialGameName?: string) =>
     drawer.open({
       title: "New warpath",
@@ -78,16 +85,16 @@ export default function RunListPage() {
         <ImportChallengeForm
           initialCode={initialCode}
           onImported={(id) => {
+            const route = `/warpath/${encodeURIComponent(id)}`;
+            recordHubImport(hubItemId, [id], route);
             drawer.close();
-            navigate(`/warpath/${encodeURIComponent(id)}`);
+            navigate(route);
           }}
         />
       ),
     });
 
-  // A confirmed `coilbox://import` deep link (issue #388) lands here with the
-  // challenge code in the query string. Open the import drawer with it prefilled.
-  const importCode = useImportParam();
+  // Open the import drawer with the deep link's code prefilled.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the deep-link code arrives, not on every drawer identity change
   useEffect(() => {
     if (importCode) openImportChallenge(importCode);

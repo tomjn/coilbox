@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { dlFetchText } from "../downloads/bindings";
 import { isHubOrigin, useTrustedHubUrl } from "../hub/config";
+import { hubItemIdForContainer, withHubItem } from "../hub/importRecord";
 import { notify } from "../notify/notify";
 import { describeOpen, type ImportPlan, prepareImport } from "./actions";
 import { setDeepLinkHandler } from "./bus";
@@ -81,7 +82,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   // Build the second (apply) confirmation for a resolved import plan. `host` is
   // set for a fetch-URL import so the dialog says where the content came from.
   const buildImportPending = useCallback(
-    (plan: ImportPlan, host?: string): Pending => ({
+    (plan: ImportPlan, host?: string, hubItemId?: string): Pending => ({
       title: "Import from a link",
       lines: [
         host
@@ -92,7 +93,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       ],
       warnings: plan.warnings,
       confirmLabel: "Continue",
-      run: () => navigate(plan.route),
+      run: () => navigate(withHubItem(plan.route, hubItemId)),
     }),
     [navigate],
   );
@@ -112,7 +113,16 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         });
         return;
       }
-      setPending(buildImportPending(result.plan, result.host));
+      // Only the browse screen knows which hub item an address belongs to, and
+      // only for one it read off the hub itself this session (issue #1368). An
+      // address from anywhere else is not claimed, so it records nothing.
+      setPending(
+        buildImportPending(
+          result.plan,
+          result.host,
+          hubItemIdForContainer(url),
+        ),
+      );
     },
     [buildImportPending],
   );

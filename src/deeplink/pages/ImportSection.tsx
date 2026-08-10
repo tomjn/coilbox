@@ -39,7 +39,7 @@ export default function ImportSection() {
 
   // A campaign deep link lands here with the code in the query string, because
   // campaigns are the one recognised kind with no code importer.
-  const linkCode = useImportParam();
+  const { code: linkCode } = useImportParam();
   // Remounting `ChallengeCodeInput` under a new key is what fills and submits
   // it, which is also how a deep-linked code reaches every other importer.
   const seed = chosen ?? linkCode;

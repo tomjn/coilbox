@@ -8,7 +8,8 @@ import { getProfile, isHubEnabled } from "../profile/profile";
  * that. Kept to one address, the API paths (`/api/v1/items`, etc.) hang off it and
  * are not independently configurable.
  *
- * Nothing consumes this yet. Issues #1346, #1347 and #1349 will, once they land.
+ * Consumed by the browse screen, the hub settings section and the deep-link
+ * handler, all of which take the address from here rather than a literal.
  */
 
 /** The public hub, live at this address. */

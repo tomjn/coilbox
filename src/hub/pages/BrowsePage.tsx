@@ -1,6 +1,8 @@
 import { Button, Input } from "@picoframe/frame";
 import {
   AlertCircle,
+  ArrowRight,
+  Check,
   Download,
   Globe,
   Loader2,
@@ -9,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -27,6 +30,8 @@ import {
   kindLabelPlural,
 } from "../api";
 import { useHubUrl } from "../config";
+import { type HubItemPresence, noteHubContainer } from "../importRecord";
+import { useHubItemPresence } from "../imports";
 import { FilterCombobox } from "./components/FilterCombobox";
 
 /**
@@ -48,6 +53,11 @@ import { FilterCombobox } from "./components/FilterCombobox";
  * is a set of chips, the search box is the API's `q`, and author and tag are set
  * by clicking them on a card - the API offers no list of what values exist, and
  * a page's worth of rows is not that list.
+ *
+ * A card says whether you already have the item and offers to open it instead
+ * (issue #1368). The answer comes from `../importRecord.ts`, which keeps a
+ * record of what each hub import produced, and checks that the produced thing
+ * is still there before it says you have it.
  *
  * Game and map need a way in that doesn't depend on the right card already being
  * on the page (issue #1357), so they get a text box too, with a suggestion list
@@ -80,6 +90,8 @@ function formatDate(iso: string): string {
 
 export default function BrowsePage() {
   const hubUrl = useHubUrl();
+  const navigate = useNavigate();
+  const presenceOf = useHubItemPresence();
   const [filters, setFilters] = useState<HubFilters>({ page: 1 });
   const [search, setSearch] = useState("");
   const [page, setPage] = useState<HubItemsPage | null>(null);
@@ -169,6 +181,9 @@ export default function BrowsePage() {
         setImportError(link.reason);
         return;
       }
+      // Say which item this address belongs to before the link goes anywhere,
+      // so the importer that finishes the job can record what it produced.
+      noteHubContainer(result.value.container_url, item.id);
       dispatchDeepLink(link.url);
     },
     [hubUrl],
@@ -306,69 +321,70 @@ export default function BrowsePage() {
         )}
         {!loading && page && page.items.length > 0 && (
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
-            {page.items.map((item) => (
-              <li
-                key={item.id}
-                className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
-              >
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">
-                    {describeItem(item.kind, item.mode)}
-                  </Badge>
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {formatDate(item.created_at)}
-                  </span>
-                </div>
-                <p className="text-sm font-medium" title={item.title}>
-                  {item.title}
-                </p>
-                {item.description && (
-                  <p className="line-clamp-3 text-xs text-muted-foreground">
-                    {item.description}
-                  </p>
-                )}
-                <div className="flex flex-wrap gap-1.5 text-xs">
-                  {item.game_name && (
-                    <FilterChip
-                      label={item.game_name}
-                      onClick={() => setFilter("game", item.game_name ?? "")}
-                    />
-                  )}
-                  {item.map_name && (
-                    <FilterChip
-                      label={item.map_name}
-                      onClick={() => setFilter("map", item.map_name ?? "")}
-                    />
-                  )}
-                  <FilterChip
-                    label={`by ${item.author_name}`}
-                    onClick={() => setFilter("author", item.author_name)}
-                  />
-                  {item.tags.map((tag) => (
-                    <FilterChip
-                      key={tag}
-                      label={`#${tag}`}
-                      onClick={() => setFilter("tag", tag)}
-                    />
-                  ))}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-auto w-full"
-                  onClick={() => importItem(item)}
-                  disabled={importing !== null}
-                  aria-label={`Import ${item.title}`}
+            {page.items.map((item) => {
+              const presence = presenceOf(item);
+              return (
+                <li
+                  key={item.id}
+                  className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20"
                 >
-                  {importing === item.id ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Download />
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">
+                      {describeItem(item.kind, item.mode)}
+                    </Badge>
+                    {presence.state === "here" && (
+                      <Badge variant="outline" className="gap-1">
+                        <Check className="size-3" aria-hidden /> Imported
+                      </Badge>
+                    )}
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {formatDate(item.created_at)}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium" title={item.title}>
+                    {item.title}
+                  </p>
+                  {item.description && (
+                    <p className="line-clamp-3 text-xs text-muted-foreground">
+                      {item.description}
+                    </p>
                   )}
-                  {importing === item.id ? "Fetching…" : "Import"}
-                </Button>
-              </li>
-            ))}
+                  <div className="flex flex-wrap gap-1.5 text-xs">
+                    {item.game_name && (
+                      <FilterChip
+                        label={item.game_name}
+                        onClick={() => setFilter("game", item.game_name ?? "")}
+                      />
+                    )}
+                    {item.map_name && (
+                      <FilterChip
+                        label={item.map_name}
+                        onClick={() => setFilter("map", item.map_name ?? "")}
+                      />
+                    )}
+                    <FilterChip
+                      label={`by ${item.author_name}`}
+                      onClick={() => setFilter("author", item.author_name)}
+                    />
+                    {item.tags.map((tag) => (
+                      <FilterChip
+                        key={tag}
+                        label={`#${tag}`}
+                        onClick={() => setFilter("tag", tag)}
+                      />
+                    ))}
+                  </div>
+                  <ItemActions
+                    item={item}
+                    presence={presence}
+                    fetching={importing === item.id}
+                    busy={importing !== null}
+                    onImport={() => importItem(item)}
+                    onOpen={(route) => navigate(route)}
+                  />
+                </li>
+              );
+            })}
           </ul>
         )}
         {!loading && page && lastPage > 1 && (
@@ -397,6 +413,82 @@ export default function BrowsePage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * What a card offers, which depends on whether you already have the item
+ * (issue #1368). Something already imported leads with Open, because fetching a
+ * second copy is almost never what was wanted. Importing again stays right
+ * there, because sometimes it is.
+ */
+function ItemActions({
+  item,
+  presence,
+  fetching,
+  busy,
+  onImport,
+  onOpen,
+}: {
+  item: HubItem;
+  presence: HubItemPresence;
+  /** This card's own fetch is in flight. */
+  fetching: boolean;
+  /** Some card's fetch is in flight, so no other one may start. */
+  busy: boolean;
+  onImport: () => void;
+  onOpen: (route: string) => void;
+}) {
+  const importIcon = fetching ? (
+    <Loader2 className="animate-spin" />
+  ) : (
+    <Download />
+  );
+
+  if (presence.state === "here") {
+    return (
+      <div className="mt-auto flex gap-2">
+        <Button
+          size="sm"
+          className="flex-1"
+          onClick={() => onOpen(presence.route)}
+          aria-label={`Open ${item.title}`}
+        >
+          <ArrowRight /> Open
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onImport}
+          disabled={busy}
+          aria-label={`Import another copy of ${item.title}`}
+        >
+          {importIcon}
+          {fetching ? "Fetching…" : "Import again"}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-auto flex flex-col gap-1.5">
+      {presence.state === "gone" && (
+        <p className="text-xs text-muted-foreground">
+          You imported this before. Nothing of it is here now.
+        </p>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full"
+        onClick={onImport}
+        disabled={busy}
+        aria-label={`Import ${item.title}`}
+      >
+        {importIcon}
+        {fetching ? "Fetching…" : "Import"}
+      </Button>
     </div>
   );
 }
