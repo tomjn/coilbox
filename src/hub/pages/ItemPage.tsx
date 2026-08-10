@@ -1,10 +1,13 @@
 import { Button } from "@picoframe/frame";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
   Check,
   Download,
+  ExternalLink,
+  Link2 as LinkIcon,
   Loader2,
   RotateCw,
   TriangleAlert,
@@ -31,6 +34,7 @@ import { useHubUrl } from "../config";
 import { type HubItemPresence, withHubItem } from "../importRecord";
 import { useHubItemPresence } from "../imports";
 import { type HubPreview, readPreview } from "../preview";
+import { hubItemPageUrl } from "../publish";
 import { ItemPreview } from "./components/ItemPreview";
 
 /**
@@ -112,6 +116,7 @@ export default function ItemPage() {
   const [fetching, setFetching] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [fetched, setFetched] = useState<Fetched | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Ask the hub for this item. Returns the abort, so the effect below can drop
   // an answer to a question the page has stopped asking, and Try again can call
@@ -184,6 +189,22 @@ export default function ItemPage() {
   }, [loadContainer]);
 
   const presence: HubItemPresence = item ? presenceOf(item) : { state: "none" };
+
+  // The address to hand somebody else. The website's own page for the item
+  // rather than the container underneath it: a person following a link wants
+  // something to read, and coilbox recognises both (see `hubItemIdFromUrl`), so
+  // a copy of this pasted back into coilbox lands on this same page.
+  const pageUrl = hubItemPageUrl(hubUrl, id);
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(pageUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // A clipboard the webview will not write to is not worth an error banner.
+      // "View on the hub" opens the same address either way.
+    }
+  };
 
   // Is this item one the distribution's game pin keeps off the browse list? Read
   // once: the profile is loaded at startup and never changes.
@@ -365,6 +386,19 @@ export default function ItemPage() {
                   Coilbox downloads it from {hostOf(hubUrl)} and opens it in the
                   importer, which resolves any missing content before saving.
                 </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button variant="ghost" size="sm" onClick={copyLink}>
+                    {copied ? <Check /> : <LinkIcon />}
+                    {copied ? "Link copied" : "Copy link"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void openUrl(pageUrl)}
+                  >
+                    <ExternalLink /> View on the hub
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
