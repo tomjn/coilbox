@@ -14,6 +14,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 
 import {
   DEFAULT_HUB_URL,
+  hubItemIdFromUrl,
   isHubOrigin,
   isValidHubUrl,
   resolveHubUrl,
@@ -121,5 +122,48 @@ describe("isHubOrigin", () => {
   it("never pairs up two opaque origins", () => {
     expect(isHubOrigin("file:///etc/passwd", "file:///etc/passwd")).toBe(false);
     expect(isHubOrigin("data:text/plain,hi", "data:text/plain,hi")).toBe(false);
+  });
+});
+
+describe("hubItemIdFromUrl", () => {
+  const hub = DEFAULT_HUB_URL;
+  const id = "c6be936e-58ed-4daa-941e-800317876663";
+
+  it("reads the id out of a share address on the configured hub", () => {
+    expect(hubItemIdFromUrl(`${hub}/i/${id}`, hub)).toBe(id);
+  });
+
+  it("keeps the query string and fragment out of the id", () => {
+    expect(hubItemIdFromUrl(`${hub}/i/${id}?from=discord#top`, hub)).toBe(id);
+  });
+
+  it("reads a hub served under a path prefix", () => {
+    const prefixed = "https://games.example.com/coilbox-hub";
+    expect(hubItemIdFromUrl(`${prefixed}/i/${id}`, prefixed)).toBe(id);
+    expect(hubItemIdFromUrl(`${prefixed}/i/${id}`, `${prefixed}/`)).toBe(id);
+    // The same path on the origin's root is not that hub's item address.
+    expect(
+      hubItemIdFromUrl(`https://games.example.com/i/${id}`, prefixed),
+    ).toBe(null);
+  });
+
+  it("refuses an address on the hub that is not an item", () => {
+    expect(hubItemIdFromUrl(hub, hub)).toBe(null);
+    expect(hubItemIdFromUrl(`${hub}/i/`, hub)).toBe(null);
+    expect(hubItemIdFromUrl(`${hub}/i/${id}/raw`, hub)).toBe(null);
+    expect(hubItemIdFromUrl(`${hub}/items/${id}`, hub)).toBe(null);
+    expect(hubItemIdFromUrl(`${hub}/api/v1/items/${id}`, hub)).toBe(null);
+  });
+
+  it("refuses the same path on any other origin", () => {
+    expect(hubItemIdFromUrl(`https://evil.test/i/${id}`, hub)).toBe(null);
+    expect(
+      hubItemIdFromUrl(`https://coilbox-hub.vercel.app.evil.test/i/${id}`, hub),
+    ).toBe(null);
+  });
+
+  it("reads nothing when there is no configured hub", () => {
+    expect(hubItemIdFromUrl(`${hub}/i/${id}`, null)).toBe(null);
+    expect(hubItemIdFromUrl(`${hub}/i/${id}`, "")).toBe(null);
   });
 });
