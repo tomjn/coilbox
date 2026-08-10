@@ -10,6 +10,7 @@ import {
   Link2 as LinkIcon,
   Loader2,
   RotateCw,
+  Trash2,
   TriangleAlert,
 } from "lucide-react";
 import {
@@ -24,6 +25,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { asContainer, decodeContainerText } from "@/container/container";
 import type { ImportPlan } from "@/deeplink/actions";
+import { ConfirmDialog, type Pending } from "@/deeplink/ConfirmDialog";
 import { fetchImportPlan } from "@/deeplink/fetchImport";
 import { fetchImportText } from "@/deeplink/fetchText";
 import { getGameMatcher, getProfile } from "@/profile/profile";
@@ -35,6 +37,7 @@ import { type HubItemPresence, withHubItem } from "../importRecord";
 import { useHubItemPresence } from "../imports";
 import { type HubPreview, readPreview } from "../preview";
 import { hubItemPageUrl } from "../publish";
+import { type HubRemoval, useHubRemoval } from "../remove";
 import { ItemPreview } from "./components/ItemPreview";
 
 /**
@@ -117,6 +120,7 @@ export default function ItemPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [fetched, setFetched] = useState<Fetched | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pending, setPending] = useState<Pending | null>(null);
 
   // Ask the hub for this item. Returns the abort, so the effect below can drop
   // an answer to a question the page has stopped asking, and Try again can call
@@ -189,6 +193,10 @@ export default function ItemPage() {
   }, [loadContainer]);
 
   const presence: HubItemPresence = item ? presenceOf(item) : { state: "none" };
+
+  // What Remove would delete, or null when there is nothing of this item here.
+  const removalOf = useHubRemoval();
+  const removal = item ? removalOf(item) : null;
 
   // The address to hand somebody else. The website's own page for the item
   // rather than the container underneath it: a person following a link wants
@@ -355,12 +363,23 @@ export default function ItemPage() {
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                   {presence.state === "here" ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => navigate(presence.route)}
-                    >
-                      <ArrowRight /> Open
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate(presence.route)}
+                      >
+                        <ArrowRight /> Open
+                      </Button>
+                      {removal && (
+                        <Button
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setPending(confirmRemoval(removal))}
+                        >
+                          <Trash2 /> Remove
+                        </Button>
+                      )}
+                    </>
                   ) : (
                     <Button
                       variant="outline"
@@ -404,8 +423,30 @@ export default function ItemPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog pending={pending} setPending={setPending} />
     </div>
   );
+}
+
+/**
+ * The question Remove asks before it deletes anything.
+ *
+ * It says the thing that is easy to get wrong, which is what "remove" means
+ * here: the copy on this computer is deleted, and the hub's copy is not, so
+ * this is undoable by importing it again. Anything the removal found using it
+ * goes in as a warning.
+ */
+function confirmRemoval(removal: HubRemoval): Pending {
+  return {
+    title: removal.summary,
+    lines: [
+      "Coilbox deletes it from this computer. It stays on the hub, so you can import it again.",
+    ],
+    warnings: removal.warning ? [removal.warning] : [],
+    confirmLabel: "Delete",
+    run: () => void removal.run(),
+    icon: Trash2,
+  };
 }
 
 /** What the import button says. "Import anyway" when the page is already showing

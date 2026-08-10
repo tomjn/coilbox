@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, ExternalLink } from "lucide-react";
+import type { ComponentType } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,10 @@ export interface Pending {
   warnings: string[];
   confirmLabel: string;
   run: () => void;
+  /** The glyph beside the title. Defaults to the link icon, which is what an
+   * import is. The hub's Remove passes its own, because a dialog about deleting
+   * something should not be marked with the sign for fetching it. */
+  icon?: ComponentType<{ className?: string }>;
 }
 
 export function ConfirmDialog({
@@ -41,6 +46,7 @@ export function ConfirmDialog({
     setPending(null);
     p?.run();
   };
+  const Icon = pending?.icon ?? ExternalLink;
 
   return (
     <Dialog
@@ -51,7 +57,7 @@ export function ConfirmDialog({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ExternalLink className="size-4 text-muted-foreground" />
+              <Icon className="size-4 text-muted-foreground" />
               {pending.title}
             </DialogTitle>
             <DialogDescription className="sr-only">
