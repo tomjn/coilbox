@@ -9,14 +9,22 @@ import {
   RotateCw,
   TriangleAlert,
 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import type { ImportPlan } from "@/deeplink/actions";
 import { fetchImportPlan } from "@/deeplink/fetchImport";
 import { fetchImportText } from "@/deeplink/fetchText";
+import { getGameMatcher, getProfile } from "@/profile/profile";
 import { describeItem, fetchHubItem, type HubItemDetail } from "../api";
+import { describePinnedGame, matchesPinnedGame } from "../browse";
 import { useHubUrl } from "../config";
 import { type HubItemPresence, withHubItem } from "../importRecord";
 import { useHubItemPresence } from "../imports";
@@ -42,6 +50,13 @@ import { useHubItemPresence } from "../imports";
  * does not, or the container warns about its version, the difference is shown
  * here and the button asks again. The importer is unchanged and still resolves
  * missing content before it saves anything.
+ *
+ * A link can address an item a distribution's game pin keeps off the browse list
+ * (issue #1362). The page shows it and still imports it, and says which game it
+ * is for. The pin scopes what coilbox advertises, the way it does everywhere
+ * else, and it is not a permission check: somebody was handed this link on
+ * purpose, and a page that refused to say what they were given would be a dead
+ * end rather than a narrower gallery.
  */
 
 function formatDate(iso: string): string {
@@ -133,6 +148,16 @@ export default function ItemPage() {
 
   const presence: HubItemPresence = item ? presenceOf(item) : { state: "none" };
 
+  // Is this item one the distribution's game pin keeps off the browse list? Read
+  // once: the profile is loaded at startup and never changes.
+  const pinnedMatcher = useMemo(() => getGameMatcher(), []);
+  const pinnedGame = useMemo(
+    () => describePinnedGame(getProfile().gameFilter),
+    [],
+  );
+  const offPin =
+    item !== null && !matchesPinnedGame(item.game_name, pinnedMatcher);
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex flex-col gap-2 border-b border-border px-6 py-4">
@@ -197,6 +222,13 @@ export default function ItemPage() {
                 {item.game_name ?? (
                   <span className="text-muted-foreground">
                     Not tied to one game
+                  </span>
+                )}
+                {offPin && (
+                  <span className="mt-1 block max-w-prose text-xs text-muted-foreground">
+                    This copy of Coilbox is set up for{" "}
+                    {pinnedGame ?? "another game"}, so this is not in its hub
+                    list. You can still import it.
                   </span>
                 )}
               </Meta>
