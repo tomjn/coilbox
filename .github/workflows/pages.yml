@@ -5,9 +5,15 @@ name: Deploy docs site
 on:
   push:
     branches: [main]
-    # Only rebuild when the site or its sources change.
+    # Only rebuild when the site or its sources change. The art files are in
+    # that list because the site imports its page backdrops straight out of the
+    # app rather than keeping a copy (see docs/.vitepress/theme/backdrops.ts),
+    # so a change to a drawing changes the site.
     paths:
       - "docs/**"
+      - "src/home/bundledArt.ts"
+      - "src/home/proceduralArt.ts"
+      - "src/conquest/rng.ts"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/pages.yml"

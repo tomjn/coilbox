@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type CardScheme, resolveCardArt } from "./art";
 import {
   BUNDLED_ART_TOOL_IDS,
+  bundledBackdropSvg,
   bundledCardArt,
   bundledCardArtSvg,
 } from "./bundledArt";
@@ -311,6 +312,107 @@ describe("the scheme contract", () => {
       expect(gap, toolId).toBeGreaterThan(0);
       expect(gap, toolId).toBeLessThan(MAX_MIRROR_GAP);
     }
+  });
+});
+
+describe("bundledBackdropSvg", () => {
+  it("draws every tool it claims to cover", () => {
+    for (const toolId of BUNDLED_ART_TOOL_IDS) {
+      const svg = bundledBackdropSvg(toolId, THEME, DARK);
+      expect(svg, toolId).toBeTruthy();
+      expect(svg, toolId).toContain("<svg");
+    }
+  });
+
+  it("says nothing about a tool it does not cover", () => {
+    expect(bundledBackdropSvg(UNCOVERED, THEME, DARK)).toBeUndefined();
+    expect(bundledBackdropSvg("", THEME, DARK)).toBeUndefined();
+    expect(bundledBackdropSvg("constructor", THEME, DARK)).toBeUndefined();
+  });
+
+  it("leaves the field wash to the card form", () => {
+    // The wash is a card's own background. A page has one already, and painting
+    // a second over it is what the copy of these drawings on the hub had to
+    // strip out by hand.
+    for (const toolId of BUNDLED_ART_TOOL_IDS) {
+      expect(
+        bundledBackdropSvg(toolId, THEME, DARK) ?? "",
+        toolId,
+      ).not.toContain("linearGradient");
+    }
+    expect(bundledCardArtSvg("conquest.list", THEME, DARK)).toContain(
+      "linearGradient",
+    );
+  });
+
+  it("covers its container rather than letterboxing inside it", () => {
+    const svg = bundledBackdropSvg("conquest.list", THEME, DARK) ?? "";
+    expect(svg).toContain('preserveAspectRatio="xMidYMax slice"');
+    // A fixed width or height would stop CSS sizing it to the viewport.
+    expect(svg).not.toMatch(/<svg[^>]*\swidth=/);
+    expect(svg).not.toMatch(/<svg[^>]*\sheight=/);
+  });
+
+  it("crops the visible canvas without moving the pools off it", () => {
+    const svg = bundledBackdropSvg("hub.browse", THEME, DARK, {
+      viewHeight: 148,
+    });
+    expect(svg).toContain('viewBox="0 0 320 148"');
+    // The pools still span the full 200, so one centred below the crop goes on
+    // lighting what is above it.
+    expect(svg).toContain('height="200"');
+  });
+
+  it("scales the subject by strength and leaves the pools alone", () => {
+    const full = bundledBackdropSvg("conquest.list", THEME, DARK) ?? "";
+    const faint =
+      bundledBackdropSvg("conquest.list", THEME, DARK, { strength: 0.4 }) ?? "";
+    expect(full).toContain('<g opacity="1">');
+    expect(faint).toContain('<g opacity="0.4">');
+    // Same drawing either way: only the group opacity moved.
+    expect(faint.replace('opacity="0.4"', 'opacity="1"')).toBe(full);
+    // Pool stops are declared per pool and tuned separately, so strength must
+    // not touch them.
+    const stops = (svg: string) => svg.match(/stop-opacity="[^"]*"/g) ?? [];
+    expect(stops(faint)).toEqual(stops(full));
+  });
+
+  it("keeps strength inside the range an opacity can take", () => {
+    const over =
+      bundledBackdropSvg("conquest.list", THEME, DARK, { strength: 4 }) ?? "";
+    const under =
+      bundledBackdropSvg("conquest.list", THEME, DARK, { strength: -2 }) ?? "";
+    expect(over).toContain('<g opacity="1">');
+    expect(under).toContain('<g opacity="0">');
+  });
+
+  it("resolves every gradient it references", () => {
+    for (const toolId of BUNDLED_ART_TOOL_IDS) {
+      const svg = bundledBackdropSvg(toolId, THEME, DARK) ?? "";
+      const declared = new Set(
+        [...svg.matchAll(/<radialGradient id="([^"]+)"/g)].map((m) => m[1]),
+      );
+      const used = [...svg.matchAll(/url\(#([^)]+)\)/g)].map((m) => m[1]);
+      expect(used.length, toolId).toBeGreaterThan(0);
+      for (const id of used) expect(declared, `${toolId} ${id}`).toContain(id);
+    }
+  });
+
+  it("cannot collide with the card form's gradient ids", () => {
+    // Both could render on one page. Same tool, same namespace, so the two
+    // forms have to differ by prefix or one would capture the other's fill.
+    const card = bundledCardArtSvg("conquest.list", THEME, DARK) ?? "";
+    const backdrop = bundledBackdropSvg("conquest.list", THEME, DARK) ?? "";
+    const ids = (svg: string) =>
+      new Set([...svg.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]));
+    for (const id of ids(backdrop)) expect(ids(card)).not.toContain(id);
+  });
+
+  it("takes both ramps, as the card form does", () => {
+    const dark = bundledBackdropSvg("conquest.list", THEME, DARK) ?? "";
+    const light = bundledBackdropSvg("conquest.list", THEME, LIGHT) ?? "";
+    expect(strip(light)).toBe(strip(dark));
+    expect(light).not.toBe(dark);
   });
 });
 

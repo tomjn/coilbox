@@ -1286,14 +1286,8 @@ export function bundledCardArtSvg(
   if (!Object.hasOwn(DRAWINGS, toolId)) return undefined;
   const drawing = DRAWINGS[toolId];
   const p = paletteFor(themeColor, scheme);
-  const ns = toolId.replace(/[^a-z0-9]+/gi, "-");
-  const pools = drawing.pools.map(
-    ([cx, cy, r, o], i) =>
-      `<radialGradient id="p${ns}${i}" cx="${cx}" cy="${cy}" r="${r}" gradientUnits="userSpaceOnUse">` +
-      `<stop offset="0" stop-color="${p.glow}" stop-opacity="${o}"/>` +
-      `<stop offset="1" stop-color="${p.glow}" stop-opacity="0"/>` +
-      "</radialGradient>",
-  );
+  const ns = idFor(toolId);
+  const pools = poolLayer(drawing, p, `p${ns}`);
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WIDTH} ${HEIGHT}" width="${WIDTH}" height="${HEIGHT}">` +
     "<defs>" +
@@ -1301,18 +1295,94 @@ export function bundledCardArtSvg(
     `<stop offset="0" stop-color="${p.fieldTop}"/>` +
     `<stop offset="1" stop-color="${p.fieldFoot}"/>` +
     "</linearGradient>" +
-    pools.join("") +
+    pools.defs +
     "</defs>" +
     `<rect width="${WIDTH}" height="${HEIGHT}" fill="url(#f${ns})"/>` +
-    pools
-      .map(
-        (_, i) =>
-          `<rect width="${WIDTH}" height="${HEIGHT}" fill="url(#p${ns}${i})"/>`,
-      )
-      .join("") +
+    pools.rects +
     drawing.paint(p) +
     "</svg>"
   );
+}
+
+/**
+ * The illustration for a tool as a full-bleed backdrop behind a page, or
+ * `undefined` when none is bundled. Written for the VitePress docs site, which
+ * imports this module directly rather than copying the drawings, so the site
+ * and the app never drift.
+ *
+ * Three things separate it from {@link bundledCardArtSvg}, each a consequence
+ * of painting behind a page rather than inside a card:
+ *
+ * - No field wash. `fieldTop`/`fieldFoot` is a card's own background, and a
+ *   page already has one of those.
+ * - It covers rather than letterboxes. No fixed width or height, and
+ *   `xMidYMax slice` scales up until both dimensions are filled, keeping the
+ *   crop centred horizontally and the drawing's foot on the bottom edge.
+ * - `strength` scales the subject down. Every drawing is tuned for a card in a
+ *   grid of muted chrome beside its own label, which is too strong full width
+ *   behind running text. Applied as one group opacity rather than per shape,
+ *   so no `paint` above needs editing. The pools are left alone: their
+ *   opacities are declared separately and read as lighting, not as subject.
+ *
+ * `viewHeight` crops the canvas to a drawing's own content. Each one leaves
+ * room at the foot of the 320x200 canvas for the label band a card needs and a
+ * backdrop does not, so cropping it keeps the subject in frame. The pool rects
+ * still fill the full canvas, so a pool centred below the crop goes on glowing
+ * into it.
+ */
+export function bundledBackdropSvg(
+  toolId: string,
+  themeColor: string,
+  scheme: CardScheme,
+  options: { viewHeight?: number; strength?: number } = {},
+): string | undefined {
+  if (!Object.hasOwn(DRAWINGS, toolId)) return undefined;
+  const { viewHeight = HEIGHT, strength = 1 } = options;
+  const drawing = DRAWINGS[toolId];
+  const p = paletteFor(themeColor, scheme);
+  const pools = poolLayer(drawing, p, `b${idFor(toolId)}`);
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WIDTH} ${viewHeight}" preserveAspectRatio="xMidYMax slice">` +
+    `<defs>${pools.defs}</defs>` +
+    pools.rects +
+    `<g opacity="${round(clamp(strength, 0, 1))}">${drawing.paint(p)}</g>` +
+    "</svg>"
+  );
+}
+
+/** A tool id reduced to something safe to build a gradient id out of. */
+function idFor(toolId: string): string {
+  return toolId.replace(/[^a-z0-9]+/gi, "-");
+}
+
+/**
+ * A drawing's pools as gradient defs plus the rects that paint them. `ns`
+ * namespaces the ids, so more than one drawing can render on a page without
+ * colliding. The rects always span the full canvas rather than a cropped
+ * viewBox, so a pool centred outside the crop still lights what is inside it.
+ */
+function poolLayer(
+  drawing: Drawing,
+  p: Palette,
+  ns: string,
+): { defs: string; rects: string } {
+  return {
+    defs: drawing.pools
+      .map(
+        ([cx, cy, r, o], i) =>
+          `<radialGradient id="${ns}${i}" cx="${cx}" cy="${cy}" r="${r}" gradientUnits="userSpaceOnUse">` +
+          `<stop offset="0" stop-color="${p.glow}" stop-opacity="${o}"/>` +
+          `<stop offset="1" stop-color="${p.glow}" stop-opacity="0"/>` +
+          "</radialGradient>",
+      )
+      .join(""),
+    rects: drawing.pools
+      .map(
+        (_, i) =>
+          `<rect width="${WIDTH}" height="${HEIGHT}" fill="url(#${ns}${i})"/>`,
+      )
+      .join(""),
+  };
 }
 
 /**
