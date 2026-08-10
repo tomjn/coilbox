@@ -11,9 +11,12 @@ import {
   type InstalledContentSnapshot,
   installedGameShortId,
   normalizeGameIdentity,
+  type ResolveReadings,
   resolveReplayShortGameId,
+  resolveVerdict,
   stripVersionSuffix,
 } from "./resolveContent";
+import type { ScanReading } from "./scanSettled";
 
 const installed = (
   over: Partial<InstalledContentSnapshot> = {},
@@ -96,6 +99,110 @@ describe("computeMissingRequirements", () => {
     expect(computeMissingRequirements([req], installed({ games: [] }))).toEqual(
       [req],
     );
+  });
+});
+
+describe("resolveVerdict", () => {
+  const SCANNING: ScanReading = {
+    loading: true,
+    data: null,
+    error: null,
+    cancelled: false,
+  };
+  const SCANNED: ScanReading = { ...SCANNING, loading: false, data: {} };
+  /** What the readings carry before anything has answered: no games, no maps. */
+  const nothingYet: InstalledContentSnapshot = {
+    games: [],
+    maps: [],
+    engineVersions: [],
+  };
+  const readings = (over: Partial<ResolveReadings> = {}): ResolveReadings => ({
+    requirements: [],
+    installed: installed(),
+    targetLoading: false,
+    hasTarget: true,
+    scan: SCANNED,
+    enginesLoading: false,
+    engineCatalogPending: false,
+    ...over,
+  });
+
+  it("offers nothing while the target read is still in flight (issue #1377)", () => {
+    // An import drawer opened before the install scan settles takes a target of
+    // null, and the empty snapshot that comes with it is not a report of a
+    // machine with nothing on it. Deciding here offers to download a game that
+    // is already on disk.
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [exactGameRequirement("Beyond All Reason")],
+        installed: nothingYet,
+        targetLoading: true,
+        hasTarget: false,
+        scan: { ...SCANNING, loading: false },
+      }),
+    );
+    expect(verdict.loading).toBe(true);
+    expect(verdict.missing).toEqual([]);
+    expect(verdict.resolved).toBe(false);
+  });
+
+  it("offers nothing while the scan is still running", () => {
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [exactGameRequirement("Beyond All Reason")],
+        installed: nothingYet,
+        scan: SCANNING,
+      }),
+    );
+    expect(verdict.loading).toBe(true);
+    expect(verdict.missing).toEqual([]);
+  });
+
+  it("offers the missing content once every reading has answered", () => {
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [
+          exactGameRequirement("Beyond All Reason"),
+          exactMapRequirement("Some Other Map"),
+        ],
+      }),
+    );
+    expect(verdict.loading).toBe(false);
+    expect(verdict.missing.map((r) => r.label)).toEqual(["Some Other Map"]);
+    expect(verdict.resolved).toBe(false);
+  });
+
+  it("resolves when the readings have answered and nothing is missing", () => {
+    const verdict = resolveVerdict(
+      readings({ requirements: [exactGameRequirement("Beyond All Reason")] }),
+    );
+    expect(verdict).toMatchObject({ loading: false, resolved: true });
+  });
+
+  it("treats a machine with no engine as an answer, not a wait", () => {
+    // There is no scan to wait for and there never will be, so the gate offers
+    // the engine rather than spinning forever.
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [engineVersionRequirement("105.1.1-2511")],
+        installed: nothingYet,
+        hasTarget: false,
+        scan: { ...SCANNING, loading: false },
+      }),
+    );
+    expect(verdict.loading).toBe(false);
+    expect(verdict.missing.map((r) => r.label)).toEqual(["105.1.1-2511"]);
+  });
+
+  it("waits for the engine catalogs before judging an engine requirement", () => {
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [engineVersionRequirement("105.1.1-2511")],
+        engineCatalogPending: true,
+      }),
+    );
+    expect(verdict.loading).toBe(true);
+    expect(verdict.missing).toEqual([]);
   });
 });
 

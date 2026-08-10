@@ -16,8 +16,8 @@ import {
 import { useContentTargets, useUnitsyncScan } from "./config";
 import {
   type ContentRequirement,
-  computeMissingRequirements,
   type InstalledContentSnapshot,
+  resolveVerdict,
 } from "./resolveContent";
 
 /** Live state of resolving a set of requirements against the recipient's own
@@ -91,10 +91,6 @@ export function useResolveContent(
     contentTargets.refresh();
   });
 
-  const scanReady = !target?.enginePath || !target?.dataDir || !!scan.data;
-  const loading =
-    !scanReady || contentTargets.loading || (hasEngineReq && !engineCatalog);
-
   const installed: InstalledContentSnapshot = useMemo(
     () => ({
       games: (scan.data?.games ?? []).map((g) => ({
@@ -108,10 +104,15 @@ export function useResolveContent(
     [scan.data, contentTargets.targets],
   );
 
-  const missing = useMemo(
-    () => (loading ? [] : computeMissingRequirements(requirements, installed)),
-    [loading, requirements, installed],
-  );
+  const { loading, missing, resolved } = resolveVerdict({
+    requirements,
+    installed,
+    targetLoading: false,
+    hasTarget: !!target?.enginePath && !!target?.dataDir,
+    scan,
+    enginesLoading: contentTargets.loading,
+    engineCatalogPending: hasEngineReq && !engineCatalog,
+  });
 
   const enqueueInputFor = useCallback(
     (req: ContentRequirement) => {
@@ -204,7 +205,7 @@ export function useResolveContent(
   return {
     loading,
     missing,
-    resolved: !loading && missing.length === 0,
+    resolved,
     download,
     statusFor,
     progressFor,
