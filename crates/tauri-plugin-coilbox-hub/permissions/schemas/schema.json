@@ -307,6 +307,18 @@
           "markdownDescription": "Denies the hub_account command without any pre-configured scope."
         },
         {
+          "description": "Enables the hub_publish command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-hub-publish",
+          "markdownDescription": "Enables the hub_publish command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the hub_publish command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-hub-publish",
+          "markdownDescription": "Denies the hub_publish command without any pre-configured scope."
+        },
+        {
           "description": "Enables the hub_sign_in command without any pre-configured scope.",
           "type": "string",
           "const": "allow-hub-sign-in",
@@ -331,10 +343,10 @@
           "markdownDescription": "Denies the hub_sign_out command without any pre-configured scope."
         },
         {
-          "description": "Allows signing in to the Coilbox hub with Discord, signing out again, and reading who is signed in.\n#### This default permission set includes:\n\n- `allow-hub-sign-in`\n- `allow-hub-sign-out`\n- `allow-hub-account`",
+          "description": "Allows signing in to the Coilbox hub with Discord, signing out again, reading who is signed in, and publishing as them.\n#### This default permission set includes:\n\n- `allow-hub-sign-in`\n- `allow-hub-sign-out`\n- `allow-hub-account`\n- `allow-hub-publish`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows signing in to the Coilbox hub with Discord, signing out again, and reading who is signed in.\n#### This default permission set includes:\n\n- `allow-hub-sign-in`\n- `allow-hub-sign-out`\n- `allow-hub-account`"
+          "markdownDescription": "Allows signing in to the Coilbox hub with Discord, signing out again, reading who is signed in, and publishing as them.\n#### This default permission set includes:\n\n- `allow-hub-sign-in`\n- `allow-hub-sign-out`\n- `allow-hub-account`\n- `allow-hub-publish`"
         }
       ]
     }
