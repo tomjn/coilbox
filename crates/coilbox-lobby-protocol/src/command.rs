@@ -142,6 +142,10 @@ pub fn say_battle_ex(msg: &str) -> String {
 ///
 /// When a script password is present but no key, uberserver expects `*` in the
 /// key slot as a placeholder.
+///
+/// Callers should always pass a script password. uberserver takes a bare
+/// `JOINBATTLE <id>`, but teiserver only matches the three-field form and answers
+/// "No incomming match for JOINBATTLE" to anything shorter.
 pub fn join_battle(id: u32, key: Option<&str>, script_pw: Option<&str>) -> String {
     match (key, script_pw) {
         (Some(k), Some(sp)) => format!("JOINBATTLE {id} {k} {sp}"),

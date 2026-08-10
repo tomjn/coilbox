@@ -84,6 +84,7 @@ import { MatchFoundPanel } from "./MatchFoundPanel";
 import { protocolForKey, syncsOnReady } from "./protocol";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
+import { newScriptPassword } from "./scriptPassword";
 import { useIdle } from "./useIdle";
 import { VerificationCodeDialog } from "./VerificationCodeDialog";
 
@@ -1253,7 +1254,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     mpJoinBattle({
       serverKey: activeKey,
       id: target.id,
-      scriptPassword: target.scriptPassword,
+      // A fresh one when the server never echoed the old back: teiserver refuses a
+      // JOINBATTLE that carries no script password at all.
+      scriptPassword: target.scriptPassword ?? newScriptPassword(),
     }).catch((e) => console.warn("multiplayer: auto-rejoin battle failed", e));
   }, [activeKey, mirror.phase, mirror.state]);
 
