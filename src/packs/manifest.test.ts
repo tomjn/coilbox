@@ -95,6 +95,7 @@ describe("parseSetupPackManifest", () => {
       "a game with a non-string rapidTag",
       { ...manifest(), games: [{ name: "g", rapidTag: 1 }] },
     ],
+    ["a games field that isn't an array", { ...manifest(), games: "oops" }],
     ["a map list with a blank entry", { ...manifest(), maps: [""] }],
     ["a map list with a non-string entry", { ...manifest(), maps: [1] }],
     ["presets that aren't an array", { ...manifest(), presets: "nope" }],

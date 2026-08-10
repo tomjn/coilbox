@@ -101,11 +101,15 @@ export function parseSetupPackManifest(
 
   // `game` is the single-game shape every pack used before a pack became a
   // collection. Read as a one-entry list so those codes still import.
-  const rawGames = Array.isArray(d.games)
-    ? d.games
-    : d.game !== undefined
-      ? [d.game]
-      : [];
+  let rawGames: unknown[];
+  if (d.games !== undefined) {
+    if (!Array.isArray(d.games)) return null;
+    rawGames = d.games;
+  } else if (d.game !== undefined) {
+    rawGames = [d.game];
+  } else {
+    rawGames = [];
+  }
   const games: SetupPackGame[] = [];
   for (const raw of rawGames) {
     const game = parsePackGame(raw);
