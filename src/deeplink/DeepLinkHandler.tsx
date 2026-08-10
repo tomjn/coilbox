@@ -9,7 +9,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { isHubOrigin, useTrustedHubUrl } from "../hub/config";
+import {
+  hubItemIdFromUrl,
+  hubItemRoute,
+  isHubOrigin,
+  useTrustedHubUrl,
+} from "../hub/config";
 import { hubItemIdForContainer, withHubItem } from "../hub/importRecord";
 import { notify } from "../notify/notify";
 import { describeOpen, type ImportPlan, prepareImport } from "./actions";
@@ -51,6 +56,14 @@ import { openScreenRoute, parseDeepLink } from "./parse";
  * `useTrustedHubUrl()`, which is null when a profile switched the hub off, and it
  * changes only how much is explained: every check the import already ran still
  * runs.
+ *
+ * One address on that hub is not a fetch at all: an item's share page,
+ * `<hub>/i/<id>`, which is what the website's Import button links to. That opens
+ * the item's own page (issue #1366), which describes the thing in full and asks
+ * there. Nothing is downloaded and nothing is applied by arriving, so there is
+ * no confirmation before it: the page is the confirmation. `hubItemIdFromUrl`
+ * only reads an id out of that one path shape, so every other hub address, its
+ * gallery, its API, its home page, still takes the fetch flow above.
  */
 
 export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
@@ -161,6 +174,13 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       // and confirm again. No request is made before the user agrees.
       if (result.source.type === "url") {
         const { url } = result.source;
+        // An item's share page on the configured hub: open the page coilbox has
+        // for it, which says what it is and offers to import it there.
+        const hubItemId = hubItemIdFromUrl(url, trustedHubUrl);
+        if (hubItemId) {
+          navigate(hubItemRoute(hubItemId));
+          return;
+        }
         let host: string;
         try {
           host = new URL(url).host;
