@@ -844,6 +844,18 @@ Points the Coilbox hub at a server you run yourself, instead of the built-in `ht
 
 A player can still override this with a setting of their own. This only changes the default they start from.
 
+### `hubImportCounts` (boolean)
+
+Stops Coilbox telling the hub when an import from a hub link finished. On by default.
+
+```json
+{ "version": 1, "hubImportCounts": false }
+```
+
+This is the only thing Coilbox sends to the hub without being asked to, and it exists because the hub can't work it out for itself: it sees the container being fetched, but Coilbox asks the player to confirm before applying anything, so a fetch that ends at the confirm dialog isn't an import. The request is a `POST` to the item's address carrying the item's id and nothing else, with no body, no account and no identifier of any kind, and Coilbox never reads what comes back.
+
+A player can turn it off for themselves under Settings > Coilbox hub, where it's on by default. Setting this to `false` makes that choice for your distribution: nothing is sent, and the switch isn't offered. Turning the hub off with [`hub`](#hub-boolean) also stops it, since there's then no hub to import from.
+
 ### `authoring` (boolean)
 
 Removes the [profile authoring tools](#writing-and-iterating-on-a-profile) from Settings > Distribution profile. On by default. Set it to `false` in the profile you ship, so a player can't reload or replace your branding by accident.
