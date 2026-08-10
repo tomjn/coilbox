@@ -59,7 +59,7 @@ describe("prepareImport", () => {
     const code = encodeContainerCode("setup-pack", 1, packPayload);
     const r = prepareImport(code);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.plan.route).toContain("/content/setup-packs?import=");
+    if (r.ok) expect(r.plan.route).toContain("/downloads/maps?import=");
   });
 
   it("routes a scenario to the player-facing Scenarios list", () => {

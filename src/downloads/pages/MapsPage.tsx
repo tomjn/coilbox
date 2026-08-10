@@ -1,4 +1,4 @@
-import { Button, Input, useSetting } from "@picoframe/frame";
+import { Button, Input, useDrawer, useSetting } from "@picoframe/frame";
 import {
   AlertCircle,
   CheckCircle2,
@@ -11,6 +11,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
+import { useImportParam } from "../../deeplink/useImportParam";
+import { nextDrawerKey } from "../../general/drawerKey";
+import { useRecordHubImport } from "../../hub/imports";
+import { presetRoute } from "../../play/presets";
 import {
   type BarMap,
   dlBarMaps,
@@ -126,6 +130,43 @@ export default function MapsPage() {
     HIDE_INSTALLED_KEY,
     false,
   );
+
+  // A confirmed `coilbox://import` deep link for a setup pack (issue #388)
+  // lands here with the pack code in the query string, since `downloads.maps`
+  // is the one content screen no distribution profile can hide.
+  const { code: importCode, hubItemId } = useImportParam();
+  const recordHubImport = useRecordHubImport();
+  const drawer = useDrawer();
+
+  const openPackImport = async (initialCode?: string) => {
+    const { ImportPackForm } = await import(
+      "../../packs/pages/components/ImportPackForm"
+    );
+    drawer.open({
+      title: "Import a setup pack",
+      width: "26rem",
+      content: (
+        // A fresh form every time, because the last one may still be mounted and
+        // would keep the code it already ran (issue #1395).
+        <ImportPackForm
+          key={nextDrawerKey()}
+          initialCode={initialCode}
+          onImported={(presetIds) =>
+            recordHubImport(
+              hubItemId,
+              presetIds,
+              presetIds[0] ? presetRoute(presetIds[0]) : "/downloads/maps",
+            )
+          }
+        />
+      ),
+    });
+  };
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the deep-link code arrives, not on every drawer identity change
+  useEffect(() => {
+    if (importCode) void openPackImport(importCode);
+  }, [importCode]);
 
   const load = useCallback(async (src: Source) => {
     setLoading(true);
