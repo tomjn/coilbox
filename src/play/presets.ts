@@ -36,6 +36,19 @@ export function useSkirmishPresets() {
     [],
   );
 
+  // The setting's setter takes a value, not an updater, and `presets` is fixed
+  // for the life of a render. Two writes in one pass, as when importing a setup
+  // pack saves each bundled preset in turn, would both fold over the list as it
+  // was before either, so only the last would survive (issue #1371). So hold the
+  // list in a box each write updates, and read the box rather than `presets`.
+  // A write re-renders this hook with what the store now holds, giving the next
+  // pass a fresh box.
+  const latest = { current: presets };
+  function write(next: SkirmishPreset[]) {
+    latest.current = next;
+    setPresets(next);
+  }
+
   /** Save the given setup under a name as a new preset, prepended to the list. */
   function savePreset(name: string, draft: SkirmishDraft): SkirmishPreset {
     const now = new Date().toISOString();
@@ -46,23 +59,23 @@ export function useSkirmishPresets() {
       createdAt: now,
       lastUsedAt: now,
     };
-    setPresets([preset, ...presets]);
+    write([preset, ...latest.current]);
     return preset;
   }
 
   /** Bump `lastUsedAt` and move the preset to the front (called on load). */
   function touchPreset(id: string) {
     const now = new Date().toISOString();
-    const target = presets.find((p) => p.id === id);
+    const target = latest.current.find((p) => p.id === id);
     if (!target) return;
-    setPresets([
+    write([
       { ...target, lastUsedAt: now },
-      ...presets.filter((p) => p.id !== id),
+      ...latest.current.filter((p) => p.id !== id),
     ]);
   }
 
   function removePreset(id: string) {
-    setPresets(presets.filter((p) => p.id !== id));
+    write(latest.current.filter((p) => p.id !== id));
   }
 
   return { presets, savePreset, touchPreset, removePreset };

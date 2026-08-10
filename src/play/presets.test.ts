@@ -1,10 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `presets.ts` pulls in `useSetting` from the frame package, whose `AppFrame`
-// subpath doesn't resolve under vitest's node resolver. We only test the pure
-// `parsePresetJson`, so stub the hook to keep the module importable.
+// subpath doesn't resolve under vitest's node resolver, so stub it. The stub
+// copies the real hook's behaviour that matters here: the setter writes the
+// given value straight to the store, and the value a caller holds is the one
+// read when the hook ran, so it doesn't move under a later write.
+const { store } = vi.hoisted(() => ({ store: new Map<string, unknown>() }));
 vi.mock("@picoframe/frame", () => ({
-  useSetting: () => [undefined, () => {}],
+  useSetting: (key: string, fallback: unknown) => {
+    const value = store.has(key) ? store.get(key) : fallback;
+    return [value, (next: unknown) => store.set(key, next)];
+  },
 }));
 
 import { encodeContainerCode, identify } from "../container/container";
@@ -15,6 +21,7 @@ import {
   presetMatchesDraft,
   presetPayload,
   type SkirmishPreset,
+  useSkirmishPresets,
 } from "./presets";
 
 const base = {
@@ -243,5 +250,32 @@ describe("presetMatchesDraft", () => {
       modOptionValues: { b: "2", a: "1" },
     });
     expect(presetMatchesDraft([saved], reordered)).toBe(true);
+  });
+});
+
+describe("useSkirmishPresets", () => {
+  beforeEach(() => store.clear());
+
+  const stored = () => (store.get("play.presets") ?? []) as SkirmishPreset[];
+
+  it("keeps every preset when several are saved in one pass", () => {
+    // What importing a setup pack that bundles three presets does: one pass over
+    // the bundle, one save each, no re-render in between (issue #1371).
+    const { savePreset } = useSkirmishPresets();
+    const ids = ["One", "Two", "Three"].map(
+      (name) => savePreset(name, draftWith(["rl0", "rl1"])).id,
+    );
+    expect(stored().map((p) => p.name)).toEqual(["Three", "Two", "One"]);
+    // Every id handed back names a preset that is actually there, so a caller
+    // recording what the import produced records real presets.
+    expect(ids.every((id) => stored().some((p) => p.id === id))).toBe(true);
+  });
+
+  it("removes a preset saved earlier in the same pass", () => {
+    const { savePreset, removePreset } = useSkirmishPresets();
+    savePreset("Keep", draftWith(["rl0", "rl1"]));
+    const drop = savePreset("Drop", draftWith(["rl0", "rl1"]));
+    removePreset(drop.id);
+    expect(stored().map((p) => p.name)).toEqual(["Keep"]);
   });
 });
