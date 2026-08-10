@@ -49,7 +49,7 @@ describe("readImport: the four things somebody can hand it", () => {
     expect(r.outcome).toBe("confirm");
     if (r.outcome !== "confirm") return;
     expect(r.phrase).toBe("a setup pack for Beyond All Reason test-1234");
-    expect(r.plan.route).toContain("/content/setup-packs?import=");
+    expect(r.plan.route).toContain("/downloads/maps?import=");
   });
 
   it("unwraps a coilbox://import?code= link and confirms it in the box", () => {

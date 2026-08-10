@@ -168,6 +168,23 @@ describe("gameIdentityFromPayload", () => {
     ).toEqual({ name: "SplinterFaction 0.1.78" });
   });
 
+  it("reads a setup pack's first game when it carries games but no game", () => {
+    expect(
+      gameIdentityFromPayload("setup-pack", {
+        games: [
+          { name: "BAR 1.2", shortname: "BAR" },
+          { name: "SplinterFaction 0.1.78" },
+        ],
+      }),
+    ).toEqual({ name: "BAR 1.2", shortname: "BAR" });
+  });
+
+  it("names no game for a setup pack with neither games nor game", () => {
+    expect(
+      gameIdentityFromPayload("setup-pack", { maps: ["Comet Catcher"] }),
+    ).toBeNull();
+  });
+
   it("reads a legacy challenge's settings.game.shortname", () => {
     expect(
       gameIdentityFromPayload("challenge", {

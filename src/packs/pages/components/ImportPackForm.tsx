@@ -9,6 +9,7 @@ import { ResolveContentGate } from "../../../content/pages/components/ResolveCon
 import { notify } from "../../../notify/notify";
 import { usePreferredTarget, useSkirmishAis } from "../../../play/config";
 import { useSkirmishPresets } from "../../../play/presets";
+import { aiGameNameForPack } from "../../build";
 import { packDecodeErrorMessage } from "../../envelope";
 import {
   decodeSetupPack,
@@ -18,8 +19,8 @@ import {
 } from "../../manifest";
 
 /**
- * "Import a setup pack" (issue #415): paste a pack code, resolve its engine,
- * game and maps through issue #387's `ResolveContentGate` (nothing is applied
+ * "Import a setup pack" (issue #415): paste a pack code, resolve its games
+ * and maps through issue #387's `ResolveContentGate` (nothing is applied
  * until every download clears, so a partial failure can't half-apply the
  * pack), then save any bundled presets, renaming on a name collision rather
  * than overwriting an existing preset.
@@ -31,9 +32,13 @@ export function ImportPackForm({
   /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
   initialCode?: string;
   /** Called with the ids of the presets the pack added, which is empty for a
-   * pack that bundles none. Lets the caller record what the import produced
-   * (issue #1368). */
-  onImported?: (presetIds: string[]) => void;
+   * pack that bundles none, and the games and maps the pack named regardless
+   * of whether it also bundled presets. Lets the caller record what the
+   * import produced (issue #1368). */
+  onImported?: (
+    presetIds: string[],
+    content: { games: string[]; maps: string[] },
+  ) => void;
 }) {
   const { presets, savePreset } = useSkirmishPresets();
   const [pending, setPending] = useState<SetupPackManifest | null>(null);
@@ -49,9 +54,9 @@ export function ImportPackForm({
   // against the recipient's installed version before saving (#501): a pack is
   // reused across game versions, so an AI the author had may be gone here.
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const gameArchive = scan.data?.games.find(
-    (g) => g.name === pending?.game.name,
-  )?.primaryArchive.name;
+  const aiGameName = pending ? aiGameNameForPack(pending) : undefined;
+  const gameArchive = scan.data?.games.find((g) => g.name === aiGameName)
+    ?.primaryArchive.name;
   const { ais, loaded: aisLoaded } = useSkirmishAis(
     target?.enginePath,
     target?.dataDir,
@@ -109,20 +114,31 @@ export function ImportPackForm({
         level: "success",
       });
     } else {
+      const counts = [
+        pending.games?.length
+          ? `${pending.games.length} game${pending.games.length === 1 ? "" : "s"}`
+          : null,
+        pending.maps?.length
+          ? `${pending.maps.length} map${pending.maps.length === 1 ? "" : "s"}`
+          : null,
+      ].filter(Boolean);
       notify({
         title: "Setup pack imported",
-        body: "The engine, game and maps are ready.",
+        body: `${counts.join(" and ")} ready.`,
         level: "success",
       });
     }
-    onImported?.(savedIds);
+    onImported?.(savedIds, {
+      games: (pending.games ?? []).map((g) => g.name),
+      maps: pending.maps ?? [],
+    });
     setPending(null);
   };
 
   return (
     <>
       <ChallengeCodeInput
-        helpText="Paste a setup pack code shared by another player to install its engine, game and maps, and add any presets it includes."
+        helpText="Paste a setup pack code shared by another player to install its games and maps, and add any presets it includes."
         placeholder="Paste a setup pack code…"
         submitLabel="Import setup pack"
         busyLabel="Checking…"
@@ -131,7 +147,7 @@ export function ImportPackForm({
       />
       {pending && (
         <ResolveContentGate
-          title="Set up this pack"
+          title={pending.title ?? "Set up this pack"}
           requirements={requirementsForPack(pending)}
           target={target ?? undefined}
           targetLoading={targetLoading}

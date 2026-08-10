@@ -1,4 +1,4 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, Input, useDrawer } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   AlertCircle,
@@ -7,6 +7,7 @@ import {
   Download,
   Globe,
   Loader2,
+  Package2,
   RotateCw,
   Search,
   X,
@@ -22,6 +23,7 @@ import { buildDeepLink } from "@/deeplink/build";
 import { dispatchDeepLink } from "@/deeplink/bus";
 import { EmptyState } from "@/downloads/pages/components/states";
 import { getGameMatcher, getProfile } from "@/profile/profile";
+import { isProfileHidden } from "../../profile/hidden";
 import {
   describeItem,
   fetchHubItem,
@@ -223,6 +225,18 @@ export default function BrowsePage() {
     [hubUrl],
   );
 
+  const drawer = useDrawer();
+  const openExport = async () => {
+    const { ExportPackForm } = await import(
+      "../../packs/pages/components/ExportPackForm"
+    );
+    drawer.open({
+      title: "Share a setup pack",
+      width: "26rem",
+      content: <ExportPackForm />,
+    });
+  };
+
   const active = useMemo(
     () => CLICKABLE.filter((f) => filters[f.key]?.trim()),
     [filters],
@@ -251,6 +265,11 @@ export default function BrowsePage() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <HeaderAccount hubUrl={hubUrl} />
+            {!isProfileHidden("content.setupPacks") && (
+              <Button variant="outline" size="sm" onClick={openExport}>
+                <Package2 size={16} /> Share a pack
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"

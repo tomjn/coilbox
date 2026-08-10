@@ -246,7 +246,7 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 | `downloads.browse`   | Downloads > Browse Rapid |
 | `downloads.games`    | Downloads > Games     |
 | `content.games`      | Content > Games       |
-| `content.setupPacks` | Content > Setup packs |
+| `content.setupPacks` | Coilbox hub's "Share a pack" button |
 | `multiplayer.stats`  | Multiplayer > Player stats |
 | `conquest.list`      | Play > Conquest       |
 | `runlite.list`       | Play > Warpath        |

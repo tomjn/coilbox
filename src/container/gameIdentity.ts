@@ -157,6 +157,15 @@ export function gameIdentityFromPayload(
   if (current) return current;
 
   switch (kind) {
+    case "setup-pack": {
+      // A pack authored since it became a collection carries `games`, not the
+      // single `game` the shared field would have already matched above. One
+      // identity is the shape this function returns, so the first game - the
+      // pack's headline entry - stands in for the rest.
+      const games = p.games;
+      if (!Array.isArray(games) || games.length === 0) return null;
+      return parseGameIdentity(games[0]);
+    }
     case "preset":
       return parseGameIdentity(p.gameName);
     case "challenge":

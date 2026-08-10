@@ -6,10 +6,10 @@
  * A hub item is a container, and each kind lands somewhere different once
  * imported: a preset in the presets setting, a conquest challenge as a galaxy
  * document, a warpath challenge as a run, a scenario as a scenario document, a
- * setup pack as whatever presets it bundled. None of those carry a hub id, and
- * an item's hub title is written by whoever published it, so it does not match
- * the name the artefact ends up with. There is nothing to compare an item
- * against.
+ * setup pack as whatever presets it bundled plus the games and maps it named.
+ * None of those carry a hub id, and an item's hub title is written by whoever
+ * published it, so it does not match the name the artefact ends up with.
+ * There is nothing to compare an item against.
  *
  * So this keeps a record, and never believes it on its own. The record says
  * which local ids one import produced. The answer to "do I have this" is
@@ -36,6 +36,10 @@ export interface HubImportRecord {
   route: string;
   /** When it was imported, ISO 8601. */
   at: string;
+  /** The content this import asked to be installed, for a pack that bundled no
+   * presets and so created no local ids. Names, not ids: a map and a game are
+   * known by name in every store that holds them. */
+  content?: { games: string[]; maps: string[] };
 }
 
 /** The settings key the records live under. */
@@ -120,17 +124,39 @@ export function withRecord(
  * those addresses existed names only the list screen. Without it, the recorded
  * route stands, which is what a conquest or warpath challenge wants since its
  * route already names the galaxy or the run.
+ *
+ * `contentRoute` is where to send Open when none of the recorded ids survived
+ * but the content case below still says the item is here. The recorded route
+ * can name a preset from that same import, and a pack that bundled both
+ * presets and content still reads as here once its presets are gone as long
+ * as the content is, so that route would address something deleted.
  */
 export function presenceOf(
   record: HubImportRecord | undefined,
   local: ReadonlySet<string> | null,
   routeFor?: (ref: string) => string,
+  installed?: { games: ReadonlySet<string>; maps: ReadonlySet<string> } | null,
+  contentRoute?: string,
 ): HubItemPresence {
   if (!record) return { state: "none" };
   if (!local) return { state: "unknown" };
   const alive = record.refs.find((ref) => local.has(ref));
   if (alive !== undefined) {
     return { state: "here", route: routeFor ? routeFor(alive) : record.route };
+  }
+  // A pack that bundled no presets left no ids behind, so what it asked for is
+  // the only evidence it is still here. All of it, because a collection half
+  // installed is not the collection somebody shared.
+  if (record.content) {
+    if (installed === null) return { state: "unknown" };
+    if (installed) {
+      const hasAll =
+        record.content.games.every((g) => installed.games.has(g)) &&
+        record.content.maps.every((m) => installed.maps.has(m));
+      if (hasAll) {
+        return { state: "here", route: contentRoute ?? record.route };
+      }
+    }
   }
   return { state: "gone" };
 }

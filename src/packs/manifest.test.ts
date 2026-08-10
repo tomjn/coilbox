@@ -25,8 +25,7 @@ function manifest(
   overrides: Partial<SetupPackManifest> = {},
 ): SetupPackManifest {
   return {
-    engineVersion: "105.1.1-2554-gabcdef",
-    game: { name: "Beyond All Reason test-27000" },
+    games: [{ name: "Beyond All Reason test-27000" }],
     maps: ["Red Comet Remake 1.8"],
     ...overrides,
   };
@@ -71,7 +70,7 @@ describe("parseSetupPackManifest", () => {
 
   it("accepts a manifest with a rapid tag and presets", () => {
     const m = manifest({
-      game: { name: "Beyond All Reason test-27000", rapidTag: "byar:test" },
+      games: [{ name: "Beyond All Reason test-27000", rapidTag: "byar:test" }],
       presets: [
         {
           participants: [],
@@ -90,14 +89,13 @@ describe("parseSetupPackManifest", () => {
     ["not an object", null],
     ["a string", "hello"],
     ["a non-string engineVersion", { ...manifest(), engineVersion: 1 }],
-    ["missing game", { ...manifest(), game: undefined }],
-    ["game without a name", { ...manifest(), game: { name: "" } }],
+    ["a non-string title", { ...manifest(), title: 5 }],
+    ["a game without a name", { ...manifest(), games: [{ name: "" }] }],
     [
-      "game with a non-string rapidTag",
-      { ...manifest(), game: { name: "g", rapidTag: 1 } },
+      "a game with a non-string rapidTag",
+      { ...manifest(), games: [{ name: "g", rapidTag: 1 }] },
     ],
-    ["missing maps", { ...manifest(), maps: undefined }],
-    ["an empty map list", { ...manifest(), maps: [] }],
+    ["a games field that isn't an array", { ...manifest(), games: "oops" }],
     ["a map list with a blank entry", { ...manifest(), maps: [""] }],
     ["a map list with a non-string entry", { ...manifest(), maps: [1] }],
     ["presets that aren't an array", { ...manifest(), presets: "nope" }],
@@ -125,9 +123,80 @@ describe("parseSetupPackManifest", () => {
   });
 });
 
+describe("a pack as a collection", () => {
+  it("takes several games", () => {
+    const parsed = parseSetupPackManifest({
+      games: [{ name: "Game A" }, { name: "Game B" }],
+      maps: ["Map One"],
+    });
+    expect(parsed?.games?.map((g) => g.name)).toEqual(["Game A", "Game B"]);
+  });
+
+  it("takes maps with no game", () => {
+    const parsed = parseSetupPackManifest({ maps: ["Map One", "Map Two"] });
+    expect(parsed?.maps).toEqual(["Map One", "Map Two"]);
+    expect(parsed?.games).toBeUndefined();
+  });
+
+  it("takes games with no maps", () => {
+    const parsed = parseSetupPackManifest({ games: [{ name: "Game A" }] });
+    expect(parsed?.games?.length).toBe(1);
+    expect(parsed?.maps).toBeUndefined();
+  });
+
+  it("rejects a pack holding neither", () => {
+    expect(parseSetupPackManifest({ presets: [] })).toBeNull();
+    expect(parseSetupPackManifest({ games: [], maps: [] })).toBeNull();
+  });
+
+  it("keeps a title when given one", () => {
+    const parsed = parseSetupPackManifest({
+      title: "Popular water maps",
+      maps: ["Map One"],
+    });
+    expect(parsed?.title).toBe("Popular water maps");
+  });
+
+  it("drops a blank title rather than carrying it", () => {
+    const parsed = parseSetupPackManifest({ title: "  ", maps: ["Map One"] });
+    expect(parsed?.title).toBeUndefined();
+  });
+
+  it("reads a pack shared before this as one game", () => {
+    const parsed = parseSetupPackManifest({
+      engineVersion: "105.1.1-2554-gabcdef",
+      game: { name: "Beyond All Reason test-27000", rapidTag: "byar:test" },
+      maps: ["Red Comet Remake 1.8"],
+    });
+    expect(parsed?.games).toEqual([
+      { name: "Beyond All Reason test-27000", rapidTag: "byar:test" },
+    ]);
+    expect(parsed?.engineVersion).toBe("105.1.1-2554-gabcdef");
+  });
+
+  it("asks for every game and every map", () => {
+    const reqs = requirementsForPack(
+      manifest({
+        games: [{ name: "Game A" }, { name: "Game B" }],
+        maps: ["Map One", "Map Two"],
+      }),
+    );
+    expect(reqs.filter((r) => r.kind === "game").map((r) => r.label)).toEqual([
+      "Game A",
+      "Game B",
+    ]);
+    expect(reqs.filter((r) => r.kind === "map").length).toBe(2);
+  });
+
+  it("asks for nothing but maps when the pack pins no game", () => {
+    const reqs = requirementsForPack({ maps: ["Map One"] });
+    expect(reqs.every((r) => r.kind === "map")).toBe(true);
+  });
+});
+
 describe("encodeSetupPack / decodeSetupPack", () => {
   it("round-trips a manifest with a pinned engine", () => {
-    const m = manifest();
+    const m = manifest({ engineVersion: "105.1.1-2554-gabcdef" });
     const result = decodeSetupPack(encodeSetupPack(m));
     expect(result).toEqual({ ok: true, settings: m });
   });
@@ -148,7 +217,7 @@ describe("encodeSetupPack / decodeSetupPack", () => {
 
   it("round-trips the game's shortname beside its archive name", () => {
     const m = manifest({
-      game: { name: "Beyond All Reason test-27000", shortname: "byar" },
+      games: [{ name: "Beyond All Reason test-27000", shortname: "byar" }],
     });
     const result = decodeSetupPack(encodeSetupPack(m));
     expect(result).toEqual({ ok: true, settings: m });
@@ -156,13 +225,16 @@ describe("encodeSetupPack / decodeSetupPack", () => {
 
   it("reads a legacy pack that names its game without a shortname", () => {
     const legacyPayload = {
-      ...manifest(),
+      maps: manifest().maps,
       game: { name: "Beyond All Reason test-27000" },
     };
     const code = encodeContainerCode("setup-pack", 1, legacyPayload);
     expect(decodeSetupPack(code)).toEqual({
       ok: true,
-      settings: legacyPayload,
+      settings: {
+        maps: manifest().maps,
+        games: [{ name: "Beyond All Reason test-27000" }],
+      },
     });
     expect(identify(code).game).toEqual({
       name: "Beyond All Reason test-27000",
@@ -207,14 +279,14 @@ describe("requirementsForPack", () => {
   });
 
   it("uses the rapid tag as the download key when given", () => {
-    const [, gameReq] = requirementsForPack(
-      manifest({ game: { name: "g", rapidTag: "byar:test" } }),
+    const [gameReq] = requirementsForPack(
+      manifest({ games: [{ name: "g", rapidTag: "byar:test" }] }),
     );
     expect(gameReq.downloadKey).toBe("byar:test");
   });
 
   it("falls back to the archive name as the download key otherwise", () => {
-    const [, gameReq] = requirementsForPack(manifest());
+    const [gameReq] = requirementsForPack(manifest());
     expect(gameReq.downloadKey).toBe("Beyond All Reason test-27000");
   });
 

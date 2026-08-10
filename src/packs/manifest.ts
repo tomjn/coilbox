@@ -18,11 +18,11 @@ import {
 
 /**
  * A shareable setup pack (issue #415): the Prism/mrpack pattern applied to
- * coilbox. References, not content. An engine version, a game (by installed
- * archive name, optionally with a rapid tag for downloading it fresh), a map
- * list, and optionally bundled skirmish presets. Small enough to paste in
- * chat. Importing resolves every reference through issue #387's
- * `ResolveContentGate` before anything is applied.
+ * coilbox. References, not content. A collection of games (by installed
+ * archive name, optionally with a rapid tag for downloading it fresh) and
+ * maps, either optional but not both, plus optionally bundled skirmish
+ * presets. Small enough to paste in chat. Importing resolves every reference
+ * through issue #387's `ResolveContentGate` before anything is applied.
  */
 export interface SetupPackGame extends GameIdentity {
   /** The exact installed archive/game name, matched the same way presets and
@@ -45,22 +45,39 @@ export type SetupPackPreset = NonNullable<
 };
 
 export interface SetupPackManifest {
-  /** Absent when the pack pins no engine, including when the source value
-   * couldn't be read as a real version. That covers a legacy pack carrying
-   * the literal path fragment `.spring` (issue #1334), read as "no engine
-   * pinned" rather than an engine version to resolve. */
+  /** What the collection is called, so a code pasted with no hub item behind
+   * it can name itself on arrival. */
+  title?: string;
+  /** Only ever set by packs shared before a pack became a collection. Still
+   * resolved on import, never authored. */
   engineVersion?: string;
-  game: SetupPackGame;
-  /** springNames to include. Must be non-empty. A pack with nothing to play on
-   * is rejected rather than imported empty. */
-  maps: string[];
+  games?: SetupPackGame[];
+  maps?: string[];
   presets?: SetupPackPreset[];
+}
+
+/** One entry of a pack's game list, or null when the shape is wrong. */
+function parsePackGame(value: unknown): SetupPackGame | null {
+  if (typeof value !== "object" || value === null) return null;
+  const g = value as Record<string, unknown>;
+  if (typeof g.name !== "string" || !g.name.trim()) return null;
+  if (g.rapidTag !== undefined && typeof g.rapidTag !== "string") return null;
+  // A pack shared before issue #1335 carries no shortname, which reads as an
+  // identity with only a name rather than a malformed pack.
+  const identity = parseGameIdentity(g) ?? {};
+  return {
+    name: g.name,
+    ...(identity.shortname ? { shortname: identity.shortname } : {}),
+    ...(typeof g.rapidTag === "string" && g.rapidTag.trim()
+      ? { rapidTag: g.rapidTag }
+      : {}),
+  };
 }
 
 /**
  * Validate an untrusted decoded payload into a `SetupPackManifest`, or `null`
- * on any shape mismatch, including the empty-map-list case, which is a pack
- * authoring mistake rather than something to silently accept.
+ * on any shape mismatch, including a pack holding neither a game nor a map,
+ * which is a pack authoring mistake rather than something to silently accept.
  */
 export function parseSetupPackManifest(
   value: unknown,
@@ -78,29 +95,42 @@ export function parseSetupPackManifest(
     ? (d.engineVersion as string).trim()
     : undefined;
 
-  if (typeof d.game !== "object" || d.game === null) return null;
-  const g = d.game as Record<string, unknown>;
-  if (typeof g.name !== "string" || !g.name.trim()) return null;
-  if (g.rapidTag !== undefined && typeof g.rapidTag !== "string") return null;
-  // A pack shared before issue #1335 carries no shortname, which reads as an
-  // identity with only a name rather than a malformed pack.
-  const identity = parseGameIdentity(g) ?? {};
-  const game: SetupPackGame = {
-    name: g.name,
-    ...(identity.shortname ? { shortname: identity.shortname } : {}),
-    ...(typeof g.rapidTag === "string" && g.rapidTag.trim()
-      ? { rapidTag: g.rapidTag }
-      : {}),
-  };
+  if (d.title !== undefined && typeof d.title !== "string") return null;
+  const title =
+    typeof d.title === "string" && d.title.trim() ? d.title.trim() : undefined;
 
-  if (
-    !Array.isArray(d.maps) ||
-    d.maps.length === 0 ||
-    !d.maps.every((m) => typeof m === "string" && m.trim())
-  ) {
-    return null;
+  // `game` is the single-game shape every pack used before a pack became a
+  // collection. Read as a one-entry list so those codes still import.
+  let rawGames: unknown[];
+  if (d.games !== undefined) {
+    if (!Array.isArray(d.games)) return null;
+    rawGames = d.games;
+  } else if (d.game !== undefined) {
+    rawGames = [d.game];
+  } else {
+    rawGames = [];
   }
-  const maps = d.maps as string[];
+  const games: SetupPackGame[] = [];
+  for (const raw of rawGames) {
+    const game = parsePackGame(raw);
+    if (!game) return null;
+    games.push(game);
+  }
+
+  let maps: string[] = [];
+  if (d.maps !== undefined) {
+    if (
+      !Array.isArray(d.maps) ||
+      !d.maps.every((m) => typeof m === "string" && m.trim())
+    ) {
+      return null;
+    }
+    maps = d.maps as string[];
+  }
+
+  // A pack with nothing in it is an authoring mistake, not something to import
+  // as an empty collection.
+  if (games.length === 0 && maps.length === 0) return null;
 
   let presets: SetupPackPreset[] | undefined;
   if (d.presets !== undefined) {
@@ -115,9 +145,10 @@ export function parseSetupPackManifest(
   }
 
   return {
+    ...(title ? { title } : {}),
     ...(engineVersion ? { engineVersion } : {}),
-    game,
-    maps,
+    ...(games.length ? { games } : {}),
+    ...(maps.length ? { maps } : {}),
     ...(presets ? { presets } : {}),
   };
 }
@@ -147,8 +178,8 @@ function gameRequirementForPack(game: SetupPackGame): ContentRequirement {
 }
 
 /** Every requirement a pack needs resolved before it can be applied: the
- * engine (when the pack pins one), the game, and each of its maps (issue
- * #387's list-of-requirements step). */
+ * engine (when the pack pins one), each of its games, and each of its maps
+ * (issue #387's list-of-requirements step). */
 export function requirementsForPack(
   manifest: SetupPackManifest,
 ): ContentRequirement[] {
@@ -156,8 +187,8 @@ export function requirementsForPack(
     ...(manifest.engineVersion
       ? [engineVersionRequirement(manifest.engineVersion)]
       : []),
-    gameRequirementForPack(manifest.game),
-    ...manifest.maps.map(exactMapRequirement),
+    ...(manifest.games ?? []).map(gameRequirementForPack),
+    ...(manifest.maps ?? []).map(exactMapRequirement),
   ]);
 }
 

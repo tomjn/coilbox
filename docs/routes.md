@@ -26,7 +26,6 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Multiplayer   | Player stats  | `#/stats`            | `multiplayer.stats`   | **yes** |
 | Content       | Maps          | `#/content/maps`     | `content.maps`     | no       |
 | Content       | Games         | `#/content/games`    | `content.games`    | **yes**  |
-| Content       | Setup packs   | `#/content/setup-packs` | `content.setupPacks` | **yes** |
 | Downloads     | Browse Rapid  | `#/downloads`        | `downloads.browse` | **yes**  |
 | Downloads     | Maps          | `#/downloads/maps`   | `downloads.maps`   | no       |
 | Downloads     | Games         | `#/downloads/games`  | `downloads.games`  | **yes**  |
@@ -35,9 +34,9 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 
 ² **Multiplayer** items appear contextually, not via the profile: **Login** shows only while logged out; **Chat** and **Battles** appear after the first connect; **Battle Room** only while you're in a battle.
 
-> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin — ask and the list can grow. Today `campaign.builder`, `conquest.list`, `content.games`, `content.setupPacks`, `downloads.browse`, `downloads.games`, `multiplayer.stats` and `runlite.list` are wired for hiding.
+> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin — ask and the list can grow. Today `campaign.builder`, `conquest.list`, `content.games`, `downloads.browse`, `downloads.games`, `multiplayer.stats` and `runlite.list` are wired for hiding. `content.setupPacks` is also on the same `hide` list. It no longer names a nav item. It hides the Coilbox hub screen's "Share a pack" button instead.
 
-> **Old paths**: `#/content/replays(/:name)` and `#/content/stats(/:name)` redirect to `#/play/replays(/:name)` and `#/stats(/:name)` respectively, so existing bookmarks and links keep working (#467).
+> **Old paths**: `#/content/replays(/:name)` and `#/content/stats(/:name)` redirect to `#/play/replays(/:name)` and `#/stats(/:name)` respectively, so existing bookmarks and links keep working (#467). `#/content/setup-packs` redirects to `#/downloads/maps`, since the Setup packs page is gone and sharing a pack now happens from the Coilbox hub screen instead.
 
 ## Advanced-mode pages
 

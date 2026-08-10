@@ -22,8 +22,13 @@ import { getProfile } from "./profile";
  *
  * KEEP IN SYNC with the `isProfileHidden(...)` call sites (see `content/index.ts`,
  * `downloads/index.ts`, `multiplayer/index.tsx`, `conquest/index.ts`,
- * `runlite/index.ts`, `campaign/index.ts` and `hub/index.tsx`): add an id here
- * whenever a nav item opts into hiding.
+ * `runlite/index.ts`, `campaign/index.ts`, `hub/index.tsx` and
+ * `hub/pages/BrowsePage.tsx`): add an id here whenever a nav item opts into
+ * hiding.
+ *
+ * `content.setupPacks` is the one id here that no longer names a nav item. It
+ * hides the hub screen's "Share a pack" button, so a distribution that switched
+ * pack sharing off keeps it off now the page has gone.
  */
 export const HIDEABLE_NAV_IDS: string[] = [
   "content.games",
