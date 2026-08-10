@@ -6,7 +6,6 @@ import {
   Gamepad2,
   HardDrive,
   Map as MapIcon,
-  Package2,
   SlidersHorizontal,
 } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
@@ -35,9 +34,11 @@ import StorageSection from "./pages/StorageSection";
  * group in #467; their old `content/replays*`/`content/stats*` paths still route
  * here purely to redirect to the new locations, via `LegacyRedirect`.
  *
- * Setup packs (`../packs`, issue #415) also route through here as
- * `content/setup-packs` since sharing an engine/game/map setup is a content
- * concern, even though the pack's own logic lives in its own top-level module.
+ * Setup packs (`../packs`) used to have its own page here too, at
+ * `content/setup-packs`. Sharing a pack now happens from the Coilbox hub
+ * screen instead, where sharing already lives; the old path stays wired up
+ * as a redirect to Downloads > Maps, the same way the replays/stats paths
+ * redirect above, so an old shared link still lands somewhere useful.
  *
  * Route Components are lazy-loaded; settings Components are imported eagerly (not
  * lazy): the frame settings page renders them directly without a Suspense
@@ -80,14 +81,6 @@ const contentPlugin: FramePlugin = {
           order: 2,
           icon: ArchiveIcon,
           useVisible: useAdvancedMode,
-        },
-        {
-          id: "content.setupPacks",
-          label: "Setup packs",
-          to: "/content/setup-packs",
-          order: 3,
-          icon: Package2,
-          useVisible: () => !isProfileHidden("content.setupPacks"),
         },
       ],
     },
@@ -137,11 +130,9 @@ const contentPlugin: FramePlugin = {
     },
     {
       path: "content/setup-packs",
-      lazy: gateProfileHidden(
-        "content.setupPacks",
-        () => import("../packs/pages/SetupPacksPage"),
-      ),
-      crumb: "Setup packs",
+      lazy: async () => ({
+        default: makeLegacyRedirect(() => "/downloads/maps"),
+      }),
     },
     // Legacy paths (#467 moved Replays to Singleplayer and Stats to
     // Multiplayer as "Player stats") — kept so old bookmarks and provenance
