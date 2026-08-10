@@ -804,6 +804,55 @@ const downloadGames: Drawing = {
     `<rect x="96" y="150" width="128" height="4" rx="2" fill="${p.faint}" fill-opacity="0.3"/>`,
 };
 
+/**
+ * A row of other people's things above a line, and one of them crossing it onto
+ * a shelf that already holds two.
+ *
+ * What the hub hands you is other players' presets, challenges, setup packs and
+ * scenarios, so the assortment is the subject: five different shapes rather than
+ * five of one. The line is what says which side of it you are standing on, and
+ * the shape crossing it is what makes this an arrival rather than a catalogue.
+ *
+ * The globe it replaces said "the internet", which is true of every screen in
+ * Coilbox that fetches anything. Not the coil mark either: the nav item beside
+ * the label already is one, and a card repeating its own icon says nothing the
+ * icon has not.
+ */
+const hub: Drawing = {
+  pools: [
+    [160, 34, 152, 0.16],
+    [160, 108, 92, 0.13],
+  ],
+  paint: (p) => {
+    // Shared out there. The hexagon is the shape the setup-pack card is drawn
+    // from, so the two read as the same object in two places.
+    const shared =
+      '<polygon points="46,32 60,40 60,56 46,64 32,56 32,40"/>' +
+      '<rect x="92" y="20" width="34" height="26" rx="4"/>' +
+      '<circle cx="166" cy="46" r="16"/>' +
+      diamond(222, 30, 16) +
+      '<rect x="262" y="30" width="28" height="28" rx="4"/>';
+    // Already yours, so the arriving one is joining a shelf rather than landing
+    // on an empty card.
+    const held =
+      '<rect x="96" y="98" width="28" height="24" rx="3"/>' +
+      '<circle cx="212" cy="110" r="12"/>';
+    return (
+      `<g fill="${p.line}" fill-opacity="0.24" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.4">${shared}</g>` +
+      `<g fill="none" stroke="${p.faint}" stroke-width="1.5" stroke-opacity="0.3" stroke-dasharray="6 9">` +
+      '<path d="M-10 78 L330 78"/>' +
+      "</g>" +
+      `<g fill="${p.line}" fill-opacity="0.28" stroke="${p.faint}" stroke-width="1.2" stroke-opacity="0.4">${held}</g>` +
+      `<g fill="none" stroke="${p.spark}" stroke-width="2" stroke-opacity="0.5" stroke-linecap="round" stroke-linejoin="round">` +
+      '<path d="M222 50 Q216 82 176 94"/>' +
+      '<path d="M188 84 L176 94 L191 96"/>' +
+      "</g>" +
+      `<g fill="${p.spark}" fill-opacity="0.8">${diamond(160, 107, 15)}</g>` +
+      `<rect x="84" y="126" width="152" height="4" rx="2" fill="${p.faint}" fill-opacity="0.32"/>`
+    );
+  },
+};
+
 /** A mission graph with edit handles on it. Building the journey, not walking it. */
 const campaignBuilder: Drawing = {
   pools: [
@@ -1207,6 +1256,7 @@ const DRAWINGS: Record<string, Drawing> = {
   "downloads.browse": downloads,
   "downloads.maps": downloadMaps,
   "downloads.games": downloadGames,
+  "hub.browse": hub,
   "lego.units": legoUnits,
   "lego.parts": legoParts,
   "mapconv.projects": mapconvProjects,
