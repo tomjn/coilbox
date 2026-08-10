@@ -37,11 +37,12 @@ import { FilterCombobox } from "./components/FilterCombobox";
  * gallery only worked if you already knew what was on it. This is the same
  * gallery the website serves, over the same filters, so a player can go looking.
  *
- * Nothing about importing changes. The button on a card fetches the item's
- * `container_url` and hands it to the deep-link handler as an
- * `import?url=` link, which is exactly what a pasted hub address already does:
- * confirm contacting the host, fetch under a byte cap, check what came back,
- * then confirm applying it. This screen never imports anything itself.
+ * This screen never imports anything itself. The button on a card fetches the
+ * item's `container_url` and hands it to the deep-link handler as an
+ * `import?url=` link: fetch under a byte cap, check what came back, then confirm
+ * applying it. The handler drops its "may coilbox contact this host" step for a
+ * URL on the configured hub (issue #1367), which is the one this page has been
+ * reading from all along. Every other check it runs is unchanged.
  *
  * Filtering follows the website's shape rather than growing a row of boxes. Kind
  * is a set of chips, the search box is the API's `q`, and author and tag are set
@@ -148,8 +149,8 @@ export default function BrowsePage() {
   );
 
   // Fetch the item for its container address, then hand that to the deep-link
-  // handler. It asks before contacting the host and again before applying, so
-  // nothing is imported by pressing this.
+  // handler. It shows what came back and asks before applying it, so nothing is
+  // imported by pressing this.
   const importItem = useCallback(
     async (item: HubItem) => {
       setImporting(item.id);
