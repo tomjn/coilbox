@@ -123,8 +123,9 @@ export function hubItemUrl(base: string, id: string): string {
   return hubUrl(base, `/api/v1/items/${encodeURIComponent(id)}`).toString();
 }
 
-/** The `{"error": "..."}` an unhappy response carries, when it has one. */
-function serverError(body: unknown): string | null {
+/** The `{"error": "..."}` an unhappy response carries, when it has one.
+ * Exported for `./publish`, which reads the same errors off the write route. */
+export function serverError(body: unknown): string | null {
   if (typeof body !== "object" || body === null) return null;
   const { error } = body as { error?: unknown };
   return typeof error === "string" && error.trim() ? error.trim() : null;
@@ -135,7 +136,7 @@ function serverError(body: unknown): string | null {
  * that pauses after a week without traffic, and waking it is the most likely
  * reason a read fails, so say so rather than leaving a bare 503 to be guessed at.
  */
-const COLD_START =
+export const COLD_START =
   "The hub may be waking up after a quiet spell, which takes a few seconds. Try again in a moment.";
 
 /** Turn a non-2xx response into a sentence. */
