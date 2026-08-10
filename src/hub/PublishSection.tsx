@@ -1,12 +1,13 @@
 import { Button, Input } from "@picoframe/frame";
 import { Check, Copy, ExternalLink, Globe } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { openExternal } from "@/home/navItem";
 import { isHubEnabled } from "@/profile/profile";
 import { ErrorBanner } from "../content/pages/components/states";
-import { hubAccount } from "./auth";
+import { useHubAccount } from "./account";
 import { useHubUrl } from "./config";
+import { SignInButton } from "./pages/components/AccountControl";
 import { Field } from "./pages/components/Field";
 import {
   hubItemPageUrl,
@@ -22,18 +23,18 @@ import {
  *
  * This replaces the stand-in from issue #1346, which copied the code and opened
  * the hub's own publish page in a browser. That button survives, but only for
- * somebody who is not signed in: it is the one thing that still works then,
- * because the hub's page can sign you in where coilbox cannot without a trip
- * through Settings. Signed in, it would be a second button doing the same job the
- * slower way.
+ * somebody who is not signed in, as the quieter of the two ways out of that
+ * state. The louder one is signing in right here: sending the reader to Settings
+ * to find a button made publishing look like a thing you had to be told how to
+ * do. Signed in, both would be one button doing the same job the slower way.
  *
  * The upload itself happens in Rust, because that is where the access token is.
  * See `./publish`.
  */
 export function PublishSection({ code }: { code: string }) {
   const hubUrl = useHubUrl();
-  const [checking, setChecking] = useState(true);
-  const [signedIn, setSignedIn] = useState(false);
+  const account = useHubAccount(hubUrl);
+  const { loading: checking, signedIn } = account;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
@@ -41,26 +42,6 @@ export function PublishSection({ code }: { code: string }) {
   const [error, setError] = useState<string | null>(null);
   const [published, setPublished] = useState<{ id: string } | null>(null);
   const [copied, setCopied] = useState(false);
-
-  // Each hub is a separate account. Failing to ask counts as signed out: the
-  // fallback below still works, and offering a Publish button that cannot
-  // publish would be worse.
-  useEffect(() => {
-    const signal = { cancelled: false };
-    void (async () => {
-      try {
-        const state = await hubAccount({ hubUrl });
-        if (!signal.cancelled) setSignedIn(state.signedIn);
-      } catch {
-        if (!signal.cancelled) setSignedIn(false);
-      } finally {
-        if (!signal.cancelled) setChecking(false);
-      }
-    })();
-    return () => {
-      signal.cancelled = true;
-    };
-  }, [hubUrl]);
 
   // What is wrong with the code itself, before anybody types a title. A campaign
   // or something oversized can never be published, so the form does not appear
@@ -173,11 +154,18 @@ export function PublishSection({ code }: { code: string }) {
       <div className="flex flex-col gap-1.5 border-t pt-3">
         <h3 className="text-sm font-medium leading-none">Coilbox hub</h3>
         <p className="text-xs text-muted-foreground">
-          Sign in under Settings &gt; Coilbox hub to publish from here. Or copy
-          the code and finish on the hub's own page, where you can sign in as
-          you go.
+          Sign in to publish from here. Or copy the code and finish on the hub's
+          own page.
         </p>
-        <Button variant="outline" onClick={copyAndOpen}>
+        <SignInButton
+          busy={account.busy}
+          onSignIn={account.signIn}
+          size="default"
+        />
+        {account.problem && (
+          <p className="text-xs text-destructive">{account.problem}</p>
+        )}
+        <Button variant="ghost" onClick={copyAndOpen}>
           <Globe className="mr-1.5 size-4" aria-hidden /> Copy code &amp; open
           hub
         </Button>

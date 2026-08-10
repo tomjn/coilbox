@@ -1,18 +1,13 @@
 import { Button } from "@picoframe/frame";
-import { useCallback, useEffect, useState } from "react";
-import {
-  type HubIdentity,
-  hubAccount,
-  hubSignIn,
-  hubSignOut,
-} from "../../auth";
+import { useHubAccount } from "../../account";
 
 /**
  * Signing in to the hub, in Settings > Coilbox hub (issue #1348).
  *
- * Here rather than on the browse screen because browsing needs no account at all.
- * Signing in is for publishing, and publishing starts from the thing being shared,
- * so this is a setting you visit once rather than a control anybody needs to hand.
+ * Settings holds the full account: who you are, and signing out. Signing in
+ * itself is also offered where it comes up - the hub screen's header and the
+ * publish form - because a sign-in button nobody can find is a sign-in nobody
+ * does. All three read the same state through `useHubAccount`.
  *
  * The whole section is behind `isHubEnabled`, so a distribution that switched the
  * hub off has no way to reach this.
@@ -22,69 +17,8 @@ import {
  * signed in.
  */
 export function AccountControl({ hubUrl }: { hubUrl: string }) {
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [account, setAccount] = useState<HubIdentity | null>(null);
-  const [signedIn, setSignedIn] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
-
-  const load = useCallback(
-    async (signal?: { cancelled: boolean }) => {
-      setLoading(true);
-      try {
-        const state = await hubAccount({ hubUrl });
-        if (signal?.cancelled) return;
-        setSignedIn(state.signedIn);
-        setAccount(state.account);
-        setProblem(state.problem);
-      } catch (e) {
-        if (signal?.cancelled) return;
-        setSignedIn(false);
-        setAccount(null);
-        setProblem(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (!signal?.cancelled) setLoading(false);
-      }
-    },
-    [hubUrl],
-  );
-
-  // Each hub is a separate account, so changing the address asks the new one.
-  useEffect(() => {
-    const signal = { cancelled: false };
-    void load(signal);
-    return () => {
-      signal.cancelled = true;
-    };
-  }, [load]);
-
-  const signIn = async () => {
-    setBusy(true);
-    setProblem(null);
-    try {
-      const { account: identity } = await hubSignIn({ hubUrl });
-      setAccount(identity);
-      setSignedIn(true);
-    } catch (e) {
-      setProblem(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const signOut = async () => {
-    setBusy(true);
-    setProblem(null);
-    try {
-      await hubSignOut({ hubUrl });
-      setAccount(null);
-      setSignedIn(false);
-    } catch (e) {
-      setProblem(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { loading, busy, signedIn, account, problem, signIn, signOut } =
+    useHubAccount(hubUrl);
 
   return (
     <section className="space-y-2">
@@ -103,7 +37,7 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={signOut}
+            onClick={() => void signOut()}
             disabled={busy}
             aria-busy={busy}
           >
@@ -120,9 +54,12 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
             You need an account to share things on the hub. Browsing and
             importing need no account.
           </p>
-          <Button size="sm" onClick={signIn} disabled={busy} aria-busy={busy}>
-            {busy ? "Waiting for your browser" : "Sign in with Discord"}
-          </Button>
+          <SignInButton
+            busy={busy}
+            onSignIn={signIn}
+            size="sm"
+            variant="default"
+          />
           {busy && (
             <p className="text-xs leading-snug text-muted-foreground">
               Finish signing in the browser window that opened. Coilbox stops
@@ -133,5 +70,34 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
       )}
       {problem && <p className="text-sm text-destructive">{problem}</p>}
     </section>
+  );
+}
+
+/**
+ * The one sign-in button, wherever it is offered. Its label says what the press
+ * does next - a browser window opens and the sign-in finishes there - because
+ * that is the surprising part of pressing it.
+ */
+export function SignInButton({
+  busy,
+  onSignIn,
+  size = "sm",
+  variant = "outline",
+}: {
+  busy: boolean;
+  onSignIn: () => Promise<void>;
+  size?: "sm" | "default";
+  variant?: "default" | "outline";
+}) {
+  return (
+    <Button
+      size={size}
+      variant={variant}
+      onClick={() => void onSignIn()}
+      disabled={busy}
+      aria-busy={busy}
+    >
+      {busy ? "Waiting for your browser" : "Sign in with Discord"}
+    </Button>
   );
 }

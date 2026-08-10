@@ -22,7 +22,6 @@ import { buildDeepLink } from "@/deeplink/build";
 import { dispatchDeepLink } from "@/deeplink/bus";
 import { EmptyState } from "@/downloads/pages/components/states";
 import { getGameMatcher, getProfile } from "@/profile/profile";
-import { KindIcon } from "../components/KindIcon";
 import {
   describeItem,
   fetchHubItem,
@@ -36,10 +35,12 @@ import {
   describePinnedGame,
   loadBrowsePage,
 } from "../browse";
+import { KindIcon } from "../components/KindIcon";
 import { hubItemRoute, useHubUrl } from "../config";
 import { type HubItemPresence, noteHubContainer } from "../importRecord";
 import { useHubItemPresence } from "../imports";
 import { FilterCombobox } from "./components/FilterCombobox";
+import { HeaderAccount } from "./components/HeaderAccount";
 
 /**
  * Browse what other players have shared on Coilbox Hub (issue #1347), without
@@ -243,18 +244,21 @@ export default function BrowsePage() {
             </p>
             {pinnedMatcher && (
               <p className="max-w-prose text-sm text-muted-foreground">
-                This copy of Coilbox is set up for {pinnedGame ?? "one game"}, so
-                the hub shows its things, plus anything not tied to a game.
+                This copy of Coilbox is set up for {pinnedGame ?? "one game"},
+                so the hub shows its things, plus anything not tied to a game.
               </p>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void openUrl(hubUrl)}
-          >
-            <ExternalLink /> Hub website
-          </Button>
+          <div className="flex flex-wrap items-start gap-2">
+            <HeaderAccount hubUrl={hubUrl} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void openUrl(hubUrl)}
+            >
+              <ExternalLink /> Hub website
+            </Button>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative max-w-xs flex-1">
