@@ -13,7 +13,11 @@ vi.mock("@picoframe/frame", () => ({
 }));
 
 import { encodeContainerCode, identify } from "../container/container";
-import { rememberShortnames, resetShortnames } from "../container/shortnames";
+import {
+  rememberCarriedShortname,
+  rememberShortnames,
+  resetShortnames,
+} from "../container/shortnames";
 import {
   installSettingsStorage,
   memorySettingsStorage,
@@ -240,6 +244,47 @@ describe("presetPayload", () => {
       JSON.stringify({ ...rest, game: { name: "BAR 1.2", shortname: "BAR" } }),
     );
     expect(parsed?.gameName).toBe("BAR 1.2");
+  });
+});
+
+// Issue #1383: the whole cycle a shared item goes through here. Every importer
+// reads a paste with `identify` and hands the game it names to
+// `rememberCarriedShortname`, which is the one line these two steps stand in
+// for.
+describe("re-sharing a preset imported for a game this machine never had", () => {
+  const authorsCode = () =>
+    encodeContainerCode("preset", PRESET_KIND_VERSION, {
+      ...base,
+      id: "author-1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      lastUsedAt: "2026-01-01T00:00:00.000Z",
+      gameName: "SplinterFaction 0.1.60",
+      game: { name: "SplinterFaction 0.1.60", shortname: "SF" },
+    });
+
+  beforeEach(resetShortnames);
+
+  it("shares it on with the shortname the author's copy carried", () => {
+    const code = authorsCode();
+    rememberCarriedShortname(identify(code).game);
+    const imported = parsePresetJson(code);
+    expect(imported).not.toBeNull();
+    if (!imported) return;
+
+    const saved = asPreset(imported, imported.name ?? "Imported preset");
+    expect(presetPayload(saved, []).game).toEqual({
+      name: "SplinterFaction 0.1.60",
+      shortname: "SF",
+    });
+  });
+
+  it("drops back to the archive name alone when nothing taught it one", () => {
+    const imported = parsePresetJson(authorsCode());
+    expect(imported).not.toBeNull();
+    if (!imported) return;
+    expect(presetPayload(asPreset(imported), []).game).toEqual({
+      name: "SplinterFaction 0.1.60",
+    });
   });
 });
 

@@ -5,7 +5,11 @@ import {
   type InstalledGameInfo,
   parseGameIdentity,
 } from "./gameIdentity";
-import { rememberShortnames, resetShortnames } from "./shortnames";
+import {
+  rememberCarriedShortname,
+  rememberShortnames,
+  resetShortnames,
+} from "./shortnames";
 
 describe("parseGameIdentity", () => {
   it("reads both spellings side by side", () => {
@@ -106,6 +110,35 @@ describe("gameIdentityForName", () => {
     expect(gameIdentityForName("Never seen 1.0", installed)).toEqual({
       name: "Never seen 1.0",
     });
+  });
+
+  // Issue #1383: a build this machine has never had is the ordinary case for
+  // anything shared, so an item that arrived naming its game both ways lends
+  // coilbox the shortname for as long as it is the only answer going.
+  it("takes the shortname a shared container carried for a build never seen here", () => {
+    rememberCarriedShortname({
+      name: "SplinterFaction 0.1.60",
+      shortname: "SF",
+    });
+    expect(gameIdentityForName("SplinterFaction 0.1.60", installed)).toEqual({
+      name: "SplinterFaction 0.1.60",
+      shortname: "SF",
+    });
+  });
+
+  it("prefers a modinfo read here over what a container claimed", () => {
+    rememberCarriedShortname({ name: "BAR 1.2", shortname: "Imposter" });
+    rememberShortnames([
+      { name: "SplinterFaction 0.1.77", info: { shortname: "SF" } },
+    ]);
+    rememberCarriedShortname({
+      name: "SplinterFaction 0.1.77",
+      shortname: "Imposter",
+    });
+    expect(gameIdentityForName("BAR 1.2", installed)?.shortname).toBe("BAR");
+    expect(gameIdentityForName("SplinterFaction 0.1.77", [])?.shortname).toBe(
+      "SF",
+    );
   });
 });
 

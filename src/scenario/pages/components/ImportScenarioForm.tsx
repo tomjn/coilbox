@@ -16,6 +16,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { ChallengeCodeInput } from "@/challenge/ChallengeCodeInput";
 import { identify } from "@/container/container";
+import { rememberCarriedShortname } from "@/container/shortnames";
 import { ResolveContentGate } from "@/content/pages/components/ResolveContentDrawer";
 import { usePreferredTarget } from "@/play/config";
 import { scenarioImport } from "../../bindings";
@@ -54,6 +55,9 @@ export function ImportScenarioForm({
       }
       throw new Error(scenarioImportErrorMessage(read.error));
     }
+    // Take the scenario's word for the shortname of the build it pins, so a
+    // re-share from here carries it on (issue #1383).
+    rememberCarriedShortname(identify(text).game);
     setPending(read.payload);
   };
 

@@ -21,10 +21,17 @@
  * machine has ever had, and keeping the old ones is the entire point, so nothing
  * here is ever evicted.
  *
- * Only a modinfo coilbox itself read gets in. A container arriving from
- * elsewhere carries a shortname too, and it is not written here: it would let a
- * bad payload name a game this machine has never installed, and everything
- * coilbox exports afterwards for that name would repeat it.
+ * A container arriving from elsewhere carries a shortname too, and coilbox
+ * trusts it (issue #1383). Without that, re-sharing an item you imported drops
+ * the shortname the author's copy had, and an item pinned to a build this
+ * machine has never seen can never gain one - which is the ordinary case for
+ * anything shared, not a rare one. A payload naming a game nobody here has is
+ * what browsing other people's things looks like, and the import gate already
+ * offers to install what is missing.
+ *
+ * A claim is still not a reading, so the two are kept in separate stores. A
+ * shortname coilbox read out of a modinfo always wins, and a claim about an
+ * archive coilbox has read is never written down at all.
  *
  * Two installs on one machine share `localStorage` while sharing no content
  * (issue #1115), and unlike the home page's card art this store wants that. An
@@ -33,17 +40,21 @@
  * nothing here prunes what it cannot currently see.
  */
 
-import type { InstalledGameInfo } from "./gameIdentity";
+import type { GameIdentity, InstalledGameInfo } from "./gameIdentity";
 
-/** Where the shortnames are kept, beside the notification history and the home
- * page's card art. */
+/** Where the shortnames read here are kept, beside the notification history and
+ * the home page's card art. */
 const STORAGE_KEY = "coilbox.container.shortnames";
+
+/** Where the ones shared containers claimed are kept, apart from the read ones
+ * so the two never blur together. */
+const CARRIED_KEY = "coilbox.container.shortnames.carried";
 
 /** Read what earlier sessions learned. Guarded for a webview with storage off,
  * a node test environment, and text that is no longer JSON. */
-function load(): Map<string, string> {
+function load(key: string): Map<string, string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     const parsed = raw ? JSON.parse(raw) : null;
     if (typeof parsed !== "object" || parsed === null) return new Map();
     const entries = Object.entries(parsed as Record<string, unknown>).filter(
@@ -55,14 +66,12 @@ function load(): Map<string, string> {
   }
 }
 
-let known = load();
+let known = load(STORAGE_KEY);
+let carried = load(CARRIED_KEY);
 
-function persist(): void {
+function persist(key: string, entries: Map<string, string>): void {
   try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(Object.fromEntries(known)),
-    );
+    localStorage.setItem(key, JSON.stringify(Object.fromEntries(entries)));
   } catch {
     // No storage. Everything still works for this session, it simply teaches
     // the next one nothing.
@@ -86,7 +95,28 @@ export function rememberShortnames(games: readonly InstalledGameInfo[]): void {
     known.set(name, shortname);
     changed = true;
   }
-  if (changed) persist();
+  if (changed) persist(STORAGE_KEY, known);
+}
+
+/**
+ * Hold onto the shortname a shared container named its game with, so an export
+ * made here later can pass it on (issue #1383).
+ *
+ * Takes the identity a container carries, which is why both halves have to be
+ * there: a challenge names a shortname and no build, and there is nothing to
+ * key that by. An archive coilbox has read the modinfo of learns nothing here,
+ * because the reading is the better answer and stays the only one.
+ */
+export function rememberCarriedShortname(
+  game: GameIdentity | null | undefined,
+): void {
+  const name = game?.name?.trim();
+  const shortname = game?.shortname?.trim();
+  if (!name || !shortname) return;
+  if (known.has(name)) return;
+  if (carried.get(name) === shortname) return;
+  carried.set(name, shortname);
+  persist(CARRIED_KEY, carried);
 }
 
 /** The shortname read for this exact archive name, whenever it was read. */
@@ -94,17 +124,25 @@ export function rememberedShortname(name: string): string | undefined {
   return known.get(name.trim());
 }
 
-/** Everything held, for tests and for anyone reporting on it. */
+/** The shortname a shared container claimed for this exact archive name. */
+export function carriedShortname(name: string): string | undefined {
+  return carried.get(name.trim());
+}
+
+/** Everything read here, for tests and for anyone reporting on it. */
 export function rememberedShortnames(): ReadonlyMap<string, string> {
   return known;
 }
 
-/** Forget the lot. For tests, which each want to start from nothing. */
+/** Forget the lot, read and carried. For tests, which each want to start from
+ * nothing. */
 export function resetShortnames(): void {
   known = new Map();
+  carried = new Map();
 }
 
 /** Start from what storage holds now, after a test has stubbed it. */
 export function loadShortnames(): void {
-  known = load();
+  known = load(STORAGE_KEY);
+  carried = load(CARRIED_KEY);
 }
