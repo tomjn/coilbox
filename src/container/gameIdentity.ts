@@ -20,15 +20,19 @@
  *
  * Both fields are optional and at least one must be present, because neither is
  * always knowable. A challenge that pins no build has no `name`. An item whose
- * game is not installed when it is exported has no `shortname`, since the
- * shortname only exists in the game's modinfo and coilbox reads that from the
- * installed archive.
+ * game coilbox has never read a modinfo for has no `shortname`, since the
+ * shortname only exists in the game's modinfo and coilbox reads that from an
+ * installed archive. It does not have to be installed right now: `./shortnames`
+ * keeps every shortname read here, so a build that has since been superseded
+ * still gets one.
  *
  * The shape sits at the top of each kind's payload as `game`, so a consumer
  * reads one field in one place whatever the kind. Payloads shared before this
  * carry no `game`, so {@link gameIdentityFromPayload} reads each kind's old
  * spelling and returns the same shape.
  */
+
+import { rememberedShortname } from "./shortnames";
 
 export interface GameIdentity {
   /** Exact installed archive name, e.g. "SplinterFaction 0.1.78". Absent when
@@ -76,17 +80,28 @@ export function parseGameIdentity(value: unknown): GameIdentity | null {
   return { ...(name ? { name } : {}), ...(shortname ? { shortname } : {}) };
 }
 
-/** Build an identity for an archive name, filling in the shortname from the
- * installed game's modinfo when that game is installed here. */
+/**
+ * Build an identity for an archive name, filling in the shortname from the
+ * game's modinfo.
+ *
+ * `name` is the build the item pins and it is never rewritten: it is what makes
+ * the same battle launch again, so an item pinned to 0.1.77 keeps saying 0.1.77
+ * even on a machine that has moved to 0.1.78.
+ *
+ * The shortname comes from the live scan when the pinned build is installed, and
+ * otherwise from the shortnames coilbox has already read here (issue #1364),
+ * which is what a build that has since been superseded falls back on. Both are
+ * modinfo this machine read, the live one being the more recent of the two.
+ */
 export function gameIdentityForName(
   name: string,
   installed: readonly InstalledGameInfo[] = [],
 ): GameIdentity | null {
   const trimmed = trimmedString(name);
   if (!trimmed) return null;
-  const shortname = trimmedString(
-    installed.find((g) => g.name === trimmed)?.info?.shortname,
-  );
+  const shortname =
+    trimmedString(installed.find((g) => g.name === trimmed)?.info?.shortname) ??
+    trimmedString(rememberedShortname(trimmed));
   return { name: trimmed, ...(shortname ? { shortname } : {}) };
 }
 

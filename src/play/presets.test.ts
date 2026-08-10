@@ -14,6 +14,7 @@ vi.mock("@picoframe/frame", () => ({
 }));
 
 import { encodeContainerCode, identify } from "../container/container";
+import { rememberShortnames, resetShortnames } from "../container/shortnames";
 import type { SkirmishDraft } from "./drafts";
 import {
   PRESET_KIND_VERSION,
@@ -184,6 +185,8 @@ describe("presetPayload", () => {
     lastUsedAt: "2026-01-01T00:00:00.000Z",
   };
 
+  beforeEach(resetShortnames);
+
   it("round-trips a shared preset that names its game both ways", () => {
     const code = encodeContainerCode(
       "preset",
@@ -201,6 +204,19 @@ describe("presetPayload", () => {
 
   it("names the game by archive name alone when it isn't installed here", () => {
     expect(presetPayload(preset, []).game).toEqual({ name: base.gameName });
+  });
+
+  // Issue #1364: the shortname is what Coilbox Hub groups an item by, and the
+  // build a preset pins is gone the moment the game updates.
+  it("names the game both ways when only an older build was ever installed", () => {
+    rememberShortnames([{ name: base.gameName, info: { shortname: "SF" } }]);
+    const installedNow = [
+      { name: "SplinterFaction 0.1.78", info: { shortname: "SF" } },
+    ];
+    expect(presetPayload(preset, installedNow).game).toEqual({
+      name: base.gameName,
+      shortname: "SF",
+    });
   });
 
   it("reads the game out of a preset shared before the shared field", () => {
