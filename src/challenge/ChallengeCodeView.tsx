@@ -1,12 +1,10 @@
 import { Button } from "@picoframe/frame";
-import { Check, Copy, Download, Globe, Link as LinkIcon } from "lucide-react";
+import { Check, Copy, Download, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { buildImportCodeLink } from "@/deeplink/build";
 import { copyDeepLink } from "@/deeplink/copyLink";
-import { openExternal } from "@/home/navItem";
-import { useHubUrl } from "@/hub/config";
-import { isHubEnabled } from "@/profile/profile";
+import { PublishSection } from "@/hub/PublishSection";
 import { ErrorBanner } from "../content/pages/components/states";
 
 /**
@@ -24,13 +22,11 @@ import { ErrorBanner } from "../content/pages/components/states";
  * the save dialog and the actual write, this component only surfaces busy and
  * error state around it.
  *
- * "Copy code and open hub" (issue #1346) needs nothing from the caller: unlike
- * `onExportFile`, every caller wants the identical action on the identical
- * `code` prop it already has, so it lives here rather than threaded in. It is
- * not the real publish flow (issue #1349, blocked on the hub growing a POST
- * endpoint) - it copies the code and opens the hub's publish page in the
- * system browser, leaving the actual pasting to the user. Gated on
- * `isHubEnabled()` so a distributor can turn the hub off entirely.
+ * Publishing to the Coilbox hub (issue #1349) needs nothing from the caller
+ * either: unlike `onExportFile`, every caller wants the identical action on the
+ * identical `code` prop it already has, so `PublishSection` is rendered here
+ * rather than threaded in. It owns its own gating, including `isHubEnabled()`
+ * so a distributor can turn the hub off entirely.
  */
 export function ChallengeCodeView({
   code,
@@ -46,7 +42,6 @@ export function ChallengeCodeView({
   const [copied, setCopied] = useState(false);
   const [fileBusy, setFileBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
-  const hubUrl = useHubUrl();
 
   // A link caps the code at `MAX_CODE_LENGTH`, well below what a pasted code may
   // be, because a URL passes through software that truncates long ones. A
@@ -63,20 +58,6 @@ export function ChallengeCodeView({
     } catch {
       // clipboard may be unavailable, so the code is still selectable in the box.
     }
-  };
-
-  // Same clipboard write as `copy`, called directly from the click handler so
-  // it stays inside the user gesture macOS requires for a clipboard write - an
-  // effect or a `.then` continuation loses it. The hub page opens regardless of
-  // whether the write succeeded: the code is still in the box above to copy by
-  // hand.
-  const publishToHub = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-    } catch {
-      // clipboard may be unavailable, so the code is still selectable in the box.
-    }
-    openExternal(`${hubUrl}/publish`);
   };
 
   const exportFile = async () => {
@@ -137,18 +118,7 @@ export function ChallengeCodeView({
           {fileBusy ? "Exporting…" : "Export as file"}
         </Button>
       )}
-      {isHubEnabled() && (
-        <div className="flex flex-col gap-1.5 border-t pt-3">
-          <Button variant="outline" onClick={publishToHub}>
-            <Globe className="mr-1.5 size-4" aria-hidden /> Copy code & open hub
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Copies the code to your clipboard, then opens the hub's publish page
-            in your browser. Coilbox doesn't upload anything itself - paste the
-            code in there to finish.
-          </p>
-        </div>
-      )}
+      <PublishSection code={code} />
     </div>
   );
 }
