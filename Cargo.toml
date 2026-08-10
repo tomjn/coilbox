@@ -11,6 +11,7 @@ members = [
   "crates/coilbox-springlua",
   "crates/coilbox-thumb-cache",
   "crates/coilbox-unitsync-worker",
+  "crates/coilbox-oauth",
   "crates/tauri-plugin-coilbox-downloads",
   "crates/tauri-plugin-coilbox-uberstress",
   "crates/tauri-plugin-coilbox-mapconv",

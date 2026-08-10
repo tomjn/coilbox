@@ -626,6 +626,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-oauth"
+version = "0.0.0"
+dependencies = [
+ "base64 0.22.1",
+ "getrandom 0.3.4",
+ "reqwest 0.12.28",
+ "serde_json",
+ "sha2 0.10.9",
+ "tauri-plugin-coilbox-lobby-servers",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "coilbox-portable"
 version = "0.0.0"
 dependencies = [
@@ -5055,21 +5069,18 @@ dependencies = [
 name = "tauri-plugin-coilbox-multiplayer"
 version = "0.0.0"
 dependencies = [
- "base64 0.22.1",
  "coilbox-lobby-protocol",
+ "coilbox-oauth",
  "coilbox-portable",
  "coilbox-tachyon-protocol",
  "futures-util",
- "getrandom 0.3.4",
  "picoframe-core",
  "reqwest 0.12.28",
  "rustls",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "tauri",
  "tauri-plugin",
- "tauri-plugin-coilbox-lobby-servers",
  "tauri-plugin-opener",
  "tokio",
  "tokio-rustls",

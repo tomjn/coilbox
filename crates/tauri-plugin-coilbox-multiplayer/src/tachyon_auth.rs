@@ -1,40 +1,27 @@
 //! Signing in to a Tachyon server through the system browser.
 //!
-//! Tachyon has no password grant and no device code flow, so the only interactive
-//! sign-in is OAuth 2.0 authorization code with PKCE and a loopback redirect, as
-//! profiled by RFC 8252 for native apps. This module owns that flow and nothing
-//! above it: it discovers the server's endpoints, runs the browser handoff,
-//! exchanges the code for tokens, refreshes them, and keeps the refresh token in
-//! the OS keychain. Opening the WebSocket with the access token is later work.
-//!
-//! Four rules shape the code.
+//! The flow itself lives in `coilbox-oauth`: PKCE, the loopback listener, the
+//! `state` check, the token request and the keychain. What is here is the part that
+//! is Tachyon's own. It discovers the server's endpoints from its RFC 8414
+//! document, names the client and scope on the authorization URL, and posts the
+//! form-encoded grants Teiserver expects.
 //!
 //! Nothing is hardcoded except the well-known discovery path. The authorization and
-//! token endpoints come from the server's RFC 8414 document, and the document's
+//! token endpoints come from the server's own document, and the document's
 //! `Cache-Control` header decides whether we may reuse it. Production answers
 //! `max-age=0`, so in practice every attempt refetches.
 //!
-//! The loopback listener is the soft spot in this flow, because any process on the
-//! machine can post to it. So [`sign_in`] sends a random `state` and refuses a
-//! callback that does not carry the same value back.
-//!
-//! The browser is only ever handed a URL on the origin we just discovered. A
-//! discovery document that pointed the authorization endpoint somewhere else would
-//! otherwise send the user's credentials to that somewhere else.
-//!
 //! Nothing here logs a token, an authorization code or a PKCE verifier, and none of
-//! the three crosses the Tauri IPC boundary. [`Tokens`] redacts itself when printed
-//! so a stray `{:?}` cannot leak one either.
+//! the three crosses the Tauri IPC boundary.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use base64::Engine as _;
+use coilbox_oauth::{
+    post_token, AuthError, AuthRequest, TokenBody, TokenRequest, Tokens, HTTP_TIMEOUT,
+};
 use serde_json::Value;
-use sha2::{Digest as _, Sha256};
-use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
-use tokio::net::{TcpListener, TcpStream};
 use url::Url;
 
 /// The public client every lobby may use. Teiserver creates it at setup time, so it
@@ -50,141 +37,11 @@ const SCOPE: &str = "tachyon.lobby";
 /// returns.
 const DISCOVERY_PATH: &str = "/.well-known/oauth-authorization-server";
 
-/// Path the browser is redirected back to. The generic client registers
-/// `http://localhost/oauth2callback` with no port, and Teiserver skips the port
-/// comparison when both sides are loopback, so an ephemeral port matches.
-const CALLBACK_PATH: &str = "/oauth2callback";
-
-/// How long the loopback listener waits for the browser before giving up. The
-/// reference client uses a minute, and an abandoned sign-in must not leave a
-/// listener bound for the rest of the session.
-const CALLBACK_TIMEOUT: Duration = Duration::from_secs(60);
-
-/// Budget for a single request to the server, discovery or token.
-const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
-
-/// Refresh an access token this long before it expires, so a token that is about to
-/// lapse is not handed to a connect that then fails mid-handshake.
-const REFRESH_MARGIN: Duration = Duration::from_secs(60);
-
-/// Why a sign-in did not produce a token.
-#[derive(Debug)]
-pub enum AuthError {
-    /// The discovery document was missing, unreadable, or lacked something we need.
-    Discovery(String),
-    /// A request to the server failed before it could answer.
-    Http(String),
-    /// The loopback listener could not be bound or read.
-    Listener(String),
-    /// The browser came back to the callback without the parameters we need.
-    BadCallback(String),
-    /// The callback carried a `state` that was not the one we sent, so it did not
-    /// come from the sign-in we started.
-    StateMismatch,
-    /// The authorization server redirected back with an error instead of a code,
-    /// most often because the user cancelled.
-    Denied {
-        error: String,
-        description: Option<String>,
-    },
-    /// Nobody hit the callback within [`CALLBACK_TIMEOUT`].
-    TimedOut,
-    /// The system browser would not open.
-    Browser(String),
-    /// The token endpoint answered with an OAuth error.
-    Token {
-        error: String,
-        description: Option<String>,
-    },
-    /// The OS keychain refused to store or return the refresh token.
-    Storage(String),
-    /// There is no stored refresh token for this account, so the user has to sign
-    /// in through the browser again.
-    NotSignedIn,
-    /// The server would not take the stored refresh token, so it is of no further
-    /// use and the user has to sign in through the browser again.
-    SignInRefused(String),
-}
-
-impl AuthError {
-    /// Whether the only way past this failure is another trip through the browser.
-    ///
-    /// This is what separates a connect worth retrying from one that never will
-    /// be. A refresh grant is refused with an HTTP 400 and an OAuth error body,
-    /// and RFC 6749 gives every one of those a cause the client cannot fix:
-    /// the grant is expired, revoked, or was never ours. Teiserver flattens them
-    /// all to `invalid_request`, so the error name is no help and the shape of
-    /// the answer is what we go on.
-    ///
-    /// Everything else stays retryable. A server that is down, slow, or answering
-    /// 5xx will work again on its own.
-    pub fn needs_sign_in(&self) -> bool {
-        matches!(
-            self,
-            Self::NotSignedIn | Self::SignInRefused(_) | Self::Token { .. }
-        )
-    }
-}
-
-impl std::fmt::Display for AuthError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Discovery(m) => write!(f, "the server did not describe its sign-in: {m}"),
-            Self::Http(m) => write!(f, "could not reach the server: {m}"),
-            Self::Listener(m) => write!(f, "could not listen for the browser: {m}"),
-            Self::BadCallback(m) => write!(f, "the browser came back with {m}"),
-            Self::StateMismatch => {
-                write!(f, "the sign-in that came back was not the one we started")
-            }
-            Self::Denied { error, description } => match description {
-                Some(d) => write!(f, "sign-in refused: {error}: {d}"),
-                None => write!(f, "sign-in refused: {error}"),
-            },
-            Self::TimedOut => write!(f, "the sign-in was not finished in time"),
-            Self::Browser(m) => write!(f, "could not open the browser: {m}"),
-            Self::Token { error, description } => match description {
-                Some(d) => write!(f, "the server refused the token request: {error}: {d}"),
-                None => write!(f, "the server refused the token request: {error}"),
-            },
-            Self::Storage(m) => write!(f, "keychain error: {m}"),
-            Self::NotSignedIn => write!(f, "not signed in to this server"),
-            Self::SignInRefused(m) => {
-                write!(f, "the server would not accept your sign-in: {m}")
-            }
-        }
-    }
-}
-
 /// The endpoints we take from the discovery document, and nothing else.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Endpoints {
     pub authorization: String,
     pub token: String,
-}
-
-/// An access token with the refresh token that will replace it.
-///
-/// `Debug` prints placeholders. The whole point of this type is to carry two
-/// secrets, and a struct that carries secrets should not be printable by accident.
-#[derive(Clone)]
-pub struct Tokens {
-    pub access: String,
-    pub refresh: String,
-    /// When the access token stops working.
-    pub expires_at: Instant,
-}
-
-impl std::fmt::Debug for Tokens {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Tokens")
-            .field("access", &"<redacted>")
-            .field("refresh", &"<redacted>")
-            .field(
-                "expires_in",
-                &self.expires_at.saturating_duration_since(Instant::now()),
-            )
-            .finish()
-    }
 }
 
 // ---------------------------------------------------------------- discovery
@@ -297,271 +154,33 @@ pub async fn discover(base_url: &str) -> Result<Endpoints, AuthError> {
     Ok(endpoints)
 }
 
-// --------------------------------------------------------------------- PKCE
-
-/// A PKCE verifier and the challenge derived from it.
-///
-/// `Debug` is deliberately not derived. The verifier is the secret half.
-pub struct Pkce {
-    verifier: String,
-    challenge: String,
-}
-
-impl Pkce {
-    /// 32 bytes from the OS random source, base64url encoded to a 43 character
-    /// verifier, which is the length RFC 7636 recommends.
-    fn generate() -> Result<Self, AuthError> {
-        let verifier = random_token(32)?;
-        let challenge = challenge_for(&verifier);
-        Ok(Self {
-            verifier,
-            challenge,
-        })
-    }
-}
-
-/// `base64url(sha256(verifier))` with no padding, which is the `S256` method.
-fn challenge_for(verifier: &str) -> String {
-    let digest = Sha256::digest(verifier.as_bytes());
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(digest)
-}
-
-/// `len` bytes from the OS random source, base64url encoded without padding.
-/// `getrandom` reads the platform CSPRNG, so this is safe for a PKCE verifier and
-/// for `state`.
-fn random_token(len: usize) -> Result<String, AuthError> {
-    let mut bytes = vec![0u8; len];
-    getrandom::fill(&mut bytes)
-        .map_err(|e| AuthError::Listener(format!("no random source: {e}")))?;
-    Ok(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes))
-}
-
-// --------------------------------------------------------- loopback listener
-
-/// The page the browser is left showing. Plain, because it is rendered by whatever
-/// browser the user happens to have and nobody reads it twice.
-const CLOSE_PAGE: &str = "<!doctype html><html><head><meta charset=\"utf-8\"><title>Signed in</title></head><body><p>Coilbox has your sign-in. You can close this window.</p></body></html>";
-
-/// Write one HTTP response and close. Anything the browser sends after this is of
-/// no interest to us.
-async fn respond(sock: &mut TcpStream, status: &str, body: &str) {
-    let head = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        body.len()
-    );
-    let _ = sock.write_all(head.as_bytes()).await;
-    let _ = sock.write_all(body.as_bytes()).await;
-    let _ = sock.flush().await;
-}
-
-/// Read the request line of an HTTP request and return its target, for example
-/// `/oauth2callback?code=x`. Anything longer than 8 KiB before the first line break
-/// is not a browser and is dropped.
-async fn read_target(sock: &mut TcpStream) -> Option<String> {
-    let mut buf = Vec::new();
-    let mut chunk = [0u8; 512];
-    while !buf.windows(2).any(|w| w == b"\r\n") {
-        if buf.len() > 8192 {
-            return None;
-        }
-        match sock.read(&mut chunk).await {
-            Ok(0) | Err(_) => return None,
-            Ok(n) => buf.extend_from_slice(&chunk[..n]),
-        }
-    }
-    let line = String::from_utf8_lossy(&buf);
-    let line = line.split("\r\n").next()?;
-    let mut parts = line.split(' ');
-    let _method = parts.next()?;
-    Some(parts.next()?.to_owned())
-}
-
-/// Wait for the browser to arrive at the callback and return the authorization
-/// code.
-///
-/// The listener is already bound, so the caller could build the redirect URI before
-/// this is awaited. It answers every request it receives, because a browser left on
-/// an unanswered socket shows an error page rather than the one we wrote, but only
-/// a request to [`CALLBACK_PATH`] ends the wait.
-///
-/// A callback carrying the wrong `state` is refused rather than ignored. Ignoring
-/// it would leave the real browser able to finish, but it would also mean a process
-/// on this machine could keep guessing without us ever noticing.
-async fn wait_for_callback(
-    listener: TcpListener,
-    state: &str,
-    timeout: Duration,
-) -> Result<String, AuthError> {
-    let wait = async {
-        loop {
-            let (mut sock, _) = listener
-                .accept()
-                .await
-                .map_err(|e| AuthError::Listener(e.to_string()))?;
-            let Some(target) = read_target(&mut sock).await else {
-                respond(&mut sock, "400 Bad Request", "Bad request.").await;
-                continue;
-            };
-            // The target is a path, so it needs any origin to parse as a URL. Ours
-            // is the one it arrived on.
-            let Ok(url) = Url::parse(&format!("http://127.0.0.1{target}")) else {
-                respond(&mut sock, "400 Bad Request", "Bad request.").await;
-                continue;
-            };
-            if url.path() != CALLBACK_PATH {
-                respond(&mut sock, "404 Not Found", "Not found.").await;
-                continue;
-            }
-            let params: HashMap<String, String> = url.query_pairs().into_owned().collect();
-
-            if let Some(error) = params.get("error") {
-                respond(
-                    &mut sock,
-                    "200 OK",
-                    "<!doctype html><html><head><meta charset=\"utf-8\"></head><body><p>Sign-in did not finish. You can close this window and try again in Coilbox.</p></body></html>",
-                )
-                .await;
-                return Err(AuthError::Denied {
-                    error: error.clone(),
-                    description: params.get("error_description").cloned(),
-                });
-            }
-
-            if params.get("state").map(String::as_str) != Some(state) {
-                respond(
-                    &mut sock,
-                    "400 Bad Request",
-                    "This sign-in was not the one Coilbox started.",
-                )
-                .await;
-                return Err(AuthError::StateMismatch);
-            }
-
-            let Some(code) = params.get("code").filter(|c| !c.is_empty()) else {
-                respond(&mut sock, "400 Bad Request", "Bad request.").await;
-                return Err(AuthError::BadCallback("no code".into()));
-            };
-            let code = code.clone();
-            respond(&mut sock, "200 OK", CLOSE_PAGE).await;
-            return Ok(code);
-        }
-    };
-    match tokio::time::timeout(timeout, wait).await {
-        Ok(result) => result,
-        Err(_) => Err(AuthError::TimedOut),
-    }
-}
-
 // ------------------------------------------------------------- token requests
 
-/// POST a form to the token endpoint and read the tokens out of the answer.
-///
-/// `previous_refresh` is used when the server rotates nothing and leaves
-/// `refresh_token` out of a refresh response, which RFC 6749 allows.
-async fn post_token(
+/// Post one of Teiserver's grants. The body is form encoded, which the
+/// specification made explicit, and carries no client secret because the generic
+/// client has none.
+async fn grant(
     token_endpoint: &str,
     form: &[(&str, &str)],
     previous_refresh: Option<&str>,
 ) -> Result<Tokens, AuthError> {
-    let client = reqwest::Client::builder()
-        .timeout(HTTP_TIMEOUT)
-        .build()
-        .map_err(|e| AuthError::Http(e.to_string()))?;
-    let sent_at = Instant::now();
-    let resp = client
-        .post(token_endpoint)
-        .form(form)
-        .send()
-        .await
-        .map_err(|e| AuthError::Http(e.to_string()))?;
-    let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| AuthError::Http(e.to_string()))?;
-    let doc: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
-
-    // A 5xx is the server failing on its own side, not our request being wrong.
-    // Checked before the error body, because reading it as a refusal would send
-    // the user back to the browser over a fault that clears itself.
-    if status.is_server_error() {
-        return Err(AuthError::Http(format!(
-            "the token endpoint answered HTTP {}",
-            status.as_u16()
-        )));
-    }
-
-    if let Some(error) = doc.get("error").and_then(Value::as_str) {
-        return Err(AuthError::Token {
-            error: error.to_owned(),
-            description: doc
-                .get("error_description")
-                .and_then(Value::as_str)
-                .map(str::to_owned),
-        });
-    }
-    if !status.is_success() {
-        return Err(AuthError::Token {
-            error: format!("http_{}", status.as_u16()),
-            description: None,
-        });
-    }
-
-    let access = doc
-        .get("access_token")
-        .and_then(Value::as_str)
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| AuthError::Token {
-            error: "invalid_response".into(),
-            description: Some("no access_token".into()),
-        })?
-        .to_owned();
-    let refresh = doc
-        .get("refresh_token")
-        .and_then(Value::as_str)
-        .filter(|s| !s.is_empty())
-        .map(str::to_owned)
-        .or_else(|| previous_refresh.map(str::to_owned))
-        .ok_or_else(|| AuthError::Token {
-            error: "invalid_response".into(),
-            description: Some("no refresh_token".into()),
-        })?;
-    // Teiserver's access tokens last 30 minutes. A server that says nothing gets
-    // the shortest sensible assumption rather than an unbounded one.
-    let expires_in = doc.get("expires_in").and_then(Value::as_u64).unwrap_or(300);
-    Ok(Tokens {
-        access,
-        refresh,
-        expires_at: sent_at + Duration::from_secs(expires_in),
+    let answer = post_token(TokenRequest {
+        endpoint: token_endpoint,
+        body: TokenBody::Form(
+            form.iter()
+                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                .collect(),
+        ),
+        headers: vec![],
+        previous_refresh,
     })
-}
-
-/// Trade an authorization code for tokens. The body is form encoded, which the
-/// specification made explicit, and carries no client secret because the generic
-/// client has none.
-async fn exchange_code(
-    token_endpoint: &str,
-    code: &str,
-    verifier: &str,
-    redirect_uri: &str,
-) -> Result<Tokens, AuthError> {
-    post_token(
-        token_endpoint,
-        &[
-            ("client_id", CLIENT_ID),
-            ("grant_type", "authorization_code"),
-            ("code", code),
-            ("code_verifier", verifier),
-            ("redirect_uri", redirect_uri),
-        ],
-        None,
-    )
-    .await
+    .await?;
+    Ok(answer.tokens)
 }
 
 /// Trade a refresh token for a fresh access token.
 pub async fn refresh(token_endpoint: &str, refresh_token: &str) -> Result<Tokens, AuthError> {
-    post_token(
+    grant(
         token_endpoint,
         &[
             ("client_id", CLIENT_ID),
@@ -576,30 +195,18 @@ pub async fn refresh(token_endpoint: &str, refresh_token: &str) -> Result<Tokens
 // ----------------------------------------------------------------- the flow
 
 /// Build the authorization URL the browser is sent to.
-fn authorize_url(
-    endpoint: &str,
-    challenge: &str,
-    state: &str,
-    redirect_uri: &str,
-) -> Result<Url, AuthError> {
+fn authorize_url(endpoint: &str, request: &AuthRequest) -> Result<Url, AuthError> {
     let mut url = Url::parse(endpoint)
         .map_err(|e| AuthError::Discovery(format!("authorization_endpoint is not a URL: {e}")))?;
     url.query_pairs_mut()
         .append_pair("response_type", "code")
         .append_pair("client_id", CLIENT_ID)
         .append_pair("scope", SCOPE)
-        .append_pair("redirect_uri", redirect_uri)
-        .append_pair("state", state)
+        .append_pair("redirect_uri", &request.redirect_uri)
+        .append_pair("state", &request.state)
         .append_pair("code_challenge_method", "S256")
-        .append_pair("code_challenge", challenge);
+        .append_pair("code_challenge", &request.challenge);
     Ok(url)
-}
-
-/// Whether two URLs share a scheme, host and port.
-fn same_origin(a: &Url, b: &Url) -> bool {
-    a.scheme() == b.scheme()
-        && a.host() == b.host()
-        && a.port_or_known_default() == b.port_or_known_default()
 }
 
 /// Run the whole browser sign-in against the server at `base_url`.
@@ -612,96 +219,34 @@ where
 {
     let base = base_url.trim_end_matches('/').to_owned();
     let endpoints = discover(&base).await?;
-
-    // Bind before the browser opens, so the redirect URI in the authorization
-    // request names a port that is already listening.
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .map_err(|e| AuthError::Listener(e.to_string()))?;
-    let port = listener
-        .local_addr()
-        .map_err(|e| AuthError::Listener(e.to_string()))?
-        .port();
-    let redirect_uri = format!("http://127.0.0.1:{port}{CALLBACK_PATH}");
-
-    let pkce = Pkce::generate()?;
-    let state = random_token(16)?;
-    let url = authorize_url(
-        &endpoints.authorization,
-        &pkce.challenge,
-        &state,
-        &redirect_uri,
-    )?;
-
-    // The guard the reference client uses, with teeth. Checking the URL we built
-    // against the endpoint we built it from proves little on its own, so the origin
-    // both must be on is the server's own. A discovery document that named an
-    // authorization endpoint elsewhere would otherwise put the user's password into
-    // a sign-in page of somebody else's choosing.
-    let server =
-        Url::parse(&base).map_err(|e| AuthError::Discovery(format!("{base} is not a URL: {e}")))?;
-    if !same_origin(&url, &server) {
-        return Err(AuthError::Browser(format!(
-            "refusing to open {}, which is not on {}",
-            url.origin().ascii_serialization(),
-            server.origin().ascii_serialization()
-        )));
-    }
-    open_browser(url.as_str()).map_err(AuthError::Browser)?;
-
-    let code = wait_for_callback(listener, &state, CALLBACK_TIMEOUT).await?;
-    exchange_code(&endpoints.token, &code, &pkce.verifier, &redirect_uri).await
+    let authorization = coilbox_oauth::authorize(
+        &base,
+        |request| authorize_url(&endpoints.authorization, request),
+        open_browser,
+    )
+    .await?;
+    grant(
+        &endpoints.token,
+        &[
+            ("client_id", CLIENT_ID),
+            ("grant_type", "authorization_code"),
+            ("code", &authorization.code),
+            ("code_verifier", &authorization.verifier),
+            ("redirect_uri", &authorization.redirect_uri),
+        ],
+        None,
+    )
+    .await
 }
 
 // -------------------------------------------------------------- token store
 
-/// Access tokens held for the life of the process, keyed the way the keychain is.
-/// These are never written to disk. A restart signs back in from the stored refresh
-/// token instead.
-static ACCESS_TOKENS: OnceLock<Mutex<HashMap<String, Tokens>>> = OnceLock::new();
-
-fn access_tokens() -> &'static Mutex<HashMap<String, Tokens>> {
-    ACCESS_TOKENS.get_or_init(Default::default)
-}
-
-/// Accounts whose stored refresh token the server has refused, keyed the way the
-/// keychain is.
-///
-/// The refusal is remembered rather than acted on, because we cannot tell a
-/// revoked token from a server that has misread one, and deleting somebody's
-/// sign-in on a bad guess is not ours to do. Remembering it is enough: it stops a
-/// reconnect loop retrying a grant that will be refused again, and
-/// [`signed_in`] reports the account as needing the browser. A fresh sign-in
-/// clears it, and so does a restart.
-static REFUSED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-
-fn refused() -> &'static Mutex<HashSet<String>> {
-    REFUSED.get_or_init(Default::default)
-}
-
-/// Whether a connect can get a token without opening a browser: something is
-/// stored for this account and the server has not refused it.
+/// Whether a connect can get a token without opening a browser.
 ///
 /// This is what tells an auto-reconnect to stop rather than retry. A dropped
 /// connection is worth another go, a sign-in the server will not take is not.
 pub fn signed_in(server_id: &str, username: &str) -> Result<bool, AuthError> {
-    let key = format!("{server_id}:{username}");
-    if refused().lock().unwrap().contains(&key) {
-        return Ok(false);
-    }
-    let stored = tauri_plugin_coilbox_lobby_servers::get_credential(server_id, username)
-        .map_err(AuthError::Storage)?;
-    Ok(stored.is_some())
-}
-
-/// Whether an access token has enough life left to open a connection with.
-///
-/// [`REFRESH_MARGIN`] is the gap, so a token that is about to lapse is refreshed
-/// rather than handed to an upgrade that then fails. Teiserver only checks the
-/// token on that upgrade and never again, so a connection that opens outlives
-/// the token that opened it and this margin is the only deadline that matters.
-fn usable(tokens: &Tokens, now: Instant) -> bool {
-    tokens.expires_at > now + REFRESH_MARGIN
+    coilbox_oauth::signed_in(server_id, username)
 }
 
 /// Sign in and keep the result: the refresh token to the OS keychain, the access
@@ -716,29 +261,18 @@ where
     F: FnOnce(&str) -> Result<(), String>,
 {
     let tokens = sign_in(base_url, open_browser).await?;
-    let key = format!("{server_id}:{username}");
-    tauri_plugin_coilbox_lobby_servers::store_credential(server_id, username, &tokens.refresh)
-        .map_err(AuthError::Storage)?;
-    // A refusal is about the token that has just been replaced, so it goes with it.
-    refused().lock().unwrap().remove(&key);
-    access_tokens().lock().unwrap().insert(key, tokens);
-    Ok(())
+    coilbox_oauth::remember(server_id, username, tokens)
 }
 
 /// Forget an account here: the stored refresh token and any access token in
 /// memory.
 ///
-/// Here is as far as it goes. RFC 7009 revocation is what would tell the server
-/// to throw its copy away, and Teiserver implements no revocation endpoint and
-/// advertises none in its metadata, so the refresh token stays valid on the
-/// server for its full hundred years. Signing out means this machine can no
-/// longer use it, not that it has stopped working.
+/// Here is as far as it goes. Teiserver implements no RFC 7009 revocation endpoint
+/// and advertises none in its metadata, so the refresh token stays valid on the
+/// server for its full hundred years. Signing out means this machine can no longer
+/// use it, not that it has stopped working.
 pub fn sign_out(server_id: &str, username: &str) -> Result<(), AuthError> {
-    let key = format!("{server_id}:{username}");
-    access_tokens().lock().unwrap().remove(&key);
-    refused().lock().unwrap().remove(&key);
-    tauri_plugin_coilbox_lobby_servers::delete_credential(server_id, username)
-        .map_err(AuthError::Storage)
+    coilbox_oauth::forget(server_id, username)
 }
 
 /// An access token good for the next minute at least, refreshed from the stored
@@ -754,45 +288,21 @@ pub async fn access_token(
     server_id: &str,
     username: &str,
 ) -> Result<String, AuthError> {
-    let key = format!("{server_id}:{username}");
-    if let Some(tokens) = access_tokens().lock().unwrap().get(&key) {
-        if usable(tokens, Instant::now()) {
-            return Ok(tokens.access.clone());
-        }
-    }
-    if refused().lock().unwrap().contains(&key) {
-        return Err(AuthError::SignInRefused(
-            "it was refused earlier this session".into(),
-        ));
-    }
-    let stored = tauri_plugin_coilbox_lobby_servers::get_credential(server_id, username)
-        .map_err(AuthError::Storage)?
-        .ok_or(AuthError::NotSignedIn)?;
-    let endpoints = discover(base_url).await?;
-    let tokens = refresh(&endpoints.token, &stored).await.map_err(|error| {
-        // A refused grant is refused for good, so remember it rather than let a
-        // reconnect loop ask again every few seconds until it gives up.
-        if error.needs_sign_in() {
-            refused().lock().unwrap().insert(key.clone());
-            return AuthError::SignInRefused(error.to_string());
-        }
-        error
-    })?;
-    // Teiserver's refresh tokens do not rotate today, but a server that starts
-    // rotating them would otherwise leave us holding a dead one.
-    if tokens.refresh != stored {
-        tauri_plugin_coilbox_lobby_servers::store_credential(server_id, username, &tokens.refresh)
-            .map_err(AuthError::Storage)?;
-    }
-    let access = tokens.access.clone();
-    access_tokens().lock().unwrap().insert(key, tokens);
-    Ok(access)
+    let base_url = base_url.to_owned();
+    coilbox_oauth::access_token(server_id, username, |stored| async move {
+        let endpoints = discover(&base_url).await?;
+        refresh(&endpoints.token, &stored).await
+    })
+    .await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use coilbox_oauth::challenge_for;
     use std::sync::Arc;
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    use tokio::net::{TcpListener, TcpStream};
 
     /// What the stand-in authorization server should do, and what it saw. One
     /// struct because every test tweaks one field of it and reads another back.
@@ -818,8 +328,6 @@ mod tests {
         token_form: HashMap<String, String>,
         /// Makes the token endpoint answer with this OAuth error instead.
         token_error: Option<&'static str>,
-        /// Makes the token endpoint fail on its own side with an HTTP 500.
-        token_fault: bool,
         /// Makes the token endpoint leave `refresh_token` out of its answer.
         omit_refresh: bool,
     }
@@ -920,10 +428,6 @@ mod tests {
                         return;
                     }
                     if target.starts_with("/oauth/token") {
-                        if shared.lock().unwrap().token_fault {
-                            write_response(&mut sock, "500 Internal Server Error", "", "{}").await;
-                            return;
-                        }
                         let form: HashMap<String, String> =
                             url::form_urlencoded::parse(body.as_bytes())
                                 .into_owned()
@@ -1004,27 +508,6 @@ mod tests {
 
     fn good_callback(state: &str) -> String {
         format!("code=an-authorization-code&state={state}")
-    }
-
-    // ------------------------------------------------------------------ PKCE
-
-    /// The RFC 7636 appendix B vector. Self-consistency would not catch a base64
-    /// alphabet or padding mistake, and this does.
-    #[test]
-    fn s256_challenge_matches_the_rfc_7636_vector() {
-        assert_eq!(
-            challenge_for("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
-            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
-        );
-    }
-
-    #[test]
-    fn a_generated_verifier_is_43_characters_and_never_repeats() {
-        let a = Pkce::generate().unwrap();
-        let b = Pkce::generate().unwrap();
-        assert_eq!(a.verifier.len(), 43);
-        assert_ne!(a.verifier, b.verifier);
-        assert_eq!(a.challenge, challenge_for(&a.verifier));
     }
 
     // ------------------------------------------------------------- discovery
@@ -1145,27 +628,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn sign_in_surfaces_an_error_redirect_rather_than_waiting_it_out() {
-        let shared = Shared::default();
-        let base = start(shared.clone()).await;
-        let err = sign_in(
-            &base,
-            browser(shared, |state| {
-                format!("error=access_denied&error_description=The+user+said+no&state={state}")
-            }),
-        )
-        .await
-        .unwrap_err();
-        match err {
-            AuthError::Denied { error, description } => {
-                assert_eq!(error, "access_denied");
-                assert_eq!(description.as_deref(), Some("The user said no"));
-            }
-            other => panic!("expected a denial, got {other:?}"),
-        }
-    }
-
-    #[tokio::test]
     async fn sign_in_refuses_to_send_the_browser_off_the_server_s_own_origin() {
         let shared = Shared::default();
         shared.lock().unwrap().authorization_override =
@@ -1177,34 +639,7 @@ mod tests {
         assert!(matches!(err, AuthError::Browser(_)), "{err:?}");
     }
 
-    #[tokio::test]
-    async fn the_listener_gives_up_rather_than_waiting_for_a_browser_that_never_comes() {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let err = wait_for_callback(listener, "some-state", Duration::from_millis(50))
-            .await
-            .unwrap_err();
-        assert!(matches!(err, AuthError::TimedOut), "{err:?}");
-    }
-
     // ----------------------------------------------------------------- tokens
-
-    #[tokio::test]
-    async fn a_token_endpoint_error_is_surfaced_with_its_description() {
-        let shared = Shared::default();
-        shared.lock().unwrap().token_error = Some("invalid_grant");
-        let base = start(shared.clone()).await;
-        let endpoints = discover(&base).await.unwrap();
-        let err = refresh(&endpoints.token, "a-stale-refresh-token")
-            .await
-            .unwrap_err();
-        match err {
-            AuthError::Token { error, description } => {
-                assert_eq!(error, "invalid_grant");
-                assert_eq!(description.as_deref(), Some("the stand-in server said no"));
-            }
-            other => panic!("expected a token error, got {other:?}"),
-        }
-    }
 
     #[tokio::test]
     async fn refreshing_sends_the_refresh_grant_and_returns_a_new_access_token() {
@@ -1250,70 +685,6 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.needs_sign_in(), "{err:?}");
-    }
-
-    /// The other half of that call. A server failing on its own side says nothing
-    /// about the sign-in, so reading it as a refusal would send the user to the
-    /// browser over a fault that clears itself.
-    #[tokio::test]
-    async fn a_server_fault_leaves_the_sign_in_alone() {
-        let shared = Shared::default();
-        shared.lock().unwrap().token_fault = true;
-        let base = start(shared.clone()).await;
-        let endpoints = discover(&base).await.unwrap();
-        let err = refresh(&endpoints.token, "a-good-refresh-token")
-            .await
-            .unwrap_err();
-        assert!(
-            matches!(&err, AuthError::Http(m) if m.contains("500")),
-            "{err:?}"
-        );
-        assert!(!err.needs_sign_in(), "{err:?}");
-    }
-
-    /// So does a server nobody can reach, which is the ordinary case a reconnect
-    /// loop exists for.
-    #[tokio::test]
-    async fn a_token_endpoint_that_answers_nothing_leaves_the_sign_in_alone() {
-        // Bound and drop a listener, so the port is one nothing is listening on.
-        let dead = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let port = dead.local_addr().unwrap().port();
-        drop(dead);
-        let err = refresh(&format!("http://127.0.0.1:{port}/oauth/token"), "a-token")
-            .await
-            .unwrap_err();
-        assert!(matches!(err, AuthError::Http(_)), "{err:?}");
-        assert!(!err.needs_sign_in(), "{err:?}");
-    }
-
-    /// The only deadline that matters. Teiserver checks the token on the HTTP
-    /// upgrade and never again, so a token is refreshed to open a connection with,
-    /// not to keep one alive.
-    #[test]
-    fn a_token_inside_the_margin_is_refreshed_rather_than_used() {
-        let now = Instant::now();
-        let token = |life: Duration| Tokens {
-            access: "an-access-token".into(),
-            refresh: "a-refresh-token".into(),
-            expires_at: now + life,
-        };
-        // What a fresh Teiserver access token looks like.
-        assert!(usable(&token(Duration::from_secs(1800)), now));
-        assert!(usable(&token(REFRESH_MARGIN * 2), now));
-        // Still valid, but not for long enough to hand to a connect.
-        assert!(!usable(&token(REFRESH_MARGIN / 2), now));
-        assert!(!usable(&token(Duration::ZERO), now));
-    }
-
-    #[test]
-    fn tokens_do_not_print_themselves() {
-        let tokens = Tokens {
-            access: "secret-access".into(),
-            refresh: "secret-refresh".into(),
-            expires_at: Instant::now(),
-        };
-        let printed = format!("{tokens:?}");
-        assert!(!printed.contains("secret"), "{printed}");
     }
 
     /// Read the real Beyond All Reason server's discovery document. It needs no

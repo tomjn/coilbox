@@ -1,0 +1,23 @@
+[package]
+name = "coilbox-oauth"
+version = "0.0.0"
+description = "The OAuth 2.0 browser sign-in coilbox uses for every service: PKCE, a loopback redirect per RFC 8252, the token request, and the OS keychain the refresh token lands in."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# Where a refresh token is kept. That crate is a thin keyring wrapper, and the
+# note on SERVICE in account.rs says why its lobby name is reused here.
+tauri-plugin-coilbox-lobby-servers = { path = "../tauri-plugin-coilbox-lobby-servers" }
+serde_json = "1"
+# rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
+# picks it.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+url = "2"
+sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.3"
+tokio = { version = "1", features = ["net", "io-util", "rt", "time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
