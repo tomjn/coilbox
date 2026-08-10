@@ -1,9 +1,10 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Play } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { useUnitsyncScan } from "@/content/config";
 import { useImportParam } from "@/deeplink/useImportParam";
+import { useOneShotParam } from "@/deeplink/useOneShotParam";
 import { useRecordHubImport } from "@/hub/imports";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
@@ -15,7 +16,7 @@ import {
 import { scenarioLaunchBlocker } from "../launch";
 import { isSetUp, playableScenarios, scenarioContents } from "../listing";
 import type { Scenario } from "../model";
-import { useScenarios } from "../scenarios";
+import { scenarioRoute, useScenarios } from "../scenarios";
 import { ScenarioImportButton } from "./components/ScenarioImportButton";
 import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
 
@@ -59,7 +60,7 @@ export default function ScenariosPage() {
   // game and map is not listed here at all, so say that rather than leave the
   // player looking for a row that never arrives.
   const imported = (scenario: Scenario) => {
-    recordHubImport(hubItemId, [scenario.id], "/scenarios");
+    recordHubImport(hubItemId, [scenario.id], scenarioRoute(scenario.id));
     return isSetUp(scenario)
       ? toast.success(`${scenario.name} is ready to play.`)
       : toast.warning(
@@ -86,6 +87,27 @@ export default function ScenariosPage() {
       width: "32rem",
       content: <ScenarioTestDrawer scenario={scenario} mode="play" />,
     });
+
+  // Opening one scenario by address (issue #1372, `scenarioRoute`): the same
+  // drawer its row's Play button opens, so a link and the row end in the same
+  // place. Waits for the list, and says what happened when the id names a
+  // scenario that is not here, or one stored without a game and map, either of
+  // which would otherwise leave the player on a list with no row to find.
+  const openScenarioId = useOneShotParam("scenario");
+  const opened = useRef<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once per id, guarded by the ref rather than by the drawer's identity
+  useEffect(() => {
+    if (!openScenarioId || loading) return;
+    if (opened.current === openScenarioId) return;
+    opened.current = openScenarioId;
+    const scenario = playable.find((s) => s.id === openScenarioId);
+    if (scenario) return void openPlay(scenario);
+    toast.warning(
+      scenarios.some((l) => l.scenario.id === openScenarioId)
+        ? "That scenario names no game and map, so there is nothing to play yet."
+        : "That scenario isn't here any more. It may have been deleted.",
+    );
+  }, [openScenarioId, loading, playable, scenarios]);
 
   return (
     <div className="flex flex-col gap-4 p-4">

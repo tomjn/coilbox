@@ -13,9 +13,9 @@
 import { useSetting } from "@picoframe/frame";
 import { useCallback, useMemo, useRef } from "react";
 import { useGalaxies } from "@/conquest/conquests";
-import { useSkirmishPresets } from "@/play/presets";
+import { presetRoute, useSkirmishPresets } from "@/play/presets";
 import { useRuns } from "@/runlite/runs";
-import { useScenarios } from "@/scenario/scenarios";
+import { scenarioRoute, useScenarios } from "@/scenario/scenarios";
 import type { HubItem } from "./api";
 import {
   HUB_IMPORTS_KEY,
@@ -101,7 +101,18 @@ export function useHubItemPresence(): (item: HubItem) => HubItemPresence {
             : // A preset, and a setup pack's bundled presets, land in the
               // same store.
               presetIds;
-      return presenceOf(byId.get(item.id), local);
+      // A challenge's recorded route already names its galaxy or its run, so
+      // only the other kinds need an address building for them (issue #1372).
+      // A setup pack opens the first of its presets that is still here: the
+      // presets are all it left behind, and they are what says it is here at
+      // all, so Open lands on the same thing that answer is about.
+      const routeFor =
+        item.kind === "scenario"
+          ? scenarioRoute
+          : item.kind === "challenge"
+            ? undefined
+            : presetRoute;
+      return presenceOf(byId.get(item.id), local, routeFor);
     },
     [byId, presetIds, galaxyIds, runIds, scenarioIds],
   );
