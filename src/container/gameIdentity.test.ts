@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   gameIdentityForName,
   gameIdentityFromPayload,
   type InstalledGameInfo,
   parseGameIdentity,
 } from "./gameIdentity";
+import { rememberShortnames, resetShortnames } from "./shortnames";
 
 describe("parseGameIdentity", () => {
   it("reads both spellings side by side", () => {
@@ -44,6 +45,8 @@ describe("gameIdentityForName", () => {
     { name: "No modinfo", info: {} },
   ];
 
+  beforeEach(resetShortnames);
+
   it("fills the shortname in from the installed game's modinfo", () => {
     expect(gameIdentityForName("BAR 1.2", installed)).toEqual({
       name: "BAR 1.2",
@@ -62,6 +65,47 @@ describe("gameIdentityForName", () => {
 
   it("rejects an empty name", () => {
     expect(gameIdentityForName("", installed)).toBeNull();
+  });
+
+  // Issue #1364: a mod's installed archive moves to a new exact name when it
+  // updates, so pinning the build the player set the battle up on is enough to
+  // lose the shortname on a machine that has read that game's modinfo.
+  it("keeps the shortname when the pinned build has been superseded", () => {
+    rememberShortnames([
+      { name: "SplinterFaction 0.1.77", info: { shortname: "SF" } },
+    ]);
+    const nowInstalled: InstalledGameInfo[] = [
+      { name: "SplinterFaction 0.1.78", info: { shortname: "SF" } },
+    ];
+    expect(gameIdentityForName("SplinterFaction 0.1.77", nowInstalled)).toEqual(
+      {
+        name: "SplinterFaction 0.1.77",
+        shortname: "SF",
+      },
+    );
+  });
+
+  it("keeps pinning the build the item names, not the one installed now", () => {
+    rememberShortnames([
+      { name: "SplinterFaction 0.1.77", info: { shortname: "SF" } },
+    ]);
+    expect(gameIdentityForName("SplinterFaction 0.1.77", [])?.name).toBe(
+      "SplinterFaction 0.1.77",
+    );
+  });
+
+  it("prefers what the scan says now over what was read before", () => {
+    rememberShortnames([{ name: "BAR 1.2", info: { shortname: "stale" } }]);
+    expect(gameIdentityForName("BAR 1.2", installed)).toEqual({
+      name: "BAR 1.2",
+      shortname: "BAR",
+    });
+  });
+
+  it("still names a game coilbox has never read a modinfo for by name alone", () => {
+    expect(gameIdentityForName("Never seen 1.0", installed)).toEqual({
+      name: "Never seen 1.0",
+    });
   });
 });
 
