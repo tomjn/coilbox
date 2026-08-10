@@ -476,9 +476,11 @@ export default function BrowsePage() {
 
 /**
  * What a card offers, which depends on whether you already have the item
- * (issue #1368). Something already imported leads with Open, because fetching a
- * second copy is almost never what was wanted. Importing again stays right
- * there, because sometimes it is.
+ * (issue #1368). Something already imported offers only Open. A second copy is
+ * not a thing anybody asked for: an imported preset that has since been edited
+ * is a new preset with no tie back to the hub item, so "import again" answered a
+ * question nobody had. Somebody who does want a fresh copy can remove theirs
+ * from the item's own page and import it.
  */
 function ItemActions({
   item,
@@ -507,22 +509,13 @@ function ItemActions({
     return (
       <div className="mt-auto flex gap-2">
         <Button
+          variant="outline"
           size="sm"
           className="flex-1"
           onClick={() => onOpen(presence.route)}
           aria-label={`Open ${item.title}`}
         >
           <ArrowRight /> Open
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onImport}
-          disabled={busy}
-          aria-label={`Import another copy of ${item.title}`}
-        >
-          {importIcon}
-          {fetching ? "Fetching…" : "Import again"}
         </Button>
       </div>
     );

@@ -277,27 +277,31 @@ export default function ItemPage() {
 
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2">
-                {presence.state === "here" && (
-                  <Button onClick={() => navigate(presence.route)}>
+                {presence.state === "here" ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate(presence.route)}
+                  >
                     <ArrowRight /> Open
                   </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      checked
+                        ? navigate(withHubItem(checked.plan.route, item.id))
+                        : void startImport()
+                    }
+                    disabled={fetching}
+                  >
+                    {fetching ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <Download />
+                    )}
+                    {importLabel(fetching, checked !== null)}
+                  </Button>
                 )}
-                <Button
-                  variant={presence.state === "here" ? "outline" : "default"}
-                  onClick={() =>
-                    checked
-                      ? navigate(withHubItem(checked.plan.route, item.id))
-                      : void startImport()
-                  }
-                  disabled={fetching}
-                >
-                  {fetching ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Download />
-                  )}
-                  {importLabel(fetching, checked !== null, presence.state)}
-                </Button>
               </div>
               <p className="max-w-prose text-xs text-muted-foreground">
                 {presence.state === "gone" &&
@@ -314,14 +318,10 @@ export default function ItemPage() {
 }
 
 /** What the import button says, which depends on how far the press has got. */
-function importLabel(
-  fetching: boolean,
-  rechecking: boolean,
-  state: HubItemPresence["state"],
-): string {
+function importLabel(fetching: boolean, rechecking: boolean): string {
   if (fetching) return "Fetching…";
   if (rechecking) return "Import anyway";
-  return state === "here" ? "Import again" : "Import";
+  return "Import";
 }
 
 /** One labelled fact about the item. */
