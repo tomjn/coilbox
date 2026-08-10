@@ -72,7 +72,18 @@ export function ExportPackForm() {
   // Coilbox's own generated games are never a pack's game: the machine that
   // imports the pack rewrites its own on the next test, and has no way to get
   // this one.
-  const games = withoutGeneratedGames(scan.data?.games ?? []);
+  // A scan can list the same game name from more than one archive, same as
+  // maps below. Deduped so two archives sharing a name don't give two rows
+  // sharing a React key.
+  const games = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          withoutGeneratedGames(scan.data?.games ?? []).map((g) => [g.name, g]),
+        ).values(),
+      ),
+    [scan.data],
+  );
   // A scan can list the same map name from more than one archive. Mirrors
   // `MapsPage`'s dedup, since the pack only needs the name once.
   const maps = useMemo(
