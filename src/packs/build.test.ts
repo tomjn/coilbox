@@ -7,7 +7,7 @@ vi.mock("@picoframe/frame", () => ({
 }));
 
 import type { SkirmishPreset } from "../play/presets";
-import { buildPackManifest } from "./build";
+import { aiGameNameForPack, buildPackManifest } from "./build";
 
 function preset(overrides: Partial<SkirmishPreset> = {}): SkirmishPreset {
   return {
@@ -84,5 +84,32 @@ describe("buildPackManifest", () => {
       installedGames: [{ name: "Game A" }],
     });
     expect(built).not.toHaveProperty("engineVersion");
+  });
+});
+
+describe("aiGameNameForPack", () => {
+  it("uses the game the first bundled preset names", () => {
+    const {
+      id: _id,
+      createdAt: _c,
+      lastUsedAt: _l,
+      ...bundled
+    } = preset({
+      gameName: "Game B",
+    });
+    expect(
+      aiGameNameForPack({
+        games: [{ name: "Game A" }, { name: "Game B" }],
+        presets: [bundled],
+      }),
+    ).toBe("Game B");
+  });
+
+  it("falls back to the pack's first game with no presets", () => {
+    expect(aiGameNameForPack({ games: [{ name: "Game A" }] })).toBe("Game A");
+  });
+
+  it("has no answer for a maps-only pack", () => {
+    expect(aiGameNameForPack({ maps: ["Map One"] })).toBeUndefined();
   });
 });

@@ -47,3 +47,14 @@ export function buildPackManifest(draft: PackDraft): SetupPackManifest | null {
     ...(presets.length ? { presets } : {}),
   };
 }
+
+/**
+ * Which game's AI list a pack's bundled presets should be reconciled against.
+ * One list, because the caller reads it through a hook: the game the first
+ * preset names, or the pack's first game when it bundles none.
+ */
+export function aiGameNameForPack(
+  manifest: SetupPackManifest,
+): string | undefined {
+  return manifest.presets?.[0]?.gameName ?? manifest.games?.[0]?.name;
+}
