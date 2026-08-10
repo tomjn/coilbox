@@ -10,9 +10,13 @@ import HubSettings from "./pages/SettingsSection";
  * The Coilbox hub plugin (issue #1347): one screen listing what other players
  * have shared, with the same filters the website's gallery has.
  *
- * A top-level nav entry rather than a child of Downloads. Downloads is about
- * fetching maps, games and engines from known sources. The hub is other people's
- * containers, which to a player is a different errand.
+ * First in the Downloads group. It shipped as a group of one with no label,
+ * which the frame draws as a stray top-level item with nothing saying what it
+ * belongs to. Downloads is where things come from, and other people's containers
+ * are things that come from somewhere, so it goes at the head of that list.
+ *
+ * The nav item deliberately has no `end`, so an item's own page (`/hub/<id>`)
+ * keeps it lit rather than leaving the sidebar looking like nowhere is open.
  *
  * The import box at Settings > Import stays where it is (`../deeplink`). A
  * profile can switch the hub off, and somebody who was handed a link still needs
@@ -60,15 +64,17 @@ const hubPlugin: FramePlugin = {
   ],
   nav: [
     {
-      // No label: a group of one, which the frame renders as a top-level item.
-      id: "hub",
-      order: 25,
+      // First in Downloads, above Browse Rapid: the hub is another place things
+      // come from, and a group of one with no label read as a stray item.
+      id: "downloads",
+      label: "Downloads",
+      order: 20,
       items: [
         {
           id: "hub.browse",
           label: "Coilbox hub",
           to: "/hub",
-          end: true,
+          order: -1,
           icon: CoilboxGlyph,
           useVisible: visible,
         },

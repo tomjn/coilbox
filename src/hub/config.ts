@@ -109,11 +109,19 @@ export function isHubOrigin(
  * item rather than fetching blind, so this is how the link is recognised.
  *
  * Origin first, through {@link isHubOrigin}, so only the configured hub is read
- * this way. Then the path, which must be exactly `/i/<one segment>` under the
- * configured base - a hub served under a path prefix keeps that prefix, the same
- * way `hubItemsUrl` builds its addresses. Every other address on the hub, its
- * home page, its gallery, its API, is not an item address and gets null, which
- * leaves the caller on the flow it would have taken anyway.
+ * this way. Then the path, which must be exactly `/i/<one segment>` or
+ * `/item/<one segment>` under the configured base - a hub served under a path
+ * prefix keeps that prefix, the same way `hubItemsUrl` builds its addresses.
+ *
+ * Both, because the two are the same item by different doors. `/i/` is the
+ * container an import fetches. `/item/` is the page a person reads, which is
+ * what the website's cards link to and what coilbox's own Copy link hands out,
+ * so it is the address that actually gets pasted into a chat and then back into
+ * coilbox.
+ *
+ * Every other address on the hub, its home page, its gallery, its API, is not an
+ * item address and gets null, which leaves the caller on the flow it would have
+ * taken anyway.
  */
 export function hubItemIdFromUrl(
   url: string,
@@ -122,11 +130,14 @@ export function hubItemIdFromUrl(
   if (!hubUrl || !isHubOrigin(url, hubUrl)) return null;
   try {
     const target = new URL(url);
-    const prefix = `${new URL(hubUrl).pathname.replace(/\/+$/, "")}/i/`;
-    if (!target.pathname.startsWith(prefix)) return null;
-    const segment = target.pathname.slice(prefix.length);
-    if (!segment || segment.includes("/")) return null;
-    return decodeURIComponent(segment).trim() || null;
+    const base = new URL(hubUrl).pathname.replace(/\/+$/, "");
+    for (const prefix of [`${base}/i/`, `${base}/item/`]) {
+      if (!target.pathname.startsWith(prefix)) continue;
+      const segment = target.pathname.slice(prefix.length);
+      if (!segment || segment.includes("/")) return null;
+      return decodeURIComponent(segment).trim() || null;
+    }
+    return null;
   } catch {
     return null;
   }

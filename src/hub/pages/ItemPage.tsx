@@ -1,12 +1,16 @@
 import { Button } from "@picoframe/frame";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
   Check,
   Download,
+  ExternalLink,
+  Link2 as LinkIcon,
   Loader2,
   RotateCw,
+  Trash2,
   TriangleAlert,
 } from "lucide-react";
 import {
@@ -19,15 +23,22 @@ import {
 import { Link, useNavigate, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { asContainer, decodeContainerText } from "@/container/container";
 import type { ImportPlan } from "@/deeplink/actions";
+import { ConfirmDialog, type Pending } from "@/deeplink/ConfirmDialog";
 import { fetchImportPlan } from "@/deeplink/fetchImport";
 import { fetchImportText } from "@/deeplink/fetchText";
 import { getGameMatcher, getProfile } from "@/profile/profile";
 import { describeItem, fetchHubItem, type HubItemDetail } from "../api";
 import { describePinnedGame, matchesPinnedGame } from "../browse";
+import { KindIcon } from "../components/KindIcon";
 import { useHubUrl } from "../config";
 import { type HubItemPresence, withHubItem } from "../importRecord";
 import { useHubItemPresence } from "../imports";
+import { type HubPreview, readPreview } from "../preview";
+import { hubItemPageUrl } from "../publish";
+import { type HubRemoval, useHubRemoval } from "../remove";
+import { ItemPreview } from "./components/ItemPreview";
 
 /**
  * One item on the Coilbox hub, in full (issue #1366). The browse screen has room
@@ -43,13 +54,21 @@ import { useHubItemPresence } from "../imports";
  * Pressing Import here does not then ask the same question in a dialog. The
  * confirmation it replaces said which host the content came from and what kind
  * of thing it was. Both are on this page already, and the reader got here by
- * choosing this item. What the page cannot know is what the container itself
- * turns out to be, so that is the one thing kept. Coilbox fetches it through the
- * same capped Rust fetch and the same `identify()` gate the deep-link flow uses,
- * and goes straight to the importer when the answer matches this page. When it
- * does not, or the container warns about its version, the difference is shown
- * here and the button asks again. The importer is unchanged and still resolves
- * missing content before it saves anything.
+ * choosing this item.
+ *
+ * What the page cannot know from the hub's API is what is actually in the
+ * container, because the API hands out a pointer to it and never the thing
+ * itself. So the page fetches it on arrival, through the same capped Rust fetch
+ * and the same `identify()` gate the deep-link flow uses, and draws what it
+ * finds (`../preview.ts`). Nothing is saved by that: it is a read of a file the
+ * page was going to read anyway when Import was pressed, brought forward so the
+ * reader can see the thing before deciding.
+ *
+ * That also moves the checks earlier. A container whose kind disagrees with what
+ * the hub lists, or which warns about its version, says so on the page rather
+ * than after a press, and Import then says "anyway". Import itself hands the
+ * already-fetched container to the importer, which is unchanged and still
+ * resolves missing content before it saves anything.
  *
  * A link can address an item a distribution's game pin keeps off the browse list
  * (issue #1362). The page shows it and still imports it, and says which game it
@@ -75,10 +94,14 @@ function hostOf(url: string): string {
   }
 }
 
-/** A container that came back, once it has been checked against this page. */
-interface Checked {
+/** The container this item points at, once it has arrived and been checked
+ * against what the page says. */
+interface Fetched {
   plan: ImportPlan;
-  /** Everything the page could not already say. Empty means go straight there. */
+  /** What it looks like, or null when its payload had nothing to draw. */
+  preview: HubPreview | null;
+  /** Everything the page could not already say. Empty means Import can go
+   * straight to the importer. */
   notes: string[];
 }
 
@@ -95,7 +118,9 @@ export default function ItemPage() {
 
   const [fetching, setFetching] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
-  const [checked, setChecked] = useState<Checked | null>(null);
+  const [fetched, setFetched] = useState<Fetched | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [pending, setPending] = useState<Pending | null>(null);
 
   // Ask the hub for this item. Returns the abort, so the effect below can drop
   // an answer to a question the page has stopped asking, and Try again can call
@@ -119,34 +144,75 @@ export default function ItemPage() {
 
   useEffect(() => load(), [load]);
 
-  // Fetch the container, check what came back against what this page says, and
-  // send it to its importer. Nothing is saved here: the importer resolves any
-  // missing content and asks before it writes.
-  const startImport = useCallback(async () => {
-    if (!item) return;
-    setFetching(true);
-    setImportError(null);
-    const result = await fetchImportPlan(item.container_url, fetchImportText);
-    setFetching(false);
-    if (!result.ok) {
-      setImportError(result.reason);
-      return;
-    }
-    const notes = [...result.plan.warnings];
-    if (result.plan.kind !== item.kind) {
-      const listed = describeItem(item.kind, item.mode).toLowerCase();
-      notes.push(
-        `The hub lists this as a ${listed}, but what it sent is a ${result.plan.label}.`,
-      );
-    }
-    if (notes.length === 0) {
-      navigate(withHubItem(result.plan.route, item.id));
-      return;
-    }
-    setChecked({ plan: result.plan, notes });
-  }, [item, navigate]);
+  // Fetch the container and check what came back against what this page says.
+  // Nothing is saved here and nothing is imported: this is the same capped
+  // fetch and the same `identify()` gate Import runs, moved to page load so the
+  // page can show what the thing looks like and flag any discrepancy before the
+  // button is pressed rather than after.
+  const loadContainer = useCallback(
+    async (signal?: { cancelled: boolean }) => {
+      if (!item) return;
+      setFetching(true);
+      setImportError(null);
+      const result = await fetchImportPlan(item.container_url, fetchImportText);
+      // The fetch has no abort, so a container for an item the reader has since
+      // navigated away from is dropped here rather than landing on the page
+      // they are now looking at.
+      if (signal?.cancelled) return;
+      setFetching(false);
+      if (!result.ok) {
+        setImportError(result.reason);
+        return;
+      }
+      const notes = [...result.plan.warnings];
+      if (result.plan.kind !== item.kind) {
+        const listed = describeItem(item.kind, item.mode).toLowerCase();
+        notes.push(
+          `The hub lists this as a ${listed}, but what it sent is a ${result.plan.label}.`,
+        );
+      }
+      const container = asContainer(decodeContainerText(result.text));
+      setFetched({
+        plan: result.plan,
+        preview: container ? readPreview(container) : null,
+        notes,
+      });
+    },
+    [item],
+  );
+
+  // One fetch per item. A failure leaves the reason showing and no container,
+  // which is the state Import retries from.
+  useEffect(() => {
+    const signal = { cancelled: false };
+    setFetched(null);
+    void loadContainer(signal);
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [loadContainer]);
 
   const presence: HubItemPresence = item ? presenceOf(item) : { state: "none" };
+
+  // What Remove would delete, or null when there is nothing of this item here.
+  const removalOf = useHubRemoval();
+  const removal = item ? removalOf(item) : null;
+
+  // The address to hand somebody else. The website's own page for the item
+  // rather than the container underneath it: a person following a link wants
+  // something to read, and coilbox recognises both (see `hubItemIdFromUrl`), so
+  // a copy of this pasted back into coilbox lands on this same page.
+  const pageUrl = hubItemPageUrl(hubUrl, id);
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(pageUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // A clipboard the webview will not write to is not worth an error banner.
+      // "View on the hub" opens the same address either way.
+    }
+  };
 
   // Is this item one the distribution's game pin keeps off the browse list? Read
   // once: the profile is loaded at startup and never changes.
@@ -170,7 +236,8 @@ export default function ItemPage() {
         {item && (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">
+              <Badge variant="secondary" className="gap-1">
+                <KindIcon kind={item.kind} mode={item.mode} />
                 {describeItem(item.kind, item.mode)}
               </Badge>
               {presence.state === "here" && (
@@ -208,118 +275,185 @@ export default function ItemPage() {
           </Alert>
         )}
         {item && (
-          <div className="flex max-w-3xl flex-col gap-6">
-            <p className="max-w-prose whitespace-pre-wrap text-sm leading-relaxed">
-              {item.description || (
-                <span className="text-muted-foreground">
-                  Whoever shared this wrote no description.
-                </span>
-              )}
-            </p>
-
-            <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-              <Meta label="Game">
-                {item.game_name ?? (
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="flex min-w-0 flex-col gap-6">
+              <p className="max-w-prose whitespace-pre-wrap text-sm leading-relaxed">
+                {item.description || (
                   <span className="text-muted-foreground">
-                    Not tied to one game
+                    Whoever shared this wrote no description.
                   </span>
                 )}
-                {offPin && (
-                  <span className="mt-1 block max-w-prose text-xs text-muted-foreground">
-                    This copy of Coilbox is set up for{" "}
-                    {pinnedGame ?? "another game"}, so this is not in its hub
-                    list. You can still import it.
-                  </span>
-                )}
-              </Meta>
-              <Meta label="Map">
-                {item.map_name ?? (
-                  <span className="text-muted-foreground">
-                    Not tied to one map
-                  </span>
-                )}
-              </Meta>
-              {item.tags.length > 0 && (
-                <Meta label="Tags">
-                  <span className="flex flex-wrap gap-1.5">
-                    {item.tags.map((tag) => (
-                      <Badge key={tag} variant="outline">
-                        #{tag}
-                      </Badge>
-                    ))}
-                  </span>
-                </Meta>
-              )}
-            </dl>
-
-            {importError && (
-              <Alert variant="destructive">
-                <AlertCircle size={15} />
-                <AlertDescription className="text-destructive">
-                  {importError}
-                </AlertDescription>
-              </Alert>
-            )}
-            {checked && (
-              <Alert variant="warning">
-                <TriangleAlert size={15} />
-                <AlertDescription>
-                  <ul className="flex flex-col gap-1">
-                    {checked.notes.map((note) => (
-                      <li key={note}>{note}</li>
-                    ))}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                {presence.state === "here" && (
-                  <Button onClick={() => navigate(presence.route)}>
-                    <ArrowRight /> Open
-                  </Button>
-                )}
-                <Button
-                  variant={presence.state === "here" ? "outline" : "default"}
-                  onClick={() =>
-                    checked
-                      ? navigate(withHubItem(checked.plan.route, item.id))
-                      : void startImport()
-                  }
-                  disabled={fetching}
-                >
-                  {fetching ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Download />
-                  )}
-                  {importLabel(fetching, checked !== null, presence.state)}
-                </Button>
-              </div>
-              <p className="max-w-prose text-xs text-muted-foreground">
-                {presence.state === "gone" &&
-                  "You imported this before. Nothing of it is here now. "}
-                Coilbox downloads it from {hostOf(hubUrl)} and opens it in the
-                importer, which resolves any missing content before saving.
               </p>
+
+              {fetching && (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 size={15} className="animate-spin" /> reading what is
+                  in it…
+                </p>
+              )}
+              {fetched?.preview && <ItemPreview preview={fetched.preview} />}
+
+              {fetched && fetched.notes.length > 0 && (
+                <Alert variant="warning">
+                  <TriangleAlert size={15} />
+                  <AlertDescription>
+                    <ul className="flex flex-col gap-1">
+                      {fetched.notes.map((note) => (
+                        <li key={note}>{note}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+              {importError && (
+                <Alert variant="destructive">
+                  <AlertCircle size={15} />
+                  <AlertDescription className="flex flex-wrap items-center gap-3 text-destructive">
+                    {importError}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void loadContainer()}
+                      disabled={fetching}
+                    >
+                      <RotateCw className="mr-1.5 size-3.5" aria-hidden /> Try
+                      again
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-6">
+              <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+                <Meta label="Game">
+                  {item.game_name ?? (
+                    <span className="text-muted-foreground">
+                      Not tied to one game
+                    </span>
+                  )}
+                  {offPin && (
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      This copy of Coilbox is set up for{" "}
+                      {pinnedGame ?? "another game"}, so this is not in its hub
+                      list. You can still import it.
+                    </span>
+                  )}
+                </Meta>
+                <Meta label="Map">
+                  {item.map_name ?? (
+                    <span className="text-muted-foreground">
+                      Not tied to one map
+                    </span>
+                  )}
+                </Meta>
+                {item.tags.length > 0 && (
+                  <Meta label="Tags">
+                    <span className="flex flex-wrap gap-1.5">
+                      {item.tags.map((tag) => (
+                        <Badge key={tag} variant="outline">
+                          #{tag}
+                        </Badge>
+                      ))}
+                    </span>
+                  </Meta>
+                )}
+              </dl>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {presence.state === "here" ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate(presence.route)}
+                      >
+                        <ArrowRight /> Open
+                      </Button>
+                      {removal && (
+                        <Button
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setPending(confirmRemoval(removal))}
+                        >
+                          <Trash2 /> Remove
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        fetched
+                          ? navigate(withHubItem(fetched.plan.route, item.id))
+                          : void loadContainer()
+                      }
+                      disabled={fetching}
+                    >
+                      {fetching ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <Download />
+                      )}
+                      {importLabel(fetching, fetched?.notes.length ?? 0)}
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {presence.state === "gone" &&
+                    "You imported this before. Nothing of it is here now. "}
+                  Coilbox downloads it from {hostOf(hubUrl)} and opens it in the
+                  importer, which resolves any missing content before saving.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button variant="ghost" size="sm" onClick={copyLink}>
+                    {copied ? <Check /> : <LinkIcon />}
+                    {copied ? "Link copied" : "Copy link"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void openUrl(pageUrl)}
+                  >
+                    <ExternalLink /> View on the hub
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
+      <ConfirmDialog pending={pending} setPending={setPending} />
     </div>
   );
 }
 
-/** What the import button says, which depends on how far the press has got. */
-function importLabel(
-  fetching: boolean,
-  rechecking: boolean,
-  state: HubItemPresence["state"],
-): string {
+/**
+ * The question Remove asks before it deletes anything.
+ *
+ * It says the thing that is easy to get wrong, which is what "remove" means
+ * here: the copy on this computer is deleted, and the hub's copy is not, so
+ * this is undoable by importing it again. Anything the removal found using it
+ * goes in as a warning.
+ */
+function confirmRemoval(removal: HubRemoval): Pending {
+  return {
+    title: removal.summary,
+    lines: [
+      "Coilbox deletes it from this computer. It stays on the hub, so you can import it again.",
+    ],
+    warnings: removal.warning ? [removal.warning] : [],
+    confirmLabel: "Delete",
+    run: () => void removal.run(),
+    icon: Trash2,
+  };
+}
+
+/** What the import button says. "Import anyway" when the page is already showing
+ * something about the container that the reader should have seen first. */
+function importLabel(fetching: boolean, notes: number): string {
   if (fetching) return "Fetching…";
-  if (rechecking) return "Import anyway";
-  return state === "here" ? "Import again" : "Import";
+  return notes > 0 ? "Import anyway" : "Import";
 }
 
 /** One labelled fact about the item. */

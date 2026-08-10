@@ -133,6 +133,13 @@ describe("hubItemIdFromUrl", () => {
     expect(hubItemIdFromUrl(`${hub}/i/${id}`, hub)).toBe(id);
   });
 
+  it("reads the id out of the page address a person would be sent", () => {
+    // What Copy link hands out and what the website's cards link to, so it is
+    // the address that actually gets pasted back into coilbox.
+    expect(hubItemIdFromUrl(`${hub}/item/${id}`, hub)).toBe(id);
+    expect(hubItemIdFromUrl(`${hub}/item/${id}?from=discord`, hub)).toBe(id);
+  });
+
   it("keeps the query string and fragment out of the id", () => {
     expect(hubItemIdFromUrl(`${hub}/i/${id}?from=discord#top`, hub)).toBe(id);
   });
