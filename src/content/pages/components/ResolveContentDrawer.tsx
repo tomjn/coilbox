@@ -70,7 +70,7 @@ function RequirementRow({
       {!resolve.canDownload(req) && !done && (
         <p className="text-xs text-muted-foreground">
           {req.kind === "engine"
-            ? "No matching engine build found automatically — install one from Content → Engines."
+            ? "No matching engine build found automatically — install one from Settings → Engines."
             : "Set a download folder in Downloads settings to enable this."}
         </p>
       )}
