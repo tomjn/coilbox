@@ -1,5 +1,5 @@
 import { Input } from "@picoframe/frame";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Popover,
   PopoverAnchor,
@@ -16,6 +16,13 @@ import {
  * A locally installed name will not always match what the hub stores. Typing is
  * always what gets sent, and the list is a shortcut into it, never the only way
  * in. Picking a suggestion commits immediately, typing commits on blur or Enter.
+ *
+ * The box is an anchor rather than a trigger, because it is a text field first
+ * and the list follows what is typed in it. That means Radix counts a press on
+ * the box itself as a press outside the list: focus opens the list and the same
+ * press closes it again, which read as a flicker rather than as a dropdown. So
+ * a press that started inside the anchor is not an outside press, and the list
+ * stays up. Everything that should close it still does.
  */
 export function FilterCombobox({
   value,
@@ -34,6 +41,7 @@ export function FilterCombobox({
 }) {
   const [draft, setDraft] = useState(value);
   const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLDivElement>(null);
 
   // Stay in sync when the filter changes from elsewhere - a card's game/map
   // badge, or the chip's own "X", both of which set the filter directly.
@@ -55,7 +63,7 @@ export function FilterCombobox({
 
   return (
     <Popover open={open && options.length > 0} onOpenChange={setOpen}>
-      <PopoverAnchor>
+      <PopoverAnchor ref={anchor}>
         <Input
           value={draft}
           onChange={(e) => {
@@ -82,6 +90,9 @@ export function FilterCombobox({
         className="w-64 p-1"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => {
+          if (anchor.current?.contains(e.target as Node)) e.preventDefault();
+        }}
       >
         <ul className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
           {matches.map((o) => (
