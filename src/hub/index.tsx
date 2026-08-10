@@ -7,7 +7,7 @@ import { isHubEnabled } from "../profile/profile";
 import HubSettings from "./pages/SettingsSection";
 
 /**
- * The community hub plugin (issue #1347): one screen listing what other players
+ * The Coilbox hub plugin (issue #1347): one screen listing what other players
  * have shared, with the same filters the website's gallery has.
  *
  * A top-level nav entry rather than a child of Downloads. Downloads is about
@@ -52,7 +52,7 @@ const hubPlugin: FramePlugin = {
   settings: [
     {
       id: "hub",
-      title: "Community hub",
+      title: "Coilbox hub",
       icon: Globe,
       Component: HubSettings,
       useVisible: isHubEnabled,
@@ -66,7 +66,7 @@ const hubPlugin: FramePlugin = {
       items: [
         {
           id: "hub.browse",
-          label: "Community hub",
+          label: "Coilbox hub",
           to: "/hub",
           end: true,
           icon: Globe,
@@ -79,7 +79,7 @@ const hubPlugin: FramePlugin = {
     {
       path: "hub",
       lazy: gated(() => import("./pages/BrowsePage")),
-      crumb: "Community hub",
+      crumb: "Coilbox hub",
     },
   ],
 };

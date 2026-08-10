@@ -2,7 +2,7 @@ import { useSetting } from "@picoframe/frame";
 import { getProfile } from "../profile/profile";
 
 /**
- * The community hub base URL: three layers, the same shape as
+ * The Coilbox hub base URL: three layers, the same shape as
  * `src/lobby-servers/config.ts`. A built-in default in code, a profile-supplied
  * override for a distributor running their own hub, and a user setting on top of
  * that. Kept to one address, the API paths (`/api/v1/items`, etc.) hang off it and
