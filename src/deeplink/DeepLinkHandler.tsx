@@ -9,33 +9,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { dlFetchText } from "../downloads/bindings";
 import { isHubOrigin, useTrustedHubUrl } from "../hub/config";
 import { hubItemIdForContainer, withHubItem } from "../hub/importRecord";
 import { notify } from "../notify/notify";
 import { describeOpen, type ImportPlan, prepareImport } from "./actions";
 import { setDeepLinkHandler } from "./bus";
 import { ConfirmDialog, type Pending } from "./ConfirmDialog";
-import { type FetchText, fetchImportPlan } from "./fetchImport";
+import { fetchImportPlan } from "./fetchImport";
+import { fetchImportText } from "./fetchText";
 import { openScreenRoute, parseDeepLink } from "./parse";
-
-/**
- * The production text fetcher: wraps the `dl_fetch_text` Rust command (which
- * enforces https, a byte cap and a timeout) and maps its thrown error into the
- * `FetchText` result shape `fetchImportPlan` expects. The fetch runs Rust-side
- * to bypass the webview's CORS limits (see `fetchImport.ts`).
- */
-const fetchImportText: FetchText = async (url) => {
-  try {
-    const { text } = await dlFetchText({ url });
-    return { ok: true, text };
-  } catch (err) {
-    return {
-      ok: false,
-      reason: err instanceof Error ? err.message : String(err),
-    };
-  }
-};
 
 /**
  * The `coilbox://` deep-link handler (issue #388). Mounted app-wide as the
