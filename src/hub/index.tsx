@@ -4,6 +4,7 @@ import { Globe } from "lucide-react";
 import type { ComponentType } from "react";
 import { isProfileHidden } from "../profile/hidden";
 import { isHubEnabled } from "../profile/profile";
+import HubSettings from "./pages/SettingsSection";
 
 /**
  * The community hub plugin (issue #1347): one screen listing what other players
@@ -16,6 +17,14 @@ import { isHubEnabled } from "../profile/profile";
  * The import box at Settings > Import stays where it is (`../deeplink`). A
  * profile can switch the hub off, and somebody who was handed a link still needs
  * somewhere to paste it when it is.
+ *
+ * The settings section (`/settings/hub`, issue #1353) is the control for the
+ * `hub.url` user setting that `useHubUrl` (`./config`) already layers over a
+ * distribution profile's `hubUrl` and the built-in default. It shares the plain
+ * `isHubEnabled()` gate rather than `visible` above, so it stays reachable
+ * whenever the hub is on even if a profile hides the browse nav item specifically
+ * (`hub.browse`). Other hub consumers, like the share drawer's "open hub"
+ * button, still read the setting.
  */
 
 /** Both gates the nav item applies, so the route can apply the same pair. */
@@ -40,6 +49,15 @@ function gated(loader: () => Promise<{ default: ComponentType }>) {
 const hubPlugin: FramePlugin = {
   id: "hub",
   version: "0.0.0",
+  settings: [
+    {
+      id: "hub",
+      title: "Community hub",
+      icon: Globe,
+      Component: HubSettings,
+      useVisible: isHubEnabled,
+    },
+  ],
   nav: [
     {
       // No label: a group of one, which the frame renders as a top-level item.

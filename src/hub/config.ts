@@ -31,6 +31,24 @@ export function resolveHubUrl(userUrl: string, profileUrl?: string): string {
 }
 
 /**
+ * Is this an address the hub setting should accept? Blank (and whitespace-only)
+ * is valid, meaning unset per {@link resolveHubUrl}, so only a non-blank value
+ * has to parse as an http or https URL. Used by the settings control (issue
+ * #1353) to reject something that would just fail on every request with a
+ * confusing error instead.
+ */
+export function isValidHubUrl(url: string): boolean {
+  const trimmed = url.trim();
+  if (trimmed === "") return true;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The effective hub base URL for the running session. This is what every hub
  * consumer should call rather than hardcoding the address (the anti-pattern named
  * in issue #1351 is `DEFAULT_BRANDING_CATALOG_URL` in `src/content/branding.ts`,
