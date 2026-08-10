@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { useRecordHubImport } from "../../hub/imports";
 import { usePlayReadiness } from "../../play/config";
+import { presetRoute } from "../../play/presets";
 
 /**
  * The Content → Setup packs page (issue #415): export the current engine,
@@ -44,8 +45,16 @@ export default function SetupPacksPage() {
           // A pack leaves its bundled presets behind and nothing else, so those
           // are what says whether this one is still here. A pack with none
           // records no ids and reads as imported before, never as still here.
+          //
+          // Opening one therefore means opening the first preset it brought
+          // (issue #1372). With none there is nothing to open, and the route is
+          // never read because such a pack never reads as still here.
           onImported={(presetIds) =>
-            recordHubImport(hubItemId, presetIds, "/play/skirmish")
+            recordHubImport(
+              hubItemId,
+              presetIds,
+              presetIds[0] ? presetRoute(presetIds[0]) : "/play/skirmish",
+            )
           }
         />
       ),

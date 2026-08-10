@@ -112,15 +112,25 @@ export function withRecord(
 /**
  * Work out where an item stands from its record and the local ids of its kind.
  * `local` is null when the ids are not known yet.
+ *
+ * `routeFor` addresses whichever id survived, for the kinds that can be
+ * addressed one at a time (issue #1372). It beats the recorded route because
+ * the record is written once and the ids outlive it: a setup pack that brought
+ * three presets and lost the first still has two, and a record written before
+ * those addresses existed names only the list screen. Without it, the recorded
+ * route stands, which is what a conquest or warpath challenge wants since its
+ * route already names the galaxy or the run.
  */
 export function presenceOf(
   record: HubImportRecord | undefined,
   local: ReadonlySet<string> | null,
+  routeFor?: (ref: string) => string,
 ): HubItemPresence {
   if (!record) return { state: "none" };
   if (!local) return { state: "unknown" };
-  if (record.refs.some((ref) => local.has(ref))) {
-    return { state: "here", route: record.route };
+  const alive = record.refs.find((ref) => local.has(ref));
+  if (alive !== undefined) {
+    return { state: "here", route: routeFor ? routeFor(alive) : record.route };
   }
   return { state: "gone" };
 }

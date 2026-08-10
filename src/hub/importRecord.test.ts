@@ -115,4 +115,20 @@ describe("presenceOf", () => {
       state: "gone",
     });
   });
+
+  it("addresses the surviving id when the kind can be addressed", () => {
+    expect(
+      presenceOf(record("a", ["x"]), new Set(["x"]), (ref) => `/here/${ref}`),
+    ).toEqual({ state: "here", route: "/here/x" });
+  });
+
+  it("addresses whichever id survived, not the first one recorded", () => {
+    expect(
+      presenceOf(
+        record("a", ["gone", "kept"]),
+        new Set(["kept"]),
+        (ref) => `/here/${ref}`,
+      ),
+    ).toEqual({ state: "here", route: "/here/kept" });
+  });
 });
