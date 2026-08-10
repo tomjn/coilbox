@@ -11,6 +11,7 @@ members = [
   "crates/coilbox-springlua",
   "crates/coilbox-thumb-cache",
   "crates/coilbox-unitsync-worker",
+  "crates/coilbox-oauth",
   "crates/tauri-plugin-coilbox-downloads",
   "crates/tauri-plugin-coilbox-uberstress",
   "crates/tauri-plugin-coilbox-mapconv",
@@ -24,5 +25,6 @@ members = [
   "crates/tauri-plugin-coilbox-runlite",
   "crates/tauri-plugin-coilbox-profile",
   "crates/tauri-plugin-coilbox-lobby-servers",
+  "crates/tauri-plugin-coilbox-hub",
   "crates/tauri-plugin-coilbox-multiplayer",
 ]

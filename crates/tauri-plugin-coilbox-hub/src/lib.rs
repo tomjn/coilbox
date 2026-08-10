@@ -1,0 +1,99 @@
+//! Coilbox hub account (Rust half).
+//!
+//! Three commands, all of them about who is signed in to the hub and none of them
+//! handing a token out. Registered as `"coilbox-hub"`, so the frontend invokes
+//! `plugin:coilbox-hub|<cmd>`. The flow they sit on is [`auth`].
+//!
+//! Every command takes the hub address rather than knowing one. It is a user
+//! setting layered over a distribution profile's own (`src/hub/config.ts`), so the
+//! frontend is the only place that can resolve it.
+
+pub mod auth;
+
+use picoframe_core::CliResult;
+use serde_json::{json, Value};
+use tauri::{
+    plugin::{Builder, TauriPlugin},
+    Runtime,
+};
+
+/// `hub_sign_in`: sign in to a hub with Discord, through the system browser.
+///
+/// Resolves only once the user has finished there, which can take a minute, and
+/// fails if they never do. What comes back is who signed in. The refresh token goes
+/// to the OS keychain and the access token stays in memory on the Rust side, so no
+/// token crosses this boundary.
+#[tauri::command]
+async fn hub_sign_in(hub_url: String) -> CliResult {
+    let open =
+        |url: &str| tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string());
+    match auth::sign_in(&hub_url, open).await {
+        Ok(identity) => CliResult::ok(json!({ "account": identity })),
+        Err(e) => CliResult::err(auth::explain(&e, &hub_url)),
+    }
+}
+
+/// `hub_sign_out`: forget this machine's sign-in to a hub.
+///
+/// This machine is as far as it goes. Coilbox holds a publishable key, which cannot
+/// revoke anything, so the token stops being usable here and stays alive in the
+/// hub's project. Say that rather than promise more.
+#[tauri::command]
+async fn hub_sign_out(hub_url: String) -> CliResult {
+    match auth::sign_out(&hub_url) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(auth::explain(&e, &hub_url)),
+    }
+}
+
+/// `hub_account`: who is signed in to a hub, if anybody.
+///
+/// `signedIn` and `problem` are separate answers because the two ways this goes
+/// wrong need different words. A refresh token the project has thrown away means
+/// signed out, and the user has to go through the browser again. A hub nobody can
+/// reach means nothing at all about the sign-in, and telling somebody on a flaky
+/// connection that they have been signed out would be a lie.
+///
+/// The first call after a restart costs one refresh, because the name arrives
+/// beside the token and there is nothing on disk that remembers it.
+#[tauri::command]
+async fn hub_account(hub_url: String) -> CliResult {
+    let answer = |signed_in: bool, account: Value, problem: Value| {
+        CliResult::ok(json!({
+            "signedIn": signed_in,
+            "account": account,
+            "problem": problem,
+        }))
+    };
+    match auth::signed_in(&hub_url) {
+        Err(e) => return CliResult::err(auth::explain(&e, &hub_url)),
+        Ok(false) => return answer(false, Value::Null, Value::Null),
+        Ok(true) => {}
+    }
+    if let Some(identity) = auth::cached_identity(&hub_url) {
+        return answer(true, json!(identity), Value::Null);
+    }
+    // Nothing known yet, so the stored token is spent on finding out. The token
+    // itself is dropped here: this is the one command that never needs it.
+    match auth::access_token(&hub_url).await {
+        Ok(_) => match auth::cached_identity(&hub_url) {
+            Some(identity) => answer(true, json!(identity), Value::Null),
+            None => answer(true, Value::Null, Value::Null),
+        },
+        Err(e) if e.needs_sign_in() => {
+            answer(false, Value::Null, json!(auth::explain(&e, &hub_url)))
+        }
+        Err(e) => answer(true, Value::Null, json!(auth::explain(&e, &hub_url))),
+    }
+}
+
+/// Build the plugin. Registered as `"coilbox-hub"`.
+pub fn init<R: Runtime>() -> TauriPlugin<R> {
+    Builder::new("coilbox-hub")
+        .invoke_handler(tauri::generate_handler![
+            hub_sign_in,
+            hub_sign_out,
+            hub_account
+        ])
+        .build()
+}
