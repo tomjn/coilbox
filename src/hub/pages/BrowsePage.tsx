@@ -1,9 +1,11 @@
 import { Button, Input } from "@picoframe/frame";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   AlertCircle,
   ArrowRight,
   Check,
   Download,
+  ExternalLink,
   Globe,
   Loader2,
   RotateCw,
@@ -75,6 +77,10 @@ import { FilterCombobox } from "./components/FilterCombobox";
  * hub endpoint. A locally installed name will not always match what the hub
  * carries, so the box always accepts whatever is typed - the list is a shortcut
  * into it, not the only way in.
+ *
+ * The website the gallery is served from is a button in the header rather than a
+ * sidebar entry: an external link sitting among the download sources would read
+ * as another place to download from.
  *
  * A distribution that pins coilbox to its own game pins this list too (issue
  * #1362, applied in `../browse.ts`). The header says so, and the game box and the
@@ -227,19 +233,28 @@ export default function BrowsePage() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex flex-col gap-3 border-b border-border px-6 py-4">
-        <div className="space-y-1">
-          <h1 className="text-lg font-semibold leading-none">Coilbox hub</h1>
-          <p className="max-w-prose text-sm text-muted-foreground">
-            Presets, challenges, setup packs and scenarios shared by other
-            players. Importing needs no account, and nothing is imported until
-            you have seen what it is and said yes.
-          </p>
-          {pinnedMatcher && (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <h1 className="text-lg font-semibold leading-none">Coilbox hub</h1>
             <p className="max-w-prose text-sm text-muted-foreground">
-              This copy of Coilbox is set up for {pinnedGame ?? "one game"}, so
-              the hub shows its things, plus anything not tied to a game.
+              Presets, challenges, setup packs and scenarios shared by other
+              players. Importing needs no account, and nothing is imported until
+              you have seen what it is and said yes.
             </p>
-          )}
+            {pinnedMatcher && (
+              <p className="max-w-prose text-sm text-muted-foreground">
+                This copy of Coilbox is set up for {pinnedGame ?? "one game"}, so
+                the hub shows its things, plus anything not tied to a game.
+              </p>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void openUrl(hubUrl)}
+          >
+            <ExternalLink /> Hub website
+          </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative max-w-xs flex-1">
