@@ -46,7 +46,13 @@ export function BattleList({
    * "Copy invite link" action. */
   serverAddress?: string;
 }) {
-  const [collapsed, setCollapsed] = useState({ open: false, running: false });
+  // Passworded and running battles are both things you cannot simply drop into,
+  // so they start collapsed and keep the joinable list short.
+  const [collapsed, setCollapsed] = useState({
+    open: false,
+    passworded: true,
+    running: true,
+  });
   // Rebuilding this object every render would defeat `BattleRow`'s memo, since
   // it spreads into every row's props.
   const rowProps: RowProps = useMemo(
@@ -54,9 +60,13 @@ export function BattleList({
     [canJoin, onJoin, onLeave, enginePath, dataDir, serverAddress],
   );
 
+  // Running wins over passworded: whether a battle has started is the first thing
+  // that decides what you can do with it.
   const rest = battles.filter((b) => b.id !== joinedId);
-  const open = rest.filter((b) => !inProgressIds.has(b.id));
   const running = rest.filter((b) => inProgressIds.has(b.id));
+  const waiting = rest.filter((b) => !inProgressIds.has(b.id));
+  const open = waiting.filter((b) => !b.passworded);
+  const passworded = waiting.filter((b) => b.passworded);
 
   if (totalCount === 0) {
     return (
@@ -85,6 +95,15 @@ export function BattleList({
         battles={open}
         collapsed={collapsed.open}
         onToggle={() => setCollapsed((c) => ({ ...c, open: !c.open }))}
+        rowProps={rowProps}
+      />
+      <BattleGroup
+        label="Passworded"
+        battles={passworded}
+        collapsed={collapsed.passworded}
+        onToggle={() =>
+          setCollapsed((c) => ({ ...c, passworded: !c.passworded }))
+        }
         rowProps={rowProps}
       />
       <BattleGroup
