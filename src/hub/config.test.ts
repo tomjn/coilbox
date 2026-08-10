@@ -12,7 +12,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
 }));
 
-import { DEFAULT_HUB_URL, resolveHubUrl } from "./config";
+import { DEFAULT_HUB_URL, isValidHubUrl, resolveHubUrl } from "./config";
 
 describe("resolveHubUrl", () => {
   it("falls back to the built-in default when neither layer is set", () => {
@@ -37,5 +37,27 @@ describe("resolveHubUrl", () => {
 
   it("treats a blank or whitespace-only override as unset", () => {
     expect(resolveHubUrl("   ", "   ")).toBe(DEFAULT_HUB_URL);
+  });
+});
+
+describe("isValidHubUrl", () => {
+  it("accepts blank and whitespace-only, meaning unset", () => {
+    expect(isValidHubUrl("")).toBe(true);
+    expect(isValidHubUrl("   ")).toBe(true);
+  });
+
+  it("accepts http and https addresses", () => {
+    expect(isValidHubUrl("https://coilbox-hub.vercel.app")).toBe(true);
+    expect(isValidHubUrl("http://localhost:3000")).toBe(true);
+  });
+
+  it("rejects a scheme that isn't http or https", () => {
+    expect(isValidHubUrl("ftp://example.com")).toBe(false);
+    expect(isValidHubUrl("javascript:alert(1)")).toBe(false);
+  });
+
+  it("rejects text that doesn't parse as a URL at all", () => {
+    expect(isValidHubUrl("not a url")).toBe(false);
+    expect(isValidHubUrl("example.com")).toBe(false);
   });
 });
