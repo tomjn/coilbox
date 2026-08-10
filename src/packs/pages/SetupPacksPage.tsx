@@ -40,7 +40,6 @@ export default function SetupPacksPage() {
       width: "26rem",
       content: (
         <ImportPackForm
-          target={target}
           initialCode={initialCode}
           // A pack leaves its bundled presets behind and nothing else, so those
           // are what says whether this one is still here. A pack with none

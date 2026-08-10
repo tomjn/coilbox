@@ -158,6 +158,21 @@ describe("resolveVerdict", () => {
     expect(verdict.missing).toEqual([]);
   });
 
+  it("does not read a scan that failed as an empty machine", () => {
+    // Stricter than `scanSettled`, which the home page reads: a failed scan has
+    // stopped, but it has not said what is on disk, and guessing costs a
+    // download of something the reader already has.
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [exactGameRequirement("Beyond All Reason")],
+        installed: nothingYet,
+        scan: { ...SCANNING, loading: false, error: "no libunitsync found" },
+      }),
+    );
+    expect(verdict.loading).toBe(true);
+    expect(verdict.missing).toEqual([]);
+  });
+
   it("offers the missing content once every reading has answered", () => {
     const verdict = resolveVerdict(
       readings({

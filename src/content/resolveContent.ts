@@ -231,9 +231,16 @@ export interface ResolveVerdict {
  * report of a machine with nothing on it. Judging requirements against it is
  * how the gate ends up offering to download content already on disk, so
  * `missing` stays empty until every reading has answered.
+ *
+ * Deliberately stricter than `./scanSettled`, which the home page's inventory
+ * reads: there, a scan that failed has answered, because the worst it costs is
+ * a card that draws nothing. Here it would cost the reader a download of
+ * something already on disk, so a scan that has not produced a result is not an
+ * answer whatever state it ended in.
  */
 export function resolveVerdict(r: ResolveReadings): ResolveVerdict {
-  const installKnown = !r.hasTarget || r.scan.data !== null;
+  const installKnown =
+    !r.targetLoading && (!r.hasTarget || r.scan.data !== null);
   const loading = !installKnown || r.enginesLoading || r.engineCatalogPending;
   const missing = loading
     ? []

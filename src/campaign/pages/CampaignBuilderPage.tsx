@@ -110,7 +110,7 @@ export default function CampaignBuilderPage() {
 
   const [pendingCampaign, setPendingCampaign] =
     useState<CampaignExportContents | null>(null);
-  const { target } = usePreferredTarget();
+  const { target, loading: targetLoading } = usePreferredTarget();
   // Read only for the modinfo shortname an export records beside the game's
   // archive name (issue #1335).
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -338,6 +338,7 @@ export default function CampaignBuilderPage() {
           title="Set up this campaign"
           requirements={requirementsForCampaign(pendingCampaign.campaign)}
           target={target ?? undefined}
+          targetLoading={targetLoading}
           onContinue={() =>
             finishImport(pendingCampaign).then(() => setPendingCampaign(null))
           }

@@ -52,10 +52,16 @@ export interface ResolveContentState {
  * anything missing via the app-wide queue. Re-scans after every queue
  * completion so a just-downloaded item clears from `missing` without a manual
  * refresh.
+ *
+ * `targetLoading` is the caller's own target read still being in flight. Pass
+ * it, or a caller that reaches here before its engine is known reads as a
+ * machine with nothing installed and gets offered downloads for content it
+ * already has (issue #1377).
  */
 export function useResolveContent(
   requirements: ContentRequirement[],
   target: { enginePath?: string; dataDir?: string } | undefined,
+  targetLoading = false,
 ): ResolveContentState {
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const contentTargets = useContentTargets();
@@ -107,7 +113,7 @@ export function useResolveContent(
   const { loading, missing, resolved } = resolveVerdict({
     requirements,
     installed,
-    targetLoading: false,
+    targetLoading,
     hasTarget: !!target?.enginePath && !!target?.dataDir,
     scan,
     enginesLoading: contentTargets.loading,
