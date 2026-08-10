@@ -294,7 +294,7 @@ Hiding the built-in **Appearance** section pairs well with forcing `mode` / `acc
 
 ### `gameFilter` (object)
 
-Narrows game lists to a single game. When set, the multiplayer **Battles** list and the game picker only show matching games. Matched case-insensitively against the game name.
+Narrows game lists to a single game. When set, the multiplayer **Battles** list, the game picker and the [Coilbox hub](#hub-boolean) browse screen only show matching games. Matched case-insensitively against the game name.
 
 ```json
 { "version": 1, "gameFilter": { "regex": "^Splinter *Faction" } }
@@ -827,6 +827,12 @@ Turns off the Coilbox hub. On by default. Set it to `false` if you're shipping a
 ```json
 { "version": 1, "hub": false }
 ```
+
+Between off and everything there's [`gameFilter`](#gamefilter-object). A profile that sets one pins the hub to that game: the browse screen lists only items for it, plus items not tied to any game at all (some kinds carry no game name, and one that works anywhere works here too). The screen says which game it's pinned to, so a short list doesn't read as an empty hub, and it drops its own game filter box rather than offering a choice that's already been made.
+
+The pin is applied to what the hub sends back, not asked for as a query, because the hub stores a game as a versioned name like `SplinterFaction 0.1.78` and a name pinned in a profile would go stale at the next release. That means a pinned Coilbox reads the hub's pages itself and counts what's left, so the item count and the page buttons are about the list on screen. It reads at most 20 pages and says so if there were more.
+
+A `coilbox://` link can still point at an item for another game. Coilbox shows that item's page and still imports it, saying which game it's for: the pin narrows what Coilbox advertises, it isn't a permission check on a link somebody was handed deliberately.
 
 ### `hubUrl` (string)
 
