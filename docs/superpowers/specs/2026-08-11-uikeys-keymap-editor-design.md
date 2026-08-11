@@ -71,6 +71,8 @@ engineDefaults      generated from defaultBindings[] in KeyBindings.cpp
 
 Every effective binding carries where it came from: engine, game, or you. That is what makes "reset this key" mean "put back what the game said", and what lets the list show at a glance which keys a player has actually changed.
 
+Provenance is worked out by comparison, not by which layer happened to run the `bind` line. Resolving the first two layers gives a baseline, resolving all three gives the effective keymap, and a binding is yours when it is in the second and not the first. That matters because a user file almost always opens with `unbindall`, which would otherwise make every binding in it look like something the player chose.
+
 ## Writing
 
 A write produces a self-contained file: a header comment saying coilbox wrote it and that editing it by hand is fine, then `unbindall`, then `fakemeta`, `keysym` and preserved lines, then every effective binding in order.
