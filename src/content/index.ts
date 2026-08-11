@@ -5,6 +5,7 @@ import {
   FolderTree,
   Gamepad2,
   HardDrive,
+  Library,
   Map as MapIcon,
   SlidersHorizontal,
 } from "lucide-react";
@@ -18,16 +19,19 @@ import { makeLegacyRedirect } from "./pages/LegacyRedirect";
 import StorageSection from "./pages/StorageSection";
 
 /**
- * The content plugin's frontend half. It owns the **Content** sidebar section —
+ * The content plugin's frontend half. It owns the **Content** sidebar section,
  * Maps and Games browsed from the installed engines via libunitsync (the
- * `tauri-plugin-coilbox-unitsync` worker) — and keeps four configuration-shaped
- * settings sections: Content Folders (Spring/Recoil data roots), Storage (per
- * root disk usage and the cleanup actions, issue #386), Engines (installs found
- * within them), and Engine Settings (a curated, read-only view of
- * `springsettings.cfg` via unitsync), at `/settings/content-folders`,
- * `/settings/storage`, `/settings/engines` and `/settings/engine-settings`. Pair
- * with the `tauri-plugin-coilbox-content` crate (ACL id `coilbox-content`), whose persisted
- * state.json is the cross-plugin read API for where game content lives.
+ * `tauri-plugin-coilbox-unitsync` worker), and keeps the configuration-shaped
+ * settings sections. Pair with the `tauri-plugin-coilbox-content` crate (ACL id
+ * `coilbox-content`), whose persisted state.json is the cross-plugin read API for
+ * where game content lives.
+ *
+ * Its settings live in two places, because they answer to two different readers.
+ * Game settings (`/settings/engine-settings`, the `springsettings.cfg` values read
+ * and written through unitsync) is what a player came to settings for, so it sits
+ * near the top. Content folders, Engines and Storage are about files on disk, so
+ * they sit in the Content group further down, alongside Downloads and Import,
+ * which other plugins declare into the same group.
  *
  * Replays (now under Singleplayer, `play/index.ts`) and the stats profile (now
  * under Multiplayer as "Player stats", `multiplayer/index.tsx`) moved out of this
@@ -165,30 +169,47 @@ const contentPlugin: FramePlugin = {
     },
   ],
   settings: [
+    // Game settings: what a player came to settings for, so it sits third,
+    // under the two the frame pins.
+    {
+      id: "engine-settings",
+      title: "Game settings",
+      order: 20,
+      icon: SlidersHorizontal,
+      Component: EngineSettingsSection,
+    },
+    // Content: the files on disk and where they come from. Configuration rather
+    // than play, so it sits below everything a player touches while playing.
+    {
+      id: "content",
+      title: "Content",
+      order: 80,
+      icon: Library,
+    },
     {
       id: "content-folders",
-      title: "Content Folders",
+      title: "Content folders",
+      parent: "content",
+      order: 10,
       icon: FolderTree,
       Component: FoldersSection,
     },
     {
-      id: "storage",
-      title: "Storage",
-      icon: HardDrive,
-      width: "lg",
-      Component: StorageSection,
-    },
-    {
       id: "engines",
       title: "Engines",
+      parent: "content",
+      order: 20,
       icon: Boxes,
       Component: EnginesSection,
     },
     {
-      id: "engine-settings",
-      title: "Engine Settings",
-      icon: SlidersHorizontal,
-      Component: EngineSettingsSection,
+      id: "storage",
+      title: "Storage",
+      parent: "content",
+      order: 40,
+      icon: HardDrive,
+      width: "lg",
+      Component: StorageSection,
     },
   ],
 };

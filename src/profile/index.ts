@@ -24,7 +24,8 @@ const profilePlugin: FramePlugin = {
     {
       id: "profile",
       title: "Distribution profile",
-      order: 90,
+      parent: "advanced",
+      order: 30,
       icon: Package,
       Component: ProfileSettings,
     },

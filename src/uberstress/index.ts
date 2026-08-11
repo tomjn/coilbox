@@ -59,6 +59,8 @@ const uberstressPlugin: FramePlugin = {
     {
       id: "uberstress",
       title: "uberstress",
+      parent: "advanced",
+      order: 20,
       icon: Server,
       Component: UberstressSettings,
     },

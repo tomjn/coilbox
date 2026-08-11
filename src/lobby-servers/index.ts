@@ -18,6 +18,8 @@ const lobbyServersPlugin: FramePlugin = {
     {
       id: "lobby-servers",
       title: "Lobby servers",
+      parent: "multiplayer",
+      order: 10,
       icon: ServerCog,
       Component: LobbyServersSettings,
     },

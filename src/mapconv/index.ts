@@ -99,6 +99,8 @@ const mapconvPlugin: FramePlugin = {
     {
       id: "mapconv",
       title: "mapconv",
+      parent: "advanced",
+      order: 10,
       icon: MapIcon,
       Component: MapconvSettings,
     },

@@ -31,6 +31,8 @@ const deepLinkPlugin: FramePlugin = {
     {
       id: "import",
       title: "Import",
+      parent: "content",
+      order: 50,
       icon: ImportIcon,
       Component: ImportSection,
     },

@@ -57,6 +57,7 @@ const hubPlugin: FramePlugin = {
     {
       id: "hub",
       title: "Coilbox hub",
+      order: 40,
       icon: CoilboxGlyph,
       Component: HubSettings,
       useVisible: isHubEnabled,

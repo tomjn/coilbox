@@ -22,6 +22,7 @@ const notifyPlugin: FramePlugin = {
     {
       id: "notifications",
       title: "Notifications",
+      order: 30,
       icon: Bell,
       Component: NotificationsSettings,
     },

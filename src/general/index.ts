@@ -1,5 +1,5 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Settings2 } from "lucide-react";
+import { Settings2, Wrench } from "lucide-react";
 import { CloseDrawerOnNavigate } from "./drawer";
 import { FullscreenControls } from "./fullscreen";
 import GeneralSettings from "./pages/SettingsSection";
@@ -34,6 +34,15 @@ const generalPlugin: FramePlugin = {
       order: 0,
       icon: Settings2,
       Component: GeneralSettings,
+    },
+    // The bottom group, for the tooling a player never needs. Declared here
+    // rather than in any one tool because no tool owns the others, and this
+    // plugin already owns the Advanced-mode toggle that gates their nav.
+    {
+      id: "advanced",
+      title: "Advanced",
+      order: 90,
+      icon: Wrench,
     },
   ],
 };

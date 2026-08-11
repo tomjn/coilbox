@@ -85,6 +85,8 @@ const downloadsPlugin: FramePlugin = {
     {
       id: "downloads",
       title: "Downloads",
+      parent: "content",
+      order: 30,
       icon: Download,
       Component: DownloadsSettings,
     },
