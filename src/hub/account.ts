@@ -10,6 +10,18 @@
  * up - on the hub screen and in the publish form - while sign-out stays in
  * Settings, where an action taken once belongs.
  *
+ * The state is one store per hub address rather than one copy per component. It
+ * used to be per component, and each one asked on mount, so opening the hub had
+ * its header, its publish form and its settings section all asking at once. On
+ * macOS that is three keychain prompts in a row. The Rust side now serialises
+ * those reads too, and either fix alone would do, but a component asking a
+ * question two others have already asked is worth not doing in the first place.
+ *
+ * The store is module state rather than a Provider on purpose. A Provider would
+ * have to mount app-wide to be useful, and would then ask who is signed in at
+ * launch, on behalf of everybody who never opens the hub. This asks the first
+ * time somebody wants to know.
+ *
  * Each hub is a separate account, so changing the address asks the new one.
  *
  * No token is on this side of the boundary. The Rust plugin keeps the refresh
@@ -17,7 +29,7 @@
  * who is signed in. See `./auth`.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { type HubIdentity, hubAccount, hubSignIn, hubSignOut } from "./auth";
 
 export interface HubAccount {
@@ -36,64 +48,103 @@ export interface HubAccount {
   signOut: () => Promise<void>;
 }
 
+/** What is known about one hub, without the two actions. */
+type Known = Omit<HubAccount, "signIn" | "signOut">;
+
+/** Before anybody has asked. Shared, so an unvisited hub keeps one identity for
+ * `useSyncExternalStore`, which compares snapshots by reference. */
+const UNASKED: Known = {
+  loading: true,
+  busy: false,
+  signedIn: false,
+  account: null,
+  problem: null,
+};
+
+const known = new Map<string, Known>();
+/** Hubs with a question already in the air, so the second asker doesn't ask. */
+const asking = new Set<string>();
+const listeners = new Set<() => void>();
+
+function snapshot(hubUrl: string): Known {
+  return known.get(hubUrl) ?? UNASKED;
+}
+
+function update(hubUrl: string, change: Partial<Known>) {
+  known.set(hubUrl, { ...snapshot(hubUrl), ...change });
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/**
+ * Ask the hub who we are, unless somebody already has.
+ *
+ * Exported for the test that holds the dedupe still, since the hook it serves
+ * needs a renderer and this needs nothing.
+ */
+export async function askHubWhoWeAre(hubUrl: string) {
+  if (known.has(hubUrl) || asking.has(hubUrl)) return;
+  asking.add(hubUrl);
+  try {
+    const state = await hubAccount({ hubUrl });
+    update(hubUrl, { ...state, loading: false });
+  } catch (e) {
+    update(hubUrl, {
+      loading: false,
+      signedIn: false,
+      account: null,
+      problem: e instanceof Error ? e.message : String(e),
+    });
+  } finally {
+    asking.delete(hubUrl);
+  }
+}
+
 export function useHubAccount(hubUrl: string): HubAccount {
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [signedIn, setSignedIn] = useState(false);
-  const [account, setAccount] = useState<HubIdentity | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
+  const state = useSyncExternalStore(
+    subscribe,
+    useCallback(() => snapshot(hubUrl), [hubUrl]),
+  );
 
   useEffect(() => {
-    const signal = { cancelled: false };
-    setLoading(true);
-    void (async () => {
-      try {
-        const state = await hubAccount({ hubUrl });
-        if (signal.cancelled) return;
-        setSignedIn(state.signedIn);
-        setAccount(state.account);
-        setProblem(state.problem);
-      } catch (e) {
-        if (signal.cancelled) return;
-        setSignedIn(false);
-        setAccount(null);
-        setProblem(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (!signal.cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      signal.cancelled = true;
-    };
+    void askHubWhoWeAre(hubUrl);
   }, [hubUrl]);
 
   const signIn = useCallback(async () => {
-    setBusy(true);
-    setProblem(null);
+    update(hubUrl, { busy: true, problem: null });
     try {
-      const { account: identity } = await hubSignIn({ hubUrl });
-      setAccount(identity);
-      setSignedIn(true);
+      const { account } = await hubSignIn({ hubUrl });
+      update(hubUrl, { account, signedIn: true, loading: false });
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : String(e));
+      update(hubUrl, { problem: e instanceof Error ? e.message : String(e) });
     } finally {
-      setBusy(false);
+      update(hubUrl, { busy: false });
     }
   }, [hubUrl]);
 
   const signOut = useCallback(async () => {
-    setBusy(true);
-    setProblem(null);
+    update(hubUrl, { busy: true, problem: null });
     try {
       await hubSignOut({ hubUrl });
-      setAccount(null);
-      setSignedIn(false);
+      update(hubUrl, { account: null, signedIn: false, loading: false });
     } catch (e) {
-      setProblem(e instanceof Error ? e.message : String(e));
+      update(hubUrl, { problem: e instanceof Error ? e.message : String(e) });
     } finally {
-      setBusy(false);
+      update(hubUrl, { busy: false });
     }
   }, [hubUrl]);
 
-  return { loading, busy, signedIn, account, problem, signIn, signOut };
+  return { ...state, signIn, signOut };
+}
+
+/** Forget every answer. For tests, which must not inherit each other's hubs. */
+export function forgetHubAccounts() {
+  known.clear();
+  asking.clear();
 }
