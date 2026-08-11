@@ -897,6 +897,15 @@ export const contentKeymapDelete = defineCommand<
   { ok: boolean }
 >("coilbox-content", "content_keymap_delete");
 
+/**
+ * Write a serialised keymap container to a path the user picked. Import runs
+ * through `content_import_container`, which reads any coilbox `.json`.
+ */
+export const contentExportKeymap = defineCommand<
+  { dest: string; text: string },
+  Record<string, never>
+>("coilbox-content", "content_export_keymap");
+
 /* -------------------------------------------------------------------------- *
  * unitsync content scan (plugin `tauri-plugin-coilbox-unitsync`, ACL id
  * `coilbox-unitsync`). The Content browser pages call this alongside the

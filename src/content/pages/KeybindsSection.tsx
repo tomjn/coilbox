@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { useImportParam } from "../../deeplink/useImportParam";
 import { useSkirmishDraft } from "../../play/drafts";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import {
@@ -14,6 +15,7 @@ import { MODIFIER_LAYERS, type ModifierLayer } from "../keyboardLayout";
 import {
   addBinding,
   bindingsFor,
+  fromSaved,
   type Keymap,
   keymapText,
   removeBinding,
@@ -24,6 +26,7 @@ import { BindingList } from "./components/BindingList";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { KeyBindingEditor } from "./components/KeyBindingEditor";
 import { KeyboardMap } from "./components/KeyboardMap";
+import { applyContainerText, KeymapsPanel } from "./components/KeymapsPanel";
 import { EmptyState, ErrorBanner } from "./components/states";
 
 /** The directory holding the engine's config, from the path unitsync reports. */
@@ -96,6 +99,17 @@ export default function KeybindsSection() {
   const [selectedKeys, setSelectedKeys] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // A shared keymap link lands here with its code in the query string. It loads
+  // into the editor and stops there, so following a link never rewrites a
+  // stranger's keybinds behind their back.
+  const { code } = useImportParam();
+  useEffect(() => {
+    if (!code) return;
+    setSaveError(
+      applyContainerText(code, (s) => setKeymap((km) => fromSaved(s, km))),
+    );
+  }, [code]);
 
   // What is dirty is what would be written, so compare the files rather than
   // the objects: a keymap rebuilt by an edit that changed nothing is not dirty.
@@ -236,6 +250,15 @@ export default function KeybindsSection() {
           setKeymap((km) => removeBinding(km, keys, action))
         }
       />
+
+      {rootPath ? (
+        <KeymapsPanel
+          rootPath={rootPath}
+          keymap={keymap}
+          gameName={gameName || undefined}
+          onApply={(s) => setKeymap((km) => fromSaved(s, km))}
+        />
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-border/50 border-t pt-3">
         <p

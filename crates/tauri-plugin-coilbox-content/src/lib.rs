@@ -1184,6 +1184,18 @@ async fn content_export_challenge(dest: String, text: String) -> Result<CliResul
     })
 }
 
+/// `content_export_keymap`, write a caller-serialized keymap container to a
+/// caller-chosen path. Opaque like the challenge export beside it: the frontend
+/// owns the container format and picks the destination. Import goes through
+/// `content_import_container`, which already reads any coilbox `.json`.
+#[tauri::command]
+async fn content_export_keymap(dest: String, text: String) -> Result<CliResult, ()> {
+    Ok(match std::fs::write(&dest, text) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(format!("could not write keymap export: {e}")),
+    })
+}
+
 /// `content_import_challenge`, read a challenge file the user picked and hand its
 /// raw text back for the frontend to decode through the same `decodeChallenge` a
 /// pasted code uses (issue #476).
@@ -1568,6 +1580,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_export_build_tree_html,
             content_export_build_tree_zip,
             content_export_challenge,
+            content_export_keymap,
             content_import_challenge,
             content_import_container,
             branding_catalog,

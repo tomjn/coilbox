@@ -155,6 +155,19 @@ export function prepareImport(code: string): PrepareImportResult {
           label: "scenario",
         },
       };
+    case "keymap":
+      // The editor is where a keymap is read and written, so a shared one lands
+      // there loaded rather than saved: nothing touches uikeys.txt until the
+      // person who followed the link presses Save.
+      return {
+        ok: true,
+        plan: {
+          ...(base as ImportPlan),
+          route: importRoute("/settings/engine-keybinds", code),
+          label: "keymap",
+          detail: "It opens in the keybinds editor, unsaved.",
+        },
+      };
   }
 }
 

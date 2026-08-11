@@ -54,7 +54,8 @@ export type ContainerKind =
   | "preset"
   | "challenge"
   | "setup-pack"
-  | "scenario";
+  | "scenario"
+  | "keymap";
 
 export const CONTAINER_KINDS: readonly ContainerKind[] = [
   "campaign",
@@ -62,6 +63,7 @@ export const CONTAINER_KINDS: readonly ContainerKind[] = [
   "challenge",
   "setup-pack",
   "scenario",
+  "keymap",
 ];
 
 /**
@@ -75,6 +77,7 @@ export const SUPPORTED_KIND_VERSIONS: Record<ContainerKind, number> = {
   challenge: 1,
   "setup-pack": 1,
   scenario: 1,
+  keymap: 1,
 };
 
 export interface Container<P = unknown> {
@@ -334,6 +337,15 @@ export function sniffPayloadKind(payload: unknown): ContainerKind | null {
     p.settings !== null
   ) {
     return "challenge";
+  }
+  // Checked before a preset, which also carries a `gameName`, because a keymap
+  // is recognised by its bindings rather than by the game it was built for.
+  if (
+    Array.isArray(p.bindings) &&
+    Array.isArray(p.keysyms) &&
+    (p.fakeMeta === null || typeof p.fakeMeta === "string")
+  ) {
+    return "keymap";
   }
   if (
     Array.isArray(p.participants) &&
