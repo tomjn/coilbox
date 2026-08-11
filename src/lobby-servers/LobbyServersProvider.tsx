@@ -5,16 +5,20 @@ import {
   lsGetCredential,
   lsStoreCredential,
 } from "./bindings";
-import { useCustomServers, useLobbyAccounts } from "./config";
-import { type LegacyLobbyServerDir, planMigration } from "./migration";
+import { useCustomServers, useLastLogin, useLobbyAccounts } from "./config";
+import {
+  type LegacyLobbyServerDir,
+  planBarTlsRemap,
+  planMigration,
+} from "./migration";
 
 /**
  * App-level provider (registered via the plugin's `Provider`) that runs the one-time
- * migration from the old `lobbyServers.directory` into the server/account model,
- * guarded by a `lobbyServers.migratedV2` flag so it runs at most once.
+ * settings migrations, each guarded by its own flag so it runs at most once.
  */
 export function LobbyServersProvider({ children }: { children: ReactNode }) {
   useLobbyServersMigration();
+  useBarTlsMigration();
   return <>{children}</>;
 }
 
@@ -57,4 +61,59 @@ function useLobbyServersMigration() {
       setMigrated(true);
     })();
   }, [migrated, oldDir, setCustom, setAccounts, setMigrated]);
+}
+
+/**
+ * Move logins off the retired plaintext BAR built-in onto the SSL one, once, guarded
+ * by `lobbyServers.migratedBarTls`.
+ *
+ * Safe to run alongside the v2 migration above despite both writing accounts: an
+ * install still holding a legacy directory has no accounts yet for this to rewrite,
+ * and `planMigration` already lands those rows on the SSL entry itself.
+ */
+function useBarTlsMigration() {
+  const [migrated, setMigrated] = useSetting(
+    "lobbyServers.migratedBarTls",
+    false,
+  );
+  const [accountsCfg, setAccounts] = useLobbyAccounts();
+  const [lastLogin, setLastLogin] = useLastLogin();
+  const ranRef = useRef(false);
+
+  useEffect(() => {
+    if (migrated || ranRef.current) return;
+    ranRef.current = true;
+
+    const plan = planBarTlsRemap(accountsCfg.accounts, lastLogin);
+    if (!plan.changed) {
+      setMigrated(true);
+      return;
+    }
+    setAccounts({ accounts: plan.accounts });
+    setLastLogin(plan.lastLogin);
+
+    (async () => {
+      // Best-effort, as above: a failed move costs that login its saved password,
+      // not the rest of the migration.
+      for (const move of plan.reKey) {
+        try {
+          const { secret } = await lsGetCredential(move.from);
+          if (secret != null) {
+            await lsStoreCredential({ ...move.to, secret });
+            await lsDeleteCredential(move.from);
+          }
+        } catch (e) {
+          console.warn("bar TLS remap: keychain move failed", move, e);
+        }
+      }
+      setMigrated(true);
+    })();
+  }, [
+    migrated,
+    accountsCfg,
+    lastLogin,
+    setAccounts,
+    setLastLogin,
+    setMigrated,
+  ]);
 }
