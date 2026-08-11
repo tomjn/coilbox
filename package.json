@@ -14,6 +14,7 @@
     "sidecar:all": "bun run sidecar:unitsync && bun run sidecar:prdownloader",
     "icon:macos-glass": "bash scripts/build-macos-glass-icon.sh",
     "stars:catalogue": "bun scripts/build-star-catalogue.mjs && biome check --write src/conquest/realstars/catalogue.json",
+    "keybinds:defaults": "bun scripts/build-engine-keybinds.mjs && biome check --write src/content/engineKeybinds.generated.ts",
     "lego:pack": "bun scripts/legopack/build.mjs",
     "lego:reads3o": "bun scripts/reads3o.mjs",
     "lego:reference": "bun scripts/reference-model.mjs",
