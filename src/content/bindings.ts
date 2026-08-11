@@ -1322,12 +1322,22 @@ export interface EngineConfigSetting {
   key: string;
   label: string;
   category: string;
-  /** How to render the value. */
-  type: "bool" | "number" | "string";
+  /**
+   * Which control the value deserves. `enum` is a named choice (see `options`),
+   * `range` has both ends known (see `min`/`max`) and is worth dragging.
+   */
+  type: "bool" | "number" | "string" | "enum" | "range";
   /** The effective value (configured value, or the engine default when unset). */
   value: string;
   /** The engine's default for this key, for reset + "changed" hints. */
   default: string;
+  /** A line under the label, for a key whose name does not explain itself. */
+  hint?: string;
+  /** The engine's own bounds, where it declares them. */
+  min?: number;
+  max?: number;
+  /** The named choices for an `enum`, absent for everything else. */
+  options?: { value: string; label: string }[];
 }
 
 export interface EngineConfigResult {

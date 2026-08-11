@@ -7,12 +7,18 @@ import {
   HardDrive,
   Library,
   Map as MapIcon,
+  Monitor,
+  MousePointer2,
+  Save,
   SlidersHorizontal,
+  Sparkles,
+  Volume2,
 } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import ContentStartupProvider from "./ContentStartupProvider";
-import EngineSettingsSection from "./pages/EngineSettingsSection";
+import { engineConfigPage } from "./pages/EngineConfigPage";
+import EngineProfilesSection from "./pages/EngineProfilesSection";
 import EnginesSection from "./pages/EnginesSection";
 import FoldersSection from "./pages/FoldersSection";
 import { makeLegacyRedirect } from "./pages/LegacyRedirect";
@@ -170,13 +176,66 @@ const contentPlugin: FramePlugin = {
   ],
   settings: [
     // Game settings: what a player came to settings for, so it sits third,
-    // under the two the frame pins.
+    // under the two the frame pins. A group with no Component of its own, which
+    // makes the frame render an index of the pages below it. The id is
+    // unchanged from when this was one page, so `/settings/engine-settings`
+    // still lands somewhere sensible.
+    //
+    // The five category pages are the worker's own categories, so a setting
+    // added to its catalog lands on the right page with no change here.
     {
       id: "engine-settings",
       title: "Game settings",
       order: 20,
       icon: SlidersHorizontal,
-      Component: EngineSettingsSection,
+    },
+    {
+      id: "engine-display",
+      title: "Display",
+      parent: "engine-settings",
+      order: 10,
+      icon: Monitor,
+      Component: engineConfigPage("Display"),
+    },
+    {
+      id: "engine-graphics",
+      title: "Graphics",
+      parent: "engine-settings",
+      order: 20,
+      icon: Sparkles,
+      Component: engineConfigPage("Graphics"),
+    },
+    {
+      id: "engine-sound",
+      title: "Sound",
+      parent: "engine-settings",
+      order: 30,
+      icon: Volume2,
+      Component: engineConfigPage("Sound"),
+    },
+    {
+      id: "engine-input",
+      title: "Input and camera",
+      parent: "engine-settings",
+      order: 40,
+      icon: MousePointer2,
+      Component: engineConfigPage("Input & Camera"),
+    },
+    {
+      id: "engine-game",
+      title: "In game",
+      parent: "engine-settings",
+      order: 50,
+      icon: Gamepad2,
+      Component: engineConfigPage("General"),
+    },
+    {
+      id: "engine-profiles",
+      title: "Saved configs",
+      parent: "engine-settings",
+      order: 60,
+      icon: Save,
+      Component: EngineProfilesSection,
     },
     // Content: the files on disk and where they come from. Configuration rather
     // than play, so it sits below everything a player touches while playing.

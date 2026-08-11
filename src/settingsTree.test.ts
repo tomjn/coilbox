@@ -77,6 +77,14 @@ describe("settings declarations", () => {
         .filter((s) => s.parent === parent)
         .sort((a, b) => (a.order ?? 100) - (b.order ?? 100))
         .map((s) => s.id);
+    expect(childrenOf("engine-settings")).toEqual([
+      "engine-display",
+      "engine-graphics",
+      "engine-sound",
+      "engine-input",
+      "engine-game",
+      "engine-profiles",
+    ]);
     expect(childrenOf("multiplayer")).toEqual([
       "lobby-servers",
       "chat-highlights",
