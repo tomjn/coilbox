@@ -11,7 +11,7 @@ picoframe composes settings from every plugin's `settings[]`, builds a tree from
 ```
 General                   0
 Appearance                10
-Game settings             20    group, id engine-settings
+Engine Settings             20    group, id engine-settings
   Display
   Graphics
   Sound
@@ -37,7 +37,7 @@ Advanced                  90    group
   Distribution profile
 ```
 
-Section ids do not change. An id is the URL (`/settings/<id>`), the merge key in `composeSettings`, and what a distribution profile names in `hideSettings`, so titles are free to change and ids are not. Two titles do change: "Engine Settings" becomes "Game settings", and "Updates" becomes "Coilbox updates" so the two update pages read as different things.
+Section ids do not change. An id is the URL (`/settings/<id>`), the merge key in `composeSettings`, and what a distribution profile names in `hideSettings`, so titles are free to change and ids are not. One title changes: "Updates" becomes "Coilbox updates", so the two update pages read as different things. Engine Settings keeps its name and becomes a group over its five categories.
 
 Coilbox updates stays top-level rather than joining Advanced. It is how a player gets fixes.
 
@@ -47,7 +47,7 @@ Coilbox updates stays top-level rather than joining Advanced. It is how a player
 
 The component moves from `src/multiplayer/pages/` to `src/downloads/pages/`, reading the key from `src/multiplayer/battle/autoDownload.ts`, which keeps the behaviour where the behaviour is.
 
-## Game settings splits by category
+## Engine Settings splits by category
 
 The worker already groups each setting under a `category`. Those categories become the subpages, so a new catalog entry lands on the right page with no frontend change.
 
@@ -55,7 +55,7 @@ One `EngineConfigPage` component takes a category and renders the shared chrome 
 
 This costs one worker call, not five. `useUnitsyncEngineConfig` reads through a module-level cache keyed `dataDir::enginePath`, and the engine choice is the persisted `content.scanTarget` setting, so it follows you between pages.
 
-Config profiles (save and restore a whole `springsettings.cfg`) apply to all five categories, so they sit on the Game settings landing page beside the category cards.
+Config profiles (save and restore a whole `springsettings.cfg`) apply to all five categories, so they sit on the Engine Settings landing page beside the category cards.
 
 ## Engine settings get the right control
 

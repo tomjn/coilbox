@@ -53,7 +53,7 @@ describe("settings declarations", () => {
     // Appearance is missing from this list on purpose. The frame declares it
     // from a plugin of its own with `order: 10`, and what the profile plugin
     // declares here under the same id is only a visibility gate. At runtime it
-    // lands between General and Game settings.
+    // lands between General and Engine Settings.
     const top = [...merged.values()]
       .filter((s) => !s.parent && s.id !== FRAME_APPEARANCE_SETTINGS_ID)
       .sort((a, b) => (a.order ?? 100) - (b.order ?? 100))

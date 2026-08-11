@@ -16,7 +16,7 @@ import {
  *
  * This was one long page with headings. The categories the worker already puts
  * every setting in make better pages than headings, so each is its own section
- * under Game settings and this component is what they all render. A category
+ * under Engine Settings and this component is what they all render. A category
  * added to the worker's catalog appears here with no change on this side.
  *
  * Splitting the page costs one worker call, not five. `useUnitsyncEngineConfig`

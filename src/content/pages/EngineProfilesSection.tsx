@@ -4,7 +4,7 @@ import { ConfigProfilesPanel } from "./components/ConfigProfilesPanel";
 import { EmptyState } from "./components/states";
 
 /**
- * Saved copies of a content root's whole engine config, in Game settings.
+ * Saved copies of a content root's whole engine config, in Engine Settings.
  *
  * It sat at the bottom of the single engine settings page. Splitting that page
  * by category left it with no category to belong to, which is the right answer:
