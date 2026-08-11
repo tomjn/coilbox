@@ -5,6 +5,7 @@ import {
   FolderTree,
   Gamepad2,
   HardDrive,
+  Keyboard,
   Library,
   Map as MapIcon,
   Monitor,
@@ -21,6 +22,7 @@ import { engineConfigPage } from "./pages/EngineConfigPage";
 import EngineProfilesSection from "./pages/EngineProfilesSection";
 import EnginesSection from "./pages/EnginesSection";
 import FoldersSection from "./pages/FoldersSection";
+import KeybindsSection from "./pages/KeybindsSection";
 import { makeLegacyRedirect } from "./pages/LegacyRedirect";
 import StorageSection from "./pages/StorageSection";
 
@@ -234,6 +236,19 @@ const contentPlugin: FramePlugin = {
       order: 50,
       icon: Gamepad2,
       Component: engineConfigPage("General"),
+    },
+    // Keybinds sits above Saved configs because saving a copy is what you do
+    // after editing, and below the category pages because it is the one engine
+    // setting that is not a springsettings.cfg value at all.
+    {
+      id: "engine-keybinds",
+      title: "Keybinds",
+      description: "What every key does, on a keyboard you can click.",
+      parent: "engine-settings",
+      order: 55,
+      icon: Keyboard,
+      width: "lg",
+      Component: KeybindsSection,
     },
     {
       id: "engine-profiles",
