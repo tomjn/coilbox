@@ -63,9 +63,9 @@ describe("settings declarations", () => {
       "engine-settings",
       "notifications",
       "hub",
-      "multiplayer",
       "updates",
       "game-updates",
+      "multiplayer",
       "content",
       "advanced",
     ]);

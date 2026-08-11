@@ -28,7 +28,7 @@ const gameUpdatesPlugin: FramePlugin = {
     {
       id: "game-updates",
       title: "Game updates",
-      order: 70,
+      order: 60,
       icon: Gamepad2,
       useVisible: hasUpdateRepo,
       Component: GameUpdatesSection,

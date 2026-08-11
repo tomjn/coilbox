@@ -22,7 +22,7 @@ const updaterPlugin: FramePlugin = {
       // "Coilbox updates" rather than "Updates", because "Game updates" sits
       // directly below it and one of the two has to say which it means.
       title: "Coilbox updates",
-      order: 60,
+      order: 50,
       icon: Download,
       Component: UpdatesSettingsSection,
     },

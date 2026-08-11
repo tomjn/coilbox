@@ -161,7 +161,7 @@ const multiplayerPlugin: FramePlugin = {
     {
       id: "multiplayer",
       title: "Multiplayer",
-      order: 50,
+      order: 70,
       icon: Users,
     },
     {
