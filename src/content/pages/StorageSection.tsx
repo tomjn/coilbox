@@ -147,7 +147,7 @@ export default function StorageSection() {
     return (
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
         <p className="text-sm text-muted-foreground">
-          No content folders to measure yet. Add one in Content Folders.
+          No content folders to measure yet. Add one in Content folders.
         </p>
       </div>
     );

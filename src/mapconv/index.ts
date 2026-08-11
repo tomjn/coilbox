@@ -99,6 +99,7 @@ const mapconvPlugin: FramePlugin = {
     {
       id: "mapconv",
       title: "mapconv",
+      description: "The map compiler coilbox builds and takes apart maps with.",
       parent: "advanced",
       order: 10,
       icon: MapIcon,

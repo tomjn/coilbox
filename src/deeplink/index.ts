@@ -31,6 +31,7 @@ const deepLinkPlugin: FramePlugin = {
     {
       id: "import",
       title: "Import",
+      description: "Paste a share code or link somebody sent you.",
       parent: "content",
       order: 50,
       icon: ImportIcon,

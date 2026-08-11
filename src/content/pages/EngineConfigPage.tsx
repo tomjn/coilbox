@@ -96,7 +96,10 @@ export function EngineConfigPage({ category }: { category: string }) {
           }
         />
       ) : (
-        <div className="grid grid-cols-[minmax(10rem,auto)_1fr] items-center gap-x-4 gap-y-2.5 rounded-lg border border-border/50 bg-card p-3 text-sm">
+        // The label column is capped rather than `auto`, because hints live in
+        // it and an `auto` column grows to the longest one, which left the
+        // controls a few pixels wide.
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(14rem,24rem)] items-center gap-x-4 gap-y-2.5 rounded-lg border border-border/50 bg-card p-3 text-sm">
           {settings.map((s) => (
             <EngineSettingField
               key={s.key}

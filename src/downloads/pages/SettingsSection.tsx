@@ -143,14 +143,14 @@ export default function DownloadsSettings() {
         </h2>
         <p className="text-xs text-muted-foreground">
           The content folder downloads are written into. Detected folders come
-          from the{" "}
+          from{" "}
           <Link
             className="underline underline-offset-4"
             to="/settings/content-folders"
           >
-            Content Folders settings
+            Content folders
           </Link>
-          ; pick one so games, maps, and engines land where the engine can find
+          . Pick one so games, maps, and engines land where the engine can find
           them.
         </p>
         {roots.length === 0 ? (
@@ -160,7 +160,7 @@ export default function DownloadsSettings() {
               className="underline underline-offset-4"
               to="/settings/content-folders"
             >
-              Content Folders
+              Content folders
             </Link>
             .
           </p>

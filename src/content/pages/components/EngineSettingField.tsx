@@ -94,7 +94,7 @@ export function EngineSettingField({
         {s.label}
       </Label>
       {s.hint && (
-        <span className="text-xs leading-snug text-muted-foreground/70">
+        <span className="text-xs leading-snug text-muted-foreground">
           {s.hint}
         </span>
       )}
@@ -105,16 +105,22 @@ export function EngineSettingField({
     <div className="contents">
       {label}
       <div className="flex min-w-0 items-center gap-2">
-        <Control
-          setting={s}
-          id={id}
-          draft={draft}
-          setDraft={setDraft}
-          commit={commit}
-          disabled={disabled}
-        />
-        {status}
-        {reset}
+        <div className="flex min-w-0 flex-1 items-center">
+          <Control
+            setting={s}
+            id={id}
+            draft={draft}
+            setDraft={setDraft}
+            commit={commit}
+            disabled={disabled}
+          />
+        </div>
+        {/* Held open whether or not there is a Reset to put in it, so a row
+            that is at its default lines up with one that is not. */}
+        <div className="flex w-24 shrink-0 items-center justify-end gap-1">
+          {status}
+          {reset}
+        </div>
       </div>
     </div>
   );
@@ -161,7 +167,7 @@ function Control({
         onValueChange={(v) => void commit(v)}
         disabled={disabled}
       >
-        <SelectTrigger id={id} size="sm" className="w-56">
+        <SelectTrigger id={id} size="sm" className="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -193,7 +199,7 @@ function Control({
           // so one drag is one write rather than one per pixel.
           onValueChange={([v]) => setDraft(String(v))}
           onValueCommit={([v]) => void commit(String(v))}
-          className="max-w-64 py-2"
+          className="py-2"
         />
         <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
           {value}

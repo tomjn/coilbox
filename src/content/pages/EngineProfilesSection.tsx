@@ -22,13 +22,8 @@ export default function EngineProfilesSection() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Save the current engine config as a named copy, and put it back later.
-        This covers{" "}
-        <span className="font-mono text-xs">springsettings.cfg</span>, your
-        LuaUI config and your hotkeys, for the content folder below.
-      </p>
-
+      {/* No intro paragraph. The section's own description sits under the page
+          title, and the panel below says what a profile covers. */}
       <BrowserToolbar
         targets={targets}
         selectedKey={selectedKey}

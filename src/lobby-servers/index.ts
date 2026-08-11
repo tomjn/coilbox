@@ -18,6 +18,7 @@ const lobbyServersPlugin: FramePlugin = {
     {
       id: "lobby-servers",
       title: "Lobby servers",
+      description: "The servers you can log in to, and your accounts on them.",
       parent: "multiplayer",
       order: 10,
       icon: ServerCog,

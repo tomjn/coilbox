@@ -98,7 +98,7 @@ export default function EnginesSection() {
               to="/settings/content-folders"
               className="underline underline-offset-4"
             >
-              Content Folders
+              Content folders
             </Link>{" "}
             or download an engine.
           </p>

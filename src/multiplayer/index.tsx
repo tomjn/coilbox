@@ -161,12 +161,14 @@ const multiplayerPlugin: FramePlugin = {
     {
       id: "multiplayer",
       title: "Multiplayer",
+      description: "The servers you play on, and who you hear from there.",
       order: 70,
       icon: Users,
     },
     {
       id: "chat-highlights",
       title: "Chat highlights",
+      description: "Words that light up a chat tab when somebody says them.",
       parent: "multiplayer",
       order: 20,
       icon: AtSign,
@@ -175,6 +177,7 @@ const multiplayerPlugin: FramePlugin = {
     {
       id: "ignored-users",
       title: "Ignored users",
+      description: "People whose messages coilbox hides from you.",
       parent: "multiplayer",
       order: 30,
       icon: UserX,

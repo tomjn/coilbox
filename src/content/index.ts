@@ -186,12 +186,14 @@ const contentPlugin: FramePlugin = {
     {
       id: "engine-settings",
       title: "Engine Settings",
+      description: "How the game itself looks, sounds and handles.",
       order: 20,
       icon: SlidersHorizontal,
     },
     {
       id: "engine-display",
       title: "Display",
+      description: "Fullscreen, resolution and vsync.",
       parent: "engine-settings",
       order: 10,
       icon: Monitor,
@@ -200,6 +202,7 @@ const contentPlugin: FramePlugin = {
     {
       id: "engine-graphics",
       title: "Graphics",
+      description: "Shadows, water, particles and anti-aliasing.",
       parent: "engine-settings",
       order: 20,
       icon: Sparkles,
@@ -208,6 +211,7 @@ const contentPlugin: FramePlugin = {
     {
       id: "engine-sound",
       title: "Sound",
+      description: "Volume, channel by channel.",
       parent: "engine-settings",
       order: 30,
       icon: Volume2,
@@ -216,6 +220,7 @@ const contentPlugin: FramePlugin = {
     {
       id: "engine-input",
       title: "Input and camera",
+      description: "Camera mode, edge scrolling and the mouse.",
       parent: "engine-settings",
       order: 40,
       icon: MousePointer2,
@@ -224,6 +229,7 @@ const contentPlugin: FramePlugin = {
     {
       id: "engine-game",
       title: "In game",
+      description: "Your player name and team highlighting.",
       parent: "engine-settings",
       order: 50,
       icon: Gamepad2,
@@ -232,6 +238,7 @@ const contentPlugin: FramePlugin = {
     {
       id: "engine-profiles",
       title: "Saved configs",
+      description: "Keep a copy of your whole engine config, and put it back.",
       parent: "engine-settings",
       order: 60,
       icon: Save,
@@ -242,12 +249,15 @@ const contentPlugin: FramePlugin = {
     {
       id: "content",
       title: "Content",
+      description:
+        "Where your games, maps and engines live, and where new ones come from.",
       order: 80,
       icon: Library,
     },
     {
       id: "content-folders",
       title: "Content folders",
+      description: "The folders coilbox reads games and maps from.",
       parent: "content",
       order: 10,
       icon: FolderTree,
@@ -256,6 +266,7 @@ const contentPlugin: FramePlugin = {
     {
       id: "engines",
       title: "Engines",
+      description: "The engine versions you have, and getting more.",
       parent: "content",
       order: 20,
       icon: Boxes,
@@ -264,6 +275,7 @@ const contentPlugin: FramePlugin = {
     {
       id: "storage",
       title: "Storage",
+      description: "What is taking up space, and clearing it out.",
       parent: "content",
       order: 40,
       icon: HardDrive,

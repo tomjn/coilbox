@@ -41,6 +41,8 @@ const generalPlugin: FramePlugin = {
     {
       id: "advanced",
       title: "Advanced",
+      description:
+        "Tools for making things, and for the people who ship coilbox.",
       order: 90,
       icon: Wrench,
     },
