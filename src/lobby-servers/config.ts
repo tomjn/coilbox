@@ -49,6 +49,11 @@ export interface LobbyServer {
   builtin?: boolean;
   /** Our support for this server is alpha, which the UI badges wherever it lists it. */
   alpha?: boolean;
+  /**
+   * A caution shown under the entry in Settings, for something a player would
+   * otherwise only discover by hitting it. Built-in entries only.
+   */
+  notice?: string;
   /** The distribution's preferred server (profile `lobby.official`): badged + first. */
   official?: boolean;
 }
@@ -98,11 +103,27 @@ export function tachyonBaseUrl(server: {
 export const OFFICIAL_ID = "profile-official";
 
 /**
+ * Built-in ids that no longer exist, mapped to the entry that replaced them. A
+ * distribution's `profile.json` is not ours to migrate, so a profile still naming
+ * a retired id keeps working instead of silently resolving to nothing.
+ */
+const RENAMED_BUILTIN_IDS: Record<string, string> = { bar: "bar-ssl" };
+
+/**
+ * The current id for a built-in, following {@link RENAMED_BUILTIN_IDS}. Unknown and
+ * current ids pass through untouched. Pure.
+ */
+export function canonicalServerId(id: string): string {
+  return RENAMED_BUILTIN_IDS[id] ?? id;
+}
+
+/**
  * The well-known public lobby servers, taken from SkyLobby's `default-servers`
- * (graal/clj/skylobby/util.clj). Read-only; users add logins against these. BAR's
- * plain (8200) and SSL (8201) endpoints are kept as two entries, mirroring SkyLobby.
- * BAR's Tachyon endpoint is a third entry, because the same server runs both
- * protocols and TASServer has no announced sunset.
+ * (graal/clj/skylobby/util.clj). Read-only, and users add logins against these. Only
+ * BAR's SSL endpoint (8201) is offered, not its plaintext 8200 one. It is the same
+ * teiserver either way, so the plain port buys nothing and sends the password in the
+ * clear. BAR's Tachyon endpoint is a separate entry, because the same server runs
+ * both protocols and TASServer has no announced sunset.
  */
 export const BUILTIN_SERVERS: LobbyServer[] = [
   {
@@ -115,14 +136,6 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     allowSelfSigned: true,
   },
   {
-    id: "spring-official",
-    name: "Spring Official",
-    host: "lobby.springrts.com",
-    port: 8200,
-    tls: false,
-    allowSelfSigned: false,
-  },
-  {
     id: "techa",
     name: "Tech Annihilation",
     host: "lobby.techa-rts.com",
@@ -131,16 +144,8 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     allowSelfSigned: false,
   },
   {
-    id: "bar",
-    name: "Beyond All Reason",
-    host: "server4.beyondallreason.info",
-    port: 8200,
-    tls: false,
-    allowSelfSigned: false,
-  },
-  {
     id: "bar-ssl",
-    name: "Beyond All Reason (SSL)",
+    name: "Beyond All Reason",
     host: "server4.beyondallreason.info",
     port: 8201,
     tls: true,
@@ -162,6 +167,20 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     allowSelfSigned: false,
     protocol: "tachyon",
     alpha: true,
+    notice:
+      "Our Tachyon support is incomplete. Use the Beyond All Reason entry instead.",
+  },
+  // Last on purpose: it is the least likely destination for a Recoil or BAR player,
+  // and the one nobody can register a new account on.
+  {
+    id: "spring-official",
+    name: "Spring Official",
+    host: "lobby.springrts.com",
+    port: 8200,
+    tls: false,
+    allowSelfSigned: false,
+    notice:
+      "You cannot register a new account here. This server's verification emails are not being delivered.",
   },
 ];
 
@@ -186,7 +205,8 @@ export function resolveProfileServerRules(
   if (!lobby) return {};
   let official: LobbyServer | undefined;
   if (typeof lobby.official === "string") {
-    const b = BUILTIN_SERVERS.find((s) => s.id === lobby.official);
+    const wanted = canonicalServerId(lobby.official);
+    const b = BUILTIN_SERVERS.find((s) => s.id === wanted);
     if (b) official = { ...b, official: true };
   } else if (lobby.official?.host) {
     const o = lobby.official;
@@ -201,7 +221,7 @@ export function resolveProfileServerRules(
       official: true,
     };
   }
-  return { official, presets: lobby.presets };
+  return { official, presets: lobby.presets?.map(canonicalServerId) };
 }
 
 /**

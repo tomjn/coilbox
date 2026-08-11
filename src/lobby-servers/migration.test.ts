@@ -11,7 +11,12 @@ vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
 }));
 
-import { type LegacyLobbyServer, planMigration } from "./migration";
+import type { LobbyAccount } from "./config";
+import {
+  type LegacyLobbyServer,
+  planBarTlsRemap,
+  planMigration,
+} from "./migration";
 
 const row = (p: Partial<LegacyLobbyServer>): LegacyLobbyServer => ({
   id: "row-uuid",
@@ -43,14 +48,16 @@ describe("planMigration", () => {
       },
       ids(),
     );
+    // 8200 was BAR's plaintext built-in, which is retired, so the row lands on the
+    // SSL entry rather than becoming a custom server that still could not host.
     expect(plan.customServers).toEqual([]);
     expect(plan.accounts).toEqual([
-      { id: "acc-1", serverId: "bar", username: "alice" },
+      { id: "acc-1", serverId: "bar-ssl", username: "alice" },
     ]);
     expect(plan.reKey).toEqual([
       {
         from: { serverId: "row-uuid", username: "alice" },
-        to: { serverId: "bar", username: "alice" },
+        to: { serverId: "bar-ssl", username: "alice" },
       },
     ]);
   });
@@ -141,5 +148,66 @@ describe("planMigration", () => {
       ids(),
     );
     expect(plan).toEqual({ customServers: [], accounts: [], reKey: [] });
+  });
+});
+
+describe("planBarTlsRemap", () => {
+  const acc = (p: Partial<LobbyAccount>): LobbyAccount => ({
+    id: "a1",
+    serverId: "bar",
+    username: "alice",
+    ...p,
+  });
+
+  it("moves a login onto the SSL entry and re-keys its secret", () => {
+    const plan = planBarTlsRemap(
+      [acc({ lastUsedAt: 7, hasSecret: true })],
+      null,
+    );
+    expect(plan.changed).toBe(true);
+    expect(plan.accounts).toEqual([
+      {
+        id: "a1",
+        serverId: "bar-ssl",
+        username: "alice",
+        lastUsedAt: 7,
+        hasSecret: true,
+      },
+    ]);
+    expect(plan.reKey).toEqual([
+      {
+        from: { serverId: "bar", username: "alice" },
+        to: { serverId: "bar-ssl", username: "alice" },
+      },
+    ]);
+  });
+
+  it("carries the last login across, so auto-connect still fires", () => {
+    const plan = planBarTlsRemap([acc({})], {
+      serverId: "bar",
+      username: "alice",
+    });
+    expect(plan.lastLogin).toEqual({ serverId: "bar-ssl", username: "alice" });
+  });
+
+  it("leaves every other login alone", () => {
+    const other = acc({ id: "a2", serverId: "techa", username: "bob" });
+    const plan = planBarTlsRemap([acc({}), other], null);
+    expect(plan.accounts[1]).toBe(other);
+  });
+
+  it("is a no-op when nothing points at the retired entry", () => {
+    const accounts = [acc({ serverId: "bar-ssl" })];
+    const plan = planBarTlsRemap(accounts, null);
+    expect(plan.changed).toBe(false);
+    expect(plan.accounts).toBe(accounts);
+    expect(plan.reKey).toEqual([]);
+  });
+
+  it("absorbs a login that already exists on the SSL entry, keeping its password", () => {
+    const kept = acc({ id: "a2", serverId: "bar-ssl", username: "Alice" });
+    const plan = planBarTlsRemap([acc({}), kept], null);
+    expect(plan.accounts).toEqual([kept]);
+    expect(plan.reKey).toEqual([]);
   });
 });

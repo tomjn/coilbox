@@ -22,7 +22,7 @@ function builtin(id: string): LobbyServer {
   return server;
 }
 
-const bar = builtin("bar");
+const bar = builtin("bar-ssl");
 const tachyon = builtin("bar-tachyon");
 
 describe("protocolForKey", () => {
@@ -39,9 +39,6 @@ describe("protocolForKey", () => {
   it("tells the two Beyond All Reason endpoints apart by port", () => {
     // The same host runs both protocols, so the port is the whole discriminator.
     expect(bar.host).toBe(tachyon.host);
-    expect(protocolForKey(`p@${bar.host}:8200`, BUILTIN_SERVERS)).toBe(
-      "tasserver",
-    );
     expect(protocolForKey(`p@${bar.host}:8201`, BUILTIN_SERVERS)).toBe(
       "tasserver",
     );

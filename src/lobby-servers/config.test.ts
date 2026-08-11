@@ -21,6 +21,7 @@ import {
   BUILTIN_SERVERS,
   buildCatalog,
   type CustomServersConfig,
+  canonicalServerId,
   isLastLogin,
   type LobbyAccount,
   type LobbyServer,
@@ -54,6 +55,12 @@ describe("allServers", () => {
   it("does not mutate BUILTIN_SERVERS with the builtin flag", () => {
     allServers([]);
     expect(BUILTIN_SERVERS.every((s) => s.builtin === undefined)).toBe(true);
+  });
+
+  it("sorts the Spring official server last, below the BAR entries", () => {
+    // Deliberate ordering, not incidental: it is the least likely destination here
+    // and the one nobody can register on. The catalog keeps declaration order.
+    expect(BUILTIN_SERVERS.at(-1)?.id).toBe("spring-official");
   });
 });
 
@@ -134,8 +141,8 @@ describe("the Tachyon built-in, offered like any other server", () => {
   });
 
   it("is kept when a profile preset names it", () => {
-    const out = buildCatalog([], { presets: ["bar", "bar-tachyon"] });
-    expect(out.map((s) => s.id)).toEqual(["bar", "bar-tachyon"]);
+    const out = buildCatalog([], { presets: ["bar-ssl", "bar-tachyon"] });
+    expect(out.map((s) => s.id)).toEqual(["bar-ssl", "bar-tachyon"]);
   });
 
   it("can be a profile's official server", () => {
@@ -250,9 +257,30 @@ describe("resolveProfileServerRules", () => {
   });
 
   it("passes the preset allow-list through", () => {
-    expect(resolveProfileServerRules({ presets: ["bar"] }).presets).toEqual([
-      "bar",
+    expect(resolveProfileServerRules({ presets: ["techa"] }).presets).toEqual([
+      "techa",
     ]);
+  });
+});
+
+describe("a profile naming BAR's retired plaintext entry", () => {
+  it("resolves the preset onto the SSL entry, so the list is not empty", () => {
+    const rules = resolveProfileServerRules({ presets: ["bar"] });
+    expect(rules.presets).toEqual(["bar-ssl"]);
+    expect(buildCatalog([], rules).map((s) => s.id)).toEqual(["bar-ssl"]);
+  });
+
+  it("resolves the official server onto the SSL entry", () => {
+    const { official } = resolveProfileServerRules({ official: "bar" });
+    expect(official).toMatchObject({ id: "bar-ssl", port: 8201, tls: true });
+  });
+
+  it("leaves a current id alone and still ignores an unknown one", () => {
+    expect(canonicalServerId("techa")).toBe("techa");
+    expect(canonicalServerId("nope")).toBe("nope");
+    expect(
+      resolveProfileServerRules({ official: "nope" }).official,
+    ).toBeUndefined();
   });
 });
 
@@ -277,12 +305,12 @@ describe("buildCatalog", () => {
   });
 
   it("narrows built-ins to the allow-list", () => {
-    const out = buildCatalog([], { presets: ["bar", "techa"] });
-    expect(out.map((s) => s.id)).toEqual(["techa", "bar"]);
+    const out = buildCatalog([], { presets: ["bar-ssl", "techa"] });
+    expect(out.map((s) => s.id)).toEqual(["techa", "bar-ssl"]);
   });
 
   it("keeps the protocol on the entries it does offer", () => {
-    const out = buildCatalog([], { presets: ["bar", "techa"] });
+    const out = buildCatalog([], { presets: ["bar-ssl", "techa"] });
     expect(out.map(serverProtocol)).toEqual(["tasserver", "tasserver"]);
   });
 
@@ -297,16 +325,16 @@ describe("buildCatalog", () => {
 describe("autoConnectTarget", () => {
   const account: LobbyAccount = {
     id: "acc-1",
-    serverId: "bar",
+    serverId: "bar-ssl",
     username: "player",
   };
   const servers = allServers([]);
-  const lastLogin = { serverId: "bar", username: "player" };
+  const lastLogin = { serverId: "bar-ssl", username: "player" };
 
   it("returns the account + server when enabled and the last login resolves", () => {
     const t = autoConnectTarget(true, lastLogin, [account], servers);
     expect(t?.account).toBe(account);
-    expect(t?.server.id).toBe("bar");
+    expect(t?.server.id).toBe("bar-ssl");
   });
 
   it("returns null when auto-connect is off", () => {
