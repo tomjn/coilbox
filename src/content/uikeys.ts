@@ -131,14 +131,45 @@ export function formatKeySet(ks: KeySet): string {
   );
 }
 
-export function parseKeyChain(raw: string): KeyChain | null {
+function parseParts(parts: string[]): KeyChain | null {
   const chain: KeyChain = [];
-  for (const part of raw.split(",")) {
+  for (const part of parts) {
     const ks = parseKeySet(part);
     if (!ks) return null;
     chain.push(ks);
   }
   return chain.length > 0 ? chain : null;
+}
+
+/**
+ * Split a keychain where a comma is both the separator and a bindable key.
+ *
+ * A comma is the key when what stands to its left cannot be a keyset on its
+ * own: nothing at all (`,` is prevmenu by default) or modifiers with no key yet
+ * (`Shift+,`). The engine reaches the same answer by reparsing and swapping a
+ * comma for its keycode, which is the same rule written backwards.
+ */
+function splitChain(raw: string): string[] {
+  const parts: string[] = [];
+  let cur = "";
+  for (const ch of raw) {
+    if (ch !== ",") {
+      cur += ch;
+      continue;
+    }
+    if (cur === "" || cur.endsWith("+")) {
+      cur += ch;
+      continue;
+    }
+    parts.push(cur);
+    cur = "";
+  }
+  parts.push(cur);
+  return parts;
+}
+
+export function parseKeyChain(raw: string): KeyChain | null {
+  return parseParts(raw.split(",")) ?? parseParts(splitChain(raw));
 }
 
 /** A keychain in its canonical printed form, or `null` when it does not parse. */

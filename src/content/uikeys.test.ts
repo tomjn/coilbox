@@ -47,6 +47,12 @@ describe("keysets", () => {
     );
   });
 
+  it("reads a comma as the key when it cannot be a separator", () => {
+    expect(normaliseKeys(",")).toBe(",");
+    expect(normaliseKeys("Shift+,")).toBe("Shift+,");
+    expect(normaliseKeys("Any+`,Any+`")).toBe("Any+`,Any+`");
+  });
+
   it("rejects a token with no key", () => {
     expect(parseKeySet("Ctrl+")).toBeNull();
     expect(normaliseKeys("")).toBeNull();
