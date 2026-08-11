@@ -872,7 +872,7 @@ export default function SkirmishPage() {
             className="font-medium underline underline-offset-4"
             to="/settings/content-folders"
           >
-            Settings → Content Folders
+            Settings → Content folders
           </Link>{" "}
           first.
         </p>

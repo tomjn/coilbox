@@ -59,6 +59,9 @@ const uberstressPlugin: FramePlugin = {
     {
       id: "uberstress",
       title: "uberstress",
+      description: "The batch runner for headless games, used for testing.",
+      parent: "advanced",
+      order: 20,
       icon: Server,
       Component: UberstressSettings,
     },

@@ -3,17 +3,16 @@ import {
   AtSign,
   BarChart3,
   Crosshair,
-  Download,
   Gamepad2,
   LogIn,
   MessagesSquare,
   Swords,
+  Users,
   UserX,
 } from "lucide-react";
 import { isProfileHidden } from "../profile/hidden";
 import LobbyStatusButton from "./LobbyStatusButton";
 import { BattleNavBadge, ChatNavBadge } from "./nav/navBadges";
-import BattleDownloadsSettings from "./pages/BattleDownloadsSettings";
 import HighlightsSettings from "./pages/HighlightsSettings";
 import IgnoreSettings from "./pages/IgnoreSettings";
 import {
@@ -156,21 +155,31 @@ const multiplayerPlugin: FramePlugin = {
     },
   ],
   settings: [
+    // The group the three multiplayer sections hang off. Declared here because
+    // this plugin owns two of them. `lobby-servers` is its own plugin and joins
+    // by naming this id as its parent.
     {
-      id: "battle-downloads",
-      title: "Battle downloads",
-      icon: Download,
-      Component: BattleDownloadsSettings,
+      id: "multiplayer",
+      title: "Multiplayer",
+      description: "The servers you play on, and who you hear from there.",
+      order: 70,
+      icon: Users,
     },
     {
       id: "chat-highlights",
       title: "Chat highlights",
+      description: "Words that light up a chat tab when somebody says them.",
+      parent: "multiplayer",
+      order: 20,
       icon: AtSign,
       Component: HighlightsSettings,
     },
     {
       id: "ignored-users",
       title: "Ignored users",
+      description: "People whose messages coilbox hides from you.",
+      parent: "multiplayer",
+      order: 30,
       icon: UserX,
       Component: IgnoreSettings,
     },

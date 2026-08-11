@@ -24,7 +24,10 @@ const profilePlugin: FramePlugin = {
     {
       id: "profile",
       title: "Distribution profile",
-      order: 90,
+      description:
+        "What a game's own build of coilbox has renamed, hidden or fixed.",
+      parent: "advanced",
+      order: 30,
       icon: Package,
       Component: ProfileSettings,
     },

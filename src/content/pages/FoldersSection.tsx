@@ -153,10 +153,9 @@ export default function FoldersSection() {
   return (
     <div className="space-y-8">
       <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-muted-foreground">
-            Spring/Recoil data roots, auto-detected and added by hand.
-          </p>
+        {/* No intro line. The section's description says what these folders
+            are, and it sits directly above. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <div className="flex items-center gap-2">
             {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control */}
             <label

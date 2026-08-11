@@ -147,7 +147,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
               is missing. Recreate it to continue, or add a different folder
               from the{" "}
               <Link className="underline" to="/settings/content-folders">
-                Content Folders
+                Content folders
               </Link>{" "}
               page.
             </p>

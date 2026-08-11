@@ -5,29 +5,39 @@ import {
   FolderTree,
   Gamepad2,
   HardDrive,
+  Library,
   Map as MapIcon,
+  Monitor,
+  MousePointer2,
+  Save,
   SlidersHorizontal,
+  Sparkles,
+  Volume2,
 } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import ContentStartupProvider from "./ContentStartupProvider";
-import EngineSettingsSection from "./pages/EngineSettingsSection";
+import { engineConfigPage } from "./pages/EngineConfigPage";
+import EngineProfilesSection from "./pages/EngineProfilesSection";
 import EnginesSection from "./pages/EnginesSection";
 import FoldersSection from "./pages/FoldersSection";
 import { makeLegacyRedirect } from "./pages/LegacyRedirect";
 import StorageSection from "./pages/StorageSection";
 
 /**
- * The content plugin's frontend half. It owns the **Content** sidebar section —
+ * The content plugin's frontend half. It owns the **Content** sidebar section,
  * Maps and Games browsed from the installed engines via libunitsync (the
- * `tauri-plugin-coilbox-unitsync` worker) — and keeps four configuration-shaped
- * settings sections: Content Folders (Spring/Recoil data roots), Storage (per
- * root disk usage and the cleanup actions, issue #386), Engines (installs found
- * within them), and Engine Settings (a curated, read-only view of
- * `springsettings.cfg` via unitsync), at `/settings/content-folders`,
- * `/settings/storage`, `/settings/engines` and `/settings/engine-settings`. Pair
- * with the `tauri-plugin-coilbox-content` crate (ACL id `coilbox-content`), whose persisted
- * state.json is the cross-plugin read API for where game content lives.
+ * `tauri-plugin-coilbox-unitsync` worker), and keeps the configuration-shaped
+ * settings sections. Pair with the `tauri-plugin-coilbox-content` crate (ACL id
+ * `coilbox-content`), whose persisted state.json is the cross-plugin read API for
+ * where game content lives.
+ *
+ * Its settings live in two places, because they answer to two different readers.
+ * Engine Settings (`/settings/engine-settings`, the `springsettings.cfg` values read
+ * and written through unitsync) is what a player came to settings for, so it sits
+ * near the top. Content folders, Engines and Storage are about files on disk, so
+ * they sit in the Content group further down, alongside Downloads and Import,
+ * which other plugins declare into the same group.
  *
  * Replays (now under Singleplayer, `play/index.ts`) and the stats profile (now
  * under Multiplayer as "Player stats", `multiplayer/index.tsx`) moved out of this
@@ -165,30 +175,112 @@ const contentPlugin: FramePlugin = {
     },
   ],
   settings: [
+    // Engine Settings: what a player came to settings for, so it sits third,
+    // under the two the frame pins. A group with no Component of its own, which
+    // makes the frame render an index of the pages below it. The id is
+    // unchanged from when this was one page, so `/settings/engine-settings`
+    // still lands somewhere sensible.
+    //
+    // The five category pages are the worker's own categories, so a setting
+    // added to its catalog lands on the right page with no change here.
+    {
+      id: "engine-settings",
+      title: "Engine Settings",
+      description: "How the game itself looks, sounds and handles.",
+      order: 20,
+      icon: SlidersHorizontal,
+    },
+    {
+      id: "engine-display",
+      title: "Display",
+      description: "Fullscreen, resolution and vsync.",
+      parent: "engine-settings",
+      order: 10,
+      icon: Monitor,
+      Component: engineConfigPage("Display"),
+    },
+    {
+      id: "engine-graphics",
+      title: "Graphics",
+      description: "Shadows, water, particles and anti-aliasing.",
+      parent: "engine-settings",
+      order: 20,
+      icon: Sparkles,
+      Component: engineConfigPage("Graphics"),
+    },
+    {
+      id: "engine-sound",
+      title: "Sound",
+      description: "Volume, channel by channel.",
+      parent: "engine-settings",
+      order: 30,
+      icon: Volume2,
+      Component: engineConfigPage("Sound"),
+    },
+    {
+      id: "engine-input",
+      title: "Input and camera",
+      description: "Camera mode, edge scrolling and the mouse.",
+      parent: "engine-settings",
+      order: 40,
+      icon: MousePointer2,
+      Component: engineConfigPage("Input & Camera"),
+    },
+    {
+      id: "engine-game",
+      title: "In game",
+      description: "Your player name and team highlighting.",
+      parent: "engine-settings",
+      order: 50,
+      icon: Gamepad2,
+      Component: engineConfigPage("General"),
+    },
+    {
+      id: "engine-profiles",
+      title: "Saved configs",
+      description: "Keep a copy of your whole engine config, and put it back.",
+      parent: "engine-settings",
+      order: 60,
+      icon: Save,
+      Component: EngineProfilesSection,
+    },
+    // Content: the files on disk and where they come from. Configuration rather
+    // than play, so it sits below everything a player touches while playing.
+    {
+      id: "content",
+      title: "Content",
+      description:
+        "Where your games, maps and engines live, and where new ones come from.",
+      order: 80,
+      icon: Library,
+    },
     {
       id: "content-folders",
-      title: "Content Folders",
+      title: "Content folders",
+      description: "The folders coilbox reads games and maps from.",
+      parent: "content",
+      order: 10,
       icon: FolderTree,
       Component: FoldersSection,
     },
     {
-      id: "storage",
-      title: "Storage",
-      icon: HardDrive,
-      width: "lg",
-      Component: StorageSection,
-    },
-    {
       id: "engines",
       title: "Engines",
+      description: "The engine versions you have, and getting more.",
+      parent: "content",
+      order: 20,
       icon: Boxes,
       Component: EnginesSection,
     },
     {
-      id: "engine-settings",
-      title: "Engine Settings",
-      icon: SlidersHorizontal,
-      Component: EngineSettingsSection,
+      id: "storage",
+      title: "Storage",
+      description: "What is taking up space, and clearing it out.",
+      parent: "content",
+      order: 40,
+      icon: HardDrive,
+      width: "lg",
+      Component: StorageSection,
     },
   ],
 };

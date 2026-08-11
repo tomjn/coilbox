@@ -13,5 +13,14 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts", "scripts/**/*.test.mjs"],
+    server: {
+      deps: {
+        // picoframe ships ESM with extensionless relative imports, which vite
+        // resolves for the app but node does not for a test. Inlining it hands
+        // those imports back to vite. Needed by any test that reaches the plugin
+        // list, e.g. settingsTree.test.ts.
+        inline: [/@picoframe\//],
+      },
+    },
   },
 });

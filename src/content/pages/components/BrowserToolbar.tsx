@@ -38,7 +38,7 @@ export function BrowserToolbar({
           to="/settings/content-folders"
           className="underline underline-offset-4"
         >
-          Content Folders
+          Content folders
         </Link>{" "}
         or install one from{" "}
         <Link to="/settings/engines" className="underline underline-offset-4">

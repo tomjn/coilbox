@@ -561,13 +561,34 @@ pub struct EngineConfigSetting {
     pub key: String,
     pub label: String,
     pub category: String,
-    /// How to render the value: `"bool"` | `"number"` | `"string"`.
+    /// Which control the value deserves: `"bool"` | `"number"` | `"string"` |
+    /// `"enum"` (a named choice, see `options`) | `"range"` (both ends known,
+    /// see `min`/`max`).
     #[serde(rename = "type")]
     pub value_type: &'static str,
     /// The value as read (stringified); empty string when unset and no default.
     pub value: String,
     /// The engine's default for this key (stringified), for reset + change hints.
     pub default: String,
+    /// A line under the label, for a key whose name does not explain itself.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hint: Option<&'static str>,
+    /// The engine's own bounds, where it declares them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    /// The named choices for an `"enum"`, empty for everything else.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<EngineConfigOption>,
+}
+
+/// One named choice of an `"enum"` setting.
+#[derive(Serialize)]
+pub struct EngineConfigOption {
+    /// The value to write, stringified like every other value here.
+    pub value: String,
+    pub label: &'static str,
 }
 
 /// Output of the `config` mode: the curated engine settings and the config file path.

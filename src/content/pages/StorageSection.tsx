@@ -147,7 +147,7 @@ export default function StorageSection() {
     return (
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
         <p className="text-sm text-muted-foreground">
-          No content folders to measure yet. Add one in Content Folders.
+          No content folders to measure yet. Add one in Content folders.
         </p>
       </div>
     );
@@ -156,10 +156,9 @@ export default function StorageSection() {
   return (
     <div className="space-y-8">
       <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-muted-foreground">
-            What each content folder holds, and what you can clear out of it.
-          </p>
+        {/* No intro line. The section's description says this already, and it
+            sits directly above. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Button
             type="button"
             size="sm"

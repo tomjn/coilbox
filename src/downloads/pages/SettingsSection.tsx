@@ -1,19 +1,27 @@
-import { Button, Input } from "@picoframe/frame";
-import { FolderDown, Plus, Server, Trash2 } from "lucide-react";
+import { Button, Input, useSetting } from "@picoframe/frame";
+import { FolderDown, Plus, Server, Swords, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { Switch } from "@/components/ui/switch";
 import { type ContentRoot, contentStateLoad } from "../../content/bindings";
+import { AUTO_DOWNLOAD_ON_JOIN_KEY } from "../../multiplayer/battle/autoDownload";
 import { useDownloadsConfig } from "../config";
 import { Field } from "./components/Field";
 import { OptionSelect } from "./components/OptionSelect";
 
 /**
  * The downloads plugin's settings section (frame settings page at
- * `/settings/downloads`). Two concerns, both persisted immediately via
- * `useDownloadsConfig` (no Save button):
+ * `/settings/downloads`). Three concerns, all persisted immediately (no Save
+ * button):
  *  - the list of rapid masters offered in the Browse Rapid / Games dropdowns
+ *  - whether joining a battle fetches missing content on its own (issue #439)
  *  - the content root every download writes into (`--filesystem-writepath`),
  *    chosen from the content plugin's detected roots.
+ *
+ * The auto-download opt-out was a settings page of its own holding one switch,
+ * which is not a page. It reads the multiplayer plugin's setting key, so the
+ * behaviour stays with the battle code that acts on it and only the control
+ * lives here, next to the other answers to "what does downloading do".
  *
  * Engine downloads live in the content plugin's Engines settings page (below the
  * engine list) but write into the destination chosen here.
@@ -21,6 +29,10 @@ import { OptionSelect } from "./components/OptionSelect";
 export default function DownloadsSettings() {
   const [cfg, setCfg] = useDownloadsConfig();
   const [roots, setRoots] = useState<ContentRoot[]>([]);
+  const [autoOnJoin, setAutoOnJoin] = useSetting<boolean>(
+    AUTO_DOWNLOAD_ON_JOIN_KEY,
+    true,
+  );
 
   useEffect(() => {
     contentStateLoad(undefined)
@@ -97,6 +109,33 @@ export default function DownloadsSettings() {
         )}
       </section>
 
+      {/* Joining a battle */}
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <Swords size={15} /> Joining a battle
+        </h2>
+        <label
+          htmlFor="auto-download-on-join"
+          className="flex items-center justify-between gap-4"
+        >
+          <span className="flex flex-col">
+            <span className="text-sm font-medium">
+              Download missing content automatically
+            </span>
+            <span className="text-xs text-muted-foreground">
+              When you join a battle whose game or map you don't have, start the
+              download straight away instead of waiting for a click. The
+              Download button stays available to pause or retry.
+            </span>
+          </span>
+          <Switch
+            id="auto-download-on-join"
+            checked={autoOnJoin}
+            onCheckedChange={setAutoOnJoin}
+          />
+        </label>
+      </section>
+
       {/* Download destination */}
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -104,14 +143,14 @@ export default function DownloadsSettings() {
         </h2>
         <p className="text-xs text-muted-foreground">
           The content folder downloads are written into. Detected folders come
-          from the{" "}
+          from{" "}
           <Link
             className="underline underline-offset-4"
             to="/settings/content-folders"
           >
-            Content Folders settings
+            Content folders
           </Link>
-          ; pick one so games, maps, and engines land where the engine can find
+          . Pick one so games, maps, and engines land where the engine can find
           them.
         </p>
         {roots.length === 0 ? (
@@ -121,7 +160,7 @@ export default function DownloadsSettings() {
               className="underline underline-offset-4"
               to="/settings/content-folders"
             >
-              Content Folders
+              Content folders
             </Link>
             .
           </p>

@@ -68,9 +68,10 @@ export default function EnginesSection() {
 
   return (
     <div className="space-y-4">
+      {/* What this page is for is the section's description, under the title.
+          This says only the part that description cannot: what Verify does. */}
       <p className="text-sm text-muted-foreground">
-        Engine installs found across your content folders. Verify reads the real
-        version from the binary.
+        Verify reads the real version from the binary.
       </p>
 
       {actionError && (
@@ -98,7 +99,7 @@ export default function EnginesSection() {
               to="/settings/content-folders"
               className="underline underline-offset-4"
             >
-              Content Folders
+              Content folders
             </Link>{" "}
             or download an engine.
           </p>
