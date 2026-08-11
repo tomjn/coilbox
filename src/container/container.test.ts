@@ -335,4 +335,28 @@ describe("sniffPayloadKind", () => {
     ).toBe("scenario");
     expect(sniffPayloadKind({ random: true })).toBeNull();
   });
+
+  it("round trips a keymap container", () => {
+    const payload = {
+      bindings: [{ keys: "Ctrl+q", action: "areaattack" }],
+      fakeMeta: "space",
+      keysyms: [],
+      gameName: "Test Game",
+    };
+    const id = identify(encodeContainerJson("keymap", 1, payload));
+    expect(id.kind).toBe("keymap");
+    expect(id.version).toBe(1);
+    expect(id.compatibility).toBe("ok");
+    expect(id.warnings).toEqual([]);
+  });
+
+  it("recognises a keymap by its shape", () => {
+    expect(
+      sniffPayloadKind({
+        bindings: [{ keys: "a", action: "chat" }],
+        fakeMeta: null,
+        keysyms: [],
+      }),
+    ).toBe("keymap");
+  });
 });

@@ -83,6 +83,7 @@ describe("settings declarations", () => {
       "engine-sound",
       "engine-input",
       "engine-game",
+      "engine-keybinds",
       "engine-profiles",
     ]);
     expect(childrenOf("multiplayer")).toEqual([

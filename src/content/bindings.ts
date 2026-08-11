@@ -851,6 +851,62 @@ export const contentConfigDeleteProfile = defineCommand<
 >("coilbox-content", "content_config_delete_profile");
 
 /* -------------------------------------------------------------------------- *
+ * Keybinds: the engine's `uikeys.txt`, beside its `springsettings.cfg`. The
+ * engine reads it raw-first, so once this file exists the copy a game ships in
+ * its archive never loads, and a write has to carry both.
+ * -------------------------------------------------------------------------- */
+
+/** Read the `uikeys.txt` in an engine's config directory. */
+export const contentKeybindsRead = defineCommand<
+  { configDir: string },
+  { path: string; exists: boolean; text: string; ours: boolean }
+>("coilbox-content", "content_keybinds_read");
+
+/**
+ * Replace that `uikeys.txt`. The first write over a file coilbox did not author
+ * copies it to `uikeys.txt.bak`, reported as `backedUp`.
+ */
+export const contentKeybindsWrite = defineCommand<
+  { configDir: string; text: string },
+  { path: string; backedUp: boolean }
+>("coilbox-content", "content_keybinds_write");
+
+/** One saved keymap for a content root. `json` is a serialised `SavedKeymap`. */
+export interface StoredKeymap {
+  name: string;
+  slug: string;
+  createdAtMs: number;
+  json: string;
+}
+
+/** Saved keymaps for a content root, newest first. */
+export const contentKeymaps = defineCommand<
+  { rootPath: string },
+  { keymaps: StoredKeymap[] }
+>("coilbox-content", "content_keymaps");
+
+/** Save a keymap under a name, replacing any keymap already saved under it. */
+export const contentKeymapSave = defineCommand<
+  { rootPath: string; name: string; json: string },
+  { keymap: StoredKeymap }
+>("coilbox-content", "content_keymap_save");
+
+/** Delete a saved keymap by slug. */
+export const contentKeymapDelete = defineCommand<
+  { rootPath: string; slug: string },
+  { ok: boolean }
+>("coilbox-content", "content_keymap_delete");
+
+/**
+ * Write a serialised keymap container to a path the user picked. Import runs
+ * through `content_import_container`, which reads any coilbox `.json`.
+ */
+export const contentExportKeymap = defineCommand<
+  { dest: string; text: string },
+  Record<string, never>
+>("coilbox-content", "content_export_keymap");
+
+/* -------------------------------------------------------------------------- *
  * unitsync content scan (plugin `tauri-plugin-coilbox-unitsync`, ACL id
  * `coilbox-unitsync`). The Content browser pages call this alongside the
  * content-state bindings above: this plugin's frontend talks to two backends.

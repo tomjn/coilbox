@@ -17,6 +17,8 @@ import {
   type ContentState,
   contentCandidates,
   contentDemoInfo,
+  contentKeybindsRead,
+  contentKeybindsWrite,
   contentListReplays,
   contentListSaves,
   contentStateLoad,
@@ -1002,6 +1004,64 @@ export function useUnitsyncEngineConfig(enginePath?: string, dataDir?: string) {
   }, [enginePath, dataDir, run]);
 
   return { data, loading, error, run, write };
+}
+
+/** What `content_keybinds_read` hands back: the file, and whether it is ours. */
+export interface KeybindsFile {
+  path: string;
+  exists: boolean;
+  text: string;
+  ours: boolean;
+}
+
+/**
+ * The `uikeys.txt` in one engine's config directory, read on demand.
+ *
+ * Deliberately uncached, unlike the engine-config reader beside it. The file is
+ * a few kilobytes, the player may well have edited it outside coilbox between
+ * visits, and showing a stale keymap is worse than reading it again.
+ */
+export function useKeybinds(configDir?: string) {
+  const [data, setData] = useState<KeybindsFile | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    if (!configDir) {
+      setData(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      setData(await contentKeybindsRead({ configDir }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [configDir]);
+
+  /** Write the file. Resolves to an error message, or `null` when it worked. */
+  const write = useCallback(
+    async (text: string): Promise<string | null> => {
+      if (!configDir) return "No engine config directory to write to.";
+      try {
+        const res = await contentKeybindsWrite({ configDir, text });
+        setData({ path: res.path, exists: true, text, ours: true });
+        return null;
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e);
+      }
+    },
+    [configDir],
+  );
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  return { data, loading, error, reload, write };
 }
 
 /* -------------------------------------------------------------------------- *
