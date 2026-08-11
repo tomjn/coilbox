@@ -15,6 +15,7 @@ mod build_tree_export;
 mod caches;
 mod demo;
 mod engine;
+mod keybinds;
 mod metrics;
 mod model;
 mod path_validity;
@@ -1348,6 +1349,31 @@ async fn content_config_delete_profile<R: Runtime>(
     }
 }
 
+/// `content_keybinds_read`, the `uikeys.txt` beside an engine's
+/// `springsettings.cfg`. `configDir` is that file's directory, which unitsync
+/// reports, so a portable engine's own config dir is handled without guessing.
+#[tauri::command]
+async fn content_keybinds_read(config_dir: String) -> Result<CliResult, ()> {
+    let res = tauri::async_runtime::spawn_blocking(move || keybinds::read(&config_dir)).await;
+    match res {
+        Ok(r) => Ok(CliResult::ok(json!(r))),
+        Err(e) => Ok(CliResult::err(format!("read keybinds task failed: {e}"))),
+    }
+}
+
+/// `content_keybinds_write`, replace that `uikeys.txt`, keeping a one-time
+/// `.bak` of a file coilbox did not write.
+#[tauri::command]
+async fn content_keybinds_write(config_dir: String, text: String) -> Result<CliResult, ()> {
+    let res =
+        tauri::async_runtime::spawn_blocking(move || keybinds::write(&config_dir, &text)).await;
+    match res {
+        Ok(Ok(r)) => Ok(CliResult::ok(json!(r))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("write keybinds task failed: {e}"))),
+    }
+}
+
 /// `content_warm_rapid_pool` — background-read every `packages/*.sdp` manifest
 /// across the given roots into the OS page cache so the engine's first rapid-tag
 /// resolution is warm. Manifests only; returns a cache-warm summary.
@@ -1458,6 +1484,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_config_backup,
             content_config_restore,
             content_config_delete_profile,
+            content_keybinds_read,
+            content_keybinds_write,
             content_warm_rapid_pool,
             content_prune_rapid_pool,
             content_reclaim_caches,

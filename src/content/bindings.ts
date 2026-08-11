@@ -851,6 +851,27 @@ export const contentConfigDeleteProfile = defineCommand<
 >("coilbox-content", "content_config_delete_profile");
 
 /* -------------------------------------------------------------------------- *
+ * Keybinds: the engine's `uikeys.txt`, beside its `springsettings.cfg`. The
+ * engine reads it raw-first, so once this file exists the copy a game ships in
+ * its archive never loads, and a write has to carry both.
+ * -------------------------------------------------------------------------- */
+
+/** Read the `uikeys.txt` in an engine's config directory. */
+export const contentKeybindsRead = defineCommand<
+  { configDir: string },
+  { path: string; exists: boolean; text: string; ours: boolean }
+>("coilbox-content", "content_keybinds_read");
+
+/**
+ * Replace that `uikeys.txt`. The first write over a file coilbox did not author
+ * copies it to `uikeys.txt.bak`, reported as `backedUp`.
+ */
+export const contentKeybindsWrite = defineCommand<
+  { configDir: string; text: string },
+  { path: string; backedUp: boolean }
+>("coilbox-content", "content_keybinds_write");
+
+/* -------------------------------------------------------------------------- *
  * unitsync content scan (plugin `tauri-plugin-coilbox-unitsync`, ACL id
  * `coilbox-unitsync`). The Content browser pages call this alongside the
  * content-state bindings above: this plugin's frontend talks to two backends.
