@@ -1258,6 +1258,11 @@ fn profiles_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(coilbox_portable::data_dir(app)?.join("engine-config-profiles"))
 }
 
+/// Directory holding saved keymaps, under the app data dir.
+fn keymaps_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(coilbox_portable::data_dir(app)?.join("keymaps"))
+}
+
 /// `content_config_profiles` — list saved engine-config snapshots for a content
 /// root (its `springsettings.cfg` / `LuaUI/Config` / `uikeys.txt`). `rootPath` is a
 /// `ContentRoot.path`.
@@ -1374,6 +1379,72 @@ async fn content_keybinds_write(config_dir: String, text: String) -> Result<CliR
     }
 }
 
+/// `content_keymaps`, saved keymaps for a content root, newest first. Separate
+/// from config profiles because a keymap is worth moving on its own.
+#[tauri::command]
+async fn content_keymaps<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+) -> Result<CliResult, ()> {
+    let dir = match keymaps_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let res =
+        tauri::async_runtime::spawn_blocking(move || keybinds::keymaps_list(&dir, &root_path))
+            .await;
+    match res {
+        Ok(keymaps) => Ok(CliResult::ok(json!({ "keymaps": keymaps }))),
+        Err(e) => Ok(CliResult::err(format!("list keymaps task failed: {e}"))),
+    }
+}
+
+/// `content_keymap_save`, store a keymap under a name (re-saving replaces it).
+/// `json` is opaque here: the frontend owns the keymap's shape.
+#[tauri::command]
+async fn content_keymap_save<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+    name: String,
+    json: String,
+) -> Result<CliResult, ()> {
+    let dir = match keymaps_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        keybinds::keymaps_save(&dir, &root_path, &name, &json)
+    })
+    .await;
+    match res {
+        Ok(Ok(keymap)) => Ok(CliResult::ok(json!({ "keymap": keymap }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("save keymap task failed: {e}"))),
+    }
+}
+
+/// `content_keymap_delete`, drop one saved keymap by slug.
+#[tauri::command]
+async fn content_keymap_delete<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+    slug: String,
+) -> Result<CliResult, ()> {
+    let dir = match keymaps_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        keybinds::keymaps_delete(&dir, &root_path, &slug)
+    })
+    .await;
+    match res {
+        Ok(Ok(())) => Ok(CliResult::ok(json!({ "ok": true }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("delete keymap task failed: {e}"))),
+    }
+}
+
 /// `content_warm_rapid_pool` — background-read every `packages/*.sdp` manifest
 /// across the given roots into the OS page cache so the engine's first rapid-tag
 /// resolution is warm. Manifests only; returns a cache-warm summary.
@@ -1486,6 +1557,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_config_delete_profile,
             content_keybinds_read,
             content_keybinds_write,
+            content_keymaps,
+            content_keymap_save,
+            content_keymap_delete,
             content_warm_rapid_pool,
             content_prune_rapid_pool,
             content_reclaim_caches,

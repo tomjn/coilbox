@@ -6,7 +6,7 @@
 //! the first write over a file coilbox did not author keeps a `.bak` beside it.
 
 use serde::Serialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// First line of a file coilbox wrote. Mirrors `COILBOX_HEADER` in `uikeys.ts`.
 const COILBOX_HEADER: &str = "// Written by coilbox";
@@ -66,10 +66,99 @@ pub fn write(config_dir: &str, text: &str) -> Result<WriteResult, String> {
     })
 }
 
+/// One saved keymap: metadata this module owns, and the payload it does not read.
+/// Named `StoredKeymap` because `SavedKeymap` in `keymap.ts` is the payload.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredKeymap {
+    pub name: String,
+    pub slug: String,
+    pub created_at_ms: u64,
+    /// The keymap document, as the frontend serialised it.
+    pub json: String,
+}
+
+/// Where one content root's keymaps live, under the keymaps store.
+fn root_dir(store: &Path, root_path: &str) -> PathBuf {
+    store.join(crate::hash_id(&[root_path]))
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Saved keymaps for a content root, newest first.
+pub fn keymaps_list(store: &Path, root_path: &str) -> Vec<StoredKeymap> {
+    let dir = root_dir(store, root_path);
+    let mut out: Vec<StoredKeymap> = match std::fs::read_dir(&dir) {
+        Ok(rd) => rd
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
+            .filter_map(|e| {
+                let text = std::fs::read_to_string(e.path()).ok()?;
+                let v: serde_json::Value = serde_json::from_str(&text).ok()?;
+                Some(StoredKeymap {
+                    name: v.get("name")?.as_str()?.to_string(),
+                    slug: v.get("slug")?.as_str()?.to_string(),
+                    created_at_ms: v.get("createdAtMs").and_then(|x| x.as_u64()).unwrap_or(0),
+                    json: v.get("keymap")?.to_string(),
+                })
+            })
+            .collect(),
+        Err(_) => Vec::new(),
+    };
+    out.sort_by_key(|k| std::cmp::Reverse(k.created_at_ms));
+    out
+}
+
+/// Save (or replace by name) one keymap for a content root.
+pub fn keymaps_save(
+    store: &Path,
+    root_path: &str,
+    name: &str,
+    json: &str,
+) -> Result<StoredKeymap, String> {
+    let slug =
+        crate::settings_backup::slug(name).ok_or("Keymap name must contain a letter or number")?;
+    let keymap: serde_json::Value =
+        serde_json::from_str(json).map_err(|e| format!("keymap is not valid JSON: {e}"))?;
+    let dir = root_dir(store, root_path);
+    std::fs::create_dir_all(&dir).map_err(|e| format!("create keymaps dir: {e}"))?;
+    let created_at_ms = now_ms();
+    let doc = serde_json::json!({
+        "name": name,
+        "slug": slug,
+        "createdAtMs": created_at_ms,
+        "keymap": keymap,
+    });
+    std::fs::write(
+        dir.join(format!("{slug}.json")),
+        serde_json::to_string_pretty(&doc).map_err(|e| format!("serialise keymap: {e}"))?,
+    )
+    .map_err(|e| format!("write keymap: {e}"))?;
+    Ok(StoredKeymap {
+        name: name.to_string(),
+        slug,
+        created_at_ms,
+        json: keymap.to_string(),
+    })
+}
+
+/// Delete one saved keymap. Deleting one that is not there is not an error.
+pub fn keymaps_delete(store: &Path, root_path: &str, slug: &str) -> Result<(), String> {
+    let path = root_dir(store, root_path).join(format!("{slug}.json"));
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| format!("delete keymap: {e}"))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     fn tmp(tag: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("cbx-keys-{tag}-{}", std::process::id()));
@@ -121,6 +210,41 @@ mod tests {
             std::fs::read_to_string(dir.join("uikeys.txt")).unwrap(),
             "// Written by coilbox\nbind c chat\n"
         );
+    }
+
+    #[test]
+    fn keymaps_save_list_delete() {
+        let dir = tmp("keymaps");
+        let store = dir.join("store");
+        let root = "/some/content/root";
+
+        assert!(keymaps_list(&store, root).is_empty());
+
+        let saved = keymaps_save(&store, root, "My BAR Keys", r#"{"bindings":[]}"#).unwrap();
+        assert_eq!(saved.slug, "my-bar-keys");
+        assert_eq!(saved.name, "My BAR Keys");
+
+        let listed = keymaps_list(&store, root);
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].json, r#"{"bindings":[]}"#);
+
+        // A different root does not see it.
+        assert!(keymaps_list(&store, "/other/root").is_empty());
+
+        // Re-saving the same name replaces rather than duplicates.
+        keymaps_save(&store, root, "My BAR Keys", r#"{"bindings":[1]}"#).unwrap();
+        let listed = keymaps_list(&store, root);
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].json, r#"{"bindings":[1]}"#);
+
+        keymaps_delete(&store, root, "my-bar-keys").unwrap();
+        assert!(keymaps_list(&store, root).is_empty());
+    }
+
+    #[test]
+    fn keymaps_reject_an_unusable_name() {
+        let dir = tmp("badname");
+        assert!(keymaps_save(&dir, "/root", "***", "{}").is_err());
     }
 
     #[test]

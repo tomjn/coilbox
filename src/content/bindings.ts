@@ -871,6 +871,32 @@ export const contentKeybindsWrite = defineCommand<
   { path: string; backedUp: boolean }
 >("coilbox-content", "content_keybinds_write");
 
+/** One saved keymap for a content root. `json` is a serialised `SavedKeymap`. */
+export interface StoredKeymap {
+  name: string;
+  slug: string;
+  createdAtMs: number;
+  json: string;
+}
+
+/** Saved keymaps for a content root, newest first. */
+export const contentKeymaps = defineCommand<
+  { rootPath: string },
+  { keymaps: StoredKeymap[] }
+>("coilbox-content", "content_keymaps");
+
+/** Save a keymap under a name, replacing any keymap already saved under it. */
+export const contentKeymapSave = defineCommand<
+  { rootPath: string; name: string; json: string },
+  { keymap: StoredKeymap }
+>("coilbox-content", "content_keymap_save");
+
+/** Delete a saved keymap by slug. */
+export const contentKeymapDelete = defineCommand<
+  { rootPath: string; slug: string },
+  { ok: boolean }
+>("coilbox-content", "content_keymap_delete");
+
 /* -------------------------------------------------------------------------- *
  * unitsync content scan (plugin `tauri-plugin-coilbox-unitsync`, ACL id
  * `coilbox-unitsync`). The Content browser pages call this alongside the
