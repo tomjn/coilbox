@@ -1,11 +1,14 @@
 import { Button, cn, Input, useSetting } from "@picoframe/frame";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   ExternalLink,
   Plus,
   RefreshCw,
   Server,
+  ServerCog,
   Terminal,
   Trash2,
+  TriangleAlert,
   UserPlus,
   Users,
   X,
@@ -46,12 +49,19 @@ const H2_CLASS =
   "flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground";
 const EMPTY_CLASS =
   "rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground";
+/**
+ * uberserver: the lobby server behind lobby.recoilengine.org. This fork rather than
+ * `spring/uberserver` upstream, because its readme is a start-to-finish deployment
+ * guide (Docker Compose, MariaDB, systemd) rather than a bare install list.
+ */
+const UBERSERVER_URL = "https://github.com/ScarylePoo/uberserver";
 
 /**
  * The lobby-servers settings section (`/settings/lobby-servers`). Splits into
- * Accounts (logins the user manages) and Servers (a read-only built-in catalog plus
- * editable custom servers). Directory fields persist immediately via the frame
- * settings store; passwords live only in the OS keychain (`ls_*_credential`).
+ * Accounts (logins the user manages) and Servers (one list of built-ins and the
+ * user's own, the latter editable through a drawer). Fields persist immediately via
+ * the frame settings store. Passwords live only in the OS keychain
+ * (`ls_*_credential`).
  */
 export default function LobbyServersSettings() {
   const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
@@ -60,6 +70,9 @@ export default function LobbyServersSettings() {
   const [registerOpen, setRegisterOpen] = useState(false);
   // The account whose editor drawer is open (null = closed).
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The custom server whose editor drawer is open (null = closed). Built-ins never
+  // open one, so this only ever holds a custom server's id.
+  const [editingServerId, setEditingServerId] = useState<string | null>(null);
   const [autoRejoin, setAutoRejoin] = useSetting<boolean>(
     "multiplayer.autoRejoin",
     true,
@@ -115,12 +128,13 @@ export default function LobbyServersSettings() {
     );
   };
 
-  const addCustomServer = () =>
+  const addCustomServer = () => {
+    const id = crypto.randomUUID();
     setCustomCfg({
       servers: [
         ...customCfg.servers,
         {
-          id: crypto.randomUUID(),
+          id,
           name: "",
           host: "",
           port: 8200,
@@ -129,6 +143,9 @@ export default function LobbyServersSettings() {
         },
       ],
     });
+    // A blank server is only editable through its drawer, so open it straight away.
+    setEditingServerId(id);
+  };
 
   const updateCustomServer = (id: string, patch: Partial<LobbyServer>) =>
     setCustomCfg({
@@ -138,6 +155,7 @@ export default function LobbyServersSettings() {
     });
 
   const removeCustomServer = (s: LobbyServer) => {
+    if (editingServerId === s.id) setEditingServerId(null);
     // Drop accounts pointing at this server (and best-effort delete their secrets).
     for (const a of accountsCfg.accounts.filter((x) => x.serverId === s.id)) {
       lsDeleteCredential({ serverId: a.serverId, username: a.username }).catch(
@@ -151,7 +169,9 @@ export default function LobbyServersSettings() {
   };
 
   return (
-    <div className="space-y-8">
+    // `pb-8` so the last section clears the bottom of the scroll area rather than
+    // ending flush against it.
+    <div className="space-y-8 pb-8">
       <section className="space-y-3">
         <h2 className={H2_CLASS}>
           <RefreshCw size={15} /> Connection
@@ -178,10 +198,13 @@ export default function LobbyServersSettings() {
           {autoAway && (
             <Field
               label="Minutes before away"
-              className="max-w-40 pl-6"
+              // The cap belongs on the input, not the field: on the field it also
+              // caps the label and hint, which wraps them at 10rem.
+              className="pl-6"
               hint={`${MIN_AUTO_AWAY_MINUTES} to ${MAX_AUTO_AWAY_MINUTES}.`}
             >
               <Input
+                className="max-w-40"
                 type="number"
                 min={MIN_AUTO_AWAY_MINUTES}
                 max={MAX_AUTO_AWAY_MINUTES}
@@ -245,25 +268,39 @@ export default function LobbyServersSettings() {
             <Plus /> Add custom server
           </Button>
         </div>
+        {/* One list: `allServers` already returns the built-ins first, then the
+            user's own, so custom entries need no separate section. Only they get
+            an `onOpen`, which is what makes their row a button. */}
         <ul className="space-y-2">
-          {servers
-            .filter((s) => s.builtin)
-            .map((s) => (
-              <BuiltinServerRow key={s.id} server={s} />
-            ))}
+          {servers.map((s) => (
+            <ServerListRow
+              key={s.id}
+              server={s}
+              onOpen={s.builtin ? undefined : () => setEditingServerId(s.id)}
+            />
+          ))}
         </ul>
-        {customCfg.servers.length > 0 && (
-          <ul className="space-y-4">
-            {customCfg.servers.map((s) => (
-              <CustomServerRow
-                key={s.id}
-                server={s}
-                onChange={(patch) => updateCustomServer(s.id, patch)}
-                onRemove={() => removeCustomServer(s)}
-              />
-            ))}
-          </ul>
-        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className={H2_CLASS}>
+          <ServerCog size={15} /> Host your own server
+        </h2>
+        <div className="space-y-3 rounded-md border border-dashed border-border p-3">
+          <p className="text-xs leading-snug text-muted-foreground">
+            Coilbox connects to any TASServer-compatible lobby, including one
+            you run yourself. lobby.recoilengine.org runs uberserver, which
+            ships a start-to-finish deployment guide using Docker and MariaDB.
+            Add yours as a custom server above once it is running.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openUrl(UBERSERVER_URL).catch(() => {})}
+          >
+            <ExternalLink /> Uberserver
+          </Button>
+        </div>
       </section>
 
       <RegisterDrawer
@@ -278,6 +315,12 @@ export default function LobbyServersSettings() {
         onRemove={removeAccount}
         onOpenConsole={() => setConsoleOpen(true)}
         onClose={() => setEditingId(null)}
+      />
+      <ServerDrawer
+        server={customCfg.servers.find((s) => s.id === editingServerId) ?? null}
+        onChange={updateCustomServer}
+        onRemove={removeCustomServer}
+        onClose={() => setEditingServerId(null)}
       />
       <ConsoleDrawer open={consoleOpen} onClose={() => setConsoleOpen(false)} />
     </div>
@@ -687,49 +730,121 @@ function TachyonSignIn({
 }
 
 /**
- * A read-only catalog entry: a built-in preset or the profile's official server. Both
- * are non-removable (no trash button); the official one is badged and listed first
- * (see `buildCatalog`).
+ * One row in the server list, for every kind of entry. A custom server passes
+ * `onOpen` and so renders as a button into its editor drawer. A built-in and the
+ * profile's official server pass nothing and are inert, because changing either
+ * takes a code or `profile.json` change rather than a click.
  */
-function BuiltinServerRow({ server: s }: { server: LobbyServer }) {
+function ServerListRow({
+  server: s,
+  onOpen,
+}: {
+  server: LobbyServer;
+  onOpen?: () => void;
+}) {
+  // `shrink-0` matters: without it a long server name squeezes the badges until
+  // their own text wraps mid-word.
   const tag =
-    "rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground";
-  return (
-    <li className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
-      <span className="font-medium">{s.name}</span>
-      <span className="font-mono text-xs text-muted-foreground">
-        {s.host}:{s.port}
-      </span>
-      {s.tls && <span className={tag}>TLS</span>}
-      {s.alpha && (
-        // Deliberately not the muted `tag` the neighbours use: this one is a
-        // warning, so it reads the same here as in the login list.
-        <span
-          className={cn(
-            tag,
-            "border border-destructive/40 bg-destructive/15 text-destructive",
-          )}
-        >
-          Alpha
+    "shrink-0 whitespace-nowrap rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground";
+  const body = (
+    <>
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 truncate font-medium">
+          {s.name || s.host || "New server"}
         </span>
+        {s.tls && <span className={tag}>TLS</span>}
+        {s.alpha && (
+          // Deliberately not the muted `tag` the neighbours use: this one is a
+          // warning, so it reads the same here as in the login list.
+          <span
+            className={cn(
+              tag,
+              "border border-destructive/40 bg-destructive/15 text-destructive",
+            )}
+          >
+            Alpha
+          </span>
+        )}
+        {s.official ? (
+          <span
+            className={cn(
+              tag,
+              "ml-auto bg-primary/15 font-medium text-primary",
+            )}
+          >
+            Official
+          </span>
+        ) : (
+          <span className={cn(tag, "ml-auto")}>
+            {s.builtin ? "Built-in" : "Custom"}
+          </span>
+        )}
+      </div>
+      <div className="truncate font-mono text-xs text-muted-foreground">
+        {s.host ? `${s.host}:${s.port}` : "No address yet"}
+      </div>
+      {s.notice && (
+        <p className="mt-1 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          {s.notice}
+        </p>
       )}
-      {s.official ? (
-        <span
-          className={cn(
-            "ml-auto rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary",
-          )}
+    </>
+  );
+
+  const shell = "rounded-md border border-border px-3 py-2 text-sm";
+  return (
+    <li>
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          className={cn(shell, "block w-full text-left hover:bg-accent")}
         >
-          Official
-        </span>
+          {body}
+        </button>
       ) : (
-        <span className={cn("ml-auto", tag)}>Built-in</span>
+        <div className={shell}>{body}</div>
       )}
     </li>
   );
 }
 
-/** An editable custom server (no username/password — those belong to accounts). */
-function CustomServerRow({
+/**
+ * The editor drawer for one custom server, in the same slide-in as the login
+ * editor. Built-ins never reach it.
+ */
+function ServerDrawer({
+  server,
+  onChange,
+  onRemove,
+  onClose,
+}: {
+  server: LobbyServer | null;
+  onChange: (id: string, patch: Partial<LobbyServer>) => void;
+  onRemove: (s: LobbyServer) => void;
+  onClose: () => void;
+}) {
+  return (
+    <SlideDrawer
+      open={server != null}
+      title={server?.name.trim() ? server.name : "New server"}
+      onClose={onClose}
+    >
+      {server && (
+        <CustomServerForm
+          key={server.id}
+          server={server}
+          onChange={(patch) => onChange(server.id, patch)}
+          onRemove={() => onRemove(server)}
+        />
+      )}
+    </SlideDrawer>
+  );
+}
+
+/** The drawer's body: one custom server's fields. Usernames and passwords belong to accounts, not here. */
+function CustomServerForm({
   server: s,
   onChange,
   onRemove,
@@ -739,17 +854,7 @@ function CustomServerRow({
   onRemove: () => void;
 }) {
   return (
-    <li className="space-y-3 rounded-md border border-border p-3">
-      <div className="flex items-center justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRemove}
-          aria-label={`Remove ${s.name || s.host || "server"}`}
-        >
-          <Trash2 />
-        </Button>
-      </div>
+    <div className="flex-1 space-y-3 overflow-y-auto p-4">
       <Field label="Name">
         <Input
           value={s.name}
@@ -802,6 +907,16 @@ function CustomServerRow({
           onChange={(v) => onChange({ allowSelfSigned: v })}
         />
       </div>
-    </li>
+      <div className="border-t border-border pt-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRemove}
+          aria-label={`Remove ${s.name || s.host || "server"}`}
+        >
+          <Trash2 /> Remove server
+        </Button>
+      </div>
+    </div>
   );
 }
