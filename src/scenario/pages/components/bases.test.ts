@@ -9,14 +9,17 @@ import {
   addBuilding,
   buildableBy,
   buildingUnits,
+  copyName,
   editBase,
   movedQueued,
   normaliseQueue,
   plusQueued,
   removeBase,
   removeBuilding,
+  renameBlueprint,
   setOrigin,
   setQueue,
+  sharingLayout,
   strayDefs,
   withoutQueued,
 } from "./bases";
@@ -201,6 +204,171 @@ describe("removing a building", () => {
   it("hands the same document back for a building that is not there", () => {
     const before = document();
     expect(removeBuilding(before, "b1", 7)).toBe(before);
+  });
+});
+
+describe("a layout two bases share", () => {
+  /** The same layout placed twice, which is what a library blueprint dropped
+   *  into a mission twice looks like. */
+  function shared(): Scenario {
+    const doc = document();
+    return {
+      ...doc,
+      bases: [
+        ...doc.bases,
+        { ...structuredClone(base), id: "b2", origin: { x: 5000, z: 6000 } },
+      ],
+    };
+  }
+
+  const layoutOf = (scenario: Scenario, id: string) =>
+    scenario.blueprints.find(
+      (b) => b.id === scenario.bases.find((p) => p.id === id)?.blueprint,
+    ) as BaseBlueprint;
+
+  it("says which other bases are placed from it", () => {
+    expect(sharingLayout(shared(), "b1")).toEqual(["b2"]);
+    expect(sharingLayout(shared(), "b2")).toEqual(["b1"]);
+    expect(sharingLayout(document(), "b1")).toEqual([]);
+  });
+
+  it("gives the edited base a layout of its own", () => {
+    const next = addBuilding(shared(), "b1", {
+      def: "armllt",
+      offset: { x: 32, z: 32 },
+      facing: 0,
+    });
+    expect(next.blueprints).toHaveLength(2);
+    expect(next.bases[0].blueprint).not.toBe("bp1");
+    expect(next.bases[1].blueprint).toBe("bp1");
+    expect(layoutOf(next, "b1").buildings.map((b) => b.def)).toEqual([
+      "armlab",
+      "armsolar",
+      "armllt",
+    ]);
+    expect(layoutOf(next, "b2").buildings.map((b) => b.def)).toEqual([
+      "armlab",
+      "armsolar",
+    ]);
+  });
+
+  it("names the copy after the layout it was made from", () => {
+    const once = addBuilding(shared(), "b1", {
+      def: "armllt",
+      offset: { x: 32, z: 32 },
+      facing: 0,
+    });
+    expect(layoutOf(once, "b1").name).toBe("The keep copy");
+  });
+
+  it("takes a building out of the copy alone", () => {
+    const next = removeBuilding(shared(), "b1", 0);
+    expect(layoutOf(next, "b1").buildings.map((b) => b.def)).toEqual([
+      "armsolar",
+    ]);
+    expect(layoutOf(next, "b2").buildings.map((b) => b.def)).toEqual([
+      "armlab",
+      "armsolar",
+    ]);
+  });
+
+  it("writes through to every base when the author asked for that", () => {
+    const next = addBuilding(
+      shared(),
+      "b1",
+      { def: "armllt", offset: { x: 32, z: 32 }, facing: 0 },
+      "shared",
+    );
+    expect(next.blueprints).toHaveLength(1);
+    expect(layoutOf(next, "b2").buildings).toHaveLength(3);
+  });
+
+  it("edits a layout nothing else places in place", () => {
+    const next = addBuilding(document(), "b1", {
+      def: "armllt",
+      offset: { x: 32, z: 32 },
+      facing: 0,
+    });
+    expect(next.blueprints).toHaveLength(1);
+    expect(next.bases[0].blueprint).toBe("bp1");
+  });
+
+  it("keeps the layout when one of the bases sharing it goes", () => {
+    const next = removeBase(shared(), "b1");
+    expect(next.bases.map((b) => b.id)).toEqual(["b2"]);
+    expect(next.blueprints.map((b) => b.id)).toEqual(["bp1"]);
+  });
+
+  it("keeps the layout when a shared base loses its last building", () => {
+    const one = removeBuilding(shared(), "b1", 1);
+    const gone = removeBuilding(one, "b1", 0);
+    expect(gone.bases.map((b) => b.id)).toEqual(["b2"]);
+    expect(layoutOf(gone, "b2").buildings).toHaveLength(2);
+  });
+});
+
+describe("naming a layout", () => {
+  it("renames the one this base is placed from", () => {
+    const next = renameBlueprint(document(), "b1", "Opening base");
+    expect(next.blueprints[0].name).toBe("Opening base");
+  });
+
+  it("trims the name and refuses a blank one", () => {
+    expect(
+      renameBlueprint(document(), "b1", "  Keep  ").blueprints[0].name,
+    ).toBe("Keep");
+    const before = document();
+    expect(renameBlueprint(before, "b1", "   ")).toBe(before);
+    expect(renameBlueprint(before, "nope", "Keep")).toBe(before);
+  });
+
+  it("gives a shared layout's name to a copy rather than to both bases", () => {
+    const doc = document();
+    const two = {
+      ...doc,
+      bases: [...doc.bases, { ...structuredClone(base), id: "b2" }],
+    };
+    const next = renameBlueprint(two, "b1", "Opening base");
+    expect(next.blueprints).toHaveLength(2);
+    expect(next.blueprints[0].name).toBe("The keep");
+    expect(next.blueprints[1].name).toBe("Opening base");
+    expect(next.bases[1].blueprint).toBe("bp1");
+  });
+
+  it("renames the shared layout when the author asked for that", () => {
+    const doc = document();
+    const two = {
+      ...doc,
+      bases: [...doc.bases, { ...structuredClone(base), id: "b2" }],
+    };
+    const next = renameBlueprint(two, "b1", "Opening base", "shared");
+    expect(next.blueprints).toHaveLength(1);
+    expect(next.blueprints[0].name).toBe("Opening base");
+  });
+
+  it("names a copy something nothing else in the document is called", () => {
+    expect(copyName([], "The keep")).toBe("The keep copy");
+    expect(copyName(["The keep", "The keep copy"], "The keep")).toBe(
+      "The keep copy 2",
+    );
+    expect(copyName(["The keep copy", "The keep copy 2"], "The keep")).toBe(
+      "The keep copy 3",
+    );
+  });
+
+  it("names a layout the editor mints rather than leaving it a UUID", () => {
+    const one = addBase(newScenario("test"), "b2", "bp2", {
+      team: "p0",
+      origin: { x: 0, z: 0 },
+      buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
+    });
+    expect(one.blueprints[0].name).toBe("Layout 1");
+    const two = addBase(one, "b3", "bp3", {
+      team: "p0",
+      origin: { x: 500, z: 0 },
+      buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
+    });
+    expect(two.blueprints[1].name).toBe("Layout 2");
   });
 });
 

@@ -14,9 +14,13 @@
  *
  * Mount this keyed by the base and the building, so moving the selection reseeds
  * the popovers with what is now selected.
+ *
+ * The layout's name and who else is using it are in the buildings popover
+ * because both belong to the layout rather than to this base (issue #1414). An
+ * author who never places a layout twice never sees the sharing half of it.
  */
 
-import { Button } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import {
   ArrowDown,
   ArrowUp,
@@ -26,6 +30,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -50,12 +55,17 @@ export function BaseControls({
   base,
   buildings,
   index,
+  layoutName,
+  sharedWith,
+  sharedEdit,
   overlaps,
   participants,
   units,
   unitsLoading,
   moving,
   onEdit,
+  onRename,
+  onSharedEdit,
   onQueue,
   onMove,
   onDelete,
@@ -66,6 +76,13 @@ export function BaseControls({
   buildings: PlacedBuilding[];
   /** Which of the base's buildings is selected. */
   index: number;
+  /** What the layout this base is placed from is called. */
+  layoutName: string;
+  /** How many other bases are placed from that layout. */
+  sharedWith: number;
+  /** Whether an edit here changes the layout all of them use, rather than
+   *  giving this base a copy of its own. */
+  sharedEdit: boolean;
   /** Which of them are standing on ground another building wants, by their
    *  place in the base. Drawn in red on the map as well. */
   overlaps: number[];
@@ -77,6 +94,11 @@ export function BaseControls({
   moving: boolean;
   /** Change the base's own fields, as {@link editBase} takes them. */
   onEdit: (patch: Partial<Pick<ScenarioBase, "team">>) => void;
+  /** Rename the layout, which names a copy when it is shared and `sharedEdit`
+   *  is off. */
+  onRename: (name: string) => void;
+  /** Ask for edits here to go to the shared layout, or stop asking. */
+  onSharedEdit: (on: boolean) => void;
   /** Replace the selected building's queue and its repeat flag. */
   onQueue: (queue: string[], repeat: boolean) => void;
   /** Ask the map for a point to put the base's origin on, or stop asking. */
@@ -223,9 +245,39 @@ export function BaseControls({
           >
             <Blocks className="size-3.5" /> {buildings.length} building
             {buildings.length === 1 ? "" : "s"}
+            {sharedWith > 0 && (sharedEdit ? " · editing shared" : " · shared")}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 space-y-3">
+          <LayoutName name={layoutName} onRename={onRename} />
+
+          {sharedWith > 0 && (
+            <div className="space-y-2 rounded bg-sky-950/60 px-2 py-1.5 text-[11px] text-sky-100">
+              <p>
+                {sharedWith === 1
+                  ? "One other base is"
+                  : `${sharedWith} other bases are`}{" "}
+                placed from this layout.{" "}
+                {sharedEdit
+                  ? "Adding, moving, turning or deleting a building here changes it for all of them."
+                  : "Adding, moving, turning or deleting a building here gives this base a copy of its own and leaves the rest where they stand."}
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <Label
+                  htmlFor="base-shared-layout"
+                  className="text-[11px] font-medium"
+                >
+                  Edit the layout they all use
+                </Label>
+                <Switch
+                  id="base-shared-layout"
+                  checked={sharedEdit}
+                  onCheckedChange={onSharedEdit}
+                />
+              </div>
+            </div>
+          )}
+
           <p className="text-xs text-muted-foreground">
             Every building sits at an offset from the base's origin. Dragging
             one moves it within the base. Moving the base takes the lot.
@@ -271,5 +323,41 @@ export function BaseControls({
         </PopoverContent>
       </Popover>
     </>
+  );
+}
+
+/**
+ * What the layout is called, which is what a picker will list it by.
+ *
+ * Local while it is typed and committed when the box is left, because every edit
+ * the editor makes is written to disk. Seeded on mount, and the popover it is in
+ * mounts each time it is opened, so a layout renamed under the author by a copy
+ * being made shows its new name the next time they look.
+ */
+function LayoutName({
+  name,
+  onRename,
+}: {
+  name: string;
+  onRename: (name: string) => void;
+}) {
+  const [text, setText] = useState(name);
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="base-layout-name" className="text-xs font-medium">
+        Layout name
+      </Label>
+      <Input
+        id="base-layout-name"
+        value={text}
+        placeholder="What this layout is called"
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => (text.trim() ? onRename(text) : setText(name))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        className="h-8 text-xs"
+      />
+    </div>
   );
 }
