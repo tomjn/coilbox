@@ -102,7 +102,9 @@ Orders are one queue given to every unit in the group. **Move along**, **Patrol*
 
 ### Bases
 
-A base, a prefab in the format, is a group of buildings you drag around as one piece. The buildings are stored as offsets from the base's origin, so moving the origin moves the lot.
+A base is a group of buildings you drag around as one piece. The buildings are stored as offsets from the base's origin, so moving the origin moves the lot.
+
+The format keeps a base in two halves. The **blueprint** is the layout: which buildings, where they sit relative to the origin, and which way each faces. The base is the placement of one blueprint: whose it is, where on the map it stands, and the fields only a mission uses. That is why the same layout can be a mission's enemy compound and something you stamp out in a live game, and it is what the base blueprint import and export work builds on.
 
 Each building carries its own facing. A factory also carries the **Queue** it starts with and whether it builds that queue **over and over**. The picker is limited to the game's static units, because a mobile unit inside a base would be placed off the build grid.
 

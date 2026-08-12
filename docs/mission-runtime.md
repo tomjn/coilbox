@@ -276,7 +276,7 @@ The gadget sits at `layer = 1000`, behind your own gadgets, because it is overri
 
 Enough to be worth knowing before you adopt it:
 
-- **The start.** Every actor, prefab building, per-team start unit and non-dormant group is created at game start. A building is put through `Spring.Pos2BuildPos` on the way, so it sits on the build grid and can be rebuilt where it stood.
+- **The start.** Every actor, base building, per-team start unit and non-dormant group is created at game start. A building is put through `Spring.Pos2BuildPos` on the way, so it sits on the build grid and can be rebuilt where it stood.
 - **Starting resources, for every mission team.** At game frame 1 each team the scenario declares has its bank set to the scenario's number, defaulting to nothing. That is how the game's usual opening bank is suppressed. Free income, if the scenario asks for it, is paid every frame.
 - **Commanders, only where asked.** A team whose scenario entry sets `noCommander` is a team the runtime starts and your game does not, which is [contract item 3](#3-do-not-start-a-team-the-mission-has-already-started). Teams without the flag keep the commander your game gave them.
 
@@ -305,7 +305,7 @@ A scenario is JSON in coilbox's app data (`scenario/scenarios/<id>.json`, with d
 
 The emitted file is a single `return { ... }` under a two-line header. It is deterministic: array order is document order, every author-keyed table is emitted in sorted key order, Lua keywords are bracketed so a trigger's `repeat` becomes `["repeat"]`, and a non-finite number throws rather than emitting. Two things are added at compile time that the document cannot carry: each participant's engine team number, and the game and map names.
 
-**The compile step doubles as the validator.** After writing, coilbox reads the file back out of the game folder with `coilbox-springlua`, which evaluates loose Spring Lua against a rooted VFS, and asserts that every id reference resolves before the engine sees it: every actor, group and prefab names a team that has an engine team number, every order target names an actor, a named prefab building or a group, and every trigger parameter of an id kind resolves against its registry. An unknown step type is skipped, because it belongs to a game extension.
+**The compile step doubles as the validator.** After writing, coilbox reads the file back out of the game folder with `coilbox-springlua`, which evaluates loose Spring Lua against a rooted VFS, and asserts that every id reference resolves before the engine sees it: every actor, group and base names a team that has an engine team number, every order target names an actor, a named base building or a group, and every trigger parameter of an id kind resolves against its registry. An unknown step type is skipped, because it belongs to a game extension.
 
 The validator is the same code path the engine will take, not a second implementation that can disagree with it. A scenario that does not validate is not launched, and the reasons are shown in editor terms rather than as compiled paths.
 
@@ -326,7 +326,7 @@ return {
 
 Coilbox reads two of these: the one in the game (`installed`) and the one this build ships (`available`). Every type is then in one of three states. `supported` means the installed runtime declares it. `added` means coilbox's does and the installed one does not, so installing or updating brings it. `extra` means the installed runtime declares it and coilbox does not, so the game is ahead of this build.
 
-A scenario records `runtimeVersion`, the lowest runtime that can play it, computed from the trigger types it uses and from the format features it uses. It is recomputed on every save, by the one function every write goes through, so a stored document always names the runtime it actually needs. Every launch-set type is version 1. Naming a prefab building needs 2. Version 3 is four format changes released together: a var read where a number goes, a team on `camera_pan` and `map_marker`, an uncontested `zone_held_for`, and the `release_group` action.
+A scenario records `runtimeVersion`, the lowest runtime that can play it, computed from the trigger types it uses and from the format features it uses. It is recomputed on every save, by the one function every write goes through, so a stored document always names the runtime it actually needs. Every launch-set type is version 1. Naming a base building needs 2. Version 3 is four format changes released together: a var read where a number goes, a team on `camera_pan` and `map_marker`, an uncontested `zone_held_for`, and the `release_group` action.
 
 Three rules keep this honest, and all three matter to anyone adding a type:
 
