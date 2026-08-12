@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { buildGridSnap } from "@/blueprint/footprint";
 import {
   loadUnitsyncUnitModel,
   useUnitsyncScan,
@@ -90,12 +91,18 @@ export function useScenarioUnits(
     return out;
   }, [dataset]);
 
+  // Where the engine will stand each of a base's buildings, so a model is drawn
+  // on the same point as its own footprint square (#1421). Built from the same
+  // dataset the footprints are, so the two agree even before it has been read,
+  // when every unit is taken to stand on one square.
+  const snap = useMemo(() => buildGridSnap(dataset?.units ?? []), [dataset]);
+
   const { actors, groups, bases, blueprints } = scenario;
   const placements = useMemo(
     // These registries are the whole input, so a change to anything else in the
     // document leaves the drawn scene alone.
-    () => scenarioPlacements({ actors, groups, bases, blueprints }),
-    [actors, groups, bases, blueprints],
+    () => scenarioPlacements({ actors, groups, bases, blueprints }, snap),
+    [actors, groups, bases, blueprints, snap],
   );
 
   const participants = scenario.setup.participants;
