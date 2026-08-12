@@ -13,12 +13,14 @@
  * editor never offers dormancy as if it were sleep.
  */
 
+import type { BaseBlueprint } from "@/blueprint/model";
 import {
   baseBuildings,
   type GroupUnit,
   type PlacedBuilding,
   type Point,
   type Scenario,
+  type ScenarioBase,
   type ScenarioGroup,
   type ScenarioOrder,
 } from "../../model";
@@ -380,6 +382,30 @@ export function groupLabel(groups: ScenarioGroup[], id: string): string {
   return at < 0 ? "a group that is gone" : `Group ${at + 1}`;
 }
 
+/**
+ * What each base is called: the layout it places, made unique when two bases
+ * place the same layout (issue #1423).
+ *
+ * A base has no name of its own. The layout does, chosen by whoever built it,
+ * so a base reads by that rather than by its place in the document, which is
+ * an implementation detail nobody picked. Two bases placed from one layout
+ * read the same name until {@link uniqueLabels} numbers them, which is the
+ * only time a number belongs here: it says "these two are the same layout,
+ * placed twice" rather than standing in for a name nobody gave.
+ */
+export function baseLabels(
+  blueprints: BaseBlueprint[],
+  bases: ScenarioBase[],
+): string[] {
+  return uniqueLabels(
+    bases.map(
+      (base) =>
+        blueprints.find((b) => b.id === base.blueprint)?.name ??
+        "a layout that is gone",
+    ),
+  );
+}
+
 /** One thing an order can be pointed at. */
 export interface TargetOption {
   value: string;
@@ -414,6 +440,7 @@ export function uniqueLabels(labels: string[]): string[] {
 export function buildingTargets(
   scenario: Pick<Scenario, "bases" | "blueprints">,
 ): { id: string; label: string; def: string }[] {
+  const baseNames = baseLabels(scenario.blueprints, scenario.bases);
   const found = scenario.bases.flatMap((base, i) =>
     baseBuildings(scenario.blueprints, base)
       .filter((building): building is PlacedBuilding & { id: string } =>
@@ -421,7 +448,7 @@ export function buildingTargets(
       )
       .map((building) => ({
         id: building.id,
-        label: `Base ${i + 1}'s ${building.def}`,
+        label: `${baseNames[i]}'s ${building.def}`,
         def: building.def,
       })),
   );
