@@ -1,16 +1,11 @@
 import { Button, Input } from "@picoframe/frame";
 import {
-  ChevronLeft,
-  ChevronRight,
   Layers,
   List,
   Loader2,
   MapPin,
   MountainSnow,
-  Pause,
-  Play,
   Redo2,
-  RotateCw,
   Trash2,
   Undo2,
   Unplug,
@@ -35,6 +30,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
+import { PlaybackBar, SelectionBar } from "@/placement/SurfaceBars";
 import {
   focusCamera,
   focusDistance,
@@ -655,7 +651,7 @@ export function ScenarioMapScene({
             {mode.hint}
           </p>
           {picked && (
-            <SelectionBar
+            <ScenarioSelectionBar
               placement={picked}
               onTurn={() =>
                 onChange((doc) =>
@@ -767,7 +763,7 @@ export function ScenarioMapScene({
                   }}
                 />
               )}
-            </SelectionBar>
+            </ScenarioSelectionBar>
           )}
           {drawingPath && pickedGroup && (
             <ClickMapBar
@@ -927,13 +923,13 @@ export function ScenarioMapScene({
 }
 
 /**
- * What is selected, and the two things that can be done to it that a drag
- * cannot: turn it a quarter turn, and delete it.
+ * What is selected, said the way this document names it.
  *
- * A group's units are spawned facing south together, so there is nothing to turn
- * on one, and the button says so rather than disappearing.
+ * The bar itself is shared with the blueprint editor. What is not shared is what
+ * a placement is called here: an actor, one of a group's units, or one of a
+ * base's buildings.
  */
-function SelectionBar({
+function ScenarioSelectionBar({
   placement,
   onTurn,
   onDelete,
@@ -946,42 +942,23 @@ function SelectionBar({
    *  overrides, and whatever a group or a base grows later. */
   children?: ReactNode;
 }) {
-  const turnable = canTurn(placement.key);
-  const what =
-    placement.kind === "actor"
-      ? "actor"
-      : placement.kind === "group"
-        ? `group unit ${placement.index + 1}`
-        : `base building ${placement.index + 1}`;
-
   return (
-    <div className="flex w-fit items-center gap-1.5 rounded-md border border-border/60 bg-card/85 p-1 pl-2 backdrop-blur">
-      <span className="font-mono text-[11px]">
-        {placement.def}
-        <span className="ml-1.5 text-muted-foreground">{what}</span>
-      </span>
+    <SelectionBar
+      def={placement.def}
+      what={
+        placement.kind === "actor"
+          ? "actor"
+          : placement.kind === "group"
+            ? `group unit ${placement.index + 1}`
+            : `base building ${placement.index + 1}`
+      }
+      turnable={canTurn(placement.key)}
+      turnHint="A group's units all face south"
+      onTurn={onTurn}
+      onDelete={onDelete}
+    >
       {children}
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 gap-1.5 px-2 text-xs"
-        onClick={onTurn}
-        disabled={!turnable}
-        title={
-          turnable ? "Turn a quarter turn" : "A group's units all face south"
-        }
-      >
-        <RotateCw className="size-3.5" /> Turn
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
-        onClick={onDelete}
-      >
-        <Trash2 className="size-3.5" /> Delete
-      </Button>
-    </div>
+    </SelectionBar>
   );
 }
 
@@ -1066,91 +1043,6 @@ function ClickMapBar({
     <div className="flex w-fit items-center gap-1.5 rounded-md border border-lime-400/60 bg-card/85 p-1 pl-2 backdrop-blur">
       <MapPin className="size-3.5 text-lime-300" />
       <span className="text-[11px]">{message}</span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 px-2 text-xs"
-        onClick={onDone}
-      >
-        Done
-      </Button>
-    </div>
-  );
-}
-
-/**
- * A build order being watched: how far up the base is, and the way to move
- * along it (issue #1418).
- *
- * The map is where this belongs rather than the popover that started it,
- * because what is being watched is the base on the map, and the popover covers
- * the corner of it. Stepping is always there beside the playing, because the
- * step somebody wants to look at is the one they want to stop on.
- */
-function PlaybackBar({
-  step,
-  total,
-  def,
-  playing,
-  onStep,
-  onPlaying,
-  onDone,
-}: {
-  /** How many buildings are standing, so 0 is bare ground. */
-  step: number;
-  total: number;
-  /** What the last step put down, for saying what just happened. */
-  def: string;
-  playing: boolean;
-  onStep: (step: number) => void;
-  onPlaying: (on: boolean) => void;
-  onDone: () => void;
-}) {
-  return (
-    <div className="flex w-fit items-center gap-1.5 rounded-md border border-lime-400/60 bg-card/85 p-1 pl-2 backdrop-blur">
-      <span className="text-[11px]">
-        {step === 0 ? (
-          <span className="text-muted-foreground">bare ground</span>
-        ) : (
-          <span className="font-mono">{def}</span>
-        )}
-        <span className="ml-1.5 text-muted-foreground">
-          {step} of {total}
-        </span>
-      </span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="size-7 p-0"
-        aria-label="Back a step"
-        disabled={step === 0}
-        onClick={() => onStep(step - 1)}
-      >
-        <ChevronLeft className="size-3.5" />
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="size-7 p-0"
-        aria-label={playing ? "Pause" : "Play"}
-        onClick={() => onPlaying(!playing)}
-      >
-        {playing ? (
-          <Pause className="size-3.5" />
-        ) : (
-          <Play className="size-3.5" />
-        )}
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="size-7 p-0"
-        aria-label="On a step, building the next one"
-        disabled={step >= total}
-        onClick={() => onStep(step + 1)}
-      >
-        <ChevronRight className="size-3.5" />
-      </Button>
       <Button
         size="sm"
         variant="ghost"

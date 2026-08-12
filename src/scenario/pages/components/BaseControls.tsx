@@ -25,21 +25,16 @@
  * the order things happened to be clicked in and is not worth showing as one.
  */
 
-import { Button, cn, Input } from "@picoframe/frame";
+import { Button } from "@picoframe/frame";
 import {
   ArrowDown,
   ArrowUp,
   Blocks,
-  ClipboardCopy,
   Hammer,
-  ListOrdered,
   Move,
-  Play,
   Trash2,
   X,
 } from "lucide-react";
-import { useState } from "react";
-import { buildOrderText } from "@/blueprint/order";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -49,6 +44,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import {
+  BuildOrderPopover,
+  LayoutNameField,
+  LayoutNotes,
+} from "@/placement/LayoutControls";
 import type { Participant } from "@/play/config";
 import type { PlacedBuilding, ScenarioBase } from "../../model";
 import {
@@ -272,7 +272,11 @@ export function BaseControls({
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 space-y-3">
-          <LayoutName name={layoutName} onRename={onRename} />
+          <LayoutNameField
+            id="base-layout-name"
+            name={layoutName}
+            onRename={onRename}
+          />
 
           {sharedWith > 0 && (
             <div className="space-y-2 rounded bg-sky-950/60 px-2 py-1.5 text-[11px] text-sky-100">
@@ -306,24 +310,7 @@ export function BaseControls({
             one moves it within the base. Moving the base takes the lot.
           </p>
 
-          {overlaps.length > 0 && (
-            <p className="rounded bg-red-950/60 px-2 py-1.5 text-[11px] text-red-200">
-              Building{overlaps.length === 1 ? " " : "s "}
-              {overlaps.map((at) => at + 1).join(", ")} stand
-              {overlaps.length === 1 ? "s" : ""} on ground another building
-              wants, marked in red on the map. The engine builds one of them and
-              refuses the rest.
-            </p>
-          )}
-
-          {strays.length > 0 && (
-            <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
-              {strays.join(", ")} {strays.length === 1 ? "is" : "are"} not a
-              building in this game, so {strays.length === 1 ? "it" : "they"}{" "}
-              will spawn off the build grid. Mobile units belong in a group or
-              as an actor.
-            </p>
-          )}
+          <LayoutNotes overlaps={overlaps} strays={strays} />
 
           <Button
             size="sm"
@@ -346,7 +333,7 @@ export function BaseControls({
         </PopoverContent>
       </Popover>
 
-      <BuildOrder
+      <BuildOrderPopover
         buildings={buildings}
         index={index}
         ordered={ordered}
@@ -355,184 +342,5 @@ export function BaseControls({
         onPlay={onPlay}
       />
     </>
-  );
-}
-
-/**
- * What this base is built in, and whether that is a claim or an accident.
- *
- * The list is the layout's own array, so moving a building up the list is the
- * whole of changing a build order. There is nothing else holding a sequence
- * that this could be out of step with.
- *
- * Off, the list is not shown at all. A layout whose order nobody meant has an
- * order all the same, and drawing it as steps would invite an author to read
- * one into what is only the order they happened to click in.
- */
-function BuildOrder({
-  buildings,
-  index,
-  ordered,
-  onOrdered,
-  onMoveBuilding,
-  onPlay,
-}: {
-  buildings: PlacedBuilding[];
-  index: number;
-  ordered: boolean;
-  onOrdered: (on: boolean) => void;
-  onMoveBuilding: (index: number, delta: number) => void;
-  onPlay: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(
-        buildOrderText({ ordered, buildings }),
-      );
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // The clipboard may be unavailable. Nothing is lost: the order is on
-      // screen and the document holds it.
-    }
-  };
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-xs">
-          <ListOrdered className="size-3.5" />
-          {ordered ? `Build order · ${buildings.length} steps` : "Build order"}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <Label htmlFor="base-ordered" className="text-xs font-medium">
-            Build these in this order
-          </Label>
-          <Switch
-            id="base-ordered"
-            checked={ordered}
-            onCheckedChange={onOrdered}
-          />
-        </div>
-
-        {ordered ? (
-          <>
-            <ol className="max-h-56 space-y-1.5 overflow-y-auto">
-              {buildings.map((building, at) => (
-                <li
-                  // biome-ignore lint/suspicious/noArrayIndexKey: a base holds the same building twice as often as not, and where it stands in the order is the only thing naming it
-                  key={`${at}-${building.def}`}
-                  className="flex items-center gap-2"
-                >
-                  <span className="w-4 shrink-0 text-right text-[11px] text-muted-foreground">
-                    {at + 1}
-                  </span>
-                  <span
-                    className={cn(
-                      "min-w-0 flex-1 truncate font-mono text-xs",
-                      at === index && "text-lime-300",
-                    )}
-                  >
-                    {building.def}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="size-7 p-0"
-                    aria-label={`Build ${building.def} sooner`}
-                    disabled={at === 0}
-                    onClick={() => onMoveBuilding(at, -1)}
-                  >
-                    <ArrowUp className="size-3.5" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="size-7 p-0"
-                    aria-label={`Build ${building.def} later`}
-                    disabled={at === buildings.length - 1}
-                    onClick={() => onMoveBuilding(at, 1)}
-                  >
-                    <ArrowDown className="size-3.5" />
-                  </Button>
-                </li>
-              ))}
-            </ol>
-
-            <p className="text-[11px] text-muted-foreground">
-              The selected building is the one in green. The order is the layout
-              itself, so a base placed from it anywhere is built the same way.
-            </p>
-
-            <div className="flex items-center gap-1.5 border-t border-border/60 pt-3">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 flex-1 gap-1.5 px-2 text-xs"
-                onClick={onPlay}
-                disabled={buildings.length < 2}
-              >
-                <Play className="size-3.5" /> Watch it go up
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 flex-1 gap-1.5 px-2 text-xs"
-                onClick={copy}
-              >
-                <ClipboardCopy className="size-3.5" />
-                {copied ? "Copied" : "Copy as a build order"}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            These buildings are in the order they were clicked, which is not an
-            opening. Turn this on to say what gets built first, and the layout
-            becomes a build order that can be followed, watched and shared.
-          </p>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-/**
- * What the layout is called, which is what a picker will list it by.
- *
- * Local while it is typed and committed when the box is left, because every edit
- * the editor makes is written to disk. Seeded on mount, and the popover it is in
- * mounts each time it is opened, so a layout renamed under the author by a copy
- * being made shows its new name the next time they look.
- */
-function LayoutName({
-  name,
-  onRename,
-}: {
-  name: string;
-  onRename: (name: string) => void;
-}) {
-  const [text, setText] = useState(name);
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor="base-layout-name" className="text-xs font-medium">
-        Layout name
-      </Label>
-      <Input
-        id="base-layout-name"
-        value={text}
-        placeholder="What this layout is called"
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => (text.trim() ? onRename(text) : setText(name))}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-        }}
-        className="h-8 text-xs"
-      />
-    </div>
   );
 }
