@@ -76,7 +76,7 @@ export const SUPPORTED_KIND_VERSIONS: Record<ContainerKind, number> = {
   preset: 1,
   challenge: 1,
   "setup-pack": 1,
-  scenario: 1,
+  scenario: 2,
   keymap: 1,
 };
 

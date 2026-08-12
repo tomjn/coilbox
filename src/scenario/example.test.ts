@@ -39,7 +39,9 @@ describe("the committed Silence the Jericho export", () => {
   it("identifies as a scenario this build can read", () => {
     expect(identify(text)).toEqual({
       kind: "scenario",
-      version: 1,
+      // 2 since the base blueprint split (issue #1310). Jericho places a base,
+      // so a build that has not got the split cannot read it without losing it.
+      version: 2,
       compatibility: "ok",
       warnings: [],
       game: { name: "SplinterFaction $VERSION" },
