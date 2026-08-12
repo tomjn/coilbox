@@ -363,6 +363,12 @@ pub struct UnitDatasetEntry {
     /// model at all.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub object_name: Option<String>,
+    /// The unitdef's `footprintx`/`footprintz`: how much ground the unit stands
+    /// on, in build squares. `Game.footprintScale` times `Game.squareSize` elmos
+    /// each, which is 16. One square for a unit that declares nothing, the same
+    /// floor the engine applies.
+    pub footprint_x: u32,
+    pub footprint_z: u32,
 }
 
 /// Output of the lazy `--unit-dataset` mode: the whole game's unit graph (units +
