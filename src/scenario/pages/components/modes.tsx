@@ -28,7 +28,13 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
-import type { Point, Scenario, ScenarioZone } from "../../model";
+import {
+  baseBuildings,
+  type Point,
+  type Scenario,
+  type ScenarioZone,
+} from "../../model";
+import { addBase, addBuilding, buildingUnits } from "./bases";
 import { addActor, parsePlacementKey } from "./editing";
 import type { ScenarioEdit } from "./edits";
 import {
@@ -38,7 +44,6 @@ import {
   MAX_GROUP_COUNT,
 } from "./groups";
 import { placementKey } from "./placements";
-import { addBuilding, addPrefab, buildingUnits } from "./prefabs";
 import { TeamSelect } from "./TeamSelect";
 import { useGameUnits } from "./useGameUnits";
 import type { GroundDragPhase } from "./useMapEditing";
@@ -64,7 +69,7 @@ export interface ModeContext {
   onChange: (edit: ScenarioEdit) => void;
   /**
    * What is selected across the whole surface, which for most modes is nothing
-   * to do with placing. Prefabs read it: a click adds to the base already
+   * to do with placing. Bases read it: a click adds to the base already
    * selected rather than starting a second one-building base beside it.
    */
   selected: string | null;
@@ -319,7 +324,7 @@ const groupsMode: EditorMode = {
 function selectedBase(scenario: Scenario, key: string | null) {
   const ref = key ? parsePlacementKey(key) : null;
   return (
-    (ref?.kind === "prefab" && scenario.prefabs.find((p) => p.id === ref.id)) ||
+    (ref?.kind === "base" && scenario.bases.find((b) => b.id === ref.id)) ||
     null
   );
 }
@@ -339,8 +344,8 @@ function selectedBase(scenario: Scenario, key: string | null) {
  * unable to be rebuilt where it stood. Mobile units are what actors and groups
  * are for.
  */
-const prefabsMode: EditorMode = {
-  id: "prefabs",
+const basesMode: EditorMode = {
+  id: "bases",
   label: "Bases",
   icon: Factory,
   hint: "Pick a building and click the map. Clicks add to the base you have selected.",
@@ -368,7 +373,8 @@ const prefabsMode: EditorMode = {
             onChange((doc) => {
               const to = selectedBase(doc, selectedNow());
               if (to) {
-                chosen.key = placementKey("prefab", to.id, to.buildings.length);
+                const at = baseBuildings(doc.blueprints, to).length;
+                chosen.key = placementKey("base", to.id, at);
                 return addBuilding(doc, to.id, {
                   // Minted here rather than when a trigger first wants one, so
                   // every building the editor puts down can be named after the
@@ -385,8 +391,8 @@ const prefabsMode: EditorMode = {
                 });
               }
               const id = crypto.randomUUID();
-              chosen.key = placementKey("prefab", id, 0);
-              return addPrefab(doc, id, {
+              chosen.key = placementKey("base", id, 0);
+              return addBase(doc, id, crypto.randomUUID(), {
                 team: owner,
                 origin: pos,
                 buildings: [
@@ -440,5 +446,5 @@ export const EDITOR_MODES: EditorMode[] = [
   zonesMode,
   actorsMode,
   groupsMode,
-  prefabsMode,
+  basesMode,
 ];

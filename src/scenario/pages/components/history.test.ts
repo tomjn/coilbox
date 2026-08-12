@@ -16,7 +16,7 @@ import {
 
 function scenario(over: Partial<Scenario> = {}): Scenario {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: "s1",
     name: "Test",
     description: "",
@@ -32,7 +32,8 @@ function scenario(over: Partial<Scenario> = {}): Scenario {
     zones: [],
     actors: [],
     groups: [],
-    prefabs: [],
+    blueprints: [],
+    bases: [],
     restrictions: {},
     vars: {},
     triggers: [],

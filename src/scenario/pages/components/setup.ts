@@ -12,15 +12,17 @@
  */
 
 import type { SkirmishDraft } from "@/play/drafts";
-import type {
-  Point,
-  Scenario,
-  ScenarioOrder,
-  ScenarioParam,
-  ScenarioTeam,
-  TriggerStep,
+import {
+  baseBuildings,
+  type Point,
+  type Scenario,
+  type ScenarioOrder,
+  type ScenarioParam,
+  type ScenarioTeam,
+  type TriggerStep,
 } from "../../model";
 import { ACTION_TYPES, CONDITION_TYPES } from "../../triggerTypes";
+import { pruneBlueprints } from "./bases";
 
 /**
  * Elmos per unit of `MapItem.width`.
@@ -124,10 +126,9 @@ function moveOrder(order: ScenarioOrder, move: (p: Point) => Point) {
 /**
  * Every absolute map coordinate in the document moved by one function.
  *
- * A prefab building's `offset` is deliberately left alone: it is measured from
- * its prefab's origin and describes a base's own layout, which a building
- * footprint fixes in elmos. Moving the origin moves the base, and that is the
- * whole of it.
+ * A blueprint building's `offset` is deliberately left alone: it is measured
+ * from the base's origin and describes a layout, which a building footprint
+ * fixes in elmos. Moving the origin moves the base, and that is the whole of it.
  */
 export function moveScenarioPoints(
   scenario: Scenario,
@@ -146,7 +147,7 @@ export function moveScenarioPoints(
       pos: move(g.pos),
       orders: g.orders.map((o) => moveOrder(o, move)),
     })),
-    prefabs: scenario.prefabs.map((p) => ({ ...p, origin: move(p.origin) })),
+    bases: scenario.bases.map((b) => ({ ...b, origin: move(b.origin) })),
     triggers: scenario.triggers.map((t) => ({
       ...t,
       conditions: {
@@ -207,11 +208,11 @@ export function scenarioPoints(scenario: Scenario): Point[] {
     out.push(p);
     return p;
   });
-  for (const prefab of scenario.prefabs) {
-    for (const building of prefab.buildings) {
+  for (const base of scenario.bases) {
+    for (const building of baseBuildings(scenario.blueprints, base)) {
       out.push({
-        x: prefab.origin.x + building.offset.x,
-        z: prefab.origin.z + building.offset.z,
+        x: base.origin.x + building.offset.x,
+        z: base.origin.z + building.offset.z,
       });
     }
   }
@@ -221,7 +222,7 @@ export function scenarioPoints(scenario: Scenario): Point[] {
 /** What changing the map costs: how much of the document is pinned to a
  *  coordinate, and how much of it the new map has no room for. */
 export interface MapCost {
-  /** Entries that stand somewhere: zones, actors, groups and prefabs. */
+  /** Entries that stand somewhere: zones, actors, groups and bases. */
   placed: number;
   /** Coordinates that fall outside the new map, where the engine clamps them
    *  onto the edge. Zero when the new map's size is unknown. */
@@ -233,7 +234,7 @@ export function mapCost(scenario: Scenario, extent: MapExtent | null): MapCost {
     scenario.zones.length +
     scenario.actors.length +
     scenario.groups.length +
-    scenario.prefabs.length;
+    scenario.bases.length;
   if (!extent) return { placed, offMap: 0 };
   const offMap = scenarioPoints(scenario).filter(
     (p) => p.x <= 0 || p.z <= 0 || p.x >= extent.x || p.z >= extent.z,
@@ -280,7 +281,7 @@ export function setScenarioGame(
 export interface ParticipantHoldings {
   actors: number;
   groups: number;
-  prefabs: number;
+  bases: number;
   /** Trigger conditions and actions that name it. */
   triggers: number;
   /** It has a `teams` entry: start units, resources, income or no commander. */
@@ -292,7 +293,7 @@ export function holdsNothing(h: ParticipantHoldings): boolean {
   return (
     h.actors === 0 &&
     h.groups === 0 &&
-    h.prefabs === 0 &&
+    h.bases === 0 &&
     h.triggers === 0 &&
     !h.team
   );
@@ -327,7 +328,7 @@ export function participantHoldings(
   return {
     actors: scenario.actors.filter((a) => a.team === id).length,
     groups: scenario.groups.filter((g) => g.team === id).length,
-    prefabs: scenario.prefabs.filter((p) => p.team === id).length,
+    bases: scenario.bases.filter((b) => b.team === id).length,
     triggers,
     team: id in scenario.teams,
   };
@@ -373,7 +374,7 @@ function rewriteTriggerTeams(
 /**
  * A participant removed, and everything that named it dealt with.
  *
- * `to` names another participant to hand its actors, groups, prefabs and
+ * `to` names another participant to hand its actors, groups, bases and
  * triggers to. `null` deletes them instead. Either way its `teams` entry goes:
  * start units and resources belong to the participant that was removed, and
  * giving them to somebody else would silently overwrite what that participant
@@ -410,12 +411,14 @@ export function removeScenarioParticipant(
       to === null
         ? scenario.groups.filter((g) => g.team !== id)
         : scenario.groups.map((g) => (g.team === id ? { ...g, team: to } : g)),
-    prefabs:
+    bases:
       to === null
-        ? scenario.prefabs.filter((p) => p.team !== id)
-        : scenario.prefabs.map((p) => (p.team === id ? { ...p, team: to } : p)),
+        ? scenario.bases.filter((b) => b.team !== id)
+        : scenario.bases.map((b) => (b.team === id ? { ...b, team: to } : b)),
   };
-  if (to === null) return next;
+  // The layouts of the bases that went with the participant go too, which is the
+  // same rule deleting one base at a time follows.
+  if (to === null) return pruneBlueprints(next);
   return rewriteTriggerTeams(next, (named) => (named === id ? to : undefined));
 }
 
@@ -423,7 +426,7 @@ export function removeScenarioParticipant(
  * A saved skirmish preset copied in as the whole setup.
  *
  * A preset's participants are a different set of ids from the ones the document
- * is keyed on, so copying one in used to leave every actor, group, prefab and
+ * is keyed on, so copying one in used to leave every actor, group, base and
  * `teams` entry pointing at somebody who no longer existed. They are handed over
  * in list order instead: the first participant's things become the preset's
  * first participant's, and so on. A participant the preset does not reach as far
@@ -465,9 +468,9 @@ export function applyPresetSetup(
     teams,
     actors: scenario.actors.map((a) => ({ ...a, team: to(a.team) ?? a.team })),
     groups: scenario.groups.map((g) => ({ ...g, team: to(g.team) ?? g.team })),
-    prefabs: scenario.prefabs.map((p) => ({
-      ...p,
-      team: to(p.team) ?? p.team,
+    bases: scenario.bases.map((b) => ({
+      ...b,
+      team: to(b.team) ?? b.team,
     })),
   };
   return rewriteTriggerTeams(next, to);

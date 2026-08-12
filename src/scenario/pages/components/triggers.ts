@@ -468,7 +468,7 @@ export function registryOptions(
         description: zone.shape,
       }));
     }
-    // Actors and named prefab buildings both, because the runtime holds them in
+    // Actors and named base buildings both, because the runtime holds them in
     // one table and a trigger naming either gets a unit back (issue #878).
     case "actorId": {
       const labels = uniqueLabels(
@@ -480,7 +480,7 @@ export function registryOptions(
           label: labels[i],
           description: actor.unitDef,
         })),
-        ...buildingTargets(scenario.prefabs).map((building) => ({
+        ...buildingTargets(scenario).map((building) => ({
           value: building.id,
           label: building.label,
           description: building.def,

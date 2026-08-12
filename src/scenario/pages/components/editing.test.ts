@@ -49,15 +49,23 @@ function document(): Scenario {
         dormant: false,
       },
     ],
-    prefabs: [
+    blueprints: [
       {
-        id: "b1",
-        team: "p1",
-        origin: { x: 2000, z: 2000 },
+        id: "bp1",
+        name: "The keep",
         buildings: [
           { def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 },
           { def: "armllt", offset: { x: 64, z: 0 }, facing: 1 },
         ],
+      },
+    ],
+    bases: [
+      {
+        id: "b1",
+        blueprint: "bp1",
+        team: "p1",
+        origin: { x: 2000, z: 2000 },
+        buildings: [],
       },
     ],
   };
@@ -167,8 +175,8 @@ describe("parsePlacementKey", () => {
       id: "g1",
       index: 3,
     });
-    expect(parsePlacementKey("prefab:b1#0")).toEqual({
-      kind: "prefab",
+    expect(parsePlacementKey("base:b1#0")).toEqual({
+      kind: "base",
       id: "b1",
       index: 0,
     });
@@ -198,8 +206,8 @@ describe("dragKeys", () => {
     ]);
   });
 
-  it("drags one building of a prefab", () => {
-    expect(dragKeys(placements, "prefab:b1#1")).toEqual(["prefab:b1#1"]);
+  it("drags one building of a base", () => {
+    expect(dragKeys(placements, "base:b1#1")).toEqual(["base:b1#1"]);
   });
 
   it("has nothing to drag for a key that is not drawn", () => {
@@ -218,10 +226,10 @@ describe("movePlacement", () => {
     expect(next.groups[0].pos).toEqual({ x: 1100, z: 1000 });
   });
 
-  it("moves one prefab building by its offset, leaving the origin alone", () => {
-    const next = movePlacement(document(), "prefab:b1#1", { x: 0, z: 64 });
-    expect(next.prefabs[0].origin).toEqual({ x: 2000, z: 2000 });
-    expect(next.prefabs[0].buildings.map((b) => b.offset)).toEqual([
+  it("moves one base building in its layout, leaving the origin alone", () => {
+    const next = movePlacement(document(), "base:b1#1", { x: 0, z: 64 });
+    expect(next.bases[0].origin).toEqual({ x: 2000, z: 2000 });
+    expect(next.blueprints[0].buildings.map((b) => b.offset)).toEqual([
       { x: 0, z: 0 },
       { x: 64, z: 64 },
     ]);
@@ -230,7 +238,7 @@ describe("movePlacement", () => {
   it("hands back the same document when the key names nothing", () => {
     const before = document();
     expect(movePlacement(before, "actor:gone", { x: 1, z: 1 })).toBe(before);
-    expect(movePlacement(before, "prefab:b1#7", { x: 1, z: 1 })).toBe(before);
+    expect(movePlacement(before, "base:b1#7", { x: 1, z: 1 })).toBe(before);
     expect(movePlacement(before, "nonsense", { x: 1, z: 1 })).toBe(before);
   });
 });
@@ -242,10 +250,10 @@ describe("turning", () => {
     expect(turnFacing(1, 4)).toBe(1);
   });
 
-  it("turns an actor and a prefab building", () => {
+  it("turns an actor and a base building", () => {
     expect(turnPlacement(document(), "actor:a1").actors[0].facing).toBe(1);
     expect(
-      turnPlacement(document(), "prefab:b1#1").prefabs[0].buildings[1].facing,
+      turnPlacement(document(), "base:b1#1").blueprints[0].buildings[1].facing,
     ).toBe(2);
   });
 
@@ -254,7 +262,7 @@ describe("turning", () => {
     expect(turnPlacement(before, "group:g1#0")).toBe(before);
     expect(canTurn("group:g1#0")).toBe(false);
     expect(canTurn("actor:a1")).toBe(true);
-    expect(canTurn("prefab:b1#0")).toBe(true);
+    expect(canTurn("base:b1#0")).toBe(true);
   });
 });
 
@@ -284,10 +292,12 @@ describe("removePlacement", () => {
     expect(doc.groups).toEqual([]);
   });
 
-  it("removes one prefab building, and the prefab with its last", () => {
-    const one = removePlacement(document(), "prefab:b1#0");
-    expect(one.prefabs[0].buildings.map((b) => b.def)).toEqual(["armllt"]);
-    expect(removePlacement(one, "prefab:b1#0").prefabs).toEqual([]);
+  it("removes one base building, and the base with its last", () => {
+    const one = removePlacement(document(), "base:b1#0");
+    expect(one.blueprints[0].buildings.map((b) => b.def)).toEqual(["armllt"]);
+    const none = removePlacement(one, "base:b1#0");
+    expect(none.bases).toEqual([]);
+    expect(none.blueprints).toEqual([]);
   });
 
   it("hands back the same document when the key names nothing", () => {

@@ -4,12 +4,16 @@ import { contentsSelection, sceneContents } from "./contents";
 import { pathKey } from "./groups";
 import { placementKey } from "./placements";
 
-type Registries = Pick<Scenario, "actors" | "groups" | "prefabs" | "zones">;
+type Registries = Pick<
+  Scenario,
+  "actors" | "groups" | "bases" | "blueprints" | "zones"
+>;
 
 const empty: Registries = {
   actors: [],
   groups: [],
-  prefabs: [],
+  bases: [],
+  blueprints: [],
   zones: [],
 };
 
@@ -34,13 +38,26 @@ const group = (id: string): Scenario["groups"][number] => ({
   dormant: false,
 });
 
-const prefab = (id: string): Scenario["prefabs"][number] => ({
-  id,
-  team: "p0",
-  origin: { x: 2048, z: 64 },
-  buildings: [
-    { def: "armlab", offset: { x: 0, z: 0 }, facing: 0 },
-    { def: "armsolar", offset: { x: 96, z: 0 }, facing: 0 },
+/** A base and the layout it is placed from, which always travel together. */
+const placedBase = (id: string): Pick<Registries, "bases" | "blueprints"> => ({
+  blueprints: [
+    {
+      id: `${id}-layout`,
+      name: "The keep",
+      buildings: [
+        { def: "armlab", offset: { x: 0, z: 0 }, facing: 0 },
+        { def: "armsolar", offset: { x: 96, z: 0 }, facing: 0 },
+      ],
+    },
+  ],
+  bases: [
+    {
+      id,
+      blueprint: `${id}-layout`,
+      team: "p0",
+      origin: { x: 2048, z: 64 },
+      buildings: [],
+    },
   ],
 });
 
@@ -64,7 +81,7 @@ const inner = (id: string, name: string): Scenario["zones"][number] => ({
 const everything: Registries = {
   actors: [actor("a1")],
   groups: [group("g1")],
-  prefabs: [prefab("p1")],
+  ...placedBase("p1"),
   zones: [box("z1", "Landing site"), inner("z2", "The pad")],
 };
 
@@ -74,7 +91,7 @@ describe("sceneContents", () => {
     expect(out.map((entry) => entry.kind)).toEqual([
       "actor",
       "group",
-      "prefab",
+      "base",
       "zone",
       "zone",
     ]);
@@ -91,7 +108,7 @@ describe("sceneContents", () => {
     expect(sceneContents(everything).map((entry) => entry.key)).toEqual([
       placementKey("actor", "a1"),
       placementKey("group", "g1", 0),
-      placementKey("prefab", "p1", 0),
+      placementKey("base", "p1", 0),
       "zone:z1",
       "zone:z2",
     ]);
@@ -143,7 +160,7 @@ describe("sceneContents", () => {
   });
 
   it("counts a base's buildings", () => {
-    const [entry] = sceneContents({ ...empty, prefabs: [prefab("p1")] });
+    const [entry] = sceneContents({ ...empty, ...placedBase("p1") });
     expect(entry.detail).toBe("2 buildings");
   });
 
@@ -189,8 +206,8 @@ describe("contentsSelection", () => {
   });
 
   it("reads a base's second building as the base", () => {
-    expect(contentsSelection(entries, placementKey("prefab", "p1", 1))).toBe(
-      placementKey("prefab", "p1", 0),
+    expect(contentsSelection(entries, placementKey("base", "p1", 1))).toBe(
+      placementKey("base", "p1", 0),
     );
   });
 

@@ -7,7 +7,7 @@ import { type EditHistory, emptyHistory } from "./history";
 
 function scenario(): Scenario {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: "s1",
     name: "Test",
     description: "",
@@ -23,7 +23,8 @@ function scenario(): Scenario {
     zones: [],
     actors: [],
     groups: [],
-    prefabs: [],
+    blueprints: [],
+    bases: [],
     restrictions: {},
     vars: {},
     triggers: [],

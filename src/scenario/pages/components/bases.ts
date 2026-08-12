@@ -1,11 +1,20 @@
 /**
- * Prefab bases as the editor edits them: what a base is made of, where its
- * buildings sit relative to it, and what a factory in one is told to build.
+ * Bases as the editor edits them: what a base is made of, where its buildings
+ * sit relative to it, and what a factory in one is told to build.
  *
  * Arithmetic on plain values, so the rules can be tested without a GPU. Moving
- * and turning a single building already live in `editing.ts`, because a prefab
+ * and turning a single building already live in `editing.ts`, because a base's
  * building is picked on the map the way an actor is. What is here is everything
  * that is about the base rather than about one of its buildings.
+ *
+ * A base is two things in the document (issue #1310): a blueprint holding the
+ * layout, and a placement naming that blueprint plus the team, the origin and
+ * the mission-only fields on each building. The editor puts one down as a pair
+ * and every operation here keeps the pair in step, so an author still works on
+ * one base. Which half an edit lands in is the point of the split: changing the
+ * team or moving the whole base touches the placement, and adding a building or
+ * moving one within the base changes the layout, which is what makes that layout
+ * worth keeping and using somewhere else.
  *
  * Two things come from the runtime and are not the editor's to decide. A
  * building's `offset` is measured from the base's origin, so moving one building
@@ -15,12 +24,14 @@
  * {@link strayDefs} says so about a document that already names something else.
  */
 
+import type { BaseBlueprint, BlueprintBuilding } from "@/blueprint/model";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import type {
+  BaseBuildingRole,
+  PlacedBuilding,
   Point,
-  PrefabBuilding,
   Scenario,
-  ScenarioPrefab,
+  ScenarioBase,
 } from "../../model";
 
 /** Whole elmos. The engine takes fractions, but an author never means
@@ -46,31 +57,101 @@ function edit<T extends { id: string }>(
   return out;
 }
 
+/**
+ * The mission-only half of a building, with the fields nothing has set left out,
+ * so a base nobody has named anything in stays free of empty entries.
+ */
+function buildingRole(building: PlacedBuilding): BaseBuildingRole {
+  const role: BaseBuildingRole = {};
+  if (building.id !== undefined) role.id = building.id;
+  if (building.queue !== undefined) role.queue = building.queue;
+  if (building.repeat !== undefined) role.repeat = building.repeat;
+  return role;
+}
+
+/**
+ * The document without the layouts nothing places any more.
+ *
+ * Called wherever a base goes, because a blueprint the editor minted for one
+ * base is that base's layout and nothing else. A layout an author saved for its
+ * own sake will have somewhere else to be listed, and this only ever drops one
+ * that no base names.
+ */
+export function pruneBlueprints(scenario: Scenario): Scenario {
+  const used = new Set(scenario.bases.map((base) => base.blueprint));
+  const blueprints = scenario.blueprints.filter((b) => used.has(b.id));
+  return blueprints.length === scenario.blueprints.length
+    ? scenario
+    : { ...scenario, blueprints };
+}
+
+/** The document with one base's layout changed. */
+function editLayout(
+  scenario: Scenario,
+  id: string,
+  update: (buildings: BlueprintBuilding[]) => BlueprintBuilding[],
+): Scenario {
+  const base = scenario.bases.find((entry) => entry.id === id);
+  if (!base) return scenario;
+  const blueprints = edit<BaseBlueprint>(
+    scenario.blueprints,
+    base.blueprint,
+    (blueprint) => ({ ...blueprint, buildings: update(blueprint.buildings) }),
+  );
+  return blueprints === scenario.blueprints
+    ? scenario
+    : { ...scenario, blueprints };
+}
+
 /* -------------------------------------------------------------------------- *
  * The document. Every one of these hands the same document back when the id
  * names nothing, so a caller can compare identities to decide whether there is
  * anything to save.
  * -------------------------------------------------------------------------- */
 
-/** The document with one more base on it. The id is passed in so the caller can
- *  select the building it just placed. */
-export function addPrefab(
+/**
+ * The document with one more base on it, and the layout it is placed from.
+ *
+ * Both ids are passed in so the caller can select the building it just placed.
+ * The layout gets one of its own rather than sharing the base's, because the two
+ * are separate registries and a base is free to be pointed at a different layout
+ * later without its own id moving.
+ */
+export function addBase(
   scenario: Scenario,
   id: string,
-  prefab: Omit<ScenarioPrefab, "id">,
+  blueprintId: string,
+  base: {
+    team: string;
+    origin: Point;
+    /** What the layout is called. Its id when the caller has nothing better,
+     *  which is what a base drawn on the map has until it is saved by name. */
+    name?: string;
+    buildings: PlacedBuilding[];
+  },
 ): Scenario {
   return {
     ...scenario,
-    prefabs: [
-      ...scenario.prefabs,
+    blueprints: [
+      ...scenario.blueprints,
       {
-        ...prefab,
-        id,
-        origin: round(prefab.origin),
-        buildings: prefab.buildings.map((b) => ({
-          ...b,
+        id: blueprintId,
+        name: base.name ?? blueprintId,
+        buildings: base.buildings.map((b) => ({
+          def: b.def,
           offset: round(b.offset),
+          facing: b.facing,
         })),
+      },
+    ],
+    bases: [
+      ...scenario.bases,
+      {
+        id,
+        blueprint: blueprintId,
+        team: base.team,
+        origin: round(base.origin),
+        buildings: base.buildings.map(buildingRole),
       },
     ],
   };
@@ -87,31 +168,47 @@ export function addPrefab(
 export function addBuilding(
   scenario: Scenario,
   id: string,
-  building: PrefabBuilding,
+  building: PlacedBuilding,
 ): Scenario {
-  const prefabs = edit<ScenarioPrefab>(scenario.prefabs, id, (prefab) => ({
-    ...prefab,
-    buildings: [
-      ...prefab.buildings,
-      { ...building, offset: round(building.offset) },
-    ],
-  }));
-  return prefabs === scenario.prefabs ? scenario : { ...scenario, prefabs };
+  const base = scenario.bases.find((entry) => entry.id === id);
+  const layout = base
+    ? scenario.blueprints.find((b) => b.id === base.blueprint)
+    : undefined;
+  if (!base || !layout) return scenario;
+
+  const at = layout.buildings.length;
+  const roles = base.buildings.slice();
+  // Filled out to the layout's length first. A placement's list is allowed to
+  // stop short where the buildings before this one say nothing, which is what a
+  // layout dropped in from outside looks like, and without the padding the new
+  // building's id would land on one of them.
+  while (roles.length < at) roles.push({});
+  roles[at] = buildingRole(building);
+
+  const withLayout = editLayout(scenario, id, (buildings) => [
+    ...buildings,
+    {
+      def: building.def,
+      offset: round(building.offset),
+      facing: building.facing,
+    },
+  ]);
+  return editBase(withLayout, id, { buildings: roles });
 }
 
 /** The document with one base's own fields changed. Its buildings are edited
  *  through {@link addBuilding}, {@link setQueue} and the shared move, turn and
  *  remove in `editing.ts`. */
-export function editPrefab(
+export function editBase(
   scenario: Scenario,
   id: string,
-  patch: Partial<Pick<ScenarioPrefab, "team" | "origin">>,
+  patch: Partial<Pick<ScenarioBase, "team" | "origin" | "buildings">>,
 ): Scenario {
-  const prefabs = edit<ScenarioPrefab>(scenario.prefabs, id, (prefab) => ({
-    ...prefab,
+  const bases = edit<ScenarioBase>(scenario.bases, id, (base) => ({
+    ...base,
     ...patch,
   }));
-  return prefabs === scenario.prefabs ? scenario : { ...scenario, prefabs };
+  return bases === scenario.bases ? scenario : { ...scenario, bases };
 }
 
 /**
@@ -126,15 +223,41 @@ export function setOrigin(
   id: string,
   pos: Point,
 ): Scenario {
-  return editPrefab(scenario, id, { origin: round(pos) });
+  return editBase(scenario, id, { origin: round(pos) });
 }
 
 /** The document without a base, buildings and queues and all. */
-export function removePrefab(scenario: Scenario, id: string): Scenario {
-  const prefabs = scenario.prefabs.filter((prefab) => prefab.id !== id);
-  return prefabs.length === scenario.prefabs.length
+export function removeBase(scenario: Scenario, id: string): Scenario {
+  const bases = scenario.bases.filter((base) => base.id !== id);
+  return bases.length === scenario.bases.length
     ? scenario
-    : { ...scenario, prefabs };
+    : pruneBlueprints({ ...scenario, bases });
+}
+
+/**
+ * The document with one of a base's buildings gone, from both halves at once.
+ *
+ * The base goes with its last building, because an empty cluster is not a thing
+ * an author can see or select again, and its layout goes with it.
+ */
+export function removeBuilding(
+  scenario: Scenario,
+  id: string,
+  index: number,
+): Scenario {
+  const base = scenario.bases.find((entry) => entry.id === id);
+  const layout = base
+    ? scenario.blueprints.find((b) => b.id === base.blueprint)
+    : undefined;
+  if (!base || !layout?.buildings[index]) return scenario;
+  if (layout.buildings.length === 1) return removeBase(scenario, id);
+
+  const next = editLayout(scenario, id, (buildings) =>
+    buildings.filter((_, i) => i !== index),
+  );
+  return editBase(next, id, {
+    buildings: base.buildings.filter((_, i) => i !== index),
+  });
 }
 
 /* -------------------------------------------------------------------------- *
@@ -154,7 +277,7 @@ export function removePrefab(scenario: Scenario, id: string): Scenario {
 export function normaliseQueue(
   queue: string[],
   repeat: boolean,
-): Pick<PrefabBuilding, "queue" | "repeat"> {
+): Pick<BaseBuildingRole, "queue" | "repeat"> {
   const kept = queue.filter((def) => def.trim().length > 0);
   if (kept.length === 0) return { queue: undefined, repeat: undefined };
   return { queue: kept, repeat: repeat ? true : undefined };
@@ -169,14 +292,18 @@ export function setQueue(
   queue: string[],
   repeat: boolean,
 ): Scenario {
-  const prefabs = edit<ScenarioPrefab>(scenario.prefabs, id, (prefab) => {
-    const building = prefab.buildings[index];
-    if (!building) return prefab;
-    const buildings = prefab.buildings.slice();
-    buildings[index] = { ...building, ...normaliseQueue(queue, repeat) };
-    return { ...prefab, buildings };
+  const bases = edit<ScenarioBase>(scenario.bases, id, (base) => {
+    const layout = scenario.blueprints.find((b) => b.id === base.blueprint);
+    if (!layout?.buildings[index]) return base;
+    const buildings = base.buildings.slice();
+    while (buildings.length <= index) buildings.push({});
+    buildings[index] = {
+      ...buildings[index],
+      ...normaliseQueue(queue, repeat),
+    };
+    return { ...base, buildings };
   });
-  return prefabs === scenario.prefabs ? scenario : { ...scenario, prefabs };
+  return bases === scenario.bases ? scenario : { ...scenario, bases };
 }
 
 /** One more unit on the end of a queue. A queue is a list of build orders, so
@@ -221,12 +348,11 @@ export function movedQueued(
 /**
  * The units a base may be built from: the game's static ones.
  *
- * A prefab is a base, and the runtime snaps a def to the build grid only when
- * the game calls it a building, so offering an author a tank here would offer
- * them something that lands off the grid and cannot be rebuilt where it stood.
- * Mobile units belong in actors and groups, which is where the editor puts them.
- * A def the dataset says nothing about is kept, because an unread dataset is not
- * evidence.
+ * The runtime snaps a def to the build grid only when the game calls it a
+ * building, so offering an author a tank here would offer them something that
+ * lands off the grid and cannot be rebuilt where it stood. Mobile units belong
+ * in actors and groups, which is where the editor puts them. A def the dataset
+ * says nothing about is kept, because an unread dataset is not evidence.
  */
 export function buildingUnits(units: UnitDatasetEntry[]): UnitDatasetEntry[] {
   return units.filter((unit) => unit.mobile !== true);
@@ -242,7 +368,7 @@ export function buildingUnits(units: UnitDatasetEntry[]): UnitDatasetEntry[] {
  */
 export function strayDefs(
   units: UnitDatasetEntry[],
-  buildings: PrefabBuilding[],
+  buildings: { def: string }[],
 ): string[] {
   if (units.length === 0) return [];
   const mobile = new Set(

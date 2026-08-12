@@ -14,7 +14,7 @@
  *
  * What is different is that a scenario is not just a launch payload. The map is
  * the space every coordinate is measured in, the game is what every unit def
- * resolves against, and a participant id is what actors, groups, prefabs and
+ * resolves against, and a participant id is what actors, groups, bases and
  * `teams` entries are keyed on. So each of those three changes is asked about
  * first, and the asking says what it costs. The arithmetic behind it is
  * `setup.ts`.
@@ -115,7 +115,7 @@ function placedList(scenario: Scenario): string {
     [scenario.zones.length, "zone"],
     [scenario.actors.length, "actor"],
     [scenario.groups.length, "group"],
-    [scenario.prefabs.length, "base"],
+    [scenario.bases.length, "base"],
   ];
   return list(kinds.filter(([n]) => n > 0).map(([n, one]) => count(n, one)));
 }
@@ -257,7 +257,7 @@ export function SetupPanel({
     scenario.zones.length +
       scenario.actors.length +
       scenario.groups.length +
-      scenario.prefabs.length >
+      scenario.bases.length >
     0;
 
   const askMap = (mapName: string) => {
@@ -641,7 +641,7 @@ function GameChangeNotice({
 /**
  * Removing a participant, and what it holds.
  *
- * A participant id is what actors, groups, prefabs and `teams` entries are keyed
+ * A participant id is what actors, groups, bases and `teams` entries are keyed
  * on, so removing one without saying where its things go is how a document comes
  * to be full of units nobody owns.
  */
@@ -665,7 +665,7 @@ function ParticipantRemovalNotice({
     [
       held.actors > 0 && count(held.actors, "actor"),
       held.groups > 0 && count(held.groups, "group"),
-      held.prefabs > 0 && count(held.prefabs, "base"),
+      held.bases > 0 && count(held.bases, "base"),
       // Listed rather than only explained below, because a participant whose
       // only holding is a start used to read as owning nothing at all.
       held.team && "a start",

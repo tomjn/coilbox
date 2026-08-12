@@ -5,7 +5,7 @@
  * game has, resolved the same way the scene resolves the models it draws them
  * with: the scan the launcher uses, keyed by the game name the setup carries. It
  * is a hook of its own rather than part of {@link useScenarioUnits} because a
- * picker needs the list and not the layer, and because groups (#761) and prefab
+ * picker needs the list and not the layer, and because groups (#761) and base
  * bases (#762) ask the same question.
  *
  * Both reads are cached per target for the session, so every mode asking is one
