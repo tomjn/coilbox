@@ -1,14 +1,11 @@
-import { Button, cn, Input } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import {
   ChevronLeft,
   ChevronRight,
-  Frame,
   Layers,
   List,
   Loader2,
   MapPin,
-  Maximize2,
-  Minimize2,
   MountainSnow,
   Pause,
   Play,
@@ -27,7 +24,6 @@ import {
   useState,
 } from "react";
 import { Link } from "react-router";
-import * as THREE from "three";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import {
@@ -37,10 +33,14 @@ import {
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useReduceMotion } from "@/general/display";
+import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
 import {
-  MapPreview3D,
-  type MapScene3D,
-} from "@/mapconv/pages/components/MapPreview3D";
+  focusCamera,
+  focusDistance,
+  mapSceneStatus,
+  worldToScene,
+} from "@/placement/scene";
 import { usePreferredTarget } from "@/play/config";
 import type { ExtensionTypes } from "../../extensions";
 import {
@@ -104,14 +104,6 @@ import {
   type Placement,
   placementKey,
 } from "./placements";
-import {
-  authoringCamera,
-  clampToPlane,
-  focusCamera,
-  focusDistance,
-  mapSceneStatus,
-  worldToScene,
-} from "./scene";
 import { startMarkers } from "./startPositions";
 import { useGameUnits } from "./useGameUnits";
 import { useMapEditing } from "./useMapEditing";
@@ -133,31 +125,18 @@ import {
  *  twenty-building opening is not a coffee break. */
 const PLAYBACK_STEP_MS = 700;
 
-/** What the surface says when there is no scene to show. */
-function SurfaceMessage({
-  icon,
-  children,
-}: {
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
-      {icon}
-      <div className="max-w-md text-balance">{children}</div>
-    </div>
-  );
-}
-
 /**
  * The scenario's map as the surface it is authored on.
  *
+ * The working area, the camera and the ground under it are
+ * {@link PlacementSurface}, which the blueprint editor stands on too (issue
+ * #1416). What this file adds is everything about a mission: the modes, the
+ * zones, the paths, the start positions, the contents list, and the bar for
+ * whatever is selected.
+ *
  * The terrain, water, sky and lighting are the content browser's 3D map preview
  * unchanged, resolved through unitsync exactly as a campaign mission's backdrop
- * is. What differs is the camera: authoring means moving over a map, not
- * orbiting an object, so the left button pans, the right rotates, the wheel
- * zooms toward the cursor, and the point being looked at is held over the
- * terrain so a pan cannot strand the view in empty space.
+ * is.
  *
  * The units the document places are drawn on top of it by
  * {@link useScenarioUnits}, and pointing at them is {@link useMapEditing}. The
@@ -284,22 +263,6 @@ export function ScenarioMapScene({
     selectedRef.current = key;
     showSelected(key);
   }, []);
-  // A fixed panel is too small to author a 12km map on (#886). Expanding takes
-  // the whole window rather than opening a second view, so the scene, its
-  // camera and everything the modes hold carry straight over.
-  const [expanded, setExpanded] = useState(false);
-
-  // Escape is the way out of anything that has taken over the window, so it is
-  // the way out of this too.
-  useEffect(() => {
-    if (!expanded) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setExpanded(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [expanded]);
-
   // Which base the author asked to edit the shared layout of (issue #1414).
   // Held against the base rather than as a mode of the editor, so working on
   // another base is back to the answer that loses nobody's work: a copy.
@@ -594,148 +557,72 @@ export function ScenarioMapScene({
     [focusOn, setSelected],
   );
 
-  /** Frame the whole map, looking down at its centre. Also the starting view. */
-  const frameMap = useCallback((handle: MapScene3D) => {
-    const { camera, controls, planeWidth, planeDepth, render } = handle;
-    const at = authoringCamera(
-      planeWidth,
-      planeDepth,
-      camera.aspect,
-      camera.fov,
-      controls.maxDistance,
-    );
-    controls.target.set(0, 0, 0);
-    camera.position.set(at.x, at.y, at.z);
-    controls.update();
-    render();
+  const onScene = useCallback((handle: MapScene3D | null) => {
+    sceneRef.current = handle;
+    setHandle(handle);
   }, []);
 
-  const onScene = useCallback(
-    (handle: MapScene3D | null) => {
-      sceneRef.current = handle;
-      setHandle(handle);
-      if (!handle) return;
-      const { camera, controls, planeWidth, planeDepth, render } = handle;
-
-      // Pan on the left button, because it is the gesture used most and the one
-      // a mouse always has. Rotate moves to the right button, which the preview
-      // otherwise spends on a second pan. The middle button pans too, because a
-      // mode that draws takes the left button for the whole gesture and the
-      // wheel already does the dollying the middle button would otherwise.
-      controls.mouseButtons = {
-        LEFT: THREE.MOUSE.PAN,
-        MIDDLE: THREE.MOUSE.PAN,
-        RIGHT: THREE.MOUSE.ROTATE,
-      };
-      // Pan across the ground rather than across the screen, so dragging moves
-      // the map under the cursor however far the camera is tilted.
-      controls.screenSpacePanning = false;
-
-      // Hold the look-at point over the terrain. Applied after the fact rather
-      // than as a limit because OrbitControls has none: the target is moved by
-      // both panning and zoom-to-cursor, and the camera has to follow the
-      // correction or the view would swing.
-      let correcting = false;
-      const holdOverMap = () => {
-        if (correcting) return;
-        const target = controls.target;
-        const held = clampToPlane(target, planeWidth, planeDepth);
-        if (held.x === target.x && held.z === target.z) return;
-        correcting = true;
-        camera.position.x += held.x - target.x;
-        camera.position.z += held.z - target.z;
-        target.x = held.x;
-        target.z = held.z;
-        correcting = false;
-        render();
-      };
-      controls.addEventListener("change", holdOverMap);
-
-      frameMap(handle);
-    },
-    [frameMap],
-  );
-
-  if (status === "no-map")
-    return (
-      <Surface expanded={expanded}>
-        <SurfaceMessage icon={<Layers className="size-6" />}>
-          Pick a setup to choose the map this scenario is authored on.
-        </SurfaceMessage>
-      </Surface>
-    );
-
-  if (status === "loading")
-    return (
-      <Surface expanded={expanded}>
-        <SurfaceMessage
-          icon={<Loader2 className="size-6 animate-spin opacity-40" />}
+  /** What is shown instead of the map when there is no map to show. */
+  const stand =
+    status === "no-map" ? (
+      <SurfaceMessage icon={<Layers className="size-6" />}>
+        Pick a setup to choose the map this scenario is authored on.
+      </SurfaceMessage>
+    ) : status === "loading" ? (
+      <SurfaceMessage
+        icon={<Loader2 className="size-6 animate-spin opacity-40" />}
+      >
+        Reading {mapName}…
+      </SurfaceMessage>
+    ) : status === "no-engine" ? (
+      <SurfaceMessage icon={<Unplug className="size-6" />}>
+        <p>
+          Coilbox reads maps through an engine, and there is no engine installed
+          to read {mapName} with.
+        </p>
+        <Link
+          to="/settings/engines"
+          className="mt-1 inline-block underline underline-offset-2 hover:text-foreground"
         >
-          Reading {mapName}…
-        </SurfaceMessage>
-      </Surface>
-    );
-
-  if (status === "no-engine")
-    return (
-      <Surface expanded={expanded}>
-        <SurfaceMessage icon={<Unplug className="size-6" />}>
-          <p>
-            Coilbox reads maps through an engine, and there is no engine
-            installed to read {mapName} with.
-          </p>
-          <Link
-            to="/settings/engines"
-            className="mt-1 inline-block underline underline-offset-2 hover:text-foreground"
-          >
-            Install an engine
-          </Link>
-        </SurfaceMessage>
-      </Surface>
-    );
-
-  if (status === "error")
-    return (
-      <Surface expanded={expanded}>
-        <SurfaceMessage icon={<MountainSnow className="size-6" />}>
-          <p>
-            {mapName} could not be read. It is most likely not installed for the
-            engine coilbox is using.
-          </p>
-          {assets.error && (
-            <p className="mt-1 font-mono text-xs opacity-70">{assets.error}</p>
-          )}
-          <Link
-            to="/content/maps"
-            className="mt-1 inline-block underline underline-offset-2 hover:text-foreground"
-          >
-            Manage maps
-          </Link>
-        </SurfaceMessage>
-      </Surface>
-    );
+          Install an engine
+        </Link>
+      </SurfaceMessage>
+    ) : status === "error" ? (
+      <SurfaceMessage icon={<MountainSnow className="size-6" />}>
+        <p>
+          {mapName} could not be read. It is most likely not installed for the
+          engine coilbox is using.
+        </p>
+        {assets.error && (
+          <p className="mt-1 font-mono text-xs opacity-70">{assets.error}</p>
+        )}
+        <Link
+          to="/content/maps"
+          className="mt-1 inline-block underline underline-offset-2 hover:text-foreground"
+        >
+          Manage maps
+        </Link>
+      </SurfaceMessage>
+    ) : null;
 
   return (
-    <Surface expanded={expanded}>
-      <div className="relative min-h-0 flex-1">
-        <MapPreview3D
-          className="h-full w-full"
-          framed={false}
-          chrome={false}
-          showSky
-          showClouds={false}
-          heightSrc={assets.heightSrc}
-          textureSrc={assets.textureSrc}
-          skyboxSrc={assets.skyboxSrc}
-          appearance={assets.appearance}
-          minHeight={assets.minHeight}
-          maxHeight={assets.maxHeight}
-          worldWidth={assets.worldWidth}
-          worldHeight={assets.worldHeight}
-          onScene={onScene}
-        />
-
-        <div className="absolute left-2 top-2 flex max-w-[calc(100%-21rem)] flex-col gap-1.5">
+    <PlacementSurface
+      ground={{
+        kind: "map",
+        heightSrc: assets.heightSrc,
+        textureSrc: assets.textureSrc,
+        skyboxSrc: assets.skyboxSrc,
+        appearance: assets.appearance,
+        minHeight: assets.minHeight,
+        maxHeight: assets.maxHeight,
+        worldWidth: assets.worldWidth,
+        worldHeight: assets.worldHeight,
+      }}
+      onScene={onScene}
+      frameLabel="Frame map"
+      stand={stand}
+      bars={
+        <>
           {/* The whole row shares one backdrop rather than each control finding
             its own: a mode's `controls` are arbitrary (selects, a count field,
             a button), so painting the panel once is what makes every one of
@@ -969,9 +856,10 @@ export function ScenarioMapScene({
               }}
             />
           )}
-        </div>
-
-        <div className="absolute right-2 top-2 flex items-center gap-1.5">
+        </>
+      }
+      chrome={
+        <>
           {history && (
             <>
               <Button
@@ -1018,45 +906,23 @@ export function ScenarioMapScene({
               />
             </PopoverContent>
           </Popover>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 bg-card/80 backdrop-blur"
-            onClick={() => {
-              if (sceneRef.current) frameMap(sceneRef.current);
-            }}
-          >
-            <Frame className="size-3.5" /> Frame map
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 bg-card/80 backdrop-blur"
-            onClick={() => setExpanded((on) => !on)}
-            title={expanded ? "Back to the page (Esc)" : "Fill the window"}
-          >
-            {expanded ? (
-              <>
-                <Minimize2 className="size-3.5" /> Collapse
-              </>
-            ) : (
-              <>
-                <Maximize2 className="size-3.5" /> Expand
-              </>
-            )}
-          </Button>
-        </div>
+        </>
+      }
+      note={
         <UnitsNote
           units={units}
           gameName={scenario.setup.gameName}
           drawing={units.drawing}
         />
-      </div>
-      <p className="shrink-0 border-t border-border/50 bg-card/40 px-2 py-1 font-mono text-[11px] text-muted-foreground">
-        {mapName} · drag or middle-drag to pan · drag a unit to move it · drag a
-        zone's middle handle to move it · right-drag to turn · scroll to zoom
-      </p>
-    </Surface>
+      }
+      footer={
+        <>
+          {mapName} · drag or middle-drag to pan · drag a unit to move it · drag
+          a zone's middle handle to move it · right-drag to turn · scroll to
+          zoom
+        </>
+      }
+    />
   );
 }
 
@@ -1376,35 +1242,5 @@ function UnitsNote({
         {units.placed} unit{units.placed === 1 ? "" : "s"}
       </p>
     </div>
-  );
-}
-
-/**
- * The working area the scene and its stand-ins share, so the page does not jump
- * as the map resolves.
- *
- * Expanded it is the whole window. Not a dialog and not a second scene: the same
- * element grows, so the canvas resizes in place, the camera keeps the view it
- * had, and the mode strip, the selection bar and the click bar come along
- * because they were always children of this.
- */
-function Surface({
-  expanded,
-  children,
-}: {
-  expanded: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      className={cn(
-        "flex flex-col overflow-hidden bg-gradient-to-b from-muted/20 to-muted/40",
-        expanded
-          ? "fixed inset-0 z-50 border-0"
-          : "relative h-[30rem] rounded-lg border border-border/50",
-      )}
-    >
-      {children}
-    </section>
   );
 }

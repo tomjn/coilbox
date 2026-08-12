@@ -19,8 +19,8 @@
 import * as THREE from "three";
 
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import { worldToScene } from "@/placement/scene";
 import type { Point } from "../../model";
-import { worldToScene } from "./scene";
 import { markerLabel, type StartMarker } from "./startPositions";
 
 /** What the start positions are drawn under, so they can be found and removed

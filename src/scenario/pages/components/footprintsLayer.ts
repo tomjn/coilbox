@@ -23,8 +23,8 @@ import * as THREE from "three";
 
 import type { FootprintMark } from "@/blueprint/footprint";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import { worldToScene } from "@/placement/scene";
 import type { Point } from "../../model";
-import { worldToScene } from "./scene";
 
 /** What the footprints are drawn under, so they can be found and removed as one
  *  thing. */
