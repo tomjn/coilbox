@@ -518,7 +518,34 @@ function parseBlueprint(b: Record<string, unknown>): BaseBlueprint | null {
   const bid = id(b.id);
   const buildings = parseLayout(b.buildings);
   if (bid === undefined || !buildings) return null;
-  return { id: bid, name: str(b.name) ?? bid, buildings };
+  // Left as it is read, blank and all. What a nameless layout is called is
+  // decided across the whole list, in {@link namedBlueprints}.
+  return { id: bid, name: str(b.name)?.trim() ?? "", buildings };
+}
+
+/**
+ * Layouts with a name a person could have chosen (issue #1414).
+ *
+ * A layout's `name` was the id the editor minted for it, because nothing in the
+ * editor set or showed one, and every document written before this build carries
+ * a UUID there. A UUID is not a name to put on a card in a library, so a layout
+ * called nothing, or called its own id, is numbered by its place in the document
+ * instead. Numbered around the names that are already taken, because two layouts
+ * called the same thing in one picker is the problem this is fixing.
+ *
+ * A read migration rather than a version bump: an older build reading a document
+ * this has been through finds a name where it expected one and loses nothing.
+ */
+function namedBlueprints(blueprints: BaseBlueprint[]): BaseBlueprint[] {
+  const named = (b: BaseBlueprint) => b.name !== "" && b.name !== b.id;
+  const taken = new Set(blueprints.filter(named).map((b) => b.name));
+  return blueprints.map((blueprint, i) => {
+    if (named(blueprint)) return blueprint;
+    let n = i + 1;
+    while (taken.has(`Layout ${n}`)) n++;
+    taken.add(`Layout ${n}`);
+    return { ...blueprint, name: `Layout ${n}` };
+  });
 }
 
 /**
@@ -598,7 +625,9 @@ function migratePrefabs(
   return {
     blueprints: prefabs.map((p) => ({
       id: p.id,
-      name: p.id,
+      // A prefab had no name of its own, so this is one {@link namedBlueprints}
+      // fills in.
+      name: "",
       buildings: p.buildings,
     })),
     bases: prefabs.map((p) => ({
@@ -637,7 +666,8 @@ function parseBases(
   if (!split) return null;
 
   const known = new Set(split.blueprints.map((b) => b.id));
-  return split.bases.every((base) => known.has(base.blueprint)) ? split : null;
+  if (!split.bases.every((base) => known.has(base.blueprint))) return null;
+  return { blueprints: namedBlueprints(split.blueprints), bases: split.bases };
 }
 
 /** One placed base's buildings, blueprint geometry and mission role together, or

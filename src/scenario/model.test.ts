@@ -306,11 +306,33 @@ describe("parseScenario — bases", () => {
     ]);
   });
 
-  it("names a layout after its id when it has no name of its own", () => {
+  it("numbers a layout that has no name of its own", () => {
     const s = parseScenario(
       withBase({ blueprints: [{ ...blueprint, name: undefined }] }),
     );
-    expect(s?.blueprints[0].name).toBe("bp1");
+    expect(s?.blueprints[0].name).toBe("Layout 1");
+  });
+
+  /** Issue #1414. Every layout written before this build was named after the id
+   *  the editor minted for it, and a UUID is not a name to put on a card. */
+  it("numbers a layout named after its own id", () => {
+    const s = parseScenario(
+      withBase({ blueprints: [{ ...blueprint, name: "bp1" }] }),
+    );
+    expect(s?.blueprints[0].name).toBe("Layout 1");
+  });
+
+  it("does not number one onto a name somebody chose", () => {
+    const s = parseScenario(
+      withBase({
+        blueprints: [
+          { ...blueprint, id: "bp0", name: "Layout 2" },
+          { ...blueprint, name: "  " },
+        ],
+        bases: [base, { ...base, id: "b0", blueprint: "bp0" }],
+      }),
+    );
+    expect(s?.blueprints.map((b) => b.name)).toEqual(["Layout 2", "Layout 3"]);
   });
 
   it("drops non-string queue entries", () => {
@@ -401,7 +423,7 @@ describe("parseScenario — reading a schema 1 document", () => {
     expect(s?.blueprints).toEqual([
       {
         id: "pf1",
-        name: "pf1",
+        name: "Layout 1",
         buildings: [
           { def: "armlab", offset: { x: 0, z: 0 }, facing: 2 },
           { def: "armsolar", offset: { x: 96, z: 0 }, facing: 0 },
