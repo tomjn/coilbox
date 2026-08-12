@@ -98,6 +98,17 @@ describe("prepareImport", () => {
       expect(r.plan.detail).toMatch(/import box/i);
     }
   });
+
+  it("says a blueprint has nowhere to land rather than dropping it", () => {
+    const code = encodeContainerCode("blueprint", 1, {
+      name: "Opening",
+      buildings: [],
+      footprints: {},
+    });
+    const r = prepareImport(code);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toMatch(/blueprint/i);
+  });
 });
 
 describe("describeOpen", () => {
