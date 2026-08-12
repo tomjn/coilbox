@@ -82,7 +82,12 @@ import {
   removePathWaypoint,
   scenarioPaths,
 } from "./orderPaths";
-import { type Placement, placementKey } from "./placements";
+import {
+  baseFootprints,
+  overlappingIn,
+  type Placement,
+  placementKey,
+} from "./placements";
 import {
   authoringCamera,
   clampToPlane,
@@ -94,6 +99,7 @@ import {
 import { startMarkers } from "./startPositions";
 import { useGameUnits } from "./useGameUnits";
 import { useMapEditing } from "./useMapEditing";
+import { useScenarioFootprints } from "./useScenarioFootprints";
 import { useScenarioPaths } from "./useScenarioPaths";
 import { useScenarioStarts } from "./useScenarioStarts";
 import { type ScenarioUnitsState, useScenarioUnits } from "./useScenarioUnits";
@@ -355,6 +361,15 @@ export function ScenarioMapScene({
   // every base building is dragged and turned onto.
   const gameUnits = useGameUnits(scenario.setup.gameName);
   const snap = useMemo(() => buildGridSnap(gameUnits.units), [gameUnits.units]);
+
+  // The ground each of those buildings stands on, and which of them are fighting
+  // over it. Drawn for the whole document rather than for the selected base, so
+  // a layout that cannot be built says so without being clicked on first.
+  const footprints = useMemo(
+    () => baseFootprints(units.placements, gameUnits.units),
+    [units.placements, gameUnits.units],
+  );
+  useScenarioFootprints(handle, footprints, assets, units.groundAt);
 
   useMapEditing({
     handle,
@@ -679,6 +694,11 @@ export function ScenarioMapScene({
                 base={pickedBase}
                 buildings={baseBuildings(scenario.blueprints, pickedBase)}
                 index={picked.index}
+                overlaps={overlappingIn(
+                  units.placements,
+                  footprints,
+                  pickedBase.id,
+                )}
                 participants={scenario.setup.participants}
                 units={gameUnits.units}
                 unitsLoading={gameUnits.loading}

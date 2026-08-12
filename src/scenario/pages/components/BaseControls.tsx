@@ -50,6 +50,7 @@ export function BaseControls({
   base,
   buildings,
   index,
+  overlaps,
   participants,
   units,
   unitsLoading,
@@ -65,6 +66,9 @@ export function BaseControls({
   buildings: PlacedBuilding[];
   /** Which of the base's buildings is selected. */
   index: number;
+  /** Which of them are standing on ground another building wants, by their
+   *  place in the base. Drawn in red on the map as well. */
+  overlaps: number[];
   participants: Participant[];
   /** The game's units, for filling the selected building's queue. */
   units: UnitDatasetEntry[];
@@ -226,6 +230,16 @@ export function BaseControls({
             Every building sits at an offset from the base's origin. Dragging
             one moves it within the base. Moving the base takes the lot.
           </p>
+
+          {overlaps.length > 0 && (
+            <p className="rounded bg-red-950/60 px-2 py-1.5 text-[11px] text-red-200">
+              Building{overlaps.length === 1 ? " " : "s "}
+              {overlaps.map((at) => at + 1).join(", ")} stand
+              {overlaps.length === 1 ? "s" : ""} on ground another building
+              wants, marked in red on the map. The engine builds one of them and
+              refuses the rest.
+            </p>
+          )}
 
           {strays.length > 0 && (
             <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
