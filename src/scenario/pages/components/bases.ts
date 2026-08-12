@@ -24,6 +24,7 @@
  * {@link strayDefs} says so about a document that already names something else.
  */
 
+import { BUILD_SQUARE } from "@/blueprint/footprint";
 import type { BaseBlueprint, BlueprintBuilding } from "@/blueprint/model";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import type {
@@ -212,18 +213,30 @@ export function editBase(
 }
 
 /**
- * The document with a whole base moved so its origin sits at `pos`.
+ * The document with a whole base moved towards `pos`.
  *
  * The buildings keep their offsets, which is the difference between this and
  * dragging one of them: the cluster arrives with its layout intact, its first
- * building on the point that was clicked.
+ * building near the point that was clicked.
+ *
+ * Near, rather than on, because the move is in whole build squares. Every
+ * building in the base stands on the grid where it was put, and the grid repeats
+ * every 16 elmos, so a base shifted by anything else arrives with all of it off
+ * the grid and the engine free to shuffle each building up to half a square on
+ * its own. Stopping on the square is what keeps a layout a layout.
  */
 export function setOrigin(
   scenario: Scenario,
   id: string,
   pos: Point,
 ): Scenario {
-  return editBase(scenario, id, { origin: round(pos) });
+  const from = scenario.bases.find((entry) => entry.id === id)?.origin;
+  if (!from) return scenario;
+  const squares = (was: number, wanted: number) =>
+    was + Math.round((wanted - was) / BUILD_SQUARE) * BUILD_SQUARE;
+  return editBase(scenario, id, {
+    origin: round({ x: squares(from.x, pos.x), z: squares(from.z, pos.z) }),
+  });
 }
 
 /** The document without a base, buildings and queues and all. */

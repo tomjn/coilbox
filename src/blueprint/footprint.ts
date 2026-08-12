@@ -127,6 +127,19 @@ export function snapToBuildGrid(
   return { x: snapAxis(pos.x, faced.x), z: snapAxis(pos.z, faced.z) };
 }
 
+/** Where the engine will stand one def, dropped at a point facing a way. What
+ *  an editor needs to know to put a building where it can be built. */
+export type SnapBuilding = (pos: Point, def: string, facing: Facing) => Point;
+
+/** {@link snapToBuildGrid} for the units of one game, so a caller with a def
+ *  name and a point needs to know nothing about footprints. */
+export function buildGridSnap(
+  units: { name: string; footprintX?: number; footprintZ?: number }[],
+): SnapBuilding {
+  const footprintOf = buildingFootprints(units);
+  return (pos, def, facing) => snapToBuildGrid(pos, footprintOf(def), facing);
+}
+
 /** The ground a building centred on `pos` stands on. */
 export function footprintRect(
   pos: Point,

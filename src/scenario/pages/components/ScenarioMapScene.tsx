@@ -24,6 +24,7 @@ import {
 } from "react";
 import { Link } from "react-router";
 import * as THREE from "three";
+import { buildGridSnap } from "@/blueprint/footprint";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import {
   Popover,
@@ -350,6 +351,11 @@ export function ScenarioMapScene({
         }
       : (picking?.onPick ?? behaviour.place);
 
+  // The game's own units, for the panels that pick one and for the build grid
+  // every base building is dragged and turned onto.
+  const gameUnits = useGameUnits(scenario.setup.gameName);
+  const snap = useMemo(() => buildGridSnap(gameUnits.units), [gameUnits.units]);
+
   useMapEditing({
     handle,
     layer: units.layer,
@@ -372,7 +378,7 @@ export function ScenarioMapScene({
         return onChange((doc) => moveZone(doc, key, delta));
       if (parsePathKey(key))
         return onChange((doc) => movePathWaypoint(doc, key, delta));
-      onChange((doc) => movePlacement(doc, key, delta));
+      onChange((doc) => movePlacement(doc, key, delta, snap));
     },
   });
 
@@ -386,7 +392,6 @@ export function ScenarioMapScene({
     (picked?.kind === "base" &&
       scenario.bases.find((b) => b.id === picked.id)) ||
     null;
-  const gameUnits = useGameUnits(scenario.setup.gameName);
 
   /**
    * A group's own controls, wherever the group was reached from.
@@ -646,7 +651,9 @@ export function ScenarioMapScene({
         {picked && (
           <SelectionBar
             placement={picked}
-            onTurn={() => onChange((doc) => turnPlacement(doc, picked.key))}
+            onTurn={() =>
+              onChange((doc) => turnPlacement(doc, picked.key, 1, snap))
+            }
             onDelete={() => {
               onChange((doc) => removePlacement(doc, picked.key));
               setSelected(null);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildGridSnap } from "@/blueprint/footprint";
 import { newScenario } from "../../create";
 import type { Scenario } from "../../model";
 import {
@@ -240,6 +241,63 @@ describe("movePlacement", () => {
     expect(movePlacement(before, "actor:gone", { x: 1, z: 1 })).toBe(before);
     expect(movePlacement(before, "base:b1#7", { x: 1, z: 1 })).toBe(before);
     expect(movePlacement(before, "nonsense", { x: 1, z: 1 })).toBe(before);
+  });
+});
+
+describe("moving a building onto the build grid", () => {
+  /** Balanced Annihilation's own footprints: a solar collector is 5 by 5 and a
+   *  fusion plant 5 by 4, so one is odd on both axes and the other on one. */
+  const snap = buildGridSnap([
+    { name: "armsolar", footprintX: 5, footprintZ: 5 },
+    { name: "armllt", footprintX: 2, footprintZ: 2 },
+    { name: "armfus", footprintX: 5, footprintZ: 4 },
+  ]);
+
+  /** One base with one fusion plant on its origin, which is the rectangle worth
+   *  turning: its two axes snap by different rules. */
+  function withFusion(): Scenario {
+    const doc = document();
+    return {
+      ...doc,
+      blueprints: [
+        {
+          id: "bp1",
+          name: "The keep",
+          buildings: [{ def: "armfus", offset: { x: 0, z: 0 }, facing: 0 }],
+        },
+      ],
+    };
+  }
+
+  it("puts a dragged building where the engine would build it", () => {
+    // Dropped at 2034, which is nowhere the engine would put a 5 by 5. The axis
+    // that was not dragged moves too, because the layout it came from was never
+    // on the grid in the first place.
+    const next = movePlacement(document(), "base:b1#0", { x: 34, z: 0 }, snap);
+    expect(next.blueprints[0].buildings[0].offset).toEqual({ x: 40, z: 8 });
+  });
+
+  it("snaps an even footprint to the other grid", () => {
+    // The same drop point, on a 2 by 2 rather than a 5 by 5: an even footprint
+    // centres where four build squares meet, an odd one in the middle of one.
+    const next = movePlacement(document(), "base:b1#1", { x: -30, z: 0 }, snap);
+    expect(next.blueprints[0].buildings[1].offset).toEqual({ x: 32, z: 0 });
+  });
+
+  it("leaves the drop where it landed when no footprints are known", () => {
+    const next = movePlacement(document(), "base:b1#0", { x: 34, z: 0 });
+    expect(next.blueprints[0].buildings[0].offset).toEqual({ x: 34, z: 0 });
+  });
+
+  it("re-snaps a turned building, because its sides have swapped", () => {
+    const next = turnPlacement(withFusion(), "base:b1#0", 1, snap);
+    expect(next.blueprints[0].buildings[0].facing).toBe(1);
+    expect(next.blueprints[0].buildings[0].offset).toEqual({ x: 0, z: 8 });
+  });
+
+  it("only turns when no footprints are known", () => {
+    const next = turnPlacement(withFusion(), "base:b1#0", 1);
+    expect(next.blueprints[0].buildings[0].offset).toEqual({ x: 0, z: 0 });
   });
 });
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BUILD_SQUARE } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { newScenario } from "../../create";
@@ -137,10 +138,24 @@ describe("adding a building", () => {
 });
 
 describe("moving a base", () => {
-  it("puts the origin on the point and leaves the offsets alone", () => {
+  it("moves it in whole build squares, leaving the offsets alone", () => {
+    // 1000 to 500 is 500 elmos, which is 31 build squares and a bit. Moving the
+    // bit as well would take every building in the base off the grid it was
+    // built on, so the base stops on the square instead of on the click.
     const next = setOrigin(document(), "b1", { x: 500.4, z: 600.6 });
-    expect(next.bases[0].origin).toEqual({ x: 500, z: 601 });
+    expect(next.bases[0].origin).toEqual({ x: 504, z: 608 });
     expect(next.blueprints[0].buildings[1].offset).toEqual({ x: 128, z: 64 });
+  });
+
+  it("keeps every building on the ground it stood on", () => {
+    const before = document();
+    const next = setOrigin(before, "b1", { x: 1234, z: 5678 });
+    const moved = {
+      x: next.bases[0].origin.x - before.bases[0].origin.x,
+      z: next.bases[0].origin.z - before.bases[0].origin.z,
+    };
+    expect(moved.x % BUILD_SQUARE).toBe(0);
+    expect(moved.z % BUILD_SQUARE).toBe(0);
   });
 
   it("hands the same document back when no base has that id", () => {

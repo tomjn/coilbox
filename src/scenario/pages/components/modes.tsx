@@ -26,6 +26,7 @@ import {
   Users,
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
+import { buildGridSnap } from "@/blueprint/footprint";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
@@ -358,6 +359,10 @@ const basesMode: EditorMode = {
       : (participants[0]?.id ?? "");
     const { units, loading } = useGameUnits(scenario.setup.gameName);
     const options = useMemo(() => buildingUnits(units), [units]);
+    // Where the engine would put what is about to be placed. Until the game's
+    // units are read this is the click itself, which is the same answer for a
+    // one-square building and the nearest the editor can get for any other.
+    const snap = useMemo(() => buildGridSnap(units), [units]);
 
     // Which base the controls are for, which is whichever the selection belongs
     // to. A click works it out again from the document it is given.
@@ -370,6 +375,9 @@ const basesMode: EditorMode = {
             // selection as they stand: the click before this one can have made
             // the base and selected it with neither yet rendered (#904).
             const chosen = { key: "" };
+            // A building goes where the engine will stand it rather than where
+            // the pointer was, so what the author sees is what they will get.
+            const stand = snap(pos, unitDef, 0);
             onChange((doc) => {
               const to = selectedBase(doc, selectedNow());
               if (to) {
@@ -382,10 +390,10 @@ const basesMode: EditorMode = {
                   id: crypto.randomUUID(),
                   def: unitDef,
                   // Offsets are measured from the base's origin, so what the
-                  // document gets is the click less that.
+                  // document gets is the snapped point less that.
                   offset: {
-                    x: pos.x - to.origin.x,
-                    z: pos.z - to.origin.z,
+                    x: stand.x - to.origin.x,
+                    z: stand.z - to.origin.z,
                   },
                   facing: 0,
                 });
@@ -394,7 +402,7 @@ const basesMode: EditorMode = {
               chosen.key = placementKey("base", id, 0);
               return addBase(doc, id, crypto.randomUUID(), {
                 team: owner,
-                origin: pos,
+                origin: stand,
                 buildings: [
                   {
                     id: crypto.randomUUID(),
