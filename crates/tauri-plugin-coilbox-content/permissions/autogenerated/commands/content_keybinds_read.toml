@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-keybinds-read"
+description = "Enables the content_keybinds_read command without any pre-configured scope."
+commands.allow = ["content_keybinds_read"]
+
+[[permission]]
+identifier = "deny-content-keybinds-read"
+description = "Denies the content_keybinds_read command without any pre-configured scope."
+commands.deny = ["content_keybinds_read"]

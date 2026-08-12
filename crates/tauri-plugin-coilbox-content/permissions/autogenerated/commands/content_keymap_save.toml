@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-keymap-save"
+description = "Enables the content_keymap_save command without any pre-configured scope."
+commands.allow = ["content_keymap_save"]
+
+[[permission]]
+identifier = "deny-content-keymap-save"
+description = "Denies the content_keymap_save command without any pre-configured scope."
+commands.deny = ["content_keymap_save"]

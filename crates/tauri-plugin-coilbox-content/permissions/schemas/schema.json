@@ -523,6 +523,18 @@
           "markdownDescription": "Denies the content_export_challenge command without any pre-configured scope."
         },
         {
+          "description": "Enables the content_export_keymap command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-export-keymap",
+          "markdownDescription": "Enables the content_export_keymap command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_export_keymap command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-export-keymap",
+          "markdownDescription": "Denies the content_export_keymap command without any pre-configured scope."
+        },
+        {
           "description": "Enables the content_gather_replays command without any pre-configured scope.",
           "type": "string",
           "const": "allow-content-gather-replays",
@@ -557,6 +569,66 @@
           "type": "string",
           "const": "deny-content-import-container",
           "markdownDescription": "Denies the content_import_container command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_keybinds_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-keybinds-read",
+          "markdownDescription": "Enables the content_keybinds_read command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_keybinds_read command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-keybinds-read",
+          "markdownDescription": "Denies the content_keybinds_read command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_keybinds_write command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-keybinds-write",
+          "markdownDescription": "Enables the content_keybinds_write command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_keybinds_write command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-keybinds-write",
+          "markdownDescription": "Denies the content_keybinds_write command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_keymap_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-keymap-delete",
+          "markdownDescription": "Enables the content_keymap_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_keymap_delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-keymap-delete",
+          "markdownDescription": "Denies the content_keymap_delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_keymap_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-keymap-save",
+          "markdownDescription": "Enables the content_keymap_save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_keymap_save command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-keymap-save",
+          "markdownDescription": "Denies the content_keymap_save command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the content_keymaps command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-content-keymaps",
+          "markdownDescription": "Enables the content_keymaps command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the content_keymaps command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-content-keymaps",
+          "markdownDescription": "Denies the content_keymaps command without any pre-configured scope."
         },
         {
           "description": "Enables the content_list_engines command without any pre-configured scope.",
@@ -811,10 +883,10 @@
           "markdownDescription": "Denies the content_warm_rapid_pool command without any pre-configured scope."
         },
         {
-          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-replay-trailer`\n- `allow-content-metric-registry`\n- `allow-content-stats-ingest`\n- `allow-content-stats-query`\n- `allow-content-stats-watch-start`\n- `allow-content-stats-watch-stop`\n- `allow-content-demo-chat`\n- `allow-content-rewrite-demo`\n- `allow-content-delete-replay`\n- `allow-content-delete-replays`\n- `allow-content-delete-archive`\n- `allow-content-gather-replays`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-content-warm-rapid-pool`\n- `allow-content-prune-rapid-pool`\n- `allow-content-reclaim-caches`\n- `allow-content-storage-overview`\n- `allow-content-delete-engine`\n- `allow-content-export-build-tree-html`\n- `allow-content-export-build-tree-zip`\n- `allow-content-export-challenge`\n- `allow-content-import-challenge`\n- `allow-content-import-container`\n- `allow-branding-catalog`\n- `allow-branding-image`",
+          "description": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-replay-trailer`\n- `allow-content-metric-registry`\n- `allow-content-stats-ingest`\n- `allow-content-stats-query`\n- `allow-content-stats-watch-start`\n- `allow-content-stats-watch-stop`\n- `allow-content-demo-chat`\n- `allow-content-rewrite-demo`\n- `allow-content-delete-replay`\n- `allow-content-delete-replays`\n- `allow-content-delete-archive`\n- `allow-content-gather-replays`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-content-keybinds-read`\n- `allow-content-keybinds-write`\n- `allow-content-keymaps`\n- `allow-content-keymap-save`\n- `allow-content-keymap-delete`\n- `allow-content-warm-rapid-pool`\n- `allow-content-prune-rapid-pool`\n- `allow-content-reclaim-caches`\n- `allow-content-storage-overview`\n- `allow-content-delete-engine`\n- `allow-content-export-build-tree-html`\n- `allow-content-export-build-tree-zip`\n- `allow-content-export-challenge`\n- `allow-content-export-keymap`\n- `allow-content-import-challenge`\n- `allow-content-import-container`\n- `allow-branding-catalog`\n- `allow-branding-image`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-replay-trailer`\n- `allow-content-metric-registry`\n- `allow-content-stats-ingest`\n- `allow-content-stats-query`\n- `allow-content-stats-watch-start`\n- `allow-content-stats-watch-stop`\n- `allow-content-demo-chat`\n- `allow-content-rewrite-demo`\n- `allow-content-delete-replay`\n- `allow-content-delete-replays`\n- `allow-content-delete-archive`\n- `allow-content-gather-replays`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-content-warm-rapid-pool`\n- `allow-content-prune-rapid-pool`\n- `allow-content-reclaim-caches`\n- `allow-content-storage-overview`\n- `allow-content-delete-engine`\n- `allow-content-export-build-tree-html`\n- `allow-content-export-build-tree-zip`\n- `allow-content-export-challenge`\n- `allow-content-import-challenge`\n- `allow-content-import-container`\n- `allow-branding-catalog`\n- `allow-branding-image`"
+          "markdownDescription": "Allows the content plugin's commands (detect candidates, load/rescan state, scan/add/remove roots, list/verify engines).\n#### This default permission set includes:\n\n- `allow-content-candidates`\n- `allow-content-state-load`\n- `allow-content-rescan`\n- `allow-content-scan-root`\n- `allow-content-add-root`\n- `allow-content-create-standard-root`\n- `allow-content-recreate-root`\n- `allow-content-remove-root`\n- `allow-content-list-engines`\n- `allow-content-verify-engine`\n- `allow-content-open-path`\n- `allow-content-list-replays`\n- `allow-content-demo-info`\n- `allow-content-replay-trailer`\n- `allow-content-metric-registry`\n- `allow-content-stats-ingest`\n- `allow-content-stats-query`\n- `allow-content-stats-watch-start`\n- `allow-content-stats-watch-stop`\n- `allow-content-demo-chat`\n- `allow-content-rewrite-demo`\n- `allow-content-delete-replay`\n- `allow-content-delete-replays`\n- `allow-content-delete-archive`\n- `allow-content-gather-replays`\n- `allow-content-list-saves`\n- `allow-content-delete-save`\n- `allow-content-config-profiles`\n- `allow-content-config-backup`\n- `allow-content-config-restore`\n- `allow-content-config-delete-profile`\n- `allow-content-keybinds-read`\n- `allow-content-keybinds-write`\n- `allow-content-keymaps`\n- `allow-content-keymap-save`\n- `allow-content-keymap-delete`\n- `allow-content-warm-rapid-pool`\n- `allow-content-prune-rapid-pool`\n- `allow-content-reclaim-caches`\n- `allow-content-storage-overview`\n- `allow-content-delete-engine`\n- `allow-content-export-build-tree-html`\n- `allow-content-export-build-tree-zip`\n- `allow-content-export-challenge`\n- `allow-content-export-keymap`\n- `allow-content-import-challenge`\n- `allow-content-import-container`\n- `allow-branding-catalog`\n- `allow-branding-image`"
         }
       ]
     }

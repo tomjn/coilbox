@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-content-keymaps"
+description = "Enables the content_keymaps command without any pre-configured scope."
+commands.allow = ["content_keymaps"]
+
+[[permission]]
+identifier = "deny-content-keymaps"
+description = "Denies the content_keymaps command without any pre-configured scope."
+commands.deny = ["content_keymaps"]
