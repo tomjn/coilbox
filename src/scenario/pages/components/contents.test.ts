@@ -109,10 +109,7 @@ describe("sceneContents", () => {
     const out = sceneContents({
       ...empty,
       blueprints: shared.blueprints,
-      bases: [
-        shared.bases[0],
-        { ...shared.bases[0], id: "p2" },
-      ],
+      bases: [shared.bases[0], { ...shared.bases[0], id: "p2" }],
     });
     expect(out.map((entry) => entry.label)).toEqual([
       "The keep 1",
