@@ -55,7 +55,8 @@ export type ContainerKind =
   | "challenge"
   | "setup-pack"
   | "scenario"
-  | "keymap";
+  | "keymap"
+  | "blueprint";
 
 export const CONTAINER_KINDS: readonly ContainerKind[] = [
   "campaign",
@@ -64,6 +65,7 @@ export const CONTAINER_KINDS: readonly ContainerKind[] = [
   "setup-pack",
   "scenario",
   "keymap",
+  "blueprint",
 ];
 
 /**
@@ -78,6 +80,7 @@ export const SUPPORTED_KIND_VERSIONS: Record<ContainerKind, number> = {
   "setup-pack": 1,
   scenario: 2,
   keymap: 1,
+  blueprint: 1,
 };
 
 export interface Container<P = unknown> {
@@ -346,6 +349,12 @@ export function sniffPayloadKind(payload: unknown): ContainerKind | null {
     (p.fakeMeta === null || typeof p.fakeMeta === "string")
   ) {
     return "keymap";
+  }
+  // A base blueprint: a named layout of buildings, each with an offset and a
+  // facing, plus how much ground each def stands on. `src/blueprint/payload.ts`
+  // in tomjn/coilbox is the shape and the reader for it.
+  if (typeof p.name === "string" && Array.isArray(p.buildings)) {
+    return "blueprint";
   }
   if (
     Array.isArray(p.participants) &&
