@@ -717,25 +717,26 @@ export function ScenarioMapScene({
 
   return (
     <Surface expanded={expanded}>
-      <MapPreview3D
-        className="h-full w-full"
-        framed={false}
-        chrome={false}
-        showSky
-        showClouds={false}
-        heightSrc={assets.heightSrc}
-        textureSrc={assets.textureSrc}
-        skyboxSrc={assets.skyboxSrc}
-        appearance={assets.appearance}
-        minHeight={assets.minHeight}
-        maxHeight={assets.maxHeight}
-        worldWidth={assets.worldWidth}
-        worldHeight={assets.worldHeight}
-        onScene={onScene}
-      />
+      <div className="relative min-h-0 flex-1">
+        <MapPreview3D
+          className="h-full w-full"
+          framed={false}
+          chrome={false}
+          showSky
+          showClouds={false}
+          heightSrc={assets.heightSrc}
+          textureSrc={assets.textureSrc}
+          skyboxSrc={assets.skyboxSrc}
+          appearance={assets.appearance}
+          minHeight={assets.minHeight}
+          maxHeight={assets.maxHeight}
+          worldWidth={assets.worldWidth}
+          worldHeight={assets.worldHeight}
+          onScene={onScene}
+        />
 
-      <div className="absolute left-2 top-2 flex max-w-[calc(100%-21rem)] flex-col gap-1.5">
-        {/* The whole row shares one backdrop rather than each control finding
+        <div className="absolute left-2 top-2 flex max-w-[calc(100%-21rem)] flex-col gap-1.5">
+          {/* The whole row shares one backdrop rather than each control finding
             its own: a mode's `controls` are arbitrary (selects, a count field,
             a button), so painting the panel once is what makes every one of
             them opaque over the map, present ones and any added later, rather
@@ -743,302 +744,315 @@ export function ScenarioMapScene({
             strip itself carried before this row grew one, so the toolbar
             reads as one panel rather than a solid strip beside naked
             controls (issue #1188). */}
-        <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card/80 p-1 backdrop-blur">
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            value={mode.id}
-            onValueChange={(next) => next && setModeId(next)}
-            aria-label="Placement mode"
-          >
-            {EDITOR_MODES.map((m) => (
-              <ToggleGroupItem key={m.id} value={m.id} className="h-8 gap-1.5">
-                <m.icon className="size-3.5" /> {m.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          {behaviour.controls}
-        </div>
-        <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
-          {mode.hint}
-        </p>
-        {picked && (
-          <SelectionBar
-            placement={picked}
-            onTurn={() =>
-              onChange((doc) =>
-                turnPlacement(doc, picked.key, 1, snap, layoutEdit(picked.id)),
-              )
-            }
-            onDelete={() => {
-              onChange((doc) =>
-                removePlacement(doc, picked.key, layoutEdit(picked.id)),
-              );
-              setSelected(null);
-            }}
-          >
-            {pickedActor && (
-              <ActorControls
-                key={pickedActor.id}
-                actor={pickedActor}
-                participants={scenario.setup.participants}
-                onEdit={(patch) =>
-                  onChange((doc) => editActor(doc, pickedActor.id, patch))
-                }
-                onState={(state) =>
-                  onChange((doc) => setActorState(doc, pickedActor.id, state))
-                }
-              />
-            )}
-            {picked.kind === "group" && groupControls}
-            {picked.kind === "base" && pickedBase && (
-              <BaseControls
-                key={`${pickedBase.id}#${picked.index}`}
-                base={pickedBase}
-                buildings={baseBuildings(scenario.blueprints, pickedBase)}
-                index={picked.index}
-                layoutName={pickedLayout?.name ?? ""}
-                ordered={pickedLayout?.ordered === true}
-                sharedWith={sharingLayout(scenario, pickedBase.id).length}
-                sharedEdit={sharedBase === pickedBase.id}
-                overlaps={overlappingIn(
-                  units.placements,
-                  footprints,
-                  pickedBase.id,
-                )}
-                participants={scenario.setup.participants}
-                units={gameUnits.units}
-                unitsLoading={gameUnits.loading}
-                moving={moving === pickedBase.id}
-                onEdit={(patch) =>
-                  onChange((doc) => editBase(doc, pickedBase.id, patch))
-                }
-                onRename={(name) =>
-                  onChange((doc) =>
-                    renameBlueprint(
-                      doc,
-                      pickedBase.id,
-                      name,
-                      layoutEdit(pickedBase.id),
-                    ),
-                  )
-                }
-                onOrdered={(on) =>
-                  onChange((doc) =>
-                    setBlueprintOrdered(
-                      doc,
-                      pickedBase.id,
-                      on,
-                      layoutEdit(pickedBase.id),
-                    ),
-                  )
-                }
-                // The selection stays where it is rather than following the
-                // building that moved, because what is selected here is a place
-                // in the base: the bar above calls it "base building 3".
-                onMoveBuilding={(at, delta) =>
-                  onChange((doc) =>
-                    moveBuilding(
-                      doc,
-                      pickedBase.id,
-                      at,
-                      delta,
-                      layoutEdit(pickedBase.id),
-                    ),
-                  )
-                }
-                onPlay={() =>
-                  setPlayback({
-                    base: pickedBase.id,
-                    step: 0,
-                    playing: !reduceMotion,
-                  })
-                }
-                onSharedEdit={(on) => setSharedBase(on ? pickedBase.id : null)}
-                onQueue={(queue, repeat) =>
-                  onChange((doc) =>
-                    setQueue(doc, pickedBase.id, picked.index, queue, repeat),
-                  )
-                }
-                onMove={(on) => setMovingBase(on ? pickedBase.id : null)}
-                onDelete={() => {
-                  onChange((doc) => removeBase(doc, pickedBase.id));
-                  setSelected(null);
-                }}
-              />
-            )}
-          </SelectionBar>
-        )}
-        {drawingPath && pickedGroup && (
-          <ClickMapBar
-            message={
-              <>
-                Click the map to add points to{" "}
-                <span className="font-mono">
-                  {groupLabel(scenario.groups, pickedGroup.id)} ·{" "}
-                  {pickedGroup.orders[drawingPath.order].kind}
-                </span>
-              </>
-            }
-            onDone={() => setDrawing(null)}
-          />
-        )}
-        {moving && (
-          <ClickMapBar
-            message="Click the map to put this base's origin there, buildings and all"
-            onDone={() => setMovingBase(null)}
-          />
-        )}
-        {playing && (
-          <PlaybackBar
-            step={playing.step}
-            total={total}
-            def={steps[playing.step - 1]?.def ?? ""}
-            playing={playing.playing}
-            onStep={(step) =>
-              setPlayback((at) => at && { ...at, step, playing: false })
-            }
-            onPlaying={(on) =>
-              setPlayback(
-                (at) =>
-                  at && {
-                    ...at,
-                    playing: on,
-                    // Playing from the end starts again, so the button is never
-                    // one that does nothing.
-                    step: on && at.step >= total ? 0 : at.step,
-                  },
-              )
-            }
-            onDone={() => setPlayback(null)}
-          />
-        )}
-        {picking && !drawingPath && !moving && (
-          <ClickMapBar message={picking.message} onDone={picking.onDone} />
-        )}
-        {pathRef && selected && (
-          <PathBar
-            what={`${pathLabel(paths, pathRef.groupId)} · point ${
-              pathRef.waypoint + 1
-            }`}
-            hint="drag it to move it"
-            // Back to the path the point belonged to rather than to nothing, so
-            // its other points keep their knobs and a path being drawn is still
-            // being drawn.
-            onDelete={() => {
-              onChange((doc) => removePathWaypoint(doc, selected));
-              setSelected(
-                pickedGroup
-                  ? placementKey("group", pathRef.groupId, 0)
-                  : pathLineKey(pathRef.groupId),
-              );
-            }}
-          >
-            {groupControls}
-          </PathBar>
-        )}
-        {selectedLine && (
-          <PathBar
-            what={pathLabel(paths, selectedLine)}
-            hint="drag one of its points to move it"
-          />
-        )}
-        {pickedZone && (
-          <ZoneBar
-            key={pickedZone.id}
-            zone={pickedZone}
-            onRename={(name) =>
-              onChange((doc) => renameZone(doc, pickedZone.id, name))
-            }
-            onDelete={() => {
-              onChange((doc) => removeZone(doc, pickedZone.id));
-              setSelected(null);
-            }}
-          />
-        )}
-      </div>
-
-      <div className="absolute right-2 top-2 flex items-center gap-1.5">
-        {history && (
-          <>
-            <Button
-              size="sm"
+          <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card/80 p-1 backdrop-blur">
+            <ToggleGroup
+              type="single"
               variant="outline"
-              className="bg-card/80 px-2 backdrop-blur"
-              onClick={history.undo}
-              disabled={!history.canUndo}
-              aria-label="Undo"
-              title={`Undo (${modKeyLabel()} Z)`}
+              value={mode.id}
+              onValueChange={(next) => next && setModeId(next)}
+              aria-label="Placement mode"
             >
-              <Undo2 className="size-3.5" />
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="bg-card/80 px-2 backdrop-blur"
-              onClick={history.redo}
-              disabled={!history.canRedo}
-              aria-label="Redo"
-              title={`Redo (${modKeyLabel()} Shift Z)`}
+              {EDITOR_MODES.map((m) => (
+                <ToggleGroupItem
+                  key={m.id}
+                  value={m.id}
+                  className="h-8 gap-1.5"
+                >
+                  <m.icon className="size-3.5" /> {m.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            {behaviour.controls}
+          </div>
+          <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
+            {mode.hint}
+          </p>
+          {picked && (
+            <SelectionBar
+              placement={picked}
+              onTurn={() =>
+                onChange((doc) =>
+                  turnPlacement(
+                    doc,
+                    picked.key,
+                    1,
+                    snap,
+                    layoutEdit(picked.id),
+                  ),
+                )
+              }
+              onDelete={() => {
+                onChange((doc) =>
+                  removePlacement(doc, picked.key, layoutEdit(picked.id)),
+                );
+                setSelected(null);
+              }}
             >
-              <Redo2 className="size-3.5" />
-            </Button>
-          </>
-        )}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5 bg-card/80 backdrop-blur"
-              title="Everything this scenario has put on the map"
-            >
-              <List className="size-3.5" /> Contents
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-80 p-1">
-            <ContentsList
-              entries={entries}
-              selected={listed}
-              participants={scenario.setup.participants}
-              onPick={pickEntry}
+              {pickedActor && (
+                <ActorControls
+                  key={pickedActor.id}
+                  actor={pickedActor}
+                  participants={scenario.setup.participants}
+                  onEdit={(patch) =>
+                    onChange((doc) => editActor(doc, pickedActor.id, patch))
+                  }
+                  onState={(state) =>
+                    onChange((doc) => setActorState(doc, pickedActor.id, state))
+                  }
+                />
+              )}
+              {picked.kind === "group" && groupControls}
+              {picked.kind === "base" && pickedBase && (
+                <BaseControls
+                  key={`${pickedBase.id}#${picked.index}`}
+                  base={pickedBase}
+                  buildings={baseBuildings(scenario.blueprints, pickedBase)}
+                  index={picked.index}
+                  layoutName={pickedLayout?.name ?? ""}
+                  ordered={pickedLayout?.ordered === true}
+                  sharedWith={sharingLayout(scenario, pickedBase.id).length}
+                  sharedEdit={sharedBase === pickedBase.id}
+                  overlaps={overlappingIn(
+                    units.placements,
+                    footprints,
+                    pickedBase.id,
+                  )}
+                  participants={scenario.setup.participants}
+                  units={gameUnits.units}
+                  unitsLoading={gameUnits.loading}
+                  moving={moving === pickedBase.id}
+                  onEdit={(patch) =>
+                    onChange((doc) => editBase(doc, pickedBase.id, patch))
+                  }
+                  onRename={(name) =>
+                    onChange((doc) =>
+                      renameBlueprint(
+                        doc,
+                        pickedBase.id,
+                        name,
+                        layoutEdit(pickedBase.id),
+                      ),
+                    )
+                  }
+                  onOrdered={(on) =>
+                    onChange((doc) =>
+                      setBlueprintOrdered(
+                        doc,
+                        pickedBase.id,
+                        on,
+                        layoutEdit(pickedBase.id),
+                      ),
+                    )
+                  }
+                  // The selection stays where it is rather than following the
+                  // building that moved, because what is selected here is a place
+                  // in the base: the bar above calls it "base building 3".
+                  onMoveBuilding={(at, delta) =>
+                    onChange((doc) =>
+                      moveBuilding(
+                        doc,
+                        pickedBase.id,
+                        at,
+                        delta,
+                        layoutEdit(pickedBase.id),
+                      ),
+                    )
+                  }
+                  onPlay={() =>
+                    setPlayback({
+                      base: pickedBase.id,
+                      step: 0,
+                      playing: !reduceMotion,
+                    })
+                  }
+                  onSharedEdit={(on) =>
+                    setSharedBase(on ? pickedBase.id : null)
+                  }
+                  onQueue={(queue, repeat) =>
+                    onChange((doc) =>
+                      setQueue(doc, pickedBase.id, picked.index, queue, repeat),
+                    )
+                  }
+                  onMove={(on) => setMovingBase(on ? pickedBase.id : null)}
+                  onDelete={() => {
+                    onChange((doc) => removeBase(doc, pickedBase.id));
+                    setSelected(null);
+                  }}
+                />
+              )}
+            </SelectionBar>
+          )}
+          {drawingPath && pickedGroup && (
+            <ClickMapBar
+              message={
+                <>
+                  Click the map to add points to{" "}
+                  <span className="font-mono">
+                    {groupLabel(scenario.groups, pickedGroup.id)} ·{" "}
+                    {pickedGroup.orders[drawingPath.order].kind}
+                  </span>
+                </>
+              }
+              onDone={() => setDrawing(null)}
             />
-          </PopoverContent>
-        </Popover>
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1.5 bg-card/80 backdrop-blur"
-          onClick={() => {
-            if (sceneRef.current) frameMap(sceneRef.current);
-          }}
-        >
-          <Frame className="size-3.5" /> Frame map
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1.5 bg-card/80 backdrop-blur"
-          onClick={() => setExpanded((on) => !on)}
-          title={expanded ? "Back to the page (Esc)" : "Fill the window"}
-        >
-          {expanded ? (
+          )}
+          {moving && (
+            <ClickMapBar
+              message="Click the map to put this base's origin there, buildings and all"
+              onDone={() => setMovingBase(null)}
+            />
+          )}
+          {playing && (
+            <PlaybackBar
+              step={playing.step}
+              total={total}
+              def={steps[playing.step - 1]?.def ?? ""}
+              playing={playing.playing}
+              onStep={(step) =>
+                setPlayback((at) => at && { ...at, step, playing: false })
+              }
+              onPlaying={(on) =>
+                setPlayback(
+                  (at) =>
+                    at && {
+                      ...at,
+                      playing: on,
+                      // Playing from the end starts again, so the button is never
+                      // one that does nothing.
+                      step: on && at.step >= total ? 0 : at.step,
+                    },
+                )
+              }
+              onDone={() => setPlayback(null)}
+            />
+          )}
+          {picking && !drawingPath && !moving && (
+            <ClickMapBar message={picking.message} onDone={picking.onDone} />
+          )}
+          {pathRef && selected && (
+            <PathBar
+              what={`${pathLabel(paths, pathRef.groupId)} · point ${
+                pathRef.waypoint + 1
+              }`}
+              hint="drag it to move it"
+              // Back to the path the point belonged to rather than to nothing, so
+              // its other points keep their knobs and a path being drawn is still
+              // being drawn.
+              onDelete={() => {
+                onChange((doc) => removePathWaypoint(doc, selected));
+                setSelected(
+                  pickedGroup
+                    ? placementKey("group", pathRef.groupId, 0)
+                    : pathLineKey(pathRef.groupId),
+                );
+              }}
+            >
+              {groupControls}
+            </PathBar>
+          )}
+          {selectedLine && (
+            <PathBar
+              what={pathLabel(paths, selectedLine)}
+              hint="drag one of its points to move it"
+            />
+          )}
+          {pickedZone && (
+            <ZoneBar
+              key={pickedZone.id}
+              zone={pickedZone}
+              onRename={(name) =>
+                onChange((doc) => renameZone(doc, pickedZone.id, name))
+              }
+              onDelete={() => {
+                onChange((doc) => removeZone(doc, pickedZone.id));
+                setSelected(null);
+              }}
+            />
+          )}
+        </div>
+
+        <div className="absolute right-2 top-2 flex items-center gap-1.5">
+          {history && (
             <>
-              <Minimize2 className="size-3.5" /> Collapse
-            </>
-          ) : (
-            <>
-              <Maximize2 className="size-3.5" /> Expand
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-card/80 px-2 backdrop-blur"
+                onClick={history.undo}
+                disabled={!history.canUndo}
+                aria-label="Undo"
+                title={`Undo (${modKeyLabel()} Z)`}
+              >
+                <Undo2 className="size-3.5" />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="bg-card/80 px-2 backdrop-blur"
+                onClick={history.redo}
+                disabled={!history.canRedo}
+                aria-label="Redo"
+                title={`Redo (${modKeyLabel()} Shift Z)`}
+              >
+                <Redo2 className="size-3.5" />
+              </Button>
             </>
           )}
-        </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 bg-card/80 backdrop-blur"
+                title="Everything this scenario has put on the map"
+              >
+                <List className="size-3.5" /> Contents
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 p-1">
+              <ContentsList
+                entries={entries}
+                selected={listed}
+                participants={scenario.setup.participants}
+                onPick={pickEntry}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 bg-card/80 backdrop-blur"
+            onClick={() => {
+              if (sceneRef.current) frameMap(sceneRef.current);
+            }}
+          >
+            <Frame className="size-3.5" /> Frame map
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 bg-card/80 backdrop-blur"
+            onClick={() => setExpanded((on) => !on)}
+            title={expanded ? "Back to the page (Esc)" : "Fill the window"}
+          >
+            {expanded ? (
+              <>
+                <Minimize2 className="size-3.5" /> Collapse
+              </>
+            ) : (
+              <>
+                <Maximize2 className="size-3.5" /> Expand
+              </>
+            )}
+          </Button>
+        </div>
+        <UnitsNote
+          units={units}
+          gameName={scenario.setup.gameName}
+          drawing={units.drawing}
+        />
       </div>
-      <UnitsNote
-        units={units}
-        gameName={scenario.setup.gameName}
-        drawing={units.drawing}
-      />
-      <p className="pointer-events-none absolute bottom-2 left-2 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
+      <p className="shrink-0 border-t border-border/50 bg-card/40 px-2 py-1 font-mono text-[11px] text-muted-foreground">
         {mapName} · drag or middle-drag to pan · drag a unit to move it · drag a
         zone's middle handle to move it · right-drag to turn · scroll to zoom
       </p>
@@ -1384,7 +1398,7 @@ function Surface({
   return (
     <section
       className={cn(
-        "overflow-hidden bg-gradient-to-b from-muted/20 to-muted/40",
+        "flex flex-col overflow-hidden bg-gradient-to-b from-muted/20 to-muted/40",
         expanded
           ? "fixed inset-0 z-50 border-0"
           : "relative h-[30rem] rounded-lg border border-border/50",
