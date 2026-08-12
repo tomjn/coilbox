@@ -11,12 +11,14 @@ import {
   buildingUnits,
   copyName,
   editBase,
+  moveBuilding,
   movedQueued,
   normaliseQueue,
   plusQueued,
   removeBase,
   removeBuilding,
   renameBlueprint,
+  setBlueprintOrdered,
   setOrigin,
   setQueue,
   sharingLayout,
@@ -369,6 +371,82 @@ describe("naming a layout", () => {
       buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
     });
     expect(two.blueprints[1].name).toBe("Layout 2");
+  });
+});
+
+/**
+ * Issue #1418. The array is the build order, so there is nothing to reorder but
+ * the array itself, and a base's own fields are read by position and have to
+ * come along.
+ */
+describe("a layout whose order is the build order", () => {
+  it("says the order was meant, and takes it back", () => {
+    const on = setBlueprintOrdered(document(), "b1", true);
+    expect(on.blueprints[0].ordered).toBe(true);
+    expect(setBlueprintOrdered(on, "b1", false).blueprints[0].ordered).toBe(
+      undefined,
+    );
+  });
+
+  it("hands the same document back when nothing changes", () => {
+    const before = document();
+    expect(setBlueprintOrdered(before, "b1", false)).toBe(before);
+    expect(setBlueprintOrdered(before, "nope", true)).toBe(before);
+  });
+
+  it("moves a building and its mission fields together", () => {
+    const doc = setQueue(document(), "b1", 1, ["armpw"], true);
+    const next = moveBuilding(doc, "b1", 1, -1);
+    expect(next.blueprints[0].buildings.map((b) => b.def)).toEqual([
+      "armsolar",
+      "armlab",
+    ]);
+    expect(buildingsOf(next).map((b) => b.queue)).toEqual([
+      ["armpw"],
+      undefined,
+    ]);
+  });
+
+  it("keeps the base's list no longer than it has to be", () => {
+    const doc = setQueue(document(), "b1", 0, ["armpw"], false);
+    const next = moveBuilding(doc, "b1", 0, 1);
+    expect(next.bases[0].buildings).toEqual([{}, { queue: ["armpw"] }]);
+    expect(moveBuilding(next, "b1", 1, -1).bases[0].buildings).toEqual([
+      { queue: ["armpw"] },
+    ]);
+  });
+
+  it("hands the same document back at either end", () => {
+    const before = document();
+    expect(moveBuilding(before, "b1", 0, -1)).toBe(before);
+    expect(moveBuilding(before, "b1", 1, 1)).toBe(before);
+    expect(moveBuilding(before, "b1", 7, -1)).toBe(before);
+    expect(moveBuilding(before, "nope", 0, 1)).toBe(before);
+  });
+
+  it("reorders a shared layout into a copy, like any other edit", () => {
+    const doc = document();
+    const two = {
+      ...doc,
+      bases: [...doc.bases, { ...structuredClone(base), id: "b2" }],
+    };
+    const own = moveBuilding(two, "b1", 0, 1);
+    expect(own.blueprints).toHaveLength(2);
+    expect(own.blueprints[0].buildings.map((b) => b.def)).toEqual([
+      "armlab",
+      "armsolar",
+    ]);
+    expect(own.blueprints[1].buildings.map((b) => b.def)).toEqual([
+      "armsolar",
+      "armlab",
+    ]);
+    const shared = moveBuilding(two, "b1", 0, 1, "shared");
+    expect(shared.blueprints).toHaveLength(1);
+    expect(shared.blueprints[0].buildings.map((b) => b.def)).toEqual([
+      "armsolar",
+      "armlab",
+    ]);
+    expect(setBlueprintOrdered(two, "b1", true).blueprints).toHaveLength(2);
   });
 });
 

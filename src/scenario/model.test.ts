@@ -335,6 +335,23 @@ describe("parseScenario — bases", () => {
     expect(s?.blueprints.map((b) => b.name)).toEqual(["Layout 2", "Layout 3"]);
   });
 
+  /** Issue #1418. The array is the build order and this says whether that order
+   *  was meant, so it has to survive a round trip like any other field. */
+  it("keeps a layout whose order is the build order", () => {
+    const s = parseScenario(
+      withBase({ blueprints: [{ ...blueprint, ordered: true }] }),
+    );
+    expect(s?.blueprints[0].ordered).toBe(true);
+  });
+
+  it("leaves a layout that does not say so unordered", () => {
+    expect(parseScenario(withBase())?.blueprints[0].ordered).toBeUndefined();
+    const s = parseScenario(
+      withBase({ blueprints: [{ ...blueprint, ordered: "yes" }] }),
+    );
+    expect(s?.blueprints[0].ordered).toBeUndefined();
+  });
+
   it("drops non-string queue entries", () => {
     const s = parseScenario(
       withBase({

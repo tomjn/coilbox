@@ -78,6 +78,22 @@ function edit<T extends { id: string }>(
 }
 
 /**
+ * One entry moved `delta` places along a list, or the list back when the move
+ * would go off either end, so an end is a no-op rather than a wrap around and a
+ * caller can compare identities.
+ */
+function movedInList<T>(list: T[], index: number, delta: number): T[] {
+  const to = index + delta;
+  if (index < 0 || index >= list.length || to < 0 || to >= list.length) {
+    return list;
+  }
+  const out = list.slice();
+  const [item] = out.splice(index, 1);
+  out.splice(to, 0, item);
+  return out;
+}
+
+/**
  * The mission-only half of a building, with the fields nothing has set left out,
  * so a base nobody has named anything in stays free of empty entries.
  */
@@ -217,6 +233,33 @@ export function editBaseLayout(
   const buildings = update(layout.buildings);
   if (!buildings) return scenario;
   return writeLayout(scenario, base, layout, how, { buildings });
+}
+
+/**
+ * The document with a layout's order said to be the build order, or said not to
+ * be (issue #1418).
+ *
+ * An edit to the layout like a rename, so a layout two bases share is copied
+ * rather than written through unless the author asked for that. Whether the
+ * sequence was meant is part of the layout, so a copy made from it is a copy of
+ * a build order.
+ */
+export function setBlueprintOrdered(
+  scenario: Scenario,
+  id: string,
+  ordered: boolean,
+  how: LayoutEdit = "own",
+): Scenario {
+  const base = scenario.bases.find((entry) => entry.id === id);
+  const layout = base
+    ? scenario.blueprints.find((b) => b.id === base.blueprint)
+    : undefined;
+  if (!base || !layout || (layout.ordered === true) === ordered) {
+    return scenario;
+  }
+  return writeLayout(scenario, base, layout, how, {
+    ordered: ordered ? true : undefined,
+  });
 }
 
 /**
@@ -414,6 +457,50 @@ export function removeBuilding(
   });
 }
 
+/**
+ * The document with one of a base's buildings moved `delta` places along the
+ * layout, which is what changing a build order is (issue #1418).
+ *
+ * The array is the order, so this is the only edit there is to make: there is
+ * nothing beside the buildings holding a sequence that could disagree with them.
+ *
+ * The base's own list moves with it, because the two are read by position and a
+ * building's id, queue and repeat belong to that building rather than to third
+ * place in the base. The list is filled out to the layout's length first, as it
+ * is allowed to stop short, and trimmed after, as it is read back trimmed.
+ */
+export function moveBuilding(
+  scenario: Scenario,
+  id: string,
+  index: number,
+  delta: number,
+  how: LayoutEdit = "own",
+): Scenario {
+  const base = scenario.bases.find((entry) => entry.id === id);
+  const layout = base
+    ? scenario.blueprints.find((b) => b.id === base.blueprint)
+    : undefined;
+  if (!base || !layout) return scenario;
+
+  const roles = base.buildings.slice();
+  while (roles.length < layout.buildings.length) roles.push({});
+  const moved = movedInList(roles, index, delta);
+  if (moved === roles) return scenario;
+
+  const next = editBaseLayout(scenario, id, how, (buildings) =>
+    movedInList(buildings, index, delta),
+  );
+  return editBase(next, id, { buildings: trimmedRoles(moved) });
+}
+
+/** A base's own list with the empty entries on the end dropped, which is how it
+ *  is read back: a run of them says nothing their absence does not. */
+function trimmedRoles(roles: BaseBuildingRole[]): BaseBuildingRole[] {
+  let end = roles.length;
+  while (end > 0 && Object.keys(roles[end - 1]).length === 0) end--;
+  return roles.slice(0, end);
+}
+
 /* -------------------------------------------------------------------------- *
  * Build queues. A factory in a base can be handed a list of units to build and
  * told to loop it, which the runtime issues as build orders once the base is on
@@ -485,14 +572,7 @@ export function movedQueued(
   index: number,
   delta: number,
 ): string[] {
-  const to = index + delta;
-  if (index < 0 || index >= queue.length || to < 0 || to >= queue.length) {
-    return queue;
-  }
-  const out = queue.slice();
-  const [def] = out.splice(index, 1);
-  out.splice(to, 0, def);
-  return out;
+  return movedInList(queue, index, delta);
 }
 
 /* -------------------------------------------------------------------------- *

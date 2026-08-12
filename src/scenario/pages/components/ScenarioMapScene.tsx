@@ -1,5 +1,7 @@
 import { Button, cn, Input } from "@picoframe/frame";
 import {
+  ChevronLeft,
+  ChevronRight,
   Frame,
   Layers,
   List,
@@ -8,6 +10,8 @@ import {
   Maximize2,
   Minimize2,
   MountainSnow,
+  Pause,
+  Play,
   Redo2,
   RotateCw,
   Trash2,
@@ -32,6 +36,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useReduceMotion } from "@/general/display";
 import {
   MapPreview3D,
   type MapScene3D,
@@ -49,8 +54,10 @@ import { BaseControls } from "./BaseControls";
 import {
   editBase,
   type LayoutEdit,
+  moveBuilding,
   removeBase,
   renameBlueprint,
+  setBlueprintOrdered,
   setOrigin,
   setQueue,
   sharingLayout,
@@ -120,6 +127,11 @@ import {
   renameZone,
   zoneExtent,
 } from "./zones";
+
+/** How long one building of a build order stands on screen before the next one
+ *  arrives. Slow enough to read the base going up, brisk enough that a
+ *  twenty-building opening is not a coffee break. */
+const PLAYBACK_STEP_MS = 700;
 
 /** What the surface says when there is no scene to show. */
 function SurfaceMessage({
@@ -204,7 +216,64 @@ export function ScenarioMapScene({
   // Also held in state, because the units layer is built from it and a ref
   // does not re-render the hook that owns that layer.
   const [handle, setHandle] = useState<MapScene3D | null>(null);
-  const units = useScenarioUnits(handle, scenario, assets);
+
+  /**
+   * The base being watched go up, and how much of it is standing (issue #1418).
+   *
+   * `step` is how many of the layout's buildings have been built, so 0 is bare
+   * ground and the last step is the base as the document holds it. Held as
+   * loosely as a base waiting to be moved: a base that has been deleted, or a
+   * layout that is no longer a build order, stops the playback rather than
+   * stranding it.
+   */
+  const [playback, setPlayback] = useState<{
+    base: string;
+    step: number;
+    playing: boolean;
+  } | null>(null);
+  const watched = playback
+    ? scenario.bases.find((b) => b.id === playback.base)
+    : undefined;
+  const watchedLayout = watched
+    ? scenario.blueprints.find((b) => b.id === watched.blueprint)
+    : undefined;
+  const steps = watchedLayout?.ordered ? watchedLayout.buildings : [];
+  const playing = playback && steps.length > 0 ? playback : null;
+
+  // What is not standing yet, which is everything the playback has not reached.
+  // Only the drawing is held back: the document is untouched, so the footprints
+  // still show the whole plan the base is being built into.
+  const undrawn = useMemo(() => {
+    if (!playing) return null;
+    const out = new Set<string>();
+    for (let at = playing.step; at < steps.length; at++) {
+      out.add(placementKey("base", playing.base, at));
+    }
+    return out;
+  }, [playing, steps.length]);
+
+  const units = useScenarioUnits(handle, scenario, assets, undrawn);
+
+  // Playing it means one step at a time on its own until the base is up. It
+  // stops there rather than looping, because the end of a build order is the
+  // base, and a base that keeps vanishing and rebuilding itself is a thing to
+  // watch rather than a thing to read.
+  const total = steps.length;
+  const advancing = playing?.playing === true;
+  useEffect(() => {
+    if (!advancing) return;
+    const timer = setInterval(() => {
+      setPlayback((at) => {
+        if (!at) return at;
+        return at.step >= total
+          ? { ...at, playing: false }
+          : { ...at, step: at.step + 1 };
+      });
+    }, PLAYBACK_STEP_MS);
+    return () => clearInterval(timer);
+  }, [advancing, total]);
+  // An author who has asked for less motion gets the steps and not the film.
+  const reduceMotion = useReduceMotion();
   const [modeId, setModeId] = useState(EDITOR_MODES[0].id);
   const [selected, showSelected] = useState<string | null>(null);
   // Also held in a ref, because a click that selects something and the click
@@ -432,6 +501,11 @@ export function ScenarioMapScene({
     (picked?.kind === "base" &&
       scenario.bases.find((b) => b.id === picked.id)) ||
     null;
+  // The layout it is placed from, which is what its name, its build order and
+  // its sharing are all about.
+  const pickedLayout = pickedBase
+    ? scenario.blueprints.find((b) => b.id === pickedBase.blueprint)
+    : undefined;
 
   /**
    * A group's own controls, wherever the group was reached from.
@@ -723,10 +797,8 @@ export function ScenarioMapScene({
                 base={pickedBase}
                 buildings={baseBuildings(scenario.blueprints, pickedBase)}
                 index={picked.index}
-                layoutName={
-                  scenario.blueprints.find((b) => b.id === pickedBase.blueprint)
-                    ?.name ?? ""
-                }
+                layoutName={pickedLayout?.name ?? ""}
+                ordered={pickedLayout?.ordered === true}
                 sharedWith={sharingLayout(scenario, pickedBase.id).length}
                 sharedEdit={sharedBase === pickedBase.id}
                 overlaps={overlappingIn(
@@ -750,6 +822,37 @@ export function ScenarioMapScene({
                       layoutEdit(pickedBase.id),
                     ),
                   )
+                }
+                onOrdered={(on) =>
+                  onChange((doc) =>
+                    setBlueprintOrdered(
+                      doc,
+                      pickedBase.id,
+                      on,
+                      layoutEdit(pickedBase.id),
+                    ),
+                  )
+                }
+                // The selection stays where it is rather than following the
+                // building that moved, because what is selected here is a place
+                // in the base: the bar above calls it "base building 3".
+                onMoveBuilding={(at, delta) =>
+                  onChange((doc) =>
+                    moveBuilding(
+                      doc,
+                      pickedBase.id,
+                      at,
+                      delta,
+                      layoutEdit(pickedBase.id),
+                    ),
+                  )
+                }
+                onPlay={() =>
+                  setPlayback({
+                    base: pickedBase.id,
+                    step: 0,
+                    playing: !reduceMotion,
+                  })
                 }
                 onSharedEdit={(on) => setSharedBase(on ? pickedBase.id : null)}
                 onQueue={(queue, repeat) =>
@@ -784,6 +887,30 @@ export function ScenarioMapScene({
           <ClickMapBar
             message="Click the map to put this base's origin there, buildings and all"
             onDone={() => setMovingBase(null)}
+          />
+        )}
+        {playing && (
+          <PlaybackBar
+            step={playing.step}
+            total={total}
+            def={steps[playing.step - 1]?.def ?? ""}
+            playing={playing.playing}
+            onStep={(step) =>
+              setPlayback((at) => at && { ...at, step, playing: false })
+            }
+            onPlaying={(on) =>
+              setPlayback(
+                (at) =>
+                  at && {
+                    ...at,
+                    playing: on,
+                    // Playing from the end starts again, so the button is never
+                    // one that does nothing.
+                    step: on && at.step >= total ? 0 : at.step,
+                  },
+              )
+            }
+            onDone={() => setPlayback(null)}
           />
         )}
         {picking && !drawingPath && !moving && (
@@ -1059,6 +1186,91 @@ function ClickMapBar({
     <div className="flex w-fit items-center gap-1.5 rounded-md border border-lime-400/60 bg-card/85 p-1 pl-2 backdrop-blur">
       <MapPin className="size-3.5 text-lime-300" />
       <span className="text-[11px]">{message}</span>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 px-2 text-xs"
+        onClick={onDone}
+      >
+        Done
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * A build order being watched: how far up the base is, and the way to move
+ * along it (issue #1418).
+ *
+ * The map is where this belongs rather than the popover that started it,
+ * because what is being watched is the base on the map, and the popover covers
+ * the corner of it. Stepping is always there beside the playing, because the
+ * step somebody wants to look at is the one they want to stop on.
+ */
+function PlaybackBar({
+  step,
+  total,
+  def,
+  playing,
+  onStep,
+  onPlaying,
+  onDone,
+}: {
+  /** How many buildings are standing, so 0 is bare ground. */
+  step: number;
+  total: number;
+  /** What the last step put down, for saying what just happened. */
+  def: string;
+  playing: boolean;
+  onStep: (step: number) => void;
+  onPlaying: (on: boolean) => void;
+  onDone: () => void;
+}) {
+  return (
+    <div className="flex w-fit items-center gap-1.5 rounded-md border border-lime-400/60 bg-card/85 p-1 pl-2 backdrop-blur">
+      <span className="text-[11px]">
+        {step === 0 ? (
+          <span className="text-muted-foreground">bare ground</span>
+        ) : (
+          <span className="font-mono">{def}</span>
+        )}
+        <span className="ml-1.5 text-muted-foreground">
+          {step} of {total}
+        </span>
+      </span>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="size-7 p-0"
+        aria-label="Back a step"
+        disabled={step === 0}
+        onClick={() => onStep(step - 1)}
+      >
+        <ChevronLeft className="size-3.5" />
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="size-7 p-0"
+        aria-label={playing ? "Pause" : "Play"}
+        onClick={() => onPlaying(!playing)}
+      >
+        {playing ? (
+          <Pause className="size-3.5" />
+        ) : (
+          <Play className="size-3.5" />
+        )}
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="size-7 p-0"
+        aria-label="On a step, building the next one"
+        disabled={step >= total}
+        onClick={() => onStep(step + 1)}
+      >
+        <ChevronRight className="size-3.5" />
+      </Button>
       <Button
         size="sm"
         variant="ghost"

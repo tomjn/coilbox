@@ -37,5 +37,18 @@ export type BaseBlueprint = {
   id: string;
   /** What the author calls it, which is what a picker lists it by. */
   name: string;
+  /**
+   * Whether the order of `buildings` is the build order (issue #1418).
+   *
+   * The array is already a sequence, so a build order is a layout whose
+   * sequence was meant rather than a second thing to hold beside the buildings.
+   * Absent on a layout drawn without caring what comes first, which is most of
+   * them, and what stops one pretending to be an opening it is not.
+   *
+   * Beyond All Reason's `blueprints.json` carries the same flag under the same
+   * name next to units in array order, so an imported one keeps its sequence
+   * and an exported one hands it back.
+   */
+  ordered?: boolean;
   buildings: BlueprintBuilding[];
 };
