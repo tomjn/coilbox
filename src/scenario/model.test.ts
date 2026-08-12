@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseScenario, parseScenarioJson } from "./model";
+import { baseBuildings, parseScenario, parseScenarioJson } from "./model";
 
 /** A minimal valid scenario document, with extra top-level fields spread in. */
 function doc(extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -33,13 +33,14 @@ describe("parseScenarioJson", () => {
   it("parses a minimal document and defaults every registry", () => {
     const s = parseScenarioJson(JSON.stringify(doc()));
     expect(s).not.toBeNull();
-    expect(s?.schemaVersion).toBe(1);
+    expect(s?.schemaVersion).toBe(2);
     expect(s?.runtimeVersion).toBe(1);
     expect(s?.description).toBe("");
     expect(s?.zones).toEqual([]);
     expect(s?.actors).toEqual([]);
     expect(s?.groups).toEqual([]);
-    expect(s?.prefabs).toEqual([]);
+    expect(s?.blueprints).toEqual([]);
+    expect(s?.bases).toEqual([]);
     expect(s?.triggers).toEqual([]);
     expect(s?.objectives).toEqual([]);
     expect(s?.dialogue).toEqual([]);
@@ -275,77 +276,186 @@ describe("parseScenario — groups", () => {
   });
 });
 
-describe("parseScenario — prefabs", () => {
-  const prefab = {
-    id: "pf1",
+describe("parseScenario — bases", () => {
+  const blueprint = {
+    id: "bp1",
+    name: "The keep",
+    buildings: [{ def: "armlab", offset: { x: 0, z: 0 }, facing: 2 }],
+  };
+  const base = {
+    id: "b1",
+    blueprint: "bp1",
     team: "p1",
     origin: { x: 500, z: 500 },
-    buildings: [
-      { def: "armlab", offset: { x: 0, z: 0 }, facing: 2, queue: ["armpw"] },
-    ],
+    buildings: [{ queue: ["armpw"] }],
   };
+  const withBase = (extra: Record<string, unknown> = {}) =>
+    doc({ blueprints: [blueprint], bases: [base], ...extra });
 
-  it("parses a prefab with a factory queue", () => {
-    const s = parseScenario(doc({ prefabs: [prefab] }));
-    expect(s?.prefabs[0].buildings[0]).toEqual({
-      def: "armlab",
-      offset: { x: 0, z: 0 },
-      facing: 2,
-      queue: ["armpw"],
-    });
-    expect(s?.prefabs[0].buildings[0].repeat).toBeUndefined();
+  it("reads a layout and the base placed from it", () => {
+    const s = parseScenario(withBase());
+    expect(s?.blueprints[0]).toEqual(blueprint);
+    expect(s?.bases[0]).toEqual(base);
+  });
+
+  it("puts the two halves of a building back together", () => {
+    const s = parseScenario(withBase());
+    if (!s) throw new Error("did not parse");
+    expect(baseBuildings(s.blueprints, s.bases[0])).toEqual([
+      { def: "armlab", offset: { x: 0, z: 0 }, facing: 2, queue: ["armpw"] },
+    ]);
+  });
+
+  it("names a layout after its id when it has no name of its own", () => {
+    const s = parseScenario(
+      withBase({ blueprints: [{ ...blueprint, name: undefined }] }),
+    );
+    expect(s?.blueprints[0].name).toBe("bp1");
   });
 
   it("drops non-string queue entries", () => {
     const s = parseScenario(
-      doc({
-        prefabs: [
-          {
-            ...prefab,
-            buildings: [
-              {
-                def: "armlab",
-                offset: { x: 0, z: 0 },
-                queue: ["armpw", 3, null],
-                repeat: true,
-              },
-            ],
-          },
+      withBase({
+        bases: [
+          { ...base, buildings: [{ queue: ["armpw", 3, null], repeat: true }] },
         ],
       }),
     );
-    expect(s?.prefabs[0].buildings[0].queue).toEqual(["armpw"]);
-    expect(s?.prefabs[0].buildings[0].repeat).toBe(true);
+    expect(s?.bases[0].buildings[0].queue).toEqual(["armpw"]);
+    expect(s?.bases[0].buildings[0].repeat).toBe(true);
   });
 
   // Issue #878. A building the author named is addressable as an actor is, so
   // the id has to survive the round trip like every other cross-reference.
   it("keeps the id a building is named by", () => {
     const s = parseScenario(
-      doc({
-        prefabs: [
-          {
-            ...prefab,
-            buildings: [
-              { id: "keep-lab", def: "armlab", offset: { x: 0, z: 0 } },
-            ],
-          },
-        ],
-      }),
+      withBase({ bases: [{ ...base, buildings: [{ id: "keep-lab" }] }] }),
     );
-    expect(s?.prefabs[0].buildings[0].id).toBe("keep-lab");
+    expect(s?.bases[0].buildings[0].id).toBe("keep-lab");
   });
 
-  it("leaves a building that has none unnamed", () => {
-    const s = parseScenario(doc({ prefabs: [prefab] }));
-    expect(s?.prefabs[0].buildings[0].id).toBeUndefined();
+  it("leaves a building nothing was said about unnamed", () => {
+    const s = parseScenario(withBase({ bases: [{ ...base, buildings: [] }] }));
+    expect(s?.bases[0].buildings).toEqual([]);
+    expect(baseBuildings(s?.blueprints ?? [], base).at(0)?.id).toBeUndefined();
+  });
+
+  /** Read by position, so a run of empties on the end says nothing an absent
+   *  list does not, and a document that keeps re-saving stays small. */
+  it("drops the empty entries on the end of a base's own list", () => {
+    const s = parseScenario(
+      withBase({
+        bases: [{ ...base, buildings: [{ id: "keep-lab" }, {}, {}] }],
+      }),
+    );
+    expect(s?.bases[0].buildings).toEqual([{ id: "keep-lab" }]);
   });
 
   it("rejects a building with no offset", () => {
     expect(
       parseScenario(
-        doc({ prefabs: [{ ...prefab, buildings: [{ def: "armlab" }] }] }),
+        withBase({ blueprints: [{ ...blueprint, buildings: [{ def: "a" }] }] }),
       ),
+    ).toBeNull();
+  });
+
+  /**
+   * The two halves are one thing split in two, so a placement whose layout is
+   * gone is not a half-authored base, it is a base whose buildings have been
+   * lost. Loading it would show an author an empty map and save the emptiness
+   * back over what they had.
+   */
+  it("rejects a base naming a layout the document does not hold", () => {
+    expect(
+      parseScenario(withBase({ bases: [{ ...base, blueprint: "gone" }] })),
+    ).toBeNull();
+  });
+});
+
+/**
+ * Issue #1310. A schema 1 document holds one `prefabs` list carrying the layout
+ * and the mission's own fields together. Every scenario saved before this build,
+ * and every export already shared, is one of those, so reading it has to go on
+ * working and has to land in the same place the editor would put it.
+ */
+describe("parseScenario — reading a schema 1 document", () => {
+  const prefab = {
+    id: "pf1",
+    team: "p1",
+    origin: { x: 500, z: 500 },
+    buildings: [
+      {
+        id: "keep-lab",
+        def: "armlab",
+        offset: { x: 0, z: 0 },
+        facing: 2,
+        queue: ["armpw"],
+        repeat: true,
+      },
+      { def: "armsolar", offset: { x: 96, z: 0 }, facing: 0 },
+    ],
+  };
+
+  it("splits a prefab into a layout and a placement", () => {
+    const s = parseScenario(doc({ prefabs: [prefab] }));
+    expect(s?.blueprints).toEqual([
+      {
+        id: "pf1",
+        name: "pf1",
+        buildings: [
+          { def: "armlab", offset: { x: 0, z: 0 }, facing: 2 },
+          { def: "armsolar", offset: { x: 96, z: 0 }, facing: 0 },
+        ],
+      },
+    ]);
+    expect(s?.bases).toEqual([
+      {
+        id: "pf1",
+        blueprint: "pf1",
+        team: "p1",
+        origin: { x: 500, z: 500 },
+        buildings: [{ id: "keep-lab", queue: ["armpw"], repeat: true }],
+      },
+    ]);
+  });
+
+  /** What the compile step and the map both read, so the split has to put every
+   *  building back exactly as the old document held it. */
+  it("puts every building back as it was", () => {
+    const s = parseScenario(doc({ prefabs: [prefab] }));
+    if (!s) throw new Error("did not parse");
+    expect(baseBuildings(s.blueprints, s.bases[0])).toEqual([
+      {
+        id: "keep-lab",
+        def: "armlab",
+        offset: { x: 0, z: 0 },
+        facing: 2,
+        queue: ["armpw"],
+        repeat: true,
+      },
+      { def: "armsolar", offset: { x: 96, z: 0 }, facing: 0 },
+    ]);
+  });
+
+  it("gives two identical prefabs a layout each", () => {
+    const s = parseScenario(
+      doc({ prefabs: [prefab, { ...prefab, id: "pf2" }] }),
+    );
+    expect(s?.blueprints.map((b) => b.id)).toEqual(["pf1", "pf2"]);
+    expect(s?.bases.map((b) => b.blueprint)).toEqual(["pf1", "pf2"]);
+  });
+
+  it("ignores `prefabs` once a document has bases of its own", () => {
+    const s = parseScenario(
+      doc({ prefabs: [prefab], blueprints: [], bases: [] }),
+    );
+    expect(s?.blueprints).toEqual([]);
+    expect(s?.bases).toEqual([]);
+  });
+
+  it("rejects a malformed prefab rather than dropping it", () => {
+    expect(
+      parseScenario(doc({ prefabs: [{ ...prefab, origin: undefined }] })),
     ).toBeNull();
   });
 });
@@ -762,12 +872,20 @@ describe("parseScenario — round trip", () => {
             dormant: true,
           },
         ],
-        prefabs: [
+        blueprints: [
           {
-            id: "pf1",
+            id: "bp1",
+            name: "The keep",
+            buildings: [{ def: "armlab", offset: { x: 0, z: 0 }, facing: 3 }],
+          },
+        ],
+        bases: [
+          {
+            id: "b1",
+            blueprint: "bp1",
             team: "p1",
             origin: { x: 5, z: 5 },
-            buildings: [{ def: "armlab", offset: { x: 0, z: 0 }, facing: 3 }],
+            buildings: [{ id: "keep-lab" }],
           },
         ],
         restrictions: { buildable: { mode: "allow", units: ["armpw"] } },

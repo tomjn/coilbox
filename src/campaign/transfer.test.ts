@@ -27,7 +27,7 @@ const campaign: Campaign = {
 
 function scenario(): Scenario {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: "s1",
     name: "Ambush",
     description: "",
@@ -43,7 +43,8 @@ function scenario(): Scenario {
     zones: [],
     actors: [],
     groups: [],
-    prefabs: [],
+    blueprints: [],
+    bases: [],
     restrictions: {},
     vars: {},
     triggers: [],

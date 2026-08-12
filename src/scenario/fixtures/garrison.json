@@ -32,8 +32,14 @@
   "teams": {
     "garrison": {
       "startUnits": ["armck"],
-      "resources": { "metal": 1000, "energy": 1000 },
-      "income": { "metal": 5, "energy": 5 }
+      "resources": {
+        "metal": 1000,
+        "energy": 1000
+      },
+      "income": {
+        "metal": 5,
+        "energy": 5
+      }
     }
   },
   "zones": [
@@ -41,7 +47,10 @@
       "id": "depot",
       "name": "Supply Depot",
       "shape": "circle",
-      "center": { "x": 2000, "z": 2000 },
+      "center": {
+        "x": 2000,
+        "z": 2000
+      },
       "radius": 200
     }
   ],
@@ -50,36 +59,83 @@
       "id": "outpost",
       "unitDef": "armestor",
       "team": "garrison",
-      "pos": { "x": 2000, "z": 1900 },
+      "pos": {
+        "x": 2000,
+        "z": 1900
+      },
       "facing": 0,
-      "state": { "name": "Outpost" }
+      "state": {
+        "name": "Outpost"
+      }
     }
   ],
   "groups": [
     {
       "id": "reinforcements",
       "team": "player",
-      "units": [{ "def": "armpw", "count": 2 }],
-      "pos": { "x": 2000, "z": 2100 },
+      "units": [
+        {
+          "def": "armpw",
+          "count": 2
+        }
+      ],
+      "pos": {
+        "x": 2000,
+        "z": 2100
+      },
       "orders": [
-        { "kind": "move", "waypoints": [{ "x": 2100, "z": 2100 }] },
+        {
+          "kind": "move",
+          "waypoints": [
+            {
+              "x": 2100,
+              "z": 2100
+            }
+          ]
+        },
         {
           "kind": "patrol",
-          "waypoints": [{ "x": 2100, "z": 2100 }, { "x": 2100, "z": 1900 }]
+          "waypoints": [
+            {
+              "x": 2100,
+              "z": 2100
+            },
+            {
+              "x": 2100,
+              "z": 1900
+            }
+          ]
         },
         {
           "kind": "fight",
-          "waypoints": [{ "x": 2100, "z": 1900 }, { "x": 1900, "z": 1900 }]
+          "waypoints": [
+            {
+              "x": 2100,
+              "z": 1900
+            },
+            {
+              "x": 1900,
+              "z": 1900
+            }
+          ]
         }
       ],
       "dormant": true
     }
   ],
-  "prefabs": [],
+  "blueprints": [],
+  "bases": [],
   "restrictions": {
-    "buildable": { "mode": "deny", "units": ["armestor"] }
+    "buildable": {
+      "mode": "deny",
+      "units": ["armestor"]
+    }
   },
-  "vars": { "garrisonBuilt": 0, "quota": 1, "bonus": 5 },
+  "vars": {
+    "garrisonBuilt": 0,
+    "quota": 1,
+    "bonus": 5
+  },
   "triggers": [
     {
       "id": "count-check",
@@ -90,16 +146,28 @@
         "conditions": [
           {
             "type": "unit_count",
-            "params": { "team": "garrison", "unitDefs": ["armpw"], "min": 3 }
+            "params": {
+              "team": "garrison",
+              "unitDefs": ["armpw"],
+              "min": 3
+            }
           }
         ]
       },
       "actions": [
         {
           "type": "set_var",
-          "params": { "name": "garrisonBuilt", "value": 1 }
+          "params": {
+            "name": "garrisonBuilt",
+            "value": 1
+          }
         },
-        { "type": "enable_trigger", "params": { "trigger": "unlock" } }
+        {
+          "type": "enable_trigger",
+          "params": {
+            "trigger": "unlock"
+          }
+        }
       ]
     },
     {
@@ -111,16 +179,30 @@
         "conditions": [
           {
             "type": "unit_built",
-            "params": { "team": "garrison", "unitDef": "armestor", "count": 1 }
+            "params": {
+              "team": "garrison",
+              "unitDef": "armestor",
+              "count": 1
+            }
           }
         ]
       },
       "actions": [
         {
           "type": "add_var",
-          "params": { "name": "garrisonBuilt", "value": { "var": "bonus" } }
+          "params": {
+            "name": "garrisonBuilt",
+            "value": {
+              "var": "bonus"
+            }
+          }
         },
-        { "type": "disable_trigger", "params": { "trigger": "count-check" } }
+        {
+          "type": "disable_trigger",
+          "params": {
+            "trigger": "count-check"
+          }
+        }
       ]
     },
     {
@@ -132,18 +214,28 @@
         "conditions": [
           {
             "type": "unit_captured",
-            "params": { "actor": "outpost", "team": "player" }
+            "params": {
+              "actor": "outpost",
+              "team": "player"
+            }
           }
         ]
       },
       "actions": [
         {
           "type": "gift_units",
-          "params": { "group": "reinforcements", "team": "garrison" }
+          "params": {
+            "group": "reinforcements",
+            "team": "garrison"
+          }
         },
         {
           "type": "reveal_area",
-          "params": { "zone": "depot", "team": "player", "seconds": 30 }
+          "params": {
+            "zone": "depot",
+            "team": "player",
+            "seconds": 30
+          }
         }
       ]
     },
@@ -153,10 +245,22 @@
       "repeat": false,
       "conditions": {
         "op": "all",
-        "conditions": [{ "type": "time_elapsed", "params": { "seconds": 8 } }]
+        "conditions": [
+          {
+            "type": "time_elapsed",
+            "params": {
+              "seconds": 8
+            }
+          }
+        ]
       },
       "actions": [
-        { "type": "release_group", "params": { "group": "reinforcements" } }
+        {
+          "type": "release_group",
+          "params": {
+            "group": "reinforcements"
+          }
+        }
       ]
     },
     {
@@ -172,14 +276,26 @@
             "params": {
               "name": "garrisonBuilt",
               "op": "gte",
-              "value": { "var": "quota" }
+              "value": {
+                "var": "quota"
+              }
             }
           }
         ]
       },
       "actions": [
-        { "type": "spawn_group", "params": { "group": "reinforcements" } },
-        { "type": "wake_group", "params": { "group": "reinforcements" } }
+        {
+          "type": "spawn_group",
+          "params": {
+            "group": "reinforcements"
+          }
+        },
+        {
+          "type": "wake_group",
+          "params": {
+            "group": "reinforcements"
+          }
+        }
       ]
     },
     {
@@ -191,14 +307,21 @@
         "conditions": [
           {
             "type": "var",
-            "params": { "name": "garrisonBuilt", "op": "gte", "value": 1 }
+            "params": {
+              "name": "garrisonBuilt",
+              "op": "gte",
+              "value": 1
+            }
           }
         ]
       },
       "actions": [
         {
           "type": "unlock_unit",
-          "params": { "unitDef": "armestor", "team": "player" }
+          "params": {
+            "unitDef": "armestor",
+            "team": "player"
+          }
         }
       ]
     }

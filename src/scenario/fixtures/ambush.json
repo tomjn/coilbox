@@ -32,7 +32,10 @@
   "teams": {
     "enemy": {
       "noCommander": true,
-      "resources": { "metal": 500, "energy": 500 }
+      "resources": {
+        "metal": 500,
+        "energy": 500
+      }
     }
   },
   "zones": [
@@ -40,8 +43,14 @@
       "id": "pass",
       "name": "Mountain Pass",
       "shape": "box",
-      "min": { "x": 1800, "z": 1800 },
-      "max": { "x": 2200, "z": 2200 }
+      "min": {
+        "x": 1800,
+        "z": 1800
+      },
+      "max": {
+        "x": 2200,
+        "z": 2200
+      }
     }
   ],
   "actors": [
@@ -49,24 +58,45 @@
       "id": "scout",
       "unitDef": "armpw",
       "team": "enemy",
-      "pos": { "x": 2000, "z": 2000 },
+      "pos": {
+        "x": 2000,
+        "z": 2000
+      },
       "facing": 0,
-      "state": { "hp": 1 }
+      "state": {
+        "hp": 1
+      }
     }
   ],
   "groups": [
     {
       "id": "raiders",
       "team": "enemy",
-      "units": [{ "def": "armpw", "count": 4 }],
-      "pos": { "x": 2000, "z": 2120 },
-      "orders": [{ "kind": "guard", "target": "scout" }],
+      "units": [
+        {
+          "def": "armpw",
+          "count": 4
+        }
+      ],
+      "pos": {
+        "x": 2000,
+        "z": 2120
+      },
+      "orders": [
+        {
+          "kind": "guard",
+          "target": "scout"
+        }
+      ],
       "dormant": true
     }
   ],
-  "prefabs": [],
+  "blueprints": [],
+  "bases": [],
   "restrictions": {},
-  "vars": { "alertLevel": 0 },
+  "vars": {
+    "alertLevel": 0
+  },
   "triggers": [
     {
       "id": "spring-ambush",
@@ -77,25 +107,51 @@
         "conditions": [
           {
             "type": "units_in_zone",
-            "params": { "zone": "pass", "team": "player" }
+            "params": {
+              "zone": "pass",
+              "team": "player"
+            }
           }
         ]
       },
       "actions": [
-        { "type": "spawn_group", "params": { "group": "raiders" } },
-        { "type": "wake_group", "params": { "group": "raiders" } },
+        {
+          "type": "spawn_group",
+          "params": {
+            "group": "raiders"
+          }
+        },
+        {
+          "type": "wake_group",
+          "params": {
+            "group": "raiders"
+          }
+        },
         {
           "type": "give_orders",
           "params": {
             "group": "raiders",
-            "orders": [{ "kind": "attack", "target": "scout" }]
+            "orders": [
+              {
+                "kind": "attack",
+                "target": "scout"
+              }
+            ]
           }
         },
-        { "type": "dialogue", "params": { "line": "warn" } },
+        {
+          "type": "dialogue",
+          "params": {
+            "line": "warn"
+          }
+        },
         {
           "type": "camera_pan",
           "params": {
-            "pos": { "x": 2000, "z": 2000 },
+            "pos": {
+              "x": 2000,
+              "z": 2000
+            },
             "seconds": 2,
             "team": "player"
           }
@@ -103,16 +159,30 @@
         {
           "type": "map_marker",
           "params": {
-            "pos": { "x": 2000, "z": 2000 },
+            "pos": {
+              "x": 2000,
+              "z": 2000
+            },
             "text": "Ambush!",
             "team": "player"
           }
         },
         {
           "type": "map_marker",
-          "params": { "pos": { "x": 1800, "z": 1800 }, "text": "They came." }
+          "params": {
+            "pos": {
+              "x": 1800,
+              "z": 1800
+            },
+            "text": "They came."
+          }
         },
-        { "type": "play_sound", "params": { "sound": "alarm.wav" } }
+        {
+          "type": "play_sound",
+          "params": {
+            "sound": "alarm.wav"
+          }
+        }
       ]
     },
     {
@@ -121,9 +191,23 @@
       "repeat": false,
       "conditions": {
         "op": "all",
-        "conditions": [{ "type": "unit_dead", "params": { "actor": "scout" } }]
+        "conditions": [
+          {
+            "type": "unit_dead",
+            "params": {
+              "actor": "scout"
+            }
+          }
+        ]
       },
-      "actions": [{ "type": "dialogue", "params": { "line": "warn" } }]
+      "actions": [
+        {
+          "type": "dialogue",
+          "params": {
+            "line": "warn"
+          }
+        }
+      ]
     },
     {
       "id": "scout-wounded",
@@ -134,11 +218,21 @@
         "conditions": [
           {
             "type": "unit_health_below",
-            "params": { "actor": "scout", "fraction": 0.5 }
+            "params": {
+              "actor": "scout",
+              "fraction": 0.5
+            }
           }
         ]
       },
-      "actions": [{ "type": "dialogue", "params": { "line": "warn" } }]
+      "actions": [
+        {
+          "type": "dialogue",
+          "params": {
+            "line": "warn"
+          }
+        }
+      ]
     }
   ],
   "objectives": [
@@ -150,7 +244,11 @@
     }
   ],
   "dialogue": [
-    { "id": "warn", "speaker": "HQ", "text": "Contact! Raiders inbound." }
+    {
+      "id": "warn",
+      "speaker": "HQ",
+      "text": "Contact! Raiders inbound."
+    }
   ],
   "createdAt": "2026-07-31T00:00:00.000Z",
   "updatedAt": "2026-07-31T00:00:00.000Z"

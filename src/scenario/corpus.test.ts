@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { compileScenario, scenarioMissionValue } from "./compile";
 import { requiredRuntimeVersion } from "./gating";
-import { amountVar, parseScenario, type Scenario } from "./model";
+import {
+  amountVar,
+  baseBuildings,
+  parseScenario,
+  type Scenario,
+} from "./model";
 import { ACTION_TYPES, CONDITION_TYPES } from "./triggerTypes";
 
 // validate.ts reaches the plugin through bindings.ts, whose plugin-sdk import
@@ -109,15 +114,19 @@ describe("scenario fixture corpus", () => {
   /**
    * Type-name coverage isn't enough: a fixture can name a type without
    * exercising the shape of data it carries. Issue #811 found the corpus had
-   * no prefab at all, so no prefab building with a factory queue and no
+   * no base at all, so no base building with a factory queue and no
    * queue with `repeat` either, and every group was `dormant`, so none of
    * them started on the map. Guard those shapes explicitly, the same way the
    * type-name check above is guarded, so a fixture that stops exercising one
    * fails here instead of silently leaving `mission.lua` untested.
    */
-  it("covers every prefab and group-dormancy shape", () => {
-    const allPrefabs = fixtures.flatMap(({ scenario }) => scenario.prefabs);
-    const allBuildings = allPrefabs.flatMap((p) => p.buildings);
+  it("covers every base and group-dormancy shape", () => {
+    const allBases = fixtures.flatMap(({ scenario }) => scenario.bases);
+    const allBuildings = fixtures.flatMap(({ scenario }) =>
+      scenario.bases.flatMap((base) =>
+        baseBuildings(scenario.blueprints, base),
+      ),
+    );
     const allGroups = fixtures.flatMap(({ scenario }) => scenario.groups);
     const allTriggers = fixtures.flatMap(({ scenario }) => scenario.triggers);
 
@@ -127,18 +136,18 @@ describe("scenario fixture corpus", () => {
         (t) => (t.cooldown ?? 0) > 0,
       ),
       "a trigger disarmed at start": allTriggers.some((t) => !t.enabled),
-      "a prefab": allPrefabs.length > 0,
-      "a prefab building with a factory queue": allBuildings.some(
+      "a base": allBases.length > 0,
+      "a base building with a factory queue": allBuildings.some(
         (b) => (b.queue?.length ?? 0) > 0,
       ),
       "a factory queue that repeats": allBuildings.some(
         (b) => b.repeat === true,
       ),
-      // Issue #878. Without one the runtime records nothing about any prefab
+      // Issue #878. Without one the runtime records nothing about any base
       // building and the headless probe is back to finding one by unit def.
-      "a prefab building a trigger names": fixtures.some(({ scenario }) => {
+      "a base building a trigger names": fixtures.some(({ scenario }) => {
         const named = new Set(
-          scenario.prefabs.flatMap((p) => p.buildings.map((b) => b.id)),
+          scenario.bases.flatMap((base) => base.buildings.map((b) => b.id)),
         );
         return scenario.triggers.some((t) =>
           t.conditions.conditions.some((c) =>
@@ -239,20 +248,20 @@ describe("scenario fixture corpus", () => {
     const offMap: string[] = [];
     for (const { file, scenario } of fixtures) {
       for (const point of pointsIn(scenario)) {
-        // A prefab building's offset is measured from its prefab's origin and is
-        // free to point north or west of it. The position it resolves to is
+        // A blueprint building's offset is measured from the base's origin and
+        // is free to point north or west of it. The position it resolves to is
         // checked below instead.
         if (point.path.endsWith(".offset")) continue;
         if (point.x <= 0 || point.z <= 0)
           offMap.push(`${file} ${point.path} at ${point.x},${point.z}`);
       }
-      for (const prefab of scenario.prefabs) {
-        for (const building of prefab.buildings) {
-          const x = prefab.origin.x + building.offset.x;
-          const z = prefab.origin.z + building.offset.z;
+      for (const base of scenario.bases) {
+        for (const building of baseBuildings(scenario.blueprints, base)) {
+          const x = base.origin.x + building.offset.x;
+          const z = base.origin.z + building.offset.z;
           if (x <= 0 || z <= 0)
             offMap.push(
-              `${file} prefab ${prefab.id}'s ${building.def} at ${x},${z}`,
+              `${file} base ${base.id}'s ${building.def} at ${x},${z}`,
             );
         }
       }

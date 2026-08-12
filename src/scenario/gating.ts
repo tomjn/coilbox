@@ -34,12 +34,12 @@ import {
 } from "./triggerTypes";
 
 /**
- * The runtime that first recorded which unit each named prefab building became
+ * The runtime that first recorded which unit each named base building became
  * (issue #878). A runtime behind this ignores a building's id, so `unit_dead` on
  * one holds from the first frame and the mission plays itself out. That is the
  * silent half-play the version gate exists to refuse.
  */
-const PREFAB_BUILDING_VERSION = 2;
+const BASE_BUILDING_VERSION = 2;
 
 /**
  * The runtime that first read a var where a trigger wants a number (issue
@@ -121,7 +121,7 @@ function stringsIn(value: unknown, out: Set<string>): void {
 }
 
 /**
- * Whether any trigger or order names a prefab building.
+ * Whether any trigger or order names a base building.
  *
  * Every string in the triggers and in the groups' opening orders, against the
  * building ids, rather than the parameters the type table calls references. A
@@ -131,10 +131,10 @@ function stringsIn(value: unknown, out: Set<string>): void {
  * only ever raises the version a scenario asks for, which is the safe way to be
  * wrong.
  */
-function namesPrefabBuilding(scenario: Scenario): boolean {
+function namesBaseBuilding(scenario: Scenario): boolean {
   const ids = new Set(
-    scenario.prefabs.flatMap((p) =>
-      p.buildings.map((b) => b.id).filter((id): id is string => !!id),
+    scenario.bases.flatMap((base) =>
+      base.buildings.map((b) => b.id).filter((id): id is string => !!id),
     ),
   );
   if (ids.size === 0) return false;
@@ -171,8 +171,8 @@ export function requiredRuntimeVersion(
       version = Math.max(version, since(step.type));
     }
   }
-  if (namesPrefabBuilding(scenario)) {
-    version = Math.max(version, PREFAB_BUILDING_VERSION);
+  if (namesBaseBuilding(scenario)) {
+    version = Math.max(version, BASE_BUILDING_VERSION);
   }
   if (readsVarAsAmount(scenario)) {
     version = Math.max(version, VAR_AMOUNT_VERSION);

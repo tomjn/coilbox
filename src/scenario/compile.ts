@@ -10,6 +10,7 @@ import type {
   ScenarioZone,
   TriggerStep,
 } from "./model";
+import { baseBuildings, MISSION_SCHEMA_VERSION } from "./model";
 
 /**
  * Compile a scenario document to the Lua the mission runtime reads.
@@ -19,6 +20,13 @@ import type {
  * inventing a second vocabulary: what the editor stores under a name is what
  * the runtime reads under that name, so a mission that misbehaves can be
  * diagnosed by reading the compiled file beside the JSON.
+ *
+ * Bases are the one exception, and they are deliberate. A document holds a
+ * layout and the placements of it separately (issue #1310), and the runtime is
+ * vendored into games, so a copy that shipped a year ago still reads what it has
+ * always read: one `prefabs` list, each entry with its buildings inline. The two
+ * halves are put back together here rather than at the far end, which costs the
+ * runtime nothing and means the split is free to move again later.
  *
  * Two things the document cannot carry are added here:
  *
@@ -363,7 +371,7 @@ function setupString(scenario: Scenario, field: string): string | undefined {
 
 function mission(scenario: Scenario): LuaTable {
   return tbl([
-    ["schemaVersion", scenario.schemaVersion],
+    ["schemaVersion", MISSION_SCHEMA_VERSION],
     ["runtimeVersion", scenario.runtimeVersion],
     ["id", scenario.id],
     ["name", scenario.name],
@@ -398,14 +406,14 @@ function mission(scenario: Scenario): LuaTable {
     ["groups", scenario.groups.map(group)],
     [
       "prefabs",
-      scenario.prefabs.map((p) =>
+      scenario.bases.map((p) =>
         tbl([
           ["id", p.id],
           ["team", p.team],
           ["origin", point(p.origin)],
           [
             "buildings",
-            p.buildings.map((b) =>
+            baseBuildings(scenario.blueprints, p).map((b) =>
               tbl([
                 ["id", b.id],
                 ["def", b.def],

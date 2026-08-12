@@ -190,28 +190,29 @@ describe("requiredRuntimeVersion", () => {
   });
 
   /**
-   * Issue #878. Runtime 1 ignores a prefab building's id, and `unit_dead` on a
+   * Issue #878. Runtime 1 ignores a base building's id, and `unit_dead` on a
    * name it has never heard of holds from the first frame, so a scenario naming
    * a building has to be refused by an older game rather than half played.
    */
-  describe("a scenario that names a prefab building", () => {
+  describe("a scenario that names a base building", () => {
     const withBase = (target: string): Scenario => {
       const scenario = withTrigger([], []);
       return {
         ...scenario,
-        prefabs: [
+        blueprints: [
+          {
+            id: "keep-layout",
+            name: "The keep",
+            buildings: [{ def: "corlab", offset: { x: 0, z: 0 }, facing: 0 }],
+          },
+        ],
+        bases: [
           {
             id: "keep",
+            blueprint: "keep-layout",
             team: "player",
             origin: { x: 500, z: 500 },
-            buildings: [
-              {
-                id: "keep-lab",
-                def: "corlab",
-                offset: { x: 0, z: 0 },
-                facing: 0,
-              },
-            ],
+            buildings: [{ id: "keep-lab" }],
           },
         ],
         triggers: [

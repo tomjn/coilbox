@@ -418,17 +418,21 @@ export interface FoundDef {
  *
  * A named list rather than a walk like {@link pointsIn}, because a def is a bare
  * string and a walk would sweep up every other string in the file. The places
- * are: a team's start units, an actor, a group's members, a prefab building and
+ * are: a team's start units, an actor, a group's members, a base building and
  * its factory queue, and the parameters of a known trigger type that hold one.
  *
  * A game extension's parameters are left alone, exactly as {@link checkStep}
  * leaves them: an unknown type's defs are that game's business.
  *
  * Takes anything, because the setup panel's "changing the game" notice asks the
- * same question of the document the author is editing (issue #940). The compiled
- * file mirrors the document field for field, so one walk answers both, and the
+ * same question of the document the author is editing (issue #940), so the
  * notice cannot say a game has everything the mission needs while the validator
  * refuses the launch over a def in a factory queue.
+ *
+ * Bases are the one field the two shapes spell differently. A document holds a
+ * layout and its placements apart (issue #1310) and the compiled file puts them
+ * back together under `prefabs`, so both spellings are read and whichever is
+ * there answers.
  */
 export function unitDefsIn(document: unknown): FoundDef[] {
   const mission = asRecord(document);
@@ -463,6 +467,7 @@ export function unitDefsIn(document: unknown): FoundDef[] {
     });
   });
 
+  // The compiled shape: layout and mission fields on one building.
   asArray(mission.prefabs).forEach((raw, index) => {
     const prefab = asRecord(raw);
     const where = at("prefabs", prefab, index);
@@ -470,6 +475,23 @@ export function unitDefsIn(document: unknown): FoundDef[] {
       const building = asRecord(entry);
       add(`${where}.buildings[${i}].def`, building.def);
       addEach(`${where}.buildings[${i}].queue`, building.queue);
+    });
+  });
+
+  // The document's shape: the defs are the layout's, the queues the base's.
+  asArray(mission.blueprints).forEach((raw, index) => {
+    const blueprint = asRecord(raw);
+    const where = at("blueprints", blueprint, index);
+    asArray(blueprint.buildings).forEach((entry, i) => {
+      add(`${where}.buildings[${i}].def`, asRecord(entry).def);
+    });
+  });
+
+  asArray(mission.bases).forEach((raw, index) => {
+    const base = asRecord(raw);
+    const where = at("bases", base, index);
+    asArray(base.buildings).forEach((entry, i) => {
+      addEach(`${where}.buildings[${i}].queue`, asRecord(entry).queue);
     });
   });
 
@@ -675,7 +697,11 @@ const PART: Record<string, string> = {
   mission: "Mission",
   actors: "Actor",
   groups: "Group",
-  prefabs: "Prefab",
+  // The compiled mission still spells a base "prefabs", because the runtime a
+  // game vendored reads that key. The editor calls it a base.
+  prefabs: "Base",
+  bases: "Base",
+  blueprints: "Layout",
   zones: "Zone",
   triggers: "Trigger",
   objectives: "Objective",
