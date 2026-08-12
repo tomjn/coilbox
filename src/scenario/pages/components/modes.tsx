@@ -35,7 +35,7 @@ import {
   type Scenario,
   type ScenarioZone,
 } from "../../model";
-import { addBase, addBuilding, buildingUnits } from "./bases";
+import { addBase, addBuilding, buildingUnits, type LayoutEdit } from "./bases";
 import { addActor, parsePlacementKey } from "./editing";
 import type { ScenarioEdit } from "./edits";
 import {
@@ -80,6 +80,9 @@ export interface ModeContext {
   /** Select what was just placed, so it can be turned or deleted straight
    *  away. Null clears the selection, which is how a mode lets go of it. */
   onSelect: (key: string | null) => void;
+  /** Whether an edit to a base names the layout every base placed from it uses,
+   *  or gives that base a copy of its own. Only bases read it. */
+  layoutEdit: (baseId: string) => LayoutEdit;
 }
 
 /** What a resolved mode contributes to the surface. */
@@ -350,7 +353,14 @@ const basesMode: EditorMode = {
   label: "Bases",
   icon: Factory,
   hint: "Pick a building and click the map. Clicks add to the base you have selected.",
-  use: ({ scenario, onChange, onSelect, selected, selectedNow }) => {
+  use: ({
+    scenario,
+    onChange,
+    onSelect,
+    selected,
+    selectedNow,
+    layoutEdit,
+  }) => {
     const [unitDef, setUnitDef] = useState("");
     const [team, setTeam] = useState("");
     const participants = scenario.setup.participants;
@@ -383,20 +393,25 @@ const basesMode: EditorMode = {
               if (to) {
                 const at = baseBuildings(doc.blueprints, to).length;
                 chosen.key = placementKey("base", to.id, at);
-                return addBuilding(doc, to.id, {
-                  // Minted here rather than when a trigger first wants one, so
-                  // every building the editor puts down can be named after the
-                  // fact without moving the base's ids around.
-                  id: crypto.randomUUID(),
-                  def: unitDef,
-                  // Offsets are measured from the base's origin, so what the
-                  // document gets is the snapped point less that.
-                  offset: {
-                    x: stand.x - to.origin.x,
-                    z: stand.z - to.origin.z,
+                return addBuilding(
+                  doc,
+                  to.id,
+                  {
+                    // Minted here rather than when a trigger first wants one,
+                    // so every building the editor puts down can be named after
+                    // the fact without moving the base's ids around.
+                    id: crypto.randomUUID(),
+                    def: unitDef,
+                    // Offsets are measured from the base's origin, so what the
+                    // document gets is the snapped point less that.
+                    offset: {
+                      x: stand.x - to.origin.x,
+                      z: stand.z - to.origin.z,
+                    },
+                    facing: 0,
                   },
-                  facing: 0,
-                });
+                  layoutEdit(to.id),
+                );
               }
               const id = crypto.randomUUID();
               chosen.key = placementKey("base", id, 0);

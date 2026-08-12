@@ -46,7 +46,15 @@ import {
 } from "../../model";
 import { ActorControls } from "./ActorControls";
 import { BaseControls } from "./BaseControls";
-import { editBase, removeBase, setOrigin, setQueue } from "./bases";
+import {
+  editBase,
+  type LayoutEdit,
+  removeBase,
+  renameBlueprint,
+  setOrigin,
+  setQueue,
+  sharingLayout,
+} from "./bases";
 import { ContentsList } from "./ContentsList";
 import {
   type ContentEntry,
@@ -57,6 +65,7 @@ import {
   canTurn,
   editActor,
   movePlacement,
+  parsePlacementKey,
   removePlacement,
   setActorState,
   turnPlacement,
@@ -222,6 +231,13 @@ export function ScenarioMapScene({
     return () => window.removeEventListener("keydown", onKey);
   }, [expanded]);
 
+  // Which base the author asked to edit the shared layout of (issue #1414).
+  // Held against the base rather than as a mode of the editor, so working on
+  // another base is back to the answer that loses nobody's work: a copy.
+  const [sharedBase, setSharedBase] = useState<string | null>(null);
+  const layoutEdit = (id: string | null | undefined): LayoutEdit =>
+    id && id === sharedBase ? "shared" : "own";
+
   // Every mode is resolved on every render, in the order of a static list, so
   // each one may hold state of its own.
   const mode = EDITOR_MODES.find((m) => m.id === modeId) ?? EDITOR_MODES[0];
@@ -232,6 +248,7 @@ export function ScenarioMapScene({
       selected,
       selectedNow: () => selectedRef.current,
       onSelect: setSelected,
+      layoutEdit,
     }),
   );
   const behaviour = behaviours[EDITOR_MODES.indexOf(mode)];
@@ -393,7 +410,15 @@ export function ScenarioMapScene({
         return onChange((doc) => moveZone(doc, key, delta));
       if (parsePathKey(key))
         return onChange((doc) => movePathWaypoint(doc, key, delta));
-      onChange((doc) => movePlacement(doc, key, delta, snap));
+      onChange((doc) =>
+        movePlacement(
+          doc,
+          key,
+          delta,
+          snap,
+          layoutEdit(parsePlacementKey(key)?.id),
+        ),
+      );
     },
   });
 
@@ -667,10 +692,14 @@ export function ScenarioMapScene({
           <SelectionBar
             placement={picked}
             onTurn={() =>
-              onChange((doc) => turnPlacement(doc, picked.key, 1, snap))
+              onChange((doc) =>
+                turnPlacement(doc, picked.key, 1, snap, layoutEdit(picked.id)),
+              )
             }
             onDelete={() => {
-              onChange((doc) => removePlacement(doc, picked.key));
+              onChange((doc) =>
+                removePlacement(doc, picked.key, layoutEdit(picked.id)),
+              );
               setSelected(null);
             }}
           >
@@ -694,6 +723,12 @@ export function ScenarioMapScene({
                 base={pickedBase}
                 buildings={baseBuildings(scenario.blueprints, pickedBase)}
                 index={picked.index}
+                layoutName={
+                  scenario.blueprints.find((b) => b.id === pickedBase.blueprint)
+                    ?.name ?? ""
+                }
+                sharedWith={sharingLayout(scenario, pickedBase.id).length}
+                sharedEdit={sharedBase === pickedBase.id}
                 overlaps={overlappingIn(
                   units.placements,
                   footprints,
@@ -706,6 +741,17 @@ export function ScenarioMapScene({
                 onEdit={(patch) =>
                   onChange((doc) => editBase(doc, pickedBase.id, patch))
                 }
+                onRename={(name) =>
+                  onChange((doc) =>
+                    renameBlueprint(
+                      doc,
+                      pickedBase.id,
+                      name,
+                      layoutEdit(pickedBase.id),
+                    ),
+                  )
+                }
+                onSharedEdit={(on) => setSharedBase(on ? pickedBase.id : null)}
                 onQueue={(queue, repeat) =>
                   onChange((doc) =>
                     setQueue(doc, pickedBase.id, picked.index, queue, repeat),
