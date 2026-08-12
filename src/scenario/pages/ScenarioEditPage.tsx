@@ -11,6 +11,7 @@ import {
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
 import { saveScenario } from "../storage";
+import { BlueprintPanel } from "./components/BlueprintPanel";
 import { DialoguePanel } from "./components/DialoguePanel";
 import { applyEdit, type ScenarioEdit } from "./components/edits";
 import {
@@ -301,6 +302,15 @@ export default function ScenarioEditPage() {
         onChange={(next) => apply(next)}
         units={gameUnits.units}
         unitsLoading={gameUnits.loading}
+      />
+      {/* The layouts the document holds, and the way in and out of a game's own
+          blueprint file. It sits with the panels rather than on the map because
+          it is about the whole document, and because a layout arriving from a
+          file is not a click on the map. */}
+      <BlueprintPanel
+        scenario={scenario}
+        onChange={(edit) => apply(edit)}
+        units={gameUnits.units}
       />
       <VarPanel
         scenario={scenario}
