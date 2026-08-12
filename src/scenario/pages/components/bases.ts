@@ -22,6 +22,25 @@
  * the game calls a building through `Spring.Pos2BuildPos`: anything else spawns
  * where it is put, off the build grid, so the picker offers buildings only and
  * {@link strayDefs} says so about a document that already names something else.
+ *
+ * ## What two bases sharing one layout means (issue #1414)
+ *
+ * A placement is an instance. Nothing stops two bases naming one layout, and
+ * once a saved blueprint can be dropped into a mission twice that is the point
+ * of the feature rather than a mistake, but an author who drags a solar in one
+ * of them means to move that solar and not the one in the base across the map.
+ *
+ * So an edit made through a base that shares its layout is copy on write: the
+ * base gets a layout of its own, named after the one it was made from, and every
+ * other base carries on standing where it stood. Nobody's work is lost either
+ * way round, which is what picks this over editing them all in place.
+ *
+ * Editing them all in place is still worth wanting, because a layout used twice
+ * in one mission is sometimes meant as one thing in two places, so every
+ * function that changes a layout takes a {@link LayoutEdit} and `"shared"` says
+ * to write through. Nothing defaults to it: the editor asks for it deliberately,
+ * because a write through cannot be told from a copy by looking at the base in
+ * front of you.
  */
 
 import { BUILD_SQUARE } from "@/blueprint/footprint";
@@ -86,22 +105,141 @@ export function pruneBlueprints(scenario: Scenario): Scenario {
     : { ...scenario, blueprints };
 }
 
-/** The document with one base's layout changed. */
-function editLayout(
+/**
+ * Whether an edit made through one base changes the layout every base placed
+ * from it uses, or gives this base a layout of its own.
+ *
+ * `"own"` everywhere by default. See the note at the top of this file.
+ */
+export type LayoutEdit = "own" | "shared";
+
+/** The other bases placed from the same layout as this one, which is what makes
+ *  the layout shared. */
+export function sharingLayout(scenario: Scenario, id: string): string[] {
+  const base = scenario.bases.find((entry) => entry.id === id);
+  if (!base) return [];
+  return scenario.bases
+    .filter((entry) => entry.blueprint === base.blueprint && entry.id !== id)
+    .map((entry) => entry.id);
+}
+
+/** A name for a copy that nothing in `taken` already answers to, so two copies
+ *  of one layout are told apart in a list rather than both called the same. */
+export function copyName(taken: string[], name: string): string {
+  const first = `${name} copy`;
+  if (!taken.includes(first)) return first;
+  let n = 2;
+  while (taken.includes(`${first} ${n}`)) n++;
+  return `${first} ${n}`;
+}
+
+/**
+ * What a layout the editor mints is called until somebody names it.
+ *
+ * A number rather than nothing, because a blueprint with no name shows up in a
+ * picker as a blank row, and rather than the id, because the id is a UUID
+ * (issue #1414).
+ */
+export function nextLayoutName(blueprints: BaseBlueprint[]): string {
+  const taken = new Set(blueprints.map((b) => b.name));
+  let n = 1;
+  while (taken.has(`Layout ${n}`)) n++;
+  return `Layout ${n}`;
+}
+
+/**
+ * The document with a layout changed through one of the bases placed from it,
+ * copying it first when another base is placed from it too.
+ *
+ * The copy carries the edit rather than being made and then edited, so a caller
+ * cannot end up with a copy identical to the layout it came from.
+ */
+function writeLayout(
+  scenario: Scenario,
+  base: ScenarioBase,
+  layout: BaseBlueprint,
+  how: LayoutEdit,
+  patch: Partial<Omit<BaseBlueprint, "id">>,
+): Scenario {
+  const shared = scenario.bases.some(
+    (entry) => entry.blueprint === layout.id && entry.id !== base.id,
+  );
+  if (how === "shared" || !shared) {
+    return {
+      ...scenario,
+      blueprints: edit<BaseBlueprint>(scenario.blueprints, layout.id, (b) => ({
+        ...b,
+        ...patch,
+      })),
+    };
+  }
+  const copy: BaseBlueprint = {
+    ...layout,
+    ...patch,
+    // Minted here rather than passed in, because a copy is made by a drag rather
+    // than by a caller that knew a layout was about to exist.
+    id: crypto.randomUUID(),
+    name:
+      patch.name ??
+      copyName(
+        scenario.blueprints.map((b) => b.name),
+        layout.name,
+      ),
+  };
+  return {
+    ...scenario,
+    blueprints: [...scenario.blueprints, copy],
+    bases: edit<ScenarioBase>(scenario.bases, base.id, (entry) => ({
+      ...entry,
+      blueprint: copy.id,
+    })),
+  };
+}
+
+/**
+ * The document with one base's layout changed, as {@link LayoutEdit} says.
+ *
+ * The update returns `null` for an edit that lands on nothing, so a drag of a
+ * building the layout has not got is the same document back rather than a copy
+ * of the layout with nothing changed in it.
+ */
+export function editBaseLayout(
   scenario: Scenario,
   id: string,
-  update: (buildings: BlueprintBuilding[]) => BlueprintBuilding[],
+  how: LayoutEdit,
+  update: (buildings: BlueprintBuilding[]) => BlueprintBuilding[] | null,
 ): Scenario {
   const base = scenario.bases.find((entry) => entry.id === id);
-  if (!base) return scenario;
-  const blueprints = edit<BaseBlueprint>(
-    scenario.blueprints,
-    base.blueprint,
-    (blueprint) => ({ ...blueprint, buildings: update(blueprint.buildings) }),
-  );
-  return blueprints === scenario.blueprints
-    ? scenario
-    : { ...scenario, blueprints };
+  const layout = base
+    ? scenario.blueprints.find((b) => b.id === base.blueprint)
+    : undefined;
+  if (!base || !layout) return scenario;
+  const buildings = update(layout.buildings);
+  if (!buildings) return scenario;
+  return writeLayout(scenario, base, layout, how, { buildings });
+}
+
+/**
+ * The document with the layout one base is placed from renamed.
+ *
+ * A rename is an edit to the layout like any other, so renaming one two bases
+ * share names a copy rather than renaming what the other base is placed from.
+ * That is what "save this one as something else" means, and `"shared"` is there
+ * for renaming the thing itself.
+ */
+export function renameBlueprint(
+  scenario: Scenario,
+  id: string,
+  name: string,
+  how: LayoutEdit = "own",
+): Scenario {
+  const base = scenario.bases.find((entry) => entry.id === id);
+  const layout = base
+    ? scenario.blueprints.find((b) => b.id === base.blueprint)
+    : undefined;
+  const wanted = name.trim();
+  if (!base || !layout || !wanted || wanted === layout.name) return scenario;
+  return writeLayout(scenario, base, layout, how, { name: wanted });
 }
 
 /* -------------------------------------------------------------------------- *
@@ -137,7 +275,7 @@ export function addBase(
       ...scenario.blueprints,
       {
         id: blueprintId,
-        name: base.name ?? blueprintId,
+        name: base.name ?? nextLayoutName(scenario.blueprints),
         buildings: base.buildings.map((b) => ({
           def: b.def,
           offset: round(b.offset),
@@ -170,6 +308,7 @@ export function addBuilding(
   scenario: Scenario,
   id: string,
   building: PlacedBuilding,
+  how: LayoutEdit = "own",
 ): Scenario {
   const base = scenario.bases.find((entry) => entry.id === id);
   const layout = base
@@ -186,7 +325,7 @@ export function addBuilding(
   while (roles.length < at) roles.push({});
   roles[at] = buildingRole(building);
 
-  const withLayout = editLayout(scenario, id, (buildings) => [
+  const withLayout = editBaseLayout(scenario, id, how, (buildings) => [
     ...buildings,
     {
       def: building.def,
@@ -251,12 +390,14 @@ export function removeBase(scenario: Scenario, id: string): Scenario {
  * The document with one of a base's buildings gone, from both halves at once.
  *
  * The base goes with its last building, because an empty cluster is not a thing
- * an author can see or select again, and its layout goes with it.
+ * an author can see or select again, and its layout goes with it unless another
+ * base is placed from that too.
  */
 export function removeBuilding(
   scenario: Scenario,
   id: string,
   index: number,
+  how: LayoutEdit = "own",
 ): Scenario {
   const base = scenario.bases.find((entry) => entry.id === id);
   const layout = base
@@ -265,7 +406,7 @@ export function removeBuilding(
   if (!base || !layout?.buildings[index]) return scenario;
   if (layout.buildings.length === 1) return removeBase(scenario, id);
 
-  const next = editLayout(scenario, id, (buildings) =>
+  const next = editBaseLayout(scenario, id, how, (buildings) =>
     buildings.filter((_, i) => i !== index),
   );
   return editBase(next, id, {

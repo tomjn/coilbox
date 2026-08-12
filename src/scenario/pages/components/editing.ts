@@ -15,7 +15,7 @@
  */
 
 import type { SnapBuilding } from "@/blueprint/footprint";
-import type { BaseBlueprint, BlueprintBuilding } from "@/blueprint/model";
+import type { BlueprintBuilding } from "@/blueprint/model";
 import type {
   ActorState,
   Facing,
@@ -24,7 +24,7 @@ import type {
   ScenarioActor,
   ScenarioGroup,
 } from "../../model";
-import { removeBuilding } from "./bases";
+import { editBaseLayout, type LayoutEdit, removeBuilding } from "./bases";
 import type { Placement } from "./placements";
 
 /** How far a pointer may travel between press and release and still count as a
@@ -213,29 +213,23 @@ function edit<T extends { id: string }>(
  *
  * Where a building stands and which way it faces are the layout, not the
  * placement, so this is the half of a base that a saved blueprint carries and
- * that another mission placing the same one would get.
+ * that another mission placing the same one would get. Which is why it goes
+ * through {@link editBaseLayout}: a base sharing its layout with another gets a
+ * copy of its own rather than dragging the other base's building with it.
  */
 function editBaseBuilding(
   scenario: Scenario,
   ref: PlacementRef,
+  how: LayoutEdit,
   update: (building: BlueprintBuilding) => BlueprintBuilding,
 ): Scenario {
-  const base = scenario.bases.find((entry) => entry.id === ref.id);
-  if (!base) return scenario;
-  const blueprints = edit<BaseBlueprint>(
-    scenario.blueprints,
-    base.blueprint,
-    (blueprint) => {
-      const building = blueprint.buildings[ref.index];
-      if (!building) return blueprint;
-      const buildings = blueprint.buildings.slice();
-      buildings[ref.index] = update(building);
-      return { ...blueprint, buildings };
-    },
-  );
-  return blueprints === scenario.blueprints
-    ? scenario
-    : { ...scenario, blueprints };
+  return editBaseLayout(scenario, ref.id, how, (buildings) => {
+    const building = buildings[ref.index];
+    if (!building) return null;
+    const next = buildings.slice();
+    next[ref.index] = update(building);
+    return next;
+  });
 }
 
 /**
@@ -254,6 +248,7 @@ export function movePlacement(
   key: string,
   delta: Point,
   snap?: SnapBuilding,
+  how: LayoutEdit = "own",
 ): Scenario {
   const ref = parsePlacementKey(key);
   if (!ref) return scenario;
@@ -278,7 +273,7 @@ export function movePlacement(
 
   const origin = scenario.bases.find((entry) => entry.id === ref.id)?.origin;
   if (!origin) return scenario;
-  return editBaseBuilding(scenario, ref, (building) => {
+  return editBaseBuilding(scenario, ref, how, (building) => {
     const moved = shift({
       x: origin.x + building.offset.x,
       z: origin.z + building.offset.z,
@@ -319,6 +314,7 @@ export function turnPlacement(
   key: string,
   steps = 1,
   snap?: SnapBuilding,
+  how: LayoutEdit = "own",
 ): Scenario {
   const ref = parsePlacementKey(key);
   if (!ref) return scenario;
@@ -334,7 +330,7 @@ export function turnPlacement(
   if (ref.kind === "base") {
     const origin = scenario.bases.find((entry) => entry.id === ref.id)?.origin;
     if (!origin) return scenario;
-    return editBaseBuilding(scenario, ref, (building) => {
+    return editBaseBuilding(scenario, ref, how, (building) => {
       const facing = turnFacing(building.facing, steps);
       if (!snap) return { ...building, facing };
       const at = snap(
@@ -361,7 +357,11 @@ export function turnPlacement(
  * A base's building goes, and the base goes with its last building, because an
  * empty cluster is not a thing an author can see or select again.
  */
-export function removePlacement(scenario: Scenario, key: string): Scenario {
+export function removePlacement(
+  scenario: Scenario,
+  key: string,
+  how: LayoutEdit = "own",
+): Scenario {
   const ref = parsePlacementKey(key);
   if (!ref) return scenario;
 
@@ -385,7 +385,7 @@ export function removePlacement(scenario: Scenario, key: string): Scenario {
     return groups === scenario.groups ? scenario : { ...scenario, groups };
   }
 
-  return removeBuilding(scenario, ref.id, ref.index);
+  return removeBuilding(scenario, ref.id, ref.index, how);
 }
 
 /**

@@ -365,6 +365,73 @@ describe("removePlacement", () => {
   });
 });
 
+describe("dragging a building of a base that shares its layout", () => {
+  /** The document's one layout placed twice. */
+  function shared(): Scenario {
+    const doc = document();
+    return {
+      ...doc,
+      bases: [
+        ...doc.bases,
+        {
+          id: "b2",
+          blueprint: "bp1",
+          team: "p0",
+          origin: { x: 5000, z: 5000 },
+          buildings: [],
+        },
+      ],
+    };
+  }
+
+  const layoutOf = (scenario: Scenario, id: string) =>
+    scenario.blueprints.find(
+      (b) => b.id === scenario.bases.find((p) => p.id === id)?.blueprint,
+    );
+
+  it("moves the building in a copy, leaving the other base where it stood", () => {
+    const next = movePlacement(shared(), "base:b1#1", { x: 0, z: 64 });
+    expect(next.blueprints).toHaveLength(2);
+    expect(layoutOf(next, "b1")?.buildings[1].offset).toEqual({ x: 64, z: 64 });
+    expect(layoutOf(next, "b2")?.buildings[1].offset).toEqual({ x: 64, z: 0 });
+  });
+
+  it("moves it in both when the author asked to edit the shared layout", () => {
+    const next = movePlacement(
+      shared(),
+      "base:b1#1",
+      { x: 0, z: 64 },
+      undefined,
+      "shared",
+    );
+    expect(next.blueprints).toHaveLength(1);
+    expect(layoutOf(next, "b2")?.buildings[1].offset).toEqual({ x: 64, z: 64 });
+  });
+
+  it("turns a building in a copy", () => {
+    const next = turnPlacement(shared(), "base:b1#1");
+    expect(layoutOf(next, "b1")?.buildings[1].facing).toBe(2);
+    expect(layoutOf(next, "b2")?.buildings[1].facing).toBe(1);
+  });
+
+  it("deletes a building from a copy", () => {
+    const next = removePlacement(shared(), "base:b1#0");
+    expect(layoutOf(next, "b1")?.buildings.map((b) => b.def)).toEqual([
+      "armllt",
+    ]);
+    expect(layoutOf(next, "b2")?.buildings.map((b) => b.def)).toEqual([
+      "armsolar",
+      "armllt",
+    ]);
+  });
+
+  it("hands the same document back when the key names no building", () => {
+    const before = shared();
+    expect(movePlacement(before, "base:b1#7", { x: 1, z: 1 })).toBe(before);
+    expect(before.blueprints).toHaveLength(1);
+  });
+});
+
 describe("addActor", () => {
   it("appends a rounded actor without touching the rest", () => {
     const before = document();
