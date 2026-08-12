@@ -35,6 +35,11 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-config-backup`
 - `allow-content-config-restore`
 - `allow-content-config-delete-profile`
+- `allow-content-keybinds-read`
+- `allow-content-keybinds-write`
+- `allow-content-keymaps`
+- `allow-content-keymap-save`
+- `allow-content-keymap-delete`
 - `allow-content-warm-rapid-pool`
 - `allow-content-prune-rapid-pool`
 - `allow-content-reclaim-caches`
@@ -43,6 +48,7 @@ Allows the content plugin's commands (detect candidates, load/rescan state, scan
 - `allow-content-export-build-tree-html`
 - `allow-content-export-build-tree-zip`
 - `allow-content-export-challenge`
+- `allow-content-export-keymap`
 - `allow-content-import-challenge`
 - `allow-content-import-container`
 - `allow-branding-catalog`
@@ -554,6 +560,32 @@ Denies the content_export_challenge command without any pre-configured scope.
 <tr>
 <td>
 
+`coilbox-content:allow-content-export-keymap`
+
+</td>
+<td>
+
+Enables the content_export_keymap command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-export-keymap`
+
+</td>
+<td>
+
+Denies the content_export_keymap command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `coilbox-content:allow-content-gather-replays`
 
 </td>
@@ -625,6 +657,136 @@ Enables the content_import_container command without any pre-configured scope.
 <td>
 
 Denies the content_import_container command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-keybinds-read`
+
+</td>
+<td>
+
+Enables the content_keybinds_read command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-keybinds-read`
+
+</td>
+<td>
+
+Denies the content_keybinds_read command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-keybinds-write`
+
+</td>
+<td>
+
+Enables the content_keybinds_write command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-keybinds-write`
+
+</td>
+<td>
+
+Denies the content_keybinds_write command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-keymap-delete`
+
+</td>
+<td>
+
+Enables the content_keymap_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-keymap-delete`
+
+</td>
+<td>
+
+Denies the content_keymap_delete command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-keymap-save`
+
+</td>
+<td>
+
+Enables the content_keymap_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-keymap-save`
+
+</td>
+<td>
+
+Denies the content_keymap_save command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:allow-content-keymaps`
+
+</td>
+<td>
+
+Enables the content_keymaps command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`coilbox-content:deny-content-keymaps`
+
+</td>
+<td>
+
+Denies the content_keymaps command without any pre-configured scope.
 
 </td>
 </tr>
