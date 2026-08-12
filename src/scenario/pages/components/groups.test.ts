@@ -375,7 +375,7 @@ describe("names", () => {
 
     it("offers a named one and leaves an unnamed one out", () => {
       expect(buildingTargets(withBase())).toEqual([
-        { id: "b1", label: "Base 1's corlab", def: "corlab" },
+        { id: "b1", label: "The keep's corlab", def: "corlab" },
       ]);
     });
 
@@ -396,7 +396,29 @@ describe("names", () => {
             { ...scenario.bases[0], buildings: [{ id: "b1" }, { id: "b2" }] },
           ],
         }).map((b) => b.label),
-      ).toEqual(["Base 1's corlab 1", "Base 1's corlab 2"]);
+      ).toEqual(["The keep's corlab 1", "The keep's corlab 2"]);
+    });
+
+    /**
+     * Issue #1423. Two bases placed from the same layout used to both read
+     * "Base 1" and "Base 2" by position, which told them apart by an
+     * implementation detail nobody chose. They now read by the layout's own
+     * name, numbered only because the name alone would be ambiguous.
+     */
+    it("numbers two bases placed from the same layout apart", () => {
+      const scenario = withBase();
+      expect(
+        buildingTargets({
+          blueprints: scenario.blueprints,
+          bases: [
+            scenario.bases[0],
+            { ...scenario.bases[0], id: "pf2", buildings: [{ id: "b2" }] },
+          ],
+        }),
+      ).toEqual([
+        { id: "b1", label: "The keep 1's corlab", def: "corlab" },
+        { id: "b2", label: "The keep 2's corlab", def: "corlab" },
+      ]);
     });
 
     it("puts them in the order picker between the actors and the groups", () => {
@@ -407,7 +429,7 @@ describe("names", () => {
         "b1",
         "g1",
       ]);
-      expect(targetLabel(withBase(), "b1")).toBe("Base 1's corlab");
+      expect(targetLabel(withBase(), "b1")).toBe("The keep's corlab");
     });
   });
 });

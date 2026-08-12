@@ -341,7 +341,7 @@ describe("registryOptions", () => {
 
     expect(registryOptions(scenario, "actorId")).toEqual([
       { value: "a1", label: "armcom", description: "armcom" },
-      { value: "b1", label: "Base 1's corlab", description: "corlab" },
+      { value: "b1", label: "The keep's corlab", description: "corlab" },
     ]);
   });
 });

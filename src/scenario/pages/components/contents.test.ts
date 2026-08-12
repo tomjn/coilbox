@@ -98,9 +98,25 @@ describe("sceneContents", () => {
     expect(out.map((entry) => entry.label)).toEqual([
       "armcom",
       "Group 1",
-      "Base 1",
+      "The keep",
       "Landing site",
       "The pad",
+    ]);
+  });
+
+  it("numbers two bases placed from the same layout", () => {
+    const shared = placedBase("p1");
+    const out = sceneContents({
+      ...empty,
+      blueprints: shared.blueprints,
+      bases: [
+        shared.bases[0],
+        { ...shared.bases[0], id: "p2" },
+      ],
+    });
+    expect(out.map((entry) => entry.label)).toEqual([
+      "The keep 1",
+      "The keep 2",
     ]);
   });
 

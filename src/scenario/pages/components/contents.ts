@@ -19,7 +19,7 @@ import {
   type Scenario,
 } from "../../model";
 import { parsePlacementKey } from "./editing";
-import { groupSize, parsePathKey, uniqueLabels } from "./groups";
+import { baseLabels, groupSize, parsePathKey, uniqueLabels } from "./groups";
 import { GROUP_SPACING, placementKey } from "./placements";
 import { parseZoneKey, zoneCenter, zoneExtent, zoneKey } from "./zones";
 
@@ -83,9 +83,10 @@ function baseSpan(buildings: PlacedBuilding[]): number {
  * actors, then groups, then bases, then zones.
  *
  * An actor goes by its display name when it has one, the way every other picker
- * in the editor offers one, and a group and a base by their place in the
- * document, which is the only thing telling two of the same apart. A zone goes
- * by the name it was given, which is what a trigger names it by.
+ * in the editor offers one, and a group by its place in the document, which is
+ * the only thing telling two of the same apart. A base goes by the layout it
+ * places (issue #1423), numbered only when two bases place the same one. A
+ * zone goes by the name it was given, which is what a trigger names it by.
  *
  * Zones are here for a reason of their own. A click picks whichever zone's sheet
  * the ray reaches first, which is decided by how the sheets drape, so a zone
@@ -121,13 +122,14 @@ export function sceneContents(
     span: groupSpan(group),
     team: group.team,
   }));
+  const baseNames = baseLabels(scenario.blueprints, scenario.bases);
   const bases = scenario.bases.map<ContentEntry>((base, i) => {
     const buildings = baseBuildings(scenario.blueprints, base);
     return {
       key: placementKey("base", base.id, 0),
       kind: "base",
       id: base.id,
-      label: `Base ${i + 1}`,
+      label: baseNames[i],
       detail: `${buildings.length} building${buildings.length === 1 ? "" : "s"}`,
       pos: base.origin,
       span: baseSpan(buildings),
