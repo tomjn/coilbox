@@ -518,9 +518,16 @@ function parseBlueprint(b: Record<string, unknown>): BaseBlueprint | null {
   const bid = id(b.id);
   const buildings = parseLayout(b.buildings);
   if (bid === undefined || !buildings) return null;
-  // Left as it is read, blank and all. What a nameless layout is called is
-  // decided across the whole list, in {@link namedBlueprints}.
-  return { id: bid, name: str(b.name)?.trim() ?? "", buildings };
+  return {
+    id: bid,
+    // Left as it is read, blank and all. What a nameless layout is called is
+    // decided across the whole list, in {@link namedBlueprints}.
+    name: str(b.name)?.trim() ?? "",
+    // Only ever true or absent: a layout is a build order or it is a layout,
+    // and "false" is the same thing as saying nothing (issue #1418).
+    ordered: b.ordered === true ? true : undefined,
+    buildings,
+  };
 }
 
 /**
