@@ -66,6 +66,18 @@ local function speed_of(d)
   return tonumber(d.speed) or tonumber(d.maxvelocity) or tonumber(d.maxVelocity) or 0
 end
 
+-- How much ground a unit stands on, in build squares. The def scripts lowercase
+-- their keys, but the field is spelled `footprintX` in a unitdef, so both are
+-- tried. The engine takes max(1, floor(n)), so a missing or nonsense value is a
+-- single square rather than a building of no size.
+local function footprint(d, lower, upper)
+  if type(d) ~= 'table' then return 1 end
+  local n = tonumber(d[lower]) or tonumber(d[upper]) or 1
+  n = math.floor(n)
+  if n < 1 then n = 1 end
+  return n
+end
+
 local lines = {}
 for _, k in ipairs(names) do
   local d = ud[k]
@@ -85,6 +97,8 @@ for _, k in ipairs(names) do
   obj = tostring(obj):gsub('[\t\r\n]', ' ')
   lines[#lines + 1] = string.lower(tostring(k)) .. '\t' .. full .. '\t'
     .. table.concat(opts, ',') .. '\t' .. mobile .. '\t' .. obj
+    .. '\t' .. footprint(d, 'footprintx', 'footprintX')
+    .. '\t' .. footprint(d, 'footprintz', 'footprintZ')
 end
 -- A big game's list runs to hundreds of kilobytes, far past what unitsync can
 -- hand back in one string, so it goes back in pieces.
@@ -194,6 +208,16 @@ fn units_via_shim(us: &Unitsync) -> Result<Vec<UnitDatasetEntry>, String> {
         .map(|raw| parse_dataset_units(&raw))
 }
 
+/// One footprint field, in build squares. Anything missing, unreadable or below
+/// a square is a single square, which is the floor the engine itself applies, so
+/// a line written before the fields existed still describes a real building.
+fn parse_footprint(field: Option<&str>) -> u32 {
+    field
+        .and_then(|s| s.trim().parse::<u32>().ok())
+        .filter(|&n| n >= 1)
+        .unwrap_or(1)
+}
+
 /// Parse the `name\tfullname\topt1,opt2,...` lines [`UNIT_DATASET_SHIM_SCRIPT`]
 /// returns into `UnitDatasetEntry`s. A full name equal to the internal name (the
 /// script's fallback) or missing collapses to `None`; an empty options field
@@ -210,6 +234,8 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
             let opts = it.next().unwrap_or("");
             let mobile = it.next().unwrap_or("") == "1";
             let object_name = it.next().unwrap_or("").trim();
+            let footprint_x = parse_footprint(it.next());
+            let footprint_z = parse_footprint(it.next());
             let build_options = opts
                 .split(',')
                 .map(str::trim)
@@ -222,6 +248,8 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
                 build_options,
                 mobile,
                 object_name: Some(object_name.to_string()).filter(|s| !s.is_empty()),
+                footprint_x,
+                footprint_z,
             })
         })
         .collect()
@@ -265,6 +293,32 @@ mod tests {
     }
 
     #[test]
+    fn reads_a_rectangular_footprint() {
+        let units = parse_dataset_units("armlab\tLab\t\t0\tARMLAB\t5\t6");
+        assert_eq!(units[0].footprint_x, 5);
+        assert_eq!(units[0].footprint_z, 6);
+    }
+
+    #[test]
+    fn missing_footprint_fields_default_to_one_square() {
+        // Older lines stop after the model name. The engine floors a footprint at
+        // one square, so that is what a line with nothing to say parses as, not a
+        // building of no size.
+        let units = parse_dataset_units("armsolar\tSolar\t\t0\tARMSOLAR");
+        assert_eq!(units[0].footprint_x, 1);
+        assert_eq!(units[0].footprint_z, 1);
+    }
+
+    #[test]
+    fn a_footprint_of_nothing_is_one_square() {
+        // The engine takes max(1, footprintX), so a def declaring 0 stands on a
+        // square all the same.
+        let units = parse_dataset_units("odd\tOdd\t\t0\t\t0\tx");
+        assert_eq!(units[0].footprint_x, 1);
+        assert_eq!(units[0].footprint_z, 1);
+    }
+
+    #[test]
     fn shim_script_reads_buildoptions_and_returns_result() {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("VFS.Include"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("buildoptions"));
@@ -272,6 +326,8 @@ mod tests {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("mapName = ''"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("speed_of"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("objectname"));
+        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("footprintx"));
+        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("footprintz"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("return __cb_chunk("));
     }
 }

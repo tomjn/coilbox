@@ -108,6 +108,8 @@ The format keeps a base in two halves. The **blueprint** is the layout: which bu
 
 Each building carries its own facing. A factory also carries the **Queue** it starts with and whether it builds that queue **over and over**. The picker is limited to the game's static units, because a mobile unit inside a base would be placed off the build grid.
 
+The square drawn under each building is the ground it really stands on, taken from the game's own `footprintx` and `footprintz`. Placing, dragging and turning one puts it on the build grid, which is where the engine will build it and nowhere else, and moving a whole base goes in whole build squares so the layout survives the move. Turning matters because the sides swap on an east or west facing, so a rectangle takes a different part of the grid once it is on its side. Two buildings wanting the same ground both turn red and the base's **buildings** popover names them, because the engine will build one of them and refuse the rest.
+
 Every building you place can be named by a trigger, the same way an actor can. It appears in the actor picker as "Base 1's corlab", so "when the keep's factory dies" is a **unit dead** condition on that building. A scenario that names one needs mission runtime 2, which is what stops a game with an older runtime playing it with that trigger dead.
 
 ### Zones

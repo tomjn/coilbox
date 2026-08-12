@@ -24,6 +24,7 @@ import {
 } from "react";
 import { Link } from "react-router";
 import * as THREE from "three";
+import { buildGridSnap } from "@/blueprint/footprint";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import {
   Popover,
@@ -81,7 +82,12 @@ import {
   removePathWaypoint,
   scenarioPaths,
 } from "./orderPaths";
-import { type Placement, placementKey } from "./placements";
+import {
+  baseFootprints,
+  overlappingIn,
+  type Placement,
+  placementKey,
+} from "./placements";
 import {
   authoringCamera,
   clampToPlane,
@@ -93,6 +99,7 @@ import {
 import { startMarkers } from "./startPositions";
 import { useGameUnits } from "./useGameUnits";
 import { useMapEditing } from "./useMapEditing";
+import { useScenarioFootprints } from "./useScenarioFootprints";
 import { useScenarioPaths } from "./useScenarioPaths";
 import { useScenarioStarts } from "./useScenarioStarts";
 import { type ScenarioUnitsState, useScenarioUnits } from "./useScenarioUnits";
@@ -350,6 +357,20 @@ export function ScenarioMapScene({
         }
       : (picking?.onPick ?? behaviour.place);
 
+  // The game's own units, for the panels that pick one and for the build grid
+  // every base building is dragged and turned onto.
+  const gameUnits = useGameUnits(scenario.setup.gameName);
+  const snap = useMemo(() => buildGridSnap(gameUnits.units), [gameUnits.units]);
+
+  // The ground each of those buildings stands on, and which of them are fighting
+  // over it. Drawn for the whole document rather than for the selected base, so
+  // a layout that cannot be built says so without being clicked on first.
+  const footprints = useMemo(
+    () => baseFootprints(units.placements, gameUnits.units),
+    [units.placements, gameUnits.units],
+  );
+  useScenarioFootprints(handle, footprints, assets, units.groundAt);
+
   useMapEditing({
     handle,
     layer: units.layer,
@@ -372,7 +393,7 @@ export function ScenarioMapScene({
         return onChange((doc) => moveZone(doc, key, delta));
       if (parsePathKey(key))
         return onChange((doc) => movePathWaypoint(doc, key, delta));
-      onChange((doc) => movePlacement(doc, key, delta));
+      onChange((doc) => movePlacement(doc, key, delta, snap));
     },
   });
 
@@ -386,7 +407,6 @@ export function ScenarioMapScene({
     (picked?.kind === "base" &&
       scenario.bases.find((b) => b.id === picked.id)) ||
     null;
-  const gameUnits = useGameUnits(scenario.setup.gameName);
 
   /**
    * A group's own controls, wherever the group was reached from.
@@ -646,7 +666,9 @@ export function ScenarioMapScene({
         {picked && (
           <SelectionBar
             placement={picked}
-            onTurn={() => onChange((doc) => turnPlacement(doc, picked.key))}
+            onTurn={() =>
+              onChange((doc) => turnPlacement(doc, picked.key, 1, snap))
+            }
             onDelete={() => {
               onChange((doc) => removePlacement(doc, picked.key));
               setSelected(null);
@@ -672,6 +694,11 @@ export function ScenarioMapScene({
                 base={pickedBase}
                 buildings={baseBuildings(scenario.blueprints, pickedBase)}
                 index={picked.index}
+                overlaps={overlappingIn(
+                  units.placements,
+                  footprints,
+                  pickedBase.id,
+                )}
                 participants={scenario.setup.participants}
                 units={gameUnits.units}
                 unitsLoading={gameUnits.loading}

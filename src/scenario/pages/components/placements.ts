@@ -12,6 +12,11 @@
  * `unitsLayer.ts`.
  */
 
+import {
+  buildingFootprints,
+  type FootprintMark,
+  footprintMarks,
+} from "@/blueprint/footprint";
 import type { Participant, Rgb } from "@/play/config";
 import {
   baseBuildings,
@@ -149,6 +154,45 @@ export function scenarioPlacements(
   }
 
   return out;
+}
+
+/**
+ * The ground every building in the document stands on, and which of them are
+ * fighting over it.
+ *
+ * Only a base's buildings: an actor or a group's units are mobile, they are not
+ * put through the engine's build grid, and two of them standing on the same spot
+ * walk apart the moment the game starts. A building that cannot be built is a
+ * different thing entirely, which is why only these are checked.
+ */
+export function baseFootprints(
+  placements: Placement[],
+  units: { name: string; footprintX?: number; footprintZ?: number }[],
+): FootprintMark[] {
+  return footprintMarks(
+    placements.filter((placement) => placement.kind === "base"),
+    buildingFootprints(units),
+  );
+}
+
+/** Which of one base's buildings want ground another building is standing on,
+ *  by their place in the base, so a panel can name them. */
+export function overlappingIn(
+  placements: Placement[],
+  marks: FootprintMark[],
+  baseId: string,
+): number[] {
+  const fighting = new Set(
+    marks.filter((mark) => mark.overlapping).map((mark) => mark.key),
+  );
+  return placements
+    .filter(
+      (placement) =>
+        placement.kind === "base" &&
+        placement.id === baseId &&
+        fighting.has(placement.key),
+    )
+    .map((placement) => placement.index);
 }
 
 /**

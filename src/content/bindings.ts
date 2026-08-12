@@ -1081,6 +1081,14 @@ export interface UnitDatasetEntry {
    * so it may be any case and usually carries no extension.
    */
   objectName?: string;
+  /**
+   * The unitdef's `footprintx` and `footprintz`: how much ground the unit stands
+   * on, in build squares of 16 elmos. Absent from a dataset read by a worker
+   * that did not report them, and read as one square when it is, which is the
+   * floor the engine applies.
+   */
+  footprintX?: number;
+  footprintZ?: number;
 }
 
 export interface UnitDatasetResult {

@@ -14,6 +14,7 @@
  * leaves the rest of the base where it is.
  */
 
+import type { SnapBuilding } from "@/blueprint/footprint";
 import type { BaseBlueprint, BlueprintBuilding } from "@/blueprint/model";
 import type {
   ActorState,
@@ -242,11 +243,17 @@ function editBaseBuilding(
  *
  * The same document back when the key names nothing, so a caller can compare
  * identities to decide whether there is anything to save.
+ *
+ * A base's building is put on the build grid on the way down, because that is
+ * where the engine will stand it and a layout drawn anywhere else is a layout
+ * that cannot be built. Without a `snap` it lands where it was dropped, which is
+ * what happens while the game's units are still being read.
  */
 export function movePlacement(
   scenario: Scenario,
   key: string,
   delta: Point,
+  snap?: SnapBuilding,
 ): Scenario {
   const ref = parsePlacementKey(key);
   if (!ref) return scenario;
@@ -269,10 +276,19 @@ export function movePlacement(
     return groups === scenario.groups ? scenario : { ...scenario, groups };
   }
 
-  return editBaseBuilding(scenario, ref, (building) => ({
-    ...building,
-    offset: shift(building.offset),
-  }));
+  const origin = scenario.bases.find((entry) => entry.id === ref.id)?.origin;
+  if (!origin) return scenario;
+  return editBaseBuilding(scenario, ref, (building) => {
+    const moved = shift({
+      x: origin.x + building.offset.x,
+      z: origin.z + building.offset.z,
+    });
+    const at = snap ? snap(moved, building.def, building.facing) : moved;
+    return {
+      ...building,
+      offset: round({ x: at.x - origin.x, z: at.z - origin.z }),
+    };
+  });
 }
 
 /** Whether the thing a key names has a facing to turn. A group's units are
@@ -289,12 +305,20 @@ export function turnFacing(facing: Facing, steps: number): Facing {
   return turned as Facing;
 }
 
-/** The document with the thing this key names turned, or the same document when
- *  it has no facing. */
+/**
+ * The document with the thing this key names turned, or the same document when
+ * it has no facing.
+ *
+ * Turning a building moves it. A footprint's sides swap on an odd facing, so a
+ * rectangle that centred in the middle of a build square on one axis centres on
+ * the corner between four of them once it is on its side. Given a `snap` the
+ * turned building is put where the engine will now stand it.
+ */
 export function turnPlacement(
   scenario: Scenario,
   key: string,
   steps = 1,
+  snap?: SnapBuilding,
 ): Scenario {
   const ref = parsePlacementKey(key);
   if (!ref) return scenario;
@@ -308,10 +332,22 @@ export function turnPlacement(
   }
 
   if (ref.kind === "base") {
-    return editBaseBuilding(scenario, ref, (building) => ({
-      ...building,
-      facing: turnFacing(building.facing, steps),
-    }));
+    const origin = scenario.bases.find((entry) => entry.id === ref.id)?.origin;
+    if (!origin) return scenario;
+    return editBaseBuilding(scenario, ref, (building) => {
+      const facing = turnFacing(building.facing, steps);
+      if (!snap) return { ...building, facing };
+      const at = snap(
+        { x: origin.x + building.offset.x, z: origin.z + building.offset.z },
+        building.def,
+        facing,
+      );
+      return {
+        ...building,
+        facing,
+        offset: round({ x: at.x - origin.x, z: at.z - origin.z }),
+      };
+    });
   }
 
   return scenario;
