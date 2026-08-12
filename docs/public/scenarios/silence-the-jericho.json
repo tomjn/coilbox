@@ -2,10 +2,10 @@
   "format": "coilbox",
   "container": 1,
   "kind": "scenario",
-  "kindVersion": 1,
+  "kindVersion": 2,
   "payload": {
     "scenario": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "id": "98794cb1-b697-4b7e-a739-f565a5008b85",
       "name": "Silence the Jericho",
       "description": "A Federation of Kala strike team lands light, scouts the ridge and destroys the Loz Jericho battery shelling the Kala line.",
@@ -225,14 +225,10 @@
           "dormant": true
         }
       ],
-      "prefabs": [
+      "blueprints": [
         {
-          "id": "4f1ab454-06d3-4c98-b63c-7f578ccf241e",
-          "team": "p3",
-          "origin": {
-            "x": 4820,
-            "z": 1303
-          },
+          "id": "jericho-outpost",
+          "name": "Jericho outpost",
           "buildings": [
             {
               "def": "f2landfac",
@@ -240,8 +236,7 @@
                 "x": 0,
                 "z": 0
               },
-              "facing": 0,
-              "queue": ["lozroach", "lozscorpion"]
+              "facing": 0
             },
             {
               "def": "fusionpowerplant",
@@ -274,6 +269,22 @@
                 "z": 346
               },
               "facing": 0
+            }
+          ]
+        }
+      ],
+      "bases": [
+        {
+          "id": "4f1ab454-06d3-4c98-b63c-7f578ccf241e",
+          "blueprint": "jericho-outpost",
+          "team": "p3",
+          "origin": {
+            "x": 4820,
+            "z": 1303
+          },
+          "buildings": [
+            {
+              "queue": ["lozroach", "lozscorpion"]
             }
           ]
         }

@@ -23,7 +23,7 @@ import { teamColor } from "./placements";
 const ICONS: Record<ContentKind, LucideIcon> = {
   actor: User,
   group: Users,
-  prefab: Factory,
+  base: Factory,
   zone: Square,
 };
 

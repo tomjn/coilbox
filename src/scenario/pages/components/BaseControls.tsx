@@ -36,18 +36,19 @@ import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import type { Participant } from "@/play/config";
-import type { ScenarioPrefab } from "../../model";
+import type { PlacedBuilding, ScenarioBase } from "../../model";
 import {
   buildableBy,
   movedQueued,
   plusQueued,
   strayDefs,
   withoutQueued,
-} from "./prefabs";
+} from "./bases";
 import { TeamSelect } from "./TeamSelect";
 
-export function PrefabControls({
-  prefab,
+export function BaseControls({
+  base,
+  buildings,
   index,
   participants,
   units,
@@ -58,7 +59,10 @@ export function PrefabControls({
   onMove,
   onDelete,
 }: {
-  prefab: ScenarioPrefab;
+  base: ScenarioBase;
+  /** The base's buildings, its blueprint's layout and its own per-building
+   *  fields read together. */
+  buildings: PlacedBuilding[];
   /** Which of the base's buildings is selected. */
   index: number;
   participants: Participant[];
@@ -67,8 +71,8 @@ export function PrefabControls({
   unitsLoading: boolean;
   /** Whether the map is waiting for a click to move the base. */
   moving: boolean;
-  /** Change the base's own fields, as {@link editPrefab} takes them. */
-  onEdit: (patch: Partial<Pick<ScenarioPrefab, "team">>) => void;
+  /** Change the base's own fields, as {@link editBase} takes them. */
+  onEdit: (patch: Partial<Pick<ScenarioBase, "team">>) => void;
   /** Replace the selected building's queue and its repeat flag. */
   onQueue: (queue: string[], repeat: boolean) => void;
   /** Ask the map for a point to put the base's origin on, or stop asking. */
@@ -77,19 +81,19 @@ export function PrefabControls({
   onDelete: () => void;
 }) {
   // The selection is one of the base's buildings, so this is always one of them.
-  const building = prefab.buildings[index];
+  const building = buildings[index];
   const queue = building.queue ?? [];
   const repeat = building.repeat === true;
   // Null while the dataset is unread and for a def the game has not got, which
   // is why the picker below falls back to every unit rather than to nothing.
   const buildable = buildableBy(units, building.def);
-  const strays = strayDefs(units, prefab.buildings);
+  const strays = strayDefs(units, buildings);
 
   return (
     <>
       <TeamSelect
         participants={participants}
-        value={prefab.team}
+        value={base.team}
         onValueChange={(team) => onEdit({ team })}
         className="w-32"
       />
@@ -191,11 +195,11 @@ export function PrefabControls({
               />
 
               <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
-                <Label htmlFor="prefab-repeat" className="text-xs font-medium">
+                <Label htmlFor="base-repeat" className="text-xs font-medium">
                   Build the queue over and over
                 </Label>
                 <Switch
-                  id="prefab-repeat"
+                  id="base-repeat"
                   checked={repeat}
                   disabled={queue.length === 0}
                   onCheckedChange={(on) => onQueue(queue, on)}
@@ -213,8 +217,8 @@ export function PrefabControls({
             variant={moving ? "default" : "ghost"}
             className="h-7 gap-1.5 px-2 text-xs"
           >
-            <Blocks className="size-3.5" /> {prefab.buildings.length} building
-            {prefab.buildings.length === 1 ? "" : "s"}
+            <Blocks className="size-3.5" /> {buildings.length} building
+            {buildings.length === 1 ? "" : "s"}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 space-y-3">

@@ -1,3 +1,4 @@
+import type { BaseBlueprint, BlueprintBuilding } from "../blueprint/model";
 import type { SkirmishDraft } from "../play/drafts";
 import {
   ACTION_TYPES,
@@ -25,8 +26,26 @@ import {
  * editor, and only playing it demands that every reference resolve.
  */
 
-/** The document schema version this build writes. */
-export const SCENARIO_SCHEMA_VERSION = 1;
+/**
+ * The document schema version this build writes. Version 2 split a prefab into a
+ * reusable {@link BaseBlueprint} and a {@link ScenarioBase} placement referencing
+ * it (issue #1310). {@link parseScenario} still reads a version 1 document.
+ */
+export const SCENARIO_SCHEMA_VERSION = 2;
+
+/**
+ * The schema version a compiled `mission.lua` declares, which the runtime a game
+ * vendored refuses to run above.
+ *
+ * Deliberately not {@link SCENARIO_SCHEMA_VERSION}. It used to be the same
+ * number because the compiled mission mirrored the document, but the two answer
+ * different questions: this one is the shape the runtime reads, and the split
+ * that moved the document to version 2 is resolved back into the old shape by
+ * `compileScenario` rather than changing it. Raising this would make every
+ * already-vendored runtime refuse every mission coilbox compiles, for a wire
+ * format that has not moved.
+ */
+export const MISSION_SCHEMA_VERSION = 1;
 
 /** The runtime version every launch-set feature needs. */
 export const SCENARIO_RUNTIME_VERSION = 1;
@@ -102,8 +121,15 @@ export type ScenarioGroup = {
   dormant: boolean;
 };
 
-/** One building in a prefab, placed relative to the prefab's origin. */
-export type PrefabBuilding = {
+/**
+ * What a mission adds to one building of a placed blueprint (issue #1310).
+ *
+ * Every field here is meaningless outside a mission, which is why none of them
+ * are on the blueprint: a layout somebody built in a live game has no triggers
+ * to answer to, and a layout posted for other people to use carries no queue
+ * anybody else would want.
+ */
+export type BaseBuildingRole = {
   /**
    * The name triggers know this building by, in the same space as `actors`. A
    * building with one is addressable exactly as an actor is, so "when the keep's
@@ -112,23 +138,43 @@ export type PrefabBuilding = {
    * points at it.
    */
   id?: string;
-  def: string;
-  offset: Point;
-  facing: Facing;
   /** Factory build queue, as unit def names. */
   queue?: string[];
   /** Loop the queue rather than building it once. */
   repeat?: boolean;
 };
 
-/** A pre-built base: several buildings placed as one movable cluster. */
-export type ScenarioPrefab = {
+/**
+ * A blueprint put down on a mission's map: whose it is, where it stands, and
+ * what each of its buildings is for.
+ *
+ * The layout itself is not here. It is the `blueprints` entry this names, so the
+ * same layout placed twice is one description of the geometry and two
+ * placements, and so a base built for a mission can be lifted straight back out
+ * as something usable anywhere.
+ */
+export type ScenarioBase = {
   id: string;
+  /** A `blueprints` id. */
+  blueprint: string;
   /** A `setup.participants` id. */
   team: string;
   origin: Point;
-  buildings: PrefabBuilding[];
+  /**
+   * The mission-only fields, one entry per blueprint building, in the same
+   * order. A building the mission adds nothing to has an empty entry rather than
+   * a hole, and the list may stop short of the blueprint's, which is what a
+   * blueprint dropped in from outside looks like before anything is added to it.
+   */
+  buildings: BaseBuildingRole[];
 };
+
+/**
+ * One building of a placed base, its blueprint geometry and its mission role
+ * read together. What every reader of a base actually wants, and the shape the
+ * compiled mission carries.
+ */
+export type PlacedBuilding = BlueprintBuilding & BaseBuildingRole;
 
 /**
  * What the player may build and do. Distinct from `setup.restrictions`, which is
@@ -237,7 +283,7 @@ export type ScenarioTrigger = {
 };
 
 export interface Scenario {
-  schemaVersion: 1;
+  schemaVersion: 2;
   id: string;
   name: string;
   description: string;
@@ -255,7 +301,9 @@ export interface Scenario {
   zones: ScenarioZone[];
   actors: ScenarioActor[];
   groups: ScenarioGroup[];
-  prefabs: ScenarioPrefab[];
+  /** The layouts this document's bases are placed from. */
+  blueprints: BaseBlueprint[];
+  bases: ScenarioBase[];
   restrictions: ScenarioRestrictions;
   /** Mission variables, keyed by name. Numbers only, so `add_var` can do sums. */
   vars: Record<string, number>;
@@ -453,37 +501,157 @@ function parseGroup(g: Record<string, unknown>): ScenarioGroup | null {
   return { id: gid, team, units, pos, orders, dormant: g.dormant === true };
 }
 
-function parseBuildings(value: unknown): PrefabBuilding[] | null {
+function parseLayout(value: unknown): BlueprintBuilding[] | null {
   if (!Array.isArray(value)) return null;
-  const out: PrefabBuilding[] = [];
+  const out: BlueprintBuilding[] = [];
   for (const raw of value) {
     if (!isRecord(raw)) return null;
     const def = id(raw.def);
     const offset = parsePoint(raw.offset);
     if (def === undefined || !offset) return null;
-    const building: PrefabBuilding = {
-      def,
-      offset,
-      facing: parseFacing(raw.facing),
-    };
-    const bid = id(raw.id);
-    if (bid !== undefined) building.id = bid;
-    if (Array.isArray(raw.queue)) building.queue = stringArray(raw.queue);
-    if (raw.repeat === true) building.repeat = true;
-    out.push(building);
+    out.push({ def, offset, facing: parseFacing(raw.facing) });
   }
   return out;
 }
 
-function parsePrefab(p: Record<string, unknown>): ScenarioPrefab | null {
+function parseBlueprint(b: Record<string, unknown>): BaseBlueprint | null {
+  const bid = id(b.id);
+  const buildings = parseLayout(b.buildings);
+  if (bid === undefined || !buildings) return null;
+  return { id: bid, name: str(b.name) ?? bid, buildings };
+}
+
+/**
+ * The mission-only half of a base's buildings.
+ *
+ * Never rejects: an entry that is not a record is a building the mission says
+ * nothing about, which is exactly what an empty role means. Trailing empties are
+ * dropped, because the list is read by position and a run of them on the end
+ * says nothing that its absence does not.
+ */
+function parseRoles(value: unknown): BaseBuildingRole[] {
+  if (!Array.isArray(value)) return [];
+  const roles = value.map((raw) => {
+    const role: BaseBuildingRole = {};
+    if (!isRecord(raw)) return role;
+    const rid = id(raw.id);
+    if (rid !== undefined) role.id = rid;
+    if (Array.isArray(raw.queue)) role.queue = stringArray(raw.queue);
+    if (raw.repeat === true) role.repeat = true;
+    return role;
+  });
+  let end = roles.length;
+  while (end > 0 && Object.keys(roles[end - 1]).length === 0) end--;
+  return roles.slice(0, end);
+}
+
+function parseBase(p: Record<string, unknown>): ScenarioBase | null {
   const pid = id(p.id);
+  const blueprint = id(p.blueprint);
   const team = id(p.team);
   const origin = parsePoint(p.origin);
-  const buildings = parseBuildings(p.buildings);
-  if (pid === undefined || team === undefined || !origin || !buildings) {
+  if (
+    pid === undefined ||
+    blueprint === undefined ||
+    team === undefined ||
+    !origin
+  ) {
     return null;
   }
-  return { id: pid, team, origin, buildings };
+  return {
+    id: pid,
+    blueprint,
+    team,
+    origin,
+    buildings: parseRoles(p.buildings),
+  };
+}
+
+/**
+ * A schema version 1 document's `prefabs` read as blueprints and placements.
+ *
+ * Each prefab becomes one blueprint holding its geometry and one base placing
+ * it, sharing the prefab's id: a base and a blueprint are separate registries,
+ * so nothing collides, and a document read and written again keeps the id every
+ * trigger and every saved selection already names.
+ *
+ * Every prefab gets a blueprint of its own even where two were laid out
+ * identically. Recognising that they match is the author's call to make in the
+ * editor, not something a migration should decide on their behalf by silently
+ * joining two bases together.
+ */
+function migratePrefabs(
+  value: unknown,
+): { blueprints: BaseBlueprint[]; bases: ScenarioBase[] } | null {
+  const prefabs = parseRegistry(value, (p) => {
+    const pid = id(p.id);
+    const team = id(p.team);
+    const origin = parsePoint(p.origin);
+    const buildings = parseLayout(p.buildings);
+    const roles = parseRoles(p.buildings);
+    if (pid === undefined || team === undefined || !origin || !buildings) {
+      return null;
+    }
+    return { id: pid, team, origin, buildings, roles };
+  });
+  if (!prefabs) return null;
+  return {
+    blueprints: prefabs.map((p) => ({
+      id: p.id,
+      name: p.id,
+      buildings: p.buildings,
+    })),
+    bases: prefabs.map((p) => ({
+      id: p.id,
+      blueprint: p.id,
+      team: p.team,
+      origin: p.origin,
+      buildings: p.roles,
+    })),
+  };
+}
+
+/**
+ * The document's layouts and the bases placed from them, migrating a version 1
+ * document's `prefabs` when it has no `bases` of its own.
+ *
+ * A base naming a blueprint the document does not hold rejects the whole thing,
+ * unlike a trigger naming a zone that is gone, which the editor is happy to let
+ * an author fix. The two halves are one thing split in two rather than two
+ * things referring to each other, so a placement with no layout is not a
+ * half-authored base, it is a base whose buildings have been lost.
+ */
+function parseBases(
+  value: Record<string, unknown>,
+): { blueprints: BaseBlueprint[]; bases: ScenarioBase[] } | null {
+  const old = value.bases === undefined && value.blueprints === undefined;
+  const blueprints = old
+    ? null
+    : parseRegistry(value.blueprints, parseBlueprint);
+  const bases = old ? null : parseRegistry(value.bases, parseBase);
+  const split = old
+    ? migratePrefabs(value.prefabs)
+    : blueprints && bases
+      ? { blueprints, bases }
+      : null;
+  if (!split) return null;
+
+  const known = new Set(split.blueprints.map((b) => b.id));
+  return split.bases.every((base) => known.has(base.blueprint)) ? split : null;
+}
+
+/** One placed base's buildings, blueprint geometry and mission role together, or
+ *  an empty list when the blueprint is gone. */
+export function baseBuildings(
+  blueprints: BaseBlueprint[],
+  base: ScenarioBase,
+): PlacedBuilding[] {
+  const layout = blueprints.find((b) => b.id === base.blueprint);
+  if (!layout) return [];
+  return layout.buildings.map((building, i) => ({
+    ...building,
+    ...base.buildings[i],
+  }));
 }
 
 function parseObjective(o: Record<string, unknown>): ScenarioObjective | null {
@@ -722,7 +890,7 @@ export function parseScenario(value: unknown): Scenario | null {
   const zones = parseRegistry(value.zones, parseZone);
   const actors = parseRegistry(value.actors, parseActor);
   const groups = parseRegistry(value.groups, parseGroup);
-  const prefabs = parseRegistry(value.prefabs, parsePrefab);
+  const split = parseBases(value);
   const triggers = parseRegistry(value.triggers, parseTrigger);
   const objectives = parseRegistry(value.objectives, parseObjective);
   const dialogue = parseRegistry(value.dialogue, parseDialogue);
@@ -731,7 +899,7 @@ export function parseScenario(value: unknown): Scenario | null {
     !zones ||
     !actors ||
     !groups ||
-    !prefabs ||
+    !split ||
     !triggers ||
     !objectives ||
     !dialogue
@@ -750,7 +918,8 @@ export function parseScenario(value: unknown): Scenario | null {
     zones,
     actors,
     groups,
-    prefabs,
+    blueprints: split.blueprints,
+    bases: split.bases,
     restrictions: parseRestrictions(value.restrictions),
     vars: parseVars(value.vars),
     triggers,

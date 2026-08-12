@@ -150,6 +150,99 @@ describe("scenario container round trip", () => {
   });
 });
 
+/**
+ * Issue #1310. The split is only a version to anybody whose scenario has a base
+ * in it, so the two cases are written apart: a scenario with one says so and
+ * locks out a build that would drop it, and one without keeps reading on
+ * anything that could read it before.
+ */
+describe("what version a scenario is written as", () => {
+  const withBase = () =>
+    scenario({
+      blueprints: [
+        {
+          id: "bp1",
+          name: "The keep",
+          buildings: [{ def: "armlab", offset: { x: 0, z: 0 }, facing: 0 }],
+        },
+      ],
+      bases: [
+        {
+          id: "b1",
+          blueprint: "bp1",
+          team: "p1",
+          origin: { x: 500, z: 500 },
+          buildings: [],
+        },
+      ],
+    });
+
+  it("is 1 for a scenario with no bases", () => {
+    const text = encodeScenarioExport(exported());
+    expect(identify(text).version).toBe(1);
+  });
+
+  it("is 2 for a scenario that places one", () => {
+    const text = encodeScenarioExport({ scenario: withBase(), media: {} });
+    expect(identify(text).version).toBe(2);
+    expect(identify(text).compatibility).toBe("ok");
+  });
+
+  it("says the same in a share code as in a file", () => {
+    const code = encodeScenarioCode({ scenario: withBase(), media: {} });
+    expect(code.ok).toBe(true);
+    if (!code.ok) return;
+    expect(identify(code.code).version).toBe(2);
+  });
+
+  /** Every scenario already exported is one of these, so it has to keep
+   *  importing, bases and all. */
+  it("reads a version 1 file that spells its bases `prefabs`", () => {
+    // Built by hand rather than from `scenario()`, which is already a parsed
+    // document and so already carries the empty new registries.
+    const { blueprints, bases, ...rest } = scenario();
+    const json = encodeContainerJson("scenario", 1, {
+      scenario: {
+        ...rest,
+        schemaVersion: 1,
+        prefabs: [
+          {
+            id: "pf1",
+            team: "p1",
+            origin: { x: 500, z: 500 },
+            buildings: [
+              {
+                id: "keep-lab",
+                def: "armlab",
+                offset: { x: 0, z: 0 },
+                facing: 0,
+                queue: ["armpw"],
+              },
+            ],
+          },
+        ],
+      },
+      media: {},
+    });
+
+    const read = readScenarioExport(json);
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.payload.scenario.bases).toEqual([
+      {
+        id: "pf1",
+        blueprint: "pf1",
+        team: "p1",
+        origin: { x: 500, z: 500 },
+        buildings: [{ id: "keep-lab", queue: ["armpw"] }],
+      },
+    ]);
+    expect(read.payload.scenario.blueprints[0].buildings).toEqual([
+      { def: "armlab", offset: { x: 0, z: 0 }, facing: 0 },
+    ]);
+  });
+});
+
 describe("encodeScenarioCode", () => {
   /** A clip of `bytes` real bytes, as random as an already-compressed one. */
   function clip(bytes: number): string {
@@ -270,7 +363,7 @@ describe("readScenarioExport rejections", () => {
   });
 
   it("reports a payload schema version this build cannot read", () => {
-    const json = encodeContainerJson("scenario", 2, exported());
+    const json = encodeContainerJson("scenario", 3, exported());
 
     expect(readScenarioExport(json)).toEqual({
       ok: false,

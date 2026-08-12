@@ -44,8 +44,35 @@ import { parseScenario, type Scenario } from "./model";
  * so the container is the only format a scenario has ever had.
  */
 
-/** Payload schema version for `kind: "scenario"`. */
-export const SCENARIO_KIND_VERSION = 1;
+/**
+ * Payload schema version for `kind: "scenario"` once the document holds a base.
+ *
+ * Version 2 is the split of a prefab into a blueprint and a placement (issue
+ * #1310). A build that only knows version 1 looks for `prefabs`, finds nothing,
+ * and reads a scenario with every base silently missing, which is the worst
+ * available failure: the import succeeds and the mission is wrong. Refusing is
+ * the only honest answer.
+ */
+export const SCENARIO_KIND_VERSION = 2;
+
+/**
+ * The version written for a scenario with no bases in it, which an older build
+ * reads exactly as it always did.
+ *
+ * The same reasoning `../campaign/transfer.ts` gives for not always writing 2:
+ * the version says what a reader has to understand, and a document that never
+ * mentions a base does not need the split explained to it. Most scenarios are
+ * that, so bumping them all would lock older builds out of files they can
+ * honour, for nothing.
+ */
+export const SCENARIO_KIND_VERSION_PLAIN = 1;
+
+/** Which of the two a scenario has to be written as. */
+export function scenarioKindVersion(scenario: Scenario): number {
+  return scenario.blueprints.length > 0 || scenario.bases.length > 0
+    ? SCENARIO_KIND_VERSION
+    : SCENARIO_KIND_VERSION_PLAIN;
+}
 
 /**
  * What one exported scenario file holds: the document plus every dialogue clip
@@ -162,7 +189,7 @@ export function encodeScenarioExport(
 ): string {
   return encodeContainerJson(
     "scenario",
-    SCENARIO_KIND_VERSION,
+    scenarioKindVersion(exported.scenario),
     scenarioPayload(exported, installed),
   );
 }
@@ -197,7 +224,7 @@ export function encodeScenarioCode(
 ): ScenarioCode {
   const result = tryEncodeContainerCode(
     "scenario",
-    SCENARIO_KIND_VERSION,
+    scenarioKindVersion(exported.scenario),
     scenarioPayload(exported, installed),
   );
   if (result.ok) return result;

@@ -313,20 +313,28 @@ describe("registryOptions", () => {
     expect(registryOptions(document(), "amount")).toBeNull();
   });
 
-  // Issue #878. A trigger that reads an actor reads a named prefab building the
+  // Issue #878. A trigger that reads an actor reads a named base building the
   // same way, so the picker offers both out of one list.
-  it("offers a named prefab building beside the actors", () => {
+  it("offers a named base building beside the actors", () => {
     const scenario: Scenario = {
       ...document(),
-      prefabs: [
+      blueprints: [
         {
-          id: "pf1",
-          team: "p0",
-          origin: { x: 500, z: 500 },
+          id: "bp1",
+          name: "The keep",
           buildings: [
-            { id: "b1", def: "corlab", offset: { x: 0, z: 0 }, facing: 0 },
+            { def: "corlab", offset: { x: 0, z: 0 }, facing: 0 },
             { def: "cormex", offset: { x: 64, z: 0 }, facing: 0 },
           ],
+        },
+      ],
+      bases: [
+        {
+          id: "pf1",
+          blueprint: "bp1",
+          team: "p0",
+          origin: { x: 500, z: 500 },
+          buildings: [{ id: "b1" }],
         },
       ],
     };

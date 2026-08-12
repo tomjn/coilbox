@@ -47,7 +47,7 @@ const VOICE = "data:audio/ogg;base64,b2dn";
 
 function scenario(id: string, over: Partial<Scenario> = {}): Scenario {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id,
     name: id,
     description: "",
@@ -63,7 +63,8 @@ function scenario(id: string, over: Partial<Scenario> = {}): Scenario {
     zones: [],
     actors: [],
     groups: [],
-    prefabs: [],
+    blueprints: [],
+    bases: [],
     restrictions: {},
     vars: {},
     triggers: [],

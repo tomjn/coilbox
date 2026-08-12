@@ -488,19 +488,20 @@ describe("validateMission", () => {
             facing: 0,
           },
         ],
-        prefabs: [
+        blueprints: [
+          {
+            id: "keep",
+            name: "The keep",
+            buildings: [{ def: "armlab", offset: { x: 0, z: 0 }, facing: 0 }],
+          },
+        ],
+        bases: [
           {
             id: "base",
+            blueprint: "keep",
             team: "player",
             origin: { x: 2, z: 2 },
-            buildings: [
-              {
-                def: "armlab",
-                offset: { x: 0, z: 0 },
-                facing: 0,
-                queue: ["armflash"],
-              },
-            ],
+            buildings: [{ queue: ["armflash"] }],
           },
         ],
         triggers: [
@@ -517,8 +518,8 @@ describe("validateMission", () => {
       expect(unitDefsIn(document)).toEqual([
         { path: 'teams["player"].startUnits[0]', def: "armpw" },
         { path: 'actors["boss"].unitDef', def: "armcom" },
-        { path: 'prefabs["base"].buildings[0].def', def: "armlab" },
-        { path: 'prefabs["base"].buildings[0].queue[0]', def: "armflash" },
+        { path: 'blueprints["keep"].buildings[0].def', def: "armlab" },
+        { path: 'bases["base"].buildings[0].queue[0]', def: "armflash" },
         { path: 'triggers["open"].actions[0].params.unitDef', def: "armzeus" },
       ]);
     });

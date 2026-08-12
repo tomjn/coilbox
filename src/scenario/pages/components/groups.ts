@@ -13,14 +13,14 @@
  * editor never offers dormancy as if it were sleep.
  */
 
-import type {
-  GroupUnit,
-  Point,
-  PrefabBuilding,
-  Scenario,
-  ScenarioGroup,
-  ScenarioOrder,
-  ScenarioPrefab,
+import {
+  baseBuildings,
+  type GroupUnit,
+  type PlacedBuilding,
+  type Point,
+  type Scenario,
+  type ScenarioGroup,
+  type ScenarioOrder,
 } from "../../model";
 
 /** The order kinds that carry a path, and the ones that carry a target. */
@@ -407,16 +407,16 @@ export function uniqueLabels(labels: string[]): string[] {
 }
 
 /**
- * Every prefab building a trigger or an order can name, labelled by the base it
+ * Every base building a trigger or an order can name, labelled by the base it
  * sits in. Only the buildings that carry an id: one without is part of a base
  * and nothing else, and the runtime records nothing about it.
  */
 export function buildingTargets(
-  prefabs: ScenarioPrefab[],
+  scenario: Pick<Scenario, "bases" | "blueprints">,
 ): { id: string; label: string; def: string }[] {
-  const found = prefabs.flatMap((prefab, i) =>
-    prefab.buildings
-      .filter((building): building is PrefabBuilding & { id: string } =>
+  const found = scenario.bases.flatMap((base, i) =>
+    baseBuildings(scenario.blueprints, base)
+      .filter((building): building is PlacedBuilding & { id: string } =>
         Boolean(building.id),
       )
       .map((building) => ({
@@ -431,14 +431,14 @@ export function buildingTargets(
 
 /**
  * Everything a guard or attack order can name: the document's actors, its named
- * prefab buildings and its groups, less the group doing the ordering, which
+ * base buildings and its groups, less the group doing the ordering, which
  * cannot guard itself.
  *
  * An actor goes by its display name when it has one, because a named character
  * is exactly the sort of thing a mission tells a group to escort.
  */
 export function targetOptions(
-  scenario: Pick<Scenario, "actors" | "groups" | "prefabs">,
+  scenario: Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">,
   exceptGroup?: string,
 ): TargetOption[] {
   const actorLabels = uniqueLabels(
@@ -449,7 +449,7 @@ export function targetOptions(
     label: actorLabels[i],
     description: `actor · ${actor.unitDef}`,
   }));
-  const buildings = buildingTargets(scenario.prefabs).map((building) => ({
+  const buildings = buildingTargets(scenario).map((building) => ({
     value: building.id,
     label: building.label,
     description: `building · ${building.def}`,
@@ -468,7 +468,7 @@ export function targetOptions(
 /** What an order's target is called, for showing beside an order that has one.
  *  An id naming nothing says so rather than showing a UUID. */
 export function targetLabel(
-  scenario: Pick<Scenario, "actors" | "groups" | "prefabs">,
+  scenario: Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">,
   target: string,
 ): string {
   if (!target) return "nothing yet";

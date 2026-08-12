@@ -12,14 +12,19 @@
  * picked is `focusCamera` in `scene.ts`.
  */
 
-import type { Point, Scenario } from "../../model";
+import {
+  baseBuildings,
+  type PlacedBuilding,
+  type Point,
+  type Scenario,
+} from "../../model";
 import { parsePlacementKey } from "./editing";
 import { groupSize, parsePathKey, uniqueLabels } from "./groups";
 import { GROUP_SPACING, placementKey } from "./placements";
 import { parseZoneKey, zoneCenter, zoneExtent, zoneKey } from "./zones";
 
 /** The kinds of thing the list holds, in the order it lists them. */
-export type ContentKind = "actor" | "group" | "prefab" | "zone";
+export type ContentKind = "actor" | "group" | "base" | "zone";
 
 /** One thing the document put on the map. */
 export interface ContentEntry {
@@ -29,7 +34,7 @@ export interface ContentEntry {
    */
   key: string;
   kind: ContentKind;
-  /** The id of the actor, group or prefab, for matching a selection back to
+  /** The id of the actor, group or base, for matching a selection back to
    *  the entry it belongs to. */
   id: string;
   label: string;
@@ -65,8 +70,8 @@ function groupSpan(group: Scenario["groups"][number]): number {
 }
 
 /** How far a base's buildings reach from its origin, in elmos. */
-function prefabSpan(prefab: Scenario["prefabs"][number]): number {
-  return prefab.buildings.reduce(
+function baseSpan(buildings: PlacedBuilding[]): number {
+  return buildings.reduce(
     (far, building) =>
       Math.max(far, Math.abs(building.offset.x), Math.abs(building.offset.z)),
     0,
@@ -88,7 +93,10 @@ function prefabSpan(prefab: Scenario["prefabs"][number]): number {
  * Picking it out of a list does not depend on hitting the right pixel.
  */
 export function sceneContents(
-  scenario: Pick<Scenario, "actors" | "groups" | "prefabs" | "zones">,
+  scenario: Pick<
+    Scenario,
+    "actors" | "groups" | "bases" | "blueprints" | "zones"
+  >,
 ): ContentEntry[] {
   const actorLabels = uniqueLabels(
     scenario.actors.map((actor) => actor.state?.name?.trim() || actor.unitDef),
@@ -113,18 +121,19 @@ export function sceneContents(
     span: groupSpan(group),
     team: group.team,
   }));
-  const prefabs = scenario.prefabs.map<ContentEntry>((prefab, i) => ({
-    key: placementKey("prefab", prefab.id, 0),
-    kind: "prefab",
-    id: prefab.id,
-    label: `Base ${i + 1}`,
-    detail: `${prefab.buildings.length} building${
-      prefab.buildings.length === 1 ? "" : "s"
-    }`,
-    pos: prefab.origin,
-    span: prefabSpan(prefab),
-    team: prefab.team,
-  }));
+  const bases = scenario.bases.map<ContentEntry>((base, i) => {
+    const buildings = baseBuildings(scenario.blueprints, base);
+    return {
+      key: placementKey("base", base.id, 0),
+      kind: "base",
+      id: base.id,
+      label: `Base ${i + 1}`,
+      detail: `${buildings.length} building${buildings.length === 1 ? "" : "s"}`,
+      pos: base.origin,
+      span: baseSpan(buildings),
+      team: base.team,
+    };
+  });
   const zoneLabels = uniqueLabels(scenario.zones.map((zone) => zone.name));
   const zones = scenario.zones.map<ContentEntry>((zone, i) => ({
     key: zoneKey(zone.id),
@@ -136,7 +145,7 @@ export function sceneContents(
     span: Math.max(...Object.values(zoneExtent(zone))),
     team: null,
   }));
-  return [...actors, ...groups, ...prefabs, ...zones];
+  return [...actors, ...groups, ...bases, ...zones];
 }
 
 /**

@@ -9,11 +9,12 @@
  * The three shapes a document places do not all move the same way. An actor is a
  * unit at a point, so it moves on its own. A group's units are a formation
  * around one point and carry no positions of their own, so dragging any of them
- * moves the whole group. A prefab's buildings are offsets from an origin, so
- * dragging one moves that building within the prefab and leaves the rest where
- * they are.
+ * moves the whole group. A base's buildings are offsets from an origin held in
+ * the blueprint it was placed from, so dragging one changes that layout and
+ * leaves the rest of the base where it is.
  */
 
+import type { BaseBlueprint, BlueprintBuilding } from "@/blueprint/model";
 import type {
   ActorState,
   Facing,
@@ -21,8 +22,8 @@ import type {
   Scenario,
   ScenarioActor,
   ScenarioGroup,
-  ScenarioPrefab,
 } from "../../model";
+import { removeBuilding } from "./bases";
 import type { Placement } from "./placements";
 
 /** How far a pointer may travel between press and release and still count as a
@@ -151,7 +152,7 @@ export function parsePlacementKey(key: string): PlacementRef | null {
   const kind = key.slice(0, colon);
   const rest = key.slice(colon + 1);
   if (kind === "actor") return rest ? { kind, id: rest, index: 0 } : null;
-  if (kind !== "group" && kind !== "prefab") return null;
+  if (kind !== "group" && kind !== "base") return null;
   const hash = rest.lastIndexOf("#");
   if (hash <= 0) return null;
   const index = Number(rest.slice(hash + 1));
@@ -162,7 +163,7 @@ export function parsePlacementKey(key: string): PlacementRef | null {
 /**
  * Every drawn object that moves when this one is dragged.
  *
- * One key for an actor or a prefab building, the whole formation for a group's
+ * One key for an actor or a base's building, the whole formation for a group's
  * unit, so the scene shows the group moving as a block while the pointer is
  * down.
  */
@@ -206,6 +207,37 @@ function edit<T extends { id: string }>(
 }
 
 /**
+ * The document with one building of a base changed, in the blueprint the base
+ * was placed from.
+ *
+ * Where a building stands and which way it faces are the layout, not the
+ * placement, so this is the half of a base that a saved blueprint carries and
+ * that another mission placing the same one would get.
+ */
+function editBaseBuilding(
+  scenario: Scenario,
+  ref: PlacementRef,
+  update: (building: BlueprintBuilding) => BlueprintBuilding,
+): Scenario {
+  const base = scenario.bases.find((entry) => entry.id === ref.id);
+  if (!base) return scenario;
+  const blueprints = edit<BaseBlueprint>(
+    scenario.blueprints,
+    base.blueprint,
+    (blueprint) => {
+      const building = blueprint.buildings[ref.index];
+      if (!building) return blueprint;
+      const buildings = blueprint.buildings.slice();
+      buildings[ref.index] = update(building);
+      return { ...blueprint, buildings };
+    },
+  );
+  return blueprints === scenario.blueprints
+    ? scenario
+    : { ...scenario, blueprints };
+}
+
+/**
  * The document with the thing this key names moved by `delta` elmos.
  *
  * The same document back when the key names nothing, so a caller can compare
@@ -237,21 +269,17 @@ export function movePlacement(
     return groups === scenario.groups ? scenario : { ...scenario, groups };
   }
 
-  const prefabs = edit<ScenarioPrefab>(scenario.prefabs, ref.id, (prefab) => {
-    const building = prefab.buildings[ref.index];
-    if (!building) return prefab;
-    const buildings = prefab.buildings.slice();
-    buildings[ref.index] = { ...building, offset: shift(building.offset) };
-    return { ...prefab, buildings };
-  });
-  return prefabs === scenario.prefabs ? scenario : { ...scenario, prefabs };
+  return editBaseBuilding(scenario, ref, (building) => ({
+    ...building,
+    offset: shift(building.offset),
+  }));
 }
 
 /** Whether the thing a key names has a facing to turn. A group's units are
  *  spawned facing south together, so a group has none. */
 export function canTurn(key: string): boolean {
   const ref = parsePlacementKey(key);
-  return ref?.kind === "actor" || ref?.kind === "prefab";
+  return ref?.kind === "actor" || ref?.kind === "base";
 }
 
 /** A facing turned `steps` quarter turns clockwise, staying in the engine's
@@ -279,18 +307,11 @@ export function turnPlacement(
     return actors === scenario.actors ? scenario : { ...scenario, actors };
   }
 
-  if (ref.kind === "prefab") {
-    const prefabs = edit<ScenarioPrefab>(scenario.prefabs, ref.id, (prefab) => {
-      const building = prefab.buildings[ref.index];
-      if (!building) return prefab;
-      const buildings = prefab.buildings.slice();
-      buildings[ref.index] = {
-        ...building,
-        facing: turnFacing(building.facing, steps),
-      };
-      return { ...prefab, buildings };
-    });
-    return prefabs === scenario.prefabs ? scenario : { ...scenario, prefabs };
+  if (ref.kind === "base") {
+    return editBaseBuilding(scenario, ref, (building) => ({
+      ...building,
+      facing: turnFacing(building.facing, steps),
+    }));
   }
 
   return scenario;
@@ -301,8 +322,8 @@ export function turnPlacement(
  *
  * What "removed" means follows what was clicked. An actor goes. One of a group's
  * units is one off that def's count, and the group goes when its last unit does.
- * A prefab's building goes, and the prefab goes with its last building, because
- * an empty cluster is not a thing an author can see or select again.
+ * A base's building goes, and the base goes with its last building, because an
+ * empty cluster is not a thing an author can see or select again.
  */
 export function removePlacement(scenario: Scenario, key: string): Scenario {
   const ref = parsePlacementKey(key);
@@ -328,12 +349,7 @@ export function removePlacement(scenario: Scenario, key: string): Scenario {
     return groups === scenario.groups ? scenario : { ...scenario, groups };
   }
 
-  const prefabs = edit<ScenarioPrefab>(scenario.prefabs, ref.id, (prefab) => {
-    if (!prefab.buildings[ref.index]) return prefab;
-    const buildings = prefab.buildings.filter((_, i) => i !== ref.index);
-    return buildings.length === 0 ? null : { ...prefab, buildings };
-  });
-  return prefabs === scenario.prefabs ? scenario : { ...scenario, prefabs };
+  return removeBuilding(scenario, ref.id, ref.index);
 }
 
 /**

@@ -37,8 +37,15 @@ import {
 } from "@/mapconv/pages/components/MapPreview3D";
 import { usePreferredTarget } from "@/play/config";
 import type { ExtensionTypes } from "../../extensions";
-import type { Point, Scenario, ScenarioZone } from "../../model";
+import {
+  baseBuildings,
+  type Point,
+  type Scenario,
+  type ScenarioZone,
+} from "../../model";
 import { ActorControls } from "./ActorControls";
+import { BaseControls } from "./BaseControls";
+import { editBase, removeBase, setOrigin, setQueue } from "./bases";
 import { ContentsList } from "./ContentsList";
 import {
   type ContentEntry,
@@ -74,9 +81,7 @@ import {
   removePathWaypoint,
   scenarioPaths,
 } from "./orderPaths";
-import { PrefabControls } from "./PrefabControls";
 import { type Placement, placementKey } from "./placements";
-import { editPrefab, removePrefab, setOrigin, setQueue } from "./prefabs";
 import {
   authoringCamera,
   clampToPlane,
@@ -326,7 +331,7 @@ export function ScenarioMapScene({
   // Which base the map is waiting for a point for, held as loosely as a path
   // being drawn: a base that has been deleted stops the map waiting for it.
   const [movingBase, setMovingBase] = useState<string | null>(null);
-  const moving = scenario.prefabs.some((p) => p.id === movingBase)
+  const moving = scenario.bases.some((b) => b.id === movingBase)
     ? movingBase
     : null;
 
@@ -377,9 +382,9 @@ export function ScenarioMapScene({
     (picked?.kind === "actor" &&
       scenario.actors.find((a) => a.id === picked.id)) ||
     null;
-  const pickedPrefab =
-    (picked?.kind === "prefab" &&
-      scenario.prefabs.find((p) => p.id === picked.id)) ||
+  const pickedBase =
+    (picked?.kind === "base" &&
+      scenario.bases.find((b) => b.id === picked.id)) ||
     null;
   const gameUnits = useGameUnits(scenario.setup.gameName);
 
@@ -661,26 +666,27 @@ export function ScenarioMapScene({
               />
             )}
             {picked.kind === "group" && groupControls}
-            {picked.kind === "prefab" && pickedPrefab && (
-              <PrefabControls
-                key={`${pickedPrefab.id}#${picked.index}`}
-                prefab={pickedPrefab}
+            {picked.kind === "base" && pickedBase && (
+              <BaseControls
+                key={`${pickedBase.id}#${picked.index}`}
+                base={pickedBase}
+                buildings={baseBuildings(scenario.blueprints, pickedBase)}
                 index={picked.index}
                 participants={scenario.setup.participants}
                 units={gameUnits.units}
                 unitsLoading={gameUnits.loading}
-                moving={moving === pickedPrefab.id}
+                moving={moving === pickedBase.id}
                 onEdit={(patch) =>
-                  onChange((doc) => editPrefab(doc, pickedPrefab.id, patch))
+                  onChange((doc) => editBase(doc, pickedBase.id, patch))
                 }
                 onQueue={(queue, repeat) =>
                   onChange((doc) =>
-                    setQueue(doc, pickedPrefab.id, picked.index, queue, repeat),
+                    setQueue(doc, pickedBase.id, picked.index, queue, repeat),
                   )
                 }
-                onMove={(on) => setMovingBase(on ? pickedPrefab.id : null)}
+                onMove={(on) => setMovingBase(on ? pickedBase.id : null)}
                 onDelete={() => {
-                  onChange((doc) => removePrefab(doc, pickedPrefab.id));
+                  onChange((doc) => removeBase(doc, pickedBase.id));
                   setSelected(null);
                 }}
               />
@@ -857,7 +863,7 @@ function SelectionBar({
   onTurn: () => void;
   onDelete: () => void;
   /** Controls for what kind of thing this is: an actor's team and its
-   *  overrides, and whatever a group or a prefab grows later. */
+   *  overrides, and whatever a group or a base grows later. */
   children?: ReactNode;
 }) {
   const turnable = canTurn(placement.key);

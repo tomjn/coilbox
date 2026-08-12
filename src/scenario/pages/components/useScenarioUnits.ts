@@ -54,7 +54,7 @@ export interface ScenarioUnitsState {
 }
 
 /**
- * Draw a scenario's actors, groups and prefabs on a built map scene.
+ * Draw a scenario's actors, groups and bases on a built map scene.
  *
  * Models come from the game named by the scenario's own setup, resolved through
  * the same unitsync scan the launcher uses, so a scenario written for one game
@@ -90,12 +90,12 @@ export function useScenarioUnits(
     return out;
   }, [dataset]);
 
-  const { actors, groups, prefabs } = scenario;
+  const { actors, groups, bases, blueprints } = scenario;
   const placements = useMemo(
-    // The three registries are the whole input, so a change to anything else in
-    // the document leaves the drawn scene alone.
-    () => scenarioPlacements({ actors, groups, prefabs }),
-    [actors, groups, prefabs],
+    // These registries are the whole input, so a change to anything else in the
+    // document leaves the drawn scene alone.
+    () => scenarioPlacements({ actors, groups, bases, blueprints }),
+    [actors, groups, bases, blueprints],
   );
 
   const participants = scenario.setup.participants;

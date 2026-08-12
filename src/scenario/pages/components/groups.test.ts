@@ -346,46 +346,56 @@ describe("names", () => {
   });
 
   /**
-   * Issue #878. A named prefab building answers to the runtime's `units` table
+   * Issue #878. A named base building answers to the runtime's `units` table
    * the way an actor does, so an order can be pointed at one.
    */
-  describe("prefab buildings", () => {
+  describe("base buildings", () => {
     const withBase = (): Scenario => ({
       ...document(),
-      prefabs: [
+      blueprints: [
         {
-          id: "pf1",
-          team: "p1",
-          origin: { x: 500, z: 500 },
+          id: "bp1",
+          name: "The keep",
           buildings: [
-            { id: "b1", def: "corlab", offset: { x: 0, z: 0 }, facing: 0 },
+            { def: "corlab", offset: { x: 0, z: 0 }, facing: 0 },
             { def: "cormex", offset: { x: 64, z: 0 }, facing: 0 },
           ],
+        },
+      ],
+      bases: [
+        {
+          id: "pf1",
+          blueprint: "bp1",
+          team: "p1",
+          origin: { x: 500, z: 500 },
+          buildings: [{ id: "b1" }],
         },
       ],
     });
 
     it("offers a named one and leaves an unnamed one out", () => {
-      expect(buildingTargets(withBase().prefabs)).toEqual([
+      expect(buildingTargets(withBase())).toEqual([
         { id: "b1", label: "Base 1's corlab", def: "corlab" },
       ]);
     });
 
     it("numbers two of a def in the same base apart", () => {
       const scenario = withBase();
-      const buildings = [
-        scenario.prefabs[0].buildings[0],
-        {
-          id: "b2",
-          def: "corlab",
-          offset: { x: 96, z: 0 },
-          facing: 0 as const,
-        },
-      ];
       expect(
-        buildingTargets([{ ...scenario.prefabs[0], buildings }]).map(
-          (b) => b.label,
-        ),
+        buildingTargets({
+          blueprints: [
+            {
+              ...scenario.blueprints[0],
+              buildings: [
+                { def: "corlab", offset: { x: 0, z: 0 }, facing: 0 },
+                { def: "corlab", offset: { x: 96, z: 0 }, facing: 0 },
+              ],
+            },
+          ],
+          bases: [
+            { ...scenario.bases[0], buildings: [{ id: "b1" }, { id: "b2" }] },
+          ],
+        }).map((b) => b.label),
       ).toEqual(["Base 1's corlab 1", "Base 1's corlab 2"]);
     });
 

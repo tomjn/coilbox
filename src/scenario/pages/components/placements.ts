@@ -3,7 +3,7 @@
  *
  * A document holds three different shapes that all end up as a model standing
  * somewhere on the map: an actor is one unit at one point, a group is a bag of
- * counts at one point, and a prefab is a list of buildings offset from an
+ * counts at one point, and a base is a blueprint's buildings offset from an
  * origin. The scene does not care which it came from, only where a unit stands,
  * which way it faces and whose it is, so the difference is resolved once, here,
  * and everything downstream works on one list.
@@ -13,7 +13,12 @@
  */
 
 import type { Participant, Rgb } from "@/play/config";
-import type { Facing, Point, Scenario } from "../../model";
+import {
+  baseBuildings,
+  type Facing,
+  type Point,
+  type Scenario,
+} from "../../model";
 
 /** One unit to draw, and the document entry it came from. */
 export interface Placement {
@@ -23,10 +28,10 @@ export interface Placement {
    * pick can be turned straight back into the thing that was clicked.
    */
   key: string;
-  kind: "actor" | "group" | "prefab";
-  /** The id of the actor, group or prefab this unit belongs to. */
+  kind: "actor" | "group" | "base";
+  /** The id of the actor, group or base this unit belongs to. */
   id: string;
-  /** Which unit within a group or prefab. Always 0 for an actor. */
+  /** Which unit within a group or base. Always 0 for an actor. */
   index: number;
   /** Unit def name, as the document holds it. */
   def: string;
@@ -80,14 +85,14 @@ export function groupFormationOffset(
 
 /**
  * Every unit the document places, in document order: actors, then groups, then
- * prefabs.
+ * bases.
  *
  * A group's `units` counts are expanded one unit per model, because the whole
  * point of drawing a scenario is seeing how much is on the map. Groups have no
  * facing of their own, so their units face south, the engine's zero.
  */
 export function scenarioPlacements(
-  scenario: Pick<Scenario, "actors" | "groups" | "prefabs">,
+  scenario: Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">,
 ): Placement[] {
   const out: Placement[] = [];
 
@@ -125,18 +130,18 @@ export function scenarioPlacements(
     }
   }
 
-  for (const prefab of scenario.prefabs) {
-    prefab.buildings.forEach((building, index) => {
+  for (const base of scenario.bases) {
+    baseBuildings(scenario.blueprints, base).forEach((building, index) => {
       out.push({
-        key: placementKey("prefab", prefab.id, index),
-        kind: "prefab",
-        id: prefab.id,
+        key: placementKey("base", base.id, index),
+        kind: "base",
+        id: base.id,
         index,
         def: building.def,
-        team: prefab.team,
+        team: base.team,
         pos: {
-          x: prefab.origin.x + building.offset.x,
-          z: prefab.origin.z + building.offset.z,
+          x: base.origin.x + building.offset.x,
+          z: base.origin.z + building.offset.z,
         },
         facing: building.facing,
       });

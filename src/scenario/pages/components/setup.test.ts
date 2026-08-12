@@ -69,12 +69,20 @@ function populated(): Scenario {
         dormant: false,
       },
     ],
-    prefabs: [
+    blueprints: [
+      {
+        id: "outpost-layout",
+        name: "Outpost",
+        buildings: [{ def: "corsolar", offset: { x: -128, z: 64 }, facing: 0 }],
+      },
+    ],
+    bases: [
       {
         id: "outpost",
+        blueprint: "outpost-layout",
         team: ai.id,
         origin: { x: 7168, z: 1024 },
-        buildings: [{ def: "corsolar", offset: { x: -128, z: 64 }, facing: 0 }],
+        buildings: [],
       },
     ],
     triggers: [
@@ -145,7 +153,7 @@ describe("what changing the map costs", () => {
 });
 
 describe("every coordinate the document holds", () => {
-  it("finds the ones inside triggers and prefab buildings", () => {
+  it("finds the ones inside triggers and base buildings", () => {
     const points = scenarioPoints(populated());
     // The ping's point, the give_orders waypoint, and the outpost's building.
     expect(points).toContainEqual({ x: 512, z: 6144 });
@@ -166,7 +174,7 @@ describe("rescaling onto a different map", () => {
       kind: "patrol",
       waypoints: [{ x: 2048, z: 1024 }],
     });
-    expect(scaled.prefabs[0].origin).toEqual({ x: 3584, z: 512 });
+    expect(scaled.bases[0].origin).toEqual({ x: 3584, z: 512 });
     expect(scaled.zones[0]).toMatchObject({
       min: { x: 512, z: 512 },
       max: { x: 1024, z: 1024 },
@@ -174,7 +182,10 @@ describe("rescaling onto a different map", () => {
   });
 
   it("leaves a base's own layout alone", () => {
-    expect(scaled.prefabs[0].buildings[0].offset).toEqual({ x: -128, z: 64 });
+    expect(scaled.blueprints[0].buildings[0].offset).toEqual({
+      x: -128,
+      z: 64,
+    });
   });
 
   it("rescales a circular zone's radius by the smaller factor", () => {
@@ -205,7 +216,7 @@ describe("rescaling onto a different map", () => {
     const moved = [
       ...tiny.actors.map((a) => a.pos),
       ...tiny.groups.map((g) => g.pos),
-      ...tiny.prefabs.map((p) => p.origin),
+      ...tiny.bases.map((b) => b.origin),
     ];
     expect(moved.every((p) => p.x >= 1 && p.z >= 1)).toBe(true);
     expect(moved.every((p) => p.x <= 127 && p.z <= 127)).toBe(true);
@@ -258,7 +269,7 @@ describe("what a participant holds", () => {
     expect(participantHoldings(scenario, ai)).toEqual({
       actors: 1,
       groups: 1,
-      prefabs: 1,
+      bases: 1,
       triggers: 1,
       team: true,
     });
@@ -269,7 +280,7 @@ describe("what a participant holds", () => {
     expect(participantHoldings(scenario, ids(scenario)[0])).toEqual({
       actors: 1,
       groups: 0,
-      prefabs: 0,
+      bases: 0,
       triggers: 1,
       team: false,
     });
@@ -289,7 +300,7 @@ describe("removing a participant", () => {
     expect(ids(next)).toEqual([you]);
     expect(next.actors.every((a) => a.team === you)).toBe(true);
     expect(next.groups[0].team).toBe(you);
-    expect(next.prefabs[0].team).toBe(you);
+    expect(next.bases[0].team).toBe(you);
     expect(next.triggers[0].conditions.conditions[0].params.team).toBe(you);
   });
 
@@ -299,7 +310,9 @@ describe("removing a participant", () => {
     const next = removeScenarioParticipant(scenario, ai, null);
     expect(next.actors.map((a) => a.id)).toEqual(["hero"]);
     expect(next.groups).toEqual([]);
-    expect(next.prefabs).toEqual([]);
+    expect(next.bases).toEqual([]);
+    // The layout goes with the base nothing places any more.
+    expect(next.blueprints).toEqual([]);
     // The trigger that named it is left alone, exactly as deleting a zone
     // leaves the conditions naming it alone.
     expect(next.triggers[0].conditions.conditions[0].params.team).toBe(ai);
@@ -351,7 +364,7 @@ describe("setting up from a preset", () => {
     const [you, ai] = next.setup.participants.map((p) => p.id);
     expect(next.actors.map((a) => a.team)).toEqual([you, ai]);
     expect(next.groups[0].team).toBe(ai);
-    expect(next.prefabs[0].team).toBe(ai);
+    expect(next.bases[0].team).toBe(ai);
     expect(next.triggers[0].conditions.conditions[0].params.team).toBe(ai);
     expect(next.triggers[0].actions[2].params.team).toBe(you);
     expect(Object.keys(next.teams)).toEqual([ai]);

@@ -10,9 +10,14 @@ import {
   UNOWNED_COLOR,
 } from "./placements";
 
-type Registries = Pick<Scenario, "actors" | "groups" | "prefabs">;
+type Registries = Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">;
 
-const empty: Registries = { actors: [], groups: [], prefabs: [] };
+const empty: Registries = {
+  actors: [],
+  groups: [],
+  bases: [],
+  blueprints: [],
+};
 
 describe("scenarioPlacements", () => {
   it("draws an actor where the document puts it", () => {
@@ -96,18 +101,26 @@ describe("scenarioPlacements", () => {
     expect(meanZ).toBeCloseTo(3000);
   });
 
-  it("offsets a prefab's buildings from its origin", () => {
+  it("offsets a base's buildings from its origin", () => {
     const out = scenarioPlacements({
       ...empty,
-      prefabs: [
+      blueprints: [
         {
-          id: "pf1",
-          team: "p0",
-          origin: { x: 500, z: 600 },
+          id: "bp1",
+          name: "The keep",
           buildings: [
             { def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 },
             { def: "armlab", offset: { x: -64, z: 128 }, facing: 3 },
           ],
+        },
+      ],
+      bases: [
+        {
+          id: "pf1",
+          blueprint: "bp1",
+          team: "p0",
+          origin: { x: 500, z: 600 },
+          buildings: [],
         },
       ],
     });
@@ -116,11 +129,29 @@ describe("scenarioPlacements", () => {
       { x: 436, z: 728 },
     ]);
     expect(out[1]).toMatchObject({
-      key: "prefab:pf1#1",
-      kind: "prefab",
+      key: "base:pf1#1",
+      kind: "base",
       index: 1,
       facing: 3,
     });
+  });
+
+  /** A placement whose blueprint is gone draws nothing rather than throwing.
+   *  The parser refuses to load one, so this is the in-memory half-edit only. */
+  it("draws nothing for a base whose layout is missing", () => {
+    const out = scenarioPlacements({
+      ...empty,
+      bases: [
+        {
+          id: "pf1",
+          blueprint: "gone",
+          team: "p0",
+          origin: { x: 500, z: 600 },
+          buildings: [],
+        },
+      ],
+    });
+    expect(out).toEqual([]);
   });
 
   it("gives every unit in a mixed document a unique key", () => {
@@ -144,12 +175,20 @@ describe("scenarioPlacements", () => {
           dormant: false,
         },
       ],
-      prefabs: [
+      blueprints: [
+        {
+          id: "bp1",
+          name: "The keep",
+          buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
+        },
+      ],
+      bases: [
         {
           id: "shared",
+          blueprint: "bp1",
           team: "p0",
           origin: { x: 0, z: 0 },
-          buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
+          buildings: [],
         },
       ],
     });
@@ -165,7 +204,7 @@ describe("placementKey", () => {
   it("agrees with the keys scenarioPlacements writes", () => {
     expect(placementKey("actor", "a1")).toBe("actor:a1");
     expect(placementKey("group", "g1", 2)).toBe("group:g1#2");
-    expect(placementKey("prefab", "pf1", 0)).toBe("prefab:pf1#0");
+    expect(placementKey("base", "pf1", 0)).toBe("base:pf1#0");
   });
 });
 
