@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildGridSnap } from "@/blueprint/footprint";
 import type { Participant } from "@/play/config";
 import type { Scenario } from "../../model";
 import {
@@ -136,6 +137,70 @@ describe("scenarioPlacements", () => {
       index: 1,
       facing: 3,
     });
+  });
+
+  /** A layout nothing in coilbox placed: the origin is off the build grid, so
+   *  every building of it is somewhere the engine would not stand one. */
+  const offGrid: Registries = {
+    ...empty,
+    blueprints: [
+      {
+        id: "bp1",
+        name: "The keep",
+        buildings: [
+          { def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 },
+          { def: "armfus", offset: { x: 96, z: 0 }, facing: 1 },
+        ],
+      },
+    ],
+    bases: [
+      {
+        id: "pf1",
+        blueprint: "bp1",
+        team: "p0",
+        origin: { x: 507, z: 603 },
+        buildings: [],
+      },
+    ],
+  };
+
+  const gridUnits = [
+    { name: "armsolar", footprintX: 5, footprintZ: 5 },
+    { name: "armfus", footprintX: 5, footprintZ: 4 },
+  ];
+
+  it("draws a base's buildings where the engine will stand them", () => {
+    const snap = buildGridSnap(gridUnits);
+    const out = scenarioPlacements(offGrid, snap);
+    expect(out.map((p) => p.pos)).toEqual([
+      // 507 and 603 are both inside a build square, and a 5 by 5 stands in the
+      // middle of one, so both axes move to the nearest middle.
+      { x: 504, z: 600 },
+      // Turned a quarter, so the 5 by 4 stands on 4 by 5: the x axis is even
+      // and centres on the corner between two squares instead.
+      { x: 608, z: 600 },
+    ]);
+  });
+
+  it("draws the model and its footprint square in the same place", () => {
+    const snap = buildGridSnap(gridUnits);
+    const out = scenarioPlacements(offGrid, snap);
+    const marks = baseFootprints(out, gridUnits);
+    expect(marks.map((m) => m.pos)).toEqual(out.map((p) => p.pos));
+  });
+
+  it("leaves the document alone", () => {
+    const before = structuredClone(offGrid);
+    scenarioPlacements(offGrid, buildGridSnap(gridUnits));
+    expect(offGrid).toEqual(before);
+  });
+
+  it("draws on the document's own point when the game is not read yet", () => {
+    const out = scenarioPlacements(offGrid);
+    expect(out.map((p) => p.pos)).toEqual([
+      { x: 507, z: 603 },
+      { x: 603, z: 603 },
+    ]);
   });
 
   /** A placement whose blueprint is gone draws nothing rather than throwing.

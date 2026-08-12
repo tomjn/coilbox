@@ -16,6 +16,7 @@ import {
   buildingFootprints,
   type FootprintMark,
   footprintMarks,
+  type SnapBuilding,
 } from "@/blueprint/footprint";
 import type { Participant, Rgb } from "@/play/config";
 import {
@@ -42,7 +43,9 @@ export interface Placement {
   def: string;
   /** A `setup.participants` id. */
   team: string;
-  /** Where it stands, in elmos from the map's north-west corner. */
+  /** Where it stands, in elmos from the map's north-west corner. For a base's
+   *  building that is where the engine will stand it, which is not always the
+   *  point its layout names. */
   pos: Point;
   facing: Facing;
 }
@@ -95,9 +98,18 @@ export function groupFormationOffset(
  * A group's `units` counts are expanded one unit per model, because the whole
  * point of drawing a scenario is seeing how much is on the map. Groups have no
  * facing of their own, so their units face south, the engine's zero.
+ *
+ * Given a `snap`, a base's buildings are drawn where the engine will stand them
+ * rather than on the point the document names, so a model and its footprint
+ * square are never in two places (#1421). Only the drawing moves: a document
+ * whose numbers the grid disagrees with is left as its author wrote it, and
+ * making those numbers agree is a conversion an import asks for and says it did.
+ * Without a `snap` everything is drawn where the document puts it, which is what
+ * happens while the game's units are still being read.
  */
 export function scenarioPlacements(
   scenario: Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">,
+  snap?: SnapBuilding,
 ): Placement[] {
   const out: Placement[] = [];
 
@@ -137,6 +149,10 @@ export function scenarioPlacements(
 
   for (const base of scenario.bases) {
     baseBuildings(scenario.blueprints, base).forEach((building, index) => {
+      const at = {
+        x: base.origin.x + building.offset.x,
+        z: base.origin.z + building.offset.z,
+      };
       out.push({
         key: placementKey("base", base.id, index),
         kind: "base",
@@ -144,10 +160,7 @@ export function scenarioPlacements(
         index,
         def: building.def,
         team: base.team,
-        pos: {
-          x: base.origin.x + building.offset.x,
-          z: base.origin.z + building.offset.z,
-        },
+        pos: snap ? snap(at, building.def, building.facing) : at,
         facing: building.facing,
       });
     });
