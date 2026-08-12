@@ -64,6 +64,15 @@ export function useScenarioUnits(
   handle: MapScene3D | null,
   scenario: Scenario,
   map: MapExtent,
+  /**
+   * Placement keys to leave off the map, or null for the whole document.
+   *
+   * Only the drawing is held back. The placements are still reported, so what
+   * is not drawn still counts, still has its ground marked out and is still
+   * something the rest of the editor knows about. Watching a build order go up
+   * is the one caller (issue #1418).
+   */
+  undrawn?: ReadonlySet<string> | null,
 ): ScenarioUnitsState {
   const { target } = usePreferredTarget();
   const enginePath = target?.enginePath;
@@ -96,6 +105,14 @@ export function useScenarioUnits(
     // document leaves the drawn scene alone.
     () => scenarioPlacements({ actors, groups, bases, blueprints }),
     [actors, groups, bases, blueprints],
+  );
+
+  const drawn = useMemo(
+    () =>
+      undrawn?.size
+        ? placements.filter((placement) => !undrawn.has(placement.key))
+        : placements,
+    [placements, undrawn],
   );
 
   const participants = scenario.setup.participants;
@@ -182,7 +199,7 @@ export function useScenarioUnits(
     let cancelled = false;
     setDrawing(true);
     layer
-      .draw(placements)
+      .draw(drawn)
       .then((result) => {
         if (cancelled) return;
         setMissing(result.missing);
@@ -197,7 +214,7 @@ export function useScenarioUnits(
     // `objectNames` rather than the archive name: a dataset already in the
     // session cache resolves in the same render the archive does, so keying on
     // the archive alone would leave the first draw's markers on the map.
-  }, [layer, placements, colorKey, defsReady, objectNames]);
+  }, [layer, drawn, colorKey, defsReady, objectNames]);
 
   const groundAt = useCallback(
     (pos: Point) =>
