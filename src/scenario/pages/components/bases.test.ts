@@ -18,6 +18,7 @@ import {
   removeBase,
   removeBuilding,
   renameBlueprint,
+  replaceBlueprint,
   setBlueprintOrdered,
   setOrigin,
   setQueue,
@@ -562,5 +563,49 @@ describe("the game's units", () => {
 
   it("says it does not know a def the dataset has not got", () => {
     expect(buildableBy(units, "armwin")).toBeNull();
+  });
+});
+
+describe("a layout edited as a layout", () => {
+  it("replaces the one with the same id, wherever it is placed", () => {
+    const doc = document();
+    const edited: BaseBlueprint = {
+      ...layout,
+      name: "The keep, redrawn",
+      buildings: [{ def: "armwin", offset: { x: 0, z: 0 }, facing: 0 }],
+    };
+    const next = replaceBlueprint(doc, edited);
+    expect(next.blueprints).toEqual([edited]);
+    expect(next.bases).toEqual(doc.bases);
+  });
+
+  it("changes every base placed from it, because it is one layout", () => {
+    const doc = {
+      ...document(),
+      bases: [
+        structuredClone(base),
+        { ...structuredClone(base), id: "b2", origin: { x: 0, z: 0 } },
+      ],
+    };
+    const next = replaceBlueprint(doc, {
+      ...layout,
+      buildings: [{ def: "armwin", offset: { x: 0, z: 0 }, facing: 0 }],
+    });
+    expect(buildingsOf(next, "b1").map((b) => b.def)).toEqual(["armwin"]);
+    expect(buildingsOf(next, "b2").map((b) => b.def)).toEqual(["armwin"]);
+  });
+
+  it("takes the layout and its bases away when it is emptied", () => {
+    // A layout with nothing in it draws nothing and can never be clicked on
+    // again, so leaving the bases behind would leave the document holding
+    // things an author cannot reach.
+    const next = replaceBlueprint(document(), { ...layout, buildings: [] });
+    expect(next.blueprints).toEqual([]);
+    expect(next.bases).toEqual([]);
+  });
+
+  it("leaves a document that has never heard of the layout alone", () => {
+    const doc = document();
+    expect(replaceBlueprint(doc, { ...layout, id: "other" })).toBe(doc);
   });
 });

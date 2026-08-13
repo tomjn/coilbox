@@ -285,6 +285,43 @@ export function renameBlueprint(
   return writeLayout(scenario, base, layout, how, { name: wanted });
 }
 
+/**
+ * The document with one of its layouts replaced by an edited version of itself
+ * (issue #1416).
+ *
+ * This is what editing a layout as a layout does, rather than editing a base
+ * that happens to be placed from one. There is no copy on write here and there
+ * should not be: an author who opened "The keep" and moved a solar meant to move
+ * the solar in The keep, and every base placed from The keep is a base with that
+ * solar moved. Copy on write is for an edit made through one base, which cannot
+ * be told from a write through by looking at the base in front of you.
+ *
+ * A layout emptied of buildings takes its bases with it. A base with nothing in
+ * it draws nothing and can never be clicked on again, so it would be a thing the
+ * document held and the author could not reach.
+ */
+export function replaceBlueprint(
+  scenario: Scenario,
+  layout: BaseBlueprint,
+): Scenario {
+  if (!scenario.blueprints.some((b) => b.id === layout.id)) return scenario;
+  if (layout.buildings.length === 0) {
+    return pruneBlueprints({
+      ...scenario,
+      blueprints: scenario.blueprints.filter((b) => b.id !== layout.id),
+      bases: scenario.bases.filter((base) => base.blueprint !== layout.id),
+    });
+  }
+  return {
+    ...scenario,
+    blueprints: edit<BaseBlueprint>(
+      scenario.blueprints,
+      layout.id,
+      () => layout,
+    ),
+  };
+}
+
 /* -------------------------------------------------------------------------- *
  * The document. Every one of these hands the same document back when the id
  * names nothing, so a caller can compare identities to decide whether there is
