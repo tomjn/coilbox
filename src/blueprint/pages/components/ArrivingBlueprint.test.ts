@@ -35,10 +35,13 @@ function payload(over: Partial<BlueprintPayload> = {}): BlueprintPayload {
   };
 }
 
+type Props = Parameters<typeof ArrivingBlueprint>[0];
+
 function markup(
   value: BlueprintPayload,
   taken: string[] = [],
   known = knownUnits(UNITS),
+  over: Partial<Props> = {},
 ): string {
   return renderToStaticMarkup(
     createElement(ArrivingBlueprint, {
@@ -51,6 +54,7 @@ function markup(
       }),
       busy: false,
       onTake: () => {},
+      ...over,
     }),
   );
 }
@@ -87,5 +91,44 @@ describe("ArrivingBlueprint", () => {
   it("says a layout naming no game names none", () => {
     const html = markup(payload({ game: undefined }));
     expect(html).toContain("No game named");
+  });
+});
+
+/**
+ * The conversion offered where the layout arrives (issue #1467).
+ *
+ * The case that must stay silent is the one worth guarding: a layout whose side
+ * nothing could work out is a layout with nothing to say about sides, and a
+ * guess here would be a guess about which game somebody is playing.
+ */
+describe("ArrivingBlueprint, taking a layout as another side", () => {
+  const conversion = {
+    offer: { from: "Armada", to: ["Cortex"] },
+    takingAs: "",
+    notes: [],
+    onTakeAs: () => {},
+  };
+
+  it("says nothing about sides when the layout's side could not be told", () => {
+    expect(markup(payload())).not.toContain("Take it as");
+  });
+
+  it("offers the layout in the other side this game has it in", () => {
+    const html = markup(payload(), [], knownUnits(UNITS), { conversion });
+    expect(html).toContain("Take it as Cortex");
+    expect(html).toContain("Keep it as Armada");
+    expect(html).toContain("does not know which side you play");
+  });
+
+  it("says what the swap does to the layout once a side is picked", () => {
+    const html = markup(payload(), [], knownUnits(UNITS), {
+      conversion: {
+        ...conversion,
+        takingAs: "Cortex",
+        notes: [{ tone: "warn" as const, text: "Building 1 will move." }],
+      },
+    });
+    expect(html).toContain("Building 1 will move.");
+    expect(html).toContain('data-tone="warn"');
   });
 });
