@@ -172,7 +172,7 @@ describe("standsOn in water", () => {
     // `maxWaterDepth` 0 is what a land building declares: the ground under it
     // may not be below the water at all.
     const limits = { ...land(TEN_DEGREES), maxWaterDepth: 0 };
-    expect(standsOn(marks()[0], seabed, limits)).toBe("depth");
+    expect(standsOn(marks()[0], seabed, limits)).toBe("too-deep");
     expect(standsOn(marks()[0], shore, limits)).toBe("fine");
   });
 
@@ -184,7 +184,7 @@ describe("standsOn in water", () => {
       minWaterDepth: 20,
       maxWaterDepth: 1000,
     };
-    expect(standsOn(marks()[0], shore, limits)).toBe("depth");
+    expect(standsOn(marks()[0], shore, limits)).toBe("too-shallow");
     expect(standsOn(marks()[0], seabed, limits)).toBe("fine");
   });
 
@@ -200,7 +200,33 @@ describe("standsOn in water", () => {
         ground(() => -5),
         limits,
       ),
-    ).toBe("depth");
+    ).toBe("too-shallow");
+  });
+
+  /**
+   * Issue #1552. The two ends of the engine's band are opposite problems with
+   * opposite fixes, so one answer for both is an answer nobody can act on.
+   */
+  it("tells the two ends of the band apart", () => {
+    const yard = {
+      ...land(TEN_DEGREES),
+      minWaterDepth: 20,
+      maxWaterDepth: 60,
+    };
+    expect(
+      standsOn(
+        marks()[0],
+        ground(() => -200),
+        yard,
+      ),
+    ).toBe("too-deep");
+    expect(
+      standsOn(
+        marks()[0],
+        ground(() => -5),
+        yard,
+      ),
+    ).toBe("too-shallow");
   });
 
   /** The band widens by the reading's own error, the same way the slope
@@ -221,7 +247,7 @@ describe("standsOn in water", () => {
         ground(() => -5),
         limits,
       ),
-    ).toBe("depth");
+    ).toBe("too-deep");
   });
 
   /** A def that declares nothing gets the engine's own default band, which no
@@ -258,7 +284,7 @@ describe("standsOn in water", () => {
       minWaterDepth: 0,
       maxWaterDepth: 1000,
     };
-    expect(standsOn(marks()[0], shore, limits)).toBe("depth");
+    expect(standsOn(marks()[0], shore, limits)).toBe("too-shallow");
   });
 
   /**

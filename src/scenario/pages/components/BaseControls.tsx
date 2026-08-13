@@ -96,7 +96,8 @@ export function BaseControls({
   sharedEdit,
   overlaps,
   unstable,
-  wrongDepth,
+  tooDeep,
+  tooShallow,
   noSlope,
   absent,
   designedFor,
@@ -145,9 +146,12 @@ export function BaseControls({
    *  base. Drawn in amber on the map as well, and empty where the terrain
    *  could not be checked at all. */
   unstable: number[];
-  /** Which of them are in the wrong depth of water for them, by their place in
+  /** Which of them have more water over them than they allow, by their place in
    *  the base. Drawn in cyan on the map as well (issue #1459). */
-  wrongDepth: number[];
+  tooDeep: number[];
+  /** Which of them want more water than there is under them (issue #1552). The
+   *  same cyan on the map, told apart in words. */
+  tooShallow: number[];
   /** Which of them this game gives no slope to check against, by their place in
    *  the base. Undefined while the reads are still in flight, when nothing is
    *  worth saying yet (issue #1491). */
@@ -399,7 +403,8 @@ export function BaseControls({
           <LayoutNotes
             overlaps={overlaps}
             unstable={unstable}
-            wrongDepth={wrongDepth}
+            tooDeep={tooDeep}
+            tooShallow={tooShallow}
             noSlope={noSlope}
             absent={absent}
             buildings={buildings.length}

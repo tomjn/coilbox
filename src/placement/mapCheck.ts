@@ -1,0 +1,68 @@
+/**
+ * Standing a layout on a real map to see what the terrain would refuse (issue
+ * #1457).
+ *
+ * The terrain check is the engine's own rule and it already exists: `standsOn`
+ * in `@/blueprint/buildable`, over a layout, a map's ground and an origin. The
+ * scenario editor runs it because a base there is already on a map. A blueprint
+ * in the library is not on one, by design (issue #1416): it is a shape rather
+ * than a place, it is not made for one map, and map reading is the slowest thing
+ * in coilbox.
+ *
+ * So this is the opt-in half. A map is chosen, a spot on it is chosen, and the
+ * same check answers the same question about that pair. Nothing here is loaded
+ * until somebody asks for it, and the editor next to it still needs no map.
+ *
+ * Arithmetic on plain values, so all of it is tested. The surface is
+ * `BlueprintOnMap.tsx`.
+ */
+
+import type { Point } from "@/scenario/model";
+import { clampToMap } from "./pointer";
+
+/**
+ * Which map to offer first, or `""` for none.
+ *
+ * A layout records the map it was drawn on, and that is the obvious default: it
+ * is the terrain the shape was made to fit, and the one an author is most likely
+ * to want to see it on again.
+ *
+ * Only when the machine actually has it. A layout from somebody else names maps
+ * this one may never have had, and reading a map that is not installed is the
+ * slowest possible way to find that out. An empty list is the scan still
+ * running rather than a machine with no maps on it, and either way nothing is
+ * chosen: the first thing an author sees must not be a map being read that they
+ * did not pick.
+ */
+export function checkMapFor(
+  designedFor: string | undefined,
+  installed: readonly { name: string }[],
+): string {
+  if (!designedFor) return "";
+  return installed.some((map) => map.name === designedFor) ? designedFor : "";
+}
+
+/**
+ * Where the layout stands, which is the middle of the map until somebody moves
+ * it.
+ *
+ * The middle because it is the one spot every map has, and because a layout
+ * arriving in a corner reads as a mistake. Held on the map, because a drag
+ * carries the layout by whatever the pointer did: the engine clamps anything
+ * standing past an edge back onto it, so a spot off the map is a verdict about
+ * ground the layout would not be on.
+ */
+export function checkSpot(
+  spot: Point | null,
+  worldWidth: number,
+  worldHeight: number,
+): Point {
+  const at = spot ?? { x: worldWidth / 2, z: worldHeight / 2 };
+  return clampToMap(at, worldWidth, worldHeight);
+}
+
+/** Where the layout is standing, in the map's own coordinates, so a spot worth
+ *  keeping can be written down and typed into a mission. */
+export function spotSentence(spot: Point): string {
+  return `Standing at ${Math.round(spot.x)}, ${Math.round(spot.z)}.`;
+}

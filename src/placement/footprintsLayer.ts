@@ -54,9 +54,16 @@ const GROUND_COLOR = 0x94a3b8;
 const CLASH_COLOR = 0xf87171;
 const SLOPE_COLOR = 0xfbbf24;
 
-/** What a building in the wrong depth of water is drawn in (issue #1459). Its
- *  own colour because it is fixed its own way: this one moves to the water, or
- *  out of it, and no amount of flatter ground helps. */
+/**
+ * What a building in the wrong depth of water is drawn in (issue #1459). Its
+ * own colour because it is fixed its own way: this one moves to the water, or
+ * out of it, and no amount of flatter ground helps.
+ *
+ * One colour for both ends of the engine's band (issue #1552). Too much water
+ * over a building and too little are the same rule read from opposite sides,
+ * and which way to move it is a thing to say in words rather than a fifth
+ * colour to learn. A legend of five is a legend nobody reads.
+ */
 const DEPTH_COLOR = 0x22d3ee;
 
 /** What a building nothing has judged is outlined in: brighter than the ground
@@ -145,7 +152,7 @@ export function footprintStyle(
   if (mark.standing === "slope") {
     return { color: SLOPE_COLOR, fill, outline, dashed: false };
   }
-  if (mark.standing === "depth") {
+  if (mark.standing === "too-deep" || mark.standing === "too-shallow") {
     return { color: DEPTH_COLOR, fill, outline, dashed: false };
   }
   if (mark.standing === "no-def") {

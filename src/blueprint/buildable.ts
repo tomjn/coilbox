@@ -37,6 +37,10 @@
  * engine's defaults of -10e6 and +10e6 are a band no ground falls outside, so a
  * def that declares neither is refused nowhere.
  *
+ * Which end of that band was crossed is part of the answer (issue #1552). Too
+ * much water over a building and too little are opposite problems, fixed by
+ * moving it opposite ways, so they are two verdicts rather than one.
+ *
  * A floater is exempt from the slope test wherever the ground is at or below
  * the water, because it never touches the seabed. It is not exempt from the
  * depth test, and where it does overhang dry land it is measured against
@@ -317,12 +321,10 @@ export function standsOn(
       if (ground.hasWater) {
         // `[-maxWaterDepth, -minWaterDepth]`, widened by what the reading can
         // hide so ground that might be inside the band is treated as inside it.
-        if (
-          square < -limits.maxWaterDepth - slack ||
-          square > -limits.minWaterDepth + slack
-        ) {
-          return "depth";
-        }
+        // Which end was crossed is the answer, because the two want the
+        // building moved opposite ways (issue #1552).
+        if (square < -limits.maxWaterDepth - slack) return "too-deep";
+        if (square > -limits.minWaterDepth + slack) return "too-shallow";
         // A floater rests on the water, so the seabed under it decides nothing.
         if (limits.floats && square - slack <= 0) continue;
       }

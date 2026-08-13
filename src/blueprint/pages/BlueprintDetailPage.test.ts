@@ -46,6 +46,11 @@ vi.mock("@picoframe/frame", async () => ({
 vi.mock("@/placement/BlueprintEditor", () => ({
   BlueprintEditor: () => null,
 }));
+// Named rather than nulled, so a test can tell "the map check is not mounted"
+// from "it is mounted and drew nothing" (issue #1457).
+vi.mock("@/placement/BlueprintOnMap", () => ({
+  BlueprintOnMap: () => createElement("p", null, "the map check"),
+}));
 vi.mock("@/content/useGameUnits", () => ({
   useGameUnits: () => ({ units: [], loading: false }),
 }));
@@ -104,6 +109,20 @@ describe("BlueprintDetailPage", () => {
    *  #1452). */
   it("offers a copy of the layout", () => {
     expect(markup()).toContain("Duplicate");
+  });
+
+  /**
+   * Issue #1457. The check against real terrain is offered here, because this
+   * is where a layout that came from somewhere else is opened.
+   *
+   * Offered rather than run. A blueprint is not made for one map and reading a
+   * map is the slowest thing in coilbox, so a page nobody asks reads none: the
+   * surface is not mounted until the button is pressed (issue #1416).
+   */
+  it("offers a check against a real map, and does not run one", () => {
+    const html = markup();
+    expect(html).toContain("Try it on a map");
+    expect(html).not.toContain("the map check");
   });
 
   /**

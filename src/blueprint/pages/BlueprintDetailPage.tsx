@@ -17,7 +17,15 @@
  */
 
 import { Button, useDrawer } from "@picoframe/frame";
-import { ArrowLeft, Copy, Loader2, Repeat, Share2, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Copy,
+  Loader2,
+  MapPin,
+  Repeat,
+  Share2,
+  Trash2,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -36,6 +44,7 @@ import { useGameUnits } from "@/content/useGameUnits";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { hubItemRoute, isHubItemPageReachable } from "@/hub/config";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
+import { BlueprintOnMap } from "@/placement/BlueprintOnMap";
 import { scenarioRoute } from "@/scenario/scenarios";
 import {
   duplicatedBlueprint,
@@ -76,6 +85,18 @@ export default function BlueprintDetailPage() {
   const gameName = record ? recordGameName(record) : "";
   const { units } = useGameUnits(gameName);
   const footprints = useMemo(() => footprintsFromUnits(units), [units]);
+  // Held rather than worked out per render: a surface drawing this rebuilds
+  // everything downstream of it when it changes, and on a map that means every
+  // model read again.
+  const layout = useMemo(
+    () => (record ? libraryLayout(record) : null),
+    [record],
+  );
+
+  // Whether the map check is open (issue #1457). Off until it is asked for, so
+  // opening a layout reads no map: a blueprint is not made for one map, and map
+  // reading is the slowest thing in coilbox.
+  const [onMap, setOnMap] = useState(false);
 
   const [revision, setRevision] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -119,7 +140,7 @@ export default function BlueprintDetailPage() {
 
   if (loading && !record) return <SkeletonList />;
 
-  if (!record) {
+  if (!record || !layout) {
     return (
       <div className="flex flex-col gap-4 p-4">
         <BackLink />
@@ -231,17 +252,39 @@ export default function BlueprintDetailPage() {
       {saveError && <ErrorBanner message={`Not saved: ${saveError}`} />}
 
       <BlueprintEditor
-        blueprint={libraryLayout(record)}
+        blueprint={layout}
         gameName={gameName}
         onChange={(layout) =>
           edit(recordWithLayout(record, layout, footprints))
         }
       />
 
+      {/* The optional step (issue #1457). Mounted only once it is asked for, so
+          a page that nobody asks reads no map at all and the editor above it
+          still needs none. */}
+      {onMap ? (
+        <BlueprintOnMap
+          blueprint={layout}
+          gameName={gameName}
+          onClose={() => setOnMap(false)}
+        />
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="w-fit gap-1.5"
+          onClick={() => setOnMap(true)}
+        >
+          <MapPin className="size-4" /> Try it on a map
+        </Button>
+      )}
+
       <p className="text-xs text-muted-foreground">
         A blueprint is a shape rather than a place, so there is no map here and
-        no team. Put it down in a mission from the scenario builder, or send it
-        to a game's own blueprint file from there.
+        no team. Try it on a map to see which of its buildings a real terrain
+        would refuse. Put it down in a mission from the scenario builder, or
+        send it to a game's own blueprint file from there.
       </p>
     </div>
   );

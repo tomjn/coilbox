@@ -43,7 +43,7 @@ describe("footprintStyle", () => {
    *  own: it is fixed by moving it into the water, or out of it, and no amount
    *  of flatter ground helps. */
   it("draws a building at the wrong depth in its own refusal colour", () => {
-    const depth = style("depth");
+    const depth = style("too-deep");
     expect(depth.fill).toBeGreaterThan(0);
     expect(depth.dashed).toBe(false);
     for (const other of [
@@ -53,6 +53,16 @@ describe("footprintStyle", () => {
     ]) {
       expect(depth.color).not.toBe(other.color);
     }
+  });
+
+  /**
+   * Issue #1552. Both ends of the band are the water refusing the building, so
+   * both are cyan: a fifth colour would be a fifth thing to learn for a
+   * difference the sentence already carries, and it would say the two are
+   * unrelated when they are the same rule read from opposite sides.
+   */
+  it("draws both ends of the band in the one water colour", () => {
+    expect(style("too-shallow")).toEqual(style("too-deep"));
   });
 
   /** The state that did not exist. Dashed and unfilled, so it cannot be read as
@@ -155,7 +165,8 @@ describe("footprintStyle, a spot being offered", () => {
   it("keeps a refusal's own colour in an offer", () => {
     expect(offered("fine", true).color).toBe(style("fine", true).color);
     expect(offered("slope").color).toBe(style("slope").color);
-    expect(offered("depth").color).toBe(style("depth").color);
+    expect(offered("too-deep").color).toBe(style("too-deep").color);
+    expect(offered("too-shallow").color).toBe(style("too-shallow").color);
     expect(offered("no-def").color).toBe(style("no-def").color);
   });
 

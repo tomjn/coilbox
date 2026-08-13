@@ -301,7 +301,11 @@ export type NudgeOffer = Nudge | "nowhere" | null;
  * spot on a map whose heights would not read.
  */
 function refusedByGround(standing: Standing): boolean {
-  return standing === "slope" || standing === "depth";
+  return (
+    standing === "slope" ||
+    standing === "too-deep" ||
+    standing === "too-shallow"
+  );
 }
 
 /**
@@ -477,9 +481,13 @@ export interface PreviewCount {
   clashes: number;
   /** Standing on ground too steep for it. */
   unstable: number;
-  /** In the wrong depth of water for it: a land building in the sea, or a naval
-   *  one out of it (issue #1459). */
-  wrongDepth: number;
+  /** Under more water than it allows: a land building in the sea (issue
+   *  #1459). It wants shallower water. */
+  tooDeep: number;
+  /** Wanting more water than there is under it: a naval building out of the
+   *  sea (issue #1459). It wants deeper water, which is the opposite move
+   *  (issue #1552). */
+  tooShallow: number;
   /** Nothing has judged the ground under it, which is not the same as the
    *  ground being fine (issue #1491). */
   unjudged: number;
@@ -493,7 +501,8 @@ export function previewCount(marks: readonly FootprintMark[]): PreviewCount {
     total: marks.length,
     clashes: marks.filter((mark) => mark.overlapping).length,
     unstable: marks.filter((mark) => mark.standing === "slope").length,
-    wrongDepth: marks.filter((mark) => mark.standing === "depth").length,
+    tooDeep: marks.filter((mark) => mark.standing === "too-deep").length,
+    tooShallow: marks.filter((mark) => mark.standing === "too-shallow").length,
     unjudged: marks.filter((mark) => unjudged(mark.standing)).length,
     absent: marks.filter((mark) => mark.standing === "no-def").length,
   };
@@ -507,7 +516,8 @@ export function sameCount(a: PreviewCount | null, b: PreviewCount | null) {
     a.total === b.total &&
     a.clashes === b.clashes &&
     a.unstable === b.unstable &&
-    a.wrongDepth === b.wrongDepth &&
+    a.tooDeep === b.tooDeep &&
+    a.tooShallow === b.tooShallow &&
     a.unjudged === b.unjudged &&
     a.absent === b.absent
   );
@@ -519,7 +529,8 @@ export function previewTrouble(count: PreviewCount): boolean {
   return (
     count.clashes > 0 ||
     count.unstable > 0 ||
-    count.wrongDepth > 0 ||
+    count.tooDeep > 0 ||
+    count.tooShallow > 0 ||
     count.absent > 0
   );
 }
@@ -528,7 +539,12 @@ export function previewTrouble(count: PreviewCount): boolean {
  *  put right, which is what makes a search for one worth running (issue #1482).
  *  A unit the game has not got is refused everywhere, so it is not. */
 export function previewMovable(count: PreviewCount): boolean {
-  return count.clashes > 0 || count.unstable > 0 || count.wrongDepth > 0;
+  return (
+    count.clashes > 0 ||
+    count.unstable > 0 ||
+    count.tooDeep > 0 ||
+    count.tooShallow > 0
+  );
 }
 
 /** What is left unsaid about this spot, when anything is. Appended rather than
@@ -573,12 +589,22 @@ export function previewSentence(count: PreviewCount): string {
         : `${unstable}${of} are on ground too steep for them, in amber.`,
     );
   }
-  if (count.wrongDepth > 0) {
+  // Both ends of the engine's band are cyan, so these two sentences are the
+  // only thing saying which way a building has to move (issue #1552).
+  if (count.tooDeep > 0) {
     const of = parts.length > 0 ? "" : ` of ${total}`;
     parts.push(
-      count.wrongDepth === 1
-        ? `1${of} is in the wrong depth of water for it, in cyan.`
-        : `${count.wrongDepth}${of} are in the wrong depth of water for them, in cyan.`,
+      count.tooDeep === 1
+        ? `1${of} is in water too deep for it, in cyan.`
+        : `${count.tooDeep}${of} are in water too deep for them, in cyan.`,
+    );
+  }
+  if (count.tooShallow > 0) {
+    const of = parts.length > 0 ? "" : ` of ${total}`;
+    parts.push(
+      count.tooShallow === 1
+        ? `1${of} is not in deep enough water, in cyan.`
+        : `${count.tooShallow}${of} are not in deep enough water, in cyan.`,
     );
   }
   if (count.absent > 0) {
