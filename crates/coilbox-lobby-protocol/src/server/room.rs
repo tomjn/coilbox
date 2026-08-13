@@ -157,6 +157,21 @@ pub struct RoomState {
     /// Names the host has kicked. Blocked for the life of the room, which is what
     /// makes a kick worth anything when anyone can reconnect in a second.
     kicked: BTreeSet<String>,
+    /// The seat each name held when their connection died under them, so a
+    /// player who drops gets their team, ally and colour back rather than
+    /// rebuilding them in front of everybody.
+    ///
+    /// Keyed by name and held outside the peer table on purpose. The plugin frees
+    /// a name after 90 seconds of silence, so the socket a seat was left on is
+    /// often long gone by the time its owner is back. Nothing about a seat
+    /// depends on that socket, so the sweep and the reclaim cannot race: whether
+    /// the returning player beats the sweep or arrives an hour later, the same
+    /// seat is here for them.
+    ///
+    /// A deliberate `LEAVEBATTLE` leaves nothing behind. Somebody who chose to
+    /// leave the battle is choosing their seat again when they come back, which
+    /// is what a real server does too.
+    seats: BTreeMap<String, MemberStatus>,
     next_battle_id: u32,
 }
 
@@ -169,6 +184,7 @@ impl RoomState {
             battle: None,
             pending: Vec::new(),
             kicked: BTreeSet::new(),
+            seats: BTreeMap::new(),
             next_battle_id: 1,
         }
     }
@@ -191,6 +207,17 @@ impl RoomState {
         // Out of the battle first, while the peer is still in the room: leaving is
         // what closes the battle when it is the host who has gone.
         let name = self.name_of(peer);
+        // A connection ending while it still holds a seat is not a decision to
+        // give that seat up, so it is kept under the name that held it. This is
+        // the only place that remembers one: a peer who sent `LEAVEBATTLE` has no
+        // seat left by the time they get here, which is how choosing to leave
+        // stays different from being cut off.
+        if let (Some(name), Some(member)) = (
+            name.clone(),
+            self.peers.get(&peer).and_then(|p| p.member.clone()),
+        ) {
+            self.seats.insert(name, member);
+        }
         let mut out = match &name {
             Some(name) => self.leave_battle(peer, name),
             None => vec![],
@@ -412,10 +439,16 @@ impl RoomState {
 
     /// Accept or refuse a login, and on acceptance stream the room's state.
     ///
-    /// The duplicate-name refusal is the only identity rule here. A suffix
-    /// suggestion, a room password and reclaiming a seat on reconnect belong to
-    /// the identity work. This is what `apply` cannot stay coherent without, since
-    /// two peers under one name would have one member entry between them.
+    /// A room has no accounts, so the name a client presents is the whole of its
+    /// identity. Two peers under one name would have one member entry between
+    /// them, so the second is refused. The refusal carries a name that is free, so
+    /// the person reading it has something to do about it rather than a dead end.
+    ///
+    /// A name is never taken off a live connection. Letting a second login evict
+    /// the first would hand anybody a way to throw anybody else out by typing
+    /// their name. A player whose socket died instead of closing waits for the
+    /// idle sweep, and their seat is waiting for them when they get back in: see
+    /// [`RoomState::seats`].
     fn login(&mut self, peer: PeerId, username: String, agent: String) -> Vec<Outbound> {
         if self.name_of(peer).is_some() {
             return vec![];
@@ -426,7 +459,11 @@ impl RoomState {
             return self.deny(peer, "that name has whitespace in it");
         }
         if self.peer_named(&username).is_some() {
-            return self.deny(peer, "that name is already in this room");
+            let free = self.suggest_name(&username);
+            return self.deny(
+                peer,
+                &format!("that name is already in this room, try {free}"),
+            );
         }
         if self.kicked.contains(&username) {
             return self.deny(peer, "you were kicked from this room");
@@ -472,6 +509,27 @@ impl RoomState {
             line: line::add_user(&username, "??", &peer.to_string(), &agent),
         });
         out
+    }
+
+    /// A free name near the one somebody asked for: the same name with a number
+    /// on the end, counting up until one nobody holds.
+    ///
+    /// Trailing digits are stripped first, so a second attempt by `alice2` offers
+    /// `alice3` rather than `alice22`. Kicked names are skipped, because
+    /// suggesting one would send the reader straight into a second refusal.
+    fn suggest_name(&self, taken: &str) -> String {
+        let stem = taken.trim_end_matches(|c: char| c.is_ascii_digit());
+        let stem = if stem.is_empty() { taken } else { stem };
+        // Terminates: every step rules out one name, and the room holds a finite
+        // number of them.
+        let mut n = 2u32;
+        loop {
+            let candidate = format!("{stem}{n}");
+            if self.peer_named(&candidate).is_none() && !self.kicked.contains(&candidate) {
+                return candidate;
+            }
+            n += 1;
+        }
     }
 
     fn deny(&mut self, peer: PeerId, reason: &str) -> Vec<Outbound> {
@@ -578,8 +636,14 @@ impl RoomState {
         if self.kicked.contains(&name) {
             return refuse("you were kicked from this room");
         }
-        if battle.key.as_deref() != key.as_deref() {
-            return refuse("wrong room password");
+        // Two refusals rather than one, because they ask for different things: a
+        // joiner who sent nothing has to be told there is a password at all, and
+        // a joiner who sent one has to be told to try again. An open room takes
+        // whatever it is handed, including a password nobody asked for.
+        match (battle.key.as_deref(), key.as_deref()) {
+            (Some(_), None) => return refuse("this room needs a password"),
+            (Some(want), Some(got)) if want != got => return refuse("wrong room password"),
+            _ => {}
         }
         if seats >= battle.max_players {
             return refuse("this room is full");
@@ -634,6 +698,20 @@ impl RoomState {
     ///
     /// Every line after the first depends on the first: they either carry no
     /// battle id, or they name a member the joiner has not been told about yet.
+    ///
+    /// # Reclaiming a seat
+    ///
+    /// A name with a seat waiting for it (see [`RoomState::seats`]) gets that
+    /// seat back, announced to the room, and is *not* asked for one. The two are
+    /// alternatives, not a sequence.
+    ///
+    /// `REQUESTBATTLESTATUS` is answered by the client's connection task out of
+    /// whatever it has folded so far, and a client that has just reconnected has
+    /// folded nothing. Ask it before telling it and the answer is the spectator
+    /// default, which comes back as a `MYBATTLESTATUS` that overwrites the seat we
+    /// had just handed back. Ask it after and the answer happens to be right.
+    /// Measured on the wire, both ways round. Not asking is the version that does
+    /// not depend on which line the client reads first.
     fn admit(&mut self, peer: PeerId, script_password: Option<String>) -> Vec<Outbound> {
         let (Some(name), Some(battle)) = (self.name_of(peer), self.battle.as_ref()) else {
             return vec![];
@@ -694,9 +772,17 @@ impl RoomState {
             ),
         });
 
+        // The script password is the one they arrived with, never the one they
+        // left with: the client generates a fresh one when it cannot remember the
+        // old, and the host's start script has to authenticate the new socket.
+        let reclaimed = self.seats.remove(&name);
+        let (battle_status, team_color) = match &reclaimed {
+            Some(seat) => (seat.battle_status, seat.team_color),
+            None => (BattleStatus::default(), 0),
+        };
         self.peers.get_mut(&peer).expect("peer exists").member = Some(MemberStatus {
-            battle_status: BattleStatus::default(),
-            team_color: 0,
+            battle_status,
+            team_color,
             script_password: script_password.clone(),
         });
 
@@ -718,12 +804,19 @@ impl RoomState {
                 line: line::joined_battle(id, &name, None),
             }),
         }
-        // Their team, ally and colour come back as MYBATTLESTATUS, which the room
-        // then broadcasts. Without the prompt they sit at the protocol default.
-        out.push(Outbound::To {
-            peer,
-            line: line::request_battle_status(),
-        });
+        match reclaimed {
+            // The seat they dropped with, given back and said out loud, so their
+            // own room and everybody else's agree without anybody being asked.
+            Some(_) => out.push(Outbound::All {
+                line: line::client_battle_status(&name, battle_status, team_color),
+            }),
+            // Their team, ally and colour come back as MYBATTLESTATUS, which the
+            // room then broadcasts. Without the prompt they sit at the default.
+            None => out.push(Outbound::To {
+                peer,
+                line: line::request_battle_status(),
+            }),
+        }
         out
     }
 
@@ -746,6 +839,10 @@ impl RoomState {
             // current battle off BATTLECLOSED, so nobody needs a LEFTBATTLE too.
             self.battle = None;
             self.pending.clear();
+            // Seats belong to a battle, not to the room. The next battle the host
+            // opens has its own map and its own teams, so an old seat in it would
+            // be a team nobody picked.
+            self.seats.clear();
             for p in self.peers.values_mut() {
                 p.member = None;
             }
@@ -1140,14 +1237,47 @@ mod tests {
     }
 
     /// Two peers under one name would share one member entry, so the room cannot
-    /// let both in whatever the identity rules end up being.
+    /// let both in. The refusal carries a free name, because a room has no
+    /// accounts and "pick another" with no suggestion is a dead end.
     #[test]
-    fn a_name_already_in_the_room_is_refused_and_dropped() {
+    fn a_name_already_in_the_room_is_refused_with_one_that_is_free() {
         let mut room = room(false);
         log_in(&mut room, ALICE, "alice");
         let out = log_in(&mut room, BOB, "alice");
-        assert_eq!(due(&out, BOB), ["DENIED that name is already in this room"]);
+        assert_eq!(
+            due(&out, BOB),
+            ["DENIED that name is already in this room, try alice2"]
+        );
         assert!(out.contains(&Outbound::Close { peer: BOB }));
+    }
+
+    /// The suggestion has to be free itself, or the reader walks into a second
+    /// refusal. Trailing digits are the counter, not part of the name.
+    #[test]
+    fn the_suggested_name_counts_past_everyone_already_here() {
+        let mut room = room(false);
+        log_in(&mut room, ALICE, "alice");
+        log_in(&mut room, BOB, "alice2");
+        log_in(&mut room, 3, "alice3");
+
+        // Somebody typing the original name, and somebody typing a suggestion
+        // that has since been taken, both land past the lot of them.
+        for typed in ["alice", "alice2", "alice3"] {
+            let out = log_in(&mut room, 4, typed);
+            assert_eq!(
+                due(&out, 4),
+                ["DENIED that name is already in this room, try alice4"]
+            );
+        }
+
+        // A kicked name is not a suggestion: it would be refused in turn.
+        send(&mut room, ALICE, &open_battle_line());
+        send(&mut room, ALICE, "KICKFROMBATTLE alice4");
+        let out = log_in(&mut room, 5, "alice");
+        assert_eq!(
+            due(&out, 5),
+            ["DENIED that name is already in this room, try alice5"]
+        );
     }
 
     /// A space in a name is impossible to send, since the parser splits the login
@@ -1334,8 +1464,10 @@ mod tests {
         assert_eq!(room.pending_joins().len(), 1);
     }
 
+    /// The two ways a password goes wrong ask the joiner for different things:
+    /// one to find a password at all, the other to check the one they typed.
     #[test]
-    fn a_wrong_room_password_is_refused_by_name() {
+    fn a_room_password_is_refused_in_the_words_that_fit_what_happened() {
         let mut room = room(false);
         log_in(&mut room, ALICE, "alice");
         let opened = command::open_battle(
@@ -1357,10 +1489,112 @@ mod tests {
         log_in(&mut room, BOB, "bob");
 
         let out = send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        assert_eq!(
+            due(&out, BOB),
+            ["JOINBATTLEFAILED this room needs a password"]
+        );
+        let out = send(&mut room, BOB, "JOINBATTLE 1 wrong s3cret");
         assert_eq!(due(&out, BOB), ["JOINBATTLEFAILED wrong room password"]);
         let out = send(&mut room, BOB, "JOINBATTLE 1 letmein s3cret");
         assert_eq!(due(&out, BOB)[0], "JOINBATTLE 1 -1 __battle__1");
+        // And the joiner is told there is one to ask for before they try.
         assert!(room.battle_view().unwrap().passworded);
+    }
+
+    /// A room with no password takes anybody, including somebody who brought one.
+    #[test]
+    fn a_room_with_no_password_lets_anyone_in() {
+        let mut room = started(false);
+        let out = send(&mut room, BOB, "JOINBATTLE 1 unnecessary s3cret");
+        assert_eq!(due(&out, BOB)[0], "JOINBATTLE 1 -1 __battle__1");
+        assert!(!room.battle_view().unwrap().passworded);
+    }
+
+    /// A dropped player comes back to the seat they had, and is not asked to
+    /// pick one: the client answers that question out of a state it rebuilt from
+    /// nothing, so the answer would be the spectator default and would throw the
+    /// seat away again.
+    #[test]
+    fn a_dropped_player_gets_their_seat_back_without_being_asked_for_it() {
+        let mut room = started(false);
+        send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        let seat = BattleStatus {
+            mode: true,
+            ally: 2,
+            team_id: 3,
+            ..default_battle_status()
+        };
+        send(&mut room, BOB, &command::my_battle_status(seat, 16_711_680));
+        room.disconnect(BOB);
+
+        log_in(&mut room, 3, "bob");
+        let out = send(&mut room, 3, "JOINBATTLE 1 * fresh-sp");
+        let lines = due(&out, 3);
+        assert_eq!(
+            lines.last(),
+            Some(&format!("CLIENTBATTLESTATUS bob {} 16711680", seat.to_int()).as_str())
+        );
+        assert!(
+            !lines.contains(&"REQUESTBATTLESTATUS"),
+            "asking would get the default back and undo the reclaim: {lines:?}"
+        );
+        // The rest of the room hears it too, so nobody is left drawing bob in the
+        // seat he had before he picked this one.
+        assert!(due(&out, ALICE)
+            .contains(&format!("CLIENTBATTLESTATUS bob {} 16711680", seat.to_int()).as_str()));
+
+        let members = room.battle_view().unwrap().members;
+        assert_eq!(members["bob"].battle_status, seat);
+        assert_eq!(members["bob"].team_color, 16_711_680);
+        // The script password is the new one: the host's start script has to
+        // authenticate the socket that is here now, not the one that died.
+        assert_eq!(members["bob"].script_password.as_deref(), Some("fresh-sp"));
+    }
+
+    /// Leaving the battle is a decision. Coming back after one starts fresh, the
+    /// same as it would on a real server.
+    #[test]
+    fn leaving_the_battle_gives_the_seat_up() {
+        let mut room = started(false);
+        send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        let seat = BattleStatus {
+            ally: 2,
+            team_id: 3,
+            ..default_battle_status()
+        };
+        send(&mut room, BOB, &command::my_battle_status(seat, 16_711_680));
+        send(&mut room, BOB, "LEAVEBATTLE");
+
+        let out = send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        assert_eq!(due(&out, BOB).last(), Some(&"REQUESTBATTLESTATUS"));
+        let members = room.battle_view().unwrap().members;
+        assert_eq!(members["bob"].battle_status, BattleStatus::default());
+        assert_eq!(members["bob"].team_color, 0);
+    }
+
+    /// Seats belong to a battle. The next one the host opens has its own map and
+    /// its own teams, so an old seat in it would be a team nobody picked.
+    #[test]
+    fn a_seat_does_not_outlive_the_battle_it_was_in() {
+        let mut room = started(false);
+        send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        let seat = BattleStatus {
+            ally: 2,
+            team_id: 3,
+            ..default_battle_status()
+        };
+        send(&mut room, BOB, &command::my_battle_status(seat, 16_711_680));
+
+        // The host leaves, which closes the battle, then opens another.
+        send(&mut room, ALICE, "LEAVEBATTLE");
+        send(&mut room, ALICE, &open_battle_line());
+
+        let out = send(&mut room, BOB, "JOINBATTLE 2 * s3cret");
+        assert_eq!(due(&out, BOB).last(), Some(&"REQUESTBATTLESTATUS"));
+        assert_eq!(
+            room.battle_view().unwrap().members["bob"].battle_status,
+            BattleStatus::default()
+        );
     }
 
     /// A kick that a reconnect undoes is not a kick, so the name stays out for the

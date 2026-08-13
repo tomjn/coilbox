@@ -9,6 +9,7 @@
 
 use std::time::Duration;
 
+use coilbox_lobby_protocol::{command, default_battle_status, BattleStatus};
 use tauri_plugin_coilbox_direct::room::{Room, RoomOptions};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
@@ -56,6 +57,32 @@ impl RawPeer {
     /// The next line, or `None` if the room closed the connection first.
     async fn next(&mut self) -> Option<String> {
         self.lines.next_line().await.expect("a readable socket")
+    }
+
+    /// Read until a line starts with `prefix`, answering with every line read,
+    /// that one last. Panics if the socket ends first, because a room that stops
+    /// talking mid-exchange is the failure these tests exist to catch.
+    async fn read_to(&mut self, prefix: &str) -> Vec<String> {
+        let mut seen = Vec::new();
+        while let Some(line) = self.next().await {
+            let done = line.starts_with(prefix);
+            seen.push(line);
+            if done {
+                return seen;
+            }
+        }
+        panic!("the socket ended before {prefix}: {seen:?}");
+    }
+
+    /// Log in and read the burst that follows, so the peer is ready to be told
+    /// about a battle.
+    async fn log_in(&mut self, name: &str) -> Vec<String> {
+        self.next().await.expect("a greeting");
+        self.send(&format!(
+            "LOGIN {name} aGFzaA== 0 127.0.0.1 Coilbox 0.1\t1\tu sp"
+        ))
+        .await;
+        self.read_to("LOGININFOEND").await
     }
 }
 
@@ -115,9 +142,86 @@ async fn a_refused_login_is_told_why_before_it_is_dropped() {
 
     assert_eq!(
         second.next().await.as_deref(),
-        Some("DENIED that name is already in this room")
+        Some("DENIED that name is already in this room, try alice2")
     );
     assert_eq!(second.next().await, None, "and then dropped");
+
+    room.stop("done").await;
+}
+
+/// The sweep and the reclaim, against each other, on one clock.
+///
+/// The sweep exists to free a name whose socket died quietly, so its owner can
+/// log back in under it. A seat is remembered by name and not by socket, so the
+/// sweep taking the socket away cannot take the seat with it. This is that claim,
+/// with the ninety seconds actually elapsing.
+#[tokio::test]
+async fn the_sweep_frees_a_name_and_leaves_the_seat_alone() {
+    let room = room().await;
+    let mut host = RawPeer::connect(&room).await;
+    host.log_in("alice").await;
+    host.send(&command::open_battle(
+        0,
+        0,
+        "*",
+        8452,
+        16,
+        -1,
+        0,
+        -1,
+        "spring",
+        "105.1.1",
+        "Red Comet",
+        "Tom's LAN game",
+        "Beyond All Reason test-1234",
+    ))
+    .await;
+    host.read_to("REQUESTBATTLESTATUS").await;
+
+    let seat = BattleStatus {
+        mode: true,
+        ally: 2,
+        team_id: 3,
+        ..default_battle_status()
+    };
+    let taken = format!("CLIENTBATTLESTATUS bob {} 16711680", seat.to_int());
+    let mut bob = RawPeer::connect(&room).await;
+    bob.log_in("bob").await;
+    bob.send("JOINBATTLE 1 * s3cret").await;
+    bob.read_to("REQUESTBATTLESTATUS").await;
+    bob.send(&command::my_battle_status(seat, 16_711_680)).await;
+    assert_eq!(bob.read_to("CLIENTBATTLESTATUS").await.last(), Some(&taken));
+
+    // Bob's machine goes to sleep. The host keeps talking on its own timer, as
+    // the real client's thirty second keepalive does, or the sweep would take the
+    // host too and close the battle out from under the test.
+    //
+    // The clock is paused from here, so the ninety seconds pass in no time. Time
+    // auto-advances to the next timer whenever the runtime is idle, which is why
+    // the host's keepalive has to be a timer and not a line this test sends: a
+    // socket read is not a timer, and the clock would jump straight past it.
+    tokio::time::pause();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            host.send("PING keepalive").await;
+        }
+    });
+    assert_eq!(bob.next().await, None, "bob's socket is swept");
+    assert_eq!(room.status().await.map(|s| s.peers), Some(1));
+
+    // The name is free, which is what the sweep is for, and the seat is still
+    // his, which is what it must not cost.
+    let mut again = RawPeer::connect(&room).await;
+    let burst = again.log_in("bob").await;
+    assert!(burst.contains(&"ACCEPTED bob".to_string()), "{burst:?}");
+    again.send("JOINBATTLE 1 * fresh-sp").await;
+    let joined = again.read_to("CLIENTBATTLESTATUS bob").await;
+    assert_eq!(joined.last(), Some(&taken));
+    assert!(
+        !joined.contains(&"REQUESTBATTLESTATUS".to_string()),
+        "asking is answered with the default and undoes the reclaim: {joined:?}"
+    );
 
     room.stop("done").await;
 }
