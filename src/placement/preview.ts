@@ -36,8 +36,18 @@ import {
   snapToBuildGrid,
   unjudged,
 } from "@/blueprint/footprint";
-import type { Facing, Point } from "@/scenario/model";
-import type { BuildingUnit, Placement } from "./placements";
+import {
+  baseBuildings,
+  type Facing,
+  type Point,
+  type Scenario,
+} from "@/scenario/model";
+import { turnFacing } from "@/scenario/pages/components/editing";
+import {
+  type BuildingUnit,
+  type Placement,
+  parsePlacementKey,
+} from "./placements";
 
 /** One building of a layout about to be placed, already offset from wherever
  *  the layout's origin would land. */
@@ -132,6 +142,72 @@ export function draggedBuilding(
     facing: placement.facing,
     pos: { x: placement.pos.x + delta.x, z: placement.pos.z + delta.z },
   };
+}
+
+/** Whether two buildings would stand on exactly the same ground. */
+function sameGround(a: Rect, b: Rect): boolean {
+  return (
+    a.minX === b.minX &&
+    a.minZ === b.minZ &&
+    a.maxX === b.maxX &&
+    a.maxZ === b.maxZ
+  );
+}
+
+/**
+ * Where a turn will stand a building, before it is turned (issue #1541).
+ *
+ * A turn moves a building half a build square whenever one side of its
+ * footprint is odd and the other even, because the sides swap and both answers
+ * are half a square from where it was drawn. Every other edit of a building is
+ * drawn before it happens, and this is the same question asked of the same
+ * arithmetic: the marks are what the building will get once it is turned, so a
+ * turn that will land it in its neighbour is red before it is taken.
+ *
+ * The point the layout names is what the engine is asked about at every facing,
+ * because a turn writes the facing and nothing else (issue #1523). So this
+ * takes the document rather than the drawn placement: the square the building
+ * is drawn on is the engine's answer at the facing it has now, and asking about
+ * that square again is what used to walk a building across the map.
+ *
+ * Empty when there is nothing to show. A square footprint does not move at all
+ * on a turn, which is most buildings, and an outline over the square a building
+ * is already on says a move happened where none did.
+ */
+export function turnedMarks(
+  scenario: Pick<Scenario, "bases" | "blueprints">,
+  key: string,
+  footprintOf: (def: string) => Footprint,
+  /** The ground the document's own buildings stand on. The building's own is
+   *  taken out: its two facings overlap, so counting it would paint every turn
+   *  red. */
+  occupied: FootprintMark[],
+  standingOf?: (mark: Omit<FootprintMark, "standing">) => Standing,
+  steps = 1,
+): FootprintMark[] {
+  const ref = parsePlacementKey(key);
+  if (ref?.kind !== "base") return [];
+  const base = scenario.bases.find((one) => one.id === ref.id);
+  if (!base) return [];
+  const building = baseBuildings(scenario.blueprints, base)[ref.index];
+  if (!building) return [];
+
+  const named = {
+    x: base.origin.x + building.offset.x,
+    z: base.origin.z + building.offset.z,
+  };
+  const footprint = footprintOf(building.def);
+  const facing = turnFacing(building.facing, steps);
+  const ground = (at: Facing) =>
+    footprintRect(snapToBuildGrid(named, footprint, at), footprint, at);
+  if (sameGround(ground(facing), ground(building.facing))) return [];
+
+  return layoutPreview(
+    [{ def: building.def, pos: named, facing }],
+    footprintOf,
+    withoutBuilding(occupied, key),
+    standingOf,
+  );
 }
 
 /**

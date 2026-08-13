@@ -93,6 +93,7 @@ export function SelectionBar({
   turnable,
   turnHint,
   onTurn,
+  onTurnPreview,
   onDelete,
   children,
 }: {
@@ -104,6 +105,15 @@ export function SelectionBar({
   /** Why it cannot be turned, when it cannot. */
   turnHint?: string;
   onTurn: () => void;
+  /**
+   * Whether the turn is being considered, which is what draws where it would
+   * put the building (issue #1541).
+   *
+   * A turn is a button press with nothing under the pointer, so the button
+   * itself is the hover. Focus counts as well, because a turn taken from the
+   * keyboard deserves the same warning as one taken with the mouse.
+   */
+  onTurnPreview?: (on: boolean) => void;
   onDelete: () => void;
   /** Controls for what kind of thing this is: an actor's team and its
    *  overrides, a base's queue, a layout's build order. */
@@ -123,6 +133,10 @@ export function SelectionBar({
         onClick={onTurn}
         disabled={!turnable}
         title={turnable ? "Turn a quarter turn" : turnHint}
+        onPointerEnter={() => onTurnPreview?.(true)}
+        onPointerLeave={() => onTurnPreview?.(false)}
+        onFocus={() => onTurnPreview?.(true)}
+        onBlur={() => onTurnPreview?.(false)}
       >
         <RotateCw className="size-3.5" /> Turn
       </Button>
@@ -135,6 +149,31 @@ export function SelectionBar({
         <Trash2 className="size-3.5" /> Delete
       </Button>
     </div>
+  );
+}
+
+/**
+ * What the outlined square beside a selected building means (issue #1541).
+ *
+ * The squares are the answer and this is what ties them to the button the
+ * pointer is on. Both cases are said, because most buildings are square and a
+ * turn leaves those exactly where they are: a control that draws something for
+ * some buildings and nothing for others otherwise reads as broken.
+ */
+export function TurnNote({
+  moves,
+}: {
+  /** Whether the turn would move the building at all. Null when nobody is
+   *  considering a turn, and then nothing is said. */
+  moves: boolean | null;
+}) {
+  if (moves === null) return null;
+  return (
+    <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
+      {moves
+        ? "Turning it stands it on the outlined squares. Its sides swap, so it moves half a build square."
+        : "Turning it leaves it on the same squares. Its footprint is square, so there is nowhere for it to move."}
+    </p>
   );
 }
 

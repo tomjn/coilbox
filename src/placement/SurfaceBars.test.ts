@@ -10,7 +10,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { HistoryControls } from "./SurfaceBars";
+import { HistoryControls, TurnNote } from "./SurfaceBars";
 
 const noop = () => {};
 
@@ -48,5 +48,32 @@ describe("HistoryControls", () => {
     const html = markup(true, false);
     expect([...html.matchAll(/disabled=""/g)]).toHaveLength(1);
     expect(html).toContain('title="Nothing to redo"');
+  });
+});
+
+/**
+ * Issue #1541. The outlined square is the answer, and the sentence is what ties
+ * it to the button the pointer is on.
+ *
+ * A square footprint does not move on a turn, which is most buildings, so the
+ * silence has to be said as well: a control that draws something for some
+ * buildings and nothing for others otherwise reads as broken.
+ */
+describe("TurnNote", () => {
+  const note = (moves: boolean | null) =>
+    renderToStaticMarkup(createElement(TurnNote, { moves }));
+
+  it("says nothing until the turn is being considered", () => {
+    expect(note(null)).toBe("");
+  });
+
+  it("points at the outlined squares when the turn moves the building", () => {
+    expect(note(true)).toContain("outlined");
+  });
+
+  it("says the building stays where it is when the turn moves it nowhere", () => {
+    const html = note(false);
+    expect(html).toContain("same squares");
+    expect(html).not.toContain("outlined");
   });
 });

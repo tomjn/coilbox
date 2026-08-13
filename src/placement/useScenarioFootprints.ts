@@ -11,13 +11,20 @@ import { useEffect, useRef, useState } from "react";
 import type { FootprintMark } from "@/blueprint/footprint";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import type { Point } from "@/scenario/model";
-import { createFootprintsLayer, type FootprintsLayer } from "./footprintsLayer";
+import {
+  createFootprintsLayer,
+  type FootprintsLayer,
+  type MarkAs,
+} from "./footprintsLayer";
 
 export function useScenarioFootprints(
   handle: MapScene3D | null,
   marks: FootprintMark[],
   map: { worldWidth: number; worldHeight: number },
   groundAt: (pos: Point) => number,
+  /** What these marks are about. A second layer drawn `"offered"` is where a
+   *  turn would put the selected building (issue #1541). */
+  as: MarkAs = "standing",
 ): void {
   const { worldWidth, worldHeight } = map;
   // Behind a ref for the same reason the starts' reader is: the heightmap
@@ -45,6 +52,6 @@ export function useScenarioFootprints(
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `groundAt` is not read here, it is the signal that the relief the footprints lie on has arrived
   useEffect(() => {
-    layer?.draw(marks);
-  }, [layer, marks, groundAt]);
+    layer?.draw(marks, as);
+  }, [layer, marks, as, groundAt]);
 }

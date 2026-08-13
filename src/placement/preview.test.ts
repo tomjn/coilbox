@@ -3,10 +3,15 @@ import { describe, expect, it } from "vitest";
 import type { Ground } from "@/blueprint/buildable";
 import {
   BUILD_SQUARE,
+  buildGridSnap,
   footprintRect,
   snapToBuildGrid,
 } from "@/blueprint/footprint";
-import type { Placement } from "./placements";
+import { newScenario } from "@/scenario/create";
+import type { Scenario } from "@/scenario/model";
+import { turnPlacement } from "@/scenario/pages/components/editing";
+import { scenarioPlacements } from "@/scenario/pages/components/placements";
+import { baseFootprints, type Placement } from "./placements";
 import {
   draggedBuilding,
   layoutPreview,
@@ -21,14 +26,18 @@ import {
   previewTrouble,
   sameCount,
   samePlace,
+  turnedMarks,
   withoutBuilding,
 } from "./preview";
 
-/** Balanced Annihilation's own numbers, so the shapes below really exist. */
+/** Balanced Annihilation's own numbers, so the shapes below really exist. A
+ *  fusion plant is 5 by 4, which is the rectangle worth turning: its two axes
+ *  snap by different rules, so a quarter turn moves it. */
 const units = [
   { name: "armsolar", footprintX: 5, footprintZ: 5, maxSlope: 20 },
   { name: "armlab", footprintX: 6, footprintZ: 6, maxSlope: 15 },
   { name: "armmex", footprintX: 3, footprintZ: 3, maxSlope: 40 },
+  { name: "armfus", footprintX: 5, footprintZ: 4, maxSlope: 15 },
 ];
 
 /** Ground at one height everywhere, which every building stands on. */
@@ -419,7 +428,10 @@ describe("nudgeToFit", () => {
      *  carries no refusal to read. */
     it("draws a spot with nothing wrong with it", () => {
       const standing = [taken(1000, 1000)];
-      const held = [solarAt(1000, 1000), solarAt(1000 + 6 * BUILD_SQUARE, 1000)];
+      const held = [
+        solarAt(1000, 1000),
+        solarAt(1000 + 6 * BUILD_SQUARE, 1000),
+      ];
       const found = nudgeToFit(held, footprintOf, standing, standingOf);
       if (!found) throw new Error("there is a spot for both of them");
       const there = nudgedPreview(
@@ -522,5 +534,132 @@ describe("withoutBuilding", () => {
   it("hands back the same list when nothing is being dragged", () => {
     const marks = [mark("base:pf1#0")];
     expect(withoutBuilding(marks, null)).toBe(marks);
+  });
+});
+
+/**
+ * Issue #1541. A turn moves a building half a build square whenever one side of
+ * its footprint is odd and the other even, and an author only found that out
+ * after taking it. Every other edit of a building is drawn before it happens.
+ */
+describe("turnedMarks", () => {
+  const { footprintOf, standingOf } = previewChecks(units, flat);
+  const snap = buildGridSnap(units);
+
+  /** One base with one building on its origin. A fusion plant is the rectangle
+   *  worth turning, and a solar collector is the square that does not move. */
+  const base = (def: string): Scenario => ({
+    ...newScenario("test"),
+    blueprints: [
+      {
+        id: "bp1",
+        name: "The keep",
+        buildings: [{ def, offset: { x: 0, z: 0 }, facing: 0 }],
+      },
+    ],
+    bases: [
+      {
+        id: "b1",
+        blueprint: "bp1",
+        team: "p0",
+        origin: { x: 2000, z: 2000 },
+        buildings: [],
+      },
+    ],
+  });
+
+  const standing = (doc: Scenario) =>
+    baseFootprints(scenarioPlacements(doc, snap), units, flat);
+
+  it("draws the squares the turn will stand it on", () => {
+    // A 5 by 4 on 2000, 2000 stands at 2008, 2000, and the quarter turn swaps
+    // which axis snaps which way.
+    const marks = turnedMarks(
+      base("armfus"),
+      "base:b1#0",
+      footprintOf,
+      [],
+      standingOf,
+    );
+    expect(marks).toHaveLength(1);
+    expect(marks[0].pos).toEqual({ x: 2000, z: 2008 });
+    expect(marks[0].facing).toBe(1);
+  });
+
+  /** The whole point of drawing it: what is outlined is where the button puts
+   *  it, on this turn and on the next one. */
+  it("draws where the turn itself puts the building", () => {
+    let doc = base("armfus");
+    for (let turn = 0; turn < 4; turn++) {
+      const drawn = turnedMarks(
+        doc,
+        "base:b1#0",
+        footprintOf,
+        [],
+        standingOf,
+      )[0];
+      doc = turnPlacement(doc, "base:b1#0", 1);
+      const landed = scenarioPlacements(doc, snap).find(
+        (one) => one.key === "base:b1#0",
+      );
+      expect(drawn.pos).toEqual(landed?.pos);
+      expect(drawn.facing).toBe(landed?.facing);
+    }
+  });
+
+  /** Most buildings are square and a turn leaves them on the same ground. An
+   *  outline over the square a building is already on says a move happened
+   *  where none did, so nothing is drawn. */
+  it("draws nothing for a turn that moves the building nowhere", () => {
+    expect(
+      turnedMarks(base("armsolar"), "base:b1#0", footprintOf, [], standingOf),
+    ).toEqual([]);
+  });
+
+  /** The building's own ground is not ground it can clash with. Its two
+   *  facings overlap heavily, so counting it would paint every turn red. */
+  it("does not mark the turn against the square it is leaving", () => {
+    const doc = base("armfus");
+    const marks = turnedMarks(
+      doc,
+      "base:b1#0",
+      footprintOf,
+      standing(doc),
+      standingOf,
+    );
+    expect(marks[0].overlapping).toBe(false);
+  });
+
+  /** A rectangle turned on its side reaches one build square further along the
+   *  other axis, so a turn can walk a building into a neighbour it is not
+   *  touching. Which is the news. */
+  it("marks a turn that will land the building in a neighbour", () => {
+    const doc = base("armfus");
+    // A solar collector one square clear of the fusion plant's south edge: the
+    // plant reaches it once it is on its side and not before.
+    const neighbour = layoutPreview(
+      [{ def: "armsolar", pos: { x: 2000, z: 2072 }, facing: 0 as const }],
+      footprintOf,
+      [],
+      standingOf,
+    ).map((one) => ({ ...one, key: "base:b2#0" }));
+    const occupied = [...standing(doc), ...neighbour];
+    expect(occupied.every((one) => !one.overlapping)).toBe(true);
+
+    const marks = turnedMarks(
+      doc,
+      "base:b1#0",
+      footprintOf,
+      occupied,
+      standingOf,
+    );
+    expect(marks[0].overlapping).toBe(true);
+  });
+
+  it("has nothing to draw for anything but a base's building", () => {
+    const doc = base("armfus");
+    for (const key of ["actor:a1", "group:g1#0", "base:b9#0", "nonsense"]) {
+      expect(turnedMarks(doc, key, footprintOf, [], standingOf)).toEqual([]);
+    }
   });
 });
