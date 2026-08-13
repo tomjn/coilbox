@@ -13,9 +13,19 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { barFormat } from "../../bar";
-import { type PackPick, packPlan, readBlueprintPack } from "../../pack";
+import {
+  type PackPick,
+  packPlan,
+  packSideOffer,
+  readBlueprintPack,
+} from "../../pack";
+import { sideUnitPrefixes } from "../../substitution";
 import { knownUnits } from "../../units";
-import { ArrivingPack, type PackView } from "./ArrivingPack";
+import {
+  ArrivingPack,
+  type ArrivingPackConversion,
+  type PackView,
+} from "./ArrivingPack";
 
 const PACK = readFileSync(
   join(__dirname, "..", "..", "fixtures", "bar-pack.json"),
@@ -47,6 +57,49 @@ function picks(taking: number[] = [], taken: string[] = []): PackPick[] {
   });
 }
 
+/** The same game with both sides installed, which is what makes a conversion
+ *  possible at all. `corllt` is left out, so "Big wall" is the layout the choice
+ *  can do nothing for, and `corwin` is a square wider, so the wind farm moves. */
+const BOTH = [
+  ...UNITS,
+  { name: "corsolar", footprintX: 4, footprintZ: 4 },
+  { name: "cormex", footprintX: 3, footprintZ: 3 },
+  { name: "corwin", footprintX: 3, footprintZ: 3 },
+  { name: "corlab", footprintX: 8, footprintZ: 6 },
+];
+const SIDES = sideUnitPrefixes([
+  { name: "Armada", startUnit: "armcom" },
+  { name: "Cortex", startUnit: "corcom" },
+]);
+const bothFootprints = (def: string) => {
+  const unit = BOTH.find((one) => one.name === def.toLowerCase());
+  return { x: unit?.footprintX ?? 1, z: unit?.footprintZ ?? 1 };
+};
+
+/** The pack as it looks once a side has been picked for the whole of it. */
+function converted(toSide: string): PackPick[] {
+  return packPlan({
+    entries: readBlueprintPack(barFormat, PACK).entries,
+    taking: new Set<number>(),
+    taken: [],
+    installed: INSTALLED,
+    known: knownUnits(BOTH),
+    footprintOf: bothFootprints,
+    gameName: GAME,
+    conversion: { toSide, sides: SIDES, footprintOf: bothFootprints },
+  });
+}
+
+function conversion(takingAs = ""): ArrivingPackConversion {
+  const offer = packSideOffer(
+    readBlueprintPack(barFormat, PACK).entries,
+    SIDES,
+    knownUnits(BOTH),
+  );
+  if (!offer) throw new Error("the fixture has a side worth offering");
+  return { offer, takingAs, onTakeAs: () => {} };
+}
+
 const VIEW: PackView = { order: "fit", hideUnplaceable: false };
 
 function markup(
@@ -56,6 +109,7 @@ function markup(
     changes?: string | null;
     unreadable?: number;
     checked?: boolean;
+    conversion?: ArrivingPackConversion;
   } = {},
 ): string {
   return renderToStaticMarkup(
@@ -70,6 +124,7 @@ function markup(
       unreadable: over.unreadable ?? 1,
       changes: over.changes ?? null,
       checked: over.checked ?? true,
+      conversion: over.conversion,
       busy: false,
       onToggle: () => {},
       onTakeAll: () => {},
@@ -126,5 +181,69 @@ describe("ArrivingPack", () => {
     expect(markup({ checked: false })).toContain(
       "nothing here has been checked",
     );
+  });
+
+  /**
+   * Issue #1492. One choice for the pack, and every row saying what it did to
+   * that row, including the rows it did nothing to.
+   */
+  describe("taking the whole pack as one side", () => {
+    it("offers nothing when there is no side worth offering", () => {
+      expect(markup()).not.toContain("Take them all as");
+    });
+
+    it("offers one choice for the pack rather than one per layout", () => {
+      // Eight layouts, two buttons. That is the whole of the point: the single
+      // import's row of buttons, once, rather than once per row.
+      const html = markup({ conversion: conversion() });
+      expect(html.match(/Take them all as/g)).toHaveLength(2);
+      expect(html).toContain("Take them all as Cortex");
+      expect(html).toContain("Keep them as they are");
+    });
+
+    it("says whose layouts they are, one side or several", () => {
+      // This pack is one player's Armada layouts with somebody's Cortex one
+      // dropped in, which is worth saying rather than rounding off.
+      expect(markup({ conversion: conversion() })).toContain(
+        "These layouts are Armada and Cortex&#x27;s.",
+      );
+      const one = conversion();
+      expect(
+        markup({
+          conversion: { ...one, offer: { ...one.offer, from: ["Armada"] } },
+        }),
+      ).toContain("These are Armada&#x27;s layouts");
+    });
+
+    it("says how much of the pack the choice covers once it is made", () => {
+      const html = markup({ conversion: conversion("Cortex") });
+      expect(html).toContain("6 of these are said in Cortex now");
+      expect(html).toContain("1 already was");
+      expect(html).toContain("nothing in Cortex to be said in");
+    });
+
+    it("says on the row of every layout what the choice did to it", () => {
+      const html = markup({
+        picks: converted("Cortex"),
+        conversion: conversion("Cortex"),
+      });
+      expect(html).toContain("4 of 4 buildings said in Cortex.");
+      expect(html).toContain("Already Cortex&#x27;s.");
+      expect(html).toContain("Nothing in it could be said in Cortex");
+    });
+
+    it("warns on the row when the substitutes will move the layout", () => {
+      const html = markup({
+        picks: converted("Cortex"),
+        conversion: conversion("Cortex"),
+      });
+      expect(html).toContain('data-conversion="warn"');
+      expect(html).toContain("will not stand where they do now");
+    });
+
+    it("says nothing on any row until a side is picked", () => {
+      const html = markup({ conversion: conversion() });
+      expect(html).not.toContain("data-conversion");
+    });
   });
 });

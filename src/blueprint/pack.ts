@@ -32,13 +32,27 @@
 
 import type { InstalledGameInfo } from "../container/gameIdentity";
 import type { Facing } from "../scenario/model";
-import { type BlueprintArrival, blueprintArrival } from "./arrival";
+import {
+  type ArrivalNote,
+  type BlueprintArrival,
+  blueprintArrival,
+} from "./arrival";
+import { type EquivalenceTable, NO_EQUIVALENTS } from "./equivalents";
 import type { Footprint, SnapBuilding } from "./footprint";
 import type { BlueprintFormat } from "./format";
 import type { MergeOutcome } from "./gameFile";
 import type { StoredBlueprint } from "./library";
 import type { BaseBlueprint } from "./model";
 import type { BlueprintPayload } from "./payload";
+import {
+  distinctDefs,
+  gameSideNames,
+  layoutSide,
+  planForSide,
+  type SideUnits,
+  type SubstitutionReport,
+  substitutePayload,
+} from "./substitution";
 import { blueprintPayload } from "./transfer";
 import { type KnownUnits, unknownBuildings } from "./units";
 
@@ -119,13 +133,190 @@ export type PackFit =
 /** One layout of a pack, as the person choosing sees it. */
 export interface PackPick {
   entry: PackEntry;
-  /** Ready to keep or to draw, with this game's footprints on it. */
+  /** Ready to keep or to draw, with this game's footprints on it. Converted
+   *  already where a side was picked for the pack, because the converted layout
+   *  is the one that would be kept. */
   payload: BlueprintPayload;
   /** What taking it would be called, and what is worth knowing first. */
   arrival: BlueprintArrival;
   fit: PackFit;
   /** Whether it is ticked. */
   taking: boolean;
+  /** What the pack's side did to this one, or nothing when no side was picked. */
+  converted?: PackConverted;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Taking a whole pack as one side (issue #1492).
+ *
+ * The conversion was deliberately left out when packs were built, because the
+ * single-layout form is a row of buttons and thirty of those is not a surface.
+ * The shape that does work is one choice for the pack, since a pack is normally
+ * one player's layouts and so one player's side.
+ *
+ * Two things follow, and both are what make it honest rather than convenient.
+ * The choice is a target side rather than a swap, so a pack that turns out to
+ * hold two players' layouts still converts: each one is read for its own side
+ * and moved towards the one picked. And every layout says what the choice did to
+ * it, including the ones it did nothing to, because "this applies to 24 of your
+ * 30" is the fact somebody needs and a silent row is a layout they will find out
+ * about later.
+ *
+ * Both sides of a game live in one game, so none of this is a fault being
+ * reported. An Armada layout has nothing missing for a Cortex player and every
+ * check the pack surface makes passes. What can be said is whose buildings they
+ * are made of.
+ * -------------------------------------------------------------------------- */
+
+/** What the pack's chosen side did to one layout. */
+export interface PackConverted {
+  state: /** Some or all of it is now said in the chosen side's buildings. */
+    | "converted"
+    /** It was already that side's, so there was nothing to say. */
+    | "already"
+    /** Nothing in it could be, so it is kept exactly as it arrived. */
+    | "cannot";
+  report: SubstitutionReport;
+}
+
+/** How a whole pack is being taken. */
+export interface PackConversion {
+  /** The side to say every layout in. Empty takes them as they are. */
+  toSide: string;
+  /** The game's sides, from its own unit naming. */
+  sides: readonly SideUnits[];
+  /** What this game has already been told (issue #1468). */
+  table?: EquivalenceTable;
+  /** How much ground each def stands on, for re-snapping a swapped building.
+   *  Absent where the game's units have not been read, which is when nothing is
+   *  checked after a swap. */
+  footprintOf?: (def: string) => Footprint;
+}
+
+/** One side a whole pack could be taken as. */
+export interface PackSideChoice {
+  side: string;
+  /** Layouts it would change. */
+  converts: number;
+  /** Layouts already drawn in it, which it leaves exactly as they are. */
+  already: number;
+  /** Layouts it can do nothing for, whether because nothing in them belongs to
+   *  a side or because this game has no version of what is in them. */
+  untouched: number;
+}
+
+/** Which sides a pack is worth offering to be taken as. */
+export interface PackSideOffer {
+  /** The sides its layouts are drawn in, in the game's own order. Usually one. */
+  from: string[];
+  /** Layouts no side could be read off at all, which a choice cannot help. */
+  sideUnknown: number;
+  /** Every side that would change at least one layout, in the game's own order.
+   *  Never empty. */
+  choices: PackSideChoice[];
+}
+
+/**
+ * What taking this pack as each side would do.
+ *
+ * Nothing at all unless some side would change something, so a pack already all
+ * one side's, or one for a game whose sides cannot be told apart and that
+ * nobody has answered anything about, gets no offer rather than a choice that
+ * does nothing.
+ *
+ * A layout whose own side cannot be told still counts as one a side would
+ * change, because a target side is a target rather than a swap: whatever in it
+ * belongs to another side moves and the rest stays. How many of those there are
+ * is said on its own, so a pack somebody has mixed two sides into is a thing the
+ * reader can see rather than a number quietly folded into the rest.
+ */
+export function packSideOffer(
+  entries: readonly { buildings: readonly { def: string }[] }[],
+  sides: readonly SideUnits[],
+  known: KnownUnits,
+  table: EquivalenceTable = NO_EQUIVALENTS,
+): PackSideOffer | undefined {
+  const each = entries.map((entry) => {
+    const defs = distinctDefs(entry.buildings.map((one) => one.def));
+    return { defs, side: layoutSide(defs, sides, table) };
+  });
+  const all = gameSideNames(sides, table);
+
+  const choices = all
+    .map((side) => {
+      let converts = 0;
+      let already = 0;
+      let untouched = 0;
+      for (const one of each) {
+        if (one.side === side) already += 1;
+        else if (
+          Object.keys(planForSide(one.defs, side, sides, known, table)).length >
+          0
+        ) {
+          converts += 1;
+        } else untouched += 1;
+      }
+      return { side, converts, already, untouched };
+    })
+    .filter((choice) => choice.converts > 0);
+  if (choices.length === 0) return undefined;
+
+  return {
+    from: all.filter((side) => each.some((one) => one.side === side)),
+    sideUnknown: each.filter((one) => one.side === undefined).length,
+    choices,
+  };
+}
+
+/**
+ * What the pack's side did to one layout, said on its row.
+ *
+ * Short, because it is said thirty times. A row that changed says how much of it
+ * changed, a row that did not says why not, and a swap that moved the layout or
+ * left it fighting over ground says so as a warning: the whole reason a
+ * conversion is shown before it is kept is that it can quietly break a base.
+ */
+export function packConversionNotes(
+  converted: PackConverted,
+  toSide: string,
+  buildings: number,
+): ArrivalNote[] {
+  if (converted.state === "already") {
+    return [{ tone: "note", text: `Already ${toSide}'s.` }];
+  }
+  if (converted.state === "cannot") {
+    return [
+      {
+        tone: "note",
+        text: `Nothing in it could be said in ${toSide}, so it is kept as it is.`,
+      },
+    ];
+  }
+
+  const { substituted, moved, overlapping } = converted.report;
+  const notes: ArrivalNote[] = [
+    {
+      tone: "note",
+      text: `${substituted.length} of ${buildings} building${buildings === 1 ? "" : "s"} said in ${toSide}.`,
+    },
+  ];
+
+  const wrong: string[] = [];
+  if (overlapping.length > 0) {
+    wrong.push(
+      `${overlapping.length} will stand on ground another building wants`,
+    );
+  }
+  if (moved.length > 0) {
+    wrong.push(`${moved.length} will not stand where they do now`);
+  }
+  if (wrong.length > 0) {
+    notes.push({
+      tone: "warn",
+      text: `${wrong.join(", and ")}, because the substitutes cover different ground.`,
+    });
+  }
+  return notes;
 }
 
 export interface PackPlanInput {
@@ -145,6 +336,11 @@ export interface PackPlanInput {
   footprintOf?: (def: string) => Footprint | undefined;
   /** The archive name of the game the pack is being read against. */
   gameName?: string;
+  /** The side the whole pack is being taken as (issue #1492). Absent, or with
+   *  no side named, leaves every layout as it arrived. Nothing is converted
+   *  without `known` either, because a substitute nothing has checked is a guess
+   *  and this offers none. */
+  conversion?: PackConversion;
 }
 
 /**
@@ -157,8 +353,16 @@ export interface PackPlanInput {
  * name is the one it would really be kept under right now.
  */
 export function packPlan(input: PackPlanInput): PackPick[] {
-  const { entries, taking, taken, installed, known, footprintOf, gameName } =
-    input;
+  const {
+    entries,
+    taking,
+    taken,
+    installed,
+    known,
+    footprintOf,
+    gameName,
+    conversion,
+  } = input;
   const claimed = [...taken];
   return entries.map((entry) => {
     const layout: BaseBlueprint = {
@@ -168,11 +372,18 @@ export function packPlan(input: PackPlanInput): PackPick[] {
       ...(entry.ordered ? { ordered: true } : {}),
       buildings: entry.buildings,
     };
-    const payload = blueprintPayload(layout, {
+    const drawn = blueprintPayload(layout, {
       footprintOf,
       gameName,
       installed: installed ?? [],
     });
+
+    // The converted layout is the one that would be kept, so everything below
+    // reads it: what it would be called, whether this game can place it, and
+    // what is drawn on the row.
+    const said = convert(entry, drawn, known, conversion);
+    const payload = said?.payload ?? drawn;
+
     const arrival = blueprintArrival({
       payload,
       taken: claimed,
@@ -187,8 +398,39 @@ export function packPlan(input: PackPlanInput): PackPick[] {
       arrival,
       fit: fitOf(payload, arrival, known),
       taking: isTaking,
+      ...(said ? { converted: said.converted } : {}),
     };
   });
+}
+
+/** One layout of a pack said in the pack's side, or nothing when no side was
+ *  picked and nothing when the game's units have not been read. */
+function convert(
+  entry: PackEntry,
+  payload: BlueprintPayload,
+  known: KnownUnits | undefined,
+  conversion: PackConversion | undefined,
+): { payload: BlueprintPayload; converted: PackConverted } | undefined {
+  if (!conversion || conversion.toSide === "" || !known) return undefined;
+  const { toSide, sides, table, footprintOf } = conversion;
+
+  const defs = distinctDefs(entry.buildings.map((one) => one.def));
+  const mine = layoutSide(defs, sides, table);
+  const plan = planForSide(defs, toSide, sides, known, table);
+  const done = substitutePayload(payload, plan, footprintOf);
+
+  return {
+    payload: done.payload,
+    converted: {
+      state:
+        done.report.substituted.length > 0
+          ? "converted"
+          : mine === toSide
+            ? "already"
+            : "cannot",
+      report: done.report,
+    },
+  };
 }
 
 function fitOf(

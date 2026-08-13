@@ -20,18 +20,27 @@
  *
  * Nothing here refuses. A layout none of whose units are here is still one
  * somebody can want, so it stays tickable and only says what it is.
+ *
+ * The side conversion is one choice for the whole pack (issue #1492), for the
+ * same reason everything else here is: thirty of the single import's row of
+ * buttons is not a surface. It sits above the list because it changes what every
+ * row below it says, and each row then says what the choice did to it, including
+ * the rows it did nothing to.
  */
 
 import { Button } from "@picoframe/frame";
-import { Blocks, Download, Loader2 } from "lucide-react";
+import { Blocks, Download, Loader2, Repeat } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import type { ArrivalNote } from "../../arrival";
 import {
   orderPack,
   type PackOrder,
   type PackPick,
+  type PackSideOffer,
+  packConversionNotes,
   packCounts,
 } from "../../pack";
 import { LayoutThumb } from "./LayoutThumb";
@@ -51,6 +60,14 @@ export interface PackView {
   hideUnplaceable: boolean;
 }
 
+/** Taking every layout in the pack as one side (issue #1492). */
+export interface ArrivingPackConversion {
+  offer: PackSideOffer;
+  /** The side they are being taken as, empty for the sides they were drawn in. */
+  takingAs: string;
+  onTakeAs: (side: string) => void;
+}
+
 export function ArrivingPack({
   file,
   picks,
@@ -62,6 +79,7 @@ export function ArrivingPack({
   unreadable,
   changes,
   checked,
+  conversion,
   busy,
   onToggle,
   onTakeAll,
@@ -86,6 +104,9 @@ export function ArrivingPack({
   /** Whether the game's units have been read. Without them nothing has been
    *  checked, which is not the same as everything fitting. */
   checked: boolean;
+  /** Absent whenever no side would change anything, which includes every pack
+   *  whose game is not installed. Nothing said beats a choice that does nothing. */
+  conversion?: ArrivingPackConversion;
   busy: boolean;
   onToggle: (index: number) => void;
   onTakeAll: () => void;
@@ -122,6 +143,8 @@ export function ArrivingPack({
             : "Its units have not been read, so nothing here has been checked against them."}
         </p>
       </div>
+
+      {conversion && <PackSideChoiceList conversion={conversion} />}
 
       <div className="flex flex-wrap items-center gap-2">
         <OptionSelect
@@ -164,7 +187,12 @@ export function ArrivingPack({
 
       <ul className="flex flex-col gap-1.5">
         {shown.map((pick) => (
-          <PackRow key={pick.entry.index} pick={pick} onToggle={onToggle} />
+          <PackRow
+            key={pick.entry.index}
+            pick={pick}
+            takingAs={conversion?.takingAs ?? ""}
+            onToggle={onToggle}
+          />
         ))}
       </ul>
 
@@ -199,12 +227,86 @@ export function ArrivingPack({
   );
 }
 
+/**
+ * Which side's buildings to take the whole pack in (issue #1492).
+ *
+ * One choice for the pack rather than one per layout, because a pack is thirty
+ * layouts and thirty forms is not a surface anybody would use. It is also
+ * usually one player's collection, so one side is usually the right answer for
+ * all of it at once.
+ *
+ * What the choice does not cover is said here as a number and on each row as a
+ * line, which is the half that keeps it honest: "24 of your 30" is the fact
+ * somebody needs before they tick anything, and a row a choice did nothing to
+ * has to say so rather than look converted.
+ */
+function PackSideChoiceList({
+  conversion,
+}: {
+  conversion: ArrivingPackConversion;
+}) {
+  const { offer, takingAs, onTakeAs } = conversion;
+  const chosen = offer.choices.find((one) => one.side === takingAs);
+
+  return (
+    <div className="flex flex-col gap-2 rounded border border-border/50 p-2">
+      <p className="text-xs text-muted-foreground">
+        {offer.from.length === 1
+          ? `These are ${offer.from[0]}'s layouts, and this game has another side's version of what is in them.`
+          : `These layouts are ${offer.from.join(" and ")}'s.`}{" "}
+        Coilbox does not know which side you play, so they are kept as they are
+        unless you say otherwise.
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        <Button
+          type="button"
+          size="sm"
+          variant={takingAs === "" ? "default" : "outline"}
+          onClick={() => onTakeAs("")}
+        >
+          Keep them as they are
+        </Button>
+        {offer.choices.map((choice) => (
+          <Button
+            key={choice.side}
+            type="button"
+            size="sm"
+            variant={takingAs === choice.side ? "default" : "outline"}
+            className="gap-1.5"
+            onClick={() => onTakeAs(choice.side)}
+          >
+            <Repeat className="size-3.5" aria-hidden />
+            Take them all as {choice.side}
+          </Button>
+        ))}
+      </div>
+      {chosen && (
+        <p className="text-xs text-muted-foreground">
+          {chosen.converts} of these are said in {chosen.side} now.
+          {chosen.already > 0
+            ? ` ${chosen.already} already ${chosen.already === 1 ? "was" : "were"}.`
+            : ""}
+          {chosen.untouched > 0
+            ? ` ${chosen.untouched} ${chosen.untouched === 1 ? "has" : "have"} nothing in ${chosen.side} to be said in, so ${chosen.untouched === 1 ? "it stays" : "they stay"} exactly as ${chosen.untouched === 1 ? "it is" : "they are"}.`
+            : ""}
+          {offer.sideUnknown > 0
+            ? ` ${offer.sideUnknown} of them ${offer.sideUnknown === 1 ? "is" : "are"} made of more than one side's buildings, so what ${offer.sideUnknown === 1 ? "it was" : "they were"} cannot be told.`
+            : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** One layout of the pack: the picture, what it is, and what is wrong with it. */
 function PackRow({
   pick,
+  takingAs,
   onToggle,
 }: {
   pick: PackPick;
+  /** The side the whole pack is being taken as, empty for none. */
+  takingAs: string;
   onToggle: (index: number) => void;
 }) {
   const { entry, payload, arrival, fit, taking } = pick;
@@ -214,6 +316,12 @@ function PackRow({
   // would be kept under, and thirty rows repeating it is thirty lines nobody
   // reads.
   const warnings = arrival.notes.filter((note) => note.tone === "warn");
+  // What the pack's side did to this one, including nothing, because a row a
+  // choice passed over has to say so rather than look converted.
+  const converted =
+    pick.converted && takingAs
+      ? packConversionNotes(pick.converted, takingAs, buildings)
+      : [];
 
   return (
     <li
@@ -255,7 +363,27 @@ function PackRow({
             {note.text}
           </p>
         ))}
+        {converted.map((note) => (
+          <ConversionLine key={note.text} note={note} />
+        ))}
       </div>
     </li>
+  );
+}
+
+/** What the pack's side did to one layout. A swap that moves a base is a
+ *  warning, because that is the way a conversion quietly breaks one. */
+function ConversionLine({ note }: { note: ArrivalNote }) {
+  return (
+    <p
+      data-conversion={note.tone}
+      className={
+        note.tone === "warn"
+          ? "text-[11px] text-amber-200/80"
+          : "text-[11px] text-muted-foreground"
+      }
+    >
+      {note.text}
+    </p>
   );
 }
