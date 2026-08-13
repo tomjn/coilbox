@@ -20,6 +20,14 @@
  *
  * The surface is `./pages/components/ArrivingPack.tsx`, and where a taken layout
  * says it came from is `BlueprintSource` in `./library.ts`.
+ *
+ * The other half of reading a pack is making one (issue #1474), and it is at
+ * the bottom of this file. Making one is not a second format or a second way to
+ * write a file: it is `./gameFile.ts` given several layouts instead of one, so
+ * the copy before the write, the refusal while a game is running and everything
+ * the file already held hold for the set exactly as they do for one. What is
+ * here is the same thing the reading half adds, in the other direction: what a
+ * whole set loses on the way out, and what the write did to the file.
  */
 
 import type { InstalledGameInfo } from "../container/gameIdentity";
@@ -27,6 +35,8 @@ import type { Facing } from "../scenario/model";
 import { type BlueprintArrival, blueprintArrival } from "./arrival";
 import type { Footprint, SnapBuilding } from "./footprint";
 import type { BlueprintFormat } from "./format";
+import type { MergeOutcome } from "./gameFile";
+import type { StoredBlueprint } from "./library";
 import type { BaseBlueprint } from "./model";
 import type { BlueprintPayload } from "./payload";
 import { blueprintPayload } from "./transfer";
@@ -269,6 +279,11 @@ function buildings(n: number): string {
   return `${n} building${n === 1 ? "" : "s"}`;
 }
 
+/** "1 layout" or "3 layouts", for the same reason. */
+function layouts(n: number): string {
+  return `${n} layout${n === 1 ? "" : "s"}`;
+}
+
 /**
  * What reading the whole file changed, in one sentence, or null when it changed
  * nothing.
@@ -295,4 +310,79 @@ export function packChanges(pack: BlueprintPack): string | null {
   const last = said.pop();
   const all = said.length > 0 ? `${said.join(", ")} and ${last}` : last;
   return `Reading this file ${all}.`;
+}
+
+/**
+ * What writing a set of layouts into a game's file leaves behind (issue #1474).
+ *
+ * A single layout's export already names the mission-only fields it drops, and
+ * this is the same promise kept for a set: an export is a conversion, so it says
+ * what it did before it does it. The three here are the ones a library layout
+ * carries that a game's file has nowhere for.
+ *
+ * The footprints are the one worth understanding. A game does not need them: it
+ * reads how much ground a building stands on out of its own units. They matter
+ * because a file is also the currency somebody else takes a pack in, and a
+ * reader without that game installed has nothing else to draw the layout at the
+ * right size with.
+ *
+ * Where each copy came from is not in the list. It is a fact about your disk
+ * rather than about the shape, so it staying behind is the design and not a
+ * loss (issue #1473).
+ */
+export function packStrips(records: readonly StoredBlueprint[]): string[] {
+  const designed = records.filter((r) => r.layout.designedFor).length;
+  const named = records.filter((r) => r.layout.game?.name).length;
+  const sized = records.filter(
+    (r) => Object.keys(r.layout.footprints).length > 0,
+  ).length;
+
+  const said: string[] = [];
+  if (designed > 0) {
+    said.push(
+      `the map ${layouts(designed)} ${designed === 1 ? "was" : "were"} designed for`,
+    );
+  }
+  if (named > 0) {
+    said.push(`which game ${layouts(named)} ${named === 1 ? "is" : "are"} for`);
+  }
+  if (sized > 0) {
+    said.push(
+      `the footprints ${layouts(sized)} carr${sized === 1 ? "ies" : "y"}`,
+    );
+  }
+  return said;
+}
+
+/**
+ * What writing them did to the file, in the words the scenario panel says it
+ * for one.
+ *
+ * Every part of it is a fact the merge reported rather than one this asked for:
+ * a layout already in the file under its name replaced the entry where it
+ * stood, so a set written twice does not double the file, and an entry no
+ * reader here understands was carried through untouched.
+ */
+export function packWriteSummary(
+  dest: string,
+  outcome: Omit<MergeOutcome, "text">,
+): string {
+  const did: string[] = [];
+  if (outcome.added.length > 0)
+    did.push(`added ${layouts(outcome.added.length)}`);
+  if (outcome.replaced.length > 0) {
+    did.push(`replaced ${layouts(outcome.replaced.length)}`);
+  }
+  const kept = outcome.kept;
+  return [
+    did.length > 0
+      ? `Wrote into ${dest}: ${did.join(" and ")}.`
+      : `Wrote nothing into ${dest}.`,
+    outcome.backup ? `The file it was is kept at ${outcome.backup}.` : null,
+    kept > 0
+      ? `${kept} entr${kept === 1 ? "y" : "ies"} coilbox cannot read ${kept === 1 ? "was" : "were"} left exactly as ${kept === 1 ? "it was" : "they were"}.`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }

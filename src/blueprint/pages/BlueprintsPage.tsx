@@ -59,6 +59,7 @@ import { blueprintRoute, saveBlueprint, useBlueprintLibrary } from "../store";
 import { BlueprintCardMenu } from "./components/BlueprintCardMenu";
 import { BlueprintImportButton } from "./components/BlueprintImportButton";
 import { BlueprintPackButton } from "./components/BlueprintPackButton";
+import { BlueprintPackWriteButton } from "./components/BlueprintPackWriteButton";
 import { LayoutThumb } from "./components/LayoutThumb";
 
 /** Every game, rather than one of them. A game's name is its archive name, so
@@ -114,6 +115,11 @@ export default function BlueprintsPage() {
               );
             }}
           />
+          {records.length > 0 && (
+            <BlueprintPackWriteButton
+              onWritten={(said) => toast.success(said)}
+            />
+          )}
           <BlueprintImportButton
             initialCode={importCode}
             hubItemId={hubItemId}

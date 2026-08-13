@@ -3,12 +3,15 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { barFormat } from "./bar";
 import { buildGridSnap } from "./footprint";
+import type { StoredBlueprint } from "./library";
 import {
   orderPack,
   type PackPick,
   packChanges,
   packCounts,
   packPlan,
+  packStrips,
+  packWriteSummary,
   readBlueprintPack,
 } from "./pack";
 import { knownUnits } from "./units";
@@ -206,5 +209,70 @@ describe("packChanges", () => {
   it("says nothing about a file it read exactly as it stood", () => {
     const read = readBlueprintPack(barFormat, '{"savedBlueprints":[]}');
     expect(packChanges(read)).toBeNull();
+  });
+});
+
+/** A layout as the library keeps one, for the writing half (issue #1474). */
+const kept = (
+  patch: Partial<StoredBlueprint["layout"]> = {},
+): StoredBlueprint => ({
+  id: crypto.randomUUID(),
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-02T00:00:00.000Z",
+  layout: {
+    name: "Opening solars",
+    buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
+    footprints: {},
+    ...patch,
+  },
+});
+
+describe("packStrips", () => {
+  it("names everything a game's file has nowhere to keep", () => {
+    const said = packStrips([
+      kept({
+        game: { name: GAME, shortname: "BA" },
+        designedFor: "Comet Catcher Remake",
+        footprints: { armsolar: { x: 4, z: 4 } },
+      }),
+      kept({ game: { name: GAME, shortname: "BA" } }),
+    ]);
+    expect(said).toEqual([
+      "the map 1 layout was designed for",
+      "which game 2 layouts are for",
+      "the footprints 1 layout carries",
+    ]);
+  });
+
+  it("says nothing when there is nothing to leave behind", () => {
+    expect(packStrips([kept()])).toEqual([]);
+  });
+});
+
+describe("packWriteSummary", () => {
+  it("counts what the write did to the file", () => {
+    expect(
+      packWriteSummary("/games/blueprints.json", {
+        added: ["Wall", "Opening solars"],
+        replaced: ["Front line"],
+        kept: 0,
+      }),
+    ).toBe(
+      "Wrote into /games/blueprints.json: added 2 layouts and replaced 1 layout.",
+    );
+  });
+
+  it("says where the file it was is kept, and what was left untouched", () => {
+    const said = packWriteSummary("/games/blueprints.json", {
+      added: ["Wall"],
+      replaced: [],
+      kept: 2,
+      backup: "/games/blueprints.json.20260813-090530.bak",
+    });
+    expect(said).toContain("added 1 layout.");
+    expect(said).toContain(
+      "The file it was is kept at /games/blueprints.json.20260813-090530.bak.",
+    );
+    expect(said).toContain("2 entries coilbox cannot read were left");
   });
 });
