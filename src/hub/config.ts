@@ -1,4 +1,5 @@
 import { useSetting } from "@picoframe/frame";
+import { isProfileHidden } from "../profile/hidden";
 import { getProfile, isHubEnabled } from "../profile/profile";
 
 /**
@@ -148,4 +149,21 @@ export function hubItemIdFromUrl(
  * plugin definition to get at one string. */
 export function hubItemRoute(id: string): string {
   return `/hub/${encodeURIComponent(id)}`;
+}
+
+/**
+ * May a screen outside the hub offer to open {@link hubItemRoute}? (issue
+ * #1487)
+ *
+ * Both gates the hub's own nav item applies, which `./index.tsx` takes from
+ * here so the pair is written once. The route redirects home when either is
+ * closed, so a link that read only `isHubEnabled` would be a button that throws
+ * you out of the page you were on.
+ *
+ * A layout imported from the hub keeps that provenance whatever the profile
+ * later says, so this is asked at the point of drawing the link rather than
+ * baked into the record.
+ */
+export function isHubItemPageReachable(): boolean {
+  return isHubEnabled() && !isProfileHidden("hub.browse");
 }
