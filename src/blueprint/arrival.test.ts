@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { arrivingGame, blueprintArrival, gameToCheckAgainst } from "./arrival";
 import type { BlueprintPayload } from "./payload";
-import {
-  arrivingGame,
-  blueprintArrival,
-  gameToCheckAgainst,
-} from "./arrival";
 import { knownUnits } from "./units";
 
 const INSTALLED = [
@@ -106,7 +102,6 @@ describe("blueprintArrival", () => {
     expect(arrival.name).toBe("Opening solars");
     expect(arrival.wasCalled).toBeUndefined();
     expect(arrival.notes).toEqual([]);
-    expect(arrival.worst).toBe("ok");
   });
 
   it("counts the name up when the library already has one, and says so", () => {
@@ -121,7 +116,6 @@ describe("blueprintArrival", () => {
     expect(arrival.notes.map((note) => note.text).join(" ")).toContain(
       "Opening solars 2",
     );
-    expect(arrival.worst).toBe("note");
   });
 
   it("names the game a layout is for when it is not installed here", () => {
@@ -150,7 +144,7 @@ describe("blueprintArrival", () => {
       known: knownUnits(UNITS),
     });
     expect(arrival.notes[0].text).toContain("legsolar");
-    expect(arrival.worst).toBe("warn");
+    expect(arrival.notes[0].tone).toBe("warn");
     expect(arrival.foreign).toBe(false);
   });
 
@@ -179,7 +173,6 @@ describe("blueprintArrival", () => {
     });
     expect(arrival.notes).toHaveLength(1);
     expect(arrival.notes[0].text).toContain("not read");
-    expect(arrival.worst).toBe("note");
   });
 
   it("says a layout naming no game cannot be checked at all", () => {

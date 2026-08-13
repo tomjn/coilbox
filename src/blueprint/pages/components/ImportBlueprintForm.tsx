@@ -79,6 +79,11 @@ export function ImportBlueprintForm({
   );
 
   const decode = async (text: string) => {
+    // Whatever was read last goes now rather than on success, so a code that
+    // will not read cannot leave the previous layout on screen under an error
+    // about a different one, still offering to be kept.
+    setPayload(null);
+    setError(null);
     const read = readBlueprintContainer(text);
     if (!read.ok) {
       // Name what the paste actually is, the way a scenario import does: "that

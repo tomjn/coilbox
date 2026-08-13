@@ -26,7 +26,11 @@ import type {
 } from "../container/gameIdentity";
 import { uniqueLayoutName } from "./library";
 import type { BlueprintPayload } from "./payload";
-import { type KnownUnits, unknownBuildings, unknownUnitsWarning } from "./units";
+import {
+  type KnownUnits,
+  unknownBuildings,
+  unknownUnitsWarning,
+} from "./units";
 
 /** Where the game a layout was drawn for stands with this machine. */
 export type ArrivingGame =
@@ -108,8 +112,6 @@ export interface BlueprintArrival {
   foreign: boolean;
   /** Worst first, so the reason not to take this is the first line read. */
   notes: ArrivalNote[];
-  /** The loudest tone in {@link notes}, or "ok" when there are none. */
-  worst: "ok" | ArrivalTone;
 }
 
 export interface ArrivalInput {
@@ -193,10 +195,5 @@ export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
     game,
     foreign,
     notes,
-    worst: notes.some((note) => note.tone === "warn")
-      ? "warn"
-      : notes.length > 0
-        ? "note"
-        : "ok",
   };
 }
