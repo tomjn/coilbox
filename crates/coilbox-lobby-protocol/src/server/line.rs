@@ -77,6 +77,23 @@ pub fn login_info_end() -> String {
     "LOGININFOEND".to_string()
 }
 
+/// `PONG [token]`, the answer to a client's `PING`.
+///
+/// A client that pings as a keepalive expects nothing back, so this is only
+/// courtesy. It costs one line and it keeps a client that does wait for it from
+/// deciding the room has gone quiet.
+pub fn pong(token: Option<&str>) -> String {
+    match token {
+        Some(t) => format!("PONG {t}"),
+        None => "PONG".to_string(),
+    }
+}
+
+/// `OPENBATTLEFAILED <reason>`, a refusal to open a battle, shown verbatim.
+pub fn open_battle_failed(reason: &str) -> String {
+    format!("OPENBATTLEFAILED {reason}")
+}
+
 /// `ADDUSER <username> <country> <user_id> <agent>`.
 pub fn add_user(username: &str, country: &str, user_id: &str, agent: &str) -> String {
     format!("ADDUSER {username} {country} {user_id} {agent}")
@@ -306,6 +323,8 @@ mod tests {
 
     #[test]
     fn optional_fields_are_omitted_not_blanked() {
+        assert_eq!(pong(None), "PONG");
+        assert_eq!(pong(Some("42")), "PONG 42");
         assert_eq!(joined_battle(1, "bob", None), "JOINEDBATTLE 1 bob");
         assert_eq!(joined_battle(1, "bob", Some("sp")), "JOINEDBATTLE 1 bob sp");
         assert_eq!(join_battle(1, -1, None), "JOINBATTLE 1 -1");
