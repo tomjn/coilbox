@@ -18,17 +18,28 @@
  * answer given then. Dropping the lot is there for somebody who would rather
  * start again than pick through it.
  *
- * Where a pairing came from is not shown, because nothing records it. A group
- * is a map of side name to def, so there is no key a source could go under that
- * a game is not free to name a side after, and giving one takes a shape change
- * rather than a surface. https://github.com/tomjn/coilbox/issues/1537.
+ * Each answer says whose it is (issue #1537), because they are not equally
+ * trustworthy and the difference is the first thing somebody hunting a wrong one
+ * wants. An answer they gave is one they meant. One a game's file brought is one
+ * nobody here chose. One from before coilbox recorded any of this is marked as
+ * nothing at all, and the list says so rather than letting it read as a third
+ * kind.
+ *
+ * Marked per answer rather than per row, because merging a game's file fills in
+ * the sides a person never answered for and leaves the ones they did, so a row
+ * really is part theirs and part the game's.
  *
  * Pure and rendered in a test. The hooks are `./GameEquivalents.tsx`.
  */
 
 import { Button } from "@picoframe/frame";
 import { Shuffle, X } from "lucide-react";
-import { type EquivalenceTable, tableSides } from "../../equivalents";
+import {
+  defIn,
+  type EquivalenceTable,
+  sourceIn,
+  tableSides,
+} from "../../equivalents";
 
 export function EquivalentsPanel({
   table,
@@ -49,6 +60,15 @@ export function EquivalentsPanel({
   // the ones it has.
   const sides = tableSides(table);
 
+  // Whether anything here is old enough that coilbox cannot say where it came
+  // from. Said only when there is one, so a table that can account for itself
+  // does not carry a caveat about a case it does not have.
+  const anyUnsourced = table.groups.some((group) =>
+    sides.some(
+      (side) => defIn(group, side) !== undefined && !sourceIn(group, side),
+    ),
+  );
+
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
@@ -63,34 +83,45 @@ export function EquivalentsPanel({
       <p className="max-w-prose text-xs text-muted-foreground">
         Which of this game's buildings coilbox treats as each side's version of
         the same thing. It uses these first when a layout of this game is said
-        in another side, ahead of anything it can read off a unit's name. They
-        come from what you picked while converting, and from this game's own
-        published table where you asked coilbox to read one.
+        in another side, ahead of anything it can read off a unit's name. Each
+        answer says where it came from: you picked it while converting, or this
+        game's own published table brought it when you asked coilbox to read
+        one.
       </p>
       <ul className="divide-y divide-border/40 rounded-lg border border-border/50 bg-card">
         {table.groups.map((group, at) => {
-          const said = sides.filter((side) => group[side] !== undefined);
+          const said = sides.filter((side) => defIn(group, side) !== undefined);
           return (
             <li
               // A table holds no ids and two groups can honestly name the same
               // def, so where it stands is the only thing telling them apart.
               // biome-ignore lint/suspicious/noArrayIndexKey: see above
-              key={`${at}-${said.map((side) => group[side]).join("-")}`}
+              key={`${at}-${said.map((side) => defIn(group, side)).join("-")}`}
               className="flex items-center gap-3 px-3 py-1.5 text-sm"
             >
               <dl className="flex min-w-0 flex-1 flex-wrap gap-x-4 gap-y-0.5">
-                {said.map((side) => (
-                  <div key={side} className="flex items-baseline gap-1.5">
-                    <dt className="text-xs text-muted-foreground">{side}</dt>
-                    <dd className="font-mono text-xs">{group[side]}</dd>
-                  </div>
-                ))}
+                {said.map((side) => {
+                  const from = sourceIn(group, side);
+                  return (
+                    <div key={side} className="flex items-baseline gap-1.5">
+                      <dt className="text-xs text-muted-foreground">{side}</dt>
+                      <dd className="font-mono text-xs">
+                        {defIn(group, side)}
+                        {from && (
+                          <span className="ml-1.5 font-sans text-[0.65rem] text-muted-foreground">
+                            {from === "you" ? "you" : "the game"}
+                          </span>
+                        )}
+                      </dd>
+                    </div>
+                  );
+                })}
               </dl>
               <Button
                 size="sm"
                 variant="ghost"
                 className="size-7 shrink-0 p-0"
-                aria-label={`Forget ${said.map((side) => group[side]).join(" and ")}`}
+                aria-label={`Forget ${said.map((side) => defIn(group, side)).join(" and ")}`}
                 onClick={() => onForget(at)}
               >
                 <X className="size-3.5" />
@@ -103,6 +134,8 @@ export function EquivalentsPanel({
         Forgetting one is how a wrong answer is corrected. The next layout of
         this game you convert asks about it again, and keeps whatever you say
         then.
+        {anyUnsourced &&
+          " An answer with nothing after it is one coilbox held before it started recording where they came from, so there is no longer anybody to ask."}
       </p>
     </section>
   );

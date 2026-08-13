@@ -252,8 +252,8 @@ describe("SubstitutionPanel", () => {
         sides: OPAQUE,
         table: {
           groups: [
-            { Rebels: "armsolar", Empire: "armmex" },
-            { Legion: "armsolar", Rebels: "legsolar" },
+            { Rebels: { def: "armsolar" }, Empire: { def: "armmex" } },
+            { Legion: { def: "armsolar" }, Rebels: { def: "legsolar" } },
           ],
         },
       });
