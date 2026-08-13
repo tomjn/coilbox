@@ -72,7 +72,6 @@ import {
   LayoutNameField,
   LayoutNotes,
 } from "@/placement/LayoutControls";
-import type { Unjudged } from "@/placement/placements";
 import type { Participant } from "@/play/config";
 import type { PlacedBuilding, ScenarioBase } from "../../model";
 import {
@@ -97,7 +96,7 @@ export function BaseControls({
   overlaps,
   unstable,
   wrongDepth,
-  unjudged,
+  noSlope,
   absent,
   designedFor,
   onMap,
@@ -148,9 +147,10 @@ export function BaseControls({
   /** Which of them are in the wrong depth of water for them, by their place in
    *  the base. Drawn in cyan on the map as well (issue #1459). */
   wrongDepth: number[];
-  /** Which of them nothing judged, and why. Undefined while the reads are still
-   *  in flight, when nothing is worth saying yet (issue #1491). */
-  unjudged?: Unjudged;
+  /** Which of them this game gives no slope to check against, by their place in
+   *  the base. Undefined while the reads are still in flight, when nothing is
+   *  worth saying yet (issue #1491). */
+  noSlope?: number[];
   /** Which of them name a unit this game has not got, by their place in the
    *  base. Drawn in violet on the map as well (issue #1445). */
   absent: UnknownBuilding[];
@@ -396,7 +396,7 @@ export function BaseControls({
             overlaps={overlaps}
             unstable={unstable}
             wrongDepth={wrongDepth}
-            unjudged={unjudged}
+            noSlope={noSlope}
             absent={absent}
             buildings={buildings.length}
             designedFor={designedFor}

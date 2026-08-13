@@ -6,13 +6,13 @@ import {
   absentIn,
   baseFootprints,
   facingToYaw,
+  noSlopeIn,
   overlappingIn,
   parsePlacementKey,
   placementKey,
   sceneUnchecked,
   teamColor,
   UNOWNED_COLOR,
-  unjudgedIn,
   unstableIn,
   wrongDepthIn,
 } from "./placements";
@@ -154,7 +154,7 @@ describe("absentIn", () => {
   });
 });
 
-describe("unjudgedIn", () => {
+describe("noSlopeIn", () => {
   /** A lab with a slope, a solar collector whose entry has none, and a bot the
    *  game has, so the three reasons can be told apart in one base. */
   const units = [
@@ -195,46 +195,37 @@ describe("unjudgedIn", () => {
     hasWater: true,
   };
 
-  it("blames the map when there is no ground to check against", () => {
-    const placements = scenarioPlacements(doc);
-    const marks = baseFootprints(placements, units, null);
-    expect(unjudgedIn(placements, marks, "pf1")).toEqual({
-      noGround: [0],
-      noUnits: [],
-      noSlope: [1],
-    });
-  });
-
-  it("blames the dataset for a def whose entry has no slope", () => {
+  it("names the building this game gives no slope to check against", () => {
     const placements = scenarioPlacements(doc);
     const marks = baseFootprints(placements, units, flat);
-    expect(unjudgedIn(placements, marks, "pf1")).toEqual({
-      noGround: [],
-      noUnits: [],
-      noSlope: [1],
-    });
+    expect(noSlopeIn(placements, marks, "pf1")).toEqual([1]);
   });
 
-  /** The loading case. Every building is unjudged for one reason, and it is not
-   *  the reason that would have an author reinstalling their game. */
-  it("blames the read still in flight before the units are read", () => {
+  /**
+   * Issue #1529. This is a fact about the game's data rather than about the
+   * map, so it is the same answer with a map that would not read: the lab has
+   * no verdict because there is no ground, which the surface says once for
+   * everything on it, and the solar collector has none because this game gives
+   * it no slope, which is only true of that building.
+   */
+  it("still names it with no ground to check against", () => {
+    const placements = scenarioPlacements(doc);
+    const marks = baseFootprints(placements, units, null);
+    expect(noSlopeIn(placements, marks, "pf1")).toEqual([1]);
+  });
+
+  /** Before the game's units are read nothing knows what any of these defs is,
+   *  which is the surface's sentence rather than this one. */
+  it("names nothing before the game's units have been read", () => {
     const placements = scenarioPlacements(doc);
     const marks = baseFootprints(placements, [], flat);
-    expect(unjudgedIn(placements, marks, "pf1")).toEqual({
-      noGround: [],
-      noUnits: [0, 1],
-      noSlope: [],
-    });
+    expect(noSlopeIn(placements, marks, "pf1")).toEqual([]);
   });
 
   it("says nothing about a base that is not the one asked for", () => {
     const placements = scenarioPlacements(doc);
-    const marks = baseFootprints(placements, units, null);
-    expect(unjudgedIn(placements, marks, "other")).toEqual({
-      noGround: [],
-      noUnits: [],
-      noSlope: [],
-    });
+    const marks = baseFootprints(placements, units, flat);
+    expect(noSlopeIn(placements, marks, "other")).toEqual([]);
   });
 });
 

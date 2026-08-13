@@ -35,12 +35,12 @@ import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
 import {
   absentIn,
   baseFootprints,
+  noSlopeIn,
   overlappingIn,
   type Placement,
   parsePlacementKey,
   placementKey,
   sceneUnchecked,
-  unjudgedIn,
   unstableIn,
   wrongDepthIn,
 } from "@/placement/placements";
@@ -833,9 +833,9 @@ export function ScenarioMapScene({
                   // unjudged for a moment, and a panel opening on a wall of
                   // warnings that clears itself teaches an author to ignore it
                   // (issue #1491).
-                  unjudged={
+                  noSlope={
                     units.settled
-                      ? unjudgedIn(units.placements, footprints, pickedBase.id)
+                      ? noSlopeIn(units.placements, footprints, pickedBase.id)
                       : undefined
                   }
                   absent={absentIn(units.placements, footprints, pickedBase.id)}
