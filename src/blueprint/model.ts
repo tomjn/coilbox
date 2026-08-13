@@ -50,5 +50,20 @@ export type BaseBlueprint = {
    * and an exported one hands it back.
    */
   ordered?: boolean;
+  /**
+   * The archive name of the map this layout was drawn on (issue #1315).
+   *
+   * A layout is geometry with no map in it, but the geometry was arrived at by
+   * looking at one: a wind farm spaced for flat ground, a line of extractors on
+   * a metal spot pattern. Naming that map is what lets a reader tell whether the
+   * layout is being used where it was meant to be, and it is why layouts posted
+   * in the community gallery carry a map name in their titles.
+   *
+   * Absent on a layout drawn on no map, which is every layout made in the
+   * standalone editor. Recording it never makes the layout require that map: it
+   * is a note about where the shape came from, not a restriction on where it
+   * goes.
+   */
+  designedFor?: string;
   buildings: BlueprintBuilding[];
 };

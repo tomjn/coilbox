@@ -350,6 +350,11 @@ export function addBase(
     /** What the layout is called. Its id when the caller has nothing better,
      *  which is what a base drawn on the map has until it is saved by name. */
     name?: string;
+    /** The map it is being drawn on, so the layout remembers what terrain it
+     *  was shaped around (issue #1315). Empty when there is no map, which is
+     *  the standalone editor, and kept as it is given for a layout that came
+     *  from somewhere else already carrying one. */
+    designedFor?: string;
     buildings: PlacedBuilding[];
   },
 ): Scenario {
@@ -360,6 +365,7 @@ export function addBase(
       {
         id: blueprintId,
         name: base.name ?? nextLayoutName(scenario.blueprints),
+        designedFor: base.designedFor?.trim() || undefined,
         buildings: base.buildings.map((b) => ({
           def: b.def,
           offset: round(b.offset),
