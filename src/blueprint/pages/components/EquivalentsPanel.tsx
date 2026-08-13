@@ -36,26 +36,56 @@
  * rather than which rows to hide, and this list is the one place every answer
  * is looked at: a row a control has hidden is a row nobody checks.
  *
+ * A long table can also be searched for one building (issue #1547), which is
+ * the other question people arrive with: what does coilbox think corak is,
+ * asked because a base built the wrong thing. Ordering does not answer that,
+ * and 87 rows is too many to read for one name.
+ *
+ * A box that hides rows is the thing issue #1545 declined to add, so this one
+ * is built to be impossible to leave on by accident. It holds nothing between
+ * visits, so the page always opens on the whole table. It shows what was typed,
+ * says how many of how many rows are left, and offers to clear itself. It is
+ * only offered for a table long enough that reading it by eye is real work, and
+ * it is ignored where it is not offered, so dropping rows down to a short table
+ * cannot leave one hidden with nothing on the page to say why. A search that
+ * finds nothing says so, which is itself an answer: coilbox has nothing
+ * recorded for that building.
+ *
  * Pure and rendered in a test. The hooks are `./GameEquivalents.tsx`.
  */
 
-import { Button } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import { Shuffle, X } from "lucide-react";
 import {
   answeredByYou,
   defIn,
   type EquivalenceTable,
+  namesDef,
   orderYoursFirst,
   sourceIn,
   tableSides,
 } from "../../equivalents";
 
+/**
+ * How long a table has to be before searching it beats reading it.
+ *
+ * A dozen rows is a glance, and a control that hides rows earns its place only
+ * where the alternative is real work. Beyond All Reason's published table is 87
+ * rows, and a table somebody answered a pair at a time is nowhere near this.
+ */
+const WORTH_SEARCHING = 12;
+
 export function EquivalentsPanel({
   table,
+  query,
+  onQuery,
   onForget,
   onForgetAll,
 }: {
   table: EquivalenceTable;
+  /** What somebody has typed to find one building. */
+  query: string;
+  onQuery: (typed: string) => void;
   /** Drop the pairing standing at this place in the table. */
   onForget: (at: number) => void;
   onForgetAll: () => void;
@@ -78,10 +108,20 @@ export function EquivalentsPanel({
     ),
   );
 
+  // A search is offered only where the list is long enough to need one, and
+  // what is not offered is not applied, so a table dropped back under that
+  // length shows every row again rather than keeping a search nobody can see.
+  const searchable = table.groups.length >= WORTH_SEARCHING;
+  const hunt = searchable ? query.trim() : "";
+
   // The person's own answers first, and how many that is, so a table a game's
   // file filled can still be read for what they said (issue #1545). Said only
-  // when the order is doing something, which is a table holding both kinds.
-  const order = orderYoursFirst(table);
+  // when the order is doing something, which is a table holding both kinds. The
+  // order holds inside a search, because narrowing to five rows does not stop
+  // two of them being theirs.
+  const order = orderYoursFirst(table).filter((at) =>
+    namesDef(table.groups[at], hunt),
+  );
   const mine = table.groups.filter(answeredByYou).length;
   const mixed = mine > 0 && mine < table.groups.length;
 
@@ -106,51 +146,83 @@ export function EquivalentsPanel({
         {mixed &&
           ` The ${mine} holding an answer you gave are first, because reading a game's table brings enough at once to lose them in.`}
       </p>
-      <ul className="divide-y divide-border/40 rounded-lg border border-border/50 bg-card">
-        {order.map((at) => {
-          // Everything on the row comes from where the group stands rather than
-          // from where it is shown, so what a row names and what dropping it
-          // drops cannot come apart.
-          const group = table.groups[at];
-          const said = sides.filter((side) => defIn(group, side) !== undefined);
-          return (
-            <li
-              // A table holds no ids and two groups can honestly name the same
-              // def, so where it stands is the only thing telling them apart.
-              key={`${at}-${said.map((side) => defIn(group, side)).join("-")}`}
-              className="flex items-center gap-3 px-3 py-1.5 text-sm"
-            >
-              <dl className="flex min-w-0 flex-1 flex-wrap gap-x-4 gap-y-0.5">
-                {said.map((side) => {
-                  const from = sourceIn(group, side);
-                  return (
-                    <div key={side} className="flex items-baseline gap-1.5">
-                      <dt className="text-xs text-muted-foreground">{side}</dt>
-                      <dd className="font-mono text-xs">
-                        {defIn(group, side)}
-                        {from && (
-                          <span className="ml-1.5 font-sans text-[0.65rem] text-muted-foreground">
-                            {from === "you" ? "you" : "the game"}
-                          </span>
-                        )}
-                      </dd>
-                    </div>
-                  );
-                })}
-              </dl>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="size-7 shrink-0 p-0"
-                aria-label={`Forget ${said.map((side) => defIn(group, side)).join(" and ")}`}
-                onClick={() => onForget(at)}
-              >
-                <X className="size-3.5" />
+      {searchable && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={query}
+            onChange={(event) => onQuery(event.target.value)}
+            placeholder="Find a building"
+            aria-label="Find a building"
+            className="w-56"
+          />
+          {hunt !== "" && (
+            <>
+              <span className="text-xs text-muted-foreground">
+                Showing {order.length} of {table.groups.length}
+              </span>
+              <Button size="sm" variant="ghost" onClick={() => onQuery("")}>
+                Clear
               </Button>
-            </li>
-          );
-        })}
-      </ul>
+            </>
+          )}
+        </div>
+      )}
+      {order.length === 0 ? (
+        <p className="rounded-lg border border-border/50 bg-card px-3 py-2 text-xs text-muted-foreground">
+          Nothing in this table names {hunt}, so coilbox has no answer recorded
+          for it and would fall back on reading the name when converting.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border/40 rounded-lg border border-border/50 bg-card">
+          {order.map((at) => {
+            // Everything on the row comes from where the group stands rather than
+            // from where it is shown, so what a row names and what dropping it
+            // drops cannot come apart.
+            const group = table.groups[at];
+            const said = sides.filter(
+              (side) => defIn(group, side) !== undefined,
+            );
+            return (
+              <li
+                // A table holds no ids and two groups can honestly name the same
+                // def, so where it stands is the only thing telling them apart.
+                key={`${at}-${said.map((side) => defIn(group, side)).join("-")}`}
+                className="flex items-center gap-3 px-3 py-1.5 text-sm"
+              >
+                <dl className="flex min-w-0 flex-1 flex-wrap gap-x-4 gap-y-0.5">
+                  {said.map((side) => {
+                    const from = sourceIn(group, side);
+                    return (
+                      <div key={side} className="flex items-baseline gap-1.5">
+                        <dt className="text-xs text-muted-foreground">
+                          {side}
+                        </dt>
+                        <dd className="font-mono text-xs">
+                          {defIn(group, side)}
+                          {from && (
+                            <span className="ml-1.5 font-sans text-[0.65rem] text-muted-foreground">
+                              {from === "you" ? "you" : "the game"}
+                            </span>
+                          )}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="size-7 shrink-0 p-0"
+                  aria-label={`Forget ${said.map((side) => defIn(group, side)).join(" and ")}`}
+                  onClick={() => onForget(at)}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       <p className="max-w-prose text-xs text-muted-foreground">
         Forgetting one is how a wrong answer is corrected. The next layout of
         this game you convert asks about it again, and keeps whatever you say

@@ -27,19 +27,27 @@ const TABLE: EquivalenceTable = {
 
 const nothing = () => {};
 
-function markup(table: EquivalenceTable): string {
+function markup(table: EquivalenceTable, query = ""): string {
   return renderToStaticMarkup(
     createElement(EquivalentsPanel, {
       table,
+      query,
+      onQuery: nothing,
       onForget: nothing,
       onForgetAll: nothing,
     }),
   );
 }
 
-/** Every button's accessible name, which is what says a row can be dropped. */
+/** Every control's accessible name, which for a row is what says it can be
+ *  dropped. */
 function labels(html: string): string[] {
   return [...html.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1]);
+}
+
+/** Only the rows, for a table whose controls are not all rows. */
+function rows(html: string): string[] {
+  return labels(html).filter((label) => label.startsWith("Forget "));
 }
 
 /** The words of one pairing's row, which is what a person actually reads off
@@ -161,6 +169,82 @@ describe("EquivalentsPanel", () => {
         ],
       });
       expect(html).not.toContain("before it started recording");
+    });
+  });
+
+  /**
+   * Issue #1547. The other question somebody arrives with is about one
+   * building: what does coilbox think corak is, usually because a base built
+   * the wrong thing. Reading Beyond All Reason's published table lands 87 rows
+   * to read for that one name.
+   */
+  describe("finding one building", () => {
+    const filler = Array.from({ length: 11 }, (_, n) => ({
+      Armada: { def: `armfill${n}`, from: "game" as const },
+      Cortex: { def: `corfill${n}`, from: "game" as const },
+    }));
+    const long: EquivalenceTable = {
+      groups: [
+        {
+          Armada: { def: "armsolar", from: "game" },
+          Cortex: { def: "corsolar", from: "game" },
+        },
+        {
+          Armada: { def: "armadvsolar", from: "you" },
+          Cortex: { def: "coradvsolar", from: "you" },
+        },
+        ...filler,
+      ],
+    };
+
+    it("offers a box for a table too long to find one name in by eye", () => {
+      expect(labels(markup(long))).toContain("Find a building");
+    });
+
+    it("offers none for a table short enough to read at a glance", () => {
+      expect(labels(markup(TABLE))).not.toContain("Find a building");
+    });
+
+    it("shows only the rows naming what was typed", () => {
+      expect(rows(markup(long, "advsolar"))).toEqual([
+        "Forget armadvsolar and coradvsolar",
+      ]);
+    });
+
+    it("keeps the answers you gave first inside a search", () => {
+      expect(rows(markup(long, "solar"))).toEqual([
+        "Forget armadvsolar and coradvsolar",
+        "Forget armsolar and corsolar",
+      ]);
+    });
+
+    it("holds what was typed, so no row is hidden without saying why", () => {
+      expect(markup(long, "solar")).toContain('value="solar"');
+    });
+
+    it("counts how many rows the search is holding back", () => {
+      expect(markup(long, "solar")).toContain("Showing 2 of 13");
+    });
+
+    it("counts nothing while the box is empty, because nothing is hidden", () => {
+      expect(markup(long)).not.toContain("Showing");
+    });
+
+    it("says a search found nothing rather than showing an empty list", () => {
+      const html = markup(long, "legpw");
+      expect(rows(html)).toEqual([]);
+      expect(html).toContain("Nothing in this table names legpw");
+    });
+
+    it("still offers to drop the whole table rather than the search", () => {
+      expect(markup(long, "advsolar")).toContain("Forget all 13");
+    });
+
+    it("ignores a search left over from before the box went away", () => {
+      // Dropping rows can take a table back under the length worth searching,
+      // and a search still narrowing with no box to clear it would hide rows
+      // with nothing on the page to say so.
+      expect(rows(markup(TABLE, "legpw"))).toHaveLength(2);
     });
   });
 });
