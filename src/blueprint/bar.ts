@@ -257,9 +257,7 @@ export function barEntry(layout: BaseBlueprint): BarBlueprint {
       // writing the ground.
       position: [building.offset.x, 0, building.offset.z],
       facing: building.facing,
-      ...(building.originalName
-        ? { originalName: building.originalName }
-        : {}),
+      ...(building.originalName ? { originalName: building.originalName } : {}),
     })),
   };
 }
