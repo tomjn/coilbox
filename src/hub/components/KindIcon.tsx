@@ -2,7 +2,7 @@
  * A glyph per kind of thing on the hub, so a grid can be scanned rather than
  * read.
  *
- * The same five glyphs the hub website draws (`components/KindIcon.tsx` in
+ * The same glyphs the hub website draws (`components/KindIcon.tsx` in
  * tomjn/coilbox-hub), redrawn here rather than swapped for lucide equivalents:
  * somebody who found an item on the website and opened it here should see the
  * same mark for it. They are paths rather than an image so they take the
@@ -74,6 +74,19 @@ function Scenario() {
   );
 }
 
+/** Buildings of different sizes on a grid, which is what a layout is and what
+ *  its preview draws. */
+function Blueprint() {
+  return (
+    <>
+      <rect x="3" y="3" width="8" height="8" rx="1.5" />
+      <rect x="14" y="3" width="7" height="4" rx="1.5" />
+      <rect x="14" y="10" width="7" height="11" rx="1.5" />
+      <rect x="3" y="14" width="8" height="7" rx="1.5" />
+    </>
+  );
+}
+
 /**
  * Mode before kind, matching `describeItem`: a challenge is a conquest or
  * a warpath run before it is a challenge. An unrecognised kind gets no glyph
@@ -99,6 +112,8 @@ export function KindIcon({
       <SetupPack />
     ) : kind === "scenario" ? (
       <Scenario />
+    ) : kind === "blueprint" ? (
+      <Blueprint />
     ) : null;
 
   if (!glyph) return null;

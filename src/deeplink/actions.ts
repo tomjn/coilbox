@@ -155,6 +155,18 @@ export function prepareImport(code: string): PrepareImportResult {
           label: "scenario",
         },
       };
+    case "blueprint":
+      // A layout is a coilbox container and the hub carries it, but on this
+      // side a blueprint still only exists inside a scenario document, so there
+      // is nowhere for a shared one to land. Saying that is better than routing
+      // it at a screen that would quietly drop it. The library that will hold
+      // one on its own is https://github.com/tomjn/coilbox/issues/1415, and it
+      // is what turns this into a route.
+      return {
+        ok: false,
+        reason:
+          "That is a base blueprint. Coilbox has nowhere to keep a layout on its own yet, so it cannot import this.",
+      };
     case "keymap":
       // The editor is where a keymap is read and written, so a shared one lands
       // there loaded rather than saved: nothing touches uikeys.txt until the

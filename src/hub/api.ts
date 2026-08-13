@@ -33,12 +33,20 @@ export const HUB_API_VERSION = 1;
  * Kinds the gallery carries, from `GALLERY_KINDS` in tomjn/coilbox-hub.
  * Campaigns are absent on purpose: they inline images and audio as data URIs and
  * blow past the import size ceiling.
+ *
+ * `blueprint` is here before the hub has it, and it has to be: the hub vendors
+ * coilbox's container code pinned by blob hash, so the kind exists on this side
+ * first and the hub builds on it afterwards (issue #1417, and
+ * tomjn/coilbox-hub#84). Until that ships, filtering by Blueprints asks the hub
+ * for a kind it does not carry and gets its 400 back, worded as the hub words
+ * it.
  */
 export const HUB_KINDS = [
   "preset",
   "challenge",
   "setup-pack",
   "scenario",
+  "blueprint",
 ] as const;
 
 export type HubKind = (typeof HUB_KINDS)[number];
@@ -283,6 +291,7 @@ const KIND_PLURAL: Record<HubKind, string> = {
   challenge: "Challenges",
   "setup-pack": "Setup packs",
   scenario: "Scenarios",
+  blueprint: "Blueprints",
 };
 
 export function kindLabelPlural(kind: HubKind): string {
@@ -295,6 +304,7 @@ const KIND_SINGULAR: Record<HubKind, string> = {
   challenge: "Challenge",
   "setup-pack": "Setup pack",
   scenario: "Scenario",
+  blueprint: "Blueprint",
 };
 
 /**

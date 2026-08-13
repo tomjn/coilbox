@@ -333,6 +333,9 @@ describe("sniffPayloadKind", () => {
     expect(
       sniffPayloadKind({ scenario: { triggers: [], zones: [] }, media: {} }),
     ).toBe("scenario");
+    expect(
+      sniffPayloadKind({ name: "Opening", buildings: [], footprints: {} }),
+    ).toBe("blueprint");
     expect(sniffPayloadKind({ random: true })).toBeNull();
   });
 
