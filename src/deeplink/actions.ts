@@ -19,6 +19,7 @@ import {
   decodeContainerText,
   identify,
 } from "../container/container";
+import { containerKindName } from "../container/names";
 import { type OpenScreen, openScreenRoute } from "./parse";
 
 /** Where a recognised import code should be sent, plus what to tell the user. */
@@ -92,28 +93,24 @@ export function prepareImport(code: string): PrepareImportResult {
         plan: {
           ...(base as ImportPlan),
           route: importRoute("/play/skirmish", code),
-          label: "singleplayer preset",
+          label: containerKindName("preset"),
         },
       };
     case "challenge": {
       const mode = challengeMode(code);
-      if (mode === "conquest") {
+      if (mode) {
         return {
           ok: true,
           plan: {
             ...(base as ImportPlan),
-            route: importRoute("/conquest", code),
-            label: "conquest challenge",
-          },
-        };
-      }
-      if (mode === "warpath") {
-        return {
-          ok: true,
-          plan: {
-            ...(base as ImportPlan),
-            route: importRoute("/warpath", code),
-            label: "warpath challenge",
+            route: importRoute(
+              mode === "conquest" ? "/conquest" : "/warpath",
+              code,
+            ),
+            // The mode in front of the kind's own name: the difference between
+            // a galactic conquest and a warpath run is the whole of what a
+            // reader wants from this sentence.
+            label: `${mode} ${containerKindName("challenge")}`,
           },
         };
       }
@@ -128,7 +125,7 @@ export function prepareImport(code: string): PrepareImportResult {
         plan: {
           ...(base as ImportPlan),
           route: importRoute("/downloads/maps", code),
-          label: "setup pack",
+          label: containerKindName("setup-pack"),
         },
       };
     case "campaign":
@@ -141,7 +138,7 @@ export function prepareImport(code: string): PrepareImportResult {
         plan: {
           ...(base as ImportPlan),
           route: importRoute("/settings/import", code),
-          label: "campaign",
+          label: containerKindName("campaign"),
           detail:
             "It opens in the import box, which says where a campaign goes.",
         },
@@ -152,7 +149,7 @@ export function prepareImport(code: string): PrepareImportResult {
         plan: {
           ...(base as ImportPlan),
           route: importRoute("/scenarios", code),
-          label: "scenario",
+          label: containerKindName("scenario"),
         },
       };
     case "blueprint":
@@ -166,7 +163,7 @@ export function prepareImport(code: string): PrepareImportResult {
         plan: {
           ...(base as ImportPlan),
           route: importRoute("/content/blueprints", code),
-          label: "base blueprint",
+          label: containerKindName("blueprint"),
         },
       };
     case "keymap":
@@ -178,7 +175,7 @@ export function prepareImport(code: string): PrepareImportResult {
         plan: {
           ...(base as ImportPlan),
           route: importRoute("/settings/engine-keybinds", code),
-          label: "keymap",
+          label: containerKindName("keymap"),
           detail: "It opens in the keybinds editor, unsaved.",
         },
       };
