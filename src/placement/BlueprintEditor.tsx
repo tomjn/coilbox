@@ -32,6 +32,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { baseBuildings, type Point, type Scenario } from "@/scenario/model";
@@ -49,15 +50,6 @@ import {
   turnPlacement,
 } from "@/scenario/pages/components/editing";
 import {
-  baseFootprints,
-  overlappingIn,
-  placementKey,
-} from "@/scenario/pages/components/placements";
-import { useGameUnits } from "@/scenario/pages/components/useGameUnits";
-import { useMapEditing } from "@/scenario/pages/components/useMapEditing";
-import { useScenarioFootprints } from "@/scenario/pages/components/useScenarioFootprints";
-import { useScenarioUnits } from "@/scenario/pages/components/useScenarioUnits";
-import {
   BLUEPRINT_BASE_ID,
   blueprintDocument,
   documentLayout,
@@ -69,8 +61,12 @@ import {
   LayoutNotes,
 } from "./LayoutControls";
 import { PlacementSurface } from "./PlacementSurface";
+import { baseFootprints, overlappingIn, placementKey } from "./placements";
 import { PlaybackBar, SelectionBar } from "./SurfaceBars";
 import { focusCamera, focusDistance, worldToScene } from "./scene";
+import { useMapEditing } from "./useMapEditing";
+import { useScenarioFootprints } from "./useScenarioFootprints";
+import { useScenarioUnits } from "./useScenarioUnits";
 
 /** How long one building of a build order stands on screen before the next one
  *  arrives, the same pace the scenario editor watches a base go up at. */

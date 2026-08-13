@@ -27,9 +27,17 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
+import {
+  baseFootprints,
+  overlappingIn,
+  type Placement,
+  parsePlacementKey,
+  placementKey,
+} from "@/placement/placements";
 import { PlaybackBar, SelectionBar } from "@/placement/SurfaceBars";
 import {
   focusCamera,
@@ -37,6 +45,12 @@ import {
   mapSceneStatus,
   worldToScene,
 } from "@/placement/scene";
+import { useMapEditing } from "@/placement/useMapEditing";
+import { useScenarioFootprints } from "@/placement/useScenarioFootprints";
+import {
+  type ScenarioUnitsState,
+  useScenarioUnits,
+} from "@/placement/useScenarioUnits";
 import { usePreferredTarget } from "@/play/config";
 import type { ExtensionTypes } from "../../extensions";
 import {
@@ -68,7 +82,6 @@ import {
   canTurn,
   editActor,
   movePlacement,
-  parsePlacementKey,
   removePlacement,
   setActorState,
   turnPlacement,
@@ -94,19 +107,9 @@ import {
   removePathWaypoint,
   scenarioPaths,
 } from "./orderPaths";
-import {
-  baseFootprints,
-  overlappingIn,
-  type Placement,
-  placementKey,
-} from "./placements";
 import { startMarkers } from "./startPositions";
-import { useGameUnits } from "./useGameUnits";
-import { useMapEditing } from "./useMapEditing";
-import { useScenarioFootprints } from "./useScenarioFootprints";
 import { useScenarioPaths } from "./useScenarioPaths";
 import { useScenarioStarts } from "./useScenarioStarts";
-import { type ScenarioUnitsState, useScenarioUnits } from "./useScenarioUnits";
 import { useScenarioZones } from "./useScenarioZones";
 import {
   moveZone,

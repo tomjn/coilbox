@@ -14,9 +14,9 @@
 
 import { Button, cn } from "@picoframe/frame";
 import { Factory, type LucideIcon, Square, User, Users } from "lucide-react";
+import { teamColor } from "@/placement/placements";
 import { type Participant, rgbToHex } from "@/play/config";
 import type { ContentEntry, ContentKind } from "./contents";
-import { teamColor } from "./placements";
 
 /** The same icons the mode strip puts on the mode that places each kind, so the
  *  list reads as the modes' own output. */

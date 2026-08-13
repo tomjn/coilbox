@@ -13,8 +13,8 @@
 import type { UnitModelResult } from "@/content/bindings";
 import { useUnitsyncUnitModel } from "@/content/config";
 import { countTriangles } from "@/content/unitModel";
+import { useGameUnits } from "@/content/useGameUnits";
 import { usePreferredTarget } from "@/play/config";
-import { useGameUnits } from "@/scenario/pages/components/useGameUnits";
 import type { UnitPreviewConfig } from "../../model";
 
 export interface MissionUnit {

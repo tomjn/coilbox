@@ -1,17 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildGridSnap } from "@/blueprint/footprint";
-import type { Participant } from "@/play/config";
+import { baseFootprints } from "@/placement/placements";
 import type { Scenario } from "../../model";
-import {
-  baseFootprints,
-  facingToYaw,
-  groupFormationOffset,
-  overlappingIn,
-  placementKey,
-  scenarioPlacements,
-  teamColor,
-  UNOWNED_COLOR,
-} from "./placements";
+import { groupFormationOffset, scenarioPlacements } from "./placements";
 
 type Registries = Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">;
 
@@ -267,124 +258,6 @@ describe("scenarioPlacements", () => {
   });
 });
 
-describe("baseFootprints", () => {
-  /** Balanced Annihilation's own numbers: a lab is 6 by 6, a solar collector 5
-   *  by 5, and a pawn is a bot rather than a building. */
-  const units = [
-    { name: "armlab", footprintX: 6, footprintZ: 6 },
-    { name: "armsolar", footprintX: 5, footprintZ: 5 },
-    { name: "armpw", footprintX: 2, footprintZ: 2 },
-  ];
-
-  /** A base of two buildings, `apart` elmos between them on the x axis. */
-  const base = (apart: number): Registries => ({
-    ...empty,
-    blueprints: [
-      {
-        id: "bp1",
-        name: "The keep",
-        buildings: [
-          { def: "armlab", offset: { x: 0, z: 0 }, facing: 0 },
-          { def: "armsolar", offset: { x: apart, z: 0 }, facing: 0 },
-        ],
-      },
-    ],
-    bases: [
-      {
-        id: "pf1",
-        blueprint: "bp1",
-        team: "p0",
-        origin: { x: 1000, z: 1000 },
-        buildings: [],
-      },
-    ],
-  });
-
-  it("leaves two buildings that fit side by side alone", () => {
-    // A 6 and a 5 need half of each between their middles, which is 48 and 40.
-    const marks = baseFootprints(scenarioPlacements(base(96)), units);
-    expect(marks.map((m) => m.overlapping)).toEqual([false, false]);
-    expect(marks[0].footprint).toEqual({ x: 6, z: 6 });
-  });
-
-  it("marks two that want the same ground", () => {
-    const marks = baseFootprints(scenarioPlacements(base(64)), units);
-    expect(marks.map((m) => m.overlapping)).toEqual([true, true]);
-  });
-
-  it("says nothing about actors and groups standing on a base", () => {
-    const doc = base(96);
-    const marks = baseFootprints(
-      scenarioPlacements({
-        ...doc,
-        actors: [
-          {
-            id: "a1",
-            unitDef: "armpw",
-            team: "p0",
-            pos: { x: 1000, z: 1000 },
-            facing: 0,
-          },
-        ],
-      }),
-      units,
-    );
-    // The bot is standing in the lab's doorway, which is a bot's business.
-    expect(marks).toHaveLength(2);
-    expect(marks.every((m) => !m.overlapping)).toBe(true);
-  });
-});
-
-describe("overlappingIn", () => {
-  const units = [
-    { name: "armlab", footprintX: 6, footprintZ: 6 },
-    { name: "armsolar", footprintX: 5, footprintZ: 5 },
-  ];
-  const doc: Registries = {
-    ...empty,
-    blueprints: [
-      {
-        id: "bp1",
-        name: "The keep",
-        buildings: [
-          { def: "armlab", offset: { x: 0, z: 0 }, facing: 0 },
-          { def: "armsolar", offset: { x: 512, z: 0 }, facing: 0 },
-          { def: "armsolar", offset: { x: 32, z: 0 }, facing: 0 },
-        ],
-      },
-    ],
-    bases: [
-      {
-        id: "pf1",
-        blueprint: "bp1",
-        team: "p0",
-        origin: { x: 1000, z: 1000 },
-        buildings: [],
-      },
-    ],
-  };
-
-  it("names the buildings by their place in the base", () => {
-    const placements = scenarioPlacements(doc);
-    const marks = baseFootprints(placements, units);
-    expect(overlappingIn(placements, marks, "pf1")).toEqual([0, 2]);
-  });
-
-  it("says nothing about a base that is not the one asked for", () => {
-    const placements = scenarioPlacements(doc);
-    const marks = baseFootprints(placements, units);
-    expect(overlappingIn(placements, marks, "other")).toEqual([]);
-  });
-});
-
-describe("placementKey", () => {
-  it("agrees with the keys scenarioPlacements writes", () => {
-    expect(placementKey("actor", "a1")).toBe("actor:a1");
-    expect(placementKey("group", "g1", 2)).toBe("group:g1#2");
-    expect(placementKey("base", "pf1", 0)).toBe("base:pf1#0");
-  });
-});
-
 describe("groupFormationOffset", () => {
   it("puts a single unit on the group's own point", () => {
     expect(groupFormationOffset(0, 1)).toEqual({ x: 0, z: 0 });
@@ -411,32 +284,5 @@ describe("groupFormationOffset", () => {
       seen.add(`${x},${z}`);
     }
     expect(seen.size).toBe(17);
-  });
-});
-
-describe("facingToYaw", () => {
-  it("leaves the engine's south facing unrotated", () => {
-    expect(facingToYaw(0)).toBe(0);
-  });
-
-  it("turns a quarter per facing, the way three rotates +z toward +x", () => {
-    expect(facingToYaw(1)).toBeCloseTo(Math.PI / 2);
-    expect(facingToYaw(2)).toBeCloseTo(Math.PI);
-    expect(facingToYaw(3)).toBeCloseTo((3 * Math.PI) / 2);
-  });
-});
-
-describe("teamColor", () => {
-  const participants = [
-    { id: "p0", color: [1, 0, 0] },
-    { id: "p1", color: [0, 0, 1] },
-  ] as Participant[];
-
-  it("takes the participant's own colour", () => {
-    expect(teamColor(participants, "p1")).toEqual([0, 0, 1]);
-  });
-
-  it("falls back to grey for a team the setup no longer has", () => {
-    expect(teamColor(participants, "gone")).toBe(UNOWNED_COLOR);
   });
 });

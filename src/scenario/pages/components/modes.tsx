@@ -28,6 +28,9 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { useGameUnits } from "@/content/useGameUnits";
+import { parsePlacementKey, placementKey } from "@/placement/placements";
+import type { GroundDragPhase } from "@/placement/useMapEditing";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   baseBuildings,
@@ -36,7 +39,7 @@ import {
   type ScenarioZone,
 } from "../../model";
 import { addBase, addBuilding, buildingUnits, type LayoutEdit } from "./bases";
-import { addActor, parsePlacementKey } from "./editing";
+import { addActor } from "./editing";
 import type { ScenarioEdit } from "./edits";
 import {
   addGroup,
@@ -44,10 +47,7 @@ import {
   DEFAULT_GROUP_COUNT,
   MAX_GROUP_COUNT,
 } from "./groups";
-import { placementKey } from "./placements";
 import { TeamSelect } from "./TeamSelect";
-import { useGameUnits } from "./useGameUnits";
-import type { GroundDragPhase } from "./useMapEditing";
 import {
   addZone,
   nextZoneName,

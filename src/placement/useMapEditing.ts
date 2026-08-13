@@ -38,19 +38,18 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
-import { sceneToWorld, worldToScene } from "@/placement/scene";
-import type { Point } from "../../model";
+import type { Point } from "@/scenario/model";
+import { dragKeys, type Placement } from "./placements";
 import {
   clampToMap,
-  dragKeys,
   isClick,
   type PointerPos,
   type PointerTargets,
   pointerNdc,
   pointerTargets,
   pressGesture,
-} from "./editing";
-import type { Placement } from "./placements";
+} from "./pointer";
+import { sceneToWorld, worldToScene } from "./scene";
 import type { UnitsLayer } from "./unitsLayer";
 
 /**

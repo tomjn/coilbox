@@ -1,20 +1,20 @@
 /**
- * The units of the game a scenario is written for.
+ * The units of the game a document is written for.
  *
- * A mode that puts units on the map has to offer the units the scenario's own
- * game has, resolved the same way the scene resolves the models it draws them
- * with: the scan the launcher uses, keyed by the game name the setup carries. It
- * is a hook of its own rather than part of {@link useScenarioUnits} because a
- * picker needs the list and not the layer, and because groups (#761) and base
- * bases (#762) ask the same question.
+ * A mode that puts units on the map has to offer the units that game has,
+ * resolved the same way the scene resolves the models it draws them with: the
+ * scan the launcher uses, keyed by the game name the document carries. It is a
+ * hook of its own rather than part of `useScenarioUnits` because a picker needs
+ * the list and not the layer, and because groups (#761) and base bases (#762)
+ * ask the same question.
  *
  * Both reads are cached per target for the session, so every mode asking is one
  * read rather than one each.
  */
 
-import type { UnitDatasetEntry } from "@/content/bindings";
-import { useUnitsyncScan, useUnitsyncUnitDataset } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
+import type { UnitDatasetEntry } from "./bindings";
+import { useUnitsyncScan, useUnitsyncUnitDataset } from "./config";
 
 export interface GameUnits {
   /** Every unit the game has, unsorted. Empty until it has been read. */

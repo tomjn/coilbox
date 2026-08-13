@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { BaseBlueprint } from "@/blueprint/model";
 import { addBuilding, removeBuilding } from "@/scenario/pages/components/bases";
 import { movePlacement } from "@/scenario/pages/components/editing";
-import { placementKey } from "@/scenario/pages/components/placements";
 import {
   BLUEPRINT_BASE_ID,
   blueprintDocument,
   documentLayout,
 } from "./blueprintDocument";
 import { GRID_ORIGIN } from "./ground";
+import { placementKey } from "./placements";
 
 const layout: BaseBlueprint = {
   id: "layout-1",

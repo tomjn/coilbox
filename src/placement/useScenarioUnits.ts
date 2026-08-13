@@ -18,8 +18,9 @@ import {
 } from "@/content/config";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { usePreferredTarget } from "@/play/config";
-import type { Point, Scenario } from "../../model";
-import { type Placement, scenarioPlacements, teamColor } from "./placements";
+import type { Point, Scenario } from "@/scenario/model";
+import { scenarioPlacements } from "@/scenario/pages/components/placements";
+import { type Placement, teamColor } from "./placements";
 import { groundHeight, type HeightField, readHeightField } from "./terrain";
 import { createUnitsLayer, type UnitsLayer } from "./unitsLayer";
 

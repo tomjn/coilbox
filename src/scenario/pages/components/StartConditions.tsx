@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { useGameUnits } from "@/content/useGameUnits";
 import type { Participant } from "@/play/config";
 import type { Scenario, ScenarioTeam } from "../../model";
 import {
@@ -40,7 +41,6 @@ import {
   startUnits,
   teamOf,
 } from "./teams";
-import { useGameUnits } from "./useGameUnits";
 
 export function StartConditions({
   scenario,

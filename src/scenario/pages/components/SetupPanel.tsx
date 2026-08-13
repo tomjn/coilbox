@@ -42,6 +42,7 @@ import {
   useUnitsyncThumbnails,
 } from "@/content/config";
 import { mergeMapTiers } from "@/content/mapTiers";
+import { useGameUnits } from "@/content/useGameUnits";
 import { useFactionLogos } from "@/factions/logos";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import {
@@ -81,7 +82,6 @@ import {
   setScenarioMap,
 } from "./setup";
 import { startsSummary } from "./teams";
-import { useGameUnits } from "./useGameUnits";
 
 /**
  * How long the panel waits for an edit to settle before writing it.

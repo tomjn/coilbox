@@ -3,6 +3,7 @@ import { ArrowLeft, Rocket } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Textarea } from "@/components/ui/textarea";
+import { useGameUnits } from "@/content/useGameUnits";
 import {
   DetailLoading,
   ErrorBanner,
@@ -38,7 +39,6 @@ import {
   stepAt,
   stepLabel,
 } from "./components/triggers";
-import { useGameUnits } from "./components/useGameUnits";
 import { useScenarioGate } from "./components/useScenarioGate";
 import { VarPanel } from "./components/VarPanel";
 
