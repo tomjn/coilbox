@@ -25,12 +25,20 @@ use tauri::{
 /// fails if they never do. What comes back is who signed in. The refresh token goes
 /// to the OS keychain and the access token stays in memory on the Rust side, so no
 /// token crosses this boundary.
+///
+/// `problem` beside the account is a sign-in that worked but was not kept, most
+/// often a keychain that did not answer inside its deadline (issue #1469). It is
+/// not an error, because the session is signed in either way, and it is not
+/// nothing, because the next run may not be.
 #[tauri::command]
 async fn hub_sign_in(hub_url: String) -> CliResult {
     let open =
         |url: &str| tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string());
     match auth::sign_in(&hub_url, open).await {
-        Ok(identity) => CliResult::ok(json!({ "account": identity })),
+        Ok(signed_in) => CliResult::ok(json!({
+            "account": signed_in.identity,
+            "problem": signed_in.problem,
+        })),
         Err(e) => CliResult::err(auth::explain(&e, &hub_url)),
     }
 }
@@ -40,9 +48,13 @@ async fn hub_sign_in(hub_url: String) -> CliResult {
 /// This machine is as far as it goes. Coilbox holds a publishable key, which cannot
 /// revoke anything, so the token stops being usable here and stays alive in the
 /// hub's project. Say that rather than promise more.
+///
+/// It always answers. The keychain delete has a deadline (issue #1469), so a
+/// permission prompt nobody clicks ends the sign-out with words rather than
+/// leaving the button spinning for the rest of the session.
 #[tauri::command]
 async fn hub_sign_out(hub_url: String) -> CliResult {
-    match auth::sign_out(&hub_url) {
+    match auth::sign_out(&hub_url).await {
         Ok(()) => CliResult::ok(json!({})),
         Err(e) => CliResult::err(auth::explain(&e, &hub_url)),
     }

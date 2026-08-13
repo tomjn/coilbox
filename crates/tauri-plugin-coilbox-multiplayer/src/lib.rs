@@ -1969,7 +1969,7 @@ async fn mp_tachyon_sign_in(base_url: String, server_id: String, username: Strin
 /// refresh token stays valid there. Say that rather than promise more.
 #[tauri::command]
 async fn mp_tachyon_sign_out(server_id: String, username: String) -> CliResult {
-    match tachyon_auth::sign_out(&server_id, &username) {
+    match tachyon_auth::sign_out(&server_id, &username).await {
         Ok(()) => CliResult::ok(json!({})),
         Err(e) => CliResult::err(e.to_string()),
     }

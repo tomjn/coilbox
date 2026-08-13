@@ -137,6 +137,58 @@ export async function recheckHubAccount(hubUrl: string) {
   await ask(hubUrl);
 }
 
+/**
+ * Sign in through the browser, and record how it went.
+ *
+ * A sign-in can come back signed in and with something to say: the token was
+ * not kept, most often a keychain that did not answer inside its deadline
+ * (issue #1469). That is `problem` beside `signedIn`, not instead of it, because
+ * this session can publish and only the next run is in doubt.
+ */
+export async function signInToHub(hubUrl: string) {
+  update(hubUrl, { busy: true, problem: null });
+  try {
+    const { account, problem } = await hubSignIn({ hubUrl });
+    update(hubUrl, {
+      account,
+      signedIn: true,
+      unknown: false,
+      loading: false,
+      problem: problem ?? null,
+    });
+  } catch (e) {
+    update(hubUrl, { problem: e instanceof Error ? e.message : String(e) });
+  } finally {
+    update(hubUrl, { busy: false });
+  }
+}
+
+/**
+ * Sign out, and record how it went.
+ *
+ * A sign-out that failed leaves `signedIn` alone rather than clearing it. The
+ * keychain delete has a deadline, and a delete coilbox stopped waiting for may
+ * still land or may not have happened at all (issue #1469), so the stored
+ * sign-in's fate is exactly what nobody knows. Showing signed out on that would
+ * be a guess dressed as a fact.
+ */
+export async function signOutOfHub(hubUrl: string) {
+  update(hubUrl, { busy: true, problem: null });
+  try {
+    await hubSignOut({ hubUrl });
+    update(hubUrl, {
+      account: null,
+      signedIn: false,
+      unknown: false,
+      loading: false,
+    });
+  } catch (e) {
+    update(hubUrl, { problem: e instanceof Error ? e.message : String(e) });
+  } finally {
+    update(hubUrl, { busy: false });
+  }
+}
+
 /** What is known about a hub right now. For the hook, and for tests. */
 export function hubAccountSnapshot(hubUrl: string): Known {
   return snapshot(hubUrl);
@@ -154,39 +206,8 @@ export function useHubAccount(hubUrl: string): HubAccount {
 
   const recheck = useCallback(() => recheckHubAccount(hubUrl), [hubUrl]);
 
-  const signIn = useCallback(async () => {
-    update(hubUrl, { busy: true, problem: null });
-    try {
-      const { account } = await hubSignIn({ hubUrl });
-      update(hubUrl, {
-        account,
-        signedIn: true,
-        unknown: false,
-        loading: false,
-      });
-    } catch (e) {
-      update(hubUrl, { problem: e instanceof Error ? e.message : String(e) });
-    } finally {
-      update(hubUrl, { busy: false });
-    }
-  }, [hubUrl]);
-
-  const signOut = useCallback(async () => {
-    update(hubUrl, { busy: true, problem: null });
-    try {
-      await hubSignOut({ hubUrl });
-      update(hubUrl, {
-        account: null,
-        signedIn: false,
-        unknown: false,
-        loading: false,
-      });
-    } catch (e) {
-      update(hubUrl, { problem: e instanceof Error ? e.message : String(e) });
-    } finally {
-      update(hubUrl, { busy: false });
-    }
-  }, [hubUrl]);
+  const signIn = useCallback(() => signInToHub(hubUrl), [hubUrl]);
+  const signOut = useCallback(() => signOutOfHub(hubUrl), [hubUrl]);
 
   return { ...state, signIn, signOut, recheck };
 }

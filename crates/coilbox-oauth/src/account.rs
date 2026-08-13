@@ -76,6 +76,48 @@ where
     }
 }
 
+/// Run a keychain write off the calling thread, and stop waiting for it after
+/// `deadline`, answering with `timed_out` when it does (issue #1469).
+///
+/// Same shape as [`read_within`] and for the same reason: a blocking OS call in
+/// an async command cannot be timed out where it is, because a deadline only
+/// cancels a future that yields.
+///
+/// What a deadline means here is not what it means for a read. A read that is
+/// given up on has simply not answered. A write that is given up on may still
+/// land, because an OS call in flight cannot be cancelled, so what is on disk
+/// afterwards is unknown. `timed_out` is the caller's word for that, and neither
+/// of the two says the write did or did not happen.
+async fn write_within<F>(
+    deadline: Duration,
+    timed_out: AuthError,
+    write: F,
+) -> Result<(), AuthError>
+where
+    F: FnOnce() -> Result<(), String> + Send + 'static,
+{
+    match tokio::time::timeout(deadline, tokio::task::spawn_blocking(write)).await {
+        Ok(Ok(Ok(()))) => Ok(()),
+        Ok(Ok(Err(said))) => Err(AuthError::Storage(said)),
+        Ok(Err(joined)) => Err(AuthError::Storage(format!(
+            "the keychain write did not finish: {joined}"
+        ))),
+        Err(_) => Err(timed_out),
+    }
+}
+
+/// Hand the keychain a refresh token to keep, off the calling thread and with
+/// [`KEYCHAIN_TIMEOUT`] to answer in.
+async fn store_credential(service: &str, account: &str, refresh: &str) -> Result<(), AuthError> {
+    let (service, account, refresh) = (service.to_owned(), account.to_owned(), refresh.to_owned());
+    write_within(
+        KEYCHAIN_TIMEOUT,
+        AuthError::StorageKeepTimedOut,
+        move || tauri_plugin_coilbox_lobby_servers::store_credential(&service, &account, &refresh),
+    )
+    .await
+}
+
 /// What the keychain holds for an account, read off the calling thread and given
 /// [`KEYCHAIN_TIMEOUT`] to answer in.
 async fn stored_credential(service: &str, account: &str) -> Result<Option<String>, AuthError> {
@@ -102,16 +144,21 @@ pub async fn signed_in(service: &str, account: &str) -> Result<bool, AuthError> 
 
 /// Keep the result of a sign-in: the refresh token to the OS keychain, the access
 /// token to memory.
-pub fn remember(service: &str, account: &str, tokens: Tokens) -> Result<(), AuthError> {
-    tauri_plugin_coilbox_lobby_servers::store_credential(service, account, &tokens.refresh)
-        .map_err(AuthError::Storage)?;
+///
+/// Memory first, keychain second, which is the order the failures want. The
+/// sign-in has already happened by the time this is called, so a keychain that
+/// will not take it does not undo it: the session works, and only the next run
+/// is in doubt. Doing it the other way round threw away a token the user had
+/// just spent a browser trip on.
+pub async fn remember(service: &str, account: &str, tokens: Tokens) -> Result<(), AuthError> {
+    let refresh = tokens.refresh.clone();
     // A refusal is about the token that has just been replaced, so it goes with it.
     refused().lock().unwrap().remove(&key(service, account));
     access_tokens()
         .lock()
         .unwrap()
         .insert(key(service, account), tokens);
-    Ok(())
+    store_credential(service, account, &refresh).await
 }
 
 /// Forget an account on this machine: the stored refresh token and any access
@@ -121,14 +168,26 @@ pub fn remember(service: &str, account: &str, tokens: Tokens) -> Result<(), Auth
 /// service to throw its copy away, and neither service coilbox signs in to
 /// advertises a revocation endpoint, so signing out means this machine can no
 /// longer use the token, not that it has stopped working.
-pub fn forget(service: &str, account: &str) -> Result<(), AuthError> {
+///
+/// The keychain delete is given [`KEYCHAIN_TIMEOUT`] to answer in and runs off
+/// the calling thread, so a permission prompt nobody clicks ends the sign-out
+/// rather than leaving the button spinning for the rest of the session (issue
+/// #1469). A delete that is given up on may still land, so
+/// [`AuthError::StorageForgetTimedOut`] says the stored token's fate is unknown
+/// rather than claiming either.
+pub async fn forget(service: &str, account: &str) -> Result<(), AuthError> {
     access_tokens()
         .lock()
         .unwrap()
         .remove(&key(service, account));
     refused().lock().unwrap().remove(&key(service, account));
-    tauri_plugin_coilbox_lobby_servers::delete_credential(service, account)
-        .map_err(AuthError::Storage)
+    let (service, account) = (service.to_owned(), account.to_owned());
+    write_within(
+        KEYCHAIN_TIMEOUT,
+        AuthError::StorageForgetTimedOut,
+        move || tauri_plugin_coilbox_lobby_servers::delete_credential(&service, &account),
+    )
+    .await
 }
 
 /// Whether an access token has enough life left to make a request with.
@@ -179,10 +238,11 @@ where
         error
     })?;
     // Teiserver's refresh tokens do not rotate, Supabase's do. A service that
-    // rotates them would otherwise leave us holding a dead one.
+    // rotates them would otherwise leave us holding a dead one. Same deadline as
+    // every other keychain call, so a prompt nobody clicks cannot hold up the
+    // request this token was fetched for (issue #1469).
     if tokens.refresh != stored {
-        tauri_plugin_coilbox_lobby_servers::store_credential(service, account, &tokens.refresh)
-            .map_err(AuthError::Storage)?;
+        store_credential(service, account, &tokens.refresh).await?;
     }
     let access = tokens.access.clone();
     access_tokens().lock().unwrap().insert(key, tokens);
@@ -218,6 +278,48 @@ mod tests {
         );
         // Lets the abandoned read finish, the way the OS eventually answers.
         drop(answer);
+    }
+
+    /// Issue #1469: the other half of #1456. Signing out writes, and a write
+    /// blocks on the same prompt a read does, so the Sign out button could spin
+    /// for good.
+    #[tokio::test]
+    async fn a_keychain_write_that_never_answers_is_given_up_on() {
+        let (answer, waiting) = std::sync::mpsc::channel::<()>();
+        let started = Instant::now();
+        let error = write_within(
+            Duration::from_millis(50),
+            AuthError::StorageForgetTimedOut,
+            move || {
+                let _ = waiting.recv();
+                Ok(())
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(error, AuthError::StorageForgetTimedOut),
+            "{error:?}"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "waited {:?}",
+            started.elapsed()
+        );
+        drop(answer);
+    }
+
+    /// The words the two writes end on. Neither may claim the write happened or
+    /// that it did not, because a write given up on is not cancelled and may yet
+    /// land.
+    #[test]
+    fn a_write_given_up_on_claims_nothing_about_what_is_stored() {
+        let kept = AuthError::StorageKeepTimedOut.to_string();
+        assert!(kept.contains("signed in for this session"), "{kept}");
+        assert!(kept.contains("may not have been kept"), "{kept}");
+        let forgotten = AuthError::StorageForgetTimedOut.to_string();
+        assert!(forgotten.contains("is not known"), "{forgotten}");
+        assert!(!forgotten.contains("signed out"), "{forgotten}");
     }
 
     #[tokio::test]

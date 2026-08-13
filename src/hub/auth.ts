@@ -36,10 +36,16 @@ export interface HubAccountState {
 /**
  * Sign in with Discord through the system browser. Resolves once the user has
  * finished there, which can take a minute, and rejects if they never do.
+ *
+ * `problem` beside the account is a sign-in that worked but was not kept: the
+ * keychain did not take the token inside its deadline, or would not take it at
+ * all (issue #1469). This session is signed in either way, so it is a sentence
+ * to show rather than a failure, and what it says is that next time may need the
+ * browser again.
  */
 export const hubSignIn = defineCommand<
   { hubUrl: string },
-  { account: HubIdentity }
+  { account: HubIdentity; problem: string | null }
 >("coilbox-hub", "hub_sign_in");
 
 /**

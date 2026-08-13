@@ -261,7 +261,7 @@ where
     F: FnOnce(&str) -> Result<(), String>,
 {
     let tokens = sign_in(base_url, open_browser).await?;
-    coilbox_oauth::remember(server_id, username, tokens)
+    coilbox_oauth::remember(server_id, username, tokens).await
 }
 
 /// Forget an account here: the stored refresh token and any access token in
@@ -271,8 +271,12 @@ where
 /// and advertises none in its metadata, so the refresh token stays valid on the
 /// server for its full hundred years. Signing out means this machine can no longer
 /// use it, not that it has stopped working.
-pub fn sign_out(server_id: &str, username: &str) -> Result<(), AuthError> {
-    coilbox_oauth::forget(server_id, username)
+///
+/// The keychain delete has a deadline, so this always answers (issue #1469). A
+/// delete that ran out of time reports itself as one: the account is unusable
+/// here from now on, and whether the stored copy went with it is not known.
+pub async fn sign_out(server_id: &str, username: &str) -> Result<(), AuthError> {
+    coilbox_oauth::forget(server_id, username).await
 }
 
 /// An access token good for the next minute at least, refreshed from the stored
