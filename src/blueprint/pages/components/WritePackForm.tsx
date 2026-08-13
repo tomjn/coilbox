@@ -19,7 +19,9 @@
  * sentence afterwards calls the file. A game's own `blueprints.json` is what
  * makes a set usable in game, and a file anywhere else is what gets posted.
  * Neither is a different code path, because a person is free to pick the game's
- * file from either button and the care has to hold either way.
+ * file from either button and the care has to hold either way. That is why the
+ * running game is checked against the path that came back from the dialog rather
+ * than against the button that opened it (issue #1488).
  */
 
 import { save } from "@tauri-apps/plugin-dialog";
@@ -103,6 +105,11 @@ export function WritePackForm({
         path: dest,
         layouts: ticked.map(libraryLayout),
         gameRunning: running,
+        // Which is what makes a running game stop the write into a game's own
+        // file and not the one being posted (issue #1488). The dialog is free
+        // to come back with a path in there whichever button opened it, so this
+        // is the check rather than the buttons being off.
+        configDir,
       });
       onWritten(packWriteSummary(dest, done));
     } catch (e) {

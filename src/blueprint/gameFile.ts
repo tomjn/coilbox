@@ -8,7 +8,10 @@
  *
  * - Refuse while a game is running. The widget holds its list in memory and
  *   writes the whole file back when the player saves or the game exits, so
- *   anything written underneath it is thrown away without a word.
+ *   anything written underneath it is thrown away without a word. That is about
+ *   the files the engine writes rather than about every file, so a caller that
+ *   says where the engine writes gets a file somewhere else written (issue
+ *   #1488), and a caller that does not gets the refusal it always got.
  * - Copy the file before changing it, and copy it every time rather than once,
  *   because the thing worth protecting is whatever was there a moment ago.
  * - Never write over a file that could not be read. The format refuses rather
@@ -20,6 +23,7 @@
  * write is the format adapter, which is plain text in and plain text out.
  */
 
+import { underEngineConfig } from "@/content/enginePaths";
 import type { BlueprintFormat, MergePlan } from "./format";
 import type { BaseBlueprint } from "./model";
 
@@ -35,8 +39,13 @@ export interface MergeRequest {
   /** The file to merge into, as the user picked it. */
   path: string;
   layouts: BaseBlueprint[];
-  /** Whether a game is running right now, which is a refusal. */
+  /** Whether a game is running right now, which is a refusal for every file
+   *  under `configDir`. */
   gameRunning: boolean;
+  /** Where the engine writes, so a running game only stops a write going there.
+   *  Absent means coilbox does not know, and a running game stops every write,
+   *  which is what it did before there was anything to compare against. */
+  configDir?: string;
   /** When this is happening, which names the copy. Passed in so a test can say. */
   now?: Date;
 }
@@ -77,11 +86,14 @@ export async function mergeIntoGameFile({
   path,
   layouts,
   gameRunning,
+  configDir,
   now = new Date(),
 }: MergeRequest): Promise<MergeOutcome> {
-  if (gameRunning) {
+  if (gameRunning && underEngineConfig(configDir, path)) {
     throw new Error(
-      `A game is running. ${format.label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again.`,
+      configDir
+        ? `A game is running and this file is one it writes. ${format.label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game, or save somewhere the game does not write.`
+        : `A game is running, and coilbox does not know where this engine writes, so it cannot tell whether the game will write this file back over. ${format.label} writes its whole blueprints file back when it saves or exits, so anything written now would be thrown away. Close the game and try again.`,
     );
   }
 

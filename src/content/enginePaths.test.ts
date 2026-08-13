@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { engineConfigDir, underConfigDir } from "./enginePaths";
+import {
+  engineConfigDir,
+  underConfigDir,
+  underEngineConfig,
+} from "./enginePaths";
 
 describe("engineConfigDir", () => {
   it("takes the directory off the path unitsync reports", () => {
@@ -41,5 +45,58 @@ describe("underConfigDir", () => {
     expect(underConfigDir("/home/a/.spring/", "LuaUI/Config")).toBe(
       "/home/a/.spring/LuaUI/Config",
     );
+  });
+});
+
+/** Every "true" here is a refusal, so the tests worth reading are the ones that
+ *  say a path cannot be told apart rather than the ones that say it is inside.
+ *  (issue #1488) */
+describe("underEngineConfig", () => {
+  const DIR = "/home/a/.spring";
+
+  it("says a file inside the directory is one the engine writes", () => {
+    expect(underEngineConfig(DIR, `${DIR}/LuaUI/Config/blueprints.json`)).toBe(
+      true,
+    );
+    expect(underEngineConfig(DIR, DIR)).toBe(true);
+  });
+
+  it("says a file somewhere else is not", () => {
+    expect(underEngineConfig(DIR, "/home/a/Downloads/blueprints.json")).toBe(
+      false,
+    );
+  });
+
+  /** `/home/a/.springfiles` is not inside `/home/a/.spring`, and a prefix match
+   *  that forgot the separator would say it was. */
+  it("does not take a longer name beginning the same way as inside it", () => {
+    expect(underEngineConfig(DIR, "/home/a/.springfiles/blueprints.json")).toBe(
+      false,
+    );
+  });
+
+  it("compares a Windows path either way round and either case", () => {
+    const dir = "C:\\Users\\A\\Documents\\Beyond All Reason";
+    expect(
+      underEngineConfig(dir, "c:/users/a/documents/beyond all reason/x.json"),
+    ).toBe(true);
+    expect(underEngineConfig(dir, "C:\\Users\\A\\Downloads\\x.json")).toBe(
+      false,
+    );
+  });
+
+  it("ignores a separator the directory ends with", () => {
+    expect(underEngineConfig(`${DIR}/`, `${DIR}/x.json`)).toBe(true);
+  });
+
+  /** Text cannot compare a path that says nothing about where it starts from,
+   *  so it says it cannot tell rather than saying it is elsewhere. */
+  it("cannot tell about a relative path either side", () => {
+    expect(underEngineConfig(DIR, "blueprints.json")).toBe(true);
+    expect(underEngineConfig(".spring", `${DIR}/x.json`)).toBe(true);
+  });
+
+  it("cannot tell without a directory to compare against", () => {
+    expect(underEngineConfig(undefined, "/home/a/Downloads/x.json")).toBe(true);
   });
 });

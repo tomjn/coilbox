@@ -44,6 +44,47 @@ describe("mergeIntoGameFile", () => {
     expect(written).toEqual([]);
   });
 
+  /** Issue #1488. The refusal is about the file the running game writes back
+   *  over, and a file nowhere near it is not that file. */
+  describe("while a game is running", () => {
+    const CONFIG = "/games/bar";
+    const ELSEWHERE = "/Users/someone/Downloads/pack.json";
+
+    it("refuses a file inside the directory the engine writes", async () => {
+      const { io, written } = fakeIO({ [PATH]: '{"savedBlueprints":[]}' });
+      await expect(
+        mergeIntoGameFile(
+          request(io, { gameRunning: true, configDir: CONFIG }),
+        ),
+      ).rejects.toThrow(/game is running/i);
+      expect(written).toEqual([]);
+    });
+
+    it("writes a file the running game will never read", async () => {
+      const { io, files, written } = fakeIO();
+      const done = await mergeIntoGameFile(
+        request(io, {
+          gameRunning: true,
+          configDir: CONFIG,
+          path: ELSEWHERE,
+        }),
+      );
+      expect(written).toEqual([ELSEWHERE]);
+      expect(done.added).toEqual(["Opening solars"]);
+      expect(JSON.parse(files[ELSEWHERE]).savedBlueprints).toHaveLength(1);
+    });
+
+    /** Without a directory to compare against there is nothing to compare, so
+     *  the broad refusal is what is left. */
+    it("refuses everything when it does not know where the engine writes", async () => {
+      const { io, written } = fakeIO();
+      await expect(
+        mergeIntoGameFile(request(io, { gameRunning: true, path: ELSEWHERE })),
+      ).rejects.toThrow(/does not know where/i);
+      expect(written).toEqual([]);
+    });
+  });
+
   it("writes the file the game has not got, with nothing to back up", async () => {
     const { io, files, written } = fakeIO();
     const done = await mergeIntoGameFile(request(io));

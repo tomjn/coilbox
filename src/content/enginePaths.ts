@@ -38,3 +38,48 @@ export function underConfigDir(configDir: string, relative: string): string {
   const root = configDir.replace(/[\\/]+$/, "");
   return [root, ...relative.split(/[\\/]+/)].join(separator);
 }
+
+/** Whether a path says where it starts from, which is what makes two of them
+ *  comparable at all: a leading separator, a drive letter, or a UNC share. */
+function absolute(path: string): boolean {
+  return /^([/\\]|[A-Za-z]:[/\\])/.test(path);
+}
+
+/** A path in the one shape two of them can be compared in: one separator, none
+ *  on the end, and folded case, because Windows and macOS both hand back
+ *  whatever was typed and two spellings are one file. Folding case can only make
+ *  two paths look like one, never the other way, so it errs the way a caller
+ *  refusing on a match wants it to. */
+function comparable(path: string): string {
+  return path
+    .replace(/[\\/]+/g, "/")
+    .replace(/\/+$/, "")
+    .toLowerCase();
+}
+
+/**
+ * Whether a path is one the engine writes, so far as its text can say (issue
+ * #1488).
+ *
+ * True is the answer that stops a caller, so every case this cannot decide is
+ * true: no directory to compare against, or either path written relative to
+ * wherever the process happens to be. That leaves false meaning one thing only,
+ * which is that both paths say where they start from and they start apart.
+ *
+ * The whole directory rather than the one file in it, because a caller asking
+ * this is asking whether the engine is going to be writing here, and the engine
+ * writes several files under there.
+ *
+ * Text, so a link is followed by nobody: a path elsewhere that the filesystem
+ * resolves into this directory reads as elsewhere. Resolving one is a syscall
+ * and this is not the place for it.
+ */
+export function underEngineConfig(
+  configDir: string | undefined,
+  path: string,
+): boolean {
+  if (!configDir || !absolute(configDir) || !absolute(path)) return true;
+  const dir = comparable(configDir);
+  const at = comparable(path);
+  return at === dir || at.startsWith(`${dir}/`);
+}

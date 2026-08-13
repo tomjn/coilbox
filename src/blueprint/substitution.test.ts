@@ -3,9 +3,12 @@ import { buildingFootprints } from "./footprint";
 import type { BaseBlueprint } from "./model";
 import type { BlueprintPayload } from "./payload";
 import {
+  distinctDefs,
   layoutDefs,
   layoutSide,
   planForSide,
+  queueNote,
+  queueReport,
   revertSubstitution,
   sideOfDef,
   sideOffer,
@@ -13,6 +16,7 @@ import {
   substituteBlueprint,
   substitutedCount,
   substitutePayload,
+  substituteQueue,
   substitutionNotes,
 } from "./substitution";
 import { knownUnits } from "./units";
@@ -384,5 +388,119 @@ describe("substitutionNotes", () => {
       buildings: [{ def: "armmex", offset: { x: 16, z: 0 }, facing: 0 }],
     };
     expect(notes(mex, { armmex: "cormex" }, footprintOf)).toEqual([]);
+  });
+});
+
+/**
+ * What a plan does to a factory's build queue (issue #1493).
+ *
+ * The units a game's two sides both have are the interesting half. Buildings are
+ * named alike across sides far more often than units are, so most of these tests
+ * are about a queue entry nothing can be suggested for, which is the common case
+ * rather than the corner.
+ */
+describe("queues", () => {
+  /** The same two sides with mobile units in them, so a queued def is a def like
+   *  any other: `armpw` has no `corpw`, which is what the naming route cannot do
+   *  for units. `armck` and `corck` are the pair that it can. */
+  const withUnits = knownUnits([
+    ...UNITS,
+    { name: "armck" },
+    { name: "corck" },
+    { name: "armpw" },
+    { name: "corak" },
+    { name: "sharedradar" },
+  ]);
+
+  describe("distinctDefs", () => {
+    it("keeps the first spelling of each and the order they came in", () => {
+      expect(distinctDefs(["armck", "armpw", "ARMCK"])).toEqual([
+        "armck",
+        "armpw",
+      ]);
+    });
+  });
+
+  describe("planForSide over queued units", () => {
+    it("offers the other side's unit where the game's naming reaches it", () => {
+      expect(planForSide(["armck"], "Cortex", prefixes, withUnits)).toEqual({
+        armck: "corck",
+      });
+    });
+
+    /** Cortex's answer to `armpw` is `corak`, which no prefix swap gets to. So
+     *  nothing is offered, and the person picks it or leaves it. */
+    it("offers nothing for a unit the other side names differently", () => {
+      expect(planForSide(["armpw"], "Cortex", prefixes, withUnits)).toEqual({});
+    });
+  });
+
+  describe("substituteQueue", () => {
+    it("swaps every entry the plan names and leaves the rest", () => {
+      expect(
+        substituteQueue(["armck", "armpw", "armck"], { armck: "corck" }),
+      ).toEqual(["corck", "armpw", "corck"]);
+    });
+
+    it("matches however the def was spelled", () => {
+      expect(substituteQueue(["ArmCK"], { armck: "corck" })).toEqual(["corck"]);
+    });
+  });
+
+  describe("queueReport", () => {
+    it("counts orders rather than units, because a queue is a list of them", () => {
+      const said = queueReport(
+        ["armck", "armck"],
+        { armck: "corck" },
+        prefixes,
+        "Cortex",
+      );
+      expect(said.swapped).toBe(2);
+      expect(said.stranded).toEqual([]);
+    });
+
+    it("names a queued unit left behind on the side the factory is leaving", () => {
+      const said = queueReport(["armpw", "armpw"], {}, prefixes, "Cortex");
+      expect(said.stranded).toEqual(["armpw"]);
+    });
+
+    /** A game's shared units are nobody's, so a converted factory that can build
+     *  one still can. Nothing to say. */
+    it("says nothing about a unit belonging to no side", () => {
+      expect(
+        queueReport(["sharedradar"], {}, prefixes, "Cortex").stranded,
+      ).toEqual([]);
+    });
+
+    it("says nothing about a unit already on the side being converted to", () => {
+      expect(queueReport(["corck"], {}, prefixes, "Cortex").stranded).toEqual(
+        [],
+      );
+    });
+
+    it("has nothing to strand in a game whose sides it cannot tell apart", () => {
+      expect(queueReport(["armpw"], {}, [], "").stranded).toEqual([]);
+    });
+  });
+
+  describe("queueNote", () => {
+    it("warns that a queued unit left behind builds nothing", () => {
+      const note = queueNote(
+        queueReport(["armpw"], {}, prefixes, "Cortex"),
+        "Cortex",
+      );
+      expect(note?.tone).toBe("warn");
+      expect(note?.text).toContain("armpw");
+      expect(note?.text).toContain("Cortex");
+    });
+
+    it("says nothing when every queued unit is accounted for", () => {
+      expect(
+        queueNote(
+          queueReport(["armck"], { armck: "corck" }, prefixes, "Cortex"),
+          "Cortex",
+        ),
+      ).toBeUndefined();
+    });
   });
 });

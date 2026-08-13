@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { BUILD_SQUARE, buildingFootprints } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
 import { onBuildGrid } from "@/blueprint/offGrid";
-import { substituteBlueprint } from "@/blueprint/substitution";
+import {
+  type SubstitutionPlan,
+  substituteBlueprint,
+} from "@/blueprint/substitution";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { newScenario } from "../../create";
 import {
@@ -35,6 +38,7 @@ import {
   setQueue,
   sharingLayout,
   strayDefs,
+  substituteQueues,
   withoutQueued,
 } from "./bases";
 
@@ -778,13 +782,14 @@ describe("putting a layout on the build grid", () => {
 });
 
 /**
- * Converting a base that is already placed in a mission (issue #1466).
+ * Converting a base that is already placed in a mission (issues #1466, #1493).
  *
  * The swap itself is `@/blueprint/substitution` and is tested there. What is
  * worth testing here is how it reaches the document: as a layout edit like a
  * drag, so an author mirroring one base of a pair does not convert the base
- * across the map as well, and so the queues stay on the buildings they were put
- * on.
+ * across the map as well, and with the factory queues carried along, because a
+ * queue is the mission's half of the placement and a converted factory told to
+ * build the old side's units builds nothing.
  */
 describe("saying a placed base in another side's buildings", () => {
   const footprintOf = buildingFootprints([
@@ -794,19 +799,26 @@ describe("saying a placed base in another side's buildings", () => {
     { name: "corsolar", footprintX: 4, footprintZ: 4 },
   ]);
 
+  const PLAN = { armlab: "corlab", armsolar: "corsolar" };
+
   /** The document with base b1 said in Cortex's buildings, the way the base's
-   *  own controls hand the converted layout back. */
-  const converted = (doc: Scenario, how: LayoutEdit = "own") => {
+   *  own controls hand the converted layout and the plan back. */
+  const converted = (
+    doc: Scenario,
+    how: LayoutEdit = "own",
+    plan: SubstitutionPlan = PLAN,
+  ) => {
     const base = doc.bases.find((one) => one.id === "b1") as ScenarioBase;
     const before = doc.blueprints.find(
       (one) => one.id === base.blueprint,
     ) as BaseBlueprint;
-    const after = substituteBlueprint(
-      before,
-      { armlab: "corlab", armsolar: "corsolar" },
-      footprintOf,
-    ).layout;
-    return editBaseLayout(doc, "b1", how, () => after.buildings);
+    const after = substituteBlueprint(before, plan, footprintOf).layout;
+    return editBaseLayout(
+      substituteQueues(doc, "b1", plan, how),
+      "b1",
+      how,
+      () => after.buildings,
+    );
   };
 
   it("swaps the buildings and remembers what they were drawn as", () => {
@@ -850,5 +862,67 @@ describe("saying a placed base in another side's buildings", () => {
     expect(buildingsOf(next)[0].def).toBe("corlab");
     expect(buildingsOf(next)[0].queue).toEqual(["armpw"]);
     expect(buildingsOf(next)[0].repeat).toBe(true);
+  });
+
+  /** Issue #1493. A converted factory queueing the old side's units is the gap
+   *  the drawer used to own up to instead of closing. */
+  it("says the queue in the same units it says the buildings in", () => {
+    const queued = setQueue(document(), "b1", 0, ["armck", "armck"], true);
+    const next = converted(queued, "own", { ...PLAN, armck: "corck" });
+    expect(buildingsOf(next)[0].def).toBe("corlab");
+    expect(buildingsOf(next)[0].queue).toEqual(["corck", "corck"]);
+    expect(buildingsOf(next)[0].repeat).toBe(true);
+  });
+
+  it("leaves a queued unit the plan says nothing about", () => {
+    const queued = setQueue(document(), "b1", 0, ["armck", "armpw"], false);
+    const next = converted(queued, "own", { ...PLAN, armck: "corck" });
+    expect(buildingsOf(next)[0].queue).toEqual(["corck", "armpw"]);
+  });
+
+  it("leaves the queues of a base placed from the same layout alone", () => {
+    const doc = setQueue(
+      {
+        ...document(),
+        bases: [structuredClone(base), { ...structuredClone(base), id: "b2" }],
+      },
+      "b2",
+      0,
+      ["armck"],
+      false,
+    );
+    const next = converted(setQueue(doc, "b1", 0, ["armck"], false), "own", {
+      ...PLAN,
+      armck: "corck",
+    });
+    expect(buildingsOf(next, "b1")[0].queue).toEqual(["corck"]);
+    expect(buildingsOf(next, "b2")[0].queue).toEqual(["armck"]);
+  });
+
+  /** Converting the layout they all use converts all their factories, so it has
+   *  to convert all their queues too. */
+  it("says every sharing base's queue when the shared layout is the one converted", () => {
+    const doc = setQueue(
+      {
+        ...document(),
+        bases: [structuredClone(base), { ...structuredClone(base), id: "b2" }],
+      },
+      "b2",
+      0,
+      ["armck"],
+      false,
+    );
+    const next = converted(setQueue(doc, "b1", 0, ["armck"], false), "shared", {
+      ...PLAN,
+      armck: "corck",
+    });
+    expect(buildingsOf(next, "b1")[0].queue).toEqual(["corck"]);
+    expect(buildingsOf(next, "b2")[0].queue).toEqual(["corck"]);
+  });
+
+  it("is the same document back when the plan touches no queue", () => {
+    const queued = setQueue(document(), "b1", 0, ["armpw"], false);
+    expect(substituteQueues(queued, "b1", PLAN)).toBe(queued);
+    expect(substituteQueues(queued, "b1", {})).toBe(queued);
   });
 });

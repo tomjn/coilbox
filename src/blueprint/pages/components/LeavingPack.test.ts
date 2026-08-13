@@ -39,6 +39,7 @@ function markup(
   over: {
     records?: StoredBlueprint[];
     taking?: Set<string>;
+    gameFile?: string;
     gameRunning?: boolean;
     keepsProvenance?: boolean;
   } = {},
@@ -50,7 +51,10 @@ function markup(
       records,
       taking,
       strips: packStrips(records.filter((one) => taking.has(one.id))),
-      gameFile: "/Users/someone/.spring/LuaUI/Config/blueprints.json",
+      gameFile:
+        "gameFile" in over
+          ? over.gameFile
+          : "/Users/someone/.spring/LuaUI/Config/blueprints.json",
       gameRunning: over.gameRunning ?? false,
       keepsProvenance: over.keepsProvenance ?? false,
       busy: false,
@@ -110,11 +114,20 @@ describe("LeavingPack", () => {
     expect(html).toContain("never goes out in a file");
   });
 
-  /** Both ways out, because coilbox cannot tell from a path whether it is the
-   *  one the running game will write back over. */
-  it("stops both ways out while a game is running, and says why", () => {
+  /** The game's own file, and only that one, because a file being posted is not
+   *  one the running game will write back over (issue #1488). */
+  it("stops the write into a game's file while a game is running, and says why", () => {
     const html = markup({ gameRunning: true });
     expect(html).toContain("A game is running.");
+    expect(html).toContain("Saving a file somewhere else is fine");
+    expect(disabledButtons(html)).toHaveLength(1);
+  });
+
+  /** Nothing to compare a destination against is nothing to reason with, so the
+   *  broad refusal is what is left. */
+  it("stops both ways out when it does not know where the engine writes", () => {
+    const html = markup({ gameRunning: true, gameFile: undefined });
+    expect(html).toContain("does not know where this engine writes");
     expect(disabledButtons(html)).toHaveLength(2);
   });
 

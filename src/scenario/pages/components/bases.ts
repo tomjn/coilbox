@@ -45,6 +45,10 @@
 
 import { BUILD_SQUARE } from "@/blueprint/footprint";
 import type { BaseBlueprint, BlueprintBuilding } from "@/blueprint/model";
+import {
+  type SubstitutionPlan,
+  substituteQueue,
+} from "@/blueprint/substitution";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import type {
   BaseBuildingRole,
@@ -636,6 +640,60 @@ export function setQueue(
     return { ...base, buildings };
   });
   return bases === scenario.bases ? scenario : { ...scenario, bases };
+}
+
+/**
+ * The document with a base's factory queues said in another side's units (issue
+ * #1493).
+ *
+ * The other half of converting a placed base. The layout goes through
+ * `editBaseLayout` and the queues come through here, by the same plan and the
+ * same {@link LayoutEdit}, because a queue is on the placement rather than in the
+ * layout and would otherwise leave a Cortex factory told to build Armada's
+ * units.
+ *
+ * `"shared"` reaches every base placed from the layout for the reason it reaches
+ * every one of their factories: their buildings are being converted, so their
+ * orders are too. Call this before the layout edit, so the bases sharing it are
+ * still the bases sharing it rather than whatever the copy left behind.
+ *
+ * The same document back whenever no queue changes, so a conversion that touches
+ * no order is not an undo step.
+ */
+export function substituteQueues(
+  scenario: Scenario,
+  id: string,
+  plan: SubstitutionPlan,
+  how: LayoutEdit = "own",
+): Scenario {
+  const base = scenario.bases.find((entry) => entry.id === id);
+  if (!base || Object.keys(plan).length === 0) return scenario;
+  const converting = new Set(
+    how === "shared"
+      ? scenario.bases
+          .filter((entry) => entry.blueprint === base.blueprint)
+          .map((entry) => entry.id)
+      : [id],
+  );
+
+  let changed = false;
+  const bases = scenario.bases.map((entry) => {
+    if (!converting.has(entry.id)) return entry;
+    let touched = false;
+    const buildings = entry.buildings.map((role) => {
+      const was = role.queue;
+      if (!was) return role;
+      const queue = substituteQueue(was, plan);
+      if (queue.every((def, at) => def === was[at])) return role;
+      touched = true;
+      return { ...role, queue };
+    });
+    if (!touched) return entry;
+    changed = true;
+    return { ...entry, buildings };
+  });
+
+  return changed ? { ...scenario, bases } : scenario;
 }
 
 /** One more unit on the end of a queue. A queue is a list of build orders, so

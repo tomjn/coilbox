@@ -87,6 +87,7 @@ import {
   setOrigin,
   setQueue,
   sharingLayout,
+  substituteQueues,
 } from "./bases";
 import { ContentsList } from "./ContentsList";
 import {
@@ -867,15 +868,19 @@ export function ScenarioMapScene({
                   }
                   // A layout edit like the snap above, so converting one of two
                   // bases placed from a layout converts one of them (#1466).
-                  onSubstitute={(next) =>
-                    onChange((doc) =>
-                      editBaseLayout(
-                        doc,
+                  // The queues are the base's rather than the layout's, so they
+                  // go through the plan first, while the bases sharing the
+                  // layout are still the bases sharing it (#1493).
+                  onSubstitute={(next, plan) =>
+                    onChange((doc) => {
+                      const how = layoutEdit(pickedBase.id);
+                      return editBaseLayout(
+                        substituteQueues(doc, pickedBase.id, plan, how),
                         pickedBase.id,
-                        layoutEdit(pickedBase.id),
+                        how,
                         () => next.buildings,
-                      ),
-                    )
+                      );
+                    })
                   }
                   onDelete={() => {
                     onChange((doc) => removeBase(doc, pickedBase.id));
