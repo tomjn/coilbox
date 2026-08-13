@@ -202,6 +202,40 @@ export function unjudgedIn(
   return out;
 }
 
+/**
+ * Why nothing on the surface has a verdict, when nothing has (issue #1496).
+ *
+ * The two whole-scene reasons, as a fact about the surface rather than about one
+ * base. `null` once anything on it has been checked, because from then on the
+ * dashed squares mean something: they stand next to plain ones, and the
+ * difference between them is the news.
+ */
+export type SceneUnchecked = "no-units" | "no-ground" | null;
+
+/**
+ * Which of those two is true of everything drawn, or null.
+ *
+ * Nothing has been checked when no building came back `"fine"` or `"slope"`,
+ * which is the only pair of answers the ground gives. A building with its own
+ * answer, a floater or a def this game has not got, is looked past rather than
+ * counted: it has not been checked against the ground either, but it is not
+ * waiting on anything and it is already marked as what it is.
+ *
+ * The read still in flight wins where both are true, because it is the one that
+ * will clear itself and the one an author must not act on.
+ */
+export function sceneUnchecked(marks: FootprintMark[]): SceneUnchecked {
+  let reason: SceneUnchecked = null;
+  for (const mark of marks) {
+    if (mark.standing === "fine" || mark.standing === "slope") return null;
+    if (mark.standing === "no-units") reason = "no-units";
+    else if (mark.standing === "no-ground" && reason === null) {
+      reason = "no-ground";
+    }
+  }
+  return reason;
+}
+
 /** Which of one base's buildings the ground will not take, by their place in
  *  the base, so a panel can name them the way it names the overlapping ones. */
 export function unstableIn(

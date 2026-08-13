@@ -49,7 +49,6 @@ import {
 } from "lucide-react";
 import { buildingFootprints } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
-import { OffGridNote } from "@/blueprint/OffGridNote";
 import { offGridBuildings } from "@/blueprint/offGrid";
 import { SubstitutionPanel } from "@/blueprint/pages/components/SubstitutionPanel";
 import type { SideUnits, SubstitutionPlan } from "@/blueprint/substitution";
@@ -178,7 +177,7 @@ export function BaseControls({
   /** Ask the map for a point to put the base's origin on, or stop asking. */
   onMove: (on: boolean) => void;
   /** Write the positions the buildings are drawn on into the layout, which is
-   *  the offer under {@link OffGridNote}. A layout edit like a drag, so a
+   *  the offer the layout's own notes carry. A layout edit like a drag, so a
    *  shared layout is copied or written through the same way. */
   onSnapToGrid: () => void;
   /** Put the converted layout into the document (issue #1466). A layout edit
@@ -388,9 +387,9 @@ export function BaseControls({
             designedFor={designedFor}
             onMap={onMap}
             strays={strays}
+            offGrid={offGrid}
+            onSnapToGrid={onSnapToGrid}
           />
-
-          <OffGridNote offGrid={offGrid} onSnap={onSnapToGrid} />
 
           {layout && (
             <Button

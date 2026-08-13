@@ -21,7 +21,8 @@ import {
   Play,
 } from "lucide-react";
 import { useState } from "react";
-
+import { OffGridNote } from "@/blueprint/OffGridNote";
+import type { OffGridBuilding } from "@/blueprint/offGrid";
 import { buildOrderText } from "@/blueprint/order";
 import { type UnknownBuilding, unknownUnitsWarning } from "@/blueprint/units";
 import { Label } from "@/components/ui/label";
@@ -31,7 +32,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import type { Unjudged } from "./placements";
+import type { SceneUnchecked, Unjudged } from "./placements";
 
 /**
  * What the layout is called, which is what a picker will list it by.
@@ -90,7 +91,13 @@ function listed(at: number[]): string {
  * not a failure and dressing one as a failure is its own kind of lying. Each
  * reason gets its own sentence: "unknown" on its own is nothing anybody can act
  * on, and a game whose units have not been read and a map whose heights will not
- * read are different problems (issue #1491).
+ * read are different problems (issue #1491). Those two are not said here at all:
+ * they are true of everything on the surface at once, so they are said once
+ * under it by {@link UncheckedNote} rather than per base (issue #1496).
+ *
+ * A layout the build grid disagrees with is said here too, rather than by
+ * whoever mounted this, so it is said in the library and the standalone editor
+ * as well as on a base (issue #1479).
  */
 export function LayoutNotes({
   overlaps,
@@ -101,6 +108,8 @@ export function LayoutNotes({
   designedFor,
   onMap,
   strays,
+  offGrid,
+  onSnapToGrid,
 }: {
   /** Buildings standing on ground another building wants, by their place in the
    *  layout. Drawn in red on the surface as well. */
@@ -132,6 +141,14 @@ export function LayoutNotes({
   onMap?: string;
   /** Defs in the layout the game does not call buildings. */
   strays: string[];
+  /** Buildings the engine will not build where the layout says (issue #1479).
+   *  Left out where the game's units have not been read, because without them
+   *  every even footprint would be accused. */
+  offGrid?: OffGridBuilding[];
+  /** Write the drawn positions into the layout, which is what the note above
+   *  offers. Given together with `offGrid`: a note nobody can act on would be a
+   *  worse thing than the silence it replaces. */
+  onSnapToGrid?: () => void;
 }) {
   const elsewhere =
     designedFor !== undefined &&
@@ -176,22 +193,6 @@ export function LayoutNotes({
         </p>
       )}
 
-      {unjudged !== undefined && unjudged.noUnits.length > 0 && (
-        <p className="rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
-          Coilbox has not read this game's units, so no building here has been
-          checked against the ground. The dashed squares have no verdict, which
-          is not the same as a clean one.
-        </p>
-      )}
-
-      {unjudged !== undefined && unjudged.noGround.length > 0 && (
-        <p className="rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
-          This map's heights could not be read, so no building here has been
-          checked against the ground. The dashed squares have no verdict, which
-          is not the same as a clean one.
-        </p>
-      )}
-
       {unjudged !== undefined && unjudged.noSlope.length > 0 && (
         <p className="rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
           Building{unjudged.noSlope.length === 1 ? " " : "s "}
@@ -218,7 +219,58 @@ export function LayoutNotes({
           actor.
         </p>
       )}
+
+      {offGrid !== undefined && onSnapToGrid !== undefined && (
+        <OffGridNote offGrid={offGrid} onSnap={onSnapToGrid} />
+      )}
     </>
+  );
+}
+
+/**
+ * What is true of everything on the surface at once, said once under it (issue
+ * #1496).
+ *
+ * The dashed squares are the at-a-glance signal, and they work by contrast: a
+ * square with no verdict reads as one because there is a plain square beside it.
+ * On a surface where nothing has been checked there is no contrast to read, and
+ * the reason was two clicks away in a popover, per base. This is that reason
+ * said once, in the open, and it is the only place either sentence lives now.
+ *
+ * The map's heights carry a second fact, which is the drawing rather than the
+ * check: the models are standing on the flat because there was no relief to
+ * stand them on (issue #1497). Both are said in one breath, so "this map's
+ * heights could not be read" is not on screen twice.
+ */
+export function UncheckedNote({
+  unchecked,
+  flattened,
+}: {
+  /** Why nothing drawn has a verdict, from `sceneUnchecked`. Null once anything
+   *  has been checked, and while the reads are still in flight. */
+  unchecked: SceneUnchecked;
+  /** Whether the units are drawn on flat ground because the map's heights would
+   *  not read. True with no map involved never happens: flat ground with no map
+   *  is level on purpose and is known exactly. */
+  flattened?: boolean;
+}) {
+  if (unchecked === null && flattened !== true) return null;
+
+  return (
+    <p className="w-fit rounded bg-slate-800/80 px-2 py-1 text-[11px] text-slate-300 backdrop-blur">
+      {flattened === true && (
+        <>
+          This map's heights could not be read, so every unit here is drawn on
+          flat ground rather than at the height the engine will stand it at.{" "}
+        </>
+      )}
+      {unchecked === "no-units" &&
+        "Coilbox has not read this game's units. Nothing here has been checked against the ground, so every square is dashed rather than clean."}
+      {unchecked === "no-ground" &&
+        (flattened === true
+          ? "Nothing here has been checked against the ground either, for want of a height to check it against."
+          : "This map's heights could not be read. Nothing here has been checked against the ground, so every square is dashed rather than clean.")}
+    </p>
   );
 }
 

@@ -24,8 +24,9 @@ import { Button } from "@picoframe/frame";
 import { Blocks } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { buildGridSnap } from "@/blueprint/footprint";
+import { buildGridSnap, buildingFootprints } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
+import { offGridBuildings, onBuildGrid } from "@/blueprint/offGrid";
 import {
   Popover,
   PopoverContent,
@@ -39,6 +40,7 @@ import { baseBuildings, type Point } from "@/scenario/model";
 import {
   addBuilding,
   buildingUnits,
+  editBaseLayout,
   moveBuilding,
   renameBlueprint,
   setBlueprintOrdered,
@@ -51,11 +53,12 @@ import {
 } from "@/scenario/pages/components/editing";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { useLayoutHistory } from "./blueprintHistory";
-import { GRID_EXTENT, gridGround, layoutFraming } from "./ground";
+import { GRID_EXTENT, GRID_ORIGIN, gridGround, layoutFraming } from "./ground";
 import {
   BuildOrderPopover,
   LayoutNameField,
   LayoutNotes,
+  UncheckedNote,
 } from "./LayoutControls";
 import { PlacementSurface } from "./PlacementSurface";
 import {
@@ -63,6 +66,7 @@ import {
   baseFootprints,
   overlappingIn,
   placementKey,
+  sceneUnchecked,
   unjudgedIn,
 } from "./placements";
 import { previewChecks, withoutBuilding } from "./preview";
@@ -291,6 +295,19 @@ export function BlueprintEditor({
     : undefined;
   const absent = absentIn(drawn.placements, footprints, BLUEPRINT_BASE_ID);
   const strays = strayDefs(units, blueprint.buildings);
+  // Which of them the engine will not build where the layout says (issue
+  // #1479). The same question a base on a map asks, asked here because a layout
+  // arriving from a game file or a pack is most likely to be opened here.
+  // Only once the game's units have been read: without them every building
+  // looks like one square, and half of a layout that is fine would be accused.
+  const offGrid =
+    units.length > 0
+      ? offGridBuildings(
+          blueprint.buildings,
+          buildingFootprints(units),
+          GRID_ORIGIN,
+        )
+      : [];
 
   return (
     <PlacementSurface
@@ -345,6 +362,24 @@ export function BlueprintEditor({
                   absent={absent}
                   buildings={blueprint.buildings.length}
                   strays={strays}
+                  offGrid={offGrid}
+                  // A layout edit like a drag, so the history holds it and the
+                  // library writes it a moment later like any other change.
+                  onSnapToGrid={() =>
+                    applyEdit((current) =>
+                      editBaseLayout(
+                        current,
+                        BLUEPRINT_BASE_ID,
+                        "own",
+                        (buildings) =>
+                          onBuildGrid(
+                            buildings,
+                            buildingFootprints(units),
+                            GRID_ORIGIN,
+                          ),
+                      ),
+                    )
+                  }
                 />
               </PopoverContent>
             </Popover>
@@ -372,6 +407,14 @@ export function BlueprintEditor({
               ? "Click the ground to put one down. Drag a building to move it within the layout."
               : "Pick a building to start placing. Drag one to move it, click bare ground to deselect."}
           </p>
+
+          {/* Nothing here has been checked, said once in the open rather than
+              per layout in a popover (issue #1496). The ground is flat on
+              purpose, so the only reason that can be true here is a game whose
+              units have not been read. */}
+          <UncheckedNote
+            unchecked={drawn.settled ? sceneUnchecked(footprints) : null}
+          />
 
           {picked && (
             <SelectionBar
