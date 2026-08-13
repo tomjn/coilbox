@@ -10,12 +10,22 @@ import {
 } from "./bar";
 import { buildGridSnap } from "./footprint";
 import type { BaseBlueprint } from "./model";
+import { knownUnits } from "./units";
 
 /** A real file in Beyond All Reason's shape, written by `cmd_blueprint.lua`.
  *  Its third entry is one this reader does not understand, which is what proves
  *  a merge does not drop what it cannot read. */
 const FIXTURE = readFileSync(
   join(__dirname, "fixtures", "bar-blueprints.json"),
+  "utf8",
+);
+
+/** One file holding two games' layouts, which is what the game's own file
+ *  really looks like: its path has no game in it, so every game sharing a data
+ *  directory writes into the same list. Its second entry is Zero-K's, its third
+ *  is this game's with one unit a Legion-less install has not got. */
+const TWO_GAMES = readFileSync(
+  join(__dirname, "fixtures", "bar-two-games.json"),
   "utf8",
 );
 
@@ -127,6 +137,44 @@ describe("readBarFile", () => {
   it("says nothing moved when the file's own positions are already on the grid", () => {
     const read = readBarFile(FIXTURE, buildGridSnap(UNITS));
     expect(read.blueprints[0].snapped).toEqual([]);
+  });
+
+  it("says which buildings name a unit the game being imported into has not got", () => {
+    const read = readBarFile(TWO_GAMES, undefined, knownUnits(UNITS));
+    expect(read.checked).toBe(true);
+    expect(read.blueprints[0].unknown).toEqual([]);
+    expect(read.blueprints[1].unknown).toEqual([
+      { index: 0, def: "energysolar" },
+      { index: 1, def: "turretlaser" },
+      { index: 2, def: "factorycloak" },
+    ]);
+    expect(read.blueprints[2].unknown).toEqual([{ index: 3, def: "legsolar" }]);
+  });
+
+  it("still reads a layout of another game's units, because taking it is the reader's caller's decision", () => {
+    const read = readBarFile(TWO_GAMES, undefined, knownUnits(UNITS));
+    expect(read.blueprints).toHaveLength(3);
+    expect(read.unreadable).toBe(0);
+    expect(read.blueprints[1].layout.buildings).toHaveLength(3);
+  });
+
+  it("checks nothing, and says it checked nothing, without a game to check against", () => {
+    const read = readBarFile(TWO_GAMES);
+    expect(read.checked).toBe(false);
+    expect(read.blueprints.every((one) => one.unknown.length === 0)).toBe(true);
+  });
+
+  it("counts a unit the game has not got by the layout's own order, turn and all", () => {
+    // The turn reorders nothing, but the index has to be the building's place
+    // in the layout that comes out, not in the file's own array.
+    const read = readBarFile(
+      '{"savedBlueprints":[{"name":"a","facing":1,"units":[' +
+        '{"unitName":"armsolar","position":[0,0,0],"facing":0},' +
+        '{"unitName":"legsolar","position":[64,0,0],"facing":0}]}]}',
+      undefined,
+      knownUnits(UNITS),
+    );
+    expect(read.blueprints[0].unknown).toEqual([{ index: 1, def: "legsolar" }]);
   });
 });
 

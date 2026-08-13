@@ -32,6 +32,7 @@ import type {
   MergePlan,
 } from "./format";
 import type { BaseBlueprint, BlueprintBuilding } from "./model";
+import { type KnownUnits, unknownBuildings } from "./units";
 
 /** Where the game reads and writes it, under whichever directory it writes to. */
 const BAR_FILE = "LuaUI/Config/blueprints.json";
@@ -146,7 +147,7 @@ function readEntry(
   value: unknown,
   index: number,
   snap?: SnapBuilding,
-): ImportedBlueprint | null {
+): Omit<ImportedBlueprint, "unknown"> | null {
   if (!isRecord(value) || !Array.isArray(value.units)) return null;
   const read = value.units.map(readUnit);
   if (read.length === 0 || read.some((unit) => unit === null)) return null;
@@ -182,17 +183,33 @@ function readEntry(
   return { layout, turned: facing, snapped, dropped };
 }
 
-/** Every layout a Beyond All Reason blueprints file holds. */
-export function readBarFile(text: string, snap?: SnapBuilding): ImportReport {
+/**
+ * Every layout a Beyond All Reason blueprints file holds.
+ *
+ * One file holds every game's layouts, because the path the widget writes to
+ * has no game in it, so `known` is how a layout gets tied back to a game at
+ * all. A layout naming units this game has not got is read like any other and
+ * carries the list of them, because the person reading is the one deciding
+ * whether it is worth taking.
+ */
+export function readBarFile(
+  text: string,
+  snap?: SnapBuilding,
+  known?: KnownUnits,
+): ImportReport {
   const { entries } = parseFile(text);
   const blueprints: ImportedBlueprint[] = [];
   let unreadable = 0;
   entries.forEach((entry, index) => {
     const read = readEntry(entry, index, snap);
-    if (read) blueprints.push(read);
-    else unreadable += 1;
+    if (read) {
+      blueprints.push({
+        ...read,
+        unknown: unknownBuildings(read.layout.buildings, known),
+      });
+    } else unreadable += 1;
   });
-  return { blueprints, unreadable };
+  return { blueprints, unreadable, checked: known !== undefined };
 }
 
 /**

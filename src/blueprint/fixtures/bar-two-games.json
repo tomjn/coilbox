@@ -1,0 +1,40 @@
+{
+  "savedBlueprints": [
+    {
+      "name": "Opening solars",
+      "spacing": 0,
+      "facing": 0,
+      "ordered": true,
+      "units": [
+        { "unitName": "armsolar", "position": [-48, 84.5, -48], "facing": 0 },
+        { "unitName": "armsolar", "position": [0, 84.5, -48], "facing": 0 },
+        { "unitName": "armmex", "position": [56, 84.5, 56], "facing": 1 }
+      ]
+    },
+    {
+      "name": "Cloaky opening",
+      "spacing": 0,
+      "facing": 0,
+      "ordered": false,
+      "units": [
+        { "unitName": "energysolar", "position": [-48, 30, 0], "facing": 0 },
+        { "unitName": "turretlaser", "position": [48, 30, 0], "facing": 0 },
+        { "unitName": "factorycloak", "position": [0, 30, 96], "facing": 0 }
+      ]
+    },
+    {
+      "name": "Front line",
+      "spacing": 0,
+      "facing": 0,
+      "ordered": false,
+      "units": [
+        { "unitName": "corllt", "position": [-48, 84.5, 0], "facing": 0 },
+        { "unitName": "corllt", "position": [48, 84.5, 0], "facing": 0 },
+        { "unitName": "armsolar", "position": [0, 84.5, 64], "facing": 0 },
+        { "unitName": "legsolar", "position": [0, 84.5, 128], "facing": 0 }
+      ]
+    }
+  ],
+  "lastSelected": 1,
+  "version": 3
+}
