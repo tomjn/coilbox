@@ -30,6 +30,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import { UncheckedNote } from "@/placement/LayoutControls";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
 import {
   absentIn,
@@ -38,6 +39,7 @@ import {
   type Placement,
   parsePlacementKey,
   placementKey,
+  sceneUnchecked,
   unjudgedIn,
   unstableIn,
 } from "@/placement/placements";
@@ -731,6 +733,14 @@ export function ScenarioMapScene({
               {previewSentence(preview.count)}
             </p>
           )}
+          {/* What is true of the whole map at once, said once here rather than
+              per base in a popover two clicks away (issue #1496). Held back
+              until the reads have settled, so an editor opening does not greet
+              anybody with a warning that clears itself. */}
+          <UncheckedNote
+            unchecked={units.settled ? sceneUnchecked(footprints) : null}
+            flattened={units.heightsUnread}
+          />
           {picked && (
             <ScenarioSelectionBar
               placement={picked}

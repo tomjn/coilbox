@@ -9,6 +9,7 @@ import {
   overlappingIn,
   parsePlacementKey,
   placementKey,
+  sceneUnchecked,
   teamColor,
   UNOWNED_COLOR,
   unjudgedIn,
@@ -231,6 +232,82 @@ describe("unjudgedIn", () => {
       noUnits: [],
       noSlope: [],
     });
+  });
+});
+
+/**
+ * Issue #1496. The two reasons that are true of the whole surface at once, asked
+ * about the surface rather than about one base.
+ */
+describe("sceneUnchecked", () => {
+  const units = [
+    { name: "armlab", footprintX: 6, footprintZ: 6, maxSlope: 10 },
+    { name: "armsolar", footprintX: 5, footprintZ: 5, maxSlope: 12 },
+  ];
+
+  const doc: Registries = {
+    ...empty,
+    blueprints: [
+      {
+        id: "bp1",
+        name: "The keep",
+        buildings: [
+          { def: "armlab", offset: { x: 0, z: 0 }, facing: 0 },
+          { def: "armsolar", offset: { x: 512, z: 0 }, facing: 0 },
+        ],
+      },
+    ],
+    bases: [
+      {
+        id: "pf1",
+        blueprint: "bp1",
+        team: "p0",
+        origin: { x: 1000, z: 1000 },
+        buildings: [],
+      },
+    ],
+  };
+
+  const flat = { cornerAt: () => 0, slack: 0, minHeight: 0, maxHeight: 0 };
+
+  it("says nothing when the buildings have been judged", () => {
+    const marks = baseFootprints(scenarioPlacements(doc), units, flat);
+    expect(sceneUnchecked(marks)).toBeNull();
+  });
+
+  it("says nothing about a surface with nothing on it", () => {
+    expect(sceneUnchecked([])).toBeNull();
+  });
+
+  it("blames the map when its heights could not be read", () => {
+    const marks = baseFootprints(scenarioPlacements(doc), units, null);
+    expect(sceneUnchecked(marks)).toBe("no-ground");
+  });
+
+  it("blames the read still in flight before the units are read", () => {
+    const marks = baseFootprints(scenarioPlacements(doc), [], null);
+    expect(sceneUnchecked(marks)).toBe("no-units");
+  });
+
+  /** A def the game has not got is judged: it is a refusal rather than a
+   *  silence, so a layout of them alongside one unread height is still a
+   *  surface where the map is what nothing could be checked against. */
+  it("looks past a building that has its own answer", () => {
+    const marks = baseFootprints(
+      scenarioPlacements(doc),
+      [{ name: "armlab", footprintX: 6, footprintZ: 6, maxSlope: 10 }],
+      null,
+    );
+    expect(sceneUnchecked(marks)).toBe("no-ground");
+  });
+
+  /** The whole point of saying it once: one building with a verdict means the
+   *  check ran, and the dashed squares beside it are per building news. */
+  it("says nothing once one building has been checked", () => {
+    const marks = baseFootprints(scenarioPlacements(doc), units, flat);
+    expect(
+      sceneUnchecked([...marks, { ...marks[0], standing: "no-slope" }]),
+    ).toBeNull();
   });
 });
 

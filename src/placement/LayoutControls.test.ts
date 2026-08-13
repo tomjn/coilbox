@@ -11,13 +11,21 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { LayoutNotes } from "./LayoutControls";
+import { LayoutNotes, UncheckedNote } from "./LayoutControls";
 
 type Notes = Parameters<typeof LayoutNotes>[0];
 
 function markup(props: Partial<Notes> = {}): string {
   return renderToStaticMarkup(
     createElement(LayoutNotes, { overlaps: [], strays: [], ...props }),
+  );
+}
+
+type Unchecked = Parameters<typeof UncheckedNote>[0];
+
+function surface(props: Partial<Unchecked> = {}): string {
+  return renderToStaticMarkup(
+    createElement(UncheckedNote, { unchecked: null, ...props }),
   );
 }
 
@@ -113,16 +121,14 @@ describe("LayoutNotes", () => {
       expect(markup({ unjudged: none })).toBe("");
     });
 
-    it("says the map's heights would not read", () => {
-      const html = markup({ unjudged: { ...none, noGround: [0, 1] } });
-      expect(html).toContain("This map&#x27;s heights could not be read");
-      expect(html).toContain("dashed");
-    });
-
-    it("says the game's units have not been read", () => {
-      const html = markup({ unjudged: { ...none, noUnits: [0, 1] } });
-      expect(html).toContain("has not read this game&#x27;s units");
-      expect(html).toContain("dashed");
+    /**
+     * Issue #1496. Both of these are true of everything on the surface at once,
+     * so they are said once under it rather than per base, and this panel does
+     * not say them at all. One sentence, one place.
+     */
+    it("leaves the whole-surface reasons to the surface", () => {
+      expect(markup({ unjudged: { ...none, noGround: [0, 1] } })).toBe("");
+      expect(markup({ unjudged: { ...none, noUnits: [0, 1] } })).toBe("");
     });
 
     it("names the buildings the game's data gives no slope", () => {
@@ -134,7 +140,7 @@ describe("LayoutNotes", () => {
     /** Not a warning. An unknown is not a failure and must not be dressed as
      *  one, so none of these take the amber a refusal takes. */
     it("does not dress an unknown as a refusal", () => {
-      const html = markup({ unjudged: { ...none, noGround: [0] } });
+      const html = markup({ unjudged: { ...none, noSlope: [0] } });
       expect(html).not.toContain("amber");
       expect(html).not.toContain("red");
     });
@@ -164,5 +170,80 @@ describe("LayoutNotes", () => {
   it("says nothing when there is no map to compare with", () => {
     expect(markup({ designedFor: "Comet Catcher" })).toBe("");
     expect(markup({ onMap: "Comet Catcher" })).toBe("");
+  });
+
+  /**
+   * Issue #1479. The same layout, in the library or in the standalone editor,
+   * used to say nothing about a position the engine will move. It is one
+   * sentence about the layout, so it is said wherever the layout is drawn.
+   */
+  describe("off the build grid", () => {
+    const off = [
+      { index: 1, def: "armsolar", from: { x: 5, z: 5 }, to: { x: 8, z: 8 } },
+    ];
+
+    it("says which building the grid disagrees with", () => {
+      const html = markup({ offGrid: off, onSnapToGrid: () => {} });
+      expect(html).toContain("do not agree with the build grid");
+      expect(html).toContain("Building 2");
+      expect(html).toContain("Put the layout on the build grid");
+    });
+
+    it("says nothing when the grid agrees", () => {
+      expect(markup({ offGrid: [], onSnapToGrid: () => {} })).toBe("");
+    });
+
+    /** Nothing has read the game's units, so nothing knows what any of these
+     *  stand on and the caller hands over no list at all. */
+    it("says nothing when nobody asked the question", () => {
+      expect(markup({ onSnapToGrid: () => {} })).toBe("");
+    });
+  });
+});
+
+/**
+ * Issue #1496, and the drawing half of #1497.
+ *
+ * The case the dashed squares cannot cover: a surface where nothing at all has
+ * a verdict, so there is no clean square beside a dashed one to read the
+ * difference from.
+ */
+describe("UncheckedNote", () => {
+  it("says nothing while the check is running normally", () => {
+    expect(surface()).toBe("");
+  });
+
+  it("says the game's units have not been read", () => {
+    const html = surface({ unchecked: "no-units" });
+    expect(html).toContain("has not read this game&#x27;s units");
+    expect(html).toContain("Nothing here has been checked");
+  });
+
+  it("says the map's heights would not read", () => {
+    const html = surface({ unchecked: "no-ground" });
+    expect(html).toContain("Nothing here has been checked");
+  });
+
+  /** The models are standing somewhere they will not stand, which no dashed
+   *  square says and no popover said (issue #1497). */
+  it("says the models are standing on the flat", () => {
+    const html = surface({ unchecked: "no-ground", flattened: true });
+    expect(html).toContain("heights could not be read");
+    expect(html).toContain("flat ground");
+  });
+
+  /** A map with nothing on it to check is still a map drawing its units at the
+   *  wrong height. */
+  it("says so even where there is nothing to check", () => {
+    const html = surface({ unchecked: null, flattened: true });
+    expect(html).toContain("flat ground");
+  });
+
+  /** An unknown is not a refusal, so this takes the slate the dashed squares
+   *  take rather than the amber a refusal takes. */
+  it("does not dress an unknown as a refusal", () => {
+    const html = surface({ unchecked: "no-ground", flattened: true });
+    expect(html).not.toContain("amber");
+    expect(html).not.toContain("red");
   });
 });

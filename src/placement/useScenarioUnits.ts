@@ -24,10 +24,12 @@ import { scenarioPlacements } from "@/scenario/pages/components/placements";
 import { type Placement, teamColor } from "./placements";
 import {
   cornerGround,
+  FLAT_FIELD,
   flatGround,
   groundHeight,
   type HeightField,
   readHeightField,
+  standingField,
 } from "./terrain";
 import { createUnitsLayer, type UnitsLayer } from "./unitsLayer";
 
@@ -39,8 +41,10 @@ export interface MapExtent {
    *
    * The blueprint editor draws on flat ground rather than on a map, and without
    * this an absent `heightSrc` is a read still in flight, which is what it is
-   * for every other caller. Said explicitly so a map whose heightmap failed to
-   * resolve keeps drawing nothing rather than quietly flattening itself.
+   * for every other caller. Still said explicitly now that a map whose heights
+   * would not read is flattened too (issue #1497): this floor is level on
+   * purpose and is known exactly, so a building on it gets a real verdict, and
+   * that one is a guess nothing may be judged against.
    */
   flat?: boolean;
   minHeight: number;
@@ -48,14 +52,6 @@ export interface MapExtent {
   worldWidth: number;
   worldHeight: number;
 }
-
-/** Ground with no relief: one sample, at nothing. Sampled through the same
- *  bilinear read the map is, which answers 0 everywhere for this. */
-const FLAT_FIELD: HeightField = {
-  width: 1,
-  height: 1,
-  samples: Float32Array.of(0),
-};
 
 /** What the editor's surface can say about what it just drew, and what editing
  *  it needs to reach. */
@@ -101,6 +97,14 @@ export interface ScenarioUnitsState {
    * wall of warnings that clears itself two seconds later.
    */
   settled: boolean;
+  /**
+   * The map's heights were asked for and would not read (issue #1497).
+   *
+   * The models are drawn on the flat rather than not at all, so this is what the
+   * surface says to keep a level scene from reading as the truth. False for the
+   * mapless editor, whose floor is level on purpose.
+   */
+  heightsUnread: boolean;
 }
 
 /**
@@ -219,13 +223,18 @@ export function useScenarioUnits(
     };
   }, [map.heightSrc, flat]);
 
+  // What the models stand on, which is the flat once the map's own heights have
+  // been asked for and refused (issue #1497).
+  const standing = standingField(field, heightRead);
+  const heightsUnread = field === null && standing !== null;
+
   const { worldWidth, worldHeight, minHeight, maxHeight } = map;
   const [layer, setLayer] = useState<UnitsLayer | null>(null);
   useEffect(() => {
-    if (!handle || !field) return;
+    if (!handle || !standing) return;
     const built = createUnitsLayer({
       handle,
-      field,
+      field: standing,
       worldWidth,
       worldHeight,
       minHeight,
@@ -248,7 +257,7 @@ export function useScenarioUnits(
     };
   }, [
     handle,
-    field,
+    standing,
     worldWidth,
     worldHeight,
     minHeight,
@@ -290,9 +299,9 @@ export function useScenarioUnits(
 
   const groundAt = useCallback(
     (pos: Point) =>
-      field
+      standing
         ? groundHeight(
-            field,
+            standing,
             pos.x,
             pos.z,
             worldWidth,
@@ -301,7 +310,7 @@ export function useScenarioUnits(
             maxHeight,
           )
         : 0,
-    [field, worldWidth, worldHeight, minHeight, maxHeight],
+    [standing, worldWidth, worldHeight, minHeight, maxHeight],
   );
 
   const ground = useMemo(() => {
@@ -321,5 +330,6 @@ export function useScenarioUnits(
     groundAt,
     ground,
     settled: defsReady && heightRead,
+    heightsUnread,
   };
 }
