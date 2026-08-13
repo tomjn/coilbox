@@ -32,11 +32,13 @@ import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
 import {
+  absentIn,
   baseFootprints,
   overlappingIn,
   type Placement,
   parsePlacementKey,
   placementKey,
+  unjudgedIn,
   unstableIn,
 } from "@/placement/placements";
 import {
@@ -775,6 +777,16 @@ export function ScenarioMapScene({
                     footprints,
                     pickedBase.id,
                   )}
+                  // Only once the reads are in. Before that everything is
+                  // unjudged for a moment, and a panel opening on a wall of
+                  // warnings that clears itself teaches an author to ignore it
+                  // (issue #1491).
+                  unjudged={
+                    units.settled
+                      ? unjudgedIn(units.placements, footprints, pickedBase.id)
+                      : undefined
+                  }
+                  absent={absentIn(units.placements, footprints, pickedBase.id)}
                   designedFor={pickedLayout?.designedFor}
                   onMap={mapName}
                   participants={scenario.setup.participants}

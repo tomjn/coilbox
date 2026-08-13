@@ -48,6 +48,7 @@ import { OffGridNote } from "@/blueprint/OffGridNote";
 import { offGridBuildings } from "@/blueprint/offGrid";
 import { SubstitutionPanel } from "@/blueprint/pages/components/SubstitutionPanel";
 import type { SideUnits } from "@/blueprint/substitution";
+import type { UnknownBuilding } from "@/blueprint/units";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -63,6 +64,7 @@ import {
   LayoutNameField,
   LayoutNotes,
 } from "@/placement/LayoutControls";
+import type { Unjudged } from "@/placement/placements";
 import type { Participant } from "@/play/config";
 import type { PlacedBuilding, ScenarioBase } from "../../model";
 import {
@@ -85,6 +87,8 @@ export function BaseControls({
   sharedEdit,
   overlaps,
   unstable,
+  unjudged,
+  absent,
   designedFor,
   onMap,
   participants,
@@ -130,6 +134,12 @@ export function BaseControls({
    *  base. Drawn in amber on the map as well, and empty where the terrain
    *  could not be checked at all. */
   unstable: number[];
+  /** Which of them nothing judged, and why. Undefined while the reads are still
+   *  in flight, when nothing is worth saying yet (issue #1491). */
+  unjudged?: Unjudged;
+  /** Which of them name a unit this game has not got, by their place in the
+   *  base. Drawn in violet on the map as well (issue #1445). */
+  absent: UnknownBuilding[];
   /** The map the layout was drawn on, when it says (issue #1315). */
   designedFor?: string;
   /** The map the mission is on, which is the one the base is standing on. */
@@ -366,6 +376,9 @@ export function BaseControls({
           <LayoutNotes
             overlaps={overlaps}
             unstable={unstable}
+            unjudged={unjudged}
+            absent={absent}
+            buildings={buildings.length}
             designedFor={designedFor}
             onMap={onMap}
             strays={strays}

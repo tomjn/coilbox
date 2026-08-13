@@ -53,6 +53,100 @@ describe("LayoutNotes", () => {
     expect(html).toContain("Building 2 stands on ground too steep for it");
   });
 
+  /**
+   * Issue #1445. A base with one Legion solar in it drew exactly like a base
+   * without one, because the import knew and the layout did not carry it.
+   */
+  describe("units the game has not got", () => {
+    it("names the buildings and the units they name", () => {
+      const html = markup({
+        absent: [
+          { index: 1, def: "legsolar" },
+          { index: 4, def: "legwin" },
+        ],
+        buildings: 6,
+      });
+      expect(html).toContain("Buildings 2, 5");
+      expect(html).toContain("legsolar");
+      expect(html).toContain("legwin");
+      expect(html).toContain("violet");
+    });
+
+    it("counts one building as one", () => {
+      const html = markup({
+        absent: [{ index: 0, def: "legsolar" }],
+        buildings: 4,
+      });
+      expect(html).toContain("Building 1 is");
+      expect(html).toContain("legsolar");
+    });
+
+    /** A layout the game has none of the units of is another game's, and that
+     *  is a different thing from a layout with one unit missing. */
+    it("says when the whole layout belongs to another game", () => {
+      const html = markup({
+        absent: [
+          { index: 0, def: "legsolar" },
+          { index: 1, def: "legwin" },
+        ],
+        buildings: 2,
+      });
+      expect(html).toContain("none of");
+      expect(html).not.toContain("Buildings 1, 2");
+    });
+
+    it("says nothing before the game's units have been read", () => {
+      expect(markup({ absent: [], buildings: 4 })).toBe("");
+      expect(markup({ buildings: 4 })).toBe("");
+    });
+  });
+
+  /**
+   * Issue #1491. The dangerous silence: a check that ran and approved and a
+   * check that never ran said the same nothing, which is how #1483 survived for
+   * months.
+   */
+  describe("no verdict", () => {
+    const none = { noGround: [], noUnits: [], noSlope: [] };
+
+    it("says nothing while every building has been judged", () => {
+      expect(markup({ unjudged: none })).toBe("");
+    });
+
+    it("says the map's heights would not read", () => {
+      const html = markup({ unjudged: { ...none, noGround: [0, 1] } });
+      expect(html).toContain("This map&#x27;s heights could not be read");
+      expect(html).toContain("dashed");
+    });
+
+    it("says the game's units have not been read", () => {
+      const html = markup({ unjudged: { ...none, noUnits: [0, 1] } });
+      expect(html).toContain("has not read this game&#x27;s units");
+      expect(html).toContain("dashed");
+    });
+
+    it("names the buildings the game's data gives no slope", () => {
+      const html = markup({ unjudged: { ...none, noSlope: [0, 3] } });
+      expect(html).toContain("Buildings 1, 4");
+      expect(html).toContain("no slope");
+    });
+
+    /** Not a warning. An unknown is not a failure and must not be dressed as
+     *  one, so none of these take the amber a refusal takes. */
+    it("does not dress an unknown as a refusal", () => {
+      const html = markup({ unjudged: { ...none, noGround: [0] } });
+      expect(html).not.toContain("amber");
+      expect(html).not.toContain("red");
+    });
+
+    /** A session that has only just opened knows nothing for a moment. Handed
+     *  no groups at all, it says nothing rather than a wall of warnings that
+     *  clears itself. */
+    it("says nothing at all when the reads have not settled", () => {
+      expect(markup()).toBe("");
+    });
+  });
+
   it("says which map a layout was drawn for when it is on another", () => {
     const html = markup({
       designedFor: "Comet Catcher",

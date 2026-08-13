@@ -13,6 +13,10 @@
  * A building on ground too steep for it is drawn in amber (issue #1315), which
  * is the same statement about a different reason the engine will refuse it.
  *
+ * A building nothing has judged is drawn as an empty dashed square (issue
+ * #1491). That is a third state rather than a quieter version of the first: an
+ * unknown is not a failure, and it is not an approval either.
+ *
  * Nothing here carries a `placementKey` and the layer is not handed to
  * `useMapEditing`, so a footprint cannot be clicked. It lies under the building
  * it belongs to and would otherwise swallow every click meant for that building.
@@ -23,7 +27,7 @@
 
 import * as THREE from "three";
 
-import type { FootprintMark } from "@/blueprint/footprint";
+import { type FootprintMark, unjudged } from "@/blueprint/footprint";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import type { Point } from "@/scenario/model";
 import { worldToScene } from "./scene";
@@ -50,6 +54,65 @@ const GROUND_COLOR = 0x94a3b8;
 const CLASH_COLOR = 0xf87171;
 const SLOPE_COLOR = 0xfbbf24;
 
+/** What a building nothing has judged is outlined in: brighter than the ground
+ *  colour, because an empty dashed square has no fill to be seen by. */
+const UNJUDGED_COLOR = 0xcbd5e1;
+
+/** What a building whose unit the game has not got is drawn in (issue #1445).
+ *  A third refusal colour, because it is fixed neither by moving the building
+ *  nor by finding flatter ground: that unit is not in this game. */
+const ABSENT_COLOR = 0xa78bfa;
+
+/** The dashes of that outline, in elmos. A build square is 16, so a dash and a
+ *  gap fall inside the smallest footprint there is. */
+const DASH_ELMOS = 7;
+const GAP_ELMOS = 5;
+
+/** How one footprint is drawn. */
+export interface FootprintStyle {
+  color: number;
+  /** How solid the patch is. Zero draws no patch at all. */
+  fill: number;
+  outline: number;
+  /** A dashed outline, which is what says nothing judged this building. */
+  dashed: boolean;
+}
+
+/**
+ * Which of the three states this building is in (issue #1491).
+ *
+ * The three are read apart by the shape rather than by the colour, because a
+ * colour on its own asks somebody to remember a key. A refusal is a filled
+ * square with a bold edge, a building nobody is refusing is a quiet filled
+ * square, and a building nothing has judged is an empty dashed one. Within a
+ * refusal the colour says which of the three it is, because they are fixed
+ * differently. There was
+ * no third state before: a building the check could not judge and one it
+ * approved of were both the quiet grey square, which is how the check managed
+ * to refuse every map it was given for months without anybody noticing (issue
+ * #1483).
+ *
+ * A clash wins the colour, because it is the one the author put there and the
+ * ground under it may well be fine once the pair is pulled apart.
+ */
+export function footprintStyle(
+  mark: Pick<FootprintMark, "overlapping" | "standing">,
+): FootprintStyle {
+  if (mark.overlapping) {
+    return { color: CLASH_COLOR, fill: 0.32, outline: 0.95, dashed: false };
+  }
+  if (mark.standing === "slope") {
+    return { color: SLOPE_COLOR, fill: 0.32, outline: 0.95, dashed: false };
+  }
+  if (mark.standing === "no-def") {
+    return { color: ABSENT_COLOR, fill: 0.32, outline: 0.95, dashed: false };
+  }
+  if (unjudged(mark.standing)) {
+    return { color: UNJUDGED_COLOR, fill: 0, outline: 0.8, dashed: true };
+  }
+  return { color: GROUND_COLOR, fill: 0.12, outline: 0.55, dashed: false };
+}
+
 export interface FootprintsLayerDeps {
   handle: MapScene3D;
   /** Map extent in elmos, as `useMissionMapAssets` reports it. */
@@ -66,7 +129,14 @@ export interface FootprintsLayer {
   dispose: () => void;
 }
 
-/** The four corners of a footprint, in elmos around its middle. */
+/**
+ * The outline of a footprint, in elmos around its middle.
+ *
+ * The first corner is repeated rather than the loop being closed by a
+ * `LineLoop`, because a dashed line needs `computeLineDistances` and that only
+ * measures the segments a geometry actually holds. A loop's closing edge is not
+ * one of them, so it would come out solid.
+ */
 function corners(width: number, depth: number): THREE.Vector3[] {
   const x = width / 2;
   const z = depth / 2;
@@ -75,6 +145,7 @@ function corners(width: number, depth: number): THREE.Vector3[] {
     new THREE.Vector3(x, 0, -z),
     new THREE.Vector3(x, 0, z),
     new THREE.Vector3(-x, 0, z),
+    new THREE.Vector3(-x, 0, -z),
   ];
 }
 
@@ -91,14 +162,7 @@ export function createFootprintsLayer(
   let owned: { dispose: () => void }[] = [];
 
   const buildMark = (mark: FootprintMark): THREE.Group => {
-    // A clash wins the colour, because it is the one the author put there and
-    // the ground under it may well be fine once the pair is pulled apart.
-    const wrong = mark.overlapping || mark.standing === "slope";
-    const colour = mark.overlapping
-      ? CLASH_COLOR
-      : mark.standing === "slope"
-        ? SLOPE_COLOR
-        : GROUND_COLOR;
+    const style = footprintStyle(mark);
     const width = mark.rect.maxX - mark.rect.minX;
     const depth = mark.rect.maxZ - mark.rect.minZ;
     const group = new THREE.Group();
@@ -117,34 +181,54 @@ export function createFootprintsLayer(
     group.scale.setScalar(handle.scale);
 
     // The patch itself is depth tested, so a hill in front of it hides it the
-    // way it hides the building standing on it.
-    const fillGeometry = new THREE.PlaneGeometry(width, depth);
-    fillGeometry.rotateX(-Math.PI / 2);
-    const fillMaterial = new THREE.MeshBasicMaterial({
-      color: colour,
-      transparent: true,
-      opacity: wrong ? 0.32 : 0.12,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    });
-    group.add(new THREE.Mesh(fillGeometry, fillMaterial));
+    // way it hides the building standing on it. A building with no verdict has
+    // no patch at all, so an empty square cannot be read as ground anybody has
+    // approved of.
+    if (style.fill > 0) {
+      const fillGeometry = new THREE.PlaneGeometry(width, depth);
+      fillGeometry.rotateX(-Math.PI / 2);
+      const fillMaterial = new THREE.MeshBasicMaterial({
+        color: style.color,
+        transparent: true,
+        opacity: style.fill,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      group.add(new THREE.Mesh(fillGeometry, fillMaterial));
+      owned.push(fillGeometry, fillMaterial);
+    }
 
     // The outline is not, so the shape of a building's ground can be read from
     // above with the model itself standing in the middle of it.
     const lineGeometry = new THREE.BufferGeometry().setFromPoints(
       corners(width, depth),
     );
-    const lineMaterial = new THREE.LineBasicMaterial({
-      color: colour,
-      transparent: true,
-      opacity: wrong ? 0.95 : 0.55,
-      depthTest: false,
-    });
-    const outline = new THREE.LineLoop(lineGeometry, lineMaterial);
+    const lineMaterial = style.dashed
+      ? new THREE.LineDashedMaterial({
+          color: style.color,
+          transparent: true,
+          opacity: style.outline,
+          depthTest: false,
+          // Both the geometry and the distances are in elmos, so the dashes are
+          // the same length on a small footprint and a large one.
+          scale: 1,
+          dashSize: DASH_ELMOS,
+          gapSize: GAP_ELMOS,
+        })
+      : new THREE.LineBasicMaterial({
+          color: style.color,
+          transparent: true,
+          opacity: style.outline,
+          depthTest: false,
+        });
+    const outline = new THREE.Line(lineGeometry, lineMaterial);
+    // A dashed material draws solid without this, which would put a building
+    // with no verdict back to looking like one that passed.
+    outline.computeLineDistances();
     outline.renderOrder = 2;
     group.add(outline);
 
-    owned.push(fillGeometry, fillMaterial, lineGeometry, lineMaterial);
+    owned.push(lineGeometry, lineMaterial);
     return group;
   };
 

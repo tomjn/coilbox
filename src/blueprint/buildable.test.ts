@@ -97,14 +97,28 @@ describe("standsOn", () => {
     ).toBe("slope");
   });
 
-  it("says nothing about a def whose slope is unknown", () => {
-    expect(
-      standsOn(
-        marks()[0],
-        ground((x) => x * 20),
-        null,
-      ),
-    ).toBe("unknown");
+  /** Which of the reasons it cannot judge a building is the answer, not that it
+   *  cannot judge it. A def the game has not got and a def whose entry predates
+   *  the slope field are different problems with different fixes (issue
+   *  #1491). */
+  it("hands back the reason it has no number to judge by", () => {
+    const steep = ground((x) => x * 20);
+    expect(standsOn(marks()[0], steep, "no-def")).toBe("no-def");
+    expect(standsOn(marks()[0], steep, "no-slope")).toBe("no-slope");
+    expect(standsOn(marks()[0], steep, "no-units")).toBe("no-units");
+    expect(standsOn(marks()[0], steep, "floats")).toBe("floats");
+  });
+
+  /** The bug behind issue #1483, which was invisible because a building with no
+   *  ground to stand on looked like one standing on ground that was fine. */
+  it("says so when there is no ground to check against", () => {
+    expect(standsOn(marks()[0], null, TEN_DEGREES)).toBe("no-ground");
+  });
+
+  /** A def the game has not got is that whether or not there is a map, so the
+   *  more specific reason wins. */
+  it("names the missing def before the missing ground", () => {
+    expect(standsOn(marks()[0], null, "no-def")).toBe("no-def");
   });
 
   /** A footprint turned a quarter turn covers different ground, so the verdict
@@ -127,24 +141,35 @@ describe("unitSlopes", () => {
     expect(of("ARMSOLAR")).toBeCloseTo(slopeTolerance(10), 6);
   });
 
-  it("has nothing to say about a def the game has not got", () => {
+  it("says a def the game has not got is one it has not got", () => {
     const of = unitSlopes([{ name: "armsolar", maxSlope: 10 }]);
-    expect(of("armlab")).toBeNull();
+    expect(of("armlab")).toBe("no-def");
   });
 
   /** The distinction the check rests on. A dataset read by a worker that never
    *  reported the field is saying nothing, not saying zero. */
-  it("has nothing to say about a def with no slope in the dataset", () => {
-    expect(unitSlopes([{ name: "armsolar" }])("armsolar")).toBeNull();
+  it("keeps a def with no slope apart from one declaring zero", () => {
+    expect(unitSlopes([{ name: "armsolar" }])("armsolar")).toBe("no-slope");
     expect(unitSlopes([{ name: "armsolar", maxSlope: 0 }])("armsolar")).toBe(0);
   });
 
   /** A floater rests on the water, so the ground under it says nothing about
    *  whether it will stand. Left unchecked rather than checked wrongly. */
-  it("has nothing to say about a building that floats", () => {
+  it("says a building that floats is a floater", () => {
     const of = unitSlopes([
       { name: "armfsolar", maxSlope: 20, floatOnWater: true },
     ]);
-    expect(of("armfsolar")).toBeNull();
+    expect(of("armfsolar")).toBe("floats");
+  });
+
+  /**
+   * The reason an editor opening on a game still being read does not accuse
+   * every building of being a unit the game has not got (issue #1491). An empty
+   * list is a read not finished, not a game with no units in it.
+   */
+  it("says the units are unread rather than the defs missing", () => {
+    expect(unitSlopes([])("armsolar")).toBe("no-units");
+    const unread = unitSlopes([{ name: "armsolar", maxSlope: 10 }], false);
+    expect(unread("armsolar")).toBe("no-units");
   });
 });

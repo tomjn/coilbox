@@ -31,6 +31,7 @@ import {
   type Rect,
   rectsOverlap,
   type Standing,
+  unjudged,
 } from "@/blueprint/footprint";
 import type { Facing, Point } from "@/scenario/model";
 import type { BuildingUnit } from "./placements";
@@ -47,9 +48,9 @@ export interface PreviewBuilding {
  *  the map's ground will take it. */
 export interface PreviewChecks {
   footprintOf: (def: string) => Footprint;
-  /** Left out where there is no map, or none read yet, and then every mark
-   *  says `"unknown"` rather than saying the ground is fine. */
-  standingOf?: (mark: Omit<FootprintMark, "standing">) => Standing;
+  /** Always asked, even where there is no map and no dataset. It answers which
+   *  reason it has no verdict rather than saying the ground is fine. */
+  standingOf: (mark: Omit<FootprintMark, "standing">) => Standing;
 }
 
 /**
@@ -63,10 +64,12 @@ export interface PreviewChecks {
 export function previewChecks(
   units: BuildingUnit[],
   ground: Ground | null,
+  /** Whether `units` is the game's dataset read, as {@link unitSlopes} takes
+   *  it. */
+  checked = units.length > 0,
 ): PreviewChecks {
   const footprintOf = buildingFootprints(units);
-  if (!ground) return { footprintOf };
-  const slopeOf = unitSlopes(units);
+  const slopeOf = unitSlopes(units, checked);
   return {
     footprintOf,
     standingOf: (mark) => standsOn(mark, ground, slopeOf(mark.def)),
@@ -132,6 +135,12 @@ export interface PreviewCount {
   clashes: number;
   /** Standing on ground too steep for it. */
   unstable: number;
+  /** Nothing has judged the ground under it, which is not the same as the
+   *  ground being fine (issue #1491). */
+  unjudged: number;
+  /** Its unit is one this game has not got, so there is nothing to build there
+   *  wherever it lands (issue #1445). */
+  absent: number;
 }
 
 export function previewCount(marks: readonly FootprintMark[]): PreviewCount {
@@ -139,6 +148,8 @@ export function previewCount(marks: readonly FootprintMark[]): PreviewCount {
     total: marks.length,
     clashes: marks.filter((mark) => mark.overlapping).length,
     unstable: marks.filter((mark) => mark.standing === "slope").length,
+    unjudged: marks.filter((mark) => unjudged(mark.standing)).length,
+    absent: marks.filter((mark) => mark.standing === "no-def").length,
   };
 }
 
@@ -147,29 +158,47 @@ export function previewCount(marks: readonly FootprintMark[]): PreviewCount {
 export function sameCount(a: PreviewCount | null, b: PreviewCount | null) {
   if (!a || !b) return a === b;
   return (
-    a.total === b.total && a.clashes === b.clashes && a.unstable === b.unstable
+    a.total === b.total &&
+    a.clashes === b.clashes &&
+    a.unstable === b.unstable &&
+    a.unjudged === b.unjudged &&
+    a.absent === b.absent
   );
 }
 
 /** Whether anything about this spot is worth an author's attention, which is
  *  what colours the sentence. */
 export function previewTrouble(count: PreviewCount): boolean {
-  return count.clashes > 0 || count.unstable > 0;
+  return count.clashes > 0 || count.unstable > 0 || count.absent > 0;
+}
+
+/** What is left unsaid about this spot, when anything is. Appended rather than
+ *  colouring the sentence, because an unknown is not a refusal (issue #1491). */
+function unjudgedClause(count: PreviewCount): string {
+  if (count.unjudged === 0) return "";
+  if (count.unjudged === count.total) {
+    return count.total === 1
+      ? " It has not been checked against the ground."
+      : " None of them has been checked against the ground.";
+  }
+  return ` ${count.unjudged} of them ${count.unjudged === 1 ? "has" : "have"} not been checked against the ground.`;
 }
 
 /**
  * What the marks under the pointer say, in words.
  *
  * Only overlaps and slopes are named, and a spot with neither is only said to
- * have room: the ground is not checked at all before the map's heights arrive,
- * and "these all fit" would be a claim nothing here has made.
+ * have room rather than to fit: room is about the other buildings, and the
+ * ground is a separate question this may not have an answer to.
  */
 export function previewSentence(count: PreviewCount): string {
   const { total, clashes, unstable } = count;
   if (!previewTrouble(count)) {
-    return total === 1
-      ? "1 building, and it has room here."
-      : `${total} buildings, and they all have room here.`;
+    const room =
+      total === 1
+        ? "1 building, and it has room here."
+        : `${total} buildings, and they all have room here.`;
+    return room + unjudgedClause(count);
   }
   const parts: string[] = [];
   if (clashes > 0) {
@@ -178,12 +207,20 @@ export function previewSentence(count: PreviewCount): string {
     );
   }
   if (unstable > 0) {
-    const of = clashes > 0 ? "" : ` of ${total}`;
+    const of = parts.length > 0 ? "" : ` of ${total}`;
     parts.push(
       unstable === 1
         ? `1${of} is on ground too steep for it, in amber.`
         : `${unstable}${of} are on ground too steep for them, in amber.`,
     );
   }
-  return parts.join(" ");
+  if (count.absent > 0) {
+    const of = parts.length > 0 ? "" : ` of ${total}`;
+    parts.push(
+      count.absent === 1
+        ? `1${of} is a unit this game has not got, in violet.`
+        : `${count.absent}${of} are units this game has not got, in violet.`,
+    );
+  }
+  return parts.join(" ") + unjudgedClause(count);
 }

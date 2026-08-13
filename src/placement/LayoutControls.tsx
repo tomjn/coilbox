@@ -23,6 +23,7 @@ import {
 import { useState } from "react";
 
 import { buildOrderText } from "@/blueprint/order";
+import { type UnknownBuilding, unknownUnitsWarning } from "@/blueprint/units";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -30,6 +31,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import type { Unjudged } from "./placements";
 
 /**
  * What the layout is called, which is what a picker will list it by.
@@ -77,16 +79,25 @@ function listed(at: number[]): string {
 
 /**
  * Which of a layout's buildings cannot be built where they stand, which of them
- * the ground will not take, and which of its defs are not buildings at all.
+ * the ground will not take, which of them name a unit this game has not got,
+ * which of them nothing has judged at all, and which of its defs are not
+ * buildings.
  *
  * All of it is true of the layout wherever it is drawn, so all of it is said the
- * same way in both editors. Nothing is said when there is nothing wrong, which
- * includes the standalone editor: there is no map there, so nothing knows
- * anything about the ground and `unstable` is empty.
+ * same way in both editors.
+ *
+ * The unjudged ones are said in slate rather than amber, because an unknown is
+ * not a failure and dressing one as a failure is its own kind of lying. Each
+ * reason gets its own sentence: "unknown" on its own is nothing anybody can act
+ * on, and a game whose units have not been read and a map whose heights will not
+ * read are different problems (issue #1491).
  */
 export function LayoutNotes({
   overlaps,
   unstable,
+  unjudged,
+  absent,
+  buildings,
   designedFor,
   onMap,
   strays,
@@ -98,6 +109,23 @@ export function LayoutNotes({
    *  Drawn in amber on the surface as well. Empty where there is no map to
    *  check against, which is not the same as everything being fine. */
   unstable?: number[];
+  /**
+   * Buildings nothing has judged, grouped by why. Drawn as empty dashed squares
+   * on the surface as well.
+   *
+   * Left out while the reads the check depends on are still in flight, so a
+   * session that has only just opened is not a wall of warnings that clears
+   * itself two seconds later.
+   */
+  unjudged?: Unjudged;
+  /** Buildings whose unit this game has not got, by their place in the layout
+   *  (issue #1445). Drawn in violet on the surface as well. Empty before the
+   *  game's units have been read, which is not the same as all of them being
+   *  units it has. */
+  absent?: UnknownBuilding[];
+  /** How many buildings the layout has, so a layout the game has none of the
+   *  units of can be told from one with a unit missing. */
+  buildings?: number;
   /** The map this layout was drawn on, when it says. */
   designedFor?: string;
   /** The map it is standing on now, when it is standing on one. */
@@ -130,6 +158,48 @@ export function LayoutNotes({
           {unstable.length === 1 ? "s" : ""} on ground too steep for
           {unstable.length === 1 ? " it" : " them"}, marked in amber. The engine
           refuses to build on a slope past what the unit allows.
+        </p>
+      )}
+
+      {absent !== undefined && absent.length > 0 && buildings !== undefined && (
+        <p className="rounded bg-violet-950/60 px-2 py-1.5 text-[11px] text-violet-200">
+          {absent.length < buildings && (
+            <>
+              Building{absent.length === 1 ? " " : "s "}
+              {listed(absent.map((one) => one.index))}{" "}
+              {absent.length === 1 ? "is" : "are"} marked in violet.{" "}
+            </>
+          )}
+          {unknownUnitsWarning(absent, buildings)}
+          {absent.length >= buildings &&
+            " Every one of them is marked in violet."}
+        </p>
+      )}
+
+      {unjudged !== undefined && unjudged.noUnits.length > 0 && (
+        <p className="rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
+          Coilbox has not read this game's units, so no building here has been
+          checked against the ground. The dashed squares have no verdict, which
+          is not the same as a clean one.
+        </p>
+      )}
+
+      {unjudged !== undefined && unjudged.noGround.length > 0 && (
+        <p className="rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
+          This map's heights could not be read, so no building here has been
+          checked against the ground. The dashed squares have no verdict, which
+          is not the same as a clean one.
+        </p>
+      )}
+
+      {unjudged !== undefined && unjudged.noSlope.length > 0 && (
+        <p className="rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
+          Building{unjudged.noSlope.length === 1 ? " " : "s "}
+          {listed(unjudged.noSlope)}{" "}
+          {unjudged.noSlope.length === 1 ? "is" : "are"} dashed because this
+          game gives {unjudged.noSlope.length === 1 ? "it" : "them"} no slope to
+          check against, so nothing can say whether the ground will take{" "}
+          {unjudged.noSlope.length === 1 ? "it" : "them"}.
         </p>
       )}
 

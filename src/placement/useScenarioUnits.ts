@@ -24,6 +24,7 @@ import { scenarioPlacements } from "@/scenario/pages/components/placements";
 import { type Placement, teamColor } from "./placements";
 import {
   cornerGround,
+  flatGround,
   groundHeight,
   type HeightField,
   readHeightField,
@@ -80,15 +81,26 @@ export interface ScenarioUnitsState {
    * The map's ground on the engine's own grid, for working out whether a
    * building will stand on it (issue #1315).
    *
-   * Null while the heightmap is being read, on flat ground with no map, and on
-   * a map whose heightmap came back smaller than its own corner grid. Every one
-   * of those is "do not ask", which is why this is separate from
-   * {@link groundAt}: that one answers 0 rather than nothing, because a model
-   * has to stand somewhere. A caller that wants a verdict has to ask for the
-   * render at `CHECK_MAX_SIDE`, or the field it hands over is a picture of the
-   * ground rather than the ground (issue #1483).
+   * Null while the heightmap is being read, and on a map whose heightmap came
+   * back smaller than its own corner grid. Both are "do not ask", which is why
+   * this is separate from {@link groundAt}: that one answers 0 rather than
+   * nothing, because a model has to stand somewhere. A caller that wants a
+   * verdict has to ask for the render at `CHECK_MAX_SIDE`, or the field it
+   * hands over is a picture of the ground rather than the ground (issue #1483).
+   *
+   * Flat ground with no map is not null. That floor is level on purpose and is
+   * known exactly, so a building on it gets a real verdict.
    */
   ground: Ground | null;
+  /**
+   * Whether the reads a verdict depends on have finished, one way or the other
+   * (issue #1491).
+   *
+   * False means an absent verdict is a read still in flight rather than a real
+   * absence, which is what stops an editor that has only just opened being a
+   * wall of warnings that clears itself two seconds later.
+   */
+  settled: boolean;
 }
 
 /**
@@ -172,24 +184,35 @@ export function useScenarioUnits(
   lookups.current = { objectNames, participants, resolve: archive };
 
   const [field, setField] = useState<HeightField | null>(null);
+  // Whether the read above has finished, which a null field cannot say: a read
+  // in flight and a read that failed both leave it null, and only one of those
+  // is worth telling somebody about (issue #1491).
+  const [heightRead, setHeightRead] = useState(false);
   const flat = map.flat === true;
   useEffect(() => {
     const src = map.heightSrc;
     if (flat) {
       setField(FLAT_FIELD);
+      setHeightRead(true);
       return;
     }
     if (!src) {
       setField(null);
+      setHeightRead(false);
       return;
     }
+    setHeightRead(false);
     let cancelled = false;
     readHeightField(src)
       .then((read) => {
-        if (!cancelled) setField(read);
+        if (cancelled) return;
+        setField(read);
+        setHeightRead(true);
       })
       .catch(() => {
-        if (!cancelled) setField(null);
+        if (cancelled) return;
+        setField(null);
+        setHeightRead(true);
       });
     return () => {
       cancelled = true;
@@ -281,13 +304,12 @@ export function useScenarioUnits(
     [field, worldWidth, worldHeight, minHeight, maxHeight],
   );
 
-  const ground = useMemo(
-    () =>
-      field
-        ? cornerGround(field, worldWidth, worldHeight, minHeight, maxHeight)
-        : null,
-    [field, worldWidth, worldHeight, minHeight, maxHeight],
-  );
+  const ground = useMemo(() => {
+    if (flat) return flatGround();
+    return field
+      ? cornerGround(field, worldWidth, worldHeight, minHeight, maxHeight)
+      : null;
+  }, [flat, field, worldWidth, worldHeight, minHeight, maxHeight]);
 
   return {
     placed: placements.length,
@@ -298,5 +320,6 @@ export function useScenarioUnits(
     placements,
     groundAt,
     ground,
+    settled: defsReady && heightRead,
   };
 }

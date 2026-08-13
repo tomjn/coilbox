@@ -58,7 +58,13 @@ import {
   LayoutNotes,
 } from "./LayoutControls";
 import { PlacementSurface } from "./PlacementSurface";
-import { baseFootprints, overlappingIn, placementKey } from "./placements";
+import {
+  absentIn,
+  baseFootprints,
+  overlappingIn,
+  placementKey,
+  unjudgedIn,
+} from "./placements";
 import { HistoryControls, PlaybackBar, SelectionBar } from "./SurfaceBars";
 import { focusCamera, focusDistance, worldToScene } from "./scene";
 import { useMapEditing } from "./useMapEditing";
@@ -159,9 +165,12 @@ export function BlueprintEditor({
   }, [advancing, total]);
 
   const drawn = useScenarioUnits(handle, doc, GROUND, undrawn);
+  // The ground here is flat on purpose rather than unread, so every building
+  // gets a real verdict and the squares are not a screen full of dashes saying
+  // nothing is known (issue #1491).
   const footprints = useMemo(
-    () => baseFootprints(drawn.placements, units),
-    [drawn.placements, units],
+    () => baseFootprints(drawn.placements, units, drawn.ground),
+    [drawn.placements, units, drawn.ground],
   );
   useScenarioFootprints(handle, footprints, GROUND, drawn.groundAt);
 
@@ -247,6 +256,12 @@ export function BlueprintEditor({
     footprints,
     BLUEPRINT_BASE_ID,
   );
+  // Only once the reads have settled, so opening the editor is not a wall of
+  // warnings that clears itself two seconds later (issue #1491).
+  const unjudged = drawn.settled
+    ? unjudgedIn(drawn.placements, footprints, BLUEPRINT_BASE_ID)
+    : undefined;
+  const absent = absentIn(drawn.placements, footprints, BLUEPRINT_BASE_ID);
   const strays = strayDefs(units, blueprint.buildings);
 
   return (
@@ -296,7 +311,13 @@ export function BlueprintEditor({
                   layout's own middle, and the squares under them are the ground
                   the engine will give them.
                 </p>
-                <LayoutNotes overlaps={overlaps} strays={strays} />
+                <LayoutNotes
+                  overlaps={overlaps}
+                  unjudged={unjudged}
+                  absent={absent}
+                  buildings={blueprint.buildings.length}
+                  strays={strays}
+                />
               </PopoverContent>
             </Popover>
 
