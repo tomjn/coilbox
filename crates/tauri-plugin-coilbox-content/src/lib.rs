@@ -14,6 +14,7 @@ mod blueprints;
 mod branding;
 mod build_tree_export;
 mod caches;
+mod container_file;
 mod demo;
 mod engine;
 mod keybinds;
@@ -1189,11 +1190,16 @@ async fn content_export_challenge(dest: String, text: String) -> Result<CliResul
 /// caller-chosen path. Opaque like the challenge export beside it: the frontend
 /// owns the container format and picks the destination. Import goes through
 /// `content_import_container`, which already reads any coilbox `.json`.
+///
+/// This is also what sends a base layout into a game's own
+/// `LuaUI/Config/blueprints.json`, which is why it makes the directory when it
+/// has to (issue #1480). How far it will go is [`container_file::write`]. The
+/// name is issue #1431's.
 #[tauri::command]
 async fn content_export_keymap(dest: String, text: String) -> Result<CliResult, ()> {
-    Ok(match std::fs::write(&dest, text) {
+    Ok(match container_file::write(&dest, &text) {
         Ok(()) => CliResult::ok(json!({})),
-        Err(e) => CliResult::err(format!("could not write keymap export: {e}")),
+        Err(e) => CliResult::err(e),
     })
 }
 
