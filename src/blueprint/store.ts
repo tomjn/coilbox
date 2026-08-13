@@ -67,6 +67,35 @@ export async function refreshBlueprints(): Promise<StoredBlueprint[]> {
 export async function saveBlueprint(
   record: StoredBlueprint,
 ): Promise<StoredBlueprint> {
+  const written = await write(record);
+  await refreshBlueprints();
+  return written;
+}
+
+/**
+ * Persist several layouts, and re-read the library once at the end.
+ *
+ * Taking twenty layouts out of a pack file is one import rather than twenty
+ * (issue #1313), and going back to disk for the whole library after each one
+ * would be nineteen reads nobody asked for. They are written one at a time
+ * because that is what the plugin offers, so a failure halfway leaves the ones
+ * before it kept, which is why this throws with them already on disk rather
+ * than pretending nothing happened.
+ */
+export async function saveBlueprints(
+  records: readonly StoredBlueprint[],
+): Promise<StoredBlueprint[]> {
+  const written: StoredBlueprint[] = [];
+  try {
+    for (const record of records) written.push(await write(record));
+  } finally {
+    await refreshBlueprints();
+  }
+  return written;
+}
+
+/** One layout onto disk, stamped. */
+async function write(record: StoredBlueprint): Promise<StoredBlueprint> {
   const now = new Date().toISOString();
   const stamped: StoredBlueprint = {
     ...record,
@@ -77,7 +106,6 @@ export async function saveBlueprint(
     id: stamped.id,
     json: JSON.stringify(stamped),
   });
-  await refreshBlueprints();
   return stamped;
 }
 

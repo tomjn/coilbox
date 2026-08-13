@@ -29,6 +29,32 @@ import {
 } from "./payload";
 import { blueprintFromPayload, blueprintPayload } from "./transfer";
 
+/**
+ * Where a layout came from, when it did not start here (issue #1313).
+ *
+ * A library of thirty layouts where five were drawn by the person and
+ * twenty-five came out of somebody's collection is a library where every card
+ * looks the same. This is the difference, and it is on the record rather than
+ * in the layout on purpose: it is a fact about this copy, not about the shape,
+ * so it stays behind when the layout is shared on and it never travels as part
+ * of somebody else's blueprint.
+ *
+ * One kind, because a pack file is the one route that arrives in bulk and so
+ * the one where a name on a card does not tell you what you are looking at. A
+ * second route is a second member of the union.
+ */
+export interface BlueprintSource {
+  /** Out of a file holding a collection of layouts. */
+  kind: "pack";
+  /** The file it was taken out of, as the person picked it. */
+  file: string;
+  /** What it was called in that file, when the library kept it as something
+   *  else. Absent when the name came through unchanged. */
+  wasCalled?: string;
+  /** When it was taken, ISO 8601. */
+  at: string;
+}
+
 /** What the library keeps for one layout. */
 export interface StoredBlueprint {
   /** Minted here and never taken from a shared file, so importing the same
@@ -39,6 +65,58 @@ export interface StoredBlueprint {
   createdAt: string;
   updatedAt: string;
   layout: BlueprintPayload;
+  /** Where this copy came from. Absent on a layout drawn here, which is what
+   *  every layout was before packs. */
+  source?: BlueprintSource;
+}
+
+/** A layout's provenance, for one taken out of a pack file. */
+export function packSource(
+  file: string,
+  wasCalled?: string,
+  at: Date = new Date(),
+): BlueprintSource {
+  return {
+    kind: "pack",
+    file,
+    ...(wasCalled ? { wasCalled } : {}),
+    at: at.toISOString(),
+  };
+}
+
+/** The file's own name, without the directories it sat in. Splits on both
+ *  separators, because the path came from whichever platform's file dialog. */
+export function sourceFileName(source: BlueprintSource): string {
+  const parts = source.file.split(/[\\/]/);
+  return parts[parts.length - 1] || source.file;
+}
+
+/** Where a layout came from, in a line under its name. */
+export function sourceSummary(source: BlueprintSource): string {
+  const from = `Imported from a file of layouts, ${source.file}.`;
+  return source.wasCalled
+    ? `${from} It was called "${source.wasCalled}" in there.`
+    : from;
+}
+
+/** Read a stored source back, or nothing when the record has none and when
+ *  what it has is not one. Provenance is a note about the layout rather than
+ *  part of it, so a damaged one is dropped and the layout still opens. */
+function parseBlueprintSource(value: unknown): BlueprintSource | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const v = value as Record<string, unknown>;
+  if (v.kind !== "pack") return undefined;
+  if (typeof v.file !== "string" || v.file.trim() === "") return undefined;
+  const wasCalled =
+    typeof v.wasCalled === "string" && v.wasCalled.trim() !== ""
+      ? v.wasCalled
+      : undefined;
+  return {
+    kind: "pack",
+    file: v.file,
+    ...(wasCalled ? { wasCalled } : {}),
+    at: typeof v.at === "string" ? v.at : "",
+  };
 }
 
 /** What a layout is called when its author has not said. */
@@ -132,11 +210,13 @@ export function parseStoredBlueprintJson(json: string): StoredBlueprint | null {
   if (typeof v.id !== "string" || v.id.trim() === "") return null;
   const layout = parseBlueprintPayload(v.layout);
   if (!layout) return null;
+  const source = parseBlueprintSource(v.source);
   return {
     id: v.id,
     createdAt: typeof v.createdAt === "string" ? v.createdAt : "",
     updatedAt: typeof v.updatedAt === "string" ? v.updatedAt : "",
     layout,
+    ...(source ? { source } : {}),
   };
 }
 

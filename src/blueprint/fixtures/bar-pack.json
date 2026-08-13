@@ -1,0 +1,105 @@
+{
+  "savedBlueprints": [
+    {
+      "name": "Opening solars",
+      "spacing": 0,
+      "facing": 0,
+      "ordered": true,
+      "units": [
+        { "unitName": "armsolar", "position": [-48, 84.5, -48], "facing": 0 },
+        { "unitName": "armsolar", "position": [0, 84.5, -48], "facing": 0 },
+        { "unitName": "armmex", "position": [50, 84.5, 54], "facing": 1 }
+      ]
+    },
+    {
+      "name": "Wind farm",
+      "spacing": 0,
+      "facing": 0,
+      "ordered": false,
+      "units": [
+        { "unitName": "armwin", "position": [-64, 12, -64], "facing": 0 },
+        { "unitName": "armwin", "position": [0, 12, -64], "facing": 0 },
+        { "unitName": "armwin", "position": [-64, 12, 0], "facing": 0 },
+        { "unitName": "armwin", "position": [0, 12, 0], "facing": 0 }
+      ]
+    },
+    {
+      "name": "Front line",
+      "spacing": 0,
+      "facing": 0,
+      "ordered": false,
+      "units": [
+        { "unitName": "armllt", "position": [-48, 84.5, 0], "facing": 0 },
+        { "unitName": "armllt", "position": [48, 84.5, 0], "facing": 0 },
+        { "unitName": "armsolar", "position": [0, 84.5, 64], "facing": 0 }
+      ]
+    },
+    {
+      "name": "Cortex opening",
+      "spacing": 0,
+      "facing": 0,
+      "ordered": false,
+      "units": [
+        { "unitName": "corsolar", "position": [-48, 30, 0], "facing": 0 },
+        { "unitName": "cormex", "position": [48, 30, 0], "facing": 0 },
+        { "unitName": "corllt", "position": [0, 30, 96], "facing": 0 }
+      ]
+    },
+    {
+      "name": "Lab corner",
+      "spacing": 0,
+      "facing": 0,
+      "ordered": false,
+      "units": [
+        { "unitName": "armlab", "position": [0, 84.5, 0], "facing": 0 },
+        { "unitName": "armsolar", "position": [-96, 84.5, 0], "facing": 0 },
+        { "unitName": "legmex", "position": [96, 84.5, 0], "facing": 0 }
+      ]
+    },
+    {
+      "spacing": 2,
+      "facing": 1,
+      "ordered": false,
+      "units": [
+        { "unitName": "armsolar", "position": [-32, 84.5, 0], "facing": 0 },
+        { "unitName": "armsolar", "position": [32, 84.5, 0], "facing": 0 }
+      ]
+    },
+    {
+      "name": "Opening solars",
+      "spacing": 0,
+      "facing": 0,
+      "ordered": false,
+      "units": [
+        { "unitName": "armsolar", "position": [-48, 84.5, 0], "facing": 0 },
+        { "unitName": "armsolar", "position": [0, 84.5, 0], "facing": 0 },
+        { "unitName": "armsolar", "position": [48, 84.5, 0], "facing": 0 },
+        { "unitName": "armwin", "position": [0, 84.5, 64], "facing": 0 }
+      ]
+    },
+    {
+      "name": "Half a thought",
+      "spacing": 0,
+      "facing": 0,
+      "units": [{ "unitName": "armsolar" }]
+    },
+    {
+      "name": "Big wall",
+      "spacing": 0,
+      "facing": 0,
+      "ordered": false,
+      "units": [
+        { "unitName": "armllt", "position": [-192, 84.5, 0], "facing": 0 },
+        { "unitName": "armllt", "position": [-128, 84.5, 0], "facing": 0 },
+        { "unitName": "armllt", "position": [-64, 84.5, 0], "facing": 0 },
+        { "unitName": "armllt", "position": [0, 84.5, 0], "facing": 0 },
+        { "unitName": "armllt", "position": [64, 84.5, 0], "facing": 0 },
+        { "unitName": "armllt", "position": [128, 84.5, 0], "facing": 0 },
+        { "unitName": "armllt", "position": [192, 84.5, 0], "facing": 0 },
+        { "unitName": "armllt", "position": [256, 84.5, 0], "facing": 0 }
+      ]
+    }
+  ],
+  "lastSelected": 2,
+  "version": 3
+}
