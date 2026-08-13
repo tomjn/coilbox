@@ -17,7 +17,12 @@
  *
  * How each part holds:
  *
- * - The grid coarsens rather than crowding. `blueprintSheet` picks the pitch.
+ * - Every mark is sized in pixels rather than in build squares, so the drawing
+ *   holds its weight from a forty pixel thumbnail to a page wide plan instead of
+ *   scaling with the base until it is a hairline or a blob. That needs the box it
+ *   is drawn in, which is why this measures itself.
+ * - The grid fades rather than crowding. `blueprintSheet` rules every build
+ *   square, so a big base gets more rules, drawn lighter.
  * - Strokes are in pixels, not build squares, so a big base gets the same crisp
  *   hairline as a small one instead of a line thinner than the screen can draw.
  * - The order thread runs under the buildings. A base with a long build order
@@ -28,8 +33,15 @@
  */
 
 import { cn } from "@picoframe/frame";
+import { useEffect, useRef, useState } from "react";
 
-import { type BlueprintShape, blueprintSheet } from "@/hub/preview";
+import {
+  type BlueprintShape,
+  type BlueprintSheet,
+  blueprintSheet,
+  type PlanBox,
+  SHEET_MARGIN,
+} from "@/hub/preview";
 
 /** How much colour each layer takes, in the illustration's order: a grid the eye
  *  skims, then a tinted fill under a stronger outline. */
@@ -40,10 +52,51 @@ const OUTLINE = 0.62;
 /** The mark the order starts on, which is the brightest thing on the sheet. */
 const START = 0.85;
 
-/** Corner radius, in build squares. A tenth of a square, which is the corner the
- *  illustration puts on a plot, so a one square building rounds off the same
- *  amount in both drawings. */
-const CORNER = 0.1;
+/** How big a build square has to be drawn for the grid to take its full weight,
+ *  in CSS pixels. Under that the rules are closer together, so they are drawn
+ *  lighter in proportion and the sheet keeps the same amount of ink on it rather
+ *  than darkening as the base grows. */
+const CLEAR_PX = 8;
+
+/**
+ * Corner radius, in CSS pixels.
+ *
+ * The illustration this drawing takes its treatment from rounds a plot by two
+ * pixels, on a sheet whose build squares are twenty pixels across. Carried over as
+ * a tenth of a build square it came to under a pixel on a library card, where a
+ * build square is nearer five, and the buildings read as hard squares (issue
+ * #1508). Two pixels is the same corner the illustration draws, at whatever size
+ * this one is drawn.
+ */
+const CORNER_PX = 2;
+
+/** The most of a building the corners may eat. A radius fixed in pixels would
+ *  round a one square building drawn small into a lozenge. */
+const CORNER_SHARE = 1 / 3;
+
+/** How big the mark on the first building is, in CSS pixels: a fifth of a build
+ *  square where there is room, and never so small it is lost or so big it covers
+ *  the building it stands on. */
+const START_PX = { share: 0.22, least: 2, most: 4.5 };
+
+/**
+ * What a build square is drawn at before the box is measured, in CSS pixels.
+ *
+ * Eight is where the grid takes its full weight, so what this draws is the layout
+ * on a sheet of its own shape: the base, its clear ground, and nothing beyond.
+ * That is the drawing without the box, which is the most that can be said before
+ * anything has said how big the box is, and it is what renders where there is no
+ * browser to measure with.
+ */
+const NOMINAL_PX_PER_SQUARE = 8;
+
+/** The box to draw in until the real one is known. */
+function nominalBox(shape: BlueprintShape): PlanBox {
+  return {
+    width: (shape.width + SHEET_MARGIN * 2) * NOMINAL_PX_PER_SQUARE,
+    height: (shape.height + SHEET_MARGIN * 2) * NOMINAL_PX_PER_SQUARE,
+  };
+}
 
 /**
  * How strongly the order thread is drawn, given how many stops it makes.
@@ -64,10 +117,41 @@ export function LayoutPlan({
 }: {
   shape: BlueprintShape;
   /** How big to draw it. The caller owns the size because a card and a page
-   *  want very different ones. */
+   *  want very different ones, and it has to settle both sides of the box: the
+   *  sheet is the whole of it, so a box with no height has no sheet. */
   className?: string;
 }) {
-  const sheet = blueprintSheet(shape);
+  const [box, setBox] = useState<PlanBox | null>(null);
+  const frame = useRef<HTMLDivElement>(null);
+
+  // Measured rather than assumed, because a card's width is whatever the column
+  // it landed in is.
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    const watch = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width <= 0 || height <= 0) return;
+      setBox((was) =>
+        was?.width === width && was?.height === height
+          ? was
+          : { width, height },
+      );
+    });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
+
+  return (
+    <div ref={frame} className={cn("text-primary", className)}>
+      <Sheet shape={shape} box={box ?? nominalBox(shape)} />
+    </div>
+  );
+}
+
+/** The plan itself, drawn once the box it goes in is known. */
+function Sheet({ shape, box }: { shape: BlueprintShape; box: PlanBox }) {
+  const sheet = blueprintSheet(shape, box);
   const centres = shape.squares.map(
     (square) =>
       [square.x + square.width / 2, square.y + square.height / 2] as const,
@@ -80,14 +164,14 @@ export function LayoutPlan({
   return (
     <svg
       viewBox={`${sheet.left} ${sheet.top} ${sheet.width} ${sheet.height}`}
-      className={cn("text-primary", className)}
+      className="block size-full"
       role="img"
       aria-label={`${shape.squares.length} buildings over ${Math.round(shape.width)} by ${Math.round(shape.height)} build squares`}
     >
       <g
         className="text-muted-foreground"
         stroke="currentColor"
-        strokeOpacity={GRID}
+        strokeOpacity={gridOpacity(sheet.scale)}
       >
         {sheet.verticals.map((x) => (
           <line
@@ -133,7 +217,7 @@ export function LayoutPlan({
           y={square.y}
           width={square.width}
           height={square.height}
-          rx={CORNER}
+          rx={corner(sheet, square.width, square.height)}
           fill="currentColor"
           fillOpacity={square.sized ? FILL : 0}
           stroke="currentColor"
@@ -145,16 +229,40 @@ export function LayoutPlan({
       ))}
       {start && (
         // Where the build order starts, drawn over the building it starts on.
-        // Sized off the grid pitch rather than fixed, so it stays the same mark
-        // against the rule whatever the base measures.
         <circle
           cx={start[0]}
           cy={start[1]}
-          r={sheet.pitch * 0.22}
+          r={startMark(sheet)}
           fill="currentColor"
           fillOpacity={START}
         />
       )}
     </svg>
   );
+}
+
+/** The grid's weight at the size it is drawn. The rules close up as a base grows,
+ *  so they lighten in step and the sheet holds the same amount of ink instead of
+ *  darkening towards a wash. */
+function gridOpacity(scale: number): number {
+  return GRID * Math.min(1, scale / CLEAR_PX);
+}
+
+/** A building's corner radius, in build squares, from a radius in pixels. Capped
+ *  against the building's short side, so a small building softens rather than
+ *  rounding away. */
+function corner(sheet: BlueprintSheet, width: number, height: number): number {
+  return Math.min(
+    CORNER_PX / sheet.scale,
+    Math.min(width, height) * CORNER_SHARE,
+  );
+}
+
+/** The start mark's radius, in build squares, from a size in pixels. */
+function startMark(sheet: BlueprintSheet): number {
+  const px = Math.min(
+    START_PX.most,
+    Math.max(START_PX.least, sheet.scale * START_PX.share),
+  );
+  return px / sheet.scale;
 }

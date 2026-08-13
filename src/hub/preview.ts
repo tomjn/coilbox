@@ -491,71 +491,104 @@ export function blueprintShape(
 export const SHEET_MARGIN = 1;
 
 /**
- * The most grid cells drawn across the long side of a layout.
+ * The biggest a build square is ever drawn, in CSS pixels.
  *
- * The smallest this is drawn is a library card about a hundred pixels across, and
- * below roughly six pixels a cell a grid stops reading as a grid and becomes grey
- * fill, which is worse than no grid at all. Sixteen holds that on the card and is
- * still fine enough on the item page to count squares off.
+ * Without this a two building layout fills the box it is given, and a base is
+ * drawn at whatever zoom makes it fill the space rather than at a size that says
+ * how big it is. Sixteen pixels is a generous build square, so only a layout
+ * small enough to look silly blown up is held back to it.
  */
-const MOST_CELLS = 16;
+const MOST_PX_PER_SQUARE = 16;
+
+/**
+ * The smallest a build square can be drawn and still be worth ruling, in CSS
+ * pixels.
+ *
+ * Below this the rules are closer together than the eye can separate and the grid
+ * becomes grey fill, which says less than a blank sheet does. A base that big gets
+ * no grid rather than a grid nobody can read.
+ */
+const LEAST_RULED_PX = 3;
+
+/** The box a plan is drawn in, in CSS pixels. Both sides are positive. */
+export interface PlanBox {
+  width: number;
+  height: number;
+}
 
 /** The sheet a layout is drawn on: the box to draw, and the rule over it. */
 export interface BlueprintSheet {
-  /** The `viewBox`, in the layout's own build squares, which is the layout's box
-   *  with {@link SHEET_MARGIN} of clear ground round it. */
+  /** The `viewBox`, in the layout's own build squares. It covers the whole box
+   *  the plan is drawn in, with the layout centred on it. */
   left: number;
   top: number;
   width: number;
   height: number;
-  /** How many build squares one grid cell covers. */
-  pitch: number;
-  /** Where the grid lines fall, down the sheet then across it. */
+  /** How many CSS pixels one build square is drawn at. What lets the drawing
+   *  choose weights in pixels, the way its strokes already do. */
+  scale: number;
+  /** Where the grid lines fall, down the sheet then across it. Empty when a
+   *  build square is too small to rule. */
   verticals: number[];
   horizontals: number[];
 }
 
 /**
- * The sheet to draw a layout on.
+ * The sheet to draw a layout on, given the box it is drawn in.
  *
- * The grid is the build grid at its own pitch while that stays readable, and a
- * doubling of it once a base is too big for that: a thirty square base drawn with
- * thirty rules is a grey wash, so it gets fifteen cells of two squares each. The
- * lines fall on real build square boundaries either way, so what the grid says is
- * true at every size, and only how much it says changes.
+ * Every build square is ruled, and the rules run the whole box rather than a
+ * patch in the middle of it (issue #1508). Both follow from what a plan is for.
+ *
+ * Ruling every build square is what makes the grid true. A footprint stands on
+ * whole build squares, so on a grid of single squares every building edge lands on
+ * a rule. A coarser grid cannot do that: a five square solar collector on rules
+ * every second square straddles them, and a grid the buildings ignore is worse
+ * than no grid, because it invites exactly the reading it then contradicts. What
+ * a big base costs is therefore weight rather than truth. The rules close up, the
+ * drawing fades them, and past {@link LEAST_RULED_PX} it stops drawing them.
+ *
+ * Running them the whole box is what makes it a sheet. Sized to the layout, the
+ * grid was a patch of graph paper floating on a blank card. The layout keeps its
+ * clear ground on all sides, {@link SHEET_MARGIN}, and then the sheet grows out to
+ * the box on whichever side has room.
  */
-export function blueprintSheet(shape: BlueprintShape): BlueprintSheet {
-  const pitch = gridPitch(Math.max(shape.width, shape.height));
-  const left = -SHEET_MARGIN;
-  const top = -SHEET_MARGIN;
-  const width = shape.width + SHEET_MARGIN * 2;
-  const height = shape.height + SHEET_MARGIN * 2;
+export function blueprintSheet(
+  shape: BlueprintShape,
+  box: PlanBox,
+): BlueprintSheet {
+  const across = shape.width + SHEET_MARGIN * 2;
+  const down = shape.height + SHEET_MARGIN * 2;
+  // Fit the layout and its clear ground, without stretching one axis past the
+  // other, and without blowing a small base up to fill the box.
+  const scale = Math.min(
+    box.width / across,
+    box.height / down,
+    MOST_PX_PER_SQUARE,
+  );
+  const width = box.width / scale;
+  const height = box.height / scale;
+  // The layout runs from zero to its own width, so centring it puts the same
+  // amount of sheet on each side of it.
+  const left = (shape.width - width) / 2;
+  const top = (shape.height - height) / 2;
+  const ruled = scale >= LEAST_RULED_PX;
   return {
     left,
     top,
     width,
     height,
-    pitch,
-    verticals: rules(left, left + width, pitch),
-    horizontals: rules(top, top + height, pitch),
+    scale,
+    verticals: ruled ? rules(left, left + width) : [],
+    horizontals: ruled ? rules(top, top + height) : [],
   };
 }
 
-/** Doubling until the long side fits in {@link MOST_CELLS}. Doubling rather than
- *  dividing the extent, so the pitch is always a whole number of build squares
- *  and a line is always a place a building could stand. */
-function gridPitch(extent: number): number {
-  let pitch = 1;
-  while (extent / pitch > MOST_CELLS) pitch *= 2;
-  return pitch;
-}
-
-/** Every multiple of the pitch inside the sheet. Measured from the layout's own
- *  origin rather than from the sheet's edge, so the rules line up with the
- *  buildings rather than with the margin. */
-function rules(from: number, to: number, pitch: number): number[] {
+/** Every build square boundary inside the sheet. Counted off the layout's own
+ *  origin rather than the sheet's edge, so the rules line up with the buildings
+ *  rather than with the margin. */
+function rules(from: number, to: number): number[] {
   const out: number[] = [];
-  for (let at = Math.ceil(from / pitch) * pitch; at <= to; at += pitch) {
+  for (let at = Math.ceil(from); at <= to; at += 1) {
     // The rule on the origin comes out of that arithmetic as `-0`, which is a
     // value of its own to anything reading these back.
     out.push(at === 0 ? 0 : at);

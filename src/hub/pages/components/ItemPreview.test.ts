@@ -66,8 +66,10 @@ describe("ItemPreview, for a blueprint", () => {
     expect(rects(html)).toHaveLength(2);
     expect(lab.width).toBeGreaterThan(solar.width);
     expect(lab.height).toBeGreaterThan(solar.height);
-    // Rounded, and taking the theme colour rather than fixed greys.
-    expect(html).toContain('rx="0.1"');
+    // Rounded by a couple of pixels rather than by a fraction of a build square,
+    // which on a card came to less than the screen can draw (issue #1508). A
+    // build square is eight pixels before anything measures the box.
+    expect(html).toContain('rx="0.25"');
     expect(html).toContain("text-primary");
   });
 

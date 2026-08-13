@@ -437,36 +437,69 @@ describe("blueprintSheet", () => {
     squares: [{ def: "armlab", sized: true, x: 0, y: 0, width, height }],
   });
 
-  it("leaves a build square of clear ground on every side", () => {
-    const sheet = blueprintSheet(shape(6, 4));
-    expect([sheet.left, sheet.top]).toEqual([-1, -1]);
-    expect([sheet.width, sheet.height]).toEqual([8, 6]);
+  /** A library card's picture, which is the smallest place a layout is drawn at
+   *  a size somebody reads it at. */
+  const card = { width: 232, height: 96 };
+
+  it("covers the whole box it is drawn in, at one scale on both axes", () => {
+    const sheet = blueprintSheet(shape(21, 18), card);
+    expect(sheet.width * sheet.scale).toBeCloseTo(card.width);
+    expect(sheet.height * sheet.scale).toBeCloseTo(card.height);
   });
 
-  it("rules the sheet in build squares while a base is small enough", () => {
-    const sheet = blueprintSheet(shape(6, 4));
-    expect(sheet.pitch).toBe(1);
-    expect(sheet.verticals).toEqual([-1, 0, 1, 2, 3, 4, 5, 6, 7]);
-    expect(sheet.horizontals).toEqual([-1, 0, 1, 2, 3, 4, 5]);
+  it("centres the layout on the sheet", () => {
+    const sheet = blueprintSheet(shape(21, 18), card);
+    expect(sheet.left).toBeCloseTo(-(sheet.width - 21) / 2);
+    expect(sheet.top).toBeCloseTo(-(sheet.height - 18) / 2);
   });
 
-  it("coarsens the grid rather than crowding it, on a base too big to rule", () => {
-    // Seventeen squares across is one too many to rule singly, and sixty five is
-    // one too many to rule in pairs.
-    expect(blueprintSheet(shape(16, 3)).pitch).toBe(1);
-    expect(blueprintSheet(shape(17, 3)).pitch).toBe(2);
-    expect(blueprintSheet(shape(3, 30)).pitch).toBe(2);
-    expect(blueprintSheet(shape(65, 3)).pitch).toBe(8);
-  });
-
-  it("keeps the rules on build square boundaries at every pitch", () => {
-    const sheet = blueprintSheet(shape(30, 30));
-    expect(sheet.pitch).toBe(2);
-    expect(sheet.verticals[0]).toBe(0);
-    for (const at of [...sheet.verticals, ...sheet.horizontals]) {
-      expect(at % sheet.pitch).toBe(0);
-      expect(at).toBeGreaterThanOrEqual(sheet.left);
-      expect(at).toBeLessThanOrEqual(sheet.left + sheet.width);
+  it("keeps a build square of clear ground on every side", () => {
+    for (const [across, down] of [
+      [21, 18],
+      [3, 3],
+      [60, 8],
+    ]) {
+      const sheet = blueprintSheet(shape(across, down), card);
+      expect(sheet.left).toBeLessThanOrEqual(-1);
+      expect(sheet.top).toBeLessThanOrEqual(-1);
+      expect(sheet.left + sheet.width).toBeGreaterThanOrEqual(across + 1);
+      expect(sheet.top + sheet.height).toBeGreaterThanOrEqual(down + 1);
     }
+  });
+
+  it("rules every build square, so every footprint edge lands on a rule", () => {
+    // The size "Opening solars" is drawn at on a card, where a grid of every
+    // second square left its five square solar collectors straddling the rules.
+    const sheet = blueprintSheet(shape(21, 18), card);
+    const consecutive = sheet.verticals.map((_, i) => sheet.verticals[0] + i);
+    expect(sheet.verticals).toEqual(consecutive);
+    for (const edge of [0, 5, 16, 21]) expect(sheet.verticals).toContain(edge);
+    for (const edge of [0, 5, 13, 18])
+      expect(sheet.horizontals).toContain(edge);
+  });
+
+  it("rules from the layout's own origin, wherever the sheet starts", () => {
+    const sheet = blueprintSheet(shape(21, 18), card);
+    for (const at of [...sheet.verticals, ...sheet.horizontals]) {
+      expect(Number.isInteger(at)).toBe(true);
+    }
+    expect(sheet.verticals[0]).toBeGreaterThanOrEqual(sheet.left);
+    expect(sheet.verticals[0] - 1).toBeLessThan(sheet.left);
+  });
+
+  it("stops ruling a base too big to draw a build square of", () => {
+    // Six hundred squares across a card is half a pixel a square, which is fill
+    // rather than a grid.
+    const sheet = blueprintSheet(shape(600, 400), card);
+    expect(sheet.verticals).toEqual([]);
+    expect(sheet.horizontals).toEqual([]);
+    // The layout is still drawn, and still centred.
+    expect(sheet.left).toBeCloseTo(-(sheet.width - 600) / 2);
+  });
+
+  it("does not blow a small layout up to fill the box", () => {
+    const sheet = blueprintSheet(shape(1, 1), card);
+    expect(sheet.scale).toBe(16);
+    expect(sheet.width).toBeCloseTo(232 / 16);
   });
 });
