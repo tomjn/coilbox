@@ -60,9 +60,10 @@ export function groupFormationOffset(
  * square are never in two places (#1421). Only the drawing moves: a document
  * whose numbers the grid disagrees with is left as its author wrote it, and
  * making those numbers agree is a conversion an import asks for and says it did.
- * The point it was written on is kept as `named`, because an edit shifts that
- * one. Without a `snap` everything is drawn where the document puts it, which is
- * what happens while the game's units are still being read.
+ * An edit of one such building writes its own square down as it goes, because a
+ * drag carries the building that was drawn (issue #1517). Without a `snap`
+ * everything is drawn where the document puts it, which is what happens while
+ * the game's units are still being read.
  */
 export function scenarioPlacements(
   scenario: Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">,
@@ -118,7 +119,6 @@ export function scenarioPlacements(
         def: building.def,
         team: base.team,
         pos: snap ? snap(at, building.def, building.facing) : at,
-        named: at,
         facing: building.facing,
       });
     });

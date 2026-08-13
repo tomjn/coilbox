@@ -285,16 +285,15 @@ describe("draggedBuilding", () => {
   });
 
   /**
-   * The drop shifts the point the document names and snaps the result, so a
-   * preview shifting the point the grid drew would answer a different question
-   * and be wrong by half a build square wherever the two differ.
+   * Issue #1517. What the author took hold of is the building on the map, which
+   * stands on the square the grid drew rather than on the point its layout
+   * names. The drop carries it from the same point, so a drag that has gone
+   * nowhere shows the building where it already is.
    */
-  it("shifts the point the document named, not the one the grid drew", () => {
-    const off = building({ named: { x: 507, z: 603 } });
-    expect(draggedBuilding([off], "base:pf1#0", { x: 0, z: 0 })?.pos).toEqual({
-      x: 507,
-      z: 603,
-    });
+  it("shifts the square the grid drew, which is the building on the map", () => {
+    const drawn = building({ pos: { x: 504, z: 600 } });
+    const held = draggedBuilding([drawn], "base:pf1#0", { x: 0, z: 0 });
+    expect(held?.pos).toEqual({ x: 504, z: 600 });
   });
 
   it("carries nothing for anything that has no footprint", () => {

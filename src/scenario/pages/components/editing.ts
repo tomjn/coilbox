@@ -98,6 +98,14 @@ function editBaseBuilding(
  * where the engine will stand it and a layout drawn anywhere else is a layout
  * that cannot be built. Without a `snap` it lands where it was dropped, which is
  * what happens while the game's units are still being read.
+ *
+ * It is carried from the square it is drawn on rather than from the point its
+ * layout names (issue #1517). The two are up to half a build square apart on any
+ * layout coilbox did not author, and a drag is somebody moving the building they
+ * can see: measured from the other point, a drag of two elmos landed a whole
+ * square away. So the first drag of such a building writes its own square down,
+ * which changes the number on the axis that was not dragged without moving the
+ * building along it.
  */
 export function movePlacement(
   scenario: Scenario,
@@ -130,10 +138,12 @@ export function movePlacement(
   const origin = scenario.bases.find((entry) => entry.id === ref.id)?.origin;
   if (!origin) return scenario;
   return editBaseBuilding(scenario, ref, how, (building) => {
-    const moved = shift({
+    const named = {
       x: origin.x + building.offset.x,
       z: origin.z + building.offset.z,
-    });
+    };
+    const drawn = snap ? snap(named, building.def, building.facing) : named;
+    const moved = shift(drawn);
     const at = snap ? snap(moved, building.def, building.facing) : moved;
     return {
       ...building,
