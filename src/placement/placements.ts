@@ -185,8 +185,8 @@ export type SceneUnchecked = "no-units" | "no-ground" | null;
 /**
  * Which of those two is true of everything drawn, or null.
  *
- * Nothing has been checked when no building came back `"fine"`, `"slope"` or
- * `"depth"`, which are the only answers the ground gives. A building with its
+ * Nothing has been checked when no building came back `"fine"`, `"slope"`,
+ * `"too-deep"` or `"too-shallow"`, which are the only answers the ground gives. A building with its
  * own answer, a floater or a def this game has not got, is looked past rather
  * than counted: it has not been checked against the ground either, but it is
  * not waiting on anything and it is already marked as what it is.
@@ -200,7 +200,8 @@ export function sceneUnchecked(marks: FootprintMark[]): SceneUnchecked {
     if (
       mark.standing === "fine" ||
       mark.standing === "slope" ||
-      mark.standing === "depth"
+      mark.standing === "too-deep" ||
+      mark.standing === "too-shallow"
     ) {
       return null;
     }
@@ -229,9 +230,11 @@ export function sceneUnchecked(marks: FootprintMark[]): SceneUnchecked {
  * The floor rather than a yes, because the sentence names it, and null rather
  * than a no. A floor of exactly 0 is a map with no water on it like any other.
  *
- * Null until something has actually been refused for its depth. A landlocked
+ * Null until something has actually been refused for want of water. A landlocked
  * map with a land layout on it is simply a map, and a note appearing with no
- * mark under it is a note nobody can tie to anything.
+ * mark under it is a note nobody can tie to anything. A building with too much
+ * water over it is not asking for water this map has not got, so it is not this
+ * note's business either (issue #1552).
  *
  * Null for the build grid too, which declares no water because its floor sits at
  * 0 and is not a sea. Nothing there is refused for depth, so nothing there needs
@@ -242,7 +245,7 @@ export function sceneWaterless(
   ground: Ground | null,
 ): number | null {
   if (!ground?.hasWater || ground.minHeight < 0) return null;
-  return marks.some((mark) => mark.standing === "depth")
+  return marks.some((mark) => mark.standing === "too-shallow")
     ? ground.minHeight
     : null;
 }
@@ -294,14 +297,31 @@ export function unstableIn(
   return standingIn(placements, marks, baseId, "slope");
 }
 
-/** Which of one base's buildings are in the wrong depth of water: a land
- *  building in the sea, or a naval one out of it (issue #1459). */
-export function wrongDepthIn(
+/**
+ * Which of one base's buildings have more water over them than they allow: a
+ * land building in the sea (issues #1459, #1552).
+ *
+ * Apart from {@link tooShallowIn} because the two are opposite problems with
+ * opposite fixes. One list for both said the same thing about a shipyard on the
+ * shore and one over a trench, and moving either of them the way that sentence
+ * suggested would make it worse.
+ */
+export function tooDeepIn(
   placements: Placement[],
   marks: FootprintMark[],
   baseId: string,
 ): number[] {
-  return standingIn(placements, marks, baseId, "depth");
+  return standingIn(placements, marks, baseId, "too-deep");
+}
+
+/** Which of one base's buildings want more water than there is under them: a
+ *  naval building out of the sea, or in a shallows (issues #1459, #1552). */
+export function tooShallowIn(
+  placements: Placement[],
+  marks: FootprintMark[],
+  baseId: string,
+): number[] {
+  return standingIn(placements, marks, baseId, "too-shallow");
 }
 
 /** Which of one base's buildings want ground another building is standing on,

@@ -203,9 +203,21 @@ export type Standing =
   | "fine"
   /** The ground under it moves further than the def tolerates. */
   | "slope"
-  /** The water over the ground under it is outside the band the def declares:
-   *  a land building in the sea, or a naval yard on dry land (issue #1459). */
-  | "depth"
+  /**
+   * There is more water over the ground under it than the def allows: a land
+   * building in the sea (issues #1459, #1552). It has to move into shallower
+   * water, or out of the water.
+   */
+  | "too-deep"
+  /**
+   * There is less water over it than the def needs: a naval yard on dry land,
+   * or in a shallows (issues #1459, #1552). It has to move into deeper water.
+   *
+   * Its own answer rather than the other end of one `"depth"`, because the two
+   * are opposite problems with opposite fixes and one mark cannot say which way
+   * to move a building.
+   */
+  | "too-shallow"
   /** There is no ground to ask: no map, or a heightmap that would not read. */
   | "no-ground"
   /** The game's units have not been read, so nothing knows what this def is. */

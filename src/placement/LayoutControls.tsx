@@ -121,7 +121,8 @@ function listed(at: number[]): string {
 export function LayoutNotes({
   overlaps,
   unstable,
-  wrongDepth,
+  tooDeep,
+  tooShallow,
   noSlope,
   absent,
   buildings,
@@ -138,9 +139,13 @@ export function LayoutNotes({
    *  Drawn in amber on the surface as well. Empty where there is no map to
    *  check against, which is not the same as everything being fine. */
   unstable?: number[];
-  /** Buildings in the wrong depth of water for them, by their place in the
+  /** Buildings with more water over them than they allow, by their place in the
    *  layout (issue #1459). Drawn in cyan on the surface as well. */
-  wrongDepth?: number[];
+  tooDeep?: number[];
+  /** Buildings wanting more water than there is under them (issue #1552). The
+   *  same cyan as {@link tooDeep} on the surface, because both are the water
+   *  refusing the building. Which way to move it is said here instead. */
+  tooShallow?: number[];
   /**
    * Buildings this game gives no slope to check against, by their place in the
    * layout. Drawn as empty dashed squares on the surface as well.
@@ -201,13 +206,28 @@ export function LayoutNotes({
         </p>
       )}
 
-      {wrongDepth !== undefined && wrongDepth.length > 0 && (
+      {/* Both ends of the engine's band are cyan on the surface, so these two
+          sentences are what says which way a building has to move (issue
+          #1552). */}
+      {tooDeep !== undefined && tooDeep.length > 0 && (
         <p className="rounded bg-cyan-950/60 px-2 py-1.5 text-[11px] text-cyan-200">
-          Building{wrongDepth.length === 1 ? " " : "s "}
-          {listed(wrongDepth)} stand
-          {wrongDepth.length === 1 ? "s" : ""} in the wrong depth of water for
-          {wrongDepth.length === 1 ? " it" : " them"}, marked in cyan. The
-          engine refuses a land building in the sea and a naval one out of it.
+          Building{tooDeep.length === 1 ? " " : "s "}
+          {listed(tooDeep)} stand
+          {tooDeep.length === 1 ? "s" : ""} in water too deep for
+          {tooDeep.length === 1 ? " it" : " them"}, marked in cyan. The engine
+          refuses a building with more water over it than its def allows, so
+          {tooDeep.length === 1 ? " it wants" : " they want"} shallower water,
+          or dry land.
+        </p>
+      )}
+
+      {tooShallow !== undefined && tooShallow.length > 0 && (
+        <p className="rounded bg-cyan-950/60 px-2 py-1.5 text-[11px] text-cyan-200">
+          Building{tooShallow.length === 1 ? " " : "s "}
+          {listed(tooShallow)} {tooShallow.length === 1 ? "is" : "are"} not in
+          deep enough water, marked in cyan. The engine refuses a naval building
+          out of the sea, so{" "}
+          {tooShallow.length === 1 ? "it wants" : "they want"} deeper water.
         </p>
       )}
 

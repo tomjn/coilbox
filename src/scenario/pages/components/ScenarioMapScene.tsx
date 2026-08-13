@@ -46,8 +46,9 @@ import {
   placementKey,
   sceneUnchecked,
   sceneWaterless,
+  tooDeepIn,
+  tooShallowIn,
   unstableIn,
-  wrongDepthIn,
 } from "@/placement/placements";
 import {
   nudgeSentence,
@@ -871,13 +872,20 @@ export function ScenarioMapScene({
                     footprints,
                     pickedBase.id,
                   )}
+                  tooDeep={tooDeepIn(
+                    units.placements,
+                    footprints,
+                    pickedBase.id,
+                  )}
                   // Nothing on a map with no water, where every one of these is
                   // refused for the same reason and the surface says that
                   // reason once (issue #1536). Naming them here as well would
-                  // be the wall of cyan written out in words.
-                  wrongDepth={
+                  // be the wall of cyan written out in words. Only this half:
+                  // a map with no sea is why a building wants water it cannot
+                  // find, and never why one is under too much (issue #1552).
+                  tooShallow={
                     waterless === null
-                      ? wrongDepthIn(
+                      ? tooShallowIn(
                           units.placements,
                           footprints,
                           pickedBase.id,

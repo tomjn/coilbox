@@ -22,6 +22,7 @@ import {
   nudgeWords,
   previewChecks,
   previewCount,
+  previewMovable,
   previewSentence,
   previewTrouble,
   sameCount,
@@ -134,7 +135,8 @@ describe("layoutPreview", () => {
       total: 1,
       clashes: 0,
       unstable: 0,
-      wrongDepth: 0,
+      tooDeep: 0,
+      tooShallow: 0,
       unjudged: 1,
       absent: 0,
     });
@@ -163,7 +165,8 @@ describe("layoutPreview", () => {
       total: 12,
       clashes: 3,
       unstable: 2,
-      wrongDepth: 0,
+      tooDeep: 0,
+      tooShallow: 0,
       unjudged: 0,
       absent: 0,
     };
@@ -175,11 +178,39 @@ describe("layoutPreview", () => {
         total: 12,
         clashes: 0,
         unstable: 1,
-        wrongDepth: 0,
+        tooDeep: 0,
+        tooShallow: 0,
         unjudged: 0,
         absent: 0,
       }),
     ).toBe("1 of 12 is on ground too steep for it, in amber.");
+  });
+
+  /**
+   * Issue #1552. Both ends of the band are cyan, so the sentence is the only
+   * thing that can say which way a building has to move.
+   */
+  it("says which way the water is wrong", () => {
+    const none = {
+      total: 12,
+      clashes: 0,
+      unstable: 0,
+      tooDeep: 0,
+      tooShallow: 0,
+      unjudged: 0,
+      absent: 0,
+    };
+    expect(previewSentence({ ...none, tooDeep: 1 })).toBe(
+      "1 of 12 is in water too deep for it, in cyan.",
+    );
+    expect(previewSentence({ ...none, tooShallow: 2 })).toBe(
+      "2 of 12 are not in deep enough water, in cyan.",
+    );
+    expect(previewSentence({ ...none, tooDeep: 1, tooShallow: 1 })).toBe(
+      "1 of 12 is in water too deep for it, in cyan. 1 is not in deep enough water, in cyan.",
+    );
+    expect(previewTrouble({ ...none, tooShallow: 1 })).toBe(true);
+    expect(previewMovable({ ...none, tooDeep: 1 })).toBe(true);
   });
 
   /**
@@ -192,7 +223,8 @@ describe("layoutPreview", () => {
       total: 12,
       clashes: 0,
       unstable: 0,
-      wrongDepth: 0,
+      tooDeep: 0,
+      tooShallow: 0,
       unjudged: 0,
       absent: 2,
     };
@@ -214,7 +246,8 @@ describe("layoutPreview", () => {
         total: 12,
         clashes: 0,
         unstable: 0,
-        wrongDepth: 0,
+        tooDeep: 0,
+        tooShallow: 0,
         unjudged: 3,
         absent: 0,
       }),
@@ -226,7 +259,8 @@ describe("layoutPreview", () => {
         total: 12,
         clashes: 0,
         unstable: 0,
-        wrongDepth: 0,
+        tooDeep: 0,
+        tooShallow: 0,
         unjudged: 3,
         absent: 0,
       }),
@@ -255,7 +289,8 @@ describe("layoutPreview", () => {
       total: 12,
       clashes: 1,
       unstable: 0,
-      wrongDepth: 0,
+      tooDeep: 0,
+      tooShallow: 0,
       unjudged: 0,
       absent: 0,
     };

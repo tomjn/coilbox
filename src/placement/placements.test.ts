@@ -13,9 +13,10 @@ import {
   sceneUnchecked,
   sceneWaterless,
   teamColor,
+  tooDeepIn,
+  tooShallowIn,
   UNOWNED_COLOR,
   unstableIn,
-  wrongDepthIn,
 } from "./placements";
 
 type Registries = Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">;
@@ -455,9 +456,10 @@ describe("overlappingIn", () => {
   });
 });
 
-/** Issue #1459: the depth half of the engine's terrain check, named the way the
- *  slope half is so a panel can list both. */
-describe("wrongDepthIn", () => {
+/** Issues #1459 and #1552: the depth half of the engine's terrain check, named
+ *  the way the slope half is so a panel can list both, and split by which end of
+ *  the band was crossed so it can say which way to move a building. */
+describe("tooDeepIn and tooShallowIn", () => {
   const units = [
     // A land building, which is what a `maxWaterDepth` of 0 means.
     { name: "armsolar", footprintX: 2, footprintZ: 2, maxSlope: 10 },
@@ -494,26 +496,38 @@ describe("wrongDepthIn", () => {
     hasWater: true,
   };
 
-  it("names the building the water is wrong for", () => {
+  /** The sea, 40 elmos deep, read exactly. */
+  const sea = { ...dry, cornerAt: () => -40 };
+
+  const harbour = [
+    { ...units[0], maxWaterDepth: 0 },
+    { ...units[1], minWaterDepth: 10, maxWaterDepth: 1000 },
+  ];
+
+  it("names the building that wants more water than there is", () => {
     const placements = scenarioPlacements(doc);
-    const marks = baseFootprints(
-      placements,
-      [
-        { ...units[0], maxWaterDepth: 0 },
-        { ...units[1], minWaterDepth: 10, maxWaterDepth: 1000 },
-      ],
-      dry,
-    );
+    const marks = baseFootprints(placements, harbour, dry);
     // The yard needs 10 elmos of water and is standing 20 above it. The solar
     // collector is exactly where it belongs.
-    expect(wrongDepthIn(placements, marks, "pf1")).toEqual([1]);
+    expect(tooShallowIn(placements, marks, "pf1")).toEqual([1]);
+    expect(tooDeepIn(placements, marks, "pf1")).toEqual([]);
     expect(unstableIn(placements, marks, "pf1")).toEqual([]);
+  });
+
+  /** Issue #1552. The same harbour in the sea is the opposite refusal, and it
+   *  wants the opposite move. */
+  it("names the building with more water over it than it allows", () => {
+    const placements = scenarioPlacements(doc);
+    const marks = baseFootprints(placements, harbour, sea);
+    expect(tooDeepIn(placements, marks, "pf1")).toEqual([0]);
+    expect(tooShallowIn(placements, marks, "pf1")).toEqual([]);
   });
 
   it("says nothing about a base whose defs declare no water", () => {
     const placements = scenarioPlacements(doc);
     const marks = baseFootprints(placements, units, dry);
-    expect(wrongDepthIn(placements, marks, "pf1")).toEqual([]);
+    expect(tooShallowIn(placements, marks, "pf1")).toEqual([]);
+    expect(tooDeepIn(placements, marks, "pf1")).toEqual([]);
   });
 });
 

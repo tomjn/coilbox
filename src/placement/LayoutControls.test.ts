@@ -59,19 +59,38 @@ describe("LayoutNotes", () => {
 
   /** Issue #1459. The depth refusal is fixed its own way, so it is said its own
    *  way rather than folded into the slope sentence. */
-  it("names the buildings the water is wrong for", () => {
-    const html = markup({ wrongDepth: [0, 3] });
+  it("names the buildings the water is too deep for", () => {
+    const html = markup({ tooDeep: [0, 3] });
     expect(html).toContain("Buildings 1, 4");
-    expect(html).toContain("wrong depth of water");
+    expect(html).toContain("water too deep");
     expect(html).toContain("cyan");
   });
 
+  /**
+   * Issue #1552. Both ends of the engine's band are cyan, because both are the
+   * water refusing the building, and one colour is one thing to learn. Which way
+   * the building has to move is the sentence's job, and it is the half an author
+   * acts on.
+   */
+  it("says the two ends of the band in opposite words", () => {
+    const deep = markup({ tooDeep: [0] });
+    const shallow = markup({ tooShallow: [0] });
+    expect(deep).toContain("shallower");
+    expect(shallow).toContain("deeper");
+    expect(shallow).not.toContain("shallower");
+    expect(shallow).toContain("cyan");
+  });
+
+  it("says both at once when a layout straddles a coast", () => {
+    const html = markup({ tooDeep: [0], tooShallow: [1] });
+    expect(html).toContain("Building 1 stands in water too deep for it");
+    expect(html).toContain("Building 2 is not in deep enough water");
+  });
+
   it("keeps the depth and the slope apart", () => {
-    const html = markup({ unstable: [0], wrongDepth: [1] });
+    const html = markup({ unstable: [0], tooShallow: [1] });
     expect(html).toContain("Building 1 stands on ground too steep for it");
-    expect(html).toContain(
-      "Building 2 stands in the wrong depth of water for it",
-    );
+    expect(html).toContain("Building 2 is not in deep enough water");
   });
 
   it("keeps the slope and the overlap apart", () => {
