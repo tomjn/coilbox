@@ -11,6 +11,9 @@
  * needs a canvas.
  */
 
+import type { Ground } from "@/blueprint/buildable";
+import { SQUARE_SIZE } from "@/blueprint/footprint";
+
 /** A decoded heightmap: one 0..1 sample per pixel, row 0 at the map's north. */
 export interface HeightField {
   width: number;
@@ -45,6 +48,42 @@ export async function readHeightField(
   } finally {
     bitmap.close();
   }
+}
+
+/**
+ * The map's ground on the engine's own grid, or `null` when this field cannot
+ * describe it.
+ *
+ * {@link groundHeight} answers "how high is the ground at this point", which is
+ * what a model standing somewhere needs. Whether a building will stand needs the
+ * other thing: the heightmap's own corners, at the 8 elmo spacing the engine
+ * measures them at, because the rule is arithmetic over those exact values.
+ *
+ * `null` when the field is not the map's corners. The worker renders a
+ * heightmap down to at most 1024 pixels a side, so a map wider than 8192 elmos
+ * comes back smoothed, and smoothed ground would flatten the very cliffs the
+ * check is looking for. Saying nothing is the right answer there.
+ *
+ * `slack` is one step of the eight bit read back off that render, which is the
+ * most a height here can differ from the one the engine holds.
+ */
+export function cornerGround(
+  field: HeightField,
+  worldWidth: number,
+  worldHeight: number,
+  minHeight: number,
+  maxHeight: number,
+): Ground | null {
+  if (worldWidth <= 0 || worldHeight <= 0) return null;
+  if (field.width !== worldWidth / SQUARE_SIZE + 1) return null;
+  if (field.height !== worldHeight / SQUARE_SIZE + 1) return null;
+  const range = maxHeight - minHeight;
+  return {
+    cornerAt: (x, z) => sampleAt(field, x, z) * range + minHeight,
+    slack: range / 255,
+    minHeight,
+    maxHeight,
+  };
 }
 
 /** A sample by pixel, clamped to the field so an edge position still reads. */
