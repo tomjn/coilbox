@@ -18,6 +18,7 @@ import {
   type FootprintMark,
   footprintMarks,
 } from "@/blueprint/footprint";
+import type { UnknownBuilding } from "@/blueprint/units";
 import type { Participant, Rgb } from "@/play/config";
 import type { Facing, Point } from "@/scenario/model";
 
@@ -134,6 +135,36 @@ export function baseFootprints(
     buildingFootprints(units),
     (mark) => standsOn(mark, ground, slopeOf(mark.def)),
   );
+}
+
+/**
+ * Which of one base's buildings name a unit this game has not got (issue
+ * #1445).
+ *
+ * The import worked this out and said so, and then the layout was taken and the
+ * answer was thrown away. Read off the marks instead, so it is true of a layout
+ * typed or edited into that state as well as of an imported one, and so it stays
+ * true as the game under it changes.
+ *
+ * Empty before the game's units have been read, because a def nothing has looked
+ * up is not a def the game has not got.
+ */
+export function absentIn(
+  placements: Placement[],
+  marks: FootprintMark[],
+  baseId: string,
+): UnknownBuilding[] {
+  const absent = new Set(
+    marks.filter((mark) => mark.standing === "no-def").map((mark) => mark.key),
+  );
+  return placements
+    .filter(
+      (placement) =>
+        placement.kind === "base" &&
+        placement.id === baseId &&
+        absent.has(placement.key),
+    )
+    .map((placement) => ({ index: placement.index, def: placement.def }));
 }
 
 /**

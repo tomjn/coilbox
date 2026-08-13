@@ -111,7 +111,13 @@ describe("layoutPreview", () => {
     const clear = previewCount(
       layoutPreview([solarAt(1000, 1000)], footprintOf, standing),
     );
-    expect(clear).toEqual({ total: 1, clashes: 0, unstable: 0, unjudged: 1 });
+    expect(clear).toEqual({
+      total: 1,
+      clashes: 0,
+      unstable: 0,
+      unjudged: 1,
+      absent: 0,
+    });
     // Nothing asked about the ground here, so having room is all it may claim.
     expect(previewSentence(clear)).toBe(
       "1 building, and it has room here. It has not been checked against the ground.",
@@ -133,13 +139,38 @@ describe("layoutPreview", () => {
   });
 
   it("says both reasons the engine would refuse a building", () => {
-    const both = { total: 12, clashes: 3, unstable: 2, unjudged: 0 };
+    const both = { total: 12, clashes: 3, unstable: 2, unjudged: 0, absent: 0 };
     expect(previewSentence(both)).toBe(
       "3 of 12 want ground another building has, in red. 2 are on ground too steep for them, in amber.",
     );
     expect(
-      previewSentence({ total: 12, clashes: 0, unstable: 1, unjudged: 0 }),
+      previewSentence({
+        total: 12,
+        clashes: 0,
+        unstable: 1,
+        unjudged: 0,
+        absent: 0,
+      }),
     ).toBe("1 of 12 is on ground too steep for it, in amber.");
+  });
+
+  /**
+   * Issue #1445. A layout carrying a unit this game has not got is worth saying
+   * before the click as much as after it, because the click is the moment
+   * somebody is choosing where to put somebody else's base.
+   */
+  it("counts the units this game has not got, and calls it trouble", () => {
+    const some = {
+      total: 12,
+      clashes: 0,
+      unstable: 0,
+      unjudged: 0,
+      absent: 2,
+    };
+    expect(previewSentence(some)).toBe(
+      "2 of 12 are units this game has not got, in violet.",
+    );
+    expect(previewTrouble(some)).toBe(true);
   });
 
   /**
@@ -150,12 +181,24 @@ describe("layoutPreview", () => {
    */
   it("says how many of them nothing judged", () => {
     expect(
-      previewSentence({ total: 12, clashes: 0, unstable: 0, unjudged: 3 }),
+      previewSentence({
+        total: 12,
+        clashes: 0,
+        unstable: 0,
+        unjudged: 3,
+        absent: 0,
+      }),
     ).toBe(
       "12 buildings, and they all have room here. 3 of them have not been checked against the ground.",
     );
     expect(
-      previewTrouble({ total: 12, clashes: 0, unstable: 0, unjudged: 3 }),
+      previewTrouble({
+        total: 12,
+        clashes: 0,
+        unstable: 0,
+        unjudged: 3,
+        absent: 0,
+      }),
     ).toBe(false);
   });
 
@@ -177,7 +220,7 @@ describe("layoutPreview", () => {
   });
 
   it("leaves a surface alone while the same thing is true", () => {
-    const one = { total: 12, clashes: 1, unstable: 0, unjudged: 0 };
+    const one = { total: 12, clashes: 1, unstable: 0, unjudged: 0, absent: 0 };
     expect(sameCount(one, { ...one })).toBe(true);
     expect(sameCount(one, { ...one, clashes: 2 })).toBe(false);
     // The moment the game's units arrive, the same layout stops being unjudged

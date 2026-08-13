@@ -31,6 +31,7 @@ import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
 import {
+  absentIn,
   baseFootprints,
   overlappingIn,
   type Placement,
@@ -780,6 +781,7 @@ export function ScenarioMapScene({
                       ? unjudgedIn(units.placements, footprints, pickedBase.id)
                       : undefined
                   }
+                  absent={absentIn(units.placements, footprints, pickedBase.id)}
                   designedFor={pickedLayout?.designedFor}
                   onMap={mapName}
                   participants={scenario.setup.participants}

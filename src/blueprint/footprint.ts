@@ -220,7 +220,8 @@ export type Standing =
  *
  * A floater is not in here: the ground under it decides nothing, so there is no
  * answer missing. Neither is a def the game has not got, which is a definite
- * absence rather than a gap in what the check knows.
+ * absence rather than a gap in what the check knows, and is drawn as its own
+ * kind of refusal (issue #1445).
  */
 export function unjudged(standing: Standing): boolean {
   return (

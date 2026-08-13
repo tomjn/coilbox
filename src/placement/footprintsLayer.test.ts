@@ -50,6 +50,20 @@ describe("footprintStyle", () => {
     }
   });
 
+  /**
+   * Issue #1445. A building whose unit the game has not got will never be
+   * built, so it is a refusal rather than a missing answer, and it is its own
+   * refusal: nothing about moving it or finding flatter ground helps.
+   */
+  it("draws a unit the game has not got as its own kind of refusal", () => {
+    const absent = style("no-def");
+    expect(absent.dashed).toBe(false);
+    expect(absent.fill).toBeGreaterThan(style("fine").fill);
+    expect(absent.color).not.toBe(style("slope").color);
+    expect(absent.color).not.toBe(style("fine", true).color);
+    expect(absent.color).not.toBe(style("fine").color);
+  });
+
   /** A clash is the author's own doing and the ground under it may well be
    *  fine once the pair is pulled apart, so it wins over anything else. */
   it("lets a clash win over a verdict it has not got", () => {

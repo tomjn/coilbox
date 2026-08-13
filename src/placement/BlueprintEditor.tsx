@@ -59,6 +59,7 @@ import {
 } from "./LayoutControls";
 import { PlacementSurface } from "./PlacementSurface";
 import {
+  absentIn,
   baseFootprints,
   overlappingIn,
   placementKey,
@@ -260,6 +261,7 @@ export function BlueprintEditor({
   const unjudged = drawn.settled
     ? unjudgedIn(drawn.placements, footprints, BLUEPRINT_BASE_ID)
     : undefined;
+  const absent = absentIn(drawn.placements, footprints, BLUEPRINT_BASE_ID);
   const strays = strayDefs(units, blueprint.buildings);
 
   return (
@@ -312,6 +314,8 @@ export function BlueprintEditor({
                 <LayoutNotes
                   overlaps={overlaps}
                   unjudged={unjudged}
+                  absent={absent}
+                  buildings={blueprint.buildings.length}
                   strays={strays}
                 />
               </PopoverContent>

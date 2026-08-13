@@ -54,6 +54,54 @@ describe("LayoutNotes", () => {
   });
 
   /**
+   * Issue #1445. A base with one Legion solar in it drew exactly like a base
+   * without one, because the import knew and the layout did not carry it.
+   */
+  describe("units the game has not got", () => {
+    it("names the buildings and the units they name", () => {
+      const html = markup({
+        absent: [
+          { index: 1, def: "legsolar" },
+          { index: 4, def: "legwin" },
+        ],
+        buildings: 6,
+      });
+      expect(html).toContain("Buildings 2, 5");
+      expect(html).toContain("legsolar");
+      expect(html).toContain("legwin");
+      expect(html).toContain("violet");
+    });
+
+    it("counts one building as one", () => {
+      const html = markup({
+        absent: [{ index: 0, def: "legsolar" }],
+        buildings: 4,
+      });
+      expect(html).toContain("Building 1 is");
+      expect(html).toContain("legsolar");
+    });
+
+    /** A layout the game has none of the units of is another game's, and that
+     *  is a different thing from a layout with one unit missing. */
+    it("says when the whole layout belongs to another game", () => {
+      const html = markup({
+        absent: [
+          { index: 0, def: "legsolar" },
+          { index: 1, def: "legwin" },
+        ],
+        buildings: 2,
+      });
+      expect(html).toContain("none of");
+      expect(html).not.toContain("Buildings 1, 2");
+    });
+
+    it("says nothing before the game's units have been read", () => {
+      expect(markup({ absent: [], buildings: 4 })).toBe("");
+      expect(markup({ buildings: 4 })).toBe("");
+    });
+  });
+
+  /**
    * Issue #1491. The dangerous silence: a check that ran and approved and a
    * check that never ran said the same nothing, which is how #1483 survived for
    * months.

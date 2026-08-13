@@ -3,6 +3,7 @@ import type { Participant } from "@/play/config";
 import type { Scenario } from "@/scenario/model";
 import { scenarioPlacements } from "@/scenario/pages/components/placements";
 import {
+  absentIn,
   baseFootprints,
   facingToYaw,
   overlappingIn,
@@ -87,6 +88,66 @@ describe("baseFootprints", () => {
     // The bot is standing in the lab's doorway, which is a bot's business.
     expect(marks).toHaveLength(2);
     expect(marks.every((m) => !m.overlapping)).toBe(true);
+  });
+});
+
+/**
+ * Issue #1445. The import knew this layout named a unit the game has not got
+ * and said so, and then the layout was taken and the knowledge was thrown away.
+ * Worked out from the placements instead, so it is true of a layout typed or
+ * edited into that state as well as of an imported one.
+ */
+describe("absentIn", () => {
+  const units = [
+    { name: "armlab", footprintX: 6, footprintZ: 6, maxSlope: 10 },
+  ];
+
+  const doc: Registries = {
+    ...empty,
+    blueprints: [
+      {
+        id: "bp1",
+        name: "Somebody else's keep",
+        buildings: [
+          { def: "armlab", offset: { x: 0, z: 0 }, facing: 0 },
+          { def: "legsolar", offset: { x: 512, z: 0 }, facing: 0 },
+          { def: "legwin", offset: { x: 1024, z: 0 }, facing: 0 },
+        ],
+      },
+    ],
+    bases: [
+      {
+        id: "pf1",
+        blueprint: "bp1",
+        team: "p0",
+        origin: { x: 1000, z: 1000 },
+        buildings: [],
+      },
+    ],
+  };
+
+  it("names the buildings whose units the game has not got", () => {
+    const placements = scenarioPlacements(doc);
+    const marks = baseFootprints(placements, units, null);
+    expect(absentIn(placements, marks, "pf1")).toEqual([
+      { index: 1, def: "legsolar" },
+      { index: 2, def: "legwin" },
+    ]);
+  });
+
+  /** The loading case. Before the units are read nothing is missing, it is only
+   *  unread, and accusing the lot would be a wall of warnings that clears
+   *  itself. */
+  it("accuses nothing before the game's units have been read", () => {
+    const placements = scenarioPlacements(doc);
+    const marks = baseFootprints(placements, [], null);
+    expect(absentIn(placements, marks, "pf1")).toEqual([]);
+  });
+
+  it("says nothing about a base that is not the one asked for", () => {
+    const placements = scenarioPlacements(doc);
+    const marks = baseFootprints(placements, units, null);
+    expect(absentIn(placements, marks, "other")).toEqual([]);
   });
 });
 

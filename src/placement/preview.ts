@@ -138,6 +138,9 @@ export interface PreviewCount {
   /** Nothing has judged the ground under it, which is not the same as the
    *  ground being fine (issue #1491). */
   unjudged: number;
+  /** Its unit is one this game has not got, so there is nothing to build there
+   *  wherever it lands (issue #1445). */
+  absent: number;
 }
 
 export function previewCount(marks: readonly FootprintMark[]): PreviewCount {
@@ -146,6 +149,7 @@ export function previewCount(marks: readonly FootprintMark[]): PreviewCount {
     clashes: marks.filter((mark) => mark.overlapping).length,
     unstable: marks.filter((mark) => mark.standing === "slope").length,
     unjudged: marks.filter((mark) => unjudged(mark.standing)).length,
+    absent: marks.filter((mark) => mark.standing === "no-def").length,
   };
 }
 
@@ -157,14 +161,15 @@ export function sameCount(a: PreviewCount | null, b: PreviewCount | null) {
     a.total === b.total &&
     a.clashes === b.clashes &&
     a.unstable === b.unstable &&
-    a.unjudged === b.unjudged
+    a.unjudged === b.unjudged &&
+    a.absent === b.absent
   );
 }
 
 /** Whether anything about this spot is worth an author's attention, which is
  *  what colours the sentence. */
 export function previewTrouble(count: PreviewCount): boolean {
-  return count.clashes > 0 || count.unstable > 0;
+  return count.clashes > 0 || count.unstable > 0 || count.absent > 0;
 }
 
 /** What is left unsaid about this spot, when anything is. Appended rather than
@@ -202,11 +207,19 @@ export function previewSentence(count: PreviewCount): string {
     );
   }
   if (unstable > 0) {
-    const of = clashes > 0 ? "" : ` of ${total}`;
+    const of = parts.length > 0 ? "" : ` of ${total}`;
     parts.push(
       unstable === 1
         ? `1${of} is on ground too steep for it, in amber.`
         : `${unstable}${of} are on ground too steep for them, in amber.`,
+    );
+  }
+  if (count.absent > 0) {
+    const of = parts.length > 0 ? "" : ` of ${total}`;
+    parts.push(
+      count.absent === 1
+        ? `1${of} is a unit this game has not got, in violet.`
+        : `${count.absent}${of} are units this game has not got, in violet.`,
     );
   }
   return parts.join(" ") + unjudgedClause(count);

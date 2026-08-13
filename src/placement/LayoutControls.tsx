@@ -23,6 +23,7 @@ import {
 import { useState } from "react";
 
 import { buildOrderText } from "@/blueprint/order";
+import { type UnknownBuilding, unknownUnitsWarning } from "@/blueprint/units";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -78,8 +79,9 @@ function listed(at: number[]): string {
 
 /**
  * Which of a layout's buildings cannot be built where they stand, which of them
- * the ground will not take, which of them nothing has judged at all, and which
- * of its defs are not buildings.
+ * the ground will not take, which of them name a unit this game has not got,
+ * which of them nothing has judged at all, and which of its defs are not
+ * buildings.
  *
  * All of it is true of the layout wherever it is drawn, so all of it is said the
  * same way in both editors.
@@ -94,6 +96,8 @@ export function LayoutNotes({
   overlaps,
   unstable,
   unjudged,
+  absent,
+  buildings,
   designedFor,
   onMap,
   strays,
@@ -114,6 +118,14 @@ export function LayoutNotes({
    * itself two seconds later.
    */
   unjudged?: Unjudged;
+  /** Buildings whose unit this game has not got, by their place in the layout
+   *  (issue #1445). Drawn in violet on the surface as well. Empty before the
+   *  game's units have been read, which is not the same as all of them being
+   *  units it has. */
+  absent?: UnknownBuilding[];
+  /** How many buildings the layout has, so a layout the game has none of the
+   *  units of can be told from one with a unit missing. */
+  buildings?: number;
   /** The map this layout was drawn on, when it says. */
   designedFor?: string;
   /** The map it is standing on now, when it is standing on one. */
@@ -146,6 +158,21 @@ export function LayoutNotes({
           {unstable.length === 1 ? "s" : ""} on ground too steep for
           {unstable.length === 1 ? " it" : " them"}, marked in amber. The engine
           refuses to build on a slope past what the unit allows.
+        </p>
+      )}
+
+      {absent !== undefined && absent.length > 0 && buildings !== undefined && (
+        <p className="rounded bg-violet-950/60 px-2 py-1.5 text-[11px] text-violet-200">
+          {absent.length < buildings && (
+            <>
+              Building{absent.length === 1 ? " " : "s "}
+              {listed(absent.map((one) => one.index))}{" "}
+              {absent.length === 1 ? "is" : "are"} marked in violet.{" "}
+            </>
+          )}
+          {unknownUnitsWarning(absent, buildings)}
+          {absent.length >= buildings &&
+            " Every one of them is marked in violet."}
         </p>
       )}
 

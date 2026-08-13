@@ -58,6 +58,11 @@ const SLOPE_COLOR = 0xfbbf24;
  *  colour, because an empty dashed square has no fill to be seen by. */
 const UNJUDGED_COLOR = 0xcbd5e1;
 
+/** What a building whose unit the game has not got is drawn in (issue #1445).
+ *  A third refusal colour, because it is fixed neither by moving the building
+ *  nor by finding flatter ground: that unit is not in this game. */
+const ABSENT_COLOR = 0xa78bfa;
+
 /** The dashes of that outline, in elmos. A build square is 16, so a dash and a
  *  gap fall inside the smallest footprint there is. */
 const DASH_ELMOS = 7;
@@ -79,7 +84,9 @@ export interface FootprintStyle {
  * The three are read apart by the shape rather than by the colour, because a
  * colour on its own asks somebody to remember a key. A refusal is a filled
  * square with a bold edge, a building nobody is refusing is a quiet filled
- * square, and a building nothing has judged is an empty dashed one. There was
+ * square, and a building nothing has judged is an empty dashed one. Within a
+ * refusal the colour says which of the three it is, because they are fixed
+ * differently. There was
  * no third state before: a building the check could not judge and one it
  * approved of were both the quiet grey square, which is how the check managed
  * to refuse every map it was given for months without anybody noticing (issue
@@ -96,6 +103,9 @@ export function footprintStyle(
   }
   if (mark.standing === "slope") {
     return { color: SLOPE_COLOR, fill: 0.32, outline: 0.95, dashed: false };
+  }
+  if (mark.standing === "no-def") {
+    return { color: ABSENT_COLOR, fill: 0.32, outline: 0.95, dashed: false };
   }
   if (unjudged(mark.standing)) {
     return { color: UNJUDGED_COLOR, fill: 0, outline: 0.8, dashed: true };
