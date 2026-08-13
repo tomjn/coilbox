@@ -1,3 +1,4 @@
+import { LayoutPlan } from "@/blueprint/LayoutPlan";
 import type {
   BlueprintShape,
   GalaxyShape,
@@ -91,44 +92,25 @@ function Stats({ stats }: { stats: PreviewStat[] }) {
 }
 
 /**
- * A shared layout, as one rounded square per building.
+ * A shared layout, as a plan on a build grid.
  *
- * The same drawing the website makes of the same container, in the app's own
- * colours: the squares are the card surface on the card's border, so a layout
- * reads as part of the page in either theme rather than as a picture pasted onto
- * it. Everything with a number in it, the gap and the corner radius and the
- * stroke, is the website's, because two drawings of one base that differ are
- * worse than either on its own.
- *
- * A square is keyed by where it stands, which is what makes it that building.
+ * The drawing is `@/blueprint/LayoutPlan`, the same one the library card makes
+ * of a layout on this machine, and the website makes of the same container. All
+ * this adds is the size it is drawn at and the line under it, because a page has
+ * room to say what the picture cannot.
  */
 function BlueprintLayout({ shape }: { shape: BlueprintShape }) {
   const buildings = shape.squares.length;
 
   return (
     <div className="flex flex-col gap-3">
-      <svg
-        viewBox={`0 0 ${shape.width} ${shape.height}`}
+      <LayoutPlan
+        shape={shape}
         // Capped in both directions. A base can be a long thin wall or a tall
         // narrow column, and either one at the column's full width is a shape
         // nobody can take in at a glance.
         className="mx-auto max-h-96 w-full max-w-md"
-        role="img"
-        aria-label={`${buildings} buildings over ${Math.round(shape.width)} by ${Math.round(shape.height)} build squares`}
-      >
-        {shape.squares.map((square) => (
-          <rect
-            key={`${square.def}@${square.x},${square.y}`}
-            x={square.x}
-            y={square.y}
-            width={square.width}
-            height={square.height}
-            rx={0.18}
-            strokeWidth={0.06}
-            className="fill-card stroke-border"
-          />
-        ))}
-      </svg>
+      />
       <p className="text-xs text-muted-foreground">
         {buildings} {buildings === 1 ? "building" : "buildings"}
         {shape.ordered ? ", in build order" : ""}
