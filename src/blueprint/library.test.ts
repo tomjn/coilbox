@@ -7,10 +7,10 @@ import {
   parseStoredBlueprintJson,
   recordGameName,
   recordWithLayout,
-  sourceFileName,
-  sourceSummary,
   type StoredBlueprint,
   sortLibrary,
+  sourceFileName,
+  sourceSummary,
   uniqueLayoutName,
 } from "./library";
 import type { BaseBlueprint } from "./model";
@@ -135,9 +135,7 @@ describe("where a layout came from", () => {
   });
 
   it("survives a trip through the stored document", () => {
-    const read = parseStoredBlueprintJson(
-      JSON.stringify(record({ source })),
-    );
+    const read = parseStoredBlueprintJson(JSON.stringify(record({ source })));
     expect(read?.source).toEqual(source);
   });
 

@@ -40,6 +40,7 @@ import {
   recordGameName,
   recordWithLayout,
   type StoredBlueprint,
+  sourceSummary,
 } from "../library";
 import type { BaseBlueprint } from "../model";
 import { deleteBlueprint, saveBlueprint, useBlueprintLibrary } from "../store";
@@ -152,6 +153,17 @@ export default function BlueprintDetailPage() {
             {buildings === 1 ? "" : "s"}
             {record.layout.ordered ? " · build order" : ""}
           </p>
+          {/* Where this copy came from, for a layout that did not start here
+              (issue #1313). The whole path, because the point of recording it
+              is being able to go back to the file. */}
+          {record.source && (
+            <p className="break-all text-xs text-muted-foreground">
+              {sourceSummary(record.source)}
+              {record.source.at
+                ? ` Taken on ${new Date(record.source.at).toLocaleDateString()}.`
+                : ""}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-3">

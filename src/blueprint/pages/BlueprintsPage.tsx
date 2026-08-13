@@ -16,7 +16,7 @@
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { Blocks, ListOrdered, Plus } from "lucide-react";
+import { Blocks, FileDown, ListOrdered, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -41,11 +41,13 @@ import {
   newStoredBlueprint,
   recordGameName,
   type StoredBlueprint,
+  sourceFileName,
   UNTITLED,
   uniqueLayoutName,
 } from "../library";
 import { blueprintRoute, saveBlueprint, useBlueprintLibrary } from "../store";
 import { BlueprintImportButton } from "./components/BlueprintImportButton";
+import { BlueprintPackButton } from "./components/BlueprintPackButton";
 import { LayoutThumb } from "./components/LayoutThumb";
 
 /** Every game, rather than one of them. A game's name is its archive name, so
@@ -86,6 +88,15 @@ export default function BlueprintsPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <BlueprintPackButton
+            onImported={(kept) => {
+              toast.success(
+                kept.length === 1
+                  ? `"${kept[0].layout.name}" is in your library.`
+                  : `${kept.length} layouts are in your library.`,
+              );
+            }}
+          />
           <BlueprintImportButton
             initialCode={importCode}
             onImported={(record) => {
@@ -134,8 +145,8 @@ export default function BlueprintsPage() {
               No blueprints yet. A blueprint is a layout of buildings you draw
               once and place wherever you like: an opening, a wall, a factory
               corner. Make one with the button above, import one somebody
-              shared, or bring one in from a game's own blueprint file in the
-              scenario builder.
+              shared, or open a pack: a file of layouts out of a game or off the
+              community gallery.
             </>
           }
         />
@@ -200,6 +211,17 @@ function BlueprintCard({
       <span className="truncate text-xs text-muted-foreground">
         {game || "No game named"}
       </span>
+      {/* Where it came from, so a layout out of somebody's collection does not
+          look identical to one you drew (issue #1313). */}
+      {record.source && (
+        <span
+          title={record.source.file}
+          className="flex items-center gap-1 truncate text-xs text-muted-foreground"
+        >
+          <FileDown className="size-3.5 shrink-0" aria-hidden="true" />
+          From {sourceFileName(record.source)}
+        </span>
+      )}
       {!installed && (
         <span className="text-xs text-amber-600 dark:text-amber-400">
           That game is not installed here.
