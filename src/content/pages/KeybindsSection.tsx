@@ -11,6 +11,7 @@ import {
   useUnitsyncEngineConfig,
   useUnitsyncScan,
 } from "../config";
+import { engineConfigDir } from "../enginePaths";
 import { MODIFIER_LAYERS, type ModifierLayer } from "../keyboardLayout";
 import {
   addBinding,
@@ -28,13 +29,6 @@ import { KeyBindingEditor } from "./components/KeyBindingEditor";
 import { KeyboardMap } from "./components/KeyboardMap";
 import { applyContainerText, KeymapsPanel } from "./components/KeymapsPanel";
 import { EmptyState, ErrorBanner } from "./components/states";
-
-/** The directory holding the engine's config, from the path unitsync reports. */
-function dirOf(path: string | undefined): string | undefined {
-  if (!path) return undefined;
-  const cut = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return cut > 0 ? path.slice(0, cut) : undefined;
-}
 
 /**
  * The keymap editor: `uikeys.txt` on a keyboard.
@@ -57,7 +51,7 @@ export default function KeybindsSection() {
   const rootPath = selected?.rootPath;
 
   const { data: engineConfig } = useUnitsyncEngineConfig(enginePath, rootPath);
-  const configDir = dirOf(engineConfig?.configPath) ?? rootPath;
+  const configDir = engineConfigDir(engineConfig?.configPath) ?? rootPath;
 
   const scan = useUnitsyncScan(enginePath, rootPath);
   const games = useMemo(() => scan.data?.games ?? [], [scan.data]);

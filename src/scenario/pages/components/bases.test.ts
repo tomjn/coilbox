@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { BUILD_SQUARE } from "@/blueprint/footprint";
+import { BUILD_SQUARE, buildingFootprints } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
+import { onBuildGrid } from "@/blueprint/offGrid";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { newScenario } from "../../create";
 import {
@@ -16,6 +17,8 @@ import {
   buildingUnits,
   copyName,
   editBase,
+  editBaseLayout,
+  type LayoutEdit,
   moveBuilding,
   movedQueued,
   normaliseQueue,
@@ -721,5 +724,54 @@ describe("a layout edited as a layout", () => {
   it("leaves a document that has never heard of the layout alone", () => {
     const doc = document();
     expect(replaceBlueprint(doc, { ...layout, id: "other" })).toBe(doc);
+  });
+});
+
+/**
+ * The offer under the note on a base's controls (issue #1427). The arithmetic
+ * is `@/blueprint/offGrid`, and what is worth testing here is that taking it up
+ * is a layout edit like any other rather than a way round the rules.
+ */
+describe("putting a layout on the build grid", () => {
+  /** Even footprints, which centre on the corner where four build squares meet.
+   *  This document's origin is 1000 elmos east, which is half a square out, and
+   *  2000 north, which is on the grid, so only the eastings move. */
+  const footprintOf = buildingFootprints([
+    { name: "armlab", footprintX: 4, footprintZ: 4 },
+    { name: "armsolar", footprintX: 4, footprintZ: 4 },
+  ]);
+
+  const snapped = (doc: Scenario, how: LayoutEdit = "own") =>
+    editBaseLayout(doc, "b1", how, (buildings) =>
+      onBuildGrid(
+        buildings,
+        footprintOf,
+        doc.bases.find((b) => b.id === "b1")?.origin,
+      ),
+    );
+
+  it("writes the positions the buildings are drawn on into the layout", () => {
+    const next = snapped(document());
+    expect(next.blueprints[0].buildings.map((b) => b.offset)).toEqual([
+      { x: 8, z: 0 },
+      { x: 136, z: 64 },
+    ]);
+  });
+
+  it("hands the document straight back when the grid already agrees", () => {
+    const doc = snapped(document());
+    expect(snapped(doc)).toBe(doc);
+  });
+
+  it("copies a layout two bases share rather than moving both", () => {
+    const doc = {
+      ...document(),
+      bases: [structuredClone(base), { ...structuredClone(base), id: "b2" }],
+    };
+    const next = snapped(doc);
+    expect(next.blueprints).toHaveLength(2);
+    expect(buildingsOf(next, "b2").map((b) => b.offset)).toEqual(
+      layout.buildings.map((b) => b.offset),
+    );
   });
 });
