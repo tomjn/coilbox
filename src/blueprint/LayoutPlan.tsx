@@ -40,6 +40,7 @@ import {
   type BlueprintSheet,
   blueprintSheet,
   type PlanBox,
+  planLabel,
   SHEET_MARGIN,
 } from "@/hub/preview";
 
@@ -166,7 +167,7 @@ function Sheet({ shape, box }: { shape: BlueprintShape; box: PlanBox }) {
       viewBox={`${sheet.left} ${sheet.top} ${sheet.width} ${sheet.height}`}
       className="block size-full"
       role="img"
-      aria-label={`${shape.squares.length} buildings over ${Math.round(shape.width)} by ${Math.round(shape.height)} build squares`}
+      aria-label={planLabel(shape)}
     >
       <g
         className="text-muted-foreground"

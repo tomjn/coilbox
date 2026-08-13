@@ -308,6 +308,27 @@ const KIND_SINGULAR: Record<HubKind, string> = {
 };
 
 /**
+ * What the hub carries, to open a sentence with: "Presets, challenges, setup
+ * packs, scenarios and blueprints".
+ *
+ * Built from {@link HUB_KINDS} rather than written out (issue #1502). The hand
+ * written version of this sentence sat directly above a row of filter chips
+ * that had grown a fifth kind, saying the hub carried four, for as long as it
+ * took somebody to notice.
+ *
+ * The labels are written to start a sentence, so every one after the first is
+ * lowered.
+ */
+export function kindsPlural(): string {
+  const [first, ...rest] = HUB_KINDS.map(kindLabelPlural);
+  const said = rest.map((l) => l.charAt(0).toLowerCase() + l.slice(1));
+  const last = said.pop();
+  return last === undefined
+    ? first
+    : `${[first, ...said].join(", ")} and ${last}`;
+}
+
+/**
  * What a card calls an item. A challenge's `mode` says which of the two it is,
  * which is the difference between a galactic conquest and a warpath run and
  * worth more to a reader than the word "challenge" on its own.

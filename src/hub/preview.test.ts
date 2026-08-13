@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Container, ContainerKind } from "@/container/container";
-import { type BlueprintShape, blueprintSheet, readPreview } from "./preview";
+import {
+  type BlueprintShape,
+  blueprintSheet,
+  planLabel,
+  readPreview,
+} from "./preview";
 
 function container(kind: ContainerKind, payload: unknown): Container {
   return {
@@ -501,5 +506,35 @@ describe("blueprintSheet", () => {
     const sheet = blueprintSheet(shape(1, 1), card);
     expect(sheet.scale).toBe(16);
     expect(sheet.width).toBeCloseTo(232 / 16);
+  });
+});
+
+describe("planLabel", () => {
+  const shape = (buildings: number, width = 5, height = 5): BlueprintShape => ({
+    width,
+    height,
+    ordered: false,
+    squares: Array.from({ length: buildings }, (_, i) => ({
+      def: "armsolar",
+      sized: true,
+      x: i,
+      y: 0,
+      width: 1,
+      height: 1,
+    })),
+  });
+
+  it("counts one building in the singular", () => {
+    expect(planLabel(shape(1))).toBe("1 building over 5 by 5 build squares");
+  });
+
+  it("counts more than one in the plural", () => {
+    expect(planLabel(shape(4))).toBe("4 buildings over 5 by 5 build squares");
+  });
+
+  it("rounds the sheet's sides, which a footprint gap leaves fractional", () => {
+    expect(planLabel(shape(2, 5.76, 3.24))).toBe(
+      "2 buildings over 6 by 3 build squares",
+    );
   });
 });

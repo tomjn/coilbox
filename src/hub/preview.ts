@@ -481,6 +481,26 @@ export function blueprintShape(
 }
 
 /**
+ * What the plan says to somebody who cannot see it (issue #1511).
+ *
+ * Here rather than in the drawing because the website draws the same plan and
+ * says the same sentence about it, in `lib/gallery/blueprintPreview.ts` in
+ * tomjn/coilbox-hub. Two drawings of one base that describe themselves
+ * differently are worse than either on its own, so each repo keeps the sentence
+ * beside the arithmetic it describes.
+ *
+ * The sides are rounded because a footprint gap leaves them fractional, and
+ * "5.76 by 3.24 build squares" is a measurement nobody asked for.
+ */
+export function planLabel(shape: BlueprintShape): string {
+  const buildings = shape.squares.length;
+  return (
+    `${buildings} building${buildings === 1 ? "" : "s"} over ` +
+    `${Math.round(shape.width)} by ${Math.round(shape.height)} build squares`
+  );
+}
+
+/**
  * Clear ground round the layout, in build squares.
  *
  * What makes the drawing a plan on a sheet rather than a base cropped to its own

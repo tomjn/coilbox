@@ -909,10 +909,12 @@ const downloadGames: Drawing = {
  * A row of other people's things above a line, and one of them crossing it onto
  * a shelf that already holds two.
  *
- * What the hub hands you is other players' presets, challenges, setup packs and
- * scenarios, so the assortment is the subject: five different shapes rather than
- * five of one. The line is what says which side of it you are standing on, and
- * the shape crossing it is what makes this an arrival rather than a catalogue.
+ * What the hub hands you is a mix of other players' things rather than one sort
+ * of thing, so the assortment is the subject: five different shapes rather than
+ * five of one. The shapes stand for that variety and are not one per kind, so
+ * they do not have to be counted out again each time the hub carries another.
+ * The line is what says which side of it you are standing on, and the shape
+ * crossing it is what makes this an arrival rather than a catalogue.
  *
  * The globe it replaces said "the internet", which is true of every screen in
  * Coilbox that fetches anything. Not the coil mark either: the nav item beside
