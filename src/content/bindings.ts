@@ -897,6 +897,31 @@ export const contentKeymapDelete = defineCommand<
   { ok: boolean }
 >("coilbox-content", "content_keymap_delete");
 
+/** One stored blueprint. `json` is a serialised `StoredBlueprint` from
+ *  `../blueprint/library.ts`, which owns the shape. */
+export interface BlueprintListItem {
+  id: string;
+  json: string;
+}
+
+/** Every layout in the blueprint library, unsorted. */
+export const contentBlueprints = defineCommand<
+  Record<string, never>,
+  { items: BlueprintListItem[] }
+>("coilbox-content", "content_blueprints");
+
+/** Write one layout under its id, replacing what was filed under it. */
+export const contentBlueprintSave = defineCommand<
+  { id: string; json: string },
+  { ok: boolean }
+>("coilbox-content", "content_blueprint_save");
+
+/** Drop one layout from the library. */
+export const contentBlueprintDelete = defineCommand<
+  { id: string },
+  { ok: boolean }
+>("coilbox-content", "content_blueprint_delete");
+
 /**
  * Write a serialised keymap container to a path the user picked. Import runs
  * through `content_import_container`, which reads any coilbox `.json`.

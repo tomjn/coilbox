@@ -1,6 +1,7 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import {
   Archive as ArchiveIcon,
+  Blocks,
   Boxes,
   FolderTree,
   Gamepad2,
@@ -15,6 +16,7 @@ import {
   Sparkles,
   Volume2,
 } from "lucide-react";
+import { cachedBlueprint } from "../blueprint/store";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import ContentStartupProvider from "./ContentStartupProvider";
@@ -85,6 +87,15 @@ const contentPlugin: FramePlugin = {
           useVisible: () => !isProfileHidden("content.games"),
         },
         {
+          // Layouts you keep, beside the maps and games they are drawn for and
+          // above the modding tool below (issue #1415).
+          id: "content.blueprints",
+          label: "Blueprints",
+          to: "/content/blueprints",
+          order: 1.5,
+          icon: Blocks,
+        },
+        {
           // Archive explorer is a modding tool — gated behind advanced mode,
           // unlike the player-facing Maps/Games in this same group.
           id: "content.archives",
@@ -123,6 +134,23 @@ const contentPlugin: FramePlugin = {
         () => import("./pages/GameDetailPage"),
       ),
       crumb: (c) => c.params.name ?? "Game",
+    },
+    {
+      // The blueprint library (issue #1415). Its pages live under
+      // `../blueprint/`, with the model and the store they read, because a
+      // layout is its own thing rather than part of the content browser.
+      path: "content/blueprints",
+      lazy: () => import("../blueprint/pages/BlueprintsPage"),
+      crumb: "Blueprints",
+    },
+    {
+      // The route param is an opaque uuid, so the crumb resolves the layout's
+      // name from the session cache, falling back when the list is not read.
+      path: "content/blueprints/:id",
+      lazy: () => import("../blueprint/pages/BlueprintDetailPage"),
+      crumb: (c) =>
+        (c.params.id && cachedBlueprint(c.params.id)?.layout.name) ||
+        "Blueprint",
     },
     {
       path: "content/archives",

@@ -22,7 +22,11 @@
  */
 
 import { BUILD_SQUARE, facedFootprint } from "@/blueprint/footprint";
-import { parseBlueprintPayload, payloadFootprint } from "@/blueprint/payload";
+import {
+  type BlueprintPayload,
+  parseBlueprintPayload,
+  payloadFootprint,
+} from "@/blueprint/payload";
 import {
   optionsFromChallenge,
   parseConquestChallengeSettings,
@@ -414,7 +418,22 @@ export const BUILDING_GAP = 0.12;
  */
 function blueprintPreview(payload: Record<string, unknown>): HubPreview | null {
   const blueprint = parseBlueprintPayload(payload);
-  if (!blueprint || blueprint.buildings.length === 0) return null;
+  const layout = blueprint ? blueprintShape(blueprint) : null;
+  return layout ? { kind: "blueprint", layout } : null;
+}
+
+/**
+ * A layout as squares, or null when there is nothing in it to draw.
+ *
+ * Separate from the container reader above because the blueprint library draws
+ * the same picture on its cards (issue #1415), from a layout it holds rather
+ * than one it was sent. Two drawings of one base that differ are worse than
+ * either on its own, so there is one arithmetic and both callers use it.
+ */
+export function blueprintShape(
+  blueprint: BlueprintPayload,
+): BlueprintShape | null {
+  if (blueprint.buildings.length === 0) return null;
 
   const rects = blueprint.buildings.map((building) => {
     // A 3 by 2 building faced east stands on 2 by 3 of the ground.
@@ -442,19 +461,16 @@ function blueprintPreview(payload: Record<string, unknown>): HubPreview | null {
   const bottom = Math.max(...rects.map((rect) => rect.top + rect.height));
 
   return {
-    kind: "blueprint",
-    layout: {
-      width: right - left,
-      height: bottom - top,
-      ordered: blueprint.ordered === true,
-      squares: rects.map((rect) => ({
-        def: rect.def,
-        x: rect.left - left + BUILDING_GAP,
-        y: rect.top - top + BUILDING_GAP,
-        // A footprint is at least one square, so this never reaches zero.
-        width: rect.width - BUILDING_GAP * 2,
-        height: rect.height - BUILDING_GAP * 2,
-      })),
-    },
+    width: right - left,
+    height: bottom - top,
+    ordered: blueprint.ordered === true,
+    squares: rects.map((rect) => ({
+      def: rect.def,
+      x: rect.left - left + BUILDING_GAP,
+      y: rect.top - top + BUILDING_GAP,
+      // A footprint is at least one square, so this never reaches zero.
+      width: rect.width - BUILDING_GAP * 2,
+      height: rect.height - BUILDING_GAP * 2,
+    })),
   };
 }

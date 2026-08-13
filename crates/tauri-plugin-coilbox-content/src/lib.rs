@@ -10,6 +10,7 @@
 //! Results use the [`CliResult`] envelope, matching every other picoframe plugin.
 
 mod archives;
+mod blueprints;
 mod branding;
 mod build_tree_export;
 mod caches;
@@ -1275,6 +1276,11 @@ fn keymaps_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(coilbox_portable::data_dir(app)?.join("keymaps"))
 }
 
+/// Directory holding the blueprint library, under the app data dir.
+fn blueprints_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(coilbox_portable::data_dir(app)?.join("blueprints"))
+}
+
 /// `content_config_profiles` — list saved engine-config snapshots for a content
 /// root (its `springsettings.cfg` / `LuaUI/Config` / `uikeys.txt`). `rootPath` is a
 /// `ContentRoot.path`.
@@ -1457,6 +1463,59 @@ async fn content_keymap_delete<R: Runtime>(
     }
 }
 
+/// `content_blueprints`, every layout in the blueprint library. The documents
+/// are opaque here: the frontend owns their shape.
+#[tauri::command]
+async fn content_blueprints<R: Runtime>(app: AppHandle<R>) -> Result<CliResult, ()> {
+    let dir = match blueprints_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    match tauri::async_runtime::spawn_blocking(move || blueprints::list(&dir)).await {
+        Ok(items) => Ok(CliResult::ok(json!({ "items": items }))),
+        Err(e) => Ok(CliResult::err(format!("list blueprints task failed: {e}"))),
+    }
+}
+
+/// `content_blueprint_save`, write one layout under its id, replacing what was
+/// there. Ids are `[A-Za-z0-9-_]+`, which is what a UUID is.
+#[tauri::command]
+async fn content_blueprint_save<R: Runtime>(
+    app: AppHandle<R>,
+    id: String,
+    json: String,
+) -> Result<CliResult, ()> {
+    let dir = match blueprints_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let res =
+        tauri::async_runtime::spawn_blocking(move || blueprints::save(&dir, &id, &json)).await;
+    match res {
+        Ok(Ok(())) => Ok(CliResult::ok(json!({ "ok": true }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("save blueprint task failed: {e}"))),
+    }
+}
+
+/// `content_blueprint_delete`, drop one layout from the library.
+#[tauri::command]
+async fn content_blueprint_delete<R: Runtime>(
+    app: AppHandle<R>,
+    id: String,
+) -> Result<CliResult, ()> {
+    let dir = match blueprints_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let res = tauri::async_runtime::spawn_blocking(move || blueprints::delete(&dir, &id)).await;
+    match res {
+        Ok(Ok(())) => Ok(CliResult::ok(json!({ "ok": true }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("delete blueprint task failed: {e}"))),
+    }
+}
+
 /// `content_warm_rapid_pool` — background-read every `packages/*.sdp` manifest
 /// across the given roots into the OS page cache so the engine's first rapid-tag
 /// resolution is warm. Manifests only; returns a cache-warm summary.
@@ -1572,6 +1631,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_keymaps,
             content_keymap_save,
             content_keymap_delete,
+            content_blueprints,
+            content_blueprint_save,
+            content_blueprint_delete,
             content_warm_rapid_pool,
             content_prune_rapid_pool,
             content_reclaim_caches,
