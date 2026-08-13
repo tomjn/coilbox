@@ -4,6 +4,8 @@ import { equivalentOf, NO_EQUIVALENTS } from "./equivalents";
 import {
   equivalentsFor,
   equivalentsKey,
+  forgetEquivalence,
+  forgetEquivalents,
   loadEquivalents,
   rememberEquivalence,
   rememberShippedEquivalents,
@@ -130,6 +132,48 @@ describe("rememberShippedEquivalents", () => {
     expect(equivalentOf("armanni", "Cortex", equivalentsFor("byar"))).toBe(
       "cordoom",
     );
+  });
+});
+
+describe("forgetting (issue #1533)", () => {
+  beforeEach(() => {
+    rememberEquivalence("byar", "Armada", "armpw", "Cortex", "corak");
+    rememberEquivalence("byar", "Armada", "armsolar", "Cortex", "corsolar");
+  });
+
+  it("drops the one pairing asked about and keeps the rest", () => {
+    forgetEquivalence("byar", 0);
+    expect(equivalentsFor("byar").groups).toEqual([
+      { Armada: "armsolar", Cortex: "corsolar" },
+    ]);
+  });
+
+  it("drops the lot for one game and leaves every other game alone", () => {
+    rememberEquivalence("other", "Armada", "armpw", "Cortex", "corak");
+    forgetEquivalents("byar");
+    expect(equivalentsFor("byar")).toEqual(NO_EQUIVALENTS);
+    expect(equivalentsFor("other").groups).toHaveLength(1);
+  });
+
+  it("stays forgotten for the next session", () => {
+    forgetEquivalence("byar", 0);
+    resetEquivalents();
+    loadEquivalents();
+    expect(equivalentOf("armpw", "Cortex", equivalentsFor("byar"))).toBe(
+      undefined,
+    );
+  });
+
+  it("does nothing for a pairing that is not there", () => {
+    const was = equivalentsFor("byar");
+    forgetEquivalence("byar", 7);
+    forgetEquivalence("byar", -1);
+    expect(equivalentsFor("byar")).toBe(was);
+  });
+
+  it("does nothing for no game, because there is nothing to key one by", () => {
+    forgetEquivalents("");
+    expect(equivalentsFor("byar").groups).toHaveLength(2);
   });
 });
 
