@@ -66,6 +66,17 @@ export interface UnitsLayer {
   draw: (placements: Placement[]) => Promise<DrawResult>;
   /** The object drawn for a placement key, for selection and picking. */
   objects: Map<string, THREE.Object3D>;
+  /**
+   * Watch for the end of a pass of drawing, and stop watching with what comes
+   * back (issue #1516).
+   *
+   * A pass empties `objects` the moment it starts and refills it over the next
+   * few frames, so anything hanging off a drawn object, which is the selection
+   * ring, cannot know when to look for it again. The layer is the only thing
+   * that does know, so it says. A pass a later draw abandoned says nothing:
+   * whatever is drawn then belongs to the later one.
+   */
+  onDrawn: (listener: () => void) => () => void;
   dispose: () => void;
 }
 
@@ -138,6 +149,7 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
    *  marker. Kept across redraws. */
   const prototypes = new Map<string, BuiltModel>();
   const objects = new Map<string, THREE.Object3D>();
+  const watchers = new Set<() => void>();
   let generation = 0;
   let disposed = false;
 
@@ -233,6 +245,7 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
     }
 
     handle.render();
+    for (const watcher of watchers) watcher();
     return { missing: [...new Set(missing)] };
   };
 
@@ -240,10 +253,17 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
     root,
     draw,
     objects,
+    onDrawn: (listener) => {
+      watchers.add(listener);
+      return () => {
+        watchers.delete(listener);
+      };
+    },
     dispose: () => {
       disposed = true;
       root.clear();
       objects.clear();
+      watchers.clear();
       root.removeFromParent();
       for (const built of prototypes.values()) built.dispose();
       prototypes.clear();

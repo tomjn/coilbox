@@ -113,10 +113,9 @@ export function layoutPreview(
  * ground there is spoken for or too steep. Nothing else the pointer can pick up
  * has a footprint, so anything but a base's building carries nothing.
  *
- * The drag is measured from the point the document names rather than from the
- * point the grid drew, because that is the point `movePlacement` shifts. The
- * two differ by up to half a build square on a layout the grid moved, and
- * starting from the wrong one would put the answer a whole square out.
+ * The drag is measured from the square the building is drawn on, which is the
+ * building the author took hold of, and is the same point `movePlacement`
+ * carries it from (issue #1517).
  */
 export function draggedBuilding(
   placements: readonly Placement[],
@@ -125,11 +124,10 @@ export function draggedBuilding(
 ): PreviewBuilding | null {
   const placement = placements.find((one) => one.key === key);
   if (placement?.kind !== "base") return null;
-  const from = placement.named ?? placement.pos;
   return {
     def: placement.def,
     facing: placement.facing,
-    pos: { x: from.x + delta.x, z: from.z + delta.z },
+    pos: { x: placement.pos.x + delta.x, z: placement.pos.z + delta.z },
   };
 }
 
