@@ -51,6 +51,22 @@ export async function readHeightField(
 }
 
 /**
+ * How long the heightmap render's longest side may be for the check to read it
+ * (issue #1483).
+ *
+ * The render's own default is 1024, which is a picture of the ground rather
+ * than the ground: a map over 8184 elmos comes back smaller than its corner
+ * grid, and {@link cornerGround} refuses it. Every map the editor is used on is
+ * over that, so the check was refusing every map it was given.
+ *
+ * 4096 corners is a 32760 elmo map, twice the 32 by 32 that is the largest
+ * Beyond All Reason publishes. Past it the check goes quiet rather than reading
+ * a smoothed picture, and the cap is what stops a map nobody has made yet from
+ * being decoded into hundreds of megabytes.
+ */
+export const CHECK_MAX_SIDE = 4096;
+
+/**
  * The map's ground on the engine's own grid, or `null` when this field cannot
  * describe it.
  *
@@ -59,10 +75,15 @@ export async function readHeightField(
  * other thing: the heightmap's own corners, at the 8 elmo spacing the engine
  * measures them at, because the rule is arithmetic over those exact values.
  *
- * `null` when the field is not the map's corners. The worker renders a
- * heightmap down to at most 1024 pixels a side, so a map wider than 8192 elmos
- * comes back smoothed, and smoothed ground would flatten the very cliffs the
- * check is looking for. Saying nothing is the right answer there.
+ * `null` when the field is not the map's corners, which is any render made
+ * smaller than the corner grid. That is refused rather than scaled onto,
+ * because there is no honest tolerance for a smoothed height. Measured on
+ * Bismuth Valley, whose corners are 1537 by 1025: read off the 1024 wide render
+ * and scaled, 117 of 5673 spots said a solar collector would not build where
+ * the map's own corners say it builds, and the worst corner was 192 elmos out
+ * against the 7 elmos that unit tolerates. Widening `slack` to cover that would
+ * pass everything everywhere. Asking for a render at {@link CHECK_MAX_SIDE} is
+ * the way out, not a wider tolerance.
  *
  * `slack` is one step of the eight bit read back off that render, which is the
  * most a height here can differ from the one the engine holds.
