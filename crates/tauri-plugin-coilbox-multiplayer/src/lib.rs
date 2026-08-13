@@ -10,6 +10,11 @@
 //! file exposes the Tauri commands over that registry.
 
 mod conn;
+/// This client against a room the direct-hosting plugin is listening for. It
+/// lives here rather than beside that plugin because [`conn::run_loop`] is
+/// private, and driving anything less than the real one would prove nothing.
+#[cfg(test)]
+mod direct_loopback;
 mod dmlog;
 mod probe;
 /// The OAuth browser sign-in that produces a Tachyon bearer token.
