@@ -3,9 +3,12 @@ import {
   libraryGames,
   libraryLayout,
   newStoredBlueprint,
+  packSource,
   parseStoredBlueprintJson,
   recordGameName,
   recordWithLayout,
+  sourceFileName,
+  sourceSummary,
   type StoredBlueprint,
   sortLibrary,
   uniqueLayoutName,
@@ -91,6 +94,64 @@ describe("parseStoredBlueprintJson", () => {
       parseStoredBlueprintJson(JSON.stringify({ id: "b1", layout: 7 })),
     ).toBeNull();
     expect(parseStoredBlueprintJson("not json")).toBeNull();
+  });
+});
+
+describe("where a layout came from", () => {
+  const source = packSource(
+    "/Users/someone/Downloads/blueprints.json",
+    "Wall",
+    new Date("2026-08-12T09:30:00.000Z"),
+  );
+
+  it("records the file, the name it had there and when it was taken", () => {
+    expect(source).toEqual({
+      kind: "pack",
+      file: "/Users/someone/Downloads/blueprints.json",
+      wasCalled: "Wall",
+      at: "2026-08-12T09:30:00.000Z",
+    });
+  });
+
+  it("says nothing about a name that was not changed", () => {
+    expect(packSource("/tmp/blueprints.json").wasCalled).toBeUndefined();
+  });
+
+  it("names the file the way a person would, on either platform", () => {
+    expect(sourceFileName(source)).toBe("blueprints.json");
+    expect(
+      sourceFileName(packSource("C:\\Users\\me\\Downloads\\pack.json")),
+    ).toBe("pack.json");
+  });
+
+  it("says where it came from and what it was called there", () => {
+    expect(sourceSummary(source)).toContain(
+      "/Users/someone/Downloads/blueprints.json",
+    );
+    expect(sourceSummary(source)).toContain('called "Wall"');
+    expect(sourceSummary(packSource("/tmp/blueprints.json"))).not.toContain(
+      "called",
+    );
+  });
+
+  it("survives a trip through the stored document", () => {
+    const read = parseStoredBlueprintJson(
+      JSON.stringify(record({ source })),
+    );
+    expect(read?.source).toEqual(source);
+  });
+
+  it("reads a layout stored before anything recorded a source", () => {
+    const read = parseStoredBlueprintJson(JSON.stringify(record()));
+    expect(read?.source).toBeUndefined();
+  });
+
+  it("drops a source that is not one rather than refusing the layout", () => {
+    const read = parseStoredBlueprintJson(
+      JSON.stringify({ ...record(), source: { kind: "pack" } }),
+    );
+    expect(read?.id).toBe("b1");
+    expect(read?.source).toBeUndefined();
   });
 });
 
