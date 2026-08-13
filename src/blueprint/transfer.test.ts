@@ -7,6 +7,8 @@ import {
   blueprintPayload,
   encodeBlueprintCode,
   encodeBlueprintJson,
+  encodePayloadCode,
+  encodePayloadJson,
   readBlueprintContainer,
 } from "./transfer";
 
@@ -50,6 +52,26 @@ describe("blueprint transfer", () => {
     if (!code.ok) return;
     const read = readBlueprintContainer(code.code);
     expect(read.ok && read.payload.buildings).toEqual(layout.buildings);
+  });
+
+  it("sends a stored layout without rebuilding it", () => {
+    // The library keeps the wire shape, footprints and all, so sharing one is
+    // wrapping what is already on disk rather than deriving it again from a
+    // unitsync read the sharer may no longer be able to do.
+    const stored = blueprintPayload(layout, {
+      footprintOf,
+      gameName: "Beyond All Reason test",
+    });
+    const read = readBlueprintContainer(encodePayloadJson(stored));
+    expect(read.ok && read.payload).toEqual(stored);
+
+    const code = encodePayloadCode(stored);
+    expect(code.ok).toBe(true);
+    if (!code.ok) return;
+    expect(readBlueprintContainer(code.code)).toEqual({
+      ok: true,
+      payload: stored,
+    });
   });
 
   it("mints no id, because the machine reading it owns that", () => {
