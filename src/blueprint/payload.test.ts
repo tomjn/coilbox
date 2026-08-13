@@ -44,6 +44,21 @@ describe("blueprint payload", () => {
     );
   });
 
+  it("keeps the name a substituted building was drawn as", () => {
+    const parsed = parseBlueprintPayload({
+      ...structuredClone(solar),
+      buildings: [
+        {
+          def: "corsolar",
+          offset: { x: 0, z: 0 },
+          facing: 0,
+          originalName: "armsolar",
+        },
+      ],
+    });
+    expect(parsed?.buildings[0].originalName).toBe("armsolar");
+  });
+
   it("refuses a payload with no name", () => {
     expect(parseBlueprintPayload({ buildings: [], footprints: {} })).toBeNull();
   });

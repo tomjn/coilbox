@@ -17,7 +17,7 @@
  */
 
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { ArrowLeft, Loader2, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Repeat, Share2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
@@ -41,6 +41,7 @@ import {
   recordWithLayout,
   type StoredBlueprint,
 } from "../library";
+import type { BaseBlueprint } from "../model";
 import { deleteBlueprint, saveBlueprint, useBlueprintLibrary } from "../store";
 
 /** How long after the last change the layout is written. Long enough that a
@@ -155,6 +156,12 @@ export default function BlueprintDetailPage() {
 
         <div className="flex items-center gap-3">
           <SaveState saving={saving} error={saveError} />
+          <SubstituteButton
+            record={record}
+            onApply={(layout) =>
+              edit(recordWithLayout(record, layout, footprints))
+            }
+          />
           <ShareBlueprintButton record={record} />
           <DeleteBlueprintButton
             name={record.layout.name}
@@ -245,6 +252,55 @@ function ShareBlueprintButton({ record }: { record: StoredBlueprint }) {
       onClick={() => void share()}
     >
       <Share2 className="size-4" /> Share
+    </Button>
+  );
+}
+
+/**
+ * Say this layout in another side's buildings (issue #1314).
+ *
+ * Next to Share rather than inside the editor, because it is a thing done to the
+ * whole layout once rather than a thing done while drawing one, and because what
+ * it needs on screen is a list of unit names rather than the surface.
+ */
+function SubstituteButton({
+  record,
+  onApply,
+}: {
+  record: StoredBlueprint;
+  onApply: (layout: BaseBlueprint) => void;
+}) {
+  const drawer = useDrawer();
+
+  const open = async () => {
+    const { SubstituteBlueprintForm } = await import(
+      "./components/SubstituteBlueprintForm"
+    );
+    drawer.open({
+      title: `Convert ${record.layout.name}`,
+      width: "32rem",
+      content: (
+        <SubstituteBlueprintForm
+          key={nextDrawerKey()}
+          record={record}
+          onApply={(layout) => {
+            onApply(layout);
+            drawer.close();
+          }}
+        />
+      ),
+    });
+  };
+
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="gap-1.5"
+      onClick={() => void open()}
+    >
+      <Repeat className="size-4" /> Convert
     </Button>
   );
 }

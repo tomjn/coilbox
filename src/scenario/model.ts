@@ -509,7 +509,15 @@ function parseLayout(value: unknown): BlueprintBuilding[] | null {
     const def = id(raw.def);
     const offset = parsePoint(raw.offset);
     if (def === undefined || !offset) return null;
-    out.push({ def, offset, facing: parseFacing(raw.facing) });
+    // What the building was before it was swapped for another side's equivalent
+    // (issue #1314), which is what makes the swap reversible.
+    const originalName = str(raw.originalName)?.trim() || undefined;
+    out.push({
+      def,
+      offset,
+      facing: parseFacing(raw.facing),
+      ...(originalName ? { originalName } : {}),
+    });
   }
   return out;
 }
