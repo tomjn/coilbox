@@ -13,12 +13,15 @@
 //! - [`password_hash`] computes the login password hash.
 //! - [`reduce`] applies a [`ServerMessage`] to [`LobbyState`], emitting [`Delta`]s.
 //! - [`LoginMachine`] drives the reply-driven login handshake.
+//! - The [`server`] module is the mirror, for hosting a room with no lobby
+//!   server: it parses client lines and builds server ones.
 
 pub mod command;
 mod hash;
 mod login;
 mod message;
 mod reduce;
+pub mod server;
 mod state;
 mod status;
 mod vote;
