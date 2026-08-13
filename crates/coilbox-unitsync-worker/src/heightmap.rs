@@ -6,7 +6,7 @@
 //! reported by cache file name so the preview loads it over the asset protocol.
 
 use crate::ffi::Unitsync;
-use crate::minimap::{map_cache_key, rendered_image, RenderedImage};
+use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage};
 use crate::model::HeightmapOutput;
 use image::{DynamicImage, ImageBuffer, ImageFormat, Luma};
 use std::io::Cursor;
@@ -79,7 +79,7 @@ pub fn render(
             .heightmap_size(map_name)
             .ok_or_else(|| "no heightmap available".to_string())?;
         // Only the cache miss pays for the full GetInfoMap read + encode.
-        let (png, on_disk) = coilbox_thumb_cache::cached_at(cache, || {
+        let (png, on_disk) = coilbox_thumb_cache::cached_at(cache.clone(), || {
             let raw = us
                 .heightmap_data(map_name, w, h)
                 .ok_or_else(|| "failed to read heightmap".to_string())?;
@@ -87,6 +87,7 @@ pub fn render(
         })?;
         Ok((rendered_image(&png, on_disk), w, h))
     })();
+    sweep_pictures(cache_dir, cache.as_slice());
 
     let errors = us.drain_errors();
     us.uninit();
@@ -137,5 +138,15 @@ mod tests {
     fn heightmap_png_rejects_size_mismatch() {
         let raw: Vec<u16> = vec![0, 1, 2];
         assert!(heightmap_png(&raw, 4, 2, 2).is_err());
+    }
+
+    /// The picture budget is a suffix, so a heightmap named anything else would
+    /// quietly stop being bounded (issue #1550).
+    #[test]
+    fn the_picture_sweep_covers_what_this_writes() {
+        let file = cache_file(Some(Path::new("/cache")), Some("abc"), 512).expect("cache file");
+        assert!(file
+            .to_string_lossy()
+            .ends_with(crate::minimap::PICTURE_SUFFIX));
     }
 }

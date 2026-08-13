@@ -17,10 +17,11 @@
 //! 32 by 32 elmo map is 33 MB of words and base64 on the bridge is no way to
 //! move that.
 //!
-//! That size is also why these are the one thing in the thumb cache that is
-//! bounded (issue #1535). Every call sweeps the least recently used of them out
-//! of the way, keeping the one it is answering with, and a map whose grid was
-//! swept is read again the next time somebody opens it.
+//! That size is also why these have a budget of their own, a small one, apart
+//! from the one the rendered pictures beside them share (issues #1535 and
+//! #1550). Every call sweeps the least recently used of them out of the way,
+//! keeping the one it is answering with, and a map whose grid was swept is read
+//! again the next time somebody opens it.
 
 use crate::ffi::Unitsync;
 use crate::minimap::map_cache_key;
@@ -32,7 +33,8 @@ use std::path::{Path, PathBuf};
 const SUFFIX: &str = "-hf.bin";
 
 /// How many bytes of raw height grids the cache holds, across every map (issue
-/// #1535).
+/// #1535). The rendered pictures beside them have their own, much larger,
+/// budget: see `minimap::PICTURE_BUDGET`.
 ///
 /// The files are 3 MB for a 12 by 12 map and 33 MB for a 32 by 32 one, so
 /// without a bound an author working through a map pack pays for every map they
@@ -111,7 +113,7 @@ pub fn render(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> HeightFiel
         // about to be fetched. A map whose grid does go loses its verdicts and
         // says so, rather than getting one off a file that is not there.
         if let Some(dir) = file.parent() {
-            coilbox_thumb_cache::sweep(dir, SUFFIX, BUDGET, &file);
+            coilbox_thumb_cache::sweep(dir, SUFFIX, BUDGET, std::slice::from_ref(&file));
         }
         Ok((name, w, h))
     })();
