@@ -4,6 +4,7 @@ import { ClipboardPaste, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { ChallengeCodeInput } from "@/challenge/ChallengeCodeInput";
+import { containerKindsSentence } from "@/container/names";
 import { importContainerFile } from "../bindings";
 import { dispatchDeepLink } from "../bus";
 import { ConfirmDialog, type Pending } from "../ConfirmDialog";
@@ -139,11 +140,13 @@ export default function ImportSection() {
       <div className="rounded-lg border">
         <ChallengeCodeInput
           key={seed ?? "empty"}
-          // No list of kinds. This box takes all seven a container can hold,
-          // not the five the hub carries, and the list it used to give had
-          // fallen two behind (issue #1502). "Anything" is both shorter and
-          // the true answer.
-          helpText="Anything coilbox shares goes here, whatever kind of thing it is."
+          // The list is back, built from the kinds a container can hold rather
+          // than written out (issue #1515). Written out is how it came to be
+          // two kinds short, and how it stayed short until somebody counted.
+          // A campaign is on it: pasting one here is answered with where a
+          // campaign goes, which is this box doing its job rather than
+          // refusing.
+          helpText={`Anything coilbox shares goes here: ${containerKindsSentence()}.`}
           placeholder="Paste a coilbox link, a code, or an exported file's contents…"
           submitLabel="Import"
           busyLabel="Checking…"

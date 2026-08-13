@@ -36,6 +36,7 @@ import { useGameUnits } from "@/content/useGameUnits";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { hubItemRoute, isHubItemPageReachable } from "@/hub/config";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
+import { scenarioRoute } from "@/scenario/scenarios";
 import {
   duplicatedBlueprint,
   footprintsFromUnits,
@@ -175,6 +176,25 @@ export default function BlueprintDetailPage() {
                     className="underline underline-offset-2 hover:text-foreground"
                   >
                     See it on the hub
+                  </Link>
+                </>
+              )}
+              {/* The same door for a layout lifted out of a mission (issue
+                  #1514). The player-facing Scenarios list rather than the
+                  builder: the builder is advanced-gated and redirects home,
+                  while this route is reachable to anybody and already answers
+                  a scenario that is not there with "it may have been deleted".
+                  A scenario renamed since keeps the name it had here, because
+                  the line is a record of where this copy came from rather than
+                  a view of the mission as it stands. */}
+              {record.source.kind === "scenario" && (
+                <>
+                  {" "}
+                  <Link
+                    to={scenarioRoute(record.source.scenario)}
+                    className="underline underline-offset-2 hover:text-foreground"
+                  >
+                    Open the scenario
                   </Link>
                 </>
               )}
