@@ -9,6 +9,7 @@ import {
   rectsOverlap,
   snapToBuildGrid,
   unitFootprint,
+  unjudged,
 } from "./footprint";
 
 /** Balanced Annihilation's own numbers, read out of the unit dataset, so the
@@ -168,7 +169,7 @@ describe("footprintMarks", () => {
         footprint: { x: 5, z: 4 },
         rect: { minX: 64, minZ: 64, maxX: 144, maxZ: 128 },
         overlapping: false,
-        standing: "unknown",
+        standing: "no-ground",
       },
     ]);
   });
@@ -193,7 +194,7 @@ describe("footprintMarks", () => {
       [{ key: "a", def: "armmex", pos: { x: 0, z: 0 }, facing: 0 }],
       of,
     );
-    expect(marks[0].standing).toBe("unknown");
+    expect(marks[0].standing).toBe("no-ground");
   });
 
   it("marks both buildings of an overlapping pair and leaves the rest", () => {
@@ -233,5 +234,34 @@ describe("footprintMarks", () => {
       of,
     );
     expect(marks[0].overlapping).toBe(false);
+  });
+});
+
+/**
+ * The three states the map draws, kept apart here so the drawing cannot quietly
+ * collapse two of them (issue #1491).
+ */
+describe("unjudged", () => {
+  it("is false for a verdict about the ground", () => {
+    expect(unjudged("fine")).toBe(false);
+    expect(unjudged("slope")).toBe(false);
+  });
+
+  it("is true for every reason there is no verdict", () => {
+    expect(unjudged("no-ground")).toBe(true);
+    expect(unjudged("no-units")).toBe(true);
+    expect(unjudged("no-slope")).toBe(true);
+  });
+
+  /** A floater is not unjudged. The ground under it decides nothing, so there
+   *  is no answer missing and nothing for an author to do. */
+  it("is false for a floater", () => {
+    expect(unjudged("floats")).toBe(false);
+  });
+
+  /** A def the game has not got is a definite absence rather than a missing
+   *  answer. Issue #1445 is what it looks like on the map. */
+  it("is false for a def the game has not got", () => {
+    expect(unjudged("no-def")).toBe(false);
   });
 });

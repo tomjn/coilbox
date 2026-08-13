@@ -80,7 +80,7 @@ describe("layoutPreview", () => {
     expect(marks.map((mark) => mark.overlapping)).toEqual([true, true]);
   });
 
-  it("says nothing about the ground where there is no map to ask", () => {
+  it("says which nothing it has about the ground with no map to ask", () => {
     const { footprintOf, standingOf } = previewChecks(units, null);
     const marks = layoutPreview(
       [solarAt(100, 100)],
@@ -88,7 +88,7 @@ describe("layoutPreview", () => {
       [],
       standingOf,
     );
-    expect(marks[0].standing).toBe("unknown");
+    expect(marks[0].standing).toBe("no-ground");
   });
 
   it("passes a building on flat ground and refuses one on a cliff", () => {
@@ -111,8 +111,11 @@ describe("layoutPreview", () => {
     const clear = previewCount(
       layoutPreview([solarAt(1000, 1000)], footprintOf, standing),
     );
-    expect(clear).toEqual({ total: 1, clashes: 0, unstable: 0 });
-    expect(previewSentence(clear)).toBe("1 building, and it has room here.");
+    expect(clear).toEqual({ total: 1, clashes: 0, unstable: 0, unjudged: 1 });
+    // Nothing asked about the ground here, so having room is all it may claim.
+    expect(previewSentence(clear)).toBe(
+      "1 building, and it has room here. It has not been checked against the ground.",
+    );
     expect(previewTrouble(clear)).toBe(false);
 
     const fighting = previewCount(
@@ -124,19 +127,36 @@ describe("layoutPreview", () => {
     );
     expect(fighting.clashes).toBe(1);
     expect(previewSentence(fighting)).toBe(
-      "1 of 2 wants ground another building has, in red.",
+      "1 of 2 wants ground another building has, in red. None of them has been checked against the ground.",
     );
     expect(previewTrouble(fighting)).toBe(true);
   });
 
   it("says both reasons the engine would refuse a building", () => {
-    const both = { total: 12, clashes: 3, unstable: 2 };
+    const both = { total: 12, clashes: 3, unstable: 2, unjudged: 0 };
     expect(previewSentence(both)).toBe(
       "3 of 12 want ground another building has, in red. 2 are on ground too steep for them, in amber.",
     );
-    expect(previewSentence({ total: 12, clashes: 0, unstable: 1 })).toBe(
-      "1 of 12 is on ground too steep for it, in amber.",
+    expect(
+      previewSentence({ total: 12, clashes: 0, unstable: 1, unjudged: 0 }),
+    ).toBe("1 of 12 is on ground too steep for it, in amber.");
+  });
+
+  /**
+   * Issue #1491. A preview that says twelve buildings all have room, when three
+   * of them were never checked against the ground, is the same false assurance
+   * the map was giving. Said as a plain fact rather than in amber, because an
+   * unknown is not a refusal.
+   */
+  it("says how many of them nothing judged", () => {
+    expect(
+      previewSentence({ total: 12, clashes: 0, unstable: 0, unjudged: 3 }),
+    ).toBe(
+      "12 buildings, and they all have room here. 3 of them have not been checked against the ground.",
     );
+    expect(
+      previewTrouble({ total: 12, clashes: 0, unstable: 0, unjudged: 3 }),
+    ).toBe(false);
   });
 
   it("knows a frame that would draw the layout where it already is", () => {
@@ -157,9 +177,12 @@ describe("layoutPreview", () => {
   });
 
   it("leaves a surface alone while the same thing is true", () => {
-    const one = { total: 12, clashes: 1, unstable: 0 };
+    const one = { total: 12, clashes: 1, unstable: 0, unjudged: 0 };
     expect(sameCount(one, { ...one })).toBe(true);
     expect(sameCount(one, { ...one, clashes: 2 })).toBe(false);
+    // The moment the game's units arrive, the same layout stops being unjudged
+    // and the sentence has to be redrawn.
+    expect(sameCount(one, { ...one, unjudged: 12 })).toBe(false);
     expect(sameCount(one, null)).toBe(false);
     expect(sameCount(null, null)).toBe(true);
   });

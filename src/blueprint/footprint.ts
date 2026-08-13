@@ -183,14 +183,52 @@ export function rectsOverlap(a: Rect, b: Rect): boolean {
 }
 
 /**
- * What can be said about the ground under one building (issue #1315).
+ * What can be said about the ground under one building (issue #1315), and where
+ * an absent verdict came from (issue #1491).
  *
- * `"unknown"` is a building nothing has judged, which is not the same as one
- * that is fine: no map to check against, a def the unit dataset says nothing
- * about, or a heightmap too coarse to read. Whoever answers is
- * `./buildable.ts`, and the type lives here because it is a fact about a mark.
+ * Two of these are answers about the ground. The rest are reasons there is no
+ * answer, and they are kept apart because they are different problems with
+ * different fixes: a person can wait for a game's units to be read, and can do
+ * nothing at all about a map whose heights will not read.
+ *
+ * One flat `"unknown"` is what let the check rot. It said the same nothing
+ * whether the ground had been read or not, so a check that had been refusing
+ * every map it was given for months looked exactly like a check that was
+ * passing everything (issue #1483).
+ *
+ * Whoever answers is `./buildable.ts`, and the type lives here because it is a
+ * fact about a mark.
  */
-export type Standing = "fine" | "slope" | "unknown";
+export type Standing =
+  | "fine"
+  /** The ground under it moves further than the def tolerates. */
+  | "slope"
+  /** There is no ground to ask: no map, or a heightmap that would not read. */
+  | "no-ground"
+  /** The game's units have not been read, so nothing knows what this def is. */
+  | "no-units"
+  /** They have been read, and this game has not got this unit (issue #1445). */
+  | "no-def"
+  /** This game's entry for the def says nothing about slope. */
+  | "no-slope"
+  /** A floater rests on the water, so the ground under it decides nothing. */
+  | "floats";
+
+/**
+ * Whether nothing has judged this building, which is not the same as its being
+ * fine.
+ *
+ * A floater is not in here: the ground under it decides nothing, so there is no
+ * answer missing. Neither is a def the game has not got, which is a definite
+ * absence rather than a gap in what the check knows.
+ */
+export function unjudged(standing: Standing): boolean {
+  return (
+    standing === "no-ground" ||
+    standing === "no-units" ||
+    standing === "no-slope"
+  );
+}
 
 /** One building as the map should draw it. */
 export interface FootprintMark {
@@ -221,8 +259,9 @@ export interface FootprintMark {
  * neither of them is the one at fault.
  *
  * `standingOf` says whether the ground will take each building, once it is known
- * where the building will stand. Left out where there is no map to ask about,
- * which is the standalone editor, and then every mark says `"unknown"`.
+ * where the building will stand. Left out where there is nobody to ask, and then
+ * every mark says `"no-ground"`, which the map draws as a building with no
+ * verdict rather than as one that is fine.
  */
 export function footprintMarks(
   buildings: { key: string; def: string; pos: Point; facing: Facing }[],
@@ -241,7 +280,7 @@ export function footprintMarks(
       rect: footprintRect(pos, footprint, building.facing),
       overlapping: false,
     };
-    return { ...mark, standing: standingOf?.(mark) ?? "unknown" };
+    return { ...mark, standing: standingOf?.(mark) ?? "no-ground" };
   });
 
   for (let i = 0; i < marks.length; i++) {

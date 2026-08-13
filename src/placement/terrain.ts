@@ -107,6 +107,18 @@ export function cornerGround(
   };
 }
 
+/**
+ * Ground with no relief, which is the standalone editor's build grid.
+ *
+ * Known, level and exact, so every building on it gets a real verdict. Without
+ * this the mapless editor would have no ground at all and would draw every
+ * building as one nothing had judged, which is true of a map that would not read
+ * and is not true of a floor that is flat on purpose (issue #1491).
+ */
+export function flatGround(): Ground {
+  return { cornerAt: () => 0, slack: 0, minHeight: 0, maxHeight: 0 };
+}
+
 /** A sample by pixel, clamped to the field so an edge position still reads. */
 function sampleAt(field: HeightField, col: number, row: number): number {
   const c = Math.min(field.width - 1, Math.max(0, col));

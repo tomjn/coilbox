@@ -94,32 +94,61 @@ export function slopeTolerance(maxSlopeDegrees: number): number {
   return 40 * Math.tan((degrees * Math.PI) / 180);
 }
 
-/** What one def tolerates, or `null` for a def this cannot judge. */
-export type SlopeOf = (def: string) => number | null;
+/**
+ * What one def tolerates, or which reason there is no number to judge it by.
+ *
+ * The reasons are the `Standing` values that are not verdicts, so a caller
+ * hands one straight back rather than translating it. That is deliberate: the
+ * moment there is a translation step, four reasons can be flattened into one
+ * silence again, which is the bug (issue #1491).
+ */
+export type SlopeAnswer =
+  | number
+  | "no-units"
+  | "no-def"
+  | "no-slope"
+  | "floats";
+export type SlopeOf = (def: string) => SlopeAnswer;
 
 /**
  * {@link slopeTolerance} for the units of one game.
  *
- * `null` for three different defs, all of which mean "say nothing": one the
- * game has not got, one whose dataset entry predates the field, and one that
- * floats. A floater rests on the water and the ground under it decides nothing,
- * so checking it against the seabed would mark buildings that build perfectly
- * well.
+ * Three different defs have no number, and which of the three it is matters to
+ * whoever has to say so on screen. One the game has not got is somebody's
+ * layout from another game. One whose entry predates the field is a gap in this
+ * game's own data. A floater rests on the water and the ground under it decides
+ * nothing, so checking it against the seabed would mark buildings that build
+ * perfectly well.
  *
  * A def declaring zero is not one of those. Zero is the engine's default and it
  * is a real answer: that building wants flat ground.
  */
 export function unitSlopes(
   units: { name: string; maxSlope?: number; floatOnWater?: boolean }[],
+  /**
+   * Whether `units` is this game's dataset read rather than an empty list
+   * standing in for one that has not been read yet.
+   *
+   * Without it an editor opening on a game still being read would accuse every
+   * building in it of being a unit the game has not got, and clear itself two
+   * seconds later. The same flag `ImportReport.checked` carries, for the same
+   * reason.
+   */
+  checked = units.length > 0,
 ): SlopeOf {
-  const byName = new Map<string, number>();
+  const byName = new Map<string, SlopeAnswer>();
   for (const unit of units) {
-    if (unit.floatOnWater === true) continue;
-    if (unit.maxSlope === undefined || !Number.isFinite(unit.maxSlope))
-      continue;
-    byName.set(unit.name.toLowerCase(), slopeTolerance(unit.maxSlope));
+    const name = unit.name.toLowerCase();
+    if (unit.floatOnWater === true) {
+      byName.set(name, "floats");
+    } else if (unit.maxSlope === undefined || !Number.isFinite(unit.maxSlope)) {
+      byName.set(name, "no-slope");
+    } else {
+      byName.set(name, slopeTolerance(unit.maxSlope));
+    }
   }
-  return (def) => byName.get(def.toLowerCase()) ?? null;
+  return (def) =>
+    checked ? (byName.get(def.toLowerCase()) ?? "no-def") : "no-units";
 }
 
 /** The ground of one heightmap square, which is the average of the four corners
@@ -176,15 +205,21 @@ function buildHeight(
  *
  * The mark's position is already where the engine will put the building, so the
  * squares it covers are read straight off it. `tolerance` is what the def
- * allows, from {@link unitSlopes}, and `null` there is a building this cannot
- * judge rather than one it approves of.
+ * allows, from {@link unitSlopes}, and anything other than a number there is
+ * the reason this building cannot be judged rather than an approval of it.
+ *
+ * A `null` ground is the same kind of answer about the map instead of about the
+ * def: no map, or a heightmap that would not read. The def's reason is given
+ * first, because a unit the game has not got is that whether or not there is a
+ * map, and it is the one an author can act on.
  */
 export function standsOn(
   mark: Pick<FootprintMark, "pos" | "facing" | "footprint">,
-  ground: Ground,
-  tolerance: number | null,
+  ground: Ground | null,
+  tolerance: SlopeAnswer,
 ): Standing {
-  if (tolerance === null) return "unknown";
+  if (typeof tolerance !== "number") return tolerance;
+  if (!ground) return "no-ground";
   const allowed = tolerance + ground.slack;
   const faced = facedFootprint(mark.footprint, mark.facing);
   // A footprint is in build squares and the heightmap is finer, so each side

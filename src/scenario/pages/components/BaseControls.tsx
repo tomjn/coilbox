@@ -52,6 +52,7 @@ import {
   LayoutNameField,
   LayoutNotes,
 } from "@/placement/LayoutControls";
+import type { Unjudged } from "@/placement/placements";
 import type { Participant } from "@/play/config";
 import type { PlacedBuilding, ScenarioBase } from "../../model";
 import {
@@ -73,6 +74,7 @@ export function BaseControls({
   sharedEdit,
   overlaps,
   unstable,
+  unjudged,
   designedFor,
   onMap,
   participants,
@@ -112,6 +114,9 @@ export function BaseControls({
    *  base. Drawn in amber on the map as well, and empty where the terrain
    *  could not be checked at all. */
   unstable: number[];
+  /** Which of them nothing judged, and why. Undefined while the reads are still
+   *  in flight, when nothing is worth saying yet (issue #1491). */
+  unjudged?: Unjudged;
   /** The map the layout was drawn on, when it says (issue #1315). */
   designedFor?: string;
   /** The map the mission is on, which is the one the base is standing on. */
@@ -340,6 +345,7 @@ export function BaseControls({
           <LayoutNotes
             overlaps={overlaps}
             unstable={unstable}
+            unjudged={unjudged}
             designedFor={designedFor}
             onMap={onMap}
             strays={strays}

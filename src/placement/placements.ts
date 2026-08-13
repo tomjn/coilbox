@@ -122,16 +122,53 @@ export function baseFootprints(
   placements: Placement[],
   units: BuildingUnit[],
   /** The map's ground, when there is a map and it can be read finely enough.
-   *  Without one no building gets a verdict, which is the standalone editor and
-   *  is also every scene before the heightmap has arrived. */
+   *  Without one no building gets a verdict, and each one says so. */
   ground: Ground | null = null,
+  /** Whether `units` is the game's dataset read rather than an empty list
+   *  standing in for one not read yet, as {@link unitSlopes} takes it. */
+  checked = units.length > 0,
 ): FootprintMark[] {
-  const slopeOf = unitSlopes(units);
+  const slopeOf = unitSlopes(units, checked);
   return footprintMarks(
     placements.filter((placement) => placement.kind === "base"),
     buildingFootprints(units),
-    ground ? (mark) => standsOn(mark, ground, slopeOf(mark.def)) : undefined,
+    (mark) => standsOn(mark, ground, slopeOf(mark.def)),
   );
+}
+
+/**
+ * Which of one base's buildings nothing has judged, grouped by why (issue
+ * #1491).
+ *
+ * Grouped rather than listed, because the reasons are different problems with
+ * different fixes and "unknown" on its own is nothing anybody can act on. Two
+ * of the three are true of every building at once, so a panel says them about
+ * the layout rather than naming buildings. The third is per building.
+ */
+export interface Unjudged {
+  /** No ground to ask about: the map's heights would not read. */
+  noGround: number[];
+  /** The game's units have not been read. */
+  noUnits: number[];
+  /** This game's entry for the def says nothing about slope. */
+  noSlope: number[];
+}
+
+export function unjudgedIn(
+  placements: Placement[],
+  marks: FootprintMark[],
+  baseId: string,
+): Unjudged {
+  const why = new Map(marks.map((mark) => [mark.key, mark.standing]));
+  const out: Unjudged = { noGround: [], noUnits: [], noSlope: [] };
+  for (const placement of placements) {
+    if (placement.kind !== "base" || placement.id !== baseId) continue;
+    const standing = why.get(placement.key);
+    if (standing === "no-ground") out.noGround.push(placement.index);
+    if (standing === "no-units") out.noUnits.push(placement.index);
+    if (standing === "no-slope") out.noSlope.push(placement.index);
+  }
+  return out;
 }
 
 /** Which of one base's buildings the ground will not take, by their place in
