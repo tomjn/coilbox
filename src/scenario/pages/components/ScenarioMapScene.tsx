@@ -813,6 +813,7 @@ export function ScenarioMapScene({
                   units={gameUnits.units}
                   unitsLoading={gameUnits.loading}
                   sides={gameSides}
+                  gameArchive={gameUnits.archive}
                   moving={moving === pickedBase.id}
                   onEdit={(patch) =>
                     onChange((doc) => editBase(doc, pickedBase.id, patch))
