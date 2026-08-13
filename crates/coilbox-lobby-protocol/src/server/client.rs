@@ -111,10 +111,7 @@ pub enum ClientCommand {
     /// `MYSTATUS <status_int>`
     MyStatus { status: i32 },
     /// `MYBATTLESTATUS <battlestatus_int> <teamcolor_int>`
-    MyBattleStatus {
-        battle_status: i32,
-        team_color: i64,
-    },
+    MyBattleStatus { battle_status: i32, team_color: i64 },
     /// `UPDATEBATTLEINFO <spectatorCount> <locked> <maphash> <map>`
     UpdateBattleInfo {
         spectator_count: u32,

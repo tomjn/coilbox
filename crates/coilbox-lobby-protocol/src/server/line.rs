@@ -300,10 +300,7 @@ mod tests {
             battle_opened(&b),
             "BATTLEOPENED 1 0 0 alice 192.168.0.5 8452 16 0 0 -1 spring\t105\tRed Comet\tLAN game\tBAR\t__battle__1"
         );
-        let no_channel = BattleOpened {
-            channel: None,
-            ..b
-        };
+        let no_channel = BattleOpened { channel: None, ..b };
         assert!(battle_opened(&no_channel).ends_with("\tBAR"));
     }
 

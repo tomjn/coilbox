@@ -176,7 +176,10 @@ fn current_battle_scoped_lines_need_the_join_ack_first() {
     // Removals are scoped the same way, so a box cleared before the ack would
     // leave the joiner holding one the host has already dropped.
     feed(&mut ordered, &line::remove_start_rect(0));
-    feed(&mut ordered, &line::remove_script_tags(&["game/startpostype"]));
+    feed(
+        &mut ordered,
+        &line::remove_script_tags(&["game/startpostype"]),
+    );
     let battle = &ordered.battles[&1];
     assert!(battle.start_rects.is_empty());
     assert!(battle.script_tags.is_empty());
@@ -188,7 +191,10 @@ fn current_battle_scoped_lines_need_the_join_ack_first() {
 fn the_host_reads_back_its_own_room() {
     let mut state = LobbyState::new();
     feed(&mut state, &line::accepted("alice"));
-    feed(&mut state, &line::add_user("alice", "??", "1", "Coilbox 0.1"));
+    feed(
+        &mut state,
+        &line::add_user("alice", "??", "1", "Coilbox 0.1"),
+    );
     feed(&mut state, &line::battle_opened(&room_battle()));
 
     let deltas = feed(&mut state, &line::open_battle(1));
