@@ -473,6 +473,124 @@ async fn a_client_that_leaves_is_forgotten() {
     room.stop("done").await;
 }
 
+/// The reclaim, over a socket, against the real client.
+///
+/// This is the one that a unit test cannot settle. The room and the client
+/// disagree about who says what after a join: the room hands the seat back, and
+/// the client's connection task answers `REQUESTBATTLESTATUS` on its own out of a
+/// state it has just rebuilt from nothing. Send both and the second undoes the
+/// first, and only a real client on a real socket shows it.
+#[tokio::test]
+async fn a_dropped_joiner_reconnects_into_the_seat_they_had() {
+    let room = room("alice", false).await;
+    let registry = Registry::default();
+
+    let host = Client::connect(&registry, loopback(room.port()), "alice").await;
+    host.wait_for_ready().await;
+    host.send(open_battle_line());
+    let joiner = Client::connect(&registry, loopback(room.port()), "bob").await;
+    joiner.wait_for_ready().await;
+    joiner.send(command::join_battle(1, None, Some("s3cret")));
+    wait_until(
+        || joiner.state().current_battle == Some(1),
+        "the joiner to be in the battle",
+    )
+    .await;
+
+    let seat = BattleStatus {
+        mode: true,
+        ally: 2,
+        team_id: 3,
+        ..default_battle_status()
+    };
+    joiner.send(command::my_battle_status(seat, 16_711_680));
+    wait_until(
+        || {
+            host.state().battles[&1]
+                .members
+                .get("bob")
+                .is_some_and(|m| m.battle_status == seat)
+        },
+        "the host to see bob's seat",
+    )
+    .await;
+
+    // The drop, and the room forgetting the socket it happened on.
+    joiner.disconnect();
+    wait_for_room(&room, |s| s.peers == 1, "the room to lose bob's socket").await;
+
+    let again = Client::connect(&registry, loopback(room.port()), "bob").await;
+    again.wait_for_ready().await;
+    again.send(command::join_battle(1, None, Some("fresh-sp")));
+    wait_until(
+        || again.state().current_battle == Some(1),
+        "the returning joiner to be back in the battle",
+    )
+    .await;
+
+    // Their own room draws the seat they left with, and so does everybody
+    // else's. Give the client's own answer to a prompt time to arrive and undo
+    // it, if the room were to send one.
+    tokio::time::sleep(LONG_ENOUGH_TO_HANG).await;
+    for (who, client) in [("the returning joiner", &again), ("the host", &host)] {
+        let me = client.state().battles[&1].members["bob"].clone();
+        assert_eq!(me.battle_status, seat, "{who} lost bob's seat");
+        assert_eq!(me.team_color, 16_711_680, "{who} lost bob's colour");
+    }
+    assert!(
+        !again
+            .received()
+            .contains(&"REQUESTBATTLESTATUS".to_string()),
+        "a prompt here is answered with the default and undoes the reclaim"
+    );
+    // The host gets the script password the new socket arrived with, because it
+    // is that socket the start script has to let in.
+    assert_eq!(
+        host.state().battles[&1].members["bob"]
+            .script_password
+            .as_deref(),
+        Some("fresh-sp")
+    );
+
+    room.stop("done").await;
+}
+
+/// A name in use is refused, and the refusal carries a name that is not, because
+/// there is no account system here to fall back on and no host watching to ask.
+#[tokio::test]
+async fn a_name_already_here_is_refused_with_one_that_is_free() {
+    let room = room("alice", false).await;
+    let registry = Registry::default();
+
+    let host = Client::connect(&registry, loopback(room.port()), "alice").await;
+    host.wait_for_ready().await;
+
+    let twin = Client::connect(&registry, loopback(room.port()), "alice").await;
+    wait_until(
+        || {
+            twin.received()
+                .iter()
+                .any(|l| l.starts_with("DENIED that name is already in this room"))
+        },
+        "the second alice to be refused",
+    )
+    .await;
+    assert!(
+        twin.received()
+            .contains(&"DENIED that name is already in this room, try alice2".to_string()),
+        "the refusal has to name a free one: {:?}",
+        twin.received()
+    );
+    // Refused and dropped, which is what puts the reason on the login form
+    // rather than leaving a socket open that can do nothing.
+    wait_until(|| twin.phase().is_none(), "the refused connection to end").await;
+    // And the suggestion works, which is the whole point of making one.
+    let renamed = Client::connect(&registry, loopback(room.port()), "alice2").await;
+    renamed.wait_for_ready().await;
+
+    room.stop("done").await;
+}
+
 /// The friend and ignore lists our client fires unprompted on login are commands
 /// a room has no answer for. Answering `FAILED cmd=...` would pop a toast at
 /// somebody who did nothing wrong, so the room says nothing at all.
