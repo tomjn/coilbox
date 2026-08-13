@@ -106,19 +106,28 @@ function buildingRole(building: PlacedBuilding): BaseBuildingRole {
 }
 
 /**
- * The document without the layouts nothing places any more.
+ * The document without one of its layouts, and without the bases placed from it
+ * (issue #1424).
  *
- * Called wherever a base goes, because a blueprint the editor minted for one
- * base is that base's layout and nothing else. A layout an author saved for its
- * own sake will have somewhere else to be listed, and this only ever drops one
- * that no base names.
+ * The only way a layout leaves a scenario. Deleting a base used to take its
+ * layout with it whenever nothing else placed it, which was fine while every
+ * layout was minted for one base and an unplaced one was unreachable, and wrong
+ * the moment a layout is a thing an author imported and means to keep: moving a
+ * base by deleting it and putting it back somewhere else threw the geometry
+ * away in between.
+ *
+ * So a placement going never takes geometry with it, and geometry going always
+ * takes its placements with it. A base is a layout put somewhere, so a base
+ * whose layout has gone would be a thing the document held and nobody could
+ * draw, select or delete.
  */
-export function pruneBlueprints(scenario: Scenario): Scenario {
-  const used = new Set(scenario.bases.map((base) => base.blueprint));
-  const blueprints = scenario.blueprints.filter((b) => used.has(b.id));
-  return blueprints.length === scenario.blueprints.length
-    ? scenario
-    : { ...scenario, blueprints };
+export function removeBlueprint(scenario: Scenario, id: string): Scenario {
+  if (!scenario.blueprints.some((b) => b.id === id)) return scenario;
+  return {
+    ...scenario,
+    blueprints: scenario.blueprints.filter((b) => b.id !== id),
+    bases: scenario.bases.filter((base) => base.blueprint !== id),
+  };
 }
 
 /**
@@ -305,13 +314,7 @@ export function replaceBlueprint(
   layout: BaseBlueprint,
 ): Scenario {
   if (!scenario.blueprints.some((b) => b.id === layout.id)) return scenario;
-  if (layout.buildings.length === 0) {
-    return pruneBlueprints({
-      ...scenario,
-      blueprints: scenario.blueprints.filter((b) => b.id !== layout.id),
-      bases: scenario.bases.filter((base) => base.blueprint !== layout.id),
-    });
-  }
+  if (layout.buildings.length === 0) return removeBlueprint(scenario, layout.id);
   return {
     ...scenario,
     blueprints: edit<BaseBlueprint>(
@@ -458,20 +461,26 @@ export function setOrigin(
   });
 }
 
-/** The document without a base, buildings and queues and all. */
+/**
+ * The document without a base, buildings and queues and all.
+ *
+ * The layout it was placed from stays, even when this was the last base placed
+ * from it. See {@link removeBlueprint}: what the author deleted is a base, and
+ * the layout is listed as one nothing places until they say otherwise.
+ */
 export function removeBase(scenario: Scenario, id: string): Scenario {
   const bases = scenario.bases.filter((base) => base.id !== id);
   return bases.length === scenario.bases.length
     ? scenario
-    : pruneBlueprints({ ...scenario, bases });
+    : { ...scenario, bases };
 }
 
 /**
  * The document with one of a base's buildings gone, from both halves at once.
  *
  * The base goes with its last building, because an empty cluster is not a thing
- * an author can see or select again, and its layout goes with it unless another
- * base is placed from that too.
+ * an author can see or select again. Its layout stays, holding the building that
+ * was left, which is the same rule deleting the base itself follows.
  */
 export function removeBuilding(
   scenario: Scenario,

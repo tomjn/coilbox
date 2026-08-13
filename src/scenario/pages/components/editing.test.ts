@@ -229,7 +229,8 @@ describe("removePlacement", () => {
     expect(one.blueprints[0].buildings.map((b) => b.def)).toEqual(["armllt"]);
     const none = removePlacement(one, "base:b1#0");
     expect(none.bases).toEqual([]);
-    expect(none.blueprints).toEqual([]);
+    // The layout stays behind, listed as one nothing places (#1424).
+    expect(none.blueprints.map((b) => b.id)).toEqual(["bp1"]);
   });
 
   it("hands back the same document when the key names nothing", () => {

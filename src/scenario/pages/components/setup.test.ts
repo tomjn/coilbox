@@ -311,8 +311,9 @@ describe("removing a participant", () => {
     expect(next.actors.map((a) => a.id)).toEqual(["hero"]);
     expect(next.groups).toEqual([]);
     expect(next.bases).toEqual([]);
-    // The layout goes with the base nothing places any more.
-    expect(next.blueprints).toEqual([]);
+    // The layout stays. It belongs to the scenario rather than to the
+    // participant whose base was placed from it (issue #1424).
+    expect(next.blueprints.map((b) => b.id)).toEqual(["outpost-layout"]);
     // The trigger that named it is left alone, exactly as deleting a zone
     // leaves the conditions naming it alone.
     expect(next.triggers[0].conditions.conditions[0].params.team).toBe(ai);
