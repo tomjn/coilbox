@@ -22,6 +22,7 @@
 import * as THREE from "three";
 
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import { worldToScene } from "@/placement/scene";
 import type { Point } from "../../model";
 import {
   drapePoints,
@@ -31,7 +32,6 @@ import {
   pathLineKey,
 } from "./groups";
 import type { PathSource } from "./orderPaths";
-import { worldToScene } from "./scene";
 
 /** What a scenario's paths are drawn under, so the layer can be found and
  *  removed as one thing. */

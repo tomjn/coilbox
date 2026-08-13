@@ -26,11 +26,28 @@ import { createUnitsLayer, type UnitsLayer } from "./unitsLayer";
 /** The map inputs the layer needs, as `useMissionMapAssets` reports them. */
 export interface MapExtent {
   heightSrc?: string;
+  /**
+   * The ground has no relief and there is no heightmap coming (issue #1416).
+   *
+   * The blueprint editor draws on flat ground rather than on a map, and without
+   * this an absent `heightSrc` is a read still in flight, which is what it is
+   * for every other caller. Said explicitly so a map whose heightmap failed to
+   * resolve keeps drawing nothing rather than quietly flattening itself.
+   */
+  flat?: boolean;
   minHeight: number;
   maxHeight: number;
   worldWidth: number;
   worldHeight: number;
 }
+
+/** Ground with no relief: one sample, at nothing. Sampled through the same
+ *  bilinear read the map is, which answers 0 everywhere for this. */
+const FLAT_FIELD: HeightField = {
+  width: 1,
+  height: 1,
+  samples: Float32Array.of(0),
+};
 
 /** What the editor's surface can say about what it just drew, and what editing
  *  it needs to reach. */
@@ -135,8 +152,13 @@ export function useScenarioUnits(
   lookups.current = { objectNames, participants, resolve: archive };
 
   const [field, setField] = useState<HeightField | null>(null);
+  const flat = map.flat === true;
   useEffect(() => {
     const src = map.heightSrc;
+    if (flat) {
+      setField(FLAT_FIELD);
+      return;
+    }
     if (!src) {
       setField(null);
       return;
@@ -152,7 +174,7 @@ export function useScenarioUnits(
     return () => {
       cancelled = true;
     };
-  }, [map.heightSrc]);
+  }, [map.heightSrc, flat]);
 
   const { worldWidth, worldHeight, minHeight, maxHeight } = map;
   const [layer, setLayer] = useState<UnitsLayer | null>(null);

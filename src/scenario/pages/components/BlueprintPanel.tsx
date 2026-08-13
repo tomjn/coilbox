@@ -28,7 +28,7 @@
 
 import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { Blocks, Download, Upload } from "lucide-react";
+import { Blocks, Download, Pencil, Upload } from "lucide-react";
 import { useState } from "react";
 import { barFormat } from "@/blueprint/bar";
 import { appFileIO } from "@/blueprint/fileIO";
@@ -36,8 +36,10 @@ import { buildGridSnap } from "@/blueprint/footprint";
 import type { ImportedBlueprint, ImportReport } from "@/blueprint/format";
 import { mergeIntoGameFile } from "@/blueprint/gameFile";
 import type { UnitDatasetEntry } from "@/content/bindings";
+import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import { usePlay } from "@/play/PlayProvider";
 import type { Scenario } from "../../model";
+import { replaceBlueprint } from "./bases";
 import { takeBlueprint } from "./blueprintImport";
 import { EditorPanel } from "./panels";
 
@@ -67,6 +69,10 @@ export function BlueprintPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  // Which layout is open in the map-free editor, if any. Held by id rather than
+  // by value, so an edit lands back in the document and comes out of it again.
+  const [editing, setEditing] = useState<string | null>(null);
+  const openLayout = scenario.blueprints.find((b) => b.id === editing) ?? null;
 
   const team = scenario.setup.participants[0]?.id;
 
@@ -233,12 +239,45 @@ export function BlueprintPanel({
                         size="sm"
                         variant="ghost"
                         className="shrink-0"
+                        onClick={() =>
+                          setEditing(editing === layout.id ? null : layout.id)
+                        }
+                      >
+                        <Pencil className="mr-1 size-3.5" />
+                        {editing === layout.id ? "Close" : "Edit the layout"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="shrink-0"
                         disabled={busy || running}
                         onClick={() => onSend(layout.id, layout.name)}
                       >
                         <Download className="mr-1 size-3.5" /> Send to a game
                       </Button>
                     </div>
+
+                    {openLayout?.id === layout.id && (
+                      <div className="space-y-2 pt-1">
+                        <p className="text-[11px] text-muted-foreground">
+                          A layout is a shape rather than a place, so this draws
+                          on a build grid and loads no map. Editing it here
+                          edits the layout itself, so every base placed from it
+                          changes. To change one base only, drag its buildings
+                          on the map above.
+                        </p>
+                        <BlueprintEditor
+                          blueprint={openLayout}
+                          gameName={scenario.setup.gameName}
+                          onChange={(next) => {
+                            onChange((current) =>
+                              replaceBlueprint(current, next),
+                            );
+                            if (next.buildings.length === 0) setEditing(null);
+                          }}
+                        />
+                      </div>
+                    )}
                     {stripped.length > 0 && (
                       <p className="text-[11px] text-amber-200/80">
                         Sending this strips {stripped.join(", ")}. A game's
