@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { directServer } from "../direct/room";
 import { lsGetCredential } from "../lobby-servers/bindings";
 import {
   allServers,
@@ -339,6 +340,15 @@ interface MultiplayerContextValue {
   busy: boolean;
   /** Open a connection as `username` to `server` (throws if no stored password). */
   connect: (server: LobbyServer, username: string) => Promise<void>;
+  /**
+   * Connect to a room this client is hosting, over loopback, and answer with its
+   * `serverKey` so the caller can act on the connection before React has re-rendered.
+   *
+   * Separate from `connect` only in where the credential comes from: a room has no
+   * accounts, so there is no keychain entry to read and nothing worth remembering
+   * as a last-used login.
+   */
+  connectDirect: (port: number, username: string) => Promise<string>;
   /**
    * Sign in to a Tachyon server through the system browser, storing the result so
    * `connect` can use it. Resolves once the user has finished in the browser, and
@@ -883,6 +893,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const reconnectCtxRef = useRef<{
     server: LobbyServer;
     username: string;
+    /** A room this client hosts, which has no stored credential to re-read. */
+    direct?: boolean;
   } | null>(null);
   // The battle to rejoin after a reconnect reaches `ready` (captured before the
   // drop tears down state). Cleared once attempted or on a manual connect.
@@ -1098,11 +1110,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // Records the reconnect context and resets the per-session drop flags so a later
   // unexpected disconnect can rebuild the session.
   const doConnect = useCallback(
-    async (server: LobbyServer, username: string) => {
+    async (server: LobbyServer, username: string, direct = false) => {
       setBusy(true);
       intentionalRef.current = false;
       loggedInRef.current = false;
-      reconnectCtxRef.current = { server, username };
+      reconnectCtxRef.current = { server, username, direct };
       const serverKey = serverKeyFor(server, username);
       connectingKeyRef.current = serverKey;
       try {
@@ -1122,11 +1134,20 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             onEvent,
           });
         } else {
-          const cred = await lsGetCredential({ serverId: server.id, username });
-          if (!cred.secret) {
-            throw new Error(
-              "No stored password for this login (set one in Settings).",
-            );
+          // A room has no accounts, so it accepts any password and there is none
+          // to look up. Everything after the handshake is identical.
+          let secret = "*";
+          if (!direct) {
+            const cred = await lsGetCredential({
+              serverId: server.id,
+              username,
+            });
+            if (!cred.secret) {
+              throw new Error(
+                "No stored password for this login (set one in Settings).",
+              );
+            }
+            secret = cred.secret;
           }
           dispatch({ type: "connecting" });
           await mpConnect({
@@ -1136,7 +1157,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             tlsMode: tlsModeFor(server),
             allowSelfSigned: server.allowSelfSigned,
             username,
-            password: cred.secret,
+            password: secret,
             clientId: clientIdRef.current,
             compatFlags: ["u", "sp"],
             onEvent,
@@ -1149,8 +1170,12 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // Remember this login as the last used, so opt-in auto-connect and the
         // one-click reconnect row can seed it next launch. Keyed by id+username so
         // it survives the account being re-created (not by the volatile account id).
-        setLastLoginRef.current({ serverId: server.id, username });
-        markAccountUsedRef.current(server.id, username);
+        // A room is skipped: it is gone by the next launch, and it is not an
+        // account, so it belongs in neither list.
+        if (!direct) {
+          setLastLoginRef.current({ serverId: server.id, username });
+          markAccountUsedRef.current(server.id, username);
+        }
       } catch (e) {
         // A user cancel aborts the in-flight connect, so `mpConnect` rejects by
         // design: swallow it, clear the mirror, and leave the UI disconnected
@@ -1194,6 +1219,19 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     [doConnect, stopReconnect],
   );
 
+  // Connect to a room we host. The key is returned rather than read off
+  // `activeKey`, because a caller that starts a room then opens a battle in it
+  // does both before React has re-rendered with the new key.
+  const connectDirect = useCallback(
+    async (port: number, username: string) => {
+      stopReconnect();
+      const server = directServer(port);
+      await doConnect(server, username, true);
+      return serverKeyFor(server, username);
+    },
+    [doConnect, stopReconnect],
+  );
+
   // Run the reconnect loop after an unexpected drop: retry `doConnect` on a bounded
   // backoff. A monotonic generation lets a manual connect/disconnect invalidate it,
   // and it self-stops on success or after exhausting the attempt budget.
@@ -1205,7 +1243,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       const ctx = reconnectCtxRef.current;
       if (!ctx) return;
       try {
-        await doConnect(ctx.server, ctx.username);
+        await doConnect(ctx.server, ctx.username, ctx.direct);
         if (reconnectGenRef.current !== gen) return;
         void notify({ title: "Reconnected to multiplayer", level: "success" });
       } catch {
@@ -1475,6 +1513,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         revealed,
         busy,
         connect,
+        connectDirect,
         signIn,
         register,
         disconnect,
