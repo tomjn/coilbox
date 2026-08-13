@@ -34,6 +34,11 @@
  * mission-only field a conversion has to reach, because a converted factory told
  * to build the side it used to be builds nothing, and the panel is where they
  * come back out as a plan the base's own queues are then said in.
+ *
+ * The panel is opened through `./SubstituteBaseForm.tsx` rather than directly,
+ * which is what puts this game's own answers in it (issue #1531). Without them
+ * a queued unit converts only where the game's naming happens to reach it, and
+ * every answer given here was thrown away when the drawer closed.
  */
 
 import { Button, useDrawer } from "@picoframe/frame";
@@ -50,7 +55,6 @@ import {
 import { buildingFootprints } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
 import { offGridBuildings } from "@/blueprint/offGrid";
-import { SubstitutionPanel } from "@/blueprint/pages/components/SubstitutionPanel";
 import type { SideUnits, SubstitutionPlan } from "@/blueprint/substitution";
 import type { UnknownBuilding } from "@/blueprint/units";
 import { Label } from "@/components/ui/label";
@@ -78,6 +82,7 @@ import {
   strayDefs,
   withoutQueued,
 } from "./bases";
+import { SubstituteBaseForm } from "./SubstituteBaseForm";
 import { TeamSelect } from "./TeamSelect";
 
 export function BaseControls({
@@ -100,6 +105,7 @@ export function BaseControls({
   units,
   unitsLoading,
   sides,
+  gameArchive,
   moving,
   onEdit,
   onRename,
@@ -159,6 +165,10 @@ export function BaseControls({
   /** What this game calls each side's units, or empty when its own naming says
    *  nothing a conversion can be suggested from. */
   sides: readonly SideUnits[];
+  /** The archive this mission's game was read out of, which is what a
+   *  conversion keys this game's answers by (issue #1525). Undefined for a game
+   *  that is not installed, which converts nothing anyway. */
+  gameArchive: string | undefined;
   /** Whether the map is waiting for a click to move the base. */
   moving: boolean;
   /** Change the base's own fields, as {@link editBase} takes them. */
@@ -407,9 +417,10 @@ export function BaseControls({
                   width: "32rem",
                   content: (
                     <div key={nextDrawerKey()} className="flex flex-col">
-                      <SubstitutionPanel
+                      <SubstituteBaseForm
                         layout={layout}
                         queued={buildings.flatMap((one) => one.queue ?? [])}
+                        gameArchive={gameArchive}
                         sides={sides}
                         units={units}
                         unitsLoading={unitsLoading}
