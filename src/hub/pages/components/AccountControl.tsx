@@ -1,4 +1,5 @@
 import { Button } from "@picoframe/frame";
+import { RotateCw } from "lucide-react";
 import { useHubAccount } from "../../account";
 
 /**
@@ -17,8 +18,17 @@ import { useHubAccount } from "../../account";
  * signed in.
  */
 export function AccountControl({ hubUrl }: { hubUrl: string }) {
-  const { loading, busy, signedIn, account, problem, signIn, signOut } =
-    useHubAccount(hubUrl);
+  const {
+    loading,
+    busy,
+    signedIn,
+    unknown,
+    account,
+    problem,
+    recheck,
+    signIn,
+    signOut,
+  } = useHubAccount(hubUrl);
 
   return (
     <section className="space-y-2">
@@ -48,6 +58,19 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
             you have already shared.
           </p>
         </>
+      ) : unknown ? (
+        // The check failed, so this is not a signed-out reader and must not be
+        // told what an account is for (issue #1470). Settings is where somebody
+        // goes to sort their account out, and it was the one place that could
+        // not ask the question again. The sign-in stays beside it, because it
+        // works whatever the keychain said a moment ago.
+        <>
+          <p className="text-sm text-muted-foreground">{COULD_NOT_CHECK}</p>
+          <div className="flex flex-wrap gap-2">
+            <TryAgainButton onRecheck={recheck} />
+            <SignInButton busy={busy} onSignIn={signIn} size="sm" />
+          </div>
+        </>
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
@@ -70,6 +93,47 @@ export function AccountControl({ hubUrl }: { hubUrl: string }) {
       )}
       {problem && <p className="text-sm text-destructive">{problem}</p>}
     </section>
+  );
+}
+
+/**
+ * What a failed check amounts to, in one sentence. The reason itself is shown
+ * beside it where there is room: this is what it means, not what went wrong.
+ *
+ * Written once because all three surfaces say it, and because the difference
+ * between this and "you are signed out" is the whole point of the state.
+ */
+export const COULD_NOT_CHECK =
+  "Coilbox could not tell whether you are signed in.";
+
+/**
+ * The one way out of a check that could not find out (issues #1456, #1470).
+ *
+ * The answer is kept for the session, so without this the only ways past it are
+ * signing in or restarting coilbox. Whatever was in the way, usually a keychain
+ * that did not answer inside its ten seconds, is often gone by the time somebody
+ * reads the sentence.
+ */
+export function TryAgainButton({
+  onRecheck,
+  size = "sm",
+  variant = "outline",
+  className,
+}: {
+  onRecheck: () => Promise<void>;
+  size?: "sm" | "default";
+  variant?: "default" | "outline";
+  className?: string;
+}) {
+  return (
+    <Button
+      size={size}
+      variant={variant}
+      className={className}
+      onClick={() => void onRecheck()}
+    >
+      <RotateCw className="mr-1.5 size-4" aria-hidden /> Try again
+    </Button>
   );
 }
 

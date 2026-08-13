@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { useHubAccount } from "../../account";
-import { SignInButton } from "./AccountControl";
+import { SignInButton, TryAgainButton } from "./AccountControl";
 
 /**
  * Who you are on the hub, in the browse screen's header.
@@ -19,14 +19,30 @@ import { SignInButton } from "./AccountControl";
  * sign-in button at somebody who is already signed in.
  */
 export function HeaderAccount({ hubUrl }: { hubUrl: string }) {
-  const { loading, busy, signedIn, account, problem, signIn } =
-    useHubAccount(hubUrl);
+  const {
+    loading,
+    busy,
+    signedIn,
+    unknown,
+    account,
+    problem,
+    recheck,
+    signIn,
+  } = useHubAccount(hubUrl);
 
   if (loading) return null;
 
   return (
     <div className="flex flex-col items-end justify-center gap-1">
-      {signedIn ? (
+      {unknown ? (
+        // The check could not find out, which is nobody's fault and not a
+        // sign-out (issue #1470). The reason is already below in red, so this
+        // is the pair of ways out of it: ask again, or sign in regardless.
+        <div className="flex items-center gap-2">
+          <TryAgainButton onRecheck={recheck} />
+          <SignInButton busy={busy} onSignIn={signIn} />
+        </div>
+      ) : signedIn ? (
         // To Settings, which is where the rest of the account is: the name you
         // are signed in under is the obvious thing to press when what you want
         // is to stop being signed in under it.
