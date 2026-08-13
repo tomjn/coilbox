@@ -204,7 +204,13 @@ export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
   // Only where there is a game here to have checked against. Saying "not
   // checked" about a game nobody has adds nothing to having just said nobody
   // has it.
-  if (gameToCheckAgainst(game) !== "") {
+  //
+  // A mission is always something to check against, whatever game the layout
+  // claims, because the mission's game is the yardstick and the units handed in
+  // are its own. That is the difference that matters for a layout from another
+  // game: the library can only say you have not got it, and a mission can say
+  // which of its buildings will not be there.
+  if (into ? into !== "" : gameToCheckAgainst(game) !== "") {
     const missing = unknownUnitsWarning(unknown, payload.buildings.length);
     if (missing) {
       notes.unshift({ tone: "warn", text: missing });

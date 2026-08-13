@@ -264,6 +264,36 @@ describe("a layout going into a mission", () => {
     expect(arrival.notes[0].text).toContain("none of its units");
   });
 
+  /** The mission's game is the yardstick, so it is always the thing to check
+   *  against, whatever game the layout claims. */
+  it("checks the units even when the layout claims another game", () => {
+    const arrival = blueprintArrival({
+      payload: payload({
+        game: { name: "Zero-K 1.2.3" },
+        buildings: [{ def: "zkfusion", offset: { x: 0, z: 0 }, facing: 0 }],
+      }),
+      taken: [],
+      installed: INSTALLED,
+      known: knownUnits(UNITS),
+      into: "Balanced Antihilation 12.34",
+    });
+    expect(arrival.foreign).toBe(true);
+    expect(arrival.notes[0].text).toContain("none of its units");
+    expect(arrival.notes[1].text).toContain("Zero-K 1.2.3");
+  });
+
+  it("says nothing about units when the mission has not picked a game", () => {
+    const arrival = blueprintArrival({
+      payload: payload({ game: { name: "Zero-K 1.2.3" } }),
+      taken: [],
+      installed: INSTALLED,
+      into: "",
+    });
+    expect(arrival.notes.map((note) => note.text).join(" ")).not.toContain(
+      "not read",
+    );
+  });
+
   it("works for a mission whose game is not installed here", () => {
     const arrival = blueprintArrival({
       payload: payload({ game: { name: "Zero-K 1.2.3" } }),
