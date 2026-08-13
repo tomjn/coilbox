@@ -36,6 +36,17 @@ pub enum AuthError {
     /// stored sign-in is not known. Not the same as there being none: a keychain
     /// waiting on a permission prompt or a locked vault says nothing either way.
     StorageTimedOut,
+    /// The OS keychain did not answer in time while being handed a sign-in to
+    /// keep. The sign-in itself worked and this process can use it, so this is
+    /// about the next run rather than this one (issue #1469).
+    ///
+    /// A write that is given up on is not cancelled, so it may yet land. That is
+    /// why nothing here says the sign-in was lost.
+    StorageKeepTimedOut,
+    /// The OS keychain did not answer in time while being asked to drop a
+    /// sign-in. Whether the stored token is gone is not known, so this is not
+    /// "signed out" (issue #1469). What this process holds is gone either way.
+    StorageForgetTimedOut,
     /// There is no stored refresh token for this account, so the user has to sign
     /// in through the browser again.
     NotSignedIn,
@@ -86,6 +97,14 @@ impl std::fmt::Display for AuthError {
             },
             Self::Storage(m) => write!(f, "keychain error: {m}"),
             Self::StorageTimedOut => write!(f, "the keychain did not answer in time"),
+            Self::StorageKeepTimedOut => write!(
+                f,
+                "you are signed in for this session, but the keychain did not answer in time, so it may not have been kept for the next one"
+            ),
+            Self::StorageForgetTimedOut => write!(
+                f,
+                "the keychain did not answer in time, so whether the stored sign-in was removed is not known"
+            ),
             Self::NotSignedIn => write!(f, "not signed in to this server"),
             Self::SignInRefused(m) => {
                 write!(f, "the server would not accept your sign-in: {m}")

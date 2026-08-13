@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const hubAccount = vi.fn();
+const hubSignIn = vi.fn();
+const hubSignOut = vi.fn();
 vi.mock("./auth", () => ({
   hubAccount: (args: { hubUrl: string }) => hubAccount(args),
-  hubSignIn: vi.fn(),
-  hubSignOut: vi.fn(),
+  hubSignIn: (args: { hubUrl: string }) => hubSignIn(args),
+  hubSignOut: (args: { hubUrl: string }) => hubSignOut(args),
 }));
 
 const {
@@ -12,6 +14,8 @@ const {
   forgetHubAccounts,
   hubAccountSnapshot,
   recheckHubAccount,
+  signInToHub,
+  signOutOfHub,
 } = await import("./account");
 
 const signedIn = {
@@ -24,6 +28,8 @@ describe("who is signed in to the hub", () => {
   beforeEach(() => {
     forgetHubAccounts();
     hubAccount.mockReset();
+    hubSignIn.mockReset();
+    hubSignOut.mockReset();
   });
 
   /** The bug: the hub header, the publish form and the settings section all
@@ -90,6 +96,49 @@ describe("who is signed in to the hub", () => {
     const state = hubAccountSnapshot("https://hub.example");
     expect(state.signedIn).toBe(true);
     expect(state.unknown).toBe(false);
+    expect(state.problem).toBe(null);
+  });
+
+  /** Issue #1469. The browser trip worked and this session holds a token, so a
+   * keychain that would not keep it is a sentence to read, not a sign-in that
+   * failed. */
+  it("counts a sign-in the keychain would not keep as signed in", async () => {
+    hubSignIn.mockResolvedValue({
+      account: signedIn.account,
+      problem: "You are signed in for this session.",
+    });
+    await signInToHub("https://hub.example");
+    const state = hubAccountSnapshot("https://hub.example");
+    expect(state.signedIn).toBe(true);
+    expect(state.account).toEqual(signedIn.account);
+    expect(state.problem).toContain("this session");
+    expect(state.busy).toBe(false);
+  });
+
+  /** Issue #1469. A keychain delete that ran out of time may still land or may
+   * never have happened, so what is stored is unknown. Showing signed out on
+   * that is the one thing a sign-out must not get wrong. */
+  it("does not show signed out when the sign-out did not complete", async () => {
+    hubAccount.mockResolvedValue(signedIn);
+    await askHubWhoWeAre("https://hub.example");
+    hubSignOut.mockRejectedValue(
+      new Error("the system keychain did not answer in time"),
+    );
+    await signOutOfHub("https://hub.example");
+    const state = hubAccountSnapshot("https://hub.example");
+    expect(state.signedIn).toBe(true);
+    expect(state.problem).toContain("keychain");
+    expect(state.busy).toBe(false);
+  });
+
+  it("shows signed out when the sign-out did complete", async () => {
+    hubAccount.mockResolvedValue(signedIn);
+    await askHubWhoWeAre("https://hub.example");
+    hubSignOut.mockResolvedValue({});
+    await signOutOfHub("https://hub.example");
+    const state = hubAccountSnapshot("https://hub.example");
+    expect(state.signedIn).toBe(false);
+    expect(state.account).toBe(null);
     expect(state.problem).toBe(null);
   });
 });

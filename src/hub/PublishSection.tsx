@@ -208,6 +208,12 @@ export function PublishSection({ code }: { code: string }) {
       <h3 className="text-sm font-medium leading-none">
         Publish to the Coilbox hub
       </h3>
+      {/* A sign-in that worked and was not kept says so here, since this is
+          where most people sign in from (issue #1469). Publishing still works,
+          so it sits above the form rather than in place of it. */}
+      {account.problem && (
+        <p className="text-xs text-destructive">{account.problem}</p>
+      )}
       <Field label="Title">
         <Input
           value={title}

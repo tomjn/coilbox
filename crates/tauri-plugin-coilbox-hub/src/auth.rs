@@ -322,9 +322,23 @@ where
     .await
 }
 
-/// Sign in through the browser and keep the result. Returns who signed in, and
-/// nothing else.
-pub async fn sign_in<F>(hub_url: &str, open_browser: F) -> Result<Identity, AuthError>
+/// What a sign-in ended as: who signed in, and anything about it the reader has
+/// to be told.
+pub struct SignedIn {
+    pub identity: Identity,
+    /// Set when the sign-in worked but keeping it did not. See [`sign_in`].
+    pub problem: Option<String>,
+}
+
+/// Sign in through the browser and keep the result.
+///
+/// A keychain that will not take the token is not a failed sign-in. By the time
+/// it is asked, the browser trip is done and this process holds a usable token,
+/// so the answer is who signed in plus a sentence saying it may not be there
+/// next time (issue #1469). Failing here instead would throw away what the user
+/// had just spent a minute on, and tell them they were signed out while they
+/// could publish.
+pub async fn sign_in<F>(hub_url: &str, open_browser: F) -> Result<SignedIn, AuthError>
 where
     F: FnOnce(&str) -> Result<(), String>,
 {
@@ -335,18 +349,25 @@ where
         error: "invalid_response".into(),
         description: Some("no user".into()),
     })?;
-    coilbox_oauth::remember(SERVICE, &account, answer.tokens)?;
-    Ok(identity)
+    let problem = match coilbox_oauth::remember(SERVICE, &account, answer.tokens).await {
+        Ok(()) => None,
+        Err(e) => Some(explain(&e, hub_url)),
+    };
+    Ok(SignedIn { identity, problem })
 }
 
 /// Forget this machine's sign-in to a hub.
 ///
 /// Supabase has no revocation endpoint coilbox can reach with a publishable key, so
 /// this is as far as it goes: the token is gone from here, not from the project.
-pub fn sign_out(hub_url: &str) -> Result<(), AuthError> {
+///
+/// The keychain delete has a deadline, so this always answers (issue #1469). A
+/// delete that ran out of time is an error rather than a sign-out, because what
+/// is left on disk is exactly what nobody knows.
+pub async fn sign_out(hub_url: &str) -> Result<(), AuthError> {
     let account = account_key(hub_url);
     identities().lock().unwrap().remove(&account);
-    coilbox_oauth::forget(SERVICE, &account)
+    coilbox_oauth::forget(SERVICE, &account).await
 }
 
 /// Whether there is a stored sign-in for this hub that has not been refused.
@@ -420,6 +441,21 @@ pub fn explain(error: &AuthError, hub_url: &str) -> String {
         // answered says nothing about what is stored in it.
         AuthError::StorageTimedOut => {
             "Coilbox could not read the system keychain in time, so it does not know whether you are signed in. The keychain may be locked, or waiting for you to allow access."
+                .into()
+        }
+        // The sign-in worked. Only the keeping of it is in doubt, and "may"
+        // rather than "will" because a write coilbox stopped waiting for can
+        // still finish on its own.
+        AuthError::StorageKeepTimedOut => {
+            "You are signed in for this session. Coilbox could not save it to the system keychain in time, so you may have to sign in again next time you open coilbox. The keychain may be locked, or waiting for you to allow access."
+                .into()
+        }
+        // Deliberately not "you are signed out". A delete coilbox stopped
+        // waiting for is not a delete that did not happen, and telling somebody
+        // their sign-in is off this machine when it may still be on it is the
+        // one thing a sign-out must never get wrong.
+        AuthError::StorageForgetTimedOut => {
+            "Coilbox stopped using your sign-in, but the system keychain did not answer in time, so whether the saved copy is gone is not known. The keychain may be locked, or waiting for you to allow access. Sign out again once you have answered it."
                 .into()
         }
         AuthError::NotSignedIn => format!("You are not signed in to the hub at {host}."),
@@ -640,6 +676,8 @@ mod tests {
             AuthError::SignInRefused("revoked".into()),
             AuthError::Storage("locked".into()),
             AuthError::StorageTimedOut,
+            AuthError::StorageKeepTimedOut,
+            AuthError::StorageForgetTimedOut,
             AuthError::Listener("port in use".into()),
             AuthError::Browser("no handler".into()),
         ];
@@ -653,6 +691,22 @@ mod tests {
             assert!(!said.contains("the server"), "{error:?} -> {said}");
         }
         assert!(explain(&AuthError::Http("x".into()), hub).contains("hub.example"));
+    }
+
+    /// Issue #1469. A keychain write that ran out of time is not a write that
+    /// did not happen, so neither sentence may state what is on disk. The
+    /// sign-out one especially: telling somebody their saved sign-in is gone
+    /// when it may still be there is the one thing a sign-out must not get
+    /// wrong.
+    #[test]
+    fn a_keychain_write_that_ran_out_of_time_claims_nothing_about_what_is_stored() {
+        let hub = "https://hub.example";
+        let forgotten = explain(&AuthError::StorageForgetTimedOut, hub);
+        assert!(forgotten.contains("is not known"), "{forgotten}");
+        assert!(!forgotten.contains("signed out"), "{forgotten}");
+        let kept = explain(&AuthError::StorageKeepTimedOut, hub);
+        assert!(kept.contains("signed in for this session"), "{kept}");
+        assert!(kept.contains("may have to sign in again"), "{kept}");
     }
 
     // ------------------------------------------------------- the whole round trip
