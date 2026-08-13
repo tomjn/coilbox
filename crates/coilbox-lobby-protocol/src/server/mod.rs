@@ -18,5 +18,7 @@
 //! the joiner sits in a room with no start boxes and no game options.
 
 mod client;
+pub mod line;
 
 pub use client::{parse_client_line, ClientCommand};
+pub use line::BattleOpened;
