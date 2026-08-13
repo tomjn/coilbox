@@ -280,6 +280,10 @@ export function BlueprintPanel({
                         <BlueprintEditor
                           blueprint={openLayout}
                           gameName={scenario.setup.gameName}
+                          // The page's history already covers these edits, and
+                          // its buttons are on the map above. A second one here
+                          // would take two steps back on one press (#1442).
+                          history="caller"
                           onChange={(next) => {
                             onChange((current) =>
                               replaceBlueprint(current, next),

@@ -35,7 +35,7 @@ import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
-import { baseBuildings, type Point, type Scenario } from "@/scenario/model";
+import { baseBuildings, type Point } from "@/scenario/model";
 import {
   addBuilding,
   buildingUnits,
@@ -49,11 +49,8 @@ import {
   removePlacement,
   turnPlacement,
 } from "@/scenario/pages/components/editing";
-import {
-  BLUEPRINT_BASE_ID,
-  blueprintDocument,
-  documentLayout,
-} from "./blueprintDocument";
+import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
+import { useLayoutHistory } from "./blueprintHistory";
 import { GRID_EXTENT, gridGround, layoutFraming } from "./ground";
 import {
   BuildOrderPopover,
@@ -62,7 +59,7 @@ import {
 } from "./LayoutControls";
 import { PlacementSurface } from "./PlacementSurface";
 import { baseFootprints, overlappingIn, placementKey } from "./placements";
-import { PlaybackBar, SelectionBar } from "./SurfaceBars";
+import { HistoryControls, PlaybackBar, SelectionBar } from "./SurfaceBars";
 import { focusCamera, focusDistance, worldToScene } from "./scene";
 import { useMapEditing } from "./useMapEditing";
 import { useScenarioFootprints } from "./useScenarioFootprints";
@@ -80,6 +77,7 @@ export function BlueprintEditor({
   blueprint,
   gameName,
   onChange,
+  history = "own",
 }: {
   blueprint: BaseBlueprint;
   /** The game whose units this layout is built from, which is what its models
@@ -88,6 +86,16 @@ export function BlueprintEditor({
   /** The layout after an edit. Called once per edit, with the whole layout,
    *  because a blueprint is small and whoever owns it decides where it goes. */
   onChange: (blueprint: BaseBlueprint) => void;
+  /**
+   * Who holds the way back from an edit (issue #1442).
+   *
+   * Its own by default, so a layout opened anywhere can be undone. `"caller"`
+   * for an editor mounted inside one that already records these edits: the
+   * scenario editor's history covers everything `onChange` reaches, and two
+   * histories listening for the same key press would take two steps back on
+   * one press.
+   */
+  history?: "own" | "caller";
 }) {
   const [handle, setHandle] = useState<MapScene3D | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -99,25 +107,14 @@ export function BlueprintEditor({
     [blueprint, gameName],
   );
 
-  /**
-   * Make an edit to the layout, as a change to the document it is held in.
-   *
-   * The latest layout rather than this render's, for the same reason the
-   * scenario editor reads its own selection through a ref: two clicks can both
-   * be handled before React renders either of them, and the second has to be
-   * built on the first.
-   */
-  const latest = useRef(blueprint);
-  latest.current = blueprint;
-  const applyEdit = useCallback(
-    (edit: (current: Scenario) => Scenario) => {
-      const was = latest.current;
-      const next = documentLayout(edit(blueprintDocument(was, gameName)), was);
-      latest.current = next;
-      onChange(next);
-    },
-    [gameName, onChange],
-  );
+  /** Every edit to the layout, and the way back from one. See
+   *  `blueprintHistory.ts`. */
+  const { apply: applyEdit, controls: undoRedo } = useLayoutHistory({
+    blueprint,
+    gameName,
+    owned: history === "own",
+    onChange,
+  });
 
   const { units, loading: unitsLoading } = useGameUnits(gameName);
   const buildings = useMemo(() => buildingUnits(units), [units]);
@@ -258,6 +255,7 @@ export function BlueprintEditor({
       onScene={setHandle}
       frame={frame}
       frameLabel="Frame layout"
+      chrome={undoRedo && <HistoryControls {...undoRedo} />}
       bars={
         <>
           <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card/80 p-1 backdrop-blur">
