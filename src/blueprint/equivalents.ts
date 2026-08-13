@@ -197,6 +197,23 @@ export function orderYoursFirst(table: EquivalenceTable): number[] {
   ];
 }
 
+/**
+ * Whether this group is one somebody hunting `hunt` is asking about (issue
+ * #1547).
+ *
+ * By def rather than by side, because the question a search answers is "what
+ * does coilbox think corak is". A side's name is on most of the rows it appears
+ * on, so matching that would take most of the table and narrow nothing.
+ *
+ * Part of a def counts, because half a name is what gets typed, and nothing
+ * typed counts as every group, so an empty box hides no row.
+ */
+export function namesDef(group: Equivalence, hunt: string): boolean {
+  const wanted = hunt.trim().toLowerCase();
+  if (wanted === "") return true;
+  return defsIn(group).some((def) => def.includes(wanted));
+}
+
 /** Every side this table has been told about, in the order it was first told.
  *  A game whose sides coilbox cannot read off its unit names still has these. */
 export function tableSides(table: EquivalenceTable): string[] {
