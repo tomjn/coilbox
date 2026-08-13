@@ -150,6 +150,42 @@ export function sceneContents(
   return [...actors, ...groups, ...bases, ...zones];
 }
 
+/** A layout the scenario holds that no base is placed from. */
+export interface LayoutEntry {
+  /** The `blueprints` id, which is what deleting it names. */
+  id: string;
+  name: string;
+  /** What it is made of, in a few words. */
+  detail: string;
+}
+
+/**
+ * The layouts this scenario is carrying and not currently placing (issue #1424).
+ *
+ * A scenario keeps a layout after the last base placed from it goes, so an
+ * author who deletes a base while they rethink where it stands still has the
+ * geometry to put back. Kept means findable: without this the layout is in the
+ * document and nowhere on screen, which is worse than losing it, so the list of
+ * what a scenario holds carries these underneath what is on the map.
+ */
+export function unplacedLayouts(
+  scenario: Pick<Scenario, "blueprints" | "bases">,
+): LayoutEntry[] {
+  const placed = new Set(scenario.bases.map((base) => base.blueprint));
+  return scenario.blueprints
+    .filter((layout) => !placed.has(layout.id))
+    .map((layout) => {
+      const count = layout.buildings.length;
+      return {
+        id: layout.id,
+        name: layout.name,
+        detail: `${count} building${count === 1 ? "" : "s"}${
+          layout.ordered ? " · build order" : ""
+        }`,
+      };
+    });
+}
+
 /**
  * The entry the current selection belongs to, or null when the selection is
  * nothing this list holds.
