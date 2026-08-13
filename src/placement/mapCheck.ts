@@ -17,10 +17,17 @@
  * `BlueprintOnMap.tsx`.
  */
 
+import type { Footprint, FootprintMark, Standing } from "@/blueprint/footprint";
 import type { BlueprintBuilding } from "@/blueprint/model";
 import type { Point } from "@/scenario/model";
 import { clampToMap } from "./pointer";
-import type { PreviewBuilding } from "./preview";
+import {
+  type NudgeOffer,
+  nudgeToFit,
+  type PreviewBuilding,
+  previewCount,
+  previewMovable,
+} from "./preview";
 
 /**
  * Which map to offer first, or `""` for none.
@@ -90,4 +97,42 @@ export function spotLayout(
     facing: building.facing,
     pos: { x: at.x + building.offset.x, z: at.z + building.offset.z },
   }));
+}
+
+/**
+ * Where on this map the whole layout would stand, when where it is standing
+ * will not do (issue #1559).
+ *
+ * The check says which buildings the terrain refuses. It does not say where on
+ * that map the whole thing would stand, and this is the surface an author is
+ * hunting for a spot on rather than drawing a shape on, so it is the surface
+ * the offer is worth most on.
+ *
+ * The search is {@link nudgeToFit}, which is the one the scenario editor
+ * already offers under a key press, asked about the layout as it stands rather
+ * than about one under a pointer. It is an offer and never a rule: a ruined
+ * base half in a cliff is a real thing an author might mean, so nothing moves
+ * until somebody asks.
+ *
+ * Nothing to offer unless something is wrong that a different spot could put
+ * right. A layout the ground takes is the answer the author came for, and a
+ * unit this game has not got is refused wherever it goes.
+ *
+ * Nothing stands on this map but the layout itself, so the search has no
+ * occupied ground to keep off: what it is avoiding is the terrain, and the
+ * layout's own buildings avoiding each other.
+ */
+export function spotNudge(
+  layout: readonly PreviewBuilding[],
+  /** The marks the surface is drawing for the layout where it stands. */
+  marks: readonly FootprintMark[],
+  footprintOf: (def: string) => Footprint,
+  standingOf?: (mark: Omit<FootprintMark, "standing">) => Standing,
+): NudgeOffer {
+  if (!previewMovable(previewCount(marks))) return null;
+  const found = nudgeToFit(layout, footprintOf, [], standingOf);
+  if (!found) return "nowhere";
+  // Where it already is, which is no offer at all: something there is refused
+  // and the search has found nothing better to say than "here".
+  return found.squares.x === 0 && found.squares.z === 0 ? null : found;
 }

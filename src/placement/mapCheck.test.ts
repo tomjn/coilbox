@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 
+import type { Ground } from "@/blueprint/buildable";
+import { BUILD_SQUARE } from "@/blueprint/footprint";
 import type { BlueprintBuilding } from "@/blueprint/model";
-import { checkMapFor, checkSpot, spotLayout, spotSentence } from "./mapCheck";
+import {
+  checkMapFor,
+  checkSpot,
+  spotLayout,
+  spotNudge,
+  spotSentence,
+} from "./mapCheck";
+import { layoutPreview, nudgedPreview, previewChecks } from "./preview";
 
 describe("checkMapFor", () => {
   const installed = [
@@ -80,11 +89,35 @@ describe("spotSentence", () => {
   });
 });
 
+/** Balanced Annihilation's own numbers, so the shapes below really exist. */
+const units = [
+  { name: "armsolar", footprintX: 5, footprintZ: 5, maxSlope: 20 },
+  { name: "armmex", footprintX: 3, footprintZ: 3, maxSlope: 40 },
+];
+
 const solar = (x: number, z: number): BlueprintBuilding => ({
   def: "armsolar",
   offset: { x, z },
   facing: 0,
 });
+
+/** Ground at one height everywhere, which every building stands on. */
+const flat: Ground = {
+  cornerAt: () => 100,
+  slack: 0,
+  minHeight: 0,
+  maxHeight: 500,
+  hasWater: true,
+};
+
+/** A cliff along x: everything east of 400 elmos is 200 elmos higher. */
+const cliff: Ground = {
+  cornerAt: (x) => (x * 8 >= 400 ? 300 : 100),
+  slack: 0,
+  minHeight: 0,
+  maxHeight: 500,
+  hasWater: true,
+};
 
 describe("spotLayout", () => {
   /** The offsets are what a layout is: a shape, said from its own middle. */
@@ -99,5 +132,58 @@ describe("spotLayout", () => {
 
   it("has nothing to stand for a layout with nothing in it", () => {
     expect(spotLayout([], { x: 100, z: 100 })).toEqual([]);
+  });
+});
+
+describe("spotNudge", () => {
+  const layoutFor = (buildings: BlueprintBuilding[], at: number) =>
+    spotLayout(buildings, { x: at, z: 100 });
+
+  const offerFor = (
+    buildings: BlueprintBuilding[],
+    at: number,
+    ground: Ground,
+  ) => {
+    const { footprintOf, standingOf } = previewChecks(units, ground);
+    const layout = layoutFor(buildings, at);
+    const marks = layoutPreview(layout, footprintOf, [], standingOf);
+    return spotNudge(layout, marks, footprintOf, standingOf);
+  };
+
+  /** A layout the ground already takes has nothing to be offered: the author is
+   *  looking at the answer they came for. */
+  it("offers nothing where the layout already stands", () => {
+    expect(offerFor([solar(0, 0)], 100, flat)).toBeNull();
+  });
+
+  /** The whole point of the offer: the spot is refused, another one nearby is
+   *  not, and the author is hunting for it by hand. */
+  it("offers the nearest spot the whole layout fits", () => {
+    const buildings = [solar(0, 0)];
+    const offer = offerFor(buildings, 400, cliff);
+    expect(offer).not.toBeNull();
+    expect(offer).not.toBe("nowhere");
+    if (!offer || offer === "nowhere") return;
+    // Whole build squares, because a shorter move lands the layout on the
+    // squares it is already on.
+    expect(offer.delta.x).toBe(offer.squares.x * BUILD_SQUARE);
+    expect(offer.delta.z).toBe(offer.squares.z * BUILD_SQUARE);
+    // And the offered spot really is one the ground takes, which is the whole
+    // of what is being offered.
+    const { footprintOf, standingOf } = previewChecks(units, cliff);
+    const there = nudgedPreview(
+      layoutFor(buildings, 400),
+      offer,
+      footprintOf,
+      [],
+      standingOf,
+    );
+    expect(there.map((mark) => mark.standing)).toEqual(["fine"]);
+  });
+
+  /** A layout whose own buildings are inside each other is refused wherever it
+   *  is put, so the search runs out rather than finding a spot. */
+  it("says nowhere for a layout no spot can fit", () => {
+    expect(offerFor([solar(0, 0), solar(16, 0)], 100, flat)).toBe("nowhere");
   });
 });
