@@ -212,6 +212,41 @@ export function sceneUnchecked(marks: FootprintMark[]): SceneUnchecked {
   return reason;
 }
 
+/**
+ * The map's own floor, when the depth refusals on this surface are the map
+ * having no sea at all (issue #1536).
+ *
+ * A layout of naval buildings on a landlocked map is refused wherever it is put,
+ * so twenty cyan squares and twenty sentences say one thing twenty times, and
+ * none of them says the thing an author can act on: the layout is on the wrong
+ * map rather than in the wrong place.
+ *
+ * The map's own floor answers it. Where the lowest ground on the map is at or
+ * above the water's surface there is no water anywhere on it, and the engine's
+ * depth test refuses every building that wants some. That is one fact about the
+ * surface, said once by whoever draws it, in place of the per base sentence.
+ *
+ * The floor rather than a yes, because the sentence names it, and null rather
+ * than a no. A floor of exactly 0 is a map with no water on it like any other.
+ *
+ * Null until something has actually been refused for its depth. A landlocked
+ * map with a land layout on it is simply a map, and a note appearing with no
+ * mark under it is a note nobody can tie to anything.
+ *
+ * Null for the build grid too, which declares no water because its floor sits at
+ * 0 and is not a sea. Nothing there is refused for depth, so nothing there needs
+ * explaining.
+ */
+export function sceneWaterless(
+  marks: FootprintMark[],
+  ground: Ground | null,
+): number | null {
+  if (!ground?.hasWater || ground.minHeight < 0) return null;
+  return marks.some((mark) => mark.standing === "depth")
+    ? ground.minHeight
+    : null;
+}
+
 /** Which of one base's buildings got one particular verdict, by their place in
  *  the base, so a panel can name them the way it names the overlapping ones. */
 function standingIn(

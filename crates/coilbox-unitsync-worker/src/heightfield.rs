@@ -16,17 +16,40 @@
 //! Cached on disk beside the PNGs and served over the asset protocol, because a
 //! 32 by 32 elmo map is 33 MB of words and base64 on the bridge is no way to
 //! move that.
+//!
+//! That size is also why these are the one thing in the thumb cache that is
+//! bounded (issue #1535). Every call sweeps the least recently used of them out
+//! of the way, keeping the one it is answering with, and a map whose grid was
+//! swept is read again the next time somebody opens it.
 
 use crate::ffi::Unitsync;
 use crate::minimap::map_cache_key;
 use crate::model::HeightFieldOutput;
 use std::path::{Path, PathBuf};
 
+/// The suffix every one of these files carries, which is also the whole of what
+/// the sweep below is allowed to delete.
+const SUFFIX: &str = "-hf.bin";
+
+/// How many bytes of raw height grids the cache holds, across every map (issue
+/// #1535).
+///
+/// The files are 3 MB for a 12 by 12 map and 33 MB for a 32 by 32 one, so
+/// without a bound an author working through a map pack pays for every map they
+/// opened once. 128 MB is four of the biggest maps or thirty ordinary ones,
+/// which is more than anybody has open at a time.
+///
+/// The number can be this small because the miss is cheap. Reading Bismuth
+/// Valley's grid and writing it out again is 120 ms of the worker's half second,
+/// measured against the same call on a hit, so the cache saves a moment rather
+/// than the work.
+const BUDGET: u64 = 128 * 1024 * 1024;
+
 /// Cache file for one map's raw heights: `<cache_dir>/<key>-hf.bin`. The `hf`
 /// suffix keeps it clear of the minimap (`<key>-<mip>`) and heightmap
 /// (`<key>-h<max_side>`) caches, which are PNGs of the same map.
 fn cache_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
-    Some(cache_dir?.join(format!("{}-hf.bin", key?)))
+    Some(cache_dir?.join(format!("{}{SUFFIX}", key?)))
 }
 
 /// The raw grid as little endian bytes, which is what a `Uint16Array` in the
@@ -69,8 +92,11 @@ pub fn render(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> HeightFiel
             .ok_or_else(|| "the heights cache file has no name".to_string())?;
         // Only a miss pays for the read: on a hit the file is already the
         // answer, and it is measured in tens of megabytes, so it is not read
-        // back only to be thrown away.
-        if !file.is_file() {
+        // back only to be thrown away. A hit is still a use, and the sweep
+        // below reads recency off the file, so say so.
+        if file.is_file() {
+            coilbox_thumb_cache::touch(&file);
+        } else {
             let raw = us
                 .heightmap_data(map_name, w, h)
                 .ok_or_else(|| "failed to read heightmap".to_string())?;
@@ -79,6 +105,13 @@ pub fn render(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> HeightFiel
             }
             std::fs::write(&file, to_le_bytes(&raw))
                 .map_err(|e| format!("failed to write the map's heights: {e}"))?;
+        }
+        // Now that this map's grid is the most recently used one, drop whatever
+        // no longer fits (issue #1535). This file is never a candidate: it is
+        // about to be fetched. A map whose grid does go loses its verdicts and
+        // says so, rather than getting one off a file that is not there.
+        if let Some(dir) = file.parent() {
+            coilbox_thumb_cache::sweep(dir, SUFFIX, BUDGET, &file);
         }
         Ok((name, w, h))
     })();

@@ -11,6 +11,7 @@ import {
   parsePlacementKey,
   placementKey,
   sceneUnchecked,
+  sceneWaterless,
   teamColor,
   UNOWNED_COLOR,
   unstableIn,
@@ -308,6 +309,107 @@ describe("sceneUnchecked", () => {
     expect(
       sceneUnchecked([...marks, { ...marks[0], standing: "no-slope" }]),
     ).toBeNull();
+  });
+});
+
+/**
+ * Issue #1536. A naval layout on a map with no sea is refused everywhere, which
+ * is one fact about the map rather than one refusal per building.
+ */
+describe("sceneWaterless", () => {
+  /** A shipyard wants 20 elmos of water under it, a solar collector says
+   *  nothing about water and so is refused nowhere. */
+  const units = [
+    { name: "armsy", footprintX: 8, footprintZ: 8, maxSlope: 10 },
+    { name: "armsolar", footprintX: 5, footprintZ: 5, maxSlope: 12 },
+  ];
+  const naval = units.map((unit) =>
+    unit.name === "armsy" ? { ...unit, minWaterDepth: 20 } : unit,
+  );
+
+  const doc: Registries = {
+    ...empty,
+    blueprints: [
+      {
+        id: "bp1",
+        name: "The harbour",
+        buildings: [
+          { def: "armsy", offset: { x: 0, z: 0 }, facing: 0 },
+          { def: "armsolar", offset: { x: 512, z: 0 }, facing: 0 },
+        ],
+      },
+    ],
+    bases: [
+      {
+        id: "pf1",
+        blueprint: "bp1",
+        team: "p0",
+        origin: { x: 1000, z: 1000 },
+        buildings: [],
+      },
+    ],
+  };
+
+  /** Bismuth Valley's shape: the lowest ground on it is 100 elmos up. */
+  const dry = {
+    cornerAt: () => 100,
+    slack: 0,
+    minHeight: 100,
+    maxHeight: 400,
+    hasWater: true,
+  };
+  /** Red River Remake's shape: a floor at -110, so there is a sea, and this
+   *  particular spot is the dry part of it. */
+  const wet = {
+    cornerAt: () => 100,
+    slack: 0,
+    minHeight: -110,
+    maxHeight: 400,
+    hasWater: true,
+  };
+
+  const marksOn = (ground: typeof dry | null, of = naval) =>
+    baseFootprints(scenarioPlacements(doc), of, ground);
+
+  it("says the map has no water when a building is refused for want of it", () => {
+    expect(sceneWaterless(marksOn(dry), dry)).toBe(100);
+  });
+
+  /** A floor at exactly the water's surface is a map with no water on it, and a
+   *  falsy 0 is not a no. */
+  it("answers a floor of nothing rather than a no", () => {
+    const sealevel = { ...dry, cornerAt: () => 0, minHeight: 0 };
+    expect(sceneWaterless(marksOn(sealevel), sealevel)).toBe(0);
+  });
+
+  /** The one case an author must not be told the map is the problem: there is a
+   *  sea here, so the shipyard wants moving into it. */
+  it("says nothing on a map with a sea, wherever the building stands", () => {
+    expect(sceneWaterless(marksOn(wet), wet)).toBeNull();
+  });
+
+  /** A statement with no mark under it is a statement nobody asked for. A
+   *  landlocked map with a land layout on it is simply a map. */
+  it("says nothing until something has been refused for its depth", () => {
+    expect(sceneWaterless(marksOn(dry, units), dry)).toBeNull();
+  });
+
+  /** The mapless build grid sits at 0 with no sea near it, which is why it
+   *  declares no water, and it is not a map anybody put a layout on the wrong
+   *  one of. */
+  it("says nothing about the build grid", () => {
+    const flat = {
+      cornerAt: () => 0,
+      slack: 0,
+      minHeight: 0,
+      maxHeight: 0,
+      hasWater: false,
+    };
+    expect(sceneWaterless(marksOn(flat), flat)).toBeNull();
+  });
+
+  it("says nothing with no ground to say it about", () => {
+    expect(sceneWaterless(marksOn(null), null)).toBeNull();
   });
 });
 
