@@ -17,9 +17,15 @@
  * `BlueprintOnMap.tsx`.
  */
 
-import type { Footprint, FootprintMark, Standing } from "@/blueprint/footprint";
+import type {
+  Footprint,
+  FootprintMark,
+  SnapBuilding,
+  Standing,
+} from "@/blueprint/footprint";
 import type { BlueprintBuilding } from "@/blueprint/model";
 import type { Point } from "@/scenario/model";
+import { layoutOrigin } from "@/scenario/pages/components/layoutPlacing";
 import { clampToMap } from "./pointer";
 import {
   type NudgeOffer,
@@ -60,14 +66,32 @@ export function checkMapFor(
  * carries the layout by whatever the pointer did: the engine clamps anything
  * standing past an edge back onto it, so a spot off the map is a verdict about
  * ground the layout would not be on.
+ *
+ * Then stood on the build grid through `layoutOrigin`, which is the same route
+ * the scenario editor places a base through (issue #1575). A pointer lands on a
+ * raw point, and every building is snapped on its own afterwards, so a raw
+ * origin leaves which lattice each building lands on to where the pointer
+ * happened to fall: an odd footprint and an even one sit half a build square
+ * apart on purpose, and a few elmos of pointer can put a whole square between
+ * two buildings that were drawn next to each other. The check would then be
+ * reporting on a base nobody drew, which is worse than not checking.
+ *
+ * The clamp comes first, because holding the layout on the map is about the
+ * spot and the grid is about the shape.
  */
 export function checkSpot(
   spot: Point | null,
   worldWidth: number,
   worldHeight: number,
+  /** The layout being stood there, whose first building is what the grid is
+   *  worked out from. */
+  buildings: readonly BlueprintBuilding[],
+  /** Undefined while the game's units are unread, and then the spot is left
+   *  alone rather than aligned against a guess. */
+  snap: SnapBuilding | undefined,
 ): Point {
   const at = spot ?? { x: worldWidth / 2, z: worldHeight / 2 };
-  return clampToMap(at, worldWidth, worldHeight);
+  return layoutOrigin(clampToMap(at, worldWidth, worldHeight), buildings, snap);
 }
 
 /** Where the layout is standing, in the map's own coordinates, so a spot worth

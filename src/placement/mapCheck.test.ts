@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { Ground } from "@/blueprint/buildable";
-import { BUILD_SQUARE } from "@/blueprint/footprint";
+import {
+  BUILD_SQUARE,
+  buildGridSnap,
+  buildingFootprints,
+} from "@/blueprint/footprint";
 import type { BlueprintBuilding } from "@/blueprint/model";
+import { layoutOrigin } from "@/scenario/pages/components/layoutPlacing";
 import {
   checkMapFor,
   checkSpot,
@@ -45,14 +50,55 @@ describe("checkMapFor", () => {
 });
 
 describe("checkSpot", () => {
+  // armsolar is 5x5, so it centres in the middle of a build square. armlab is
+  // 6x6, so it centres on the line between two, which is the half square of
+  // phase that makes a mixed layout worth testing (issue #1575).
+  const gridUnits = [
+    { name: "armsolar", footprintX: 5, footprintZ: 5 },
+    { name: "armlab", footprintX: 6, footprintZ: 6 },
+  ];
+  const snap = buildGridSnap(gridUnits);
+
+  /**
+   * A layout of one odd footprint and one even one, whose offsets are not a
+   * whole number of build squares apart.
+   *
+   * A shape drawn in the editor is not the only shape that reaches here. A
+   * layout out of somebody else's scenario carries whatever offsets that base's
+   * origin gave it, and an import read before the game's units arrived was
+   * never snapped at all. Those are the layouts a raw point can pull apart.
+   */
+  const mixed: BlueprintBuilding[] = [
+    { def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 },
+    { def: "armlab", offset: { x: 84, z: 4 }, facing: 0 },
+  ];
+
+  /** Where each of the layout's buildings stands relative to its first, which
+   *  is the shape the check is reporting on. */
+  const shapeAt = (x: number) => {
+    const origin = checkSpot({ x, z: 1000 }, 4096, 4096, mixed, snap);
+    const [first, ...rest] = layoutPreview(
+      spotLayout(mixed, origin),
+      buildingFootprints(gridUnits),
+      [],
+    );
+    return rest.map((mark) => ({
+      x: mark.pos.x - first.pos.x,
+      z: mark.pos.z - first.pos.z,
+    }));
+  };
+
   /** A layout arrives in the middle of the map, which is the one spot on every
    *  map that is on it. */
   it("puts a layout nobody has placed in the middle", () => {
-    expect(checkSpot(null, 4096, 8192)).toEqual({ x: 2048, z: 4096 });
+    expect(checkSpot(null, 4096, 8192, [], undefined)).toEqual({
+      x: 2048,
+      z: 4096,
+    });
   });
 
   it("keeps the spot an author picked", () => {
-    expect(checkSpot({ x: 100, z: 200 }, 4096, 4096)).toEqual({
+    expect(checkSpot({ x: 100, z: 200 }, 4096, 4096, [], undefined)).toEqual({
       x: 100,
       z: 200,
     });
@@ -62,7 +108,7 @@ describe("checkSpot", () => {
    *  the map. The engine clamps anything standing past the edge onto it, so the
    *  check would be answering about ground the layout is not on. */
   it("holds the spot on the map", () => {
-    expect(checkSpot({ x: -400, z: 9000 }, 4096, 4096)).toEqual({
+    expect(checkSpot({ x: -400, z: 9000 }, 4096, 4096, [], undefined)).toEqual({
       x: 0,
       z: 4096,
     });
@@ -71,7 +117,36 @@ describe("checkSpot", () => {
   /** Before the map's extent has been read there is no middle to arrive at, and
    *  a spot of nothing is as good an answer as any. */
   it("answers nothing about a map with no extent yet", () => {
-    expect(checkSpot(null, 0, 0)).toEqual({ x: 0, z: 0 });
+    expect(checkSpot(null, 0, 0, [], undefined)).toEqual({ x: 0, z: 0 });
+  });
+
+  /** Issue #1575. The whole of the fix: one route from a pointer to an origin,
+   *  and it is the one the scenario editor places a base through. */
+  it("stands the layout where the scenario editor would stand it", () => {
+    expect(checkSpot({ x: 1003, z: 2005 }, 4096, 4096, mixed, snap)).toEqual(
+      layoutOrigin({ x: 1003, z: 2005 }, mixed, snap),
+    );
+  });
+
+  /**
+   * Issue #1575. Every building is snapped on its own afterwards, so standing a
+   * layout on the raw point leaves which lattice each one lands on to where the
+   * pointer happened to fall. Move it a few elmos and one building jumps a whole
+   * square away from its neighbour, and the check reports on a base the author
+   * never drew.
+   */
+  it("stands a mixed-footprint layout in one shape wherever it is put", () => {
+    const shapes = [1000, 1004, 1010, 1015].map(shapeAt);
+    for (const shape of shapes) expect(shape).toEqual(shapes[0]);
+  });
+
+  /** Without a footprint there is no phase to work out, and a guess of one
+   *  square would stand every even-footprint layout on the wrong half of the
+   *  grid. So the spot is left where it is until the units are read. */
+  it("leaves the spot alone while the game's units are unread", () => {
+    expect(
+      checkSpot({ x: 1003, z: 2005 }, 4096, 4096, mixed, undefined),
+    ).toEqual({ x: 1003, z: 2005 });
   });
 });
 

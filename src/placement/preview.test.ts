@@ -484,7 +484,20 @@ describe("nudgeToFit", () => {
     });
   });
 
-  it("is cheap enough to run on a pointer move that finds nothing", () => {
+  /**
+   * What makes the search cheap enough to run on a pointer move (issue #1576).
+   *
+   * Counted rather than timed. This runs in a suite of three hundred files at
+   * once, so a wall clock budget here reports a busy machine as a performance
+   * regression, and a failure that means "your laptop was busy" is a failure
+   * people learn to ignore.
+   *
+   * The search is over a bounded space, so the work it does is a number: how
+   * many spots it tries, and how much of the layout it stands at each. Both are
+   * asked for through the lookups the caller passes in, which is where the cost
+   * of the search actually lives.
+   */
+  it("tries each spot in its bound once, and gives up on one at the first building it cannot place", () => {
     // The worst case: thirty buildings on a map already holding two hundred,
     // where every square the search tries is refused, so it tries all of them.
     const layout = Array.from({ length: 30 }, (_, at) =>
@@ -493,12 +506,32 @@ describe("nudgeToFit", () => {
     const standing = Array.from({ length: 200 }, (_, at) =>
       taken(200 + (at % 20) * 96, 200 + Math.floor(at / 20) * 96),
     );
-    const started = performance.now();
-    for (let pass = 0; pass < 20; pass++) {
-      nudgeToFit(layout, footprintOf, standing, standingOf);
-    }
-    const each = (performance.now() - started) / 20;
-    expect(each).toBeLessThan(3);
+
+    let stood = 0;
+    let asked = 0;
+    const found = nudgeToFit(
+      layout,
+      (def) => {
+        stood++;
+        return footprintOf(def);
+      },
+      standing,
+      (mark) => {
+        asked++;
+        return standingOf(mark);
+      },
+    );
+
+    expect(found).toBeNull();
+    // Every spot within the bound, and nothing outside it.
+    const spots = (2 * NUDGE_LIMIT + 1) ** 2;
+    // One building stood per spot: each is refused by the first thing tried, so
+    // the other twenty nine are never placed. Carrying on to the end of the
+    // layout at every spot would be 8,670 of these instead.
+    expect(stood).toBe(spots);
+    // And the ground, which is the expensive question, is never asked about a
+    // building that a rectangle has already refused.
+    expect(asked).toBe(0);
   });
 });
 

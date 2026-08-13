@@ -28,7 +28,7 @@ import { Loader2, MapPin, MountainSnow, Unplug, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
-import type { FootprintMark } from "@/blueprint/footprint";
+import { buildGridSnap, type FootprintMark } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
@@ -113,14 +113,24 @@ export function BlueprintOnMap({
   // map with no name.
   const assets = useMissionMapAssets(mapName, true);
 
+  const { units } = useGameUnits(gameName);
+  // Undefined until the game's units are read, which is what stops a layout of
+  // even-footprint buildings being stood on the wrong half of the grid by a
+  // fallback that calls every def one square.
+  const snap = useMemo(
+    () => (units.length > 0 ? buildGridSnap(units) : undefined),
+    [units],
+  );
+
   const [spot, setSpot] = useState<Point | null>(null);
   // Held rather than worked out per render, because everything downstream of the
   // document is rebuilt when it changes, and that means every model on the map
   // read again.
   const { worldWidth, worldHeight } = assets;
+  const buildings = blueprint.buildings;
   const origin = useMemo(
-    () => checkSpot(spot, worldWidth, worldHeight),
-    [spot, worldWidth, worldHeight],
+    () => checkSpot(spot, worldWidth, worldHeight, buildings, snap),
+    [spot, worldWidth, worldHeight, buildings, snap],
   );
 
   const [handle, setHandle] = useState<MapScene3D | null>(null);
@@ -129,7 +139,6 @@ export function BlueprintOnMap({
     [blueprint, gameName, origin],
   );
 
-  const { units } = useGameUnits(gameName);
   const drawn = useScenarioUnits(handle, doc, assets);
   const footprints = useMemo(
     () => baseFootprints(drawn.placements, units, drawn.ground),
@@ -157,11 +166,13 @@ export function BlueprintOnMap({
     ghost: null,
     carried: (drag) =>
       spotLayout(
-        blueprint.buildings,
+        buildings,
         checkSpot(
           { x: origin.x + drag.delta.x, z: origin.z + drag.delta.z },
           assets.worldWidth,
           assets.worldHeight,
+          buildings,
+          snap,
         ),
       ),
     checks,
