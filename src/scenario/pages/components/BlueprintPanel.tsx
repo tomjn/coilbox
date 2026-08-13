@@ -1,6 +1,6 @@
 /**
- * The layouts this scenario holds, and the way in and out of a game's own
- * blueprint file (issue #1312).
+ * The layouts this scenario holds, and the ways out of it (issues #1312,
+ * #1327).
  *
  * A layout is worth having outside the mission it was drawn in, and the easiest
  * way to make one is to build a base in game and save it with the game's own
@@ -8,10 +8,15 @@
  * in as bases on the map, and a base drawn here goes back out for the same
  * widget to place.
  *
- * It is a panel rather than a library because the library is
- * https://github.com/tomjn/coilbox/issues/1415 and does not exist yet. A layout
- * currently lives inside a scenario document and nowhere else, so a scenario is
- * where an import has to land and where an export has to come from.
+ * There are two ways out now, and they are the same trip. "Send to a game"
+ * writes into that game's own blueprint file, which the game's widget reads.
+ * "Save to your library" keeps it in coilbox, where it can be edited, shared and
+ * dropped into another mission. Both take the geometry and leave everything a
+ * mission put on top of it, which is what the warning under a layout counts.
+ *
+ * The way back in is the Layouts mode on the map, not a button here: a layout
+ * arriving needs somewhere to stand, so it is placed by a click rather than
+ * dropped at a fixed point.
  *
  * Three things this panel is careful about, all of them the point of the issue:
  *
@@ -31,16 +36,26 @@
 
 import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { Blocks, Download, Pencil, Upload } from "lucide-react";
+import { Blocks, Download, Library, Pencil, Upload } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router";
 import { barFormat } from "@/blueprint/bar";
 import { appFileIO } from "@/blueprint/fileIO";
-import { buildGridSnap } from "@/blueprint/footprint";
+import { buildGridSnap, type Footprint } from "@/blueprint/footprint";
 import type { ImportedBlueprint, ImportReport } from "@/blueprint/format";
 import { mergeIntoGameFile } from "@/blueprint/gameFile";
+import { footprintsFromUnits, uniqueLayoutName } from "@/blueprint/library";
+import {
+  blueprintRoute,
+  saveBlueprint,
+  useBlueprintLibrary,
+} from "@/blueprint/store";
+import { blueprintPayload } from "@/blueprint/transfer";
 import { knownUnits, unknownUnitsWarning } from "@/blueprint/units";
 import type { UnitDatasetEntry } from "@/content/bindings";
+import { useUnitsyncScan } from "@/content/config";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
+import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import type { Scenario } from "../../model";
 import { replaceBlueprint } from "./bases";
@@ -53,6 +68,10 @@ import { EditorPanel } from "./panels";
 const DROP_POINT = { x: 0, z: 0 };
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** What a def stands on when the game's units have not been read. The engine
+ *  floors a footprint at one square, so nothing ever stands on less. */
+const ONE_SQUARE = (): Footprint => ({ x: 1, z: 1 });
 
 export function BlueprintPanel({
   scenario,
@@ -73,6 +92,12 @@ export function BlueprintPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  // What the last save landed as, so the panel can offer the way to it rather
+  // than only saying it happened.
+  const [kept, setKept] = useState<{ id: string; name: string } | null>(null);
+  const { records } = useBlueprintLibrary();
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   // Which layout is open in the map-free editor, if any. Held by id rather than
   // by value, so an edit lands back in the document and comes out of it again.
   const [editing, setEditing] = useState<string | null>(null);
@@ -117,6 +142,64 @@ export function BlueprintPanel({
     setStatus(
       `Added "${imported.layout.name}" at the map's north-west corner. Select one of its buildings and use Move the whole base to put it where you want it.`,
     );
+  }
+
+  /**
+   * Keep one of this scenario's layouts in the library (issue #1327).
+   *
+   * The geometry and nothing else. What a mission put on top of it, the team,
+   * the origin, the trigger addressable ids and the factory queues, belongs to
+   * a placement rather than to a shape, so none of it travels and all of it
+   * stays in this scenario. The warning under the layout counts what that is.
+   *
+   * The footprints come from the game's units, which is what lets the library
+   * card and the hub draw the layout at the right size, and are the one thing
+   * that cannot be worked out later on a machine without the game.
+   */
+  async function onKeep(layoutId: string) {
+    setError(null);
+    setStatus(null);
+    setKept(null);
+    const layout = scenario.blueprints.find((b) => b.id === layoutId);
+    if (!layout) return;
+    try {
+      setBusy(true);
+      const name = uniqueLayoutName(
+        layout.name,
+        records.map((record) => record.layout.name),
+      );
+      const saved = await saveBlueprint({
+        id: crypto.randomUUID(),
+        createdAt: "",
+        updatedAt: "",
+        layout: blueprintPayload(
+          { ...layout, name },
+          {
+            footprintOf: footprintsFromUnits(units) ?? ONE_SQUARE,
+            gameName: scenario.setup.gameName,
+            installed: scan.data?.games ?? [],
+          },
+        ),
+      });
+      setKept({ id: saved.id, name });
+      setStatus(
+        [
+          `"${name}" is in your library.`,
+          name === layout.name
+            ? null
+            : `A layout there was already called "${layout.name}".`,
+          units.length === 0
+            ? "This game's units have not been read, so every building in it is recorded as one build square and its picture will be the wrong shape until it is saved again."
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onSend(layoutId: string, layoutName: string) {
@@ -201,7 +284,23 @@ export function BlueprintPanel({
             {error}
           </p>
         )}
-        {status && <p className="text-xs text-muted-foreground">{status}</p>}
+        {status && (
+          <p className="text-xs text-muted-foreground">
+            {status}
+            {kept && (
+              <>
+                {" "}
+                <Link
+                  to={blueprintRoute(kept.id)}
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  Open it
+                </Link>
+                .
+              </>
+            )}
+          </p>
+        )}
 
         {read && (
           <FileContents
@@ -261,6 +360,16 @@ export function BlueprintPanel({
                         size="sm"
                         variant="ghost"
                         className="shrink-0"
+                        disabled={busy || layout.buildings.length === 0}
+                        onClick={() => void onKeep(layout.id)}
+                      >
+                        <Library className="mr-1 size-3.5" /> Save to your
+                        library
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="shrink-0"
                         disabled={busy || running}
                         onClick={() => onSend(layout.id, layout.name)}
                       >
@@ -294,8 +403,11 @@ export function BlueprintPanel({
                       </div>
                     )}
                     {stripped.length > 0 && (
+                      // The same list either way out. A blueprint is geometry
+                      // in coilbox's own library as much as in a game's file,
+                      // so what a game cannot hold the library cannot either.
                       <p className="text-[11px] text-amber-200/80">
-                        Sending this strips {stripped.join(", ")}. A game's
+                        Sending or saving this strips {stripped.join(", ")}. A
                         blueprint is geometry, so there is nowhere for them to
                         go. They stay in this scenario.
                       </p>
