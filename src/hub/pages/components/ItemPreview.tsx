@@ -1,4 +1,9 @@
-import type { GalaxyShape, HubPreview, PreviewStat } from "../../preview";
+import type {
+  BlueprintShape,
+  GalaxyShape,
+  HubPreview,
+  PreviewStat,
+} from "../../preview";
 
 /**
  * What a hub item looks like, drawn from the container the item page fetched.
@@ -62,6 +67,10 @@ export function ItemPreview({ preview }: { preview: HubPreview }) {
     );
   }
 
+  if (preview.kind === "blueprint") {
+    return <BlueprintLayout shape={preview.layout} />;
+  }
+
   return <Stats stats={preview.stats} />;
 }
 
@@ -78,6 +87,53 @@ function Stats({ stats }: { stats: PreviewStat[] }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/**
+ * A shared layout, as one rounded square per building.
+ *
+ * The same drawing the website makes of the same container, in the app's own
+ * colours: the squares are the card surface on the card's border, so a layout
+ * reads as part of the page in either theme rather than as a picture pasted onto
+ * it. Everything with a number in it, the gap and the corner radius and the
+ * stroke, is the website's, because two drawings of one base that differ are
+ * worse than either on its own.
+ *
+ * A square is keyed by where it stands, which is what makes it that building.
+ */
+function BlueprintLayout({ shape }: { shape: BlueprintShape }) {
+  const buildings = shape.squares.length;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <svg
+        viewBox={`0 0 ${shape.width} ${shape.height}`}
+        // Capped in both directions. A base can be a long thin wall or a tall
+        // narrow column, and either one at the column's full width is a shape
+        // nobody can take in at a glance.
+        className="mx-auto max-h-96 w-full max-w-md"
+        role="img"
+        aria-label={`${buildings} buildings over ${Math.round(shape.width)} by ${Math.round(shape.height)} build squares`}
+      >
+        {shape.squares.map((square) => (
+          <rect
+            key={`${square.def}@${square.x},${square.y}`}
+            x={square.x}
+            y={square.y}
+            width={square.width}
+            height={square.height}
+            rx={0.18}
+            strokeWidth={0.06}
+            className="fill-card stroke-border"
+          />
+        ))}
+      </svg>
+      <p className="text-xs text-muted-foreground">
+        {buildings} {buildings === 1 ? "building" : "buildings"}
+        {shape.ordered ? ", in build order" : ""}
+      </p>
+    </div>
   );
 }
 
