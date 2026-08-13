@@ -21,6 +21,8 @@
  * the app generates a real galaxy with, so a preview cannot drift from it.
  */
 
+import { BUILD_SQUARE, facedFootprint } from "@/blueprint/footprint";
+import { parseBlueprintPayload, payloadFootprint } from "@/blueprint/payload";
 import {
   optionsFromChallenge,
   parseConquestChallengeSettings,
@@ -75,11 +77,32 @@ export interface GalaxyShape {
   factionColors: string[];
 }
 
+/** One building, as a rectangle inside the box below. Build squares throughout,
+ * measured from the top left of the box. */
+export interface BlueprintSquare {
+  def: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** A layout as squares on a grid. */
+export interface BlueprintShape {
+  /** The box every square fits inside, in build squares. */
+  width: number;
+  height: number;
+  /** In the payload's own order, which is the build order when `ordered`. */
+  squares: BlueprintSquare[];
+  ordered: boolean;
+}
+
 export type HubPreview =
   | { kind: "preset"; teams: PresetTeam[]; playing: number }
   | { kind: "setup-pack"; stats: PreviewStat[] }
   | { kind: "challenge"; galaxy: GalaxyShape | null; stats: PreviewStat[] }
-  | { kind: "scenario"; stats: PreviewStat[] };
+  | { kind: "scenario"; stats: PreviewStat[] }
+  | { kind: "blueprint"; layout: BlueprintShape };
 
 /**
  * Read a container into something drawable, or null when there is nothing to
@@ -100,6 +123,8 @@ export function readPreview(container: Container): HubPreview | null {
         return challengePreview(record);
       case "scenario":
         return scenarioPreview(record);
+      case "blueprint":
+        return blueprintPreview(record);
       default:
         return null;
     }
@@ -358,4 +383,78 @@ function count(value: unknown): number {
   if (Array.isArray(value)) return value.length;
   if (value && typeof value === "object") return Object.keys(value).length;
   return 0;
+}
+
+/**
+ * Ground left clear on each side of a building, in build squares.
+ *
+ * Buildings in a real base stand shoulder to shoulder, and squares drawn true to
+ * size would touch and read as one shape. Taking the gap off each building
+ * rather than adding it between them keeps the layout to scale: the distance
+ * between two buildings stays what the author placed.
+ */
+export const BUILDING_GAP = 0.12;
+
+/**
+ * A layout as squares on a grid, the same drawing the website makes of the same
+ * container (tomjn/coilbox-hub#84), down to the gap and the arithmetic.
+ *
+ * A building is a square because neither side has unit models or unit pictures.
+ * What stops that being a diagram of nothing is the footprint, which travels in
+ * the payload for exactly this, so a factory really is bigger than a solar
+ * collector here.
+ *
+ * Two things the payload measures in different units meet here. Offsets are in
+ * elmos and footprints are in build squares, so everything is converted to build
+ * squares, which is also what makes a sensible `viewBox`.
+ *
+ * Positions are drawn where the layout puts them. The engine snaps a building to
+ * the build grid when it is placed and the editor snaps as it is drawn, so a
+ * layout made here arrives on the grid already.
+ */
+function blueprintPreview(payload: Record<string, unknown>): HubPreview | null {
+  const blueprint = parseBlueprintPayload(payload);
+  if (!blueprint || blueprint.buildings.length === 0) return null;
+
+  const rects = blueprint.buildings.map((building) => {
+    // A 3 by 2 building faced east stands on 2 by 3 of the ground.
+    const faced = facedFootprint(
+      payloadFootprint(blueprint, building.def),
+      building.facing,
+    );
+    // An offset is the middle of the building, so the ground it stands on
+    // reaches half a footprint either side of it.
+    return {
+      def: building.def,
+      left: building.offset.x / BUILD_SQUARE - faced.x / 2,
+      top: building.offset.z / BUILD_SQUARE - faced.z / 2,
+      width: faced.x,
+      height: faced.z,
+    };
+  });
+
+  // Measured from the layout rather than from zero. Offsets run out from the
+  // origin in both directions, so a box starting at zero would leave half the
+  // base outside the picture.
+  const left = Math.min(...rects.map((rect) => rect.left));
+  const top = Math.min(...rects.map((rect) => rect.top));
+  const right = Math.max(...rects.map((rect) => rect.left + rect.width));
+  const bottom = Math.max(...rects.map((rect) => rect.top + rect.height));
+
+  return {
+    kind: "blueprint",
+    layout: {
+      width: right - left,
+      height: bottom - top,
+      ordered: blueprint.ordered === true,
+      squares: rects.map((rect) => ({
+        def: rect.def,
+        x: rect.left - left + BUILDING_GAP,
+        y: rect.top - top + BUILDING_GAP,
+        // A footprint is at least one square, so this never reaches zero.
+        width: rect.width - BUILDING_GAP * 2,
+        height: rect.height - BUILDING_GAP * 2,
+      })),
+    },
+  };
 }

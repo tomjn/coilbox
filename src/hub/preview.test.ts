@@ -318,6 +318,95 @@ describe("readPreview", () => {
     expect(preview).toBeNull();
   });
 
+  it("sizes a blueprint's squares by what each building stands on", () => {
+    const preview = readPreview(
+      container("blueprint", {
+        name: "A wall of solars",
+        buildings: [
+          { def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 },
+          { def: "armlab", offset: { x: 64, z: 0 }, facing: 0 },
+        ],
+        footprints: { armsolar: { x: 1, z: 1 }, armlab: { x: 3, z: 2 } },
+      }),
+    );
+    expect(preview?.kind).toBe("blueprint");
+    if (preview?.kind !== "blueprint") return;
+    const [solar, lab] = preview.layout.squares;
+    // A gap is taken off each side, so a one-square building is 1 - 0.12 * 2.
+    expect(solar.width).toBeCloseTo(0.76);
+    expect(solar.height).toBeCloseTo(0.76);
+    expect(lab.width).toBeCloseTo(2.76);
+    expect(lab.height).toBeCloseTo(1.76);
+  });
+
+  it("turns a blueprint's building on its side when it faces east or west", () => {
+    const preview = readPreview(
+      container("blueprint", {
+        name: "Turned",
+        buildings: [{ def: "armlab", offset: { x: 0, z: 0 }, facing: 1 }],
+        footprints: { armlab: { x: 3, z: 2 } },
+      }),
+    );
+    if (preview?.kind !== "blueprint") throw new Error("no blueprint preview");
+    expect(preview.layout.width).toBeCloseTo(2);
+    expect(preview.layout.height).toBeCloseTo(3);
+  });
+
+  it("fits a blueprint drawn around its origin inside its own box", () => {
+    const preview = readPreview(
+      container("blueprint", {
+        name: "Around the origin",
+        buildings: [
+          { def: "armsolar", offset: { x: -64, z: -32 }, facing: 0 },
+          { def: "armsolar", offset: { x: 64, z: 96 }, facing: 0 },
+          { def: "armlab", offset: { x: 0, z: 0 }, facing: 0 },
+        ],
+        footprints: { armsolar: { x: 1, z: 1 }, armlab: { x: 3, z: 2 } },
+      }),
+    );
+    if (preview?.kind !== "blueprint") throw new Error("no blueprint preview");
+    const { width, height, squares } = preview.layout;
+    expect(squares).toHaveLength(3);
+    for (const square of squares) {
+      expect(square.x).toBeGreaterThanOrEqual(0);
+      expect(square.y).toBeGreaterThanOrEqual(0);
+      expect(square.x + square.width).toBeLessThanOrEqual(width);
+      expect(square.y + square.height).toBeLessThanOrEqual(height);
+    }
+  });
+
+  it("stands a blueprint's unknown def on one square rather than dropping it", () => {
+    const preview = readPreview(
+      container("blueprint", {
+        name: "Half measured",
+        ordered: true,
+        buildings: [
+          { def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 },
+          { def: "whatisthis", offset: { x: 32, z: 0 }, facing: 0 },
+        ],
+        footprints: { armsolar: { x: 1, z: 1 } },
+      }),
+    );
+    if (preview?.kind !== "blueprint") throw new Error("no blueprint preview");
+    expect(preview.layout.ordered).toBe(true);
+    expect(preview.layout.squares.map((s) => s.def)).toEqual([
+      "armsolar",
+      "whatisthis",
+    ]);
+    const unknown = preview.layout.squares[1];
+    expect(unknown.width).toBeCloseTo(0.76);
+    expect(unknown.height).toBeCloseTo(0.76);
+  });
+
+  it("has nothing to draw for a blueprint with no buildings in it", () => {
+    expect(
+      readPreview(container("blueprint", { name: "Empty", buildings: [] })),
+    ).toBeNull();
+    expect(
+      readPreview(container("blueprint", { name: "Damaged", buildings: 5 })),
+    ).toBeNull();
+  });
+
   it("shows nothing for a kind the hub does not carry", () => {
     expect(
       readPreview(container("campaign", { type: "ta", missions: [] })),
