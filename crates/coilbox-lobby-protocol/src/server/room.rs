@@ -210,6 +210,15 @@ impl RoomState {
         &self.pending
     }
 
+    /// The connection the host is logged in on, if they are here yet.
+    ///
+    /// Approval never reaches the wire (see [`RoomConfig::approve_joins`]), so the
+    /// answer to a queued join has to be applied as though the host had typed it.
+    /// This is the peer to apply it as.
+    pub fn host_peer(&self) -> Option<PeerId> {
+        self.peer_named(&self.config.host)
+    }
+
     /// The battle as the room believes it, in the shape a client folds it into.
     ///
     /// Script passwords are included: this is the room's own view, and the host is
@@ -1272,6 +1281,20 @@ mod tests {
 
         let out = log_in(&mut room, 3, "carol");
         assert!(due(&out, 3).contains(&"CLIENTSTATUS alice 1"));
+    }
+
+    /// The plugin has to answer a queued join as the host, and this is the only
+    /// thing that tells it which socket that is.
+    #[test]
+    fn the_host_peer_is_named_once_the_host_has_logged_in() {
+        let mut room = room(false);
+        assert_eq!(room.host_peer(), None);
+        log_in(&mut room, BOB, "bob");
+        assert_eq!(room.host_peer(), None, "bob is not the host");
+        log_in(&mut room, ALICE, "alice");
+        assert_eq!(room.host_peer(), Some(ALICE));
+        room.disconnect(ALICE);
+        assert_eq!(room.host_peer(), None);
     }
 
     #[test]
