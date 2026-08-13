@@ -1114,6 +1114,22 @@ export interface UnitDatasetEntry {
    */
   footprintX?: number;
   footprintZ?: number;
+  /**
+   * The unitdef's `maxSlope` in degrees, clamped to the 0..89 the engine clamps
+   * it to. What decides whether a building will stand on a piece of ground: the
+   * engine tolerates `40 * tan(maxSlope)` elmos of height difference across the
+   * footprint and refuses to build past that.
+   *
+   * Absent from a dataset read by a worker that did not report it, which is not
+   * the same as zero. Zero is a def asking for flat ground, absent is a dataset
+   * that cannot answer, and a caller that confused the two would call every
+   * building on a hill unbuildable.
+   */
+  maxSlope?: number;
+  /** Whether the building sits on the water rather than on the seabed, from the
+   *  unitdef's `floater` or its having a `waterline`. Exempt from the slope test
+   *  wherever the ground is below sea level. */
+  floatOnWater?: boolean;
 }
 
 export interface UnitDatasetResult {

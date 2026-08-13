@@ -526,6 +526,10 @@ function parseBlueprint(b: Record<string, unknown>): BaseBlueprint | null {
     // Only ever true or absent: a layout is a build order or it is a layout,
     // and "false" is the same thing as saying nothing (issue #1418).
     ordered: b.ordered === true ? true : undefined,
+    // The map it was drawn on, when it was drawn on one (issue #1315). A blank
+    // is the same thing as saying nothing, so it reads as no map rather than as
+    // a map called nothing.
+    designedFor: str(b.designedFor)?.trim() || undefined,
     buildings,
   };
 }

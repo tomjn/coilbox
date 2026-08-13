@@ -69,31 +69,74 @@ export function LayoutNameField({
   );
 }
 
+/** Buildings named by their place in the layout, the way an author counts
+ *  them. */
+function listed(at: number[]): string {
+  return at.map((n) => n + 1).join(", ");
+}
+
 /**
- * Which of a layout's buildings cannot be built where they stand, and which of
- * its defs are not buildings at all.
+ * Which of a layout's buildings cannot be built where they stand, which of them
+ * the ground will not take, and which of its defs are not buildings at all.
  *
- * Both are true of the layout wherever it is drawn, so both are said the same
- * way in both editors. Nothing is said when there is nothing wrong.
+ * All of it is true of the layout wherever it is drawn, so all of it is said the
+ * same way in both editors. Nothing is said when there is nothing wrong, which
+ * includes the standalone editor: there is no map there, so nothing knows
+ * anything about the ground and `unstable` is empty.
  */
 export function LayoutNotes({
   overlaps,
+  unstable,
+  designedFor,
+  onMap,
   strays,
 }: {
   /** Buildings standing on ground another building wants, by their place in the
    *  layout. Drawn in red on the surface as well. */
   overlaps: number[];
+  /** Buildings the map's terrain will not take, by their place in the layout.
+   *  Drawn in amber on the surface as well. Empty where there is no map to
+   *  check against, which is not the same as everything being fine. */
+  unstable?: number[];
+  /** The map this layout was drawn on, when it says. */
+  designedFor?: string;
+  /** The map it is standing on now, when it is standing on one. */
+  onMap?: string;
   /** Defs in the layout the game does not call buildings. */
   strays: string[];
 }) {
+  const elsewhere =
+    designedFor !== undefined &&
+    designedFor !== "" &&
+    onMap !== undefined &&
+    onMap !== "" &&
+    designedFor !== onMap;
+
   return (
     <>
       {overlaps.length > 0 && (
         <p className="rounded bg-red-950/60 px-2 py-1.5 text-[11px] text-red-200">
           Building{overlaps.length === 1 ? " " : "s "}
-          {overlaps.map((at) => at + 1).join(", ")} stand
+          {listed(overlaps)} stand
           {overlaps.length === 1 ? "s" : ""} on ground another building wants,
           marked in red. The engine builds one of them and refuses the rest.
+        </p>
+      )}
+
+      {unstable !== undefined && unstable.length > 0 && (
+        <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
+          Building{unstable.length === 1 ? " " : "s "}
+          {listed(unstable)} stand
+          {unstable.length === 1 ? "s" : ""} on ground too steep for
+          {unstable.length === 1 ? " it" : " them"}, marked in amber. The engine
+          refuses to build on a slope past what the unit allows.
+        </p>
+      )}
+
+      {elsewhere && (
+        <p className="rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
+          Drawn for {designedFor}. A layout shaped around one map's terrain does
+          not always fit another's.
         </p>
       )}
 

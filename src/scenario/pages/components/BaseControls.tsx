@@ -69,6 +69,9 @@ export function BaseControls({
   sharedWith,
   sharedEdit,
   overlaps,
+  unstable,
+  designedFor,
+  onMap,
   participants,
   units,
   unitsLoading,
@@ -101,6 +104,14 @@ export function BaseControls({
   /** Which of them are standing on ground another building wants, by their
    *  place in the base. Drawn in red on the map as well. */
   overlaps: number[];
+  /** Which of them this map's terrain will not take, by their place in the
+   *  base. Drawn in amber on the map as well, and empty where the terrain
+   *  could not be checked at all. */
+  unstable: number[];
+  /** The map the layout was drawn on, when it says (issue #1315). */
+  designedFor?: string;
+  /** The map the mission is on, which is the one the base is standing on. */
+  onMap: string;
   participants: Participant[];
   /** The game's units, for filling the selected building's queue. */
   units: UnitDatasetEntry[];
@@ -310,7 +321,13 @@ export function BaseControls({
             one moves it within the base. Moving the base takes the lot.
           </p>
 
-          <LayoutNotes overlaps={overlaps} strays={strays} />
+          <LayoutNotes
+            overlaps={overlaps}
+            unstable={unstable}
+            designedFor={designedFor}
+            onMap={onMap}
+            strays={strays}
+          />
 
           <Button
             size="sm"

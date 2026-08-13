@@ -29,6 +29,10 @@ export function takeBlueprint(
     team,
     origin,
     name: layout.name,
+    // Whatever map the layout says it was drawn for, which is not this
+    // scenario's: an imported layout was shaped somewhere else and saying
+    // otherwise would be inventing provenance (issue #1315).
+    designedFor: layout.designedFor,
     buildings: layout.buildings,
   });
   return layout.ordered ? setBlueprintOrdered(placed, ids.base, true) : placed;

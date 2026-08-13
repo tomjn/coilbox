@@ -78,6 +78,32 @@ local function footprint(d, lower, upper)
   return n
 end
 
+-- How steep the ground under a building may be, in degrees. The engine reads
+-- `maxSlope` and turns it into the height difference it will tolerate across
+-- the footprint, clamping the angle to 0..89 first. A def that says nothing
+-- gets 0, which is the engine's own default and means perfectly flat ground.
+local function maxslope(d)
+  if type(d) ~= 'table' then return 0 end
+  local n = tonumber(d.maxslope) or tonumber(d.maxSlope) or 0
+  if n < 0 then n = 0 end
+  if n > 89 then n = 89 end
+  return n
+end
+
+-- Whether the building sits on the water rather than on the seabed. The engine
+-- takes `floater`, or the mere presence of a `waterline` key, and a floater is
+-- exempt from the slope test wherever the ground is below sea level.
+local function floats(d)
+  if type(d) ~= 'table' then return '0' end
+  local v = d.floater
+  if v == nil then v = d.Floater end
+  if v == nil then
+    return (d.waterline ~= nil or d.WaterLine ~= nil or d.waterLine ~= nil) and '1' or '0'
+  end
+  if type(v) == 'number' then return v ~= 0 and '1' or '0' end
+  return v and '1' or '0'
+end
+
 local lines = {}
 for _, k in ipairs(names) do
   local d = ud[k]
@@ -99,6 +125,8 @@ for _, k in ipairs(names) do
     .. table.concat(opts, ',') .. '\t' .. mobile .. '\t' .. obj
     .. '\t' .. footprint(d, 'footprintx', 'footprintX')
     .. '\t' .. footprint(d, 'footprintz', 'footprintZ')
+    .. '\t' .. string.format('%.4f', maxslope(d))
+    .. '\t' .. floats(d)
 end
 -- A big game's list runs to hundreds of kilobytes, far past what unitsync can
 -- hand back in one string, so it goes back in pieces.
@@ -218,6 +246,21 @@ fn parse_footprint(field: Option<&str>) -> u32 {
         .unwrap_or(1)
 }
 
+/// How steep the ground under a building may be, in degrees, or `None` when the
+/// line does not carry it.
+///
+/// `None` and `Some(0.0)` are different answers and must stay that way. Zero is
+/// the engine's own default and it means the ground has to be flat, which is a
+/// strong claim. A line written before this field existed is making no claim at
+/// all, and a reader that confused the two would call every building on a hill
+/// unbuildable.
+fn parse_max_slope(field: Option<&str>) -> Option<f32> {
+    field
+        .and_then(|s| s.trim().parse::<f32>().ok())
+        .filter(|n| n.is_finite())
+        .map(|n| n.clamp(0.0, 89.0))
+}
+
 /// Parse the `name\tfullname\topt1,opt2,...` lines [`UNIT_DATASET_SHIM_SCRIPT`]
 /// returns into `UnitDatasetEntry`s. A full name equal to the internal name (the
 /// script's fallback) or missing collapses to `None`; an empty options field
@@ -236,6 +279,8 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
             let object_name = it.next().unwrap_or("").trim();
             let footprint_x = parse_footprint(it.next());
             let footprint_z = parse_footprint(it.next());
+            let max_slope = parse_max_slope(it.next());
+            let float_on_water = it.next().unwrap_or("") == "1";
             let build_options = opts
                 .split(',')
                 .map(str::trim)
@@ -250,6 +295,8 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
                 object_name: Some(object_name.to_string()).filter(|s| !s.is_empty()),
                 footprint_x,
                 footprint_z,
+                max_slope,
+                float_on_water,
             })
         })
         .collect()
@@ -319,6 +366,46 @@ mod tests {
     }
 
     #[test]
+    fn reads_the_slope_a_building_tolerates() {
+        let units = parse_dataset_units("armsolar\tSolar\t\t0\tARMSOLAR\t2\t2\t10.0000\t0");
+        assert_eq!(units[0].max_slope, Some(10.0));
+        assert!(!units[0].float_on_water);
+    }
+
+    #[test]
+    fn reads_a_floating_building() {
+        let units = parse_dataset_units("armfsolar\tFloating Solar\t\t0\t\t2\t2\t20.0000\t1");
+        assert!(units[0].float_on_water);
+    }
+
+    #[test]
+    fn a_line_without_a_slope_claims_none() {
+        // The distinction the whole terrain check rests on. An older line stops
+        // after the footprint and is saying nothing, which must not read as the
+        // engine's default of zero degrees, meaning flat ground only.
+        let units = parse_dataset_units("armsolar\tSolar\t\t0\tARMSOLAR\t2\t2");
+        assert_eq!(units[0].max_slope, None);
+        let flat = parse_dataset_units("armsolar\tSolar\t\t0\tARMSOLAR\t2\t2\t0.0000\t0");
+        assert_eq!(flat[0].max_slope, Some(0.0));
+    }
+
+    #[test]
+    fn an_unreadable_slope_claims_none() {
+        let units = parse_dataset_units("odd\tOdd\t\t0\t\t1\t1\tsteep\t0");
+        assert_eq!(units[0].max_slope, None);
+    }
+
+    #[test]
+    fn a_slope_outside_the_engines_range_is_clamped() {
+        // The engine clamps `maxSlope` to 0..89 before it reaches the tangent,
+        // which is what keeps the tolerance finite.
+        let units = parse_dataset_units("wall\tWall\t\t0\t\t1\t1\t-5.0000\t0");
+        assert_eq!(units[0].max_slope, Some(0.0));
+        let steep = parse_dataset_units("wall\tWall\t\t0\t\t1\t1\t120.0000\t0");
+        assert_eq!(steep[0].max_slope, Some(89.0));
+    }
+
+    #[test]
     fn shim_script_reads_buildoptions_and_returns_result() {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("VFS.Include"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("buildoptions"));
@@ -328,6 +415,8 @@ mod tests {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("objectname"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("footprintx"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("footprintz"));
+        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("maxslope"));
+        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("waterline"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("return __cb_chunk("));
     }
 }

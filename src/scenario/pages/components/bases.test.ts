@@ -105,6 +105,28 @@ describe("adding a base", () => {
     expect(next.bases[0].blueprint).toBe("bp2");
     expect(next.bases[0].buildings).toEqual([{ id: "lab" }]);
   });
+
+  /** Issue #1315. A layout drawn by eye on one map's terrain is a layout that
+   *  says something about that map, so which one it was is worth keeping. */
+  it("records the map the layout was drawn on", () => {
+    const next = addBase(newScenario("test"), "b2", "bp2", {
+      team: "p0",
+      origin: { x: 10, z: 20 },
+      designedFor: "Comet Catcher Remake 1.8",
+      buildings: [],
+    });
+    expect(next.blueprints[0].designedFor).toBe("Comet Catcher Remake 1.8");
+  });
+
+  it("records no map when there is none", () => {
+    const next = addBase(newScenario("test"), "b2", "bp2", {
+      team: "p0",
+      origin: { x: 10, z: 20 },
+      designedFor: "",
+      buildings: [],
+    });
+    expect(next.blueprints[0].designedFor).toBeUndefined();
+  });
 });
 
 describe("adding a building", () => {

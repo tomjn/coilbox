@@ -151,8 +151,32 @@ describe("footprintMarks", () => {
         footprint: { x: 5, z: 4 },
         rect: { minX: 64, minZ: 64, maxX: 144, maxZ: 128 },
         overlapping: false,
+        standing: "unknown",
       },
     ]);
+  });
+
+  /** Issue #1315. Nothing here works out whether the ground will take a
+   *  building, it only carries the answer beside the overlap so the map can
+   *  draw both from one list. */
+  it("carries a verdict on the ground each building stands on", () => {
+    const marks = footprintMarks(
+      [
+        { key: "a", def: "armmex", pos: { x: 0, z: 0 }, facing: 0 },
+        { key: "b", def: "armmex", pos: { x: 1000, z: 0 }, facing: 0 },
+      ],
+      of,
+      (mark) => (mark.key === "a" ? "slope" : "fine"),
+    );
+    expect(marks.map((m) => m.standing)).toEqual(["slope", "fine"]);
+  });
+
+  it("knows nothing about the ground when nobody is asked", () => {
+    const marks = footprintMarks(
+      [{ key: "a", def: "armmex", pos: { x: 0, z: 0 }, facing: 0 }],
+      of,
+    );
+    expect(marks[0].standing).toBe("unknown");
   });
 
   it("marks both buildings of an overlapping pair and leaves the rest", () => {

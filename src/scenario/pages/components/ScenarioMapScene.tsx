@@ -35,6 +35,7 @@ import {
   type Placement,
   parsePlacementKey,
   placementKey,
+  unstableIn,
 } from "@/placement/placements";
 import {
   HistoryControls,
@@ -424,9 +425,12 @@ export function ScenarioMapScene({
   // The ground each of those buildings stands on, and which of them are fighting
   // over it. Drawn for the whole document rather than for the selected base, so
   // a layout that cannot be built says so without being clicked on first.
+  // Which of them the map's terrain will not take goes in the same pass (issue
+  // #1315): a base whose half floats is a mission that ships broken, and this
+  // is where the layout is sitting on the real ground it will be played on.
   const footprints = useMemo(
-    () => baseFootprints(units.placements, gameUnits.units),
-    [units.placements, gameUnits.units],
+    () => baseFootprints(units.placements, gameUnits.units, units.ground),
+    [units.placements, gameUnits.units, units.ground],
   );
   useScenarioFootprints(handle, footprints, assets, units.groundAt);
 
@@ -716,6 +720,13 @@ export function ScenarioMapScene({
                     footprints,
                     pickedBase.id,
                   )}
+                  unstable={unstableIn(
+                    units.placements,
+                    footprints,
+                    pickedBase.id,
+                  )}
+                  designedFor={pickedLayout?.designedFor}
+                  onMap={mapName}
                   participants={scenario.setup.participants}
                   units={gameUnits.units}
                   unitsLoading={gameUnits.loading}

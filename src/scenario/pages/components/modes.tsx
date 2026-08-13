@@ -444,6 +444,9 @@ const basesMode: EditorMode = {
               return addBase(doc, id, crypto.randomUUID(), {
                 team: owner,
                 origin: stand,
+                // The layout is being shaped around this map's terrain, so the
+                // map goes on it (issue #1315).
+                designedFor: doc.setup.mapName,
                 buildings: [
                   {
                     id: crypto.randomUUID(),
