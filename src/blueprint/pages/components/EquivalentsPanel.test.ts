@@ -152,6 +152,24 @@ describe("EquivalentsPanel", () => {
         expect(markup(long)).toContain("The 2 holding an answer you gave");
       });
 
+      it("says one holding an answer is first, not are", () => {
+        const one: EquivalenceTable = {
+          groups: [
+            {
+              Armada: { def: "armpw", from: "you" },
+              Cortex: { def: "corak", from: "you" },
+            },
+            {
+              Armada: { def: "armsolar", from: "game" },
+              Cortex: { def: "corsolar", from: "game" },
+            },
+          ],
+        };
+        expect(markup(one)).toContain(
+          "The 1 holding an answer you gave is first",
+        );
+      });
+
       it("says nothing about an order in a table that is all one kind", () => {
         expect(markup({ groups: [long.groups[0]] })).not.toContain(
           "holding an answer you gave",
