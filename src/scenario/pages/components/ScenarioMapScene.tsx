@@ -19,6 +19,7 @@ import {
 import { Link } from "react-router";
 import { buildGridSnap, buildingFootprints } from "@/blueprint/footprint";
 import { onBuildGrid } from "@/blueprint/offGrid";
+import { useGameSides } from "@/blueprint/useGameSides";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import {
   Popover,
@@ -429,6 +430,9 @@ export function ScenarioMapScene({
   // every base building is dragged and turned onto.
   const gameUnits = useGameUnits(scenario.setup.gameName);
   const snap = useMemo(() => buildGridSnap(gameUnits.units), [gameUnits.units]);
+  // What the game calls each side's units, which is all a base's conversion
+  // needs beyond the units themselves (issue #1466).
+  const gameSides = useGameSides(gameUnits.archive);
 
   // The ground each of those buildings stands on, and which of them are fighting
   // over it. Drawn for the whole document rather than for the selected base, so
@@ -752,6 +756,7 @@ export function ScenarioMapScene({
                   base={pickedBase}
                   buildings={baseBuildings(scenario.blueprints, pickedBase)}
                   index={picked.index}
+                  layout={pickedLayout}
                   layoutName={pickedLayout?.name ?? ""}
                   ordered={pickedLayout?.ordered === true}
                   sharedWith={sharingLayout(scenario, pickedBase.id).length}
@@ -771,6 +776,7 @@ export function ScenarioMapScene({
                   participants={scenario.setup.participants}
                   units={gameUnits.units}
                   unitsLoading={gameUnits.loading}
+                  sides={gameSides}
                   moving={moving === pickedBase.id}
                   onEdit={(patch) =>
                     onChange((doc) => editBase(doc, pickedBase.id, patch))
@@ -840,6 +846,18 @@ export function ScenarioMapScene({
                             buildingFootprints(gameUnits.units),
                             pickedBase.origin,
                           ),
+                      ),
+                    )
+                  }
+                  // A layout edit like the snap above, so converting one of two
+                  // bases placed from a layout converts one of them (#1466).
+                  onSubstitute={(next) =>
+                    onChange((doc) =>
+                      editBaseLayout(
+                        doc,
+                        pickedBase.id,
+                        layoutEdit(pickedBase.id),
+                        () => next.buildings,
                       ),
                     )
                   }

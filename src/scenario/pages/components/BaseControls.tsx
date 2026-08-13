@@ -23,21 +23,31 @@
  * a claim about the layout rather than a fact about it: a layout is a build
  * order once somebody says the sequence was meant, and until then the list is
  * the order things happened to be clicked in and is not worth showing as one.
+ *
+ * Converting the base to another side's buildings (issue #1466) is in the
+ * buildings popover for the same reason the layout's name is: it is a thing done
+ * to the layout rather than to this placement. The panel it opens is the one the
+ * library uses, and what it hands back goes through the same layout edit as a
+ * drag, so converting one of a pair of bases converts one of them.
  */
 
-import { Button } from "@picoframe/frame";
+import { Button, useDrawer } from "@picoframe/frame";
 import {
   ArrowDown,
   ArrowUp,
   Blocks,
   Hammer,
   Move,
+  Repeat,
   Trash2,
   X,
 } from "lucide-react";
 import { buildingFootprints } from "@/blueprint/footprint";
+import type { BaseBlueprint } from "@/blueprint/model";
 import { OffGridNote } from "@/blueprint/OffGridNote";
 import { offGridBuildings } from "@/blueprint/offGrid";
+import { SubstitutionPanel } from "@/blueprint/pages/components/SubstitutionPanel";
+import type { SideUnits } from "@/blueprint/substitution";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -47,6 +57,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { nextDrawerKey } from "@/general/drawerKey";
 import {
   BuildOrderPopover,
   LayoutNameField,
@@ -67,6 +78,7 @@ export function BaseControls({
   base,
   buildings,
   index,
+  layout,
   layoutName,
   ordered,
   sharedWith,
@@ -78,6 +90,7 @@ export function BaseControls({
   participants,
   units,
   unitsLoading,
+  sides,
   moving,
   onEdit,
   onRename,
@@ -88,6 +101,7 @@ export function BaseControls({
   onQueue,
   onMove,
   onSnapToGrid,
+  onSubstitute,
   onDelete,
 }: {
   base: ScenarioBase;
@@ -96,6 +110,10 @@ export function BaseControls({
   buildings: PlacedBuilding[];
   /** Which of the base's buildings is selected. */
   index: number;
+  /** The layout this base is placed from, as the conversion panel works on it:
+   *  the geometry with no mission-only field on it. Absent for a base whose
+   *  layout the document has lost, which has nothing to convert. */
+  layout?: BaseBlueprint;
   /** What the layout this base is placed from is called. */
   layoutName: string;
   /** Whether the order the buildings are in is the build order. */
@@ -120,6 +138,9 @@ export function BaseControls({
   /** The game's units, for filling the selected building's queue. */
   units: UnitDatasetEntry[];
   unitsLoading: boolean;
+  /** What this game calls each side's units, or empty when its own naming says
+   *  nothing a conversion can be suggested from. */
+  sides: readonly SideUnits[];
   /** Whether the map is waiting for a click to move the base. */
   moving: boolean;
   /** Change the base's own fields, as {@link editBase} takes them. */
@@ -145,9 +166,14 @@ export function BaseControls({
    *  the offer under {@link OffGridNote}. A layout edit like a drag, so a
    *  shared layout is copied or written through the same way. */
   onSnapToGrid: () => void;
+  /** Put the converted layout into the document (issue #1466). A layout edit
+   *  like a drag, so a shared layout is copied or written through the same
+   *  way. */
+  onSubstitute: (layout: BaseBlueprint) => void;
   /** Delete the whole base, buildings and queues and all. */
   onDelete: () => void;
 }) {
+  const drawer = useDrawer();
   // The selection is one of the base's buildings, so this is always one of them.
   const building = buildings[index];
   const queue = building.queue ?? [];
@@ -313,8 +339,8 @@ export function BaseControls({
                   : `${sharedWith} other bases are`}{" "}
                 placed from this layout.{" "}
                 {sharedEdit
-                  ? "Adding, moving, turning or deleting a building here changes it for all of them."
-                  : "Adding, moving, turning or deleting a building here gives this base a copy of its own and leaves the rest where they stand."}
+                  ? "Adding, moving, turning, converting or deleting a building here changes it for all of them."
+                  : "Adding, moving, turning, converting or deleting a building here gives this base a copy of its own and leaves the rest where they stand."}
               </p>
               <div className="flex items-center justify-between gap-3">
                 <Label
@@ -346,6 +372,45 @@ export function BaseControls({
           />
 
           <OffGridNote offGrid={offGrid} onSnap={onSnapToGrid} />
+
+          {layout && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 w-full gap-1.5 px-2 text-xs"
+              onClick={() =>
+                drawer.open({
+                  title: `Convert ${layoutName}`,
+                  width: "32rem",
+                  content: (
+                    <div key={nextDrawerKey()} className="flex flex-col">
+                      {buildings.some(
+                        (one) => (one.queue ?? []).length > 0,
+                      ) && (
+                        <p className="px-4 pt-4 text-xs text-muted-foreground">
+                          Only the buildings change. Anything queued on a
+                          factory in this base still names the units it named
+                          before.
+                        </p>
+                      )}
+                      <SubstitutionPanel
+                        layout={layout}
+                        sides={sides}
+                        units={units}
+                        unitsLoading={unitsLoading}
+                        onApply={(next) => {
+                          onSubstitute(next);
+                          drawer.close();
+                        }}
+                      />
+                    </div>
+                  ),
+                })
+              }
+            >
+              <Repeat className="size-3.5" /> Say it in another side's buildings
+            </Button>
+          )}
 
           <Button
             size="sm"
