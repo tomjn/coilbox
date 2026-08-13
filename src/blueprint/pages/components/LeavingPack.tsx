@@ -10,7 +10,14 @@
  * `blueprints.json` is what makes a set usable in game, and a file somewhere
  * else is what you post for somebody to open. Both are the same write through
  * the same care in `../../gameFile.ts`: the file is copied first, nothing is
- * written while a game is running, and everything the file already held is kept.
+ * written into a file a running game will write back over, and everything the
+ * file already held is kept.
+ *
+ * Which is where the two destinations stop being interchangeable (issue #1488).
+ * A running game rewrites its own file and no other, so it stops the write into
+ * a game's file and leaves the one being posted alone. That needs a directory to
+ * compare a destination against, and without one there is nothing to reason with
+ * and both are stopped, which is what both did before.
  *
  * Pure, and given everything, which is what makes `./LeavingPack.test.ts` able
  * to look at it without a library, a game or a file dialog to hand.
@@ -43,7 +50,8 @@ export function LeavingPack({
   taking: ReadonlySet<string>;
   /** What writing the ticked ones leaves behind, from `packStrips`. */
   strips: string[];
-  /** Where this engine's game keeps its own file, when coilbox knows. */
+  /** Where this engine's game keeps its own file, when coilbox knows. Knowing it
+   *  is also what lets a running game stop only the write that goes there. */
   gameFile?: string;
   /** Whether a game is running right now, which is a refusal. */
   gameRunning: boolean;
@@ -60,6 +68,11 @@ export function LeavingPack({
   const ticked = records.filter((record) => taking.has(record.id));
   const count = ticked.length;
   const games = new Set(ticked.map(recordGameName).filter(Boolean));
+  // A file being posted is one no game reads, so a running game is no reason to
+  // stop it. Only once there is a directory to tell one destination from the
+  // other: without one every write is the game's own as far as anything here can
+  // say (issue #1488).
+  const sharingStopped = gameRunning && !gameFile;
 
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -155,13 +168,13 @@ export function LeavingPack({
       )}
 
       {gameRunning && (
-        // Both ways out, not just the game's own file. Coilbox cannot tell from
-        // a path whether it is the one the running game will write back over,
-        // so it refuses every blueprints write until the game is closed.
         <p className="rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200">
           A game is running. It writes its whole blueprints file back when it
-          saves or exits, so anything written now could be thrown away without a
-          word. Close the game and come back.
+          saves or exits, so anything written into that file now could be thrown
+          away without a word.{" "}
+          {sharingStopped
+            ? "Coilbox does not know where this engine writes, so it cannot tell that file from any other. Close the game and come back."
+            : "Saving a file somewhere else is fine, because no game reads it. Close the game to write into a game's own file."}
         </p>
       )}
 
@@ -189,7 +202,7 @@ export function LeavingPack({
         </Button>
         <Button
           variant="outline"
-          disabled={busy || count === 0 || gameRunning}
+          disabled={busy || count === 0 || sharingStopped}
           onClick={onWriteToFile}
         >
           <FileUp className="mr-1.5 size-4" aria-hidden />
