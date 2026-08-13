@@ -319,6 +319,37 @@ export function nudgeToFit(
   return null;
 }
 
+/**
+ * The layout as the offer would stand it, for drawing the spot rather than only
+ * naming it (issue #1543).
+ *
+ * Drawn beside the layout under the pointer rather than instead of it. The
+ * pointer is where the click goes, and a preview that has quietly slid
+ * somewhere else is the silent relocation the offer was built to avoid.
+ *
+ * The same marks the layout would get if it were placed there, so what is
+ * outlined is what a press of the key puts down. A nudge moves whole build
+ * squares, so moving each building by the nudge and snapping lands exactly
+ * where moving the layout's origin and snapping would.
+ */
+export function nudgedPreview(
+  buildings: readonly PreviewBuilding[],
+  nudge: Nudge,
+  footprintOf: (def: string) => Footprint,
+  occupied: readonly { rect: Rect }[],
+  standingOf?: (mark: Omit<FootprintMark, "standing">) => Standing,
+): FootprintMark[] {
+  return layoutPreview(
+    buildings.map((one) => ({
+      ...one,
+      pos: { x: one.pos.x + nudge.delta.x, z: one.pos.z + nudge.delta.z },
+    })),
+    footprintOf,
+    occupied,
+    standingOf,
+  );
+}
+
 /** Which way a nudge goes, in the map's own directions: `+x` is east and `+z`
  *  is south, the way the engine's facings run. */
 export function nudgeWords(squares: Point): string {
@@ -350,7 +381,7 @@ export function nudgeSentence(offer: NudgeOffer, limit = NUDGE_LIMIT): string {
   if (offer === "nowhere") {
     return `Nothing within ${limit} squares of here fits.`;
   }
-  return `Press N to put it down ${nudgeWords(offer.squares)} instead, where it fits.`;
+  return `Press N to put it down ${nudgeWords(offer.squares)} instead, outlined, where it fits.`;
 }
 
 /** Whether two offers say the same thing, so a surface can leave its state

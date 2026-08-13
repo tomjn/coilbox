@@ -40,6 +40,7 @@ import {
   draggedBuilding,
   layoutPreview,
   type NudgeOffer,
+  nudgedPreview,
   nudgeToFit,
   type PreviewBuilding,
   type PreviewChecks,
@@ -111,18 +112,26 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
   const latest = useRef(deps);
   latest.current = deps;
 
+  /** What the pointer is holding, and the spot being offered beside it. Two
+   *  layers rather than one, because both are on screen at once and each is
+   *  redrawn on its own (issue #1543). */
   const [layer, setLayer] = useState<FootprintsLayer | null>(null);
+  const offerLayer = useRef<FootprintsLayer | null>(null);
   useEffect(() => {
     if (!handle) return;
-    const built = createFootprintsLayer({
+    const deps = {
       handle,
       worldWidth,
       worldHeight,
-      groundAt: (pos) => latest.current.groundAt(pos),
-    });
+      groundAt: (pos: Point) => latest.current.groundAt(pos),
+    };
+    const built = createFootprintsLayer(deps);
+    offerLayer.current = createFootprintsLayer(deps);
     setLayer(built);
     return () => {
       built.dispose();
+      offerLayer.current?.dispose();
+      offerLayer.current = null;
       setLayer(null);
       handle.render();
     };
@@ -143,12 +152,29 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
   );
   const frame = useRef<number | null>(null);
 
-  /** Hold an offer and where taking it would put the layout, without a render
-   *  while it says the same thing. */
-  const offer = useCallback((next: NudgeOffer, at: Point | null) => {
-    nudgeAt.current = at;
-    setNudge((was) => (sameNudge(was, next) ? was : next));
-  }, []);
+  /** Whether the offer layer has anything on it, so clearing an offer that was
+   *  never drawn costs no draw and no render. */
+  const drawnOffer = useRef(false);
+
+  /**
+   * Hold an offer, where taking it would put the layout, and the spot itself,
+   * without a render while it says the same thing.
+   *
+   * The words and the squares are set together because they are one offer. A
+   * sentence naming a spot nothing is drawn on, or an outline nothing explains,
+   * would each be half of it.
+   */
+  const offer = useCallback(
+    (next: NudgeOffer, at: Point | null, marks: FootprintMark[] = []) => {
+      nudgeAt.current = at;
+      if (marks.length > 0 || drawnOffer.current) {
+        offerLayer.current?.draw(marks, "offered");
+        drawnOffer.current = marks.length > 0;
+      }
+      setNudge((was) => (sameNudge(was, next) ? was : next));
+    },
+    [],
+  );
 
   const show = useCallback(
     (what: Showing) => {
@@ -186,7 +212,7 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
         held ? withoutBuilding(occupied, what.drag.key) : occupied,
         checks.standingOf,
       );
-      layer.draw(marks, held);
+      layer.draw(marks, held ? "held" : "standing");
       const next = previewCount(marks);
       setCount((was) => (sameCount(was, next) ? was : next));
       // Only for a layout a click would place, and only when moving it could
@@ -206,10 +232,20 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
       if (!found) return offer("nowhere", null);
       if (found.squares.x === 0 && found.squares.z === 0)
         return offer(null, null);
-      offer(found, {
-        x: what.pos.x + found.delta.x,
-        z: what.pos.z + found.delta.z,
-      });
+      offer(
+        found,
+        { x: what.pos.x + found.delta.x, z: what.pos.z + found.delta.z },
+        // Drawn as well as named, so the offer is a shape rather than a compass
+        // bearing (issue #1543). The layout stays under the pointer, because
+        // the pointer is where the click goes.
+        nudgedPreview(
+          buildings,
+          found,
+          checks.footprintOf,
+          occupied,
+          checks.standingOf,
+        ),
+      );
     },
     [layer, offer],
   );

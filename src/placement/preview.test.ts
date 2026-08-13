@@ -11,6 +11,7 @@ import {
   draggedBuilding,
   layoutPreview,
   NUDGE_LIMIT,
+  nudgedPreview,
   nudgeSentence,
   nudgeToFit,
   nudgeWords,
@@ -379,11 +380,61 @@ describe("nudgeToFit", () => {
         delta: { x: 0, z: -32 },
         squares: { x: 0, z: -2 },
       }),
-    ).toBe("Press N to put it down 2 squares north instead, where it fits.");
+    ).toBe(
+      "Press N to put it down 2 squares north instead, outlined, where it fits.",
+    );
     expect(nudgeSentence("nowhere")).toBe(
       `Nothing within ${NUDGE_LIMIT} squares of here fits.`,
     );
     expect(nudgeSentence(null)).toBe("");
+  });
+
+  /**
+   * Issue #1543. A direction and a number of squares is something an author has
+   * to picture. The spot itself is a shape, drawn beside the layout the pointer
+   * is holding, and it has to be the same spot the key press takes.
+   */
+  describe("the spot it is offering", () => {
+    it("stands the layout a whole nudge away from where the pointer has it", () => {
+      const standing = [taken(1000, 1000)];
+      const held = [solarAt(1000, 1000)];
+      const found = nudgeToFit(held, footprintOf, standing, standingOf);
+      if (!found) throw new Error("there is a spot five squares north");
+      const here = layoutPreview(held, footprintOf, standing, standingOf);
+      const there = nudgedPreview(
+        held,
+        found,
+        footprintOf,
+        standing,
+        standingOf,
+      );
+      expect(there).toHaveLength(1);
+      expect(there[0].pos).toEqual({
+        x: here[0].pos.x + found.delta.x,
+        z: here[0].pos.z + found.delta.z,
+      });
+    });
+
+    /** The offer is only made where the whole layout fits, so what is drawn
+     *  carries no refusal to read. */
+    it("draws a spot with nothing wrong with it", () => {
+      const standing = [taken(1000, 1000)];
+      const held = [solarAt(1000, 1000), solarAt(1000 + 6 * BUILD_SQUARE, 1000)];
+      const found = nudgeToFit(held, footprintOf, standing, standingOf);
+      if (!found) throw new Error("there is a spot for both of them");
+      const there = nudgedPreview(
+        held,
+        found,
+        footprintOf,
+        standing,
+        standingOf,
+      );
+      expect(there).toHaveLength(2);
+      for (const mark of there) {
+        expect(mark.overlapping).toBe(false);
+        expect(mark.standing).toBe("fine");
+      }
+    });
   });
 
   it("is cheap enough to run on a pointer move that finds nothing", () => {

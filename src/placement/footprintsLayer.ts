@@ -70,13 +70,25 @@ const ABSENT_COLOR = 0xa78bfa;
 
 /** What the building the pointer is holding is drawn in, when nothing is wrong
  *  with where it is being held (issue #1512). The colour the selection ring
- *  was, because it is saying what the ring said: this is the one you have. */
+ *  was, because it is saying what the ring said: this is the one you have. A
+ *  spot being offered takes it too, for the same reason: it is about the
+ *  building being worked on rather than about one that is standing. */
 const HELD_COLOR = 0x7dd3fc;
 
 /** The dashes of that outline, in elmos. A build square is 16, so a dash and a
  *  gap fall inside the smallest footprint there is. */
 const DASH_ELMOS = 7;
 const GAP_ELMOS = 5;
+
+/**
+ * What one set of marks is about (issues #1512, #1541, #1543).
+ *
+ * `"standing"` is ground a building is on. `"held"` is the building the pointer
+ * is carrying. `"offered"` is a spot something would go to if an offer were
+ * taken, which is where a turn will stand a building and where a nudge would
+ * put a layout: nothing is there yet, so it is an outline with no fill.
+ */
+export type MarkAs = "standing" | "held" | "offered";
 
 /** How one footprint is drawn. */
 export interface FootprintStyle {
@@ -105,19 +117,28 @@ export interface FootprintStyle {
  * A clash wins the colour, because it is the one the author put there and the
  * ground under it may well be fine once the pair is pulled apart.
  *
- * `held` is the building the pointer is carrying (issue #1512). It is the same
- * three states said louder: a refusal keeps its own colour, because red is the
- * answer to where this is being dropped and being held cannot paint over it,
- * and a building nothing has judged keeps its empty dashed square, because the
- * shape is the statement. Only the state with nothing to say takes a colour of
- * its own, which is the one thing the selection ring was for.
+ * `"held"` is the building the pointer is carrying (issue #1512). It is the
+ * same three states said louder: a refusal keeps its own colour, because red is
+ * the answer to where this is being dropped and being held cannot paint over
+ * it, and a building nothing has judged keeps its empty dashed square, because
+ * the shape is the statement. Only the state with nothing to say takes a colour
+ * of its own, which is the one thing the selection ring was for.
+ *
+ * `"offered"` is a spot rather than a building (issues #1541, #1543): where a
+ * turn will stand the building, or where a nudge would put the layout. It is
+ * drawn beside the thing it is about, so it takes no fill at all: two filled
+ * squares half a build square apart read as one smeared square rather than as a
+ * move. A refusal still keeps its colour, because a turn that will land a
+ * building in its neighbour is exactly what this is for.
  */
 export function footprintStyle(
   mark: Pick<FootprintMark, "overlapping" | "standing">,
-  held = false,
+  as: MarkAs = "standing",
 ): FootprintStyle {
-  const fill = held ? 0.45 : 0.32;
-  const outline = held ? 1 : 0.95;
+  const held = as === "held";
+  const offered = as === "offered";
+  const fill = offered ? 0 : held ? 0.45 : 0.32;
+  const outline = held || offered ? 1 : 0.95;
   if (mark.overlapping) {
     return { color: CLASH_COLOR, fill, outline, dashed: false };
   }
@@ -132,11 +153,14 @@ export function footprintStyle(
   }
   if (unjudged(mark.standing)) {
     return {
-      color: held ? HELD_COLOR : UNJUDGED_COLOR,
+      color: held || offered ? HELD_COLOR : UNJUDGED_COLOR,
       fill: 0,
-      outline: held ? 1 : 0.8,
+      outline: held || offered ? 1 : 0.8,
       dashed: true,
     };
+  }
+  if (offered) {
+    return { color: HELD_COLOR, fill: 0, outline: 1, dashed: false };
   }
   return held
     ? { color: HELD_COLOR, fill: 0.3, outline: 1, dashed: false }
@@ -154,10 +178,10 @@ export interface FootprintsLayerDeps {
 
 export interface FootprintsLayer {
   root: THREE.Group;
-  /** Draw this list, replacing whatever was drawn before. `held` draws them as
-   *  the building the pointer is carrying rather than as ground being stood
-   *  on. */
-  draw: (marks: FootprintMark[], held?: boolean) => void;
+  /** Draw this list, replacing whatever was drawn before. `as` says what the
+   *  marks are about: ground being stood on, the building the pointer is
+   *  carrying, or a spot being offered. */
+  draw: (marks: FootprintMark[], as?: MarkAs) => void;
   dispose: () => void;
 }
 
@@ -193,8 +217,8 @@ export function createFootprintsLayer(
    *  is its own size, so there is nothing to share between two of them. */
   let owned: { dispose: () => void }[] = [];
 
-  const buildMark = (mark: FootprintMark, held: boolean): THREE.Group => {
-    const style = footprintStyle(mark, held);
+  const buildMark = (mark: FootprintMark, as: MarkAs): THREE.Group => {
+    const style = footprintStyle(mark, as);
     const width = mark.rect.maxX - mark.rect.minX;
     const depth = mark.rect.maxZ - mark.rect.minZ;
     const group = new THREE.Group();
@@ -272,9 +296,9 @@ export function createFootprintsLayer(
 
   return {
     root,
-    draw: (marks, held = false) => {
+    draw: (marks, as = "standing") => {
       clear();
-      for (const mark of marks) root.add(buildMark(mark, held));
+      for (const mark of marks) root.add(buildMark(mark, as));
       handle.render();
     },
     dispose: () => {
