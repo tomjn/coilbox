@@ -35,6 +35,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { buildingFootprints } from "@/blueprint/footprint";
+import { OffGridNote } from "@/blueprint/OffGridNote";
+import { offGridBuildings } from "@/blueprint/offGrid";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -84,6 +87,7 @@ export function BaseControls({
   onSharedEdit,
   onQueue,
   onMove,
+  onSnapToGrid,
   onDelete,
 }: {
   base: ScenarioBase;
@@ -137,6 +141,10 @@ export function BaseControls({
   onQueue: (queue: string[], repeat: boolean) => void;
   /** Ask the map for a point to put the base's origin on, or stop asking. */
   onMove: (on: boolean) => void;
+  /** Write the positions the buildings are drawn on into the layout, which is
+   *  the offer under {@link OffGridNote}. A layout edit like a drag, so a
+   *  shared layout is copied or written through the same way. */
+  onSnapToGrid: () => void;
   /** Delete the whole base, buildings and queues and all. */
   onDelete: () => void;
 }) {
@@ -148,6 +156,14 @@ export function BaseControls({
   // is why the picker below falls back to every unit rather than to nothing.
   const buildable = buildableBy(units, building.def);
   const strays = strayDefs(units, buildings);
+  // Which of them the engine will not build where the layout says (#1427).
+  // Only once the game's units have been read: without them every building
+  // looks like one square, and half of a layout that is perfectly fine would be
+  // accused of being off the grid.
+  const offGrid =
+    units.length > 0
+      ? offGridBuildings(buildings, buildingFootprints(units), base.origin)
+      : [];
 
   return (
     <>
@@ -328,6 +344,8 @@ export function BaseControls({
             onMap={onMap}
             strays={strays}
           />
+
+          <OffGridNote offGrid={offGrid} onSnap={onSnapToGrid} />
 
           <Button
             size="sm"

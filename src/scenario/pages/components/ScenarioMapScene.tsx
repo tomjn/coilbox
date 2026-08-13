@@ -17,7 +17,8 @@ import {
   useState,
 } from "react";
 import { Link } from "react-router";
-import { buildGridSnap } from "@/blueprint/footprint";
+import { buildGridSnap, buildingFootprints } from "@/blueprint/footprint";
+import { onBuildGrid } from "@/blueprint/offGrid";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import {
   Popover,
@@ -66,6 +67,7 @@ import { ActorControls } from "./ActorControls";
 import { BaseControls } from "./BaseControls";
 import {
   editBase,
+  editBaseLayout,
   type LayoutEdit,
   moveBuilding,
   removeBase,
@@ -784,6 +786,24 @@ export function ScenarioMapScene({
                     )
                   }
                   onMove={(on) => setMovingBase(on ? pickedBase.id : null)}
+                  // A layout edit, so it copies a shared layout rather than
+                  // moving every base placed from it, and the history holds it
+                  // like any other (#1427).
+                  onSnapToGrid={() =>
+                    onChange((doc) =>
+                      editBaseLayout(
+                        doc,
+                        pickedBase.id,
+                        layoutEdit(pickedBase.id),
+                        (buildings) =>
+                          onBuildGrid(
+                            buildings,
+                            buildingFootprints(gameUnits.units),
+                            pickedBase.origin,
+                          ),
+                      ),
+                    )
+                  }
                   onDelete={() => {
                     onChange((doc) => removeBase(doc, pickedBase.id));
                     setSelected(null);
