@@ -27,6 +27,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
@@ -107,7 +108,6 @@ import {
   scenarioPaths,
 } from "./orderPaths";
 import { startMarkers } from "./startPositions";
-import { useGameUnits } from "./useGameUnits";
 import { useScenarioPaths } from "./useScenarioPaths";
 import { useScenarioStarts } from "./useScenarioStarts";
 import { useScenarioZones } from "./useScenarioZones";

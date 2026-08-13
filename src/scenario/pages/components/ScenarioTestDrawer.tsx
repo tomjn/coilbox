@@ -28,6 +28,7 @@ import {
   useUnitsyncHeightmap,
   useUnitsyncScan,
 } from "@/content/config";
+import { useGameUnits } from "@/content/useGameUnits";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import { MUTATOR_FOLDER } from "../../../lib/generatedGames";
@@ -42,7 +43,6 @@ import { mutatorOffer } from "../../offer";
 import { ensureBundledScenarioMedia } from "../../storage";
 import { describeIssue, type MissionIssue } from "../../validate";
 import { missionWarnings, type ScenarioReader } from "../../wording";
-import { useGameUnits } from "./useGameUnits";
 import { useScenarioGate } from "./useScenarioGate";
 
 type Launched = Extract<ScenarioLaunchResult, { ok: true }>;

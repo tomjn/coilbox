@@ -28,6 +28,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { useGameUnits } from "@/content/useGameUnits";
 import { parsePlacementKey, placementKey } from "@/placement/placements";
 import type { GroundDragPhase } from "@/placement/useMapEditing";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
@@ -47,7 +48,6 @@ import {
   MAX_GROUP_COUNT,
 } from "./groups";
 import { TeamSelect } from "./TeamSelect";
-import { useGameUnits } from "./useGameUnits";
 import {
   addZone,
   nextZoneName,

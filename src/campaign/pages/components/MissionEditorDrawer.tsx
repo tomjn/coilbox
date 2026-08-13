@@ -14,9 +14,9 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useGameUnits } from "@/content/useGameUnits";
 import { UnitDefSelect } from "../../../content/pages/components/UnitDefSelect";
 import { mediaKind, refIsVideo } from "../../../lib/assetUrl";
-import { useGameUnits } from "../../../scenario/pages/components/useGameUnits";
 import {
   campaignImageDelete,
   campaignImageImport,

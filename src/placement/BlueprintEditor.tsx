@@ -32,6 +32,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { baseBuildings, type Point, type Scenario } from "@/scenario/model";
@@ -48,7 +49,6 @@ import {
   removePlacement,
   turnPlacement,
 } from "@/scenario/pages/components/editing";
-import { useGameUnits } from "@/scenario/pages/components/useGameUnits";
 import {
   BLUEPRINT_BASE_ID,
   blueprintDocument,
