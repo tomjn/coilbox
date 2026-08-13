@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   coveredDefs,
+  coveredDefsBySource,
   type EquivalenceTable,
   equivalentOf,
   learnEquivalence,
   mergeEquivalents,
   NO_EQUIVALENTS,
+  orderYoursFirst,
   parseEquivalenceTable,
   sideOfDefInTable,
   sourceIn,
@@ -126,6 +128,108 @@ describe("coveredDefs", () => {
   it("counts the defs it can answer for", () => {
     expect(coveredDefs(learned)).toBe(4);
     expect(coveredDefs(NO_EQUIVALENTS)).toBe(0);
+  });
+});
+
+/**
+ * Issue #1544. The same count split by whose answer it is, because a table that
+ * has read a game's published file is mostly the game's and saying the lot came
+ * from converting claims credit for answers nobody here gave.
+ */
+describe("coveredDefsBySource", () => {
+  /** Two answers a person gave, one group a game's file brought, and one pair
+   *  an older coilbox stored with nothing said about it. */
+  const mixed: EquivalenceTable = {
+    groups: [
+      ...learned.groups,
+      {
+        Armada: { def: "armanni", from: "game" },
+        Cortex: { def: "cordoom", from: "game" },
+      },
+      { Armada: { def: "armllt" }, Cortex: { def: "corllt" } },
+    ],
+  };
+
+  it("counts a person's answers apart from a game's", () => {
+    expect(coveredDefsBySource(mixed).you).toBe(4);
+    expect(coveredDefsBySource(mixed).game).toBe(2);
+  });
+
+  it("counts an answer from before it recorded any of this as neither", () => {
+    expect(coveredDefsBySource(mixed).unsaid).toBe(2);
+  });
+
+  it("adds up to every def the table can answer for", () => {
+    const split = coveredDefsBySource(mixed);
+    expect(split.all).toBe(coveredDefs(mixed));
+    expect(split.you + split.game + split.unsaid).toBe(split.all);
+  });
+
+  it("counts a def as the person's wherever else it is named", () => {
+    // The same def in two groups, one of them a person's answer. They said it,
+    // so it is theirs, the same order of trust as everywhere else here.
+    const twice: EquivalenceTable = {
+      groups: [
+        { Armada: { def: "armsolar", from: "game" }, Cortex: { def: "corsy" } },
+        ...learned.groups,
+      ],
+    };
+    expect(coveredDefsBySource(twice).you).toBe(4);
+    expect(coveredDefsBySource(twice).game).toBe(0);
+  });
+
+  it("counts nothing for a table nobody has filled in", () => {
+    expect(coveredDefsBySource(NO_EQUIVALENTS)).toEqual({
+      all: 0,
+      you: 0,
+      game: 0,
+      unsaid: 0,
+    });
+  });
+});
+
+/**
+ * Issue #1545. Where each group stands, the ones a person answered first. A
+ * game's published table brings 87 at once, so their own five are otherwise
+ * found by eye.
+ */
+describe("orderYoursFirst", () => {
+  const table: EquivalenceTable = {
+    groups: [
+      {
+        Armada: { def: "armanni", from: "game" },
+        Cortex: { def: "cordoom", from: "game" },
+      },
+      {
+        Armada: { def: "armpw", from: "you" },
+        Cortex: { def: "corak", from: "you" },
+      },
+      { Armada: { def: "armllt" }, Cortex: { def: "corllt" } },
+      {
+        Armada: { def: "armsolar", from: "game" },
+        Cortex: { def: "corsolar", from: "you" },
+      },
+    ],
+  };
+
+  it("puts the groups holding an answer a person gave first", () => {
+    // The last of them is one merging left half theirs and half the game's,
+    // which is theirs enough to be worth finding.
+    expect(orderYoursFirst(table)).toEqual([1, 3, 0, 2]);
+  });
+
+  it("says where each group stands in the table, so dropping one drops that one", () => {
+    expect([...orderYoursFirst(table)].sort()).toEqual([0, 1, 2, 3]);
+  });
+
+  it("leaves a table nobody has answered any of in the order it is kept", () => {
+    expect(
+      orderYoursFirst({ groups: [table.groups[0], table.groups[2]] }),
+    ).toEqual([0, 1]);
+  });
+
+  it("orders nothing for a table nobody has filled in", () => {
+    expect(orderYoursFirst(NO_EQUIVALENTS)).toEqual([]);
   });
 });
 
