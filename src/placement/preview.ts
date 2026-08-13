@@ -34,7 +34,7 @@ import {
   unjudged,
 } from "@/blueprint/footprint";
 import type { Facing, Point } from "@/scenario/model";
-import type { BuildingUnit } from "./placements";
+import type { BuildingUnit, Placement } from "./placements";
 
 /** One building of a layout about to be placed, already offset from wherever
  *  the layout's origin would land. */
@@ -103,6 +103,52 @@ export function layoutPreview(
     );
   }
   return marks;
+}
+
+/**
+ * The building a drag is carrying, as far as the drag has got (issue #1512).
+ *
+ * A layout of one, so the building being positioned is drawn the way a whole
+ * base being placed is: on the squares it will really stand on, marked if the
+ * ground there is spoken for or too steep. Nothing else the pointer can pick up
+ * has a footprint, so anything but a base's building carries nothing.
+ *
+ * The drag is measured from the point the document names rather than from the
+ * point the grid drew, because that is the point `movePlacement` shifts. The
+ * two differ by up to half a build square on a layout the grid moved, and
+ * starting from the wrong one would put the answer a whole square out.
+ */
+export function draggedBuilding(
+  placements: readonly Placement[],
+  key: string,
+  delta: Point,
+): PreviewBuilding | null {
+  const placement = placements.find((one) => one.key === key);
+  if (placement?.kind !== "base") return null;
+  const from = placement.named ?? placement.pos;
+  return {
+    def: placement.def,
+    facing: placement.facing,
+    pos: { x: from.x + delta.x, z: from.z + delta.z },
+  };
+}
+
+/**
+ * The document's footprints without the one being dragged.
+ *
+ * A building in the air is drawn where it is going rather than where it came
+ * from, so the ground it came from is nobody's until it lands: left in, it would
+ * be a square the author never put there, and one the building would be marked
+ * red for wanting back.
+ *
+ * The same list back when nothing is being dragged, so a surface can hand the
+ * answer straight to a layer that redraws whenever it changes.
+ */
+export function withoutBuilding(
+  marks: FootprintMark[],
+  key: string | null,
+): FootprintMark[] {
+  return key === null ? marks : marks.filter((mark) => mark.key !== key);
 }
 
 /**

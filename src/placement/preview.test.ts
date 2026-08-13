@@ -6,7 +6,9 @@ import {
   footprintRect,
   snapToBuildGrid,
 } from "@/blueprint/footprint";
+import type { Placement } from "./placements";
 import {
+  draggedBuilding,
   layoutPreview,
   previewChecks,
   previewCount,
@@ -14,6 +16,7 @@ import {
   previewTrouble,
   sameCount,
   samePlace,
+  withoutBuilding,
 } from "./preview";
 
 /** Balanced Annihilation's own numbers, so the shapes below really exist. */
@@ -251,5 +254,76 @@ describe("layoutPreview", () => {
     }
     const each = (performance.now() - started) / 120;
     expect(each).toBeLessThan(2);
+  });
+});
+
+/**
+ * Issue #1512. A building being dragged is a layout of one under the pointer,
+ * so it is the same preview with the same marks, asked about one of the
+ * document's own buildings instead of about one it has not got yet.
+ */
+describe("draggedBuilding", () => {
+  const building = (over: Partial<Placement> = {}): Placement => ({
+    key: "base:pf1#0",
+    kind: "base",
+    id: "pf1",
+    index: 0,
+    def: "armsolar",
+    team: "p0",
+    pos: { x: 504, z: 600 },
+    facing: 0,
+    ...over,
+  });
+
+  it("carries the building the drag picked up, as far as the drag has got", () => {
+    const at = draggedBuilding([building()], "base:pf1#0", { x: 96, z: -32 });
+    expect(at).toEqual({
+      def: "armsolar",
+      facing: 0,
+      pos: { x: 600, z: 568 },
+    });
+  });
+
+  /**
+   * The drop shifts the point the document names and snaps the result, so a
+   * preview shifting the point the grid drew would answer a different question
+   * and be wrong by half a build square wherever the two differ.
+   */
+  it("shifts the point the document named, not the one the grid drew", () => {
+    const off = building({ named: { x: 507, z: 603 } });
+    expect(draggedBuilding([off], "base:pf1#0", { x: 0, z: 0 })?.pos).toEqual({
+      x: 507,
+      z: 603,
+    });
+  });
+
+  it("carries nothing for anything that has no footprint", () => {
+    const mobile = building({ key: "actor:a1", kind: "actor", id: "a1" });
+    const nowhere = { x: 0, z: 0 };
+    expect(draggedBuilding([mobile], "actor:a1", nowhere)).toBe(null);
+    expect(draggedBuilding([building()], "zone:z1", nowhere)).toBe(null);
+  });
+});
+
+describe("withoutBuilding", () => {
+  const mark = (key: string) =>
+    layoutPreview(
+      [solarAt(100, 100)],
+      previewChecks(units, null).footprintOf,
+      [],
+    ).map((one) => ({ ...one, key }))[0];
+
+  /** The building being dragged is drawn where it is going rather than where it
+   *  came from, so the ground it came from is nobody's while the drag lasts. */
+  it("drops the ground the building being dragged came from", () => {
+    const marks = [mark("base:pf1#0"), mark("base:pf1#1")];
+    expect(withoutBuilding(marks, "base:pf1#0").map((one) => one.key)).toEqual([
+      "base:pf1#1",
+    ]);
+  });
+
+  it("hands back the same list when nothing is being dragged", () => {
+    const marks = [mark("base:pf1#0")];
+    expect(withoutBuilding(marks, null)).toBe(marks);
   });
 });

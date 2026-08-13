@@ -84,6 +84,12 @@ export interface OverlayLayer {
  *  away by the browser before it finished. */
 export type GroundDragPhase = "move" | "end" | "cancel";
 
+/** A drawn unit being dragged, and how far it has been carried, in elmos. */
+export interface UnitDrag {
+  key: string;
+  delta: Point;
+}
+
 /** What the surface hands the pointer layer. Everything but `handle` and
  *  `layer` is read at the moment of a gesture rather than captured, so changing
  *  mode or document does not detach and reattach the listeners. */
@@ -129,6 +135,21 @@ export interface MapEditingDeps {
   onDragGround:
     | ((from: Point, to: Point, phase: GroundDragPhase) => void)
     | null;
+  /**
+   * A drag of a drawn unit, as it moves, and null the moment it ends
+   * (issue #1512).
+   *
+   * For showing where the thing being dragged will land. The document is not
+   * touched: this is called on every move and `onMove` once, so a drag is still
+   * one edit.
+   *
+   * It answers whether it is showing the drag, and a drag it is showing loses
+   * the selection ring: the ring is there to say which one is selected when the
+   * model is a few pixels across, and a footprint drawn on the squares the
+   * building will stand on says that and more. Nothing but a building has a
+   * footprint, so a scout being dragged keeps its ring.
+   */
+  onDragUnit?: ((drag: UnitDrag | null) => boolean) | null;
   /**
    * Anything pickable that is not a unit, nearest layer first.
    *
@@ -232,6 +253,9 @@ interface Drag {
   overlay: OverlayLayer | null;
   moved: boolean;
   delta: Point;
+  /** Whether the drag is being drawn as a footprint, which is what the ring
+   *  stands down for (issue #1512). */
+  held: boolean;
 }
 
 /** A drag across bare ground: where it began on the map, and where it has got
@@ -343,7 +367,9 @@ export function useMapEditing(deps: MapEditingDeps): void {
         );
         const at = worldToScene(to, worldWidth, worldHeight, handle.scale);
         member.object.position.set(at.x, groundAt(to) * handle.scale, at.z);
-        if (member.key === drag.key) ring.show(member.object);
+        // The ring follows what is being dragged, unless a footprint is being
+        // drawn for it, which says which one it is far better than a ring.
+        if (member.key === drag.key && !drag.held) ring.show(member.object);
       }
       handle.render();
     };
@@ -390,6 +416,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
           overlay: owner,
           moved: false,
           delta: { x: 0, z: 0 },
+          held: false,
         };
         handle.controls.enabled = false;
         latest.current.onSelect(key);
@@ -414,6 +441,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
         overlay: null,
         moved: false,
         delta: { x: 0, z: 0 },
+        held: false,
       };
       // The camera pans on this button, so it has to stand down for the
       // duration or the map would slide out from under what is being dragged.
@@ -449,8 +477,17 @@ export function useMapEditing(deps: MapEditingDeps): void {
       const at = groundPoint(event);
       if (!at) return;
       drag.delta = { x: at.x - drag.origin.x, z: at.z - drag.origin.z };
-      if (drag.overlay) drag.overlay.drag(drag.key, drag.delta);
-      else carry(drag.delta);
+      if (drag.overlay) {
+        drag.overlay.drag(drag.key, drag.delta);
+        return;
+      }
+      // Asked before the objects are moved, because the answer decides whether
+      // the ring moves with them.
+      drag.held =
+        latest.current.onDragUnit?.({ key: drag.key, delta: drag.delta }) ??
+        false;
+      if (drag.held) ring.hide();
+      carry(drag.delta);
     };
 
     const finish = (event: PointerEvent) => {
@@ -465,7 +502,16 @@ export function useMapEditing(deps: MapEditingDeps): void {
       handle.controls.enabled = true;
       dom.style.cursor = drawingCursor(latest.current);
       if (gesture) {
-        if (gesture.moved) latest.current.onMove(gesture.key, gesture.delta);
+        if (gesture.moved) {
+          // Down goes the footprint that was following the pointer, and back
+          // comes the ring: what is drawn from here is the document's own.
+          if (gesture.held) {
+            latest.current.onDragUnit?.(null);
+            const object = layer.objects.get(gesture.key);
+            if (object) ring.show(object);
+          }
+          latest.current.onMove(gesture.key, gesture.delta);
+        }
         return;
       }
       if (drawn?.moved) {
@@ -493,6 +539,10 @@ export function useMapEditing(deps: MapEditingDeps): void {
     const onPointerCancel = () => {
       // Put back whatever the abandoned drag had moved. The next render of the
       // units layer would do it too, but only if the document changed.
+      if (drag?.held) {
+        drag.held = false;
+        latest.current.onDragUnit?.(null);
+      }
       if (drag && !drag.overlay) carry({ x: 0, z: 0 });
       if (drag?.overlay) drag.overlay.drag(drag.key, { x: 0, z: 0 });
       if (band?.moved)

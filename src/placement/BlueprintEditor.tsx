@@ -65,8 +65,10 @@ import {
   placementKey,
   unjudgedIn,
 } from "./placements";
+import { previewChecks, withoutBuilding } from "./preview";
 import { HistoryControls, PlaybackBar, SelectionBar } from "./SurfaceBars";
 import { focusCamera, focusDistance, worldToScene } from "./scene";
+import { useLayoutPreview } from "./useLayoutPreview";
 import { useMapEditing } from "./useMapEditing";
 import { useScenarioFootprints } from "./useScenarioFootprints";
 import { useScenarioUnits } from "./useScenarioUnits";
@@ -172,7 +174,33 @@ export function BlueprintEditor({
     () => baseFootprints(drawn.placements, units, drawn.ground),
     [drawn.placements, units, drawn.ground],
   );
-  useScenarioFootprints(handle, footprints, GROUND, drawn.groundAt);
+
+  // Where a building being dragged will land, drawn while it is in the air
+  // (issue #1512). Nothing is ever shown under the pointer here, because a
+  // click puts down one building rather than a layout, so `ghost` is null and
+  // this costs nothing until something is picked up.
+  const checks = useMemo(
+    () => previewChecks(units, drawn.ground),
+    [units, drawn.ground],
+  );
+  const preview = useLayoutPreview({
+    handle,
+    worldWidth: GROUND.worldWidth,
+    worldHeight: GROUND.worldHeight,
+    groundAt: drawn.groundAt,
+    ghost: null,
+    checks,
+    occupied: footprints,
+    placements: drawn.placements,
+  });
+
+  // The building in the air is drawn on the squares it will land on, so its own
+  // square stays out of the layout's until it lands.
+  const standing = useMemo(
+    () => withoutBuilding(footprints, preview.dragging),
+    [footprints, preview.dragging],
+  );
+  useScenarioFootprints(handle, standing, GROUND, drawn.groundAt);
 
   const place = unitDef
     ? (pos: Point) => {
@@ -212,6 +240,7 @@ export function BlueprintEditor({
     drawing: drawn.drawing,
     onSelect: setSelected,
     onPlace: place,
+    onDragUnit: preview.onDragUnit,
     onDragGround: null,
     onMove: (key, delta) =>
       applyEdit((current) => movePlacement(current, key, delta, snap)),

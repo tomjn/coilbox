@@ -43,6 +43,15 @@ export interface Placement {
    *  building that is where the engine will stand it, which is not always the
    *  point its layout names. */
   pos: Point;
+  /**
+   * The point the layout names, for a base's building the grid moved. The same
+   * as `pos` for everything else, and left out there.
+   *
+   * Kept because an edit shifts this point rather than the drawn one, so
+   * anything working out where a drag will land has to start from it or it
+   * answers a different question (issue #1512).
+   */
+  named?: Point;
   facing: Facing;
 }
 
