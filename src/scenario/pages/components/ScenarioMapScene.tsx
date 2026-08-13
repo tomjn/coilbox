@@ -103,7 +103,8 @@ import {
   removeGroup,
   targetOptions,
 } from "./groups";
-import { EDITOR_MODES } from "./modes";
+import type { LayoutChoice } from "./layoutPlacing";
+import { EDITOR_MODES, LAYOUTS_MODE_ID } from "./modes";
 import {
   movePathWaypoint,
   pathLabel,
@@ -271,6 +272,11 @@ export function ScenarioMapScene({
   const [sharedBase, setSharedBase] = useState<string | null>(null);
   const layoutEdit = (id: string | null | undefined): LayoutEdit =>
     id && id === sharedBase ? "shared" : "own";
+  // What the Layouts mode is about to place, and whether the contents list is
+  // open. Both are here because one press in that list sets the first, switches
+  // the mode and shuts the second (issue #1450).
+  const [layoutChoice, setLayoutChoice] = useState<LayoutChoice | null>(null);
+  const [contentsOpen, setContentsOpen] = useState(false);
 
   // Every mode is resolved on every render, in the order of a static list, so
   // each one may hold state of its own.
@@ -283,6 +289,8 @@ export function ScenarioMapScene({
       selectedNow: () => selectedRef.current,
       onSelect: setSelected,
       layoutEdit,
+      layout: layoutChoice,
+      onLayout: setLayoutChoice,
     }),
   );
   const behaviour = behaviours[EDITOR_MODES.indexOf(mode)];
@@ -865,7 +873,7 @@ export function ScenarioMapScene({
       chrome={
         <>
           {history && <HistoryControls {...history} />}
-          <Popover>
+          <Popover open={contentsOpen} onOpenChange={setContentsOpen}>
             <PopoverTrigger asChild>
               <Button
                 size="sm"
@@ -883,6 +891,14 @@ export function ScenarioMapScene({
                 selected={listed}
                 participants={scenario.setup.participants}
                 onPick={pickEntry}
+                // Armed rather than placed. Where a base stands is the reason
+                // the author deleted it, so the next click on the map is the
+                // placement and this only gets them ready to make it (#1450).
+                onPlaceLayout={(layout) => {
+                  setLayoutChoice({ from: "scenario", id: layout.id });
+                  setModeId(LAYOUTS_MODE_ID);
+                  setContentsOpen(false);
+                }}
                 onDeleteLayout={(layout) =>
                   onChange((doc) => removeBlueprint(doc, layout.id))
                 }

@@ -157,6 +157,9 @@ export interface LayoutEntry {
   name: string;
   /** What it is made of, in a few words. */
   detail: string;
+  /** Nothing in it, so there is no base to place from it (issue #1450). A base
+   *  with no buildings draws nothing and can never be selected again. */
+  empty: boolean;
 }
 
 /**
@@ -167,6 +170,9 @@ export interface LayoutEntry {
  * geometry to put back. Kept means findable: without this the layout is in the
  * document and nowhere on screen, which is worse than losing it, so the list of
  * what a scenario holds carries these underneath what is on the map.
+ *
+ * Findable also means usable. A row is where an author puts one back on the map
+ * (issue #1450), which is what `empty` is for.
  */
 export function unplacedLayouts(
   scenario: Pick<Scenario, "blueprints" | "bases">,
@@ -182,6 +188,7 @@ export function unplacedLayouts(
         detail: `${count} building${count === 1 ? "" : "s"}${
           layout.ordered ? " · build order" : ""
         }`,
+        empty: count === 0,
       };
     });
 }

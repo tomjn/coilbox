@@ -21,6 +21,7 @@ import {
   Blocks,
   Factory,
   type LucideIcon,
+  MapPin,
   Square,
   Trash2,
   User,
@@ -45,6 +46,7 @@ export function ContentsList({
   selected,
   participants,
   onPick,
+  onPlaceLayout,
   onDeleteLayout,
 }: {
   entries: ContentEntry[];
@@ -57,6 +59,9 @@ export function ContentsList({
   /** The setup's participants, for the colour a team's things are drawn in. */
   participants: Participant[];
   onPick: (entry: ContentEntry) => void;
+  /** Arm the Layouts mode with this layout, so the next click on the map puts
+   *  a base of it down (#1450). */
+  onPlaceLayout: (layout: LayoutEntry) => void;
   onDeleteLayout: (layout: LayoutEntry) => void;
 }) {
   if (entries.length === 0 && layouts.length === 0)
@@ -106,7 +111,11 @@ export function ContentsList({
       </ul>
 
       {layouts.length > 0 && (
-        <UnplacedLayouts layouts={layouts} onDelete={onDeleteLayout} />
+        <UnplacedLayouts
+          layouts={layouts}
+          onPlace={onPlaceLayout}
+          onDelete={onDeleteLayout}
+        />
       )}
     </div>
   );
@@ -117,15 +126,21 @@ export function ContentsList({
  *
  * They belong here rather than in the list above because they are the one thing
  * a scenario holds that looking at the map cannot find: nothing on it is drawn
- * from them. A row therefore takes the camera nowhere and offers the one action
- * there is, which is throwing the layout away. Nothing else does that any more,
- * so a layout an author wants gone goes from here.
+ * from them. A row therefore takes the camera nowhere, and offers the two
+ * things there are to do with geometry nothing places: put it back, or throw it
+ * away. Nothing else does either any more.
+ *
+ * Putting it back arms the Layouts mode rather than dropping a base at some
+ * fixed point, because where a base stands is the whole reason the author
+ * deleted it (#1450). The next click on the map is the placement.
  */
 function UnplacedLayouts({
   layouts,
+  onPlace,
   onDelete,
 }: {
   layouts: LayoutEntry[];
+  onPlace: (layout: LayoutEntry) => void;
   onDelete: (layout: LayoutEntry) => void;
 }) {
   return (
@@ -148,6 +163,19 @@ function UnplacedLayouts({
               size="sm"
               variant="ghost"
               className="size-7 shrink-0 p-0"
+              aria-label={`Place ${layout.name}`}
+              title={`Place ${layout.name} on the map`}
+              // A layout with nothing in it would place a base that draws
+              // nothing and can never be selected again.
+              disabled={layout.empty}
+              onClick={() => onPlace(layout)}
+            >
+              <MapPin className="size-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="size-7 shrink-0 p-0"
               aria-label={`Delete ${layout.name}`}
               title={`Delete ${layout.name}`}
               onClick={() => onDelete(layout)}
@@ -158,8 +186,8 @@ function UnplacedLayouts({
         ))}
       </ul>
       <p className="px-2 py-1 text-[11px] text-muted-foreground">
-        Kept in this scenario until you delete them. Edit one under Base
-        blueprints below the map.
+        Kept in this scenario until you delete them. Place one back on the map
+        with the pin, or edit it under Base blueprints below the map.
       </p>
     </section>
   );
