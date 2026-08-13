@@ -49,9 +49,10 @@ export function blueprintRoute(id: string): string {
   return `/content/blueprints/${encodeURIComponent(id)}`;
 }
 
-/** Every game, rather than one of them. Not a game name, so it can never be
- *  one. */
-const ALL_GAMES = "";
+/** Every game, rather than one of them. A game's name is its archive name, so
+ *  a bare word can never be one, and the select needs a value that is not the
+ *  empty string. */
+const ALL_GAMES = "every-game";
 
 export default function BlueprintsPage() {
   const { records, loading, error } = useBlueprintLibrary();
@@ -167,13 +168,15 @@ function BlueprintCard({
         )}
       </div>
       <span className="truncate text-sm font-medium">{record.layout.name}</span>
-      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {buildings} building{buildings === 1 ? "" : "s"}
+      <span className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>
+          {buildings} building{buildings === 1 ? "" : "s"}
+        </span>
         {record.layout.ordered && (
-          <>
-            <ListOrdered className="size-3.5" aria-label="build order" />
+          <span className="flex items-center gap-1">
+            <ListOrdered className="size-3.5" aria-hidden="true" />
             build order
-          </>
+          </span>
         )}
       </span>
       <span className="truncate text-xs text-muted-foreground">
