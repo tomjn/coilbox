@@ -17,8 +17,10 @@
  * `BlueprintOnMap.tsx`.
  */
 
+import type { BlueprintBuilding } from "@/blueprint/model";
 import type { Point } from "@/scenario/model";
 import { clampToMap } from "./pointer";
+import type { PreviewBuilding } from "./preview";
 
 /**
  * Which map to offer first, or `""` for none.
@@ -65,4 +67,27 @@ export function checkSpot(
  *  keeping can be written down and typed into a mission. */
 export function spotSentence(spot: Point): string {
   return `Standing at ${Math.round(spot.x)}, ${Math.round(spot.z)}.`;
+}
+
+/**
+ * Every building of the layout as it would stand with the layout at `at`.
+ *
+ * A layout is a shape said from its own middle, so a spot and the offsets are
+ * the whole of where its buildings go. The same arithmetic the document does
+ * when the spot is written, which is what lets a drag draw the base it is about
+ * to land (issue #1558) and a search ask about the base as it stands.
+ *
+ * Nothing here snaps: `footprintMarks` puts every building on the engine's grid
+ * afterwards, and it is the only thing that should, because it is what the
+ * document itself is drawn through.
+ */
+export function spotLayout(
+  buildings: readonly BlueprintBuilding[],
+  at: Point,
+): PreviewBuilding[] {
+  return buildings.map((building) => ({
+    def: building.def,
+    facing: building.facing,
+    pos: { x: at.x + building.offset.x, z: at.z + building.offset.z },
+  }));
 }

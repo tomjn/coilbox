@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { checkMapFor, checkSpot, spotSentence } from "./mapCheck";
+import type { BlueprintBuilding } from "@/blueprint/model";
+import { checkMapFor, checkSpot, spotLayout, spotSentence } from "./mapCheck";
 
 describe("checkMapFor", () => {
   const installed = [
@@ -76,5 +77,27 @@ describe("spotSentence", () => {
     expect(spotSentence({ x: 1023.7, z: 2047.2 })).toBe(
       "Standing at 1024, 2047.",
     );
+  });
+});
+
+const solar = (x: number, z: number): BlueprintBuilding => ({
+  def: "armsolar",
+  offset: { x, z },
+  facing: 0,
+});
+
+describe("spotLayout", () => {
+  /** The offsets are what a layout is: a shape, said from its own middle. */
+  it("stands every building at its offset from the spot", () => {
+    expect(
+      spotLayout([solar(0, 0), solar(96, -32)], { x: 1000, z: 2000 }),
+    ).toEqual([
+      { def: "armsolar", facing: 0, pos: { x: 1000, z: 2000 } },
+      { def: "armsolar", facing: 0, pos: { x: 1096, z: 1968 } },
+    ]);
+  });
+
+  it("has nothing to stand for a layout with nothing in it", () => {
+    expect(spotLayout([], { x: 100, z: 100 })).toEqual([]);
   });
 });

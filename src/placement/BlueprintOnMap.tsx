@@ -28,6 +28,7 @@ import { Loader2, MapPin, MountainSnow, Unplug, X } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
+import type { FootprintMark } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
@@ -40,7 +41,7 @@ import { strayDefs } from "@/scenario/pages/components/bases";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { layoutFraming } from "./ground";
 import { LayoutNotes, UncheckedNote, WaterlessNote } from "./LayoutControls";
-import { checkMapFor, checkSpot, spotSentence } from "./mapCheck";
+import { checkMapFor, checkSpot, spotLayout, spotSentence } from "./mapCheck";
 import { PlacementSurface, SurfaceMessage } from "./PlacementSurface";
 import {
   absentIn,
@@ -53,15 +54,21 @@ import {
   tooShallowIn,
   unstableIn,
 } from "./placements";
+import { previewChecks, previewSentence, previewTrouble } from "./preview";
 import {
   focusCamera,
   focusDistance,
   mapSceneStatus,
   worldToScene,
 } from "./scene";
+import { useLayoutPreview } from "./useLayoutPreview";
 import { useMapEditing } from "./useMapEditing";
 import { useScenarioFootprints } from "./useScenarioFootprints";
 import { useScenarioUnits } from "./useScenarioUnits";
+
+/** One list for every "nothing to draw", so a layer with nothing on it is not
+ *  cleared and redrawn on every render. */
+const NOTHING: FootprintMark[] = [];
 
 export function BlueprintOnMap({
   blueprint,
@@ -115,7 +122,50 @@ export function BlueprintOnMap({
     () => baseFootprints(drawn.placements, units, drawn.ground),
     [drawn.placements, units, drawn.ground],
   );
-  useScenarioFootprints(handle, footprints, assets, drawn.groundAt);
+
+  // The layout as a drag carries it, drawn on the squares it will land on
+  // (issue #1558). A drag here moves the whole base rather than editing one
+  // building, so what follows the pointer is the whole base: showing the one
+  // building that was grabbed made it look as though the layout tore apart and
+  // snapped back together on the drop.
+  const checks = useMemo(
+    () => previewChecks(units, drawn.ground),
+    [units, drawn.ground],
+  );
+  const preview = useLayoutPreview({
+    handle,
+    worldWidth: assets.worldWidth,
+    worldHeight: assets.worldHeight,
+    groundAt: drawn.groundAt,
+    // Nothing is drawn under a pointer that is only passing over: a click
+    // stands the layout where it lands, and a second copy of the base
+    // following the pointer about would be one base too many on a surface that
+    // has exactly one.
+    ghost: null,
+    carried: (drag) =>
+      spotLayout(
+        blueprint.buildings,
+        checkSpot(
+          { x: origin.x + drag.delta.x, z: origin.z + drag.delta.z },
+          assets.worldWidth,
+          assets.worldHeight,
+        ),
+      ),
+    checks,
+    // Nothing else stands on this map, and the whole layout is in the air, so
+    // there is no ground here that is already spoken for.
+    occupied: NOTHING,
+    placements: drawn.placements,
+  });
+
+  // While it is in the air the layout is drawn where it is going, so the
+  // squares it came from come down for the length of the drag.
+  useScenarioFootprints(
+    handle,
+    preview.dragging ? NOTHING : footprints,
+    assets,
+    drawn.groundAt,
+  );
 
   // Framed on the layout rather than on the map: the map is a few kilometres
   // across and the base is a few hundred elmos, so framing the map would open
@@ -157,8 +207,10 @@ export function BlueprintOnMap({
     onDragGround: null,
     // A drag of any of its buildings carries the layout, because the layout is
     // the only thing on this surface and none of its buildings can be edited
-    // here. The one building follows the pointer while the drag is on, and the
-    // rest catch up when it lands.
+    // here. Every building of it follows the pointer, and the squares under
+    // them are drawn by the preview above.
+    carries: () => drawn.placements.map((one) => one.key),
+    onDragUnit: preview.onDragUnit,
     onMove: (_key, delta) =>
       setSpot({ x: origin.x + delta.x, z: origin.z + delta.z }),
   });
@@ -309,6 +361,21 @@ export function BlueprintOnMap({
                 else.
               </p>
             </div>
+
+            {/* What the squares under the layout say while it is being
+                carried, in words, because a colour on its own is not a
+                statement anybody can act on (issue #1558). */}
+            {preview.count && (
+              <p
+                className={`w-fit rounded px-2 py-1 text-[11px] backdrop-blur ${
+                  previewTrouble(preview.count)
+                    ? "bg-amber-950/80 text-amber-200"
+                    : "bg-card/70 text-muted-foreground"
+                }`}
+              >
+                {previewSentence(preview.count)}
+              </p>
+            )}
 
             <UncheckedNote
               unchecked={drawn.settled ? sceneUnchecked(footprints) : null}
