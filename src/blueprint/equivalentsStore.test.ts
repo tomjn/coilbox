@@ -6,6 +6,7 @@ import {
   equivalentsKey,
   loadEquivalents,
   rememberEquivalence,
+  rememberShippedEquivalents,
   resetEquivalents,
 } from "./equivalentsStore";
 
@@ -69,6 +70,70 @@ describe("rememberEquivalence", () => {
     expect(equivalentsFor("")).toEqual(NO_EQUIVALENTS);
   });
 
+  it("survives a webview with no storage at all", () => {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: () => {
+          throw new Error("off");
+        },
+        setItem: () => {
+          throw new Error("off");
+        },
+      },
+    });
+    loadEquivalents();
+    rememberEquivalence("byar", "Armada", "armpw", "Cortex", "corak");
+    expect(equivalentOf("armpw", "Cortex", equivalentsFor("byar"))).toBe(
+      "corak",
+    );
+  });
+});
+
+/** Issue #1526. What a game itself says, kept beside what a person said. */
+describe("rememberShippedEquivalents", () => {
+  const shipped = {
+    groups: [{ Armada: "armanni", Cortex: "cordoom", Legion: "legbastion" }],
+  };
+
+  it("keeps what the game said, and counts what was new about it", () => {
+    expect(rememberShippedEquivalents("byar", shipped)).toBe(3);
+    expect(equivalentOf("armanni", "Cortex", equivalentsFor("byar"))).toBe(
+      "cordoom",
+    );
+  });
+
+  it("counts nothing the second time, because nothing was new", () => {
+    rememberShippedEquivalents("byar", shipped);
+    expect(rememberShippedEquivalents("byar", shipped)).toBe(0);
+  });
+
+  it("leaves an answer a person gave, and counts only what it added", () => {
+    rememberEquivalence("byar", "Armada", "armanni", "Cortex", "corsy");
+    expect(rememberShippedEquivalents("byar", shipped)).toBe(1);
+    expect(equivalentOf("armanni", "Cortex", equivalentsFor("byar"))).toBe(
+      "corsy",
+    );
+    expect(equivalentOf("armanni", "Legion", equivalentsFor("byar"))).toBe(
+      "legbastion",
+    );
+  });
+
+  it("keeps nothing for no game, because there is nothing to key it by", () => {
+    expect(rememberShippedEquivalents("", shipped)).toBe(0);
+  });
+
+  it("is still there for the next session", () => {
+    rememberShippedEquivalents("byar", shipped);
+    resetEquivalents();
+    loadEquivalents();
+    expect(equivalentOf("armanni", "Cortex", equivalentsFor("byar"))).toBe(
+      "cordoom",
+    );
+  });
+});
+
+describe("storage that is not there", () => {
   it("survives a webview with no storage at all", () => {
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,

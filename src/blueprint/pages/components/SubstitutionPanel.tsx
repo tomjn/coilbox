@@ -39,7 +39,7 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { ArrowRight, Undo2, X } from "lucide-react";
+import { ArrowRight, BookOpen, Undo2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Label } from "@/components/ui/label";
@@ -85,6 +85,9 @@ export function SubstitutionPanel({
   unitsLoading = false,
   onApply,
   onRemember,
+  onReadShipped,
+  readingShipped = false,
+  shippedNote,
 }: {
   layout: BaseBlueprint;
   /** Every unit this base's factories are told to build, in the order they are
@@ -117,6 +120,13 @@ export function SubstitutionPanel({
     toSide: string,
     toDef: string,
   ) => void;
+  /** Go and read the table this game publishes, if it publishes one (issue
+   *  #1526). Absent for a caller with no game to go and read, which is every
+   *  caller that cannot reach unitsync. */
+  onReadShipped?: () => void;
+  readingShipped?: boolean;
+  /** What the last read found, or nothing before one. */
+  shippedNote?: string;
 }) {
   const defs = useMemo(() => layoutDefs(layout), [layout]);
   const queuedDefs = useMemo(() => distinctDefs(queued), [queued]);
@@ -229,6 +239,24 @@ export function SubstitutionPanel({
               you have converted before, and uses those first. Correcting one
               here corrects it for the next layout as well.
             </p>
+          )}
+          {onReadShipped && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-full gap-1.5"
+              disabled={readingShipped}
+              onClick={onReadShipped}
+            >
+              <BookOpen className="size-3.5" aria-hidden />
+              {readingShipped
+                ? "Reading this game's own pairings"
+                : "Read this game's own pairings"}
+            </Button>
+          )}
+          {shippedNote && (
+            <p className="text-xs text-muted-foreground">{shippedNote}</p>
           )}
         </div>
       ) : (

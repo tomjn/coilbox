@@ -267,6 +267,29 @@ describe("SubstitutionPanel", () => {
       expect(html).not.toContain("cannot tell which side");
     });
 
+    /** Issue #1526. One game publishes its own table, so the offer to read it
+     *  is there when there is something to read it with and nowhere else. */
+    describe("reading the game's own table", () => {
+      it("offers to read it", () => {
+        expect(markup({ onReadShipped: () => {} })).toContain(
+          "Read this game&#x27;s own pairings",
+        );
+      });
+
+      it("offers nothing for a game coilbox cannot go and read", () => {
+        expect(markup()).not.toContain("own pairings");
+      });
+
+      it("says what reading it did", () => {
+        expect(
+          markup({
+            onReadShipped: () => {},
+            shippedNote: "Read 86 pairings, 23 of them new.",
+          }),
+        ).toContain("23 of them new");
+      });
+    });
+
     it("offers the sides only the table knows about", () => {
       // No prefixes at all, so without the table this game has no side picker
       // and every row has to be filled in by hand, every time.
