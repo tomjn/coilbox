@@ -10,6 +10,10 @@ import type { Placement } from "./placements";
 import {
   draggedBuilding,
   layoutPreview,
+  NUDGE_LIMIT,
+  nudgeSentence,
+  nudgeToFit,
+  nudgeWords,
   previewChecks,
   previewCount,
   previewSentence,
@@ -275,6 +279,128 @@ describe("layoutPreview", () => {
     }
     const each = (performance.now() - started) / 120;
     expect(each).toBeLessThan(2);
+  });
+});
+
+/**
+ * Issue #1482. Seeing that a base does not fit is half an answer. The other
+ * half is where it would, which is a search of the same question over the
+ * squares around the pointer.
+ */
+describe("nudgeToFit", () => {
+  const { footprintOf, standingOf } = previewChecks(units, flat);
+
+  /** The ground a solar collector is already standing on at a point, for a
+   *  layout to be dropped on top of. */
+  const taken = (x: number, z: number) => ({
+    rect: footprintRect(
+      snapToBuildGrid({ x, z }, { x: 5, z: 5 }, 0),
+      { x: 5, z: 5 },
+      0,
+    ),
+  });
+
+  it("offers where it is when the layout already fits", () => {
+    const found = nudgeToFit(
+      [solarAt(1000, 1000)],
+      footprintOf,
+      [],
+      standingOf,
+    );
+    expect(found?.squares).toEqual({ x: 0, z: 0 });
+    expect(found?.delta).toEqual({ x: 0, z: 0 });
+  });
+
+  /** Two five square buildings clear each other at five build squares and not
+   *  before, so the nearest spot is five squares off, and north wins a tie. */
+  it("moves the whole layout off ground another building has", () => {
+    const found = nudgeToFit(
+      [solarAt(1000, 1000)],
+      footprintOf,
+      [taken(1000, 1000)],
+      standingOf,
+    );
+    expect(found?.squares).toEqual({ x: 0, z: -5 });
+    expect(found?.delta).toEqual({ x: 0, z: -5 * BUILD_SQUARE });
+  });
+
+  /** A nudge that fixes the overlap and lands the base on a slope has not
+   *  helped, so the ground is asked about every candidate as well. */
+  it("passes over a spot that is clear and too steep", () => {
+    const step: Ground = {
+      cornerAt: (_x, z) => (z * 8 < 900 ? 300 : 100),
+      slack: 0,
+      minHeight: 0,
+      maxHeight: 500,
+      hasWater: true,
+    };
+    const on = previewChecks(units, step);
+    const found = nudgeToFit(
+      [solarAt(1000, 1000)],
+      on.footprintOf,
+      [taken(1000, 1000)],
+      on.standingOf,
+    );
+    expect(found?.squares).toEqual({ x: -5, z: 0 });
+  });
+
+  /** Moving the base cannot conjure up a unit the game has not got, so an
+   *  absent def is not something a spot is judged on. */
+  it("does not hunt for a spot that would fix a missing unit", () => {
+    const found = nudgeToFit(
+      [{ def: "armnope", pos: { x: 1000, z: 1000 }, facing: 0 }],
+      footprintOf,
+      [],
+      standingOf,
+    );
+    expect(found?.squares).toEqual({ x: 0, z: 0 });
+  });
+
+  /** A pointer move must not turn into a scan of the map, so the search stops
+   *  and the offer is simply absent. */
+  it("gives up rather than searching further than its bound", () => {
+    const wall = Array.from({ length: 25 }, (_, at) =>
+      taken(1000 + ((at % 5) - 2) * 80, 1000 + (Math.floor(at / 5) - 2) * 80),
+    );
+    expect(
+      nudgeToFit([solarAt(1000, 1000)], footprintOf, wall, standingOf, 2),
+    ).toBe(null);
+  });
+
+  it("says which way it would go, in build squares", () => {
+    expect(nudgeWords({ x: 0, z: -2 })).toBe("2 squares north");
+    expect(nudgeWords({ x: 1, z: 0 })).toBe("1 square east");
+    expect(nudgeWords({ x: -3, z: 2 })).toBe("2 squares south and 3 west");
+  });
+
+  it("offers it in words, and says when there was nothing to offer", () => {
+    expect(
+      nudgeSentence({
+        delta: { x: 0, z: -32 },
+        squares: { x: 0, z: -2 },
+      }),
+    ).toBe("Press N to put it down 2 squares north instead, where it fits.");
+    expect(nudgeSentence("nowhere")).toBe(
+      `Nothing within ${NUDGE_LIMIT} squares of here fits.`,
+    );
+    expect(nudgeSentence(null)).toBe("");
+  });
+
+  it("is cheap enough to run on a pointer move that finds nothing", () => {
+    // The worst case: thirty buildings on a map already holding two hundred,
+    // where every square the search tries is refused, so it tries all of them.
+    const layout = Array.from({ length: 30 }, (_, at) =>
+      solarAt(1000 + (at % 6) * 96, 1000 + Math.floor(at / 6) * 96),
+    );
+    const standing = Array.from({ length: 200 }, (_, at) =>
+      taken(200 + (at % 20) * 96, 200 + Math.floor(at / 20) * 96),
+    );
+    const started = performance.now();
+    for (let pass = 0; pass < 20; pass++) {
+      nudgeToFit(layout, footprintOf, standing, standingOf);
+    }
+    const each = (performance.now() - started) / 20;
+    expect(each).toBeLessThan(3);
   });
 });
 

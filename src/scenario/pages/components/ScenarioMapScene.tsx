@@ -45,6 +45,7 @@ import {
   wrongDepthIn,
 } from "@/placement/placements";
 import {
+  nudgeSentence,
   previewChecks,
   previewSentence,
   previewTrouble,
@@ -120,6 +121,7 @@ import {
   removeGroup,
   targetOptions,
 } from "./groups";
+import { isTypingTarget } from "./history";
 import type { LayoutChoice } from "./layoutPlacing";
 import { EDITOR_MODES, LAYOUTS_MODE_ID } from "./modes";
 import {
@@ -473,6 +475,28 @@ export function ScenarioMapScene({
     placements: units.placements,
   });
 
+  // Taking the offer of a spot the layout fits (issue #1482). A key rather than
+  // a button, because the offer is about where the pointer is and the pointer
+  // reaching a button in the panel is the pointer off the map, which puts the
+  // preview and the offer with it away. It does exactly what a click at the
+  // offered point would do, so nothing about the placement is special.
+  const offered = preview.nudge;
+  const takeNudge = preview.nudgeAt;
+  useEffect(() => {
+    if (!offered || offered === "nowhere" || !onPlace) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "n") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isTypingTarget(event.target as HTMLElement | null)) return;
+      const at = takeNudge();
+      if (!at) return;
+      event.preventDefault();
+      onPlace(at);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [offered, takeNudge, onPlace]);
+
   // A building being dragged is drawn by the preview, on the squares it will
   // land on, so its own square stays out of the document's until it lands
   // (issue #1512).
@@ -731,6 +755,15 @@ export function ScenarioMapScene({
               }`}
             >
               {previewSentence(preview.count)}
+            </p>
+          )}
+          {/* Where it would fit instead, offered rather than done: the engine
+              builds one of a pair of overlapping buildings, and a ruined base
+              with buildings inside each other is a real thing an author might
+              mean, so nothing moves until somebody asks (issue #1482). */}
+          {preview.nudge && (
+            <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
+              {nudgeSentence(preview.nudge)}
             </p>
           )}
           {/* What is true of the whole map at once, said once here rather than
