@@ -280,6 +280,15 @@ pub fn said_battle_ex(username: &str, message: &str) -> String {
     format!("SAIDBATTLEEX {username} {message}")
 }
 
+/// `SERVERMSG <text>`, an announcement shown to the player verbatim.
+///
+/// A room uses it for the one thing it has to say that no room message covers:
+/// why the room is closing. Without it a host who stops hosting is a socket that
+/// goes quiet, and every joiner is left guessing.
+pub fn server_msg(text: &str) -> String {
+    format!("SERVERMSG {text}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -359,5 +368,10 @@ mod tests {
             "hi\nSAIDBATTLE host pwned"
         )));
         assert!(!is_wire_safe(&join_battle_failed("no\rway")));
+        assert_eq!(
+            server_msg("the host stopped hosting"),
+            "SERVERMSG the host stopped hosting"
+        );
+        assert!(!is_wire_safe(&server_msg("bye\nDENIED gotcha")));
     }
 }

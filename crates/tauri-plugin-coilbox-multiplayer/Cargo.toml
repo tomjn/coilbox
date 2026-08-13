@@ -15,6 +15,9 @@ tauri-plugin = { version = "2", features = ["build"] }
 # Paused time, so the test for the request timeout does not wait out the real
 # fifteen seconds.
 tokio = { version = "1", features = ["test-util"] }
+# The room this client can be pointed at when nobody is running a lobby server.
+# A dev dependency only: nothing in this crate's build depends on it.
+tauri-plugin-coilbox-direct = { path = "../tauri-plugin-coilbox-direct" }
 
 [dependencies]
 tauri = { version = "2" }

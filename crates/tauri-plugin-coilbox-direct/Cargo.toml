@@ -1,0 +1,27 @@
+[package]
+name = "tauri-plugin-coilbox-direct"
+version = "0.0.0"
+description = "Direct and LAN hosting (Rust half): a TASServer subset the host runs in process, so a battle needs no lobby server. ACL identifier: coilbox-direct"
+edition = "2021"
+license = "MIT"
+# Tauri requires `links` to equal `package.name`. The ACL identifier is this name
+# with the `tauri-plugin-` prefix stripped -> `coilbox-direct`.
+links = "tauri-plugin-coilbox-direct"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dev-dependencies]
+# A runtime of their own, and a clock the idle-peer test can wind forward
+# rather than waiting out the real ninety seconds.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "io-util", "test-util"] }
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+picoframe-core = "0.0.4"
+coilbox-lobby-protocol = { path = "../coilbox-lobby-protocol" }
+tokio = { version = "1", features = ["net", "io-util", "sync", "rt", "macros", "time"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
