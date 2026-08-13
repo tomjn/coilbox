@@ -24,7 +24,11 @@ import { Button } from "@picoframe/frame";
 import { Blocks } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { buildGridSnap, buildingFootprints } from "@/blueprint/footprint";
+import {
+  buildGridSnap,
+  buildingFootprints,
+  type FootprintMark,
+} from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
 import { offGridBuildings, onBuildGrid } from "@/blueprint/offGrid";
 import {
@@ -58,6 +62,7 @@ import {
   BuildOrderPopover,
   LayoutNameField,
   LayoutNotes,
+  layoutTriggerLabel,
   UncheckedNote,
 } from "./LayoutControls";
 import { PlacementSurface } from "./PlacementSurface";
@@ -69,8 +74,13 @@ import {
   placementKey,
   sceneUnchecked,
 } from "./placements";
-import { previewChecks, withoutBuilding } from "./preview";
-import { HistoryControls, PlaybackBar, SelectionBar } from "./SurfaceBars";
+import { previewChecks, turnedMarks, withoutBuilding } from "./preview";
+import {
+  HistoryControls,
+  PlaybackBar,
+  SelectionBar,
+  TurnNote,
+} from "./SurfaceBars";
 import { focusCamera, focusDistance, worldToScene } from "./scene";
 import { useLayoutPreview } from "./useLayoutPreview";
 import { useMapEditing } from "./useMapEditing";
@@ -84,6 +94,10 @@ const PLAYBACK_STEP_MS = 700;
 /** The ground every blueprint is drawn on: flat, gridded and the same size
  *  every time, so a layout looks the same wherever it is opened. */
 const GROUND = gridGround();
+
+/** One list for every "nothing to draw", so a layer with nothing on it is not
+ *  cleared and redrawn on every render. */
+const NOTHING: FootprintMark[] = [];
 
 export function BlueprintEditor({
   blueprint,
@@ -205,6 +219,26 @@ export function BlueprintEditor({
     [footprints, preview.dragging],
   );
   useScenarioFootprints(handle, standing, GROUND, drawn.groundAt);
+
+  // Where a turn would stand the selected building, drawn while the Turn button
+  // is under the pointer or has the focus (issue #1541). A turn is the one edit
+  // with nothing under the pointer to hang a preview on, so the button is the
+  // hover. Empty for a square footprint, which does not move at all.
+  const [turning, setTurning] = useState(false);
+  const turned = useMemo(
+    () =>
+      turning && selected
+        ? turnedMarks(
+            doc,
+            selected,
+            checks.footprintOf,
+            footprints,
+            checks.standingOf,
+          )
+        : NOTHING,
+    [turning, selected, doc, checks, footprints],
+  );
+  useScenarioFootprints(handle, turned, GROUND, drawn.groundAt, "offered");
 
   const place = unitDef
     ? (pos: Point) => {
@@ -333,11 +367,15 @@ export function BlueprintEditor({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-8 gap-1.5 px-2 text-xs"
+                  className="h-8 max-w-52 gap-1.5 px-2 text-xs"
                 >
-                  <Blocks className="size-3.5" /> {blueprint.buildings.length}{" "}
-                  building
-                  {blueprint.buildings.length === 1 ? "" : "s"}
+                  <Blocks className="size-3.5 shrink-0" />
+                  <span className="truncate">
+                    {layoutTriggerLabel(
+                      blueprint.name,
+                      blueprint.buildings.length,
+                    )}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-80 space-y-3">
@@ -416,6 +454,8 @@ export function BlueprintEditor({
             unchecked={drawn.settled ? sceneUnchecked(footprints) : null}
           />
 
+          <TurnNote moves={turning && picked ? turned.length > 0 : null} />
+
           {picked && (
             <SelectionBar
               def={picked.def}
@@ -424,6 +464,7 @@ export function BlueprintEditor({
               onTurn={() =>
                 applyEdit((current) => turnPlacement(current, picked.key, 1))
               }
+              onTurnPreview={setTurning}
               onDelete={() => {
                 applyEdit((current) => removePlacement(current, picked.key));
                 setSelected(null);

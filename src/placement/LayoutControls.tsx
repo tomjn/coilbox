@@ -72,6 +72,25 @@ export function LayoutNameField({
   );
 }
 
+/**
+ * What the button that opens a layout's own controls says (issue #1484).
+ *
+ * The name, because that is what an author is looking for and the field behind
+ * this button is the only way to change it while the editor is running. A
+ * rename made here is a step in the editor's history, which is why it is not
+ * also offered somewhere quieter: two fields for one name meant one of them
+ * went round the way back.
+ *
+ * The count only for a layout with no name, so the button is never blank. It is
+ * said in the corner of the surface and on the library card as well, so this is
+ * the third place rather than the only one.
+ */
+export function layoutTriggerLabel(name: string, buildings: number): string {
+  const called = name.trim();
+  if (called) return called;
+  return `${buildings} building${buildings === 1 ? "" : "s"}`;
+}
+
 /** Buildings named by their place in the layout, the way an author counts
  *  them. */
 function listed(at: number[]): string {

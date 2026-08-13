@@ -11,7 +11,11 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { LayoutNotes, UncheckedNote } from "./LayoutControls";
+import {
+  LayoutNotes,
+  layoutTriggerLabel,
+  UncheckedNote,
+} from "./LayoutControls";
 
 type Notes = Parameters<typeof LayoutNotes>[0];
 
@@ -203,6 +207,25 @@ describe("LayoutNotes", () => {
     it("says nothing when nobody asked the question", () => {
       expect(markup({ onSnapToGrid: () => {} })).toBe("");
     });
+  });
+});
+
+/**
+ * Issue #1484. The one route to a layout's name while it is open is a popover,
+ * and the button that opens it counted the buildings. Nobody clicks a count to
+ * rename something, and the count is already said in the corner of the surface
+ * and on the library card.
+ */
+describe("layoutTriggerLabel", () => {
+  it("says what the layout is called", () => {
+    expect(layoutTriggerLabel("Opening solars", 7)).toBe("Opening solars");
+  });
+
+  /** A blank button says nothing about what it opens, so a layout with no name
+   *  keeps the count the button had before. */
+  it("counts the buildings when the layout has no name", () => {
+    expect(layoutTriggerLabel("", 7)).toBe("7 buildings");
+    expect(layoutTriggerLabel("   ", 1)).toBe("1 building");
   });
 });
 

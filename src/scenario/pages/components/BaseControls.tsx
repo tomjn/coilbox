@@ -71,6 +71,7 @@ import {
   BuildOrderPopover,
   LayoutNameField,
   LayoutNotes,
+  layoutTriggerLabel,
 } from "@/placement/LayoutControls";
 import type { Participant } from "@/play/config";
 import type { PlacedBuilding, ScenarioBase } from "../../model";
@@ -346,11 +347,14 @@ export function BaseControls({
           <Button
             size="sm"
             variant={moving ? "default" : "ghost"}
-            className="h-7 gap-1.5 px-2 text-xs"
+            className="h-7 max-w-52 gap-1.5 px-2 text-xs"
           >
-            <Blocks className="size-3.5" /> {buildings.length} building
-            {buildings.length === 1 ? "" : "s"}
-            {sharedWith > 0 && (sharedEdit ? " · editing shared" : " · shared")}
+            <Blocks className="size-3.5 shrink-0" />
+            <span className="truncate">
+              {layoutTriggerLabel(layoutName, buildings.length)}
+              {sharedWith > 0 &&
+                (sharedEdit ? " · editing shared" : " · shared")}
+            </span>
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 space-y-3">

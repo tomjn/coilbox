@@ -17,7 +17,10 @@ const style = (standing: Standing, overlapping = false) =>
   footprintStyle({ standing, overlapping });
 
 const held = (standing: Standing, overlapping = false) =>
-  footprintStyle({ standing, overlapping }, true);
+  footprintStyle({ standing, overlapping }, "held");
+
+const offered = (standing: Standing, overlapping = false) =>
+  footprintStyle({ standing, overlapping }, "offered");
 
 describe("footprintStyle", () => {
   it("draws a building the ground takes as a quiet filled square", () => {
@@ -124,5 +127,42 @@ describe("footprintStyle, held by the pointer", () => {
     expect(held("no-ground").dashed).toBe(true);
     expect(held("no-ground").fill).toBe(0);
     expect(held("no-ground").color).toBe(held("fine").color);
+  });
+});
+
+/**
+ * Issues #1541 and #1543. A spot being offered is drawn beside the building
+ * rather than instead of it: a turn's destination stands next to where the
+ * building is now, and a nudge's spot next to the layout under the pointer.
+ *
+ * So it is an outline with nothing filled in. Two filled squares half a build
+ * square apart read as one smeared square, and the offered one is not somewhere
+ * anything is standing yet.
+ */
+describe("footprintStyle, a spot being offered", () => {
+  it("draws an offer as an outline with nothing filled in", () => {
+    expect(offered("fine").fill).toBe(0);
+    expect(offered("fine").dashed).toBe(false);
+    expect(offered("fine").outline).toBeGreaterThan(style("fine").outline);
+  });
+
+  it("tells an offered spot from a building standing on one", () => {
+    expect(offered("fine").color).not.toBe(style("fine").color);
+  });
+
+  /** The whole point of drawing the spot: a turn that will land the building
+   *  in its neighbour says so before it is taken. */
+  it("keeps a refusal's own colour in an offer", () => {
+    expect(offered("fine", true).color).toBe(style("fine", true).color);
+    expect(offered("slope").color).toBe(style("slope").color);
+    expect(offered("depth").color).toBe(style("depth").color);
+    expect(offered("no-def").color).toBe(style("no-def").color);
+  });
+
+  /** An offer nothing has judged is still nothing anything has judged, and the
+   *  dashes are what say so. */
+  it("keeps an unjudged offer dashed", () => {
+    expect(offered("no-ground").dashed).toBe(true);
+    expect(offered("no-ground").fill).toBe(0);
   });
 });

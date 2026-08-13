@@ -17,7 +17,11 @@ import {
   useState,
 } from "react";
 import { Link } from "react-router";
-import { buildGridSnap, buildingFootprints } from "@/blueprint/footprint";
+import {
+  buildGridSnap,
+  buildingFootprints,
+  type FootprintMark,
+} from "@/blueprint/footprint";
 import { onBuildGrid } from "@/blueprint/offGrid";
 import { useGameSides } from "@/blueprint/useGameSides";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
@@ -50,12 +54,14 @@ import {
   previewChecks,
   previewSentence,
   previewTrouble,
+  turnedMarks,
   withoutBuilding,
 } from "@/placement/preview";
 import {
   HistoryControls,
   PlaybackBar,
   SelectionBar,
+  TurnNote,
 } from "@/placement/SurfaceBars";
 import {
   focusCamera,
@@ -147,6 +153,10 @@ import {
  *  arrives. Slow enough to read the base going up, brisk enough that a
  *  twenty-building opening is not a coffee break. */
 const PLAYBACK_STEP_MS = 700;
+
+/** One list for every "nothing to draw", so a layer with nothing on it is not
+ *  cleared and redrawn on every render. */
+const NOTHING: FootprintMark[] = [];
 
 /**
  * The scenario's map as the surface it is authored on.
@@ -513,6 +523,26 @@ export function ScenarioMapScene({
   );
   useScenarioFootprints(handle, standing, assets, units.groundAt);
 
+  // Where a turn would stand the selected building, drawn while the Turn button
+  // is under the pointer or has the focus (issue #1541). A turn is the one edit
+  // with nothing under the pointer to hang a preview on, so the button is the
+  // hover. Empty for a square footprint, which does not move at all.
+  const [turning, setTurning] = useState(false);
+  const turned = useMemo(
+    () =>
+      turning && selected
+        ? turnedMarks(
+            scenario,
+            selected,
+            checks.footprintOf,
+            footprints,
+            checks.standingOf,
+          )
+        : NOTHING,
+    [turning, selected, scenario, checks, footprints],
+  );
+  useScenarioFootprints(handle, turned, assets, units.groundAt, "offered");
+
   useMapEditing({
     handle,
     layer: units.layer,
@@ -782,9 +812,18 @@ export function ScenarioMapScene({
             flattened={units.heightsUnread}
           />
           <WaterlessNote floor={waterless} />
+          {/* What the outlined square beside the selected building is, while a
+              turn is being considered (issue #1541). Nothing for an actor,
+              which stands on no build squares at all. */}
+          <TurnNote
+            moves={
+              turning && picked?.kind === "base" ? turned.length > 0 : null
+            }
+          />
           {picked && (
             <ScenarioSelectionBar
               placement={picked}
+              onTurnPreview={setTurning}
               onTurn={() =>
                 onChange((doc) =>
                   turnPlacement(doc, picked.key, 1, layoutEdit(picked.id)),
@@ -1112,11 +1151,14 @@ export function ScenarioMapScene({
 function ScenarioSelectionBar({
   placement,
   onTurn,
+  onTurnPreview,
   onDelete,
   children,
 }: {
   placement: Placement;
   onTurn: () => void;
+  /** Whether a turn is being considered, which draws where it would go. */
+  onTurnPreview: (on: boolean) => void;
   onDelete: () => void;
   /** Controls for what kind of thing this is: an actor's team and its
    *  overrides, and whatever a group or a base grows later. */
@@ -1135,6 +1177,7 @@ function ScenarioSelectionBar({
       turnable={canTurn(placement.key)}
       turnHint="A group's units all face south"
       onTurn={onTurn}
+      onTurnPreview={onTurnPreview}
       onDelete={onDelete}
     >
       {children}
