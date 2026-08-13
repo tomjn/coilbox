@@ -13,6 +13,13 @@
  * nothing filled in, which is the manual route and is still far quicker than
  * drawing the layout again.
  *
+ * Every row a person fills in is then remembered for that game and used first
+ * next time (issue #1468), which is why the manual route is a route rather than
+ * a punishment: the tenth layout of a game costs nothing because the first nine
+ * answered the questions. That is the only reason a queued unit ever converts,
+ * since no reading of `armpw` reaches `corak`. Correcting a row is how a wrong
+ * answer is corrected, here and for every later layout.
+ *
  * Nothing refuses. A conversion that moves buildings or leaves two of them
  * fighting over ground is still one somebody may want, so the warnings are said
  * plainly and the button stays.
@@ -34,10 +41,16 @@ import type { UnitDatasetEntry } from "@/content/bindings";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ArrivalNote } from "../../arrival";
+import {
+  coveredDefs,
+  type EquivalenceTable,
+  NO_EQUIVALENTS,
+} from "../../equivalents";
 import { buildingFootprints } from "../../footprint";
 import type { BaseBlueprint } from "../../model";
 import {
   distinctDefs,
+  gameSideNames,
   layoutDefs,
   planForSide,
   queueNote,
@@ -45,10 +58,11 @@ import {
   revertSubstitution,
   type SideUnits,
   type SubstitutionPlan,
-  sideOfDef,
+  sideNameOfDef,
   substituteBlueprint,
   substitutedCount,
   substitutionNotes,
+  substitutionPairs,
 } from "../../substitution";
 import { knownUnits } from "../../units";
 
@@ -58,9 +72,11 @@ export function SubstitutionPanel({
   layout,
   queued = NO_QUEUE,
   sides,
+  table = NO_EQUIVALENTS,
   units,
   unitsLoading = false,
   onApply,
+  onRemember,
 }: {
   layout: BaseBlueprint;
   /** Every unit this base's factories are told to build, in the order they are
@@ -70,6 +86,10 @@ export function SubstitutionPanel({
   /** The game's sides and what its units are named, or empty when the game's own
    *  names say nothing coilbox can read a mapping out of. */
   sides: readonly SideUnits[];
+  /** What this game has already been told, which beats any name (issue #1468).
+   *  Empty for a game nobody has answered anything about yet, and for a caller
+   *  that has no game to key one by. */
+  table?: EquivalenceTable;
   /** The game's units. Empty until they have been read, which is when nothing
    *  can be checked and nothing can be suggested. */
   units: UnitDatasetEntry[];
@@ -79,6 +99,15 @@ export function SubstitutionPanel({
    *  substitute somebody picked by hand is in it and a fresh derivation would
    *  lose it. Empty for a revert, which changes no queue. */
   onApply: (layout: BaseBlueprint, plan: SubstitutionPlan) => void;
+  /** Hold onto one thing this conversion said about the game, for the next
+   *  layout of it. Absent for a caller with no game to key a table by, which is
+   *  a panel that suggests from names alone and teaches nothing. */
+  onRemember?: (
+    fromSide: string,
+    fromDef: string,
+    toSide: string,
+    toDef: string,
+  ) => void;
 }) {
   const defs = useMemo(() => layoutDefs(layout), [layout]);
   const queuedDefs = useMemo(() => distinctDefs(queued), [queued]);
@@ -87,17 +116,18 @@ export function SubstitutionPanel({
     () => (units.length > 0 ? buildingFootprints(units) : undefined),
     [units],
   );
+  const sideNames = useMemo(() => gameSideNames(sides, table), [sides, table]);
 
   // The side the layout is not already in, so the panel opens on the conversion
   // somebody came here for rather than on an empty form.
-  const [toSide, setToSide] = useState(() => otherSide(defs, sides));
+  const [toSide, setToSide] = useState(() => otherSide(defs, sides, table));
   /** What the person said, over what the game's naming suggested. An empty
    *  string is a def they have decided to leave alone. */
   const [chosen, setChosen] = useState<Record<string, string>>({});
 
   const suggested = useMemo(
-    () => planForSide([...defs, ...queuedDefs], toSide, sides, known),
-    [defs, queuedDefs, toSide, sides, known],
+    () => planForSide([...defs, ...queuedDefs], toSide, sides, known, table),
+    [defs, queuedDefs, toSide, sides, known, table],
   );
 
   const plan: SubstitutionPlan = {};
@@ -109,10 +139,26 @@ export function SubstitutionPanel({
 
   const preview = substituteBlueprint(layout, plan, footprintOf);
   const notes = substitutionNotes(preview.report);
-  const queues = queueReport(queued, plan, sides, toSide);
+  const queues = queueReport(queued, plan, sides, toSide, table);
   const stranded = queueNote(queues, toSide);
   const swapping = preview.report.substituted.length;
   const already = substitutedCount(layout);
+  const learned = coveredDefs(table);
+
+  /**
+   * Convert, and hold onto what converting said about this game (issue #1468).
+   *
+   * Every pair, not only the ones picked by hand: a suggestion somebody looked
+   * at and applied is an answer too, and holding onto it is what makes the
+   * naming route's right answers survive into a game release that renames the
+   * units it was reading.
+   */
+  const apply = () => {
+    for (const pair of substitutionPairs(plan, toSide, sides, table)) {
+      onRemember?.(pair.fromSide, pair.fromDef, pair.toSide, pair.toDef);
+    }
+    onApply(preview.layout, plan);
+  };
   const converting = [
     swapping > 0
       ? `${swapping} of ${layout.buildings.length} buildings`
@@ -130,7 +176,7 @@ export function SubstitutionPanel({
             ? "Reading this game's units."
             : "Coilbox has not read this game's units, so it cannot offer substitutes or check that they fit. Install the game and open this again."}
         </p>
-      ) : sides.length > 0 ? (
+      ) : sideNames.length > 0 ? (
         <div className="space-y-1.5">
           <Label htmlFor="substitute-side" className="text-xs font-medium">
             Say this layout in
@@ -141,10 +187,12 @@ export function SubstitutionPanel({
               setToSide(side);
               setChosen({});
             }}
-            options={sides.map((side) => ({
-              value: side.side,
-              label: side.side,
-              description: `${side.prefix}…`,
+            options={sideNames.map((side) => ({
+              value: side,
+              label: side,
+              description: sides.find((one) => one.side === side)?.prefix
+                ? `${sides.find((one) => one.side === side)?.prefix}…`
+                : undefined,
             }))}
             placeholder="Pick a side"
             size="sm"
@@ -153,6 +201,13 @@ export function SubstitutionPanel({
             Suggested from what this game calls each side's units, and only
             where the game has the unit. Change any of them.
           </p>
+          {learned > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Coilbox also remembers {learned} of this game's units from what
+              you have converted before, and uses those first. Correcting one
+              here corrects it for the next layout as well.
+            </p>
+          )}
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">
@@ -228,7 +283,7 @@ export function SubstitutionPanel({
           type="button"
           className="flex-1 gap-1.5"
           disabled={converting.length === 0}
-          onClick={() => onApply(preview.layout, plan)}
+          onClick={apply}
         >
           <ArrowRight className="size-4" aria-hidden />
           {converting.length === 0
@@ -367,19 +422,20 @@ function NoteLine({ note }: { note: ArrivalNote }) {
  * The side to open on: the first one the layout is not already written in.
  *
  * A layout is normally all one side's, so this is the conversion somebody opened
- * the panel to do. Empty when the game offers no sides to read, which is the
- * manual route.
+ * the panel to do. Empty when neither the game's naming nor its table offers a
+ * side to read, which is the manual route.
  */
 function otherSide(
   defs: readonly string[],
   sides: readonly SideUnits[],
+  table: EquivalenceTable,
 ): string {
-  if (sides.length === 0) return "";
+  const all = gameSideNames(sides, table);
+  if (all.length === 0) return "";
   const mine = new Set(
     defs
-      .map((def) => sideOfDef(def, sides))
-      .filter((side) => side !== undefined)
-      .map((side) => side.side),
+      .map((def) => sideNameOfDef(def, sides, table))
+      .filter((side) => side !== undefined),
   );
-  return (sides.find((side) => !mine.has(side.side)) ?? sides[0]).side;
+  return all.find((side) => !mine.has(side)) ?? all[0];
 }

@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
+import { learnEquivalence, NO_EQUIVALENTS } from "./equivalents";
 import { buildingFootprints } from "./footprint";
 import type { BaseBlueprint } from "./model";
 import type { BlueprintPayload } from "./payload";
 import {
   distinctDefs,
+  gameSideNames,
   layoutDefs,
   layoutSide,
   planForSide,
   queueNote,
   queueReport,
   revertSubstitution,
+  sideNameOfDef,
   sideOfDef,
   sideOffer,
   sideUnitPrefixes,
@@ -18,6 +21,7 @@ import {
   substitutePayload,
   substituteQueue,
   substitutionNotes,
+  substitutionPairs,
 } from "./substitution";
 import { knownUnits } from "./units";
 
@@ -133,7 +137,7 @@ describe("planForSide", () => {
 
 describe("layoutSide", () => {
   it("names the side a layout is written in", () => {
-    expect(layoutSide(["armsolar", "armmex"], prefixes)?.side).toBe("Armada");
+    expect(layoutSide(["armsolar", "armmex"], prefixes)).toBe("Armada");
   });
 
   it("says nothing about a layout with both sides' buildings in it", () => {
@@ -141,9 +145,7 @@ describe("layoutSide", () => {
   });
 
   it("ignores buildings belonging to no side, because nobody owns those", () => {
-    expect(layoutSide(["armsolar", "raptorqueen"], prefixes)?.side).toBe(
-      "Armada",
-    );
+    expect(layoutSide(["armsolar", "raptorqueen"], prefixes)).toBe("Armada");
   });
 
   it("says nothing when no building belongs to a side", () => {
@@ -185,6 +187,125 @@ describe("sideOffer", () => {
 
   it("offers nothing when the game's units have not been read", () => {
     expect(sideOffer(["armsolar"], three, knownUnits([]))).toBeUndefined();
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The table (issue #1468). Everything above reads a name. This reads what a
+ * person said about this game last time, which is the half a name cannot reach.
+ * -------------------------------------------------------------------------- */
+describe("planForSide over a table", () => {
+  /** `armllt`'s Cortex opposite is `cormaw`, which no prefix swap gets to, so
+   *  the only way coilbox ever knows it is that somebody said so. */
+  const withMaw = knownUnits([...UNITS, { name: "cormaw" }]);
+  const said = learnEquivalence(
+    NO_EQUIVALENTS,
+    "Armada",
+    "armllt",
+    "Cortex",
+    "cormaw",
+  );
+
+  it("uses what a person said where a name says nothing", () => {
+    expect(planForSide(["armllt"], "Cortex", prefixes, withMaw, said)).toEqual({
+      armllt: "cormaw",
+    });
+  });
+
+  it("still reads the name for a def nobody has answered for", () => {
+    expect(
+      planForSide(["armllt", "armsolar"], "Cortex", prefixes, withMaw, said),
+    ).toEqual({ armllt: "cormaw", armsolar: "corsolar" });
+  });
+
+  it("takes what a person said over what the name would have given", () => {
+    const corrected = learnEquivalence(
+      NO_EQUIVALENTS,
+      "Armada",
+      "armsolar",
+      "Cortex",
+      "cormex",
+    );
+    expect(
+      planForSide(["armsolar"], "Cortex", prefixes, known, corrected),
+    ).toEqual({ armsolar: "cormex" });
+  });
+
+  it("offers nothing for a table entry this version of the game has dropped", () => {
+    // The table outlives a game release, so an entry can name a unit that is no
+    // longer there. Every candidate is still checked, and an unchecked guess is
+    // worse than leaving the building alone.
+    expect(planForSide(["armllt"], "Cortex", prefixes, known, said)).toEqual(
+      {},
+    );
+  });
+
+  it("leaves a def the table puts on the side being converted to alone", () => {
+    expect(planForSide(["cormaw"], "Cortex", prefixes, withMaw, said)).toEqual(
+      {},
+    );
+  });
+
+  it("converts a game whose unit names say nothing about its sides", () => {
+    // No prefixes at all, so the naming route offers nothing here and never
+    // will. Somebody said one thing, and that one thing now works every time.
+    const opaque = learnEquivalence(
+      NO_EQUIVALENTS,
+      "Empire",
+      "e_barracks",
+      "Rebels",
+      "r_camp",
+    );
+    const theirs = knownUnits([{ name: "e_barracks" }, { name: "r_camp" }]);
+    expect(planForSide(["e_barracks"], "Rebels", [], theirs, opaque)).toEqual({
+      e_barracks: "r_camp",
+    });
+    expect(gameSideNames([], opaque)).toEqual(["Empire", "Rebels"]);
+    expect(layoutSide(["e_barracks"], [], opaque)).toBe("Empire");
+    expect(sideOffer(["e_barracks"], [], theirs, opaque)).toEqual({
+      from: "Empire",
+      to: ["Rebels"],
+    });
+  });
+
+  it("says which side a def is by what was said before what it is called", () => {
+    const wrong = learnEquivalence(
+      NO_EQUIVALENTS,
+      "Cortex",
+      "armsolar",
+      "Armada",
+      "corsolar",
+    );
+    expect(sideNameOfDef("armsolar", prefixes, wrong)).toBe("Cortex");
+    expect(sideNameOfDef("armsolar", prefixes)).toBe("Armada");
+    expect(sideNameOfDef("raptorqueen", prefixes, wrong)).toBeUndefined();
+  });
+});
+
+describe("substitutionPairs", () => {
+  it("says what an applied conversion asserts about the game", () => {
+    expect(
+      substitutionPairs({ armsolar: "corsolar" }, "Cortex", prefixes),
+    ).toEqual([
+      {
+        fromSide: "Armada",
+        fromDef: "armsolar",
+        toSide: "Cortex",
+        toDef: "corsolar",
+      },
+    ]);
+  });
+
+  it("asserts nothing about a def whose own side cannot be told", () => {
+    expect(
+      substitutionPairs({ raptorqueen: "corsolar" }, "Cortex", prefixes),
+    ).toEqual([]);
+  });
+
+  it("asserts nothing when the game's sides cannot be told apart at all", () => {
+    expect(substitutionPairs({ armsolar: "corsolar" }, "Cortex", [])).toEqual(
+      [],
+    );
   });
 });
 

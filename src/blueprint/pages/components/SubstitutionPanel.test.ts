@@ -14,6 +14,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { learnEquivalence, NO_EQUIVALENTS } from "../../equivalents";
 import type { BaseBlueprint } from "../../model";
 import { sideUnitPrefixes } from "../../substitution";
 import { SubstitutionPanel } from "./SubstitutionPanel";
@@ -195,6 +196,53 @@ describe("SubstitutionPanel", () => {
         queued: ["armck"],
       });
       expect(html).toContain("leaves the queues as they are");
+    });
+  });
+
+  /**
+   * Issue #1468. What a person said last time about this game, used before any
+   * name is read, which is the only route that ever reaches a queued unit.
+   */
+  describe("what this game has already been told", () => {
+    const knows = learnEquivalence(
+      NO_EQUIVALENTS,
+      "Armada",
+      "armpw",
+      "Cortex",
+      "corak",
+    );
+    const llt: BaseBlueprint = {
+      ...layout,
+      buildings: [{ def: "armllt", offset: { x: 0, z: 0 }, facing: 0 }],
+    };
+
+    it("converts a queued unit no naming reaches, once somebody has said what it is", () => {
+      const html = markup({ layout: llt, queued: ["armpw"], table: knows });
+      expect(html).toContain("Convert 1 queued unit to Cortex");
+      expect(html).not.toContain("cannot build another side&#x27;s units");
+    });
+
+    it("says how much of this game it has been told, so the suggestions are accounted for", () => {
+      expect(markup({ table: knows })).toContain("2 of this game");
+    });
+
+    it("says nothing about a table nobody has filled in", () => {
+      expect(markup()).not.toContain("of this game&#x27;s units from");
+    });
+
+    it("offers the sides only the table knows about", () => {
+      // No prefixes at all, so without the table this game has no side picker
+      // and every row has to be filled in by hand, every time.
+      const opaque = learnEquivalence(
+        NO_EQUIVALENTS,
+        "Empire",
+        "armsolar",
+        "Rebels",
+        "armmex",
+      );
+      const html = markup({ sides: [], table: opaque });
+      expect(html).toContain("Say this layout in");
+      expect(html).not.toContain("says nothing about which of its buildings");
     });
   });
 });

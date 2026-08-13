@@ -20,14 +20,23 @@
  * however it was arrived at. That is slower than a table and still far faster
  * than drawing the layout again, and it is the answer for every game.
  *
- * {@link planForSide} fills that in where a game's own names allow it, which is
- * a suggestion rather than a mapping. Games in the Total Annihilation line name
- * a side's units with a shared prefix, and the sides' start units are what says
- * what those prefixes are: `armcom` and `corcom` differ by `arm` and `cor`, so
- * `armsolar` has a candidate called `corsolar`. Every candidate is checked
+ * What they said is then kept, per game, and used first the next time (issue
+ * #1468). That is `./equivalents.ts`, which is where the reasoning about why a
+ * person is the only honest source of a table lives.
+ *
+ * {@link planForSide} fills the rest in where a game's own names allow it, which
+ * is a suggestion rather than a mapping. Games in the Total Annihilation line
+ * name a side's units with a shared prefix, and the sides' start units are what
+ * says what those prefixes are: `armcom` and `corcom` differ by `arm` and `cor`,
+ * so `armsolar` has a candidate called `corsolar`. Every candidate is checked
  * against the game's own units before it is offered, so nothing is proposed that
  * the game does not have, and a game whose sides are not named that way gets no
  * suggestions rather than wrong ones.
+ *
+ * The table wins wherever it has an answer, because somebody said so and this is
+ * reading a name. The naming stays as the fallback, because it is right often
+ * enough for buildings to be worth keeping and it is what a game nobody has
+ * answered anything about yet has.
  *
  * ## What a substitution does to the shape
  *
@@ -50,6 +59,13 @@
  */
 
 import type { ArrivalNote } from "./arrival";
+import {
+  type EquivalenceTable,
+  equivalentOf,
+  NO_EQUIVALENTS,
+  sideOfDefInTable,
+  tableSides,
+} from "./equivalents";
 import { type Footprint, footprintMarks, snapToBuildGrid } from "./footprint";
 import type { BaseBlueprint, BlueprintBuilding } from "./model";
 import type { BlueprintPayload } from "./payload";
@@ -129,6 +145,40 @@ export function sideOfDef(
 }
 
 /**
+ * Which side a def belongs to, by whatever can answer.
+ *
+ * The table first, because somebody said so and the prefix is a reading of a
+ * name. A game whose sides cannot be told apart from their unit names gets an
+ * answer here as soon as anybody has said one thing about it, which is the whole
+ * of what a table adds to this half.
+ */
+export function sideNameOfDef(
+  def: string,
+  sides: readonly SideUnits[],
+  table: EquivalenceTable = NO_EQUIVALENTS,
+): string | undefined {
+  return sideOfDefInTable(def, table) ?? sideOfDef(def, sides)?.side;
+}
+
+/**
+ * Every side this game can be said to have, in the game's own order.
+ *
+ * The sides read off the unit names, then any side only the table knows about.
+ * The second half is what lets a game whose names say nothing be converted at
+ * all once somebody has answered one question about it.
+ */
+export function gameSideNames(
+  sides: readonly SideUnits[],
+  table: EquivalenceTable = NO_EQUIVALENTS,
+): string[] {
+  const out = sides.map((side) => side.side);
+  for (const side of tableSides(table)) {
+    if (!out.includes(side)) out.push(side);
+  }
+  return out;
+}
+
+/**
  * What each def of a layout becomes, keyed by the def in lower case.
  *
  * A def the plan says nothing about is left alone, which is what makes a partly
@@ -158,31 +208,83 @@ export function layoutDefs(layout: BaseBlueprint): string[] {
 }
 
 /**
- * A suggested plan for converting these defs to a side, from the game's own
- * naming.
+ * A suggested plan for converting these defs to a side: the table first, then
+ * the game's own naming.
  *
- * Only a candidate the game actually has is offered, so this proposes nothing
- * for a building the other side has no version of and nothing at all for a game
- * whose sides {@link sideUnitPrefixes} could not tell apart. The person still
- * sees every line of it before it is applied.
+ * A def the table answers for is answered by the table and nothing else is
+ * tried, including when the answer is that the def is already this side's. That
+ * is the point of a table: it is what stops the naming route quietly overriding
+ * something a person has said.
+ *
+ * Only a candidate the game actually has is offered, whichever route found it.
+ * So this proposes nothing for a building the other side has no version of,
+ * nothing for a table entry naming a unit this version of the game has dropped,
+ * and nothing at all for a game with no table whose sides
+ * {@link sideUnitPrefixes} could not tell apart. The person still sees every
+ * line of it before it is applied.
  */
 export function planForSide(
   defs: readonly string[],
   toSide: string,
   sides: readonly SideUnits[],
   known: KnownUnits,
+  table: EquivalenceTable = NO_EQUIVALENTS,
 ): SubstitutionPlan {
   const to = sides.find((one) => one.side === toSide);
-  if (!to) return {};
   const plan: SubstitutionPlan = {};
   for (const def of defs) {
+    const key = def.toLowerCase();
+
+    const said = equivalentOf(def, toSide, table);
+    if (said !== undefined) {
+      if (said !== key && known(said)) plan[key] = said;
+      continue;
+    }
+    // The table knows this def and puts it on the side being converted to, so
+    // there is nothing to swap and no name worth reading.
+    if (sideOfDefInTable(def, table) === toSide) continue;
+
+    if (!to) continue;
     const from = sideOfDef(def, sides);
     if (!from || from.prefix === to.prefix) continue;
-    const candidate = to.prefix + def.toLowerCase().slice(from.prefix.length);
+    const candidate = to.prefix + key.slice(from.prefix.length);
     if (!known(candidate)) continue;
-    plan[def.toLowerCase()] = candidate;
+    plan[key] = candidate;
   }
   return plan;
+}
+
+/** One thing an applied conversion asserts, in the shape a table keeps. */
+export interface SubstitutionPair {
+  fromSide: string;
+  fromDef: string;
+  toSide: string;
+  toDef: string;
+}
+
+/**
+ * What applying this plan says about the game, for a table to keep (issue
+ * #1468).
+ *
+ * Only the pairs whose starting side can be told, because a group is keyed by
+ * side and a pair with nowhere to file its first half is not a pair. A game
+ * whose unit names say nothing about its sides and whose table is still empty
+ * therefore learns nothing from the first conversion, which is honest: nothing
+ * in it said which side anything was.
+ */
+export function substitutionPairs(
+  plan: SubstitutionPlan,
+  toSide: string,
+  sides: readonly SideUnits[],
+  table: EquivalenceTable = NO_EQUIVALENTS,
+): SubstitutionPair[] {
+  const out: SubstitutionPair[] = [];
+  for (const [fromDef, toDef] of Object.entries(plan)) {
+    const fromSide = sideNameOfDef(fromDef, sides, table);
+    if (!fromSide || fromSide === toSide) continue;
+    out.push({ fromSide, fromDef, toSide, toDef });
+  }
+  return out;
 }
 
 /**
@@ -194,21 +296,22 @@ export function planForSide(
  * answer, because a game's shared buildings are nobody's and a layout of solars
  * and one shared radar is still an Armada layout.
  *
- * Nothing whenever that reasoning does not hold: a game whose sides
- * {@link sideUnitPrefixes} could not tell apart, a layout naming no side's
- * buildings at all, or one naming two sides' at once. Nothing means the side
- * could not be told, and a caller with nothing to say should say nothing rather
- * than guess.
+ * Nothing whenever that reasoning does not hold: a game whose sides neither
+ * {@link sideUnitPrefixes} nor the table can tell apart, a layout naming no
+ * side's buildings at all, or one naming two sides' at once. Nothing means the
+ * side could not be told, and a caller with nothing to say should say nothing
+ * rather than guess.
  */
 export function layoutSide(
   defs: readonly string[],
   sides: readonly SideUnits[],
-): SideUnits | undefined {
-  let found: SideUnits | undefined;
+  table: EquivalenceTable = NO_EQUIVALENTS,
+): string | undefined {
+  let found: string | undefined;
   for (const def of defs) {
-    const side = sideOfDef(def, sides);
+    const side = sideNameOfDef(def, sides, table);
     if (!side) continue;
-    if (found && found.side !== side.side) return undefined;
+    if (found && found !== side) return undefined;
     found = side;
   }
   return found;
@@ -242,16 +345,17 @@ export function sideOffer(
   defs: readonly string[],
   sides: readonly SideUnits[],
   known: KnownUnits,
+  table: EquivalenceTable = NO_EQUIVALENTS,
 ): SideOffer | undefined {
-  const from = layoutSide(defs, sides);
+  const from = layoutSide(defs, sides, table);
   if (!from) return undefined;
-  const to = sides
-    .filter((side) => side.side !== from.side)
+  const to = gameSideNames(sides, table)
+    .filter((side) => side !== from)
     .filter(
-      (side) => Object.keys(planForSide(defs, side.side, sides, known)).length,
-    )
-    .map((side) => side.side);
-  return to.length > 0 ? { from: from.side, to } : undefined;
+      (side) =>
+        Object.keys(planForSide(defs, side, sides, known, table)).length,
+    );
+  return to.length > 0 ? { from, to } : undefined;
 }
 
 /** One building that changed hands. */
@@ -548,14 +652,15 @@ export function queueReport(
   plan: SubstitutionPlan,
   sides: readonly SideUnits[],
   toSide: string,
+  table: EquivalenceTable = NO_EQUIVALENTS,
 ): QueueReport {
   const left = queued.filter((def) => !plan[def.toLowerCase()]);
   return {
     swapped: queued.length - left.length,
     stranded: distinctDefs(
       left.filter((def) => {
-        const side = sideOfDef(def, sides);
-        return side !== undefined && side.side !== toSide;
+        const side = sideNameOfDef(def, sides, table);
+        return side !== undefined && side !== toSide;
       }),
     ),
   };
