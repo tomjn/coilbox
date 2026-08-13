@@ -159,6 +159,16 @@ export function BlueprintPanel({
    * it to pick a point on. Where a base stands is the whole point of a base, so
    * the author places it with a click rather than finding it in a corner and
    * moving it.
+   *
+   * It does not arm the map either, which was asked for and decided against
+   * (issue #1538). Three things leave a layout unplaced: a base deleted from
+   * the map, a layout a shared scenario carries, and this one. They share one
+   * route back onto the map, the pin under Contents, and a second route from
+   * here would make the layout that came out of a file the special one for no
+   * reason an author could state. A file also holds however many layouts it
+   * holds and this panel stays open across them, so arming on each add would
+   * change the map's mode under somebody still reading the file and keep only
+   * the last one armed.
    */
   function onTake(imported: ImportedBlueprint) {
     onChange((current) =>
