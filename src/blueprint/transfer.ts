@@ -88,6 +88,7 @@ export function blueprintPayload(
   return {
     ...(game ? { game } : {}),
     name: layout.name,
+    ...(layout.designedFor ? { designedFor: layout.designedFor } : {}),
     ...(layout.ordered ? { ordered: true } : {}),
     buildings: layout.buildings.map((building) => ({
       def: building.def,
@@ -182,6 +183,7 @@ export function blueprintFromPayload(
 ): Omit<BaseBlueprint, "id"> {
   return {
     name: payload.name,
+    ...(payload.designedFor ? { designedFor: payload.designedFor } : {}),
     ...(payload.ordered ? { ordered: true } : {}),
     buildings: payload.buildings.map((building) => ({
       def: building.def,

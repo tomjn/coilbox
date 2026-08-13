@@ -74,6 +74,27 @@ describe("blueprint transfer", () => {
     });
   });
 
+  /** Issue #1315 put the map a layout was shaped around on the layout. A layout
+   *  leaving a mission for the library or for somebody else is exactly where
+   *  that provenance is worth having, so it travels. */
+  it("carries the map the layout was drawn for", () => {
+    const payload = blueprintPayload(
+      { ...layout, designedFor: "Comet Catcher Remake 1.8" },
+      { footprintOf },
+    );
+    expect(payload.designedFor).toBe("Comet Catcher Remake 1.8");
+    const read = readBlueprintContainer(encodePayloadJson(payload));
+    expect(read.ok && blueprintFromPayload(read.payload).designedFor).toBe(
+      "Comet Catcher Remake 1.8",
+    );
+  });
+
+  it("says nothing about a map for a layout drawn on none", () => {
+    const payload = blueprintPayload(layout, { footprintOf });
+    expect(payload).not.toHaveProperty("designedFor");
+    expect(blueprintFromPayload(payload)).not.toHaveProperty("designedFor");
+  });
+
   it("mints no id, because the machine reading it owns that", () => {
     const payload = blueprintPayload(layout, { footprintOf });
     expect(payload).not.toHaveProperty("id");

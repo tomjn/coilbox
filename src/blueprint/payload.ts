@@ -80,6 +80,16 @@ export interface BlueprintPayload {
    *  Absent on a layout exported where the game could not be identified. */
   game?: GameIdentity;
   name: string;
+  /**
+   * The map the layout was shaped around, when it was shaped around one (issue
+   * #1315).
+   *
+   * A note about where the shape came from, never a restriction on where it
+   * goes. It travels because that is what makes it worth recording: a layout
+   * spaced for one map's metal spots is worth knowing about by whoever takes it,
+   * and the community gallery already puts map names in layout titles by hand.
+   */
+  designedFor?: string;
   /** Whether the order of `buildings` is the build order. Absent on a layout
    *  drawn without caring, which is most of them. */
   ordered?: boolean;
@@ -165,9 +175,14 @@ export function parseBlueprintPayload(value: unknown): BlueprintPayload | null {
   }
 
   const game = parseGameIdentity(v.game);
+  const designedFor =
+    typeof v.designedFor === "string" && v.designedFor.trim() !== ""
+      ? v.designedFor.trim()
+      : undefined;
   return {
     ...(game ? { game } : {}),
     name: v.name,
+    ...(designedFor ? { designedFor } : {}),
     ...(v.ordered === true ? { ordered: true } : {}),
     buildings,
     footprints,
