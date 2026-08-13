@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchHubItems,
+  HUB_KINDS,
   hubItemsUrl,
   hubItemUrl,
+  kindLabelPlural,
+  kindsPlural,
   readItemBody,
   readItemsBody,
 } from "./api";
@@ -190,5 +193,26 @@ describe("fetchHubItems", () => {
     });
     const result = await fetchHubItems(BASE, { q: "x" });
     expect(result).toMatchObject({ ok: true, value: { total: 1 } });
+  });
+});
+
+/**
+ * The sentence a screen uses to say what the hub carries (issue #1502). Built
+ * from the kinds rather than written out, because the hand written version sat
+ * under a row of filter chips it contradicted.
+ */
+describe("the kinds, as a sentence", () => {
+  it("lists every kind the hub carries, in the plural", () => {
+    expect(kindsPlural()).toBe(
+      "Presets, challenges, setup packs, scenarios and blueprints",
+    );
+  });
+
+  it("cannot fall behind the kinds the filter chips offer", () => {
+    for (const kind of HUB_KINDS) {
+      expect(kindsPlural().toLowerCase()).toContain(
+        kindLabelPlural(kind).toLowerCase(),
+      );
+    }
   });
 });

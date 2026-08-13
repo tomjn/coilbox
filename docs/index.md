@@ -31,7 +31,7 @@ features:
   - title: Brandable & portable
     details: Ship a distribution profile to reskin and narrow Coilbox for your game, or run it fully portable from a folder next to the executable.
   - title: Share what you make
-    details: Publish battle presets, warpath and conquest challenges, setup packs and scenarios to the community hub, and import anyone else's in one click.
+    details: Publish battle presets, warpath and conquest challenges, setup packs, scenarios and base blueprints to the community hub, and import anyone else's in one click.
     link: https://coilbox-hub.vercel.app
     linkText: Browse the hub
 ---

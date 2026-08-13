@@ -2,8 +2,8 @@ import { NavGate } from "@picoframe/frame";
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import type { ComponentType } from "react";
 import { CoilboxGlyph } from "../components/CoilboxGlyph";
-import { isProfileHidden } from "../profile/hidden";
 import { isHubEnabled } from "../profile/profile";
+import { isHubItemPageReachable } from "./config";
 import HubSettings from "./pages/SettingsSection";
 
 /**
@@ -31,8 +31,9 @@ import HubSettings from "./pages/SettingsSection";
  * button, still read the setting.
  */
 
-/** Both gates the nav item applies, so the route can apply the same pair. */
-const visible = () => isHubEnabled() && !isProfileHidden("hub.browse");
+/** Both gates the nav item applies, so the route can apply the same pair, and
+ *  so can anything outside the hub linking to an item page (`./config`). */
+const visible = isHubItemPageReachable;
 
 /** Redirect home when the hub is off or hidden, so the route is no more
  * reachable than the nav item that leads to it. */

@@ -139,7 +139,11 @@ export default function ImportSection() {
       <div className="rounded-lg border">
         <ChallengeCodeInput
           key={seed ?? "empty"}
-          helpText="Anything coilbox shares goes here: a challenge, a setup pack, a singleplayer preset, or a scenario."
+          // No list of kinds. This box takes all seven a container can hold,
+          // not the five the hub carries, and the list it used to give had
+          // fallen two behind (issue #1502). "Anything" is both shorter and
+          // the true answer.
+          helpText="Anything coilbox shares goes here, whatever kind of thing it is."
           placeholder="Paste a coilbox link, a code, or an exported file's contents…"
           submitLabel="Import"
           busyLabel="Checking…"

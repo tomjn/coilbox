@@ -12,9 +12,12 @@ vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
 }));
 
+import { getProfile } from "../profile/profile";
 import {
   DEFAULT_HUB_URL,
   hubItemIdFromUrl,
+  hubItemRoute,
+  isHubItemPageReachable,
   isHubOrigin,
   isValidHubUrl,
   resolveHubUrl,
@@ -172,5 +175,37 @@ describe("hubItemIdFromUrl", () => {
   it("reads nothing when there is no configured hub", () => {
     expect(hubItemIdFromUrl(`${hub}/i/${id}`, null)).toBe(null);
     expect(hubItemIdFromUrl(`${hub}/i/${id}`, "")).toBe(null);
+  });
+});
+
+/**
+ * Whether a screen outside the hub may offer to open a hub item page (issue
+ * #1487). The route redirects home when either gate is closed, so a link that
+ * ignored them would read as a broken button rather than as a link to nowhere.
+ */
+describe("isHubItemPageReachable", () => {
+  it("is reachable on a vanilla build", () => {
+    expect(isHubItemPageReachable()).toBe(true);
+  });
+
+  it("is unreachable when a profile switches the hub off", () => {
+    const loaded = getProfile();
+    loaded.hub = false;
+    expect(isHubItemPageReachable()).toBe(false);
+    loaded.hub = undefined;
+  });
+
+  it("is unreachable when a profile hides the browse screen", () => {
+    const loaded = getProfile();
+    loaded.hide = ["hub.browse"];
+    expect(isHubItemPageReachable()).toBe(false);
+    loaded.hide = undefined;
+  });
+});
+
+describe("hubItemRoute", () => {
+  it("addresses the item page, escaping an id that is not a bare word", () => {
+    expect(hubItemRoute("item-7")).toBe("/hub/item-7");
+    expect(hubItemRoute("a/b")).toBe("/hub/a%2Fb");
   });
 });

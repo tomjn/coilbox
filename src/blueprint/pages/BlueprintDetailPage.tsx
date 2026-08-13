@@ -34,6 +34,7 @@ import {
 } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
 import { nextDrawerKey } from "@/general/drawerKey";
+import { hubItemRoute, isHubItemPageReachable } from "@/hub/config";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import {
   duplicatedBlueprint,
@@ -158,6 +159,25 @@ export default function BlueprintDetailPage() {
               {record.source.at
                 ? ` Taken on ${new Date(record.source.at).toLocaleDateString()}.`
                 : ""}
+              {/* The recorded item id is the key back into the hub, so it is
+                  worth a door rather than a number nothing opens (issue
+                  #1487). The app's own item page rather than the website: it
+                  says the same things, it is where a hub link already lands,
+                  and it answers a withdrawn item with the hub's own "no such
+                  item, it may have been taken down" instead of a browser tab
+                  showing a 404. Hidden when a profile has switched the hub off
+                  or hidden it, because that route then redirects home. */}
+              {record.source.kind === "hub" && isHubItemPageReachable() && (
+                <>
+                  {" "}
+                  <Link
+                    to={hubItemRoute(record.source.item)}
+                    className="underline underline-offset-2 hover:text-foreground"
+                  >
+                    See it on the hub
+                  </Link>
+                </>
+              )}
             </p>
           )}
         </div>
