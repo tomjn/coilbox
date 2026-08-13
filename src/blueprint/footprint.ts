@@ -70,21 +70,38 @@ export function unitFootprint(
 }
 
 /**
- * A lookup from unit def name to footprint, for the units of one game.
+ * What each of a game's units declares it stands on, and nothing for a def that
+ * game has not got (issue #1463).
  *
  * Case-insensitive, because a document holds whatever its author typed and the
- * dataset is lowercased. A def the game has not got stands on one square rather
- * than nothing, so an unread dataset draws squares of the right shape in the
- * wrong size instead of drawing nothing at all.
+ * dataset is lowercased. The undefined is the whole point: drawing an unknown
+ * def wants a square to draw, and recording one wants the truth, and one square
+ * is only the right answer to the first. Whoever records a footprint reads this,
+ * whoever draws one reads {@link buildingFootprints}.
  */
-export function buildingFootprints(
+export function declaredFootprints(
   units: { name: string; footprintX?: number; footprintZ?: number }[],
-): (def: string) => Footprint {
+): (def: string) => Footprint | undefined {
   const byName = new Map<string, Footprint>();
   for (const unit of units) {
     byName.set(unit.name.toLowerCase(), unitFootprint(unit));
   }
-  return (def) => byName.get(def.toLowerCase()) ?? ONE_SQUARE;
+  return (def) => byName.get(def.toLowerCase());
+}
+
+/**
+ * A lookup from unit def name to footprint, for the units of one game.
+ *
+ * A def the game has not got stands on one square rather than nothing, so an
+ * unread dataset draws squares of the right shape in the wrong size instead of
+ * drawing nothing at all. That fallback is for drawing only: see
+ * {@link declaredFootprints}.
+ */
+export function buildingFootprints(
+  units: { name: string; footprintX?: number; footprintZ?: number }[],
+): (def: string) => Footprint {
+  const declared = declaredFootprints(units);
+  return (def) => declared(def) ?? ONE_SQUARE;
 }
 
 /**

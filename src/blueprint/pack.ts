@@ -129,8 +129,10 @@ export interface PackPlanInput {
   /** The units of the game the pack is being read against. Absent means the
    *  units have not been read, which is not the same as nothing fitting. */
   known?: KnownUnits;
-  /** How much ground each def stands on, from the same game's units. */
-  footprintOf: (def: string) => Footprint;
+  /** How much ground each def stands on, from the same game's units. Nothing
+   *  for a def that game has not got, and absent where the units have not been
+   *  read at all: both mean the layout is kept without a footprint for it. */
+  footprintOf?: (def: string) => Footprint | undefined;
   /** The archive name of the game the pack is being read against. */
   gameName?: string;
 }

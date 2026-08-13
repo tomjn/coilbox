@@ -104,17 +104,27 @@ export interface BlueprintPayload {
   footprints: Record<string, PayloadFootprint>;
 }
 
-/** What a def stands on, or one square when the payload does not say. Matches
- *  the case-insensitive lookup `./footprint.ts` does, because a layout holds
- *  whatever its author typed. */
+/** What a def stands on where the payload says so, and nothing where it does
+ *  not. The case-insensitive lookup `./footprint.ts` does, because a layout
+ *  holds whatever its author typed. */
+export function declaredFootprint(
+  payload: BlueprintPayload,
+  def: string,
+): PayloadFootprint | undefined {
+  const key = def.toLowerCase();
+  return Object.hasOwn(payload.footprints, key)
+    ? payload.footprints[key]
+    : undefined;
+}
+
+/** What a def stands on, or one square when the payload does not say. The
+ *  fallback belongs here, at the point of reading: a payload that says nothing
+ *  about a def is not the same as one claiming it stands on one square. */
 export function payloadFootprint(
   payload: BlueprintPayload,
   def: string,
 ): PayloadFootprint {
-  const key = def.toLowerCase();
-  return Object.hasOwn(payload.footprints, key)
-    ? payload.footprints[key]
-    : ONE_BUILD_SQUARE;
+  return declaredFootprint(payload, def) ?? ONE_BUILD_SQUARE;
 }
 
 function finite(value: unknown): number | null {

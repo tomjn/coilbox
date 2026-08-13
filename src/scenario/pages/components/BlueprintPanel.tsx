@@ -41,7 +41,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { barFormat } from "@/blueprint/bar";
 import { appFileIO } from "@/blueprint/fileIO";
-import { buildGridSnap, type Footprint } from "@/blueprint/footprint";
+import { buildGridSnap } from "@/blueprint/footprint";
 import type { ImportedBlueprint, ImportReport } from "@/blueprint/format";
 import { mergeIntoGameFile } from "@/blueprint/gameFile";
 import { footprintsFromUnits, uniqueLayoutName } from "@/blueprint/library";
@@ -69,10 +69,6 @@ import { EditorPanel } from "./panels";
 const DROP_POINT = { x: 0, z: 0 };
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-/** What a def stands on when the game's units have not been read. The engine
- *  floors a footprint at one square, so nothing ever stands on less. */
-const ONE_SQUARE = (): Footprint => ({ x: 1, z: 1 });
 
 export function BlueprintPanel({
   scenario,
@@ -173,6 +169,11 @@ export function BlueprintPanel({
    * The footprints come from the game's units, which is what lets the library
    * card and the hub draw the layout at the right size, and are the one thing
    * that cannot be worked out later on a machine without the game.
+   *
+   * A def this game has not got is recorded without one rather than as one
+   * build square (issue #1463). One square is what a reader draws an unstated
+   * def as, so nothing is lost by saying nothing, and what is gained is that
+   * the layout stops claiming a size for a unit nobody here could measure.
    */
   async function onKeep(layoutId: string) {
     setError(null);
@@ -186,6 +187,7 @@ export function BlueprintPanel({
         layout.name,
         records.map((record) => record.layout.name),
       );
+      const footprintOf = footprintsFromUnits(units);
       const saved = await saveBlueprint({
         id: crypto.randomUUID(),
         createdAt: "",
@@ -193,12 +195,17 @@ export function BlueprintPanel({
         layout: blueprintPayload(
           { ...layout, name },
           {
-            footprintOf: footprintsFromUnits(units) ?? ONE_SQUARE,
+            footprintOf,
             gameName: scenario.setup.gameName,
             installed: scan.data?.games ?? [],
           },
         ),
       });
+      const unstated = footprintOf
+        ? [...new Set(layout.buildings.map((b) => b.def))].filter(
+            (def) => !footprintOf(def),
+          )
+        : [];
       setKept({ id: saved.id, name });
       setStatus(
         [
@@ -207,7 +214,10 @@ export function BlueprintPanel({
             ? null
             : `A layout there was already called "${layout.name}".`,
           units.length === 0
-            ? "This game's units have not been read, so every building in it is recorded as one build square and its picture will be the wrong shape until it is saved again."
+            ? "This game's units have not been read, so nothing is recorded about how much ground its buildings stand on, and its picture draws each of them as one build square until it is saved again."
+            : null,
+          unstated.length > 0
+            ? `This game has no ${unstated.join(", ")}, so nothing is recorded about how much ground ${unstated.length === 1 ? "it stands" : "they stand"} on and the picture draws ${unstated.length === 1 ? "it" : "them"} as one build square.`
             : null,
         ]
           .filter(Boolean)

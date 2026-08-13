@@ -48,11 +48,17 @@ export const BLUEPRINT_KIND_VERSION = 1;
 /** What an export needs that a layout does not carry. */
 export interface BlueprintExportOptions {
   /**
-   * How much ground each def stands on, which is `buildingFootprints(units)`
+   * How much ground each def stands on, which is `declaredFootprints(units)`
    * from `./footprint.ts` for the game's units. Passed in rather than looked up
    * here because it comes from a unitsync scan, and this file is arithmetic.
+   *
+   * Absent, or answering nothing for a def, records nothing for that def rather
+   * than one square (issue #1463). A footprint is read back through
+   * `payloadFootprint`, which stands an unstated def on one square, so the
+   * fallback is kept where it belongs: a guess made while drawing is not a
+   * guess worth storing and sending to other people.
    */
-  footprintOf: (def: string) => Footprint;
+  footprintOf?: (def: string) => Footprint | undefined;
   /** The archive name of the game these def names belong to. Absent on a layout
    *  whose game is not known, which costs the reader the ability to say what it
    *  is for. */
@@ -61,17 +67,19 @@ export interface BlueprintExportOptions {
   installed?: readonly InstalledGameInfo[];
 }
 
-/** What each def in the layout stands on, stated once per def. */
+/** What each def in the layout stands on, stated once per def, and left out
+ *  where nothing is known about it. */
 function footprintsFor(
   layout: BaseBlueprint,
-  footprintOf: (def: string) => Footprint,
+  footprintOf?: (def: string) => Footprint | undefined,
 ): Record<string, PayloadFootprint> {
   const footprints: Record<string, PayloadFootprint> = {};
+  if (!footprintOf) return footprints;
   for (const building of layout.buildings) {
     const key = building.def.toLowerCase();
     if (key in footprints) continue;
-    const { x, z } = footprintOf(building.def);
-    footprints[key] = { x, z };
+    const stands = footprintOf(building.def);
+    if (stands) footprints[key] = { x: stands.x, z: stands.z };
   }
   return footprints;
 }

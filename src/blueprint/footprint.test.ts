@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BUILD_SQUARE,
   buildingFootprints,
+  declaredFootprints,
   facedFootprint,
   footprintMarks,
   footprintRect,
@@ -46,6 +47,22 @@ describe("buildingFootprints", () => {
   it("gives a def the game has not got one square", () => {
     const of = buildingFootprints([]);
     expect(of("armfus")).toEqual({ x: 1, z: 1 });
+  });
+});
+
+describe("declaredFootprints", () => {
+  it("answers for a def the game has, whatever case it was written in", () => {
+    const of = declaredFootprints([
+      { name: "armfus", footprintX: 5, footprintZ: 4 },
+    ]);
+    expect(of("ARMFUS")).toEqual({ x: 5, z: 4 });
+  });
+
+  it("says nothing about a def the game has not got (issue #1463)", () => {
+    const of = declaredFootprints([
+      { name: "armfus", footprintX: 5, footprintZ: 4 },
+    ]);
+    expect(of("legmex")).toBeUndefined();
   });
 });
 

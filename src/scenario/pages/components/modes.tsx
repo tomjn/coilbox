@@ -35,6 +35,7 @@ import { useUnitsyncScan } from "@/content/config";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { useGameUnits } from "@/content/useGameUnits";
 import { parsePlacementKey, placementKey } from "@/placement/placements";
+import type { PreviewBuilding } from "@/placement/preview";
 import type { GroundDragPhase } from "@/placement/useMapEditing";
 import { usePreferredTarget } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
@@ -61,7 +62,7 @@ import {
   MAX_GROUP_COUNT,
 } from "./groups";
 import { LayoutPlacer, layoutPlacement } from "./LayoutPlacer";
-import { type LayoutChoice, layoutOrigin } from "./layoutPlacing";
+import { type LayoutChoice, layoutGhost, layoutOrigin } from "./layoutPlacing";
 import { TeamSelect } from "./TeamSelect";
 import {
   addZone,
@@ -127,6 +128,16 @@ export interface ModeBehaviour {
    * which pans on the middle button instead while the mode is current.
    */
   draw?: ((from: Point, to: Point, phase: GroundDragPhase) => void) | null;
+  /**
+   * What a click at a point would put on the ground, shown under the pointer
+   * before the click (issue #1464). Null in a mode that has nothing worth
+   * showing, and then a pointer move over the map does no work at all.
+   *
+   * Only the modes that place a whole shape at once set this. A mode placing
+   * one unit puts it where the pointer already is, so drawing it twice would
+   * say nothing.
+   */
+  ghost?: ((pos: Point) => PreviewBuilding[]) | null;
   /**
    * Zones the mode is part way through drawing, shown alongside the document's
    * own. A half-drawn zone lives here rather than in the document, so a drag
@@ -552,7 +563,28 @@ const layoutsMode: EditorMode = {
       known,
     );
 
+    // The shape the pointer is carrying, wherever it is being carried from, so
+    // what is shown under the pointer is what the click would put there
+    // (issue #1464). Nothing while a click would do nothing, which is a layout
+    // nobody has chosen and a scenario with nobody to own the base.
+    const carrying =
+      choice && owner && placement
+        ? choice.from === "scenario"
+          ? scenario.blueprints.find((b) => b.id === choice.id)?.buildings
+          : records.find((one) => one.id === choice.id)?.layout.buildings
+        : undefined;
+    // Held steady between renders, because the surface redraws what it shows
+    // whenever this changes identity.
+    const ghost = useMemo(
+      () =>
+        carrying && carrying.length > 0
+          ? (pos: Point) => layoutGhost(pos, carrying, snap)
+          : null,
+      [carrying, snap],
+    );
+
     return {
+      ghost,
       place:
         choice && owner && placement
           ? (pos: Point) => {

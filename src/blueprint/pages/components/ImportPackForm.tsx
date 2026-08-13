@@ -31,7 +31,7 @@ import { useGameUnits } from "@/content/useGameUnits";
 import { usePreferredTarget } from "@/play/config";
 import { barFormat } from "../../bar";
 import { appFileIO } from "../../fileIO";
-import { buildGridSnap, type Footprint } from "../../footprint";
+import { buildGridSnap } from "../../footprint";
 import {
   footprintsFromUnits,
   packSource,
@@ -49,10 +49,6 @@ import { knownUnits } from "../../units";
 import { ArrivingPack, type PackView } from "./ArrivingPack";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-/** What a def stands on when the game's units have not been read. The engine
- *  floors a footprint at one square, so nothing ever stands on less. */
-const ONE_SQUARE = (): Footprint => ({ x: 1, z: 1 });
 
 export function ImportPackForm({
   onImported,
@@ -90,10 +86,10 @@ export function ImportPackForm({
     () => (units.length > 0 ? knownUnits(units) : undefined),
     [units],
   );
-  const footprintOf = useMemo(
-    () => footprintsFromUnits(units) ?? ONE_SQUARE,
-    [units],
-  );
+  // Nothing where the game's units have not been read, and nothing for a def
+  // this game has not got, so a layout is kept carrying what is known about it
+  // rather than a square somebody guessed (issue #1463).
+  const footprintOf = useMemo(() => footprintsFromUnits(units), [units]);
 
   // Re-read rather than re-checked when the game changes, because the build
   // grid a layout snaps to is that game's footprints.

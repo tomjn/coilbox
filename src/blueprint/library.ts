@@ -20,12 +20,12 @@
  * `./pages/`.
  */
 
-import { buildingFootprints, type Footprint } from "./footprint";
+import { declaredFootprints, type Footprint } from "./footprint";
 import type { BaseBlueprint } from "./model";
 import {
   type BlueprintPayload,
+  declaredFootprint,
   parseBlueprintPayload,
-  payloadFootprint,
 } from "./payload";
 import { blueprintFromPayload, blueprintPayload } from "./transfer";
 
@@ -152,11 +152,8 @@ export function newStoredBlueprint(
     id: crypto.randomUUID(),
     createdAt: "",
     updatedAt: "",
-    layout: blueprintPayload(layout, {
-      footprintOf: () => ({ x: 1, z: 1 }),
-      gameName,
-      installed,
-    }),
+    // No buildings, so there is nothing to state a footprint for.
+    layout: blueprintPayload(layout, { gameName, installed }),
   };
 }
 
@@ -192,17 +189,18 @@ export function duplicatedBlueprint(
  * The record after an edit to its layout.
  *
  * `footprintOf` is the game's units, which is what makes the stored footprints
- * right. Without it the footprints already stored are kept rather than being
- * flattened to one square each: a layout edited on a machine that cannot read
- * the game's units must not come back smaller than it went in.
+ * right. What that cannot answer for falls back to what the layout already
+ * carried, and then to nothing at all: a layout edited on a machine that cannot
+ * read the game's units must not come back smaller than it went in, and a def
+ * neither of them knows is one nothing here can honestly state (issue #1463).
  */
 export function recordWithLayout(
   record: StoredBlueprint,
   layout: BaseBlueprint,
-  footprintOf?: (def: string) => Footprint,
+  footprintOf?: (def: string) => Footprint | undefined,
 ): StoredBlueprint {
-  const lookup =
-    footprintOf ?? ((def: string) => payloadFootprint(record.layout, def));
+  const lookup = (def: string) =>
+    footprintOf?.(def) ?? declaredFootprint(record.layout, def);
   return {
     ...record,
     layout: {
@@ -213,11 +211,13 @@ export function recordWithLayout(
 }
 
 /** A footprint lookup for a game's units, or nothing when they have not been
- *  read, which is what {@link recordWithLayout} treats as "leave them alone". */
+ *  read, which is what {@link recordWithLayout} treats as "leave them alone".
+ *  It answers nothing for a def the game has not got, which is the same thing
+ *  said about one unit rather than about all of them. */
 export function footprintsFromUnits(
   units: { name: string; footprintX?: number; footprintZ?: number }[],
-): ((def: string) => Footprint) | undefined {
-  return units.length > 0 ? buildingFootprints(units) : undefined;
+): ((def: string) => Footprint | undefined) | undefined {
+  return units.length > 0 ? declaredFootprints(units) : undefined;
 }
 
 /**

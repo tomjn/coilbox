@@ -39,6 +39,11 @@ import {
   unstableIn,
 } from "@/placement/placements";
 import {
+  previewChecks,
+  previewSentence,
+  previewTrouble,
+} from "@/placement/preview";
+import {
   HistoryControls,
   PlaybackBar,
   SelectionBar,
@@ -49,6 +54,7 @@ import {
   mapSceneStatus,
   worldToScene,
 } from "@/placement/scene";
+import { useLayoutPreview } from "@/placement/useLayoutPreview";
 import { useMapEditing } from "@/placement/useMapEditing";
 import { useScenarioFootprints } from "@/placement/useScenarioFootprints";
 import {
@@ -436,6 +442,24 @@ export function ScenarioMapScene({
   );
   useScenarioFootprints(handle, footprints, assets, units.groundAt);
 
+  // The same two questions asked about a layout the pointer is carrying rather
+  // than about one the document holds, so an author placing a whole base sees
+  // where it lands before they land it (issue #1464). Built once per game and
+  // map, because a pointer move must not cost a scan of the unit dataset.
+  const checks = useMemo(
+    () => previewChecks(gameUnits.units, units.ground),
+    [gameUnits.units, units.ground],
+  );
+  const preview = useLayoutPreview({
+    handle,
+    worldWidth: assets.worldWidth,
+    worldHeight: assets.worldHeight,
+    groundAt: units.groundAt,
+    ghost: behaviour.ghost ?? null,
+    checks,
+    occupied: footprints,
+  });
+
   useMapEditing({
     handle,
     layer: units.layer,
@@ -452,6 +476,7 @@ export function ScenarioMapScene({
     overlays: [onPlace ? null : zonesLayer, pathsLayer],
     onSelect: select,
     onPlace,
+    onHover: preview.onHover,
     onDragGround: behaviour.draw ?? null,
     onMove: (key, delta) => {
       if (parseZoneKey(key))
@@ -672,6 +697,20 @@ export function ScenarioMapScene({
           <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
             {mode.hint}
           </p>
+          {/* What the squares under the pointer are saying, said in words as
+              well: a mark is a colour, and a colour on its own is not a
+              statement anybody can act on (issue #1464). */}
+          {preview.count && (
+            <p
+              className={`w-fit rounded px-2 py-1 text-[11px] backdrop-blur ${
+                previewTrouble(preview.count)
+                  ? "bg-amber-950/80 text-amber-200"
+                  : "bg-card/70 text-muted-foreground"
+              }`}
+            >
+              {previewSentence(preview.count)}
+            </p>
+          )}
           {picked && (
             <ScenarioSelectionBar
               placement={picked}

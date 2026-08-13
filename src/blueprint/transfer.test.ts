@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { identify } from "../container/container";
-import { buildingFootprints } from "./footprint";
+import { buildingFootprints, declaredFootprints } from "./footprint";
 import type { BaseBlueprint } from "./model";
+import { payloadFootprint } from "./payload";
 import {
   blueprintFromPayload,
   blueprintPayload,
@@ -135,6 +136,32 @@ describe("blueprint transfer", () => {
   it("names a def's footprint once however many times it is placed", () => {
     const payload = blueprintPayload(layout, { footprintOf });
     expect(Object.keys(payload.footprints)).toHaveLength(2);
+  });
+
+  it("records nothing for a def the game has not got (issue #1463)", () => {
+    // A layout naming a unit this game never had is a real thing to save: a
+    // mission whose game was changed under it, or one imported from another
+    // game's file. One square is the engine's floor rather than the truth, and
+    // a stored one travels to the hub as a claim about a unit nobody read.
+    const stranger: BaseBlueprint = {
+      ...layout,
+      buildings: [
+        ...layout.buildings,
+        { def: "legmex", offset: { x: 160, z: 0 }, facing: 0 },
+      ],
+    };
+    const payload = blueprintPayload(stranger, {
+      footprintOf: declaredFootprints(units),
+    });
+    expect(payload.footprints).not.toHaveProperty("legmex");
+    expect(payload.footprints.armsolar).toEqual({ x: 5, z: 5 });
+    expect(payloadFootprint(payload, "legmex")).toEqual({ x: 1, z: 1 });
+  });
+
+  it("records nothing at all when the game's units are unread", () => {
+    const payload = blueprintPayload(layout, {});
+    expect(payload.footprints).toEqual({});
+    expect(payload.buildings).toHaveLength(3);
   });
 
   it("names the game the way every other kind does", () => {

@@ -3,6 +3,7 @@ import { BUILD_SQUARE } from "./footprint";
 import {
   type BlueprintPayload,
   BUILD_SQUARE_ELMOS,
+  declaredFootprint,
   parseBlueprintPayload,
   payloadFootprint,
 } from "./payload";
@@ -105,5 +106,13 @@ describe("blueprint payload", () => {
 
   it("is not fooled by a def named after an inherited property", () => {
     expect(payloadFootprint(solar, "constructor")).toEqual({ x: 1, z: 1 });
+  });
+});
+
+describe("declaredFootprint", () => {
+  it("tells a footprint the payload states from one it does not (issue #1463)", () => {
+    expect(declaredFootprint(solar, "ArmSolar")).toEqual({ x: 5, z: 5 });
+    expect(declaredFootprint(solar, "armwin")).toBeUndefined();
+    expect(declaredFootprint(solar, "constructor")).toBeUndefined();
   });
 });

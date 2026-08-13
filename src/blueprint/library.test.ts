@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   duplicatedBlueprint,
+  footprintsFromUnits,
   libraryGames,
   libraryLayout,
   newStoredBlueprint,
@@ -75,6 +76,37 @@ describe("recordWithLayout", () => {
   it("keeps the footprints it already had when the units cannot be read", () => {
     const next = recordWithLayout(record(), edited);
     expect(next.layout.footprints.armsolar).toEqual({ x: 4, z: 4 });
+  });
+
+  it("keeps a stored footprint the read units cannot better (issue #1463)", () => {
+    // The game answers for nothing this layout names, so what the layout
+    // already carried is the best thing known about it. Overwriting it with
+    // one square would shrink a building nobody looked at.
+    const next = recordWithLayout(record(), edited, () => undefined);
+    expect(next.layout.footprints.armsolar).toEqual({ x: 4, z: 4 });
+  });
+
+  it("records nothing for a def neither the game nor the layout knows", () => {
+    const stranger: BaseBlueprint = {
+      ...edited,
+      buildings: [{ def: "legmex", offset: { x: 0, z: 0 }, facing: 0 }],
+    };
+    const next = recordWithLayout(record(), stranger, () => undefined);
+    expect(next.layout.footprints).not.toHaveProperty("legmex");
+  });
+});
+
+describe("footprintsFromUnits", () => {
+  it("answers for a def the game has and says nothing about one it has not", () => {
+    const of = footprintsFromUnits([
+      { name: "armsolar", footprintX: 5, footprintZ: 5 },
+    ]);
+    expect(of?.("armsolar")).toEqual({ x: 5, z: 5 });
+    expect(of?.("legmex")).toBeUndefined();
+  });
+
+  it("is nothing at all when the units have not been read", () => {
+    expect(footprintsFromUnits([])).toBeUndefined();
   });
 });
 
