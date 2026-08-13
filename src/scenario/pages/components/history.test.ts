@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { BaseBlueprint } from "@/blueprint/model";
 import type { Scenario } from "../../model";
 import {
   type EditHistory,
@@ -85,12 +86,15 @@ describe("recordEdit", () => {
   });
 
   it("drops the future, because an edit after an undo is a new branch", () => {
-    const history: EditHistory = { past: [], future: [withName("Forward")] };
+    const history: EditHistory<Scenario> = {
+      past: [],
+      future: [withName("Forward")],
+    };
     expect(recordEdit(history, scenario(), withName("Two")).future).toEqual([]);
   });
 
   it("keeps only the last HISTORY_LIMIT steps", () => {
-    let history = emptyHistory;
+    let history: EditHistory<Scenario> = emptyHistory;
     for (let i = 0; i < HISTORY_LIMIT + 10; i++)
       history = recordEdit(history, withName(`${i}`), withName(`${i + 1}`));
     expect(history.past).toHaveLength(HISTORY_LIMIT);
@@ -127,7 +131,7 @@ describe("undoEdit and redoEdit", () => {
 
   it("walks a run of edits back and forward in order", () => {
     const docs = ["One", "Two", "Three", "Four"].map(withName);
-    let history = emptyHistory;
+    let history: EditHistory<Scenario> = emptyHistory;
     for (let i = 1; i < docs.length; i++)
       history = recordEdit(history, docs[i - 1], docs[i]);
 
@@ -190,6 +194,27 @@ describe("shortcuts", () => {
 
   it("reads a capital Z as the same key, which is what Shift produces", () => {
     expect(isRedoKey(key("Z", { metaKey: true, shiftKey: true }))).toBe(true);
+  });
+});
+
+/** The blueprint editor holds a layout rather than a scenario (#1442), and the
+ *  history is the same one. */
+describe("a document that is not a scenario", () => {
+  const empty: BaseBlueprint = { id: "bp1", name: "Opening", buildings: [] };
+  const built: BaseBlueprint = {
+    ...empty,
+    buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
+  };
+
+  it("goes back to the layout before the edit", () => {
+    const history = recordEdit<BaseBlueprint>(emptyHistory, empty, built);
+    expect(undoEdit(history, built)?.document).toEqual(empty);
+  });
+
+  it("has nothing to record when the layout is unchanged", () => {
+    expect(recordEdit<BaseBlueprint>(emptyHistory, empty, { ...empty })).toBe(
+      emptyHistory,
+    );
   });
 });
 

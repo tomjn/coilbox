@@ -10,6 +10,10 @@
  * The bars that are about a mission stay there: the one that says a path is
  * being drawn, the one that says a base is waiting to be moved, and the one for
  * a selected zone.
+ *
+ * Undo and redo are here for the same reason, though they sit in the corner
+ * rather than in a bar: both editors have a history now (issue #1442), and one
+ * pair of buttons means one answer to what they say when there is nowhere to go.
  */
 
 import { Button } from "@picoframe/frame";
@@ -18,10 +22,63 @@ import {
   ChevronRight,
   Pause,
   Play,
+  Redo2,
   RotateCw,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { modKeyLabel } from "@/scenario/pages/components/history";
+
+/**
+ * The way back from an edit, and forward again.
+ *
+ * Pressed far less often than the shortcut, which is why the shortcut is on the
+ * button: this is the only place either editor says what the keyboard does. A
+ * button with nowhere to go is disabled and says so, because the start of a
+ * session is exactly where somebody reaches for undo first, and one that does
+ * nothing silently reads as broken.
+ */
+export function HistoryControls({
+  canUndo,
+  canRedo,
+  undo,
+  redo,
+}: {
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
+}) {
+  const mod = modKeyLabel();
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        className="bg-card/80 px-2 backdrop-blur"
+        onClick={undo}
+        disabled={!canUndo}
+        aria-label="Undo"
+        title={canUndo ? `Undo (${mod} Z)` : "Nothing to undo yet"}
+      >
+        <Undo2 className="size-3.5" />
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        className="bg-card/80 px-2 backdrop-blur"
+        onClick={redo}
+        disabled={!canRedo}
+        aria-label="Redo"
+        title={canRedo ? `Redo (${mod} Shift Z)` : "Nothing to redo"}
+      >
+        <Redo2 className="size-3.5" />
+      </Button>
+    </>
+  );
+}
 
 /**
  * What is selected, and the two things that can be done to it that a drag

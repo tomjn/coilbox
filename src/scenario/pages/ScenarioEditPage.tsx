@@ -74,7 +74,7 @@ export default function ScenarioEditPage() {
   // panel that renames a reference needs the game's own declared types to carry
   // that reference over (issue #913).
   const { gate, extensions, note } = useScenarioGate(scenario, "author");
-  const [history, setHistory] = useState<EditHistory>(emptyHistory);
+  const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
   // Both are also held in refs, because an edit and a step through the history
   // read them at the moment they happen rather than at the last render: two
   // undos in quick succession are two presses before one re-render.
