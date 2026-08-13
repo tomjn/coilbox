@@ -314,7 +314,8 @@ export function replaceBlueprint(
   layout: BaseBlueprint,
 ): Scenario {
   if (!scenario.blueprints.some((b) => b.id === layout.id)) return scenario;
-  if (layout.buildings.length === 0) return removeBlueprint(scenario, layout.id);
+  if (layout.buildings.length === 0)
+    return removeBlueprint(scenario, layout.id);
   return {
     ...scenario,
     blueprints: edit<BaseBlueprint>(
