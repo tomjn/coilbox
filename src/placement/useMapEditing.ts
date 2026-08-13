@@ -109,6 +109,16 @@ export interface MapEditingDeps {
    *  that places nothing, which is what makes that mode read-only. */
   onPlace: ((pos: Point) => void) | null;
   /**
+   * Where the pointer is over the map, for a mode that shows what a click
+   * would put there (issue #1464). Null as the pointer leaves the map or takes
+   * hold of something, so whatever was being shown is taken down.
+   *
+   * Called on every move, so whoever takes it decides how much work a move is
+   * worth: nothing here throttles or compares. Left out by a mode that shows
+   * nothing, and then no move costs anything at all.
+   */
+  onHover?: ((pos: Point | null) => void) | null;
+  /**
    * A drag across bare ground, from where it was pressed to where the pointer
    * has got to, both in elmos.
    *
@@ -347,6 +357,9 @@ export function useMapEditing(deps: MapEditingDeps): void {
         grab,
         draws: !!latest.current.onDragGround,
       });
+      // The pointer is about to mean something else, so what it was showing
+      // under it goes now rather than sitting there through the whole drag.
+      if (gesture !== "camera") latest.current.onHover?.(null);
       // What a drag would carry, once there is somewhere on the map to carry it
       // from. The two are read together because a gesture needs both.
       const key = grab;
@@ -410,6 +423,14 @@ export function useMapEditing(deps: MapEditingDeps): void {
 
     const onPointerMove = (event: PointerEvent) => {
       const now = { x: event.clientX, y: event.clientY };
+
+      // What a click here would put down, shown while nothing is being
+      // dragged or drawn: during either of those the pointer is busy saying
+      // something else and a second thing following it would be noise. The
+      // ray is only cast for a mode that asked, so a move costs nothing in the
+      // modes that show nothing.
+      const hover = latest.current.onHover;
+      if (hover && !band && !drag) hover(groundPoint(event));
 
       if (band) {
         if (!band.moved && isClick(band.from, now)) return;
@@ -483,16 +504,21 @@ export function useMapEditing(deps: MapEditingDeps): void {
       handle.controls.enabled = true;
     };
 
+    /** The pointer has left the map, so anything drawn under it goes. */
+    const onPointerLeave = () => latest.current.onHover?.(null);
+
     dom.addEventListener("pointerdown", onPointerDown);
     dom.addEventListener("pointermove", onPointerMove);
     dom.addEventListener("pointerup", finish);
     dom.addEventListener("pointercancel", onPointerCancel);
+    dom.addEventListener("pointerleave", onPointerLeave);
 
     return () => {
       dom.removeEventListener("pointerdown", onPointerDown);
       dom.removeEventListener("pointermove", onPointerMove);
       dom.removeEventListener("pointerup", finish);
       dom.removeEventListener("pointercancel", onPointerCancel);
+      dom.removeEventListener("pointerleave", onPointerLeave);
       dom.style.cursor = "";
       handle.controls.enabled = true;
       ring.dispose();

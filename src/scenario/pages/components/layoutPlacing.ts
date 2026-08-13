@@ -27,6 +27,7 @@
 import type { SnapBuilding } from "@/blueprint/footprint";
 import { recordGameName, type StoredBlueprint } from "@/blueprint/library";
 import type { BlueprintBuilding } from "@/blueprint/model";
+import type { PreviewBuilding } from "@/placement/preview";
 import type { Point, Scenario } from "../../model";
 
 /** Where a layout the editor is about to place is coming from. */
@@ -90,6 +91,30 @@ export function layoutOrigin(
     first.facing,
   );
   return { x: stand.x - first.offset.x, z: stand.z - first.offset.z };
+}
+
+/**
+ * Every building of a layout as it would stand if it were dropped at `pos`,
+ * for showing under the pointer before the click (issue #1464).
+ *
+ * {@link layoutOrigin} and the offsets, which is exactly what the click itself
+ * does, so what is shown is what happens. Empty while the game's units are
+ * unread, for the reason `layoutOrigin` leaves the point alone then: without a
+ * footprint every def looks like one square, and a shape drawn on that guess is
+ * a shape nobody is about to place.
+ */
+export function layoutGhost(
+  pos: Point,
+  buildings: readonly BlueprintBuilding[],
+  snap: SnapBuilding | undefined,
+): PreviewBuilding[] {
+  if (!snap) return [];
+  const origin = layoutOrigin(pos, buildings, snap);
+  return buildings.map((building) => ({
+    def: building.def,
+    pos: { x: origin.x + building.offset.x, z: origin.z + building.offset.z },
+    facing: building.facing,
+  }));
 }
 
 /** One layout offered in the picker. */

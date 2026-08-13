@@ -1,0 +1,189 @@
+import { describe, expect, it } from "vitest";
+
+import type { Ground } from "@/blueprint/buildable";
+import {
+  BUILD_SQUARE,
+  footprintRect,
+  snapToBuildGrid,
+} from "@/blueprint/footprint";
+import {
+  layoutPreview,
+  previewChecks,
+  previewCount,
+  previewSentence,
+  previewTrouble,
+  sameCount,
+  samePlace,
+} from "./preview";
+
+/** Balanced Annihilation's own numbers, so the shapes below really exist. */
+const units = [
+  { name: "armsolar", footprintX: 5, footprintZ: 5, maxSlope: 20 },
+  { name: "armlab", footprintX: 6, footprintZ: 6, maxSlope: 15 },
+  { name: "armmex", footprintX: 3, footprintZ: 3, maxSlope: 40 },
+];
+
+/** Ground at one height everywhere, which every building stands on. */
+const flat: Ground = {
+  cornerAt: () => 100,
+  slack: 0,
+  minHeight: 0,
+  maxHeight: 500,
+};
+
+/** A cliff along x: everything east of 400 elmos is 200 elmos higher. */
+const cliff: Ground = {
+  cornerAt: (x) => (x * 8 >= 400 ? 300 : 100),
+  slack: 0,
+  minHeight: 0,
+  maxHeight: 500,
+};
+
+const solarAt = (x: number, z: number) => ({
+  def: "armsolar",
+  pos: { x, z },
+  facing: 0 as const,
+});
+
+describe("layoutPreview", () => {
+  it("stands each building where the engine would, not where it was asked", () => {
+    const { footprintOf } = previewChecks(units, null);
+    // A five square footprint centres in the middle of a build square, so a
+    // point part way across one is pulled to that middle.
+    const marks = layoutPreview([solarAt(100, 100)], footprintOf, []);
+    expect(marks).toHaveLength(1);
+    expect(marks[0].pos).toEqual({ x: 104, z: 104 });
+    expect(marks[0].footprint).toEqual({ x: 5, z: 5 });
+  });
+
+  it("marks a building wanting ground something already standing wants", () => {
+    const { footprintOf } = previewChecks(units, null);
+    const standing = [
+      { rect: footprintRect({ x: 104, z: 104 }, { x: 5, z: 5 }, 0) },
+    ];
+    const marks = layoutPreview(
+      [solarAt(100, 100), solarAt(100 + 6 * BUILD_SQUARE, 100)],
+      footprintOf,
+      standing,
+    );
+    expect(marks[0].overlapping).toBe(true);
+    expect(marks[1].overlapping).toBe(false);
+  });
+
+  it("marks two of its own buildings fighting over one piece of ground", () => {
+    const { footprintOf } = previewChecks(units, null);
+    const marks = layoutPreview(
+      [solarAt(100, 100), solarAt(116, 100)],
+      footprintOf,
+      [],
+    );
+    expect(marks.map((mark) => mark.overlapping)).toEqual([true, true]);
+  });
+
+  it("says nothing about the ground where there is no map to ask", () => {
+    const { footprintOf, standingOf } = previewChecks(units, null);
+    const marks = layoutPreview(
+      [solarAt(100, 100)],
+      footprintOf,
+      [],
+      standingOf,
+    );
+    expect(marks[0].standing).toBe("unknown");
+  });
+
+  it("passes a building on flat ground and refuses one on a cliff", () => {
+    const level = previewChecks(units, flat);
+    const step = previewChecks(units, cliff);
+    const at = solarAt(400, 100);
+    expect(
+      layoutPreview([at], level.footprintOf, [], level.standingOf)[0].standing,
+    ).toBe("fine");
+    expect(
+      layoutPreview([at], step.footprintOf, [], step.standingOf)[0].standing,
+    ).toBe("slope");
+  });
+
+  it("counts what is wrong and says it in words", () => {
+    const { footprintOf } = previewChecks(units, null);
+    const standing = [
+      { rect: footprintRect({ x: 104, z: 104 }, { x: 5, z: 5 }, 0) },
+    ];
+    const clear = previewCount(
+      layoutPreview([solarAt(1000, 1000)], footprintOf, standing),
+    );
+    expect(clear).toEqual({ total: 1, clashes: 0, unstable: 0 });
+    expect(previewSentence(clear)).toBe("1 building, and it has room here.");
+    expect(previewTrouble(clear)).toBe(false);
+
+    const fighting = previewCount(
+      layoutPreview(
+        [solarAt(100, 100), solarAt(1000, 1000)],
+        footprintOf,
+        standing,
+      ),
+    );
+    expect(fighting.clashes).toBe(1);
+    expect(previewSentence(fighting)).toBe(
+      "1 of 2 wants ground another building has, in red.",
+    );
+    expect(previewTrouble(fighting)).toBe(true);
+  });
+
+  it("says both reasons the engine would refuse a building", () => {
+    const both = { total: 12, clashes: 3, unstable: 2 };
+    expect(previewSentence(both)).toBe(
+      "3 of 12 want ground another building has, in red. 2 are on ground too steep for them, in amber.",
+    );
+    expect(previewSentence({ total: 12, clashes: 0, unstable: 1 })).toBe(
+      "1 of 12 is on ground too steep for it, in amber.",
+    );
+  });
+
+  it("knows a frame that would draw the layout where it already is", () => {
+    // What keeps a pointer move cheap: the origin is snapped, so most of the
+    // pointer's travel lands the layout on the squares it is already on.
+    const at = (x: number) =>
+      [0, 96].map((offset) => ({
+        def: "armsolar",
+        pos: snapToBuildGrid({ x: x + offset, z: 100 }, { x: 5, z: 5 }, 0),
+        facing: 0 as const,
+      }));
+    const near = at(100);
+    const same = at(107);
+    const along = at(140);
+    expect(samePlace(near, same)).toBe(true);
+    expect(samePlace(near, along)).toBe(false);
+    expect(samePlace(near, near.slice(1))).toBe(false);
+  });
+
+  it("leaves a surface alone while the same thing is true", () => {
+    const one = { total: 12, clashes: 1, unstable: 0 };
+    expect(sameCount(one, { ...one })).toBe(true);
+    expect(sameCount(one, { ...one, clashes: 2 })).toBe(false);
+    expect(sameCount(one, null)).toBe(false);
+    expect(sameCount(null, null)).toBe(true);
+  });
+
+  it("is cheap enough to run on every pointer move (issue #1464)", () => {
+    // Thirty buildings against a map already holding two hundred, which is a
+    // bigger mission than anybody builds, run the number of times a pointer
+    // crosses build squares in a second of dragging across the map.
+    const { footprintOf, standingOf } = previewChecks(units, flat);
+    const layout = Array.from({ length: 30 }, (_, at) =>
+      solarAt(1000 + at * 6 * BUILD_SQUARE, 1000),
+    );
+    const standing = Array.from({ length: 200 }, (_, at) => ({
+      rect: footprintRect(
+        { x: 200 + (at % 20) * 96, z: 200 + Math.floor(at / 20) * 96 },
+        { x: 5, z: 5 },
+        0,
+      ),
+    }));
+    const started = performance.now();
+    for (let pass = 0; pass < 120; pass++) {
+      layoutPreview(layout, footprintOf, standing, standingOf);
+    }
+    const each = (performance.now() - started) / 120;
+    expect(each).toBeLessThan(2);
+  });
+});

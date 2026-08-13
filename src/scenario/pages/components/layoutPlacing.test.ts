@@ -5,6 +5,7 @@ import { newScenario } from "../../create";
 import type { Scenario } from "../../model";
 import {
   layoutChoiceKey,
+  layoutGhost,
   layoutOptions,
   layoutOrigin,
   parseLayoutChoice,
@@ -107,6 +108,27 @@ describe("where a dropped layout puts its origin", () => {
     expect(layoutOrigin({ x: 7, z: 9 }, buildings, undefined)).toEqual({
       x: 7,
       z: 9,
+    });
+  });
+
+  describe("the layout under the pointer (issue #1464)", () => {
+    it("stands every building where the click would put it", () => {
+      const at = { x: 1003, z: 2005 };
+      const origin = layoutOrigin(at, buildings, snap);
+      expect(layoutGhost(at, buildings, snap)).toEqual([
+        { def: "armsolar", pos: origin, facing: 0 },
+        {
+          def: "armlab",
+          pos: { x: origin.x + 88, z: origin.z + 8 },
+          facing: 0,
+        },
+      ]);
+    });
+
+    it("shows nothing until the game's units are read", () => {
+      // Every def would look like one square, so the shape shown would be a
+      // shape nobody is about to place.
+      expect(layoutGhost({ x: 7, z: 9 }, buildings, undefined)).toEqual([]);
     });
   });
 });
