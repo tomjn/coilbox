@@ -6,8 +6,8 @@ import {
   parseStoredBlueprintJson,
   recordGameName,
   recordWithLayout,
-  sortLibrary,
   type StoredBlueprint,
+  sortLibrary,
   uniqueLayoutName,
 } from "./library";
 import type { BaseBlueprint } from "./model";
@@ -108,9 +108,9 @@ describe("libraryGames and recordGameName", () => {
   it("lists each game once, and says when a layout names none", () => {
     const nameless = record({ id: "b2" });
     nameless.layout = { ...nameless.layout, game: undefined };
-    expect(
-      libraryGames([record(), record({ id: "b3" }), nameless]),
-    ).toEqual(["Beyond All Reason test-1"]);
+    expect(libraryGames([record(), record({ id: "b3" }), nameless])).toEqual([
+      "Beyond All Reason test-1",
+    ]);
     expect(recordGameName(nameless)).toBe("");
   });
 });
