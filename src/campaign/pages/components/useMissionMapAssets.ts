@@ -1,4 +1,5 @@
 import {
+  useUnitsyncHeightField,
   useUnitsyncHeightmap,
   useUnitsyncMapSkybox,
   useUnitsyncMinimap,
@@ -16,22 +17,22 @@ import { usePreferredTarget } from "../../../play/config";
 export function useMissionMapAssets(
   mapName: string,
   /**
-   * How long the heightmap render's longest side may be, for a caller that
-   * reads heights back off it rather than only drawing it. Left out for a
-   * backdrop, which is every caller that only looks at the relief.
+   * Also read the map's raw heights, for a caller that has to say whether a
+   * building will stand rather than only draw the relief (issue #1490). Tens of
+   * megabytes on a large map, so a backdrop does not ask for it.
    */
-  heightMaxSide?: number,
+  exactHeights = false,
 ) {
   const { target } = usePreferredTarget();
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
 
   const minimap = useUnitsyncMinimap(enginePath, dataDir, mapName);
-  const heightmap = useUnitsyncHeightmap(
+  const heightmap = useUnitsyncHeightmap(enginePath, dataDir, mapName);
+  const heightField = useUnitsyncHeightField(
     enginePath,
     dataDir,
-    mapName,
-    heightMaxSide,
+    exactHeights ? mapName : undefined,
   );
   const skybox = useUnitsyncMapSkybox(enginePath, dataDir, mapName);
 
@@ -46,6 +47,16 @@ export function useMissionMapAssets(
     enginePath,
     dataDir,
     heightSrc: heightUrl,
+    /** The map's own heights, when they were asked for: the file, and the grid
+     *  it holds. Undefined until the write has finished, and on a map whose
+     *  heights would not read. */
+    heightFieldSrc: heightField.url ?? undefined,
+    heightFieldWidth: heightField.data?.width,
+    heightFieldHeight: heightField.data?.height,
+    /** Whether the raw heights were asked for and have settled one way or the
+     *  other, so an absent grid can be told from a read still in flight. */
+    heightFieldRead:
+      !exactHeights || (!heightField.loading && !!heightField.data),
     textureSrc: textureUrl,
     appearance: minimap.appearance,
     /** The map's own team start positions, in elmos from its north-west corner,

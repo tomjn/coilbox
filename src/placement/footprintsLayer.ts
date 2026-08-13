@@ -54,6 +54,11 @@ const GROUND_COLOR = 0x94a3b8;
 const CLASH_COLOR = 0xf87171;
 const SLOPE_COLOR = 0xfbbf24;
 
+/** What a building in the wrong depth of water is drawn in (issue #1459). Its
+ *  own colour because it is fixed its own way: this one moves to the water, or
+ *  out of it, and no amount of flatter ground helps. */
+const DEPTH_COLOR = 0x22d3ee;
+
 /** What a building nothing has judged is outlined in: brighter than the ground
  *  colour, because an empty dashed square has no fill to be seen by. */
 const UNJUDGED_COLOR = 0xcbd5e1;
@@ -90,7 +95,7 @@ export interface FootprintStyle {
  * colour on its own asks somebody to remember a key. A refusal is a filled
  * square with a bold edge, a building nobody is refusing is a quiet filled
  * square, and a building nothing has judged is an empty dashed one. Within a
- * refusal the colour says which of the three it is, because they are fixed
+ * refusal the colour says which of the four it is, because they are fixed
  * differently. There was
  * no third state before: a building the check could not judge and one it
  * approved of were both the quiet grey square, which is how the check managed
@@ -118,6 +123,9 @@ export function footprintStyle(
   }
   if (mark.standing === "slope") {
     return { color: SLOPE_COLOR, fill, outline, dashed: false };
+  }
+  if (mark.standing === "depth") {
+    return { color: DEPTH_COLOR, fill, outline, dashed: false };
   }
   if (mark.standing === "no-def") {
     return { color: ABSENT_COLOR, fill, outline, dashed: false };

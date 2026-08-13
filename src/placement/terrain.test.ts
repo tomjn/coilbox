@@ -1,16 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
-  CHECK_MAX_SIDE,
   cornerGround,
   FLAT_FIELD,
   groundHeight,
   type HeightField,
+  heightGrid,
   standingField,
 } from "./terrain";
 
 /** A field from a row-major list of 0..1 samples. */
 function field(width: number, height: number, samples: number[]): HeightField {
   return { width, height, samples: Float32Array.from(samples) };
+}
+
+/** A grid from a row-major list of the engine's own 16 bit words, as the worker
+ *  writes them: little endian. */
+function grid(width: number, height: number, words: number[]) {
+  const read = heightGrid(Uint16Array.from(words).buffer, width, height);
+  if (!read) throw new Error("no grid");
+  return read;
 }
 
 // A 2 by 2 field: 0 at the north-west corner rising to 1 at the south-east.
@@ -84,78 +92,82 @@ describe("standingField", () => {
   });
 });
 
+/**
+ * The raw grid the worker writes, which is what the check reads now (issue
+ * #1490). A file of the wrong length is not this map's heights, and reading one
+ * anyway would put a building's verdict on somebody else's ground.
+ */
+describe("heightGrid", () => {
+  it("reads the worker's words in the order it wrote them", () => {
+    const read = grid(2, 2, [0, 1, 2, 65535]);
+    expect(read.width).toBe(2);
+    expect(read.height).toBe(2);
+    expect(Array.from(read.words)).toEqual([0, 1, 2, 65535]);
+  });
+
+  it("has no grid when the file is not the size the map says", () => {
+    const bytes = Uint16Array.from([0, 1, 2, 3]).buffer;
+    expect(heightGrid(bytes, 3, 3)).toBeNull();
+    expect(heightGrid(bytes, 0, 0)).toBeNull();
+  });
+});
+
 describe("cornerGround", () => {
   // A tiny map: 3 by 3 corners is 2 by 2 heightmap squares, 16 elmos a side.
-  const small = field(3, 3, [0, 0.5, 1, 0, 0.5, 1, 0, 0.5, 1]);
+  // Words rather than samples, because the corners are read at the depth the
+  // engine holds them.
+  const column = [0, 32768, 65535];
+  const small = grid(3, 3, [...column, ...column, ...column]);
 
+  /** `CSMFMapFile::ReadHeightmap`: `minHeight + word * range / 65536`. Not
+   *  `/ 65535`, which is the reading the eight bit canvas forced. */
   it("reads a corner as the engine's own height there", () => {
-    const ground = cornerGround(small, 16, 16, 0, 100);
+    const ground = cornerGround(small, 16, 16, 0, 65536);
     if (!ground) throw new Error("no ground");
-    expect(ground.cornerAt(0, 0)).toBeCloseTo(0);
-    expect(ground.cornerAt(1, 0)).toBeCloseTo(50);
-    expect(ground.cornerAt(2, 2)).toBeCloseTo(100);
+    expect(ground.cornerAt(0, 0)).toBe(0);
+    expect(ground.cornerAt(1, 0)).toBe(32768);
+    expect(ground.cornerAt(2, 2)).toBe(65535);
+  });
+
+  it("scales a word into the map's own height range", () => {
+    const ground = cornerGround(small, 16, 16, -100, 100);
+    expect(ground?.cornerAt(1, 0)).toBeCloseTo(0);
   });
 
   it("clamps a corner off the map to the edge, as the engine does", () => {
-    const ground = cornerGround(small, 16, 16, 0, 100);
-    expect(ground?.cornerAt(-4, -4)).toBeCloseTo(0);
-    expect(ground?.cornerAt(90, 90)).toBeCloseTo(100);
+    const ground = cornerGround(small, 16, 16, 0, 65536);
+    expect(ground?.cornerAt(-4, -4)).toBe(0);
+    expect(ground?.cornerAt(90, 90)).toBe(65535);
   });
 
-  /** One step of the eight bit read back off the rendered heightmap, which is
-   *  what the check has to allow for before it calls anything unbuildable. */
-  it("allows for how coarsely the heightmap was read", () => {
-    expect(cornerGround(small, 16, 16, 0, 255)?.slack).toBeCloseTo(1);
-    expect(cornerGround(small, 16, 16, -50, 205)?.slack).toBeCloseTo(1);
+  /** The whole of issue #1490. The heights are the engine's own numbers now,
+   *  so there is nothing for a tolerance to cover. */
+  it("costs the check no tolerance at all", () => {
+    expect(cornerGround(small, 16, 16, 0, 255)?.slack).toBe(0);
+    expect(cornerGround(small, 16, 16, 100, 800)?.slack).toBe(0);
   });
 
-  /** A big map comes back downscaled, so its samples are no longer the map's
-   *  corners and the arithmetic below them is no longer the engine's. Better to
-   *  say nothing than to mark a building off smoothed ground. */
-  it("has no ground when the heightmap came back downscaled", () => {
+  it("has water on it, because a map's zero is the sea", () => {
+    expect(cornerGround(small, 16, 16, 0, 100)?.hasWater).toBe(true);
+  });
+
+  /** A grid that is not the map's own corner count describes some other map, or
+   *  a read that went wrong. Better to say nothing than to mark a building
+   *  against it. */
+  it("has no ground when the grid is not the map's corners", () => {
     expect(cornerGround(small, 4096, 4096, 0, 100)).toBeNull();
-    expect(cornerGround(field(1, 1, [0]), 4096, 4096, 0, 100)).toBeNull();
   });
 
   it("has no ground for a map with no extent", () => {
     expect(cornerGround(small, 0, 0, 0, 100)).toBeNull();
   });
-});
 
-/**
- * What the editor has to ask the heightmap render for (issue #1483).
- *
- * A field of nothing, because only its size is under test: whether the render
- * the editor asks for comes back as the map's own corners or as a picture of
- * them.
- */
-function blank(width: number, height: number): HeightField {
-  return { width, height, samples: new Float32Array(width * height) };
-}
-
-describe("the render the check reads", () => {
-  // Bismuth Valley v2.4.1, a map on this machine: 12288 by 8192 elmos, so a
-  // 1537 by 1025 corner grid. Read back off the render the worker caches at its
-  // own default cap it is 1024 by 683, which the check refused, so no building
-  // on it ever got a verdict.
-  const WIDTH = 12288;
-  const HEIGHT = 8192;
-
-  it("is not the map's corners at the render's own default cap", () => {
-    expect(cornerGround(blank(1024, 683), WIDTH, HEIGHT, 100, 800)).toBeNull();
-  });
-
-  it("is the map's corners at the cap the check asks for", () => {
-    expect(CHECK_MAX_SIDE).toBeGreaterThanOrEqual(1537);
-    expect(
-      cornerGround(blank(1537, 1025), WIDTH, HEIGHT, 100, 800),
-    ).not.toBeNull();
-  });
-
-  /** 32 by 32 is the largest map Beyond All Reason publishes, 16384 elmos and
-   *  a 2049 corner grid. A cap under that would leave the check silent on the
-   *  big maps all over again (issue #1460). */
-  it("covers the largest map in circulation", () => {
-    expect(CHECK_MAX_SIDE).toBeGreaterThanOrEqual(2049);
+  /** Bismuth Valley v2.4.1, a map on this machine: 12288 by 8192 elmos, so a
+   *  1537 by 1025 corner grid, which is what the worker writes. */
+  it("takes a real map's whole corner grid", () => {
+    const words = new Uint16Array(1537 * 1025);
+    const read = heightGrid(words.buffer, 1537, 1025);
+    if (!read) throw new Error("no grid");
+    expect(cornerGround(read, 12288, 8192, 100, 800)).not.toBeNull();
   });
 });

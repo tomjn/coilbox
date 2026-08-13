@@ -186,7 +186,7 @@ export function rectsOverlap(a: Rect, b: Rect): boolean {
  * What can be said about the ground under one building (issue #1315), and where
  * an absent verdict came from (issue #1491).
  *
- * Two of these are answers about the ground. The rest are reasons there is no
+ * Three of these are answers about the ground. The rest are reasons there is no
  * answer, and they are kept apart because they are different problems with
  * different fixes: a person can wait for a game's units to be read, and can do
  * nothing at all about a map whose heights will not read.
@@ -203,6 +203,9 @@ export type Standing =
   | "fine"
   /** The ground under it moves further than the def tolerates. */
   | "slope"
+  /** The water over the ground under it is outside the band the def declares:
+   *  a land building in the sea, or a naval yard on dry land (issue #1459). */
+  | "depth"
   /** There is no ground to ask: no map, or a heightmap that would not read. */
   | "no-ground"
   /** The game's units have not been read, so nothing knows what this def is. */

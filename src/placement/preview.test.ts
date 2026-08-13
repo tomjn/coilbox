@@ -32,6 +32,7 @@ const flat: Ground = {
   slack: 0,
   minHeight: 0,
   maxHeight: 500,
+  hasWater: true,
 };
 
 /** A cliff along x: everything east of 400 elmos is 200 elmos higher. */
@@ -40,6 +41,7 @@ const cliff: Ground = {
   slack: 0,
   minHeight: 0,
   maxHeight: 500,
+  hasWater: true,
 };
 
 const solarAt = (x: number, z: number) => ({
@@ -118,6 +120,7 @@ describe("layoutPreview", () => {
       total: 1,
       clashes: 0,
       unstable: 0,
+      wrongDepth: 0,
       unjudged: 1,
       absent: 0,
     });
@@ -142,7 +145,14 @@ describe("layoutPreview", () => {
   });
 
   it("says both reasons the engine would refuse a building", () => {
-    const both = { total: 12, clashes: 3, unstable: 2, unjudged: 0, absent: 0 };
+    const both = {
+      total: 12,
+      clashes: 3,
+      unstable: 2,
+      wrongDepth: 0,
+      unjudged: 0,
+      absent: 0,
+    };
     expect(previewSentence(both)).toBe(
       "3 of 12 want ground another building has, in red. 2 are on ground too steep for them, in amber.",
     );
@@ -151,6 +161,7 @@ describe("layoutPreview", () => {
         total: 12,
         clashes: 0,
         unstable: 1,
+        wrongDepth: 0,
         unjudged: 0,
         absent: 0,
       }),
@@ -167,6 +178,7 @@ describe("layoutPreview", () => {
       total: 12,
       clashes: 0,
       unstable: 0,
+      wrongDepth: 0,
       unjudged: 0,
       absent: 2,
     };
@@ -188,6 +200,7 @@ describe("layoutPreview", () => {
         total: 12,
         clashes: 0,
         unstable: 0,
+        wrongDepth: 0,
         unjudged: 3,
         absent: 0,
       }),
@@ -199,6 +212,7 @@ describe("layoutPreview", () => {
         total: 12,
         clashes: 0,
         unstable: 0,
+        wrongDepth: 0,
         unjudged: 3,
         absent: 0,
       }),
@@ -223,7 +237,14 @@ describe("layoutPreview", () => {
   });
 
   it("leaves a surface alone while the same thing is true", () => {
-    const one = { total: 12, clashes: 1, unstable: 0, unjudged: 0, absent: 0 };
+    const one = {
+      total: 12,
+      clashes: 1,
+      unstable: 0,
+      wrongDepth: 0,
+      unjudged: 0,
+      absent: 0,
+    };
     expect(sameCount(one, { ...one })).toBe(true);
     expect(sameCount(one, { ...one, clashes: 2 })).toBe(false);
     // The moment the game's units arrive, the same layout stops being unjudged

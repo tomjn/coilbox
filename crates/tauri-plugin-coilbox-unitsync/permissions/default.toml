@@ -6,6 +6,7 @@ permissions = [
   "allow-unitsync-scan",
   "allow-unitsync-minimap",
   "allow-unitsync-heightmap",
+  "allow-unitsync-height-field",
   "allow-unitsync-metalmap",
   "allow-unitsync-thumbnails",
   "allow-unitsync-map-meta",

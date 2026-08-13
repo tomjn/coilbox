@@ -12,11 +12,12 @@
  * `unitsLayer.ts`.
  */
 
-import { type Ground, standsOn, unitSlopes } from "@/blueprint/buildable";
+import { type Ground, standsOn, unitLimits } from "@/blueprint/buildable";
 import {
   buildingFootprints,
   type FootprintMark,
   footprintMarks,
+  type Standing,
 } from "@/blueprint/footprint";
 import type { UnknownBuilding } from "@/blueprint/units";
 import type { Participant, Rgb } from "@/play/config";
@@ -101,13 +102,17 @@ export function dragKeys(placements: Placement[], key: string): string[] {
 }
 
 /** What the check needs to know about a game's units: how much ground each one
- *  stands on, and how steep that ground may be. */
+ *  stands on, how steep that ground may be, and how much water may be over
+ *  it. */
 export type BuildingUnit = {
   name: string;
   footprintX?: number;
   footprintZ?: number;
   maxSlope?: number;
   floatOnWater?: boolean;
+  minWaterDepth?: number;
+  maxWaterDepth?: number;
+  waterline?: number;
 };
 
 /**
@@ -126,14 +131,14 @@ export function baseFootprints(
    *  Without one no building gets a verdict, and each one says so. */
   ground: Ground | null = null,
   /** Whether `units` is the game's dataset read rather than an empty list
-   *  standing in for one not read yet, as {@link unitSlopes} takes it. */
+   *  standing in for one not read yet, as {@link unitLimits} takes it. */
   checked = units.length > 0,
 ): FootprintMark[] {
-  const slopeOf = unitSlopes(units, checked);
+  const limitsOf = unitLimits(units, checked);
   return footprintMarks(
     placements.filter((placement) => placement.kind === "base"),
     buildingFootprints(units),
-    (mark) => standsOn(mark, ground, slopeOf(mark.def)),
+    (mark) => standsOn(mark, ground, limitsOf(mark.def)),
   );
 }
 
@@ -215,11 +220,11 @@ export type SceneUnchecked = "no-units" | "no-ground" | null;
 /**
  * Which of those two is true of everything drawn, or null.
  *
- * Nothing has been checked when no building came back `"fine"` or `"slope"`,
- * which is the only pair of answers the ground gives. A building with its own
- * answer, a floater or a def this game has not got, is looked past rather than
- * counted: it has not been checked against the ground either, but it is not
- * waiting on anything and it is already marked as what it is.
+ * Nothing has been checked when no building came back `"fine"`, `"slope"` or
+ * `"depth"`, which are the only answers the ground gives. A building with its
+ * own answer, a floater or a def this game has not got, is looked past rather
+ * than counted: it has not been checked against the ground either, but it is
+ * not waiting on anything and it is already marked as what it is.
  *
  * The read still in flight wins where both are true, because it is the one that
  * will clear itself and the one an author must not act on.
@@ -227,7 +232,13 @@ export type SceneUnchecked = "no-units" | "no-ground" | null;
 export function sceneUnchecked(marks: FootprintMark[]): SceneUnchecked {
   let reason: SceneUnchecked = null;
   for (const mark of marks) {
-    if (mark.standing === "fine" || mark.standing === "slope") return null;
+    if (
+      mark.standing === "fine" ||
+      mark.standing === "slope" ||
+      mark.standing === "depth"
+    ) {
+      return null;
+    }
     if (mark.standing === "no-units") reason = "no-units";
     else if (mark.standing === "no-ground" && reason === null) {
       reason = "no-ground";
@@ -236,15 +247,16 @@ export function sceneUnchecked(marks: FootprintMark[]): SceneUnchecked {
   return reason;
 }
 
-/** Which of one base's buildings the ground will not take, by their place in
+/** Which of one base's buildings got one particular verdict, by their place in
  *  the base, so a panel can name them the way it names the overlapping ones. */
-export function unstableIn(
+function standingIn(
   placements: Placement[],
   marks: FootprintMark[],
   baseId: string,
+  standing: Standing,
 ): number[] {
   const refused = new Set(
-    marks.filter((mark) => mark.standing === "slope").map((mark) => mark.key),
+    marks.filter((mark) => mark.standing === standing).map((mark) => mark.key),
   );
   return placements
     .filter(
@@ -254,6 +266,25 @@ export function unstableIn(
         refused.has(placement.key),
     )
     .map((placement) => placement.index);
+}
+
+/** Which of one base's buildings stand on ground too steep for them. */
+export function unstableIn(
+  placements: Placement[],
+  marks: FootprintMark[],
+  baseId: string,
+): number[] {
+  return standingIn(placements, marks, baseId, "slope");
+}
+
+/** Which of one base's buildings are in the wrong depth of water: a land
+ *  building in the sea, or a naval one out of it (issue #1459). */
+export function wrongDepthIn(
+  placements: Placement[],
+  marks: FootprintMark[],
+  baseId: string,
+): number[] {
+  return standingIn(placements, marks, baseId, "depth");
 }
 
 /** Which of one base's buildings want ground another building is standing on,

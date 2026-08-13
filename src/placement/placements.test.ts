@@ -13,6 +13,8 @@ import {
   teamColor,
   UNOWNED_COLOR,
   unjudgedIn,
+  unstableIn,
+  wrongDepthIn,
 } from "./placements";
 
 type Registries = Pick<Scenario, "actors" | "groups" | "bases" | "blueprints">;
@@ -190,6 +192,7 @@ describe("unjudgedIn", () => {
     slack: 0,
     minHeight: 0,
     maxHeight: 0,
+    hasWater: true,
   };
 
   it("blames the map when there is no ground to check against", () => {
@@ -268,7 +271,13 @@ describe("sceneUnchecked", () => {
     ],
   };
 
-  const flat = { cornerAt: () => 0, slack: 0, minHeight: 0, maxHeight: 0 };
+  const flat = {
+    cornerAt: () => 0,
+    slack: 0,
+    minHeight: 0,
+    maxHeight: 0,
+    hasWater: true,
+  };
 
   it("says nothing when the buildings have been judged", () => {
     const marks = baseFootprints(scenarioPlacements(doc), units, flat);
@@ -350,6 +359,68 @@ describe("overlappingIn", () => {
     const placements = scenarioPlacements(doc);
     const marks = baseFootprints(placements, units);
     expect(overlappingIn(placements, marks, "other")).toEqual([]);
+  });
+});
+
+/** Issue #1459: the depth half of the engine's terrain check, named the way the
+ *  slope half is so a panel can list both. */
+describe("wrongDepthIn", () => {
+  const units = [
+    // A land building, which is what a `maxWaterDepth` of 0 means.
+    { name: "armsolar", footprintX: 2, footprintZ: 2, maxSlope: 10 },
+    { name: "armshipyard", footprintX: 2, footprintZ: 2, maxSlope: 10 },
+  ];
+  const doc: Registries = {
+    ...empty,
+    blueprints: [
+      {
+        id: "bp1",
+        name: "The harbour",
+        buildings: [
+          { def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 },
+          { def: "armshipyard", offset: { x: 256, z: 0 }, facing: 0 },
+        ],
+      },
+    ],
+    bases: [
+      {
+        id: "pf1",
+        blueprint: "bp1",
+        team: "p0",
+        origin: { x: 1000, z: 1000 },
+        buildings: [],
+      },
+    ],
+  };
+  /** Dry land, level and read exactly. */
+  const dry = {
+    cornerAt: () => 20,
+    slack: 0,
+    minHeight: -100,
+    maxHeight: 100,
+    hasWater: true,
+  };
+
+  it("names the building the water is wrong for", () => {
+    const placements = scenarioPlacements(doc);
+    const marks = baseFootprints(
+      placements,
+      [
+        { ...units[0], maxWaterDepth: 0 },
+        { ...units[1], minWaterDepth: 10, maxWaterDepth: 1000 },
+      ],
+      dry,
+    );
+    // The yard needs 10 elmos of water and is standing 20 above it. The solar
+    // collector is exactly where it belongs.
+    expect(wrongDepthIn(placements, marks, "pf1")).toEqual([1]);
+    expect(unstableIn(placements, marks, "pf1")).toEqual([]);
+  });
+
+  it("says nothing about a base whose defs declare no water", () => {
+    const placements = scenarioPlacements(doc);
+    const marks = baseFootprints(placements, units, dry);
+    expect(wrongDepthIn(placements, marks, "pf1")).toEqual([]);
   });
 });
 

@@ -96,6 +96,7 @@ export function BaseControls({
   sharedEdit,
   overlaps,
   unstable,
+  wrongDepth,
   unjudged,
   absent,
   designedFor,
@@ -144,6 +145,9 @@ export function BaseControls({
    *  base. Drawn in amber on the map as well, and empty where the terrain
    *  could not be checked at all. */
   unstable: number[];
+  /** Which of them are in the wrong depth of water for them, by their place in
+   *  the base. Drawn in cyan on the map as well (issue #1459). */
+  wrongDepth: number[];
   /** Which of them nothing judged, and why. Undefined while the reads are still
    *  in flight, when nothing is worth saying yet (issue #1491). */
   unjudged?: Unjudged;
@@ -391,6 +395,7 @@ export function BaseControls({
           <LayoutNotes
             overlaps={overlaps}
             unstable={unstable}
+            wrongDepth={wrongDepth}
             unjudged={unjudged}
             absent={absent}
             buildings={buildings.length}

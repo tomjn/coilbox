@@ -29,8 +29,10 @@ use std::path::Path;
 /// on the missing field has to be re-read. v9: the unit dataset gained each
 /// unit's footprint. v10: the unit dataset gained each unit's `maxSlope` and
 /// whether it floats, which is what decides if a building will stand on a piece
-/// of ground.
-const INFO_CACHE_VERSION: u32 = 10;
+/// of ground. v11: the unit dataset gained each unit's `minWaterDepth`,
+/// `maxWaterDepth` and `waterline`, which is the other half of the same
+/// question.
+const INFO_CACHE_VERSION: u32 = 11;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.

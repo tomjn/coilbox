@@ -22,7 +22,7 @@
  * every pointer move would be the expensive part of an otherwise cheap check.
  */
 
-import { type Ground, standsOn, unitSlopes } from "@/blueprint/buildable";
+import { type Ground, standsOn, unitLimits } from "@/blueprint/buildable";
 import {
   buildingFootprints,
   type Footprint,
@@ -64,15 +64,15 @@ export interface PreviewChecks {
 export function previewChecks(
   units: BuildingUnit[],
   ground: Ground | null,
-  /** Whether `units` is the game's dataset read, as {@link unitSlopes} takes
+  /** Whether `units` is the game's dataset read, as {@link unitLimits} takes
    *  it. */
   checked = units.length > 0,
 ): PreviewChecks {
   const footprintOf = buildingFootprints(units);
-  const slopeOf = unitSlopes(units, checked);
+  const limitsOf = unitLimits(units, checked);
   return {
     footprintOf,
-    standingOf: (mark) => standsOn(mark, ground, slopeOf(mark.def)),
+    standingOf: (mark) => standsOn(mark, ground, limitsOf(mark.def)),
   };
 }
 
@@ -179,6 +179,9 @@ export interface PreviewCount {
   clashes: number;
   /** Standing on ground too steep for it. */
   unstable: number;
+  /** In the wrong depth of water for it: a land building in the sea, or a naval
+   *  one out of it (issue #1459). */
+  wrongDepth: number;
   /** Nothing has judged the ground under it, which is not the same as the
    *  ground being fine (issue #1491). */
   unjudged: number;
@@ -192,6 +195,7 @@ export function previewCount(marks: readonly FootprintMark[]): PreviewCount {
     total: marks.length,
     clashes: marks.filter((mark) => mark.overlapping).length,
     unstable: marks.filter((mark) => mark.standing === "slope").length,
+    wrongDepth: marks.filter((mark) => mark.standing === "depth").length,
     unjudged: marks.filter((mark) => unjudged(mark.standing)).length,
     absent: marks.filter((mark) => mark.standing === "no-def").length,
   };
@@ -205,6 +209,7 @@ export function sameCount(a: PreviewCount | null, b: PreviewCount | null) {
     a.total === b.total &&
     a.clashes === b.clashes &&
     a.unstable === b.unstable &&
+    a.wrongDepth === b.wrongDepth &&
     a.unjudged === b.unjudged &&
     a.absent === b.absent
   );
@@ -213,7 +218,12 @@ export function sameCount(a: PreviewCount | null, b: PreviewCount | null) {
 /** Whether anything about this spot is worth an author's attention, which is
  *  what colours the sentence. */
 export function previewTrouble(count: PreviewCount): boolean {
-  return count.clashes > 0 || count.unstable > 0 || count.absent > 0;
+  return (
+    count.clashes > 0 ||
+    count.unstable > 0 ||
+    count.wrongDepth > 0 ||
+    count.absent > 0
+  );
 }
 
 /** What is left unsaid about this spot, when anything is. Appended rather than
@@ -256,6 +266,14 @@ export function previewSentence(count: PreviewCount): string {
       unstable === 1
         ? `1${of} is on ground too steep for it, in amber.`
         : `${unstable}${of} are on ground too steep for them, in amber.`,
+    );
+  }
+  if (count.wrongDepth > 0) {
+    const of = parts.length > 0 ? "" : ` of ${total}`;
+    parts.push(
+      count.wrongDepth === 1
+        ? `1${of} is in the wrong depth of water for it, in cyan.`
+        : `${count.wrongDepth}${of} are in the wrong depth of water for them, in cyan.`,
     );
   }
   if (count.absent > 0) {

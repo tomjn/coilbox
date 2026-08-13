@@ -102,6 +102,7 @@ function listed(at: number[]): string {
 export function LayoutNotes({
   overlaps,
   unstable,
+  wrongDepth,
   unjudged,
   absent,
   buildings,
@@ -118,6 +119,9 @@ export function LayoutNotes({
    *  Drawn in amber on the surface as well. Empty where there is no map to
    *  check against, which is not the same as everything being fine. */
   unstable?: number[];
+  /** Buildings in the wrong depth of water for them, by their place in the
+   *  layout (issue #1459). Drawn in cyan on the surface as well. */
+  wrongDepth?: number[];
   /**
    * Buildings nothing has judged, grouped by why. Drawn as empty dashed squares
    * on the surface as well.
@@ -175,6 +179,16 @@ export function LayoutNotes({
           {unstable.length === 1 ? "s" : ""} on ground too steep for
           {unstable.length === 1 ? " it" : " them"}, marked in amber. The engine
           refuses to build on a slope past what the unit allows.
+        </p>
+      )}
+
+      {wrongDepth !== undefined && wrongDepth.length > 0 && (
+        <p className="rounded bg-cyan-950/60 px-2 py-1.5 text-[11px] text-cyan-200">
+          Building{wrongDepth.length === 1 ? " " : "s "}
+          {listed(wrongDepth)} stand
+          {wrongDepth.length === 1 ? "s" : ""} in the wrong depth of water for
+          {wrongDepth.length === 1 ? " it" : " them"}, marked in cyan. The
+          engine refuses a land building in the sea and a naval one out of it.
         </p>
       )}
 

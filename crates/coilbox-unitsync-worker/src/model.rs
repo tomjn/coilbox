@@ -264,6 +264,34 @@ pub struct HeightmapOutput {
     pub errors: Vec<String>,
 }
 
+/// The map's raw heights, returned by the lazy `height-field` mode: the file the
+/// grid was written to plus the bounds its words span (issue #1490).
+///
+/// No inline fallback. The grid runs to tens of megabytes on a large map, which
+/// is not something to put on the bridge as base64, so without a cache directory
+/// this mode reports the failure and the caller goes quiet.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HeightFieldOutput {
+    /// Cache file name, served over `coilbox://unitsyncthumb/`. Little endian
+    /// `u16` words, row major, `width * height` of them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// Grid dimensions, `(mapx+1, mapy+1)`, which is the engine's own corner
+    /// grid at 8 elmo spacing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    /// World height at word 0, and at word 65536. The engine's conversion is
+    /// `minHeight + word * (maxHeight - minHeight) / 65536`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_height: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_height: Option<f32>,
+    pub errors: Vec<String>,
+}
+
 /// A rendered metal infomap, returned by the lazy `metalmap` mode: a downscaled
 /// green-on-transparent RGBA PNG marking where mexes can extract, for overlaying
 /// on the minimap. Transparent where there's no metal, so it reads over the map.
@@ -383,6 +411,25 @@ pub struct UnitDatasetEntry {
     /// the unitdef's `floater` or its having a `waterline`. A floater is exempt
     /// from the slope test wherever the ground is below sea level.
     pub float_on_water: bool,
+    /// The unitdef's `minWaterDepth`/`maxWaterDepth`, the other half of the
+    /// engine's `CheckTerrainConstraints`: the ground under every square of the
+    /// footprint must lie in `[-maxWaterDepth, -minWaterDepth]`. A naval yard
+    /// declares a `minWaterDepth` so it can only go in the sea, a land building
+    /// declares a `maxWaterDepth` of 0 so it cannot.
+    ///
+    /// `None` on a line written before these fields existed, for the same
+    /// reason `max_slope` is. The engine's own defaults are -10e6 and +10e6, a
+    /// band so wide it refuses nothing, and a line that predates the fields is
+    /// not claiming that band.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_water_depth: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_water_depth: Option<f32>,
+    /// The unitdef's `waterline`: how far below the water a floater sits.
+    /// `GetBuildHeight` levels a floater to `-waterline` rather than to the
+    /// ground, so without it a floater cannot be judged at all.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub waterline: Option<f32>,
 }
 
 /// Output of the lazy `--unit-dataset` mode: the whole game's unit graph (units +

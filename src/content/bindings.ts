@@ -1130,6 +1130,23 @@ export interface UnitDatasetEntry {
    *  unitdef's `floater` or its having a `waterline`. Exempt from the slope test
    *  wherever the ground is below sea level. */
   floatOnWater?: boolean;
+  /**
+   * The unitdef's `minWaterDepth`/`maxWaterDepth`, the depth half of the
+   * engine's terrain check: the ground under every square of the footprint has
+   * to lie in `[-maxWaterDepth, -minWaterDepth]`. A naval yard declares a
+   * `minWaterDepth` so it can only go in the sea, a land building declares a
+   * `maxWaterDepth` of 0 so it cannot.
+   *
+   * Absent from a dataset read by a worker that did not report them. The
+   * engine's own defaults are -10e6 and +10e6, a band no ground falls outside,
+   * so a caller with nothing to read here refuses nothing.
+   */
+  minWaterDepth?: number;
+  maxWaterDepth?: number;
+  /** The unitdef's `waterline`: how far below the water a floater sits. The
+   *  engine levels a floater to `-waterline` rather than to the ground, so
+   *  without it a floater cannot be judged at all. */
+  waterline?: number;
 }
 
 export interface UnitDatasetResult {
@@ -1369,6 +1386,31 @@ export const unitsyncHeightmap = defineCommand<
   { enginePath: string; dataDir: string; mapName: string; maxSide?: number },
   HeightmapResult
 >("coilbox-unitsync", "unitsync_heightmap");
+
+export interface HeightFieldResult {
+  /** Cache file name, served over `coilbox://unitsyncthumb/`. Little endian
+   *  `u16` words, row major, `width * height` of them. No inline fallback: the
+   *  grid runs to tens of megabytes and does not belong on the bridge. */
+  file?: string;
+  /** Grid dimensions `(mapx+1, mapy+1)`, the engine's own corner grid. */
+  width?: number;
+  height?: number;
+  /** World height at word 0, and at word 65536. The engine's conversion is
+   *  `minHeight + word * (maxHeight - minHeight) / 65536`. */
+  minHeight?: number;
+  maxHeight?: number;
+  errors: string[];
+}
+
+/**
+ * Write one map's raw 16 bit heights to the thumbnail cache and report the
+ * file, for the terrain check to read at the depth the engine holds them (issue
+ * #1490). Lazy, a separate unitsync session, cached on disk.
+ */
+export const unitsyncHeightField = defineCommand<
+  { enginePath: string; dataDir: string; mapName: string },
+  HeightFieldResult
+>("coilbox-unitsync", "unitsync_height_field");
 
 export interface MetalmapResult {
   /** Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
