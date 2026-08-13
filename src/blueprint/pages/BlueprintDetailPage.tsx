@@ -16,7 +16,7 @@
  * written a moment after the last change, and again on the way out.
  */
 
-import { Button, Input, useDrawer } from "@picoframe/frame";
+import { Button, useDrawer } from "@picoframe/frame";
 import { ArrowLeft, Loader2, Repeat, Share2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -130,23 +130,12 @@ export default function BlueprintDetailPage() {
 
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1.5">
-          <label
-            htmlFor="blueprint-name"
-            className="text-xs text-muted-foreground"
-          >
-            Name
-          </label>
-          <Input
-            id="blueprint-name"
-            className="w-80 text-base font-medium"
-            value={record.layout.name}
-            onChange={(e) =>
-              edit({
-                ...record,
-                layout: { ...record.layout, name: e.target.value },
-              })
-            }
-          />
+          {/* Named rather than renamed here: the one name field is the
+              editor's, so a rename is a step the history holds like any other
+              edit (issue #1454). */}
+          <h1 className="truncate text-lg font-semibold">
+            {record.layout.name}
+          </h1>
           <p className="truncate text-xs text-muted-foreground">
             {gameName || "No game named"} · {buildings} building
             {buildings === 1 ? "" : "s"}

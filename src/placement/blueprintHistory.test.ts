@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 
 import type { BaseBlueprint } from "@/blueprint/model";
 import type { Scenario } from "@/scenario/model";
+import { renameBlueprint } from "@/scenario/pages/components/bases";
 import {
   movePlacement,
   removePlacement,
@@ -169,6 +170,21 @@ describe("undo in the blueprint editor", () => {
 
     expect(editing.history.past).toHaveLength(0);
     expect(editing.undo()).toBe(false);
+  });
+
+  /**
+   * A rename is an edit like any other, which is why it has to come through
+   * here (issue #1454). Renamed outside the funnel it is not a step, so taking
+   * back the drag before it hands back a layout carrying the old name.
+   */
+  it("keeps a rename when an edit made before it is taken back", () => {
+    const editing = editor(layout());
+    editing.apply((doc) => renameBlueprint(doc, BLUEPRINT_BASE_ID, "Wall"));
+    editing.apply((doc) => movePlacement(doc, at(1), { x: 300, z: 0 }));
+
+    editing.undo();
+    expect(editing.layout.buildings[1].offset).toEqual({ x: 32, z: 0 });
+    expect(editing.layout.name).toBe("Wall");
   });
 
   it("walks a run of edits back in the order they were made", () => {
