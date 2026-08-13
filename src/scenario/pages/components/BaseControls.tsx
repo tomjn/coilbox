@@ -29,6 +29,11 @@
  * to the layout rather than to this placement. The panel it opens is the one the
  * library uses, and what it hands back goes through the same layout edit as a
  * drag, so converting one of a pair of bases converts one of them.
+ *
+ * The factory queues go into that panel too (issue #1493). They are the one
+ * mission-only field a conversion has to reach, because a converted factory told
+ * to build the side it used to be builds nothing, and the panel is where they
+ * come back out as a plan the base's own queues are then said in.
  */
 
 import { Button, useDrawer } from "@picoframe/frame";
@@ -47,7 +52,7 @@ import type { BaseBlueprint } from "@/blueprint/model";
 import { OffGridNote } from "@/blueprint/OffGridNote";
 import { offGridBuildings } from "@/blueprint/offGrid";
 import { SubstitutionPanel } from "@/blueprint/pages/components/SubstitutionPanel";
-import type { SideUnits } from "@/blueprint/substitution";
+import type { SideUnits, SubstitutionPlan } from "@/blueprint/substitution";
 import type { UnknownBuilding } from "@/blueprint/units";
 import { Label } from "@/components/ui/label";
 import {
@@ -178,8 +183,9 @@ export function BaseControls({
   onSnapToGrid: () => void;
   /** Put the converted layout into the document (issue #1466). A layout edit
    *  like a drag, so a shared layout is copied or written through the same
-   *  way. */
-  onSubstitute: (layout: BaseBlueprint) => void;
+   *  way. The plan comes with it because the queues are converted by it and
+   *  they are on the base rather than in the layout (issue #1493). */
+  onSubstitute: (layout: BaseBlueprint, plan: SubstitutionPlan) => void;
   /** Delete the whole base, buildings and queues and all. */
   onDelete: () => void;
 }) {
@@ -397,22 +403,14 @@ export function BaseControls({
                   width: "32rem",
                   content: (
                     <div key={nextDrawerKey()} className="flex flex-col">
-                      {buildings.some(
-                        (one) => (one.queue ?? []).length > 0,
-                      ) && (
-                        <p className="px-4 pt-4 text-xs text-muted-foreground">
-                          Only the buildings change. Anything queued on a
-                          factory in this base still names the units it named
-                          before.
-                        </p>
-                      )}
                       <SubstitutionPanel
                         layout={layout}
+                        queued={buildings.flatMap((one) => one.queue ?? [])}
                         sides={sides}
                         units={units}
                         unitsLoading={unitsLoading}
-                        onApply={(next) => {
-                          onSubstitute(next);
+                        onApply={(next, plan) => {
+                          onSubstitute(next, plan);
                           drawer.close();
                         }}
                       />

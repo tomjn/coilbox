@@ -137,17 +137,24 @@ export function sideOfDef(
  */
 export type SubstitutionPlan = Record<string, string>;
 
-/** Every def a layout names, once each, in the order they are built. */
-export function layoutDefs(layout: BaseBlueprint): string[] {
+/** These defs, once each, keeping the first spelling of each and the order they
+ *  came in. A def is written however its author felt like, so the same unit
+ *  twice in two cases is one unit to pick a substitute for. */
+export function distinctDefs(defs: readonly string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const building of layout.buildings) {
-    const key = building.def.toLowerCase();
+  for (const def of defs) {
+    const key = def.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(building.def);
+    out.push(def);
   }
   return out;
+}
+
+/** Every def a layout names, once each, in the order they are built. */
+export function layoutDefs(layout: BaseBlueprint): string[] {
+  return distinctDefs(layout.buildings.map((building) => building.def));
 }
 
 /**
@@ -482,4 +489,88 @@ export function substitutionNotes(report: SubstitutionReport): ArrivalNote[] {
   }
 
   return notes;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Build queues (issue #1493).
+ *
+ * A factory placed in a mission carries a list of units to build, and that list
+ * is the mission's half of the placement rather than part of the layout. So
+ * converting the layout leaves a Cortex factory told to build Armada's units,
+ * which it cannot, and the queue has to go through the same plan the buildings
+ * did.
+ *
+ * A queued def is a def, so {@link planForSide} derives a candidate for it and
+ * checks it against the game's units exactly as it does for a building. What
+ * differs is how often that lands. Games in the Total Annihilation line name a
+ * side's buildings for what they do, so `armsolar` and `corsolar` are the same
+ * building twice, and name their units for what they are, so Armada's Pawn is
+ * `armpw` and Cortex's answer to it is `corak`. The naming route reaches the
+ * first and cannot reach the second, and rather than guess it offers nothing and
+ * the person picks. That is the same rule everything here follows: a wrong
+ * substitution is worse than none, because it silently changes what a mission
+ * builds.
+ *
+ * Nothing here is re-snapped or re-checked, because a queue is a list of names
+ * with no ground under it. A unit's footprint says where it comes off the pad,
+ * not where it stands.
+ * -------------------------------------------------------------------------- */
+
+/** A queue with every def the plan names swapped, and every other left. */
+export function substituteQueue(
+  queue: readonly string[],
+  plan: SubstitutionPlan,
+): string[] {
+  return queue.map((def) => plan[def.toLowerCase()] ?? def);
+}
+
+/** What a plan does to the units a base's factories are told to build. */
+export interface QueueReport {
+  /** How many queued orders change. Orders rather than units, because a queue is
+   *  a list of build orders and the same unit twice is two of them. */
+  swapped: number;
+  /**
+   * Queued units left as they are that the side being converted to has not got.
+   *
+   * The one thing here worth a warning. A factory that is now Cortex's cannot
+   * build Armada's units, so an order left naming one sits in the queue and
+   * builds nothing. A unit belonging to no side, or already to the side being
+   * converted to, is left out: leaving it alone is the right answer rather than
+   * a gap.
+   */
+  stranded: string[];
+}
+
+/** What {@link substituteQueue} would do to these orders, and what it would
+ *  leave that the converted factory cannot build. */
+export function queueReport(
+  queued: readonly string[],
+  plan: SubstitutionPlan,
+  sides: readonly SideUnits[],
+  toSide: string,
+): QueueReport {
+  const left = queued.filter((def) => !plan[def.toLowerCase()]);
+  return {
+    swapped: queued.length - left.length,
+    stranded: distinctDefs(
+      left.filter((def) => {
+        const side = sideOfDef(def, sides);
+        return side !== undefined && side.side !== toSide;
+      }),
+    ),
+  };
+}
+
+/** What a person needs to know about the queues before a conversion is applied,
+ *  or nothing when there is nothing wrong with them. */
+export function queueNote(
+  report: QueueReport,
+  toSide: string,
+): ArrivalNote | undefined {
+  if (report.stranded.length === 0) return undefined;
+  const one = report.stranded.length === 1;
+  return {
+    tone: "warn",
+    text: `Nothing was picked for ${report.stranded.join(", ")}, so ${one ? "it stays" : "they stay"} queued. A factory converted to ${toSide} cannot build another side's units, so ${one ? "that order builds" : "those orders build"} nothing.`,
+  };
 }

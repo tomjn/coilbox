@@ -5,6 +5,10 @@
  * this covers is that the person doing it is told: that a swap which moves the
  * layout says so before it is applied, in a warning that reads as one, and that a
  * game offering no mapping still gets a row per building to pick for.
+ *
+ * The queued units are the same promise over the mission's half of a placement
+ * (issue #1493), and the half most likely to come back with nothing suggested,
+ * so the row and the warning matter more there than anywhere.
  */
 
 import { createElement } from "react";
@@ -25,6 +29,12 @@ const UNITS = [
   { name: "armmex", footprintX: 2, footprintZ: 2 },
   { name: "cormex", footprintX: 2, footprintZ: 2 },
   { name: "armllt", footprintX: 2, footprintZ: 2 },
+  // Two mobile units, one pair the naming route reaches and one it does not:
+  // Cortex's answer to `armpw` is `corak`.
+  { name: "armck", footprintX: 2, footprintZ: 2, mobile: true },
+  { name: "corck", footprintX: 2, footprintZ: 2, mobile: true },
+  { name: "armpw", footprintX: 2, footprintZ: 2, mobile: true },
+  { name: "corak", footprintX: 2, footprintZ: 2, mobile: true },
 ];
 
 /** Two solars touching, whose Cortex equivalent is a square wider. */
@@ -113,5 +123,78 @@ describe("SubstitutionPanel", () => {
 
   it("says nothing about putting back a layout nobody has converted", () => {
     expect(markup()).not.toContain("Put it back");
+  });
+
+  /** Issue #1493. A layout on its own has no queues, so none of this shows up in
+   *  the library.
+   *
+   *  The picked substitutes are not in this markup: the picker keeps its list in
+   *  a portal and shows the choice through it, so what says a plan reached a
+   *  queued unit is the button that counts it. */
+  describe("the units queued on a base's factories", () => {
+    /** One turret nothing can be swapped for, so anything the button counts
+     *  came from the queue rather than from the buildings. */
+    const llt: BaseBlueprint = {
+      ...layout,
+      buildings: [{ def: "armllt", offset: { x: 0, z: 0 }, facing: 0 }],
+    };
+
+    it("says nothing about queues when there are none", () => {
+      expect(markup()).not.toContain("Queued on this base");
+    });
+
+    it("converts a queued unit the game's naming reaches, buildings or no", () => {
+      const html = markup({ layout: llt, queued: ["armck"] });
+      expect(html).toContain("Queued on this base");
+      expect(html).toContain("Convert 1 queued unit to Cortex");
+    });
+
+    it("counts the orders rather than the units on the row", () => {
+      expect(markup({ layout: llt, queued: ["armck", "armck"] })).toContain(
+        "queued twice",
+      );
+    });
+
+    it("counts the queued units on the button that converts them", () => {
+      expect(markup({ layout: llt, queued: ["armck", "armck"] })).toContain(
+        "2 queued units",
+      );
+    });
+
+    it("warns that a queued unit it found nothing for builds nothing", () => {
+      const html = markup({ layout: llt, queued: ["armpw"] });
+      expect(html).not.toContain("corpw");
+      expect(html).toContain("cannot build another side&#x27;s units");
+      expect(html).toContain("armpw");
+      expect(html).toContain("Nothing to convert");
+    });
+
+    /** A queue is a list of names with nothing under it, so the row says no
+     *  ground and never accuses a substitute of moving anything. */
+    it("says nothing about ground on a queued unit's row", () => {
+      const html = markup({ layout: llt, queued: ["armck"] });
+      expect(html).not.toContain('data-tone="resized"');
+      expect(html).not.toContain("build squares");
+    });
+
+    /** A queue does not remember what it was, so the offer to put the buildings
+     *  back has to say what it does not cover. */
+    it("says putting the buildings back leaves the queues alone", () => {
+      const html = markup({
+        layout: {
+          ...layout,
+          buildings: [
+            {
+              def: "corsolar",
+              offset: { x: -8, z: 8 },
+              facing: 0,
+              originalName: "armsolar",
+            },
+          ],
+        },
+        queued: ["armck"],
+      });
+      expect(html).toContain("leaves the queues as they are");
+    });
   });
 });
