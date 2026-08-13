@@ -12,10 +12,10 @@ import { importContainerFile } from "../../../deeplink/bindings";
 import { buildImportCodeLink } from "../../../deeplink/build";
 import { copyDeepLink } from "../../../deeplink/copyLink";
 import {
-  contentExportKeymap,
   contentKeymapDelete,
   contentKeymapSave,
   contentKeymaps,
+  contentWriteFile,
   type StoredKeymap,
 } from "../../bindings";
 import type { Keymap, SavedKeymap } from "../../keymap";
@@ -146,7 +146,7 @@ export function KeymapsPanel({
         filters: [{ name: "Coilbox keymap", extensions: ["json"] }],
       });
       if (!dest) return;
-      await contentExportKeymap({
+      await contentWriteFile({
         dest,
         text: encodeContainerJson("keymap", KEYMAP_KIND_VERSION, payload),
       });

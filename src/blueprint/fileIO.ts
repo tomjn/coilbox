@@ -1,10 +1,8 @@
 /**
  * The app's filesystem, as {@link BlueprintFileIO} wants it.
  *
- * Two commands, both of which read and write a path the user picked and neither
- * of which knows or cares what is in the file. They are named for the first
- * thing that needed them rather than for what they do, which is worth giving
- * honest names, and is https://github.com/tomjn/coilbox/issues/1431.
+ * Two commands, one to read a path and one to write one, neither of which knows
+ * or cares what is in the file.
  *
  * A read of a file that is not there answers with null rather than throwing,
  * because a player who has never saved a blueprint in game has no file yet and
@@ -13,7 +11,7 @@
  * is not there, or the merge would write a fresh one over it.
  */
 
-import { contentExportKeymap } from "../content/bindings";
+import { contentWriteFile } from "../content/bindings";
 import { importContainerFile } from "../deeplink/bindings";
 import type { BlueprintFileIO } from "./gameFile";
 
@@ -35,6 +33,6 @@ export const appFileIO: BlueprintFileIO = {
     }
   },
   write: async (path, text) => {
-    await contentExportKeymap({ dest: path, text });
+    await contentWriteFile({ dest: path, text });
   },
 };
