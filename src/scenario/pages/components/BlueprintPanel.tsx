@@ -53,7 +53,8 @@ import {
 import { blueprintPayload } from "@/blueprint/transfer";
 import { knownUnits, unknownUnitsWarning } from "@/blueprint/units";
 import type { UnitDatasetEntry } from "@/content/bindings";
-import { useUnitsyncScan } from "@/content/config";
+import { useUnitsyncEngineConfig, useUnitsyncScan } from "@/content/config";
+import { engineConfigDir, underConfigDir } from "@/content/enginePaths";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
@@ -98,6 +99,19 @@ export function BlueprintPanel({
   const { records } = useBlueprintLibrary();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  // Where this engine writes, which is where the game keeps its blueprints
+  // (issue #1435). Both dialogs open there, so the common case is one click,
+  // and both still let the player go somewhere else: several engines or
+  // several content roots means several of these files.
+  const { data: engineConfig } = useUnitsyncEngineConfig(
+    target?.enginePath,
+    target?.dataDir,
+  );
+  const configDir =
+    engineConfigDir(engineConfig?.configPath) ?? target?.dataDir;
+  const gameFile = configDir
+    ? underConfigDir(configDir, barFormat.file)
+    : undefined;
   // Which layout is open in the map-free editor, if any. Held by id rather than
   // by value, so an edit lands back in the document and comes out of it again.
   const [editing, setEditing] = useState<string | null>(null);
@@ -112,6 +126,10 @@ export function BlueprintPanel({
       const src = await open({
         title: `Open ${barFormat.label}'s ${barFormat.file}`,
         multiple: false,
+        // The file itself, which the dialog reads as its directory plus its
+        // name, so a game that has never saved a blueprint still opens in the
+        // right place with the right name filled in.
+        defaultPath: gameFile,
         filters: [{ name: "Blueprints", extensions: ["json"] }],
       });
       if (typeof src !== "string") return;
@@ -210,7 +228,7 @@ export function BlueprintPanel({
     try {
       const dest = await save({
         title: `Write into ${barFormat.label}'s ${barFormat.file}`,
-        defaultPath: "blueprints.json",
+        defaultPath: gameFile ?? "blueprints.json",
         filters: [{ name: "Blueprints", extensions: ["json"] }],
       });
       if (!dest) return;
@@ -255,12 +273,24 @@ export function BlueprintPanel({
     >
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
-            {barFormat.label} keeps the bases a player saves in game in{" "}
-            <span className="font-mono">{barFormat.file}</span>, under whichever
-            directory the engine writes to. Coilbox reads that file and writes
-            back into it, keeping everything already in it.
-          </p>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">
+              {barFormat.label} keeps the bases a player saves in game in{" "}
+              <span className="font-mono">{barFormat.file}</span>, under
+              whichever directory the engine writes to. Coilbox reads that file
+              and writes back into it, keeping everything already in it.
+            </p>
+            {gameFile && (
+              <p className="break-all text-[11px] text-muted-foreground">
+                Both buttons open on{" "}
+                <span className="font-mono">{gameFile}</span>, where{" "}
+                {target?.engineVersion ?? "your engine"} writes. Pick another
+                file if you keep your games somewhere else. A player who has
+                never saved a base in game has no file there yet, and sending
+                one writes it.
+              </p>
+            )}
+          </div>
           <Button
             size="sm"
             variant="outline"
