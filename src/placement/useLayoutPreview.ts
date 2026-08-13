@@ -2,6 +2,11 @@
  * Drawing the layout under the pointer, and paying for it once per frame
  * (issue #1464).
  *
+ * It draws the building a drag is carrying too (issue #1512), which is the same
+ * question about one building the document already has: where will this land,
+ * and will the ground and the neighbours take it. One hook and one layer,
+ * because a pointer only ever does one of the two at a time.
+ *
  * The three.js and React half of `./preview.ts`. It exists as its own hook
  * rather than as more of the surface because of what it deliberately does not
  * do: a pointer move over the map does not set React state, does not re-render
@@ -16,9 +21,12 @@
  *   The origin is snapped to the build grid, so most moves land on the square
  *   the layout is already drawn on and there is nothing to redraw.
  *
- * The counts are the one thing that reaches React, and only when they change,
- * which is when a building crosses into or out of trouble. That is worth a
- * render: it is what puts the answer in words rather than only in colour.
+ * The counts are the one thing a hover puts into React, and only when they
+ * change, which is when a building crosses into or out of trouble. That is
+ * worth a render: it is what puts the answer in words rather than only in
+ * colour. A drag adds one more, on its first move and on its last, because the
+ * document's own square for the building has to come down while it is in the
+ * air. Neither of them is per move.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -27,7 +35,9 @@ import type { FootprintMark } from "@/blueprint/footprint";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import type { Point } from "@/scenario/model";
 import { createFootprintsLayer, type FootprintsLayer } from "./footprintsLayer";
+import type { Placement } from "./placements";
 import {
+  draggedBuilding,
   layoutPreview,
   type PreviewBuilding,
   type PreviewChecks,
@@ -35,7 +45,9 @@ import {
   previewCount,
   sameCount,
   samePlace,
+  withoutBuilding,
 } from "./preview";
+import type { UnitDrag } from "./useMapEditing";
 
 export interface LayoutPreviewDeps {
   handle: MapScene3D | null;
@@ -49,16 +61,32 @@ export interface LayoutPreviewDeps {
   checks: PreviewChecks;
   /** The ground the document's own buildings already stand on. */
   occupied: FootprintMark[];
+  /** Every unit currently drawn, for finding the one a drag picked up. */
+  placements: Placement[];
 }
 
 export interface LayoutPreviewState {
   /** Hand to `useMapEditing` as `onHover`. Null in a mode with nothing to
    *  show, which is what stops the pointer layer casting a ray per move. */
   onHover: ((pos: Point | null) => void) | null;
+  /** Hand to `useMapEditing` as `onDragUnit`. Answers whether it is drawing
+   *  the drag, which is what takes the selection ring off it. */
+  onDragUnit: ((drag: UnitDrag | null) => boolean) | null;
+  /** The key of the building being dragged, while one is. What is drawn for it
+   *  is where it is going, so whoever draws the document's own footprints
+   *  should leave this one's out: see {@link withoutBuilding}. */
+  dragging: string | null;
   /** What is drawn under the pointer right now, in words. Null when nothing
    *  is. */
   count: PreviewCount | null;
 }
+
+/** What the pointer is showing: the layout a click would place, or the
+ *  building a drag is carrying. */
+type Showing =
+  | { kind: "ghost"; pos: Point }
+  | { kind: "drag"; drag: UnitDrag }
+  | null;
 
 export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
   const { handle, worldWidth, worldHeight, ghost } = deps;
@@ -85,44 +113,66 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
   }, [handle, worldWidth, worldHeight]);
 
   const [count, setCount] = useState<PreviewCount | null>(null);
-  /** Where the pointer last was, so the same spot can be redrawn when what is
-   *  standing on the map under it changes. Null when it is off the map. */
-  const at = useRef<Point | null>(null);
-  /** Where the layout was last drawn, for dropping a frame that would draw it
-   *  in exactly the same place. */
-  const drawn = useRef<PreviewBuilding[] | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  /** What the pointer was last doing, so the same thing can be redrawn when
+   *  what is standing on the map under it changes. Null when it is doing
+   *  nothing worth drawing. */
+  const showing = useRef<Showing>(null);
+  /** What was last drawn, for dropping a frame that would draw it in exactly
+   *  the same place. */
+  const drawn = useRef<{ buildings: PreviewBuilding[]; held: boolean } | null>(
+    null,
+  );
   const frame = useRef<number | null>(null);
 
   const show = useCallback(
-    (pos: Point | null) => {
-      const { ghost: make, checks, occupied } = latest.current;
+    (what: Showing) => {
+      const { ghost: make, checks, occupied, placements } = latest.current;
       if (!layer) return;
-      if (!pos || !make) {
+      // A drag is one building of the document rather than a layout that is not
+      // in it yet, and the ground it came from is not ground it can clash with.
+      const held = what?.kind === "drag";
+      const carried =
+        what?.kind === "drag"
+          ? draggedBuilding(placements, what.drag.key, what.drag.delta)
+          : null;
+      const buildings = held
+        ? carried && [carried]
+        : what && make
+          ? make(what.pos)
+          : null;
+      if (!buildings) {
         drawn.current = null;
         layer.draw([]);
         setCount(null);
         return;
       }
-      const buildings = make(pos);
-      if (drawn.current && samePlace(drawn.current, buildings)) return;
-      drawn.current = buildings;
+      if (
+        drawn.current &&
+        drawn.current.held === held &&
+        samePlace(drawn.current.buildings, buildings)
+      )
+        return;
+      drawn.current = { buildings, held };
       const marks = layoutPreview(
         buildings,
         checks.footprintOf,
-        occupied,
+        held ? withoutBuilding(occupied, what.drag.key) : occupied,
         checks.standingOf,
       );
-      layer.draw(marks);
+      layer.draw(marks, held);
       const next = previewCount(marks);
       setCount((was) => (sameCount(was, next) ? was : next));
     },
     [layer],
   );
 
-  const onHover = useCallback(
-    (pos: Point | null) => {
-      at.current = pos;
-      if (pos === null) {
+  /** Draw this on the next frame, so a burst of pointer events between two
+   *  frames costs one preview rather than twenty. */
+  const queue = useCallback(
+    (what: Showing) => {
+      showing.current = what;
+      if (what === null) {
         if (frame.current !== null) cancelAnimationFrame(frame.current);
         frame.current = null;
         show(null);
@@ -131,10 +181,37 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
       if (frame.current !== null) return;
       frame.current = requestAnimationFrame(() => {
         frame.current = null;
-        show(at.current);
+        show(showing.current);
       });
     },
     [show],
+  );
+
+  const onHover = useCallback(
+    (pos: Point | null) => queue(pos ? { kind: "ghost", pos } : null),
+    [queue],
+  );
+
+  const onDragUnit = useCallback(
+    (drag: UnitDrag | null) => {
+      if (!drag) {
+        queue(null);
+        setDragging(null);
+        return false;
+      }
+      // Whether this is a building at all, answered now rather than on the
+      // frame that draws it, because the pointer layer needs it to decide what
+      // to do with the ring.
+      const carrying =
+        draggedBuilding(latest.current.placements, drag.key, drag.delta) !==
+        null;
+      queue(carrying ? { kind: "drag", drag } : null);
+      // A render on the first move of a drag and none after it: the key is the
+      // same one for the rest of the gesture.
+      setDragging(carrying ? drag.key : null);
+      return carrying;
+    },
+    [queue],
   );
 
   // What is standing on the map has changed under the pointer, which is what a
@@ -145,7 +222,7 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
   // biome-ignore lint/correctness/useExhaustiveDependencies: `occupied` and `ghost` are not read here, they are the signal that what is drawn is out of date
   useEffect(() => {
     drawn.current = null;
-    show(at.current);
+    show(showing.current);
   }, [show, occupied, ghost]);
 
   useEffect(
@@ -156,5 +233,12 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
     [],
   );
 
-  return { onHover: ghost && layer ? onHover : null, count };
+  return {
+    onHover: ghost && layer ? onHover : null,
+    // Offered whether or not the mode places anything, because dragging a
+    // building is not placing one: it is on in every mode that can pick one up.
+    onDragUnit: layer ? onDragUnit : null,
+    dragging,
+    count,
+  };
 }

@@ -173,6 +173,17 @@ describe("scenarioPlacements", () => {
     ]);
   });
 
+  /** What an edit shifts from is the point the document names, not the point
+   *  the grid drew, so anything predicting where a drag will land has to be
+   *  able to see it (issue #1512). */
+  it("keeps the point the document named alongside the one it drew", () => {
+    const out = scenarioPlacements(offGrid, buildGridSnap(gridUnits));
+    expect(out.map((p) => p.named)).toEqual([
+      { x: 507, z: 603 },
+      { x: 603, z: 603 },
+    ]);
+  });
+
   it("draws the model and its footprint square in the same place", () => {
     const snap = buildGridSnap(gridUnits);
     const out = scenarioPlacements(offGrid, snap);
