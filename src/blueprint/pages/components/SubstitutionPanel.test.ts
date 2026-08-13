@@ -242,6 +242,15 @@ describe("SubstitutionPanel", () => {
       expect(markup()).not.toContain("of this game&#x27;s units and uses");
     });
 
+    it("keeps units plural for a table holding one answer", () => {
+      const one: EquivalenceTable = {
+        groups: [{ Armada: { def: "armsolar", from: "you" } }],
+      };
+      expect(markup({ table: one })).toContain(
+        "answers for 1 of this game&#x27;s units and uses those first",
+      );
+    });
+
     /**
      * Issue #1544. Whose answers they are. A game's published table lands 87 of
      * them at once, so counting the lot as what this person converted tells

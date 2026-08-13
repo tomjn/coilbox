@@ -144,7 +144,7 @@ export function EquivalentsPanel({
         game's own published table brought it when you asked coilbox to read
         one.
         {mixed &&
-          ` The ${mine} holding an answer you gave are first, because reading a game's table brings enough at once to lose them in.`}
+          ` The ${mine} holding an answer you gave ${mine === 1 ? "is" : "are"} first, because reading a game's table brings enough at once to lose them in.`}
       </p>
       {searchable && (
         <div className="flex flex-wrap items-center gap-2">

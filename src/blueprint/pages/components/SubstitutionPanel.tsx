@@ -424,7 +424,7 @@ function heldNote(held: DefsBySource): string {
       among: `${held.unsaid} from before coilbox recorded where an answer came from`,
     });
 
-  const answers = `Coilbox also has answers for ${held.all} of this game's unit${held.all === 1 ? "" : "s"} and uses those first`;
+  const answers = `Coilbox also has answers for ${held.all} of this game's units and uses those first`;
   if (kinds.length === 1) return `${answers}, ${kinds[0].alone}.`;
 
   const among = kinds.map((kind) => kind.among);
