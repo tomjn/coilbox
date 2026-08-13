@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groundHeight, type HeightField } from "./terrain";
+import { cornerGround, groundHeight, type HeightField } from "./terrain";
 
 /** A field from a row-major list of 0..1 samples. */
 function field(width: number, height: number, samples: number[]): HeightField {
@@ -50,5 +50,43 @@ describe("groundHeight", () => {
     const northOnly = field(2, 2, [1, 1, 0, 0]);
     expect(groundHeight(northOnly, W / 2, 0, W, H, 0, 100)).toBeCloseTo(100);
     expect(groundHeight(northOnly, W / 2, H, W, H, 0, 100)).toBeCloseTo(0);
+  });
+});
+
+describe("cornerGround", () => {
+  // A tiny map: 3 by 3 corners is 2 by 2 heightmap squares, 16 elmos a side.
+  const small = field(3, 3, [0, 0.5, 1, 0, 0.5, 1, 0, 0.5, 1]);
+
+  it("reads a corner as the engine's own height there", () => {
+    const ground = cornerGround(small, 16, 16, 0, 100);
+    if (!ground) throw new Error("no ground");
+    expect(ground.cornerAt(0, 0)).toBeCloseTo(0);
+    expect(ground.cornerAt(1, 0)).toBeCloseTo(50);
+    expect(ground.cornerAt(2, 2)).toBeCloseTo(100);
+  });
+
+  it("clamps a corner off the map to the edge, as the engine does", () => {
+    const ground = cornerGround(small, 16, 16, 0, 100);
+    expect(ground?.cornerAt(-4, -4)).toBeCloseTo(0);
+    expect(ground?.cornerAt(90, 90)).toBeCloseTo(100);
+  });
+
+  /** One step of the eight bit read back off the rendered heightmap, which is
+   *  what the check has to allow for before it calls anything unbuildable. */
+  it("allows for how coarsely the heightmap was read", () => {
+    expect(cornerGround(small, 16, 16, 0, 255)?.slack).toBeCloseTo(1);
+    expect(cornerGround(small, 16, 16, -50, 205)?.slack).toBeCloseTo(1);
+  });
+
+  /** A big map comes back downscaled, so its samples are no longer the map's
+   *  corners and the arithmetic below them is no longer the engine's. Better to
+   *  say nothing than to mark a building off smoothed ground. */
+  it("has no ground when the heightmap came back downscaled", () => {
+    expect(cornerGround(small, 4096, 4096, 0, 100)).toBeNull();
+    expect(cornerGround(field(1, 1, [0]), 4096, 4096, 0, 100)).toBeNull();
+  });
+
+  it("has no ground for a map with no extent", () => {
+    expect(cornerGround(small, 0, 0, 0, 100)).toBeNull();
   });
 });

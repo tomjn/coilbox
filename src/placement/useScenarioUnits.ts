@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import type { Ground } from "@/blueprint/buildable";
 import { buildGridSnap } from "@/blueprint/footprint";
 import {
   loadUnitsyncUnitModel,
@@ -21,7 +22,12 @@ import { usePreferredTarget } from "@/play/config";
 import type { Point, Scenario } from "@/scenario/model";
 import { scenarioPlacements } from "@/scenario/pages/components/placements";
 import { type Placement, teamColor } from "./placements";
-import { groundHeight, type HeightField, readHeightField } from "./terrain";
+import {
+  cornerGround,
+  groundHeight,
+  type HeightField,
+  readHeightField,
+} from "./terrain";
 import { createUnitsLayer, type UnitsLayer } from "./unitsLayer";
 
 /** The map inputs the layer needs, as `useMissionMapAssets` reports them. */
@@ -70,6 +76,16 @@ export interface ScenarioUnitsState {
   /** The map's ground height in elmos at an engine position, or 0 while the
    *  heightmap is still being read. */
   groundAt: (pos: Point) => number;
+  /**
+   * The map's ground on the engine's own grid, for working out whether a
+   * building will stand on it (issue #1315).
+   *
+   * Null while the heightmap is being read, on flat ground with no map, and on
+   * a map whose heightmap came back downscaled. Every one of those is "do not
+   * ask", which is why this is separate from {@link groundAt}: that one answers
+   * 0 rather than nothing, because a model has to stand somewhere.
+   */
+  ground: Ground | null;
 }
 
 /**
@@ -262,6 +278,14 @@ export function useScenarioUnits(
     [field, worldWidth, worldHeight, minHeight, maxHeight],
   );
 
+  const ground = useMemo(
+    () =>
+      field
+        ? cornerGround(field, worldWidth, worldHeight, minHeight, maxHeight)
+        : null,
+    [field, worldWidth, worldHeight, minHeight, maxHeight],
+  );
+
   return {
     placed: placements.length,
     missing,
@@ -270,5 +294,6 @@ export function useScenarioUnits(
     layer,
     placements,
     groundAt,
+    ground,
   };
 }

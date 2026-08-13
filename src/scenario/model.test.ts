@@ -352,6 +352,29 @@ describe("parseScenario — bases", () => {
     expect(s?.blueprints[0].ordered).toBeUndefined();
   });
 
+  /** Issue #1315. A layout is only correct on the terrain it was drawn for, so
+   *  which map that was is worth keeping. */
+  it("keeps the map a layout was designed for", () => {
+    const s = parseScenario(
+      withBase({
+        blueprints: [{ ...blueprint, designedFor: "Comet Catcher Remake 1.8" }],
+      }),
+    );
+    expect(s?.blueprints[0].designedFor).toBe("Comet Catcher Remake 1.8");
+  });
+
+  it("leaves a layout drawn for no map without one", () => {
+    expect(
+      parseScenario(withBase())?.blueprints[0].designedFor,
+    ).toBeUndefined();
+    for (const designedFor of [42, "", "   "]) {
+      const s = parseScenario(
+        withBase({ blueprints: [{ ...blueprint, designedFor }] }),
+      );
+      expect(s?.blueprints[0].designedFor).toBeUndefined();
+    }
+  });
+
   it("drops non-string queue entries", () => {
     const s = parseScenario(
       withBase({

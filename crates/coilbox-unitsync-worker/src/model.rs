@@ -369,6 +369,20 @@ pub struct UnitDatasetEntry {
     /// floor the engine applies.
     pub footprint_x: u32,
     pub footprint_z: u32,
+    /// The unitdef's `maxSlope` in degrees, clamped to the 0..89 the engine
+    /// clamps it to. This is what decides whether a building will stand on a
+    /// piece of ground: the engine turns it into `40 * tan(maxSlope)` elmos of
+    /// height difference it will tolerate across the footprint.
+    ///
+    /// `None` on a line written before this field existed, which is not the
+    /// same as zero. Zero is a def asking for flat ground, `None` is a dataset
+    /// that cannot answer the question.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_slope: Option<f32>,
+    /// Whether the building sits on the water rather than on the seabed, from
+    /// the unitdef's `floater` or its having a `waterline`. A floater is exempt
+    /// from the slope test wherever the ground is below sea level.
+    pub float_on_water: bool,
 }
 
 /// Output of the lazy `--unit-dataset` mode: the whole game's unit graph (units +
