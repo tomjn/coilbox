@@ -1,4 +1,4 @@
-import { Button, NavGate } from "@picoframe/frame";
+import { Button } from "@picoframe/frame";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 import type { SkirmishDraft } from "@/play/drafts";
@@ -25,15 +25,15 @@ import {
   mpOpenBattle,
 } from "../bindings";
 import { newScriptPassword } from "../scriptPassword";
-import { serverAddressFromKey, useMpRevealed, useMultiplayer } from "../store";
+import { serverAddressFromKey, useMultiplayer } from "../store";
 
 /**
  * The Battles hub: search + filter/sort controls over the live battle list, with
  * in-place join. Battles come from the mirror snapshot (kept fresh by the store's
  * delta→snapshot rule); joining is reflected by the joined banner rather than
  * navigating away. Connection lives on the Login page; disconnected shows a prompt.
- * Reachable only once the user has connected this session (see the `NavGate`
- * wrapper below); before that, the route redirects to Login.
+ * Reachable with no connection, because this is also where a room is hosted with
+ * no server at all.
  */
 function BattlesPage() {
   const {
@@ -229,14 +229,28 @@ function BattlesPage() {
     await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
   }, [activeKey]);
 
+  // Logged out. The page is reachable with no connection (issue #1580), so this
+  // has to read as "there is no server here" rather than as a server with nobody
+  // on it, which is what an empty list would have said.
   if (!activeKey) {
     return (
-      <main className="flex flex-col items-center justify-center gap-4 p-10 text-center">
-        <h1 className="text-lg font-semibold">Battles</h1>
-        <p className="text-sm text-muted-foreground">
-          You are not connected to a lobby server.
-        </p>
-        <Button onClick={openLoginPopover}>Connect…</Button>
+      <main className="flex h-full min-h-0 flex-col">
+        <header className="flex items-center justify-between gap-2 border-b border-border p-4">
+          <h1 className="text-lg font-semibold">Battles</h1>
+        </header>
+        <div className="flex flex-1 items-center justify-center p-10">
+          <div className="flex max-w-md flex-col items-center gap-3 text-center">
+            <h2 className="text-base font-semibold">
+              Not connected to a server
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Server battles are listed here once you log in. This list is empty
+              because coilbox has no lobby connection, not because nobody is
+              playing.
+            </p>
+            <Button onClick={openLoginPopover}>Log in</Button>
+          </div>
+        </div>
       </main>
     );
   }
@@ -300,11 +314,10 @@ function BattlesPage() {
   );
 }
 
-/** Route entry: gated behind having connected at least once this session. */
+/**
+ * Route entry. Ungated: the page is where a room is hosted with no server at all,
+ * so redirecting a logged-out visitor to Login would close the only door to it.
+ */
 export default function BattlesRoute() {
-  return (
-    <NavGate use={useMpRevealed} redirectTo="/lobby">
-      <BattlesPage />
-    </NavGate>
-  );
+  return <BattlesPage />;
 }

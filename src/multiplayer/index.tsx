@@ -74,7 +74,11 @@ const multiplayerPlugin: FramePlugin = {
           end: true,
           order: 2,
           icon: Swords,
-          useVisible: useMpRevealed,
+          // Not gated on having connected: a direct room is hosted from this page
+          // with no server and no login, so gating it on a login would put the
+          // one entry point to serverless hosting behind the servers being up
+          // (issue #1580). A distribution profile can still hide it.
+          useVisible: () => !isProfileHidden("multiplayer.battles"),
         },
         {
           id: "multiplayer.matchmaking",
