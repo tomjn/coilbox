@@ -169,7 +169,7 @@ mod tests {
         let dir = temp_dir("sweep_under");
         let a = aged(&dir, "a-hf.bin", 100, 60);
         let b = aged(&dir, "b-hf.bin", 100, 30);
-        assert_eq!(sweep(&dir, "-hf.bin", 1000, &[b.clone()]), 0);
+        assert_eq!(sweep(&dir, "-hf.bin", 1000, std::slice::from_ref(&b)), 0);
         assert!(a.exists() && b.exists());
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -181,7 +181,7 @@ mod tests {
         let middle = aged(&dir, "middle-hf.bin", 100, 200);
         let new = aged(&dir, "new-hf.bin", 100, 10);
         // Room for two of the three.
-        assert_eq!(sweep(&dir, "-hf.bin", 250, &[new.clone()]), 100);
+        assert_eq!(sweep(&dir, "-hf.bin", 250, std::slice::from_ref(&new)), 100);
         assert!(new.exists() && middle.exists());
         assert!(!old.exists());
         let _ = std::fs::remove_dir_all(&dir);
@@ -195,7 +195,10 @@ mod tests {
         let old = aged(&dir, "old-hf.bin", 100, 300);
         // In use, older than the other, and bigger than the whole budget.
         let using = aged(&dir, "using-hf.bin", 500, 900);
-        assert_eq!(sweep(&dir, "-hf.bin", 250, &[using.clone()]), 100);
+        assert_eq!(
+            sweep(&dir, "-hf.bin", 250, std::slice::from_ref(&using)),
+            100
+        );
         assert!(using.exists());
         assert!(!old.exists());
         let _ = std::fs::remove_dir_all(&dir);
@@ -227,7 +230,7 @@ mod tests {
         let png = aged(&dir, "a-0.png", 100, 900);
         let dims = aged(&dir, "a-dims.json", 100, 900);
         let grid = aged(&dir, "a-hf.bin", 100, 10);
-        assert_eq!(sweep(&dir, "-hf.bin", 0, &[grid.clone()]), 0);
+        assert_eq!(sweep(&dir, "-hf.bin", 0, std::slice::from_ref(&grid)), 0);
         assert!(png.exists() && dims.exists() && grid.exists());
         // And the picture budget cannot reach the grid or the proportions.
         assert_eq!(sweep(&dir, ".png", 0, &[]), 100);
