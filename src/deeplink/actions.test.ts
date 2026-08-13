@@ -99,15 +99,19 @@ describe("prepareImport", () => {
     }
   });
 
-  it("says a blueprint has nowhere to land rather than dropping it", () => {
+  it("sends a blueprint to the library that keeps one", () => {
     const code = encodeContainerCode("blueprint", 1, {
       name: "Opening",
       buildings: [],
       footprints: {},
     });
     const r = prepareImport(code);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toMatch(/blueprint/i);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.plan.kind).toBe("blueprint");
+      expect(r.plan.route).toContain("/content/blueprints?import=");
+      expect(r.plan.label).toMatch(/blueprint/i);
+    }
   });
 });
 
