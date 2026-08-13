@@ -17,7 +17,7 @@ import {
   useHostContent,
 } from "../multiplayer/battles/useHostContent";
 import type { DirectRoomStatus } from "./bindings";
-import { DEFAULT_ROOM_PORT, normalizeRoomPort, startButtonLabel } from "./room";
+import { DEFAULT_ROOM_PORT, roomPortProblem, startButtonLabel } from "./room";
 
 /** Everything the page needs to start a room and open the host's battle in it. */
 export interface StartRoomArgs {
@@ -136,7 +136,9 @@ function HostRoomPopover({
   const [name, setName] = useState(defaultName ?? "Player");
   const [title, setTitle] = useState("");
   const [password, setPassword] = useState("");
-  const [port, setPort] = useState(DEFAULT_ROOM_PORT);
+  // Held as typed rather than as a number, so the field can be emptied and a bad
+  // value can be shown back to the host instead of being corrected under them.
+  const [port, setPort] = useState(String(DEFAULT_ROOM_PORT));
   const [maxPlayers, setMaxPlayers] = useState(8);
 
   const trimmedName = name.trim();
@@ -144,10 +146,12 @@ function HostRoomPopover({
   // space in it arrives as two, and the room refuses the login rather than
   // guessing. Say so here instead of letting the handshake fail.
   const nameHasSpace = /\s/.test(trimmedName);
+  const portProblem = roomPortProblem(port);
   const canStart =
     content.ready &&
     !!trimmedName &&
     !nameHasSpace &&
+    !portProblem &&
     !busy &&
     !content.noEngine;
 
@@ -156,7 +160,7 @@ function HostRoomPopover({
     if (!canStart || !content.target) return;
     onStart({
       host: trimmedName,
-      port: normalizeRoomPort(port),
+      port: Number(port),
       battle: {
         battleType: 0,
         // Direct is the only mode coilbox implements, here as everywhere.
@@ -295,11 +299,16 @@ function HostRoomPopover({
                   <span className="font-medium">Room port</span>
                   <Input
                     type="number"
+                    min={1}
+                    max={65535}
                     value={port}
-                    onChange={(e) =>
-                      setPort(Number(e.target.value) || DEFAULT_ROOM_PORT)
-                    }
+                    onChange={(e) => setPort(e.target.value)}
                   />
+                  {portProblem && (
+                    <span className="text-xs text-destructive">
+                      {portProblem}
+                    </span>
+                  )}
                 </label>
               </div>
 

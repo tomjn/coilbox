@@ -3,7 +3,7 @@ import {
   DEFAULT_ROOM_PORT,
   directServer,
   isDirectKey,
-  normalizeRoomPort,
+  roomPortProblem,
   roomStopReason,
   startButtonLabel,
   startRoomFailure,
@@ -94,20 +94,32 @@ describe("startButtonLabel", () => {
   });
 });
 
-describe("normalizeRoomPort", () => {
-  it("keeps a real port", () => {
-    expect(normalizeRoomPort(8452)).toBe(8452);
+describe("roomPortProblem", () => {
+  it("accepts the default", () => {
+    expect(roomPortProblem(String(DEFAULT_ROOM_PORT))).toBeNull();
+  });
+
+  it("accepts any other real port", () => {
+    expect(roomPortProblem("8452")).toBeNull();
+    expect(roomPortProblem("65535")).toBeNull();
+  });
+
+  // Clamping this to 65535 is what put a host on a port they never chose, while
+  // reading the one they typed out to a joiner.
+  it("refuses a port above the range rather than correcting it", () => {
+    expect(roomPortProblem("82008300")).toBe("Ports run from 1 to 65535.");
   });
 
   it("refuses port 0, which a host could not pass on to a joiner", () => {
-    expect(normalizeRoomPort(0)).toBe(1);
+    expect(roomPortProblem("0")).toBe("Ports run from 1 to 65535.");
   });
 
-  it("clamps above the range a socket can bind", () => {
-    expect(normalizeRoomPort(99999)).toBe(65535);
+  it("asks for a port rather than guessing at an empty field", () => {
+    expect(roomPortProblem("  ")).toBe("Enter a port.");
   });
 
-  it("falls back to the default when the field is empty", () => {
-    expect(normalizeRoomPort(Number.NaN)).toBe(DEFAULT_ROOM_PORT);
+  it("refuses anything that is not digits", () => {
+    expect(roomPortProblem("82e3")).toBe("Ports are whole numbers.");
+    expect(roomPortProblem("-1")).toBe("Ports are whole numbers.");
   });
 });

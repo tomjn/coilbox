@@ -85,12 +85,18 @@ export function startButtonLabel(
 }
 
 /**
- * A room's port, forced into the range a socket can be bound on. Pure.
+ * Why a typed room port cannot be used, or null when it can. Pure.
  *
- * Port 0 would work on the Rust side, where the OS picks a free port, but a host
- * who cannot see which one it picked has nothing to give a joiner.
+ * Refusing rather than correcting: a port quietly clamped into range is a room
+ * listening somewhere the host never chose, and the address they then read out to
+ * a joiner is the one they typed. Port 0 is refused for the same reason, even
+ * though the Rust side would take it and let the OS pick.
  */
-export function normalizeRoomPort(value: number): number {
-  if (!Number.isFinite(value)) return DEFAULT_ROOM_PORT;
-  return Math.max(1, Math.min(65535, Math.trunc(value)));
+export function roomPortProblem(typed: string): string | null {
+  const value = typed.trim();
+  if (!value) return "Enter a port.";
+  if (!/^\d+$/.test(value)) return "Ports are whole numbers.";
+  const port = Number(value);
+  if (port < 1 || port > 65535) return "Ports run from 1 to 65535.";
+  return null;
 }
