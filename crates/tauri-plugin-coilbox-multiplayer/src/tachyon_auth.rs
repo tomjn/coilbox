@@ -245,8 +245,8 @@ where
 ///
 /// This is what tells an auto-reconnect to stop rather than retry. A dropped
 /// connection is worth another go, a sign-in the server will not take is not.
-pub fn signed_in(server_id: &str, username: &str) -> Result<bool, AuthError> {
-    coilbox_oauth::signed_in(server_id, username)
+pub async fn signed_in(server_id: &str, username: &str) -> Result<bool, AuthError> {
+    coilbox_oauth::signed_in(server_id, username).await
 }
 
 /// Sign in and keep the result: the refresh token to the OS keychain, the access

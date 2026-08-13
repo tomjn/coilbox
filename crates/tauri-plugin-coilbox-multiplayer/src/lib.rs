@@ -1982,7 +1982,7 @@ async fn mp_tachyon_sign_out(server_id: String, username: String) -> CliResult {
 /// auto-reconnect to stop rather than retry a refusal that will not change.
 #[tauri::command]
 async fn mp_tachyon_signed_in(server_id: String, username: String) -> CliResult {
-    match tachyon_auth::signed_in(&server_id, &username) {
+    match tachyon_auth::signed_in(&server_id, &username).await {
         Ok(signed_in) => CliResult::ok(json!({ "signedIn": signed_in })),
         Err(e) => CliResult::err(e.to_string()),
     }

@@ -32,6 +32,10 @@ pub enum AuthError {
     },
     /// The OS keychain refused to store or return the refresh token.
     Storage(String),
+    /// The OS keychain did not answer a read in time, so whether there is a
+    /// stored sign-in is not known. Not the same as there being none: a keychain
+    /// waiting on a permission prompt or a locked vault says nothing either way.
+    StorageTimedOut,
     /// There is no stored refresh token for this account, so the user has to sign
     /// in through the browser again.
     NotSignedIn,
@@ -81,6 +85,7 @@ impl std::fmt::Display for AuthError {
                 None => write!(f, "the server refused the token request: {error}"),
             },
             Self::Storage(m) => write!(f, "keychain error: {m}"),
+            Self::StorageTimedOut => write!(f, "the keychain did not answer in time"),
             Self::NotSignedIn => write!(f, "not signed in to this server"),
             Self::SignInRefused(m) => {
                 write!(f, "the server would not accept your sign-in: {m}")

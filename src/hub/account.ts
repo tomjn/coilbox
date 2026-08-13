@@ -38,6 +38,11 @@ export interface HubAccount {
   /** A sign-in or sign-out is in flight. */
   busy: boolean;
   signedIn: boolean;
+  /** The check itself failed, so whether you are signed in is not known. A
+   * keychain that never answered (issue #1456) is the usual reason, and it says
+   * nothing about what is stored in it, so `signedIn` being false here means
+   * "not known" rather than "signed out". */
+  unknown: boolean;
   /** Who, when the hub said. Null while signed out, and also for a signed-in
    * session whose name could not be fetched this time. */
   account: HubIdentity | null;
@@ -46,10 +51,12 @@ export interface HubAccount {
   problem: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  /** Ask again. The answer is kept for the session, so nothing else would. */
+  recheck: () => Promise<void>;
 }
 
-/** What is known about one hub, without the two actions. */
-type Known = Omit<HubAccount, "signIn" | "signOut">;
+/** What is known about one hub, without the actions. */
+type Known = Omit<HubAccount, "signIn" | "signOut" | "recheck">;
 
 /** Before anybody has asked. Shared, so an unvisited hub keeps one identity for
  * `useSyncExternalStore`, which compares snapshots by reference. */
@@ -57,6 +64,7 @@ const UNASKED: Known = {
   loading: true,
   busy: false,
   signedIn: false,
+  unknown: false,
   account: null,
   problem: null,
 };
@@ -82,21 +90,20 @@ function subscribe(listener: () => void) {
   };
 }
 
-/**
- * Ask the hub who we are, unless somebody already has.
- *
- * Exported for the test that holds the dedupe still, since the hook it serves
- * needs a renderer and this needs nothing.
- */
-export async function askHubWhoWeAre(hubUrl: string) {
-  if (known.has(hubUrl) || asking.has(hubUrl)) return;
+/** Put the question to the Rust side, once at a time per hub. */
+async function ask(hubUrl: string) {
+  if (asking.has(hubUrl)) return;
   asking.add(hubUrl);
   try {
     const state = await hubAccount({ hubUrl });
-    update(hubUrl, { ...state, loading: false });
+    update(hubUrl, { ...state, loading: false, unknown: false });
   } catch (e) {
+    // Not "signed out". The command fails when coilbox could not find out, most
+    // often a keychain that did not answer, and what is stored behind it is
+    // exactly what nobody knows. See `unknown`.
     update(hubUrl, {
       loading: false,
+      unknown: true,
       signedIn: false,
       account: null,
       problem: e instanceof Error ? e.message : String(e),
@@ -104,6 +111,35 @@ export async function askHubWhoWeAre(hubUrl: string) {
   } finally {
     asking.delete(hubUrl);
   }
+}
+
+/**
+ * Ask the hub who we are, unless somebody already has.
+ *
+ * Exported for the test that holds the dedupe still, since the hook it serves
+ * needs a renderer and this needs nothing.
+ */
+export async function askHubWhoWeAre(hubUrl: string) {
+  if (known.has(hubUrl)) return;
+  await ask(hubUrl);
+}
+
+/**
+ * Ask again, however it went last time.
+ *
+ * The answer is kept for the session, so a check that failed is the last word
+ * until something asks for another one. That was the dead end in issue #1456:
+ * the keychain never answered, and nothing could ask it twice.
+ */
+export async function recheckHubAccount(hubUrl: string) {
+  if (asking.has(hubUrl)) return;
+  update(hubUrl, { loading: true, problem: null });
+  await ask(hubUrl);
+}
+
+/** What is known about a hub right now. For the hook, and for tests. */
+export function hubAccountSnapshot(hubUrl: string): Known {
+  return snapshot(hubUrl);
 }
 
 export function useHubAccount(hubUrl: string): HubAccount {
@@ -116,11 +152,18 @@ export function useHubAccount(hubUrl: string): HubAccount {
     void askHubWhoWeAre(hubUrl);
   }, [hubUrl]);
 
+  const recheck = useCallback(() => recheckHubAccount(hubUrl), [hubUrl]);
+
   const signIn = useCallback(async () => {
     update(hubUrl, { busy: true, problem: null });
     try {
       const { account } = await hubSignIn({ hubUrl });
-      update(hubUrl, { account, signedIn: true, loading: false });
+      update(hubUrl, {
+        account,
+        signedIn: true,
+        unknown: false,
+        loading: false,
+      });
     } catch (e) {
       update(hubUrl, { problem: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -132,7 +175,12 @@ export function useHubAccount(hubUrl: string): HubAccount {
     update(hubUrl, { busy: true, problem: null });
     try {
       await hubSignOut({ hubUrl });
-      update(hubUrl, { account: null, signedIn: false, loading: false });
+      update(hubUrl, {
+        account: null,
+        signedIn: false,
+        unknown: false,
+        loading: false,
+      });
     } catch (e) {
       update(hubUrl, { problem: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -140,7 +188,7 @@ export function useHubAccount(hubUrl: string): HubAccount {
     }
   }, [hubUrl]);
 
-  return { ...state, signIn, signOut };
+  return { ...state, signIn, signOut, recheck };
 }
 
 /** Forget every answer. For tests, which must not inherit each other's hubs. */
