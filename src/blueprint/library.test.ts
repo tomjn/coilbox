@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  codeSource,
   duplicatedBlueprint,
+  fileSource,
   footprintsFromUnits,
+  hubSource,
   libraryGames,
   libraryLayout,
   newStoredBlueprint,
@@ -10,8 +13,10 @@ import {
   recordGameName,
   recordWithLayout,
   type StoredBlueprint,
+  scenarioSource,
   sortLibrary,
   sourceFileName,
+  sourceLabel,
   sourceSummary,
   uniqueLayoutName,
 } from "./library";
@@ -179,10 +184,12 @@ describe("where a layout came from", () => {
   });
 
   it("names the file the way a person would, on either platform", () => {
-    expect(sourceFileName(source)).toBe("blueprints.json");
-    expect(
-      sourceFileName(packSource("C:\\Users\\me\\Downloads\\pack.json")),
-    ).toBe("pack.json");
+    expect(sourceFileName("/Users/someone/Downloads/blueprints.json")).toBe(
+      "blueprints.json",
+    );
+    expect(sourceFileName("C:\\Users\\me\\Downloads\\pack.json")).toBe(
+      "pack.json",
+    );
   });
 
   it("says where it came from and what it was called there", () => {
@@ -208,6 +215,88 @@ describe("where a layout came from", () => {
   it("drops a source that is not one rather than refusing the layout", () => {
     const read = parseStoredBlueprintJson(
       JSON.stringify({ ...record(), source: { kind: "pack" } }),
+    );
+    expect(read?.id).toBe("b1");
+    expect(read?.source).toBeUndefined();
+  });
+});
+
+describe("the other ways a layout arrives (issue #1473)", () => {
+  const at = new Date("2026-08-12T09:30:00.000Z");
+  const when = "2026-08-12T09:30:00.000Z";
+
+  it("names the file a single layout was read out of", () => {
+    expect(fileSource("/tmp/opening.json", undefined, at)).toEqual({
+      kind: "file",
+      file: "/tmp/opening.json",
+      at: when,
+    });
+    expect(sourceLabel(fileSource("/tmp/opening.json"))).toBe(
+      "From opening.json",
+    );
+  });
+
+  it("admits that a code knows nothing but when it arrived", () => {
+    expect(codeSource(undefined, at)).toEqual({ kind: "code", at: when });
+    expect(sourceSummary(codeSource())).toContain(
+      "nothing about where it came from",
+    );
+    expect(sourceLabel(codeSource())).toBe("From a shared code");
+  });
+
+  it("records the hub item and whoever published it", () => {
+    const source = hubSource({ item: "item-7", author: "Alice" }, "Wall", at);
+    expect(source).toEqual({
+      kind: "hub",
+      item: "item-7",
+      author: "Alice",
+      wasCalled: "Wall",
+      at: when,
+    });
+    expect(sourceLabel(source)).toBe("From Alice on the hub");
+    expect(sourceSummary(source)).toContain("Alice");
+    expect(sourceSummary(source)).toContain('called "Wall"');
+  });
+
+  it("says only that a hub item arrived when nobody was named", () => {
+    const source = hubSource({ item: "item-7" });
+    expect(source.author).toBeUndefined();
+    expect(sourceLabel(source)).toBe("From the hub");
+  });
+
+  it("names the scenario a layout was saved out of", () => {
+    const source = scenarioSource(
+      { id: "s1", name: "Tutorial" },
+      undefined,
+      at,
+    );
+    expect(source).toEqual({
+      kind: "scenario",
+      scenario: "s1",
+      scenarioName: "Tutorial",
+      at: when,
+    });
+    expect(sourceLabel(source)).toBe("From Tutorial");
+    expect(sourceSummary(source)).toContain("Tutorial");
+  });
+
+  it("survives a trip through the stored document, whichever way it came", () => {
+    const sources = [
+      packSource("/tmp/pack.json", "Wall", at),
+      fileSource("/tmp/opening.json", undefined, at),
+      codeSource("Wall", at),
+      hubSource({ item: "item-7", author: "Alice" }, undefined, at),
+      scenarioSource({ id: "s1", name: "Tutorial" }, undefined, at),
+    ];
+    for (const source of sources) {
+      const read = parseStoredBlueprintJson(JSON.stringify(record({ source })));
+      expect(read?.source).toEqual(source);
+    }
+  });
+
+  it("drops a way in nothing here knows about", () => {
+    const read = parseStoredBlueprintJson(
+      JSON.stringify({ ...record(), source: { kind: "telepathy", at: when } }),
     );
     expect(read?.id).toBe("b1");
     expect(read?.source).toBeUndefined();

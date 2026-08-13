@@ -16,7 +16,16 @@
  */
 
 import { Button, Input } from "@picoframe/frame";
-import { Blocks, FileDown, ListOrdered, Plus } from "lucide-react";
+import {
+  Blocks,
+  FileDown,
+  Flag,
+  Globe,
+  Layers,
+  Link2,
+  ListOrdered,
+  Plus,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -37,11 +46,12 @@ import { useRecordHubImport } from "@/hub/imports";
 import { usePreferredTarget } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
+  type BlueprintSource,
   libraryGames,
   newStoredBlueprint,
   recordGameName,
   type StoredBlueprint,
-  sourceFileName,
+  sourceLabel,
   UNTITLED,
   uniqueLayoutName,
 } from "../library";
@@ -49,6 +59,7 @@ import { blueprintRoute, saveBlueprint, useBlueprintLibrary } from "../store";
 import { BlueprintCardMenu } from "./components/BlueprintCardMenu";
 import { BlueprintImportButton } from "./components/BlueprintImportButton";
 import { BlueprintPackButton } from "./components/BlueprintPackButton";
+import { BlueprintPackWriteButton } from "./components/BlueprintPackWriteButton";
 import { LayoutThumb } from "./components/LayoutThumb";
 
 /** Every game, rather than one of them. A game's name is its archive name, so
@@ -104,8 +115,14 @@ export default function BlueprintsPage() {
               );
             }}
           />
+          {records.length > 0 && (
+            <BlueprintPackWriteButton
+              onWritten={(said) => toast.success(said)}
+            />
+          )}
           <BlueprintImportButton
             initialCode={importCode}
+            hubItemId={hubItemId}
             onImported={(record) => {
               recordHubImport(
                 hubItemId,
@@ -232,16 +249,8 @@ function BlueprintCard({
         {game || "No game named"}
       </span>
       {/* Where it came from, so a layout out of somebody's collection does not
-          look identical to one you drew (issue #1313). */}
-      {record.source && (
-        <span
-          title={record.source.file}
-          className="flex items-center gap-1 truncate text-xs text-muted-foreground"
-        >
-          <FileDown className="size-3.5 shrink-0" aria-hidden="true" />
-          From {sourceFileName(record.source)}
-        </span>
-      )}
+          look identical to one you drew (issues #1313, #1473). */}
+      {record.source && <SourceLine source={record.source} />}
       {!installed && (
         <span className="text-xs text-amber-600 dark:text-amber-400">
           That game is not installed here.
@@ -254,6 +263,38 @@ function BlueprintCard({
         <BlueprintCardMenu record={record} taken={taken} />
       </div>
     </div>
+  );
+}
+
+/** The mark each way in gets, so a glance tells a pack apart from a code
+ *  without reading the line (issue #1473). */
+const SOURCE_ICONS = {
+  pack: Layers,
+  file: FileDown,
+  code: Link2,
+  hub: Globe,
+  scenario: Flag,
+} as const;
+
+/** Where one copy came from, in a line. The title is the fuller fact, which is
+ *  a path for a file and the item's own id for a hub import: too long for a
+ *  card, and the thing you need when you go looking for it again. */
+function SourceLine({ source }: { source: BlueprintSource }) {
+  const Icon = SOURCE_ICONS[source.kind];
+  const detail =
+    source.kind === "pack" || source.kind === "file"
+      ? source.file
+      : source.kind === "hub"
+        ? source.item
+        : undefined;
+  return (
+    <span
+      title={detail}
+      className="flex items-center gap-1 truncate text-xs text-muted-foreground"
+    >
+      <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+      {sourceLabel(source)}
+    </span>
   );
 }
 

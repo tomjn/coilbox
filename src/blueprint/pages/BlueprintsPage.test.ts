@@ -15,7 +15,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import type { StoredBlueprint } from "../library";
+import { hubSource, type StoredBlueprint } from "../library";
 
 const RECORD: StoredBlueprint = {
   id: "b1",
@@ -30,6 +30,7 @@ const RECORD: StoredBlueprint = {
     ],
     footprints: { armsolar: { x: 4, z: 4 }, armlab: { x: 8, z: 6 } },
   },
+  source: hubSource({ item: "item-7", author: "Alice" }),
 };
 
 // Drawers live on the app frame, which is not mounted here.
@@ -84,5 +85,13 @@ describe("BlueprintsPage", () => {
     const link = cardLink(markup());
     expect(link).toContain('href="/content/blueprints/b1"');
     expect(link).not.toContain("<button");
+  });
+
+  /** Where a copy came from, for every way in rather than only a pack file
+   *  (issue #1473). */
+  it("says where a layout came from when it did not start here", () => {
+    const html = markup();
+    expect(html).toContain("From Alice on the hub");
+    expect(html).toContain('title="item-7"');
   });
 });
