@@ -41,8 +41,10 @@ export interface MapExtent {
    *
    * The blueprint editor draws on flat ground rather than on a map, and without
    * this an absent `heightSrc` is a read still in flight, which is what it is
-   * for every other caller. Said explicitly so a map whose heightmap failed to
-   * resolve keeps drawing nothing rather than quietly flattening itself.
+   * for every other caller. Still said explicitly now that a map whose heights
+   * would not read is flattened too (issue #1497): this floor is level on
+   * purpose and is known exactly, so a building on it gets a real verdict, and
+   * that one is a guess nothing may be judged against.
    */
   flat?: boolean;
   minHeight: number;
