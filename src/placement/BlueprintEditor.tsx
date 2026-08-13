@@ -510,8 +510,8 @@ export function BlueprintEditor({
       footer={
         <>
           no map · a build grid, {GRID_EXTENT} elmos square · drag or
-          middle-drag to pan · drag a building to move it · right-drag to turn ·
-          scroll to zoom
+          middle-drag to pan · drag a building to move it · right-drag to turn
+          the view · scroll to zoom
         </>
       }
     />

@@ -1141,8 +1141,8 @@ export function ScenarioMapScene({
       footer={
         <>
           {mapName} · drag or middle-drag to pan · drag a unit to move it · drag
-          a zone's middle handle to move it · right-drag to turn · scroll to
-          zoom
+          a zone's middle handle to move it · right-drag to turn the view ·
+          scroll to zoom
         </>
       }
     />
