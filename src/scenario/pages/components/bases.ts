@@ -381,6 +381,44 @@ export function addBase(
 }
 
 /**
+ * The document with one more base placed from a layout it already holds
+ * (issues #1327, #1450).
+ *
+ * The other way of adding a base. {@link addBase} mints geometry as it goes,
+ * which is what drawing one building at a time needs, and this places geometry
+ * the document has: a layout an author deleted the last base of while they
+ * thought about where to put it back, or one just copied in from the library.
+ * Nothing is duplicated, so placing "The keep" twice is one layout in two
+ * places and an edit through either goes through {@link LayoutEdit}.
+ *
+ * The base arrives with no building roles at all. A trigger addressable id and
+ * a factory queue belong to a base rather than to a layout, so a layout has
+ * never carried one and a base placed from one starts without them. They are
+ * added after placement rather than assumed.
+ */
+export function placeBlueprint(
+  scenario: Scenario,
+  id: string,
+  blueprintId: string,
+  base: { team: string; origin: Point },
+): Scenario {
+  if (!scenario.blueprints.some((b) => b.id === blueprintId)) return scenario;
+  return {
+    ...scenario,
+    bases: [
+      ...scenario.bases,
+      {
+        id,
+        blueprint: blueprintId,
+        team: base.team,
+        origin: round(base.origin),
+        buildings: [],
+      },
+    ],
+  };
+}
+
+/**
  * The document with one more building in a base.
  *
  * The offset is measured from the base's origin, which is what the caller has to
