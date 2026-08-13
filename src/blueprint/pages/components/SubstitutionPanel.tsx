@@ -48,7 +48,8 @@ import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ArrivalNote } from "../../arrival";
 import {
-  coveredDefs,
+  coveredDefsBySource,
+  type DefsBySource,
   type EquivalenceTable,
   NO_EQUIVALENTS,
 } from "../../equivalents";
@@ -172,7 +173,7 @@ export function SubstitutionPanel({
   const stranded = queueNote(queues, toSide);
   const swapping = preview.report.substituted.length;
   const already = substitutedCount(layout);
-  const learned = coveredDefs(table);
+  const learned = coveredDefsBySource(table);
 
   /**
    * Convert, and hold onto what converting said about this game (issue #1468).
@@ -233,13 +234,11 @@ export function SubstitutionPanel({
             Suggested from what this game calls each side's units, and only
             where the game has the unit. Change any of them.
           </p>
-          {learned > 0 && (
+          {learned.all > 0 && (
             <p className="text-xs text-muted-foreground">
-              Coilbox also remembers {learned} of this game's units from what
-              you have converted before, and uses those first. Correcting one
-              here corrects it for the next layout as well. All of them are
-              listed on this game's page under Content, where one can be dropped
-              without converting anything.
+              {heldNote(learned)} Correcting one here corrects it for the next
+              layout as well. All of them are listed on this game's page under
+              Content, where one can be dropped without converting anything.
             </p>
           )}
           {onReadShipped && (
@@ -391,6 +390,46 @@ export function SubstitutionPanel({
       )}
     </div>
   );
+}
+
+/**
+ * What this game has already been told, and by whom (issue #1544).
+ *
+ * Whose is the point. Counting the lot as what this person converted was true
+ * when converting was the only way into the table, and stopped being true when
+ * coilbox learned to read a game's own published one: Beyond All Reason's
+ * brings 87 answers in one go, so the sentence would tell somebody they picked
+ * answers nobody here gave. It reads worst for the person who suspects one is
+ * wrong, which is the person the table is for.
+ *
+ * A kind coilbox holds none of is not mentioned, so a table that came entirely
+ * from converting still reads as one sentence about that.
+ */
+function heldNote(held: DefsBySource): string {
+  const kinds: { alone: string; among: string }[] = [];
+  if (held.you > 0)
+    kinds.push({
+      alone: "all of them ones you picked while converting",
+      among: `${held.you} you picked while converting`,
+    });
+  if (held.game > 0)
+    kinds.push({
+      alone: "all of them brought by this game's own published table",
+      among: `${held.game} brought by this game's own published table`,
+    });
+  if (held.unsaid > 0)
+    kinds.push({
+      alone:
+        "all of them from before coilbox recorded where an answer came from",
+      among: `${held.unsaid} from before coilbox recorded where an answer came from`,
+    });
+
+  const answers = `Coilbox also has answers for ${held.all} of this game's unit${held.all === 1 ? "" : "s"} and uses those first`;
+  if (kinds.length === 1) return `${answers}, ${kinds[0].alone}.`;
+
+  const among = kinds.map((kind) => kind.among);
+  const last = among[among.length - 1];
+  return `${answers}: ${among.slice(0, -1).join(", ")} and ${last}.`;
 }
 
 /** How many of a thing a row covers, in the words that thing is counted in. */
