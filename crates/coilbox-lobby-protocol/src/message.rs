@@ -291,7 +291,7 @@ pub enum ServerMessage {
 }
 
 /// Strip a `\r`, then an optional leading `#<digits> ` message-id prefix.
-fn strip_framing(line: &str) -> &str {
+pub(crate) fn strip_framing(line: &str) -> &str {
     let line = line.strip_suffix('\r').unwrap_or(line);
     if let Some(rest) = line.strip_prefix('#') {
         // `#<digits> <command...>`
@@ -306,7 +306,7 @@ fn strip_framing(line: &str) -> &str {
 }
 
 /// Split into `(COMMAND, rest)` with the command upper-cased.
-fn split_command(line: &str) -> (String, &str) {
+pub(crate) fn split_command(line: &str) -> (String, &str) {
     match line.split_once(' ') {
         Some((cmd, rest)) => (cmd.to_ascii_uppercase(), rest),
         None => (line.to_ascii_uppercase(), ""),
@@ -315,7 +315,7 @@ fn split_command(line: &str) -> (String, &str) {
 
 /// Parse `N` space-separated fields keeping the last field's embedded spaces.
 /// Returns `None` if there are fewer than `n` fields.
-fn fields<const N: usize>(rest: &str) -> Option<[&str; N]> {
+pub(crate) fn fields<const N: usize>(rest: &str) -> Option<[&str; N]> {
     let mut out: [&str; N] = [""; N];
     let mut remaining = rest;
     for (i, slot) in out.iter_mut().enumerate() {
@@ -330,13 +330,13 @@ fn fields<const N: usize>(rest: &str) -> Option<[&str; N]> {
     Some(out)
 }
 
-fn parse_bool01(s: &str) -> bool {
+pub(crate) fn parse_bool01(s: &str) -> bool {
     s.trim() != "0" && !s.trim().is_empty()
 }
 
 /// Look up a `key=value` tag in a tab-separated tag block, returning its value.
 /// Used by the friend messages, whose payload is `userName=<name>[\tmsg=<msg>]`.
-fn tag<'a>(rest: &'a str, key: &str) -> Option<&'a str> {
+pub(crate) fn tag<'a>(rest: &'a str, key: &str) -> Option<&'a str> {
     rest.split('\t').find_map(|kv| {
         let (k, v) = kv.split_once('=')?;
         (k == key).then_some(v)
