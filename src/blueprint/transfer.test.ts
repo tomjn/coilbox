@@ -46,6 +46,29 @@ describe("blueprint transfer", () => {
     });
   });
 
+  it("carries what a substituted building was drawn as out and back", () => {
+    // A layout converted to another side is still a layout somebody shares, and
+    // the name it was drawn as is what makes the conversion reversible at the
+    // far end (issue #1314).
+    const converted: BaseBlueprint = {
+      ...layout,
+      buildings: [
+        {
+          def: "corsolar",
+          offset: { x: 0, z: 0 },
+          facing: 0,
+          originalName: "armsolar",
+        },
+      ],
+    };
+    const read = readBlueprintContainer(
+      encodeBlueprintJson(converted, { footprintOf }),
+    );
+    expect(read.ok && blueprintFromPayload(read.payload).buildings).toEqual(
+      converted.buildings,
+    );
+  });
+
   it("round-trips through a share code as well as a file", () => {
     const code = encodeBlueprintCode(layout, { footprintOf });
     expect(code.ok).toBe(true);

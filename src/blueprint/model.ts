@@ -30,6 +30,20 @@ export type BlueprintBuilding = {
   def: string;
   offset: Point;
   facing: Facing;
+  /**
+   * What this building was before it was substituted for another side's
+   * equivalent (issue #1314).
+   *
+   * A layout naming one side's buildings is no use to a player of the other, so
+   * a layout can be converted by swapping each def for the other side's. Keeping
+   * the name it was drawn as is what makes that reversible, and it is the same
+   * field under the same name that Beyond All Reason's own substitution writes,
+   * so a converted layout survives a trip out through `./bar.ts` and back.
+   *
+   * Absent on a building nobody has swapped, which is every building of a layout
+   * as it was drawn.
+   */
+  originalName?: string;
 };
 
 /** A named, reusable layout of buildings. */

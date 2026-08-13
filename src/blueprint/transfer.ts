@@ -94,6 +94,9 @@ export function blueprintPayload(
       def: building.def,
       offset: { x: building.offset.x, z: building.offset.z },
       facing: building.facing,
+      ...(building.originalName
+        ? { originalName: building.originalName }
+        : {}),
     })),
     footprints: footprintsFor(layout, options.footprintOf),
   };
@@ -189,6 +192,9 @@ export function blueprintFromPayload(
       def: building.def,
       offset: { x: building.offset.x, z: building.offset.z },
       facing: building.facing,
+      ...(building.originalName
+        ? { originalName: building.originalName }
+        : {}),
     })),
   };
 }
