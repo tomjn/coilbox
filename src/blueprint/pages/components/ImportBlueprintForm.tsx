@@ -41,6 +41,7 @@ import {
   blueprintArrival,
   gameToCheckAgainst,
 } from "../../arrival";
+import { useEquivalents } from "../../equivalentsStore";
 import { appFileIO } from "../../fileIO";
 import { buildingFootprints } from "../../footprint";
 import {
@@ -125,6 +126,10 @@ export function ImportBlueprintForm({
   );
   const { units, archive } = useGameUnits(gameToCheckAgainst(game));
   const sides = useGameSides(archive);
+  // What somebody already said about this game's sides (issue #1468). Read only:
+  // an import offers whole sides rather than rows, so there is no answer here
+  // that was not already in the table or read off a name.
+  const { table } = useEquivalents(archive);
   const known = useMemo(() => knownUnits(units), [units]);
   const footprintOf = useMemo(
     () => (units.length > 0 ? buildingFootprints(units) : undefined),
@@ -141,9 +146,10 @@ export function ImportBlueprintForm({
             payload.buildings.map((building) => building.def),
             sides,
             known,
+            table,
           )
         : undefined,
-    [payload, sides, known],
+    [payload, sides, known, table],
   );
 
   // The layout as it will be kept: converted where a side has been picked, and
@@ -159,11 +165,12 @@ export function ImportBlueprintForm({
               takingAs,
               sides,
               known,
+              table,
             ),
             footprintOf,
           )
         : null,
-    [payload, takingAs, sides, known, footprintOf],
+    [payload, takingAs, sides, known, footprintOf, table],
   );
   const keeping = converted?.payload ?? payload;
 

@@ -6,15 +6,28 @@ import { buildGridSnap } from "./footprint";
 import type { StoredBlueprint } from "./library";
 import {
   orderPack,
+  type PackConverted,
   type PackPick,
   packChanges,
+  packConversionNotes,
   packCounts,
   packPlan,
+  packSideOffer,
   packStrips,
   packWriteSummary,
   readBlueprintPack,
 } from "./pack";
+import { type SubstitutionReport, sideUnitPrefixes } from "./substitution";
 import { knownUnits } from "./units";
+
+/** A conversion that did nothing, for the two rows that say why not. */
+const EMPTY_REPORT: SubstitutionReport = {
+  substituted: [],
+  kept: [],
+  moved: [],
+  overlapping: [],
+  checked: true,
+};
 
 /** A file of the shape somebody downloads from the community gallery: a pile of
  *  other people's layouts, one of them another game's, two of them called the
@@ -147,6 +160,227 @@ describe("packPlan", () => {
     expect(
       picks.find((one) => one.entry.name === "Wind farm")?.payload.ordered,
     ).toBeUndefined();
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * Taking the whole pack as one side (issue #1492).
+ *
+ * The fixture is what a pack really looks like: six Armada layouts, one Cortex
+ * one somebody dropped in, and one with a Legion mex in it whose side therefore
+ * cannot be told. A choice has to say what it does to all three kinds.
+ * -------------------------------------------------------------------------- */
+describe("taking a pack as one side", () => {
+  const SIDES = sideUnitPrefixes([
+    { name: "Armada", startUnit: "armcom" },
+    { name: "Cortex", startUnit: "corcom" },
+  ]);
+
+  /** Both sides installed, which is what a real game looks like. `corllt` is
+   *  left out on purpose, so "Front line" is a layout Cortex has only part of. */
+  const BOTH = [
+    ...UNITS,
+    { name: "corsolar", footprintX: 4, footprintZ: 4 },
+    { name: "cormex", footprintX: 3, footprintZ: 3 },
+    { name: "corwin", footprintX: 3, footprintZ: 3 },
+    { name: "corlab", footprintX: 8, footprintZ: 6 },
+  ];
+  const bothKnown = knownUnits(BOTH);
+  const bothFootprints = (def: string) => {
+    const unit = BOTH.find((one) => one.name === def.toLowerCase());
+    return { x: unit?.footprintX ?? 1, z: unit?.footprintZ ?? 1 };
+  };
+  const entries = () => pack().entries;
+
+  function taken(toSide: string): PackPick[] {
+    return packPlan({
+      entries: entries(),
+      taking: new Set<number>(),
+      taken: [],
+      installed: INSTALLED,
+      known: bothKnown,
+      footprintOf: bothFootprints,
+      gameName: GAME,
+      conversion: {
+        toSide,
+        sides: SIDES,
+        footprintOf: bothFootprints,
+      },
+    });
+  }
+
+  const row = (picks: PackPick[], name: string) =>
+    picks.find((pick) => pick.entry.name === name);
+
+  describe("packSideOffer", () => {
+    it("counts what a side would do to the whole pack in one go", () => {
+      // "Big wall" is every one of this game's light laser towers and Cortex
+      // has none, so it is the one a Cortex choice can do nothing for.
+      const offer = packSideOffer(entries(), SIDES, bothKnown);
+      expect(offer?.from).toEqual(["Armada", "Cortex"]);
+      expect(offer?.sideUnknown).toBe(0);
+      expect(offer?.choices).toEqual([
+        { side: "Armada", converts: 1, already: 7, untouched: 0 },
+        { side: "Cortex", converts: 6, already: 1, untouched: 1 },
+      ]);
+    });
+
+    it("counts a layout of two sides' buildings, whose own side is unanswerable", () => {
+      // Still converted, because a target side is a target rather than a swap:
+      // whatever is Armada's in it becomes Cortex's and the rest stays. What
+      // cannot be answered is which side it was, and that is said as its own
+      // number rather than folded into the counts.
+      const mixed = [
+        { buildings: [{ def: "armsolar" }, { def: "corsolar" }] },
+        { buildings: [{ def: "armmex" }] },
+      ];
+      const offer = packSideOffer(mixed, SIDES, bothKnown);
+      expect(offer?.from).toEqual(["Armada"]);
+      expect(offer?.sideUnknown).toBe(1);
+      expect(offer?.choices).toEqual([
+        { side: "Armada", converts: 1, already: 1, untouched: 0 },
+        { side: "Cortex", converts: 2, already: 0, untouched: 0 },
+      ]);
+    });
+
+    it("offers only the side this game has the buildings for", () => {
+      // No Cortex units in this dataset at all, so taking the pack as Cortex is
+      // not an answer rather than an answer that would do nothing.
+      expect(packSideOffer(entries(), SIDES, KNOWN)?.choices).toEqual([
+        { side: "Armada", converts: 1, already: 7, untouched: 0 },
+      ]);
+    });
+
+    it("offers nothing at all when the game's sides cannot be told apart", () => {
+      expect(packSideOffer(entries(), [], bothKnown)).toBeUndefined();
+    });
+  });
+
+  describe("packPlan over a whole pack", () => {
+    it("keeps every layout as it is when no side is picked", () => {
+      expect(plan()[0].converted).toBeUndefined();
+      expect(plan()[0].payload.buildings[0].def).toBe("armsolar");
+    });
+
+    it("says the layout it converted in the buildings it converted it to", () => {
+      const done = row(taken("Cortex"), "Wind farm");
+      expect(done?.converted?.state).toBe("converted");
+      expect(done?.payload.buildings.map((building) => building.def)).toEqual([
+        "corwin",
+        "corwin",
+        "corwin",
+        "corwin",
+      ]);
+    });
+
+    it("leaves a layout already that side's alone, and says so", () => {
+      const done = row(taken("Cortex"), "Cortex opening");
+      expect(done?.converted?.state).toBe("already");
+      expect(done?.payload.buildings[0].def).toBe("corsolar");
+    });
+
+    it("says plainly that a layout it can do nothing for was left alone", () => {
+      // Nothing is called `corllt` in this game, so a wall of Armada's turrets
+      // stays a wall of Armada's turrets and the row says which it was.
+      const done = row(taken("Cortex"), "Big wall");
+      expect(done?.converted?.state).toBe("cannot");
+      expect(done?.payload.buildings.every((one) => one.def === "armllt")).toBe(
+        true,
+      );
+    });
+
+    it("leaves a building belonging to no side alone rather than guessing", () => {
+      // `legmex` is neither side's as far as this game's naming goes, so it is
+      // not the conversion's to touch. The rest of the layout still converts.
+      const done = row(taken("Cortex"), "Lab corner");
+      expect(done?.payload.buildings.map((one) => one.def)).toEqual([
+        "corlab",
+        "corsolar",
+        "legmex",
+      ]);
+    });
+
+    it("converts what it can of a layout this game has only part of", () => {
+      // `corllt` is not in this game, so the two turrets stay Armada's and the
+      // solar becomes Cortex's. Half a conversion said out loud beats a refusal.
+      const done = row(taken("Cortex"), "Front line");
+      expect(done?.converted?.report.substituted).toHaveLength(1);
+      expect(done?.payload.buildings.map((one) => one.def)).toEqual([
+        "armllt",
+        "armllt",
+        "corsolar",
+      ]);
+    });
+
+    it("checks the converted layout rather than the one that arrived", () => {
+      // The pack's Cortex layout cannot be placed in a game with no Cortex
+      // units, and taking the pack as Armada is exactly what fixes that.
+      expect(row(plan(), "Cortex opening")?.fit).toBe("none");
+      const done = packPlan({
+        entries: entries(),
+        taking: new Set<number>(),
+        taken: [],
+        installed: INSTALLED,
+        known: KNOWN,
+        footprintOf,
+        gameName: GAME,
+        conversion: { toSide: "Armada", sides: SIDES, footprintOf },
+      });
+      expect(row(done, "Cortex opening")?.fit).toBe("all");
+    });
+
+    it("converts nothing before the game's units have been read", () => {
+      const done = packPlan({
+        entries: entries(),
+        taking: new Set<number>(),
+        taken: [],
+        installed: INSTALLED,
+        gameName: GAME,
+        conversion: { toSide: "Cortex", sides: SIDES },
+      });
+      expect(done[0].converted).toBeUndefined();
+    });
+  });
+
+  describe("packConversionNotes", () => {
+    it("says how much of a layout changed", () => {
+      const done = row(taken("Cortex"), "Wind farm");
+      const notes = packConversionNotes(
+        done?.converted as PackConverted,
+        "Cortex",
+        4,
+      );
+      expect(notes[0].text).toBe("4 of 4 buildings said in Cortex.");
+    });
+
+    it("warns when the substitutes will not stand where the layout does", () => {
+      // A Cortex wind generator covers three squares to Armada's two, so a farm
+      // packed tight cannot stay packed tight.
+      const done = row(taken("Cortex"), "Wind farm");
+      const notes = packConversionNotes(
+        done?.converted as PackConverted,
+        "Cortex",
+        4,
+      );
+      expect(notes.some((note) => note.tone === "warn")).toBe(true);
+    });
+
+    it("says a layout it did nothing to was left alone, and why", () => {
+      expect(
+        packConversionNotes(
+          { state: "already", report: EMPTY_REPORT },
+          "Cortex",
+          3,
+        )[0].text,
+      ).toBe("Already Cortex's.");
+      expect(
+        packConversionNotes(
+          { state: "cannot", report: EMPTY_REPORT },
+          "Cortex",
+          3,
+        )[0].text,
+      ).toContain("Nothing in it could be said in Cortex");
+    });
   });
 });
 

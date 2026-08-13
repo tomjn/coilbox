@@ -30,8 +30,9 @@ import { ErrorBanner } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
 import { usePreferredTarget } from "@/play/config";
 import { barFormat } from "../../bar";
+import { useEquivalents } from "../../equivalentsStore";
 import { appFileIO } from "../../fileIO";
-import { buildGridSnap } from "../../footprint";
+import { buildGridSnap, buildingFootprints } from "../../footprint";
 import {
   footprintsFromUnits,
   packSource,
@@ -41,11 +42,13 @@ import {
   type BlueprintPack,
   packChanges,
   packPlan,
+  packSideOffer,
   placeableIndexes,
   readBlueprintPack,
 } from "../../pack";
 import { saveBlueprints, useBlueprintLibrary } from "../../store";
 import { knownUnits } from "../../units";
+import { useGameSides } from "../../useGameSides";
 import { ArrivingPack, type PackView } from "./ArrivingPack";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -59,6 +62,9 @@ export function ImportPackForm({
   const [file, setFile] = useState<{ path: string; text: string } | null>(null);
   const [game, setGame] = useState("");
   const [taking, setTaking] = useState<ReadonlySet<number>>(new Set());
+  /** The side the whole pack is being taken as, empty for the sides it was drawn
+   *  in (issue #1492). */
+  const [takingAs, setTakingAs] = useState("");
   const [view, setView] = useState<PackView>({
     order: "fit",
     hideUnplaceable: false,
@@ -73,7 +79,9 @@ export function ImportPackForm({
   // The first game on the machine until somebody says otherwise, so the pack is
   // read against something rather than opening on an empty list.
   const against = game || installed[0]?.name || "";
-  const { units } = useGameUnits(against);
+  const { units, archive } = useGameUnits(against);
+  const sides = useGameSides(archive);
+  const { table } = useEquivalents(archive);
 
   // Without the units every building looks like one square, and snapping on
   // that would move the even-footprint ones onto the wrong half of the grid.
@@ -105,6 +113,24 @@ export function ImportPackForm({
     }
   }, [file, snap]);
 
+  // Which sides the whole pack could be taken as, read off the pack as it
+  // arrived rather than off the converted one, so the choice stays the same
+  // choice after it has been made (issue #1492).
+  const offer = useMemo(
+    () =>
+      read?.pack && known
+        ? packSideOffer(read.pack.entries, sides, known, table)
+        : undefined,
+    [read, sides, known, table],
+  );
+
+  // Every substitute's own footprint, which is what a swapped building is
+  // re-snapped onto. Nothing without the units, which is when nothing converts.
+  const swapFootprints = useMemo(
+    () => (units.length > 0 ? buildingFootprints(units) : undefined),
+    [units],
+  );
+
   const picks = useMemo(
     () =>
       read?.pack
@@ -116,9 +142,27 @@ export function ImportPackForm({
             known,
             footprintOf,
             gameName: against,
+            conversion: {
+              toSide: takingAs,
+              sides,
+              table,
+              footprintOf: swapFootprints,
+            },
           })
         : [],
-    [read, taking, records, installed, known, footprintOf, against],
+    [
+      read,
+      taking,
+      records,
+      installed,
+      known,
+      footprintOf,
+      against,
+      takingAs,
+      sides,
+      table,
+      swapFootprints,
+    ],
   );
 
   const pickFile = async () => {
@@ -133,6 +177,7 @@ export function ImportPackForm({
       const text = await appFileIO.read(src);
       if (text === null) throw new Error("There is no file there.");
       setTaking(new Set());
+      setTakingAs("");
       setFile({ path: src, text });
     } catch (e) {
       setError(message(e));
@@ -225,10 +270,18 @@ export function ImportPackForm({
             onView={setView}
             games={installed.map((one) => one.name)}
             game={against}
-            onGame={setGame}
+            onGame={(name) => {
+              // The sides one game has are not the sides the next one has, so a
+              // choice made against the old game says nothing about this one.
+              setTakingAs("");
+              setGame(name);
+            }}
             unreadable={read.pack.unreadable}
             changes={packChanges(read.pack)}
             checked={known !== undefined}
+            conversion={
+              offer ? { offer, takingAs, onTakeAs: setTakingAs } : undefined
+            }
             busy={busy}
             onToggle={toggle}
             onTakeAll={() => setTaking(placeableIndexes(picks))}
