@@ -106,10 +106,10 @@ function BlueprintLayout({ shape }: { shape: BlueprintShape }) {
     <div className="flex flex-col gap-3">
       <LayoutPlan
         shape={shape}
-        // Capped in both directions. A base can be a long thin wall or a tall
-        // narrow column, and either one at the column's full width is a shape
-        // nobody can take in at a glance.
-        className="mx-auto max-h-96 w-full max-w-md"
+        // A sheet of fixed proportions rather than a box the shape of the base.
+        // A base can be a long thin wall or a tall narrow column, and either one
+        // at the column's full width is a shape nobody can take in at a glance.
+        className="mx-auto aspect-[4/3] w-full max-w-md"
       />
       <p className="text-xs text-muted-foreground">
         {buildings} {buildings === 1 ? "building" : "buildings"}

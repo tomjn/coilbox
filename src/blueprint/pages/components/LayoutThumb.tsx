@@ -18,5 +18,7 @@ export function LayoutThumb({ layout }: { layout: BlueprintPayload }) {
   const shape = blueprintShape(layout);
   if (!shape) return null;
 
-  return <LayoutPlan shape={shape} className="max-h-24 w-full" />;
+  // The whole of whatever box it was put in, because the plan is a sheet now and
+  // a sheet fills the space it is given (issue #1508).
+  return <LayoutPlan shape={shape} className="size-full" />;
 }
