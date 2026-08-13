@@ -16,6 +16,9 @@ import { footprintStyle } from "./footprintsLayer";
 const style = (standing: Standing, overlapping = false) =>
   footprintStyle({ standing, overlapping });
 
+const held = (standing: Standing, overlapping = false) =>
+  footprintStyle({ standing, overlapping }, true);
+
 describe("footprintStyle", () => {
   it("draws a building the ground takes as a quiet filled square", () => {
     const fine = style("fine");
@@ -74,5 +77,36 @@ describe("footprintStyle", () => {
    *  drawn like any other building nobody has anything to say about. */
   it("draws a floater as a settled building", () => {
     expect(style("floats")).toEqual(style("fine"));
+  });
+});
+
+/**
+ * Issue #1512. A building being dragged is the one the author is positioning,
+ * so it is picked out of the squares around it the way the selection ring used
+ * to pick it out, and it says the same three states as any other building while
+ * it is in the air.
+ */
+describe("footprintStyle, held by the pointer", () => {
+  it("picks the held building out of the ones standing around it", () => {
+    expect(held("fine").color).not.toBe(style("fine").color);
+    expect(held("fine").fill).toBeGreaterThan(style("fine").fill);
+    expect(held("fine").outline).toBeGreaterThan(style("fine").outline);
+  });
+
+  /** The whole reason for carrying the marks live: red is the answer to where
+   *  this is being dropped, so being held cannot paint over it. */
+  it("keeps a refusal's own colour while it is being held", () => {
+    expect(held("fine", true).color).toBe(style("fine", true).color);
+    expect(held("slope").color).toBe(style("slope").color);
+    expect(held("no-def").color).toBe(style("no-def").color);
+    expect(held("fine", true).fill).toBeGreaterThan(style("fine", true).fill);
+  });
+
+  /** A held building nothing has judged is still a building nothing has
+   *  judged: the empty dashed square is the statement, not the colour. */
+  it("keeps an unjudged building empty and dashed", () => {
+    expect(held("no-ground").dashed).toBe(true);
+    expect(held("no-ground").fill).toBe(0);
+    expect(held("no-ground").color).toBe(held("fine").color);
   });
 });

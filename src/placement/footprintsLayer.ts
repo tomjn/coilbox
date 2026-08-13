@@ -63,6 +63,11 @@ const UNJUDGED_COLOR = 0xcbd5e1;
  *  nor by finding flatter ground: that unit is not in this game. */
 const ABSENT_COLOR = 0xa78bfa;
 
+/** What the building the pointer is holding is drawn in, when nothing is wrong
+ *  with where it is being held (issue #1512). The colour the selection ring
+ *  was, because it is saying what the ring said: this is the one you have. */
+const HELD_COLOR = 0x7dd3fc;
+
 /** The dashes of that outline, in elmos. A build square is 16, so a dash and a
  *  gap fall inside the smallest footprint there is. */
 const DASH_ELMOS = 7;
@@ -94,23 +99,40 @@ export interface FootprintStyle {
  *
  * A clash wins the colour, because it is the one the author put there and the
  * ground under it may well be fine once the pair is pulled apart.
+ *
+ * `held` is the building the pointer is carrying (issue #1512). It is the same
+ * three states said louder: a refusal keeps its own colour, because red is the
+ * answer to where this is being dropped and being held cannot paint over it,
+ * and a building nothing has judged keeps its empty dashed square, because the
+ * shape is the statement. Only the state with nothing to say takes a colour of
+ * its own, which is the one thing the selection ring was for.
  */
 export function footprintStyle(
   mark: Pick<FootprintMark, "overlapping" | "standing">,
+  held = false,
 ): FootprintStyle {
+  const fill = held ? 0.45 : 0.32;
+  const outline = held ? 1 : 0.95;
   if (mark.overlapping) {
-    return { color: CLASH_COLOR, fill: 0.32, outline: 0.95, dashed: false };
+    return { color: CLASH_COLOR, fill, outline, dashed: false };
   }
   if (mark.standing === "slope") {
-    return { color: SLOPE_COLOR, fill: 0.32, outline: 0.95, dashed: false };
+    return { color: SLOPE_COLOR, fill, outline, dashed: false };
   }
   if (mark.standing === "no-def") {
-    return { color: ABSENT_COLOR, fill: 0.32, outline: 0.95, dashed: false };
+    return { color: ABSENT_COLOR, fill, outline, dashed: false };
   }
   if (unjudged(mark.standing)) {
-    return { color: UNJUDGED_COLOR, fill: 0, outline: 0.8, dashed: true };
+    return {
+      color: held ? HELD_COLOR : UNJUDGED_COLOR,
+      fill: 0,
+      outline: held ? 1 : 0.8,
+      dashed: true,
+    };
   }
-  return { color: GROUND_COLOR, fill: 0.12, outline: 0.55, dashed: false };
+  return held
+    ? { color: HELD_COLOR, fill: 0.3, outline: 1, dashed: false }
+    : { color: GROUND_COLOR, fill: 0.12, outline: 0.55, dashed: false };
 }
 
 export interface FootprintsLayerDeps {
@@ -124,8 +146,10 @@ export interface FootprintsLayerDeps {
 
 export interface FootprintsLayer {
   root: THREE.Group;
-  /** Draw this list, replacing whatever was drawn before. */
-  draw: (marks: FootprintMark[]) => void;
+  /** Draw this list, replacing whatever was drawn before. `held` draws them as
+   *  the building the pointer is carrying rather than as ground being stood
+   *  on. */
+  draw: (marks: FootprintMark[], held?: boolean) => void;
   dispose: () => void;
 }
 
@@ -161,8 +185,8 @@ export function createFootprintsLayer(
    *  is its own size, so there is nothing to share between two of them. */
   let owned: { dispose: () => void }[] = [];
 
-  const buildMark = (mark: FootprintMark): THREE.Group => {
-    const style = footprintStyle(mark);
+  const buildMark = (mark: FootprintMark, held: boolean): THREE.Group => {
+    const style = footprintStyle(mark, held);
     const width = mark.rect.maxX - mark.rect.minX;
     const depth = mark.rect.maxZ - mark.rect.minZ;
     const group = new THREE.Group();
@@ -240,9 +264,9 @@ export function createFootprintsLayer(
 
   return {
     root,
-    draw: (marks) => {
+    draw: (marks, held = false) => {
       clear();
-      for (const mark of marks) root.add(buildMark(mark));
+      for (const mark of marks) root.add(buildMark(mark, held));
       handle.render();
     },
     dispose: () => {
