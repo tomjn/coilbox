@@ -1,5 +1,5 @@
 /**
- * The hub's "do you already have this" answer, wired to the four stores an
+ * The hub's "do you already have this" answer, wired to the five stores an
  * import can land in (issue #1368). The record shape and the reasoning live in
  * `./importRecord.ts`, which has no stores in it so the deep-link handler can
  * use the same record without pulling every play surface in behind it.
@@ -12,6 +12,7 @@
 
 import { useSetting } from "@picoframe/frame";
 import { useCallback, useMemo, useRef } from "react";
+import { blueprintRoute, useBlueprintLibrary } from "@/blueprint/store";
 import { useGalaxies } from "@/conquest/conquests";
 import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
@@ -72,7 +73,7 @@ export function useRecordHubImport() {
 }
 
 /**
- * Ask where any hub item stands with this install. Reads the four local stores
+ * Ask where any hub item stands with this install. Reads the five local stores
  * a hub import can land in, so it costs a listing of each: use it once per
  * screen and call the returned function per item.
  *
@@ -84,6 +85,8 @@ export function useHubItemPresence(): (item: HubItem) => HubItemPresence {
   const { galaxies, loading: galaxiesLoading } = useGalaxies();
   const { runs, loading: runsLoading } = useRuns();
   const { scenarios, loading: scenariosLoading } = useScenarios();
+  const { records: blueprints, loading: blueprintsLoading } =
+    useBlueprintLibrary();
   const [records] = useSetting<HubImportRecord[]>(HUB_IMPORTS_KEY, []);
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -112,6 +115,11 @@ export function useHubItemPresence(): (item: HubItem) => HubItemPresence {
       scenariosLoading ? null : new Set(scenarios.map((s) => s.scenario.id)),
     [scenarios, scenariosLoading],
   );
+  const blueprintIds = useMemo(
+    () =>
+      blueprintsLoading ? null : new Set(blueprints.map((record) => record.id)),
+    [blueprints, blueprintsLoading],
+  );
   const byId = useMemo(
     () => new Map(records.map((r) => [r.id, r] as const)),
     [records],
@@ -120,15 +128,17 @@ export function useHubItemPresence(): (item: HubItem) => HubItemPresence {
   return useCallback(
     (item: HubItem) => {
       const local =
-        item.kind === "scenario"
-          ? scenarioIds
-          : item.kind === "challenge"
-            ? item.mode === "warpath"
-              ? runIds
-              : galaxyIds
-            : // A preset, and a setup pack's bundled presets, land in the
-              // same store.
-              presetIds;
+        item.kind === "blueprint"
+          ? blueprintIds
+          : item.kind === "scenario"
+            ? scenarioIds
+            : item.kind === "challenge"
+              ? item.mode === "warpath"
+                ? runIds
+                : galaxyIds
+              : // A preset, and a setup pack's bundled presets, land in the
+                // same store.
+                presetIds;
       // A challenge's recorded route already names its galaxy or its run, so
       // only the other kinds need an address building for them (issue #1372).
       // A setup pack opens the first of its bundled presets that is still
@@ -137,11 +147,13 @@ export function useHubItemPresence(): (item: HubItem) => HubItemPresence {
       // the recorded route can name a preset from that same import, which is
       // exactly the one just found to be gone.
       const routeFor =
-        item.kind === "scenario"
-          ? scenarioRoute
-          : item.kind === "challenge"
-            ? undefined
-            : presetRoute;
+        item.kind === "blueprint"
+          ? blueprintRoute
+          : item.kind === "scenario"
+            ? scenarioRoute
+            : item.kind === "challenge"
+              ? undefined
+              : presetRoute;
       const contentRoute =
         item.kind === "setup-pack" ? "/downloads/maps" : undefined;
       return presenceOf(
@@ -152,6 +164,6 @@ export function useHubItemPresence(): (item: HubItem) => HubItemPresence {
         contentRoute,
       );
     },
-    [byId, presetIds, galaxyIds, runIds, scenarioIds, installed],
+    [byId, presetIds, galaxyIds, runIds, scenarioIds, blueprintIds, installed],
   );
 }
