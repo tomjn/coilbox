@@ -45,6 +45,7 @@ import {
   previewChecks,
   previewSentence,
   previewTrouble,
+  withoutBuilding,
 } from "@/placement/preview";
 import {
   HistoryControls,
@@ -451,8 +452,6 @@ export function ScenarioMapScene({
     () => baseFootprints(units.placements, gameUnits.units, units.ground),
     [units.placements, gameUnits.units, units.ground],
   );
-  useScenarioFootprints(handle, footprints, assets, units.groundAt);
-
   // The same two questions asked about a layout the pointer is carrying rather
   // than about one the document holds, so an author placing a whole base sees
   // where it lands before they land it (issue #1464). Built once per game and
@@ -469,7 +468,17 @@ export function ScenarioMapScene({
     ghost: behaviour.ghost ?? null,
     checks,
     occupied: footprints,
+    placements: units.placements,
   });
+
+  // A building being dragged is drawn by the preview, on the squares it will
+  // land on, so its own square stays out of the document's until it lands
+  // (issue #1512).
+  const standing = useMemo(
+    () => withoutBuilding(footprints, preview.dragging),
+    [footprints, preview.dragging],
+  );
+  useScenarioFootprints(handle, standing, assets, units.groundAt);
 
   useMapEditing({
     handle,
@@ -488,6 +497,7 @@ export function ScenarioMapScene({
     onSelect: select,
     onPlace,
     onHover: preview.onHover,
+    onDragUnit: preview.onDragUnit,
     onDragGround: behaviour.draw ?? null,
     onMove: (key, delta) => {
       if (parseZoneKey(key))
