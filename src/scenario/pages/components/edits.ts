@@ -51,9 +51,9 @@ export function editedScenario(
  */
 export function applyEdit(
   current: Scenario,
-  history: EditHistory,
+  history: EditHistory<Scenario>,
   edit: ScenarioEdit,
-): HistoryStep {
+): HistoryStep<Scenario> {
   const document = editedScenario(current, edit);
   return { document, history: recordEdit(history, current, document) };
 }

@@ -1,5 +1,10 @@
 /**
- * Undo and redo for the scenario editor.
+ * Undo and redo for an editor that saves as it goes.
+ *
+ * Written for the scenario editor and used by the standalone blueprint editor
+ * too (issue #1442), which holds a layout rather than a scenario. Nothing here
+ * reads a document, so the document is whatever the editor holds: what a step
+ * back hands over is the thing that editor already knows how to show and save.
  *
  * The editor has no save button: every change is written to disk as it is made,
  * so before this there was no way back from a mistaken drag or a delete. History
@@ -20,24 +25,24 @@
  * edit and one step back.
  */
 
-import type { Scenario } from "../../model";
-
 /** How many steps back a session keeps. Whole documents, so the cap is about
  *  memory rather than about how far anyone would sensibly go. */
 export const HISTORY_LIMIT = 100;
 
 /** Where the editor has been, and where it has been brought back from. Both
  *  newest last. */
-export interface EditHistory {
-  past: Scenario[];
-  future: Scenario[];
+export interface EditHistory<T> {
+  past: T[];
+  future: T[];
 }
 
-export const emptyHistory: EditHistory = { past: [], future: [] };
+export const emptyHistory: EditHistory<never> = { past: [], future: [] };
 
-/** A document without the stamp a save puts on it. */
-function content(doc: Scenario): Omit<Scenario, "updatedAt"> {
-  const { updatedAt: _stamp, ...rest } = doc;
+/** A document without the stamp a save puts on it, for a document that carries
+ *  one. */
+function content(doc: unknown): unknown {
+  if (!doc || typeof doc !== "object") return doc;
+  const { updatedAt: _stamp, ...rest } = doc as Record<string, unknown>;
   return rest;
 }
 
@@ -46,9 +51,10 @@ function content(doc: Scenario): Omit<Scenario, "updatedAt"> {
  *
  * `updatedAt` is ignored, because saving stamps it and re-saving an untouched
  * document would otherwise be a step in the history that undoes to itself.
- * Blurring the name field does exactly that.
+ * Blurring the name field does exactly that. A document with no such stamp, such
+ * as a blueprint, is compared whole.
  */
-export function sameEdit(a: Scenario, b: Scenario): boolean {
+export function sameEdit<T>(a: T, b: T): boolean {
   return a === b || JSON.stringify(content(a)) === JSON.stringify(content(b));
 }
 
@@ -58,11 +64,11 @@ export function sameEdit(a: Scenario, b: Scenario): boolean {
  * The future is dropped, because editing after an undo is a new branch and the
  * old one is no longer reachable from here.
  */
-export function recordEdit(
-  history: EditHistory,
-  before: Scenario,
-  after: Scenario,
-): EditHistory {
+export function recordEdit<T>(
+  history: EditHistory<T>,
+  before: T,
+  after: T,
+): EditHistory<T> {
   if (sameEdit(before, after)) return history;
   return {
     past: [...history.past, before].slice(-HISTORY_LIMIT),
@@ -71,16 +77,16 @@ export function recordEdit(
 }
 
 /** A step taken: the history that remains, and the document to write. */
-export interface HistoryStep {
-  history: EditHistory;
-  document: Scenario;
+export interface HistoryStep<T> {
+  history: EditHistory<T>;
+  document: T;
 }
 
 /** One step back from `current`, or null when there is nowhere to go. */
-export function undoEdit(
-  history: EditHistory,
-  current: Scenario,
-): HistoryStep | null {
+export function undoEdit<T>(
+  history: EditHistory<T>,
+  current: T,
+): HistoryStep<T> | null {
   const previous = history.past.at(-1);
   if (!previous) return null;
   return {
@@ -93,10 +99,10 @@ export function undoEdit(
 }
 
 /** One step forward from `current`, or null when there is nowhere to go. */
-export function redoEdit(
-  history: EditHistory,
-  current: Scenario,
-): HistoryStep | null {
+export function redoEdit<T>(
+  history: EditHistory<T>,
+  current: T,
+): HistoryStep<T> | null {
   const next = history.future.at(-1);
   if (!next) return null;
   return {

@@ -42,7 +42,7 @@ function scenario(): Scenario {
  */
 function editor(from: Scenario) {
   let document = from;
-  let history: EditHistory = emptyHistory;
+  let history: EditHistory<Scenario> = emptyHistory;
   return {
     apply(edit: Parameters<typeof applyEdit>[2]) {
       const applied = applyEdit(document, history, edit);
