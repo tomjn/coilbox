@@ -16,8 +16,12 @@ import { EquivalentsPanel } from "./EquivalentsPanel";
 
 const TABLE: EquivalenceTable = {
   groups: [
-    { Armada: "armsolar", Cortex: "corsolar", Legion: "legsolar" },
-    { Armada: "armpw", Cortex: "corak" },
+    {
+      Armada: { def: "armsolar", from: "you" },
+      Cortex: { def: "corsolar", from: "you" },
+      Legion: { def: "legsolar", from: "game" },
+    },
+    { Armada: { def: "armpw", from: "you" }, Cortex: { def: "corak" } },
   ],
 };
 
@@ -36,6 +40,16 @@ function markup(table: EquivalenceTable): string {
 /** Every button's accessible name, which is what says a row can be dropped. */
 function labels(html: string): string[] {
   return [...html.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1]);
+}
+
+/** The words of one pairing's row, which is what a person actually reads off
+ *  it. Tags out, so nothing here is a claim about how it is marked up. */
+function rowText(html: string, at: number): string {
+  const rows = [...html.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/g)];
+  return (rows[at]?.[1] ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 describe("EquivalentsPanel", () => {
@@ -63,8 +77,12 @@ describe("EquivalentsPanel", () => {
   it("leaves a gap for a side a pairing says nothing about", () => {
     const html = markup({
       groups: [
-        { Armada: "armsolar", Cortex: "corsolar", Legion: "legsolar" },
-        { Armada: "armpw", Legion: "legpw" },
+        {
+          Armada: { def: "armsolar", from: "you" },
+          Cortex: { def: "corsolar", from: "you" },
+          Legion: { def: "legsolar", from: "you" },
+        },
+        { Armada: { def: "armpw" }, Legion: { def: "legpw" } },
       ],
     });
     expect(labels(html)[1]).toBe("Forget armpw and legpw");
@@ -72,5 +90,35 @@ describe("EquivalentsPanel", () => {
 
   it("says nothing at all about a game nobody has answered anything about", () => {
     expect(markup({ groups: [] })).toBe("");
+  });
+
+  /** Issue #1537. Whose answer each one is, because the ones a person gave are
+   *  the ones they can be sure they meant, and the rest are not. */
+  describe("where each answer came from", () => {
+    it("says which answers a person gave and which the game's file brought", () => {
+      expect(rowText(markup(TABLE), 0)).toBe(
+        "Armada armsolar you Cortex corsolar you Legion legsolar the game",
+      );
+    });
+
+    it("claims nothing about an answer stored before it started recording this", () => {
+      expect(rowText(markup(TABLE), 1)).toBe("Armada armpw you Cortex corak");
+    });
+
+    it("says an unmarked answer is one from before, rather than one from nowhere", () => {
+      expect(markup(TABLE)).toContain("before it started recording");
+    });
+
+    it("says nothing of the sort when it can account for every answer", () => {
+      const html = markup({
+        groups: [
+          {
+            Armada: { def: "armpw", from: "you" },
+            Cortex: { def: "corak", from: "you" },
+          },
+        ],
+      });
+      expect(html).not.toContain("before it started recording");
+    });
   });
 });

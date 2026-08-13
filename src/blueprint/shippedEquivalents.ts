@@ -117,6 +117,10 @@ export function shippedGroups(result: string | undefined): ShippedGroup[] {
  * dropped: a wrong pairing is worse than a missing one, because it silently
  * changes what a base builds. A group left naming fewer than two sides goes with
  * it, and a game whose sides have no prefixes to match on gets nothing at all.
+ *
+ * Every answer is marked as the game's on the way out, because this is the one
+ * place that knows they came from its file, and nothing downstream would be
+ * able to tell them from a person's afterwards (issue #1537).
  */
 export function shippedEquivalents(
   result: string | undefined,
@@ -133,7 +137,7 @@ export function shippedEquivalents(
     const kept: Equivalence = {};
     for (const [key, def] of Object.entries(group)) {
       const side = named.get(key.toLowerCase());
-      if (side) kept[side] = def;
+      if (side) kept[side] = { def, from: "game" };
     }
     if (Object.keys(kept).length >= 2) groups.push(kept);
   }

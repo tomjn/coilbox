@@ -8,6 +8,7 @@ import {
   NO_EQUIVALENTS,
   parseEquivalenceTable,
   sideOfDefInTable,
+  sourceIn,
   tableSides,
 } from "./equivalents";
 
@@ -135,8 +136,15 @@ describe("coveredDefs", () => {
 describe("mergeEquivalents", () => {
   const theirs: EquivalenceTable = {
     groups: [
-      { Armada: "armsolar", Cortex: "corsolar", Legion: "legsolar" },
-      { Armada: "armanni", Cortex: "cordoom" },
+      {
+        Armada: { def: "armsolar", from: "game" },
+        Cortex: { def: "corsolar", from: "game" },
+        Legion: { def: "legsolar", from: "game" },
+      },
+      {
+        Armada: { def: "armanni", from: "game" },
+        Cortex: { def: "cordoom", from: "game" },
+      },
     ],
   };
 
@@ -168,13 +176,13 @@ describe("mergeEquivalents", () => {
   it("leaves a group two of a person's own groups both claim", () => {
     const mine: EquivalenceTable = {
       groups: [
-        { Armada: "armsolar", Cortex: "corsy" },
-        { Legion: "legsolar", Cortex: "corak" },
+        { Armada: { def: "armsolar" }, Cortex: { def: "corsy" } },
+        { Legion: { def: "legsolar" }, Cortex: { def: "corak" } },
       ],
     };
     const merged = mergeEquivalents(mine, theirs).groups;
-    expect(merged[0]).toEqual({ Armada: "armsolar", Cortex: "corsy" });
-    expect(merged[1]).toEqual({ Legion: "legsolar", Cortex: "corak" });
+    expect(merged[0]).toEqual(mine.groups[0]);
+    expect(merged[1]).toEqual(mine.groups[1]);
   });
 
   it("changes nothing the second time, so reading it again is free", () => {
@@ -206,5 +214,101 @@ describe("parseEquivalenceTable", () => {
     expect(parseEquivalenceTable({ groups: [{ Armada: 7 }] })).toEqual(
       NO_EQUIVALENTS,
     );
+  });
+});
+
+/**
+ * Issue #1537. Which answers a person gave and which a game's file brought, so
+ * somebody hunting a wrong one knows whose it is before they drop it.
+ */
+describe("where a pairing came from", () => {
+  const fromGame: EquivalenceTable = {
+    groups: [
+      {
+        Armada: { def: "armsolar", from: "game" },
+        Cortex: { def: "corsolar", from: "game" },
+        Legion: { def: "legsolar", from: "game" },
+      },
+      {
+        Armada: { def: "armanni", from: "game" },
+        Cortex: { def: "cordoom", from: "game" },
+      },
+    ],
+  };
+
+  it("marks a pair a person picked as theirs, on both sides of it", () => {
+    expect(sourceIn(learned.groups[1], "Armada")).toBe("you");
+    expect(sourceIn(learned.groups[1], "Cortex")).toBe("you");
+  });
+
+  it("marks a group only a game's file knows about as the game's", () => {
+    const merged = mergeEquivalents(learned, fromGame);
+    const anni = merged.groups.find((group) => group.Armada?.def === "armanni");
+    expect(sourceIn(anni ?? {}, "Cortex")).toBe("game");
+  });
+
+  it("keeps a person's mark on the side they answered when a game fills the rest", () => {
+    const merged = mergeEquivalents(learned, fromGame);
+    expect(sourceIn(merged.groups[0], "Armada")).toBe("you");
+    expect(sourceIn(merged.groups[0], "Cortex")).toBe("you");
+    expect(sourceIn(merged.groups[0], "Legion")).toBe("game");
+  });
+
+  it("takes a person's correction of a game's answer as theirs", () => {
+    const merged = mergeEquivalents(NO_EQUIVALENTS, fromGame);
+    const fixed = learnEquivalence(
+      merged,
+      "Armada",
+      "armanni",
+      "Cortex",
+      "corsy",
+    );
+    expect(equivalentOf("armanni", "Cortex", fixed)).toBe("corsy");
+    expect(sourceIn(fixed.groups[1], "Cortex")).toBe("you");
+  });
+
+  it("says nothing about a side a group has no answer for", () => {
+    expect(sourceIn(learned.groups[1], "Legion")).toBeUndefined();
+  });
+
+  it("holds a game with a side called source, because a source is not a key beside one", () => {
+    const odd = learnEquivalence(
+      NO_EQUIVALENTS,
+      "source",
+      "srcpw",
+      "from",
+      "frompw",
+    );
+    expect(equivalentOf("srcpw", "from", odd)).toBe("frompw");
+    expect(sourceIn(odd.groups[0], "source")).toBe("you");
+  });
+
+  it("reads a table an older coilbox stored, as a source nobody can name now", () => {
+    const old = parseEquivalenceTable({
+      groups: [{ Armada: "armsolar", Cortex: "corsolar" }],
+    });
+    expect(equivalentOf("armsolar", "Cortex", old)).toBe("corsolar");
+    expect(sourceIn(old.groups[0], "Armada")).toBeUndefined();
+  });
+
+  it("reads back a source it wrote", () => {
+    const written = JSON.parse(JSON.stringify(learned));
+    expect(sourceIn(parseEquivalenceTable(written).groups[0], "Armada")).toBe(
+      "you",
+    );
+  });
+
+  it("keeps the def but drops a source that is not one it writes", () => {
+    const odd = parseEquivalenceTable({
+      groups: [
+        {
+          Armada: { def: "armsolar", from: "somebody" },
+          Cortex: { def: "corsolar", from: 7 },
+        },
+      ],
+    });
+    expect(equivalentOf("armsolar", "Cortex", odd)).toBe("corsolar");
+    expect(sourceIn(odd.groups[0], "Armada")).toBeUndefined();
+    expect(sourceIn(odd.groups[0], "Cortex")).toBeUndefined();
   });
 });

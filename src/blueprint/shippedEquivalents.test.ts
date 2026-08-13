@@ -79,7 +79,13 @@ describe("shippedEquivalents", () => {
     expect(
       shippedEquivalents("SOLAR:arm=armsolar|cor=corsolar|leg=legsolar", SIDES)
         .groups,
-    ).toEqual([{ Armada: "armsolar", Cortex: "corsolar", Legion: "legsolar" }]);
+    ).toEqual([
+      {
+        Armada: { def: "armsolar", from: "game" },
+        Cortex: { def: "corsolar", from: "game" },
+        Legion: { def: "legsolar", from: "game" },
+      },
+    ]);
   });
 
   /** The whole point of reading it: `armanni` is Cortex's `cordoom`, and no
@@ -87,11 +93,11 @@ describe("shippedEquivalents", () => {
   it("answers the pairs the naming route gets wrong", () => {
     const table = shippedEquivalents(BAR.result, SIDES);
     expect(
-      table.groups.find((group) => group.Armada === "armanni")?.Cortex,
-    ).toBe("cordoom");
+      table.groups.find((group) => group.Armada?.def === "armanni")?.Cortex,
+    ).toEqual({ def: "cordoom", from: "game" });
     expect(
-      table.groups.find((group) => group.Armada === "armbeamer")?.Cortex,
-    ).toBe("corhllt");
+      table.groups.find((group) => group.Armada?.def === "armbeamer")?.Cortex,
+    ).toEqual({ def: "corhllt", from: "game" });
   });
 
   it("says nothing when the sides cannot be matched to the game's own keys", () => {
@@ -112,6 +118,11 @@ describe("shippedEquivalents", () => {
     ).toEqual([]);
     expect(
       shippedEquivalents("SOLAR:arm=armsolar|cor=corsolar|zzz=x", SIDES).groups,
-    ).toEqual([{ Armada: "armsolar", Cortex: "corsolar" }]);
+    ).toEqual([
+      {
+        Armada: { def: "armsolar", from: "game" },
+        Cortex: { def: "corsolar", from: "game" },
+      },
+    ]);
   });
 });

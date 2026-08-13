@@ -39,10 +39,15 @@
  * ## The shape
  *
  * A group is one thing the game has a version of per side, keyed by the side's
- * own name: `{ Armada: "armsolar", Cortex: "corsolar", Legion: "legsolar" }`.
- * Same shape BAR arrived at independently, and it is the right one for a reason:
- * a game with three sides needs one group rather than six pairs, and a game that
- * gains a fourth side gains a key rather than a rewrite.
+ * own name. Same shape BAR arrived at independently, and it is the right one for
+ * a reason: a game with three sides needs one group rather than six pairs, and a
+ * game that gains a fourth side gains a key rather than a rewrite.
+ *
+ * Each side's answer carries where it came from with it (issue #1537), so a
+ * group is `{ Armada: { def: "armsolar", from: "you" }, ... }`. Per answer
+ * rather than per group, because merging a game's own table fills in the sides a
+ * person never answered for and leaves the ones they did, so a group really is
+ * part theirs and part the game's and there is no one true source to give it.
  *
  * Nothing here answers when it cannot. A def two groups disagree about has no
  * answer rather than the first answer found, because a wrong substitution is
@@ -53,9 +58,36 @@
  * layout, so it never travels with a shared one.
  */
 
-/** One thing a game has a version of per side, by the side's own name. Defs are
- *  lower case, because a def is written however its author felt like. */
-export type Equivalence = Record<string, string>;
+/**
+ * Where one answer came from (issue #1537).
+ *
+ * Two rather than three. A pair picked by hand in a conversion and a pair
+ * suggested and then applied both reach here through the same call, because in
+ * both a person looked at the suggestion and said yes, and that is the thing
+ * being recorded: that somebody who plays the game agreed to it.
+ */
+export type EquivalenceSource = "you" | "game";
+
+/**
+ * What one side calls a thing, and where coilbox got it.
+ *
+ * The source lives inside the answer rather than beside it, because a group is
+ * keyed by the game's own side names and a game is free to call a side
+ * anything, "source" included. Nothing can be added alongside those keys
+ * without a game being able to collide with it, so nothing is.
+ *
+ * No source at all is a real state and means nobody can say: a table an older
+ * coilbox wrote holds the def and not where it came from, and inventing one
+ * would be worse than admitting it.
+ */
+export interface SideDef {
+  /** Lower case, because a def is written however its author felt like. */
+  def: string;
+  from?: EquivalenceSource;
+}
+
+/** One thing a game has a version of per side, by the side's own name. */
+export type Equivalence = Record<string, SideDef>;
 
 /** Everything a person has said about one game. */
 export interface EquivalenceTable {
@@ -65,11 +97,30 @@ export interface EquivalenceTable {
 /** A game nobody has answered anything about yet. */
 export const NO_EQUIVALENTS: EquivalenceTable = { groups: [] };
 
+/** What this group says that side calls the thing, or nothing. */
+export function defIn(group: Equivalence, side: string): string | undefined {
+  return group[side.trim()]?.def;
+}
+
+/** Where this group's answer for that side came from, or nothing for a side it
+ *  has no answer for and for one an older coilbox stored. */
+export function sourceIn(
+  group: Equivalence,
+  side: string,
+): EquivalenceSource | undefined {
+  return group[side.trim()]?.from;
+}
+
+/** Every def this group names, whichever side names it. */
+export function defsIn(group: Equivalence): string[] {
+  return Object.values(group).map((held) => held.def);
+}
+
 /** Every group holding this def, under any side. */
 function groupsHolding(def: string, table: EquivalenceTable): Equivalence[] {
   const name = def.trim().toLowerCase();
   if (name === "") return [];
-  return table.groups.filter((group) => Object.values(group).includes(name));
+  return table.groups.filter((group) => defsIn(group).includes(name));
 }
 
 /**
@@ -87,10 +138,9 @@ export function equivalentOf(
   toSide: string,
   table: EquivalenceTable,
 ): string | undefined {
-  const side = toSide.trim();
   const answers = new Set(
     groupsHolding(def, table)
-      .map((group) => group[side])
+      .map((group) => defIn(group, toSide))
       .filter((answer) => answer !== undefined),
   );
   return answers.size === 1 ? [...answers][0] : undefined;
@@ -111,7 +161,7 @@ export function sideOfDefInTable(
   const sides = new Set<string>();
   for (const group of groupsHolding(def, table)) {
     for (const [side, held] of Object.entries(group)) {
-      if (held === name) sides.add(side);
+      if (held.def === name) sides.add(side);
     }
   }
   return sides.size === 1 ? [...sides][0] : undefined;
@@ -132,7 +182,7 @@ export function tableSides(table: EquivalenceTable): string[] {
 /** How many defs this table can answer for, which is what says whether it is
  *  worth mentioning to anybody. */
 export function coveredDefs(table: EquivalenceTable): number {
-  return new Set(table.groups.flatMap((group) => Object.values(group))).size;
+  return new Set(table.groups.flatMap(defsIn)).size;
 }
 
 /**
@@ -146,6 +196,10 @@ export function coveredDefs(table: EquivalenceTable): number {
  *
  * Nothing is learned from a pair that says nothing: a def standing in for
  * itself, one side standing in for itself, or a blank.
+ *
+ * Both sides of the pair are marked as the person's, including when the pair
+ * corrects one a game's file brought: they looked at that answer and replaced
+ * it, which makes the new one theirs (issue #1537).
  */
 export function learnEquivalence(
   table: EquivalenceTable,
@@ -162,7 +216,11 @@ export function learnEquivalence(
   if (from === to || was === now) return table;
 
   const held = groupsHolding(was, table)[0] ?? groupsHolding(now, table)[0];
-  const grown: Equivalence = { ...held, [from]: was, [to]: now };
+  const grown: Equivalence = {
+    ...held,
+    [from]: { def: was, from: "you" },
+    [to]: { def: now, from: "you" },
+  };
   return {
     groups: held
       ? table.groups.map((group) => (group === held ? grown : group))
@@ -185,6 +243,12 @@ export function learnEquivalence(
  *
  * The same table back, unchanged, when there is nothing to add, so reading a
  * game's file twice writes nothing the second time.
+ *
+ * Each answer arrives already saying where it came from and is copied as it
+ * stands, so a group half of which a person gave and half of which a game's
+ * file filled in says exactly that, side by side (issue #1537). Marking the
+ * whole group one way would be a lie on every group merging touches, which is
+ * every group worth looking at.
  */
 export function mergeEquivalents(
   mine: EquivalenceTable,
@@ -194,9 +258,9 @@ export function mergeEquivalents(
   let grew = false;
 
   for (const group of theirs.groups) {
-    const defs = Object.values(group);
+    const defs = defsIn(group);
     const holding = groups.filter((held) =>
-      Object.values(held).some((def) => defs.includes(def)),
+      defsIn(held).some((def) => defs.includes(def)),
     );
     if (holding.length > 1) continue;
 
@@ -218,6 +282,30 @@ export function mergeEquivalents(
   return grew ? { groups } : mine;
 }
 
+/** One side's answer read back off disk, or nothing for one that reads as
+ *  neither shape.
+ *
+ * A bare string is what every coilbox before issue #1537 wrote, and it reads
+ * back as the answer it is with no source, because there is nobody left to ask
+ * where it came from. A source that is not one of the two coilbox writes goes
+ * the same way: the answer is still the answer, and only the claim about it is
+ * dropped. */
+function parseSideDef(value: unknown): SideDef | undefined {
+  const held =
+    typeof value === "string"
+      ? { def: value }
+      : typeof value === "object" && value !== null
+        ? (value as { def?: unknown; from?: unknown })
+        : undefined;
+  if (typeof held?.def !== "string") return undefined;
+
+  const def = held.def.trim().toLowerCase();
+  if (def === "") return undefined;
+  return held.from === "you" || held.from === "game"
+    ? { def, from: held.from }
+    : { def };
+}
+
 /**
  * A table read back off disk, with everything unreadable dropped.
  *
@@ -237,10 +325,9 @@ export function parseEquivalenceTable(value: unknown): EquivalenceTable {
     for (const [side, def] of Object.entries(
       group as Record<string, unknown>,
     )) {
-      if (typeof def !== "string") continue;
-      const name = def.trim().toLowerCase();
-      if (side.trim() === "" || name === "") continue;
-      kept[side] = name;
+      const held = parseSideDef(def);
+      if (!held || side.trim() === "") continue;
+      kept[side] = held;
     }
     if (Object.keys(kept).length >= 2) out.push(kept);
   }

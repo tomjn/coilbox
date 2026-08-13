@@ -58,7 +58,8 @@ export function takeBlueprint(
 export function carryBlueprint(
   scenario: Scenario,
   layout: Omit<BaseBlueprint, "id">,
-  /** Minted by the caller, so it can arm the map with what it just added. */
+  /** Minted by the caller, so this stays an edit rather than something that
+   *  makes up an id every time it runs. */
   blueprintId: string,
 ): Scenario {
   return {

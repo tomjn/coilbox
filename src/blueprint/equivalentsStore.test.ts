@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { rememberShortnames, resetShortnames } from "../container/shortnames";
-import { equivalentOf, NO_EQUIVALENTS } from "./equivalents";
+import {
+  type EquivalenceTable,
+  equivalentOf,
+  NO_EQUIVALENTS,
+  sourceIn,
+} from "./equivalents";
 import {
   equivalentsFor,
   equivalentsKey,
@@ -49,6 +54,44 @@ describe("equivalentsKey", () => {
   });
 });
 
+/**
+ * Issue #1537. A table an older coilbox left in this machine's storage, which
+ * is what every person who has answered anything already has. It answers
+ * exactly as it did, and says nothing about where its answers came from,
+ * because there is nobody left to ask.
+ */
+describe("a table stored before answers said where they came from", () => {
+  beforeEach(() => {
+    const held = stubStorage();
+    held.set(
+      "coilbox.blueprint.equivalents",
+      JSON.stringify({
+        byar: { groups: [{ Armada: "armpw", Cortex: "corak" }] },
+      }),
+    );
+    loadEquivalents();
+  });
+
+  it("still answers what it always answered", () => {
+    expect(equivalentOf("armpw", "Cortex", equivalentsFor("byar"))).toBe(
+      "corak",
+    );
+  });
+
+  it("claims nothing about where its answers came from", () => {
+    expect(
+      sourceIn(equivalentsFor("byar").groups[0], "Armada"),
+    ).toBeUndefined();
+  });
+
+  it("takes the mark on an answer given now, beside the ones without one", () => {
+    rememberEquivalence("byar", "Armada", "armsolar", "Cortex", "corsolar");
+    const groups = equivalentsFor("byar").groups;
+    expect(sourceIn(groups[0], "Armada")).toBeUndefined();
+    expect(sourceIn(groups[1], "Armada")).toBe("you");
+  });
+});
+
 describe("rememberEquivalence", () => {
   it("keeps what was said for the game it was said about", () => {
     rememberEquivalence("byar", "Armada", "armpw", "Cortex", "corak");
@@ -94,8 +137,14 @@ describe("rememberEquivalence", () => {
 
 /** Issue #1526. What a game itself says, kept beside what a person said. */
 describe("rememberShippedEquivalents", () => {
-  const shipped = {
-    groups: [{ Armada: "armanni", Cortex: "cordoom", Legion: "legbastion" }],
+  const shipped: EquivalenceTable = {
+    groups: [
+      {
+        Armada: { def: "armanni", from: "game" },
+        Cortex: { def: "cordoom", from: "game" },
+        Legion: { def: "legbastion", from: "game" },
+      },
+    ],
   };
 
   it("keeps what the game said, and counts what was new about it", () => {
@@ -144,7 +193,10 @@ describe("forgetting (issue #1533)", () => {
   it("drops the one pairing asked about and keeps the rest", () => {
     forgetEquivalence("byar", 0);
     expect(equivalentsFor("byar").groups).toEqual([
-      { Armada: "armsolar", Cortex: "corsolar" },
+      {
+        Armada: { def: "armsolar", from: "you" },
+        Cortex: { def: "corsolar", from: "you" },
+      },
     ]);
   });
 
