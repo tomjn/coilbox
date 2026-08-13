@@ -1433,7 +1433,12 @@ export function useUnitsyncMinimap(
   return { url, startPositions, env, appearance, loading, error };
 }
 
-/** Session cache of heightmap results, keyed by `dataDir::enginePath::mapName`. */
+/**
+ * Session cache of heightmap results, keyed by
+ * `dataDir::enginePath::mapName::maxSide`. The cap is part of the key because
+ * the same map is rendered at two sizes: a picture of the relief for a preview,
+ * and the map's own corner grid for the terrain check.
+ */
 const heightmapCache = new Map<string, HeightmapResult>();
 
 /** Session cache of metalmap results, keyed by `dataDir::enginePath::mapName`. */
@@ -1457,15 +1462,28 @@ export function invalidateMapPreview(
       minimapCache.delete(cached);
     }
   }
-  heightmapCache.delete(key);
+  // The heightmap is cached per cap for the same reason.
+  for (const cached of heightmapCache.keys()) {
+    if (cached === key || cached.startsWith(`${key}::`)) {
+      heightmapCache.delete(cached);
+    }
+  }
   metalmapCache.delete(key);
 }
 
-/** Lazily render and cache a map's heightmap (PNG URL + world-height bounds). */
+/**
+ * Lazily render and cache a map's heightmap (PNG URL + world-height bounds).
+ *
+ * `maxSide` caps the render's longest side, and the worker's own default is
+ * enough for a preview. A caller that reads heights back off it rather than
+ * looking at it wants `CHECK_MAX_SIDE`, which is a render of the map's own
+ * corner grid rather than a picture of it (issue #1483).
+ */
 export function useUnitsyncHeightmap(
   enginePath?: string,
   dataDir?: string,
   mapName?: string,
+  maxSide?: number,
 ) {
   const [data, setData] = useState<HeightmapResult | null>(null);
   const [url, setUrl] = useState<string | null>(null);
@@ -1478,7 +1496,7 @@ export function useUnitsyncHeightmap(
       setUrl(null);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${mapName}`;
+    const key = `${dataDir}::${enginePath}::${mapName}::${maxSide ?? ""}`;
     const apply = (res: HeightmapResult) => {
       setData(res);
       const url = renderedUrl(res, unitsyncThumbUrl);
@@ -1493,7 +1511,7 @@ export function useUnitsyncHeightmap(
     let cancelled = false;
     setLoading(true);
     setError(null);
-    unitsyncHeightmap({ enginePath, dataDir, mapName })
+    unitsyncHeightmap({ enginePath, dataDir, mapName, maxSide })
       .then((res) => {
         if (cancelled) return;
         // Same rule as the minimap: an empty render is a state, not an answer.
@@ -1509,7 +1527,7 @@ export function useUnitsyncHeightmap(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, mapName]);
+  }, [enginePath, dataDir, mapName, maxSide]);
 
   return { data, url, loading, error };
 }
