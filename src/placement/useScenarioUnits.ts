@@ -17,16 +17,12 @@ import {
   useUnitsyncUnitDataset,
 } from "@/content/config";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
-import { type Placement, teamColor } from "@/placement/placements";
-import {
-  groundHeight,
-  type HeightField,
-  readHeightField,
-} from "@/placement/terrain";
-import { createUnitsLayer, type UnitsLayer } from "@/placement/unitsLayer";
 import { usePreferredTarget } from "@/play/config";
-import type { Point, Scenario } from "../../model";
-import { scenarioPlacements } from "./placements";
+import type { Point, Scenario } from "@/scenario/model";
+import { scenarioPlacements } from "@/scenario/pages/components/placements";
+import { type Placement, teamColor } from "./placements";
+import { groundHeight, type HeightField, readHeightField } from "./terrain";
+import { createUnitsLayer, type UnitsLayer } from "./unitsLayer";
 
 /** The map inputs the layer needs, as `useMissionMapAssets` reports them. */
 export interface MapExtent {

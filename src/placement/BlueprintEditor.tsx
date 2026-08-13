@@ -49,9 +49,6 @@ import {
   turnPlacement,
 } from "@/scenario/pages/components/editing";
 import { useGameUnits } from "@/scenario/pages/components/useGameUnits";
-import { useMapEditing } from "@/scenario/pages/components/useMapEditing";
-import { useScenarioFootprints } from "@/scenario/pages/components/useScenarioFootprints";
-import { useScenarioUnits } from "@/scenario/pages/components/useScenarioUnits";
 import {
   BLUEPRINT_BASE_ID,
   blueprintDocument,
@@ -67,6 +64,9 @@ import { PlacementSurface } from "./PlacementSurface";
 import { baseFootprints, overlappingIn, placementKey } from "./placements";
 import { PlaybackBar, SelectionBar } from "./SurfaceBars";
 import { focusCamera, focusDistance, worldToScene } from "./scene";
+import { useMapEditing } from "./useMapEditing";
+import { useScenarioFootprints } from "./useScenarioFootprints";
+import { useScenarioUnits } from "./useScenarioUnits";
 
 /** How long one building of a build order stands on screen before the next one
  *  arrives, the same pace the scenario editor watches a base go up at. */

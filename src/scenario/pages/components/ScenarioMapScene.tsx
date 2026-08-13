@@ -44,6 +44,12 @@ import {
   mapSceneStatus,
   worldToScene,
 } from "@/placement/scene";
+import { useMapEditing } from "@/placement/useMapEditing";
+import { useScenarioFootprints } from "@/placement/useScenarioFootprints";
+import {
+  type ScenarioUnitsState,
+  useScenarioUnits,
+} from "@/placement/useScenarioUnits";
 import { usePreferredTarget } from "@/play/config";
 import type { ExtensionTypes } from "../../extensions";
 import {
@@ -102,11 +108,8 @@ import {
 } from "./orderPaths";
 import { startMarkers } from "./startPositions";
 import { useGameUnits } from "./useGameUnits";
-import { useMapEditing } from "./useMapEditing";
-import { useScenarioFootprints } from "./useScenarioFootprints";
 import { useScenarioPaths } from "./useScenarioPaths";
 import { useScenarioStarts } from "./useScenarioStarts";
-import { type ScenarioUnitsState, useScenarioUnits } from "./useScenarioUnits";
 import { useScenarioZones } from "./useScenarioZones";
 import {
   moveZone,

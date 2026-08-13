@@ -38,7 +38,8 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
-import { dragKeys, type Placement } from "@/placement/placements";
+import type { Point } from "@/scenario/model";
+import { dragKeys, type Placement } from "./placements";
 import {
   clampToMap,
   isClick,
@@ -47,10 +48,9 @@ import {
   pointerNdc,
   pointerTargets,
   pressGesture,
-} from "@/placement/pointer";
-import { sceneToWorld, worldToScene } from "@/placement/scene";
-import type { UnitsLayer } from "@/placement/unitsLayer";
-import type { Point } from "../../model";
+} from "./pointer";
+import { sceneToWorld, worldToScene } from "./scene";
+import type { UnitsLayer } from "./unitsLayer";
 
 /**
  * Pickable things on the map that are not units: zones, and the waypoints of a

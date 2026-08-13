@@ -29,6 +29,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { parsePlacementKey, placementKey } from "@/placement/placements";
+import type { GroundDragPhase } from "@/placement/useMapEditing";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   baseBuildings,
@@ -47,7 +48,6 @@ import {
 } from "./groups";
 import { TeamSelect } from "./TeamSelect";
 import { useGameUnits } from "./useGameUnits";
-import type { GroundDragPhase } from "./useMapEditing";
 import {
   addZone,
   nextZoneName,
