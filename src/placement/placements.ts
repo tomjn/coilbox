@@ -12,6 +12,7 @@
  * `unitsLayer.ts`.
  */
 
+import { type Ground, standsOn, unitSlopes } from "@/blueprint/buildable";
 import {
   buildingFootprints,
   type FootprintMark,
@@ -98,9 +99,19 @@ export function dragKeys(placements: Placement[], key: string): string[] {
     .map((p) => p.key);
 }
 
+/** What the check needs to know about a game's units: how much ground each one
+ *  stands on, and how steep that ground may be. */
+export type BuildingUnit = {
+  name: string;
+  footprintX?: number;
+  footprintZ?: number;
+  maxSlope?: number;
+  floatOnWater?: boolean;
+};
+
 /**
- * The ground every building in the document stands on, and which of them are
- * fighting over it.
+ * The ground every building in the document stands on, which of them are
+ * fighting over it, and which of them the ground itself will not take.
  *
  * Only a base's buildings: an actor or a group's units are mobile, they are not
  * put through the engine's build grid, and two of them standing on the same spot
@@ -109,12 +120,38 @@ export function dragKeys(placements: Placement[], key: string): string[] {
  */
 export function baseFootprints(
   placements: Placement[],
-  units: { name: string; footprintX?: number; footprintZ?: number }[],
+  units: BuildingUnit[],
+  /** The map's ground, when there is a map and it can be read finely enough.
+   *  Without one no building gets a verdict, which is the standalone editor and
+   *  is also every scene before the heightmap has arrived. */
+  ground: Ground | null = null,
 ): FootprintMark[] {
+  const slopeOf = unitSlopes(units);
   return footprintMarks(
     placements.filter((placement) => placement.kind === "base"),
     buildingFootprints(units),
+    ground ? (mark) => standsOn(mark, ground, slopeOf(mark.def)) : undefined,
   );
+}
+
+/** Which of one base's buildings the ground will not take, by their place in
+ *  the base, so a panel can name them the way it names the overlapping ones. */
+export function unstableIn(
+  placements: Placement[],
+  marks: FootprintMark[],
+  baseId: string,
+): number[] {
+  const refused = new Set(
+    marks.filter((mark) => mark.standing === "slope").map((mark) => mark.key),
+  );
+  return placements
+    .filter(
+      (placement) =>
+        placement.kind === "base" &&
+        placement.id === baseId &&
+        refused.has(placement.key),
+    )
+    .map((placement) => placement.index);
 }
 
 /** Which of one base's buildings want ground another building is standing on,

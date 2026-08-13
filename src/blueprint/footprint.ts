@@ -165,6 +165,16 @@ export function rectsOverlap(a: Rect, b: Rect): boolean {
   );
 }
 
+/**
+ * What can be said about the ground under one building (issue #1315).
+ *
+ * `"unknown"` is a building nothing has judged, which is not the same as one
+ * that is fine: no map to check against, a def the unit dataset says nothing
+ * about, or a heightmap too coarse to read. Whoever answers is
+ * `./buildable.ts`, and the type lives here because it is a fact about a mark.
+ */
+export type Standing = "fine" | "slope" | "unknown";
+
 /** One building as the map should draw it. */
 export interface FootprintMark {
   /** Whatever the caller identifies the building by, handed straight back. */
@@ -179,6 +189,8 @@ export interface FootprintMark {
   rect: Rect;
   /** Whether some other building wants ground this one is standing on. */
   overlapping: boolean;
+  /** Whether the ground itself will take it. */
+  standing: Standing;
 }
 
 /**
@@ -190,15 +202,20 @@ export interface FootprintMark {
  * engine will move, and two of those can collide after the move even though the
  * numbers in the file do not. Both buildings of a pair are marked, because
  * neither of them is the one at fault.
+ *
+ * `standingOf` says whether the ground will take each building, once it is known
+ * where the building will stand. Left out where there is no map to ask about,
+ * which is the standalone editor, and then every mark says `"unknown"`.
  */
 export function footprintMarks(
   buildings: { key: string; def: string; pos: Point; facing: Facing }[],
   footprintOf: (def: string) => Footprint,
+  standingOf?: (mark: Omit<FootprintMark, "standing">) => Standing,
 ): FootprintMark[] {
   const marks = buildings.map((building) => {
     const footprint = footprintOf(building.def);
     const pos = snapToBuildGrid(building.pos, footprint, building.facing);
-    return {
+    const mark = {
       key: building.key,
       def: building.def,
       pos,
@@ -207,6 +224,7 @@ export function footprintMarks(
       rect: footprintRect(pos, footprint, building.facing),
       overlapping: false,
     };
+    return { ...mark, standing: standingOf?.(mark) ?? "unknown" };
   });
 
   for (let i = 0; i < marks.length; i++) {

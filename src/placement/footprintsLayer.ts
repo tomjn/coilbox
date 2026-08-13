@@ -10,6 +10,8 @@
  *
  * Two buildings wanting the same ground are drawn in red. Both of them, because
  * neither is the one at fault, and it is the pair that has to be pulled apart.
+ * A building on ground too steep for it is drawn in amber (issue #1315), which
+ * is the same statement about a different reason the engine will refuse it.
  *
  * Nothing here carries a `placementKey` and the layer is not handed to
  * `useMapEditing`, so a footprint cannot be clicked. It lies under the building
@@ -35,10 +37,18 @@ const ROOT_NAME = "scenario-footprints";
  *  only samples. */
 const LIFT_ELMOS = 4;
 
-/** What ground nobody is fighting over is drawn in, and what a pair fighting
- *  over it turns. Deliberately quiet until something is wrong. */
+/**
+ * What ground nobody is fighting over is drawn in, what a pair fighting over it
+ * turns, and what ground too steep to build on turns. Deliberately quiet until
+ * something is wrong.
+ *
+ * Two colours rather than one because the two are fixed differently. A clash is
+ * pulled apart by moving either building, and a building the ground refuses has
+ * to go somewhere flatter, or nowhere.
+ */
 const GROUND_COLOR = 0x94a3b8;
 const CLASH_COLOR = 0xf87171;
+const SLOPE_COLOR = 0xfbbf24;
 
 export interface FootprintsLayerDeps {
   handle: MapScene3D;
@@ -81,7 +91,14 @@ export function createFootprintsLayer(
   let owned: { dispose: () => void }[] = [];
 
   const buildMark = (mark: FootprintMark): THREE.Group => {
-    const colour = mark.overlapping ? CLASH_COLOR : GROUND_COLOR;
+    // A clash wins the colour, because it is the one the author put there and
+    // the ground under it may well be fine once the pair is pulled apart.
+    const wrong = mark.overlapping || mark.standing === "slope";
+    const colour = mark.overlapping
+      ? CLASH_COLOR
+      : mark.standing === "slope"
+        ? SLOPE_COLOR
+        : GROUND_COLOR;
     const width = mark.rect.maxX - mark.rect.minX;
     const depth = mark.rect.maxZ - mark.rect.minZ;
     const group = new THREE.Group();
@@ -106,7 +123,7 @@ export function createFootprintsLayer(
     const fillMaterial = new THREE.MeshBasicMaterial({
       color: colour,
       transparent: true,
-      opacity: mark.overlapping ? 0.32 : 0.12,
+      opacity: wrong ? 0.32 : 0.12,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
@@ -120,7 +137,7 @@ export function createFootprintsLayer(
     const lineMaterial = new THREE.LineBasicMaterial({
       color: colour,
       transparent: true,
-      opacity: mark.overlapping ? 0.95 : 0.55,
+      opacity: wrong ? 0.95 : 0.55,
       depthTest: false,
     });
     const outline = new THREE.LineLoop(lineGeometry, lineMaterial);

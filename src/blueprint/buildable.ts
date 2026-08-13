@@ -55,6 +55,7 @@ import {
   type FootprintMark,
   facedFootprint,
   SQUARE_SIZE,
+  type Standing,
 } from "./footprint";
 
 /**
@@ -81,10 +82,6 @@ export interface Ground {
   minHeight: number;
   maxHeight: number;
 }
-
-/** What this can say about one building. `"unknown"` is a building it has no
- *  business judging, which is not the same as one it approves of. */
-export type Standing = "fine" | "slope" | "unknown";
 
 /**
  * The height difference a def tolerates across its footprint, in elmos.
@@ -183,7 +180,7 @@ function buildHeight(
  * judge rather than one it approves of.
  */
 export function standsOn(
-  mark: FootprintMark,
+  mark: Pick<FootprintMark, "pos" | "facing" | "footprint">,
   ground: Ground,
   tolerance: number | null,
 ): Standing {
