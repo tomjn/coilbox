@@ -237,7 +237,6 @@ export function BlueprintEditor({
     worldHeight: GROUND.worldHeight,
     groundAt: drawn.groundAt,
     selected,
-    drawing: drawn.drawing,
     onSelect: setSelected,
     onPlace: place,
     onDragUnit: preview.onDragUnit,

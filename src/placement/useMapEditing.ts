@@ -105,10 +105,6 @@ export interface MapEditingDeps {
   groundAt: (pos: Point) => number;
   /** Placement key currently selected, so the ring can be drawn on it. */
   selected: string | null;
-  /** Whether the units layer is part way through a redraw. The layer empties
-   *  itself before it refills, so the ring waits for this to fall before it
-   *  looks for the object it belongs under. */
-  drawing: boolean;
   /** A click on a drawn unit, or on empty ground with nothing to place. */
   onSelect: (key: string | null) => void;
   /** A click on empty ground in a mode that places something. Null in a mode
@@ -374,6 +370,27 @@ export function useMapEditing(deps: MapEditingDeps): void {
       handle.render();
     };
 
+    /** Put the ring back under the selection, or take it away when there is
+     *  nothing drawn to put it under. */
+    const followSelection = () => {
+      const key = latest.current.selected;
+      const object = key ? layer.objects.get(key) : undefined;
+      if (object) ring.show(object);
+      else ring.hide();
+      handle.render();
+    };
+
+    // An edit redraws the units, and the object a key names afterwards is not
+    // the one that was selected before it. The layer says when its new objects
+    // are there, because it is the only thing that knows: it empties itself the
+    // moment the edit lands and refills over the following frames, and a look
+    // taken in between finds nothing (issue #1516). A drag drawing its own
+    // footprint keeps the ring down until it lands.
+    const unwatch = layer.onDrawn(() => {
+      if (drag?.held) return;
+      followSelection();
+    });
+
     const onPointerDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
       pressed = { x: event.clientX, y: event.clientY };
@@ -564,6 +581,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
     dom.addEventListener("pointerleave", onPointerLeave);
 
     return () => {
+      unwatch();
       dom.removeEventListener("pointerdown", onPointerDown);
       dom.removeEventListener("pointermove", onPointerMove);
       dom.removeEventListener("pointerup", finish);
@@ -577,11 +595,11 @@ export function useMapEditing(deps: MapEditingDeps): void {
     };
   }, [handle, layer]);
 
-  // The ring is put where the selection is whenever either the selection or the
-  // objects under it change: the units layer redraws wholesale, so the object a
-  // key names after an edit is not the one that was selected before it.
-  const { selected, placements, drawing } = deps;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `drawing` is not read here, it is the signal that the objects this reads have been replaced
+  // A selection made anywhere else, which is anything but a click on the map:
+  // an object just placed, a delete that leaves nothing selected, a bar that
+  // chose something. A redraw of the units is followed above, off the layer's
+  // own signal rather than off a render.
+  const { selected } = deps;
   useEffect(() => {
     const ring = ringRef.current;
     if (!handle || !layer || !ring) return;
@@ -589,7 +607,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
     if (object) ring.show(object);
     else ring.hide();
     handle.render();
-  }, [handle, layer, selected, placements, drawing]);
+  }, [handle, layer, selected]);
 
   // The cursor says whether a gesture on bare ground will make something.
   const { onPlace, onDragGround } = deps;
