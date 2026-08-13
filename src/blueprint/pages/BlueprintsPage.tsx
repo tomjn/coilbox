@@ -46,6 +46,7 @@ import {
   uniqueLayoutName,
 } from "../library";
 import { blueprintRoute, saveBlueprint, useBlueprintLibrary } from "../store";
+import { BlueprintCardMenu } from "./components/BlueprintCardMenu";
 import { BlueprintImportButton } from "./components/BlueprintImportButton";
 import { BlueprintPackButton } from "./components/BlueprintPackButton";
 import { LayoutThumb } from "./components/LayoutThumb";
@@ -68,6 +69,12 @@ export default function BlueprintsPage() {
   const recordHubImport = useRecordHubImport();
 
   const games = useMemo(() => libraryGames(records), [records]);
+  /** Every name in the library, which is what a new layout's name and a copy's
+   *  are counted up past. */
+  const names = useMemo(
+    () => records.map((record) => record.layout.name),
+    [records],
+  );
   const shown = useMemo(
     () =>
       game === ALL_GAMES
@@ -110,7 +117,7 @@ export default function BlueprintsPage() {
           />
           <NewBlueprintButton
             games={installed}
-            taken={records.map((record) => record.layout.name)}
+            taken={names}
             scanning={scan.loading}
           />
         </div>
@@ -158,6 +165,7 @@ export default function BlueprintsPage() {
             <li key={record.id}>
               <BlueprintCard
                 record={record}
+                taken={names}
                 installed={
                   !recordGameName(record) ||
                   installed.some((g) => g.name === recordGameName(record))
@@ -171,24 +179,31 @@ export default function BlueprintsPage() {
   );
 }
 
-/** One layout, drawn as it stands and named by what it is for. */
+/**
+ * One layout, drawn as it stands and named by what it is for.
+ *
+ * The name is the link and it covers the card, so anywhere on the card opens
+ * the layout, and the menu beside it is the one place a press means something
+ * else (issue #1477). A menu button inside the anchor would be a link that
+ * sometimes is not one.
+ */
 function BlueprintCard({
   record,
   installed,
+  taken,
 }: {
   record: StoredBlueprint;
   /** False when this layout's game is not on this machine, which is why its
    *  buildings would be drawn as boxes if it were opened. */
   installed: boolean;
+  /** Every name in the library, for the copy the menu makes. */
+  taken: string[];
 }) {
   const buildings = record.layout.buildings.length;
   const game = recordGameName(record);
 
   return (
-    <Link
-      to={blueprintRoute(record.id)}
-      className="flex h-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50"
-    >
+    <div className="relative flex h-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50 focus-within:border-primary/40">
       <div className="flex h-24 items-center justify-center">
         {buildings > 0 ? (
           <LayoutThumb layout={record.layout} />
@@ -196,7 +211,12 @@ function BlueprintCard({
           <Blocks className="size-6 text-muted-foreground" />
         )}
       </div>
-      <span className="truncate text-sm font-medium">{record.layout.name}</span>
+      <Link
+        to={blueprintRoute(record.id)}
+        className="truncate text-sm font-medium after:absolute after:inset-0 after:rounded-lg"
+      >
+        {record.layout.name}
+      </Link>
       <span className="flex items-center gap-2 text-xs text-muted-foreground">
         <span>
           {buildings} building{buildings === 1 ? "" : "s"}
@@ -227,7 +247,13 @@ function BlueprintCard({
           That game is not installed here.
         </span>
       )}
-    </Link>
+
+      {/* Above the link's own cover, so the menu is reachable by pointer as
+          well as by tab. */}
+      <div className="absolute right-1 top-1 z-10">
+        <BlueprintCardMenu record={record} taken={taken} />
+      </div>
+    </div>
   );
 }
 
