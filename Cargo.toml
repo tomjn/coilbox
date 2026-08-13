@@ -27,4 +27,5 @@ members = [
   "crates/tauri-plugin-coilbox-lobby-servers",
   "crates/tauri-plugin-coilbox-hub",
   "crates/tauri-plugin-coilbox-multiplayer",
+  "crates/tauri-plugin-coilbox-direct",
 ]
