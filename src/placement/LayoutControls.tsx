@@ -288,6 +288,39 @@ export function UncheckedNote({
 }
 
 /**
+ * A map with no water on it, said once for the whole surface (issue #1536).
+ *
+ * The other half of {@link UncheckedNote}'s job. A layout of naval buildings on
+ * a landlocked map is refused wherever it stands, so the surface fills with cyan
+ * squares and the note under the base names all twenty of them and repeats the
+ * general rule. Neither says the thing an author can act on, which is that this
+ * map has no sea and no amount of moving the base will find one.
+ *
+ * So it is said here, once, about the map, and the per base sentence is left out
+ * where this one is showing. Cyan, like the squares it is explaining, because a
+ * statement about a mark that is not in the mark's colour is one more thing to
+ * work out.
+ */
+export function WaterlessNote({
+  floor,
+}: {
+  /** The map's lowest ground in elmos, from `sceneWaterless`. Null where there
+   *  is water on the map, or where nothing has been refused for want of it. */
+  floor: number | null;
+}) {
+  if (floor === null) return null;
+
+  return (
+    <p className="w-fit rounded bg-cyan-950/80 px-2 py-1 text-[11px] text-cyan-200 backdrop-blur">
+      This map has no water on it: nothing on it is below the waterline, and its
+      lowest ground is {Math.round(floor)} elmos. Every building here that needs
+      water is refused wherever it stands, marked in cyan. This layout wants a
+      map with a coast rather than a different spot on this one.
+    </p>
+  );
+}
+
+/**
  * What this layout is built in, and whether that is a claim or an accident.
  *
  * The list is the layout's own array, so moving a building up the list is the

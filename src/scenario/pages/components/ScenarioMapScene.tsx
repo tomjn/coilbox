@@ -30,7 +30,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
-import { UncheckedNote } from "@/placement/LayoutControls";
+import { UncheckedNote, WaterlessNote } from "@/placement/LayoutControls";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
 import {
   absentIn,
@@ -41,6 +41,7 @@ import {
   parsePlacementKey,
   placementKey,
   sceneUnchecked,
+  sceneWaterless,
   unstableIn,
   wrongDepthIn,
 } from "@/placement/placements";
@@ -464,6 +465,12 @@ export function ScenarioMapScene({
     () => previewChecks(gameUnits.units, units.ground),
     [gameUnits.units, units.ground],
   );
+  // A map with no sea refuses every naval building on it wherever it is put, so
+  // that is said once about the map instead of once per building (issue #1536).
+  // Held back until the reads have settled, like the unchecked note beside it.
+  const waterless = units.settled
+    ? sceneWaterless(footprints, units.ground)
+    : null;
   const preview = useLayoutPreview({
     handle,
     worldWidth: assets.worldWidth,
@@ -774,6 +781,7 @@ export function ScenarioMapScene({
             unchecked={units.settled ? sceneUnchecked(footprints) : null}
             flattened={units.heightsUnread}
           />
+          <WaterlessNote floor={waterless} />
           {picked && (
             <ScenarioSelectionBar
               placement={picked}
@@ -824,11 +832,19 @@ export function ScenarioMapScene({
                     footprints,
                     pickedBase.id,
                   )}
-                  wrongDepth={wrongDepthIn(
-                    units.placements,
-                    footprints,
-                    pickedBase.id,
-                  )}
+                  // Nothing on a map with no water, where every one of these is
+                  // refused for the same reason and the surface says that
+                  // reason once (issue #1536). Naming them here as well would
+                  // be the wall of cyan written out in words.
+                  wrongDepth={
+                    waterless === null
+                      ? wrongDepthIn(
+                          units.placements,
+                          footprints,
+                          pickedBase.id,
+                        )
+                      : []
+                  }
                   // Only once the reads are in. Before that everything is
                   // unjudged for a moment, and a panel opening on a wall of
                   // warnings that clears itself teaches an author to ignore it

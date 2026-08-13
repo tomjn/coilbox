@@ -1,14 +1,18 @@
 //! A tiny, dependency-free on-disk byte cache.
 //!
-//! The whole crate is one function: [`cached`]. The caller owns the key scheme —
+//! The heart of it is one function: [`cached`]. The caller owns the key scheme —
 //! it passes the full cache-file path it wants — and supplies a closure that
 //! produces the bytes. On a hit the file is read and returned; on a miss the
 //! closure runs and its bytes are best-effort written back. This is the
 //! read-before-compute / write-after boilerplate that the mapconv plugin and the
 //! unitsync worker both need (for JSON thumbnail entries and raw PNGs
 //! respectively), kept in one place.
+//!
+//! [`sweep`] and [`touch`] are the other half: a caller whose entries are big
+//! enough to matter can bound them, least recently used first (issue #1535).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 /// Return the bytes for `cache_file`, computing them with `compute` on a miss.
 ///
@@ -54,15 +58,159 @@ where
     Ok((bytes, written))
 }
 
+/// Delete the least recently used `suffix` files in `dir` until what is left
+/// fits in `budget` bytes. Returns the bytes deleted.
+///
+/// Written for the map height grids the terrain check reads (issue #1535): tens
+/// of megabytes each, one per map an author opens a scenario on, and nothing
+/// ever removed them. The suffix is the whole of the policy's scope, because the
+/// dir also holds the minimap and heightmap PNGs, and those are small, numerous
+/// and shown fifty at a time, so evicting one takes a picture off a screen
+/// somebody is looking at.
+///
+/// `keep` is never deleted, whatever its age and even if it alone is over
+/// budget. It is the file the caller has just produced or handed out, which is
+/// the one thing in here that is certainly in use.
+///
+/// Recency is the file's modified time, which the caller bumps when it serves a
+/// hit, so this is least recently used rather than least recently written. A
+/// file whose metadata will not read is left where it is: an entry nothing can
+/// judge is not an entry to delete.
+///
+/// Only immediate children are considered, and only regular files, so a symlink
+/// in the dir is counted by neither the total nor the deletions and nothing
+/// outside `dir` can be reached.
+pub fn sweep(dir: &Path, suffix: &str, budget: u64, keep: &Path) -> u64 {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    let mut files: Vec<(SystemTime, u64, PathBuf)> = Vec::new();
+    let mut spent = 0u64;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy().ends_with(suffix))
+        {
+            continue;
+        }
+        let Ok(meta) = std::fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if !meta.is_file() {
+            continue;
+        }
+        if path == keep {
+            spent += meta.len();
+            continue;
+        }
+        let Ok(used) = meta.modified() else {
+            continue;
+        };
+        files.push((used, meta.len(), path));
+    }
+
+    // Most recently used first, so the budget is spent on what is being looked
+    // at now and the tail of the list is what nobody has come back to.
+    files.sort_by_key(|(used, _, _)| std::cmp::Reverse(*used));
+    let mut removed = 0u64;
+    for (_, size, path) in files {
+        if spent + size <= budget {
+            spent += size;
+        } else if std::fs::remove_file(&path).is_ok() {
+            removed += size;
+        }
+    }
+    removed
+}
+
+/// Mark `file` as used now, so [`sweep`] counts a cache hit as a use rather than
+/// only a write. Best effort, like every other write in here.
+pub fn touch(file: &Path) {
+    if let Ok(handle) = std::fs::File::options().write(true).open(file) {
+        let _ = handle.set_modified(SystemTime::now());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::cell::Cell;
+    use std::time::{Duration, SystemTime};
 
     fn temp_dir(tag: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("coilbox_thumb_cache_{tag}"));
         let _ = std::fs::remove_dir_all(&dir);
         dir
+    }
+
+    /// Write `bytes` bytes to `dir/name`, last used `age` seconds ago.
+    fn aged(dir: &PathBuf, name: &str, bytes: usize, age: u64) -> PathBuf {
+        std::fs::create_dir_all(dir).unwrap();
+        let file = dir.join(name);
+        std::fs::write(&file, vec![0u8; bytes]).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&file)
+            .unwrap()
+            .set_modified(SystemTime::now() - Duration::from_secs(age))
+            .unwrap();
+        file
+    }
+
+    #[test]
+    fn keeps_everything_inside_the_budget() {
+        let dir = temp_dir("sweep_under");
+        let a = aged(&dir, "a-hf.bin", 100, 60);
+        let b = aged(&dir, "b-hf.bin", 100, 30);
+        assert_eq!(sweep(&dir, "-hf.bin", 1000, &b), 0);
+        assert!(a.exists() && b.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn drops_the_least_recently_used_first() {
+        let dir = temp_dir("sweep_over");
+        let old = aged(&dir, "old-hf.bin", 100, 300);
+        let middle = aged(&dir, "middle-hf.bin", 100, 200);
+        let new = aged(&dir, "new-hf.bin", 100, 10);
+        // Room for two of the three.
+        assert_eq!(sweep(&dir, "-hf.bin", 250, &new), 100);
+        assert!(new.exists() && middle.exists());
+        assert!(!old.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The one file that must survive every sweep: the map somebody is looking
+    /// at, which is about to be read over the asset protocol.
+    #[test]
+    fn never_drops_the_file_in_use() {
+        let dir = temp_dir("sweep_keep");
+        let old = aged(&dir, "old-hf.bin", 100, 300);
+        // In use, older than the other, and bigger than the whole budget.
+        let using = aged(&dir, "using-hf.bin", 500, 900);
+        assert_eq!(sweep(&dir, "-hf.bin", 250, &using), 100);
+        assert!(using.exists());
+        assert!(!old.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The PNGs share the dir and are a different problem: small, numerous and
+    /// a whole screen of them is on show at once.
+    #[test]
+    fn leaves_everything_else_in_the_dir_alone() {
+        let dir = temp_dir("sweep_others");
+        let png = aged(&dir, "a-0.png", 100, 900);
+        let grid = aged(&dir, "a-hf.bin", 100, 10);
+        assert_eq!(sweep(&dir, "-hf.bin", 0, &grid), 0);
+        assert!(png.exists() && grid.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_dir_that_is_not_there_is_nothing_to_sweep() {
+        let dir = temp_dir("sweep_missing");
+        assert_eq!(sweep(&dir, "-hf.bin", 100, &dir.join("a-hf.bin")), 0);
     }
 
     #[test]
