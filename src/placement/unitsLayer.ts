@@ -17,9 +17,9 @@ import * as THREE from "three";
 import type { UnitModelResult } from "@/content/bindings";
 import { type BuiltModel, buildModel } from "@/content/unitModel";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
-import { facingToYaw, type Placement } from "@/placement/placements";
-import { worldToScene } from "@/placement/scene";
 import type { Rgb } from "@/play/config";
+import { facingToYaw, type Placement } from "./placements";
+import { worldToScene } from "./scene";
 import { groundHeight, type HeightField } from "./terrain";
 
 /** How wide the stand-in for a unit with no model is, in elmos. Roughly a

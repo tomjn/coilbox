@@ -49,8 +49,8 @@ import {
   pressGesture,
 } from "@/placement/pointer";
 import { sceneToWorld, worldToScene } from "@/placement/scene";
+import type { UnitsLayer } from "@/placement/unitsLayer";
 import type { Point } from "../../model";
-import type { UnitsLayer } from "./unitsLayer";
 
 /**
  * Pickable things on the map that are not units: zones, and the waypoints of a

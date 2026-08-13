@@ -10,8 +10,11 @@ import { useEffect, useRef, useState } from "react";
 
 import type { FootprintMark } from "@/blueprint/footprint";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import {
+  createFootprintsLayer,
+  type FootprintsLayer,
+} from "@/placement/footprintsLayer";
 import type { Point } from "../../model";
-import { createFootprintsLayer, type FootprintsLayer } from "./footprintsLayer";
 
 export function useScenarioFootprints(
   handle: MapScene3D | null,
