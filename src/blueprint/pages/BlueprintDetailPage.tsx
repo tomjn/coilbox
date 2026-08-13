@@ -17,9 +17,10 @@
  */
 
 import { Button, useDrawer } from "@picoframe/frame";
-import { ArrowLeft, Loader2, Repeat, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Copy, Loader2, Repeat, Share2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
 
 import {
   Popover,
@@ -35,6 +36,7 @@ import { useGameUnits } from "@/content/useGameUnits";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import {
+  duplicatedBlueprint,
   footprintsFromUnits,
   libraryLayout,
   recordGameName,
@@ -42,7 +44,12 @@ import {
   type StoredBlueprint,
 } from "../library";
 import type { BaseBlueprint } from "../model";
-import { deleteBlueprint, saveBlueprint, useBlueprintLibrary } from "../store";
+import {
+  blueprintRoute,
+  deleteBlueprint,
+  saveBlueprint,
+  useBlueprintLibrary,
+} from "../store";
 
 /** How long after the last change the layout is written. Long enough that a
  *  drag is one write rather than several, short enough that nobody has to think
@@ -151,6 +158,10 @@ export default function BlueprintDetailPage() {
               edit(recordWithLayout(record, layout, footprints))
             }
           />
+          <DuplicateBlueprintButton
+            record={record}
+            taken={records.map((entry) => entry.layout.name)}
+          />
           <ShareBlueprintButton record={record} />
           <DeleteBlueprintButton
             name={record.layout.name}
@@ -241,6 +252,59 @@ function ShareBlueprintButton({ record }: { record: StoredBlueprint }) {
       onClick={() => void share()}
     >
       <Share2 className="size-4" /> Share
+    </Button>
+  );
+}
+
+/**
+ * Make a variant of this layout (issue #1452).
+ *
+ * A copy rather than a fork of what is on disk: it takes the record in hand, so
+ * a duplicate pressed a moment after a drag carries the drag. It lands as its
+ * own entry and opens, because the reason to copy a layout is to change the
+ * copy.
+ */
+function DuplicateBlueprintButton({
+  record,
+  taken,
+}: {
+  record: StoredBlueprint;
+  /** Every name in the library, so a copy of "Opening solars" is offered as
+   *  "Opening solars 2" rather than as a twin. */
+  taken: string[];
+}) {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+
+  async function duplicate() {
+    setBusy(true);
+    try {
+      const copy = duplicatedBlueprint(record, taken);
+      await saveBlueprint(copy);
+      toast.success(`"${copy.layout.name}" is yours to change.`);
+      navigate(blueprintRoute(copy.id));
+    } catch (e) {
+      toast.error(`That layout could not be copied: ${message(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="gap-1.5"
+      disabled={busy}
+      onClick={() => void duplicate()}
+    >
+      {busy ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <Copy className="size-4" />
+      )}
+      Duplicate
     </Button>
   );
 }

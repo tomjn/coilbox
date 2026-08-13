@@ -83,6 +83,34 @@ export function newStoredBlueprint(
 }
 
 /**
+ * A copy of a layout, to make a variant of it (issue #1452).
+ *
+ * A second opening is usually the first one with a building moved, so the way
+ * to one is the layout you already have under a new name. The copy is a fresh
+ * id over the same payload, which is what makes it a separate entry rather than
+ * a second name for the same one, and it is deep so that editing it never
+ * reaches the original. The name is counted up past what is taken, the same way
+ * a new layout's is, so a copy of "Opening solars" is "Opening solars 2".
+ *
+ * Timestamps are left for the store to stamp, so a copy is the most recently
+ * edited thing in the library and opens at the top of it.
+ */
+export function duplicatedBlueprint(
+  record: StoredBlueprint,
+  taken: Iterable<string>,
+): StoredBlueprint {
+  return {
+    id: crypto.randomUUID(),
+    createdAt: "",
+    updatedAt: "",
+    layout: {
+      ...structuredClone(record.layout),
+      name: uniqueLayoutName(record.layout.name, taken),
+    },
+  };
+}
+
+/**
  * The record after an edit to its layout.
  *
  * `footprintOf` is the game's units, which is what makes the stored footprints

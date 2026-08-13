@@ -86,4 +86,10 @@ describe("BlueprintDetailPage", () => {
   it("offers no name field of its own, so a rename is an editor edit", () => {
     expect(markup()).not.toContain("<input");
   });
+
+  /** The way to a variant of a layout, rather than drawing it again (issue
+   *  #1452). */
+  it("offers a copy of the layout", () => {
+    expect(markup()).toContain("Duplicate");
+  });
 });
