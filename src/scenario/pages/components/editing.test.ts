@@ -3,7 +3,7 @@ import { buildGridSnap } from "@/blueprint/footprint";
 import { dragKeys } from "@/placement/placements";
 import { draggedBuilding } from "@/placement/preview";
 import { newScenario } from "../../create";
-import type { Scenario } from "../../model";
+import type { Point, Scenario } from "../../model";
 import {
   addActor,
   canTurn,
@@ -220,15 +220,57 @@ describe("moving a building onto the build grid", () => {
     expect(next.blueprints[0].buildings[0].offset).toEqual({ x: 34, z: 0 });
   });
 
-  it("re-snaps a turned building, because its sides have swapped", () => {
-    const next = turnPlacement(withFusion(), "base:b1#0", 1, snap);
+  /** Where the engine stands the first building of a base, which is the square
+   *  an author sees and the square a drag is measured from. */
+  function drawnAt(doc: Scenario): Point {
+    const at = scenarioPlacements(doc, snap).find(
+      (one) => one.key === "base:b1#0",
+    );
+    if (!at) throw new Error("the base has no first building");
+    return at.pos;
+  }
+
+  /**
+   * Issue #1523. A turn writes the facing and nothing else. Its sides have
+   * swapped, so the engine stands it half a build square from where it was,
+   * and that is the whole of the move: the point the layout names is what the
+   * engine is asked about at both facings, so the same facing always means the
+   * same square.
+   */
+  it("turns a building without writing a new point into the layout", () => {
+    const next = turnPlacement(withFusion(), "base:b1#0", 1);
     expect(next.blueprints[0].buildings[0].facing).toBe(1);
-    expect(next.blueprints[0].buildings[0].offset).toEqual({ x: 0, z: 8 });
+    expect(next.blueprints[0].buildings[0].offset).toEqual({ x: 0, z: 0 });
   });
 
-  it("only turns when no footprints are known", () => {
-    const next = turnPlacement(withFusion(), "base:b1#0", 1);
-    expect(next.blueprints[0].buildings[0].offset).toEqual({ x: 0, z: 0 });
+  it("stands a turned building where the engine will build it", () => {
+    // A 5 by 4 on 2000, 2000: odd on x and even on z, so the engine takes it
+    // to 2008, 2000, and a quarter turn swaps which axis is which.
+    expect(drawnAt(withFusion())).toEqual({ x: 2008, z: 2000 });
+    expect(drawnAt(turnPlacement(withFusion(), "base:b1#0", 1))).toEqual({
+      x: 2000,
+      z: 2008,
+    });
+  });
+
+  it("puts a building back on its square when the turn is turned back", () => {
+    const doc = withFusion();
+    const there = turnPlacement(doc, "base:b1#0", 1);
+    expect(drawnAt(turnPlacement(there, "base:b1#0", -1))).toEqual(
+      drawnAt(doc),
+    );
+  });
+
+  it("leaves a building where it started after a full circle", () => {
+    const doc = withFusion();
+    let round = doc;
+    for (let turn = 0; turn < 4; turn++) {
+      round = turnPlacement(round, "base:b1#0", 1);
+    }
+    expect(drawnAt(round)).toEqual(drawnAt(doc));
+    expect(round.blueprints[0].buildings[0]).toEqual(
+      doc.blueprints[0].buildings[0],
+    );
   });
 });
 

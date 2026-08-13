@@ -422,9 +422,7 @@ export function BlueprintEditor({
               what={`building ${picked.index + 1}`}
               turnable
               onTurn={() =>
-                applyEdit((current) =>
-                  turnPlacement(current, picked.key, 1, snap),
-                )
+                applyEdit((current) => turnPlacement(current, picked.key, 1))
               }
               onDelete={() => {
                 applyEdit((current) => removePlacement(current, picked.key));

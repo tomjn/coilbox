@@ -746,13 +746,7 @@ export function ScenarioMapScene({
               placement={picked}
               onTurn={() =>
                 onChange((doc) =>
-                  turnPlacement(
-                    doc,
-                    picked.key,
-                    1,
-                    snap,
-                    layoutEdit(picked.id),
-                  ),
+                  turnPlacement(doc, picked.key, 1, layoutEdit(picked.id)),
                 )
               }
               onDelete={() => {
