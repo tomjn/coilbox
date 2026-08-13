@@ -703,12 +703,15 @@ impl RoomState {
     ///
     /// A name with a seat waiting for it (see [`RoomState::seats`]) gets that
     /// seat back, announced to the room, and is *not* asked for one. The two are
-    /// alternatives, not a sequence: `REQUESTBATTLESTATUS` is answered by the
-    /// client's connection task, and a client that has just reconnected has a
-    /// state built from nothing, so its answer would be the spectator default and
-    /// would overwrite the seat we had just handed back. Telling the room what
-    /// the seat is fills the same gap without asking a question we already know
-    /// the wrong answer to.
+    /// alternatives, not a sequence.
+    ///
+    /// `REQUESTBATTLESTATUS` is answered by the client's connection task out of
+    /// whatever it has folded so far, and a client that has just reconnected has
+    /// folded nothing. Ask it before telling it and the answer is the spectator
+    /// default, which comes back as a `MYBATTLESTATUS` that overwrites the seat we
+    /// had just handed back. Ask it after and the answer happens to be right.
+    /// Measured on the wire, both ways round. Not asking is the version that does
+    /// not depend on which line the client reads first.
     fn admit(&mut self, peer: PeerId, script_password: Option<String>) -> Vec<Outbound> {
         let (Some(name), Some(battle)) = (self.name_of(peer), self.battle.as_ref()) else {
             return vec![];

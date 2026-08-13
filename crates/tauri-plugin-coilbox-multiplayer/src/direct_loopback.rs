@@ -475,11 +475,12 @@ async fn a_client_that_leaves_is_forgotten() {
 
 /// The reclaim, over a socket, against the real client.
 ///
-/// This is the one that a unit test cannot settle. The room and the client
-/// disagree about who says what after a join: the room hands the seat back, and
-/// the client's connection task answers `REQUESTBATTLESTATUS` on its own out of a
-/// state it has just rebuilt from nothing. Send both and the second undoes the
-/// first, and only a real client on a real socket shows it.
+/// This is the one that a unit test cannot settle. The client's connection task
+/// answers `REQUESTBATTLESTATUS` by itself, out of whatever it has folded so far,
+/// and a client that has just reconnected has folded nothing. So a room that both
+/// hands the seat back and asks for one gets the spectator default back and
+/// overwrites what it just gave, unless the two lines happen to be in the right
+/// order. Which line lands last is not a thing a unit test can see.
 #[tokio::test]
 async fn a_dropped_joiner_reconnects_into_the_seat_they_had() {
     let room = room("alice", false).await;
