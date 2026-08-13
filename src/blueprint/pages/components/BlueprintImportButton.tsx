@@ -16,11 +16,15 @@ import type { StoredBlueprint } from "../../library";
 
 export function BlueprintImportButton({
   initialCode,
+  hubItemId,
   onImported,
 }: {
   /** A confirmed `coilbox://import` code, which opens the drawer with it
    *  prefilled and reads it once (issue #388). */
   initialCode?: string;
+  /** The hub item the code came off, when the hub started this import. What
+   *  the kept layout records as where it came from (issue #1473). */
+  hubItemId?: string;
   onImported: (record: StoredBlueprint) => void;
 }) {
   const drawer = useDrawer();
@@ -36,6 +40,7 @@ export function BlueprintImportButton({
         <ImportBlueprintForm
           key={nextDrawerKey()}
           initialCode={code}
+          hubItemId={hubItemId}
           onImported={(record) => {
             drawer.close();
             onImported(record);

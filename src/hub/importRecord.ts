@@ -96,9 +96,52 @@ export function hubItemIdForContainer(url: string): string | undefined {
   return containerUrls.get(url);
 }
 
-/** Forget every noted address. For tests. */
+/** What one hub item said about itself, for an importer that records where a
+ * copy came from (issue #1473). Only what the item page shows anyway: the id
+ * rides the importer route, and the rest would otherwise have to be fetched
+ * again to say who published something you just pressed Import on. */
+export interface NotedHubItem {
+  id: string;
+  title: string;
+  author: string;
+}
+
+/**
+ * Items this session has read off the hub, by id. Session-scoped for the same
+ * reason the addresses above are: it is a note of what this app just did, and
+ * a stale one only means an import records the item's id without its author.
+ */
+const hubItems = new Map<string, NotedHubItem>();
+
+/** Note what the hub says about `item`, for an import about to be started
+ * from it. */
+export function noteHubItem(item: {
+  id: string;
+  title: string;
+  author_name: string;
+}): void {
+  hubItems.delete(item.id);
+  hubItems.set(item.id, {
+    id: item.id,
+    title: item.title,
+    author: item.author_name,
+  });
+  while (hubItems.size > MAX_CONTAINER_URLS) {
+    const oldest = hubItems.keys().next().value;
+    if (oldest === undefined) break;
+    hubItems.delete(oldest);
+  }
+}
+
+/** What this session read about a hub item, if it read it. */
+export function notedHubItem(id: string): NotedHubItem | undefined {
+  return hubItems.get(id);
+}
+
+/** Forget every noted address and item. For tests. */
 export function clearNotedHubContainers(): void {
   containerUrls.clear();
+  hubItems.clear();
 }
 
 /** Fold a fresh record into the list, replacing any earlier one for the same

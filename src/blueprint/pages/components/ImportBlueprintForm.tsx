@@ -11,16 +11,23 @@
  * (issue #1444). {@link blueprintArrival} works that out, `../../arrival.ts`
  * says why, and none of it blocks the import: the library holds layouts for
  * every game at once, so keeping somebody else's is a real thing to want.
+ *
+ * What the kept copy records about where it came from depends on which of the
+ * three doors it walked through, because they know different amounts (issue
+ * #1473). A file names itself. A hub import names the item and, when the screen
+ * that started it had read one, the author. A pasted code names nothing, and
+ * the record says so rather than inventing a provenance.
  */
 
 import { open } from "@tauri-apps/plugin-dialog";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { ChallengeCodeInput } from "@/challenge/ChallengeCodeInput";
 import { identify } from "@/container/container";
 import { useUnitsyncScan } from "@/content/config";
 import { ErrorBanner } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
+import { notedHubItem } from "@/hub/importRecord";
 import { usePreferredTarget } from "@/play/config";
 import {
   arrivingGame,
@@ -28,7 +35,13 @@ import {
   gameToCheckAgainst,
 } from "../../arrival";
 import { appFileIO } from "../../fileIO";
-import type { StoredBlueprint } from "../../library";
+import {
+  type BlueprintSource,
+  codeSource,
+  fileSource,
+  hubSource,
+  type StoredBlueprint,
+} from "../../library";
 import type { BlueprintPayload } from "../../payload";
 import { saveBlueprint, useBlueprintLibrary } from "../../store";
 import {
@@ -38,18 +51,47 @@ import {
 import { knownUnits } from "../../units";
 import { ArrivingBlueprint } from "./ArrivingBlueprint";
 
+/**
+ * Which of the three doors this copy came through (issue #1473).
+ *
+ * The hub first, because a hub import is also a code and also arrives here: it
+ * is the one that knows the most, so it wins. The author is whatever the screen
+ * that started the import had already read off the hub, and its absence is not
+ * worth a fetch: the id is the fact worth keeping and the hub keeps the rest.
+ */
+function arrivedBy(
+  hubItemId: string | undefined,
+  file: string | null,
+  wasCalled?: string,
+): BlueprintSource {
+  if (hubItemId) {
+    const noted = notedHubItem(hubItemId);
+    return hubSource({ item: hubItemId, author: noted?.author }, wasCalled);
+  }
+  return file ? fileSource(file, wasCalled) : codeSource(wasCalled);
+}
+
 export function ImportBlueprintForm({
   initialCode,
+  hubItemId,
   onImported,
 }: {
   /** A confirmed `coilbox://import` code to prefill and read once (issue #388). */
   initialCode?: string;
+  /** The hub item this code came off, when the hub started the import. */
+  hubItemId?: string;
   /** The stored layout, once it is on disk and the library has been re-read. */
   onImported: (record: StoredBlueprint) => void;
 }) {
   const [payload, setPayload] = useState<BlueprintPayload | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The file the next read is coming out of, set by the browse button and
+  // taken by the read that follows it. A pasted code sets nothing, so what is
+  // here is the difference between a file import and a code import: the two
+  // share one decode, and the paste box does not know which of them ran.
+  const cameFromFile = useRef<string | null>(null);
+  const [from, setFrom] = useState<string | null>(null);
 
   const { records } = useBlueprintLibrary();
   const { target } = usePreferredTarget();
@@ -84,6 +126,9 @@ export function ImportBlueprintForm({
     // about a different one, still offering to be kept.
     setPayload(null);
     setError(null);
+    const file = cameFromFile.current;
+    cameFromFile.current = null;
+    setFrom(file);
     const read = readBlueprintContainer(text);
     if (!read.ok) {
       // Name what the paste actually is, the way a scenario import does: "that
@@ -107,6 +152,7 @@ export function ImportBlueprintForm({
     if (typeof src !== "string") return null;
     const text = await appFileIO.read(src);
     if (text === null) throw new Error("There is no file there.");
+    cameFromFile.current = src;
     return text;
   };
 
@@ -123,6 +169,7 @@ export function ImportBlueprintForm({
         createdAt: "",
         updatedAt: "",
         layout: { ...payload, name: arrival.name },
+        source: arrivedBy(hubItemId, from, arrival.wasCalled),
       });
       onImported(saved);
     } catch (e) {

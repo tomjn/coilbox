@@ -44,7 +44,11 @@ import { appFileIO } from "@/blueprint/fileIO";
 import { buildGridSnap } from "@/blueprint/footprint";
 import type { ImportedBlueprint, ImportReport } from "@/blueprint/format";
 import { mergeIntoGameFile } from "@/blueprint/gameFile";
-import { footprintsFromUnits, uniqueLayoutName } from "@/blueprint/library";
+import {
+  footprintsFromUnits,
+  scenarioSource,
+  uniqueLayoutName,
+} from "@/blueprint/library";
 import {
   blueprintRoute,
   saveBlueprint,
@@ -174,6 +178,10 @@ export function BlueprintPanel({
    * build square (issue #1463). One square is what a reader draws an unstated
    * def as, so nothing is lost by saying nothing, and what is gained is that
    * the layout stops claiming a size for a unit nobody here could measure.
+   *
+   * The copy records which scenario it was lifted out of (issue #1473). A note
+   * about this copy, on the library record rather than in the layout, so it
+   * never travels when the layout is shared on.
    */
   async function onKeep(layoutId: string) {
     setError(null);
@@ -199,6 +207,10 @@ export function BlueprintPanel({
             gameName: scenario.setup.gameName,
             installed: scan.data?.games ?? [],
           },
+        ),
+        source: scenarioSource(
+          { id: scenario.id, name: scenario.name },
+          name === layout.name ? undefined : layout.name,
         ),
       });
       const unstated = footprintOf

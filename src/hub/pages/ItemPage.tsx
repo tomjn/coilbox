@@ -33,7 +33,11 @@ import { describeItem, fetchHubItem, type HubItemDetail } from "../api";
 import { describePinnedGame, matchesPinnedGame } from "../browse";
 import { KindIcon } from "../components/KindIcon";
 import { useHubUrl } from "../config";
-import { type HubItemPresence, withHubItem } from "../importRecord";
+import {
+  type HubItemPresence,
+  noteHubItem,
+  withHubItem,
+} from "../importRecord";
 import { useHubItemPresence } from "../imports";
 import { type HubPreview, readPreview } from "../preview";
 import { hubItemPageUrl } from "../publish";
@@ -383,11 +387,17 @@ export default function ItemPage() {
                   ) : (
                     <Button
                       variant="outline"
-                      onClick={() =>
-                        fetched
-                          ? navigate(withHubItem(fetched.plan.route, item.id))
-                          : void loadContainer()
-                      }
+                      onClick={() => {
+                        if (!fetched) {
+                          void loadContainer();
+                          return;
+                        }
+                        // What the hub says about it, so an importer that
+                        // records where a copy came from can name the author
+                        // rather than an id (issue #1473).
+                        noteHubItem(item);
+                        navigate(withHubItem(fetched.plan.route, item.id));
+                      }}
                       disabled={fetching}
                     >
                       {fetching ? (

@@ -39,7 +39,11 @@ import {
 } from "../browse";
 import { KindIcon } from "../components/KindIcon";
 import { hubItemRoute, useHubUrl } from "../config";
-import { type HubItemPresence, noteHubContainer } from "../importRecord";
+import {
+  type HubItemPresence,
+  noteHubContainer,
+  noteHubItem,
+} from "../importRecord";
 import { useHubItemPresence } from "../imports";
 import { FilterCombobox } from "./components/FilterCombobox";
 import { HeaderAccount } from "./components/HeaderAccount";
@@ -220,6 +224,9 @@ export default function BrowsePage() {
       // Say which item this address belongs to before the link goes anywhere,
       // so the importer that finishes the job can record what it produced.
       noteHubContainer(result.value.container_url, item.id);
+      // And what the hub says about it, so a layout imported from here can
+      // record who published it (issue #1473).
+      noteHubItem(item);
       dispatchDeepLink(link.url);
     },
     [hubUrl],

@@ -30,29 +30,77 @@ import {
 import { blueprintFromPayload, blueprintPayload } from "./transfer";
 
 /**
- * Where a layout came from, when it did not start here (issue #1313).
+ * Where a layout came from, when it did not start here (issues #1313, #1473).
  *
  * A library of thirty layouts where five were drawn by the person and
  * twenty-five came out of somebody's collection is a library where every card
  * looks the same. This is the difference, and it is on the record rather than
  * in the layout on purpose: it is a fact about this copy, not about the shape,
  * so it stays behind when the layout is shared on and it never travels as part
- * of somebody else's blueprint.
+ * of somebody else's blueprint. That is also what keeps a path off your own
+ * disk out of a stranger's file.
  *
- * One kind, because a pack file is the one route that arrives in bulk and so
- * the one where a name on a card does not tell you what you are looking at. A
- * second route is a second member of the union.
+ * One member per way in, because each way knows a different amount and a
+ * record that flattened them would be claiming the same thing about all of
+ * them. A pack file and a single file name themselves, a hub item names its id
+ * and whoever published it, a scenario names the mission the layout was lifted
+ * out of, and a code knows almost nothing, which is worth saying plainly rather
+ * than dressing up.
  */
-export interface BlueprintSource {
-  /** Out of a file holding a collection of layouts. */
+export type BlueprintSource =
+  | PackSource
+  | FileSource
+  | CodeSource
+  | HubSource
+  | ScenarioSource;
+
+/** What every way in knows. */
+interface ArrivedHere {
+  /** What it was called where it came from, when the library kept it as
+   *  something else. Absent when the name came through unchanged. */
+  wasCalled?: string;
+  /** When it arrived, ISO 8601. */
+  at: string;
+}
+
+/** Out of a file holding a collection of layouts. */
+export interface PackSource extends ArrivedHere {
   kind: "pack";
   /** The file it was taken out of, as the person picked it. */
   file: string;
-  /** What it was called in that file, when the library kept it as something
-   *  else. Absent when the name came through unchanged. */
-  wasCalled?: string;
-  /** When it was taken, ISO 8601. */
-  at: string;
+}
+
+/** Out of a file holding this layout on its own. */
+export interface FileSource extends ArrivedHere {
+  kind: "file";
+  /** The file it was read out of, as the person picked it. */
+  file: string;
+}
+
+/** Out of a pasted code or a `coilbox://` link. */
+export interface CodeSource extends ArrivedHere {
+  kind: "code";
+}
+
+/** Out of the community hub. */
+export interface HubSource extends ArrivedHere {
+  kind: "hub";
+  /** The hub item's id. The rest of what the hub knows is the hub's to keep,
+   *  in `../hub/importRecord.ts`, so this holds the key and not a copy. */
+  item: string;
+  /** Who published it, when the screen that started the import had read it.
+   *  Absent for a link followed from anywhere else. */
+  author?: string;
+}
+
+/** Saved out of a scenario, where it was drawn as part of a mission. */
+export interface ScenarioSource extends ArrivedHere {
+  kind: "scenario";
+  /** The scenario document's id. */
+  scenario: string;
+  /** What that scenario is called, for a line a person can read. Absent when
+   *  the scenario had no name. */
+  scenarioName?: string;
 }
 
 /** What the library keeps for one layout. */
@@ -70,53 +118,167 @@ export interface StoredBlueprint {
   source?: BlueprintSource;
 }
 
+/** What every constructor here adds, so none of them has to repeat it. */
+function arrived(wasCalled: string | undefined, at: Date): ArrivedHere {
+  return { ...(wasCalled ? { wasCalled } : {}), at: at.toISOString() };
+}
+
 /** A layout's provenance, for one taken out of a pack file. */
 export function packSource(
   file: string,
   wasCalled?: string,
   at: Date = new Date(),
-): BlueprintSource {
+): PackSource {
+  return { kind: "pack", file, ...arrived(wasCalled, at) };
+}
+
+/** For one read out of a file holding it on its own. */
+export function fileSource(
+  file: string,
+  wasCalled?: string,
+  at: Date = new Date(),
+): FileSource {
+  return { kind: "file", file, ...arrived(wasCalled, at) };
+}
+
+/** For one out of a pasted code or a link, which is all anybody can say about
+ *  it: a code carries the layout and nothing about where it has been. */
+export function codeSource(
+  wasCalled?: string,
+  at: Date = new Date(),
+): CodeSource {
+  return { kind: "code", ...arrived(wasCalled, at) };
+}
+
+/** For one imported from the hub. */
+export function hubSource(
+  item: { item: string; author?: string },
+  wasCalled?: string,
+  at: Date = new Date(),
+): HubSource {
   return {
-    kind: "pack",
-    file,
-    ...(wasCalled ? { wasCalled } : {}),
-    at: at.toISOString(),
+    kind: "hub",
+    item: item.item,
+    ...(item.author ? { author: item.author } : {}),
+    ...arrived(wasCalled, at),
   };
 }
 
-/** The file's own name, without the directories it sat in. Splits on both
+/** For one saved out of a scenario. */
+export function scenarioSource(
+  scenario: { id: string; name?: string },
+  wasCalled?: string,
+  at: Date = new Date(),
+): ScenarioSource {
+  return {
+    kind: "scenario",
+    scenario: scenario.id,
+    ...(scenario.name ? { scenarioName: scenario.name } : {}),
+    ...arrived(wasCalled, at),
+  };
+}
+
+/** A file's own name, without the directories it sat in. Splits on both
  *  separators, because the path came from whichever platform's file dialog. */
-export function sourceFileName(source: BlueprintSource): string {
-  const parts = source.file.split(/[\\/]/);
-  return parts[parts.length - 1] || source.file;
+export function sourceFileName(path: string): string {
+  const parts = path.split(/[\\/]/);
+  return parts[parts.length - 1] || path;
+}
+
+/** Where a layout came from, short enough to sit on a card. */
+export function sourceLabel(source: BlueprintSource): string {
+  switch (source.kind) {
+    case "pack":
+    case "file":
+      return `From ${sourceFileName(source.file)}`;
+    case "code":
+      return "From a shared code";
+    case "hub":
+      return source.author
+        ? `From ${source.author} on the hub`
+        : "From the hub";
+    default:
+      return source.scenarioName
+        ? `From ${source.scenarioName}`
+        : "From a scenario";
+  }
 }
 
 /** Where a layout came from, in a line under its name. */
 export function sourceSummary(source: BlueprintSource): string {
-  const from = `Imported from a file of layouts, ${source.file}.`;
+  const from = summaryOf(source);
   return source.wasCalled
     ? `${from} It was called "${source.wasCalled}" in there.`
     : from;
 }
 
+function summaryOf(source: BlueprintSource): string {
+  switch (source.kind) {
+    case "pack":
+      return `Imported from a file of layouts, ${source.file}.`;
+    case "file":
+      return `Imported from the file ${source.file}.`;
+    case "code":
+      // The honest answer rather than a shrug. A code is the layout and
+      // nothing else, so there is no file, no author and no site to name, and
+      // saying so beats a card that looks like it forgot.
+      return "Imported from a code somebody shared. A code carries the layout and nothing about where it came from, so that is the whole of what is known about it.";
+    case "hub":
+      return source.author
+        ? `Imported from the community hub, published by ${source.author}.`
+        : "Imported from the community hub.";
+    default:
+      return source.scenarioName
+        ? `Saved out of the scenario "${source.scenarioName}".`
+        : "Saved out of a scenario.";
+  }
+}
+
 /** Read a stored source back, or nothing when the record has none and when
  *  what it has is not one. Provenance is a note about the layout rather than
- *  part of it, so a damaged one is dropped and the layout still opens. */
+ *  part of it, so a damaged one is dropped and the layout still opens, and so
+ *  is one recorded by a later version of coilbox naming a way in this one has
+ *  never heard of. */
 function parseBlueprintSource(value: unknown): BlueprintSource | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const v = value as Record<string, unknown>;
-  if (v.kind !== "pack") return undefined;
-  if (typeof v.file !== "string" || v.file.trim() === "") return undefined;
-  const wasCalled =
-    typeof v.wasCalled === "string" && v.wasCalled.trim() !== ""
-      ? v.wasCalled
-      : undefined;
-  return {
-    kind: "pack",
-    file: v.file,
-    ...(wasCalled ? { wasCalled } : {}),
-    at: typeof v.at === "string" ? v.at : "",
+  const text = (key: string): string | undefined => {
+    const held = v[key];
+    return typeof held === "string" && held.trim() !== "" ? held : undefined;
   };
+  const at = typeof v.at === "string" ? v.at : "";
+  const wasCalled = text("wasCalled");
+  const rest: ArrivedHere = { ...(wasCalled ? { wasCalled } : {}), at };
+  const file = text("file");
+  switch (v.kind) {
+    case "pack":
+      return file ? { kind: "pack", file, ...rest } : undefined;
+    case "file":
+      return file ? { kind: "file", file, ...rest } : undefined;
+    case "code":
+      return { kind: "code", ...rest };
+    case "hub": {
+      const item = text("item");
+      const author = text("author");
+      return item
+        ? { kind: "hub", item, ...(author ? { author } : {}), ...rest }
+        : undefined;
+    }
+    case "scenario": {
+      const scenario = text("scenario");
+      const scenarioName = text("scenarioName");
+      return scenario
+        ? {
+            kind: "scenario",
+            scenario,
+            ...(scenarioName ? { scenarioName } : {}),
+            ...rest,
+          }
+        : undefined;
+    }
+    default:
+      return undefined;
+  }
 }
 
 /** What a layout is called when its author has not said. */
