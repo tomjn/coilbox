@@ -19,6 +19,9 @@
  *   saved on its side is turned, a building the engine would not build where the
  *   file put it is moved onto the build grid, and both are counted on screen
  *   before anything is added to the document.
+ * - A game's file holds every game's layouts, because its path has no game in
+ *   it, so each one is checked against the units this scenario's game has and
+ *   what will not place is said before the document changes rather than after.
  * - An export is lossy in one direction only, and the fields it strips are on
  *   screen next to the button that strips them.
  * - Writing into a game's file copies it first and refuses while a game is
@@ -35,6 +38,7 @@ import { appFileIO } from "@/blueprint/fileIO";
 import { buildGridSnap } from "@/blueprint/footprint";
 import type { ImportedBlueprint, ImportReport } from "@/blueprint/format";
 import { mergeIntoGameFile } from "@/blueprint/gameFile";
+import { knownUnits, unknownUnitsWarning } from "@/blueprint/units";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import { usePlay } from "@/play/PlayProvider";
@@ -94,8 +98,11 @@ export function BlueprintPanel({
       // Without a unit dataset every building looks like one square, and
       // snapping on that would move the even-footprint ones onto the wrong half
       // of the grid. Better to leave the file's own numbers alone and say so.
+      // The same dataset is what says whether this game has the units a layout
+      // names at all, so both go in together or neither does.
       const snap = units.length > 0 ? buildGridSnap(units) : undefined;
-      setRead({ from: src, report: barFormat.read(text, snap) });
+      const known = units.length > 0 ? knownUnits(units) : undefined;
+      setRead({ from: src, report: barFormat.read(text, snap, known) });
     } catch (e) {
       setError(message(e));
     }
@@ -339,37 +346,68 @@ function FileContents({
         </p>
       ) : (
         <ul className="space-y-1.5">
-          {report.blueprints.map((imported, at) => (
-            <li
-              // A file is free to hold two layouts of the same name, and where
-              // it stands in the file is the only thing telling them apart.
-              // biome-ignore lint/suspicious/noArrayIndexKey: see above
-              key={`${at}-${imported.layout.name}`}
-              className="space-y-1 rounded border border-border/40 bg-background px-2 py-1.5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate text-sm">
-                  {imported.layout.name}
-                </span>
-                <span className="shrink-0 text-[11px] text-muted-foreground">
-                  {imported.layout.buildings.length} building
-                  {imported.layout.buildings.length === 1 ? "" : "s"}
-                  {imported.layout.ordered ? " · build order" : ""}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0"
-                  disabled={!canTake}
-                  onClick={() => onTake(imported)}
-                >
-                  Add to this scenario
-                </Button>
-              </div>
-              <Changes imported={imported} />
-            </li>
-          ))}
+          {report.blueprints.map((imported, at) => {
+            const buildings = imported.layout.buildings.length;
+            // Every building of it, which is what another game's layout looks
+            // like from here. Worth reading differently from a layout with one
+            // unit missing, which is still most of a base.
+            const foreign =
+              imported.unknown.length > 0 &&
+              imported.unknown.length >= buildings;
+            const missing = unknownUnitsWarning(imported.unknown, buildings);
+            return (
+              <li
+                // A file is free to hold two layouts of the same name, and
+                // where it stands in the file is the only thing telling them
+                // apart.
+                // biome-ignore lint/suspicious/noArrayIndexKey: see above
+                key={`${at}-${imported.layout.name}`}
+                className="space-y-1 rounded border border-border/40 bg-background px-2 py-1.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate text-sm">
+                    {imported.layout.name}
+                  </span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {buildings} building
+                    {buildings === 1 ? "" : "s"}
+                    {imported.layout.ordered ? " · build order" : ""}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    disabled={!canTake}
+                    onClick={() => onTake(imported)}
+                  >
+                    {foreign ? "Add it anyway" : "Add to this scenario"}
+                  </Button>
+                </div>
+                {missing && (
+                  <p
+                    className={
+                      foreign
+                        ? "rounded bg-amber-950/60 px-2 py-1.5 text-[11px] text-amber-200"
+                        : "text-[11px] text-amber-200/80"
+                    }
+                  >
+                    {missing}
+                  </p>
+                )}
+                <Changes imported={imported} />
+              </li>
+            );
+          })}
         </ul>
+      )}
+
+      {!report.checked && report.blueprints.length > 0 && (
+        <p className="text-[11px] text-amber-200/80">
+          Coilbox has not read this game's units yet, so nothing here has been
+          checked against them. This file holds every layout every game sharing
+          a data directory has saved, and another game's looks exactly like this
+          one's until the names are checked.
+        </p>
       )}
 
       {report.unreadable > 0 && (
