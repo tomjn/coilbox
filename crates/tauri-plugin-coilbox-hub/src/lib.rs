@@ -58,6 +58,10 @@ async fn hub_sign_out(hub_url: String) -> CliResult {
 ///
 /// The first call after a restart costs one refresh, because the name arrives
 /// beside the token and there is nothing on disk that remembers it.
+///
+/// It always answers. The keychain read it starts with has a deadline (issue
+/// #1456), so a prompt nobody has clicked ends as an error the reader can act on
+/// rather than a command that stays pending for the rest of the session.
 #[tauri::command]
 async fn hub_account(hub_url: String) -> CliResult {
     let answer = |signed_in: bool, account: Value, problem: Value| {
@@ -67,7 +71,7 @@ async fn hub_account(hub_url: String) -> CliResult {
             "problem": problem,
         }))
     };
-    match auth::signed_in(&hub_url) {
+    match auth::signed_in(&hub_url).await {
         Err(e) => return CliResult::err(auth::explain(&e, &hub_url)),
         Ok(false) => return answer(false, Value::Null, Value::Null),
         Ok(true) => {}
