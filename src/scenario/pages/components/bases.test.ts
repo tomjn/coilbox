@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BUILD_SQUARE, buildingFootprints } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
 import { onBuildGrid } from "@/blueprint/offGrid";
+import { substituteBlueprint } from "@/blueprint/substitution";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { newScenario } from "../../create";
 import {
@@ -773,5 +774,81 @@ describe("putting a layout on the build grid", () => {
     expect(buildingsOf(next, "b2").map((b) => b.offset)).toEqual(
       layout.buildings.map((b) => b.offset),
     );
+  });
+});
+
+/**
+ * Converting a base that is already placed in a mission (issue #1466).
+ *
+ * The swap itself is `@/blueprint/substitution` and is tested there. What is
+ * worth testing here is how it reaches the document: as a layout edit like a
+ * drag, so an author mirroring one base of a pair does not convert the base
+ * across the map as well, and so the queues stay on the buildings they were put
+ * on.
+ */
+describe("saying a placed base in another side's buildings", () => {
+  const footprintOf = buildingFootprints([
+    { name: "armlab", footprintX: 4, footprintZ: 4 },
+    { name: "armsolar", footprintX: 4, footprintZ: 4 },
+    { name: "corlab", footprintX: 4, footprintZ: 4 },
+    { name: "corsolar", footprintX: 4, footprintZ: 4 },
+  ]);
+
+  /** The document with base b1 said in Cortex's buildings, the way the base's
+   *  own controls hand the converted layout back. */
+  const converted = (doc: Scenario, how: LayoutEdit = "own") => {
+    const base = doc.bases.find((one) => one.id === "b1") as ScenarioBase;
+    const before = doc.blueprints.find(
+      (one) => one.id === base.blueprint,
+    ) as BaseBlueprint;
+    const after = substituteBlueprint(
+      before,
+      { armlab: "corlab", armsolar: "corsolar" },
+      footprintOf,
+    ).layout;
+    return editBaseLayout(doc, "b1", how, () => after.buildings);
+  };
+
+  it("swaps the buildings and remembers what they were drawn as", () => {
+    const next = converted(document());
+    expect(buildingsOf(next).map((b) => b.def)).toEqual(["corlab", "corsolar"]);
+    expect(buildingsOf(next).map((b) => b.originalName)).toEqual([
+      "armlab",
+      "armsolar",
+    ]);
+  });
+
+  it("copies a layout two bases share rather than converting both", () => {
+    const doc = {
+      ...document(),
+      bases: [structuredClone(base), { ...structuredClone(base), id: "b2" }],
+    };
+    const next = converted(doc);
+    expect(next.blueprints).toHaveLength(2);
+    expect(buildingsOf(next, "b2").map((b) => b.def)).toEqual([
+      "armlab",
+      "armsolar",
+    ]);
+  });
+
+  it("converts every base placed from the layout when that is what was asked", () => {
+    const doc = {
+      ...document(),
+      bases: [structuredClone(base), { ...structuredClone(base), id: "b2" }],
+    };
+    const next = converted(doc, "shared");
+    expect(next.blueprints).toHaveLength(1);
+    expect(buildingsOf(next, "b2").map((b) => b.def)).toEqual([
+      "corlab",
+      "corsolar",
+    ]);
+  });
+
+  it("leaves each building's queue on the building it was put on", () => {
+    const queued = setQueue(document(), "b1", 0, ["armpw"], true);
+    const next = converted(queued);
+    expect(buildingsOf(next)[0].def).toBe("corlab");
+    expect(buildingsOf(next)[0].queue).toEqual(["armpw"]);
+    expect(buildingsOf(next)[0].repeat).toBe(true);
   });
 });

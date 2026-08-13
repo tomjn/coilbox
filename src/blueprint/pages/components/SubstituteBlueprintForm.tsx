@@ -10,17 +10,14 @@
  * The panel itself is pure and tested. This is the half that cannot be.
  */
 
-import { useMemo } from "react";
-import { useUnitsyncGameInfo } from "@/content/config";
 import { useGameUnits } from "@/content/useGameUnits";
-import { usePreferredTarget } from "@/play/config";
 import {
   libraryLayout,
   recordGameName,
   type StoredBlueprint,
 } from "../../library";
 import type { BaseBlueprint } from "../../model";
-import { sideUnitPrefixes } from "../../substitution";
+import { useGameSides } from "../../useGameSides";
 import { SubstitutionPanel } from "./SubstitutionPanel";
 
 export function SubstituteBlueprintForm({
@@ -32,13 +29,7 @@ export function SubstituteBlueprintForm({
 }) {
   const gameName = recordGameName(record);
   const { units, loading, archive } = useGameUnits(gameName);
-  const { target } = usePreferredTarget();
-  const { info } = useUnitsyncGameInfo(
-    target?.enginePath,
-    target?.dataDir,
-    archive,
-  );
-  const sides = useMemo(() => sideUnitPrefixes(info?.sides ?? []), [info]);
+  const sides = useGameSides(archive);
 
   return (
     <SubstitutionPanel

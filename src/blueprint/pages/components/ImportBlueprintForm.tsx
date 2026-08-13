@@ -12,6 +12,13 @@
  * says why, and none of it blocks the import: the library holds layouts for
  * every game at once, so keeping somebody else's is a real thing to want.
  *
+ * The side conversion is offered here too (issue #1467), and it is the one thing
+ * on this screen that is not a check. Both sides of a game live in one game, so
+ * an Armada layout has every unit a Cortex player has installed and nothing
+ * above finds anything wrong with it. What can be said is whose buildings it is
+ * made of, which needs the game's sides rather than its unit list, and it is
+ * said only where that can be worked out at all.
+ *
  * What the kept copy records about where it came from depends on which of the
  * three doors it walked through, because they know different amounts (issue
  * #1473). A file names itself. A hub import names the item and, when the screen
@@ -35,6 +42,7 @@ import {
   gameToCheckAgainst,
 } from "../../arrival";
 import { appFileIO } from "../../fileIO";
+import { buildingFootprints } from "../../footprint";
 import {
   type BlueprintSource,
   codeSource,
@@ -45,10 +53,17 @@ import {
 import type { BlueprintPayload } from "../../payload";
 import { saveBlueprint, useBlueprintLibrary } from "../../store";
 import {
+  planForSide,
+  sideOffer,
+  substitutePayload,
+  substitutionNotes,
+} from "../../substitution";
+import {
   blueprintImportErrorMessage,
   readBlueprintContainer,
 } from "../../transfer";
 import { knownUnits } from "../../units";
+import { useGameSides } from "../../useGameSides";
 import { ArrivingBlueprint } from "./ArrivingBlueprint";
 
 /**
@@ -92,6 +107,9 @@ export function ImportBlueprintForm({
   // share one decode, and the paste box does not know which of them ran.
   const cameFromFile = useRef<string | null>(null);
   const [from, setFrom] = useState<string | null>(null);
+  /** The side the layout is being taken as, empty for the one it was drawn in
+   *  (issue #1467). */
+  const [takingAs, setTakingAs] = useState("");
 
   const { records } = useBlueprintLibrary();
   const { target } = usePreferredTarget();
@@ -105,19 +123,61 @@ export function ImportBlueprintForm({
     () => arrivingGame(payload?.game, installed),
     [payload, installed],
   );
-  const { units } = useGameUnits(gameToCheckAgainst(game));
+  const { units, archive } = useGameUnits(gameToCheckAgainst(game));
+  const sides = useGameSides(archive);
+  const known = useMemo(() => knownUnits(units), [units]);
+  const footprintOf = useMemo(
+    () => (units.length > 0 ? buildingFootprints(units) : undefined),
+    [units],
+  );
+
+  // Which side the layout is written in and which sides this game has it in,
+  // both read off the layout as it arrived rather than off the converted one,
+  // so the choice below stays the same choice after it has been made.
+  const offer = useMemo(
+    () =>
+      payload
+        ? sideOffer(
+            payload.buildings.map((building) => building.def),
+            sides,
+            known,
+          )
+        : undefined,
+    [payload, sides, known],
+  );
+
+  // The layout as it will be kept: converted where a side has been picked, and
+  // exactly as it arrived otherwise. Everything below reads this, so the
+  // drawing, the missing-unit check and the save are all about the same layout.
+  const converted = useMemo(
+    () =>
+      payload && takingAs
+        ? substitutePayload(
+            payload,
+            planForSide(
+              payload.buildings.map((building) => building.def),
+              takingAs,
+              sides,
+              known,
+            ),
+            footprintOf,
+          )
+        : null,
+    [payload, takingAs, sides, known, footprintOf],
+  );
+  const keeping = converted?.payload ?? payload;
 
   const arrival = useMemo(
     () =>
-      payload
+      keeping
         ? blueprintArrival({
-            payload,
+            payload: keeping,
             taken: records.map((record) => record.layout.name),
             installed,
-            known: units.length > 0 ? knownUnits(units) : undefined,
+            known: units.length > 0 ? known : undefined,
           })
         : null,
-    [payload, records, installed, units],
+    [keeping, records, installed, units, known],
   );
 
   const decode = async (text: string) => {
@@ -126,6 +186,9 @@ export function ImportBlueprintForm({
     // about a different one, still offering to be kept.
     setPayload(null);
     setError(null);
+    // A side picked for the last layout says nothing about this one, and the
+    // sides a game has are not the sides the next game has.
+    setTakingAs("");
     const file = cameFromFile.current;
     cameFromFile.current = null;
     setFrom(file);
@@ -160,7 +223,7 @@ export function ImportBlueprintForm({
   // importing the layout you exported give you a second copy instead of
   // overwriting the first.
   const take = async () => {
-    if (!payload || !arrival) return;
+    if (!keeping || !arrival) return;
     setError(null);
     setBusy(true);
     try {
@@ -168,7 +231,7 @@ export function ImportBlueprintForm({
         id: crypto.randomUUID(),
         createdAt: "",
         updatedAt: "",
-        layout: { ...payload, name: arrival.name },
+        layout: { ...keeping, name: arrival.name },
         source: arrivedBy(hubItemId, from, arrival.wasCalled),
       });
       onImported(saved);
@@ -205,12 +268,20 @@ export function ImportBlueprintForm({
         </div>
       )}
 
-      {payload && arrival && (
+      {keeping && arrival && (
         <ArrivingBlueprint
-          payload={payload}
+          payload={keeping}
           arrival={arrival}
           busy={busy}
           onTake={() => void take()}
+          conversion={
+            offer && {
+              offer,
+              takingAs,
+              notes: converted ? substitutionNotes(converted.report) : [],
+              onTakeAs: setTakingAs,
+            }
+          }
         />
       )}
     </div>

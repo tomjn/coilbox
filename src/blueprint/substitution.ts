@@ -52,6 +52,8 @@
 import type { ArrivalNote } from "./arrival";
 import { type Footprint, footprintMarks, snapToBuildGrid } from "./footprint";
 import type { BaseBlueprint, BlueprintBuilding } from "./model";
+import type { BlueprintPayload } from "./payload";
+import { blueprintFromPayload } from "./transfer";
 import type { KnownUnits } from "./units";
 
 /** A side of a game and the prefix its unit names start with. */
@@ -176,6 +178,75 @@ export function planForSide(
   return plan;
 }
 
+/**
+ * The one side a whole layout is written in, or nothing.
+ *
+ * A layout is normally all one side's, and that is the fact worth having: it is
+ * what lets an arriving layout be described as Armada's before anybody keeps it.
+ * A building belonging to no side is skipped rather than counted against the
+ * answer, because a game's shared buildings are nobody's and a layout of solars
+ * and one shared radar is still an Armada layout.
+ *
+ * Nothing whenever that reasoning does not hold: a game whose sides
+ * {@link sideUnitPrefixes} could not tell apart, a layout naming no side's
+ * buildings at all, or one naming two sides' at once. Nothing means the side
+ * could not be told, and a caller with nothing to say should say nothing rather
+ * than guess.
+ */
+export function layoutSide(
+  defs: readonly string[],
+  sides: readonly SideUnits[],
+): SideUnits | undefined {
+  let found: SideUnits | undefined;
+  for (const def of defs) {
+    const side = sideOfDef(def, sides);
+    if (!side) continue;
+    if (found && found.side !== side.side) return undefined;
+    found = side;
+  }
+  return found;
+}
+
+/** A layout's own side, and the sides it could be said in instead. */
+export interface SideOffer {
+  /** The side every building of it that belongs to one belongs to. */
+  from: string;
+  /** The other sides this game has a version of at least one of those
+   *  buildings in, in the game's own order. Never empty. */
+  to: string[];
+}
+
+/**
+ * Which sides a layout is worth offering to be taken as (issue #1467).
+ *
+ * Two sides of one game live in one game, so a layout naming only one side's
+ * buildings is not a layout with anything missing: every unit it names is
+ * installed and every check coilbox makes of an arriving layout passes. The
+ * thing worth saying to the person taking it is therefore not that something is
+ * wrong, because nothing is, and coilbox does not know which side they play. It
+ * is that this layout is one side's and can be had as another.
+ *
+ * Nothing at all unless the whole question can be answered: the game's sides
+ * read, the layout's own side told, and a side the game really has substitutes
+ * in. A side that would swap nothing is left out rather than offered as a
+ * conversion that does nothing.
+ */
+export function sideOffer(
+  defs: readonly string[],
+  sides: readonly SideUnits[],
+  known: KnownUnits,
+): SideOffer | undefined {
+  const from = layoutSide(defs, sides);
+  if (!from) return undefined;
+  const to = sides
+    .filter((side) => side.side !== from.side)
+    .filter(
+      (side) => Object.keys(planForSide(defs, side.side, sides, known)).length,
+    )
+    .map((side) => side.side);
+  return to.length > 0 ? { from: from.side, to } : undefined;
+}
+
 /** One building that changed hands. */
 export interface SubstitutedBuilding {
   /** Its place in the layout, which is how an author counts buildings. */
@@ -290,6 +361,60 @@ export function substituteBlueprint(
     (building) => plan[building.def.toLowerCase()],
     footprintOf,
   );
+}
+
+/** A shared layout with a plan applied to it, and what that did. */
+export interface SubstitutedPayload {
+  payload: BlueprintPayload;
+  report: SubstitutionReport;
+}
+
+/**
+ * A layout converted before it is kept rather than after (issue #1467).
+ *
+ * The same swap {@link substituteBlueprint} does, said in the shape a layout
+ * travels in, because an import holds the payload and not the app's own layout.
+ * Everything the payload carries that a layout does not, its game and the map it
+ * was drawn on, is carried through untouched: a conversion changes which
+ * buildings it names and nothing else about where it came from.
+ *
+ * The footprints are the one part that has to grow. A payload records how much
+ * ground each def it names stands on, and the substitutes are defs it did not
+ * name, so without this a converted layout would draw its new buildings one
+ * square each. They can only be added where the game's units have been read,
+ * which is the same condition on which anything here is checked at all.
+ */
+export function substitutePayload(
+  payload: BlueprintPayload,
+  plan: SubstitutionPlan,
+  footprintOf?: (def: string) => Footprint,
+): SubstitutedPayload {
+  const done = substituteBlueprint(
+    { id: "", ...blueprintFromPayload(payload) },
+    plan,
+    footprintOf,
+  );
+  const footprints = { ...payload.footprints };
+  if (footprintOf) {
+    for (const one of done.report.substituted) {
+      footprints[one.to.toLowerCase()] = footprintOf(one.to);
+    }
+  }
+  return {
+    payload: {
+      ...payload,
+      buildings: done.layout.buildings.map((building) => ({
+        def: building.def,
+        offset: { x: building.offset.x, z: building.offset.z },
+        facing: building.facing,
+        ...(building.originalName
+          ? { originalName: building.originalName }
+          : {}),
+      })),
+      footprints,
+    },
+    report: done.report,
+  };
 }
 
 /** This layout with every substituted building back under the name it was drawn
