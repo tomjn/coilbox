@@ -19,6 +19,7 @@ import type { BaseBuildingRole, Facing, Point } from "../scenario/model";
 import { barFormat } from "./bar";
 import type { SnapBuilding } from "./footprint";
 import type { BaseBlueprint } from "./model";
+import type { KnownUnits, UnknownBuilding } from "./units";
 
 /**
  * One layout out of a game's file, and what reading it changed.
@@ -43,6 +44,11 @@ export interface ImportedBlueprint {
   /** What the file said that a coilbox layout has nowhere to keep, in words a
    *  person can read. */
   dropped: string[];
+  /** Buildings naming a unit the game being imported into has not got, by their
+   *  place in the layout. Empty when the game has all of them, and when there
+   *  was no unit dataset to check against, which {@link ImportReport.checked}
+   *  is how a reader tells apart. */
+  unknown: UnknownBuilding[];
 }
 
 /** Everything one game's file holds, as coilbox can use it. */
@@ -51,6 +57,10 @@ export interface ImportReport {
   /** How many entries the file holds that this reader could not make a layout
    *  of. They are still in the file and a merge still writes them back. */
   unreadable: number;
+  /** Whether the unit names were checked against a game at all. False when
+   *  there was no dataset, and then an empty `unknown` means nothing was
+   *  looked at rather than that everything is there. */
+  checked: boolean;
 }
 
 /** A file's new text, and what merging into it did. */
@@ -82,8 +92,13 @@ export interface BlueprintFormat {
    * `snap` puts each building where the engine would build it. Without one the
    * positions come through exactly as the file has them, which is what a caller
    * with no unit footprints to hand should get rather than a confident guess.
+   *
+   * `known` is the units of the game being imported into, and a layout naming
+   * anything else is still read: which of them are worth taking is the caller's
+   * question, not this one's. Without it nothing is checked and the report says
+   * so. Both come from the unit dataset, so a caller has both or neither.
    */
-  read(text: string, snap?: SnapBuilding): ImportReport;
+  read(text: string, snap?: SnapBuilding, known?: KnownUnits): ImportReport;
   /**
    * The file's text with these layouts merged into it, matched by name.
    * `existing` is empty when the game has no file yet. Throws rather than
