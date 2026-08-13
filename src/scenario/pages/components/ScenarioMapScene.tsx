@@ -30,6 +30,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { PlacementSurface, SurfaceMessage } from "@/placement/PlacementSurface";
+import {
+  baseFootprints,
+  overlappingIn,
+  type Placement,
+  placementKey,
+} from "@/placement/placements";
 import { PlaybackBar, SelectionBar } from "@/placement/SurfaceBars";
 import {
   focusCamera,
@@ -94,12 +100,6 @@ import {
   removePathWaypoint,
   scenarioPaths,
 } from "./orderPaths";
-import {
-  baseFootprints,
-  overlappingIn,
-  type Placement,
-  placementKey,
-} from "./placements";
 import { startMarkers } from "./startPositions";
 import { useGameUnits } from "./useGameUnits";
 import { useMapEditing } from "./useMapEditing";

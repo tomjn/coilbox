@@ -16,6 +16,7 @@
 
 import type { SnapBuilding } from "@/blueprint/footprint";
 import type { BlueprintBuilding } from "@/blueprint/model";
+import type { Placement } from "@/placement/placements";
 import type {
   ActorState,
   Facing,
@@ -25,7 +26,6 @@ import type {
   ScenarioGroup,
 } from "../../model";
 import { editBaseLayout, type LayoutEdit, removeBuilding } from "./bases";
-import type { Placement } from "./placements";
 
 /** How far a pointer may travel between press and release and still count as a
  *  click, in CSS pixels. Wide enough to survive a shaky hand, narrow enough that

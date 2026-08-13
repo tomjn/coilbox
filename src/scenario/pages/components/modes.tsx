@@ -28,6 +28,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { placementKey } from "@/placement/placements";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   baseBuildings,
@@ -44,7 +45,6 @@ import {
   DEFAULT_GROUP_COUNT,
   MAX_GROUP_COUNT,
 } from "./groups";
-import { placementKey } from "./placements";
 import { TeamSelect } from "./TeamSelect";
 import { useGameUnits } from "./useGameUnits";
 import type { GroundDragPhase } from "./useMapEditing";

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { placementKey } from "@/placement/placements";
 import type { Scenario } from "../../model";
 import { contentsSelection, sceneContents } from "./contents";
 import { pathKey } from "./groups";
-import { placementKey } from "./placements";
 
 type Registries = Pick<
   Scenario,

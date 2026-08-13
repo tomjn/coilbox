@@ -17,9 +17,10 @@ import {
   useUnitsyncUnitDataset,
 } from "@/content/config";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
+import { type Placement, teamColor } from "@/placement/placements";
 import { usePreferredTarget } from "@/play/config";
 import type { Point, Scenario } from "../../model";
-import { type Placement, scenarioPlacements, teamColor } from "./placements";
+import { scenarioPlacements } from "./placements";
 import { groundHeight, type HeightField, readHeightField } from "./terrain";
 import { createUnitsLayer, type UnitsLayer } from "./unitsLayer";
 
