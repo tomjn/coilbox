@@ -28,6 +28,12 @@ import {
 let cache: StoredBlueprint[] | null = null;
 const listeners = new Set<(records: StoredBlueprint[]) => void>();
 
+/** Where one layout is edited. Here rather than on the page it addresses, so
+ *  that anything wanting the address does not pull the page in behind it. */
+export function blueprintRoute(id: string): string {
+  return `/content/blueprints/${encodeURIComponent(id)}`;
+}
+
 /** Read and parse every stored document, newest edit first. A document that
  *  will not read is skipped with a warning: one bad file must not empty the
  *  library. */
