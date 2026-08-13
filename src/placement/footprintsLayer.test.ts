@@ -36,6 +36,22 @@ describe("footprintStyle", () => {
     expect(slope.dashed).toBe(false);
   });
 
+  /** Issue #1459. A building in the wrong depth of water is a refusal of its
+   *  own: it is fixed by moving it into the water, or out of it, and no amount
+   *  of flatter ground helps. */
+  it("draws a building at the wrong depth in its own refusal colour", () => {
+    const depth = style("depth");
+    expect(depth.fill).toBeGreaterThan(0);
+    expect(depth.dashed).toBe(false);
+    for (const other of [
+      style("slope"),
+      style("no-def"),
+      style("fine", true),
+    ]) {
+      expect(depth.color).not.toBe(other.color);
+    }
+  });
+
   /** The state that did not exist. Dashed and unfilled, so it cannot be read as
    *  either of the other two at a glance. */
   it("draws a building with no verdict as an empty dashed square", () => {

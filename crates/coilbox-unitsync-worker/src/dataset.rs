@@ -104,6 +104,25 @@ local function floats(d)
   return v and '1' or '0'
 end
 
+-- How deep the water under a building may be, in elmos. The engine demands the
+-- ground under every square of the footprint lie in
+-- [-maxWaterDepth, -minWaterDepth], which is how a naval yard is kept in the sea
+-- and a land building out of it. A def that says nothing gets the engine's own
+-- defaults of -10e6 and +10e6, a band nothing falls outside.
+local function depth(d, lower, upper, fallback)
+  if type(d) ~= 'table' then return fallback end
+  local n = tonumber(d[lower]) or tonumber(d[upper]) or fallback
+  return n
+end
+
+-- How far below the water a floater sits. `GetBuildHeight` levels a floater to
+-- -waterline rather than to the ground under it, so this is what a floating
+-- building is measured against. The engine's default is 0.
+local function waterline_of(d)
+  if type(d) ~= 'table' then return 0 end
+  return tonumber(d.waterline) or tonumber(d.WaterLine) or tonumber(d.waterLine) or 0
+end
+
 local lines = {}
 for _, k in ipairs(names) do
   local d = ud[k]
@@ -127,6 +146,9 @@ for _, k in ipairs(names) do
     .. '\t' .. footprint(d, 'footprintz', 'footprintZ')
     .. '\t' .. string.format('%.4f', maxslope(d))
     .. '\t' .. floats(d)
+    .. '\t' .. string.format('%.4f', depth(d, 'minwaterdepth', 'minWaterDepth', -10e6))
+    .. '\t' .. string.format('%.4f', depth(d, 'maxwaterdepth', 'maxWaterDepth', 10e6))
+    .. '\t' .. string.format('%.4f', waterline_of(d))
 end
 -- A big game's list runs to hundreds of kilobytes, far past what unitsync can
 -- hand back in one string, so it goes back in pieces.
@@ -261,6 +283,19 @@ fn parse_max_slope(field: Option<&str>) -> Option<f32> {
         .map(|n| n.clamp(0.0, 89.0))
 }
 
+/// One water field in elmos, or `None` when the line does not carry it.
+///
+/// Kept apart from a real value for the same reason [`parse_max_slope`] is: a
+/// line written before these fields existed is making no claim, and a reader
+/// that turned that into the engine's defaults would be putting words in its
+/// mouth. Unlike the slope, a negative value is meaningful, because the
+/// engine's own `minWaterDepth` default is -10e6.
+fn parse_water(field: Option<&str>) -> Option<f32> {
+    field
+        .and_then(|s| s.trim().parse::<f32>().ok())
+        .filter(|n| n.is_finite())
+}
+
 /// Parse the `name\tfullname\topt1,opt2,...` lines [`UNIT_DATASET_SHIM_SCRIPT`]
 /// returns into `UnitDatasetEntry`s. A full name equal to the internal name (the
 /// script's fallback) or missing collapses to `None`; an empty options field
@@ -281,6 +316,9 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
             let footprint_z = parse_footprint(it.next());
             let max_slope = parse_max_slope(it.next());
             let float_on_water = it.next().unwrap_or("") == "1";
+            let min_water_depth = parse_water(it.next());
+            let max_water_depth = parse_water(it.next());
+            let waterline = parse_water(it.next());
             let build_options = opts
                 .split(',')
                 .map(str::trim)
@@ -297,6 +335,9 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
                 footprint_z,
                 max_slope,
                 float_on_water,
+                min_water_depth,
+                max_water_depth,
+                waterline,
             })
         })
         .collect()
@@ -406,6 +447,46 @@ mod tests {
     }
 
     #[test]
+    fn reads_the_water_a_building_needs() {
+        let units = parse_dataset_units(
+            "armfsolar\tFloating Solar\t\t0\t\t2\t2\t20.0000\t1\t2.0000\t100.0000\t5.0000",
+        );
+        assert_eq!(units[0].min_water_depth, Some(2.0));
+        assert_eq!(units[0].max_water_depth, Some(100.0));
+        assert_eq!(units[0].waterline, Some(5.0));
+    }
+
+    #[test]
+    fn a_line_without_water_fields_claims_none() {
+        // Same reasoning as the slope. The engine's own defaults are a band so
+        // wide it refuses nothing, and a line that predates the fields is not
+        // claiming that band, it is claiming nothing.
+        let units = parse_dataset_units("armsolar\tSolar\t\t0\tARMSOLAR\t2\t2\t10.0000\t0");
+        assert_eq!(units[0].min_water_depth, None);
+        assert_eq!(units[0].max_water_depth, None);
+        assert_eq!(units[0].waterline, None);
+    }
+
+    #[test]
+    fn a_land_building_keeps_its_negative_min_water_depth() {
+        // The engine's default `minWaterDepth` is -10e6, so the sign has to
+        // survive the round trip or every building would be required to be in
+        // the sea.
+        let units =
+            parse_dataset_units("armsolar\tSolar\t\t0\t\t2\t2\t10.0000\t0\t-10000000\t0.0000\t0");
+        assert_eq!(units[0].min_water_depth, Some(-10_000_000.0));
+        assert_eq!(units[0].max_water_depth, Some(0.0));
+    }
+
+    #[test]
+    fn an_unreadable_water_depth_claims_none() {
+        let units = parse_dataset_units("odd\tOdd\t\t0\t\t1\t1\t0.0000\t0\tdeep\tdeeper\twet");
+        assert_eq!(units[0].min_water_depth, None);
+        assert_eq!(units[0].max_water_depth, None);
+        assert_eq!(units[0].waterline, None);
+    }
+
+    #[test]
     fn shim_script_reads_buildoptions_and_returns_result() {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("VFS.Include"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("buildoptions"));
@@ -417,6 +498,8 @@ mod tests {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("footprintz"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("maxslope"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("waterline"));
+        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("minwaterdepth"));
+        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("maxwaterdepth"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("return __cb_chunk("));
     }
 }

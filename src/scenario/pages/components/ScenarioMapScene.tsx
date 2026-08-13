@@ -42,6 +42,7 @@ import {
   sceneUnchecked,
   unjudgedIn,
   unstableIn,
+  wrongDepthIn,
 } from "@/placement/placements";
 import {
   previewChecks,
@@ -793,6 +794,11 @@ export function ScenarioMapScene({
                     pickedBase.id,
                   )}
                   unstable={unstableIn(
+                    units.placements,
+                    footprints,
+                    pickedBase.id,
+                  )}
+                  wrongDepth={wrongDepthIn(
                     units.placements,
                     footprints,
                     pickedBase.id,

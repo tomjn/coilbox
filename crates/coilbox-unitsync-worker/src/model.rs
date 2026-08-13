@@ -383,6 +383,25 @@ pub struct UnitDatasetEntry {
     /// the unitdef's `floater` or its having a `waterline`. A floater is exempt
     /// from the slope test wherever the ground is below sea level.
     pub float_on_water: bool,
+    /// The unitdef's `minWaterDepth`/`maxWaterDepth`, the other half of the
+    /// engine's `CheckTerrainConstraints`: the ground under every square of the
+    /// footprint must lie in `[-maxWaterDepth, -minWaterDepth]`. A naval yard
+    /// declares a `minWaterDepth` so it can only go in the sea, a land building
+    /// declares a `maxWaterDepth` of 0 so it cannot.
+    ///
+    /// `None` on a line written before these fields existed, for the same
+    /// reason `max_slope` is. The engine's own defaults are -10e6 and +10e6, a
+    /// band so wide it refuses nothing, and a line that predates the fields is
+    /// not claiming that band.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_water_depth: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_water_depth: Option<f32>,
+    /// The unitdef's `waterline`: how far below the water a floater sits.
+    /// `GetBuildHeight` levels a floater to `-waterline` rather than to the
+    /// ground, so without it a floater cannot be judged at all.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub waterline: Option<f32>,
 }
 
 /// Output of the lazy `--unit-dataset` mode: the whole game's unit graph (units +

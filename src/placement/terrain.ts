@@ -104,6 +104,7 @@ export function cornerGround(
     slack: range / 255,
     minHeight,
     maxHeight,
+    hasWater: true,
   };
 }
 
@@ -149,9 +150,19 @@ export function standingField(
  * this the mapless editor would have no ground at all and would draw every
  * building as one nothing had judged, which is true of a map that would not read
  * and is not true of a floor that is flat on purpose (issue #1491).
+ *
+ * No water on it either. The floor sits at 0, which on a map is the water's
+ * surface, and a depth check reading it that way would mark every naval
+ * building in a layout that is only a shape (issue #1459).
  */
 export function flatGround(): Ground {
-  return { cornerAt: () => 0, slack: 0, minHeight: 0, maxHeight: 0 };
+  return {
+    cornerAt: () => 0,
+    slack: 0,
+    minHeight: 0,
+    maxHeight: 0,
+    hasWater: false,
+  };
 }
 
 /** A sample by pixel, clamped to the field so an edge position still reads. */

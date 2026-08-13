@@ -53,6 +53,23 @@ describe("LayoutNotes", () => {
     expect(markup()).toBe("");
   });
 
+  /** Issue #1459. The depth refusal is fixed its own way, so it is said its own
+   *  way rather than folded into the slope sentence. */
+  it("names the buildings the water is wrong for", () => {
+    const html = markup({ wrongDepth: [0, 3] });
+    expect(html).toContain("Buildings 1, 4");
+    expect(html).toContain("wrong depth of water");
+    expect(html).toContain("cyan");
+  });
+
+  it("keeps the depth and the slope apart", () => {
+    const html = markup({ unstable: [0], wrongDepth: [1] });
+    expect(html).toContain("Building 1 stands on ground too steep for it");
+    expect(html).toContain(
+      "Building 2 stands in the wrong depth of water for it",
+    );
+  });
+
   it("keeps the slope and the overlap apart", () => {
     const html = markup({ overlaps: [0], unstable: [1] });
     expect(html).toContain(
