@@ -7,7 +7,12 @@ vi.mock("./auth", () => ({
   hubSignOut: vi.fn(),
 }));
 
-const { askHubWhoWeAre, forgetHubAccounts } = await import("./account");
+const {
+  askHubWhoWeAre,
+  forgetHubAccounts,
+  hubAccountSnapshot,
+  recheckHubAccount,
+} = await import("./account");
 
 const signedIn = {
   signedIn: true,
@@ -57,5 +62,34 @@ describe("who is signed in to the hub", () => {
     await askHubWhoWeAre("https://hub.example");
     await askHubWhoWeAre("https://hub.example");
     expect(hubAccount).toHaveBeenCalledTimes(1);
+  });
+
+  /** Issue #1456. A keychain that did not answer says nothing about whether
+   * there is a sign-in behind it, so reporting it as signed out would offer to
+   * sign in somebody who already is. */
+  it("does not read a failed check as being signed out", async () => {
+    hubAccount.mockRejectedValue(
+      new Error("Coilbox could not read the system keychain in time."),
+    );
+    await askHubWhoWeAre("https://hub.example");
+    const state = hubAccountSnapshot("https://hub.example");
+    expect(state.unknown).toBe(true);
+    expect(state.signedIn).toBe(false);
+    expect(state.loading).toBe(false);
+    expect(state.problem).toContain("keychain");
+  });
+
+  /** The way out of a failed check, since the answer is cached for the session
+   * and nothing else would ask again. */
+  it("asks again when told to", async () => {
+    hubAccount.mockRejectedValueOnce(new Error("no route to host"));
+    hubAccount.mockResolvedValueOnce(signedIn);
+    await askHubWhoWeAre("https://hub.example");
+    await recheckHubAccount("https://hub.example");
+    expect(hubAccount).toHaveBeenCalledTimes(2);
+    const state = hubAccountSnapshot("https://hub.example");
+    expect(state.signedIn).toBe(true);
+    expect(state.unknown).toBe(false);
+    expect(state.problem).toBe(null);
   });
 });
