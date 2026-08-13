@@ -31,6 +31,7 @@ import {
   type HubFilters,
   type HubItem,
   kindLabelPlural,
+  kindsPlural,
 } from "../api";
 import {
   type BrowseResult,
@@ -259,9 +260,11 @@ export default function BrowsePage() {
           <div className="space-y-1">
             <h1 className="text-lg font-semibold leading-none">Coilbox hub</h1>
             <p className="max-w-prose text-sm text-muted-foreground">
-              Presets, challenges, setup packs and scenarios shared by other
-              players. Importing needs no account, and nothing is imported until
-              you have seen what it is and said yes.
+              {/* Built from the kinds the chips below offer, so the sentence
+                  cannot say four when there are five (issue #1502). */}
+              {kindsPlural()} shared by other players. Importing needs no
+              account, and nothing is imported until you have seen what it is
+              and said yes.
             </p>
             {pinnedMatcher && (
               <p className="max-w-prose text-sm text-muted-foreground">
