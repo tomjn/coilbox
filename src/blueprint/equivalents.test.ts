@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   coveredDefs,
+  type EquivalenceTable,
   equivalentOf,
   learnEquivalence,
+  mergeEquivalents,
   NO_EQUIVALENTS,
   parseEquivalenceTable,
   sideOfDefInTable,
@@ -123,6 +125,65 @@ describe("coveredDefs", () => {
   it("counts the defs it can answer for", () => {
     expect(coveredDefs(learned)).toBe(4);
     expect(coveredDefs(NO_EQUIVALENTS)).toBe(0);
+  });
+});
+
+/**
+ * Issue #1526. A game's own table folded into this machine's, where a person's
+ * own answer always wins, because they are the one who plays it.
+ */
+describe("mergeEquivalents", () => {
+  const theirs: EquivalenceTable = {
+    groups: [
+      { Armada: "armsolar", Cortex: "corsolar", Legion: "legsolar" },
+      { Armada: "armanni", Cortex: "cordoom" },
+    ],
+  };
+
+  it("takes what nobody has said anything about", () => {
+    expect(
+      equivalentOf("armanni", "Cortex", mergeEquivalents(learned, theirs)),
+    ).toBe("cordoom");
+  });
+
+  it("leaves an answer a person already gave", () => {
+    const mine = learnEquivalence(
+      NO_EQUIVALENTS,
+      "Armada",
+      "armanni",
+      "Cortex",
+      "corsy",
+    );
+    expect(
+      equivalentOf("armanni", "Cortex", mergeEquivalents(mine, theirs)),
+    ).toBe("corsy");
+  });
+
+  it("fills in a side a person never answered for", () => {
+    expect(
+      equivalentOf("armsolar", "Legion", mergeEquivalents(learned, theirs)),
+    ).toBe("legsolar");
+  });
+
+  it("leaves a group two of a person's own groups both claim", () => {
+    const mine: EquivalenceTable = {
+      groups: [
+        { Armada: "armsolar", Cortex: "corsy" },
+        { Legion: "legsolar", Cortex: "corak" },
+      ],
+    };
+    const merged = mergeEquivalents(mine, theirs).groups;
+    expect(merged[0]).toEqual({ Armada: "armsolar", Cortex: "corsy" });
+    expect(merged[1]).toEqual({ Legion: "legsolar", Cortex: "corak" });
+  });
+
+  it("changes nothing the second time, so reading it again is free", () => {
+    const once = mergeEquivalents(learned, theirs);
+    expect(mergeEquivalents(once, theirs)).toBe(once);
+  });
+
+  it("takes nothing from a game that shipped nothing", () => {
+    expect(mergeEquivalents(learned, NO_EQUIVALENTS)).toBe(learned);
   });
 });
 

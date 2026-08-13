@@ -24,13 +24,11 @@
  *   people who do not play most of those games, going stale every time a game
  *   renames a unit. It also says nothing at all about the mods, which are most
  *   of what this app is for.
- * - Reading one out of the game is the good idea that does not pay. Beyond All
- *   Reason ships the only one anybody has, at
- *   `luaui/Include/blueprint_substitution/definitions.lua`, and it is Lua behind
- *   a `VFS.Include`, in a shape that is BAR's rather than a format. It covers 87
- *   categories, all of them buildings bar the commander, so it does not reach
- *   the queued units that are the actual gap. Worth doing one day for the
- *   buildings it does fix, and it is filed, but it is not the fix.
+ * - Reading one out of the game is worth having and is not the fix. Beyond All
+ *   Reason ships the only one anybody has, and coilbox now reads it on being
+ *   asked to: `./shippedEquivalents.ts`. It covers 87 categories, all of them
+ *   buildings bar the commander, so it does not reach the queued units that are
+ *   the actual gap, and it is one game.
  *
  * A person's own answers cost nothing to be right, are corrigible by
  * definition because correcting one is how they are made, and are the only route
@@ -170,6 +168,54 @@ export function learnEquivalence(
       ? table.groups.map((group) => (group === held ? grown : group))
       : [...table.groups, grown],
   };
+}
+
+/**
+ * This machine's table with a game's own folded into it (issue #1526).
+ *
+ * A person's answer always wins, because they are the one who plays the game and
+ * the game's file is a fact about a version of it. So a side they have already
+ * answered for is left exactly as it is, and only the sides they never answered
+ * are filled in: somebody who has said Armada's annihilator is Cortex's shipyard
+ * keeps that, and still gains Legion's from the game.
+ *
+ * A group two of their groups both claim is left alone entirely. That is the
+ * same rule as everywhere else here: two answers is no answer, and merging into
+ * one of them at random would silently change what a base builds.
+ *
+ * The same table back, unchanged, when there is nothing to add, so reading a
+ * game's file twice writes nothing the second time.
+ */
+export function mergeEquivalents(
+  mine: EquivalenceTable,
+  theirs: EquivalenceTable,
+): EquivalenceTable {
+  const groups = [...mine.groups];
+  let grew = false;
+
+  for (const group of theirs.groups) {
+    const defs = Object.values(group);
+    const holding = groups.filter((held) =>
+      Object.values(held).some((def) => defs.includes(def)),
+    );
+    if (holding.length > 1) continue;
+
+    if (holding.length === 0) {
+      groups.push({ ...group });
+      grew = true;
+      continue;
+    }
+
+    const held = holding[0];
+    const added = Object.fromEntries(
+      Object.entries(group).filter(([side]) => held[side] === undefined),
+    );
+    if (Object.keys(added).length === 0) continue;
+    groups[groups.indexOf(held)] = { ...held, ...added };
+    grew = true;
+  }
+
+  return grew ? { groups } : mine;
 }
 
 /**

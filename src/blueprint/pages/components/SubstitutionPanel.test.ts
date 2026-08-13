@@ -16,12 +16,19 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { learnEquivalence, NO_EQUIVALENTS } from "../../equivalents";
 import type { BaseBlueprint } from "../../model";
-import { sideUnitPrefixes } from "../../substitution";
+import { gameSides, sideUnitPrefixes } from "../../substitution";
 import { SubstitutionPanel } from "./SubstitutionPanel";
 
 const SIDES = sideUnitPrefixes([
   { name: "Armada", startUnit: "armcom" },
   { name: "Cortex", startUnit: "corcom" },
+]);
+
+/** A game whose sides are named and whose units say nothing about which side
+ *  they are, which is what issue #1527 is about. */
+const OPAQUE = gameSides([
+  { name: "Empire", startUnit: "empire_commander" },
+  { name: "Rebels", startUnit: "rebel_hq" },
 ]);
 
 const UNITS = [
@@ -228,6 +235,59 @@ describe("SubstitutionPanel", () => {
 
     it("says nothing about a table nobody has filled in", () => {
       expect(markup()).not.toContain("of this game&#x27;s units from");
+    });
+
+    /**
+     * Issue #1527. A game whose unit names say nothing about its sides still
+     * has sides, and a swap it cannot file under one teaches the table nothing
+     * unless somebody says which side the building was.
+     *
+     * The table here holds two groups that disagree about whose `armsolar` is,
+     * which is the one way a def can be swapped and have no side in a rendered
+     * panel: everything else needs somebody to pick a substitute first, and a
+     * rendered panel is not clicked.
+     */
+    it("asks which side a swapped building is when nothing else can say", () => {
+      const html = markup({
+        sides: OPAQUE,
+        table: {
+          groups: [
+            { Rebels: "armsolar", Empire: "armmex" },
+            { Legion: "armsolar", Rebels: "legsolar" },
+          ],
+        },
+      });
+      expect(html).toContain("cannot tell which side");
+      expect(html).toContain("Say which side it is");
+    });
+
+    it("asks nothing about a game whose own names say which side is which", () => {
+      const html = markup();
+      expect(html).not.toContain("Say which side it is");
+      expect(html).not.toContain("cannot tell which side");
+    });
+
+    /** Issue #1526. One game publishes its own table, so the offer to read it
+     *  is there when there is something to read it with and nowhere else. */
+    describe("reading the game's own table", () => {
+      it("offers to read it", () => {
+        expect(markup({ onReadShipped: () => {} })).toContain(
+          "Read this game&#x27;s own pairings",
+        );
+      });
+
+      it("offers nothing for a game coilbox cannot go and read", () => {
+        expect(markup()).not.toContain("own pairings");
+      });
+
+      it("says what reading it did", () => {
+        expect(
+          markup({
+            onReadShipped: () => {},
+            shippedNote: "Read 86 pairings, 23 of them new.",
+          }),
+        ).toContain("23 of them new");
+      });
     });
 
     it("offers the sides only the table knows about", () => {

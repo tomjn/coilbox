@@ -27,8 +27,10 @@ import { useCallback, useEffect, useState } from "react";
 
 import { carriedShortname, rememberedShortname } from "../container/shortnames";
 import {
+  coveredDefs,
   type EquivalenceTable,
   learnEquivalence,
+  mergeEquivalents,
   NO_EQUIVALENTS,
   parseEquivalenceTable,
 } from "./equivalents";
@@ -108,6 +110,28 @@ export function rememberEquivalence(
   tables.set(key, grown);
   persist();
   for (const listener of listeners) listener();
+}
+
+/**
+ * Fold a game's own published table into this game's, and tell every panel
+ * showing it (issue #1526).
+ *
+ * How many more defs it can answer for than it could before, which is the only
+ * honest measure of what reading the game's file bought: most of what one says
+ * is what the naming route was already right about.
+ */
+export function rememberShippedEquivalents(
+  key: string,
+  theirs: EquivalenceTable,
+): number {
+  if (key === "") return 0;
+  const was = equivalentsFor(key);
+  const grown = mergeEquivalents(was, theirs);
+  if (grown === was) return 0;
+  tables.set(key, grown);
+  persist();
+  for (const listener of listeners) listener();
+  return coveredDefs(grown) - coveredDefs(was);
 }
 
 /** Forget the lot. For tests, which each want to start from nothing. */

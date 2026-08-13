@@ -76,7 +76,12 @@ import type { KnownUnits } from "./units";
 export interface SideUnits {
   /** The side's own name, as `unitsyncGameInfo` reports it. */
   side: string;
-  /** Lower case, because a def is written however its author felt like. */
+  /**
+   * Lower case, because a def is written however its author felt like.
+   *
+   * Empty for a side whose units are not named after it, which is a side that
+   * can be named and picked and read nothing off a def (issue #1527).
+   */
   prefix: string;
 }
 
@@ -129,8 +134,32 @@ export function sideUnitPrefixes(
   return out;
 }
 
+/**
+ * Every side this game has, named, and their prefixes where there are any.
+ *
+ * {@link sideUnitPrefixes} answers the mapping question and says nothing when it
+ * cannot, which loses the side names along with the prefixes. The names are
+ * worth keeping on their own (issue #1527): they are what a person picks a side
+ * from, and unitsync reports them whatever the units are called. So a game whose
+ * naming says nothing gets its sides with no prefix, which reads no side off any
+ * def and suggests no substitute for one.
+ *
+ * A side with no name at all is dropped, because a side nothing can call it is
+ * not one anybody can pick.
+ */
+export function gameSides(
+  sides: readonly { name: string; startUnit?: string }[],
+): SideUnits[] {
+  const read = sideUnitPrefixes(sides);
+  if (read.length > 0) return read;
+  return sides
+    .filter((side) => side.name.trim() !== "")
+    .map((side) => ({ side: side.name, prefix: "" }));
+}
+
 /** Which side a def's name says it belongs to, or nothing for one that belongs
- *  to none: a game's shared units are nobody's to swap. */
+ *  to none: a game's shared units are nobody's to swap. A side with no prefix
+ *  says nothing about any def, so it never claims one. */
 export function sideOfDef(
   def: string,
   sides: readonly SideUnits[],
@@ -138,6 +167,7 @@ export function sideOfDef(
   const name = def.toLowerCase();
   let found: SideUnits | undefined;
   for (const side of sides) {
+    if (side.prefix === "") continue;
     if (!name.startsWith(side.prefix)) continue;
     if (!found || side.prefix.length > found.prefix.length) found = side;
   }
@@ -244,7 +274,9 @@ export function planForSide(
     // there is nothing to swap and no name worth reading.
     if (sideOfDefInTable(def, table) === toSide) continue;
 
-    if (!to) continue;
+    // A side whose units are not named after it has no name to build a
+    // candidate out of, so nothing is proposed rather than a bare stem.
+    if (!to || to.prefix === "") continue;
     const from = sideOfDef(def, sides);
     if (!from || from.prefix === to.prefix) continue;
     const candidate = to.prefix + key.slice(from.prefix.length);
@@ -262,29 +294,62 @@ export interface SubstitutionPair {
   toDef: string;
 }
 
+/** Which side a person said a def is, keyed by the def in lower case. Their word
+ *  and nothing derived, which is why it beats everything else (issue #1527). */
+export type SaidSides = Record<string, string>;
+
 /**
  * What applying this plan says about the game, for a table to keep (issue
  * #1468).
  *
  * Only the pairs whose starting side can be told, because a group is keyed by
  * side and a pair with nowhere to file its first half is not a pair. A game
- * whose unit names say nothing about its sides and whose table is still empty
- * therefore learns nothing from the first conversion, which is honest: nothing
- * in it said which side anything was.
+ * whose unit names say nothing about its sides, whose table is still empty and
+ * whose person was asked nothing therefore learns nothing from the first
+ * conversion, which is honest: nothing in it said which side anything was.
+ *
+ * `said` is the way out of that (issue #1527), and it is first because a person
+ * saying which side a building is outranks a table and a name both.
  */
 export function substitutionPairs(
   plan: SubstitutionPlan,
   toSide: string,
   sides: readonly SideUnits[],
   table: EquivalenceTable = NO_EQUIVALENTS,
+  said: SaidSides = {},
 ): SubstitutionPair[] {
   const out: SubstitutionPair[] = [];
   for (const [fromDef, toDef] of Object.entries(plan)) {
-    const fromSide = sideNameOfDef(fromDef, sides, table);
+    const fromSide =
+      said[fromDef.toLowerCase()]?.trim() ||
+      sideNameOfDef(fromDef, sides, table);
     if (!fromSide || fromSide === toSide) continue;
     out.push({ fromSide, fromDef, toSide, toDef });
   }
   return out;
+}
+
+/**
+ * The defs this plan swaps that nothing can name the side of (issue #1527).
+ *
+ * Exactly what a person has to be asked, and the reason it is this and not the
+ * whole layout: a def left alone teaches nothing whatever side it is, a def a
+ * name or a table already answers for is answered, and a game with no sides to
+ * pick from has nothing to ask about. So a game in the Total Annihilation line
+ * asks nothing ever, and a game whose names say nothing asks once per building
+ * being swapped, until its table has been told and then it stops asking too.
+ *
+ * In the plan's own order, which is the order the rows are in.
+ */
+export function defsNeedingSide(
+  plan: SubstitutionPlan,
+  sides: readonly SideUnits[],
+  table: EquivalenceTable = NO_EQUIVALENTS,
+): string[] {
+  if (gameSideNames(sides, table).length === 0) return [];
+  return Object.keys(plan).filter(
+    (def) => sideNameOfDef(def, sides, table) === undefined,
+  );
 }
 
 /**

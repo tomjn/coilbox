@@ -8,6 +8,9 @@
  * game not being installed, and a table with nothing to check against is no use,
  * so the panel says so rather than offering a conversion it cannot check.
  *
+ * A fourth read is offered rather than done: the table the game itself publishes
+ * (issue #1526), which one game in the world does.
+ *
  * The panel itself is pure and tested. This is the half that cannot be.
  */
 
@@ -20,6 +23,7 @@ import {
 } from "../../library";
 import type { BaseBlueprint } from "../../model";
 import { useGameSides } from "../../useGameSides";
+import { useShippedEquivalents } from "../../useShippedEquivalents";
 import { SubstitutionPanel } from "./SubstitutionPanel";
 
 export function SubstituteBlueprintForm({
@@ -33,6 +37,7 @@ export function SubstituteBlueprintForm({
   const { units, loading, archive } = useGameUnits(gameName);
   const sides = useGameSides(archive);
   const { table, remember } = useEquivalents(archive);
+  const shipped = useShippedEquivalents(archive, sides);
 
   return (
     <SubstitutionPanel
@@ -43,6 +48,9 @@ export function SubstituteBlueprintForm({
       unitsLoading={loading}
       onApply={onApply}
       onRemember={remember}
+      onReadShipped={shipped.read}
+      readingShipped={shipped.reading}
+      shippedNote={shipped.note}
     />
   );
 }

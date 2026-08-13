@@ -4,8 +4,10 @@ import { buildingFootprints } from "./footprint";
 import type { BaseBlueprint } from "./model";
 import type { BlueprintPayload } from "./payload";
 import {
+  defsNeedingSide,
   distinctDefs,
   gameSideNames,
+  gameSides,
   layoutDefs,
   layoutSide,
   planForSide,
@@ -97,6 +99,50 @@ describe("sideUnitPrefixes", () => {
     expect(sideOfDef("corsolar", prefixes)?.side).toBe("Cortex");
     expect(sideOfDef("ArmSolar", prefixes)?.side).toBe("Armada");
     expect(sideOfDef("raptorqueen", prefixes)).toBeUndefined();
+  });
+});
+
+/** Issue #1527. A game whose unit names say nothing about its sides still has
+ *  sides, and their names are the ones a person picks from. */
+describe("gameSides", () => {
+  const opaque = [
+    { name: "Empire", startUnit: "empire_commander" },
+    { name: "Rebels", startUnit: "rebel_hq" },
+  ];
+
+  it("reads the prefixes where the start units give them", () => {
+    expect(gameSides(SIDES)).toEqual([
+      { side: "Armada", prefix: "arm" },
+      { side: "Cortex", prefix: "cor" },
+    ]);
+  });
+
+  it("keeps a game's side names when their unit naming says nothing", () => {
+    expect(gameSides(opaque)).toEqual([
+      { side: "Empire", prefix: "" },
+      { side: "Rebels", prefix: "" },
+    ]);
+  });
+
+  it("drops a side with no name, and has nothing to say about no sides", () => {
+    expect(gameSides([{ name: " " }, { name: "Rebels" }])).toEqual([
+      { side: "Rebels", prefix: "" },
+    ]);
+    expect(gameSides([])).toEqual([]);
+  });
+
+  it("reads no side off a name when there is no prefix to read", () => {
+    expect(sideOfDef("armsolar", gameSides(opaque))).toBeUndefined();
+  });
+
+  it("suggests nothing for a game with no prefixes to swap", () => {
+    expect(
+      planForSide(["armsolar"], "Rebels", gameSides(opaque), known),
+    ).toEqual({});
+  });
+
+  it("offers the game's own side names to convert to", () => {
+    expect(gameSideNames(gameSides(opaque))).toEqual(["Empire", "Rebels"]);
   });
 });
 
@@ -306,6 +352,92 @@ describe("substitutionPairs", () => {
     expect(substitutionPairs({ armsolar: "corsolar" }, "Cortex", [])).toEqual(
       [],
     );
+  });
+
+  /** Issue #1527. Somebody saying which side a building is, which is the only
+   *  thing that can answer for a game whose names do not. */
+  describe("what a person said the side was", () => {
+    const opaque = gameSides([
+      { name: "Empire", startUnit: "empire_commander" },
+      { name: "Rebels", startUnit: "rebel_hq" },
+    ]);
+
+    it("asserts the pair a person's word made sayable", () => {
+      expect(
+        substitutionPairs({ armsolar: "armmex" }, "Rebels", opaque, undefined, {
+          armsolar: "Empire",
+        }),
+      ).toEqual([
+        {
+          fromSide: "Empire",
+          fromDef: "armsolar",
+          toSide: "Rebels",
+          toDef: "armmex",
+        },
+      ]);
+    });
+
+    it("takes a person's word over a name, because somebody said so", () => {
+      expect(
+        substitutionPairs(
+          { armsolar: "corsolar" },
+          "Cortex",
+          prefixes,
+          NO_EQUIVALENTS,
+          { armsolar: "Empire" },
+        )[0].fromSide,
+      ).toBe("Empire");
+    });
+
+    it("asserts nothing from a word that says the def is already this side's", () => {
+      expect(
+        substitutionPairs({ armsolar: "armmex" }, "Rebels", opaque, undefined, {
+          armsolar: "Rebels",
+        }),
+      ).toEqual([]);
+    });
+
+    it("still asserts nothing about a def nobody has said anything about", () => {
+      expect(
+        substitutionPairs({ armsolar: "armmex" }, "Rebels", opaque),
+      ).toEqual([]);
+    });
+  });
+});
+
+/**
+ * Issue #1527. Which of the buildings being swapped nothing can name the side
+ * of, which is exactly what a person has to be asked and no more than that.
+ */
+describe("defsNeedingSide", () => {
+  const opaque = gameSides([
+    { name: "Empire", startUnit: "empire_commander" },
+    { name: "Rebels", startUnit: "rebel_hq" },
+  ]);
+
+  it("names the swapped defs whose side nothing can say", () => {
+    expect(
+      defsNeedingSide({ armsolar: "armmex", armllt: "corsolar" }, opaque),
+    ).toEqual(["armsolar", "armllt"]);
+  });
+
+  it("asks nothing about a game whose own names answer", () => {
+    expect(defsNeedingSide({ armsolar: "corsolar" }, prefixes)).toEqual([]);
+  });
+
+  it("asks nothing about a def this game has already been told", () => {
+    const knows = learnEquivalence(
+      NO_EQUIVALENTS,
+      "Empire",
+      "armsolar",
+      "Rebels",
+      "armmex",
+    );
+    expect(defsNeedingSide({ armsolar: "armmex" }, opaque, knows)).toEqual([]);
+  });
+
+  it("asks nothing at all when there are no sides to pick from", () => {
+    expect(defsNeedingSide({ armsolar: "armmex" }, [])).toEqual([]);
   });
 });
 
