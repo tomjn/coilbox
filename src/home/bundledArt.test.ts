@@ -168,6 +168,7 @@ describe("the chain with bundled art registered", () => {
       "multiplayer.battle",
       "multiplayer.stats",
       "content.games",
+      "content.blueprints",
       "content.archives",
       "content.setupPacks",
       "downloads.maps",
