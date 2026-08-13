@@ -50,7 +50,7 @@ permissions = [
   "allow-content-export-build-tree-html",
   "allow-content-export-build-tree-zip",
   "allow-content-export-challenge",
-  "allow-content-export-keymap",
+  "allow-content-write-file",
   "allow-content-import-challenge",
   "allow-content-import-container",
   "allow-branding-catalog",

@@ -82,6 +82,42 @@ pub(crate) fn map_index(us: &Unitsync, map_name: &str) -> Option<i32> {
     (0..us.map_count()).find(|&i| us.map_name(i).as_deref() == Some(map_name))
 }
 
+/// The suffix every rendered picture in the thumb cache carries, and the whole
+/// of what [`sweep_pictures`] is allowed to delete: minimaps `<key>-<mip>.png`,
+/// heightmaps `<key>-h<side>.png` and metal maps `<key>-m<side>.png`.
+///
+/// The raw height grids in the same dir are bounded on their own much smaller
+/// budget (issue #1535), and the `-dims.json` entries beside them are a few
+/// bytes each and left alone.
+pub(crate) const PICTURE_SUFFIX: &str = ".png";
+
+/// How many bytes of rendered pictures the thumb cache holds, across every map
+/// (issue #1550).
+///
+/// A whole library's pictures came to 72 MB in 200 files on the machine this was
+/// measured on: a small thumbnail for every map, plus a 1024px minimap, a
+/// heightmap and a metal map for each map whose page has been opened. So 512 MB
+/// is seven of those, and what it bounds is years of switching engine and data
+/// directory rather than any one library.
+///
+/// It has to be that generous because the consumer is nothing like the height
+/// grids'. A grid is 3 to 33 MB and one map's, and one map is open at a time. A
+/// picture is a few hundred kilobytes and fifty are on screen at once, so a
+/// picture taken off a page in view is a blank box on it. Three things keep the
+/// sweep off what is being looked at: every call keeps every file it is
+/// answering with, a cache hit counts as a use so a list that was read back
+/// moves as one, and a session that does lose a picture asks for it again
+/// (issue #1551).
+const PICTURE_BUDGET: u64 = 512 * 1024 * 1024;
+
+/// Bound the rendered pictures in the thumb cache, keeping every file this call
+/// is answering with. Called by each of the four renders that writes one.
+pub(crate) fn sweep_pictures(cache_dir: Option<&Path>, keep: &[PathBuf]) {
+    if let Some(dir) = cache_dir {
+        coilbox_thumb_cache::sweep(dir, PICTURE_SUFFIX, PICTURE_BUDGET, keep);
+    }
+}
+
 /// Cache file for a map's minimap: `<cache_dir>/<key>-<mip>.png`. `None` (no
 /// cache dir, or no cache key) disables caching for that map.
 fn cache_file(cache_dir: Option<&Path>, key: Option<&str>, mip: i32) -> Option<PathBuf> {
@@ -146,16 +182,13 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
     };
     us.init(false, 0);
     let _ = us.drain_errors();
-    let result = render_one(
-        &us,
-        map_name,
+    let file = cache_file(
+        cache_dir,
+        map_cache_key(&us, None, map_name).as_deref(),
         mip,
-        cache_file(
-            cache_dir,
-            map_cache_key(&us, None, map_name).as_deref(),
-            mip,
-        ),
     );
+    let result = render_one(&us, map_name, mip, file.clone());
+    sweep_pictures(cache_dir, file.as_slice());
 
     // Start positions, environment (wind/tidal) and appearance (water/sky/sun) all
     // live in mapinfo.lua, so load the map's archives and parse them via unitsync's
@@ -239,12 +272,19 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
     let mut errors = us.drain_errors();
 
     let mut thumbnails = Vec::new();
+    // Every thumbnail this call answers with, which is the whole of a map list
+    // and therefore the whole of what a page of it draws. None of them is a
+    // candidate for the sweep below (issue #1550).
+    let mut rendered = Vec::new();
     for i in 0..us.map_count() {
         let Some(name) = us.map_name(i) else {
             continue;
         };
         let key = map_cache_key(&us, Some(i), &name);
         let file = cache_file(cache_dir, key.as_deref(), mip);
+        if let Some(f) = &file {
+            rendered.push(f.clone());
+        }
         match render_one(&us, &name, mip, file) {
             Ok((image, _)) => {
                 let dims = cached_dims(dims_file(cache_dir, key.as_deref()), || {
@@ -263,6 +303,7 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
     }
     errors.extend(us.drain_errors());
     us.uninit();
+    sweep_pictures(cache_dir, &rendered);
 
     ThumbnailsOutput { thumbnails, errors }
 }
@@ -423,5 +464,17 @@ mod tests {
         let png = cache_file(Some(dir.as_path()), Some("abc"), 3);
         let dims = dims_file(Some(dir.as_path()), Some("abc"));
         assert_ne!(png, dims);
+    }
+
+    /// The picture budget is a suffix, so a minimap that stopped being named
+    /// one would quietly stop being bounded (issue #1550), and the proportions
+    /// beside it must stay out of a budget measured in pictures.
+    #[test]
+    fn the_picture_sweep_covers_a_minimap_and_not_its_proportions() {
+        let dir = temp_dir("sweep-scope");
+        let png = cache_file(Some(dir.as_path()), Some("abc"), 3).expect("cache file");
+        let dims = dims_file(Some(dir.as_path()), Some("abc")).expect("dims file");
+        assert!(png.to_string_lossy().ends_with(PICTURE_SUFFIX));
+        assert!(!dims.to_string_lossy().ends_with(PICTURE_SUFFIX));
     }
 }

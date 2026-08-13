@@ -923,13 +923,14 @@ export const contentBlueprintDelete = defineCommand<
 >("coilbox-content", "content_blueprint_delete");
 
 /**
- * Write a serialised keymap container to a path the user picked. Import runs
- * through `content_import_container`, which reads any coilbox `.json`.
+ * Write text to a path the caller picked, knowing nothing about what is in it:
+ * a serialised keymap, or a game's own `blueprints.json`. Reading runs through
+ * `content_import_container`, the other half of the pair.
  */
-export const contentExportKeymap = defineCommand<
+export const contentWriteFile = defineCommand<
   { dest: string; text: string },
   Record<string, never>
->("coilbox-content", "content_export_keymap");
+>("coilbox-content", "content_write_file");
 
 /* -------------------------------------------------------------------------- *
  * unitsync content scan (plugin `tauri-plugin-coilbox-unitsync`, ACL id

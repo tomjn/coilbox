@@ -66,6 +66,7 @@ import {
   unitsyncUnitDataset,
   unitsyncUnitModel,
 } from "./bindings";
+import { liveCacheHit } from "./cachedFile";
 import { newestEngineId } from "./engineVersion";
 import { useRecordMapAppearance } from "./mapAppearanceCache";
 import { deriveSetup } from "./setup";
@@ -1316,6 +1317,11 @@ export function useUnitsyncGameHeaders(enginePath?: string, dataDir?: string) {
  * Session cache of minimap results, keyed by
  * `dataDir::enginePath::mapName::mip`. The mip is part of the key because the
  * same map is rendered at two sizes: a list thumbnail and a full preview.
+ *
+ * What is cached is the name of the file the worker wrote, not the picture, and
+ * the thumb cache is swept, so every hit goes through {@link liveCacheHit}
+ * rather than being trusted outright (issue #1551). The same is true of the
+ * three caches below.
  */
 const minimapCache = new Map<string, MinimapResult>();
 
@@ -1400,27 +1406,29 @@ export function useUnitsyncMinimap(
       if (mapName) recordAppearance(mapName, appearance);
       if (!url && res.errors?.length) setError(res.errors.join("; "));
     };
-    const cached = minimapCache.get(key);
-    if (cached) {
-      apply(cached);
-      return;
-    }
     let cancelled = false;
     setLoading(true);
     setError(null);
-    // mip 0 = 1024px, the engine's minimap ceiling. That is what the 3D preview
-    // needs, because the minimap is the diffuse texture draped over its terrain.
-    unitsyncMinimap({ enginePath, dataDir, mapName, mip })
-      .then((res) => {
-        if (cancelled) return;
-        // Only remember a render that produced an image. A map unitsync cannot
-        // see yet answers successfully with nothing, and caching that pins the
-        // blank box for the rest of the session: asking for a map mid-download,
-        // or before the rescan that follows it, would leave it without a
-        // minimap even after it had installed.
-        if (renderedUrl(res, unitsyncThumbUrl)) minimapCache.set(key, res);
-        apply(res);
-      })
+    (async () => {
+      const cached = await liveCacheHit(minimapCache, key, (r) => r.file);
+      if (cancelled) return;
+      if (cached) {
+        apply(cached);
+        return;
+      }
+      // mip 0 = 1024px, the engine's minimap ceiling. That is what the 3D
+      // preview needs, because the minimap is the diffuse texture draped over
+      // its terrain.
+      const res = await unitsyncMinimap({ enginePath, dataDir, mapName, mip });
+      if (cancelled) return;
+      // Only remember a render that produced an image. A map unitsync cannot
+      // see yet answers successfully with nothing, and caching that pins the
+      // blank box for the rest of the session: asking for a map mid-download,
+      // or before the rescan that follows it, would leave it without a
+      // minimap even after it had installed.
+      if (renderedUrl(res, unitsyncThumbUrl)) minimapCache.set(key, res);
+      apply(res);
+    })()
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       })
@@ -1510,21 +1518,27 @@ export function useUnitsyncHeightmap(
       setUrl(url);
       if (!url && res.errors?.length) setError(res.errors.join("; "));
     };
-    const cached = heightmapCache.get(key);
-    if (cached) {
-      apply(cached);
-      return;
-    }
     let cancelled = false;
     setLoading(true);
     setError(null);
-    unitsyncHeightmap({ enginePath, dataDir, mapName, maxSide })
-      .then((res) => {
-        if (cancelled) return;
-        // Same rule as the minimap: an empty render is a state, not an answer.
-        if (renderedUrl(res, unitsyncThumbUrl)) heightmapCache.set(key, res);
-        apply(res);
-      })
+    (async () => {
+      const cached = await liveCacheHit(heightmapCache, key, (r) => r.file);
+      if (cancelled) return;
+      if (cached) {
+        apply(cached);
+        return;
+      }
+      const res = await unitsyncHeightmap({
+        enginePath,
+        dataDir,
+        mapName,
+        maxSide,
+      });
+      if (cancelled) return;
+      // Same rule as the minimap: an empty render is a state, not an answer.
+      if (renderedUrl(res, unitsyncThumbUrl)) heightmapCache.set(key, res);
+      apply(res);
+    })()
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       })
@@ -1569,22 +1583,23 @@ export function useUnitsyncHeightField(
       setUrl(url);
       if (!url && res.errors?.length) setError(res.errors.join("; "));
     };
-    const cached = heightFieldCache.get(key);
-    if (cached) {
-      apply(cached);
-      return;
-    }
     let cancelled = false;
     setLoading(true);
     setError(null);
-    unitsyncHeightField({ enginePath, dataDir, mapName })
-      .then((res) => {
-        if (cancelled) return;
-        // Same rule as the minimap: a write that produced nothing is a state,
-        // not an answer, so a retry re-runs it.
-        if (res.file) heightFieldCache.set(key, res);
-        apply(res);
-      })
+    (async () => {
+      const cached = await liveCacheHit(heightFieldCache, key, (r) => r.file);
+      if (cancelled) return;
+      if (cached) {
+        apply(cached);
+        return;
+      }
+      const res = await unitsyncHeightField({ enginePath, dataDir, mapName });
+      if (cancelled) return;
+      // Same rule as the minimap: a write that produced nothing is a state,
+      // not an answer, so a retry re-runs it.
+      if (res.file) heightFieldCache.set(key, res);
+      apply(res);
+    })()
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       })
@@ -1623,21 +1638,22 @@ export function useUnitsyncMetalmap(
       setUrl(url);
       if (!url && res.errors?.length) setError(res.errors.join("; "));
     };
-    const cached = metalmapCache.get(key);
-    if (cached) {
-      apply(cached);
-      return;
-    }
     let cancelled = false;
     setLoading(true);
     setError(null);
-    unitsyncMetalmap({ enginePath, dataDir, mapName })
-      .then((res) => {
-        if (cancelled) return;
-        // Same rule as the minimap: an empty render is a state, not an answer.
-        if (renderedUrl(res, unitsyncThumbUrl)) metalmapCache.set(key, res);
-        apply(res);
-      })
+    (async () => {
+      const cached = await liveCacheHit(metalmapCache, key, (r) => r.file);
+      if (cancelled) return;
+      if (cached) {
+        apply(cached);
+        return;
+      }
+      const res = await unitsyncMetalmap({ enginePath, dataDir, mapName });
+      if (cancelled) return;
+      // Same rule as the minimap: an empty render is a state, not an answer.
+      if (renderedUrl(res, unitsyncThumbUrl)) metalmapCache.set(key, res);
+      apply(res);
+    })()
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       })

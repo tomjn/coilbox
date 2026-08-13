@@ -6,7 +6,7 @@
 //! name so the overlay loads it over the asset protocol.
 
 use crate::ffi::Unitsync;
-use crate::minimap::{map_cache_key, rendered_image, RenderedImage};
+use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage};
 use crate::model::MetalmapOutput;
 use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba};
 use std::io::Cursor;
@@ -88,7 +88,7 @@ pub fn render(
             .map_dimensions(map_name)
             .ok_or_else(|| "no metal infomap available".to_string())?;
         // Only the cache miss pays for the full GetInfoMap read + encode.
-        let (png, on_disk) = coilbox_thumb_cache::cached_at(cache, || {
+        let (png, on_disk) = coilbox_thumb_cache::cached_at(cache.clone(), || {
             let raw = us
                 .metalmap_data(map_name, w, h)
                 .ok_or_else(|| "failed to read metal infomap".to_string())?;
@@ -96,6 +96,7 @@ pub fn render(
         })?;
         Ok((rendered_image(&png, on_disk), w, h))
     })();
+    sweep_pictures(cache_dir, cache.as_slice());
 
     let errors = us.drain_errors();
     us.uninit();
@@ -150,5 +151,15 @@ mod tests {
     fn metalmap_png_rejects_size_mismatch() {
         let raw: Vec<u8> = vec![0, 1, 2];
         assert!(metalmap_png(&raw, 4, 2, 2).is_err());
+    }
+
+    /// The picture budget is a suffix, so a metal map named anything else would
+    /// quietly stop being bounded (issue #1550).
+    #[test]
+    fn the_picture_sweep_covers_what_this_writes() {
+        let file = cache_file(Some(Path::new("/cache")), Some("abc"), 512).expect("cache file");
+        assert!(file
+            .to_string_lossy()
+            .ends_with(crate::minimap::PICTURE_SUFFIX));
     }
 }
