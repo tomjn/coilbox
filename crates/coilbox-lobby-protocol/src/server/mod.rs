@@ -19,6 +19,8 @@
 
 mod client;
 pub mod line;
+mod room;
 
 pub use client::{parse_client_line, ClientCommand};
 pub use line::BattleOpened;
+pub use room::{Outbound, PeerId, PendingJoin, RoomConfig, RoomState};
