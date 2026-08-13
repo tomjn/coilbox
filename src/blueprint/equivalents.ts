@@ -167,6 +167,36 @@ export function sideOfDefInTable(
   return sides.size === 1 ? [...sides][0] : undefined;
 }
 
+/** Whether a person gave any of this group's answers, which is what makes it one
+ *  they meant rather than one they were handed. */
+export function answeredByYou(group: Equivalence): boolean {
+  return Object.values(group).some((held) => held.from === "you");
+}
+
+/**
+ * Where every group stands in the table, the ones a person answered first
+ * (issue #1545).
+ *
+ * Positions rather than groups, so whoever shows them in this order still drops
+ * the group they meant: a table holds no ids, and where a group stands is the
+ * only thing telling two that name the same def apart.
+ *
+ * A group half of which a person gave counts as theirs. They answered part of
+ * it, so it is one of the ones they will come looking for.
+ *
+ * Order rather than a filter, because the question is which answers are theirs
+ * rather than which to hide, and a table read out of a game's file is exactly
+ * where hiding rows is worst: it is long because there is a lot in it worth
+ * looking at.
+ */
+export function orderYoursFirst(table: EquivalenceTable): number[] {
+  const at = table.groups.map((_, stands) => stands);
+  return [
+    ...at.filter((stands) => answeredByYou(table.groups[stands])),
+    ...at.filter((stands) => !answeredByYou(table.groups[stands])),
+  ];
+}
+
 /** Every side this table has been told about, in the order it was first told.
  *  A game whose sides coilbox cannot read off its unit names still has these. */
 export function tableSides(table: EquivalenceTable): string[] {

@@ -109,6 +109,48 @@ describe("EquivalentsPanel", () => {
       expect(markup(TABLE)).toContain("before it started recording");
     });
 
+    /**
+     * Issue #1545. Reading Beyond All Reason's published table lands 87 rows in
+     * one go, and the few answers a person gave are then somewhere in the
+     * middle of them. Their own come first so the list is worth opening.
+     */
+    describe("finding your own answers in a long table", () => {
+      const long: EquivalenceTable = {
+        groups: [
+          {
+            Armada: { def: "armanni", from: "game" },
+            Cortex: { def: "cordoom", from: "game" },
+          },
+          {
+            Armada: { def: "armpw", from: "you" },
+            Cortex: { def: "corak", from: "you" },
+          },
+          {
+            Armada: { def: "armsolar", from: "game" },
+            Cortex: { def: "corsolar", from: "you" },
+          },
+        ],
+      };
+
+      it("lists the answers a person gave before the ones they did not", () => {
+        expect(labels(markup(long))).toEqual([
+          "Forget armpw and corak",
+          "Forget armsolar and corsolar",
+          "Forget armanni and cordoom",
+        ]);
+      });
+
+      it("says how many of them are theirs, so they know where their own stop", () => {
+        expect(markup(long)).toContain("The 2 holding an answer you gave");
+      });
+
+      it("says nothing about an order in a table that is all one kind", () => {
+        expect(markup({ groups: [long.groups[0]] })).not.toContain(
+          "holding an answer you gave",
+        );
+      });
+    });
+
     it("says nothing of the sort when it can account for every answer", () => {
       const html = markup({
         groups: [

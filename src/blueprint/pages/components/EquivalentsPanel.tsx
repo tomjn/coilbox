@@ -29,14 +29,23 @@
  * the sides a person never answered for and leaves the ones they did, so a row
  * really is part theirs and part the game's.
  *
+ * The rows they answered come first (issue #1545). Reading Beyond All Reason's
+ * published table lands 87 at once, and finding their own five among those by
+ * eye is the work marking them was meant to remove. Ordered rather than
+ * filtered, because the question somebody has is which answers are theirs
+ * rather than which rows to hide, and this list is the one place every answer
+ * is looked at: a row a control has hidden is a row nobody checks.
+ *
  * Pure and rendered in a test. The hooks are `./GameEquivalents.tsx`.
  */
 
 import { Button } from "@picoframe/frame";
 import { Shuffle, X } from "lucide-react";
 import {
+  answeredByYou,
   defIn,
   type EquivalenceTable,
+  orderYoursFirst,
   sourceIn,
   tableSides,
 } from "../../equivalents";
@@ -69,6 +78,13 @@ export function EquivalentsPanel({
     ),
   );
 
+  // The person's own answers first, and how many that is, so a table a game's
+  // file filled can still be read for what they said (issue #1545). Said only
+  // when the order is doing something, which is a table holding both kinds.
+  const order = orderYoursFirst(table);
+  const mine = table.groups.filter(answeredByYou).length;
+  const mixed = mine > 0 && mine < table.groups.length;
+
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
@@ -87,15 +103,20 @@ export function EquivalentsPanel({
         answer says where it came from: you picked it while converting, or this
         game's own published table brought it when you asked coilbox to read
         one.
+        {mixed &&
+          ` The ${mine} holding an answer you gave are first, because reading a game's table brings enough at once to lose them in.`}
       </p>
       <ul className="divide-y divide-border/40 rounded-lg border border-border/50 bg-card">
-        {table.groups.map((group, at) => {
+        {order.map((at) => {
+          // Everything on the row comes from where the group stands rather than
+          // from where it is shown, so what a row names and what dropping it
+          // drops cannot come apart.
+          const group = table.groups[at];
           const said = sides.filter((side) => defIn(group, side) !== undefined);
           return (
             <li
               // A table holds no ids and two groups can honestly name the same
               // def, so where it stands is the only thing telling them apart.
-              // biome-ignore lint/suspicious/noArrayIndexKey: see above
               key={`${at}-${said.map((side) => defIn(group, side)).join("-")}`}
               className="flex items-center gap-3 px-3 py-1.5 text-sm"
             >
