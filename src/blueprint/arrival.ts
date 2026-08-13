@@ -14,6 +14,10 @@
  * (`./units.ts`, issue #1436), while a shared one can say which game it is for
  * and whether you have it.
  *
+ * A layout can also arrive somewhere narrower than the library: a mission, which
+ * is for one game (issue #1327). That is the same question with a different
+ * yardstick, so it is `into` on the input rather than a second set of sentences.
+ *
  * Pure, and takes the answers rather than fetching them: the installed games and
  * the unit dataset are both React state on the surface that uses this.
  * Substitution stays out of scope and is
@@ -116,20 +120,50 @@ export interface BlueprintArrival {
 
 export interface ArrivalInput {
   payload: BlueprintPayload;
-  /** The names already in the library, so a second "Opening solars" is kept as
-   *  "Opening solars 2" rather than as a twin. */
+  /** The names already where this is going, so a second "Opening solars" is
+   *  kept as "Opening solars 2" rather than as a twin. */
   taken: Iterable<string>;
   /** This machine's games, or null while they are still being read. */
   installed: readonly InstalledGameInfo[] | null;
   /** The units of {@link gameToCheckAgainst}'s game, once they have been read.
    *  Absent means not checked, which is not the same as nothing being wrong. */
   known?: KnownUnits;
+  /**
+   * The archive name of the game a mission is for, when the layout is going
+   * into that mission rather than into the library (issue #1327).
+   *
+   * The library holds every game's layouts at once, so what it wants to know is
+   * whether this machine has the layout's game. A mission is for exactly one
+   * game, so the question is a different one: a layout for another game is
+   * wrong for this mission even when the machine has both installed, and "not
+   * installed here" would be false about it.
+   */
+  into?: string;
+}
+
+/**
+ * The one game a mission is for, as the list {@link arrivingGame} matches
+ * against, so a layout is checked against the mission and not against
+ * everything on the machine.
+ *
+ * Taken from the installed list where it is there, because that is where the
+ * modinfo shortname is, and that shortname is what recognises a layout drawn
+ * for last week's build of the mission's own game.
+ */
+function missionGame(
+  into: string,
+  installed: readonly InstalledGameInfo[] | null,
+): readonly InstalledGameInfo[] {
+  return [installed?.find((one) => one.name === into) ?? { name: into }];
 }
 
 /** What the person taking this layout needs to know before they take it. */
 export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
-  const { payload, taken, installed, known } = input;
-  const game = arrivingGame(payload.game, installed);
+  const { payload, taken, installed, known, into } = input;
+  const game = arrivingGame(
+    payload.game,
+    into === undefined ? installed : missionGame(into, installed),
+  );
   const notes: ArrivalNote[] = [];
 
   const unknown = unknownBuildings(payload.buildings, known);
@@ -152,13 +186,15 @@ export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
     case "missing":
       notes.push({
         tone: "warn",
-        text: `This layout is for ${game.wanted}, which is not installed here. It will be kept exactly as it is, and its buildings can be checked once you have that game.`,
+        text: into
+          ? `This layout is for ${game.wanted}, and this mission is for ${into}.`
+          : `This layout is for ${game.wanted}, which is not installed here. It will be kept exactly as it is, and its buildings can be checked once you have that game.`,
       });
       break;
     case "other-version":
       notes.push({
         tone: "note",
-        text: `This layout is for ${game.wanted}. You have ${game.here}, which is the same game at another version, so a unit it names may have moved since.`,
+        text: `This layout is for ${game.wanted}. ${into ? `This mission is for ${game.here}` : `You have ${game.here}`}, which is the same game at another version, so a unit it names may have moved since.`,
       });
       break;
     case "installed":
@@ -185,7 +221,7 @@ export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
   if (wasCalled) {
     notes.push({
       tone: "note",
-      text: `A layout in your library is already called "${wasCalled}", so this one is kept as "${name}".`,
+      text: `A layout ${into ? "in this scenario" : "in your library"} is already called "${wasCalled}", so this one is kept as "${name}".`,
     });
   }
 

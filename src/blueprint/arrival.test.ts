@@ -202,3 +202,89 @@ describe("blueprintArrival", () => {
     expect(text).toContain("legsolar");
   });
 });
+
+/**
+ * A layout going into a mission rather than into the library (issue #1327).
+ *
+ * The library holds every game's layouts at once, so what matters there is
+ * whether this machine has the game. A mission is for one game, so a layout for
+ * a different one is wrong for it even when the machine has both, and saying
+ * "not installed here" about it would be false.
+ */
+describe("a layout going into a mission", () => {
+  it("has nothing to say when the layout is for the mission's game", () => {
+    const arrival = blueprintArrival({
+      payload: payload({ game: { name: "Balanced Antihilation 12.34" } }),
+      taken: [],
+      installed: INSTALLED,
+      known: knownUnits(UNITS),
+      into: "Balanced Antihilation 12.34",
+    });
+    expect(arrival.notes).toEqual([]);
+  });
+
+  it("names both games when the layout is for another one this machine has", () => {
+    const arrival = blueprintArrival({
+      payload: payload({ game: { name: "Beyond All Reason test-1" } }),
+      taken: [],
+      installed: INSTALLED,
+      into: "Balanced Antihilation 12.34",
+    });
+    expect(arrival.notes[0].tone).toBe("warn");
+    expect(arrival.notes[0].text).toContain("Beyond All Reason test-1");
+    expect(arrival.notes[0].text).toContain("Balanced Antihilation 12.34");
+    expect(arrival.notes[0].text).not.toContain("not installed");
+  });
+
+  it("still spots another build of the mission's own game", () => {
+    const arrival = blueprintArrival({
+      payload: payload({
+        game: { name: "Balanced Antihilation 12.00", shortname: "BA" },
+      }),
+      taken: [],
+      installed: INSTALLED,
+      into: "Balanced Antihilation 12.34",
+    });
+    expect(arrival.notes[0].text).toContain("another version");
+    expect(arrival.notes[0].tone).toBe("note");
+  });
+
+  it("checks the units against the mission's game", () => {
+    const arrival = blueprintArrival({
+      payload: payload({
+        game: { name: "Balanced Antihilation 12.34" },
+        buildings: [{ def: "legsolar", offset: { x: 0, z: 0 }, facing: 0 }],
+      }),
+      taken: [],
+      installed: INSTALLED,
+      known: knownUnits(UNITS),
+      into: "Balanced Antihilation 12.34",
+    });
+    expect(arrival.foreign).toBe(true);
+    expect(arrival.notes[0].text).toContain("none of its units");
+  });
+
+  it("works for a mission whose game is not installed here", () => {
+    const arrival = blueprintArrival({
+      payload: payload({ game: { name: "Zero-K 1.2.3" } }),
+      taken: [],
+      installed: INSTALLED,
+      into: "Zero-K 1.2.3",
+    });
+    expect(arrival.notes.map((note) => note.text).join(" ")).not.toContain(
+      "not installed",
+    );
+  });
+
+  it("counts a second copy up against the scenario, not the library", () => {
+    const arrival = blueprintArrival({
+      payload: payload({ game: { name: "Balanced Antihilation 12.34" } }),
+      taken: ["Opening solars"],
+      installed: INSTALLED,
+      known: knownUnits(UNITS),
+      into: "Balanced Antihilation 12.34",
+    });
+    expect(arrival.name).toBe("Opening solars 2");
+    expect(arrival.notes[0].text).toContain("in this scenario");
+  });
+});
