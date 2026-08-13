@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   coveredDefs,
   coveredDefsBySource,
+  type Equivalence,
   type EquivalenceTable,
   equivalentOf,
   learnEquivalence,
   mergeEquivalents,
   NO_EQUIVALENTS,
+  namesDef,
   orderYoursFirst,
   parseEquivalenceTable,
   sideOfDefInTable,
@@ -230,6 +232,45 @@ describe("orderYoursFirst", () => {
 
   it("orders nothing for a table nobody has filled in", () => {
     expect(orderYoursFirst(NO_EQUIVALENTS)).toEqual([]);
+  });
+});
+
+/**
+ * Issue #1547. Which rows a person hunting one building is asking about, so a
+ * table long enough to be worth reading is also short enough to answer with.
+ */
+describe("namesDef", () => {
+  const group: Equivalence = {
+    Armada: { def: "armpw", from: "you" },
+    Cortex: { def: "corak", from: "you" },
+  };
+
+  it("finds a row by a def any of its sides calls the thing", () => {
+    expect(namesDef(group, "corak")).toBe(true);
+    expect(namesDef(group, "armpw")).toBe(true);
+  });
+
+  it("finds a row by part of a def, because half a name is what gets typed", () => {
+    expect(namesDef(group, "ak")).toBe(true);
+  });
+
+  it("reads a def written in any case, because a def is typed however", () => {
+    expect(namesDef(group, "CorAk")).toBe(true);
+  });
+
+  it("leaves out a row naming nothing of the sort", () => {
+    expect(namesDef(group, "legpw")).toBe(false);
+  });
+
+  it("takes every row when nothing has been typed, so a blank box hides none", () => {
+    expect(namesDef(group, "")).toBe(true);
+    expect(namesDef(group, "   ")).toBe(true);
+  });
+
+  it("goes by what the game calls a thing rather than what the side is called", () => {
+    // Otherwise typing a side's name would take every row it has an answer
+    // for, which is most of the table and no help to anybody.
+    expect(namesDef(group, "Cortex")).toBe(false);
   });
 });
 
