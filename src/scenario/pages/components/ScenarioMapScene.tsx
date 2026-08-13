@@ -488,7 +488,6 @@ export function ScenarioMapScene({
     worldHeight: assets.worldHeight,
     groundAt: units.groundAt,
     selected,
-    drawing: units.drawing,
     // A zone is a sheet lying over the ground, so it steps aside for a mode
     // that puts things on the ground: otherwise a zone covering a corner of the
     // map would be a corner of the map nothing could be placed on. A waypoint

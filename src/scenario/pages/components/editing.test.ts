@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { dragKeys } from "@/placement/placements";
+import { draggedBuilding } from "@/placement/preview";
 import { newScenario } from "../../create";
 import type { Scenario } from "../../model";
 import {
@@ -143,12 +144,68 @@ describe("moving a building onto the build grid", () => {
     };
   }
 
+  /** A layout coilbox did not author: the solar collector's own point is 15
+   *  elmos from the square the engine will stand it on. */
+  function offGrid(): Scenario {
+    const doc = document();
+    return {
+      ...doc,
+      blueprints: [
+        {
+          ...doc.blueprints[0],
+          buildings: [
+            { def: "armsolar", offset: { x: 15, z: 0 }, facing: 0 },
+            { def: "armllt", offset: { x: 64, z: 0 }, facing: 1 },
+          ],
+        },
+      ],
+    };
+  }
+
   it("puts a dragged building where the engine would build it", () => {
     // Dropped at 2034, which is nowhere the engine would put a 5 by 5. The axis
-    // that was not dragged moves too, because the layout it came from was never
-    // on the grid in the first place.
+    // that was not dragged has its number written down where the building was
+    // already drawn, which moves the offset without moving the building.
     const next = movePlacement(document(), "base:b1#0", { x: 34, z: 0 }, snap);
     expect(next.blueprints[0].buildings[0].offset).toEqual({ x: 40, z: 8 });
+  });
+
+  /**
+   * Issue #1517. A drag carries the building the author is looking at, which
+   * stands where the engine will build it rather than on the point its layout
+   * names. Measuring from the named point put a two elmo drag a whole build
+   * square away on any layout the grid had moved.
+   */
+  it("drags from where the building is drawn, not from the point named", () => {
+    // The layout names 2015 and the engine stands a 5 by 5 at 2008, so two
+    // elmos is a building that has not left the square it was drawn on.
+    const next = movePlacement(offGrid(), "base:b1#0", { x: 2, z: 0 }, snap);
+    expect(next.blueprints[0].buildings[0].offset).toEqual({ x: 8, z: 8 });
+  });
+
+  /** The whole point of the preview a drag draws (#1512): what it showed is
+   *  where the building lands, on a layout the grid moved as much as on one it
+   *  did not. */
+  it("lands the building on the square the drag preview drew", () => {
+    for (const delta of [
+      { x: 2, z: 0 },
+      { x: 34, z: -9 },
+      { x: -30, z: 7 },
+      { x: 0, z: 0 },
+    ]) {
+      const doc = offGrid();
+      const held = draggedBuilding(
+        scenarioPlacements(doc, snap),
+        "base:b1#0",
+        delta,
+      );
+      if (!held) throw new Error("the drag carried nothing");
+      const dropped = scenarioPlacements(
+        movePlacement(doc, "base:b1#0", delta, snap),
+        snap,
+      ).find((one) => one.key === "base:b1#0");
+      expect(dropped?.pos).toEqual(snap(held.pos, held.def, held.facing));
+    }
   });
 
   it("snaps an even footprint to the other grid", () => {
