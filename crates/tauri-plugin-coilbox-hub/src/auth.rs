@@ -350,8 +350,12 @@ pub fn sign_out(hub_url: &str) -> Result<(), AuthError> {
 }
 
 /// Whether there is a stored sign-in for this hub that has not been refused.
-pub fn signed_in(hub_url: &str) -> Result<bool, AuthError> {
-    coilbox_oauth::signed_in(SERVICE, &account_key(hub_url))
+///
+/// The keychain read behind this is given a deadline and run off this thread, so
+/// a keychain that never answers ends as [`AuthError::StorageTimedOut`] rather
+/// than never ending at all. See `coilbox_oauth::signed_in`.
+pub async fn signed_in(hub_url: &str) -> Result<bool, AuthError> {
+    coilbox_oauth::signed_in(SERVICE, &account_key(hub_url)).await
 }
 
 /// An access token for the hub, good for the next minute at least.
@@ -411,6 +415,12 @@ pub fn explain(error: &AuthError, hub_url: &str) -> String {
         }
         AuthError::Storage(said) => {
             format!("Coilbox could not use the system keychain, so your sign-in cannot be kept: {said}")
+        }
+        // Deliberately not "you are not signed in". A keychain that has not
+        // answered says nothing about what is stored in it.
+        AuthError::StorageTimedOut => {
+            "Coilbox could not read the system keychain in time, so it does not know whether you are signed in. The keychain may be locked, or waiting for you to allow access."
+                .into()
         }
         AuthError::NotSignedIn => format!("You are not signed in to the hub at {host}."),
         AuthError::SignInRefused(_) => {
@@ -629,6 +639,7 @@ mod tests {
             AuthError::NotSignedIn,
             AuthError::SignInRefused("revoked".into()),
             AuthError::Storage("locked".into()),
+            AuthError::StorageTimedOut,
             AuthError::Listener("port in use".into()),
             AuthError::Browser("no handler".into()),
         ];

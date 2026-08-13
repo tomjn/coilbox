@@ -1,5 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
-import { Check, Copy, ExternalLink, Globe } from "lucide-react";
+import { Check, Copy, ExternalLink, Globe, RotateCw } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { openExternal } from "@/home/navItem";
@@ -145,6 +145,36 @@ export function PublishSection({ code }: { code: string }) {
         <p className="text-xs text-muted-foreground">
           Checking whether you are signed in.
         </p>
+      </div>
+    );
+  }
+
+  // Coilbox asked and could not find out, which is not the same as being signed
+  // out (issue #1456). Usually a keychain that did not answer inside its ten
+  // seconds. So it says that rather than "sign in", and offers the same question
+  // again first, because whatever was in the way is often gone by now.
+  if (account.unknown) {
+    return (
+      <div className="flex flex-col gap-1.5 border-t pt-3">
+        <h3 className="text-sm font-medium leading-none">Coilbox hub</h3>
+        <p className="text-xs text-muted-foreground">
+          {account.problem ??
+            "Coilbox could not tell whether you are signed in."}
+        </p>
+        <div className="flex gap-2">
+          <Button className="flex-1" onClick={() => void account.recheck()}>
+            <RotateCw className="mr-1.5 size-4" aria-hidden /> Try again
+          </Button>
+          <SignInButton
+            busy={account.busy}
+            onSignIn={account.signIn}
+            size="default"
+          />
+        </div>
+        <Button variant="ghost" onClick={copyAndOpen}>
+          <Globe className="mr-1.5 size-4" aria-hidden /> Copy code &amp; open
+          hub
+        </Button>
       </div>
     );
   }
