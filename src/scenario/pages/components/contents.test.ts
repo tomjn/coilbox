@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { placementKey } from "@/placement/placements";
 import type { Scenario } from "../../model";
-import { contentsSelection, sceneContents } from "./contents";
+import { contentsSelection, sceneContents, unplacedLayouts } from "./contents";
 import { pathKey } from "./groups";
 
 type Registries = Pick<
@@ -200,6 +200,37 @@ describe("sceneContents", () => {
 
   it("holds nothing for a document that places nothing", () => {
     expect(sceneContents(empty)).toEqual([]);
+  });
+});
+
+describe("unplacedLayouts", () => {
+  it("lists the layouts no base is placed from", () => {
+    const placed = placedBase("p1");
+    const out = unplacedLayouts({
+      ...empty,
+      blueprints: [
+        ...placed.blueprints,
+        { id: "spare", name: "Forward post", buildings: [] },
+      ],
+      bases: placed.bases,
+    });
+    expect(out.map((layout) => layout.id)).toEqual(["spare"]);
+    expect(out[0].name).toBe("Forward post");
+  });
+
+  it("counts what a layout is made of, and says it holds a build order", () => {
+    const [entry] = unplacedLayouts({
+      ...empty,
+      blueprints: placedBase("p1").blueprints.map((b) => ({
+        ...b,
+        ordered: true,
+      })),
+    });
+    expect(entry.detail).toBe("2 buildings · build order");
+  });
+
+  it("holds nothing while every layout is placed", () => {
+    expect(unplacedLayouts({ ...empty, ...placedBase("p1") })).toEqual([]);
   });
 });
 

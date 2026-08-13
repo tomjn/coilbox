@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { Point, Scenario } from "../../model";
+import { addBase, removeBase } from "./bases";
 import { addActor } from "./editing";
 import { applyEdit } from "./edits";
-import { type EditHistory, emptyHistory } from "./history";
+import { type EditHistory, emptyHistory, undoEdit } from "./history";
 
 function scenario(): Scenario {
   return {
@@ -47,6 +48,12 @@ function editor(from: Scenario) {
       const applied = applyEdit(document, history, edit);
       document = applied.document;
       history = applied.history;
+    },
+    undo() {
+      const step = undoEdit(history, document);
+      if (!step) return;
+      document = step.document;
+      history = step.history;
     },
     get document() {
       return document;
@@ -94,6 +101,25 @@ describe("applyEdit", () => {
 
     expect(editing.document.name).toBe("Renamed");
     expect(editing.history.past).toHaveLength(1);
+  });
+
+  /** A base and its layout are two registries, so undoing a delete could put a
+   *  second copy of the layout back beside the one the delete left (#1424). */
+  it("puts a deleted base back beside the layout it was placed from", () => {
+    const editing = editor(scenario());
+    editing.apply((doc) =>
+      addBase(doc, "b1", "bp1", {
+        team: "you",
+        origin: { x: 100, z: 100 },
+        buildings: [{ def: "armlab", offset: { x: 0, z: 0 }, facing: 0 }],
+      }),
+    );
+    editing.apply((doc) => removeBase(doc, "b1"));
+    expect(editing.document.blueprints).toHaveLength(1);
+
+    editing.undo();
+    expect(editing.document.blueprints.map((b) => b.id)).toEqual(["bp1"]);
+    expect(editing.document.bases.map((b) => b.id)).toEqual(["b1"]);
   });
 
   it("records nothing for an edit that changed nothing", () => {

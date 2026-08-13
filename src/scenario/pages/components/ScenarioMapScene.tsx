@@ -66,6 +66,7 @@ import {
   type LayoutEdit,
   moveBuilding,
   removeBase,
+  removeBlueprint,
   renameBlueprint,
   setBlueprintOrdered,
   setOrigin,
@@ -77,6 +78,7 @@ import {
   type ContentEntry,
   contentsSelection,
   sceneContents,
+  unplacedLayouts,
 } from "./contents";
 import {
   canTurn,
@@ -511,6 +513,8 @@ export function ScenarioMapScene({
   // What the document has put on the map, for the list that finds it again.
   const entries = useMemo(() => sceneContents(scenario), [scenario]);
   const listed = contentsSelection(entries, selected);
+  // And what it holds without placing, which the map cannot show at all.
+  const layouts = useMemo(() => unplacedLayouts(scenario), [scenario]);
 
   /**
    * Look closely at a point on the map.
@@ -891,7 +895,7 @@ export function ScenarioMapScene({
                 size="sm"
                 variant="outline"
                 className="gap-1.5 bg-card/80 backdrop-blur"
-                title="Everything this scenario has put on the map"
+                title="Everything this scenario holds, placed or not"
               >
                 <List className="size-3.5" /> Contents
               </Button>
@@ -899,9 +903,13 @@ export function ScenarioMapScene({
             <PopoverContent align="end" className="w-80 p-1">
               <ContentsList
                 entries={entries}
+                layouts={layouts}
                 selected={listed}
                 participants={scenario.setup.participants}
                 onPick={pickEntry}
+                onDeleteLayout={(layout) =>
+                  onChange((doc) => removeBlueprint(doc, layout.id))
+                }
               />
             </PopoverContent>
           </Popover>

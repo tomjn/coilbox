@@ -3,7 +3,12 @@ import { BUILD_SQUARE } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
 import type { UnitDatasetEntry } from "@/content/bindings";
 import { newScenario } from "../../create";
-import { baseBuildings, type Scenario, type ScenarioBase } from "../../model";
+import {
+  baseBuildings,
+  parseScenarioJson,
+  type Scenario,
+  type ScenarioBase,
+} from "../../model";
 import {
   addBase,
   addBuilding,
@@ -16,6 +21,7 @@ import {
   normaliseQueue,
   plusQueued,
   removeBase,
+  removeBlueprint,
   removeBuilding,
   renameBlueprint,
   replaceBlueprint,
@@ -175,10 +181,10 @@ describe("the base itself", () => {
     expect(editBase(document(), "b1", { team: "p2" }).bases[0].team).toBe("p2");
   });
 
-  it("removes the whole base, and the layout nothing places any more", () => {
+  it("removes the whole base and leaves the layout it placed", () => {
     const next = removeBase(document(), "b1");
     expect(next.bases).toEqual([]);
-    expect(next.blueprints).toEqual([]);
+    expect(next.blueprints.map((b) => b.id)).toEqual(["bp1"]);
   });
 
   it("hands the same document back when removing one that is not there", () => {
@@ -197,11 +203,11 @@ describe("removing a building", () => {
     expect(next.bases[0].buildings).toEqual([{ queue: ["armpw"] }]);
   });
 
-  it("takes the base and its layout with the last building", () => {
+  it("takes the base with the last building and leaves the layout", () => {
     const one = removeBuilding(document(), "b1", 1);
     const none = removeBuilding(one, "b1", 0);
     expect(none.bases).toEqual([]);
-    expect(none.blueprints).toEqual([]);
+    expect(none.blueprints.map((b) => b.id)).toEqual(["bp1"]);
   });
 
   it("hands the same document back for a building that is not there", () => {
@@ -307,6 +313,34 @@ describe("a layout two bases share", () => {
     const gone = removeBuilding(one, "b1", 0);
     expect(gone.bases.map((b) => b.id)).toEqual(["b2"]);
     expect(layoutOf(gone, "b2").buildings).toHaveLength(2);
+  });
+});
+
+describe("a layout nothing places", () => {
+  /** The document as it is left after the last base placed from a layout goes,
+   *  which is what an author has while they think about where to put it back. */
+  const unplaced = () => removeBase(document(), "b1");
+
+  it("survives being saved and opened again", () => {
+    const reopened = parseScenarioJson(JSON.stringify(unplaced()));
+    expect(reopened?.blueprints.map((b) => b.name)).toEqual(["The keep"]);
+  });
+
+  it("goes when it is deleted on purpose", () => {
+    expect(removeBlueprint(unplaced(), "bp1").blueprints).toEqual([]);
+  });
+
+  it("hands the same document back for a layout that is not there", () => {
+    const before = unplaced();
+    expect(removeBlueprint(before, "nope")).toBe(before);
+  });
+
+  /** Geometry going takes its placements with it, because a base with no
+   *  buildings is nothing an author can see or select again. */
+  it("takes every base placed from it when it is deleted", () => {
+    const next = removeBlueprint(document(), "bp1");
+    expect(next.blueprints).toEqual([]);
+    expect(next.bases).toEqual([]);
   });
 });
 

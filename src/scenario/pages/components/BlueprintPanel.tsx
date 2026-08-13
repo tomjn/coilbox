@@ -241,6 +241,10 @@ export function BlueprintPanel({
                         {layout.buildings.length} building
                         {layout.buildings.length === 1 ? "" : "s"}
                         {layout.ordered ? " · build order" : ""}
+                        {/* A layout stays in the scenario after the last base
+                            placed from it goes (#1424), so this list holds
+                            layouts nothing on the map is drawn from. */}
+                        {places.length === 0 ? " · not placed" : ""}
                       </span>
                       <Button
                         size="sm"

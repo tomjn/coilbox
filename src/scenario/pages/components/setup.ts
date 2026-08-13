@@ -22,7 +22,6 @@ import {
   type TriggerStep,
 } from "../../model";
 import { ACTION_TYPES, CONDITION_TYPES } from "../../triggerTypes";
-import { pruneBlueprints } from "./bases";
 
 /**
  * Elmos per unit of `MapItem.width`.
@@ -416,9 +415,10 @@ export function removeScenarioParticipant(
         ? scenario.bases.filter((b) => b.team !== id)
         : scenario.bases.map((b) => (b.team === id ? { ...b, team: to } : b)),
   };
-  // The layouts of the bases that went with the participant go too, which is the
-  // same rule deleting one base at a time follows.
-  if (to === null) return pruneBlueprints(next);
+  // The layouts of the bases that went with the participant stay, which is the
+  // same rule deleting one base at a time follows: a layout belongs to the
+  // scenario rather than to whoever happened to have it on the map (#1424).
+  if (to === null) return next;
   return rewriteTriggerTeams(next, (named) => (named === id ? to : undefined));
 }
 
