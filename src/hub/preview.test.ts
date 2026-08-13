@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Container, ContainerKind } from "@/container/container";
-import { readPreview } from "./preview";
+import { type BlueprintShape, blueprintSheet, readPreview } from "./preview";
 
 function container(kind: ContainerKind, payload: unknown): Container {
   return {
@@ -425,5 +425,48 @@ describe("readPreview", () => {
     expect(
       readPreview(container("challenge", { mode: "conquest", settings: 5 })),
     ).toBeNull();
+  });
+});
+
+describe("blueprintSheet", () => {
+  /** A layout of one building, as many build squares across as asked for. */
+  const shape = (width: number, height: number): BlueprintShape => ({
+    width,
+    height,
+    ordered: false,
+    squares: [{ def: "armlab", sized: true, x: 0, y: 0, width, height }],
+  });
+
+  it("leaves a build square of clear ground on every side", () => {
+    const sheet = blueprintSheet(shape(6, 4));
+    expect([sheet.left, sheet.top]).toEqual([-1, -1]);
+    expect([sheet.width, sheet.height]).toEqual([8, 6]);
+  });
+
+  it("rules the sheet in build squares while a base is small enough", () => {
+    const sheet = blueprintSheet(shape(6, 4));
+    expect(sheet.pitch).toBe(1);
+    expect(sheet.verticals).toEqual([-1, 0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(sheet.horizontals).toEqual([-1, 0, 1, 2, 3, 4, 5]);
+  });
+
+  it("coarsens the grid rather than crowding it, on a base too big to rule", () => {
+    // Seventeen squares across is one too many to rule singly, and sixty five is
+    // one too many to rule in pairs.
+    expect(blueprintSheet(shape(16, 3)).pitch).toBe(1);
+    expect(blueprintSheet(shape(17, 3)).pitch).toBe(2);
+    expect(blueprintSheet(shape(3, 30)).pitch).toBe(2);
+    expect(blueprintSheet(shape(65, 3)).pitch).toBe(8);
+  });
+
+  it("keeps the rules on build square boundaries at every pitch", () => {
+    const sheet = blueprintSheet(shape(30, 30));
+    expect(sheet.pitch).toBe(2);
+    expect(sheet.verticals[0]).toBe(0);
+    for (const at of [...sheet.verticals, ...sheet.horizontals]) {
+      expect(at % sheet.pitch).toBe(0);
+      expect(at).toBeGreaterThanOrEqual(sheet.left);
+      expect(at).toBeLessThanOrEqual(sheet.left + sheet.width);
+    }
   });
 });
