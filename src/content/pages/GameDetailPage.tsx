@@ -2,6 +2,7 @@ import { Button, useSetting } from "@picoframe/frame";
 import { FolderOpen, Trophy } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router";
+import { GameEquivalents } from "@/blueprint/pages/components/GameEquivalents";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFactionLogos } from "@/factions/logos";
@@ -254,6 +255,12 @@ export default function GameDetailPage() {
           )}
         </section>
       )}
+
+      {/* What converting a layout of this game between its sides has been
+          told, which is a fact about the game rather than about any layout, so
+          it belongs here and not on a blueprint (issue #1533). Nothing at all
+          for a game nobody has answered anything about. */}
+      <GameEquivalents gameArchive={game.primaryArchive.name} />
 
       {!statsHidden && factionNames.length > 0 && (
         <section className="rounded-lg border border-border/60 bg-card p-4">

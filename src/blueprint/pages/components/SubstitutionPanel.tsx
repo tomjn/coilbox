@@ -237,7 +237,9 @@ export function SubstitutionPanel({
             <p className="text-xs text-muted-foreground">
               Coilbox also remembers {learned} of this game's units from what
               you have converted before, and uses those first. Correcting one
-              here corrects it for the next layout as well.
+              here corrects it for the next layout as well. All of them are
+              listed on this game's page under Content, where one can be dropped
+              without converting anything.
             </p>
           )}
           {onReadShipped && (

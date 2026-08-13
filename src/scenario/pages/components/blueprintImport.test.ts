@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readBarFile } from "@/blueprint/bar";
 import { newScenario } from "../../create";
-import { takeBlueprint } from "./blueprintImport";
+import { carryBlueprint, takeBlueprint } from "./blueprintImport";
 
 const IDS = { base: "b1", blueprint: "bp1" };
 const ORIGIN = { x: 0, z: 0 };
@@ -95,6 +95,50 @@ describe("takeBlueprint", () => {
     );
     expect(second.blueprints).toHaveLength(2);
     expect(second.bases).toHaveLength(2);
+    expect(second.blueprints[0]).toEqual(first.blueprints[0]);
+  });
+});
+
+describe("carryBlueprint", () => {
+  it("lands as a layout and nothing on the map (issue #1434)", () => {
+    const done = carryBlueprint(newScenario("Mine"), fromFile(false), "bp1");
+    expect(done.blueprints).toEqual([
+      {
+        id: "bp1",
+        name: "Opening solars",
+        buildings: [
+          { def: "armsolar", offset: { x: -48, z: 0 }, facing: 0 },
+          { def: "armmex", offset: { x: 56, z: 0 }, facing: 1 },
+        ],
+      },
+    ]);
+    expect(done.bases).toEqual([]);
+  });
+
+  it("keeps a build order the file claimed", () => {
+    const done = carryBlueprint(newScenario("Mine"), fromFile(true), "bp1");
+    expect(done.blueprints[0].ordered).toBe(true);
+  });
+
+  it("does not read an order into a layout that never claimed one", () => {
+    const done = carryBlueprint(newScenario("Mine"), fromFile(false), "bp1");
+    expect(done.blueprints[0].ordered).toBeUndefined();
+  });
+
+  it("keeps whatever map the layout was drawn for", () => {
+    const done = carryBlueprint(
+      newScenario("Mine"),
+      { ...fromFile(false), designedFor: "Comet Catcher Remake" },
+      "bp1",
+    );
+    expect(done.blueprints[0].designedFor).toBe("Comet Catcher Remake");
+  });
+
+  it("leaves what was already in the document where it was", () => {
+    const first = carryBlueprint(newScenario("Mine"), fromFile(false), "bp1");
+    const second = carryBlueprint(first, fromFile(true), "bp2");
+    expect(second.blueprints).toHaveLength(2);
+    expect(second.bases).toEqual([]);
     expect(second.blueprints[0]).toEqual(first.blueprints[0]);
   });
 });

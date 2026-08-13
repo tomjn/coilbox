@@ -16,7 +16,9 @@
  *
  * The way back in is the Layouts mode on the map, not a button here: a layout
  * arriving needs somewhere to stand, so it is placed by a click rather than
- * dropped at a fixed point.
+ * dropped at a fixed point. Taking one out of a game's file goes the same way
+ * (issue #1434). It lands in the scenario unplaced, which is what the contents
+ * list already has a pin for, rather than at the map's north-west corner.
  *
  * Three things this panel is careful about, all of them the point of the issue:
  *
@@ -64,13 +66,8 @@ import { usePreferredTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import type { Scenario } from "../../model";
 import { replaceBlueprint } from "./bases";
-import { takeBlueprint } from "./blueprintImport";
+import { carryBlueprint } from "./blueprintImport";
 import { EditorPanel } from "./panels";
-
-/** Where a layout taken out of a game's file is put down. The map's north-west
- *  corner, because the panel has no map to pick a better point on and a fixed
- *  one is at least somewhere an author can find it again. */
-const DROP_POINT = { x: 0, z: 0 };
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -117,7 +114,9 @@ export function BlueprintPanel({
   const [editing, setEditing] = useState<string | null>(null);
   const openLayout = scenario.blueprints.find((b) => b.id === editing) ?? null;
 
-  const team = scenario.setup.participants[0]?.id;
+  // Nothing here needs a participant any more, because nothing here places a
+  // base. The Layouts mode asks whose the base is at the click that places it.
+  const anyone = scenario.setup.participants.length > 0;
 
   async function onImport() {
     setError(null);
@@ -151,14 +150,22 @@ export function BlueprintPanel({
     }
   }
 
+  /**
+   * Take one layout out of the file, and put it nowhere (issue #1434).
+   *
+   * The scenario carries it and nothing on the map is drawn from it, which is
+   * the state the contents list calls "not placed". It used to land at the
+   * map's north-west corner, half off the map, because this panel has no map in
+   * it to pick a point on. Where a base stands is the whole point of a base, so
+   * the author places it with a click rather than finding it in a corner and
+   * moving it.
+   */
   function onTake(imported: ImportedBlueprint) {
-    if (!team) return;
-    const ids = { base: crypto.randomUUID(), blueprint: crypto.randomUUID() };
     onChange((current) =>
-      takeBlueprint(current, imported.layout, team, ids, DROP_POINT),
+      carryBlueprint(current, imported.layout, crypto.randomUUID()),
     );
     setStatus(
-      `Added "${imported.layout.name}" at the map's north-west corner. Select one of its buildings and use Move the whole base to put it where you want it.`,
+      `"${imported.layout.name}" is in this scenario and is not placed yet. Put it on the map with Layouts on the mode strip, or with the pin beside it under Contents.`,
     );
   }
 
@@ -358,7 +365,7 @@ export function BlueprintPanel({
           <FileContents
             from={read.from}
             report={read.report}
-            canTake={!!team}
+            anyone={anyone}
             onTake={onTake}
             onClose={() => setRead(null)}
           />
@@ -485,14 +492,15 @@ export function BlueprintPanel({
 function FileContents({
   from,
   report,
-  canTake,
+  anyone,
   onTake,
   onClose,
 }: {
   from: string;
   report: ImportReport;
-  /** False when the scenario has no participant to give a base to. */
-  canTake: boolean;
+  /** Whether the scenario has a participant yet. A layout arrives whether or
+   *  not it has one, and placing it is what needs somebody to own the base. */
+  anyone: boolean;
   onTake: (imported: ImportedBlueprint) => void;
   onClose: () => void;
 }) {
@@ -549,7 +557,6 @@ function FileContents({
                     size="sm"
                     variant="outline"
                     className="shrink-0"
-                    disabled={!canTake}
                     onClick={() => onTake(imported)}
                   >
                     {foreign ? "Add it anyway" : "Add to this scenario"}
@@ -592,10 +599,11 @@ function FileContents({
         </p>
       )}
 
-      {!canTake && (
+      {!anyone && report.blueprints.length > 0 && (
         <p className="text-[11px] text-amber-200/80">
-          This scenario has no participants yet, and a base on the map belongs
-          to one. Add a participant in the setup above first.
+          This scenario has no participants yet. A layout can still be added,
+          and putting one on the map cannot be done until there is somebody for
+          the base to belong to. Add a participant in the setup above.
         </p>
       )}
     </section>
