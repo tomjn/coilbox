@@ -10,7 +10,9 @@
  *   answers which.
  * - It is corrigible, because correcting one is how it is made. Picking a
  *   different substitute for a def is a correction, and the next layout of that
- *   game gets the corrected answer.
+ *   game gets the corrected answer. It is also readable and droppable on the
+ *   game's own page, which is where somebody who suspects a wrong answer looks
+ *   rather than where they were when they gave it (issue #1533).
  * - It never travels with a shared layout. A layout carries what it is made of
  *   and a table is a fact about the game, so the two are kept apart on purpose:
  *   see `./transfer.ts`, which has no idea this file exists.
@@ -134,6 +136,37 @@ export function rememberShippedEquivalents(
   return coveredDefs(grown) - coveredDefs(was);
 }
 
+/**
+ * Drop one of a game's pairings (issue #1533).
+ *
+ * By where it stands in the table, because that is what a list of them has to
+ * name one by: a group holds no id, and naming one by a def it holds picks two
+ * groups on the one case where two of them disagree, which is exactly the case
+ * somebody is here to sort out.
+ *
+ * Dropping it rather than editing it is the whole correction. The next
+ * conversion of this game asks the question again, and the answer given then is
+ * the one that is kept.
+ */
+export function forgetEquivalence(key: string, at: number): void {
+  const was = equivalentsFor(key);
+  if (key === "" || at < 0 || at >= was.groups.length) return;
+  tables.set(key, {
+    groups: was.groups.filter((_, index) => index !== at),
+  });
+  persist();
+  for (const listener of listeners) listener();
+}
+
+/** Drop everything said about one game, for somebody who would rather start
+ *  again than pick through it. Every other game is untouched. */
+export function forgetEquivalents(key: string): void {
+  if (key === "" || !tables.has(key)) return;
+  tables.delete(key);
+  persist();
+  for (const listener of listeners) listener();
+}
+
 /** Forget the lot. For tests, which each want to start from nothing. */
 export function resetEquivalents(): void {
   tables = new Map();
@@ -159,6 +192,10 @@ export function useEquivalents(gameArchive: string | undefined): {
     toSide: string,
     toDef: string,
   ) => void;
+  /** Drop the pairing standing at this place in the table (issue #1533). */
+  forget: (at: number) => void;
+  /** Drop everything said about this game. */
+  forgetAll: () => void;
 } {
   const key = equivalentsKey(gameArchive);
   const [table, setTable] = useState(() => equivalentsFor(key));
@@ -177,6 +214,8 @@ export function useEquivalents(gameArchive: string | undefined): {
       rememberEquivalence(key, fromSide, fromDef, toSide, toDef),
     [key],
   );
+  const forget = useCallback((at: number) => forgetEquivalence(key, at), [key]);
+  const forgetAll = useCallback(() => forgetEquivalents(key), [key]);
 
-  return { table, remember };
+  return { table, remember, forget, forgetAll };
 }
