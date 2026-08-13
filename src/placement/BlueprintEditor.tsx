@@ -64,10 +64,10 @@ import { PlacementSurface } from "./PlacementSurface";
 import {
   absentIn,
   baseFootprints,
+  noSlopeIn,
   overlappingIn,
   placementKey,
   sceneUnchecked,
-  unjudgedIn,
 } from "./placements";
 import { previewChecks, withoutBuilding } from "./preview";
 import { HistoryControls, PlaybackBar, SelectionBar } from "./SurfaceBars";
@@ -290,8 +290,8 @@ export function BlueprintEditor({
   );
   // Only once the reads have settled, so opening the editor is not a wall of
   // warnings that clears itself two seconds later (issue #1491).
-  const unjudged = drawn.settled
-    ? unjudgedIn(drawn.placements, footprints, BLUEPRINT_BASE_ID)
+  const noSlope = drawn.settled
+    ? noSlopeIn(drawn.placements, footprints, BLUEPRINT_BASE_ID)
     : undefined;
   const absent = absentIn(drawn.placements, footprints, BLUEPRINT_BASE_ID);
   const strays = strayDefs(units, blueprint.buildings);
@@ -358,7 +358,7 @@ export function BlueprintEditor({
                 </p>
                 <LayoutNotes
                   overlaps={overlaps}
-                  unjudged={unjudged}
+                  noSlope={noSlope}
                   absent={absent}
                   buildings={blueprint.buildings.length}
                   strays={strays}
@@ -422,9 +422,7 @@ export function BlueprintEditor({
               what={`building ${picked.index + 1}`}
               turnable
               onTurn={() =>
-                applyEdit((current) =>
-                  turnPlacement(current, picked.key, 1, snap),
-                )
+                applyEdit((current) => turnPlacement(current, picked.key, 1))
               }
               onDelete={() => {
                 applyEdit((current) => removePlacement(current, picked.key));

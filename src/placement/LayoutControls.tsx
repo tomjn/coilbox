@@ -32,7 +32,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import type { SceneUnchecked, Unjudged } from "./placements";
+import type { SceneUnchecked } from "./placements";
 
 /**
  * What the layout is called, which is what a picker will list it by.
@@ -103,7 +103,7 @@ export function LayoutNotes({
   overlaps,
   unstable,
   wrongDepth,
-  unjudged,
+  noSlope,
   absent,
   buildings,
   designedFor,
@@ -123,14 +123,14 @@ export function LayoutNotes({
    *  layout (issue #1459). Drawn in cyan on the surface as well. */
   wrongDepth?: number[];
   /**
-   * Buildings nothing has judged, grouped by why. Drawn as empty dashed squares
-   * on the surface as well.
+   * Buildings this game gives no slope to check against, by their place in the
+   * layout. Drawn as empty dashed squares on the surface as well.
    *
    * Left out while the reads the check depends on are still in flight, so a
    * session that has only just opened is not a wall of warnings that clears
    * itself two seconds later.
    */
-  unjudged?: Unjudged;
+  noSlope?: number[];
   /** Buildings whose unit this game has not got, by their place in the layout
    *  (issue #1445). Drawn in violet on the surface as well. Empty before the
    *  game's units have been read, which is not the same as all of them being
@@ -207,14 +207,13 @@ export function LayoutNotes({
         </p>
       )}
 
-      {unjudged !== undefined && unjudged.noSlope.length > 0 && (
+      {noSlope !== undefined && noSlope.length > 0 && (
         <p className="rounded bg-slate-800/70 px-2 py-1.5 text-[11px] text-slate-300">
-          Building{unjudged.noSlope.length === 1 ? " " : "s "}
-          {listed(unjudged.noSlope)}{" "}
-          {unjudged.noSlope.length === 1 ? "is" : "are"} dashed because this
-          game gives {unjudged.noSlope.length === 1 ? "it" : "them"} no slope to
+          Building{noSlope.length === 1 ? " " : "s "}
+          {listed(noSlope)} {noSlope.length === 1 ? "is" : "are"} dashed because
+          this game gives {noSlope.length === 1 ? "it" : "them"} no slope to
           check against, so nothing can say whether the ground will take{" "}
-          {unjudged.noSlope.length === 1 ? "it" : "them"}.
+          {noSlope.length === 1 ? "it" : "them"}.
         </p>
       )}
 

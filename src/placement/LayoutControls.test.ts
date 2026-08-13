@@ -132,24 +132,12 @@ describe("LayoutNotes", () => {
    * months.
    */
   describe("no verdict", () => {
-    const none = { noGround: [], noUnits: [], noSlope: [] };
-
     it("says nothing while every building has been judged", () => {
-      expect(markup({ unjudged: none })).toBe("");
-    });
-
-    /**
-     * Issue #1496. Both of these are true of everything on the surface at once,
-     * so they are said once under it rather than per base, and this panel does
-     * not say them at all. One sentence, one place.
-     */
-    it("leaves the whole-surface reasons to the surface", () => {
-      expect(markup({ unjudged: { ...none, noGround: [0, 1] } })).toBe("");
-      expect(markup({ unjudged: { ...none, noUnits: [0, 1] } })).toBe("");
+      expect(markup({ noSlope: [] })).toBe("");
     });
 
     it("names the buildings the game's data gives no slope", () => {
-      const html = markup({ unjudged: { ...none, noSlope: [0, 3] } });
+      const html = markup({ noSlope: [0, 3] });
       expect(html).toContain("Buildings 1, 4");
       expect(html).toContain("no slope");
     });
@@ -157,7 +145,7 @@ describe("LayoutNotes", () => {
     /** Not a warning. An unknown is not a failure and must not be dressed as
      *  one, so none of these take the amber a refusal takes. */
     it("does not dress an unknown as a refusal", () => {
-      const html = markup({ unjudged: { ...none, noSlope: [0] } });
+      const html = markup({ noSlope: [0] });
       expect(html).not.toContain("amber");
       expect(html).not.toContain("red");
     });

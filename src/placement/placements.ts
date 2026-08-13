@@ -173,41 +173,6 @@ export function absentIn(
 }
 
 /**
- * Which of one base's buildings nothing has judged, grouped by why (issue
- * #1491).
- *
- * Grouped rather than listed, because the reasons are different problems with
- * different fixes and "unknown" on its own is nothing anybody can act on. Two
- * of the three are true of every building at once, so a panel says them about
- * the layout rather than naming buildings. The third is per building.
- */
-export interface Unjudged {
-  /** No ground to ask about: the map's heights would not read. */
-  noGround: number[];
-  /** The game's units have not been read. */
-  noUnits: number[];
-  /** This game's entry for the def says nothing about slope. */
-  noSlope: number[];
-}
-
-export function unjudgedIn(
-  placements: Placement[],
-  marks: FootprintMark[],
-  baseId: string,
-): Unjudged {
-  const why = new Map(marks.map((mark) => [mark.key, mark.standing]));
-  const out: Unjudged = { noGround: [], noUnits: [], noSlope: [] };
-  for (const placement of placements) {
-    if (placement.kind !== "base" || placement.id !== baseId) continue;
-    const standing = why.get(placement.key);
-    if (standing === "no-ground") out.noGround.push(placement.index);
-    if (standing === "no-units") out.noUnits.push(placement.index);
-    if (standing === "no-slope") out.noSlope.push(placement.index);
-  }
-  return out;
-}
-
-/**
  * Why nothing on the surface has a verdict, when nothing has (issue #1496).
  *
  * The two whole-scene reasons, as a fact about the surface rather than about one
@@ -266,6 +231,23 @@ function standingIn(
         refused.has(placement.key),
     )
     .map((placement) => placement.index);
+}
+
+/**
+ * Which of one base's buildings this game gives no slope to check against, so
+ * nothing can say whether the ground will take them (issues #1491, #1529).
+ *
+ * The one reason a building has no verdict that is about that building. The
+ * other two, a map whose heights would not read and a game whose units have not
+ * been read, are true of everything drawn at once, and are said about the
+ * surface by {@link sceneUnchecked} rather than named building by building.
+ */
+export function noSlopeIn(
+  placements: Placement[],
+  marks: FootprintMark[],
+  baseId: string,
+): number[] {
+  return standingIn(placements, marks, baseId, "no-slope");
 }
 
 /** Which of one base's buildings stand on ground too steep for them. */

@@ -39,11 +39,15 @@ import type { Placement } from "./placements";
 import {
   draggedBuilding,
   layoutPreview,
+  type NudgeOffer,
+  nudgeToFit,
   type PreviewBuilding,
   type PreviewChecks,
   type PreviewCount,
   previewCount,
+  previewMovable,
   sameCount,
+  sameNudge,
   samePlace,
   withoutBuilding,
 } from "./preview";
@@ -79,6 +83,18 @@ export interface LayoutPreviewState {
   /** What is drawn under the pointer right now, in words. Null when nothing
    *  is. */
   count: PreviewCount | null;
+  /** Where the layout would fit instead, when what is under the pointer does
+   *  not (issue #1482). Null when there is nothing to offer. */
+  nudge: NudgeOffer;
+  /**
+   * The point to place at to take the offer, which is the pointer's own point
+   * moved by the nudge, or null when there is nothing to take.
+   *
+   * Asked at the moment the offer is taken rather than handed over with it,
+   * because the pointer goes on moving inside the square it is in and the
+   * answer is about where it is now.
+   */
+  nudgeAt: () => Point | null;
 }
 
 /** What the pointer is showing: the layout a click would place, or the
@@ -113,6 +129,8 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
   }, [handle, worldWidth, worldHeight]);
 
   const [count, setCount] = useState<PreviewCount | null>(null);
+  const [nudge, setNudge] = useState<NudgeOffer>(null);
+  const nudgeAt = useRef<Point | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   /** What the pointer was last doing, so the same thing can be redrawn when
    *  what is standing on the map under it changes. Null when it is doing
@@ -124,6 +142,13 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
     null,
   );
   const frame = useRef<number | null>(null);
+
+  /** Hold an offer and where taking it would put the layout, without a render
+   *  while it says the same thing. */
+  const offer = useCallback((next: NudgeOffer, at: Point | null) => {
+    nudgeAt.current = at;
+    setNudge((was) => (sameNudge(was, next) ? was : next));
+  }, []);
 
   const show = useCallback(
     (what: Showing) => {
@@ -145,6 +170,7 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
         drawn.current = null;
         layer.draw([]);
         setCount(null);
+        offer(null, null);
         return;
       }
       if (
@@ -163,8 +189,29 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
       layer.draw(marks, held);
       const next = previewCount(marks);
       setCount((was) => (sameCount(was, next) ? was : next));
+      // Only for a layout a click would place, and only when moving it could
+      // fix something. A drag is one building the author is already carrying by
+      // hand, so it needs no help finding a spot, and a search run over a spot
+      // that is fine is a search that can only answer "where it is".
+      if (held || what?.kind !== "ghost" || !previewMovable(next)) {
+        offer(null, null);
+        return;
+      }
+      const found = nudgeToFit(
+        buildings,
+        checks.footprintOf,
+        occupied,
+        checks.standingOf,
+      );
+      if (!found) return offer("nowhere", null);
+      if (found.squares.x === 0 && found.squares.z === 0)
+        return offer(null, null);
+      offer(found, {
+        x: what.pos.x + found.delta.x,
+        z: what.pos.z + found.delta.z,
+      });
     },
-    [layer],
+    [layer, offer],
   );
 
   /** Draw this on the next frame, so a burst of pointer events between two
@@ -233,7 +280,11 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
     [],
   );
 
+  const takeNudge = useCallback(() => nudgeAt.current, []);
+
   return {
+    nudge,
+    nudgeAt: takeNudge,
     onHover: ghost && layer ? onHover : null,
     // Offered whether or not the mode places anything, because dragging a
     // building is not placing one: it is on in every mode that can pick one up.

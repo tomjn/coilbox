@@ -24,13 +24,16 @@
 
 import { type Ground, standsOn, unitLimits } from "@/blueprint/buildable";
 import {
+  BUILD_SQUARE,
   buildingFootprints,
   type Footprint,
   type FootprintMark,
   footprintMarks,
+  footprintRect,
   type Rect,
   rectsOverlap,
   type Standing,
+  snapToBuildGrid,
   unjudged,
 } from "@/blueprint/footprint";
 import type { Facing, Point } from "@/scenario/model";
@@ -171,6 +174,194 @@ export function samePlace(
   );
 }
 
+/**
+ * Where the whole layout would fit, when the spot under the pointer does not
+ * (issue #1482).
+ *
+ * An offer, never a rule. The engine builds one of a pair of overlapping
+ * buildings and refuses the rest, and a ruined base with buildings inside each
+ * other is a real thing an author might mean, so nothing here moves anything:
+ * it works out a spot and says so, and a person takes it or ignores it.
+ *
+ * Three things decide what the search means.
+ *
+ * The base moves as one. The shape is what is being placed, so a search that
+ * moved the one offending building would be offering a different base. Every
+ * building goes the same way by the same distance.
+ *
+ * It moves in whole build squares. Everything is snapped, so a move of less
+ * than a square lands the base on the squares it is already on, and a candidate
+ * that draws the same picture is not a candidate.
+ *
+ * It has to fit for every building, not for the one that was red. A nudge that
+ * clears the overlap and stands three of the base's mills on a slope has not
+ * helped anybody.
+ */
+
+/** How far the search looks, in build squares. Two five square buildings clear
+ *  each other at five squares, so a bound much tighter than this would never
+ *  find the spot the author is about to find by hand. */
+export const NUDGE_LIMIT = 8;
+
+/** A spot the whole layout fits, as far from the pointer as it has to be. */
+export interface Nudge {
+  /** How far the layout moves, in elmos, for handing to whatever places it. */
+  delta: Point;
+  /** The same move in build squares, which is what it is said in. */
+  squares: Point;
+}
+
+/** What the surface has to say about fitting: a spot, `"nowhere"` when the
+ *  search found none within its bound, or nothing to say at all. */
+export type NudgeOffer = Nudge | "nowhere" | null;
+
+/**
+ * Which verdicts a different spot could change.
+ *
+ * Slope and depth are the ground refusing this building here, and other ground
+ * may not. A unit the game has not got is refused everywhere, and an unjudged
+ * building is not refused at all, so neither is anything to search on: counting
+ * them would mean either hunting for a spot that cannot exist or refusing every
+ * spot on a map whose heights would not read.
+ */
+function refusedByGround(standing: Standing): boolean {
+  return standing === "slope" || standing === "depth";
+}
+
+/**
+ * Whether every building of the layout lands clean with the whole thing moved
+ * by `delta`.
+ *
+ * Building by building, giving up on the first one that is refused, because
+ * most candidate spots are refused by the first thing tried and the ground is
+ * the expensive question.
+ */
+export function fitsAt(
+  buildings: readonly PreviewBuilding[],
+  delta: Point,
+  footprintOf: (def: string) => Footprint,
+  occupied: readonly { rect: Rect }[],
+  standingOf?: (mark: Omit<FootprintMark, "standing">) => Standing,
+): boolean {
+  const placed: Rect[] = [];
+  for (const building of buildings) {
+    const footprint = footprintOf(building.def);
+    const pos = snapToBuildGrid(
+      { x: building.pos.x + delta.x, z: building.pos.z + delta.z },
+      footprint,
+      building.facing,
+    );
+    const rect = footprintRect(pos, footprint, building.facing);
+    if (occupied.some((one) => rectsOverlap(rect, one.rect))) return false;
+    if (placed.some((one) => rectsOverlap(rect, one))) return false;
+    if (
+      standingOf &&
+      refusedByGround(
+        standingOf({
+          key: "",
+          def: building.def,
+          pos,
+          facing: building.facing,
+          footprint,
+          rect,
+          overlapping: false,
+        }),
+      )
+    ) {
+      return false;
+    }
+    placed.push(rect);
+  }
+  return true;
+}
+
+/** Every move worth trying at a bound, nearest first. Ties go north, then
+ *  west, then east, then south, so the same crowded spot always offers the same
+ *  way out. Built once per bound, because the order never changes. */
+const searches = new Map<number, Point[]>();
+function nudgeCandidates(limit: number): Point[] {
+  const had = searches.get(limit);
+  if (had) return had;
+  const out: Point[] = [];
+  for (let x = -limit; x <= limit; x++) {
+    for (let z = -limit; z <= limit; z++) out.push({ x, z });
+  }
+  out.sort(
+    (a, b) =>
+      a.x * a.x + a.z * a.z - (b.x * b.x + b.z * b.z) || a.z - b.z || a.x - b.x,
+  );
+  searches.set(limit, out);
+  return out;
+}
+
+/**
+ * The nearest spot the whole layout fits, or `null` when none within `limit`
+ * build squares does.
+ *
+ * Where it already is counts as a spot and comes first, so a layout that fits
+ * is answered with a move of nothing rather than with the nearest place it
+ * could go instead.
+ */
+export function nudgeToFit(
+  buildings: readonly PreviewBuilding[],
+  footprintOf: (def: string) => Footprint,
+  occupied: readonly { rect: Rect }[],
+  standingOf?: (mark: Omit<FootprintMark, "standing">) => Standing,
+  limit = NUDGE_LIMIT,
+): Nudge | null {
+  if (buildings.length === 0) return null;
+  for (const squares of nudgeCandidates(limit)) {
+    const delta = { x: squares.x * BUILD_SQUARE, z: squares.z * BUILD_SQUARE };
+    if (fitsAt(buildings, delta, footprintOf, occupied, standingOf)) {
+      return { delta, squares };
+    }
+  }
+  return null;
+}
+
+/** Which way a nudge goes, in the map's own directions: `+x` is east and `+z`
+ *  is south, the way the engine's facings run. */
+export function nudgeWords(squares: Point): string {
+  const ways: { far: number; way: string }[] = [];
+  if (squares.z !== 0) {
+    ways.push({
+      far: Math.abs(squares.z),
+      way: squares.z < 0 ? "north" : "south",
+    });
+  }
+  if (squares.x !== 0) {
+    ways.push({
+      far: Math.abs(squares.x),
+      way: squares.x < 0 ? "west" : "east",
+    });
+  }
+  return ways
+    .map(({ far, way }, at) =>
+      at === 0
+        ? `${far} ${far === 1 ? "square" : "squares"} ${way}`
+        : `${far} ${way}`,
+    )
+    .join(" and ");
+}
+
+/** The offer in words, said next to the warning rather than instead of it. */
+export function nudgeSentence(offer: NudgeOffer, limit = NUDGE_LIMIT): string {
+  if (offer === null) return "";
+  if (offer === "nowhere") {
+    return `Nothing within ${limit} squares of here fits.`;
+  }
+  return `Press N to put it down ${nudgeWords(offer.squares)} instead, where it fits.`;
+}
+
+/** Whether two offers say the same thing, so a surface can leave its state
+ *  alone while the pointer moves about inside one build square. */
+export function sameNudge(a: NudgeOffer, b: NudgeOffer): boolean {
+  if (a === null || b === null || a === "nowhere" || b === "nowhere") {
+    return a === b;
+  }
+  return a.squares.x === b.squares.x && a.squares.z === b.squares.z;
+}
+
 /** What a preview is worth saying in words: how many of its buildings the
  *  engine would refuse, and why. Colour alone is not a statement. */
 export interface PreviewCount {
@@ -224,6 +415,13 @@ export function previewTrouble(count: PreviewCount): boolean {
     count.wrongDepth > 0 ||
     count.absent > 0
   );
+}
+
+/** Whether what is wrong with this spot is the kind of wrong another spot could
+ *  put right, which is what makes a search for one worth running (issue #1482).
+ *  A unit the game has not got is refused everywhere, so it is not. */
+export function previewMovable(count: PreviewCount): boolean {
+  return count.clashes > 0 || count.unstable > 0 || count.wrongDepth > 0;
 }
 
 /** What is left unsaid about this spot, when anything is. Appended rather than

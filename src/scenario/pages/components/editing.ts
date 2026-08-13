@@ -170,16 +170,29 @@ export function turnFacing(facing: Facing, steps: number): Facing {
  * The document with the thing this key names turned, or the same document when
  * it has no facing.
  *
- * Turning a building moves it. A footprint's sides swap on an odd facing, so a
- * rectangle that centred in the middle of a build square on one axis centres on
- * the corner between four of them once it is on its side. Given a `snap` the
- * turned building is put where the engine will now stand it.
+ * Turning a building moves it, and there is no way to turn one without moving
+ * it. A footprint's sides swap on an odd facing, so a rectangle that centred in
+ * the middle of a build square on one axis centres on the corner between four
+ * of them once it is on its side, and both answers are half a build square from
+ * where it was drawn.
+ *
+ * So a turn writes the facing and nothing else (issue #1523). The point the
+ * layout names is what the engine is asked about at every facing, which is what
+ * makes a turn mean one thing: the same facing always puts the building on the
+ * same square, turning back puts it back, and a full circle leaves it where it
+ * started. Writing the new square down instead re-asked the engine about its
+ * own last answer, and the engine breaks the tie the same way every time, so
+ * four quarter turns walked a fusion plant a square east and two squares south.
+ *
+ * Which is why this takes no `snap`. A drag has to be measured from the square
+ * the building is drawn on, because a drag is a distance and the author is
+ * moving what they can see (issue #1517). A turn is not a distance, and
+ * measuring it from the drawn square is what makes it creep.
  */
 export function turnPlacement(
   scenario: Scenario,
   key: string,
   steps = 1,
-  snap?: SnapBuilding,
   how: LayoutEdit = "own",
 ): Scenario {
   const ref = parsePlacementKey(key);
@@ -194,22 +207,10 @@ export function turnPlacement(
   }
 
   if (ref.kind === "base") {
-    const origin = scenario.bases.find((entry) => entry.id === ref.id)?.origin;
-    if (!origin) return scenario;
-    return editBaseBuilding(scenario, ref, how, (building) => {
-      const facing = turnFacing(building.facing, steps);
-      if (!snap) return { ...building, facing };
-      const at = snap(
-        { x: origin.x + building.offset.x, z: origin.z + building.offset.z },
-        building.def,
-        facing,
-      );
-      return {
-        ...building,
-        facing,
-        offset: round({ x: at.x - origin.x, z: at.z - origin.z }),
-      };
-    });
+    return editBaseBuilding(scenario, ref, how, (building) => ({
+      ...building,
+      facing: turnFacing(building.facing, steps),
+    }));
   }
 
   return scenario;
