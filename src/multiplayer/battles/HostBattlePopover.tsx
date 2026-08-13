@@ -1,5 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -7,16 +7,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  useUnitsyncGameInfo,
-  useUnitsyncMapInfo,
-  useUnitsyncScan,
-} from "@/content/config";
-import { withoutGeneratedGames } from "@/lib/generatedGames";
-import { usePreferredTarget } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
-import { hexToI32 } from "../battle/config";
 import type { mpOpenBattle } from "../bindings";
+import { hashFailureMessage, useHostContent } from "./useHostContent";
 
 /** The `mpOpenBattle` argument shape, minus the connection key the parent supplies. */
 export type OpenBattleArgs = Omit<
@@ -25,7 +18,7 @@ export type OpenBattleArgs = Omit<
 >;
 
 /** Spring's conventional lobby-host port; editable for power users / multi-host. */
-const DEFAULT_HOST_PORT = 8452;
+export const DEFAULT_HOST_PORT = 8452;
 
 /**
  * "Host a battle" affordance for the Battles hub: a compact popover collecting the
@@ -57,41 +50,25 @@ export function HostBattlePopover({
   autoOpen?: boolean;
 }) {
   const [open, setOpen] = useState(!!autoOpen);
-  const { target } = usePreferredTarget();
-  const enginePath = target?.enginePath;
-  const dataDir = target?.dataDir;
-
-  const scan = useUnitsyncScan(enginePath, dataDir);
-  // A game or map can appear in more than one archive (e.g. a packaged `.sdz`
-  // and its decompiled `.sdd`); collapse by name so each Select has one option
-  // per name. The option value/key is the name, so duplicates would both violate
-  // the unique-key rule and give the Select two indistinguishable entries.
-  // Coilbox's own generated games are dropped first: nobody else could join a
-  // battle hosted on a game only this machine has, and only until the next test
-  // rewrites it. One the caller already named stays, so the Select is not left
-  // showing a value it has no option for.
-  const games = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          withoutGeneratedGames(scan.data?.games ?? [], initialGame).map(
-            (g) => [g.name, g],
-          ),
-        ).values(),
-      ),
-    [scan.data, initialGame],
-  );
-  const maps = useMemo(
-    () =>
-      Array.from(
-        new Map((scan.data?.maps ?? []).map((m) => [m.name, m])).values(),
-      ),
-    [scan.data],
-  );
+  const content = useHostContent(initialGame, initialMap);
+  const {
+    target,
+    games,
+    maps,
+    gameName,
+    setGameName,
+    mapName,
+    setMapName,
+    gameInfo,
+    mapInfo,
+    modhash,
+    maphash,
+    checksumsReady,
+    gameFailed,
+    mapFailed,
+  } = content;
 
   const [title, setTitle] = useState(initialTitle ?? "");
-  const [gameName, setGameName] = useState(initialGame ?? "");
-  const [mapName, setMapName] = useState(initialMap ?? "");
   // 8 is a sensible starting size for a fresh host (issue #502), the user can
   // still raise it. A "Host as battle" draft only ever carries the AIs (added
   // as bots, not real player slots) plus the one human host seat, so no
@@ -105,36 +82,6 @@ export function HostBattlePopover({
   // Direct is what we implement, so direct is what we advertise.
   const [holePunch, setHolePunch] = useState(false);
 
-  // Default the game/map to the first scanned entry once a scan lands.
-  useEffect(() => {
-    if (games.length > 0)
-      setGameName((c) => (games.some((g) => g.name === c) ? c : games[0].name));
-  }, [games]);
-  useEffect(() => {
-    if (maps.length > 0)
-      setMapName((c) => (maps.some((m) => m.name === c) ? c : maps[0].name));
-  }, [maps]);
-
-  const selectedGame = games.find((g) => g.name === gameName);
-  const gameInfo = useUnitsyncGameInfo(
-    enginePath,
-    dataDir,
-    selectedGame?.primaryArchive.name,
-  );
-  const mapInfo = useUnitsyncMapInfo(enginePath, dataDir, mapName || undefined);
-  const modhash = hexToI32(gameInfo.info?.checksum);
-  const maphash = hexToI32(mapInfo.info?.checksum);
-  // The hashes let joiners verify they have the same content; without them the
-  // battle would open unsyncable, so gate hosting on both resolving.
-  const checksumsReady =
-    gameInfo.status === "ready" && mapInfo.status === "ready";
-  // A resolved-but-unhashable checksum or a worker error is a dead end, not
-  // progress — surface it (with a retry) instead of hanging on "Reading content".
-  const gameFailed =
-    gameInfo.status === "error" || gameInfo.status === "unsyncable";
-  const mapFailed =
-    mapInfo.status === "error" || mapInfo.status === "unsyncable";
-
   function hostButtonLabel(): string {
     if (!gameName || !mapName || checksumsReady) return "Host battle";
     if (gameInfo.status === "loading") return "Hashing game…";
@@ -143,22 +90,8 @@ export function HostBattlePopover({
     return "Host battle";
   }
 
-  function failMessage(
-    kind: "game" | "map",
-    status: typeof gameInfo.status,
-    firstError?: string,
-  ): string {
-    if (status === "unsyncable")
-      return firstError
-        ? `Couldn't hash the ${kind}: ${firstError}`
-        : `Couldn't hash the ${kind} — it may be missing a dependency or be unreadable.`;
-    return firstError
-      ? `Failed to read the ${kind}: ${firstError}`
-      : `Failed to read the ${kind}.`;
-  }
-
-  const noEngine = !target && !scan.loading;
-  const canHost = !!target && !!gameName && !!mapName && checksumsReady;
+  const noEngine = content.noEngine;
+  const canHost = content.ready;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -222,7 +155,7 @@ export function HostBattlePopover({
                   value={gameName}
                   onValueChange={setGameName}
                   options={games.map((g) => ({ value: g.name, label: g.name }))}
-                  placeholder={scan.loading ? "Scanning…" : "Select a game"}
+                  placeholder={content.scanning ? "Scanning…" : "Select a game"}
                   size="sm"
                 />
               </label>
@@ -234,7 +167,7 @@ export function HostBattlePopover({
                   value={mapName}
                   onValueChange={setMapName}
                   options={maps.map((m) => ({ value: m.name, label: m.name }))}
-                  placeholder={scan.loading ? "Scanning…" : "Select a map"}
+                  placeholder={content.scanning ? "Scanning…" : "Select a map"}
                   size="sm"
                 />
               </label>
@@ -303,7 +236,7 @@ export function HostBattlePopover({
                   {gameFailed && (
                     <div className="flex items-center justify-between gap-2">
                       <span>
-                        {failMessage(
+                        {hashFailureMessage(
                           "game",
                           gameInfo.status,
                           gameInfo.info?.errors?.[0],
@@ -322,7 +255,7 @@ export function HostBattlePopover({
                   {mapFailed && (
                     <div className="flex items-center justify-between gap-2">
                       <span>
-                        {failMessage(
+                        {hashFailureMessage(
                           "map",
                           mapInfo.status,
                           mapInfo.info?.errors?.[0],

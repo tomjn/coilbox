@@ -84,6 +84,10 @@ Hole punching is out. It needs both peers to learn each other's endpoint through
 
 ### 5. Frontend
 
+Reaching any of this comes first. The Battles page is where hosting lives, and its nav item was revealed on first connect and then sticky for the session, so on a fresh install with every server down there was no way in. That is the exact case this milestone exists for, so the item is visible whether or not there is a connection, and the page has a logged out state: the direct hosting entry works, and the server battle list says it is not connected and points at Login rather than showing an empty list that reads like nobody is playing. The gate that stays is `isProfileHidden`, so a distribution profile can still hide it.
+
+Once a room starts, the host's own client connects to loopback, which flips the same session flag and brings the rest of the Lobby nav group back by itself.
+
 - "Host on LAN" beside the existing host popover: room name, optional password, port, discovery on or off, internet reachability on or off, approve joins on or off.
 - LAN section on the Battles page, fed by the beacon.
 - Join by typed `address:port`.

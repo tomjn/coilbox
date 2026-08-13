@@ -1,8 +1,24 @@
-import { Button, NavGate } from "@picoframe/frame";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { Button } from "@picoframe/frame";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import type { SkirmishDraft } from "@/play/drafts";
 import { useScanTargetSelection } from "../../content/config";
+import {
+  type DirectRoomStatus,
+  directRoomStatus,
+  directStartRoom,
+  directStopRoom,
+} from "../../direct/bindings";
+import {
+  HostRoomControl,
+  type StartRoomArgs,
+} from "../../direct/HostRoomControl";
+import {
+  isDirectKey,
+  roomStopReason,
+  startRoomFailure,
+} from "../../direct/room";
+import { useLastLogin } from "../../lobby-servers/config";
 import { notify } from "../../notify/notify";
 import { getGameMatcher } from "../../profile/profile";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
@@ -25,15 +41,15 @@ import {
   mpOpenBattle,
 } from "../bindings";
 import { newScriptPassword } from "../scriptPassword";
-import { serverAddressFromKey, useMpRevealed, useMultiplayer } from "../store";
+import { serverAddressFromKey, useMultiplayer } from "../store";
 
 /**
  * The Battles hub: search + filter/sort controls over the live battle list, with
  * in-place join. Battles come from the mirror snapshot (kept fresh by the store's
  * delta→snapshot rule); joining is reflected by the joined banner rather than
  * navigating away. Connection lives on the Login page; disconnected shows a prompt.
- * Reachable only once the user has connected this session (see the `NavGate`
- * wrapper below); before that, the route redirects to Login.
+ * Reachable with no connection, because this is also where a room is hosted with
+ * no server at all.
  */
 function BattlesPage() {
   const {
@@ -44,7 +60,21 @@ function BattlesPage() {
     lastJoinError,
     clearJoinError,
     openLoginPopover,
+    connectDirect,
+    disconnect,
   } = useMultiplayer();
+
+  // The room this client hosts, refetched on arrival because the page unmounts
+  // when a start lands the host in the battle room and they walk back here.
+  const [room, setRoom] = useState<DirectRoomStatus | null>(null);
+  const [roomBusy, setRoomBusy] = useState(false);
+  const [roomError, setRoomError] = useState<string | null>(null);
+  const [lastLogin] = useLastLogin();
+  useEffect(() => {
+    directRoomStatus({})
+      .then((r) => setRoom(r.room))
+      .catch(() => {});
+  }, []);
   // Under Tachyon the server allocates a dedicated autohost and a client cannot
   // host a battle at all. What it can do is create a lobby, which is a different
   // thing with its own popover, so the two swap rather than one being hidden.
@@ -229,14 +259,96 @@ function BattlesPage() {
     await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
   }, [activeKey]);
 
+  // Start a room of our own: bind the port, dial it over loopback like any other
+  // server, then open the battle in it. Landing in the battle room is the join
+  // effect above doing what it does for every other battle.
+  async function onStartRoom(args: StartRoomArgs) {
+    setRoomBusy(true);
+    setRoomError(null);
+    let port: number;
+    try {
+      ({ port } = await directStartRoom({ host: args.host, port: args.port }));
+    } catch (e) {
+      setRoomError(startRoomFailure(e, args.port));
+      setRoomBusy(false);
+      return;
+    }
+    try {
+      const key = await connectDirect(port, args.host);
+      clearJoinError();
+      hostingFromDraftRef.current = false;
+      joiningRef.current = true;
+      await mpOpenBattle({ serverKey: key, ...args.battle });
+      setRoom(await directRoomStatus({}).then((r) => r.room));
+    } catch (e) {
+      // The room is up but we are not in it, which is a room nobody can host.
+      // Take it down rather than leave a listener with no owner behind.
+      joiningRef.current = false;
+      await directStopRoom({
+        reason: "the host could not join their own room",
+      }).catch(() => {});
+      setRoomError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRoomBusy(false);
+    }
+  }
+
+  // Stop hosting. Our own client goes first and on purpose, so its drop is not
+  // read as a server that fell over and does not start a reconnect loop against
+  // a port that is about to close.
+  async function onStopRoom() {
+    setRoomBusy(true);
+    setRoomError(null);
+    try {
+      const reason = roomStopReason(room?.host ?? "");
+      await disconnect();
+      await directStopRoom({ reason });
+      setRoom(null);
+    } catch (e) {
+      setRoomError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRoomBusy(false);
+    }
+  }
+
+  const hostControl = (
+    <HostRoomControl
+      room={room}
+      connectedToServer={activeKey != null && !isDirectKey(activeKey)}
+      defaultName={lastLogin?.username}
+      busy={roomBusy || busy}
+      error={roomError}
+      onStart={onStartRoom}
+      onStop={onStopRoom}
+    />
+  );
+
+  // Logged out. The page is reachable with no connection (issue #1580), so this
+  // has to read as "there is no server here" rather than as a server with nobody
+  // on it, which is what an empty list would have said.
   if (!activeKey) {
     return (
-      <main className="flex flex-col items-center justify-center gap-4 p-10 text-center">
-        <h1 className="text-lg font-semibold">Battles</h1>
-        <p className="text-sm text-muted-foreground">
-          You are not connected to a lobby server.
-        </p>
-        <Button onClick={openLoginPopover}>Connect…</Button>
+      <main className="flex h-full min-h-0 flex-col">
+        <header className="flex items-center justify-between gap-2 border-b border-border p-4">
+          <h1 className="text-lg font-semibold">Battles</h1>
+        </header>
+        <div className="flex flex-1 items-center justify-center p-10">
+          <div className="flex max-w-md flex-col items-center gap-3 text-center">
+            <h2 className="text-base font-semibold">
+              Not connected to a server
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Server battles are listed here once you log in. This list is empty
+              because coilbox has no lobby connection, not because nobody is
+              playing.
+            </p>
+            <Button onClick={openLoginPopover}>Log in</Button>
+            <p className="text-sm text-muted-foreground">
+              Or host a room of your own. It needs no server and no account.
+            </p>
+            {hostControl}
+          </div>
+        </div>
       </main>
     );
   }
@@ -270,6 +382,7 @@ function BattlesPage() {
               autoOpen={!!hostMap || !!hostDraft}
             />
           )}
+          {hostControl}
           <BattleFilterPopover filters={filters} setFilters={setFilters} />
         </div>
       </header>
@@ -300,11 +413,10 @@ function BattlesPage() {
   );
 }
 
-/** Route entry: gated behind having connected at least once this session. */
+/**
+ * Route entry. Ungated: the page is where a room is hosted with no server at all,
+ * so redirecting a logged-out visitor to Login would close the only door to it.
+ */
 export default function BattlesRoute() {
-  return (
-    <NavGate use={useMpRevealed} redirectTo="/lobby">
-      <BattlesPage />
-    </NavGate>
-  );
+  return <BattlesPage />;
 }
