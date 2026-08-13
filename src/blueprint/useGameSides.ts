@@ -8,15 +8,16 @@
  * caller has already resolved one to get the units: an archive nobody found is
  * no sides, which is the honest answer for a game that is not installed.
  *
- * Empty is not a failure. A game whose sides cannot be told apart from their
- * start units offers no mapping, and the surfaces above ask the person instead
- * or say nothing at all.
+ * A side with no prefix is not a failure. A game whose sides cannot be told
+ * apart from their start units offers no mapping, and the surfaces above ask the
+ * person instead: they still have the side's name to ask with, which is why the
+ * names are kept when the prefixes cannot be read (issue #1527).
  */
 
 import { useMemo } from "react";
 import { useUnitsyncGameInfo } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
-import { type SideUnits, sideUnitPrefixes } from "./substitution";
+import { gameSides, type SideUnits } from "./substitution";
 
 export function useGameSides(gameArchive?: string): SideUnits[] {
   const { target } = usePreferredTarget();
@@ -25,5 +26,5 @@ export function useGameSides(gameArchive?: string): SideUnits[] {
     target?.dataDir,
     gameArchive,
   );
-  return useMemo(() => sideUnitPrefixes(info?.sides ?? []), [info]);
+  return useMemo(() => gameSides(info?.sides ?? []), [info]);
 }

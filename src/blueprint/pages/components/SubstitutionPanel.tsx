@@ -20,6 +20,12 @@
  * since no reading of `armpw` reaches `corak`. Correcting a row is how a wrong
  * answer is corrected, here and for every later layout.
  *
+ * A row also asks which side the building is, where nothing else can say (issue
+ * #1527). That is what a game whose unit names say nothing about its sides needs
+ * before its table can start, and it is asked on the rows that need it and
+ * nowhere else, because being asked to classify a game's whole unit list before
+ * anything works is not a feature.
+ *
  * Nothing refuses. A conversion that moves buildings or leaves two of them
  * fighting over ground is still one somebody may want, so the warnings are said
  * plainly and the button stays.
@@ -49,6 +55,7 @@ import {
 import { buildingFootprints } from "../../footprint";
 import type { BaseBlueprint } from "../../model";
 import {
+  defsNeedingSide,
   distinctDefs,
   gameSideNames,
   layoutDefs,
@@ -56,6 +63,7 @@ import {
   queueNote,
   queueReport,
   revertSubstitution,
+  type SaidSides,
   type SideUnits,
   type SubstitutionPlan,
   sideNameOfDef,
@@ -83,8 +91,9 @@ export function SubstitutionPanel({
    *  queued and repeats and all. Empty for a layout on its own, which has no
    *  queues: a queue is the mission's half of a placement (issue #1493). */
   queued?: readonly string[];
-  /** The game's sides and what its units are named, or empty when the game's own
-   *  names say nothing coilbox can read a mapping out of. */
+  /** The game's sides and what its units are named. A side with no prefix is one
+   *  whose units are not named after it, which is a side to pick and nothing to
+   *  read off a def. Empty for a game with no sides at all. */
   sides: readonly SideUnits[];
   /** What this game has already been told, which beats any name (issue #1468).
    *  Empty for a game nobody has answered anything about yet, and for a caller
@@ -124,6 +133,10 @@ export function SubstitutionPanel({
   /** What the person said, over what the game's naming suggested. An empty
    *  string is a def they have decided to leave alone. */
   const [chosen, setChosen] = useState<Record<string, string>>({});
+  /** Which side the person said a building is, for the ones nothing else can
+   *  say (issue #1527). Kept across a change of side, because whose a building
+   *  is does not depend on what it is being converted to. */
+  const [said, setSaid] = useState<SaidSides>({});
 
   const suggested = useMemo(
     () => planForSide([...defs, ...queuedDefs], toSide, sides, known, table),
@@ -136,6 +149,12 @@ export function SubstitutionPanel({
     const pick = Object.hasOwn(chosen, key) ? chosen[key] : suggested[key];
     if (pick) plan[key] = pick;
   }
+
+  // The buildings being swapped that nothing can file under a side, and the
+  // sides they could be. A def cannot be the side it is being converted to, so
+  // that one is not offered (issue #1527).
+  const needsSide = defsNeedingSide(plan, sides, table);
+  const sideChoices = sideNames.filter((side) => side !== toSide);
 
   const preview = substituteBlueprint(layout, plan, footprintOf);
   const notes = substitutionNotes(preview.report);
@@ -152,9 +171,12 @@ export function SubstitutionPanel({
    * at and applied is an answer too, and holding onto it is what makes the
    * naming route's right answers survive into a game release that renames the
    * units it was reading.
+   *
+   * Including the sides the person said, which are the only thing that gets a
+   * pair filed at all for a game whose names say nothing (issue #1527).
    */
   const apply = () => {
-    for (const pair of substitutionPairs(plan, toSide, sides, table)) {
+    for (const pair of substitutionPairs(plan, toSide, sides, table, said)) {
       onRemember?.(pair.fromSide, pair.fromDef, pair.toSide, pair.toDef);
     }
     onApply(preview.layout, plan);
@@ -218,6 +240,15 @@ export function SubstitutionPanel({
         </p>
       )}
 
+      {needsSide.length > 0 && sideChoices.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Coilbox cannot tell which side{" "}
+          {needsSide.length === 1 ? "one" : "some"} of these belong to, so it
+          cannot remember the swap for next time. Say which side and it will.
+          Converting works either way.
+        </p>
+      )}
+
       <ul className="flex flex-col gap-2">
         {defs.map((def) => (
           <SubstituteRow
@@ -233,6 +264,13 @@ export function SubstitutionPanel({
             units={units}
             unitsLoading={unitsLoading}
             footprint={footprintOf}
+            side={said[def.toLowerCase()] ?? ""}
+            sideChoices={
+              needsSide.includes(def.toLowerCase()) ? sideChoices : undefined
+            }
+            onSide={(side) =>
+              setSaid((was) => ({ ...was, [def.toLowerCase()]: side }))
+            }
             onPick={(pick) =>
               setChosen((was) => ({ ...was, [def.toLowerCase()]: pick }))
             }
@@ -263,6 +301,15 @@ export function SubstitutionPanel({
                 to={plan[def.toLowerCase()] ?? ""}
                 units={units}
                 unitsLoading={unitsLoading}
+                side={said[def.toLowerCase()] ?? ""}
+                sideChoices={
+                  needsSide.includes(def.toLowerCase())
+                    ? sideChoices
+                    : undefined
+                }
+                onSide={(side) =>
+                  setSaid((was) => ({ ...was, [def.toLowerCase()]: side }))
+                }
                 onPick={(pick) =>
                   setChosen((was) => ({ ...was, [def.toLowerCase()]: pick }))
                 }
@@ -331,6 +378,12 @@ function countOf(count: number, what: "building" | "queued"): string {
  * the reason a substitution moves a layout and this is where somebody is looking
  * when they choose one. A queued unit's row has none: a queue holds no ground,
  * so a size on it would be a fact about nothing.
+ *
+ * Which side the building is, on the row too, and only on the rows where nothing
+ * can say (issue #1527). That is the least this can be asked: never for a game
+ * that names its sides' units after them, never for a building being left alone,
+ * never for one this game has already been told about, and never twice, because
+ * answering is what puts it in the table.
  */
 function SubstituteRow({
   def,
@@ -339,6 +392,9 @@ function SubstituteRow({
   units,
   unitsLoading,
   footprint,
+  side,
+  sideChoices,
+  onSide,
   onPick,
 }: {
   def: string;
@@ -350,6 +406,13 @@ function SubstituteRow({
   /** What each def stands on, or nothing while the game's units are unread,
    *  which is a row that says no size rather than one that guesses at it. */
   footprint?: (def: string) => { x: number; z: number };
+  /** Which side the person has said this building is, or empty for one they
+   *  have not been asked about or not answered. */
+  side: string;
+  /** The sides this building could be said to be, or nothing at all for a row
+   *  whose side is not in question. */
+  sideChoices?: string[];
+  onSide: (side: string) => void;
   onPick: (def: string) => void;
 }) {
   const from = footprint?.(def);
@@ -391,6 +454,15 @@ function SubstituteRow({
           </Button>
         )}
       </div>
+      {sideChoices && sideChoices.length > 0 && (
+        <OptionSelect
+          value={side}
+          onValueChange={onSide}
+          options={sideChoices.map((one) => ({ value: one, label: one }))}
+          placeholder={`Say which side it is, so ${def} is remembered`}
+          size="sm"
+        />
+      )}
       {resized && into && from && (
         <p data-tone="resized" className="text-[11px] text-amber-200">
           {to} stands on {into.x} by {into.z} build squares rather than {from.x}{" "}
