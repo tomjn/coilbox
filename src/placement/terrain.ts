@@ -7,8 +7,13 @@
  * The heightmap is already in hand as a data URL, so the same values the shader
  * uses are read back off a canvas once and sampled here.
  *
- * The sampling is arithmetic and tested. Decoding the image is not, because it
- * needs a canvas.
+ * Whether a building will stand is a separate read (issue #1490). A canvas
+ * hands back eight bits whatever the PNG holds, which cost the check a
+ * tolerance of one step of the map's whole range, so the terrain check reads
+ * the worker's raw 16 bit grid instead and the drawing keeps the picture.
+ *
+ * The sampling is arithmetic and tested. Fetching the image and the grid is
+ * not, because one needs a canvas and the other needs the asset protocol.
  */
 
 import type { Ground } from "@/blueprint/buildable";
@@ -51,23 +56,55 @@ export async function readHeightField(
 }
 
 /**
- * How long the heightmap render's longest side may be for the check to read it
- * (issue #1483).
+ * The map's heights as the engine holds them (issue #1490).
  *
- * The render's own default is 1024, which is a picture of the ground rather
- * than the ground: a map over 8184 elmos comes back smaller than its corner
- * grid, and {@link cornerGround} refuses it. Every map the editor is used on is
- * over that, so the check was refusing every map it was given.
- *
- * 4096 corners is a 32760 elmo map, twice the 32 by 32 that is the largest
- * Beyond All Reason publishes. Past it the check goes quiet rather than reading
- * a smoothed picture, and the cap is what stops a map nobody has made yet from
- * being decoded into hundreds of megabytes.
+ * Not a {@link HeightField}: those are 0..1 samples read back off a rendered
+ * PNG through a canvas, which hands back eight bits whatever the PNG holds.
+ * These are the stored 16 bit words themselves, written out by the worker's
+ * `--height-field` mode and fetched as raw bytes, so the check pays no
+ * tolerance for the reading.
  */
-export const CHECK_MAX_SIDE = 4096;
+export interface HeightGrid {
+  /** `(mapx+1)` by `(mapy+1)`: the engine's own corner grid, 8 elmos apart. */
+  width: number;
+  height: number;
+  /** Row-major, `width * height` words, row 0 at the map's north. */
+  words: Uint16Array;
+}
 
 /**
- * The map's ground on the engine's own grid, or `null` when this field cannot
+ * The worker's bytes as a grid, or `null` when they are not this map's.
+ *
+ * A file of the wrong length is some other map's heights or a read that went
+ * wrong, and reading it anyway would put a building's verdict on ground that is
+ * not under it.
+ *
+ * The words are little endian on disk, which is what a `Uint16Array` over the
+ * buffer reads on every platform coilbox ships on.
+ */
+export function heightGrid(
+  bytes: ArrayBuffer,
+  width: number,
+  height: number,
+): HeightGrid | null {
+  if (width <= 0 || height <= 0) return null;
+  if (bytes.byteLength !== width * height * 2) return null;
+  return { width, height, words: new Uint16Array(bytes) };
+}
+
+/** Fetch the worker's raw height grid, or `null` if it will not read. Tens of
+ *  megabytes on a large map, which is why it is a file over the asset protocol
+ *  rather than anything on the bridge. */
+export async function readHeightGrid(
+  src: string,
+  width: number,
+  height: number,
+): Promise<HeightGrid | null> {
+  return heightGrid(await (await fetch(src)).arrayBuffer(), width, height);
+}
+
+/**
+ * The map's ground on the engine's own grid, or `null` when this grid cannot
  * describe it.
  *
  * {@link groundHeight} answers "how high is the ground at this point", which is
@@ -75,37 +112,41 @@ export const CHECK_MAX_SIDE = 4096;
  * other thing: the heightmap's own corners, at the 8 elmo spacing the engine
  * measures them at, because the rule is arithmetic over those exact values.
  *
- * `null` when the field is not the map's corners, which is any render made
- * smaller than the corner grid. That is refused rather than scaled onto,
- * because there is no honest tolerance for a smoothed height. Measured on
- * Bismuth Valley, whose corners are 1537 by 1025: read off the 1024 wide render
- * and scaled, 117 of 5673 spots said a solar collector would not build where
- * the map's own corners say it builds, and the worst corner was 192 elmos out
- * against the 7 elmos that unit tolerates. Widening `slack` to cover that would
- * pass everything everywhere. Asking for a render at {@link CHECK_MAX_SIDE} is
- * the way out, not a wider tolerance.
+ * The arithmetic is `CSMFMapFile::ReadHeightmap`'s own:
+ * `minHeight + word * (maxHeight - minHeight) / 65536`. Both ends of that come
+ * from unitsync, which honours the same `mapinfo.lua` overrides the engine does,
+ * so the number here is the number the engine holds and `slack` is nothing.
  *
- * `slack` is one step of the eight bit read back off that render, which is the
- * most a height here can differ from the one the engine holds.
+ * `null` when the grid is not the map's corners. That is a file describing some
+ * other map rather than a smoothed picture of this one, so there is nothing to
+ * scale and no tolerance that would make it honest.
  */
 export function cornerGround(
-  field: HeightField,
+  grid: HeightGrid,
   worldWidth: number,
   worldHeight: number,
   minHeight: number,
   maxHeight: number,
 ): Ground | null {
   if (worldWidth <= 0 || worldHeight <= 0) return null;
-  if (field.width !== worldWidth / SQUARE_SIZE + 1) return null;
-  if (field.height !== worldHeight / SQUARE_SIZE + 1) return null;
-  const range = maxHeight - minHeight;
+  if (grid.width !== worldWidth / SQUARE_SIZE + 1) return null;
+  if (grid.height !== worldHeight / SQUARE_SIZE + 1) return null;
+  const step = (maxHeight - minHeight) / 65536;
   return {
-    cornerAt: (x, z) => sampleAt(field, x, z) * range + minHeight,
-    slack: range / 255,
+    cornerAt: (x, z) => wordAt(grid, x, z) * step + minHeight,
+    slack: 0,
     minHeight,
     maxHeight,
     hasWater: true,
   };
+}
+
+/** One word by corner, clamped to the grid so an edge corner still reads, the
+ *  way the engine clamps one. */
+function wordAt(grid: HeightGrid, col: number, row: number): number {
+  const c = Math.min(grid.width - 1, Math.max(0, col));
+  const r = Math.min(grid.height - 1, Math.max(0, row));
+  return grid.words[r * grid.width + c];
 }
 
 /** Ground with no relief: one sample, at nothing. Sampled through the same

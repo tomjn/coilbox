@@ -1387,6 +1387,31 @@ export const unitsyncHeightmap = defineCommand<
   HeightmapResult
 >("coilbox-unitsync", "unitsync_heightmap");
 
+export interface HeightFieldResult {
+  /** Cache file name, served over `coilbox://unitsyncthumb/`. Little endian
+   *  `u16` words, row major, `width * height` of them. No inline fallback: the
+   *  grid runs to tens of megabytes and does not belong on the bridge. */
+  file?: string;
+  /** Grid dimensions `(mapx+1, mapy+1)`, the engine's own corner grid. */
+  width?: number;
+  height?: number;
+  /** World height at word 0, and at word 65536. The engine's conversion is
+   *  `minHeight + word * (maxHeight - minHeight) / 65536`. */
+  minHeight?: number;
+  maxHeight?: number;
+  errors: string[];
+}
+
+/**
+ * Write one map's raw 16 bit heights to the thumbnail cache and report the
+ * file, for the terrain check to read at the depth the engine holds them (issue
+ * #1490). Lazy, a separate unitsync session, cached on disk.
+ */
+export const unitsyncHeightField = defineCommand<
+  { enginePath: string; dataDir: string; mapName: string },
+  HeightFieldResult
+>("coilbox-unitsync", "unitsync_height_field");
+
 export interface MetalmapResult {
   /** Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
    * render reached disk, and preferred over `dataUrl`. */

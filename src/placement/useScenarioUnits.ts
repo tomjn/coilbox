@@ -28,7 +28,9 @@ import {
   flatGround,
   groundHeight,
   type HeightField,
+  type HeightGrid,
   readHeightField,
+  readHeightGrid,
   standingField,
 } from "./terrain";
 import { createUnitsLayer, type UnitsLayer } from "./unitsLayer";
@@ -36,6 +38,21 @@ import { createUnitsLayer, type UnitsLayer } from "./unitsLayer";
 /** The map inputs the layer needs, as `useMissionMapAssets` reports them. */
 export interface MapExtent {
   heightSrc?: string;
+  /**
+   * The map's own 16 bit heights, which is what a verdict is worked out on
+   * (issue #1490).
+   *
+   * Separate from `heightSrc` because the two are different reads for different
+   * jobs: the PNG is the picture the models are stood on and the terrain is
+   * displaced by, and this is the engine's own numbers. Left out by every
+   * surface that only draws.
+   */
+  heightFieldSrc?: string;
+  heightFieldWidth?: number;
+  heightFieldHeight?: number;
+  /** Whether that read has settled, one way or the other. False means one is
+   *  still in flight, so an absent grid is not yet an absent verdict. */
+  heightFieldRead?: boolean;
   /**
    * The ground has no relief and there is no heightmap coming (issue #1416).
    *
@@ -77,12 +94,12 @@ export interface ScenarioUnitsState {
    * The map's ground on the engine's own grid, for working out whether a
    * building will stand on it (issue #1315).
    *
-   * Null while the heightmap is being read, and on a map whose heightmap came
-   * back smaller than its own corner grid. Both are "do not ask", which is why
-   * this is separate from {@link groundAt}: that one answers 0 rather than
-   * nothing, because a model has to stand somewhere. A caller that wants a
-   * verdict has to ask for the render at `CHECK_MAX_SIDE`, or the field it
-   * hands over is a picture of the ground rather than the ground (issue #1483).
+   * Null while the map's heights are being read, and on a map whose heights
+   * would not read. Both are "do not ask", which is why this is separate from
+   * {@link groundAt}: that one answers 0 rather than nothing, because a model
+   * has to stand somewhere. A caller that wants a verdict has to hand over the
+   * raw grid, because the rendered picture is eight bits deep and a verdict off
+   * it costs a tolerance (issue #1490).
    *
    * Flat ground with no map is not null. That floor is level on purpose and is
    * known exactly, so a building on it gets a real verdict.
@@ -223,6 +240,39 @@ export function useScenarioUnits(
     };
   }, [map.heightSrc, flat]);
 
+  // The engine's own heights, read as raw bytes rather than off the picture
+  // (issue #1490). Its own read because it is its own file, and because a
+  // surface that only draws never asks for it.
+  const gridSettled = map.heightFieldRead !== false;
+  const [gridField, setGridField] = useState<HeightGrid | null>(null);
+  const [gridRead, setGridRead] = useState(true);
+  const gridSrc = map.heightFieldSrc;
+  const gridWidth = map.heightFieldWidth;
+  const gridHeight = map.heightFieldHeight;
+  useEffect(() => {
+    if (!gridSrc || !gridWidth || !gridHeight) {
+      setGridField(null);
+      setGridRead(true);
+      return;
+    }
+    setGridRead(false);
+    let cancelled = false;
+    readHeightGrid(gridSrc, gridWidth, gridHeight)
+      .then((read) => {
+        if (cancelled) return;
+        setGridField(read);
+        setGridRead(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setGridField(null);
+        setGridRead(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gridSrc, gridWidth, gridHeight]);
+
   // What the models stand on, which is the flat once the map's own heights have
   // been asked for and refused (issue #1497).
   const standing = standingField(field, heightRead);
@@ -315,10 +365,10 @@ export function useScenarioUnits(
 
   const ground = useMemo(() => {
     if (flat) return flatGround();
-    return field
-      ? cornerGround(field, worldWidth, worldHeight, minHeight, maxHeight)
+    return gridField
+      ? cornerGround(gridField, worldWidth, worldHeight, minHeight, maxHeight)
       : null;
-  }, [flat, field, worldWidth, worldHeight, minHeight, maxHeight]);
+  }, [flat, gridField, worldWidth, worldHeight, minHeight, maxHeight]);
 
   return {
     placed: placements.length,
@@ -329,7 +379,7 @@ export function useScenarioUnits(
     placements,
     groundAt,
     ground,
-    settled: defsReady && heightRead,
+    settled: defsReady && heightRead && gridRead && gridSettled,
     heightsUnread,
   };
 }

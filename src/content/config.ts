@@ -29,6 +29,7 @@ import {
   type DemoInfo,
   type EngineConfigResult,
   type GameInfoResult,
+  type HeightFieldResult,
   type HeightmapResult,
   type IngestSummary,
   type MapInfoResult,
@@ -52,6 +53,7 @@ import {
   unitsyncEngineConfigSet,
   unitsyncGameHeaders,
   unitsyncGameInfo,
+  unitsyncHeightField,
   unitsyncHeightmap,
   unitsyncMapInfo,
   unitsyncMapMeta,
@@ -1435,11 +1437,16 @@ export function useUnitsyncMinimap(
 
 /**
  * Session cache of heightmap results, keyed by
- * `dataDir::enginePath::mapName::maxSide`. The cap is part of the key because
- * the same map is rendered at two sizes: a picture of the relief for a preview,
- * and the map's own corner grid for the terrain check.
+ * `dataDir::enginePath::mapName::maxSide`. The cap is part of the key because a
+ * caller may ask for a different one, though every caller now takes the
+ * worker's own default: the terrain check reads the raw grid rather than a
+ * bigger picture of it (issue #1490).
  */
 const heightmapCache = new Map<string, HeightmapResult>();
+
+/** Session cache of raw height grids, keyed by `dataDir::enginePath::mapName`.
+ *  The result is a file name, not the grid, so this is small. */
+const heightFieldCache = new Map<string, HeightFieldResult>();
 
 /** Session cache of metalmap results, keyed by `dataDir::enginePath::mapName`. */
 const metalmapCache = new Map<string, MetalmapResult>();
@@ -1468,6 +1475,7 @@ export function invalidateMapPreview(
       heightmapCache.delete(cached);
     }
   }
+  heightFieldCache.delete(key);
   metalmapCache.delete(key);
 }
 
@@ -1475,9 +1483,8 @@ export function invalidateMapPreview(
  * Lazily render and cache a map's heightmap (PNG URL + world-height bounds).
  *
  * `maxSide` caps the render's longest side, and the worker's own default is
- * enough for a preview. A caller that reads heights back off it rather than
- * looking at it wants `CHECK_MAX_SIDE`, which is a render of the map's own
- * corner grid rather than a picture of it (issue #1483).
+ * enough for everyone: this is the picture the preview displaces its terrain
+ * with, and the terrain check reads {@link useUnitsyncHeightField} instead.
  */
 export function useUnitsyncHeightmap(
   enginePath?: string,
@@ -1528,6 +1535,66 @@ export function useUnitsyncHeightmap(
       cancelled = true;
     };
   }, [enginePath, dataDir, mapName, maxSide]);
+
+  return { data, url, loading, error };
+}
+
+/**
+ * Lazily write and cache a map's raw 16 bit heights, for the terrain check
+ * (issue #1490).
+ *
+ * The url is the file the worker wrote, which the caller fetches as bytes. The
+ * bounds come back with it because a word means nothing without them.
+ */
+export function useUnitsyncHeightField(
+  enginePath?: string,
+  dataDir?: string,
+  mapName?: string,
+) {
+  const [data, setData] = useState<HeightFieldResult | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enginePath || !dataDir || !mapName) {
+      setData(null);
+      setUrl(null);
+      return;
+    }
+    const key = `${dataDir}::${enginePath}::${mapName}`;
+    const apply = (res: HeightFieldResult) => {
+      setData(res);
+      const url = res.file ? unitsyncThumbUrl(res.file) : null;
+      setUrl(url);
+      if (!url && res.errors?.length) setError(res.errors.join("; "));
+    };
+    const cached = heightFieldCache.get(key);
+    if (cached) {
+      apply(cached);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    unitsyncHeightField({ enginePath, dataDir, mapName })
+      .then((res) => {
+        if (cancelled) return;
+        // Same rule as the minimap: a write that produced nothing is a state,
+        // not an answer, so a retry re-runs it.
+        if (res.file) heightFieldCache.set(key, res);
+        apply(res);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enginePath, dataDir, mapName]);
 
   return { data, url, loading, error };
 }

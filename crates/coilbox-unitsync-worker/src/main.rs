@@ -20,6 +20,7 @@ mod dataset;
 mod factionlogo;
 mod ffi;
 mod game;
+mod heightfield;
 mod heightmap;
 mod infocache;
 mod lua;
@@ -50,6 +51,9 @@ struct Args {
     extract: Option<String>,
     thumbnails: bool,
     heightmap: bool,
+    /// `--height-field`: write one map's raw 16 bit heights to the cache, for
+    /// the terrain check to read without a PNG in the way (issue #1490).
+    height_field: bool,
     /// `--metalmap`: render one map's metal infomap as an RGBA overlay PNG.
     metalmap: bool,
     /// `--map-info`: lazily read one map's options (combined with `--map`).
@@ -485,6 +489,26 @@ fn run() -> i32 {
         return 1;
     }
 
+    // Height field: write one map's raw heights out for the terrain check.
+    if args.height_field {
+        if let Some(map) = args.map.clone() {
+            return match std::panic::catch_unwind(|| {
+                heightfield::render(&args.lib, &map, cache_dir)
+            }) {
+                Ok(out) => {
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    0
+                }
+                Err(_) => {
+                    heightfield::emit_error("worker panicked while reading heights".into());
+                    1
+                }
+            };
+        }
+        emit_error("missing --map <name> for --height-field".into());
+        return 1;
+    }
+
     // Metalmap: render one map's metal infomap to a green-on-transparent RGBA PNG.
     if args.metalmap {
         if let Some(map) = args.map.clone() {
@@ -547,6 +571,7 @@ fn parse_args() -> Result<Args, String> {
     let mut extract = None;
     let mut thumbnails = false;
     let mut heightmap = false;
+    let mut height_field = false;
     let mut metalmap = false;
     let mut map_info = false;
     let mut map_meta = false;
@@ -582,6 +607,7 @@ fn parse_args() -> Result<Args, String> {
             "--extract" => extract = it.next(),
             "--thumbnails" => thumbnails = true,
             "--heightmap" => heightmap = true,
+            "--height-field" => height_field = true,
             "--metalmap" => metalmap = true,
             "--map-info" => map_info = true,
             "--map-meta" => map_meta = true,
@@ -650,6 +676,7 @@ fn parse_args() -> Result<Args, String> {
         extract,
         thumbnails,
         heightmap,
+        height_field,
         metalmap,
         map_info,
         map_meta,

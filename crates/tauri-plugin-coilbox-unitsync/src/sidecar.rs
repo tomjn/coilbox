@@ -200,6 +200,24 @@ pub fn build_heightmap_args(
     args
 }
 
+/// Build args for height-field mode: scan args plus the map name, the
+/// `--height-field` flag, and the cache directory the grid is written to. No
+/// size cap: the whole point is the map's own corner grid at full depth (issue
+/// #1490).
+pub fn build_height_field_args(
+    lib: &str,
+    datadir: &str,
+    map: &str,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--map".into());
+    args.push(map.into());
+    args.push("--height-field".into());
+    push_cache_dir(&mut args, cache_dir);
+    args
+}
+
 /// Build args for metalmap mode: scan args plus the map name, the `--metalmap`
 /// flag, the longest-side pixel cap, and the optional on-disk PNG cache directory.
 pub fn build_metalmap_args(

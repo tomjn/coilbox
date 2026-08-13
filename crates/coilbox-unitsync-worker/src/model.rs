@@ -264,6 +264,34 @@ pub struct HeightmapOutput {
     pub errors: Vec<String>,
 }
 
+/// The map's raw heights, returned by the lazy `height-field` mode: the file the
+/// grid was written to plus the bounds its words span (issue #1490).
+///
+/// No inline fallback. The grid runs to tens of megabytes on a large map, which
+/// is not something to put on the bridge as base64, so without a cache directory
+/// this mode reports the failure and the caller goes quiet.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct HeightFieldOutput {
+    /// Cache file name, served over `coilbox://unitsyncthumb/`. Little endian
+    /// `u16` words, row major, `width * height` of them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// Grid dimensions, `(mapx+1, mapy+1)`, which is the engine's own corner
+    /// grid at 8 elmo spacing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    /// World height at word 0, and at word 65536. The engine's conversion is
+    /// `minHeight + word * (maxHeight - minHeight) / 65536`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_height: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_height: Option<f32>,
+    pub errors: Vec<String>,
+}
+
 /// A rendered metal infomap, returned by the lazy `metalmap` mode: a downscaled
 /// green-on-transparent RGBA PNG marking where mexes can extract, for overlaying
 /// on the minimap. Transparent where there's no metal, so it reads over the map.
