@@ -5,9 +5,7 @@ import {
   Loader2,
   MapPin,
   MountainSnow,
-  Redo2,
   Trash2,
-  Undo2,
   Unplug,
 } from "lucide-react";
 import {
@@ -38,7 +36,11 @@ import {
   parsePlacementKey,
   placementKey,
 } from "@/placement/placements";
-import { PlaybackBar, SelectionBar } from "@/placement/SurfaceBars";
+import {
+  HistoryControls,
+  PlaybackBar,
+  SelectionBar,
+} from "@/placement/SurfaceBars";
 import {
   focusCamera,
   focusDistance,
@@ -101,7 +103,6 @@ import {
   removeGroup,
   targetOptions,
 } from "./groups";
-import { modKeyLabel } from "./history";
 import { EDITOR_MODES } from "./modes";
 import {
   movePathWaypoint,
@@ -863,32 +864,7 @@ export function ScenarioMapScene({
       }
       chrome={
         <>
-          {history && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                className="bg-card/80 px-2 backdrop-blur"
-                onClick={history.undo}
-                disabled={!history.canUndo}
-                aria-label="Undo"
-                title={`Undo (${modKeyLabel()} Z)`}
-              >
-                <Undo2 className="size-3.5" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="bg-card/80 px-2 backdrop-blur"
-                onClick={history.redo}
-                disabled={!history.canRedo}
-                aria-label="Redo"
-                title={`Redo (${modKeyLabel()} Shift Z)`}
-              >
-                <Redo2 className="size-3.5" />
-              </Button>
-            </>
-          )}
+          {history && <HistoryControls {...history} />}
           <Popover>
             <PopoverTrigger asChild>
               <Button
