@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { buildingFootprints } from "./footprint";
 import type { BaseBlueprint } from "./model";
+import type { BlueprintPayload } from "./payload";
 import {
   layoutDefs,
+  layoutSide,
   planForSide,
   revertSubstitution,
   sideOfDef,
+  sideOffer,
   sideUnitPrefixes,
   substituteBlueprint,
   substitutedCount,
+  substitutePayload,
   substitutionNotes,
 } from "./substitution";
 import { knownUnits } from "./units";
@@ -120,6 +124,105 @@ describe("planForSide", () => {
 
   it("lists a layout's defs once each, in the order they are built", () => {
     expect(layoutDefs(layout)).toEqual(["armsolar"]);
+  });
+});
+
+describe("layoutSide", () => {
+  it("names the side a layout is written in", () => {
+    expect(layoutSide(["armsolar", "armmex"], prefixes)?.side).toBe("Armada");
+  });
+
+  it("says nothing about a layout with both sides' buildings in it", () => {
+    expect(layoutSide(["armsolar", "corsolar"], prefixes)).toBeUndefined();
+  });
+
+  it("ignores buildings belonging to no side, because nobody owns those", () => {
+    expect(layoutSide(["armsolar", "raptorqueen"], prefixes)?.side).toBe(
+      "Armada",
+    );
+  });
+
+  it("says nothing when no building belongs to a side", () => {
+    expect(layoutSide(["raptorqueen"], prefixes)).toBeUndefined();
+  });
+
+  it("says nothing when the game's sides cannot be told apart", () => {
+    expect(layoutSide(["armsolar"], [])).toBeUndefined();
+  });
+});
+
+describe("sideOffer", () => {
+  /** A third side, so the offer has more than one answer to give. */
+  const three = sideUnitPrefixes([
+    ...SIDES,
+    { name: "Legion", startUnit: "legcom" },
+  ]);
+  const withLeg = knownUnits([...UNITS, { name: "legsolar" }]);
+
+  it("offers every side this game has a version of these buildings in", () => {
+    expect(sideOffer(["armsolar"], three, withLeg)).toEqual({
+      from: "Armada",
+      to: ["Cortex", "Legion"],
+    });
+  });
+
+  it("leaves out a side the game has no substitute in", () => {
+    // Nothing is called legsolar in this dataset, so Legion is not an answer
+    // rather than an answer that would do nothing.
+    expect(sideOffer(["armsolar"], three, known)).toEqual({
+      from: "Armada",
+      to: ["Cortex"],
+    });
+  });
+
+  it("offers nothing when the layout's own side cannot be told", () => {
+    expect(sideOffer(["armsolar", "corsolar"], three, withLeg)).toBeUndefined();
+  });
+
+  it("offers nothing when the game's units have not been read", () => {
+    expect(sideOffer(["armsolar"], three, knownUnits([]))).toBeUndefined();
+  });
+});
+
+describe("substitutePayload", () => {
+  const payload: BlueprintPayload = {
+    game: { name: "Beyond All Reason test-1" },
+    name: "Opening solars",
+    buildings: [
+      { def: "armsolar", offset: { x: -16, z: 0 }, facing: 0 },
+      { def: "armmex", offset: { x: 96, z: 0 }, facing: 0 },
+    ],
+    footprints: { armsolar: { x: 2, z: 2 }, armmex: { x: 2, z: 2 } },
+  };
+
+  it("swaps the names and keeps what each building was drawn as", () => {
+    const { payload: out } = substitutePayload(
+      payload,
+      { armsolar: "corsolar" },
+      footprintOf,
+    );
+    expect(out.buildings.map((b) => b.def)).toEqual(["corsolar", "armmex"]);
+    expect(out.buildings[0].originalName).toBe("armsolar");
+    expect(out.name).toBe("Opening solars");
+    expect(out.game).toEqual(payload.game);
+  });
+
+  it("records what the substitutes stand on, so a reader can draw them", () => {
+    const { payload: out } = substitutePayload(
+      payload,
+      { armsolar: "corsolar" },
+      footprintOf,
+    );
+    expect(out.footprints.corsolar).toEqual({ x: 3, z: 3 });
+    expect(out.footprints.armsolar).toEqual({ x: 2, z: 2 });
+  });
+
+  it("leaves the footprints alone when nothing has read them", () => {
+    const { payload: out, report } = substitutePayload(payload, {
+      armsolar: "corsolar",
+    });
+    expect(out.footprints).toEqual(payload.footprints);
+    expect(report.checked).toBe(false);
   });
 });
 
