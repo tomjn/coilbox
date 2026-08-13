@@ -62,6 +62,7 @@ import {
   BuildOrderPopover,
   LayoutNameField,
   LayoutNotes,
+  layoutTriggerLabel,
   UncheckedNote,
 } from "./LayoutControls";
 import { PlacementSurface } from "./PlacementSurface";
@@ -366,11 +367,15 @@ export function BlueprintEditor({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-8 gap-1.5 px-2 text-xs"
+                  className="h-8 max-w-52 gap-1.5 px-2 text-xs"
                 >
-                  <Blocks className="size-3.5" /> {blueprint.buildings.length}{" "}
-                  building
-                  {blueprint.buildings.length === 1 ? "" : "s"}
+                  <Blocks className="size-3.5 shrink-0" />
+                  <span className="truncate">
+                    {layoutTriggerLabel(
+                      blueprint.name,
+                      blueprint.buildings.length,
+                    )}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-80 space-y-3">
