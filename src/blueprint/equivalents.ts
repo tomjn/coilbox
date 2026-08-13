@@ -185,6 +185,46 @@ export function coveredDefs(table: EquivalenceTable): number {
   return new Set(table.groups.flatMap(defsIn)).size;
 }
 
+/** The same count, split by whose answer names each def (issue #1544). */
+export interface DefsBySource {
+  /** Every def, whoever named it, which is `coveredDefs`. */
+  all: number;
+  you: number;
+  game: number;
+  /** Defs only an answer from before coilbox recorded any of this names. */
+  unsaid: number;
+}
+
+/**
+ * How many defs this table can answer for and where each of them came from
+ * (issue #1544).
+ *
+ * Per def rather than per answer, because that is what the panels count and a
+ * def is one thing whichever group names it. A def two answers name is filed
+ * under the more trusted of them, the same order the table itself keeps: a
+ * person's answer beats a game's file, and either beats one nobody can account
+ * for. So a def somebody answered for is theirs even where a game's file names
+ * it as well, and the three counts always add up to `all`.
+ */
+export function coveredDefsBySource(table: EquivalenceTable): DefsBySource {
+  const trust = { you: 2, game: 1, unsaid: 0 };
+  const best = new Map<string, number>();
+  for (const group of table.groups) {
+    for (const held of Object.values(group)) {
+      const rank = trust[held.from ?? "unsaid"];
+      best.set(held.def, Math.max(best.get(held.def) ?? 0, rank));
+    }
+  }
+
+  const ranks = [...best.values()];
+  return {
+    all: ranks.length,
+    you: ranks.filter((rank) => rank === trust.you).length,
+    game: ranks.filter((rank) => rank === trust.game).length,
+    unsaid: ranks.filter((rank) => rank === trust.unsaid).length,
+  };
+}
+
 /**
  * The table with one more thing said about it: that on `fromSide` this game
  * calls it `fromDef`, and on `toSide` it calls it `toDef`.

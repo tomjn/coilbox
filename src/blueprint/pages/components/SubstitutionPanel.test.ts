@@ -14,7 +14,12 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { learnEquivalence, NO_EQUIVALENTS } from "../../equivalents";
+import {
+  type EquivalenceTable,
+  learnEquivalence,
+  mergeEquivalents,
+  NO_EQUIVALENTS,
+} from "../../equivalents";
 import type { BaseBlueprint } from "../../model";
 import { gameSides, sideUnitPrefixes } from "../../substitution";
 import { SubstitutionPanel } from "./SubstitutionPanel";
@@ -234,7 +239,51 @@ describe("SubstitutionPanel", () => {
     });
 
     it("says nothing about a table nobody has filled in", () => {
-      expect(markup()).not.toContain("of this game&#x27;s units from");
+      expect(markup()).not.toContain("of this game&#x27;s units and uses");
+    });
+
+    /**
+     * Issue #1544. Whose answers they are. A game's published table lands 87 of
+     * them at once, so counting the lot as what this person converted tells
+     * them they picked answers nobody here gave, which reads worst for somebody
+     * who suspects one is wrong.
+     */
+    describe("whose answers it is counting", () => {
+      const shipped: EquivalenceTable = {
+        groups: [
+          {
+            Armada: { def: "armsolar", from: "game" },
+            Cortex: { def: "corsolar", from: "game" },
+          },
+        ],
+      };
+
+      it("counts the answers a person gave apart from the game's", () => {
+        const html = markup({ table: mergeEquivalents(knows, shipped) });
+        expect(html).toContain("4 of this game&#x27;s units");
+        expect(html).toContain("2 you picked while converting");
+        expect(html).toContain(
+          "2 brought by this game&#x27;s own published table",
+        );
+      });
+
+      it("claims none of a table that only came from the game's own file", () => {
+        const html = markup({ table: shipped });
+        expect(html).toContain(
+          "brought by this game&#x27;s own published table",
+        );
+        expect(html).not.toContain("you picked");
+      });
+
+      it("claims an answer it cannot account for for nobody", () => {
+        const html = markup({
+          table: {
+            groups: [{ Armada: { def: "armpw" }, Cortex: { def: "corak" } }],
+          },
+        });
+        expect(html).toContain("before coilbox recorded where an answer came");
+        expect(html).not.toContain("you picked");
+      });
     });
 
     /**
