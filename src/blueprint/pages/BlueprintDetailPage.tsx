@@ -16,8 +16,8 @@
  * written a moment after the last change, and again on the way out.
  */
 
-import { Button, Input } from "@picoframe/frame";
-import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
+import { Button, Input, useDrawer } from "@picoframe/frame";
+import { ArrowLeft, Loader2, Share2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
@@ -32,6 +32,7 @@ import {
   SkeletonList,
 } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
+import { nextDrawerKey } from "@/general/drawerKey";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import {
   footprintsFromUnits,
@@ -154,6 +155,7 @@ export default function BlueprintDetailPage() {
 
         <div className="flex items-center gap-3">
           <SaveState saving={saving} error={saveError} />
+          <ShareBlueprintButton record={record} />
           <DeleteBlueprintButton
             name={record.layout.name}
             onDelete={async () => {
@@ -212,6 +214,38 @@ function SaveState({
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <Loader2 className="size-3.5 animate-spin" /> Saving
     </span>
+  );
+}
+
+/**
+ * Send this layout to somebody (issue #1439). A drawer rather than a dialog, and
+ * it carries the record in hand rather than the one on disk, so a share pressed
+ * a moment after an edit sends what is on screen.
+ */
+function ShareBlueprintButton({ record }: { record: StoredBlueprint }) {
+  const drawer = useDrawer();
+
+  const share = async () => {
+    const { ShareBlueprintForm } = await import(
+      "./components/ShareBlueprintForm"
+    );
+    drawer.open({
+      title: `Share ${record.layout.name}`,
+      width: "28rem",
+      content: <ShareBlueprintForm key={nextDrawerKey()} record={record} />,
+    });
+  };
+
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="gap-1.5"
+      onClick={() => void share()}
+    >
+      <Share2 className="size-4" /> Share
+    </Button>
   );
 }
 

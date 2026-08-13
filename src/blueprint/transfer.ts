@@ -98,16 +98,24 @@ export function blueprintPayload(
   };
 }
 
+/**
+ * Wrap a payload as an export file's text.
+ *
+ * The library stores the wire shape (`./library.ts`), so sharing a kept layout
+ * is this rather than {@link encodeBlueprintJson}: rebuilding the payload would
+ * need the footprints again, and those come from a unitsync read the sharer may
+ * not be able to do right now for a layout whose game they have since removed.
+ */
+export function encodePayloadJson(payload: BlueprintPayload): string {
+  return encodeContainerJson("blueprint", BLUEPRINT_KIND_VERSION, payload);
+}
+
 /** Serialize a layout as an export file's text. */
 export function encodeBlueprintJson(
   layout: BaseBlueprint,
   options: BlueprintExportOptions,
 ): string {
-  return encodeContainerJson(
-    "blueprint",
-    BLUEPRINT_KIND_VERSION,
-    blueprintPayload(layout, options),
-  );
+  return encodePayloadJson(blueprintPayload(layout, options));
 }
 
 /** A pasteable blueprint code, or why this layout cannot have one. */
@@ -127,20 +135,24 @@ export type BlueprintCode =
  * repetitive text that compresses hard and the footprints are one entry per def
  * rather than one per building.
  */
-export function encodeBlueprintCode(
-  layout: BaseBlueprint,
-  options: BlueprintExportOptions,
-): BlueprintCode {
+export function encodePayloadCode(payload: BlueprintPayload): BlueprintCode {
   const result = tryEncodeContainerCode(
     "blueprint",
     BLUEPRINT_KIND_VERSION,
-    blueprintPayload(layout, options),
+    payload,
   );
   if (result.ok) return result;
   return {
     ok: false,
     message: `This layout is ${formatBytes(result.bytes)}, past the ${formatBytes(result.limit)} a share code can carry. Export it as a file and send that instead.`,
   };
+}
+
+export function encodeBlueprintCode(
+  layout: BaseBlueprint,
+  options: BlueprintExportOptions,
+): BlueprintCode {
+  return encodePayloadCode(blueprintPayload(layout, options));
 }
 
 /**
