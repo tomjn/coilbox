@@ -24,8 +24,10 @@
  * that uses them is `modes.tsx`.
  */
 
+import type { SnapBuilding } from "@/blueprint/footprint";
 import { recordGameName, type StoredBlueprint } from "@/blueprint/library";
-import type { Scenario } from "../../model";
+import type { BlueprintBuilding } from "@/blueprint/model";
+import type { Point, Scenario } from "../../model";
 
 /** Where a layout the editor is about to place is coming from. */
 export type LayoutSource = "scenario" | "library";
@@ -50,6 +52,44 @@ export function parseLayoutChoice(key: string): LayoutChoice | null {
   const id = key.slice(at + 1);
   if ((from !== "scenario" && from !== "library") || !id) return null;
   return { from, id };
+}
+
+/**
+ * Where a layout dropped at `pos` puts its origin, so the base lands on the
+ * build grid rather than near it.
+ *
+ * The engine only stands a building on the grid, and the grid is absolute: a
+ * base whose origin is half a square out arrives with every building in it off
+ * the lattice it was drawn on, and the engine free to shuffle each one up to
+ * half a square on its own. That is the same reason `setOrigin` moves a base in
+ * whole squares rather than to the click.
+ *
+ * The first building is what is aligned, and every other one keeps its offset
+ * from it. An offset was drawn against the first building's grid position, so
+ * putting that one right puts the rest right, including a layout mixing odd and
+ * even footprints, whose buildings are half a square out of phase with each
+ * other on purpose.
+ *
+ * `pos` unchanged for a layout with nothing in it, and while the game's units
+ * are unread: without a footprint there is no phase to work out, and guessing
+ * one square would move the even-footprint layouts onto the wrong half of the
+ * grid.
+ */
+export function layoutOrigin(
+  pos: Point,
+  buildings: readonly BlueprintBuilding[],
+  /** Undefined while the game's units are unread, which is not the same as a
+   *  snap that treats every def as one square. */
+  snap: SnapBuilding | undefined,
+): Point {
+  const first = buildings[0];
+  if (!first || !snap) return pos;
+  const stand = snap(
+    { x: pos.x + first.offset.x, z: pos.z + first.offset.z },
+    first.def,
+    first.facing,
+  );
+  return { x: stand.x - first.offset.x, z: stand.z - first.offset.z };
 }
 
 /** One layout offered in the picker. */

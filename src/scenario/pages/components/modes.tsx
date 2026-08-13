@@ -61,7 +61,7 @@ import {
   MAX_GROUP_COUNT,
 } from "./groups";
 import { LayoutPlacer, layoutPlacement } from "./LayoutPlacer";
-import type { LayoutChoice } from "./layoutPlacing";
+import { type LayoutChoice, layoutOrigin } from "./layoutPlacing";
 import { TeamSelect } from "./TeamSelect";
 import {
   addZone,
@@ -536,6 +536,13 @@ const layoutsMode: EditorMode = {
       () => (units.length > 0 ? knownUnits(units) : undefined),
       [units],
     );
+    // Undefined until the game's units are read, which is what stops a layout
+    // of even-footprint buildings being snapped onto the wrong half of the
+    // grid by a fallback that calls everything one square.
+    const snap = useMemo(
+      () => (units.length > 0 ? buildGridSnap(units) : undefined),
+      [units],
+    );
 
     const placement = layoutPlacement(
       scenario,
@@ -551,28 +558,30 @@ const layoutsMode: EditorMode = {
           ? (pos: Point) => {
               const id = crypto.randomUUID();
               if (choice.from === "scenario") {
-                onChange((doc) =>
-                  placeBlueprint(doc, id, choice.id, {
+                onChange((doc) => {
+                  const layout = doc.blueprints.find((b) => b.id === choice.id);
+                  return placeBlueprint(doc, id, choice.id, {
                     team: owner,
-                    origin: pos,
-                  }),
-                );
+                    origin: layoutOrigin(pos, layout?.buildings ?? [], snap),
+                  });
+                });
                 onSelect(placementKey("base", id, 0));
                 return;
               }
               const record = records.find((one) => one.id === choice.id);
               if (!record) return;
               const blueprint = crypto.randomUUID();
+              const layout = {
+                ...blueprintFromPayload(record.layout),
+                name: placement.name,
+              };
               onChange((doc) =>
                 takeBlueprint(
                   doc,
-                  {
-                    ...blueprintFromPayload(record.layout),
-                    name: placement.name,
-                  },
+                  layout,
                   owner,
                   { base: id, blueprint },
-                  pos,
+                  layoutOrigin(pos, layout.buildings, snap),
                 ),
               );
               onSelect(placementKey("base", id, 0));
