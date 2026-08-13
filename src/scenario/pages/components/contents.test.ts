@@ -232,6 +232,20 @@ describe("unplacedLayouts", () => {
   it("holds nothing while every layout is placed", () => {
     expect(unplacedLayouts({ ...empty, ...placedBase("p1") })).toEqual([]);
   });
+
+  /** A base with no buildings draws nothing and can never be selected again, so
+   *  the row that would put one on the map has to know not to offer it. */
+  it("marks a layout with nothing in it as empty", () => {
+    const out = unplacedLayouts({
+      ...empty,
+      blueprints: [
+        { id: "spare", name: "Forward post", buildings: [] },
+        ...placedBase("p1").blueprints,
+      ],
+    });
+    expect(out[0].empty).toBe(true);
+    expect(out[1].empty).toBe(false);
+  });
 });
 
 describe("contentsSelection", () => {

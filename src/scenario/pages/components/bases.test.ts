@@ -19,6 +19,7 @@ import {
   moveBuilding,
   movedQueued,
   normaliseQueue,
+  placeBlueprint,
   plusQueued,
   removeBase,
   removeBlueprint,
@@ -363,6 +364,63 @@ describe("a layout nothing places", () => {
     const next = removeBlueprint(document(), "bp1");
     expect(next.blueprints).toEqual([]);
     expect(next.bases).toEqual([]);
+  });
+
+  it("goes back on the map without a second copy of the geometry", () => {
+    const next = placeBlueprint(unplaced(), "b2", "bp1", {
+      team: "p1",
+      origin: { x: 500, z: 600 },
+    });
+    expect(next.blueprints).toHaveLength(1);
+    expect(next.bases).toEqual([
+      {
+        id: "b2",
+        blueprint: "bp1",
+        team: "p1",
+        origin: { x: 500, z: 600 },
+        buildings: [],
+      },
+    ]);
+  });
+
+  /** A layout dropped in from outside has no trigger names and no queues, so a
+   *  base placed from one carries none until an author adds them. */
+  it("arrives with nothing a trigger can address and nothing queued", () => {
+    const next = placeBlueprint(unplaced(), "b2", "bp1", {
+      team: "p1",
+      origin: { x: 0, z: 0 },
+    });
+    expect(buildingsOf(next, "b2")).toEqual([
+      { def: "armlab", offset: { x: 0, z: 0 }, facing: 0 },
+      { def: "armsolar", offset: { x: 128, z: 64 }, facing: 1 },
+    ]);
+  });
+
+  it("places a layout a base is already placed from, sharing the geometry", () => {
+    const next = placeBlueprint(document(), "b2", "bp1", {
+      team: "p2",
+      origin: { x: 40, z: 50 },
+    });
+    expect(next.blueprints).toHaveLength(1);
+    expect(sharingLayout(next, "b1")).toEqual(["b2"]);
+  });
+
+  it("rounds the origin, because an author never means 1023.9997", () => {
+    const next = placeBlueprint(unplaced(), "b2", "bp1", {
+      team: "p1",
+      origin: { x: 1023.9997, z: 60.5 },
+    });
+    expect(next.bases[0].origin).toEqual({ x: 1024, z: 61 });
+  });
+
+  it("hands the same document back for a layout that is not there", () => {
+    const before = unplaced();
+    expect(
+      placeBlueprint(before, "b2", "nope", {
+        team: "p1",
+        origin: { x: 0, z: 0 },
+      }),
+    ).toBe(before);
   });
 });
 

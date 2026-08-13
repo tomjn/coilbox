@@ -16,6 +16,7 @@
 
 import { Button, Input } from "@picoframe/frame";
 import {
+  Blocks,
   Circle,
   Factory,
   type LucideIcon,
@@ -27,10 +28,15 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { buildGridSnap } from "@/blueprint/footprint";
+import { useBlueprintLibrary } from "@/blueprint/store";
+import { blueprintFromPayload } from "@/blueprint/transfer";
+import { knownUnits } from "@/blueprint/units";
+import { useUnitsyncScan } from "@/content/config";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
 import { useGameUnits } from "@/content/useGameUnits";
 import { parsePlacementKey, placementKey } from "@/placement/placements";
 import type { GroundDragPhase } from "@/placement/useMapEditing";
+import { usePreferredTarget } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   baseBuildings,
@@ -38,7 +44,14 @@ import {
   type Scenario,
   type ScenarioZone,
 } from "../../model";
-import { addBase, addBuilding, buildingUnits, type LayoutEdit } from "./bases";
+import {
+  addBase,
+  addBuilding,
+  buildingUnits,
+  type LayoutEdit,
+  placeBlueprint,
+} from "./bases";
+import { takeBlueprint } from "./blueprintImport";
 import { addActor } from "./editing";
 import type { ScenarioEdit } from "./edits";
 import {
@@ -47,6 +60,8 @@ import {
   DEFAULT_GROUP_COUNT,
   MAX_GROUP_COUNT,
 } from "./groups";
+import { LayoutPlacer, layoutPlacement } from "./LayoutPlacer";
+import { type LayoutChoice, layoutOrigin } from "./layoutPlacing";
 import { TeamSelect } from "./TeamSelect";
 import {
   addZone,
@@ -83,6 +98,17 @@ export interface ModeContext {
   /** Whether an edit to a base names the layout every base placed from it uses,
    *  or gives that base a copy of its own. Only bases read it. */
   layoutEdit: (baseId: string) => LayoutEdit;
+  /**
+   * The layout the Layouts mode is about to place, and the way to change it.
+   * Only that mode reads it.
+   *
+   * Held by the surface rather than inside the mode, because something else
+   * arms it: the row for an unplaced layout in the contents list is where an
+   * author goes to put a deleted base back, and pressing it has to reach into
+   * the mode it switches to (issue #1450).
+   */
+  layout: LayoutChoice | null;
+  onLayout: (choice: LayoutChoice | null) => void;
 }
 
 /** What a resolved mode contributes to the surface. */
@@ -466,6 +492,120 @@ const basesMode: EditorMode = {
   },
 };
 
+/**
+ * A whole base at once, from a layout somebody already drew (issues #1327,
+ * #1450).
+ *
+ * The other half of Bases. That mode builds a base a click at a time, which is
+ * how a layout gets made. This one places a layout that exists, which is what
+ * makes having made one worth anything. The two things it reaches are the
+ * scenario's own layouts, including the ones no base is currently placed from,
+ * and the blueprint library, which is where a base saved out of another mission
+ * or taken off the hub lives.
+ *
+ * A library layout is copied into the document as it is placed. A scenario is
+ * shared as one self-contained payload, so a base pointing at a layout outside
+ * the document would work for its author and for nobody they send it to. Having
+ * copied it, the picker moves to the copy, so placing the same layout a second
+ * time is one shape in two places rather than two layouts of one name.
+ *
+ * What a base placed here does not get is anything a mission adds on top: no
+ * trigger addressable ids and no factory queues. Those belong to a placement
+ * rather than to a shape and are added afterwards, from the base's own bar.
+ */
+const layoutsMode: EditorMode = {
+  id: "layouts",
+  label: "Layouts",
+  icon: Blocks,
+  hint: "Pick a layout and a team, then click the map to place the whole base.",
+  use: ({ scenario, onChange, onSelect, layout: choice, onLayout }) => {
+    const [team, setTeam] = useState("");
+    const participants = scenario.setup.participants;
+    const owner = participants.some((p) => p.id === team)
+      ? team
+      : (participants[0]?.id ?? "");
+
+    const { records } = useBlueprintLibrary();
+    const { target } = usePreferredTarget();
+    const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+    // Null only while the scan is still running, the same rule the library's
+    // own import follows: a scan that failed answers with no games.
+    const installed = scan.data?.games ?? (scan.loading ? null : []);
+    const { units } = useGameUnits(scenario.setup.gameName);
+    const known = useMemo(
+      () => (units.length > 0 ? knownUnits(units) : undefined),
+      [units],
+    );
+    // Undefined until the game's units are read, which is what stops a layout
+    // of even-footprint buildings being snapped onto the wrong half of the
+    // grid by a fallback that calls everything one square.
+    const snap = useMemo(
+      () => (units.length > 0 ? buildGridSnap(units) : undefined),
+      [units],
+    );
+
+    const placement = layoutPlacement(
+      scenario,
+      choice,
+      records,
+      installed,
+      known,
+    );
+
+    return {
+      place:
+        choice && owner && placement
+          ? (pos: Point) => {
+              const id = crypto.randomUUID();
+              if (choice.from === "scenario") {
+                onChange((doc) => {
+                  const layout = doc.blueprints.find((b) => b.id === choice.id);
+                  return placeBlueprint(doc, id, choice.id, {
+                    team: owner,
+                    origin: layoutOrigin(pos, layout?.buildings ?? [], snap),
+                  });
+                });
+                onSelect(placementKey("base", id, 0));
+                return;
+              }
+              const record = records.find((one) => one.id === choice.id);
+              if (!record) return;
+              const blueprint = crypto.randomUUID();
+              const layout = {
+                ...blueprintFromPayload(record.layout),
+                name: placement.name,
+              };
+              onChange((doc) =>
+                takeBlueprint(
+                  doc,
+                  layout,
+                  owner,
+                  { base: id, blueprint },
+                  layoutOrigin(pos, layout.buildings, snap),
+                ),
+              );
+              onSelect(placementKey("base", id, 0));
+              // The library entry is a layout of this scenario's now, so the
+              // next click places that rather than copying the same shape in
+              // again under a counted-up name.
+              onLayout({ from: "scenario", id: blueprint });
+            }
+          : null,
+      controls: (
+        <LayoutPlacer
+          scenario={scenario}
+          records={records}
+          choice={choice}
+          onChoice={onLayout}
+          placement={placement}
+          team={owner}
+          onTeam={setTeam}
+        />
+      ),
+    };
+  },
+};
+
 /** Every mode the editor offers, in the order the strip shows them. */
 export const EDITOR_MODES: EditorMode[] = [
   selectMode,
@@ -473,4 +613,9 @@ export const EDITOR_MODES: EditorMode[] = [
   actorsMode,
   groupsMode,
   basesMode,
+  layoutsMode,
 ];
+
+/** The mode that places a whole layout, which the contents list switches to
+ *  when an author asks to put an unplaced one back (issue #1450). */
+export const LAYOUTS_MODE_ID = layoutsMode.id;
