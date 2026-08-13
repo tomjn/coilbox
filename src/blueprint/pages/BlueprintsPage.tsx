@@ -19,6 +19,7 @@ import { Button, Input } from "@picoframe/frame";
 import { Blocks, ListOrdered, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 
 import {
   Popover,
@@ -31,6 +32,8 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "@/content/pages/components/states";
+import { useImportParam } from "@/deeplink/useImportParam";
+import { useRecordHubImport } from "@/hub/imports";
 import { usePreferredTarget } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
@@ -41,13 +44,9 @@ import {
   UNTITLED,
   uniqueLayoutName,
 } from "../library";
-import { saveBlueprint, useBlueprintLibrary } from "../store";
+import { blueprintRoute, saveBlueprint, useBlueprintLibrary } from "../store";
+import { BlueprintImportButton } from "./components/BlueprintImportButton";
 import { LayoutThumb } from "./components/LayoutThumb";
-
-/** Where one layout is edited. */
-export function blueprintRoute(id: string): string {
-  return `/content/blueprints/${encodeURIComponent(id)}`;
-}
 
 /** Every game, rather than one of them. A game's name is its archive name, so
  *  a bare word can never be one, and the select needs a value that is not the
@@ -60,6 +59,11 @@ export default function BlueprintsPage() {
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const installed = useMemo(() => scan.data?.games ?? [], [scan.data]);
   const [game, setGame] = useState(ALL_GAMES);
+  // A confirmed `coilbox://import` link carrying a blueprint code lands here,
+  // because this is the only place a layout can be kept on its own. It names the
+  // hub item it came from when the hub browse screen started it (issue #1368).
+  const { code: importCode, hubItemId } = useImportParam();
+  const recordHubImport = useRecordHubImport();
 
   const games = useMemo(() => libraryGames(records), [records]);
   const shown = useMemo(
@@ -81,11 +85,24 @@ export default function BlueprintsPage() {
             and in somebody else's game.
           </p>
         </div>
-        <NewBlueprintButton
-          games={installed}
-          taken={records.map((record) => record.layout.name)}
-          scanning={scan.loading}
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          <BlueprintImportButton
+            initialCode={importCode}
+            onImported={(record) => {
+              recordHubImport(
+                hubItemId,
+                [record.id],
+                blueprintRoute(record.id),
+              );
+              toast.success(`"${record.layout.name}" is in your library.`);
+            }}
+          />
+          <NewBlueprintButton
+            games={installed}
+            taken={records.map((record) => record.layout.name)}
+            scanning={scan.loading}
+          />
+        </div>
       </header>
 
       {error && <ErrorBanner message={error} />}
@@ -116,8 +133,9 @@ export default function BlueprintsPage() {
             <>
               No blueprints yet. A blueprint is a layout of buildings you draw
               once and place wherever you like: an opening, a wall, a factory
-              corner. Make one with the button above, or bring one in from a
-              game's own blueprint file in the scenario builder.
+              corner. Make one with the button above, import one somebody
+              shared, or bring one in from a game's own blueprint file in the
+              scenario builder.
             </>
           }
         />
