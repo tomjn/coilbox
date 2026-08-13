@@ -107,6 +107,41 @@ export function cornerGround(
   };
 }
 
+/** Ground with no relief: one sample, at nothing. Sampled through the same
+ *  bilinear read a map is, which answers the map's own floor everywhere. */
+export const FLAT_FIELD: HeightField = {
+  width: 1,
+  height: 1,
+  samples: Float32Array.of(0),
+};
+
+/**
+ * The heights the models are drawn on, which are not always the heights the
+ * check is given (issue #1497).
+ *
+ * A map whose heightmap will not read leaves the field null forever, and a layer
+ * built from nothing draws nothing: the map came up with its zones, its paths,
+ * its start positions and its footprint squares, and not one unit on it. An
+ * author looking at that had no way to tell "this scenario has nothing in it"
+ * from "the ground could not be read, so nothing could be stood on it".
+ *
+ * So once the read has finished and failed, the models stand on the flat. Every
+ * other part of the document still draws, the editor still works, and the
+ * surface says why everything is level.
+ *
+ * The check is not given this. Flat ground invented because the real ground
+ * would not read is not ground, and a building on it must keep its dashed square
+ * rather than collect a verdict from a floor that is not there.
+ */
+export function standingField(
+  field: HeightField | null,
+  /** Whether the read has finished, one way or the other. Null before it has is
+   *  a read in flight, and there is nothing to stand anything on yet. */
+  read: boolean,
+): HeightField | null {
+  return field ?? (read ? FLAT_FIELD : null);
+}
+
 /**
  * Ground with no relief, which is the standalone editor's build grid.
  *

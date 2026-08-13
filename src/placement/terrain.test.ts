@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   CHECK_MAX_SIDE,
   cornerGround,
+  FLAT_FIELD,
   groundHeight,
   type HeightField,
+  standingField,
 } from "./terrain";
 
 /** A field from a row-major list of 0..1 samples. */
@@ -55,6 +57,30 @@ describe("groundHeight", () => {
     const northOnly = field(2, 2, [1, 1, 0, 0]);
     expect(groundHeight(northOnly, W / 2, 0, W, H, 0, 100)).toBeCloseTo(100);
     expect(groundHeight(northOnly, W / 2, H, W, H, 0, 100)).toBeCloseTo(0);
+  });
+});
+
+/**
+ * Issue #1497. A map whose heights would not read drew no units at all, so the
+ * editor looked like a scenario with nothing in it.
+ */
+describe("standingField", () => {
+  it("stands the models on the map's own heights when it has them", () => {
+    expect(standingField(CORNERS, true)).toBe(CORNERS);
+  });
+
+  it("stands nothing anywhere while the read is still in flight", () => {
+    expect(standingField(null, false)).toBeNull();
+  });
+
+  it("stands them on the flat once the read has failed", () => {
+    expect(standingField(null, true)).toBe(FLAT_FIELD);
+  });
+
+  /** The whole point of the fallback: a scene, rather than a map with nothing
+   *  on it. Level, and level at the map's own floor. */
+  it("puts them at the bottom of the map's range", () => {
+    expect(groundHeight(FLAT_FIELD, 100, 900, W, H, -40, 260)).toBe(-40);
   });
 });
 
