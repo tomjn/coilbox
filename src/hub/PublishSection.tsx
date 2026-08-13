@@ -1,5 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
-import { Check, Copy, ExternalLink, Globe, RotateCw } from "lucide-react";
+import { Check, Copy, ExternalLink, Globe } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { openExternal } from "@/home/navItem";
@@ -7,7 +7,11 @@ import { isHubEnabled } from "@/profile/profile";
 import { ErrorBanner } from "../content/pages/components/states";
 import { useHubAccount } from "./account";
 import { useHubUrl } from "./config";
-import { SignInButton } from "./pages/components/AccountControl";
+import {
+  COULD_NOT_CHECK,
+  SignInButton,
+  TryAgainButton,
+} from "./pages/components/AccountControl";
 import { Field } from "./pages/components/Field";
 import {
   hubItemPageUrl,
@@ -158,13 +162,15 @@ export function PublishSection({ code }: { code: string }) {
       <div className="flex flex-col gap-1.5 border-t pt-3">
         <h3 className="text-sm font-medium leading-none">Coilbox hub</h3>
         <p className="text-xs text-muted-foreground">
-          {account.problem ??
-            "Coilbox could not tell whether you are signed in."}
+          {account.problem ?? COULD_NOT_CHECK}
         </p>
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={() => void account.recheck()}>
-            <RotateCw className="mr-1.5 size-4" aria-hidden /> Try again
-          </Button>
+          <TryAgainButton
+            onRecheck={account.recheck}
+            size="default"
+            variant="default"
+            className="flex-1"
+          />
           <SignInButton
             busy={account.busy}
             onSignIn={account.signIn}

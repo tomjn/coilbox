@@ -17,7 +17,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import type { StoredBlueprint } from "../library";
+import type { BlueprintSource, StoredBlueprint } from "../library";
 
 const RECORD: StoredBlueprint = {
   id: "b1",
@@ -33,6 +33,9 @@ const RECORD: StoredBlueprint = {
     footprints: { armsolar: { x: 4, z: 4 }, armlab: { x: 8, z: 6 } },
   },
 };
+
+/** The record the page has open, so a test can give the layout a past. */
+let open: StoredBlueprint = RECORD;
 
 // Drawers live on the app frame, which is not mounted here, and the editor is a
 // 3D surface that cannot render to markup.
@@ -51,7 +54,7 @@ vi.mock("../store", () => ({
   deleteBlueprint: async () => {},
   saveBlueprint: async (record: StoredBlueprint) => record,
   useBlueprintLibrary: () => ({
-    records: [RECORD],
+    records: [open],
     loading: false,
     error: null,
   }),
@@ -76,6 +79,16 @@ function markup(): string {
   );
 }
 
+/** The page, for a layout that arrived from somewhere. */
+function markupFrom(source: BlueprintSource): string {
+  open = { ...RECORD, source };
+  try {
+    return markup();
+  } finally {
+    open = RECORD;
+  }
+}
+
 describe("BlueprintDetailPage", () => {
   it("names the layout it has open", () => {
     const html = markup();
@@ -91,5 +104,36 @@ describe("BlueprintDetailPage", () => {
    *  #1452). */
   it("offers a copy of the layout", () => {
     expect(markup()).toContain("Duplicate");
+  });
+
+  /**
+   * Issue #1514. A layout saved out of a scenario recorded which scenario and
+   * then did nothing with it, so the one thing the record was for, getting back
+   * to the mission it was drawn in, was the one thing it could not do.
+   */
+  describe("a layout saved out of a scenario", () => {
+    const source: BlueprintSource = {
+      kind: "scenario",
+      scenario: "s1",
+      scenarioName: "Tutorial",
+      at: "2026-08-02T00:00:00.000Z",
+    };
+
+    it("says which scenario, and opens it", () => {
+      const html = markupFrom(source);
+      expect(html).toContain("Tutorial");
+      expect(html).toContain('href="/scenarios?scenario=s1"');
+    });
+
+    /** The player-facing list rather than the builder, which is advanced-gated
+     *  and redirects home. Its own answer to a scenario that is gone is the
+     *  wording a deleted one gets. */
+    it("does not send anybody to the builder", () => {
+      expect(markupFrom(source)).not.toContain("/scenario-builder");
+    });
+
+    it("offers nothing to open for a layout drawn here", () => {
+      expect(markup()).not.toContain("/scenarios?scenario=");
+    });
   });
 });
