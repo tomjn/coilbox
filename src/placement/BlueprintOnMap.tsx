@@ -25,9 +25,10 @@
 
 import { Button } from "@picoframe/frame";
 import { Loader2, MapPin, MountainSnow, Unplug, X } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
+import type { FootprintMark } from "@/blueprint/footprint";
 import type { BaseBlueprint } from "@/blueprint/model";
 import { useMissionMapAssets } from "@/campaign/pages/components/useMissionMapAssets";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
@@ -37,10 +38,17 @@ import { usePreferredTarget } from "@/play/config";
 import { MapPickerDrawer } from "@/play/pages/components/MapPickerDrawer";
 import type { Point } from "@/scenario/model";
 import { strayDefs } from "@/scenario/pages/components/bases";
+import { isTypingTarget } from "@/scenario/pages/components/history";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { layoutFraming } from "./ground";
 import { LayoutNotes, UncheckedNote, WaterlessNote } from "./LayoutControls";
-import { checkMapFor, checkSpot, spotSentence } from "./mapCheck";
+import {
+  checkMapFor,
+  checkSpot,
+  spotLayout,
+  spotNudge,
+  spotSentence,
+} from "./mapCheck";
 import { PlacementSurface, SurfaceMessage } from "./PlacementSurface";
 import {
   absentIn,
@@ -54,14 +62,26 @@ import {
   unstableIn,
 } from "./placements";
 import {
+  nudgedPreview,
+  nudgeSentence,
+  previewChecks,
+  previewSentence,
+  previewTrouble,
+} from "./preview";
+import {
   focusCamera,
   focusDistance,
   mapSceneStatus,
   worldToScene,
 } from "./scene";
+import { useLayoutPreview } from "./useLayoutPreview";
 import { useMapEditing } from "./useMapEditing";
 import { useScenarioFootprints } from "./useScenarioFootprints";
 import { useScenarioUnits } from "./useScenarioUnits";
+
+/** One list for every "nothing to draw", so a layer with nothing on it is not
+ *  cleared and redrawn on every render. */
+const NOTHING: FootprintMark[] = [];
 
 export function BlueprintOnMap({
   blueprint,
@@ -115,7 +135,107 @@ export function BlueprintOnMap({
     () => baseFootprints(drawn.placements, units, drawn.ground),
     [drawn.placements, units, drawn.ground],
   );
-  useScenarioFootprints(handle, footprints, assets, drawn.groundAt);
+
+  // The layout as a drag carries it, drawn on the squares it will land on
+  // (issue #1558). A drag here moves the whole base rather than editing one
+  // building, so what follows the pointer is the whole base: showing the one
+  // building that was grabbed made it look as though the layout tore apart and
+  // snapped back together on the drop.
+  const checks = useMemo(
+    () => previewChecks(units, drawn.ground),
+    [units, drawn.ground],
+  );
+  const preview = useLayoutPreview({
+    handle,
+    worldWidth: assets.worldWidth,
+    worldHeight: assets.worldHeight,
+    groundAt: drawn.groundAt,
+    // Nothing is drawn under a pointer that is only passing over: a click
+    // stands the layout where it lands, and a second copy of the base
+    // following the pointer about would be one base too many on a surface that
+    // has exactly one.
+    ghost: null,
+    carried: (drag) =>
+      spotLayout(
+        blueprint.buildings,
+        checkSpot(
+          { x: origin.x + drag.delta.x, z: origin.z + drag.delta.z },
+          assets.worldWidth,
+          assets.worldHeight,
+        ),
+      ),
+    checks,
+    // Nothing else stands on this map, and the whole layout is in the air, so
+    // there is no ground here that is already spoken for.
+    occupied: NOTHING,
+    placements: drawn.placements,
+  });
+
+  // While it is in the air the layout is drawn where it is going, so the
+  // squares it came from come down for the length of the drag.
+  useScenarioFootprints(
+    handle,
+    preview.dragging ? NOTHING : footprints,
+    assets,
+    drawn.groundAt,
+  );
+
+  // Where the whole layout would stand, when the spot it is on will not do
+  // (issue #1559). Worked out from where it is standing rather than from a
+  // pointer, because that is the question this surface is asked: the author is
+  // hunting for a spot on this map, not drawing a shape.
+  const standing = useMemo(
+    () => spotLayout(blueprint.buildings, origin),
+    [blueprint.buildings, origin],
+  );
+  const offer = useMemo(
+    () =>
+      // Only once the reads have settled, so a map opening does not offer a
+      // move away from a refusal that is about to clear itself (issue #1491).
+      drawn.settled
+        ? spotNudge(standing, footprints, checks.footprintOf, checks.standingOf)
+        : null,
+    [drawn.settled, standing, footprints, checks],
+  );
+  // Outlined rather than filled, and beside the layout rather than instead of
+  // it: two filled sets of squares half a build square apart read as one smear
+  // (issue #1543). Nothing while a drag is on, when the layout is somewhere
+  // else and the offer is about where it was.
+  const offered = useMemo(
+    () =>
+      offer && offer !== "nowhere" && !preview.dragging
+        ? nudgedPreview(
+            standing,
+            offer,
+            checks.footprintOf,
+            [],
+            checks.standingOf,
+          )
+        : NOTHING,
+    [offer, standing, checks, preview.dragging],
+  );
+  useScenarioFootprints(handle, offered, assets, drawn.groundAt, "offered");
+
+  // Taking the offer, which is a plain move of the layout to the offered spot:
+  // nothing about it is special, and nothing has moved until this is pressed.
+  // A key rather than a button, so the same press takes the same offer here as
+  // it does in the scenario editor.
+  const takeOffer = useCallback(() => {
+    if (!offer || offer === "nowhere") return;
+    setSpot({ x: origin.x + offer.delta.x, z: origin.z + offer.delta.z });
+  }, [offer, origin]);
+  useEffect(() => {
+    if (!offer || offer === "nowhere") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "n") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isTypingTarget(event.target as HTMLElement | null)) return;
+      event.preventDefault();
+      takeOffer();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [offer, takeOffer]);
 
   // Framed on the layout rather than on the map: the map is a few kilometres
   // across and the base is a few hundred elmos, so framing the map would open
@@ -157,8 +277,10 @@ export function BlueprintOnMap({
     onDragGround: null,
     // A drag of any of its buildings carries the layout, because the layout is
     // the only thing on this surface and none of its buildings can be edited
-    // here. The one building follows the pointer while the drag is on, and the
-    // rest catch up when it lands.
+    // here. Every building of it follows the pointer, and the squares under
+    // them are drawn by the preview above.
+    carries: () => drawn.placements.map((one) => one.key),
+    onDragUnit: preview.onDragUnit,
     onMove: (_key, delta) =>
       setSpot({ x: origin.x + delta.x, z: origin.z + delta.z }),
   });
@@ -308,7 +430,30 @@ export function BlueprintOnMap({
                 {spotSentence(origin)} Click the ground to stand it somewhere
                 else.
               </p>
+              {/* Where the whole thing would stand instead, offered rather than
+                  done: a base half in a cliff is a real thing an author might
+                  mean, so nothing moves until somebody asks (issue #1559). */}
+              {offer && !preview.dragging && (
+                <p className="text-[11px] text-muted-foreground">
+                  {nudgeSentence(offer)}
+                </p>
+              )}
             </div>
+
+            {/* What the squares under the layout say while it is being
+                carried, in words, because a colour on its own is not a
+                statement anybody can act on (issue #1558). */}
+            {preview.count && (
+              <p
+                className={`w-fit rounded px-2 py-1 text-[11px] backdrop-blur ${
+                  previewTrouble(preview.count)
+                    ? "bg-amber-950/80 text-amber-200"
+                    : "bg-card/70 text-muted-foreground"
+                }`}
+              >
+                {previewSentence(preview.count)}
+              </p>
+            )}
 
             <UncheckedNote
               unchecked={drawn.settled ? sceneUnchecked(footprints) : null}
@@ -320,7 +465,8 @@ export function BlueprintOnMap({
         footer={
           <>
             {mapName} · click or drag to stand the layout somewhere else · this
-            changes the layout in no way · right-drag to turn · scroll to zoom
+            changes the layout in no way · right-drag to turn the view · scroll
+            to zoom
           </>
         }
       />

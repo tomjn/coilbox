@@ -147,6 +147,17 @@ export interface MapEditingDeps {
    */
   onDragUnit?: ((drag: UnitDrag | null) => boolean) | null;
   /**
+   * Which drawn objects a drag of this one carries, when the surface has an
+   * answer of its own (issue #1558).
+   *
+   * Left out wherever {@link dragKeys} is right, which is every surface where a
+   * building is edited rather than the whole layout moved. The map check is the
+   * one where it is not: the layout is the only thing on it and none of its
+   * buildings can be edited there, so taking hold of one takes hold of all of
+   * them.
+   */
+  carries?: ((key: string) => string[]) | null;
+  /**
    * Anything pickable that is not a unit, nearest layer first.
    *
    * A list rather than one, because zones and order paths are pickable at the
@@ -440,8 +451,9 @@ export function useMapEditing(deps: MapEditingDeps): void {
         return;
       }
 
-      const { placements } = latest.current;
-      const members = dragKeys(placements, key).flatMap((member) => {
+      const { placements, carries } = latest.current;
+      const carried = carries?.(key) ?? dragKeys(placements, key);
+      const members = carried.flatMap((member) => {
         const object = layer.objects.get(member);
         const placement = placements.find((p) => p.key === member);
         return object && placement

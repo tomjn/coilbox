@@ -63,6 +63,19 @@ export interface LayoutPreviewDeps {
    *  Null in a mode that places nothing whole, and then nothing is drawn and a
    *  pointer move does no work at all. */
   ghost: ((pos: Point) => PreviewBuilding[]) | null;
+  /**
+   * What a drag of a drawn unit is carrying, when it is not the one building
+   * under the pointer (issue #1558).
+   *
+   * The map check has one thing on it, so a drag of any of its buildings
+   * carries the whole layout, and drawing only the building that was grabbed is
+   * what made the base look as though it tore apart. Left out everywhere a drag
+   * really does move one building.
+   *
+   * Null for a drag of something with no footprint, the same as the building
+   * answer, and then the drag draws nothing and keeps its ring.
+   */
+  carried?: ((drag: UnitDrag) => PreviewBuilding[] | null) | null;
   checks: PreviewChecks;
   /** The ground the document's own buildings already stand on. */
   occupied: FootprintMark[];
@@ -79,7 +92,9 @@ export interface LayoutPreviewState {
   onDragUnit: ((drag: UnitDrag | null) => boolean) | null;
   /** The key of the building being dragged, while one is. What is drawn for it
    *  is where it is going, so whoever draws the document's own footprints
-   *  should leave this one's out: see {@link withoutBuilding}. */
+   *  should leave this one's out: see {@link withoutBuilding}. A surface whose
+   *  drag carries a whole layout leaves all of them out instead, because all of
+   *  them are in the air (issue #1558). */
   dragging: string | null;
   /** What is drawn under the pointer right now, in words. Null when nothing
    *  is. */
@@ -176,22 +191,32 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
     [],
   );
 
+  /** What a drag is holding, which is the one building it took hold of unless
+   *  the surface says a drag there carries a whole layout (issue #1558). */
+  const heldBy = useCallback((drag: UnitDrag): PreviewBuilding[] | null => {
+    const { carried, placements } = latest.current;
+    if (carried) {
+      const layout = carried(drag);
+      return layout && layout.length > 0 ? layout : null;
+    }
+    const one = draggedBuilding(placements, drag.key, drag.delta);
+    return one && [one];
+  }, []);
+
   const show = useCallback(
     (what: Showing) => {
-      const { ghost: make, checks, occupied, placements } = latest.current;
+      const { ghost: make, checks, occupied } = latest.current;
       if (!layer) return;
-      // A drag is one building of the document rather than a layout that is not
-      // in it yet, and the ground it came from is not ground it can clash with.
+      // A drag is what the document already holds rather than a layout that is
+      // not in it yet, and the ground it came from is not ground it can clash
+      // with.
       const held = what?.kind === "drag";
-      const carried =
+      const buildings =
         what?.kind === "drag"
-          ? draggedBuilding(placements, what.drag.key, what.drag.delta)
-          : null;
-      const buildings = held
-        ? carried && [carried]
-        : what && make
-          ? make(what.pos)
-          : null;
+          ? heldBy(what.drag)
+          : what && make
+            ? make(what.pos)
+            : null;
       if (!buildings) {
         drawn.current = null;
         layer.draw([]);
@@ -247,7 +272,7 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
         ),
       );
     },
-    [layer, offer],
+    [layer, offer, heldBy],
   );
 
   /** Draw this on the next frame, so a burst of pointer events between two
@@ -285,16 +310,14 @@ export function useLayoutPreview(deps: LayoutPreviewDeps): LayoutPreviewState {
       // Whether this is a building at all, answered now rather than on the
       // frame that draws it, because the pointer layer needs it to decide what
       // to do with the ring.
-      const carrying =
-        draggedBuilding(latest.current.placements, drag.key, drag.delta) !==
-        null;
+      const carrying = heldBy(drag) !== null;
       queue(carrying ? { kind: "drag", drag } : null);
       // A render on the first move of a drag and none after it: the key is the
       // same one for the rest of the gesture.
       setDragging(carrying ? drag.key : null);
       return carrying;
     },
-    [queue],
+    [queue, heldBy],
   );
 
   // What is standing on the map has changed under the pointer, which is what a
