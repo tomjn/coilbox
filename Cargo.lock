@@ -589,6 +589,7 @@ dependencies = [
  "tauri-plugin-coilbox-campaign",
  "tauri-plugin-coilbox-conquest",
  "tauri-plugin-coilbox-content",
+ "tauri-plugin-coilbox-direct",
  "tauri-plugin-coilbox-downloads",
  "tauri-plugin-coilbox-hub",
  "tauri-plugin-coilbox-lego",
@@ -5003,6 +5004,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-coilbox-direct"
+version = "0.0.0"
+dependencies = [
+ "coilbox-lobby-protocol",
+ "futures-util",
+ "picoframe-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "tauri-plugin-coilbox-downloads"
 version = "0.0.0"
 dependencies = [
@@ -5098,6 +5114,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-plugin",
+ "tauri-plugin-coilbox-direct",
  "tauri-plugin-opener",
  "tokio",
  "tokio-rustls",

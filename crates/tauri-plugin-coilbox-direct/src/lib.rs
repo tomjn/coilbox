@@ -43,9 +43,9 @@ pub struct ActiveRoom(Arc<Mutex<Option<Room>>>);
 
 /// `direct_start_room`: bind the lobby port and start hosting.
 ///
-/// Answers with the address the host's own client should connect to. Nothing
-/// else happens here: the battle itself is opened by that client sending
-/// `OPENBATTLE`, exactly as it would to a real server.
+/// Answers with the port the host's own client should then connect to over
+/// loopback. Nothing else happens here: the battle itself is opened by that
+/// client sending `OPENBATTLE`, exactly as it would to a real server.
 #[tauri::command]
 async fn direct_start_room(
     active: State<'_, ActiveRoom>,
@@ -57,8 +57,8 @@ async fn direct_start_room(
     let mut slot = active.0.lock().await;
     if let Some(running) = slot.as_ref() {
         return Ok(CliResult::err(format!(
-            "already hosting a room on {}",
-            running.addr()
+            "already hosting a room on port {}",
+            running.port()
         )));
     }
     let options = RoomOptions {
@@ -72,9 +72,9 @@ async fn direct_start_room(
     };
     Ok(match Room::start(options).await {
         Ok(room) => {
-            let addr = room.addr();
+            let port = room.port();
             *slot = Some(room);
-            CliResult::ok(json!({ "addr": addr.to_string(), "port": addr.port() }))
+            CliResult::ok(json!({ "port": port }))
         }
         Err(e) => CliResult::err(e),
     })

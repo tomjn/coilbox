@@ -25,8 +25,7 @@
 //! that has said nothing for [`IDLE_TIMEOUT`] is treated as disconnected.
 
 use std::collections::BTreeMap;
-use std::net::SocketAddr;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use coilbox_lobby_protocol::server::{
     line, parse_client_line, ClientCommand, Outbound, PeerId, RoomConfig, RoomState,
@@ -37,6 +36,7 @@ use serde::Serialize;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
 use tokio_util::codec::{Framed, LinesCodec};
 
 /// The port a room listens on unless the host picks another. Distinct from the
@@ -73,9 +73,8 @@ pub struct RoomOptions {
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoomStatus {
-    /// The address the listener is bound to, for the host's own client to dial
-    /// and for a joiner to be given.
-    pub addr: String,
+    /// The port the room is listening on, which is what the host's own client
+    /// dials over loopback and what a joiner has to be given.
     pub port: u16,
     pub host: String,
     pub ip: String,
@@ -93,7 +92,7 @@ pub struct RoomStatus {
 /// A handle on a running room. Dropping it does not stop the room, so end one
 /// with [`Room::stop`].
 pub struct Room {
-    addr: SocketAddr,
+    port: u16,
     options: RoomOptions,
     requests: mpsc::UnboundedSender<Request>,
     listener: JoinHandle<()>,
@@ -108,9 +107,14 @@ enum Request {
         out: mpsc::UnboundedSender<PeerMsg>,
     },
     /// One line read off a peer's socket.
-    Line { peer: PeerId, line: String },
+    Line {
+        peer: PeerId,
+        line: String,
+    },
     /// A peer's socket has ended, politely or otherwise.
-    Gone { peer: PeerId },
+    Gone {
+        peer: PeerId,
+    },
     Status(oneshot::Sender<RoomStatus>),
     /// The host's answer to a queued join, applied as though they had sent it.
     AnswerJoin {
@@ -135,7 +139,9 @@ enum PeerMsg {
 /// One connected socket.
 struct Peer {
     out: mpsc::UnboundedSender<PeerMsg>,
-    /// When this peer last said anything. See [`IDLE_TIMEOUT`].
+    /// When this peer last said anything. See [`IDLE_TIMEOUT`]. The runtime's
+    /// clock rather than the system one, so it is the same clock the sweep
+    /// interval runs on.
     heard: Instant,
 }
 
@@ -151,9 +157,12 @@ impl Room {
         let listener = TcpListener::bind(&bind)
             .await
             .map_err(|e| format!("cannot listen on port {}: {e}", options.port))?;
-        let addr = listener
+        // Asked for port 0, the OS picks one, and this is the only place that
+        // learns which.
+        let port = listener
             .local_addr()
-            .map_err(|e| format!("cannot read the listening address: {e}"))?;
+            .map_err(|e| format!("cannot read the listening address: {e}"))?
+            .port();
 
         let state = RoomState::new(RoomConfig {
             host: options.host.clone(),
@@ -161,21 +170,21 @@ impl Room {
             approve_joins: options.approve_joins,
         });
         let (requests, rx) = mpsc::unbounded_channel();
-        tokio::spawn(run_room(state, options.clone(), addr, rx));
+        tokio::spawn(run_room(state, options.clone(), port, rx));
         let listener = tokio::spawn(accept_loop(listener, requests.clone()));
 
         Ok(Room {
-            addr,
+            port,
             options,
             requests,
             listener,
         })
     }
 
-    /// Where the room is listening, for the host's client to connect to and for
-    /// a joiner to be told.
-    pub fn addr(&self) -> SocketAddr {
-        self.addr
+    /// The port the room is listening on. The host's own client dials this on
+    /// loopback, and a joiner is given it alongside [`RoomOptions::ip`].
+    pub fn port(&self) -> u16 {
+        self.port
     }
 
     /// What the room holds right now. `None` once the room has stopped.
@@ -299,7 +308,7 @@ async fn run_peer(
 async fn run_room(
     mut state: RoomState,
     options: RoomOptions,
-    addr: SocketAddr,
+    port: u16,
     mut rx: mpsc::UnboundedReceiver<Request>,
 ) {
     let mut peers: BTreeMap<PeerId, Peer> = BTreeMap::new();
@@ -328,7 +337,7 @@ async fn run_room(
                         deliver(&peers, state.disconnect(peer));
                     }
                     Request::Status(reply) => {
-                        let _ = reply.send(status_of(&state, &options, addr, peers.len()));
+                        let _ = reply.send(status_of(&state, &options, port, peers.len()));
                     }
                     Request::AnswerJoin { name, allow, reason } => {
                         let Some(host) = state.host_peer() else { continue };
@@ -390,15 +399,9 @@ fn deliver(peers: &BTreeMap<PeerId, Peer>, out: Vec<Outbound>) {
     }
 }
 
-fn status_of(
-    state: &RoomState,
-    options: &RoomOptions,
-    addr: SocketAddr,
-    peers: usize,
-) -> RoomStatus {
+fn status_of(state: &RoomState, options: &RoomOptions, port: u16, peers: usize) -> RoomStatus {
     RoomStatus {
-        addr: addr.to_string(),
-        port: addr.port(),
+        port,
         host: options.host.clone(),
         ip: options.ip.clone(),
         approve_joins: options.approve_joins,
@@ -437,8 +440,8 @@ mod tests {
 
     /// A closed laptop lid leaves a live TCP connection and a name nobody can
     /// reuse. The client's own keepalive is what tells the two apart.
-    #[test]
-    fn a_peer_that_has_missed_three_keepalives_is_idle() {
+    #[tokio::test]
+    async fn a_peer_that_has_missed_three_keepalives_is_idle() {
         let peers = peers_last_heard(&[
             Duration::from_secs(0),
             Duration::from_secs(45),

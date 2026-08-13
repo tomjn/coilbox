@@ -12,8 +12,9 @@ links = "tauri-plugin-coilbox-direct"
 tauri-plugin = { version = "2", features = ["build"] }
 
 [dev-dependencies]
-# The loopback tests need a runtime with a reactor and a timer of their own.
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "io-util"] }
+# A runtime of their own, and a clock the idle-peer test can wind forward
+# rather than waiting out the real ninety seconds.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "io-util", "test-util"] }
 
 [dependencies]
 tauri = { version = "2" }
