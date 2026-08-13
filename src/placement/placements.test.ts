@@ -6,6 +6,7 @@ import {
   baseFootprints,
   facingToYaw,
   overlappingIn,
+  parsePlacementKey,
   placementKey,
   teamColor,
   UNOWNED_COLOR,
@@ -127,6 +128,34 @@ describe("overlappingIn", () => {
     const placements = scenarioPlacements(doc);
     const marks = baseFootprints(placements, units);
     expect(overlappingIn(placements, marks, "other")).toEqual([]);
+  });
+});
+
+describe("parsePlacementKey", () => {
+  it("reads the three key shapes", () => {
+    expect(parsePlacementKey("actor:a1")).toEqual({
+      kind: "actor",
+      id: "a1",
+      index: 0,
+    });
+    expect(parsePlacementKey("group:g1#3")).toEqual({
+      kind: "group",
+      id: "g1",
+      index: 3,
+    });
+    expect(parsePlacementKey("base:b1#0")).toEqual({
+      kind: "base",
+      id: "b1",
+      index: 0,
+    });
+  });
+
+  it("rejects anything else", () => {
+    expect(parsePlacementKey("zone:z1")).toBeNull();
+    expect(parsePlacementKey("group:g1")).toBeNull();
+    expect(parsePlacementKey("group:g1#x")).toBeNull();
+    expect(parsePlacementKey("actor:")).toBeNull();
+    expect(parsePlacementKey("")).toBeNull();
   });
 });
 

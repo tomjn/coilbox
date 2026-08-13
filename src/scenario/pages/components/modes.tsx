@@ -28,7 +28,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
-import { placementKey } from "@/placement/placements";
+import { parsePlacementKey, placementKey } from "@/placement/placements";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   baseBuildings,
@@ -37,7 +37,7 @@ import {
   type ScenarioZone,
 } from "../../model";
 import { addBase, addBuilding, buildingUnits, type LayoutEdit } from "./bases";
-import { addActor, parsePlacementKey } from "./editing";
+import { addActor } from "./editing";
 import type { ScenarioEdit } from "./edits";
 import {
   addGroup,

@@ -12,14 +12,13 @@
  * picked is `focusCamera` in `scene.ts`.
  */
 
-import { placementKey } from "@/placement/placements";
+import { parsePlacementKey, placementKey } from "@/placement/placements";
 import {
   baseBuildings,
   type PlacedBuilding,
   type Point,
   type Scenario,
 } from "../../model";
-import { parsePlacementKey } from "./editing";
 import { baseLabels, groupSize, parsePathKey, uniqueLabels } from "./groups";
 import { GROUP_SPACING } from "./placements";
 import { parseZoneKey, zoneCenter, zoneExtent, zoneKey } from "./zones";

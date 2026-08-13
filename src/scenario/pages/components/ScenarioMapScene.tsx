@@ -34,6 +34,7 @@ import {
   baseFootprints,
   overlappingIn,
   type Placement,
+  parsePlacementKey,
   placementKey,
 } from "@/placement/placements";
 import { PlaybackBar, SelectionBar } from "@/placement/SurfaceBars";
@@ -74,7 +75,6 @@ import {
   canTurn,
   editActor,
   movePlacement,
-  parsePlacementKey,
   removePlacement,
   setActorState,
   turnPlacement,

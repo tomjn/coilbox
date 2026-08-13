@@ -53,6 +53,51 @@ export function placementKey(
   return kind === "actor" ? `actor:${id}` : `${kind}:${id}#${index}`;
 }
 
+/** Which document entry a drawn object belongs to. */
+export interface PlacementRef {
+  kind: Placement["kind"];
+  id: string;
+  index: number;
+}
+
+/**
+ * The entry a placement key names, or `null` if it names nothing.
+ *
+ * The inverse of {@link placementKey}. Ids are UUIDs, so the separators cannot
+ * appear inside one, but the index is still read off the end rather than by
+ * splitting blindly.
+ */
+export function parsePlacementKey(key: string): PlacementRef | null {
+  const colon = key.indexOf(":");
+  if (colon < 0) return null;
+  const kind = key.slice(0, colon);
+  const rest = key.slice(colon + 1);
+  if (kind === "actor") return rest ? { kind, id: rest, index: 0 } : null;
+  if (kind !== "group" && kind !== "base") return null;
+  const hash = rest.lastIndexOf("#");
+  if (hash <= 0) return null;
+  const index = Number(rest.slice(hash + 1));
+  if (!Number.isInteger(index) || index < 0) return null;
+  return { kind, id: rest.slice(0, hash), index };
+}
+
+/**
+ * Every drawn object that moves when this one is dragged.
+ *
+ * One key for an actor or a base's building, the whole formation for a group's
+ * unit, so the scene shows the group moving as a block while the pointer is
+ * down.
+ */
+export function dragKeys(placements: Placement[], key: string): string[] {
+  const ref = parsePlacementKey(key);
+  if (!ref) return [];
+  if (ref.kind !== "group")
+    return placements.some((p) => p.key === key) ? [key] : [];
+  return placements
+    .filter((p) => p.kind === "group" && p.id === ref.id)
+    .map((p) => p.key);
+}
+
 /**
  * The ground every building in the document stands on, and which of them are
  * fighting over it.
