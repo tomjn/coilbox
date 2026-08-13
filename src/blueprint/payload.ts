@@ -73,6 +73,10 @@ export interface PayloadBuilding {
   def: string;
   offset: { x: number; z: number };
   facing: PayloadFacing;
+  /** What this building was before it was swapped for another side's equivalent
+   *  (issue #1314). It travels because it is what makes the swap reversible by
+   *  whoever receives the layout, rather than only by whoever made it. */
+  originalName?: string;
 }
 
 export interface BlueprintPayload {
@@ -130,7 +134,16 @@ function parseBuilding(value: unknown): PayloadBuilding | null {
   if (v.facing !== 0 && v.facing !== 1 && v.facing !== 2 && v.facing !== 3) {
     return null;
   }
-  return { def: v.def, offset: { x, z }, facing: v.facing };
+  const was =
+    typeof v.originalName === "string" && v.originalName.trim() !== ""
+      ? v.originalName
+      : undefined;
+  return {
+    def: v.def,
+    offset: { x, z },
+    facing: v.facing,
+    ...(was ? { originalName: was } : {}),
+  };
 }
 
 /** One footprint, floored at a square the way the engine does, or null when it

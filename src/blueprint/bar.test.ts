@@ -207,6 +207,39 @@ describe("barEntry", () => {
   });
 });
 
+describe("substituted buildings", () => {
+  const swapped = layout({
+    buildings: [
+      {
+        def: "corsolar",
+        offset: { x: -48, z: -48 },
+        facing: 0,
+        originalName: "armsolar",
+      },
+    ],
+  });
+
+  it("writes the name a building was drawn as, the way the game does", () => {
+    expect(barEntry(swapped).units[0]).toEqual({
+      unitName: "corsolar",
+      position: [-48, 0, -48],
+      facing: 0,
+      originalName: "armsolar",
+    });
+  });
+
+  it("says nothing about a building that was never substituted", () => {
+    expect(barEntry(layout()).units[0]).not.toHaveProperty("originalName");
+  });
+
+  it("reads the name back, so a substitution survives the game's own file", () => {
+    const back = readBarFile(
+      JSON.stringify({ savedBlueprints: [barEntry(swapped)] }),
+    );
+    expect(back.blueprints[0].layout.buildings).toEqual(swapped.buildings);
+  });
+});
+
 describe("strippedByBar", () => {
   it("names the mission-only fields the file cannot carry", () => {
     expect(

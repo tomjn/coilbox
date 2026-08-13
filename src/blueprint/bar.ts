@@ -43,6 +43,10 @@ interface BarUnit {
   unitName: string;
   position: [number, number, number];
   facing: number;
+  /** What the unit was before the game substituted another side's equivalent for
+   *  it. The game's own `blueprint_substitution` writes this and reads it back to
+   *  undo the swap, and coilbox keeps it for the same reason (issue #1314). */
+  originalName?: string;
 }
 
 /** One saved layout, as the file has it. */
@@ -123,9 +127,12 @@ function round(point: Point): Point {
 }
 
 /** One building of a saved layout, or null when the entry is not one. */
-function readUnit(
-  value: unknown,
-): { def: string; pos: Point; facing: Facing } | null {
+function readUnit(value: unknown): {
+  def: string;
+  pos: Point;
+  facing: Facing;
+  originalName?: string;
+} | null {
   if (!isRecord(value)) return null;
   const def = value.unitName;
   const pos = value.position;
@@ -134,7 +141,15 @@ function readUnit(
   const [x, , z] = pos;
   if (typeof x !== "number" || typeof z !== "number") return null;
   if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
-  return { def, pos: { x, z }, facing: facingOf(value.facing) };
+  const was = value.originalName;
+  return {
+    def,
+    pos: { x, z },
+    facing: facingOf(value.facing),
+    ...(typeof was === "string" && was.trim() !== ""
+      ? { originalName: was }
+      : {}),
+  };
 }
 
 /**
@@ -156,14 +171,24 @@ function readEntry(
   const snapped: ImportedBlueprint["snapped"] = [];
   const buildings: BlueprintBuilding[] = read.map((unit, at) => {
     // Not null: the whole entry was refused above if any of them were.
-    const { def, pos, facing: own } = unit as NonNullable<typeof unit>;
+    const {
+      def,
+      pos,
+      facing: own,
+      originalName,
+    } = unit as NonNullable<typeof unit>;
     const facingHere = ((own + facing) % 4) as Facing;
     const from = round(turned(pos, facing));
     const offset = snap ? snap(from, def, facingHere) : from;
     if (offset.x !== from.x || offset.z !== from.z) {
       snapped.push({ index: at, def, from, to: offset });
     }
-    return { def, offset, facing: facingHere };
+    return {
+      def,
+      offset,
+      facing: facingHere,
+      ...(originalName ? { originalName } : {}),
+    };
   });
 
   const name =
@@ -232,6 +257,7 @@ export function barEntry(layout: BaseBlueprint): BarBlueprint {
       // writing the ground.
       position: [building.offset.x, 0, building.offset.z],
       facing: building.facing,
+      ...(building.originalName ? { originalName: building.originalName } : {}),
     })),
   };
 }
