@@ -81,9 +81,12 @@ export interface ScenarioUnitsState {
    * building will stand on it (issue #1315).
    *
    * Null while the heightmap is being read, on flat ground with no map, and on
-   * a map whose heightmap came back downscaled. Every one of those is "do not
-   * ask", which is why this is separate from {@link groundAt}: that one answers
-   * 0 rather than nothing, because a model has to stand somewhere.
+   * a map whose heightmap came back smaller than its own corner grid. Every one
+   * of those is "do not ask", which is why this is separate from
+   * {@link groundAt}: that one answers 0 rather than nothing, because a model
+   * has to stand somewhere. A caller that wants a verdict has to ask for the
+   * render at `CHECK_MAX_SIDE`, or the field it hands over is a picture of the
+   * ground rather than the ground (issue #1483).
    */
   ground: Ground | null;
 }

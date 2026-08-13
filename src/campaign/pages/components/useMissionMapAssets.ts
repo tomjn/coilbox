@@ -13,13 +13,26 @@ import { usePreferredTarget } from "../../../play/config";
  * (minimap → diffuse + appearance, heightmap → displacement + world bounds, skybox
  * → sky), but keyed by the mission's `snapshot.mapName` rather than a page route.
  */
-export function useMissionMapAssets(mapName: string) {
+export function useMissionMapAssets(
+  mapName: string,
+  /**
+   * How long the heightmap render's longest side may be, for a caller that
+   * reads heights back off it rather than only drawing it. Left out for a
+   * backdrop, which is every caller that only looks at the relief.
+   */
+  heightMaxSide?: number,
+) {
   const { target } = usePreferredTarget();
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
 
   const minimap = useUnitsyncMinimap(enginePath, dataDir, mapName);
-  const heightmap = useUnitsyncHeightmap(enginePath, dataDir, mapName);
+  const heightmap = useUnitsyncHeightmap(
+    enginePath,
+    dataDir,
+    mapName,
+    heightMaxSide,
+  );
   const skybox = useUnitsyncMapSkybox(enginePath, dataDir, mapName);
 
   const heightUrl = heightmap.url ?? undefined;

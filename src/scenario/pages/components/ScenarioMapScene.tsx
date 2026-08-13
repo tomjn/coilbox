@@ -54,6 +54,7 @@ import {
   mapSceneStatus,
   worldToScene,
 } from "@/placement/scene";
+import { CHECK_MAX_SIDE } from "@/placement/terrain";
 import { useLayoutPreview } from "@/placement/useLayoutPreview";
 import { useMapEditing } from "@/placement/useMapEditing";
 import { useScenarioFootprints } from "@/placement/useScenarioFootprints";
@@ -201,7 +202,10 @@ export function ScenarioMapScene({
   } | null;
 }) {
   const mapName = scenario.setup.mapName;
-  const assets = useMissionMapAssets(mapName);
+  // The map's own corner heights rather than a picture of them, because the
+  // buildings placed here are checked against the ground they stand on and the
+  // engine's rule is arithmetic over those exact corners (issue #1483).
+  const assets = useMissionMapAssets(mapName, CHECK_MAX_SIDE);
   const { loading: enginesLoading } = usePreferredTarget();
   const sceneRef = useRef<MapScene3D | null>(null);
   // Also held in state, because the units layer is built from it and a ref

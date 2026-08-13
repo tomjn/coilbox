@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { cornerGround, groundHeight, type HeightField } from "./terrain";
+import {
+  CHECK_MAX_SIDE,
+  cornerGround,
+  groundHeight,
+  type HeightField,
+} from "./terrain";
 
 /** A field from a row-major list of 0..1 samples. */
 function field(width: number, height: number, samples: number[]): HeightField {
@@ -88,5 +93,43 @@ describe("cornerGround", () => {
 
   it("has no ground for a map with no extent", () => {
     expect(cornerGround(small, 0, 0, 0, 100)).toBeNull();
+  });
+});
+
+/**
+ * What the editor has to ask the heightmap render for (issue #1483).
+ *
+ * A field of nothing, because only its size is under test: whether the render
+ * the editor asks for comes back as the map's own corners or as a picture of
+ * them.
+ */
+function blank(width: number, height: number): HeightField {
+  return { width, height, samples: new Float32Array(width * height) };
+}
+
+describe("the render the check reads", () => {
+  // Bismuth Valley v2.4.1, a map on this machine: 12288 by 8192 elmos, so a
+  // 1537 by 1025 corner grid. Read back off the render the worker caches at its
+  // own default cap it is 1024 by 683, which the check refused, so no building
+  // on it ever got a verdict.
+  const WIDTH = 12288;
+  const HEIGHT = 8192;
+
+  it("is not the map's corners at the render's own default cap", () => {
+    expect(cornerGround(blank(1024, 683), WIDTH, HEIGHT, 100, 800)).toBeNull();
+  });
+
+  it("is the map's corners at the cap the check asks for", () => {
+    expect(CHECK_MAX_SIDE).toBeGreaterThanOrEqual(1537);
+    expect(
+      cornerGround(blank(1537, 1025), WIDTH, HEIGHT, 100, 800),
+    ).not.toBeNull();
+  });
+
+  /** 32 by 32 is the largest map Beyond All Reason publishes, 16384 elmos and
+   *  a 2049 corner grid. A cap under that would leave the check silent on the
+   *  big maps all over again (issue #1460). */
+  it("covers the largest map in circulation", () => {
+    expect(CHECK_MAX_SIDE).toBeGreaterThanOrEqual(2049);
   });
 });
