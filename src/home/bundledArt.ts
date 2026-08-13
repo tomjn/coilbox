@@ -760,6 +760,107 @@ const setupPacks: Drawing = {
     `<g fill="${p.spark}" fill-opacity="0.7">${diamond(160, 118, 12)}</g>`,
 };
 
+/**
+ * A base laid out on a build grid, threaded in the order it goes up, with the
+ * plot the order has not reached yet still an empty outline.
+ *
+ * What separates this from the maps card two along is that a blueprint is a
+ * plan and not a place. The maps grid runs off the canvas on every side because
+ * it is ground. This one stops short of the edges with a square of clear ground
+ * round the layout, because it is a sheet, and what stands on it is footprints
+ * rather than terrain. Footprint size is the one thing about a building a
+ * blueprint really carries, so the squares come in three sizes rather than one
+ * repeated.
+ *
+ * The order thread runs one way across the layout and touches three of the nine
+ * buildings on its way to the empty plot. A line through every one of them
+ * doubles back on itself and reads as a scribble over the thing it is meant to
+ * explain.
+ */
+const blueprints: Drawing = {
+  pools: [
+    [112, 68, 126, 0.18],
+    [232, 130, 84, 0.1],
+  ],
+  paint: (p) => {
+    /**
+     * The sheet: one build square in canvas units, its top left corner, and how
+     * many squares it runs. Eleven by seven leaves a square of clear ground on
+     * every side of the layout below, which is what makes it a sheet rather
+     * than ground that happens to stop.
+     */
+    const pitch = 20;
+    const [left, top] = [50, 20];
+    const [cols, rows] = [11, 7];
+    /**
+     * Ground left clear round each building. Buildings in a real base stand
+     * shoulder to shoulder, and squares drawn true to size would touch and read
+     * as one shape. Taken off each building rather than added between them, so
+     * the layout stays on the grid.
+     */
+    const gap = 2;
+    /** Where one building stands: column, row, squares wide, squares deep. */
+    type Plot = readonly [number, number, number, number];
+    /** A factory, a lab, a store, a turret, a row of solars and a second store. */
+    const built: readonly Plot[] = [
+      [1, 1, 3, 3],
+      [5, 1, 2, 2],
+      [8, 1, 2, 2],
+      [7, 3, 1, 1],
+      [1, 4, 1, 1],
+      [2, 4, 1, 1],
+      [3, 4, 1, 1],
+      [4, 4, 1, 1],
+      [5, 4, 2, 2],
+    ];
+    /** The plot the order has not reached. A plan covers ground nobody has built on. */
+    const next: Plot = [8, 4, 2, 2];
+    /** Which buildings the order thread passes through, as indices into `built`. */
+    const order = [0, 1, 8];
+    const box = ([col, row, wide, deep]: Plot) =>
+      `x="${left + col * pitch + gap}" y="${top + row * pitch + gap}" ` +
+      `width="${wide * pitch - gap * 2}" height="${deep * pitch - gap * 2}" rx="2"`;
+    const middle = ([col, row, wide, deep]: Plot): readonly [
+      number,
+      number,
+    ] => [left + (col + wide / 2) * pitch, top + (row + deep / 2) * pitch];
+    const sheet =
+      Array.from(
+        { length: cols + 1 },
+        (_, i) =>
+          `<path d="M${left + i * pitch} ${top} L${left + i * pitch} ${top + rows * pitch}"/>`,
+      ).join("") +
+      Array.from(
+        { length: rows + 1 },
+        (_, i) =>
+          `<path d="M${left} ${top + i * pitch} L${left + cols * pitch} ${top + i * pitch}"/>`,
+      ).join("");
+    const stops = [...order.map((i) => built[i]), next].map(middle);
+    const passed = stops
+      .slice(1, -1)
+      .map(
+        ([x, y]) =>
+          `<circle cx="${x}" cy="${y}" r="2.5" fill="${p.spark}" fill-opacity="0.6"/>`,
+      )
+      .join("");
+    const [startX, startY] = stops[0];
+    return (
+      `<g fill="none" stroke="${p.faint}" stroke-width="1" stroke-opacity="0.24">` +
+      sheet +
+      "</g>" +
+      `<g fill="${p.line}" fill-opacity="0.26" stroke="${p.line}" stroke-width="1.2" stroke-opacity="0.5">` +
+      built.map((plot) => `<rect ${box(plot)}/>`).join("") +
+      "</g>" +
+      `<rect ${box(next)} fill="none" stroke="${p.spark}" stroke-width="1.5" stroke-opacity="0.5" stroke-dasharray="5 5"/>` +
+      `<g fill="none" stroke="${p.spark}" stroke-width="1.5" stroke-opacity="0.45" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 7">` +
+      `<path d="M${stops.map(([x, y]) => `${x} ${y}`).join(" L")}"/>` +
+      "</g>" +
+      passed +
+      `<circle cx="${startX}" cy="${startY}" r="4.5" fill="${p.spark}" fill-opacity="0.85"/>`
+    );
+  },
+};
+
 /** A map sheet coming down off the network. */
 const downloadMaps: Drawing = {
   pools: [
@@ -1251,6 +1352,7 @@ const DRAWINGS: Record<string, Drawing> = {
   "multiplayer.stats": stats,
   "content.maps": maps,
   "content.games": games,
+  "content.blueprints": blueprints,
   "content.archives": archives,
   "content.setupPacks": setupPacks,
   "downloads.browse": downloads,
