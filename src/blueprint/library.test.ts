@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  duplicatedBlueprint,
   libraryGames,
   libraryLayout,
   newStoredBlueprint,
@@ -74,6 +75,34 @@ describe("recordWithLayout", () => {
   it("keeps the footprints it already had when the units cannot be read", () => {
     const next = recordWithLayout(record(), edited);
     expect(next.layout.footprints.armsolar).toEqual({ x: 4, z: 4 });
+  });
+});
+
+describe("duplicatedBlueprint", () => {
+  it("is the same layout under a fresh id and the next name up", () => {
+    const copy = duplicatedBlueprint(record(), ["Opening solars"]);
+    expect(copy.id).not.toBe("b1");
+    expect(copy.layout.name).toBe("Opening solars 2");
+    expect(copy.layout.buildings).toEqual(record().layout.buildings);
+    expect(copy.layout.footprints).toEqual(record().layout.footprints);
+    expect(copy.layout.game?.shortname).toBe("BAR");
+  });
+
+  it("is stamped by the store rather than inheriting the original's dates", () => {
+    const copy = duplicatedBlueprint(record(), []);
+    expect(copy.createdAt).toBe("");
+    expect(copy.updatedAt).toBe("");
+  });
+
+  /** Editing the copy must not reach the layout it was made from, which it
+   *  would if the two shared one buildings array. */
+  it("leaves the original alone when the copy is edited", () => {
+    const original = record();
+    const copy = duplicatedBlueprint(original, []);
+    copy.layout.buildings[0].offset.x = 999;
+    copy.layout.footprints.armsolar.x = 9;
+    expect(original.layout.buildings[0].offset.x).toBe(0);
+    expect(original.layout.footprints.armsolar.x).toBe(4);
   });
 });
 
