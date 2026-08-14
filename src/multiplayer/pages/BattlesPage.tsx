@@ -298,7 +298,11 @@ function BattlesPage() {
     setRoomBusy(true);
     let port: number;
     try {
-      ({ port } = await directStartRoom({ host: args.host, port: args.port }));
+      ({ port } = await directStartRoom({
+        host: args.host,
+        port: args.port,
+        advertise: args.advertise,
+      }));
     } catch (e) {
       setRoomBusy(false);
       throw new Error(startRoomFailure(e, args.port));
