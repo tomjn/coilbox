@@ -12,14 +12,15 @@
 //! Two servers appear below. [`Room`] is the real one. [`handshake_server`] is a
 //! deliberately broken one, used to show what the missing line costs.
 
+use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use coilbox_lobby_protocol::server::{line, parse_client_line, ClientCommand};
 use coilbox_lobby_protocol::{
-    command, default_battle_status, password_hash, BattleStatus, ClientStatus, LobbyState,
-    LoginConfig, LoginMode, LoginPhase,
+    command, default_battle_status, password_hash, BattleStatus, ChatKind, ClientStatus,
+    LobbyState, LoginConfig, LoginMode, LoginPhase, StartRect,
 };
 use futures_util::{SinkExt, StreamExt};
 use tauri::ipc::{Channel, InvokeResponseBody};
@@ -418,6 +419,218 @@ async fn a_seat_the_joiner_picks_reaches_the_host() {
     .await;
 
     room.stop("done").await;
+}
+
+/// A room with the battle open and one joiner already in it, which is where the
+/// tests about what the host does next all start.
+async fn hosted_battle_with_a_joiner(registry: &Registry) -> (Room, Client, Client) {
+    let room = room("alice", false).await;
+    let host = Client::connect(registry, loopback(room.port()), "alice").await;
+    host.wait_for_ready().await;
+    host.send(open_battle_line());
+    wait_until(
+        || host.state().current_battle == Some(1),
+        "the host to be in its own battle",
+    )
+    .await;
+    let joiner = Client::connect(registry, loopback(room.port()), "bob").await;
+    joiner.wait_for_ready().await;
+    joiner.send(command::join_battle(1, None, Some("s3cret")));
+    wait_until(
+        || joiner.state().current_battle == Some(1),
+        "the joiner to be in the battle",
+    )
+    .await;
+    (room, host, joiner)
+}
+
+/// The map and the game options the host picks reach everyone, whenever they
+/// arrived.
+///
+/// The second half is the ordering the design turns on. `SETSCRIPTTAGS` names no
+/// battle, so a client that has not yet been told it is in one files the tags
+/// under nothing and drops them. The room therefore replays them after the join
+/// acknowledgement rather than before, and only a real client folding a real
+/// stream can show that it worked.
+#[tokio::test]
+async fn the_hosts_options_reach_joiners_whenever_they_arrived() {
+    let registry = Registry::default();
+    let (room, host, joiner) = hosted_battle_with_a_joiner(&registry).await;
+
+    let mut tags = BTreeMap::new();
+    tags.insert("game/startpostype".to_string(), "2".to_string());
+    tags.insert("game/modoptions/startmetal".to_string(), "5000".to_string());
+    host.send(command::set_script_tags(&tags));
+    host.send(command::update_battle_info(0, false, 1234, "Comet Catcher"));
+
+    let has_the_options = |client: &Client| {
+        let state = client.state();
+        let battle = &state.battles[&1];
+        battle.map == "Comet Catcher" && battle.script_tags == tags
+    };
+    wait_until(
+        || has_the_options(&joiner),
+        "the joiner to see the map and options the host set",
+    )
+    .await;
+
+    // Somebody who turns up after all that gets the same room, not an empty one.
+    let late = Client::connect(&registry, loopback(room.port()), "carol").await;
+    late.wait_for_ready().await;
+    late.send(command::join_battle(1, None, Some("sp-carol")));
+    wait_until(
+        || late.state().current_battle == Some(1),
+        "the late joiner to be in the battle",
+    )
+    .await;
+    wait_until(
+        || has_the_options(&late),
+        "the late joiner to be caught up on the map and options",
+    )
+    .await;
+
+    room.stop("done").await;
+}
+
+/// The start boxes the host draws reach the joiner, and rubbing one out reaches
+/// them too. Without this the joiner spawns where the host did not put them.
+#[tokio::test]
+async fn the_start_boxes_the_host_draws_reach_the_joiner() {
+    let registry = Registry::default();
+    let (room, host, joiner) = hosted_battle_with_a_joiner(&registry).await;
+
+    host.send(command::add_start_rect(0, 0, 0, 60, 200));
+    host.send(command::add_start_rect(1, 140, 0, 200, 200));
+    wait_until(
+        || joiner.state().battles[&1].start_rects.len() == 2,
+        "the joiner to see both start boxes",
+    )
+    .await;
+    assert_eq!(
+        joiner.state().battles[&1].start_rects[&0],
+        StartRect {
+            left: 0,
+            top: 0,
+            right: 60,
+            bottom: 200,
+        }
+    );
+
+    host.send(command::remove_start_rect(1));
+    wait_until(
+        || {
+            let state = joiner.state();
+            let rects = &state.battles[&1].start_rects;
+            rects.len() == 1 && rects.contains_key(&0)
+        },
+        "the joiner to lose the box the host rubbed out",
+    )
+    .await;
+
+    room.stop("done").await;
+}
+
+/// A bot the host adds is a player in the start script, so the joiner has to hold
+/// the same one: added, moved to another team, and taken away again.
+#[tokio::test]
+async fn a_bot_the_host_adds_reaches_the_joiner() {
+    let registry = Registry::default();
+    let (room, host, joiner) = hosted_battle_with_a_joiner(&registry).await;
+
+    let seat = BattleStatus {
+        mode: true,
+        ally: 1,
+        team_id: 2,
+        ..default_battle_status()
+    };
+    host.send(command::add_bot("Scrapper", seat, 255, "NullAI"));
+    wait_until(
+        || joiner.state().battles[&1].bots.contains_key("Scrapper"),
+        "the joiner to see the host's bot",
+    )
+    .await;
+    let seen = joiner.state().battles[&1].bots["Scrapper"].clone();
+    assert_eq!(seen.owner, "alice");
+    assert_eq!(seen.ai_dll, "NullAI");
+    assert_eq!(seen.battle_status, seat);
+    assert_eq!(seen.team_color, 255);
+
+    let moved = BattleStatus { ally: 0, ..seat };
+    host.send(command::update_bot("Scrapper", moved, 65_280));
+    wait_until(
+        || {
+            joiner.state().battles[&1]
+                .bots
+                .get("Scrapper")
+                .is_some_and(|b| b.battle_status == moved && b.team_color == 65_280)
+        },
+        "the joiner to see the bot change teams",
+    )
+    .await;
+
+    host.send(command::remove_bot("Scrapper"));
+    wait_until(
+        || joiner.state().battles[&1].bots.is_empty(),
+        "the joiner to lose the bot the host removed",
+    )
+    .await;
+
+    room.stop("done").await;
+}
+
+/// Battle chat carries both ways, and lands in the battle's own channel.
+///
+/// The room's `BATTLEOPENED` names that channel, and a client that never learned
+/// it files chat under no channel at all, where the battle room cannot show it.
+#[tokio::test]
+async fn battle_chat_reaches_both_ends() {
+    let registry = Registry::default();
+    let (room, host, joiner) = hosted_battle_with_a_joiner(&registry).await;
+
+    joiner.send(command::say_battle("is this the right map?"));
+    wait_until(
+        || {
+            battle_chat(&host.state()).contains(&(
+                "bob".to_string(),
+                "is this the right map?".to_string(),
+                ChatKind::SaidBattle,
+            ))
+        },
+        "the host to hear the joiner",
+    )
+    .await;
+
+    host.send(command::say_battle_ex("checks"));
+    wait_until(
+        || {
+            battle_chat(&joiner.state()).contains(&(
+                "alice".to_string(),
+                "checks".to_string(),
+                ChatKind::SaidEx,
+            ))
+        },
+        "the joiner to hear the host",
+    )
+    .await;
+
+    // Said in the battle's channel, which is the one the battle room reads.
+    assert!(host.state().channels.contains_key("__battle__1"));
+
+    room.stop("done").await;
+}
+
+/// Everything said in the battle channel, as sender, text and kind.
+fn battle_chat(state: &LobbyState) -> Vec<(String, String, ChatKind)> {
+    state
+        .channels
+        .get("__battle__1")
+        .map(|c| {
+            c.messages
+                .iter()
+                .map(|m| (m.from.clone(), m.text.clone(), m.kind))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// A joiner who does not have the map or the game says so, and the host sees it.
