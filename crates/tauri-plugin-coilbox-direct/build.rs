@@ -6,6 +6,7 @@ const COMMANDS: &[&str] = &[
     "direct_start_room",
     "direct_stop_room",
     "direct_room_status",
+    "direct_answer_join",
     "direct_lan_rooms",
     "direct_stop_discovery",
 ];
