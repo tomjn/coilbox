@@ -1092,6 +1092,13 @@ fn mp_open_battle(
     title: String,
     modname: String,
 ) -> CliResult {
+    // Refused rather than sent, because a key with whitespace in it moves the
+    // port, the player limit and both content hashes into the wrong slots, and
+    // the battle that opens is one nobody can join. Neither end can tell
+    // afterwards, so it has to stop here.
+    if !command::fits_one_field(&key) {
+        return CliResult::err("a battle password cannot contain spaces");
+    }
     let line = command::open_battle(
         battle_type,
         nat_type,

@@ -127,3 +127,26 @@ export function roomPortProblem(typed: string): string | null {
   if (port < 1 || port > 65535) return "Ports run from 1 to 65535.";
   return null;
 }
+
+/**
+ * Why a typed room password cannot be used, or null when it can. Pure.
+ *
+ * The password is sent in one space-separated slot of the line that opens the
+ * battle, so a space in it moves the port, the player limit and both content
+ * hashes along one. The room reads them where they land, and the battle it opens
+ * has a limit of zero, which tells every joiner it is full. Nothing on either
+ * side can tell afterwards, so it is refused here, before a port is bound.
+ */
+export function roomPasswordProblem(typed: string): string | null {
+  if (!/\s/.test(typed.trim())) return null;
+  return "No spaces in a room password. A room sends it in a single wire field, so a password with a space in it does not survive the trip.";
+}
+
+/** What to tell a host whose room started but opened no battle. Pure.
+ *
+ * The room is stopped by the time this is read: a listener with a host in it and
+ * nothing to join is worse than no room, because it looks like hosting works
+ * (issue #1587). */
+export function noBattleFailure(): string {
+  return "The room started but its battle never opened, so the room has been stopped. Try again, and if it keeps happening, host on another port.";
+}

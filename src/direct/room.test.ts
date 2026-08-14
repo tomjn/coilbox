@@ -5,6 +5,7 @@ import {
   DEFAULT_ROOM_PORT,
   directServer,
   isDirectKey,
+  roomPasswordProblem,
   roomPortProblem,
   roomStopReason,
   roomSummary,
@@ -173,5 +174,22 @@ describe("roomPortProblem", () => {
   it("refuses anything that is not digits", () => {
     expect(roomPortProblem("82e3")).toBe("Ports are whole numbers.");
     expect(roomPortProblem("-1")).toBe("Ports are whole numbers.");
+  });
+});
+
+describe("roomPasswordProblem", () => {
+  it("takes an ordinary password, and no password at all", () => {
+    expect(roomPasswordProblem("s3cret")).toBeNull();
+    expect(roomPasswordProblem("")).toBeNull();
+    // Trimmed before it is sent, so the edges are not the host's problem.
+    expect(roomPasswordProblem("  s3cret  ")).toBeNull();
+  });
+
+  // Sent, this one moves the port, the player limit and both content hashes
+  // along a slot, and the battle that opens has a limit of zero: full to every
+  // joiner, with nothing said to the host.
+  it("refuses a password with a space in it", () => {
+    expect(roomPasswordProblem("let me in")).toContain("No spaces");
+    expect(roomPasswordProblem("let\tme in")).toContain("No spaces");
   });
 });

@@ -20,6 +20,18 @@ pub fn is_wire_safe(line: &str) -> bool {
     !line.contains(['\n', '\r'])
 }
 
+/// Whether a value can be sent in one of a line's space-separated slots.
+///
+/// A slot ends at the first space, so a value with whitespace in it is not a
+/// malformed argument, it is every argument after it moved along one. A room
+/// password of "let me in" puts the rest of the password where the port belongs
+/// and the port where the player limit belongs, and the battle that opens has a
+/// limit of zero, which refuses every joiner as full. Nothing escapes it, so the
+/// value has to be refused where it is typed.
+pub fn fits_one_field(value: &str) -> bool {
+    !value.chars().any(char::is_whitespace)
+}
+
 /// `LOGIN <user> <pass> <cpu> <local_ip> <agent>\t<client_id>\t<flags>`.
 ///
 /// `pw_hash` is the already-computed `BASE64(MD5(password))`. `cpu` is fixed at
@@ -423,6 +435,34 @@ mod tests {
             l,
             "OPENBATTLE 0 0 * 8452 16 -1 0 -1 spring\t105\tMap\tTitle Here\tBAR"
         );
+    }
+
+    /// The room password rides in a space-separated slot, so a space in it is
+    /// not a bad password, it is a battle built out of the wrong fields.
+    #[test]
+    fn a_room_password_with_a_space_moves_every_field_after_it() {
+        let line = open_battle(
+            0,
+            0,
+            "let me in",
+            8452,
+            16,
+            -1,
+            0,
+            -1,
+            "spring",
+            "105",
+            "Map",
+            "Title Here",
+            "BAR",
+        );
+        // The port slot now holds the second half of the password, and the
+        // player limit holds the port.
+        assert!(line.starts_with("OPENBATTLE 0 0 let me in 8452 16"));
+        assert!(!fits_one_field("let me in"));
+        assert!(fits_one_field("letmein"));
+        // The empty key a room with no password sends.
+        assert!(fits_one_field("*"));
     }
 
     #[test]
