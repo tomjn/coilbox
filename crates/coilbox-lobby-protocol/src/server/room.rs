@@ -1732,10 +1732,11 @@ mod tests {
     #[test]
     fn commands_out_of_turn_are_ignored_rather_than_answered() {
         let mut room = room(false);
-        // Before a login, only the handshake works.
+        // Before a login, only the handshake works. The two battle commands are
+        // the exception and are refused out loud: see
+        // `a_battle_command_before_the_login_is_told_why_it_did_nothing`.
         room.connect(ALICE);
         assert!(send(&mut room, ALICE, "SAYBATTLE hello").is_empty());
-        assert!(send(&mut room, ALICE, &open_battle_line()).is_empty());
         // From a socket the room has never seen, nothing works at all.
         assert!(send(&mut room, 99, "LISTCOMPFLAGS").is_empty());
 
