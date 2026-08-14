@@ -822,6 +822,13 @@ mod header_tests {
     #[test]
     fn undecodable_header_bytes_return_none() {
         assert!(encode_header_image("png", b"not a png").is_none());
+        // Coilbox does encode WebP now, in `assetencode` (issue #1623), but that
+        // is the hub's corpus and this is the game header. The header is decoded
+        // by extension against the `image` decoders the worker builds, which do
+        // not include WebP, and it is re-encoded as a JPEG for the webview
+        // regardless. So a `.webp` loadpicture is still a header we skip, and
+        // this stays a statement about the header path rather than about what
+        // coilbox can encode.
         assert!(encode_header_image("webp", &png_bytes(8, 8)).is_none());
     }
 

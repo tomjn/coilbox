@@ -32,6 +32,18 @@ image = { version = "0.25", default-features = false, features = [
 ddsfile = "0.6"
 texpresso = "2"
 base64 = "0.22"
+# The one WebP encoder, lossy and lossless (issue #1623). It wraps libwebp-sys,
+# which vendors libwebp's C and builds it with `cc`, so there is no system
+# library and no pkg-config, and all three release targets build it natively with
+# the toolchain they already have. The C stops here: this crate is a sidecar
+# binary, so the app never links it. `default-features = false` drops the crate's
+# optional `image` bridge, because `src/assetencode.rs` feeds libwebp raw
+# RGB/RGBA itself.
+webp = { version = "0.3.1", default-features = false }
+# The variant names, encode profiles and dimension caps the hub checks the
+# encoded bytes against. Read, never restated, so the encoder cannot drift from
+# what the hub will accept.
+coilbox-assets = { path = "../coilbox-assets" }
 # Skirmish-AI whitelist: a game's `validais.lua` lists AI name *patterns*, matched
 # as regexes against AI short names (skylobby-compatible `re-find` semantics).
 regex = "1"
