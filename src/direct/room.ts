@@ -21,17 +21,22 @@ export const LOOPBACK_HOST = "127.0.0.1";
 export const DIRECT_SERVER_ID = "direct-room";
 
 /**
- * The lobby server the host's own client connects to once its room is listening.
+ * The lobby server a room is dialled as: the host's own room over loopback, or
+ * somebody else's at the address their beacon arrived from.
  *
  * A room is a TASServer, so the whole existing client path applies unchanged: no
- * TLS, because the socket never leaves the machine, and no stored account, because
- * a room has no accounts to store. Pure.
+ * TLS, because a room serves none, and no stored account, because a room has no
+ * accounts to store. Pure.
  */
-export function directServer(port: number): LobbyServer {
+export function directServer(
+  port: number,
+  host: string = LOOPBACK_HOST,
+): LobbyServer {
+  const own = host === LOOPBACK_HOST;
   return {
     id: DIRECT_SERVER_ID,
-    name: "Room on this machine",
-    host: LOOPBACK_HOST,
+    name: own ? "Room on this machine" : `Room at ${host}`,
+    host,
     port,
     tls: false,
     allowSelfSigned: false,
@@ -125,6 +130,23 @@ export function roomPortProblem(typed: string): string | null {
   if (!/^\d+$/.test(value)) return "Ports are whole numbers.";
   const port = Number(value);
   if (port < 1 || port > 65535) return "Ports run from 1 to 65535.";
+  return null;
+}
+
+/**
+ * Why a typed player name cannot be used in a room, or null when it can. Pure.
+ *
+ * A room announces its members by name in single space-separated wire fields, so
+ * a name with a space in it arrives as two and the login is refused. Saying so
+ * here is the difference between a corrected field and a handshake that fails
+ * for reasons nobody can see.
+ */
+export function playerNameProblem(typed: string): string | null {
+  const name = typed.trim();
+  if (!name) return "Enter the name others will see.";
+  if (/\s/.test(name)) {
+    return "No spaces in your name. A room announces names in single wire fields, so a name with a space in it does not survive the trip.";
+  }
   return null;
 }
 

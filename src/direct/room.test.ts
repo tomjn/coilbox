@@ -6,6 +6,7 @@ import {
   DEFAULT_ROOM_PORT,
   directServer,
   isDirectKey,
+  playerNameProblem,
   roomPasswordProblem,
   roomPortProblem,
   roomStopReason,
@@ -27,6 +28,14 @@ describe("directServer", () => {
     // The store keys a connection `username@host:port` (see `serverKeyFor`).
     const server = directServer(8200);
     expect(isDirectKey(`Tom@${server.host}:${server.port}`)).toBe(true);
+  });
+
+  it("dials somebody else's room where their beacon came from", () => {
+    const server = directServer(8300, "192.168.1.5");
+    expect(server.host).toBe("192.168.1.5");
+    expect(server.port).toBe(8300);
+    expect(server.tls).toBe(false);
+    expect(server.name).toContain("192.168.1.5");
   });
 });
 
@@ -239,6 +248,24 @@ describe("battleOpened", () => {
       async () => {},
     );
     expect(opened).toBeNull();
+  });
+});
+
+describe("playerNameProblem", () => {
+  it("takes an ordinary name", () => {
+    expect(playerNameProblem("Tom")).toBeNull();
+    // Trimmed before it is sent, so the edges are not the player's problem.
+    expect(playerNameProblem("  Tom  ")).toBeNull();
+  });
+
+  it("asks for a name rather than logging in as nobody", () => {
+    expect(playerNameProblem("  ")).toBe("Enter the name others will see.");
+  });
+
+  // Sent, this one arrives as two fields and the room refuses the login with
+  // nothing on screen to say why.
+  it("refuses a name with a space in it", () => {
+    expect(playerNameProblem("Tom J")).toContain("No spaces in your name");
   });
 });
 
