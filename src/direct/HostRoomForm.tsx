@@ -53,13 +53,14 @@ export interface StartRoomArgs {
 }
 
 export function HostRoomForm({
-  connectedToServer,
+  blocked,
   defaultName,
   onStart,
 }: {
-  /** Connected to a real lobby server. There is one connection, so it is the
-   *  room's or the server's, and the server got there first. */
-  connectedToServer: boolean;
+  /** Why hosting is unavailable, or null when it is available. There is one
+   *  lobby connection, so whatever already has it is in the way (see
+   *  `hostBlockedReason`). */
+  blocked: string | null;
   /** The name to offer as the host's, usually their last lobby login. */
   defaultName?: string;
   /** Starts the room and opens the battle in it. Rejects with what to tell the
@@ -137,13 +138,8 @@ export function HostRoomForm({
     }
   }
 
-  if (connectedToServer) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Log out of the lobby server first. Coilbox holds one lobby connection,
-        and hosting a room needs it.
-      </p>
-    );
+  if (blocked) {
+    return <p className="text-sm text-muted-foreground">{blocked}</p>;
   }
 
   if (content.noEngine) {

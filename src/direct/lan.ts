@@ -1,6 +1,5 @@
 import type { Battle } from "../multiplayer/bindings";
 import type { DirectLanRoom } from "./bindings";
-import { isDirectKey } from "./room";
 
 /**
  * The pure decisions behind finding and joining somebody else's room: what a
@@ -78,15 +77,24 @@ export function addressProblem(typed: string): string | null {
  *
  * Coilbox holds one lobby connection. Whatever has it, a join needs it, so the
  * reason is said out loud rather than shown as a button that does nothing.
+ *
+ * Which of the two connections it is has to be told, not read off the key. A key
+ * is `username@host:port` for a room and for a server alike, and the only thing
+ * that ever set them apart was the host's own loopback address, so a joiner in
+ * somebody else's room was sent to log out of a lobby server that does not exist
+ * (issue #1618). The store knows which it dialled, so it says.
  */
 export function joinBlockedReason(
   activeKey: string | null,
+  /** Whether the live connection is a room somebody is hosting. */
+  direct: boolean,
+  /** Whether this client is hosting a room of its own. */
   hosting: boolean,
 ): string | null {
   if (hosting) {
     return "Stop your own room first. Coilbox holds one lobby connection, and joining needs it.";
   }
-  if (isDirectKey(activeKey)) {
+  if (activeKey && direct) {
     return "You are connected to a room already. Disconnect from it first: coilbox holds one lobby connection, and joining needs it.";
   }
   if (activeKey) {

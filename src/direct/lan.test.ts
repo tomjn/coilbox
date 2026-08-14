@@ -114,12 +114,12 @@ describe("addressProblem", () => {
 
 describe("joinBlockedReason", () => {
   it("lets a client with no connection join", () => {
-    expect(joinBlockedReason(null, false)).toBeNull();
+    expect(joinBlockedReason(null, false, false)).toBeNull();
   });
 
   // Coilbox holds one lobby connection, so whatever has it, a join needs it.
   it("says to stop your own room first", () => {
-    expect(joinBlockedReason("Tom@127.0.0.1:8200", true)).toContain(
+    expect(joinBlockedReason("Tom@127.0.0.1:8200", true, true)).toContain(
       "Stop your own room first",
     );
   });
@@ -127,21 +127,29 @@ describe("joinBlockedReason", () => {
   // Said of the connection rather than the battle, because leaving the battle
   // leaves the connection to the room behind it, and a join still cannot have it.
   it("says to disconnect from a room already connected to", () => {
-    expect(joinBlockedReason("Tom@127.0.0.1:8200", false)).toContain(
+    expect(joinBlockedReason("Tom@127.0.0.1:8200", true, false)).toContain(
+      "connected to a room already",
+    );
+  });
+
+  // The bug this replaced: a joiner's key is the shape of a server's, so the
+  // room they are actually in was named as a lobby server (issue #1618).
+  it("says the same of somebody else's room, which is not a loopback key", () => {
+    expect(joinBlockedReason("Tom@192.168.1.45:8200", true, false)).toContain(
       "connected to a room already",
     );
   });
 
   it("says to log out of a server", () => {
     expect(
-      joinBlockedReason("Tom@lobby.beyondallreason.info:8200", false),
+      joinBlockedReason("Tom@lobby.beyondallreason.info:8200", false, false),
     ).toContain("Log out of the lobby server first");
   });
 
-  // Hosting is checked before the key, because a host's own client is connected
-  // to their room and "leave the room you are in" is not what they should do.
+  // Hosting is checked first, because a host's own client is connected to their
+  // room and "leave the room you are in" is not what they should do.
   it("prefers the room over the connection it made", () => {
-    expect(joinBlockedReason("Tom@127.0.0.1:8200", true)).toContain(
+    expect(joinBlockedReason("Tom@127.0.0.1:8200", true, true)).toContain(
       "your own room",
     );
   });
