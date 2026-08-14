@@ -204,10 +204,16 @@ async fn room(host: &str, approve_joins: bool) -> Room {
 
 /// The `OPENBATTLE` the host's client sends, as the battle room builds it.
 fn open_battle_line() -> String {
+    keyed_open_battle_line("*")
+}
+
+/// The same with a room password in the key slot, which is what the Host on LAN
+/// form sends when its Password field has anything in it.
+fn keyed_open_battle_line(key: &str) -> String {
     command::open_battle(
         0,
         0,
-        "*",
+        key,
         8452,
         16,
         -1,
@@ -219,6 +225,59 @@ fn open_battle_line() -> String {
         "Tom's LAN game",
         "Beyond All Reason test-1234",
     )
+}
+
+/// A host who typed a password gets a battle, and joiners are asked for it.
+///
+/// Issue #1587 read as though a keyed `OPENBATTLE` was being dropped somewhere
+/// after the login, which nothing at the unit level could rule out. It is not:
+/// the whole password path is here on a socket, from the host's line through to
+/// a joiner refused for want of the password and let in with it.
+#[tokio::test]
+async fn a_passworded_room_opens_its_battle_and_asks_joiners_for_the_password() {
+    let room = room("alice", false).await;
+    let registry = Registry::default();
+
+    let host = Client::connect(&registry, loopback(room.port()), "alice").await;
+    host.wait_for_ready().await;
+    host.send(keyed_open_battle_line("letmein"));
+    wait_for_room(
+        &room,
+        |s| s.battle.is_some(),
+        "the room to hold the passworded battle",
+    )
+    .await;
+    wait_until(
+        || host.state().current_battle == Some(1),
+        "the host to be in their own passworded battle",
+    )
+    .await;
+    assert!(host.state().battles[&1].passworded);
+
+    // A joiner who brought no password is told there is one, and stays out.
+    let joiner = Client::connect(&registry, loopback(room.port()), "bob").await;
+    joiner.wait_for_ready().await;
+    joiner.send(command::join_battle(1, None, Some("sp-bob")));
+    wait_until(
+        || {
+            joiner
+                .received()
+                .contains(&"JOINBATTLEFAILED this room needs a password".to_string())
+        },
+        "the joiner to be told the room has a password",
+    )
+    .await;
+    assert_eq!(joiner.state().current_battle, None);
+
+    // And with it, in.
+    joiner.send(command::join_battle(1, Some("letmein"), Some("sp-bob")));
+    wait_until(
+        || joiner.state().current_battle == Some(1),
+        "the joiner to be in the battle with the password",
+    )
+    .await;
+
+    room.stop("done").await;
 }
 
 /// The whole point of the milestone: a joiner reaches a battle, over a socket,
