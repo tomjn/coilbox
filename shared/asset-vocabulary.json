@@ -1,0 +1,92 @@
+{
+  "unit": {
+    "buildpicVariant": "buildpic",
+    "renderVariantPrefix": "render:",
+    "renderAngles": ["top"]
+  },
+  "mapVariants": ["minimap", "overlay:metal", "overlay:type", "overlay:height"],
+  "origins": ["extracted", "rendered", "uploaded"],
+  "classes": {
+    "buildpic": {
+      "keyedOn": "unit",
+      "mime": "image/webp",
+      "encodeProfile": "webp-lossless-256",
+      "lossless": true,
+      "quality": null,
+      "maxEdgePx": 256,
+      "maxBytes": 262144,
+      "square": true,
+      "minBitDepth": null,
+      "grayscale": false
+    },
+    "render": {
+      "keyedOn": "unit",
+      "mime": "image/webp",
+      "encodeProfile": "webp-q80-256",
+      "lossless": false,
+      "quality": 80,
+      "maxEdgePx": 256,
+      "maxBytes": 262144,
+      "square": false,
+      "minBitDepth": null,
+      "grayscale": false
+    },
+    "minimap": {
+      "keyedOn": "map",
+      "mime": "image/webp",
+      "encodeProfile": "webp-q80-512",
+      "lossless": false,
+      "quality": 80,
+      "maxEdgePx": 512,
+      "maxBytes": 1048576,
+      "square": false,
+      "minBitDepth": null,
+      "grayscale": false
+    },
+    "overlay:metal": {
+      "keyedOn": "map",
+      "mime": "image/webp",
+      "encodeProfile": "webp-lossless-source",
+      "lossless": true,
+      "quality": null,
+      "maxEdgePx": null,
+      "maxBytes": null,
+      "square": false,
+      "minBitDepth": null,
+      "grayscale": false
+    },
+    "overlay:type": {
+      "keyedOn": "map",
+      "mime": "image/webp",
+      "encodeProfile": "webp-lossless-source",
+      "lossless": true,
+      "quality": null,
+      "maxEdgePx": null,
+      "maxBytes": null,
+      "square": false,
+      "minBitDepth": null,
+      "grayscale": false
+    },
+    "overlay:height": {
+      "keyedOn": "map",
+      "mime": "image/png",
+      "encodeProfile": "png16-lossless-source",
+      "lossless": true,
+      "quality": null,
+      "maxEdgePx": null,
+      "maxBytes": null,
+      "square": false,
+      "minBitDepth": 16,
+      "grayscale": true
+    }
+  },
+  "maxObjectBytes": 2097152,
+  "renderFrame": {
+    "bleedSquares": 1,
+    "elmosPerBuildSquare": 16
+  },
+  "heightOverlay": {
+    "elmosPerSample": 8,
+    "bytesPerSample": 2
+  }
+}
