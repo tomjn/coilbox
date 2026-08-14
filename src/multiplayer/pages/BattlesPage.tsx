@@ -74,6 +74,7 @@ function BattlesPage() {
   const {
     mirror,
     activeKey,
+    activeDirect,
     protocol,
     busy,
     lastJoinError,
@@ -544,16 +545,14 @@ function BattlesPage() {
         onLeave={leave}
         enginePath={selected?.enginePath}
         dataDir={selected?.rootPath}
-        // A room of our own is dialled over loopback, so the only address this
-        // connection could put in a link is 127.0.0.1, which reaches nobody
-        // (issue #1615). The room line at the top of this page has the real
-        // addresses and a link for each, so the row says nothing rather than
-        // saying the wrong thing.
-        serverAddress={
-          activeKey && !isDirectKey(activeKey)
-            ? serverAddressFromKey(activeKey)
-            : undefined
-        }
+        // What the row can hand out depends on what it is connected to, so both
+        // halves go down and `inviteLink` decides. A room of our own is dialled
+        // over loopback and offers nothing, because the only address it could
+        // name is 127.0.0.1 and the room line at the top of this page has the
+        // real ones (issue #1615). Somebody else's room offers the address we
+        // dialled it on (issue #1617).
+        serverAddress={activeKey ? serverAddressFromKey(activeKey) : undefined}
+        directRoom={activeDirect}
       />
     </main>
   );

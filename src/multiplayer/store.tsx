@@ -327,6 +327,13 @@ interface MultiplayerContextValue {
   /** Whether a connection is currently live (`activeKey != null`). */
   connected: boolean;
   /**
+   * Whether the live connection is a room somebody is hosting themselves rather
+   * than a lobby server. Read by anything that passes the battle on: a room
+   * holds one battle and is reached by dialling it, so it is shared as a
+   * `coilbox://room` link rather than a `join` one (see `inviteLink`).
+   */
+  activeDirect: boolean;
+  /**
    * The wire protocol the live connection speaks, `tasserver` when there is none.
    * Surfaces with no Tachyon equivalent read this and hide themselves: named
    * channels, moderation, and hosting a battle. See `docs/tachyon-protocol.md`.
@@ -842,6 +849,21 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     setClientId(fresh);
   }, [clientId, setClientId]);
 
+  // The key of the connection that is a room rather than a server, which is what
+  // tells the two apart: both are dialled as a TASServer at a `host:port`, and
+  // only a room's link is an address to dial (see `inviteLink`).
+  //
+  // Kept in settings rather than in React state because the Rust connection
+  // outlives a webview reload and is re-adopted below with nothing to say where
+  // it came from, and a room re-adopted as a server hands out a link that
+  // reaches nobody (issue #1617). Every connect rewrites it, so it never
+  // outlives the connection it describes.
+  const [roomKey, setRoomKey] = useSetting<string>("multiplayer.roomKey", "");
+  const setRoomKeyRef = useRef(setRoomKey);
+  useEffect(() => {
+    setRoomKeyRef.current = setRoomKey;
+  }, [setRoomKey]);
+
   // Startup auto-connect (issue #404, opt-in, default off) + one-click reconnect.
   // The last-used login is written on every successful connect and read once at
   // boot. The decision inputs are mirrored into a ref so the once-only boot effect
@@ -1172,6 +1194,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         const snap = await mpSnapshot({ serverKey });
         dispatch({ type: "snapshot", state: snap.state });
         setActiveKey(serverKey);
+        setRoomKeyRef.current(direct ? serverKey : "");
         setLoginPopoverOpen(false);
         // Remember this login as the last used, so opt-in auto-connect and the
         // one-click reconnect row can seed it next launch. Keyed by id+username so
@@ -1530,6 +1553,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         mirror,
         activeKey,
         connected: activeKey != null,
+        activeDirect: activeKey != null && activeKey === roomKey,
         protocol,
         revealed,
         busy,

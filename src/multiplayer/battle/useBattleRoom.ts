@@ -166,6 +166,9 @@ export interface BattleRoomView {
    * every non-spectator human is ready (see `battleStartable`). */
   allReady: boolean;
   serverKey: string | null;
+  /** Whether that connection is a room somebody is hosting rather than a lobby
+   * server, which decides how the battle is passed on (see `inviteLink`). */
+  directRoom: boolean;
   /** Bumped on rescan/download so content-dependent subtrees can remount+refetch. */
   contentNonce: number;
   setReady: (ready: boolean) => void;
@@ -272,7 +275,8 @@ export interface BattleRoomView {
 }
 
 export function useBattleRoom(): BattleRoomView {
-  const { mirror, activeKey, protocol, setIngame } = useMultiplayer();
+  const { mirror, activeKey, activeDirect, protocol, setIngame } =
+    useMultiplayer();
   const state = mirror.state;
   // Tachyon assigns team colours when the match starts, and picks a member's
   // team within their ally team itself, so the colour, faction, team and
@@ -959,6 +963,7 @@ export function useBattleRoom(): BattleRoomView {
     castVote,
     allReady,
     serverKey: activeKey,
+    directRoom: activeDirect,
     contentNonce,
     setReady: (ready) => pushStatus({ ready }),
     setSpectator: (spectator) => pushStatus({ mode: !spectator }),

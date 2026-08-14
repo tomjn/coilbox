@@ -3,8 +3,8 @@ import { Link as LinkIcon, Lock, LogOut, Users } from "lucide-react";
 import { memo, useState } from "react";
 import { THUMB_MINIMAP_MIP, useUnitsyncMinimap } from "../../content/config";
 import { MapThumb } from "../../content/pages/components/MapThumb";
-import { buildJoinLink } from "../../deeplink/build";
 import { copyDeepLink } from "../../deeplink/copyLink";
+import { inviteLink } from "../../direct/invite";
 import type { Battle } from "../bindings";
 import { battleRowAction, occupancy } from "./battleFilters";
 import { JoinBattlePopover } from "./JoinBattlePopover";
@@ -35,6 +35,7 @@ function BattleRowInner({
   enginePath,
   dataDir,
   serverAddress,
+  directRoom = false,
 }: {
   battle: Battle;
   joined: boolean;
@@ -46,9 +47,13 @@ function BattleRowInner({
   onLeave: () => void;
   enginePath?: string;
   dataDir?: string;
-  /** This server's `host:port` (issue #498), for a "Copy invite link" action.
-   * `undefined` hides the action rather than building a broken link. */
+  /** This connection's `host:port` (issue #498), for a "Copy invite link"
+   * action. `undefined` hides the action rather than building a broken link. */
   serverAddress?: string;
+  /** Whether that connection is a room somebody is hosting rather than a
+   * server, which is passed on as an address to dial rather than as a battle on
+   * a server nobody else is on (issue #1617). */
+  directRoom?: boolean;
 }) {
   const players = occupancy(battle);
   const restricted = battle.passworded || battle.locked;
@@ -57,6 +62,9 @@ function BattleRowInner({
   const action = battleRowAction(battle, { canJoin, inProgress });
   const disabled = joined || action.disabled;
   const [pwOpen, setPwOpen] = useState(false);
+  // Built rather than assumed: a connection that has no link worth giving out
+  // shows no button, instead of one that copies something nobody can act on.
+  const invite = inviteLink(serverAddress, directRoom, String(battle.id));
   const { url, loading } = useUnitsyncMinimap(
     enginePath,
     dataDir,
@@ -130,16 +138,14 @@ function BattleRowInner({
           <span className="ml-1">+{battle.spectatorCount} spec</span>
         )}
       </div>
-      {serverAddress && (
+      {invite && (
         <Button
           variant="ghost"
           size="icon"
           className="size-8 shrink-0"
           aria-label={`Copy an invite link for ${battle.title}`}
           title="Copy invite link"
-          onClick={() =>
-            copyDeepLink(buildJoinLink(serverAddress, String(battle.id)))
-          }
+          onClick={() => copyDeepLink(invite)}
         >
           <LinkIcon className="size-4" />
         </Button>
