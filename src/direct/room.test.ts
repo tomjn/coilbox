@@ -6,6 +6,7 @@ import {
   DEFAULT_ROOM_PORT,
   directServer,
   isDirectKey,
+  newPendingNames,
   pendingJoinsHeadline,
   playerNameProblem,
   roomPasswordProblem,
@@ -14,6 +15,7 @@ import {
   roomSummary,
   startButtonLabel,
   startRoomFailure,
+  waitingJoinNotice,
 } from "./room";
 
 describe("directServer", () => {
@@ -166,6 +168,43 @@ describe("pendingJoinsHeadline", () => {
 
   it("counts a queue, so a host knows to keep reading past the first", () => {
     expect(pendingJoinsHeadline(3)).toBe("3 people are waiting to join");
+  });
+});
+
+describe("newPendingNames", () => {
+  it("names only who has just started waiting", () => {
+    expect(newPendingNames(["bob"], ["bob", "carol"])).toEqual(["carol"]);
+  });
+
+  // The list is republished every two seconds. Notifying off the list rather
+  // than off the arrivals would be a toast every two seconds for as long as
+  // anybody waits.
+  it("says nothing about a queue that has not changed", () => {
+    expect(newPendingNames(["bob", "carol"], ["bob", "carol"])).toEqual([]);
+  });
+
+  it("says nothing when a queue empties", () => {
+    expect(newPendingNames(["bob"], [])).toEqual([]);
+  });
+
+  it("notices somebody who left the queue and came back", () => {
+    expect(newPendingNames([], ["bob"])).toEqual(["bob"]);
+  });
+});
+
+describe("waitingJoinNotice", () => {
+  it("names the one person a host has to decide about", () => {
+    expect(waitingJoinNotice(["bob"])).toEqual({
+      title: "Somebody is waiting to join",
+      body: "bob is waiting for you to let them into your room. Open the battle room to answer.",
+    });
+  });
+
+  it("puts a whole tick's arrivals in one notification", () => {
+    expect(waitingJoinNotice(["bob", "carol"])).toEqual({
+      title: "2 people are waiting to join",
+      body: "bob and carol are waiting for you to let them into your room. Open the battle room to answer.",
+    });
   });
 });
 

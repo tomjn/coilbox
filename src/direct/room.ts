@@ -133,6 +133,42 @@ export function pendingJoinsHeadline(count: number): string {
 }
 
 /**
+ * The names that have started waiting since the last look. Pure.
+ *
+ * The prompt lives in the battle room, so a host who has wandered off to
+ * Content or Settings hears nothing and the person waiting sits on a spinner
+ * until they come back (issue #1600). This is what a notification fires on, and
+ * it has to be the arrivals rather than the list: the list is republished every
+ * two seconds, and notifying off that would be a toast every two seconds for as
+ * long as anybody waits.
+ */
+export function newPendingNames(before: string[], after: string[]): string[] {
+  return after.filter((name) => !before.includes(name));
+}
+
+/**
+ * The notification a host gets when somebody starts waiting on them. Pure.
+ *
+ * One notification however many arrived at once, because they arrive in the
+ * same two-second tick and three toasts say nothing the first one did not. The
+ * names are in it: a host who is elsewhere in the app is being asked to decide
+ * something, and "somebody" is not enough to decide on.
+ */
+export function waitingJoinNotice(names: string[]): {
+  title: string;
+  body: string;
+} {
+  const who =
+    names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return {
+    title: pendingJoinsHeadline(names.length),
+    body: `${who} ${names.length === 1 ? "is" : "are"} waiting for you to let them into your room. Open the battle room to answer.`,
+  };
+}
+
+/**
  * Why a typed room port cannot be used, or null when it can. Pure.
  *
  * Refusing rather than correcting: a port quietly clamped into range is a room
