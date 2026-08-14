@@ -68,13 +68,35 @@ function BattlesPage() {
   // when a start lands the host in the battle room and they walk back here.
   const [room, setRoom] = useState<DirectRoomStatus | null>(null);
   const [roomBusy, setRoomBusy] = useState(false);
-  const [roomError, setRoomError] = useState<string | null>(null);
+  const [stopError, setStopError] = useState<string | null>(null);
   const [lastLogin] = useLastLogin();
   useEffect(() => {
     directRoomStatus({})
       .then((r) => setRoom(r.room))
       .catch(() => {});
   }, []);
+
+  // A stop this page has already asked for, so an answer that was in flight before
+  // it does not put the room's line back for one more tick.
+  const stoppedRef = useRef(false);
+  // Who is in the room and whether it wants a password are the room's to know, and
+  // the direct plugin emits no events, so the running line is polled rather than
+  // subscribed to. The command reads a struct out of the room task in this same
+  // process, so two seconds costs nothing and is quick enough that a host sees a
+  // join before they wonder whether it worked. Only while there is a room: with
+  // none, `hosting` is false and there is no timer at all.
+  const hosting = room !== null;
+  useEffect(() => {
+    if (!hosting) return;
+    const timer = setInterval(() => {
+      directRoomStatus({})
+        .then((r) => {
+          if (!stoppedRef.current) setRoom(r.room);
+        })
+        .catch(() => {});
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [hosting]);
   // Under Tachyon the server allocates a dedicated autohost and a client cannot
   // host a battle at all. What it can do is create a lobby, which is a different
   // thing with its own popover, so the two swap rather than one being hidden.
@@ -262,16 +284,18 @@ function BattlesPage() {
   // Start a room of our own: bind the port, dial it over loopback like any other
   // server, then open the battle in it. Landing in the battle room is the join
   // effect above doing what it does for every other battle.
+  //
+  // Failures are thrown rather than stored, because the only place a host can read
+  // one is the drawer they pressed Start in, and the drawer holds the element it
+  // was opened with. So the form asking is the form told.
   async function onStartRoom(args: StartRoomArgs) {
     setRoomBusy(true);
-    setRoomError(null);
     let port: number;
     try {
       ({ port } = await directStartRoom({ host: args.host, port: args.port }));
     } catch (e) {
-      setRoomError(startRoomFailure(e, args.port));
       setRoomBusy(false);
-      return;
+      throw new Error(startRoomFailure(e, args.port));
     }
     try {
       const key = await connectDirect(port, args.host);
@@ -279,6 +303,8 @@ function BattlesPage() {
       hostingFromDraftRef.current = false;
       joiningRef.current = true;
       await mpOpenBattle({ serverKey: key, ...args.battle });
+      stoppedRef.current = false;
+      setStopError(null);
       setRoom(await directRoomStatus({}).then((r) => r.room));
     } catch (e) {
       // The room is up but we are not in it, which is a room nobody can host.
@@ -287,7 +313,7 @@ function BattlesPage() {
       await directStopRoom({
         reason: "the host could not join their own room",
       }).catch(() => {});
-      setRoomError(e instanceof Error ? e.message : String(e));
+      throw e;
     } finally {
       setRoomBusy(false);
     }
@@ -298,14 +324,17 @@ function BattlesPage() {
   // a port that is about to close.
   async function onStopRoom() {
     setRoomBusy(true);
-    setRoomError(null);
+    setStopError(null);
+    stoppedRef.current = true;
     try {
       const reason = roomStopReason(room?.host ?? "");
       await disconnect();
       await directStopRoom({ reason });
       setRoom(null);
     } catch (e) {
-      setRoomError(e instanceof Error ? e.message : String(e));
+      // The room is still there, so let the poll speak for it again.
+      stoppedRef.current = false;
+      setStopError(e instanceof Error ? e.message : String(e));
     } finally {
       setRoomBusy(false);
     }
@@ -317,7 +346,7 @@ function BattlesPage() {
       connectedToServer={activeKey != null && !isDirectKey(activeKey)}
       defaultName={lastLogin?.username}
       busy={roomBusy || busy}
-      error={roomError}
+      error={stopError}
       onStart={onStartRoom}
       onStop={onStopRoom}
     />
