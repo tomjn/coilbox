@@ -78,11 +78,19 @@ async function vetHostAddress(
  * (`isHost:true`, bound to our HOSTPORT), otherwise a client config pointing at
  * the host, vetted first by [`vetHostAddress`]. `running` is app-wide (one game
  * at a time), `error` is local, and the launch resolves when the engine exits.
+ *
+ * `blocked` is a reason the local install cannot play this battle at all, from
+ * [`launchBlock`]. Every way a match can start funnels through here (the host's
+ * Start, a joiner auto-launching when the host goes in-game, a Tachyon server's
+ * start signal, the manual Rejoin), so refusing here is what makes sure nobody
+ * points the engine at a game or map they do not have and watches it fail with
+ * nothing said (issue #1572).
  */
 export function useBattleLaunch(
   serverKey: string | null,
   target: PlayTarget | null,
   host = false,
+  blocked: string | null = null,
 ) {
   const { running, launch } = usePlay();
   const { setProvenance } = useReplayUserState();
@@ -90,6 +98,10 @@ export function useBattleLaunch(
 
   const doLaunch = useCallback(async () => {
     if (!serverKey || !target) return;
+    if (blocked) {
+      setError(blocked);
+      return;
+    }
     setError(null);
     // Snapshot the replays before the engine runs, so any new file afterwards
     // can be tagged as multiplayer. Best-effort: a failure here just disables
@@ -138,7 +150,7 @@ export function useBattleLaunch(
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [serverKey, target, host, launch, setProvenance]);
+  }, [serverKey, target, host, blocked, launch, setProvenance]);
 
   return { running, error, launch: doLaunch };
 }
