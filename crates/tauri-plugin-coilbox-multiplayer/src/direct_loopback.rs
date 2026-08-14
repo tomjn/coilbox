@@ -498,6 +498,90 @@ async fn a_refused_join_is_told_why() {
     .await;
     assert_eq!(joiner.state().current_battle, None);
 
+    // A refusal is about this join and not about this person: they stay logged in
+    // and may ask again. A host who wants somebody gone rather than turned away
+    // kicks them, which is a different thing and holds by name.
+    joiner.send(command::join_battle(1, None, Some("s3cret")));
+    wait_for_room(
+        &room,
+        |s| s.pending == ["bob".to_string()],
+        "the room to queue bob's second attempt",
+    )
+    .await;
+    room.answer_join("bob", true, None);
+    wait_until(
+        || joiner.state().current_battle == Some(1),
+        "the joiner to get in on the second ask",
+    )
+    .await;
+
+    room.stop("done").await;
+}
+
+/// A kick, sent the way the battle room sends it, and held the way a kick has to
+/// be held.
+///
+/// The whole of this path already existed and none of it had ever been on a
+/// socket: the roster's kick button calls `mp_kick`, which puts
+/// `KICKFROMBATTLE` on the host's loopback connection, and it is the room at the
+/// other end that decides what a kick means. What is kicked is a *name*, so the
+/// person holding it is thrown out, told why, and refused the moment they dial
+/// back in, which is the only version of a kick worth having when reconnecting
+/// takes a second.
+#[tokio::test]
+async fn a_kicked_joiner_is_told_why_and_cannot_come_back() {
+    let room = room("alice", false).await;
+    let registry = Registry::default();
+
+    let host = Client::connect(&registry, loopback(room.port()), "alice").await;
+    host.wait_for_ready().await;
+    host.send(open_battle_line());
+    let joiner = Client::connect(&registry, loopback(room.port()), "bob").await;
+    joiner.wait_for_ready().await;
+    joiner.send(command::join_battle(1, None, Some("s3cret")));
+    wait_until(
+        || host.state().battles[&1].members.len() == 2,
+        "bob to be in the host's battle",
+    )
+    .await;
+
+    host.send(command::kick_from_battle("bob"));
+
+    wait_until(
+        || {
+            joiner
+                .received()
+                .contains(&"SERVERMSG you were kicked from this room".to_string())
+        },
+        "the kicked joiner to be told why",
+    )
+    .await;
+    // Out of the battle for everybody, and off the socket.
+    wait_until(
+        || !host.state().battles[&1].members.contains_key("bob"),
+        "the host to see bob leave the battle",
+    )
+    .await;
+    wait_until(|| joiner.phase().is_none(), "the kicked connection to end").await;
+
+    // The reconnect a kick is only worth anything against. Refused at the login,
+    // before the room has to decide anything about a battle.
+    let again = Client::connect(&registry, loopback(room.port()), "bob").await;
+    wait_until(
+        || {
+            again
+                .received()
+                .contains(&"DENIED you were kicked from this room".to_string())
+        },
+        "the returning bob to be refused by name",
+    )
+    .await;
+    wait_until(|| again.phase().is_none(), "the refused connection to end").await;
+    // The block is on the name, not on the socket it arrived on: a fresh
+    // connection under another name still gets in.
+    let renamed = Client::connect(&registry, loopback(room.port()), "bob2").await;
+    renamed.wait_for_ready().await;
+
     room.stop("done").await;
 }
 
