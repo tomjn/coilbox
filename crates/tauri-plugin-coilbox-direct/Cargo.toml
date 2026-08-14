@@ -39,3 +39,4 @@ crab_nat = "0.8.1"
 # subnet it is leaving by, and port mapping needs the gateway to speak NAT-PMP
 # to, and both are per platform work: this is one crate for the two of them.
 netdev = "0.46.0"
+mdns-sd = "0.21.0"
