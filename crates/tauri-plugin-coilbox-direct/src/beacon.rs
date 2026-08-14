@@ -154,6 +154,37 @@ pub fn decode(datagram: &[u8]) -> Option<Beacon> {
     serde_json::from_str(json).ok()
 }
 
+/// How long an mDNS record keeps a room in the list without being heard again.
+///
+/// The two announcements do not tick at the same rate and cannot share an
+/// expiry. A beacon is resent every two seconds, so silence for seven means the
+/// room is gone. A DNS-SD record is sent once and cached by everybody who heard
+/// it, and its host only re-announces when something about the room changes, so
+/// silence means nothing at all.
+///
+/// What ends an mDNS record early is the responder saying so: a room that stops
+/// sends a goodbye and leaves every list at once. This is the backstop for when
+/// no goodbye arrives, at the 120 second TTL mdns-sd puts on the SRV and address
+/// records plus slack. A host whose machine is killed rather than quit can sit in
+/// the list that long on the mDNS side, which is DNS-SD's own behaviour and not
+/// something this can shorten: joining them then fails at connect.
+pub const MDNS_EXPIRY: Duration = Duration::from_secs(150);
+
+/// Which announcement a room was heard through.
+///
+/// Both describe the same room and are keyed by the same [`Beacon::id`], so this
+/// is not an identity. It is here because when the two disagree one of them has
+/// to win, and because a host working out why nobody can see their room wants to
+/// know which half of the network is carrying it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Source {
+    /// Coilbox's own UDP beacon, this module's payload.
+    Beacon,
+    /// A DNS-SD service record. See [`crate::mdns`].
+    Mdns,
+}
+
 /// A room heard on the local network, as the frontend reads it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -168,73 +199,168 @@ pub struct LanRoom {
     /// The lobby port to dial, alongside [`LanRoom::address`].
     pub port: u16,
     pub passworded: bool,
-    /// Where the beacon came from, which is the address to dial. Taken from the
-    /// datagram rather than from the payload, so it is the address that works on
-    /// the interface it arrived on.
+    /// Where the announcement came from, which is the address to dial. Taken
+    /// from the datagram rather than from the payload, so it is the address that
+    /// works on the interface it arrived on. An mDNS record has no source
+    /// address to read, so [`crate::mdns`] picks one out of the addresses the
+    /// room published.
     pub address: String,
     /// This client's own room, heard back off the network. Worth showing as
     /// "yours" rather than hiding: a host who cannot see their own room in the
     /// list has no way to tell whether anybody else can.
     pub is_self: bool,
-    /// How long ago the last beacon arrived. A room whose beacons have stopped
-    /// climbs towards [`BEACON_EXPIRY`] and then leaves the list.
+    /// How long ago this room was last heard from, on whichever announcement
+    /// spoke most recently.
     pub last_seen_ms: u64,
+    /// The announcements carrying this room right now, beacon first.
+    ///
+    /// One entry is the ordinary case on a network where only one of the two
+    /// gets through, which is the reason for announcing twice.
+    pub sources: Vec<Source>,
 }
 
-/// The rooms heard so far, newest beacon per room.
+/// The rooms heard so far, newest announcement per room per source.
 #[derive(Default)]
 pub struct Directory {
     seen: HashMap<String, Heard>,
 }
 
-/// One room's most recent beacon.
+/// One room, as each announcement last described it.
+///
+/// Two slots rather than one, because the two announcements expire on different
+/// clocks and a room carried by only one of them is still a room. See
+/// [`MDNS_EXPIRY`].
+#[derive(Default)]
 struct Heard {
+    beacon: Option<Told>,
+    mdns: Option<Told>,
+}
+
+/// What one announcement last said about a room, and when.
+struct Told {
     beacon: Beacon,
     address: String,
     at: Instant,
 }
 
-impl Directory {
-    /// Take one beacon in.
-    ///
-    /// Keyed by the room's id rather than by its address, because a host with
-    /// two interfaces announces on both and the two datagrams are one room. The
-    /// last address heard wins, which is the interface that most recently proved
-    /// it can reach us.
-    pub fn record(&mut self, beacon: Beacon, address: String, at: Instant) {
-        self.seen.insert(
-            beacon.id.clone(),
-            Heard {
-                beacon,
-                address,
-                at,
-            },
-        );
+impl Heard {
+    /// Drop whichever announcements have gone quiet for longer than their own
+    /// expiry allows.
+    fn expire(&mut self, now: Instant) {
+        if let Some(told) = &self.beacon {
+            if now.saturating_duration_since(told.at) >= BEACON_EXPIRY {
+                self.beacon = None;
+            }
+        }
+        if let Some(told) = &self.mdns {
+            if now.saturating_duration_since(told.at) >= MDNS_EXPIRY {
+                self.mdns = None;
+            }
+        }
     }
 
-    /// The rooms still alive at `now`, dropping the ones whose beacons stopped.
+    /// The announcement whose facts this room is described by.
+    ///
+    /// The beacon, whenever there is a live one. Not because it is ours, but
+    /// because its age is bounded: it is resent every two seconds with whatever
+    /// the room holds at that moment, so a live beacon is at most two seconds
+    /// out of date. A DNS-SD record is sent once and served from everybody's
+    /// cache afterwards, so the moment it reaches us says nothing about how old
+    /// the player count in it is. A stale TXT record therefore never overwrites
+    /// a fresh beacon, whichever arrived last.
+    fn best(&self) -> Option<&Told> {
+        self.beacon.as_ref().or(self.mdns.as_ref())
+    }
+
+    fn sources(&self) -> Vec<Source> {
+        let mut sources = Vec::new();
+        if self.beacon.is_some() {
+            sources.push(Source::Beacon);
+        }
+        if self.mdns.is_some() {
+            sources.push(Source::Mdns);
+        }
+        sources
+    }
+}
+
+impl Directory {
+    /// Take one announcement in.
+    ///
+    /// Keyed by the room's id rather than by its address, because a host with
+    /// two interfaces announces on both, and announces over both mDNS and the
+    /// beacon, and all of that is one room. The id is what makes it one: it
+    /// names a run of a room, it is minted once when the room starts, and both
+    /// announcements carry the same one. Nothing else would do. An address is
+    /// per interface, a title is not unique, and the DNS-SD instance name gets
+    /// renamed under a host who shares a title with somebody else.
+    ///
+    /// The last address heard on a given source wins, which is the interface
+    /// that most recently proved it can reach us.
+    pub fn record(&mut self, source: Source, beacon: Beacon, address: String, at: Instant) {
+        let heard = self.seen.entry(beacon.id.clone()).or_default();
+        let told = Some(Told {
+            beacon,
+            address,
+            at,
+        });
+        match source {
+            Source::Beacon => heard.beacon = told,
+            Source::Mdns => heard.mdns = told,
+        }
+    }
+
+    /// Drop one source's record of a room, because that source says it is gone.
+    ///
+    /// This is what a DNS-SD goodbye means, and it is the only thing that takes
+    /// an mDNS record out of the list promptly. A room still carried by the
+    /// beacon stays listed.
+    pub fn forget(&mut self, source: Source, id: &str) {
+        let Some(heard) = self.seen.get_mut(id) else {
+            return;
+        };
+        match source {
+            Source::Beacon => heard.beacon = None,
+            Source::Mdns => heard.mdns = None,
+        }
+    }
+
+    /// The rooms still alive at `now`, dropping the ones both announcements have
+    /// gone quiet on.
     ///
     /// Sorted by title so a list on screen does not reshuffle itself every time
-    /// a beacon lands.
+    /// an announcement lands.
     pub fn list(&mut self, now: Instant, own_id: Option<&str>) -> Vec<LanRoom> {
-        self.seen
-            .retain(|_, heard| now.saturating_duration_since(heard.at) < BEACON_EXPIRY);
+        self.seen.retain(|_, heard| {
+            heard.expire(now);
+            heard.best().is_some()
+        });
         let mut rooms: Vec<LanRoom> = self
             .seen
             .values()
-            .map(|heard| LanRoom {
-                id: heard.beacon.id.clone(),
-                title: heard.beacon.title.clone(),
-                host: heard.beacon.host.clone(),
-                game: heard.beacon.game.clone(),
-                map: heard.beacon.map.clone(),
-                players: heard.beacon.players,
-                max_players: heard.beacon.max_players,
-                port: heard.beacon.port,
-                passworded: heard.beacon.passworded,
-                address: heard.address.clone(),
-                is_self: own_id == Some(heard.beacon.id.as_str()),
-                last_seen_ms: now.saturating_duration_since(heard.at).as_millis() as u64,
+            .filter_map(|heard| {
+                let told = heard.best()?;
+                let freshest = [heard.beacon.as_ref(), heard.mdns.as_ref()]
+                    .into_iter()
+                    .flatten()
+                    .map(|told| told.at)
+                    .max()
+                    .unwrap_or(told.at);
+                Some(LanRoom {
+                    id: told.beacon.id.clone(),
+                    title: told.beacon.title.clone(),
+                    host: told.beacon.host.clone(),
+                    game: told.beacon.game.clone(),
+                    map: told.beacon.map.clone(),
+                    players: told.beacon.players,
+                    max_players: told.beacon.max_players,
+                    port: told.beacon.port,
+                    passworded: told.beacon.passworded,
+                    address: told.address.clone(),
+                    is_self: own_id == Some(told.beacon.id.as_str()),
+                    last_seen_ms: now.saturating_duration_since(freshest).as_millis() as u64,
+                    sources: heard.sources(),
+                })
             })
             .collect();
         rooms.sort_by(|a, b| a.title.cmp(&b.title).then_with(|| a.id.cmp(&b.id)));
@@ -329,7 +455,7 @@ mod tests {
     fn a_room_stops_being_listed_once_its_beacons_stop() {
         let mut dir = Directory::default();
         let start = Instant::now();
-        dir.record(beacon(), "192.168.0.5".to_string(), start);
+        dir.record(Source::Beacon, beacon(), "192.168.0.5".to_string(), start);
 
         // Two beacons missed, and the room is still there: multicast drops
         // datagrams and a room that flickered would be unjoinable.
@@ -337,6 +463,7 @@ mod tests {
         assert_eq!(alive.len(), 1);
         assert_eq!(alive[0].address, "192.168.0.5");
         assert_eq!(alive[0].last_seen_ms, 5000);
+        assert_eq!(alive[0].sources, vec![Source::Beacon]);
 
         assert!(dir.list(start + BEACON_EXPIRY, None).is_empty());
     }
@@ -345,8 +472,9 @@ mod tests {
     fn a_fresh_beacon_keeps_a_room_alive() {
         let mut dir = Directory::default();
         let start = Instant::now();
-        dir.record(beacon(), "192.168.0.5".to_string(), start);
+        dir.record(Source::Beacon, beacon(), "192.168.0.5".to_string(), start);
         dir.record(
+            Source::Beacon,
             beacon(),
             "192.168.0.5".to_string(),
             start + Duration::from_secs(6),
@@ -360,8 +488,8 @@ mod tests {
     fn one_room_on_two_interfaces_is_one_entry() {
         let mut dir = Directory::default();
         let now = Instant::now();
-        dir.record(beacon(), "192.168.0.5".to_string(), now);
-        dir.record(beacon(), "10.8.0.2".to_string(), now);
+        dir.record(Source::Beacon, beacon(), "192.168.0.5".to_string(), now);
+        dir.record(Source::Beacon, beacon(), "10.8.0.2".to_string(), now);
         let rooms = dir.list(now, None);
         assert_eq!(rooms.len(), 1);
         assert_eq!(rooms[0].address, "10.8.0.2");
@@ -371,16 +499,108 @@ mod tests {
     fn a_host_can_tell_its_own_room_from_everybody_elses() {
         let mut dir = Directory::default();
         let now = Instant::now();
-        dir.record(beacon(), "192.168.0.5".to_string(), now);
+        dir.record(Source::Beacon, beacon(), "192.168.0.5".to_string(), now);
         let mut theirs = beacon();
         theirs.id = "somebody-else".to_string();
         theirs.title = "Another room".to_string();
-        dir.record(theirs, "192.168.0.9".to_string(), now);
+        dir.record(Source::Beacon, theirs, "192.168.0.9".to_string(), now);
 
         let rooms = dir.list(now, Some("abc123"));
         assert_eq!(rooms.len(), 2);
         // Sorted by title: "Another room" before "Tom's room".
         assert!(!rooms[0].is_self);
         assert!(rooms[1].is_self);
+    }
+
+    /// The whole point of announcing twice. One room, heard both ways, is one
+    /// line on screen, because the room id is the same on both.
+    #[test]
+    fn a_room_heard_both_ways_is_listed_once() {
+        let mut dir = Directory::default();
+        let now = Instant::now();
+        dir.record(Source::Beacon, beacon(), "192.168.0.5".to_string(), now);
+        dir.record(Source::Mdns, beacon(), "192.168.0.5".to_string(), now);
+        let rooms = dir.list(now, None);
+        assert_eq!(rooms.len(), 1);
+        assert_eq!(rooms[0].sources, vec![Source::Beacon, Source::Mdns]);
+    }
+
+    /// A cached TXT record can arrive later than a beacon and still be older
+    /// than it, because a responder serves it from cache long after its host
+    /// last said anything. So the beacon's facts win while it is live, whichever
+    /// order the two arrived in.
+    #[test]
+    fn a_stale_mdns_record_does_not_overwrite_a_fresh_beacon() {
+        let mut dir = Directory::default();
+        let start = Instant::now();
+        dir.record(Source::Beacon, beacon(), "192.168.0.5".to_string(), start);
+
+        let mut cached = beacon();
+        cached.players = 1;
+        cached.map = "A map they left an hour ago".to_string();
+        dir.record(
+            Source::Mdns,
+            cached,
+            "192.168.0.5".to_string(),
+            start + Duration::from_secs(1),
+        );
+
+        let rooms = dir.list(start + Duration::from_secs(1), None);
+        assert_eq!(rooms.len(), 1);
+        assert_eq!(rooms[0].players, 2);
+        assert_eq!(rooms[0].map, "Red Comet Remake 1.8");
+        // Freshness is the freshest of the two, so a room the beacon has gone
+        // quiet on but mDNS has not does not read as stale.
+        assert_eq!(rooms[0].last_seen_ms, 0);
+    }
+
+    /// A network that drops the beacon and carries mDNS is exactly why there are
+    /// two announcements, so the room stays listed on the one that works, and it
+    /// is described by that one.
+    #[test]
+    fn a_room_only_mdns_carries_is_still_listed() {
+        let mut dir = Directory::default();
+        let start = Instant::now();
+        let mut only = beacon();
+        only.players = 5;
+        dir.record(Source::Mdns, only, "192.168.0.5".to_string(), start);
+
+        let rooms = dir.list(start + Duration::from_secs(30), None);
+        assert_eq!(rooms.len(), 1);
+        assert_eq!(rooms[0].players, 5);
+        assert_eq!(rooms[0].sources, vec![Source::Mdns]);
+
+        // The two announcements do not share an expiry: seven seconds of
+        // silence means nothing to a record that is only re-sent when it
+        // changes.
+        assert!(dir.list(start + MDNS_EXPIRY, None).is_empty());
+    }
+
+    /// A goodbye packet is what makes a room leave the list at once rather than
+    /// sitting out the TTL. The beacon, if it is still arriving, keeps the room.
+    #[test]
+    fn a_goodbye_drops_only_the_announcement_that_sent_it() {
+        let mut dir = Directory::default();
+        let now = Instant::now();
+        dir.record(Source::Beacon, beacon(), "192.168.0.5".to_string(), now);
+        dir.record(Source::Mdns, beacon(), "192.168.0.5".to_string(), now);
+
+        dir.forget(Source::Mdns, "abc123");
+        let rooms = dir.list(now, None);
+        assert_eq!(rooms.len(), 1);
+        assert_eq!(rooms[0].sources, vec![Source::Beacon]);
+
+        dir.forget(Source::Beacon, "abc123");
+        assert!(dir.list(now, None).is_empty());
+    }
+
+    /// An mDNS record with no beacon behind it still has to be dialable, and the
+    /// address it carries is the one it was resolved to.
+    #[test]
+    fn an_mdns_only_room_is_dialled_at_the_address_it_resolved_to() {
+        let mut dir = Directory::default();
+        let now = Instant::now();
+        dir.record(Source::Mdns, beacon(), "10.0.0.7".to_string(), now);
+        assert_eq!(dir.list(now, None)[0].address, "10.0.0.7");
     }
 }

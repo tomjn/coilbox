@@ -1,5 +1,6 @@
 //! Discovery over real sockets: a beacon on the wire, two listeners on one
-//! machine hearing it, and a room leaving the list when its beacons stop.
+//! machine hearing it, a room announced over mDNS as well and still listed once,
+//! and a room leaving the list when its beacons stop.
 //!
 //! The two listeners are the point. One process hearing its own datagram proves
 //! almost nothing, because address reuse and multicast loopback are exactly what
@@ -21,7 +22,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
 use tauri_plugin_coilbox_direct::beacon::{
-    encode, room_id, Beacon, LanRoom, BEACON_EXPIRY, BEACON_INTERVAL,
+    encode, room_id, Beacon, LanRoom, Source, BEACON_EXPIRY, BEACON_INTERVAL,
 };
 use tauri_plugin_coilbox_direct::discovery::{announce_once, Discovery};
 use tauri_plugin_coilbox_direct::room::{Room, RoomOptions};
@@ -277,6 +278,90 @@ async fn a_room_with_a_battle_in_it_announces_what_it_holds() {
     // And the host can pick their own room out of the list.
     let ours = find(&listening.rooms(Some(room.beacon_id())), room.beacon_id()).expect("ours");
     assert!(ours.is_self);
+
+    room.stop("done").await;
+    listening.stop();
+}
+
+/// The second announcement, end to end and merged: a real room advertised as a
+/// DNS-SD service, resolved by a real mDNS browse, and listed once.
+///
+/// The room is announced both ways at once, so the thing being proved is that
+/// the two arrive as one entry rather than two, and that the mDNS half is
+/// genuinely carrying it. `sources` is what shows both, and it is the only way to
+/// tell from outside which half of the network worked.
+///
+/// Slower than the beacon tests by design. A beacon is pushed every two seconds
+/// and a DNS-SD service has to be asked for: a browse query goes out, the
+/// responder answers with the PTR, and the SRV, TXT and address records follow.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_room_announced_both_ways_is_heard_both_ways_and_listed_once() {
+    let listening = Discovery::start().expect("the beacon port binds");
+    let room = Room::start(RoomOptions {
+        host: "alice".to_string(),
+        ip: "127.0.0.1".to_string(),
+        port: 0,
+        approve_joins: false,
+        advertise: true,
+    })
+    .await
+    .expect("a free port");
+
+    let title = named("both-ways");
+    let stream = TcpStream::connect(("127.0.0.1", room.port()))
+        .await
+        .expect("the room is listening");
+    let (_read, mut write) = stream.into_split();
+    for line in [
+        "LOGIN alice aGFzaA== 0 127.0.0.1 Coilbox 0.1\t1\tu sp".to_string(),
+        command::open_battle(
+            0,
+            0,
+            "",
+            8452,
+            16,
+            -1,
+            0,
+            -1,
+            "spring",
+            "105.1.1",
+            "Red Comet Remake 1.8",
+            &title,
+            "Beyond All Reason test-1234",
+        ),
+    ] {
+        write
+            .write_all(format!("{line}\n").as_bytes())
+            .await
+            .expect("the room is still there");
+    }
+
+    let both = until(Duration::from_secs(30), || {
+        find(&listening.rooms(None), room.beacon_id())
+            .is_some_and(|heard| heard.sources.contains(&Source::Mdns))
+    })
+    .await;
+    assert!(both, "the room was never resolved over mDNS");
+
+    let heard = find(&listening.rooms(None), room.beacon_id()).expect("the room");
+    assert_eq!(
+        heard.sources,
+        vec![Source::Beacon, Source::Mdns],
+        "a room announced both ways has to be carried by both"
+    );
+    // One entry, not two. The room id in the TXT record is what ties the DNS-SD
+    // service to the beacon, and without it this would be the same room twice.
+    let listed = listening.rooms(None);
+    assert_eq!(
+        listed.iter().filter(|r| r.id == room.beacon_id()).count(),
+        1,
+        "the same room was listed twice"
+    );
+    // And the facts are the room's, whichever announcement carried them.
+    assert_eq!(heard.title, title);
+    assert_eq!(heard.map, "Red Comet Remake 1.8");
+    assert_eq!(heard.port, room.port());
+    assert!(!heard.address.is_empty());
 
     room.stop("done").await;
     listening.stop();
