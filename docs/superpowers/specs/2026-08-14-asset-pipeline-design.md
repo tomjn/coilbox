@@ -1411,3 +1411,154 @@ coilbox's hub client speaks `/api/v1` and nothing else, at `/api/v1/auth`,
 `/api/v1/items` and `/api/v1/items/{id}/imported`, and reads a `format` and
 `version` envelope off every response. Asset routes join it rather than
 starting a second prefix a released desktop build does not know about.
+
+---
+
+## 14. The agreed vocabulary
+
+The strings and numbers both repos have to spell the same way, settled in
+tomjn/coilbox#1622. Section 13 wins over anything earlier that disagrees, and
+this section wins over section 13, which it only extends rather than revises.
+
+Every value here is a hard failure rather than a cosmetic drift. The hub reads
+the pixel dimensions off the bytes rather than trusting what a client declares,
+and it refuses a variant it does not recognise, so a name spelled differently
+in the two repos shows up as a rejected upload on somebody's machine rather
+than as a compile error.
+
+### 14.1 Where the list lives
+
+`shared/asset-vocabulary.json` in coilbox is the machine readable half, and it
+is one document rather than two. `crates/coilbox-assets` embeds it with
+`include_str!` and parses it with serde, and `src/hub/assets/vocabulary.ts`
+imports it directly, so the encoder in the unitsync worker, the upload client
+in the hub plugin and the renderer in the webview cannot disagree with each
+other. Both sides embed it at build time, so the two test files are what stand
+between a bad edit and a shipped build.
+
+That solves drift inside coilbox and not across the two repos. The hub keeps
+its own copy in `lib/assets/asset.ts` and `lib/assets/caps.ts`, and nothing
+makes the two agree. Serving the vocabulary off the `/api/v1/auth` discovery
+document would let an old client find out it is behind rather than discover it
+one refusal at a time, and that is a hub change: coilbox-hub#165.
+
+### 14.2 The variant names
+
+| Key | Variants |
+|---|---|
+| `(game, unit_name, variant)` | `buildpic`, `render:<angle>` |
+| `(map_name, variant)` | `minimap`, `overlay:metal`, `overlay:type`, `overlay:height` |
+
+The map list is closed and the unit list is not, because an angle is open ended
+and a map layer is not. A typo in a map variant mints an identity nothing ever
+asks for, so the hub holds that list as a check constraint.
+
+### 14.3 The angle names
+
+`top`, and only `top`. The full variant is `render:top`.
+
+It exists for the blueprint preview and nothing else asks for another. Renders
+are the only class in the corpus that scales without a natural bound, so an
+angle added on spec is a real cost rather than a spare column. A second angle
+arrives with the use case that wants it.
+
+### 14.4 The `encode_profile` names
+
+The field's job is telling last year's output from this year's, so the name
+carries the codec, the quality and the size cap and nothing else.
+
+| Class | `encode_profile` |
+|---|---|
+| `buildpic` | `webp-lossless-256` |
+| `render:<angle>` | `webp-q80-256` |
+| `minimap` | `webp-q80-512` |
+| `overlay:metal` | `webp-lossless-source` |
+| `overlay:type` | `webp-lossless-source` |
+| `overlay:height` | `png16-lossless-source` |
+
+`source` in the cap position means the class has no pixel cap and keeps
+whatever resolution it was extracted at.
+
+**The mapping is class to profile, and it is not one to one.** `overlay:metal`
+and `overlay:type` share a name because they share an encoding exactly, and the
+row already carries the variant, so nothing is ambiguous. That is the point of
+naming the settings rather than the class: a re-encode pass targets the
+settings that changed, and a class whose settings did not change is not swept
+up in it.
+
+The name changes when a setting changes, so q80 becoming q85 makes
+`webp-q80-512` into `webp-q85-512`. It does **not** change when libwebp
+produces different bytes from the same settings. That case is already handled,
+because the have check compares `source_hash` and never the encoded hash.
+
+Quality is exactly 80 rather than about 80. The name pins it.
+
+### 14.5 The per class dimension caps
+
+The hub's own list, at `lib/assets/caps.ts`. Coilbox holds the same numbers so
+it can encode to them rather than discover them from a 413.
+
+| Class | Type | Max edge | Square | Lossless | Bit depth | Grayscale |
+|---|---|---|---|---|---|---|
+| `buildpic` | `image/webp` | 256px | yes | yes | any | no |
+| `render:<angle>` | `image/webp` | 256px | no | no | any | no |
+| `minimap` | `image/webp` | 512px | no | no | any | no |
+| `overlay:metal` | `image/webp` | as source | no | yes | any | no |
+| `overlay:type` | `image/webp` | as source | no | yes | any | no |
+| `overlay:height` | `image/png` | as source | no | yes | 16 | yes |
+
+Bytes are capped too, and the number is derived rather than picked: the
+uncompressed size of the largest image the edge cap permits, four bytes a
+pixel. So 262,144 bytes for a unit image and 1,048,576 for a minimap. No
+encoding of a picture the class allows can reach it, and anything that does is
+carrying something other than the picture, which is how a 256px build pic
+arrives as two megabytes of metadata chunks.
+
+The overlays have no edge cap to derive one from. `overlay:metal` and
+`overlay:type` fall through to a 2 MB backstop. `overlay:height` gets a number
+per upload out of the map's own size, two bytes for each of
+`floor(elmos / 8) + 1` samples on each edge, which is coilbox-hub#142.
+
+### 14.6 The render framing rule
+
+**The one thing the hub cannot check, because it does not hold footprints.**
+Being wrong here is caught nowhere downstream. Implemented at `renderFrame` in
+`src/hub/assets/vocabulary.ts`, for tomjn/coilbox#1631.
+
+**The footprint sets the aspect.** A 3 by 2 building renders 3 by 2 and never
+square. A build pic is a three quarter icon at a fixed size and does not tile
+into a base layout, which is the whole reason a render exists.
+
+**The frame carries a bleed of one whole build square on each side.** Models
+overhang their footprints, so a frame taken exactly on the footprint clips
+them, and a clipped radar dish reads as broken where a centred one does not.
+The bleed is a whole square rather than a fraction so the consumer can add it
+back exactly: it knows the footprint, so the footprint is the central
+`footprintX` by `footprintZ` squares of a `footprintX + 2` by `footprintZ + 2`
+frame, inset by one square on every side.
+
+`footprintX` and `footprintZ` are the unitdef's `footprintx` and `footprintz`
+in build squares, as `--unit-dataset` reports them, and the engine floors both
+at 1. A build square is 16 elmos, two of the engine's `SQUARE_SIZE`, the same
+conversion `src/lego/unitDef.ts` uses.
+
+So for a footprint of `fx` by `fz`:
+
+```
+squaresX        = fx + 2
+squaresZ        = fz + 2
+camera extent   = squaresX * 16 by squaresZ * 16 elmos, orthographic,
+                  centred on the footprint's centre
+pixelsPerSquare = max(1, floor(256 / max(squaresX, squaresZ)))
+image           = squaresX * pixelsPerSquare by squaresZ * pixelsPerSquare
+```
+
+Pixels come out as a whole number per square so the encoded aspect is exactly
+the framed aspect rather than a rounding of it, and the longest edge lands at
+or under the 256px cap without a separate check.
+
+**Orientation, which is easier to rediscover wrongly than to look up.** The
+model's `+z` is the front and its `+x` is the unit's left. Looking down on it,
+the front is the top of the image and the unit's left is the left of the image,
+so the image's rightwards axis is world `-x` and its downwards axis is world
+`-z`.
