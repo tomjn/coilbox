@@ -25,6 +25,7 @@ import { BattlePresetsDrawer } from "../battle/BattlePresetsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
 import { battleOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
+import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import { matchStartAction } from "../battle/matchStart";
@@ -64,7 +65,27 @@ function BattleRoomPage() {
   // The game's AI catalogue, for the AI picker's difficulty pips.
   const brandingAi = useBrandingEntry(room.localGame)?.ai;
   const aiConfig = mergeGameAi(getProfile().ai, brandingAi);
-  const launch = useBattleLaunch(room.serverKey, room.target, room.selfHost);
+  // Why this install cannot play this battle, named, from the moment we walk in.
+  // A joiner who only finds out at match start has already given the room ten
+  // minutes, and a direct room has no server to fetch the content from and no
+  // hashes in the LAN beacon to warn before the join (issue #1572). The battle
+  // itself carries the map and game names, so the room can say it straight away.
+  const block = launchBlock({
+    hasTarget: !!room.target,
+    targetLoading: room.targetLoading,
+    contentKnown: room.contentKnown,
+    mapMissing: room.mapMissing,
+    gameMissing: room.gameMissing,
+    mapName: room.battle?.map ?? "",
+    gameName: room.battle?.modname ?? "",
+  });
+  const blockReason = block?.reason ?? null;
+  const launch = useBattleLaunch(
+    room.serverKey,
+    room.target,
+    room.selfHost,
+    blockReason,
+  );
   // People waiting to be let into a room we are hosting ourselves, with approval
   // switched on. Asked for only when this connection is that room over loopback,
   // so a battle on a real server never polls a plugin holding no room at all.
@@ -273,7 +294,7 @@ function BattleRoomPage() {
   // if the answer waits on a download.
   const startedRef = useRef(room.battleStartSeq);
   const startNoticeRef = useRef(room.battleStartSeq);
-  const { battleStartSeq, contentKnown } = room;
+  const { battleStartSeq } = room;
   useEffect(() => {
     const action = matchStartAction({
       seq: battleStartSeq,
@@ -288,11 +309,11 @@ function BattleRoomPage() {
     if (action === "wait") {
       // Say so once. A room that sits still while its match runs without us
       // needs explaining, and the missing-content cards below say what to get.
-      if (contentKnown && startNoticeRef.current !== battleStartSeq) {
+      if (blockReason && startNoticeRef.current !== battleStartSeq) {
         startNoticeRef.current = battleStartSeq;
         void notify({
           title: "The match has started",
-          body: "Coilbox will join as soon as the map, game and engine it needs are ready.",
+          body: `${blockReason} Coilbox will join as soon as it is there.`,
           level: "error",
         });
       }
@@ -301,7 +322,7 @@ function BattleRoomPage() {
     startedRef.current = battleStartSeq;
     setLaunchSettled(false);
     doLaunch().finally(() => setLaunchSettled(true));
-  }, [battleStartSeq, contentKnown, canRun, doLaunch]);
+  }, [battleStartSeq, blockReason, canRun, doLaunch]);
 
   // Never automatic: an engine that exited may have exited on purpose, so
   // getting back in has to be a deliberate click.
@@ -369,6 +390,8 @@ function BattleRoomPage() {
         battle={battle}
         myStatus={room.myStatus}
         sync={room.sync}
+        blockShort={block?.short ?? null}
+        blockReason={blockReason}
         hostIngame={room.hostIngame}
         allReady={room.allReady}
         onToggleReady={room.setReady}
@@ -415,10 +438,15 @@ function BattleRoomPage() {
           </Button>
         </div>
       )}
-      {room.hostIngame && !canRun && (
+      {/* Named the moment we know, not at launch. Once the host is in-game the
+          same fact is reworded, because by then the match is running without us
+          and sitting still needs explaining. Our own in-game flag is not that,
+          so a self-hosted room never says it. */}
+      {block && (
         <p className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
-          The match has started, but the map or game isn't installed — install
-          it to join.
+          {room.hostIngame && !room.selfHost
+            ? startedWithoutYou(block)
+            : block.reason}
         </p>
       )}
 

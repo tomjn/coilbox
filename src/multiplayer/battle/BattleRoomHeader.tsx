@@ -30,6 +30,8 @@ export function BattleRoomHeader({
   battle,
   myStatus,
   sync,
+  blockShort,
+  blockReason,
   hostIngame,
   allReady,
   onToggleReady,
@@ -44,6 +46,10 @@ export function BattleRoomHeader({
   battle: Battle;
   myStatus: MemberStatus | undefined;
   sync: SyncState;
+  /** What the local install is missing, in a few words, for the sync pill. */
+  blockShort: string | null;
+  /** The same thing said in full, for the disabled Start button's tooltip. */
+  blockReason: string | null;
   hostIngame: boolean;
   allReady: boolean;
   onToggleReady: (ready: boolean) => void;
@@ -67,7 +73,13 @@ export function BattleRoomHeader({
         <h1 className="break-words text-lg font-semibold">
           {battle.title || `Battle ${battle.id}`}
         </h1>
-        <SyncStatusPill state={sync} />
+        {/* "Out of sync" on its own leaves the player hunting. Name the thing,
+            but never on a green pill, where the label collapses into a tooltip
+            and would read as a problem on a room that has none. */}
+        <SyncStatusPill
+          state={sync}
+          detail={sync === "synced" ? undefined : (blockShort ?? undefined)}
+        />
         {serverKey && (
           <Button
             variant="ghost"
@@ -173,13 +185,15 @@ export function BattleRoomHeader({
           )}
           <Button
             onClick={onStart}
-            disabled={hostIngame || !allReady}
+            disabled={hostIngame || !allReady || !!blockReason}
             title={
-              hostIngame
-                ? "The match is already running"
-                : allReady
-                  ? "Ask the autohost to start the match"
-                  : "All players must be ready first"
+              blockReason
+                ? blockReason
+                : hostIngame
+                  ? "The match is already running"
+                  : allReady
+                    ? "Ask the autohost to start the match"
+                    : "All players must be ready first"
             }
           >
             <Play className="size-4 fill-current" />
