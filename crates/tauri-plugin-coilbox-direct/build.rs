@@ -9,6 +9,9 @@ const COMMANDS: &[&str] = &[
     "direct_answer_join",
     "direct_lan_rooms",
     "direct_stop_discovery",
+    "direct_open_ports",
+    "direct_close_ports",
+    "direct_port_status",
 ];
 
 fn main() {

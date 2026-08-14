@@ -1,7 +1,13 @@
 import { Button, useDrawer } from "@picoframe/frame";
+import { useEffect, useState } from "react";
 import { nextDrawerKey } from "@/general/drawerKey";
 import type { DirectRoomStatus } from "./bindings";
 import { HostRoomForm, type StartRoomArgs } from "./HostRoomForm";
+import {
+  type DirectReachability,
+  directPortStatus,
+  joinAddress,
+} from "./reachability";
 import { roomSummary } from "./room";
 
 export type { StartRoomArgs } from "./HostRoomForm";
@@ -86,12 +92,48 @@ function RunningRoom({
           Stop room
         </Button>
       </div>
+      <PublicAddress />
       {error && (
         <p role="alert" className="text-xs text-destructive">
           {error}
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The address to send somebody outside this network, while there is one.
+ *
+ * Read once on mount rather than polled: ports do not open and close by
+ * themselves, and this component only exists while a room is up. It is here
+ * because starting a room takes the host straight to their battle room, so the
+ * drawer that showed them the address is long gone by the time they want to read
+ * it out to a friend.
+ *
+ * Renders nothing at all when no ports are open, which is every room on a LAN.
+ */
+function PublicAddress() {
+  const [report, setReport] = useState<DirectReachability | null>(null);
+  useEffect(() => {
+    let live = true;
+    directPortStatus({})
+      .then((r) => {
+        if (live) setReport(r.reachability);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const address = report && joinAddress(report);
+  if (!address) return null;
+  return (
+    <span className="text-xs text-muted-foreground">
+      Reachable from outside at{" "}
+      <code className="select-all font-mono text-foreground">{address}</code>
+    </span>
   );
 }
 

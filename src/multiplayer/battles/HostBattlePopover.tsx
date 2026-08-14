@@ -8,6 +8,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import { ReachablePorts } from "../../direct/ReachablePorts";
+import { battlePorts } from "../../direct/reachability";
 import type { mpOpenBattle } from "../bindings";
 import { hostBattleFailure } from "./hostBattle";
 import { hashFailureMessage, useHostContent } from "./useHostContent";
@@ -26,10 +28,13 @@ export const DEFAULT_HOST_PORT = 8452;
  * game, map, title, size and (optional) password, then firing OPENBATTLE via the
  * parent's `onHost`. The engine is the preferred one (no picker), and the mod/map
  * hashes come from unitsync so joining clients can sync. The battle opens as a
- * plain natType 0 one that needs `port` reachable (public IP, LAN, or a manual
- * port-forward), which is the only mode coilbox implements. "Hole punching"
- * opts into advertising natType 1 instead, for a host who knows their joiners
- * bring their own traversal.
+ * plain natType 0 one that needs `port` reachable, which is the only mode
+ * coilbox implements. "Hole punching" opts into advertising natType 1 instead,
+ * for a host who knows their joiners bring their own traversal.
+ *
+ * Making `port` reachable used to be entirely the host's problem and this said
+ * so. {@link ReachablePorts} now offers to ask their router, and says what to do
+ * by hand when it refuses, which on most home routers it will.
  */
 export function HostBattlePopover({
   disabled,
@@ -230,6 +235,11 @@ export function HostBattlePopover({
                 />
               </label>
 
+              <ReachablePorts
+                ports={battlePorts(port)}
+                help={`Asks your router to forward UDP ${port}, which is the port the engine hosts the game on. One port, because the lobby is somebody else's server and coilbox listens on nothing.`}
+              />
+
               {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association) */}
               <label className="flex items-start gap-2 text-sm">
                 <Checkbox
@@ -243,8 +253,8 @@ export function HostBattlePopover({
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {holePunch
-                      ? `Tells joiners they need help getting through your router. Coilbox does not do that work yet, so forwarding port ${port} is still what makes joins succeed.`
-                      : `Players connect straight to port ${port}. Forward it on your router or others cannot join.`}
+                      ? `Tells joiners they need help getting through your router. Coilbox does not do that work, so port ${port} being open is still what makes joins succeed.`
+                      : `Players connect straight to port ${port}. It has to be open on your router or others cannot join.`}
                   </span>
                 </span>
               </label>

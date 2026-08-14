@@ -16,6 +16,8 @@
 //! - [`room`] owns the listener, the sockets and the disconnects.
 //! - [`beacon`] is what a room says about itself on the local network.
 //! - [`discovery`] carries that, and hears everybody else's.
+//! - [`portmap`] asks the router to open ports, and [`stun`] asks the internet
+//!   whether it worked. [`reachability`] is the two of them together.
 //! - This file is the IPC surface over one running room.
 
 use std::sync::Arc;
@@ -30,10 +32,15 @@ use tokio::sync::Mutex;
 
 pub mod beacon;
 pub mod discovery;
+pub mod portmap;
+pub mod reachability;
 pub mod room;
+pub mod stun;
 
 pub use beacon::{Beacon, LanRoom};
 pub use discovery::Discovery;
+pub use portmap::{PortRequest, Transport};
+pub use reachability::{Ports, Reachability};
 pub use room::{Room, RoomOptions, RoomStatus, DEFAULT_LOBBY_PORT};
 
 /// The reason a stopped room gives its joiners when the host did not name one.
@@ -53,6 +60,16 @@ pub struct ActiveRoom(Arc<Mutex<Option<Room>>>);
 /// while hosting, and somebody looking for a room to join is not hosting at all.
 #[derive(Default)]
 pub struct ActiveDiscovery(Arc<Mutex<Option<Discovery>>>);
+
+/// The ports this client has open on somebody's router, if it has any.
+///
+/// One set at a time, like the room: a second set would be a second host on one
+/// machine, and there is one room and one engine either way. Separate from
+/// [`ActiveRoom`] because the two lifetimes are not the same. A host ticks the
+/// box before pressing Start, and the self-hosted battle path opens a port with
+/// no room behind it at all.
+#[derive(Default)]
+pub struct ActivePorts(Arc<Mutex<Option<Ports>>>);
 
 /// `direct_start_room`: bind the lobby port and start hosting.
 ///
@@ -214,12 +231,60 @@ async fn direct_stop_discovery(discovery: State<'_, ActiveDiscovery>) -> Result<
     Ok(CliResult::ok(json!({ "stopped": stopped })))
 }
 
+/// `direct_open_ports`: ask the router to open every port given, then look from
+/// outside to see whether it made any difference.
+///
+/// Replaces whatever was open before, so a host who changes the port they are
+/// hosting on does not leave the old one behind. Never fails: a router that
+/// refuses is an outcome the host reads and acts on, and the report carries the
+/// port numbers the manual forwarding instructions need.
+#[tauri::command]
+async fn direct_open_ports(
+    active: State<'_, ActivePorts>,
+    ports: Vec<PortRequest>,
+) -> Result<CliResult, ()> {
+    let mut slot = active.0.lock().await;
+    if let Some(previous) = slot.take() {
+        previous.release().await;
+    }
+    let (report, held) = reachability::open(ports).await;
+    *slot = held;
+    Ok(CliResult::ok(json!({ "reachability": report })))
+}
+
+/// `direct_close_ports`: hand the ports back to the router.
+///
+/// Called when a host unticks the box and when a room stops. A mapping left on
+/// somebody's router after the thing that wanted it has gone is rude, and the
+/// lease that limits the damage when this never runs is an hour long.
+#[tauri::command]
+async fn direct_close_ports(active: State<'_, ActivePorts>) -> Result<CliResult, ()> {
+    let held = active.0.lock().await.take();
+    let closed = held.is_some();
+    if let Some(held) = held {
+        held.release().await;
+    }
+    Ok(CliResult::ok(json!({ "closed": closed })))
+}
+
+/// `direct_port_status`: what is open right now, or `null`.
+///
+/// So a host who has walked away from the page that opened the ports and come
+/// back still has their address to read out.
+#[tauri::command]
+async fn direct_port_status(active: State<'_, ActivePorts>) -> Result<CliResult, ()> {
+    let slot = active.0.lock().await;
+    let report = slot.as_ref().map(|held| held.report.clone());
+    Ok(CliResult::ok(json!({ "reachability": report })))
+}
+
 /// Build the plugin. Registered as `"coilbox-direct"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-direct")
         .setup(|app, _api| {
             tauri::Manager::manage(app, ActiveRoom::default());
             tauri::Manager::manage(app, ActiveDiscovery::default());
+            tauri::Manager::manage(app, ActivePorts::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -228,7 +293,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             direct_room_status,
             direct_answer_join,
             direct_lan_rooms,
-            direct_stop_discovery
+            direct_stop_discovery,
+            direct_open_ports,
+            direct_close_ports,
+            direct_port_status
         ])
         .build()
 }

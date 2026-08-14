@@ -28,3 +28,9 @@ tokio = { version = "1", features = ["net", "io-util", "sync", "rt", "macros", "
 socket2 = { version = "0.6", features = ["all"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+# Asking a router to open a port. Two protocols because a home router speaks
+# one, the other, both or neither. STUN is hand rolled in `stun.rs`: it is one
+# binding request and one attribute, and every STUN crate carries the ICE and
+# TURN machinery that none of this uses.
+igd-next = { version = "0.17.1", default-features = false, features = ["aio_tokio"] }
+crab_nat = "0.8.1"
