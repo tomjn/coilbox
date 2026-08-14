@@ -35,6 +35,7 @@ import {
   useStartBoxAllies,
 } from "../battle/StartBoxControls";
 import { StartPosOptions } from "../battle/StartPosOptions";
+import { unsyncedPlayers } from "../battle/startBlockers";
 import { useSavedStartBoxes } from "../battle/startBoxSaved";
 import { battleToSkirmishDraft } from "../battle/toSkirmish";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
@@ -392,6 +393,7 @@ function BattleRoomPage() {
         sync={room.sync}
         blockShort={block?.short ?? null}
         blockReason={blockReason}
+        unsynced={unsyncedPlayers(room.rows)}
         hostIngame={room.hostIngame}
         allReady={room.allReady}
         onToggleReady={room.setReady}

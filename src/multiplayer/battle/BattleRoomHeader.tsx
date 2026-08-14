@@ -14,6 +14,7 @@ import type { Battle, MemberStatus } from "../bindings";
 import { serverAddressFromKey } from "../store";
 import type { SyncState } from "./config";
 import { SyncStatusPill } from "./SyncStatusPill";
+import { startAnywayWarning } from "./startBlockers";
 
 /**
  * The battle room's top bar: the battle name (replacing the singleplayer
@@ -25,6 +26,10 @@ import { SyncStatusPill } from "./SyncStatusPill";
  * When we host the battle ourselves (`selfHost`), the bar also carries a native
  * Lock toggle, and Leave becomes "Close battle" (leaving tears the battle down
  * for everyone, so it confirms first).
+ *
+ * Start confirms too when somebody in the room says they cannot play it
+ * (issue #1605), because in a room coilbox hosts itself there is no server
+ * between that button and the engine.
  */
 export function BattleRoomHeader({
   battle,
@@ -32,6 +37,7 @@ export function BattleRoomHeader({
   sync,
   blockShort,
   blockReason,
+  unsynced,
   hostIngame,
   allReady,
   onToggleReady,
@@ -50,6 +56,9 @@ export function BattleRoomHeader({
   blockShort: string | null;
   /** The same thing said in full, for the disabled Start button's tooltip. */
   blockReason: string | null;
+  /** Other people in the room whose own sync bit says they cannot play this
+   * battle (issue #1605). Start asks before leaving them behind. */
+  unsynced: string[];
   hostIngame: boolean;
   allReady: boolean;
   onToggleReady: (ready: boolean) => void;
@@ -66,6 +75,31 @@ export function BattleRoomHeader({
   const ready = myStatus?.battleStatus.ready ?? false;
   const spectator = myStatus ? !myStatus.battleStatus.mode : false;
   const [confirmClose, setConfirmClose] = useState(false);
+  const [confirmStart, setConfirmStart] = useState(false);
+  // Somebody in the room cannot play this battle. Not a reason to refuse the
+  // start: with no server there is nobody to kick them with, and a room can
+  // want to play without whoever is still downloading. So Start asks first and
+  // names them, rather than either going ahead in silence or seizing up.
+  const startWarning = startAnywayWarning(unsynced);
+  const startDisabled = hostIngame || !allReady || !!blockReason;
+  const startButton = (
+    <Button
+      onClick={startWarning ? undefined : onStart}
+      disabled={startDisabled}
+      title={
+        blockReason
+          ? blockReason
+          : hostIngame
+            ? "The match is already running"
+            : !allReady
+              ? "All players must be ready first"
+              : (startWarning ?? "Ask the autohost to start the match")
+      }
+    >
+      <Play className="size-4 fill-current" />
+      {hostIngame ? "In game" : "Start"}
+    </Button>
+  );
 
   return (
     <header className="flex items-center justify-between gap-4 border-b border-border p-4">
@@ -183,22 +217,34 @@ export function BattleRoomHeader({
               Leave
             </Button>
           )}
-          <Button
-            onClick={onStart}
-            disabled={hostIngame || !allReady || !!blockReason}
-            title={
-              blockReason
-                ? blockReason
-                : hostIngame
-                  ? "The match is already running"
-                  : allReady
-                    ? "Ask the autohost to start the match"
-                    : "All players must be ready first"
-            }
-          >
-            <Play className="size-4 fill-current" />
-            {hostIngame ? "In game" : "Start"}
-          </Button>
+          {startWarning && !startDisabled ? (
+            <Popover open={confirmStart} onOpenChange={setConfirmStart}>
+              <PopoverTrigger asChild>{startButton}</PopoverTrigger>
+              <PopoverContent align="end" className="w-72 space-y-3">
+                <p className="text-sm">{startWarning}</p>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setConfirmStart(false)}
+                  >
+                    Wait for them
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setConfirmStart(false);
+                      onStart();
+                    }}
+                  >
+                    Start anyway
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            startButton
+          )}
         </ButtonGroup>
       </div>
     </header>
