@@ -46,11 +46,33 @@ export function buildDeepLink(action: DeepLinkAction): BuildDeepLinkResult {
   switch (action.kind) {
     case "join":
       return buildJoin(action);
+    case "room":
+      return buildRoom(action);
     case "import":
       return buildImport(action);
     case "open":
       return buildOpen(action);
   }
+}
+
+function buildRoom(
+  action: Extract<DeepLinkAction, { kind: "room" }>,
+): BuildDeepLinkResult {
+  if (!validField(action.address)) {
+    return invalid("This room has no address to join at.");
+  }
+  if (
+    !Number.isInteger(action.port) ||
+    action.port < 1 ||
+    action.port > 65535
+  ) {
+    return invalid("This room has no port to join on.");
+  }
+  const params = new URLSearchParams({
+    address: action.address.trim(),
+    port: String(action.port),
+  });
+  return { ok: true, url: `${DEEP_LINK_SCHEME}://room?${params.toString()}` };
 }
 
 function buildJoin(
@@ -131,6 +153,14 @@ export function buildImportCodeLink(code: string): string | null {
     kind: "import",
     source: { type: "code", code },
   });
+  return result.ok ? result.url : null;
+}
+
+/** Build a `room?address=&port=` link for a room somebody is hosting themselves
+ * (issue #1612), which is a nicer way of saying the address and port a host
+ * would otherwise be reading out. Returns `null` rather than a broken link. */
+export function buildRoomLink(address: string, port: number): string | null {
+  const result = buildDeepLink({ kind: "room", address, port });
   return result.ok ? result.url : null;
 }
 

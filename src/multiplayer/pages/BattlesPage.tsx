@@ -18,6 +18,7 @@ import {
   useHostedRoom,
 } from "../../direct/hostedRoom";
 import { type JoinRoomArgs, LanRooms } from "../../direct/LanRooms";
+import { LinkedRoomJoin } from "../../direct/LinkedRoomJoin";
 import {
   joinBlockedReason,
   joinRoomFailure,
@@ -146,6 +147,19 @@ function BattlesPage() {
     } | null
   )?.deeplinkJoin;
   const deeplinkJoinHandledRef = useRef(false);
+
+  // A confirmed coilbox://room deep link (issue #1612) navigates here with the
+  // address and port of a room somebody is hosting themselves. Unlike the join
+  // above it needs no connection and no battle list, because a room is one
+  // machine and one battle, so it opens the join form filled in rather than
+  // acting: the person still has to put their name in and press Join, and a room
+  // that has stopped since the link was written is reported there.
+  const deeplinkRoom =
+    (
+      location.state as {
+        deeplinkRoom?: { address: string; port: number };
+      } | null
+    )?.deeplinkRoom ?? null;
 
   const navigate = useNavigate();
   const ready = mirror.phase === "ready";
@@ -407,15 +421,23 @@ function BattlesPage() {
   // as well was the same room twice (issue #1608). What the host's own beacon
   // proves is said on the host's own line instead.
   const lanSection = (
-    <LanRooms
-      rooms={otherRooms(lan.rooms)}
-      error={lan.error}
-      blocked={joinBlockedReason(activeKey, room !== null)}
-      defaultName={lastLogin?.username}
-      enginePath={selected?.enginePath}
-      dataDir={selected?.rootPath}
-      onJoin={onJoinRoom}
-    />
+    <>
+      <LanRooms
+        rooms={otherRooms(lan.rooms)}
+        error={lan.error}
+        blocked={joinBlockedReason(activeKey, room !== null)}
+        defaultName={lastLogin?.username}
+        enginePath={selected?.enginePath}
+        dataDir={selected?.rootPath}
+        onJoin={onJoinRoom}
+      />
+      <LinkedRoomJoin
+        target={deeplinkRoom}
+        blocked={joinBlockedReason(activeKey, room !== null)}
+        defaultName={lastLogin?.username}
+        onJoin={onJoinRoom}
+      />
+    </>
   );
 
   const hostControl = (

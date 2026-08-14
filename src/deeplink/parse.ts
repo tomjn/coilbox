@@ -12,11 +12,18 @@
  * Grammar (the action is the URL's authority, params are the query string):
  *
  *   coilbox://join?server=<host[:port]>&battle=<id>[&password=<pw>]
+ *   coilbox://room?address=<host>&port=<port>
  *   coilbox://import?code=<container code>
  *   coilbox://import?url=<https url>
  *   coilbox://open?screen=<name>[&id=<id>]
  *
  * `open` screens are allow-listed. `map`, `game` and `replay` require an `id`.
+ *
+ * `join` and `room` are not the same thing. A `join` names a battle on a lobby
+ * server this client is already logged in to. A `room` names a machine hosting a
+ * room of its own with no server behind it (issue #1612), which has one battle in
+ * it and no id worth putting in a link, so it carries the address and the port a
+ * joiner would otherwise be reading out over voice chat.
  */
 
 /** The scheme every coilbox deep link must use. */
@@ -46,6 +53,7 @@ export const MAX_FIELD_LENGTH = 512;
 
 export type DeepLinkAction =
   | { kind: "join"; server: string; battle: string; password?: string }
+  | { kind: "room"; address: string; port: number }
   | { kind: "import"; source: ImportSource }
   | { kind: "open"; screen: OpenScreen; id?: string };
 
@@ -91,6 +99,8 @@ export function parseDeepLink(raw: string): DeepLinkParseResult {
   switch (action) {
     case "join":
       return parseJoin(params);
+    case "room":
+      return parseRoom(params);
     case "import":
       return parseImport(params);
     case "open":
@@ -120,6 +130,32 @@ function parseJoin(params: URLSearchParams): DeepLinkParseResult {
     battle,
     ...(password ? { password } : {}),
   };
+}
+
+/**
+ * A room on somebody's machine, as an address and a port (issue #1612).
+ *
+ * The address is only checked for the shapes that could not possibly be one, the
+ * same test a typed address gets in `direct/lan.ts`: whether a machine is
+ * actually there is the connection's answer, and refusing here would refuse
+ * hostnames that resolve perfectly well. The port is checked properly, because a
+ * link with a port outside the range is a link that could never have worked.
+ */
+function parseRoom(params: URLSearchParams): DeepLinkParseResult {
+  const address = field(params, "address");
+  const port = field(params, "port");
+  if (!address) return invalid("This room link has no address.");
+  if (!port) return invalid("This room link has no port.");
+  if (/\s/.test(address) || address.includes("/")) {
+    return invalid("This room link's address is not an address.");
+  }
+  if (!/^\d+$/.test(port))
+    return invalid("This room link's port is not a port.");
+  const number = Number(port);
+  if (number < 1 || number > 65535) {
+    return invalid("This room link's port is not a port.");
+  }
+  return { kind: "room", address, port: number };
 }
 
 function parseImport(params: URLSearchParams): DeepLinkParseResult {

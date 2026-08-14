@@ -161,6 +161,7 @@ function LanRoomRow({
           address: room.address,
           port: room.port,
           passworded: room.passworded,
+          from: "network",
         }}
         defaultName={defaultName}
         blocked={blocked}
@@ -192,10 +193,12 @@ function JoinRoomDrawerButton({
     <Button
       variant="secondary"
       className="h-8 shrink-0 px-3"
-      aria-label={target ? `Join ${target.title}` : "Join a room by address"}
+      aria-label={
+        target?.title ? `Join ${target.title}` : "Join a room by address"
+      }
       onClick={() =>
         drawer.open({
-          title: target ? `Join ${target.title}` : "Join by address",
+          title: target?.title ? `Join ${target.title}` : "Join by address",
           width: "30rem",
           content: (
             <JoinRoomForm
@@ -209,7 +212,7 @@ function JoinRoomDrawerButton({
         })
       }
     >
-      {target ? "Join" : "Join by address"}
+      {target?.title ? "Join" : "Join by address"}
     </Button>
   );
 }

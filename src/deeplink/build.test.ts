@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { encodeContainerCode } from "../container/container";
-import { buildDeepLink, buildImportCodeLink, buildJoinLink } from "./build";
+import {
+  buildDeepLink,
+  buildImportCodeLink,
+  buildJoinLink,
+  buildRoomLink,
+} from "./build";
 import {
   MAX_CODE_LENGTH,
   MAX_FIELD_LENGTH,
@@ -9,6 +14,35 @@ import {
 } from "./parse";
 
 describe("buildDeepLink", () => {
+  describe("room", () => {
+    it("round-trips a room link", () => {
+      const action = {
+        kind: "room" as const,
+        address: "192.168.1.45",
+        port: 8200,
+      };
+      const built = buildDeepLink(action);
+      expect(built.ok).toBe(true);
+      if (!built.ok) return;
+      expect(parseDeepLink(built.url)).toEqual(action);
+    });
+
+    it("hands back nothing rather than a link with no address in it", () => {
+      expect(buildRoomLink("  ", 8200)).toBeNull();
+    });
+
+    it("hands back nothing rather than a link to a port that cannot exist", () => {
+      expect(buildRoomLink("192.168.1.45", 0)).toBeNull();
+      expect(buildRoomLink("192.168.1.45", 70000)).toBeNull();
+    });
+
+    it("builds the link a host copies off their room line", () => {
+      expect(buildRoomLink("192.168.1.45", 8200)).toBe(
+        "coilbox://room?address=192.168.1.45&port=8200",
+      );
+    });
+  });
+
   describe("join", () => {
     it("round-trips a join link", () => {
       const action = {

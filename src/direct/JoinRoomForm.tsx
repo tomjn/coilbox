@@ -29,13 +29,20 @@ export interface JoinRoomArgs {
   password: string;
 }
 
-/** A room found on the network, filled into the form so nobody reads an address
- *  off a screen that already has it. */
+/** A room coilbox already knows where to find, filled into the form so nobody
+ *  reads an address off a screen that already has it. */
 export interface JoinRoomTarget {
-  title: string;
+  /** The room's name, when it was found on the network. A link carries an
+   *  address and no name, because a link is written before anybody joins and the
+   *  host can rename their room after. */
+  title?: string;
   address: string;
   port: number;
   passworded: boolean;
+  /** How coilbox came to know this address, which is what the form says above
+   *  the fields. A room heard announcing itself was up two seconds ago. A room
+   *  in a link was up whenever the link was pasted, which could be yesterday. */
+  from: "network" | "link";
 }
 
 export function JoinRoomForm({
@@ -115,7 +122,19 @@ export function JoinRoomForm({
 
   return (
     <form className="flex flex-col gap-2.5" onSubmit={submit}>
-      {target && (
+      {/* A link is the case worth saying something about. It arrived from
+          outside coilbox, nothing has checked that the room is still up, and the
+          person following it has not agreed to connect to anything yet: pressing
+          Join is where that happens, and a room that has since stopped says so
+          there rather than here (see `joinRoomFailure`). */}
+      {target?.from === "link" && (
+        <p className="text-sm text-muted-foreground">
+          From a link, to a room at {target.address}:{target.port}. Nothing
+          connects until you press Join, and if the host has stopped hosting you
+          will be told so.
+        </p>
+      )}
+      {target?.from === "network" && (
         <p className="text-sm text-muted-foreground">
           Joining {target.title}, found on this network.
         </p>

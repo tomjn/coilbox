@@ -1,5 +1,6 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { useEffect, useState } from "react";
+import { buildRoomLink } from "@/deeplink/build";
 import { nextDrawerKey } from "@/general/drawerKey";
 import {
   type DirectLocalAddress,
@@ -169,23 +170,37 @@ function RoomAddresses({ port }: { port: number }) {
     <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
       <span>{shareHeadline(shared)}</span>
       <ul className="flex flex-col items-end gap-1">
-        {shared.map((address) => (
-          <li
-            key={`${address.scope}-${address.address}`}
-            className="flex items-center gap-2"
-          >
-            <span>{address.label}</span>
-            <code className="select-all rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
-              {addressText(address)}
-            </code>
-            <CopyButton
-              value={addressText(address)}
-              label={`Copy ${addressText(address)}, ${address.who}`}
+        {shared.map((address) => {
+          // A link says the same thing as the address beside it, so it is an
+          // extra button rather than a replacement: somebody reading it out over
+          // voice chat still needs the numbers (issue #1612).
+          const link = buildRoomLink(address.address, address.port);
+          return (
+            <li
+              key={`${address.scope}-${address.address}`}
+              className="flex items-center gap-2"
             >
-              Copy
-            </CopyButton>
-          </li>
-        ))}
+              <span>{address.label}</span>
+              <code className="select-all rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
+                {addressText(address)}
+              </code>
+              <CopyButton
+                value={addressText(address)}
+                label={`Copy ${addressText(address)}, ${address.who}`}
+              >
+                Copy
+              </CopyButton>
+              {link && (
+                <CopyButton
+                  value={link}
+                  label={`Copy a link that joins at ${addressText(address)}, ${address.who}`}
+                >
+                  Copy link
+                </CopyButton>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

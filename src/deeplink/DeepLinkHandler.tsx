@@ -170,6 +170,31 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // A room somebody is hosting themselves (issue #1612). Nothing here can
+      // tell whether it is still up: a room is a port on a machine and the only
+      // way to ask is to dial it, which is the thing this must not do before the
+      // person agrees. So this confirms, then opens the join form filled in, and
+      // the room being gone is answered where the join is made, in the words
+      // `joinRoomFailure` already had for it.
+      if (result.kind === "room") {
+        setPending({
+          title: "Join a room",
+          lines: [
+            `Join the room at ${result.address}:${result.port}?`,
+            "The join form opens filled in. Nothing connects until you press Join in it.",
+          ],
+          warnings: [],
+          confirmLabel: "Open the join form",
+          run: () =>
+            navigate("/battles", {
+              state: {
+                deeplinkRoom: { address: result.address, port: result.port },
+              },
+            }),
+        });
+        return;
+      }
+
       // Import from a URL: confirm the network fetch first, then fetch, validate
       // and confirm again. No request is made before the user agrees.
       if (result.source.type === "url") {
