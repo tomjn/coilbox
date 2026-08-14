@@ -1,0 +1,215 @@
+import { describe, expect, it } from "vitest";
+import {
+  ASSET_CLASSES,
+  ASSET_ORIGINS,
+  BUILDPIC_VARIANT,
+  classForVariant,
+  ELMOS_PER_BUILD_SQUARE,
+  heightOverlayMaxBytes,
+  MAP_VARIANTS,
+  maxObjectBytes,
+  RENDER_ANGLES,
+  RENDER_BLEED_SQUARES,
+  RENDER_VARIANT_PREFIX,
+  renderFrame,
+  renderVariant,
+} from "./vocabulary";
+
+/**
+ * `shared/asset-vocabulary.json` is embedded at build time on both sides, so a
+ * bad edit to it cannot reach a user's machine without failing here first. That
+ * makes these assertions the guard rather than a restatement of the file: every
+ * expected value below is written out by hand, so changing the JSON and changing
+ * the test are two separate decisions.
+ *
+ * `crates/coilbox-assets/src/lib.rs` asserts the same values from Rust.
+ */
+
+describe("the variant names", () => {
+  it("names the two a unit has", () => {
+    expect(BUILDPIC_VARIANT).toBe("buildpic");
+    expect(renderVariant("top")).toBe("render:top");
+    expect(RENDER_VARIANT_PREFIX).toBe("render:");
+  });
+
+  it("closes the map list at four", () => {
+    expect([...MAP_VARIANTS]).toEqual([
+      "minimap",
+      "overlay:metal",
+      "overlay:type",
+      "overlay:height",
+    ]);
+  });
+
+  it("renders one angle, because one has a use case", () => {
+    expect([...RENDER_ANGLES]).toEqual(["top"]);
+  });
+
+  it("names how the bytes were produced", () => {
+    expect([...ASSET_ORIGINS]).toEqual(["extracted", "rendered", "uploaded"]);
+  });
+});
+
+describe("the encode profiles", () => {
+  it("names the codec, the quality and the size cap for each class", () => {
+    expect(ASSET_CLASSES.buildpic.encodeProfile).toBe("webp-lossless-256");
+    expect(ASSET_CLASSES.render.encodeProfile).toBe("webp-q80-256");
+    expect(ASSET_CLASSES.minimap.encodeProfile).toBe("webp-q80-512");
+    expect(ASSET_CLASSES["overlay:metal"].encodeProfile).toBe(
+      "webp-lossless-source",
+    );
+    expect(ASSET_CLASSES["overlay:type"].encodeProfile).toBe(
+      "webp-lossless-source",
+    );
+    expect(ASSET_CLASSES["overlay:height"].encodeProfile).toBe(
+      "png16-lossless-source",
+    );
+  });
+
+  it("fits the 64 characters the hub's `encode_profile` column takes", () => {
+    for (const asset of Object.values(ASSET_CLASSES)) {
+      expect(asset.encodeProfile.length).toBeLessThanOrEqual(64);
+    }
+  });
+
+  it("names a quality on exactly the lossy classes", () => {
+    for (const asset of Object.values(ASSET_CLASSES)) {
+      expect(asset.quality === null).toBe(asset.lossless);
+    }
+  });
+});
+
+describe("the dimension caps", () => {
+  it("caps a unit image at 256px and a minimap at 512px", () => {
+    expect(ASSET_CLASSES.buildpic.maxEdgePx).toBe(256);
+    expect(ASSET_CLASSES.render.maxEdgePx).toBe(256);
+    expect(ASSET_CLASSES.minimap.maxEdgePx).toBe(512);
+  });
+
+  it("leaves the overlays at whatever resolution the map's grid has", () => {
+    for (const variant of ["overlay:metal", "overlay:type", "overlay:height"]) {
+      expect(ASSET_CLASSES[variant].maxEdgePx).toBeNull();
+      expect(ASSET_CLASSES[variant].maxBytes).toBeNull();
+    }
+  });
+
+  it("keeps square a build pic property and extends it to nothing else", () => {
+    expect(ASSET_CLASSES.buildpic.square).toBe(true);
+    for (const [name, asset] of Object.entries(ASSET_CLASSES)) {
+      if (name !== "buildpic") expect(asset.square).toBe(false);
+    }
+  });
+
+  it("derives maxBytes from maxEdgePx at four bytes a pixel", () => {
+    for (const asset of Object.values(ASSET_CLASSES)) {
+      if (asset.maxEdgePx === null) continue;
+      expect(asset.maxBytes).toBe(asset.maxEdgePx * asset.maxEdgePx * 4);
+    }
+  });
+
+  it("holds the same 2 MB backstop the hub does", () => {
+    expect(maxObjectBytes).toBe(2 * 1024 * 1024);
+  });
+
+  it("takes height as 16 bit grayscale PNG and everything else as WebP", () => {
+    const height = ASSET_CLASSES["overlay:height"];
+    expect(height.mime).toBe("image/png");
+    expect(height.minBitDepth).toBe(16);
+    expect(height.grayscale).toBe(true);
+
+    for (const [name, asset] of Object.entries(ASSET_CLASSES)) {
+      if (name !== "overlay:height") {
+        expect(asset.mime).toBe("image/webp");
+        expect(asset.minBitDepth).toBeNull();
+        expect(asset.grayscale).toBe(false);
+      }
+    }
+  });
+
+  it("requires lossless of every class that carries data rather than a picture", () => {
+    expect(ASSET_CLASSES.buildpic.lossless).toBe(true);
+    expect(ASSET_CLASSES["overlay:metal"].lossless).toBe(true);
+    expect(ASSET_CLASSES["overlay:type"].lossless).toBe(true);
+    expect(ASSET_CLASSES["overlay:height"].lossless).toBe(true);
+    expect(ASSET_CLASSES.render.lossless).toBe(false);
+    expect(ASSET_CLASSES.minimap.lossless).toBe(false);
+  });
+});
+
+describe("classForVariant", () => {
+  it("gives every render angle the render class", () => {
+    expect(classForVariant("render:top")).toBe(ASSET_CLASSES.render);
+    expect(classForVariant("render:front")).toBe(ASSET_CLASSES.render);
+  });
+
+  it("gives each map variant its own class", () => {
+    for (const variant of MAP_VARIANTS) {
+      expect(classForVariant(variant)).toBe(ASSET_CLASSES[variant]);
+    }
+  });
+
+  it("keys the unit classes on the unit and the map classes on the map", () => {
+    expect(classForVariant("buildpic")?.keyedOn).toBe("unit");
+    expect(classForVariant("render:top")?.keyedOn).toBe("unit");
+    for (const variant of MAP_VARIANTS) {
+      expect(classForVariant(variant)?.keyedOn).toBe("map");
+    }
+  });
+
+  it("has nothing for a variant the hub would refuse", () => {
+    expect(classForVariant("overlay:wind")).toBeNull();
+    expect(classForVariant("buildpics")).toBeNull();
+  });
+});
+
+describe("heightOverlayMaxBytes", () => {
+  it("counts one sample per heightmap vertex, at two bytes each", () => {
+    // A 16384 elmo edge is 2048 squares and 2049 samples, the fencepost the hub
+    // measured its own cap against.
+    expect(heightOverlayMaxBytes("overlay:height", 16384, 16384)).toBe(
+      2049 * 2049 * 2,
+    );
+  });
+
+  it("is a height overlay's number and no other class's", () => {
+    expect(heightOverlayMaxBytes("overlay:metal", 16384, 16384)).toBeNull();
+    expect(heightOverlayMaxBytes("minimap", 16384, 16384)).toBeNull();
+  });
+});
+
+describe("renderFrame", () => {
+  it("takes its aspect from the footprint, so a 3 by 2 building is never square", () => {
+    const frame = renderFrame(3, 2);
+    expect(frame.squaresX).toBe(5);
+    expect(frame.squaresZ).toBe(4);
+    expect(frame.widthPx / frame.heightPx).toBe(5 / 4);
+    expect(frame.widthPx).toBeGreaterThan(frame.heightPx);
+  });
+
+  it("carries a whole build square of bleed on every side", () => {
+    expect(RENDER_BLEED_SQUARES).toBe(1);
+    const frame = renderFrame(4, 4);
+    expect(frame.squaresX).toBe(6);
+    expect(frame.squaresZ).toBe(6);
+    expect(frame.widthElmos).toBe(6 * ELMOS_PER_BUILD_SQUARE);
+    expect(ELMOS_PER_BUILD_SQUARE).toBe(16);
+  });
+
+  it("stays inside the render cap on the longest edge", () => {
+    for (let footprint = 1; footprint <= 32; footprint++) {
+      const frame = renderFrame(footprint, footprint);
+      expect(Math.max(frame.widthPx, frame.heightPx)).toBeLessThanOrEqual(256);
+      expect(frame.widthPx).toBeGreaterThan(0);
+    }
+  });
+
+  it("uses whole pixels per square, so the encoded aspect is exact", () => {
+    const frame = renderFrame(7, 3);
+    expect(frame.widthPx).toBe(frame.squaresX * frame.pixelsPerSquare);
+    expect(frame.heightPx).toBe(frame.squaresZ * frame.pixelsPerSquare);
+  });
+
+  it("floors a footprint at one square the way the engine does", () => {
+    expect(renderFrame(0, 0)).toEqual(renderFrame(1, 1));
+  });
+});
