@@ -64,18 +64,28 @@ export function JoinRoomForm({
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const problem = addressProblem(address);
-  const portProblem = roomPortProblem(port);
+  // A pasted `192.168.1.5:8200` is one answer to two fields, so the address is
+  // read as both and the port in it wins: it is the more specific answer, and it
+  // is the one that was just typed.
+  //
+  // Read rather than rewritten as it is typed. Rewriting mid-keystroke turns
+  // `127.0.0.1:8300` into `127.0.0.1300` on the way past the first digit of the
+  // port, because the field the next keystroke lands in is no longer the field
+  // the last one was in.
+  const dialled = splitHostPort(address);
+  const dialledPort = dialled.port ?? port;
+  const problem = addressProblem(dialled.address);
+  const portProblem = roomPortProblem(dialledPort);
   const nameProblem = playerNameProblem(name);
   const canJoin = !problem && !portProblem && !nameProblem && !joining;
 
-  // A pasted `192.168.1.5:8200` is one answer to two fields. Split it here, so
-  // the port a host read out lands in the port field instead of failing
-  // validation in the address one.
-  function typeAddress(typed: string) {
-    const split = splitHostPort(typed);
-    setAddress(split.address);
-    if (split.port) setPort(split.port);
+  // Once they have finished with the field, the port moves into the port field
+  // where it can be read and corrected. Nothing is decided here that submitting
+  // would not decide anyway: this only makes it visible.
+  function settleAddress() {
+    if (!dialled.port) return;
+    setAddress(dialled.address);
+    setPort(dialled.port);
   }
 
   async function submit(e: React.FormEvent) {
@@ -85,8 +95,8 @@ export function JoinRoomForm({
     setError(null);
     try {
       await onJoin({
-        address: address.trim(),
-        port: Number(port),
+        address: dialled.address,
+        port: Number(dialledPort),
         name: name.trim(),
         password: password.trim(),
       });
@@ -117,7 +127,8 @@ export function JoinRoomForm({
           <span className="font-medium">Host address</span>
           <Input
             value={address}
-            onChange={(e) => typeAddress(e.target.value)}
+            onChange={(e) => setAddress(e.target.value)}
+            onBlur={settleAddress}
             placeholder="192.168.1.5"
             autoComplete="off"
             spellCheck={false}
@@ -127,12 +138,19 @@ export function JoinRoomForm({
         {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
         <label className="flex flex-1 flex-col gap-1 text-sm">
           <span className="font-medium">Port</span>
+          {/* Shows the port that will be dialled, which is the one in the
+              address while there is one. Typing here takes it back off the
+              address, so this field is never showing one port and the join
+              using another. */}
           <Input
             type="number"
             min={1}
             max={65535}
-            value={port}
-            onChange={(e) => setPort(e.target.value)}
+            value={dialledPort}
+            onChange={(e) => {
+              setAddress(dialled.address);
+              setPort(e.target.value);
+            }}
           />
         </label>
       </div>
