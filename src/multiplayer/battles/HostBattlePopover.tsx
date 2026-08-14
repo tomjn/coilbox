@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/popover";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { mpOpenBattle } from "../bindings";
+import { hostBattleFailure } from "./hostBattle";
 import { hashFailureMessage, useHostContent } from "./useHostContent";
 
 /** The `mpOpenBattle` argument shape, minus the connection key the parent supplies. */
@@ -39,7 +40,8 @@ export function HostBattlePopover({
   autoOpen,
 }: {
   disabled: boolean;
-  onHost: (args: OpenBattleArgs) => void;
+  /** Rejects when the battle did not open, which is what this form shows. */
+  onHost: (args: OpenBattleArgs) => Promise<void>;
   /** Preselect this map (e.g. from a content map detail's "Host a battle here"). */
   initialMap?: string;
   /** Preselect this game (e.g. from a skirmish preset's "Host as battle"). */
@@ -81,8 +83,14 @@ export function HostBattlePopover({
   // work, so all it bought was a battle that looked joinable and was not.
   // Direct is what we implement, so direct is what we advertise.
   const [holePunch, setHolePunch] = useState(false);
+  // Why the last press did nothing. A refusal that never reaches the wire leaves
+  // no join error and no disconnect, so this is the only account of it there is
+  // (issue #1591).
+  const [error, setError] = useState<string | null>(null);
+  const [hosting, setHosting] = useState(false);
 
   function hostButtonLabel(): string {
+    if (hosting) return "Hosting…";
     if (!gameName || !mapName || checksumsReady) return "Host battle";
     if (gameInfo.status === "loading") return "Hashing game…";
     if (mapInfo.status === "loading") return "Hashing map…";
@@ -93,25 +101,35 @@ export function HostBattlePopover({
   const noEngine = content.noEngine;
   const canHost = content.ready;
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canHost || !target) return;
-    onHost({
-      battleType: 0,
-      natType: holePunch ? 1 : 0,
-      key: password.trim() || "*",
-      port,
-      maxPlayers,
-      modhash,
-      rank: 0,
-      maphash,
-      engine: "spring",
-      version: target.engineVersion,
-      map: mapName,
-      title: title.trim() || `${gameName} — hosted`,
-      modname: gameName,
-    });
-    setOpen(false);
+    if (!canHost || !target || hosting) return;
+    setError(null);
+    setHosting(true);
+    try {
+      await onHost({
+        battleType: 0,
+        natType: holePunch ? 1 : 0,
+        key: password.trim() || "*",
+        port,
+        maxPlayers,
+        modhash,
+        rank: 0,
+        maphash,
+        engine: "spring",
+        version: target.engineVersion,
+        map: mapName,
+        title: title.trim() || `${gameName} — hosted`,
+        modname: gameName,
+      });
+      setOpen(false);
+    } catch (err) {
+      // Left open on purpose: the answer is in here, and the fields that need
+      // changing are too.
+      setError(hostBattleFailure(err));
+    } finally {
+      setHosting(false);
+    }
   }
 
   return (
@@ -274,7 +292,20 @@ export function HostBattlePopover({
                 </div>
               )}
 
-              <Button type="submit" className="h-8" disabled={!canHost}>
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive"
+                >
+                  {error}
+                </p>
+              )}
+
+              <Button
+                type="submit"
+                className="h-8"
+                disabled={!canHost || hosting}
+              >
                 {hostButtonLabel()}
               </Button>
             </>
