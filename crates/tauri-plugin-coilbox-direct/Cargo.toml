@@ -34,3 +34,8 @@ futures-util = { version = "0.3", default-features = false, features = ["sink"] 
 # TURN machinery that none of this uses.
 igd-next = { version = "0.17.1", default-features = false, features = ["aio_tokio"] }
 crab_nat = "0.8.1"
+# The OS's interface list, with a netmask on every address and the default
+# gateway beside it. The beacon needs the netmask to address a broadcast to the
+# subnet it is leaving by, and port mapping needs the gateway to speak NAT-PMP
+# to, and both are per platform work: this is one crate for the two of them.
+netdev = "0.46.0"

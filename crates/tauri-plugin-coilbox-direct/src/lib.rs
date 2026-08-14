@@ -21,12 +21,13 @@
 //! - This file is the IPC surface over one running room.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use picoframe_core::CliResult;
 use serde_json::json;
 use tauri::{
     plugin::{Builder, TauriPlugin},
-    Runtime, State,
+    AppHandle, Manager, RunEvent, Runtime, State,
 };
 use tokio::sync::Mutex;
 
@@ -45,6 +46,17 @@ pub use room::{Room, RoomOptions, RoomStatus, DEFAULT_LOBBY_PORT};
 
 /// The reason a stopped room gives its joiners when the host did not name one.
 const DEFAULT_STOP_REASON: &str = "the host stopped hosting this room";
+
+/// How long quitting waits for the router to be told the ports are free.
+///
+/// Giving a mapping back is one datagram over NAT-PMP, or one HTTP request over
+/// UPnP, to a box on the same network. Anything that is going to answer answers
+/// in far less than this.
+///
+/// It is a budget and not a deadline the router has to meet. When it runs out
+/// the app quits anyway and the mapping is left to its lease, because an app
+/// that hangs on quit is a worse bug than a port left open for an hour.
+const EXIT_RELEASE_BUDGET: Duration = Duration::from_millis(500);
 
 /// The one room this client hosts, if it is hosting.
 ///
@@ -254,9 +266,11 @@ async fn direct_open_ports(
 
 /// `direct_close_ports`: hand the ports back to the router.
 ///
-/// Called when a host unticks the box and when a room stops. A mapping left on
-/// somebody's router after the thing that wanted it has gone is rude, and the
-/// lease that limits the damage when this never runs is an hour long.
+/// Called when a host unticks the box and when a room stops. Quitting the app
+/// does the same thing without the round trip through the frontend, in
+/// [`release_ports_on_exit`]. A mapping left on somebody's router after the
+/// thing that wanted it has gone is rude, and the lease that limits the damage
+/// when none of those run is an hour long.
 #[tauri::command]
 async fn direct_close_ports(active: State<'_, ActivePorts>) -> Result<CliResult, ()> {
     let held = active.0.lock().await.take();
@@ -278,9 +292,45 @@ async fn direct_port_status(active: State<'_, ActivePorts>) -> Result<CliResult,
     Ok(CliResult::ok(json!({ "reachability": report })))
 }
 
+/// Hand the ports back on the way out, without holding the quit up for long.
+///
+/// What this buys, exactly: an ordinary quit gives the mapping back, and a quit
+/// with nothing open costs nothing. What it cannot cover is a kill, a crash or a
+/// power cut, where no code of ours runs at all and the mapping stands until its
+/// lease runs out an hour later. On the routers that refuse a finite lease there
+/// is no expiry to fall back on, which is why the release is worth waiting half
+/// a second for rather than firing and forgetting.
+fn release_ports_on_exit<R: Runtime>(app: &AppHandle<R>) {
+    let Some(state) = app.try_state::<ActivePorts>() else {
+        return;
+    };
+    let slot = Arc::clone(&state.0);
+    // Nothing open, which is nearly every quit, waits for nothing at all.
+    if let Ok(held) = slot.try_lock() {
+        if held.is_none() {
+            return;
+        }
+    }
+    let (done, finished) = std::sync::mpsc::channel();
+    tauri::async_runtime::spawn(async move {
+        if let Some(held) = slot.lock().await.take() {
+            let _ = tokio::time::timeout(EXIT_RELEASE_BUDGET, held.release()).await;
+        }
+        let _ = done.send(());
+    });
+    // The runtime is still running while this thread waits, so the release makes
+    // progress. When the budget is gone the app quits regardless.
+    let _ = finished.recv_timeout(EXIT_RELEASE_BUDGET);
+}
+
 /// Build the plugin. Registered as `"coilbox-direct"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-direct")
+        .on_event(|app, event| {
+            if matches!(event, RunEvent::Exit) {
+                release_ports_on_exit(app);
+            }
+        })
         .setup(|app, _api| {
             tauri::Manager::manage(app, ActiveRoom::default());
             tauri::Manager::manage(app, ActiveDiscovery::default());
