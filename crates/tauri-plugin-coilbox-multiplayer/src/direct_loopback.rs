@@ -25,9 +25,10 @@ use futures_util::{SinkExt, StreamExt};
 use tauri::ipc::{Channel, InvokeResponseBody};
 use tauri_plugin_coilbox_direct::room::{Room, RoomOptions, RoomStatus};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Notify;
 use tokio_util::codec::{Framed, LinesCodec};
 
-use crate::conn::{spawn_connection, Outbound, Registry};
+use crate::conn::{spawn_connection, wait_until_ready, Outbound, Registry};
 use crate::dmlog::DmLog;
 
 /// How long a test waits for something that should happen in milliseconds.
@@ -95,7 +96,7 @@ impl Client {
     /// torn down and evicted from the registry.
     fn phase(&self) -> Option<LoginPhase> {
         let registry = self.registry.lock().unwrap();
-        registry.get(&self.key).map(|c| *c.phase.lock().unwrap())
+        registry.get(&self.key).map(|c| *c.phase.borrow())
     }
 
     /// The lobby state this client has folded for itself.
@@ -785,6 +786,164 @@ async fn handshake_server(comp_flags: bool, login_info_end: bool) -> SocketAddr 
         }
     });
     addr
+}
+
+/// A server that finishes the login only when it is told to, and keeps every line
+/// the client sent it.
+///
+/// The order in issue #1590 is decided by which of two things happens first, and
+/// over loopback the login all but always wins, which is why the run where it
+/// loses was so hard to see. Holding the last line of the handshake makes the
+/// order the test's to choose rather than the scheduler's. The read loop keeps
+/// running while it is held, so a line sent by a client that is not logged in yet
+/// is recorded rather than missed.
+async fn paused_login_server() -> (SocketAddr, Arc<Notify>, Arc<Mutex<Vec<String>>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("a free port");
+    let addr = listener.local_addr().expect("a bound address");
+    let release = Arc::new(Notify::new());
+    let held = Arc::clone(&release);
+    let sent: Arc<Mutex<Vec<String>>> = Arc::default();
+    let heard = Arc::clone(&sent);
+    tokio::spawn(async move {
+        let Ok((stream, _)) = listener.accept().await else {
+            return;
+        };
+        let mut framed = Framed::new(stream, LinesCodec::new());
+        if framed
+            .send(line::tas_server("0.38", "*", 8452, 0))
+            .await
+            .is_err()
+        {
+            return;
+        }
+        let mut releasing = true;
+        loop {
+            let reply = tokio::select! {
+                // `notify_one` leaves a permit behind, so a release that lands
+                // between two polls of this branch is not lost.
+                _ = held.notified(), if releasing => {
+                    releasing = false;
+                    line::login_info_end()
+                }
+                read = framed.next() => {
+                    let Some(Ok(read)) = read else { return };
+                    heard.lock().unwrap().push(read.clone());
+                    match parse_client_line(&read) {
+                        ClientCommand::ListCompFlags => line::comp_flags(&["u", "sp"]),
+                        ClientCommand::Login { username, .. } => line::accepted(&username),
+                        _ => continue,
+                    }
+                }
+            };
+            if framed.send(reply).await.is_err() {
+                return;
+            }
+        }
+    });
+    (addr, release, sent)
+}
+
+/// The host's client opens its battle once it is logged in, not once it has a
+/// socket (issue #1590).
+///
+/// `mp_connect` answers when the stream is up and the connection task is spawned,
+/// so a host that starts a room and opens a battle in it in one breath used to be
+/// racing its own handshake. It won nearly every time over loopback, and the run
+/// where it lost left a room holding the host's socket, no battle in it, and
+/// nothing said about either.
+#[tokio::test]
+async fn the_battle_line_waits_for_the_login_rather_than_racing_it() {
+    let registry = Registry::default();
+    let (addr, release, sent) = paused_login_server().await;
+    let client = Client::connect(&registry, addr, "alice").await;
+
+    // What the host's client does the moment its room is listening.
+    let waiting = tokio::spawn({
+        let registry = registry.clone();
+        let key = client.key.clone();
+        async move { wait_until_ready(&registry, &key, PATIENCE).await }
+    });
+    tokio::time::sleep(LONG_ENOUGH_TO_HANG).await;
+    assert_eq!(
+        client.phase(),
+        Some(LoginPhase::StreamingState),
+        "the login is deliberately unfinished at this point"
+    );
+    assert!(
+        !waiting.is_finished(),
+        "a connect that answers here answers before it is logged in, which is the bug"
+    );
+
+    release.notify_one();
+    waiting
+        .await
+        .expect("the wait to finish")
+        .expect("the login to land");
+    assert_eq!(client.phase(), Some(LoginPhase::Ready));
+
+    // And only now does the battle line go out, which is the whole point of
+    // waiting: the server has to know who is asking.
+    assert!(
+        !sent
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|l| l.starts_with("OPENBATTLE")),
+        "nothing opened a battle before the wait answered"
+    );
+    client.send(open_battle_line());
+    wait_until(
+        || {
+            sent.lock()
+                .unwrap()
+                .iter()
+                .any(|l| l.starts_with("OPENBATTLE"))
+        },
+        "the battle line to reach the server",
+    )
+    .await;
+}
+
+/// A login that never finishes is a failure the host can read, rather than a wait
+/// with no end.
+///
+/// There is no read timeout below this, so the wait is the only thing that can
+/// end it. A room always sends `LOGININFOEND`. This is here because the host's
+/// client dials a socket, and a socket is not always a room.
+#[tokio::test]
+async fn a_login_that_never_finishes_is_reported_rather_than_waited_on() {
+    let registry = Registry::default();
+    let stuck = Client::connect(&registry, handshake_server(true, false).await, "alice").await;
+
+    let failure = wait_until_ready(&registry, &stuck.key, LONG_ENOUGH_TO_HANG)
+        .await
+        .expect_err("a login that never lands cannot be reported as ready");
+    assert!(
+        failure.contains("did not finish"),
+        "the host has to be told what went wrong: {failure}"
+    );
+}
+
+/// A room that refuses the login says so, and the wait carries the refusal rather
+/// than sitting there until it times out.
+#[tokio::test]
+async fn a_refused_login_ends_the_wait_with_the_refusal() {
+    let room = room("alice", false).await;
+    let registry = Registry::default();
+
+    let host = Client::connect(&registry, loopback(room.port()), "alice").await;
+    host.wait_for_ready().await;
+    // The room has one name and it is taken, which is the one refusal a room has.
+    let twin = Client::connect(&registry, loopback(room.port()), "alice").await;
+    let failure = wait_until_ready(&registry, &twin.key, PATIENCE)
+        .await
+        .expect_err("a refused login is not ready");
+    assert!(
+        failure.contains("refused"),
+        "the refusal has to be what comes back: {failure}"
+    );
+
+    room.stop("done").await;
 }
 
 /// The risk this whole design rests on, shown rather than asserted.

@@ -55,7 +55,10 @@ use coilbox_lobby_protocol::{
     command, default_battle_status, password_hash, team_color_rgb, BattleStatus, ClientStatus,
     LobbyState, LoginConfig, LoginMode, LoginPhase,
 };
-use conn::{spawn_connection, LobbyEvent, Outbound, Registry, TachyonAction};
+use conn::{
+    spawn_connection, wait_until_ready, LobbyEvent, Outbound, Registry, TachyonAction,
+    READY_TIMEOUT,
+};
 use picoframe_core::CliResult;
 use serde_json::{json, Value};
 use tachyon_conn::TachyonMarkers;
@@ -461,6 +464,26 @@ fn mp_cancel_connect(pending: State<'_, PendingConnects>, server_key: String) ->
     }
 }
 
+/// `mp_wait_until_ready`: resolve once a connection has finished logging in.
+///
+/// For a caller whose next act is a command only a logged-in client may send, and
+/// which cannot watch the phase events itself because it is inside one `await`
+/// (see `connectDirect`, which starts a room and opens a battle in it before React
+/// has re-rendered once). Fails rather than waits forever on a login that is
+/// refused, dropped, or never finished.
+#[tauri::command]
+async fn mp_wait_until_ready(
+    registry: State<'_, Registry>,
+    server_key: String,
+) -> Result<CliResult, ()> {
+    Ok(
+        match wait_until_ready(registry.inner(), &server_key, READY_TIMEOUT).await {
+            Ok(()) => CliResult::ok(json!({ "ready": true })),
+            Err(e) => CliResult::err(e),
+        },
+    )
+}
+
 /// `mp_reattach` — after a webview reload the connect `Channel` is dead but the
 /// connection task keeps running. Swap in the fresh `Channel` and replay
 /// `Connected` + the current login phase so the frontend can re-adopt the live
@@ -476,7 +499,7 @@ fn mp_reattach(
         Some(conn) => {
             *lock_or_recover(&conn.sink) = on_event.clone();
             let _ = on_event.send(LobbyEvent::Connected);
-            let phase = *lock_or_recover(&conn.phase);
+            let phase = *conn.phase.borrow();
             let agreement = lock_or_recover(&conn.agreement).clone();
             let _ = on_event.send(LobbyEvent::Phase { phase, agreement });
             CliResult::ok(json!({ "reattached": true }))
@@ -2016,6 +2039,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_confirm_agreement,
             mp_disconnect,
             mp_cancel_connect,
+            mp_wait_until_ready,
             mp_reattach,
             mp_active_keys,
             mp_snapshot,

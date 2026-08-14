@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "mp_confirm_agreement",
     "mp_disconnect",
     "mp_cancel_connect",
+    "mp_wait_until_ready",
     "mp_reattach",
     "mp_active_keys",
     "mp_snapshot",
