@@ -44,6 +44,8 @@ export interface StartRoomArgs {
   /** Announce the room on the local network, so people on it find it without
    *  being told an address. */
   advertise: boolean;
+  /** Hold every join until the host answers it. */
+  approveJoins: boolean;
   /** The battle to open once the host's client has connected. */
   battle: OpenBattleArgs;
 }
@@ -74,6 +76,10 @@ export function HostRoomForm({
   // On by default: the point of hosting on a LAN is that the people on it find
   // the room without being read an address across the sofa.
   const [advertise, setAdvertise] = useState(true);
+  // Off by default: on a LAN everybody in the room is somebody you can see, and
+  // a host who has to watch the screen to let people in is worse than no gate at
+  // all. It earns its keep once a forwarded port puts the room on the internet.
+  const [approveJoins, setApproveJoins] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,6 +105,7 @@ export function HostRoomForm({
         host: trimmedName,
         port: Number(port),
         advertise,
+        approveJoins,
         battle: {
           battleType: 0,
           // Direct is the only mode coilbox implements, here as everywhere.
@@ -271,10 +278,21 @@ export function HostRoomForm({
         label="Reachable over the internet"
         reason="Coilbox cannot open a port on your router yet. Forward it by hand for players outside your network."
       />
-      <PendingToggle
-        label="Approve joins"
-        reason="There is nowhere to answer a waiting join yet, so every join would sit unanswered."
-      />
+      {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association) */}
+      <label className="flex items-start gap-2 text-sm">
+        <Checkbox
+          checked={approveJoins}
+          onCheckedChange={(checked) => setApproveJoins(checked === true)}
+          className="mt-0.5"
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="font-medium">Approve joins</span>
+          <span className="text-xs text-muted-foreground">
+            Nobody gets in until you say so. You are asked in the battle room,
+            and whoever is asking waits until you answer.
+          </span>
+        </span>
+      </label>
 
       {(content.gameFailed || content.mapFailed) && (
         <div className="flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive">

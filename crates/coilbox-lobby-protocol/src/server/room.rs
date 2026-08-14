@@ -47,6 +47,11 @@ const NAT_HELP_PORT: u16 = 8452;
 /// exactly these two.
 const COMP_FLAGS: [&str; 2] = ["u", "sp"];
 
+/// What a kicked player is told, both as they go and every time they try to come
+/// back. One sentence rather than two, so somebody who reads it twice is not left
+/// wondering whether the second is about something else.
+const KICK_REASON: &str = "you were kicked from this room";
+
 /// Where a line goes.
 ///
 /// `All` includes the peer whose command produced it, because that is how a real
@@ -483,7 +488,7 @@ impl RoomState {
             );
         }
         if self.kicked.contains(&username) {
-            return self.deny(peer, "you were kicked from this room");
+            return self.deny(peer, KICK_REASON);
         }
 
         let entry = self.peers.get_mut(&peer).expect("peer checked by caller");
@@ -651,7 +656,7 @@ impl RoomState {
             return refuse("you are already in this battle");
         }
         if self.kicked.contains(&name) {
-            return refuse("you were kicked from this room");
+            return refuse(KICK_REASON);
         }
         // Two refusals rather than one, because they ask for different things: a
         // joiner who sent nothing has to be told there is a password at all, and
@@ -1066,6 +1071,15 @@ impl RoomState {
 
     /// Throw somebody out of the battle and keep them out for the rest of the
     /// room's life. A kick anyone can undo by reconnecting is not a kick.
+    ///
+    /// The name is blocked whether or not anybody is here under it, so a host who
+    /// kicks somebody in the second between their socket dying and their reconnect
+    /// still gets a kick rather than nothing.
+    ///
+    /// The person kicked is told before their socket goes. A window that empties
+    /// itself and then disconnects with nothing said is indistinguishable from the
+    /// host's machine going down, and the reason they read here is the same one
+    /// their next login attempt is refused with.
     fn kick(&mut self, peer: PeerId, username: &str) -> Vec<Outbound> {
         if !self.is_host(peer) || username == self.config.host {
             return vec![];
@@ -1075,6 +1089,10 @@ impl RoomState {
             return vec![];
         };
         let mut out = self.leave_battle(target, username);
+        out.push(Outbound::To {
+            peer: target,
+            line: line::server_msg(KICK_REASON),
+        });
         out.push(Outbound::Close { peer: target });
         out
     }
@@ -1655,6 +1673,13 @@ mod tests {
 
         let out = send(&mut room, ALICE, "KICKFROMBATTLE bob");
         assert!(due(&out, ALICE).contains(&"LEFTBATTLE 1 bob"));
+        // Told before the socket goes, or the kick is indistinguishable from the
+        // host's machine falling over.
+        assert!(
+            due(&out, BOB).contains(&"SERVERMSG you were kicked from this room"),
+            "the kicked player has to be told: {:?}",
+            due(&out, BOB)
+        );
         assert!(out.contains(&Outbound::Close { peer: BOB }));
         room.disconnect(BOB);
 

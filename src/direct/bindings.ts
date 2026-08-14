@@ -69,6 +69,28 @@ export const directRoomStatus = defineCommand<
   { room: DirectRoomStatus | null }
 >("coilbox-direct", "direct_room_status");
 
+/**
+ * Answer a join the room is holding: let them in, or turn them away with a
+ * reason they read verbatim.
+ *
+ * Only reaches a room this client is hosting. The answer never touches the wire
+ * as `JOINBATTLEREQUEST`, because our own client answers that automatically and
+ * would wave every join through before the host saw it, so the room applies it
+ * against the host's own connection instead.
+ *
+ * An answer to a name the room is not holding is ignored, so pressing a button
+ * on somebody who has already given up is harmless.
+ */
+export const directAnswerJoin = defineCommand<
+  {
+    username: string;
+    allow: boolean;
+    /** Why they were turned away. The room supplies its own words when omitted. */
+    reason?: string | null;
+  },
+  { answered: boolean }
+>("coilbox-direct", "direct_answer_join");
+
 /** A room heard announcing itself on the local network (mirrors the Rust
  *  `LanRoom`). */
 export interface DirectLanRoom {

@@ -6,6 +6,7 @@ import {
   DEFAULT_ROOM_PORT,
   directServer,
   isDirectKey,
+  pendingJoinsHeadline,
   playerNameProblem,
   roomPasswordProblem,
   roomPortProblem,
@@ -155,6 +156,16 @@ describe("roomSummary", () => {
   // process and a line reading "-1 players joined" would be worse than a stale one.
   it("does not go negative if the room answers before the host is counted", () => {
     expect(roomSummary(room({ peers: 0 }))).toContain("nobody has joined yet");
+  });
+});
+
+describe("pendingJoinsHeadline", () => {
+  it("says one person without a number, because the buttons name them", () => {
+    expect(pendingJoinsHeadline(1)).toBe("Somebody is waiting to join");
+  });
+
+  it("counts a queue, so a host knows to keep reading past the first", () => {
+    expect(pendingJoinsHeadline(3)).toBe("3 people are waiting to join");
   });
 });
 

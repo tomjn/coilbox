@@ -116,6 +116,22 @@ export function roomSummary(room: DirectRoomStatus): string {
   return parts.join(", ");
 }
 
+/** How often the host's own room is asked what it holds. The command reads a
+ *  struct out of a task in this same process, so two seconds costs nothing and is
+ *  quick enough that somebody waiting at the door is not left there. */
+export const ROOM_POLL_MS = 2000;
+
+/**
+ * What to say above the list of people waiting to be let in. Pure.
+ *
+ * The count is in the words rather than only in the list, because the list is
+ * read as a set of buttons and the sentence is what a host skims.
+ */
+export function pendingJoinsHeadline(count: number): string {
+  if (count === 1) return "Somebody is waiting to join";
+  return `${count} people are waiting to join`;
+}
+
 /**
  * Why a typed room port cannot be used, or null when it can. Pure.
  *

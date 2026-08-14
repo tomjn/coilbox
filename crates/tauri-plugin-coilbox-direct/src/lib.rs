@@ -132,6 +132,34 @@ async fn direct_room_status(active: State<'_, ActiveRoom>) -> Result<CliResult, 
     Ok(CliResult::ok(json!({ "room": status })))
 }
 
+/// `direct_answer_join`: let a waiting joiner in, or turn them away with a
+/// reason they read verbatim.
+///
+/// The host's own client could send `JOINBATTLEACCEPT` over its loopback socket
+/// and the room would act on it, but there is no `mp_join_battle_accept` to send
+/// it with, and the half that exists (`mp_join_battle_deny`) is keyed by server
+/// connection. Answering here keeps one action in one plugin, against the same
+/// room the pending names were read from.
+///
+/// An answer to a join the room is not holding is ignored, so the host pressing
+/// a button on a name that has already given up is harmless.
+#[tauri::command]
+async fn direct_answer_join(
+    active: State<'_, ActiveRoom>,
+    username: String,
+    allow: bool,
+    reason: Option<String>,
+) -> Result<CliResult, ()> {
+    let slot = active.0.lock().await;
+    Ok(match slot.as_ref() {
+        Some(room) => {
+            room.answer_join(&username, allow, reason);
+            CliResult::ok(json!({ "answered": true }))
+        }
+        None => CliResult::err("not hosting a room"),
+    })
+}
+
 /// `direct_lan_rooms`: the rooms being announced on this network right now.
 ///
 /// Starts listening the first time it is asked, so a client that never looks for
@@ -198,6 +226,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             direct_start_room,
             direct_stop_room,
             direct_room_status,
+            direct_answer_join,
             direct_lan_rooms,
             direct_stop_discovery
         ])

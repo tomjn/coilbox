@@ -3,6 +3,8 @@ import { Bookmark, Gamepad2, LogIn } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useBrandingEntry } from "@/content/branding";
+import { PendingJoinsPanel, usePendingJoins } from "@/direct/PendingJoins";
+import { isDirectKey } from "@/direct/room";
 import { useFactionLogos } from "@/factions/logos";
 import { notify } from "@/notify/notify";
 import { useSkirmishAis } from "@/play/config";
@@ -63,6 +65,10 @@ function BattleRoomPage() {
   const brandingAi = useBrandingEntry(room.localGame)?.ai;
   const aiConfig = mergeGameAi(getProfile().ai, brandingAi);
   const launch = useBattleLaunch(room.serverKey, room.target, room.selfHost);
+  // People waiting to be let into a room we are hosting ourselves, with approval
+  // switched on. Asked for only when this connection is that room over loopback,
+  // so a battle on a real server never polls a plugin holding no room at all.
+  const joins = usePendingJoins(isDirectKey(room.serverKey) && room.selfHost);
   // Private, client-side per-player notes (issue #341), scoped to this server.
   const { get: getNote, set: setNote } = useNoteActions(room.serverKey);
   // "N games with this player…" line for the note popover, from the local
@@ -374,6 +380,10 @@ function BattleRoomPage() {
         onToggleLock={room.setLocked}
         serverKey={room.serverKey}
       />
+
+      {/* Above everything else on the page: somebody is sitting on a spinner
+          until this is answered, and nothing below is blocking anyone. */}
+      <PendingJoinsPanel pending={joins.pending} onAnswer={joins.answer} />
 
       {room.currentVote && (
         <VotePanel vote={room.currentVote} onVote={room.castVote} />
