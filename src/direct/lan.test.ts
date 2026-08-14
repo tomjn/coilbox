@@ -90,9 +90,11 @@ describe("joinBlockedReason", () => {
     );
   });
 
-  it("says to leave a room you are already in", () => {
+  // Said of the connection rather than the battle, because leaving the battle
+  // leaves the connection to the room behind it, and a join still cannot have it.
+  it("says to disconnect from a room already connected to", () => {
     expect(joinBlockedReason("Tom@127.0.0.1:8200", false)).toContain(
-      "Leave the room you are in first",
+      "connected to a room already",
     );
   });
 

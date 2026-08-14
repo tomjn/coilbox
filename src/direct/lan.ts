@@ -66,7 +66,7 @@ export function joinBlockedReason(
     return "Stop your own room first. Coilbox holds one lobby connection, and joining needs it.";
   }
   if (isDirectKey(activeKey)) {
-    return "Leave the room you are in first. Coilbox holds one lobby connection, and joining needs it.";
+    return "You are connected to a room already. Disconnect from it first: coilbox holds one lobby connection, and joining needs it.";
   }
   if (activeKey) {
     return "Log out of the lobby server first. Coilbox holds one lobby connection, and joining needs it.";
