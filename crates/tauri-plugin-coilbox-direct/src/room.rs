@@ -85,6 +85,8 @@ pub struct RoomStatus {
     pub host: String,
     pub ip: String,
     pub approve_joins: bool,
+    /// Whether this room is announcing itself on the local network.
+    pub advertise: bool,
     /// Open sockets, logged in or not.
     pub peers: usize,
     /// Names waiting on the host's answer, oldest first. Empty unless
@@ -466,6 +468,7 @@ fn status_of(state: &RoomState, options: &RoomOptions, port: u16, peers: usize) 
         host: options.host.clone(),
         ip: options.ip.clone(),
         approve_joins: options.approve_joins,
+        advertise: options.advertise,
         peers,
         pending: state
             .pending_joins()

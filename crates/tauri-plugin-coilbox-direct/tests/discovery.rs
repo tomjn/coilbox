@@ -15,7 +15,13 @@
 
 use std::time::Duration;
 
-use tauri_plugin_coilbox_direct::beacon::{encode, Beacon, LanRoom, BEACON_EXPIRY, BEACON_INTERVAL};
+use coilbox_lobby_protocol::command;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
+
+use tauri_plugin_coilbox_direct::beacon::{
+    encode, Beacon, LanRoom, BEACON_EXPIRY, BEACON_INTERVAL,
+};
 use tauri_plugin_coilbox_direct::discovery::{announce_once, Discovery};
 use tauri_plugin_coilbox_direct::room::{Room, RoomOptions};
 
@@ -153,6 +159,80 @@ async fn a_room_that_stops_beaconing_leaves_the_list() {
     .await;
     assert!(gone, "a room whose beacons stopped is still listed");
 
+    listening.stop();
+}
+
+/// The whole chain with nothing faked: a real room, a real battle opened in it
+/// over a real socket, and a listener that hears what it holds.
+///
+/// This is the test that keeps the beacon honest. Everything it says is read
+/// from the room's own status, which is the same answer `direct_room_status`
+/// gives the host's screen, so a beacon that drifts from the room fails here.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_room_with_a_battle_in_it_announces_what_it_holds() {
+    let listening = Discovery::start().expect("the beacon port binds");
+    let room = Room::start(RoomOptions {
+        host: "alice".to_string(),
+        ip: "127.0.0.1".to_string(),
+        port: 0,
+        approve_joins: false,
+        advertise: true,
+    })
+    .await
+    .expect("a free port");
+
+    // The host's own client, as far as the room is concerned: log in, then open
+    // the battle. Lines the room sends back are left in the socket buffer, since
+    // what is being checked is what the room then announces.
+    let stream = TcpStream::connect(("127.0.0.1", room.port()))
+        .await
+        .expect("the room is listening");
+    let (_read, mut write) = stream.into_split();
+    for line in [
+        "LOGIN alice aGFzaA== 0 127.0.0.1 Coilbox 0.1\t1\tu sp".to_string(),
+        command::open_battle(
+            0,
+            0,
+            "letmein",
+            8452,
+            16,
+            -1,
+            0,
+            -1,
+            "spring",
+            "105.1.1",
+            "Red Comet Remake 1.8",
+            "Tom's LAN game",
+            "Beyond All Reason test-1234",
+        ),
+    ] {
+        write
+            .write_all(format!("{line}\n").as_bytes())
+            .await
+            .expect("the room is still there");
+    }
+
+    let announced = until(BEACON_INTERVAL * 3, || {
+        find(&listening.rooms(None), room.beacon_id()).is_some()
+    })
+    .await;
+    assert!(announced, "a room with a battle in it was never announced");
+
+    let heard = find(&listening.rooms(None), room.beacon_id()).expect("the beacon");
+    assert_eq!(heard.title, "Tom's LAN game");
+    assert_eq!(heard.host, "alice");
+    assert_eq!(heard.game, "Beyond All Reason test-1234");
+    assert_eq!(heard.map, "Red Comet Remake 1.8");
+    assert_eq!(heard.max_players, 16);
+    assert_eq!(heard.players, 1, "the host is in their own battle");
+    // The lobby port a joiner dials, not the engine's 8452 in the battle.
+    assert_eq!(heard.port, room.port());
+    assert!(heard.passworded, "the battle was opened with a key");
+    // And the host can pick their own room out of the list.
+    let ours = find(&listening.rooms(Some(room.beacon_id())), room.beacon_id()).expect("ours");
+    assert!(ours.is_self);
+
+    room.stop("done").await;
     listening.stop();
 }
 
