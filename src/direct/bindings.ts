@@ -108,17 +108,22 @@ export interface DirectLanRoom {
    *  engine's game port. */
   port: number;
   passworded: boolean;
-  /** Where the beacon came from, which is the address to dial. Read off the
-   *  datagram rather than out of it, so it is right for the interface it
+  /** Where the announcement came from, which is the address to dial. Read off
+   *  the datagram rather than out of it, so it is right for the interface it
    *  arrived on. */
   address: string;
   /** This client's own room, heard back off the network. Worth showing as yours
    *  rather than hiding: a host who cannot see their own room has no way to tell
    *  whether anybody else can. */
   isSelf: boolean;
-  /** How long ago the last beacon arrived. A room is dropped once its beacons
-   *  have been silent for a few seconds. */
+  /** How long ago this room was last heard from, on whichever announcement spoke
+   *  most recently. */
   lastSeenMs: number;
+  /** The announcements carrying this room: coilbox's own UDP beacon, a DNS-SD
+   *  service record, or both. A room is announced both ways and listed once, so
+   *  one entry here means the other half of the network is not getting through.
+   */
+  sources: ("beacon" | "mdns")[];
 }
 
 /**

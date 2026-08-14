@@ -36,17 +36,27 @@
 //! would pick. The netmask is the reason: a probe can learn an address but not
 //! the subnet it is on, and without that the only broadcast address there is to
 //! send to is the limited one, 255.255.255.255.
+//!
+//! # And a third, which is not ours
+//!
+//! [`crate::mdns`] says the same thing again as a DNS-SD service, and [`Browse`]
+//! below is the listening half of it. Same reason as the two above: it reaches
+//! networks these do not. The two halves never wait on each other, and a machine
+//! that cannot do mDNS at all loses nothing here.
 
+use std::collections::HashMap;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use mdns_sd::ServiceEvent;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::net::UdpSocket;
 use tokio::task::JoinHandle;
 
-use crate::beacon::{decode, Directory, LanRoom, BEACON_GROUP, BEACON_PORT};
+use crate::beacon::{decode, Directory, LanRoom, Source, BEACON_GROUP, BEACON_PORT};
+use crate::mdns;
 
 /// The largest datagram this will read. A beacon is a couple of hundred bytes
 /// and anything near this is somebody else's protocol.
@@ -77,6 +87,14 @@ impl LocalNet {
             return Ipv4Addr::BROADCAST;
         }
         Ipv4Addr::from(u32::from(self.addr) | !mask(self.prefix_len))
+    }
+
+    /// Whether an address is on this network.
+    ///
+    /// What [`crate::mdns`] uses to pick which of the addresses a room published
+    /// is the one this machine can reach it at.
+    pub fn contains(&self, addr: Ipv4Addr) -> bool {
+        u32::from(addr) & mask(self.prefix_len) == u32::from(self.addr) & mask(self.prefix_len)
     }
 
     /// The first and last usable address of this subnet, in that order.
@@ -276,9 +294,19 @@ fn send_from(net: LocalNet, payload: &[u8]) -> io::Result<()> {
 }
 
 /// The rooms this client can hear, kept up to date by a task of its own.
+///
+/// Two tasks, in fact, one per announcement, both filling the one [`Directory`]:
+/// the beacon socket below, and the DNS-SD browse in [`crate::mdns`]. They are
+/// independent on purpose. A network that carries one and drops the other is the
+/// whole reason for announcing twice, and a failure to browse must not cost the
+/// beacon anything, so the mDNS half is started on a best effort and its absence
+/// is not an error anybody is shown.
 pub struct Discovery {
     rooms: Arc<Mutex<Directory>>,
     task: JoinHandle<()>,
+    /// The DNS-SD browse, when one could be started. Holds the daemon, so
+    /// dropping this shuts its thread down.
+    browse: Option<Browse>,
 }
 
 impl Discovery {
@@ -291,7 +319,11 @@ impl Discovery {
         let socket = bind_listener()?;
         let rooms = Arc::new(Mutex::new(Directory::default()));
         let task = tokio::spawn(listen(socket, Arc::clone(&rooms)));
-        Ok(Discovery { rooms, task })
+        Ok(Discovery {
+            rooms: Arc::clone(&rooms),
+            task,
+            browse: Browse::start(rooms).ok(),
+        })
     }
 
     /// The rooms heard recently, oldest beacons dropped.
@@ -310,6 +342,83 @@ impl Discovery {
     /// Stop listening and free the port.
     pub fn stop(self) {
         self.task.abort();
+        // The browse goes with it: dropping it shuts the mDNS daemon's thread
+        // down, which is the half of this that is not a tokio task.
+        drop(self.browse);
+    }
+}
+
+/// The DNS-SD half of listening: one mDNS daemon, one browse, one task reading
+/// what it finds into the same [`Directory`] the beacon fills.
+struct Browse {
+    daemon: mdns_sd::ServiceDaemon,
+    task: JoinHandle<()>,
+}
+
+impl Browse {
+    /// Start browsing for rooms.
+    ///
+    /// Fails where the daemon cannot be created at all, which the caller treats
+    /// as "this machine does mDNS badly" rather than as an error: the beacon is
+    /// still listening and is still the transport most rooms arrive on.
+    fn start(rooms: Arc<Mutex<Directory>>) -> Result<Browse, mdns_sd::Error> {
+        let daemon = mdns_sd::ServiceDaemon::new()?;
+        let events = daemon.browse(mdns::SERVICE_TYPE)?;
+        Ok(Browse {
+            daemon,
+            task: tokio::spawn(browse(events, rooms)),
+        })
+    }
+}
+
+impl Drop for Browse {
+    fn drop(&mut self) {
+        self.task.abort();
+        // Not waited on. Shutting the daemon down sends the goodbyes and ends
+        // its thread, and it does both itself.
+        let _ = self.daemon.shutdown();
+    }
+}
+
+/// Read resolved rooms out of a DNS-SD browse until the task is dropped.
+///
+/// A record is only taken as a room when it carries an id, which is what ties it
+/// to the same room's beacon. See [`crate::mdns::from_txt`].
+async fn browse(events: mdns_sd::Receiver<ServiceEvent>, rooms: Arc<Mutex<Directory>>) {
+    // Which room each published service is, so a goodbye naming the service can
+    // take the right room out. The instance name is not the room id, and a
+    // removal carries nothing else.
+    let mut named: HashMap<String, String> = HashMap::new();
+    while let Ok(event) = events.recv_async().await {
+        match event {
+            ServiceEvent::ServiceResolved(service) => {
+                let props = service.txt_properties.clone().into_property_map_str();
+                let Some(beacon) = mdns::from_txt(&props, service.port) else {
+                    continue;
+                };
+                let addresses: Vec<Ipv4Addr> = service.get_addresses_v4().into_iter().collect();
+                let Some(address) = mdns::address_to_dial(&addresses, &local_nets()) else {
+                    // A service with no IPv4 address is one nothing here can
+                    // dial. IPv6 is not a transport this hosts on.
+                    continue;
+                };
+                named.insert(service.fullname.clone(), beacon.id.clone());
+                if let Ok(mut dir) = rooms.lock() {
+                    dir.record(Source::Mdns, beacon, address.to_string(), Instant::now());
+                }
+            }
+            // The goodbye a stopping room sends, or the record's TTL running
+            // out. Either way that announcement is over, and the room stays
+            // listed only if its beacon is still arriving.
+            ServiceEvent::ServiceRemoved(_, fullname) => {
+                if let Some(id) = named.remove(&fullname) {
+                    if let Ok(mut dir) = rooms.lock() {
+                        dir.forget(Source::Mdns, &id);
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }
 
@@ -356,7 +465,12 @@ async fn listen(socket: UdpSocket, rooms: Arc<Mutex<Directory>>) {
             continue;
         };
         if let Ok(mut dir) = rooms.lock() {
-            dir.record(beacon, from.ip().to_string(), Instant::now());
+            dir.record(
+                Source::Beacon,
+                beacon,
+                from.ip().to_string(),
+                Instant::now(),
+            );
         }
     }
 }

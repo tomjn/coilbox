@@ -40,7 +40,8 @@ use tokio::time::Instant;
 use tokio_util::codec::{Framed, LinesCodec};
 
 use crate::beacon::{self, Beacon, BEACON_INTERVAL};
-use crate::discovery::announce_once;
+use crate::discovery::{announce_once, local_addrs};
+use crate::mdns::Advert;
 
 /// The port a room listens on unless the host picks another. Distinct from the
 /// engine's game port (8452), which the engine binds itself and this never
@@ -244,8 +245,11 @@ impl Room {
     /// Returns once the port is free, so a host who stops and restarts on the
     /// same port is not told it is in use by the room they just closed.
     pub async fn stop(self, reason: &str) {
-        // The beacon first: a room that is closing must stop telling the network
-        // it is open, or it stays in everybody's list for another few seconds.
+        // The announcements first: a room that is closing must stop telling the
+        // network it is open, or it stays in everybody's list for another few
+        // seconds. Aborting drops the task, which drops the DNS-SD advert, which
+        // is what sends the goodbye that takes the room out of everybody's list
+        // at once instead of leaving it to its TTL.
         if let Some(announcer) = self.announcer {
             announcer.abort();
             let _ = announcer.await;
@@ -413,8 +417,25 @@ async fn run_room(
 ///
 /// A room with no battle in it yet is not announced. See
 /// [`Beacon::from_status`].
+///
+/// # Both announcements, one switch
+///
+/// The same status also feeds the DNS-SD advert in [`crate::mdns`], because a
+/// room that says two different things about itself is worse than a room that
+/// says one. One task rather than two, and one description read once.
+///
+/// This whole task only exists when the host left announcements on, so mDNS is
+/// governed by the same switch. Announcing on a second channel after somebody
+/// turned announcements off would be the opposite of what they asked for, and
+/// they have no way of knowing there is a second channel to turn off.
+///
+/// The mDNS advert is only put on the wire when something about it changes,
+/// which is what DNS-SD expects and is why it is held across ticks rather than
+/// rebuilt on each one. It is dropped with the task, which is what sends the
+/// goodbye packet.
 async fn announce_loop(id: String, requests: mpsc::UnboundedSender<Request>) {
     let mut tick = tokio::time::interval(BEACON_INTERVAL);
+    let mut advert: Option<Advert> = None;
     loop {
         tick.tick().await;
         let (tx, rx) = oneshot::channel();
@@ -426,6 +447,14 @@ async fn announce_loop(id: String, requests: mpsc::UnboundedSender<Request>) {
         let Some(beacon) = Beacon::from_status(&status, &id) else {
             continue;
         };
+        let addresses = local_addrs();
+        match &mut advert {
+            Some(advert) => advert.update(&beacon, &addresses),
+            // A machine with no working mDNS gets one attempt per tick and
+            // costs the beacon nothing either way. There is nobody to tell:
+            // the room is still announced, on the transport that works.
+            None => advert = Advert::start(&beacon, &addresses).ok(),
+        }
         let bytes = beacon::encode(&beacon).into_bytes();
         // Sending is a handful of blocking socket calls, so it happens off the
         // runtime's worker threads.

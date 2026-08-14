@@ -14,8 +14,11 @@
 //!
 //! - `coilbox-lobby-protocol::server` decides what every peer is told.
 //! - [`room`] owns the listener, the sockets and the disconnects.
-//! - [`beacon`] is what a room says about itself on the local network.
-//! - [`discovery`] carries that, and hears everybody else's.
+//! - [`beacon`] is what a room says about itself on the local network, and how
+//!   what comes back from both announcements is merged into one list.
+//! - [`mdns`] says the same thing again as a DNS-SD service, beside the beacon
+//!   rather than instead of it.
+//! - [`discovery`] carries both, and hears everybody else's.
 //! - [`portmap`] asks the router to open ports, and [`stun`] asks the internet
 //!   whether it worked. [`reachability`] is the two of them together.
 //! - This file is the IPC surface over one running room.
@@ -33,12 +36,13 @@ use tokio::sync::Mutex;
 
 pub mod beacon;
 pub mod discovery;
+pub mod mdns;
 pub mod portmap;
 pub mod reachability;
 pub mod room;
 pub mod stun;
 
-pub use beacon::{Beacon, LanRoom};
+pub use beacon::{Beacon, LanRoom, Source};
 pub use discovery::Discovery;
 pub use portmap::{PortRequest, Transport};
 pub use reachability::{Ports, Reachability};
