@@ -6,8 +6,8 @@
 //! # Two transports, on purpose
 //!
 //! Every beacon is sent twice, once to the multicast group and once to the
-//! broadcast address. They fail in different places, and neither is reliable
-//! enough on its own:
+//! broadcast address of the subnet it is leaving by. They fail in different
+//! places, and neither is reliable enough on its own:
 //!
 //! - Multicast is dropped by some wireless access points, and by hosts that
 //!   joined the group on a different interface than the sender used.
@@ -31,11 +31,14 @@
 //! so a broadcast arriving on any interface is delivered whatever the multicast
 //! joins did.
 //!
-//! Finding those addresses without an interface enumeration library is what
-//! [`local_addrs`] is for.
+//! [`local_nets`] is what finds those addresses, by asking the OS for its
+//! interfaces rather than by probing the routing table for the source address it
+//! would pick. The netmask is the reason: a probe can learn an address but not
+//! the subnet it is on, and without that the only broadcast address there is to
+//! send to is the limited one, 255.255.255.255.
 
 use std::io;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -49,53 +52,119 @@ use crate::beacon::{decode, Directory, LanRoom, BEACON_GROUP, BEACON_PORT};
 /// and anything near this is somebody else's protocol.
 const MAX_DATAGRAM: usize = 2048;
 
-/// Addresses used to ask the routing table which of this machine's addresses
-/// would be used to reach a given network.
+/// One IPv4 address this machine holds, and the two things worth knowing about
+/// the network it is on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LocalNet {
+    /// The address itself. A beacon is sent from it, and a joiner is given it.
+    pub addr: Ipv4Addr,
+    /// How much of it names the network rather than this machine.
+    pub prefix_len: u8,
+    /// The gateway the OS routes this interface's traffic through, when it names
+    /// one. This is what [`crate::portmap`] speaks NAT-PMP to.
+    pub gateway: Option<Ipv4Addr>,
+}
+
+impl LocalNet {
+    /// Where a broadcast beacon leaving by this address should be addressed.
+    ///
+    /// The subnet's own broadcast address. A prefix with no room for one, which
+    /// is what a point to point tunnel is usually given, falls back to the
+    /// limited broadcast 255.255.255.255, which is what every interface used
+    /// before any of this could see a netmask.
+    pub fn broadcast(&self) -> Ipv4Addr {
+        if self.prefix_len >= 31 {
+            return Ipv4Addr::BROADCAST;
+        }
+        Ipv4Addr::from(u32::from(self.addr) | !mask(self.prefix_len))
+    }
+
+    /// The first and last usable address of this subnet, in that order.
+    ///
+    /// Where a home router sits when nothing will say where it is. Empty when
+    /// the prefix leaves no usable addresses to guess at.
+    pub fn ends(&self) -> Vec<Ipv4Addr> {
+        if self.prefix_len >= 31 {
+            return Vec::new();
+        }
+        let network = u32::from(self.addr) & mask(self.prefix_len);
+        let broadcast = network | !mask(self.prefix_len);
+        vec![Ipv4Addr::from(network + 1), Ipv4Addr::from(broadcast - 1)]
+    }
+}
+
+/// The netmask of a prefix, as the bits it keeps.
+fn mask(prefix_len: u8) -> u32 {
+    if prefix_len == 0 {
+        0
+    } else {
+        u32::MAX << (32 - prefix_len.min(32))
+    }
+}
+
+/// Every IPv4 network this machine is on, best first and loopback last.
 ///
-/// Connecting a UDP socket sends nothing: it only fixes a route and a source
-/// address, which is then readable with `local_addr`. One probe per network a
-/// LAN is normally on, plus a public address for whatever holds the default
-/// route, plus link-local for two machines on one cable with no DHCP.
+/// Read from the OS's own interface list, so an address on an unusual private
+/// range, or a second address on one interface, is announced on like any other.
 ///
-/// Private networks come first so the address a room announces itself at is the
-/// one a neighbour on the LAN can reach, rather than the one a full tunnel VPN
-/// handed out.
-const PROBES: &[(Ipv4Addr, u16)] = &[
-    (Ipv4Addr::new(192, 168, 0, 1), 53),
-    (Ipv4Addr::new(192, 168, 1, 1), 53),
-    (Ipv4Addr::new(10, 0, 0, 1), 53),
-    (Ipv4Addr::new(172, 16, 0, 1), 53),
-    (Ipv4Addr::new(169, 254, 1, 1), 53),
-    (Ipv4Addr::new(1, 1, 1, 1), 53),
-];
+/// The order is what decides which address a room announces itself at, so
+/// ordinary private networks come first, then anything else routable, then point
+/// to point tunnels: a full tunnel VPN's address is no use to somebody sitting
+/// in the same room. Loopback is last, is always in the list whatever
+/// enumeration found, and is what makes two coilboxes on one machine find each
+/// other with no network at all, which is also how discovery is tested.
+pub fn local_nets() -> Vec<LocalNet> {
+    let mut found: Vec<(u8, LocalNet)> = Vec::new();
+    for iface in netdev::get_interfaces() {
+        // A cable that is unplugged still has its last address on some
+        // platforms, and a beacon sent from it goes nowhere.
+        if !iface.is_up() {
+            continue;
+        }
+        let gateway = iface
+            .gateway
+            .as_ref()
+            .and_then(|device| device.ipv4.first().copied());
+        for net in &iface.ipv4 {
+            let addr = net.addr();
+            if addr.is_unspecified() || found.iter().any(|(_, seen)| seen.addr == addr) {
+                continue;
+            }
+            let rank = if addr.is_loopback() {
+                3
+            } else if iface.is_point_to_point() {
+                2
+            } else if addr.is_private() {
+                0
+            } else {
+                1
+            };
+            found.push((
+                rank,
+                LocalNet {
+                    addr,
+                    prefix_len: net.prefix_len(),
+                    gateway,
+                },
+            ));
+        }
+    }
+    // Stable, so interfaces of equal rank stay in the order the OS listed them.
+    found.sort_by_key(|(rank, _)| *rank);
+    let mut nets: Vec<LocalNet> = found.into_iter().map(|(_, net)| net).collect();
+    if !nets.iter().any(|net| net.addr.is_loopback()) {
+        nets.push(LocalNet {
+            addr: Ipv4Addr::LOCALHOST,
+            prefix_len: 8,
+            gateway: None,
+        });
+    }
+    nets
+}
 
 /// Every local IPv4 address a beacon should be sent from, loopback last.
-///
-/// Loopback is always in the list and is what makes two coilboxes on one machine
-/// find each other with no network at all, which is also how discovery is
-/// tested.
 pub fn local_addrs() -> Vec<Ipv4Addr> {
-    let mut found: Vec<Ipv4Addr> = Vec::new();
-    for (ip, port) in PROBES {
-        let Ok(socket) = std::net::UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)) else {
-            continue;
-        };
-        // Fails with "network unreachable" when nothing routes there, which is
-        // the answer rather than an error.
-        if socket.connect((*ip, *port)).is_err() {
-            continue;
-        }
-        let Ok(SocketAddr::V4(local)) = socket.local_addr() else {
-            continue;
-        };
-        let local = *local.ip();
-        if local.is_unspecified() || local.is_loopback() || found.contains(&local) {
-            continue;
-        }
-        found.push(local);
-    }
-    found.push(Ipv4Addr::LOCALHOST);
-    found
+    local_nets().into_iter().map(|net| net.addr).collect()
 }
 
 /// The address to tell a joining engine to connect to, or `None` when this
@@ -121,14 +190,15 @@ pub fn lan_address() -> Option<String> {
 /// multicast, which is normal for a VPN tunnel, must not stop the interface that
 /// can.
 pub fn announce_once(payload: &[u8]) {
-    for local in local_addrs() {
-        let _ = send_from(local, payload);
+    for net in local_nets() {
+        let _ = send_from(net, payload);
     }
 }
 
-/// One beacon, from one of this machine's addresses, to both the group and the
-/// broadcast address.
-fn send_from(local: Ipv4Addr, payload: &[u8]) -> io::Result<()> {
+/// One beacon, from one of this machine's addresses, to both the group and that
+/// address's own broadcast address.
+fn send_from(net: LocalNet, payload: &[u8]) -> io::Result<()> {
+    let local = net.addr;
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_reuse_address(true)?;
     socket.bind(&SockAddr::from(SocketAddrV4::new(local, 0)))?;
@@ -144,7 +214,7 @@ fn send_from(local: Ipv4Addr, payload: &[u8]) -> io::Result<()> {
     socket.set_multicast_loop_v4(true)?;
 
     let group = SockAddr::from(SocketAddrV4::new(BEACON_GROUP, BEACON_PORT));
-    let broadcast = SockAddr::from(SocketAddrV4::new(Ipv4Addr::BROADCAST, BEACON_PORT));
+    let broadcast = SockAddr::from(SocketAddrV4::new(net.broadcast(), BEACON_PORT));
     let sent_group = socket.send_to(payload, &group);
     let sent_broadcast = socket.send_to(payload, &broadcast);
     // Only a failure if neither transport left the machine.
@@ -262,6 +332,72 @@ mod tests {
     fn the_announced_address_is_never_loopback() {
         if let Some(address) = lan_address() {
             assert_ne!(address, "127.0.0.1");
+        }
+    }
+
+    /// The netmask is the whole reason for enumerating: a beacon goes to the
+    /// broadcast address of the network it is leaving by, and a /24 is not the
+    /// only shape a network comes in.
+    #[test]
+    fn a_beacon_is_addressed_to_its_own_subnets_broadcast() {
+        let net = |addr: [u8; 4], prefix_len| LocalNet {
+            addr: Ipv4Addr::from(addr),
+            prefix_len,
+            gateway: None,
+        };
+        assert_eq!(
+            net([192, 168, 1, 45], 24).broadcast(),
+            Ipv4Addr::new(192, 168, 1, 255)
+        );
+        assert_eq!(
+            net([10, 12, 5, 9], 22).broadcast(),
+            Ipv4Addr::new(10, 12, 7, 255)
+        );
+        assert_eq!(
+            net([172, 16, 4, 200], 16).broadcast(),
+            Ipv4Addr::new(172, 16, 255, 255)
+        );
+    }
+
+    /// A tunnel handed a single address has no subnet to broadcast to, so it
+    /// sends where everything sent before there was a netmask to read.
+    #[test]
+    fn an_address_with_no_subnet_falls_back_to_the_limited_broadcast() {
+        for prefix_len in [31, 32] {
+            let net = LocalNet {
+                addr: Ipv4Addr::new(100, 88, 3, 4),
+                prefix_len,
+                gateway: None,
+            };
+            assert_eq!(net.broadcast(), Ipv4Addr::BROADCAST);
+            assert!(net.ends().is_empty());
+        }
+    }
+
+    /// Both ends of the real subnet, which on anything other than a /24 is not
+    /// what counting to 254 would have given.
+    #[test]
+    fn the_ends_of_a_subnet_are_its_own_and_not_a_slash_24s() {
+        let net = LocalNet {
+            addr: Ipv4Addr::new(10, 12, 5, 9),
+            prefix_len: 22,
+            gateway: None,
+        };
+        assert_eq!(
+            net.ends(),
+            vec![Ipv4Addr::new(10, 12, 4, 1), Ipv4Addr::new(10, 12, 7, 254)]
+        );
+    }
+
+    /// Enumeration says what the OS says, and the OS always has loopback, so an
+    /// empty answer means the enumeration itself is broken.
+    #[test]
+    fn every_address_enumerated_carries_the_network_it_is_on() {
+        let nets = local_nets();
+        assert!(!nets.is_empty());
+        for net in &nets {
+            assert!(net.prefix_len <= 32, "{net:?} has an impossible prefix");
+            assert!(!net.addr.is_unspecified());
         }
     }
 }
