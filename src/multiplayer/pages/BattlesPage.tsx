@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from "react-router";
 import type { SkirmishDraft } from "@/play/drafts";
 import { useScanTargetSelection } from "../../content/config";
 import {
-  type DirectRoomStatus,
   directRoomStatus,
   directStartRoom,
   directStopRoom,
@@ -13,6 +12,11 @@ import {
   HostRoomControl,
   type StartRoomArgs,
 } from "../../direct/HostRoomControl";
+import {
+  readHostedRoom,
+  setHostedRoom,
+  useHostedRoom,
+} from "../../direct/hostedRoom";
 import { type JoinRoomArgs, LanRooms } from "../../direct/LanRooms";
 import {
   joinBlockedReason,
@@ -76,9 +80,11 @@ function BattlesPage() {
     disconnect,
   } = useMultiplayer();
 
-  // The room this client hosts, refetched on arrival because the page unmounts
-  // when a start lands the host in the battle room and they walk back here.
-  const [room, setRoom] = useState<DirectRoomStatus | null>(null);
+  // The room this client hosts, off the shared source that outlives this page.
+  // Who is in it and whether it wants a password are the room's to know and the
+  // direct plugin emits no events, so it is polled, but by one reader rather
+  // than by every page that wants it (issue #1600).
+  const room = useHostedRoom();
   const [roomBusy, setRoomBusy] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const [lastLogin] = useLastLogin();
@@ -86,33 +92,6 @@ function BattlesPage() {
   // this page is open and stopped when it is not, so nothing holds the beacon
   // port open behind a page nobody is looking at.
   const lan = useLanRooms();
-  useEffect(() => {
-    directRoomStatus({})
-      .then((r) => setRoom(r.room))
-      .catch(() => {});
-  }, []);
-
-  // A stop this page has already asked for, so an answer that was in flight before
-  // it does not put the room's line back for one more tick.
-  const stoppedRef = useRef(false);
-  // Who is in the room and whether it wants a password are the room's to know, and
-  // the direct plugin emits no events, so the running line is polled rather than
-  // subscribed to. The command reads a struct out of the room task in this same
-  // process, so two seconds costs nothing and is quick enough that a host sees a
-  // join before they wonder whether it worked. Only while there is a room: with
-  // none, `hosting` is false and there is no timer at all.
-  const hosting = room !== null;
-  useEffect(() => {
-    if (!hosting) return;
-    const timer = setInterval(() => {
-      directRoomStatus({})
-        .then((r) => {
-          if (!stoppedRef.current) setRoom(r.room);
-        })
-        .catch(() => {});
-    }, 2000);
-    return () => clearInterval(timer);
-  }, [hosting]);
   // Under Tachyon the server allocates a dedicated autohost and a client cannot
   // host a battle at all. What it can do is create a lobby, which is a different
   // thing with its own popover, so the two swap rather than one being hidden.
@@ -338,9 +317,8 @@ function BattlesPage() {
         (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
       );
       if (!opened) throw new Error(noBattleFailure());
-      stoppedRef.current = false;
       setStopError(null);
-      setRoom(opened);
+      setHostedRoom(opened);
     } catch (e) {
       // The room is up but we are not in it, which is a room nobody can host.
       // Take it down rather than leave a listener with no owner behind.
@@ -360,7 +338,6 @@ function BattlesPage() {
   async function onStopRoom() {
     setRoomBusy(true);
     setStopError(null);
-    stoppedRef.current = true;
     try {
       const reason = roomStopReason(room?.host ?? "");
       await disconnect();
@@ -370,10 +347,10 @@ function BattlesPage() {
       // asked for it has gone is rude, and the hour-long lease only limits the
       // damage when this never runs, which is a host whose machine was killed.
       await directClosePorts({}).catch(() => {});
-      setRoom(null);
+      setHostedRoom(null);
     } catch (e) {
-      // The room is still there, so let the poll speak for it again.
-      stoppedRef.current = false;
+      // The room is still there, so let a fresh reading speak for it again.
+      void readHostedRoom();
       setStopError(e instanceof Error ? e.message : String(e));
     } finally {
       setRoomBusy(false);

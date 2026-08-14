@@ -530,10 +530,11 @@ async fn a_join_the_host_has_to_approve_waits_for_them() {
     room.stop("done").await;
 }
 
-/// A refusal has to reach the joiner in words. Being dropped in silence is the
-/// one thing a room may never do.
+/// A refusal has to reach the joiner in words, and it has to hold. Being dropped
+/// in silence is the one thing a room may never do, and a refusal somebody can
+/// undo by asking again is not a refusal.
 #[tokio::test]
-async fn a_refused_join_is_told_why() {
+async fn a_refused_join_is_told_why_and_cannot_be_asked_again() {
     let room = room("alice", true).await;
     let registry = Registry::default();
 
@@ -563,20 +564,36 @@ async fn a_refused_join_is_told_why() {
     .await;
     assert_eq!(joiner.state().current_battle, None);
 
-    // A refusal is about this join and not about this person: they stay logged in
-    // and may ask again. A host who wants somebody gone rather than turned away
-    // kicks them, which is a different thing and holds by name.
+    // Asking again gets the same answer from the room, without the host being
+    // asked a second time (issue #1599). Nothing on their prompt could have
+    // ended it: kick lives in the roster and reaches only people already in the
+    // battle.
     joiner.send(command::join_battle(1, None, Some("s3cret")));
-    wait_for_room(
-        &room,
-        |s| s.pending == ["bob".to_string()],
-        "the room to queue bob's second attempt",
+    wait_until(
+        || {
+            joiner.received().contains(
+                &"JOINBATTLEFAILED the host has already turned you away from this battle"
+                    .to_string(),
+            )
+        },
+        "the second ask to be refused by the room",
     )
     .await;
-    room.answer_join("bob", true, None);
+    assert_eq!(joiner.state().current_battle, None);
+    tokio::time::sleep(LONG_ENOUGH_TO_HANG).await;
+    assert_eq!(
+        room.status().await.expect("still hosting").pending,
+        Vec::<String>::new(),
+        "a name the host has answered may not come back to their prompt"
+    );
+
+    // Weaker than a kick, on purpose. Being turned away from a game is not being
+    // thrown off the machine, so the connection lives and the host still has a
+    // kick for the case that calls for one.
+    assert_eq!(joiner.phase(), Some(LoginPhase::Ready));
     wait_until(
-        || joiner.state().current_battle == Some(1),
-        "the joiner to get in on the second ask",
+        || host.state().users.contains_key("bob"),
+        "the refused joiner to still be in the room",
     )
     .await;
 

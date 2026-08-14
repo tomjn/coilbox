@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useBrandingEntry } from "@/content/branding";
 import { PendingJoinsPanel, usePendingJoins } from "@/direct/PendingJoins";
-import { isDirectKey } from "@/direct/room";
 import { useFactionLogos } from "@/factions/logos";
 import { notify } from "@/notify/notify";
 import { useSkirmishAis } from "@/play/config";
@@ -35,6 +34,7 @@ import {
   useStartBoxAllies,
 } from "../battle/StartBoxControls";
 import { StartPosOptions } from "../battle/StartPosOptions";
+import { unsyncedPlayers } from "../battle/startBlockers";
 import { useSavedStartBoxes } from "../battle/startBoxSaved";
 import { battleToSkirmishDraft } from "../battle/toSkirmish";
 import { useBattleLaunch } from "../battle/useBattleLaunch";
@@ -87,9 +87,9 @@ function BattleRoomPage() {
     blockReason,
   );
   // People waiting to be let into a room we are hosting ourselves, with approval
-  // switched on. Asked for only when this connection is that room over loopback,
-  // so a battle on a real server never polls a plugin holding no room at all.
-  const joins = usePendingJoins(isDirectKey(room.serverKey) && room.selfHost);
+  // switched on. Read off the shared room source, which holds nothing at all
+  // unless this client is hosting, so a battle on a real server asks nothing.
+  const joins = usePendingJoins();
   // Private, client-side per-player notes (issue #341), scoped to this server.
   const { get: getNote, set: setNote } = useNoteActions(room.serverKey);
   // "N games with this player…" line for the note popover, from the local
@@ -392,6 +392,7 @@ function BattleRoomPage() {
         sync={room.sync}
         blockShort={block?.short ?? null}
         blockReason={blockReason}
+        unsynced={unsyncedPlayers(room.rows)}
         hostIngame={room.hostIngame}
         allReady={room.allReady}
         onToggleReady={room.setReady}

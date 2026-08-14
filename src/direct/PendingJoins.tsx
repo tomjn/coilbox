@@ -1,57 +1,46 @@
 import { Button } from "@picoframe/frame";
 import { DoorOpen } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { directAnswerJoin, directRoomStatus } from "./bindings";
-import { pendingJoinsHeadline, ROOM_POLL_MS } from "./room";
+import { useCallback } from "react";
+import { directAnswerJoin } from "./bindings";
+import { setHostedRoom, useHostedRoom } from "./hostedRoom";
+import { pendingJoinsHeadline } from "./room";
 
 /**
- * The people waiting on the host of a room this client is hosting, kept fresh
- * while the caller is mounted.
+ * The people waiting on the host of a room this client is hosting.
  *
- * Polled rather than subscribed to: the direct plugin emits no events, and the
- * command reads a struct out of the room task in this same process. `enabled` is
- * what stops every battle room on a real server from asking a plugin that has no
- * room in it.
+ * Read off the shared room source rather than polled here: one reading of
+ * `direct_room_status` serves this, the running-room line on the Battles page
+ * and the notification that reaches a host who is on neither (issue #1600).
+ * That reading only exists while a room does, so a battle room on a real server
+ * asks nothing of a plugin holding no room.
  *
  * An answer is applied optimistically, so a name pressed on vanishes at once
  * rather than at the next tick. The room is the authority either way, and the
- * next poll puts back anything that did not take.
+ * next reading puts back anything that did not take.
  */
-export function usePendingJoins(enabled: boolean): {
+export function usePendingJoins(): {
   /** Names waiting on the host, oldest first. */
   pending: string[];
   answer: (username: string, allow: boolean) => void;
 } {
-  const [pending, setPending] = useState<string[]>([]);
+  const room = useHostedRoom();
+  const pending = room?.pending ?? [];
 
-  useEffect(() => {
-    if (!enabled) {
-      setPending([]);
-      return;
-    }
-    let live = true;
-    const poll = () => {
-      directRoomStatus({})
-        .then((r) => {
-          if (live) setPending(r.room?.pending ?? []);
-        })
-        .catch(() => {});
-    };
-    poll();
-    const timer = setInterval(poll, ROOM_POLL_MS);
-    return () => {
-      live = false;
-      clearInterval(timer);
-    };
-  }, [enabled]);
-
-  const answer = useCallback((username: string, allow: boolean) => {
-    setPending((names) => names.filter((n) => n !== username));
-    // No reason passed: the room's own words ("the host turned you away") are
-    // what the person refused reads, and a free-text box here would be one more
-    // thing to fill in while somebody waits.
-    directAnswerJoin({ username, allow }).catch(() => {});
-  }, []);
+  const answer = useCallback(
+    (username: string, allow: boolean) => {
+      if (room) {
+        setHostedRoom({
+          ...room,
+          pending: room.pending.filter((n) => n !== username),
+        });
+      }
+      // No reason passed: the room's own words ("the host turned you away") are
+      // what the person refused reads, and a free-text box here would be one
+      // more thing to fill in while somebody waits.
+      directAnswerJoin({ username, allow }).catch(() => {});
+    },
+    [room],
+  );
 
   return { pending, answer };
 }
@@ -97,9 +86,13 @@ export function PendingJoinsPanel({
             <Button size="sm" onClick={() => onAnswer(name, true)}>
               Approve {name}
             </Button>
+            {/* Said in a tooltip rather than in the label, because the label is
+                what a screen reader announces and "Reject bob" is the whole of
+                what the button does. The sentence is what it costs. */}
             <Button
               size="sm"
               variant="secondary"
+              title={`${name} cannot ask again while this battle is open.`}
               onClick={() => onAnswer(name, false)}
             >
               Reject {name}

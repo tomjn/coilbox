@@ -10,6 +10,8 @@ import {
   Users,
   UserX,
 } from "lucide-react";
+import type { ReactNode } from "react";
+import { HostedRoomProvider } from "../direct/HostedRoomProvider";
 import { isProfileHidden } from "../profile/hidden";
 import LobbyStatusButton from "./LobbyStatusButton";
 import { BattleNavBadge, ChatNavBadge } from "./nav/navBadges";
@@ -35,6 +37,18 @@ import {
  * content plugin's local replay-stats database) — only the nav item and route
  * registration moved.
  */
+/**
+ * The two things that have to outlive every route: the lobby connection and its
+ * state mirror, and the room this client hosts.
+ */
+function LobbyProviders({ children }: { children: ReactNode }) {
+  return (
+    <MultiplayerProvider>
+      <HostedRoomProvider>{children}</HostedRoomProvider>
+    </MultiplayerProvider>
+  );
+}
+
 const multiplayerPlugin: FramePlugin = {
   id: "multiplayer",
   version: "0.0.0",
@@ -190,8 +204,10 @@ const multiplayerPlugin: FramePlugin = {
   ],
   slots: [{ slot: "topbar.right", order: 100, Component: LobbyStatusButton }],
   // App-level: the live connection + its state mirror must outlive the Lobby route
-  // so navigating away doesn't drop the UI's view of a still-open connection.
-  Provider: MultiplayerProvider,
+  // so navigating away doesn't drop the UI's view of a still-open connection. The
+  // room this client hosts is here for the same reason (issue #1600): somebody
+  // waiting at its door has to reach a host who is anywhere in the app.
+  Provider: LobbyProviders,
 };
 
 export default multiplayerPlugin;
