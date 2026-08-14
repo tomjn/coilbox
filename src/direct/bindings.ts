@@ -19,6 +19,8 @@ export interface DirectRoomStatus {
   /** The address a joining engine dials for the game itself. */
   ip: string;
   approveJoins: boolean;
+  /** Whether the room is announcing itself on the local network. */
+  advertise: boolean;
   /** Open sockets, logged in or not. The host's own client is one of them. */
   peers: number;
   /** Names waiting on the host's answer, oldest first. Empty while `approveJoins`
@@ -38,11 +40,15 @@ export const directStartRoom = defineCommand<
   {
     /** The player who holds host powers, by the name their client logs in under. */
     host: string;
-    /** The address announced to joiners for the game. Loopback when omitted. */
+    /** The address announced to joiners for the game. This machine's address on
+     *  the network it is on when omitted, and loopback only if it is on none. */
     ip?: string | null;
     /** Defaults to 8200 on the Rust side. */
     port?: number | null;
     approveJoins?: boolean | null;
+    /** Announce the room on the local network, so people on it find the room
+     *  without being told an address. On when omitted. */
+    advertise?: boolean | null;
   },
   { port: number }
 >("coilbox-direct", "direct_start_room");
@@ -62,3 +68,52 @@ export const directRoomStatus = defineCommand<
   Record<string, never>,
   { room: DirectRoomStatus | null }
 >("coilbox-direct", "direct_room_status");
+
+/** A room heard announcing itself on the local network (mirrors the Rust
+ *  `LanRoom`). */
+export interface DirectLanRoom {
+  /** Names one run of one room. New every time a room starts, so it says nothing
+   *  about the machine or the person. */
+  id: string;
+  /** The room's name, as its host typed it. */
+  title: string;
+  host: string;
+  game: string;
+  map: string;
+  players: number;
+  maxPlayers: number;
+  /** The lobby port to dial, alongside {@link DirectLanRoom.address}. Not the
+   *  engine's game port. */
+  port: number;
+  passworded: boolean;
+  /** Where the beacon came from, which is the address to dial. Read off the
+   *  datagram rather than out of it, so it is right for the interface it
+   *  arrived on. */
+  address: string;
+  /** This client's own room, heard back off the network. Worth showing as yours
+   *  rather than hiding: a host who cannot see their own room has no way to tell
+   *  whether anybody else can. */
+  isSelf: boolean;
+  /** How long ago the last beacon arrived. A room is dropped once its beacons
+   *  have been silent for a few seconds. */
+  lastSeenMs: number;
+}
+
+/**
+ * The rooms being announced on this network right now.
+ *
+ * Starts listening the first time it is called, so a client that never looks for
+ * a room never binds the beacon port. The first answer is usually empty and the
+ * next one, two seconds later, is not: beacons arrive when their hosts send them
+ * and there is nothing to ask for, so this is polled rather than awaited.
+ */
+export const directLanRooms = defineCommand<
+  Record<string, never>,
+  { rooms: DirectLanRoom[] }
+>("coilbox-direct", "direct_lan_rooms");
+
+/** Stop listening for rooms and free the beacon port. */
+export const directStopDiscovery = defineCommand<
+  Record<string, never>,
+  { stopped: boolean }
+>("coilbox-direct", "direct_stop_discovery");

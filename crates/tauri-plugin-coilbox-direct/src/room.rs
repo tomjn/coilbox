@@ -39,6 +39,9 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_util::codec::{Framed, LinesCodec};
 
+use crate::beacon::{self, Beacon, BEACON_INTERVAL};
+use crate::discovery::announce_once;
+
 /// The port a room listens on unless the host picks another. Distinct from the
 /// engine's game port (8452), which the engine binds itself and this never
 /// touches.
@@ -67,6 +70,9 @@ pub struct RoomOptions {
     pub port: u16,
     /// Whether a join waits for the host to answer it.
     pub approve_joins: bool,
+    /// Whether the room announces itself on the local network, so somebody on
+    /// the same network finds it without being told an address.
+    pub advertise: bool,
 }
 
 /// A running room, as the frontend sees it.
@@ -79,6 +85,8 @@ pub struct RoomStatus {
     pub host: String,
     pub ip: String,
     pub approve_joins: bool,
+    /// Whether this room is announcing itself on the local network.
+    pub advertise: bool,
     /// Open sockets, logged in or not.
     pub peers: usize,
     /// Names waiting on the host's answer, oldest first. Empty unless
@@ -94,8 +102,13 @@ pub struct RoomStatus {
 pub struct Room {
     port: u16,
     options: RoomOptions,
+    /// Names this run of this room in its beacons, so the host can pick its own
+    /// room out of the list it hears.
+    beacon_id: String,
     requests: mpsc::UnboundedSender<Request>,
     listener: JoinHandle<()>,
+    /// The task announcing this room, if it is being announced.
+    announcer: Option<JoinHandle<()>>,
 }
 
 /// Something for the task that owns the room state to do.
@@ -173,11 +186,18 @@ impl Room {
         tokio::spawn(run_room(state, options.clone(), port, rx));
         let listener = tokio::spawn(accept_loop(listener, requests.clone()));
 
+        let beacon_id = beacon::room_id();
+        let announcer = options
+            .advertise
+            .then(|| tokio::spawn(announce_loop(beacon_id.clone(), requests.clone())));
+
         Ok(Room {
             port,
             options,
+            beacon_id,
             requests,
             listener,
+            announcer,
         })
     }
 
@@ -185,6 +205,13 @@ impl Room {
     /// loopback, and a joiner is given it alongside [`RoomOptions::ip`].
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    /// What this room calls itself in its beacons. A listener hearing this id is
+    /// hearing us, which is how the host's own room is marked in a list of rooms
+    /// on the network rather than shown as somebody else's.
+    pub fn beacon_id(&self) -> &str {
+        &self.beacon_id
     }
 
     /// What the room holds right now. `None` once the room has stopped.
@@ -217,7 +244,13 @@ impl Room {
     /// Returns once the port is free, so a host who stops and restarts on the
     /// same port is not told it is in use by the room they just closed.
     pub async fn stop(self, reason: &str) {
-        // The listener first: a socket accepted after the room task has gone
+        // The beacon first: a room that is closing must stop telling the network
+        // it is open, or it stays in everybody's list for another few seconds.
+        if let Some(announcer) = self.announcer {
+            announcer.abort();
+            let _ = announcer.await;
+        }
+        // Then the listener: a socket accepted after the room task has gone
         // would be a connection nothing ever answers.
         self.listener.abort();
         let _ = self.listener.await;
@@ -370,6 +403,36 @@ async fn run_room(
     }
 }
 
+/// Announce this room every [`BEACON_INTERVAL`] until the task is aborted.
+///
+/// The room is asked what it holds on every tick rather than being described
+/// once, because the player count, the map and the game all change while a room
+/// runs, and a beacon that says otherwise sends people to a room that is not
+/// there any more. It is the same answer `direct_room_status` gives the host's
+/// own screen, so there is one source of truth and not two.
+///
+/// A room with no battle in it yet is not announced. See
+/// [`Beacon::from_status`].
+async fn announce_loop(id: String, requests: mpsc::UnboundedSender<Request>) {
+    let mut tick = tokio::time::interval(BEACON_INTERVAL);
+    loop {
+        tick.tick().await;
+        let (tx, rx) = oneshot::channel();
+        // The room has stopped, so there is nothing left to announce.
+        if requests.send(Request::Status(tx)).is_err() {
+            return;
+        }
+        let Ok(status) = rx.await else { return };
+        let Some(beacon) = Beacon::from_status(&status, &id) else {
+            continue;
+        };
+        let bytes = beacon::encode(&beacon).into_bytes();
+        // Sending is a handful of blocking socket calls, so it happens off the
+        // runtime's worker threads.
+        let _ = tokio::task::spawn_blocking(move || announce_once(&bytes)).await;
+    }
+}
+
 /// Peers that have said nothing for [`IDLE_TIMEOUT`].
 fn idle_peers(peers: &BTreeMap<PeerId, Peer>, now: Instant) -> Vec<PeerId> {
     peers
@@ -405,6 +468,7 @@ fn status_of(state: &RoomState, options: &RoomOptions, port: u16, peers: usize) 
         host: options.host.clone(),
         ip: options.ip.clone(),
         approve_joins: options.approve_joins,
+        advertise: options.advertise,
         peers,
         pending: state
             .pending_joins()

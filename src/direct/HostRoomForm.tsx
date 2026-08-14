@@ -40,6 +40,9 @@ export interface StartRoomArgs {
   host: string;
   /** The lobby port the room listens on. */
   port: number;
+  /** Announce the room on the local network, so people on it find it without
+   *  being told an address. */
+  advertise: boolean;
   /** The battle to open once the host's client has connected. */
   battle: OpenBattleArgs;
 }
@@ -67,6 +70,9 @@ export function HostRoomForm({
   // value can be shown back to the host instead of being corrected under them.
   const [port, setPort] = useState(String(DEFAULT_ROOM_PORT));
   const [maxPlayers, setMaxPlayers] = useState(8);
+  // On by default: the point of hosting on a LAN is that the people on it find
+  // the room without being read an address across the sofa.
+  const [advertise, setAdvertise] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,6 +101,7 @@ export function HostRoomForm({
       await onStart({
         host: trimmedName,
         port: Number(port),
+        advertise,
         battle: {
           battleType: 0,
           // Direct is the only mode coilbox implements, here as everywhere.
@@ -250,10 +257,22 @@ export function HostRoomForm({
         )}
       </label>
 
-      <PendingToggle
-        label="Advertise on the local network"
-        reason="Rooms are not announced yet, so give joiners the address instead."
-      />
+      {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association) */}
+      <label className="flex items-start gap-2 text-sm">
+        <Checkbox
+          checked={advertise}
+          onCheckedChange={(checked) => setAdvertise(checked === true)}
+          className="mt-0.5"
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="font-medium">Advertise on the local network</span>
+          <span className="text-xs text-muted-foreground">
+            People on this network see your room without being told an address.
+            Turn it off and they need your address and port.
+          </span>
+        </span>
+      </label>
+
       <PendingToggle
         label="Reachable over the internet"
         reason="Coilbox cannot open a port on your router yet. Forward it by hand for players outside your network."

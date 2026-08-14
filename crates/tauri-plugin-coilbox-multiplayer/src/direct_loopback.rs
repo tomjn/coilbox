@@ -198,6 +198,10 @@ async fn room(host: &str, approve_joins: bool) -> Room {
         // real default (8200) may well be a room the developer is hosting.
         port: 0,
         approve_joins,
+        // No beacon: these tests are about the wire between a room and its
+        // clients, and a room announcing itself would put real datagrams on the
+        // developer's network every two seconds.
+        advertise: false,
     })
     .await
     .expect("a free port")
@@ -723,6 +727,7 @@ async fn a_port_in_use_is_refused_and_freed_again() {
         ip: "127.0.0.1".to_string(),
         port,
         approve_joins: false,
+        advertise: false,
     })
     .await;
     let message = clash.err().expect("the second room cannot have the port");
@@ -740,6 +745,7 @@ async fn a_port_in_use_is_refused_and_freed_again() {
         ip: "127.0.0.1".to_string(),
         port,
         approve_joins: false,
+        advertise: false,
     })
     .await
     .expect("the port is free again");

@@ -23,5 +23,8 @@ serde_json = "1"
 picoframe-core = "0.0.4"
 coilbox-lobby-protocol = { path = "../coilbox-lobby-protocol" }
 tokio = { version = "1", features = ["net", "io-util", "sync", "rt", "macros", "time"] }
+# Address reuse and the multicast options, which std's UdpSocket does not expose.
+# Two coilboxes on one machine have to be able to bind the beacon port at once.
+socket2 = { version = "0.6", features = ["all"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
