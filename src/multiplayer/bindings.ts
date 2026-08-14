@@ -498,6 +498,20 @@ export const mpCancelConnect = defineCommand<
 >("coilbox-multiplayer", "mp_cancel_connect");
 
 /**
+ * Resolve once a connection has finished logging in.
+ *
+ * `mpConnect` resolves when the socket is up and the connection task is running,
+ * which is not the same as being logged in. Anything sent in between is sent by a
+ * client the server does not know yet, and is refused. For a caller that connects
+ * and then acts in one breath, with no render in between to watch the phase for
+ * it. Rejects on a login that is refused, dropped, or never finishes.
+ */
+export const mpWaitUntilReady = defineCommand<
+  { serverKey: string },
+  { ready: boolean }
+>("coilbox-multiplayer", "mp_wait_until_ready");
+
+/**
  * Re-adopt a still-live connection after a webview reload: swap in a fresh event
  * `Channel`. The backend replays `Connected` + the current phase over it, then the
  * caller pulls `mpSnapshot` to refill its mirror.
