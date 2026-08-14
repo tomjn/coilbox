@@ -420,6 +420,71 @@ async fn a_seat_the_joiner_picks_reaches_the_host() {
     room.stop("done").await;
 }
 
+/// A joiner who does not have the map or the game says so, and the host sees it.
+///
+/// Nothing in a direct room serves content, and the beacon carries no hashes
+/// (#1594), so the joiner's own sync bit is the only warning anyone gets. The
+/// joiner sets it from what is on their disk and the room passes
+/// `CLIENTBATTLESTATUS` through untouched, which is what puts "out of sync"
+/// against their name on the host's roster while the joiner's own launch is
+/// blocked with the reason (issue #1572).
+#[tokio::test]
+async fn a_joiner_without_the_content_reports_itself_out_of_sync() {
+    let room = room("alice", false).await;
+    let registry = Registry::default();
+
+    let host = Client::connect(&registry, loopback(room.port()), "alice").await;
+    host.wait_for_ready().await;
+    host.send(open_battle_line());
+    let joiner = Client::connect(&registry, loopback(room.port()), "bob").await;
+    joiner.wait_for_ready().await;
+    joiner.send(command::join_battle(1, None, Some("s3cret")));
+    wait_until(
+        || joiner.state().current_battle == Some(1),
+        "the joiner to be in the battle",
+    )
+    .await;
+
+    // Bob has neither Red Comet nor the game the host named, so the room is
+    // told 2, unsynced.
+    let unsynced = BattleStatus {
+        mode: true,
+        sync: 2,
+        ..default_battle_status()
+    };
+    joiner.send(command::my_battle_status(unsynced, 16_711_680));
+    wait_until(
+        || {
+            host.state().battles[&1]
+                .members
+                .get("bob")
+                .is_some_and(|m| m.battle_status.sync == 2)
+        },
+        "the host to see that bob is missing content",
+    )
+    .await;
+
+    // The download lands and bob rescans, so the same bit clears without anyone
+    // leaving the room.
+    let synced = BattleStatus {
+        sync: 1,
+        ..unsynced
+    };
+    joiner.send(command::my_battle_status(synced, 16_711_680));
+    wait_until(
+        || {
+            host.state().battles[&1]
+                .members
+                .get("bob")
+                .is_some_and(|m| m.battle_status.sync == 1)
+        },
+        "the host to see bob catch up",
+    )
+    .await;
+
+    room.stop("done").await;
+}
+
 /// A joiner the host has to wave through waits, and the wait is invisible on the
 /// wire: our own client answers `JOINBATTLEREQUEST` automatically, so the room
 /// never sends one.
