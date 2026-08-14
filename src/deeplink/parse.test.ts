@@ -25,6 +25,52 @@ describe("parseDeepLink", () => {
     });
   });
 
+  // A room on somebody's own machine (issue #1612), which is the address and
+  // port a host would otherwise be reading out over voice chat.
+  describe("room", () => {
+    it("parses an address and a port", () => {
+      expect(
+        parseDeepLink("coilbox://room?address=192.168.1.45&port=8200"),
+      ).toEqual({ kind: "room", address: "192.168.1.45", port: 8200 });
+    });
+
+    it("takes a hostname, because a room can be behind one", () => {
+      expect(
+        parseDeepLink("coilbox://room?address=tom-laptop.local&port=8200"),
+      ).toMatchObject({ address: "tom-laptop.local" });
+    });
+
+    it("rejects a link with no address", () => {
+      expect(parseDeepLink("coilbox://room?port=8200").kind).toBe("invalid");
+    });
+
+    // Guessing 8200 would send somebody to a room that is not there, and the
+    // host who pasted the link would never know why nobody arrived.
+    it("rejects a link with no port rather than assuming the usual one", () => {
+      expect(parseDeepLink("coilbox://room?address=192.168.1.45").kind).toBe(
+        "invalid",
+      );
+    });
+
+    it("rejects a port no socket could be listening on", () => {
+      expect(
+        parseDeepLink("coilbox://room?address=192.168.1.45&port=99999").kind,
+      ).toBe("invalid");
+      expect(
+        parseDeepLink("coilbox://room?address=192.168.1.45&port=0").kind,
+      ).toBe("invalid");
+      expect(
+        parseDeepLink("coilbox://room?address=192.168.1.45&port=eight").kind,
+      ).toBe("invalid");
+    });
+
+    it("rejects an address with a path on it", () => {
+      expect(
+        parseDeepLink("coilbox://room?address=evil.com%2Fpath&port=8200").kind,
+      ).toBe("invalid");
+    });
+  });
+
   describe("join", () => {
     it("parses a valid join link", () => {
       expect(

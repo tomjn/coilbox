@@ -139,3 +139,26 @@ export const directStopDiscovery = defineCommand<
   Record<string, never>,
   { stopped: boolean }
 >("coilbox-direct", "direct_stop_discovery");
+
+/** One address this machine answers on (mirrors the Rust `LocalAddress`). */
+export interface DirectLocalAddress {
+  /** Dotted quad, as it would be typed into "Join by address". */
+  address: string;
+  /** What the OS calls the interface it is on, for example `en0` or `Wi-Fi`. */
+  interface: string;
+  /** This machine talking to itself, which is an address to give nobody else. */
+  loopback: boolean;
+}
+
+/**
+ * Every address this machine can be dialled at, best first and loopback last.
+ *
+ * What a host reads out to somebody joining by address (issue #1611). All of
+ * them, because a machine with a VPN or Docker on it has several private
+ * addresses and only the person hosting can tell which one their friend is on
+ * the same side of.
+ */
+export const directLocalAddresses = defineCommand<
+  Record<string, never>,
+  { addresses: DirectLocalAddress[] }
+>("coilbox-direct", "direct_local_addresses");

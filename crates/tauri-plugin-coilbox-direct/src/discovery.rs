@@ -102,6 +102,24 @@ fn mask(prefix_len: u8) -> u32 {
     }
 }
 
+/// One of this machine's addresses as a host reads it out: the address itself,
+/// and the interface it belongs to.
+///
+/// The interface is here because a machine with a VPN, or Docker, or a virtual
+/// machine adapter has several private addresses and only one of them is the one
+/// the person in the same room can reach. Nothing here can tell which, so the
+/// host is told which interface each address is on and picks.
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalAddress {
+    /// Dotted quad, as it would be typed into "Join by address".
+    pub address: String,
+    /// What the OS calls the interface, for example `en0` or `Wi-Fi`.
+    pub interface: String,
+    /// This machine talking to itself, which is an address to give nobody else.
+    pub loopback: bool,
+}
+
 /// Every IPv4 network this machine is on, best first and loopback last.
 ///
 /// Read from the OS's own interface list, so an address on an unusual private
@@ -114,7 +132,16 @@ fn mask(prefix_len: u8) -> u32 {
 /// enumeration found, and is what makes two coilboxes on one machine find each
 /// other with no network at all, which is also how discovery is tested.
 pub fn local_nets() -> Vec<LocalNet> {
-    let mut found: Vec<(u8, LocalNet)> = Vec::new();
+    local_nets_named().into_iter().map(|(_, net)| net).collect()
+}
+
+/// [`local_nets`], each paired with the name of the interface it was found on.
+///
+/// One enumeration for both, so the address a host is told to read out is the
+/// same address the beacon leaves by and the same one the router is asked to
+/// forward.
+pub fn local_nets_named() -> Vec<(String, LocalNet)> {
+    let mut found: Vec<(u8, String, LocalNet)> = Vec::new();
     for iface in netdev::get_interfaces() {
         // A cable that is unplugged still has its last address on some
         // platforms, and a beacon sent from it goes nowhere.
@@ -125,9 +152,16 @@ pub fn local_nets() -> Vec<LocalNet> {
             .gateway
             .as_ref()
             .and_then(|device| device.ipv4.first().copied());
+        // Windows names an interface twice: `name` is a GUID there and the
+        // friendly name is the "Wi-Fi" a person would recognise. Elsewhere there
+        // is only the one, and it is already `en0`.
+        let named = iface
+            .friendly_name
+            .clone()
+            .unwrap_or_else(|| iface.name.clone());
         for net in &iface.ipv4 {
             let addr = net.addr();
-            if addr.is_unspecified() || found.iter().any(|(_, seen)| seen.addr == addr) {
+            if addr.is_unspecified() || found.iter().any(|(_, _, seen)| seen.addr == addr) {
                 continue;
             }
             let rank = if addr.is_loopback() {
@@ -141,6 +175,7 @@ pub fn local_nets() -> Vec<LocalNet> {
             };
             found.push((
                 rank,
+                named.clone(),
                 LocalNet {
                     addr,
                     prefix_len: net.prefix_len(),
@@ -150,16 +185,35 @@ pub fn local_nets() -> Vec<LocalNet> {
         }
     }
     // Stable, so interfaces of equal rank stay in the order the OS listed them.
-    found.sort_by_key(|(rank, _)| *rank);
-    let mut nets: Vec<LocalNet> = found.into_iter().map(|(_, net)| net).collect();
-    if !nets.iter().any(|net| net.addr.is_loopback()) {
-        nets.push(LocalNet {
-            addr: Ipv4Addr::LOCALHOST,
-            prefix_len: 8,
-            gateway: None,
-        });
+    found.sort_by_key(|(rank, _, _)| *rank);
+    let mut nets: Vec<(String, LocalNet)> = found
+        .into_iter()
+        .map(|(_, named, net)| (named, net))
+        .collect();
+    if !nets.iter().any(|(_, net)| net.addr.is_loopback()) {
+        nets.push((
+            "loopback".to_string(),
+            LocalNet {
+                addr: Ipv4Addr::LOCALHOST,
+                prefix_len: 8,
+                gateway: None,
+            },
+        ));
     }
     nets
+}
+
+/// Every address this machine can be dialled at, best first and loopback last,
+/// each named by the interface it is on.
+pub fn local_addresses() -> Vec<LocalAddress> {
+    local_nets_named()
+        .into_iter()
+        .map(|(interface, net)| LocalAddress {
+            address: net.addr.to_string(),
+            interface,
+            loopback: net.addr.is_loopback(),
+        })
+        .collect()
 }
 
 /// Every local IPv4 address a beacon should be sent from, loopback last.
@@ -399,5 +453,23 @@ mod tests {
             assert!(net.prefix_len <= 32, "{net:?} has an impossible prefix");
             assert!(!net.addr.is_unspecified());
         }
+    }
+
+    /// A host choosing between a VPN's address and the one the person next to
+    /// them can reach has only the interface name to choose on, so an address
+    /// with no name against it is no better than the list this replaced.
+    #[test]
+    fn every_address_a_host_is_shown_names_its_interface() {
+        let addresses = local_addresses();
+        assert_eq!(addresses.len(), local_nets().len());
+        for address in &addresses {
+            assert!(
+                !address.interface.is_empty(),
+                "{address:?} has no interface"
+            );
+            assert!(!address.address.is_empty());
+        }
+        assert!(addresses.iter().any(|a| a.loopback));
+        assert!(addresses.last().is_some_and(|a| a.loopback));
     }
 }
