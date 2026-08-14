@@ -1,4 +1,5 @@
 import type { LobbyServer } from "../lobby-servers/config";
+import type { DirectRoomStatus } from "./bindings";
 
 /**
  * The pure decisions behind hosting a room: where the host's own client dials,
@@ -82,6 +83,32 @@ export function startButtonLabel(
 ): string {
   if (busy) return "Starting…";
   return checksumsReady ? "Start room" : "Reading content…";
+}
+
+/**
+ * The one line a host reads while their room is up: where it is, whose name holds
+ * it, how many people are in, and whether a joiner needs a password. Pure.
+ *
+ * Peers are open sockets and the host's own client is one of them, so the count
+ * said out loud is one less than the room's.
+ *
+ * The password is left unsaid until there is a battle, because the battle is what
+ * carries the answer and a room that has only just bound its port has none yet.
+ * Guessing "no password" in that gap would be wrong for every passworded room.
+ */
+export function roomSummary(room: DirectRoomStatus): string {
+  const joined = Math.max(0, room.peers - 1);
+  const who =
+    joined === 0
+      ? "nobody has joined yet"
+      : joined === 1
+        ? "1 player joined"
+        : `${joined} players joined`;
+  const parts = [`Hosting on port ${room.port} as ${room.host}`, who];
+  if (room.battle) {
+    parts.push(room.battle.passworded ? "password needed" : "no password");
+  }
+  return parts.join(", ");
 }
 
 /**
