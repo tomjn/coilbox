@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useBrandingEntry } from "@/content/branding";
 import { PendingJoinsPanel, usePendingJoins } from "@/direct/PendingJoins";
-import { isDirectKey } from "@/direct/room";
 import { useFactionLogos } from "@/factions/logos";
 import { notify } from "@/notify/notify";
 import { useSkirmishAis } from "@/play/config";
@@ -404,9 +403,11 @@ function BattleRoomPage() {
         locked={battle.locked}
         onToggleLock={room.setLocked}
         // Same as the battle row on the Battles page: a room of our own is
-        // reached over loopback, so there is no invite link to give from here
-        // (issue #1615).
-        serverKey={isDirectKey(room.serverKey) ? null : room.serverKey}
+        // reached over loopback and has no link to give from here (issue
+        // #1615), somebody else's is passed on as the address we dialled it on
+        // (issue #1617), and a server is passed on as a battle to join.
+        serverKey={room.serverKey}
+        directRoom={room.directRoom}
       />
 
       {/* Above everything else on the page: somebody is sitting on a spinner

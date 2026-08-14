@@ -10,6 +10,7 @@ type RowProps = {
   enginePath?: string;
   dataDir?: string;
   serverAddress?: string;
+  directRoom?: boolean;
 };
 
 /**
@@ -31,6 +32,7 @@ export function BattleList({
   enginePath,
   dataDir,
   serverAddress,
+  directRoom,
 }: {
   battles: Battle[];
   totalCount: number;
@@ -42,9 +44,12 @@ export function BattleList({
   onLeave: () => void;
   enginePath?: string;
   dataDir?: string;
-  /** This server's `host:port` (issue #498), threaded down to each row's
+  /** This connection's `host:port` (issue #498), threaded down to each row's
    * "Copy invite link" action. */
   serverAddress?: string;
+  /** Whether that connection is a room rather than a server, which decides which
+   * kind of link the rows offer (issue #1617). */
+  directRoom?: boolean;
 }) {
   // Passworded and running battles are both things you cannot simply drop into,
   // so they start collapsed and keep the joinable list short.
@@ -56,8 +61,16 @@ export function BattleList({
   // Rebuilding this object every render would defeat `BattleRow`'s memo, since
   // it spreads into every row's props.
   const rowProps: RowProps = useMemo(
-    () => ({ canJoin, onJoin, onLeave, enginePath, dataDir, serverAddress }),
-    [canJoin, onJoin, onLeave, enginePath, dataDir, serverAddress],
+    () => ({
+      canJoin,
+      onJoin,
+      onLeave,
+      enginePath,
+      dataDir,
+      serverAddress,
+      directRoom,
+    }),
+    [canJoin, onJoin, onLeave, enginePath, dataDir, serverAddress, directRoom],
   );
 
   // Running wins over passworded: whether a battle has started is the first thing

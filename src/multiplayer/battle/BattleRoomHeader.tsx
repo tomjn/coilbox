@@ -8,8 +8,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { buildJoinLink } from "@/deeplink/build";
 import { copyDeepLink } from "@/deeplink/copyLink";
+import { inviteLink } from "@/direct/invite";
 import type { Battle, MemberStatus } from "../bindings";
 import { serverAddressFromKey } from "../store";
 import type { SyncState } from "./config";
@@ -48,6 +48,7 @@ export function BattleRoomHeader({
   locked,
   onToggleLock,
   serverKey,
+  directRoom,
 }: {
   battle: Battle;
   myStatus: MemberStatus | undefined;
@@ -71,6 +72,9 @@ export function BattleRoomHeader({
   /** This room's connection key (issue #498), for a "Copy invite link"
    * action. `null` hides the action rather than building a broken link. */
   serverKey: string | null;
+  /** Whether that connection is a room somebody is hosting rather than a
+   * server, which decides what kind of link there is to give (issue #1617). */
+  directRoom: boolean;
 }) {
   const ready = myStatus?.battleStatus.ready ?? false;
   const spectator = myStatus ? !myStatus.battleStatus.mode : false;
@@ -81,6 +85,11 @@ export function BattleRoomHeader({
   // want to play without whoever is still downloading. So Start asks first and
   // names them, rather than either going ahead in silence or seizing up.
   const startWarning = startAnywayWarning(unsynced);
+  // A room and a server are passed on differently, and a connection with nothing
+  // worth handing out shows no button at all.
+  const invite = serverKey
+    ? inviteLink(serverAddressFromKey(serverKey), directRoom, String(battle.id))
+    : null;
   const startDisabled = hostIngame || !allReady || !!blockReason;
   const startButton = (
     <Button
@@ -114,21 +123,14 @@ export function BattleRoomHeader({
           state={sync}
           detail={sync === "synced" ? undefined : (blockShort ?? undefined)}
         />
-        {serverKey && (
+        {invite && (
           <Button
             variant="ghost"
             size="icon"
             className="size-8 shrink-0 text-muted-foreground"
             aria-label="Copy an invite link for this battle"
             title="Copy invite link"
-            onClick={() =>
-              copyDeepLink(
-                buildJoinLink(
-                  serverAddressFromKey(serverKey),
-                  String(battle.id),
-                ),
-              )
-            }
+            onClick={() => copyDeepLink(invite)}
           >
             <LinkIcon className="size-4" />
           </Button>
