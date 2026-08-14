@@ -8,7 +8,7 @@ import {
   directPortStatus,
   joinAddress,
 } from "./reachability";
-import { roomSummary } from "./room";
+import { announcementNote, roomSummary } from "./room";
 
 export type { StartRoomArgs } from "./HostRoomForm";
 
@@ -28,6 +28,7 @@ export type { StartRoomArgs } from "./HostRoomForm";
  */
 export function HostRoomControl({
   room,
+  heardOnNetwork,
   connectedToServer,
   defaultName,
   busy,
@@ -37,6 +38,9 @@ export function HostRoomControl({
 }: {
   /** The room this client is hosting, or null when it is not hosting. */
   room: DirectRoomStatus | null;
+  /** This client has heard its own room announcing itself, which is the only
+   *  evidence a host has that the announcement left the machine. */
+  heardOnNetwork: boolean;
   /** Connected to a real lobby server. There is one connection, so it is the
    *  room's or the server's, and the server got there first. */
   connectedToServer: boolean;
@@ -51,7 +55,13 @@ export function HostRoomControl({
 }) {
   if (room) {
     return (
-      <RunningRoom room={room} busy={busy} error={error} onStop={onStop} />
+      <RunningRoom
+        room={room}
+        heardOnNetwork={heardOnNetwork}
+        busy={busy}
+        error={error}
+        onStop={onStop}
+      />
     );
   }
   return (
@@ -63,16 +73,18 @@ export function HostRoomControl({
   );
 }
 
-/** The room as it runs: who is in it, where to find it, and how to end it. The
- *  line is a reading of the room's live status, so a join or a leave shows up in
- *  it (see the poll in `BattlesPage`). */
+/** The room as it runs: who is in it, whether the network can hear it, where to
+ *  find it, and how to end it. The line is a reading of the room's live status,
+ *  so a join or a leave shows up in it (see the poll in `BattlesPage`). */
 function RunningRoom({
   room,
+  heardOnNetwork,
   busy,
   error,
   onStop,
 }: {
   room: DirectRoomStatus;
+  heardOnNetwork: boolean;
   busy: boolean;
   error: string | null;
   onStop: () => void;
@@ -92,6 +104,13 @@ function RunningRoom({
           Stop room
         </Button>
       </div>
+      {/* The room used to prove this by turning up in the list of rooms on the
+          network with a "Yours" badge on it, which listed it twice over
+          (issue #1608). Said here instead, where the host is already reading
+          about their room. */}
+      <span className="text-right text-xs text-muted-foreground">
+        {announcementNote(room.advertise, heardOnNetwork)}
+      </span>
       <PublicAddress />
       {error && (
         <p role="alert" className="text-xs text-destructive">

@@ -22,6 +22,8 @@ import {
   joinBlockedReason,
   joinRoomFailure,
   noRoomBattleFailure,
+  otherRooms,
+  ownRoomHeard,
   roomBattle,
 } from "../../direct/lan";
 import { directClosePorts } from "../../direct/reachability";
@@ -400,9 +402,13 @@ function BattlesPage() {
     }
   }
 
+  // The list is everybody else's rooms. A host is already in their own, so it
+  // sits in the battle list below with the way back into it, and listing it here
+  // as well was the same room twice (issue #1608). What the host's own beacon
+  // proves is said on the host's own line instead.
   const lanSection = (
     <LanRooms
-      rooms={lan.rooms}
+      rooms={otherRooms(lan.rooms)}
       error={lan.error}
       blocked={joinBlockedReason(activeKey, room !== null)}
       defaultName={lastLogin?.username}
@@ -415,6 +421,7 @@ function BattlesPage() {
   const hostControl = (
     <HostRoomControl
       room={room}
+      heardOnNetwork={ownRoomHeard(lan.rooms)}
       connectedToServer={activeKey != null && !isDirectKey(activeKey)}
       defaultName={lastLogin?.username}
       busy={roomBusy || busy}

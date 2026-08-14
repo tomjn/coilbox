@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Battle } from "../multiplayer/bindings";
 import type { DirectRoomStatus } from "./bindings";
 import {
+  announcementNote,
   battleOpened,
   DEFAULT_ROOM_PORT,
   directServer,
@@ -158,6 +159,31 @@ describe("roomSummary", () => {
   // process and a line reading "-1 players joined" would be worse than a stale one.
   it("does not go negative if the room answers before the host is counted", () => {
     expect(roomSummary(room({ peers: 0 }))).toContain("nobody has joined yet");
+  });
+});
+
+describe("announcementNote", () => {
+  // The answer the "Yours" row in the network list used to carry, which listed
+  // the host's room a second time (issue #1608).
+  it("confirms an announced room the client has heard back", () => {
+    expect(announcementNote(true, true)).toBe("Announced on this network.");
+  });
+
+  // What a host wants to know when nobody is joining, and the one case the old
+  // badge said nothing about: it was simply absent, which is also what a room
+  // that had only just started looked like.
+  it("says so when the announcement has not been heard", () => {
+    const note = announcementNote(true, false);
+    expect(note).toContain("Not heard announcing itself yet");
+    expect(note).toContain("need your address");
+  });
+
+  // A host who turned announcing off is not missing anything, so this is what
+  // they have to do instead rather than a fault.
+  it("names the address as the way in when the room announces nothing", () => {
+    expect(announcementNote(false, false)).toBe(
+      "Not announced on this network, so give joiners your address.",
+    );
   });
 });
 

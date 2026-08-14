@@ -1,12 +1,46 @@
 import { describe, expect, it } from "vitest";
 import type { Battle } from "../multiplayer/bindings";
+import type { DirectLanRoom } from "./bindings";
 import {
   addressProblem,
   joinBlockedReason,
   joinRoomFailure,
+  otherRooms,
+  ownRoomHeard,
   roomBattle,
   splitHostPort,
 } from "./lan";
+
+const heard = (id: string, isSelf: boolean) =>
+  ({ id, title: `room ${id}`, isSelf }) as unknown as DirectLanRoom;
+
+describe("otherRooms", () => {
+  // The host is already in their own room, and the battle list below holds it
+  // with the way back into it, so listing it here as well was the same room
+  // twice (issue #1608).
+  it("leaves out the room this client is hosting", () => {
+    const rooms = otherRooms([heard("mine", true), heard("theirs", false)]);
+    expect(rooms.map((room) => room.id)).toEqual(["theirs"]);
+  });
+
+  it("keeps every room somebody else is announcing", () => {
+    const rooms = [heard("a", false), heard("b", false)];
+    expect(otherRooms(rooms)).toEqual(rooms);
+  });
+});
+
+describe("ownRoomHeard", () => {
+  it("is true once this client's own beacon comes back", () => {
+    expect(ownRoomHeard([heard("theirs", false), heard("mine", true)])).toBe(
+      true,
+    );
+  });
+
+  it("is false while nothing of ours has been heard", () => {
+    expect(ownRoomHeard([heard("theirs", false)])).toBe(false);
+    expect(ownRoomHeard([])).toBe(false);
+  });
+});
 
 describe("splitHostPort", () => {
   // What a host reads out, and what they copy off their own screen, is one
