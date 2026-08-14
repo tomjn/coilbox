@@ -6,7 +6,7 @@ import {
   battleOpened,
   DEFAULT_ROOM_PORT,
   directServer,
-  isDirectKey,
+  hostBlockedReason,
   newPendingNames,
   pendingJoinsHeadline,
   playerNameProblem,
@@ -28,12 +28,6 @@ describe("directServer", () => {
     expect(server.protocol).toBe("tasserver");
   });
 
-  it("produces a key the store recognises as a room", () => {
-    // The store keys a connection `username@host:port` (see `serverKeyFor`).
-    const server = directServer(8200);
-    expect(isDirectKey(`Tom@${server.host}:${server.port}`)).toBe(true);
-  });
-
   it("dials somebody else's room where their beacon came from", () => {
     const server = directServer(8300, "192.168.1.5");
     expect(server.host).toBe("192.168.1.5");
@@ -43,13 +37,25 @@ describe("directServer", () => {
   });
 });
 
-describe("isDirectKey", () => {
-  it("does not mistake a real server for a room", () => {
-    expect(isDirectKey("Tom@lobby.beyondallreason.info:8200")).toBe(false);
+describe("hostBlockedReason", () => {
+  it("lets a client with no connection host", () => {
+    expect(hostBlockedReason(null, false)).toBeNull();
   });
 
-  it("reads no connection as no room", () => {
-    expect(isDirectKey(null)).toBe(false);
+  it("says to log out of a server", () => {
+    expect(
+      hostBlockedReason("Tom@lobby.beyondallreason.info:8200", false),
+    ).toBe(
+      "Log out of the lobby server first. Coilbox holds one lobby connection, and hosting a room needs it.",
+    );
+  });
+
+  // The key of somebody else's room is `bob@192.168.1.45:8200`, which is the
+  // shape of a server's and was read as one (issue #1618).
+  it("says to disconnect from somebody else's room", () => {
+    expect(hostBlockedReason("Tom@192.168.1.45:8200", true)).toContain(
+      "connected to a room already",
+    );
   });
 });
 

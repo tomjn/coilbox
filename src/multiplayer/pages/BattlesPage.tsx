@@ -30,7 +30,7 @@ import {
 import { directClosePorts } from "../../direct/reachability";
 import {
   battleOpened,
-  isDirectKey,
+  hostBlockedReason,
   noBattleFailure,
   roomStopReason,
   startRoomFailure,
@@ -426,7 +426,7 @@ function BattlesPage() {
       <LanRooms
         rooms={otherRooms(lan.rooms)}
         error={lan.error}
-        blocked={joinBlockedReason(activeKey, room !== null)}
+        blocked={joinBlockedReason(activeKey, activeDirect, room !== null)}
         defaultName={lastLogin?.username}
         enginePath={selected?.enginePath}
         dataDir={selected?.rootPath}
@@ -434,7 +434,7 @@ function BattlesPage() {
       />
       <LinkedRoomJoin
         target={deeplinkRoom}
-        blocked={joinBlockedReason(activeKey, room !== null)}
+        blocked={joinBlockedReason(activeKey, activeDirect, room !== null)}
         defaultName={lastLogin?.username}
         onJoin={onJoinRoom}
       />
@@ -445,7 +445,7 @@ function BattlesPage() {
     <HostRoomControl
       room={room}
       heardOnNetwork={ownRoomHeard(lan.rooms)}
-      connectedToServer={activeKey != null && !isDirectKey(activeKey)}
+      blocked={hostBlockedReason(activeKey, activeDirect)}
       defaultName={lastLogin?.username}
       busy={roomBusy || busy}
       error={stopError}

@@ -32,7 +32,7 @@ export type { StartRoomArgs } from "./HostRoomForm";
 export function HostRoomControl({
   room,
   heardOnNetwork,
-  connectedToServer,
+  blocked,
   defaultName,
   busy,
   error,
@@ -44,9 +44,10 @@ export function HostRoomControl({
   /** This client has heard its own room announcing itself, which is the only
    *  evidence a host has that the announcement left the machine. */
   heardOnNetwork: boolean;
-  /** Connected to a real lobby server. There is one connection, so it is the
-   *  room's or the server's, and the server got there first. */
-  connectedToServer: boolean;
+  /** Why hosting is unavailable, or null when it is available. There is one
+   *  lobby connection, so whatever already has it is in the way (see
+   *  `hostBlockedReason`). */
+  blocked: string | null;
   /** The name to offer as the host's, usually their last lobby login. */
   defaultName?: string;
   busy: boolean;
@@ -69,7 +70,7 @@ export function HostRoomControl({
   }
   return (
     <HostRoomDrawerButton
-      connectedToServer={connectedToServer}
+      blocked={blocked}
       defaultName={defaultName}
       onStart={onStart}
     />
@@ -209,19 +210,19 @@ function RoomAddresses({ port }: { port: number }) {
 /** Opens the form in the frame's drawer. Keyed per opening so a second visit gets
  *  a new form rather than the one the last visit left behind. */
 function HostRoomDrawerButton({
-  connectedToServer,
+  blocked,
   defaultName,
   onStart,
 }: {
-  connectedToServer: boolean;
+  blocked: string | null;
   defaultName?: string;
   onStart: (args: StartRoomArgs) => Promise<void>;
 }) {
   const drawer = useDrawer();
   return (
-    // Deliberately not disabled while connected to a server: a button that does
-    // nothing and says nothing is the failure this milestone is about. The drawer
-    // opens and says why hosting is unavailable.
+    // Deliberately not disabled while blocked: a button that does nothing and
+    // says nothing is the failure this milestone is about. The drawer opens and
+    // says why hosting is unavailable.
     <Button
       variant="secondary"
       className="h-8 px-3"
@@ -236,7 +237,7 @@ function HostRoomDrawerButton({
           content: (
             <HostRoomForm
               key={nextDrawerKey()}
-              connectedToServer={connectedToServer}
+              blocked={blocked}
               defaultName={defaultName}
               onStart={onStart}
             />

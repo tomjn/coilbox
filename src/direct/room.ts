@@ -45,11 +45,28 @@ export function directServer(
 }
 
 /**
- * Whether a connection key names a room this client hosts rather than a real
- * server. Keys are `username@host:port` (see `serverKeyFor`). Pure.
+ * Why this client cannot host a room right now, or null when it can. Pure.
+ *
+ * Coilbox holds one lobby connection and a room needs it, so a connection of any
+ * kind is in the way. Which kind decides what to do about it, and that is told
+ * rather than read off the key: both are `username@host:port`, so a joiner in
+ * somebody else's room used to be sent to log out of a lobby server they were
+ * never on (issue #1618).
+ *
+ * A host's own room is not a case here. The control shows the running room in
+ * place of the form while there is one, so this is only ever read by somebody
+ * who has no room of their own.
  */
-export function isDirectKey(serverKey: string | null): boolean {
-  return serverKey != null && serverKey.includes(`@${LOOPBACK_HOST}:`);
+export function hostBlockedReason(
+  activeKey: string | null,
+  /** Whether the live connection is a room somebody is hosting. */
+  direct: boolean,
+): string | null {
+  if (!activeKey) return null;
+  if (direct) {
+    return "You are connected to a room already. Disconnect from it first: coilbox holds one lobby connection, and hosting a room needs it.";
+  }
+  return "Log out of the lobby server first. Coilbox holds one lobby connection, and hosting a room needs it.";
 }
 
 /** The words a stopped room gives its joiners, so the drop is named rather than
