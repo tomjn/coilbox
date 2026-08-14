@@ -38,7 +38,7 @@ use coilbox_lobby_protocol::{Delta, LobbyState, LoginPhase};
 use coilbox_tachyon_protocol::{parse_frame, TachyonMessage};
 use serde_json::{json, Value};
 use tauri::ipc::Channel;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 
 use crate::conn::{
     emit, now_ms, EventSink, LobbyEvent, Outbound, Registry, ServerConn, StartedBattle,
@@ -118,7 +118,11 @@ pub fn spawn_connection(
     // the launch config.
     let started = StartedBattle::default();
 
-    tokio::spawn(run_loop(
+    // A socket that opened is already authenticated, so the phase starts and stays
+    // at ready. The sending half still goes to the task, so anything waiting on the
+    // phase is woken when the connection ends, exactly as on a line connection.
+    let (phase_tx, phase) = watch::channel(LoginPhase::Ready);
+    let task = run_loop(
         registry.clone(),
         server_key.clone(),
         socket,
@@ -128,7 +132,11 @@ pub fn spawn_connection(
         tachyon.clone(),
         started.clone(),
         markers,
-    ));
+    );
+    tokio::spawn(async move {
+        let _phase = phase_tx;
+        task.await;
+    });
 
     lock_or_recover(&registry).insert(
         server_key,
@@ -138,8 +146,7 @@ pub fn spawn_connection(
             sink,
             tachyon,
             started,
-            // The socket is open, so the connection is past every phase there is.
-            phase: Arc::new(Mutex::new(LoginPhase::Ready)),
+            phase,
             // Tachyon has no agreement handshake. The terms are accepted in the
             // browser, before a token exists.
             agreement: Arc::new(Mutex::new(None)),
@@ -1299,12 +1306,9 @@ mod tests {
         assert_eq!(map.len(), 2);
         // The Tachyon one is connected, the line one is still waiting to be
         // greeted, and each carries its own phase and its own state.
+        assert_eq!(*map["alice@bar:443"].phase.borrow(), LoginPhase::Ready);
         assert_eq!(
-            *lock_or_recover(&map["alice@bar:443"].phase),
-            LoginPhase::Ready
-        );
-        assert_eq!(
-            *lock_or_recover(&map["alice@bar:8200"].phase),
+            *map["alice@bar:8200"].phase.borrow(),
             LoginPhase::AwaitGreeting
         );
     }

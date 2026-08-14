@@ -77,7 +77,7 @@ mod tests {
     use coilbox_lobby_protocol::{LobbyState, LoginPhase};
     use std::sync::{Arc, Mutex};
     use tauri::ipc::Channel;
-    use tokio::sync::mpsc;
+    use tokio::sync::{mpsc, watch};
 
     /// Register a connection with no Tachyon client, which is what every TASServer
     /// connection looks like. The receiver comes back so the caller can hold it,
@@ -91,7 +91,9 @@ mod tests {
                 tx,
                 state: Arc::new(Mutex::new(LobbyState::new())),
                 sink,
-                phase: Arc::new(Mutex::new(LoginPhase::Ready)),
+                // No task behind this one, so the sending half goes nowhere: these
+                // tests only ask what a connection can send, never what it is doing.
+                phase: watch::channel(LoginPhase::Ready).1,
                 agreement: Arc::new(Mutex::new(None)),
                 tachyon: TachyonHandle::default(),
                 started: StartedBattle::default(),

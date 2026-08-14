@@ -257,9 +257,13 @@ function BattlesPage() {
     joiningRef.current = true;
     try {
       await mpOpenBattle({ serverKey: activeKey, ...args });
-    } catch {
+    } catch (e) {
       joiningRef.current = false;
       hostingFromDraftRef.current = false;
+      // Thrown on rather than dropped. A refusal that never reached the wire has
+      // no join error and no disconnect behind it, so the popover the host
+      // pressed in is the only place it can be read (issue #1591).
+      throw e;
     }
   }
 

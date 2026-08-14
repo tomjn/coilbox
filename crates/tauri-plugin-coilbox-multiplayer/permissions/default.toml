@@ -9,6 +9,7 @@ permissions = [
   "allow-mp-confirm-agreement",
   "allow-mp-disconnect",
   "allow-mp-cancel-connect",
+  "allow-mp-wait-until-ready",
   "allow-mp-reattach",
   "allow-mp-active-keys",
   "allow-mp-snapshot",

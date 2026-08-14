@@ -61,6 +61,7 @@ import {
   mpSnapshot,
   mpTachyonSignedIn,
   mpTachyonSignIn,
+  mpWaitUntilReady,
 } from "./bindings";
 import {
   forgetJoinedChannel,
@@ -1227,7 +1228,22 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       stopReconnect();
       const server = directServer(port);
       await doConnect(server, username, true);
-      return serverKeyFor(server, username);
+      const serverKey = serverKeyFor(server, username);
+      // Connected is not logged in. `mpConnect` answers as soon as the socket is
+      // up, and the caller's next act is to open a battle, which a room refuses
+      // from a client it has not greeted yet. Over loopback the handshake beat
+      // the round trips nearly every time, and nearly was the bug (issue #1590).
+      try {
+        await mpWaitUntilReady({ serverKey });
+      } catch (e) {
+        // A socket that never logged in can do nothing and still holds the key,
+        // so a second attempt would be refused as a duplicate. Drop it.
+        await mpDisconnect({ serverKey }).catch(() => {});
+        dispatch({ type: "reset" });
+        setActiveKey(null);
+        throw e;
+      }
+      return serverKey;
     },
     [doConnect, stopReconnect],
   );

@@ -19,6 +19,7 @@ use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
 use tauri::ipc::Channel;
 use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio::sync::watch;
 use tokio_util::codec::{Framed, LinesCodec};
 
 use crate::dmlog::DmLog;
@@ -98,6 +99,60 @@ pub enum TachyonAction {
 /// `Channel` (via `mp_reattach`) without disturbing the running connection task.
 pub type EventSink = Arc<Mutex<Channel<LobbyEvent>>>;
 
+/// The login phase of a connection, as the connection task keeps it.
+///
+/// A watch rather than a lock, because the phase is not only read: a caller about
+/// to send something a logged-out client cannot send has to be able to wait for
+/// it (see [`wait_until_ready`]). The sending half lives in the connection task,
+/// so a channel that has closed is that task having ended, which is the other
+/// answer a waiter needs.
+pub type PhaseSlot = watch::Receiver<LoginPhase>;
+
+/// How long [`wait_until_ready`] waits before calling a login failed.
+///
+/// Generous, because a real server behind a slow link is not a failure, and
+/// bounded because there is no read timeout anywhere below this: a server that
+/// simply never sends `LOGININFOEND` would otherwise be waited on forever.
+pub const READY_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Wait until the connection under `server_key` has finished logging in.
+///
+/// `mp_connect` answers as soon as the socket is up and the connection task is
+/// spawned, which is not the same as being logged in. Anything sent in between is
+/// sent by a client the server does not yet know, and a room refuses it (issue
+/// #1590). So a caller that opens a battle the moment it connects waits here
+/// first, rather than relying on a handshake over loopback being quicker than the
+/// round trips that follow it.
+pub async fn wait_until_ready(
+    registry: &Registry,
+    server_key: &str,
+    timeout: Duration,
+) -> Result<(), String> {
+    let mut phase = match lock_or_recover(registry).get(server_key) {
+        Some(conn) => conn.phase.clone(),
+        None => return Err(format!("not connected: {server_key}")),
+    };
+    // Mapped to unit here rather than matched on, because what `wait_for` answers
+    // with borrows the receiver the failure arm below reads.
+    let waited = tokio::time::timeout(timeout, phase.wait_for(|p| *p == LoginPhase::Ready))
+        .await
+        .map(|reached| reached.map(|_| ()));
+    match waited {
+        Ok(Ok(())) => Ok(()),
+        // The sending half is the connection task's, so a closed channel means
+        // that task has ended: a refused login, a dropped socket, or a logout.
+        Ok(Err(_)) => Err(if *phase.borrow() == LoginPhase::Denied {
+            "the server refused the login".to_string()
+        } else {
+            "the connection ended before the login finished".to_string()
+        }),
+        Err(_) => Err(format!(
+            "the login did not finish within {}s",
+            timeout.as_secs()
+        )),
+    }
+}
+
 /// A slot for the Tachyon request client, shared because the connection task fills
 /// it after registering and a command reads it later. Empty on a line-protocol
 /// connection, and on a Tachyon one for the moment between registering and the
@@ -127,7 +182,9 @@ pub struct ServerConn {
     pub tx: UnboundedSender<Outbound>,
     pub state: Arc<Mutex<LobbyState>>,
     pub sink: EventSink,
-    pub phase: Arc<Mutex<LoginPhase>>,
+    /// The login phase, watched rather than locked so it can be waited on. See
+    /// [`PhaseSlot`].
+    pub phase: PhaseSlot,
     /// The Tachyon request client, on a connection that has one. Set by
     /// [`crate::tachyon_conn`] once the correlator is running, and left empty on a
     /// line-protocol connection, which is what tells the two apart from a command.
@@ -192,7 +249,9 @@ pub fn spawn_connection(
     initial.dms = dm_log.load();
     let state = Arc::new(Mutex::new(initial));
     let sink: EventSink = Arc::new(Mutex::new(on_event));
-    let phase = Arc::new(Mutex::new(LoginPhase::AwaitGreeting));
+    // The sending half goes to the task and nowhere else, so it is dropped when
+    // the connection ends and everything waiting on the phase is woken.
+    let (phase_tx, phase) = watch::channel(LoginPhase::AwaitGreeting);
     let agreement = Arc::new(Mutex::new(None));
 
     tokio::spawn(run_loop(
@@ -201,7 +260,7 @@ pub fn spawn_connection(
         stream,
         login_cfg,
         sink.clone(),
-        phase.clone(),
+        phase_tx,
         agreement.clone(),
         rx,
         state.clone(),
@@ -240,7 +299,7 @@ async fn run_loop(
     stream: Box<dyn AsyncReadWrite>,
     login_cfg: LoginConfig,
     sink: EventSink,
-    phase_slot: Arc<Mutex<LoginPhase>>,
+    phase_slot: watch::Sender<LoginPhase>,
     agreement_slot: Arc<Mutex<Option<String>>>,
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
@@ -276,7 +335,7 @@ async fn run_loop(
                     if login.phase() != before {
                         let agreement = (login.phase() == LoginPhase::AwaitAgreement)
                             .then(|| login.agreement_text());
-                        *lock_or_recover(&phase_slot) = login.phase();
+                        let _ = phase_slot.send(login.phase());
                         *lock_or_recover(&agreement_slot) = agreement.clone();
                         emit(
                             &sink,
@@ -390,7 +449,7 @@ async fn run_loop(
                     if login.phase() != before {
                         let agreement = (login.phase() == LoginPhase::AwaitAgreement)
                             .then(|| login.agreement_text());
-                        *lock_or_recover(&phase_slot) = login.phase();
+                        let _ = phase_slot.send(login.phase());
                         *lock_or_recover(&agreement_slot) = agreement.clone();
                         emit(
                             &sink,
