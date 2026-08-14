@@ -123,6 +123,52 @@ async fn the_handshake_lines_are_exactly_what_the_client_parses() {
     room.stop("done").await;
 }
 
+/// An `OPENBATTLE` that overtakes its own login is answered on the socket.
+///
+/// Over loopback the login lands first almost every time, which is what made this
+/// so hard to see: the one run where it does not leaves the room holding a socket,
+/// no battle, and a host reading an empty battle list with nothing said to them
+/// (issue #1587). A raw peer can put the two lines in that order on purpose, which
+/// a client cannot, so the room's answer is checked here rather than through one.
+#[tokio::test]
+async fn a_battle_command_that_overtakes_its_login_is_answered() {
+    let room = room().await;
+    let mut peer = RawPeer::connect(&room).await;
+    peer.next().await.expect("a greeting");
+
+    peer.send(&command::open_battle(
+        0,
+        0,
+        "letmein",
+        8452,
+        16,
+        -1,
+        0,
+        -1,
+        "spring",
+        "105.1.1",
+        "Red Comet",
+        "Tom's LAN game",
+        "Beyond All Reason test-1234",
+    ))
+    .await;
+    // Bounded, because the failure being guarded against is silence, and an
+    // unbounded read of a room that has nothing to say never returns.
+    let answer = tokio::time::timeout(Duration::from_secs(5), peer.next())
+        .await
+        .expect("the room to answer rather than say nothing");
+    assert_eq!(
+        answer.as_deref(),
+        Some("OPENBATTLEFAILED you are not logged in yet")
+    );
+    assert!(
+        room.status().await.is_some_and(|s| s.battle.is_none()),
+        "and no battle was opened by it"
+    );
+
+    room.stop("done").await;
+}
+
 /// A room a joiner cannot reach is worse than no room, so a refusal has to be a
 /// line and not a closed socket.
 #[tokio::test]

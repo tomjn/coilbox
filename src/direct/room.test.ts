@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { Battle } from "../multiplayer/bindings";
 import type { DirectRoomStatus } from "./bindings";
 import {
+  battleOpened,
   DEFAULT_ROOM_PORT,
   directServer,
   isDirectKey,
+  roomPasswordProblem,
   roomPortProblem,
   roomStopReason,
   roomSummary,
@@ -173,5 +175,84 @@ describe("roomPortProblem", () => {
   it("refuses anything that is not digits", () => {
     expect(roomPortProblem("82e3")).toBe("Ports are whole numbers.");
     expect(roomPortProblem("-1")).toBe("Ports are whole numbers.");
+  });
+});
+
+describe("battleOpened", () => {
+  const room = (over: Partial<DirectRoomStatus> = {}): DirectRoomStatus => ({
+    port: 8200,
+    host: "Tom",
+    ip: "127.0.0.1",
+    approveJoins: false,
+    peers: 1,
+    pending: [],
+    battle: null,
+    ...over,
+  });
+  const withBattle = room({ battle: {} as unknown as Battle });
+
+  it("answers with the room as soon as it has the battle, without waiting", async () => {
+    const waits: number[] = [];
+    const opened = await battleOpened(
+      async () => withBattle,
+      async (ms) => {
+        waits.push(ms);
+      },
+    );
+    expect(opened).toBe(withBattle);
+    expect(waits).toEqual([]);
+  });
+
+  it("keeps looking while the room has only the host's socket", async () => {
+    let looks = 0;
+    const opened = await battleOpened(
+      async () => {
+        looks += 1;
+        return looks < 3 ? room() : withBattle;
+      },
+      async () => {},
+    );
+    expect(opened).toBe(withBattle);
+    expect(looks).toBe(3);
+  });
+
+  // The failure this exists for: the port is bound, the host's own client is on
+  // it, and no battle is ever going to appear. Giving up is what lets the caller
+  // stop the room and say so, rather than leaving it up in silence.
+  it("gives up rather than waiting on a battle that never comes", async () => {
+    let waits = 0;
+    const opened = await battleOpened(
+      async () => room(),
+      async () => {
+        waits += 1;
+      },
+    );
+    expect(opened).toBeNull();
+    expect(waits).toBe(50);
+  });
+
+  it("gives up on a room that has stopped underneath it", async () => {
+    const opened = await battleOpened(
+      async () => null,
+      async () => {},
+    );
+    expect(opened).toBeNull();
+  });
+});
+
+describe("roomPasswordProblem", () => {
+  it("takes an ordinary password, and no password at all", () => {
+    expect(roomPasswordProblem("s3cret")).toBeNull();
+    expect(roomPasswordProblem("")).toBeNull();
+    // Trimmed before it is sent, so the edges are not the host's problem.
+    expect(roomPasswordProblem("  s3cret  ")).toBeNull();
+  });
+
+  // Sent, this one moves the port, the player limit and both content hashes
+  // along a slot, and the battle that opens has a limit of zero: full to every
+  // joiner, with nothing said to the host.
+  it("refuses a password with a space in it", () => {
+    expect(roomPasswordProblem("let me in")).toContain("No spaces");
+    expect(roomPasswordProblem("let\tme in")).toContain("No spaces");
   });
 });

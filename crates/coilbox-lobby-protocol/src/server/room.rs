@@ -301,6 +301,23 @@ impl RoomState {
                 out.push(Outbound::Close { peer });
                 out
             }
+            // The two battle commands are answered rather than dropped, because
+            // a client that sends one before its login has landed is left with a
+            // room that has its socket, no battle, and nothing said about either
+            // (issue #1587). Every other command is a client talking to itself
+            // and costs nothing to ignore.
+            ClientCommand::OpenBattle { .. } if self.name_of(peer).is_none() => {
+                vec![Outbound::To {
+                    peer,
+                    line: line::open_battle_failed("you are not logged in yet"),
+                }]
+            }
+            ClientCommand::JoinBattle { .. } if self.name_of(peer).is_none() => {
+                vec![Outbound::To {
+                    peer,
+                    line: line::join_battle_failed("you are not logged in yet"),
+                }]
+            }
             _ if self.name_of(peer).is_none() => vec![],
             ClientCommand::OpenBattle {
                 key,
@@ -1226,6 +1243,38 @@ mod tests {
         assert!(lines.contains(&"ADDUSER alice ?? 1 Coilbox 0.1"));
     }
 
+    /// A battle command that arrives before the login has landed is answered,
+    /// not swallowed. Swallowed, it leaves a host with a room holding their
+    /// socket, no battle in it, and nothing said about either (issue #1587).
+    #[test]
+    fn a_battle_command_before_the_login_is_told_why_it_did_nothing() {
+        let mut room = room(false);
+        room.connect(ALICE);
+
+        let out = send(&mut room, ALICE, &open_battle_line());
+        assert_eq!(
+            due(&out, ALICE),
+            ["OPENBATTLEFAILED you are not logged in yet"]
+        );
+        assert!(room.battle_view().is_none());
+
+        let out = send(&mut room, ALICE, "JOINBATTLE 1 * s3cret");
+        assert_eq!(
+            due(&out, ALICE),
+            ["JOINBATTLEFAILED you are not logged in yet"]
+        );
+    }
+
+    /// Everything else a client fires unprompted is it talking to itself, and a
+    /// refusal would pop an error at somebody who did nothing wrong.
+    #[test]
+    fn other_commands_before_the_login_stay_silent() {
+        let mut room = room(false);
+        room.connect(ALICE);
+        assert!(send(&mut room, ALICE, "MYSTATUS 0").is_empty());
+        assert!(send(&mut room, ALICE, "SAYBATTLE hello").is_empty());
+    }
+
     /// The second peer is told about the first, and the first about the second.
     #[test]
     fn the_roster_reaches_both_ways() {
@@ -1683,10 +1732,11 @@ mod tests {
     #[test]
     fn commands_out_of_turn_are_ignored_rather_than_answered() {
         let mut room = room(false);
-        // Before a login, only the handshake works.
+        // Before a login, only the handshake works. The two battle commands are
+        // the exception and are refused out loud: see
+        // `a_battle_command_before_the_login_is_told_why_it_did_nothing`.
         room.connect(ALICE);
         assert!(send(&mut room, ALICE, "SAYBATTLE hello").is_empty());
-        assert!(send(&mut room, ALICE, &open_battle_line()).is_empty());
         // From a socket the room has never seen, nothing works at all.
         assert!(send(&mut room, 99, "LISTCOMPFLAGS").is_empty());
 

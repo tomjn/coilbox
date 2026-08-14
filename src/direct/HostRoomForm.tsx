@@ -26,7 +26,12 @@ import {
   hashFailureMessage,
   useHostContent,
 } from "../multiplayer/battles/useHostContent";
-import { DEFAULT_ROOM_PORT, roomPortProblem, startButtonLabel } from "./room";
+import {
+  DEFAULT_ROOM_PORT,
+  roomPasswordProblem,
+  roomPortProblem,
+  startButtonLabel,
+} from "./room";
 
 /** Everything the page needs to start a room and open the host's battle in it. */
 export interface StartRoomArgs {
@@ -71,11 +76,13 @@ export function HostRoomForm({
   // guessing. Say so here instead of letting the handshake fail.
   const nameHasSpace = /\s/.test(trimmedName);
   const portProblem = roomPortProblem(port);
+  const passwordProblem = roomPasswordProblem(password);
   const canStart =
     content.ready &&
     !!trimmedName &&
     !nameHasSpace &&
     !portProblem &&
+    !passwordProblem &&
     !starting &&
     !content.noEngine;
 
@@ -238,6 +245,9 @@ export function HostRoomForm({
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Leave blank for an open room"
         />
+        {passwordProblem && (
+          <span className="text-xs text-destructive">{passwordProblem}</span>
+        )}
       </label>
 
       <PendingToggle
