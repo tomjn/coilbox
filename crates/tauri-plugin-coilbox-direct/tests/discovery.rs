@@ -9,9 +9,10 @@
 //! tested without a second machine.
 //!
 //! These bind the real beacon port and put real datagrams on the network, so
-//! every test here names its own room and only ever asserts about that one.
-//! Otherwise they would see each other's beacons, and a developer hosting a
-//! room while running the tests would break them.
+//! every test here names its own room, with a name new every run (see
+//! [`named`]), and only ever asserts about that one. Otherwise they would see
+//! each other's beacons, and a developer hosting a room, or a second run of this
+//! suite anywhere on the network, would break them.
 
 use std::time::Duration;
 
@@ -20,7 +21,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
 use tauri_plugin_coilbox_direct::beacon::{
-    encode, Beacon, LanRoom, BEACON_EXPIRY, BEACON_INTERVAL,
+    encode, room_id, Beacon, LanRoom, BEACON_EXPIRY, BEACON_INTERVAL,
 };
 use tauri_plugin_coilbox_direct::discovery::{announce_once, Discovery};
 use tauri_plugin_coilbox_direct::room::{Room, RoomOptions};
@@ -48,6 +49,54 @@ fn find(rooms: &[LanRoom], id: &str) -> Option<LanRoom> {
     rooms.iter().find(|room| room.id == id).cloned()
 }
 
+/// A room name for this run of this test and nothing else.
+///
+/// Naming a room in the source is not enough, because the datagrams go on the
+/// real network and every other coilbox on it hears them. A second test run, on
+/// this machine or on the next desk, announces the same rooms this one is
+/// asserting about, and its beacons keep an entry alive that is supposed to be
+/// ageing out (issue #1606). `room_id` is what a real room names itself with, so
+/// a test run is as distinct from another run as two rooms are.
+fn named(label: &str) -> String {
+    format!("{label}-{}", room_id())
+}
+
+/// Wait for a room to leave the list, counting from the last beacon heard rather
+/// than from the first.
+///
+/// One announce is not one datagram. It goes out of every interface, to the
+/// group and to the broadcast address, and the copies arrive when they arrive:
+/// about a second apart on an idle machine here, and several seconds apart while
+/// a second test run has the CPU. Every copy is a fresh sighting that restarts
+/// the room's expiry, so a fixed deadline made the test a race against its own
+/// announce (issue #1606).
+///
+/// The room's `last_seen_ms` says when the newest beacon behind it landed, so
+/// that is what the deadline hangs off. What is asserted is unchanged: an entry
+/// outlives its last beacon by [`BEACON_EXPIRY`] and no longer. `CAP` only stops
+/// a directory that never drops anything from looping forever.
+async fn gone_after_the_last_beacon(rooms: impl Fn() -> Vec<LanRoom>, id: &str) -> bool {
+    const SLACK: Duration = Duration::from_secs(3);
+    const CAP: Duration = Duration::from_secs(60);
+    let start = tokio::time::Instant::now();
+    let mut last_beacon = start;
+    while start.elapsed() < CAP {
+        let now = tokio::time::Instant::now();
+        match find(&rooms(), id) {
+            None => return true,
+            Some(room) => {
+                let landed = now - Duration::from_millis(room.last_seen_ms);
+                last_beacon = last_beacon.max(landed);
+                if now > last_beacon + BEACON_EXPIRY + SLACK {
+                    return false;
+                }
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    false
+}
+
 fn beacon(id: &str) -> Beacon {
     Beacon {
         id: id.to_string(),
@@ -69,7 +118,8 @@ async fn two_listeners_on_one_machine_both_hear_a_beacon() {
     let first = Discovery::start().expect("the beacon port binds");
     let second = Discovery::start().expect("the beacon port binds a second time");
 
-    let payload = encode(&beacon("two-listeners")).into_bytes();
+    let id = named("two-listeners");
+    let payload = encode(&beacon(&id)).into_bytes();
     // Twice, because the first datagram can go out before a group join has
     // settled. Which is also why a room announces itself every two seconds
     // rather than once.
@@ -78,17 +128,17 @@ async fn two_listeners_on_one_machine_both_hear_a_beacon() {
     announce_once(&payload);
 
     let heard_first = until(Duration::from_secs(5), || {
-        find(&first.rooms(None), "two-listeners").is_some()
+        find(&first.rooms(None), &id).is_some()
     })
     .await;
     let heard_second = until(Duration::from_secs(5), || {
-        find(&second.rooms(None), "two-listeners").is_some()
+        find(&second.rooms(None), &id).is_some()
     })
     .await;
     assert!(heard_first, "the first listener heard nothing");
     assert!(heard_second, "the second listener heard nothing");
 
-    let room = find(&first.rooms(None), "two-listeners").expect("the room it just heard");
+    let room = find(&first.rooms(None), &id).expect("the room it just heard");
     assert_eq!(room.title, "A room on this machine");
     assert_eq!(room.game, "Beyond All Reason test-1234");
     assert_eq!(room.map, "Red Comet Remake 1.8");
@@ -113,20 +163,21 @@ async fn two_listeners_on_one_machine_both_hear_a_beacon() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_host_hears_its_own_room_and_can_tell() {
     let listening = Discovery::start().expect("the beacon port binds");
-    let payload = encode(&beacon("my-own-room")).into_bytes();
+    let id = named("my-own-room");
+    let payload = encode(&beacon(&id)).into_bytes();
     announce_once(&payload);
     tokio::time::sleep(Duration::from_millis(200)).await;
     announce_once(&payload);
 
     let heard = until(Duration::from_secs(5), || {
-        find(&listening.rooms(Some("my-own-room")), "my-own-room").is_some()
+        find(&listening.rooms(Some(&id)), &id).is_some()
     })
     .await;
     assert!(heard, "the listener heard nothing");
 
-    let ours = find(&listening.rooms(Some("my-own-room")), "my-own-room").expect("our beacon");
+    let ours = find(&listening.rooms(Some(&id)), &id).expect("our beacon");
     assert!(ours.is_self, "our own beacon has to be marked as ours");
-    let theirs = find(&listening.rooms(Some("another-room")), "my-own-room").expect("our beacon");
+    let theirs = find(&listening.rooms(Some("another-room")), &id).expect("our beacon");
     assert!(!theirs.is_self, "somebody else's beacon is not ours");
 
     listening.stop();
@@ -137,26 +188,21 @@ async fn a_host_hears_its_own_room_and_can_tell() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_room_that_stops_beaconing_leaves_the_list() {
     let listening = Discovery::start().expect("the beacon port binds");
-    let payload = encode(&beacon("gone-in-a-moment")).into_bytes();
+    let id = named("gone-in-a-moment");
+    let payload = encode(&beacon(&id)).into_bytes();
     announce_once(&payload);
     tokio::time::sleep(Duration::from_millis(200)).await;
     announce_once(&payload);
 
     assert!(
-        until(Duration::from_secs(5), || find(
-            &listening.rooms(None),
-            "gone-in-a-moment"
-        )
-        .is_some())
+        until(Duration::from_secs(5), || find(&listening.rooms(None), &id)
+            .is_some())
         .await,
         "the listener heard nothing"
     );
 
     // Nothing more is sent, so the entry has to age out on its own.
-    let gone = until(BEACON_EXPIRY + Duration::from_secs(3), || {
-        find(&listening.rooms(None), "gone-in-a-moment").is_none()
-    })
-    .await;
+    let gone = gone_after_the_last_beacon(|| listening.rooms(None), &id).await;
     assert!(gone, "a room whose beacons stopped is still listed");
 
     listening.stop();
