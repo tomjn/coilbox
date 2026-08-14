@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows starting, stopping, inspecting and answering joins to the lobby room this client hosts itself, and finding rooms announced on the local network."
+description = "Allows starting, stopping, inspecting and answering joins to the lobby room this client hosts itself, finding rooms announced on the local network, and asking the router to open the ports a host needs."
 permissions = [
   "allow-direct-start-room",
   "allow-direct-stop-room",
@@ -9,4 +9,7 @@ permissions = [
   "allow-direct-answer-join",
   "allow-direct-lan-rooms",
   "allow-direct-stop-discovery",
+  "allow-direct-open-ports",
+  "allow-direct-close-ports",
+  "allow-direct-port-status",
 ]
