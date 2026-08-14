@@ -26,6 +26,8 @@ import {
   hashFailureMessage,
   useHostContent,
 } from "../multiplayer/battles/useHostContent";
+import { ReachablePorts } from "./ReachablePorts";
+import { roomPorts } from "./reachability";
 import {
   DEFAULT_ROOM_PORT,
   playerNameProblem,
@@ -274,10 +276,11 @@ export function HostRoomForm({
         </span>
       </label>
 
-      <PendingToggle
-        label="Reachable over the internet"
-        reason="Coilbox cannot open a port on your router yet. Forward it by hand for players outside your network."
+      <ReachablePorts
+        ports={portProblem ? null : roomPorts(Number(port), DEFAULT_HOST_PORT)}
+        help={`Asks your router to forward the room's port and the game's port ${DEFAULT_HOST_PORT} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch.`}
       />
+
       {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association) */}
       <label className="flex items-start gap-2 text-sm">
         <Checkbox
@@ -360,20 +363,5 @@ export function HostRoomForm({
         </Button>
       </div>
     </form>
-  );
-}
-
-/** A toggle the design calls for and nothing implements yet: off, unusable, and
- *  saying so rather than pretending. */
-function PendingToggle({ label, reason }: { label: string; reason: string }) {
-  return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association)
-    <label className="flex items-start gap-2 text-sm opacity-60">
-      <Checkbox checked={false} disabled className="mt-0.5" />
-      <span className="flex flex-col gap-0.5">
-        <span className="font-medium">{label}</span>
-        <span className="text-xs text-muted-foreground">Not yet. {reason}</span>
-      </span>
-    </label>
   );
 }

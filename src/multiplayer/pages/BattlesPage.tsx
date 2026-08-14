@@ -20,6 +20,7 @@ import {
   noRoomBattleFailure,
   roomBattle,
 } from "../../direct/lan";
+import { directClosePorts } from "../../direct/reachability";
 import {
   battleOpened,
   isDirectKey,
@@ -364,6 +365,11 @@ function BattlesPage() {
       const reason = roomStopReason(room?.host ?? "");
       await disconnect();
       await directStopRoom({ reason });
+      // The room is what wanted the ports open, so the room ending is what hands
+      // them back. Leaving a mapping on somebody's router after the thing that
+      // asked for it has gone is rude, and the hour-long lease only limits the
+      // damage when this never runs, which is a host whose machine was killed.
+      await directClosePorts({}).catch(() => {});
       setRoom(null);
     } catch (e) {
       // The room is still there, so let the poll speak for it again.
