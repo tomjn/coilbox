@@ -1,6 +1,5 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { Lock, Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { THUMB_MINIMAP_MIP, useUnitsyncMinimap } from "../content/config";
 import { MapThumb } from "../content/pages/components/MapThumb";
@@ -14,8 +13,13 @@ import {
 export type { JoinRoomArgs } from "./JoinRoomForm";
 
 /**
- * "Rooms on your network": the rooms heard announcing themselves, and the way in
+ * "Rooms on your network": the rooms other people are announcing, and the way in
  * for a host who was never heard at all.
+ *
+ * Other people's, because a host is already in their own room and it is in the
+ * battle list below with the way back into it, so listing it here as well was
+ * the same room twice (issue #1608). `BattlesPage` filters it out, and the note
+ * on the host's own line says whether their room is being announced.
  *
  * An empty list is a real answer, not a wait. Plenty of access points refuse to
  * carry broadcast between the devices on them, and a VPN or a guest network does
@@ -37,6 +41,7 @@ export function LanRooms({
   dataDir,
   onJoin,
 }: {
+  /** The rooms somebody else is announcing. */
   rooms: DirectLanRoom[];
   /** Why this client cannot listen for rooms at all, or null. */
   error: string | null;
@@ -139,9 +144,6 @@ function LanRoomRow({
             />
           )}
           <span className="truncate">{room.title}</span>
-          {/* A host who cannot see their own room has no way to tell whether
-              anybody else can, so it is marked rather than hidden. */}
-          {room.isSelf && <Badge variant="secondary">Yours</Badge>}
         </p>
         <p className="truncate text-xs text-muted-foreground">
           {room.map} · {room.game} · host {room.host}
@@ -153,23 +155,17 @@ function LanRoomRow({
           {room.players}/{room.maxPlayers}
         </span>
       </div>
-      {room.isSelf ? (
-        <span className="shrink-0 text-xs text-muted-foreground">
-          You are hosting this
-        </span>
-      ) : (
-        <JoinRoomDrawerButton
-          target={{
-            title: room.title,
-            address: room.address,
-            port: room.port,
-            passworded: room.passworded,
-          }}
-          defaultName={defaultName}
-          blocked={blocked}
-          onJoin={onJoin}
-        />
-      )}
+      <JoinRoomDrawerButton
+        target={{
+          title: room.title,
+          address: room.address,
+          port: room.port,
+          passworded: room.passworded,
+        }}
+        defaultName={defaultName}
+        blocked={blocked}
+        onJoin={onJoin}
+      />
     </li>
   );
 }

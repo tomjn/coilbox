@@ -1,4 +1,5 @@
 import type { Battle } from "../multiplayer/bindings";
+import type { DirectLanRoom } from "./bindings";
 import { isDirectKey } from "./room";
 
 /**
@@ -14,6 +15,26 @@ import { isDirectKey } from "./room";
  * The same interval rooms announce themselves at (`BEACON_INTERVAL`), because
  * asking faster only re-reads a map that has not changed. */
 export const LAN_POLL_MS = 2000;
+
+/**
+ * The rooms on this network that are somebody else's, which are the ones there
+ * is anything to do about. Pure.
+ *
+ * A host hears their own beacon back, and while they are hosting they are also
+ * connected to their own room, so the room turned up twice on the Battles page:
+ * once here and once in the battle list below, which is the copy that takes them
+ * back into it (issue #1608). The list is what a joiner reads, so it keeps the
+ * rooms a joiner can join, and what the host's own beacon proves is said on the
+ * host's own line instead (see `announcementNote`).
+ */
+export function otherRooms(rooms: DirectLanRoom[]): DirectLanRoom[] {
+  return rooms.filter((room) => !room.isSelf);
+}
+
+/** Whether this client's own room has come back off the network. Pure. */
+export function ownRoomHeard(rooms: DirectLanRoom[]): boolean {
+  return rooms.some((room) => room.isSelf);
+}
 
 /**
  * The address and port in one typed string, so `192.168.1.5:8200` read out over

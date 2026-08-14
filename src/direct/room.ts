@@ -116,6 +116,30 @@ export function roomSummary(room: DirectRoomStatus): string {
   return parts.join(", ");
 }
 
+/**
+ * What a host reads about their room being announced. Pure.
+ *
+ * This is the answer the "Yours" row in the network list used to carry, and it
+ * is here because the room was listed twice while it was hosted: once there and
+ * once in the battle list, which is the copy that takes the host back into the
+ * battle (issue #1608). A host still has to be able to tell whether their room
+ * is being announced, which is what they want to know when nobody is joining, so
+ * the fact moved onto the host's own line, where it is said in words rather than
+ * left to be read out of a badge being present.
+ *
+ * "Heard" is this client hearing its own beacon back off the network, which is
+ * the only evidence a host has that the announcement left the machine at all.
+ */
+export function announcementNote(advertise: boolean, heard: boolean): string {
+  if (!advertise) {
+    return "Not announced on this network, so give joiners your address.";
+  }
+  if (!heard) {
+    return "Not heard announcing itself yet. If it stays that way, people on this network will need your address rather than finding the room themselves.";
+  }
+  return "Announced on this network.";
+}
+
 /** How often the host's own room is asked what it holds. The command reads a
  *  struct out of a task in this same process, so two seconds costs nothing and is
  *  quick enough that somebody waiting at the door is not left there. */
