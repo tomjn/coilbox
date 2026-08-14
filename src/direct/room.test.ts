@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
+import type { Battle } from "../multiplayer/bindings";
+import type { DirectRoomStatus } from "./bindings";
 import {
   DEFAULT_ROOM_PORT,
   directServer,
   isDirectKey,
   roomPortProblem,
   roomStopReason,
+  roomSummary,
   startButtonLabel,
   startRoomFailure,
 } from "./room";
@@ -91,6 +94,55 @@ describe("startButtonLabel", () => {
 
   it("offers the start once there is something to start", () => {
     expect(startButtonLabel(false, true)).toBe("Start room");
+  });
+});
+
+describe("roomSummary", () => {
+  const room = (over: Partial<DirectRoomStatus> = {}): DirectRoomStatus => ({
+    port: 8200,
+    host: "Tom",
+    ip: "127.0.0.1",
+    approveJoins: false,
+    peers: 1,
+    pending: [],
+    battle: null,
+    ...over,
+  });
+  const battle = (passworded: boolean) => ({ passworded }) as unknown as Battle;
+
+  it("counts the host out of the peers, since one of them is their own client", () => {
+    expect(roomSummary(room({ peers: 1 }))).toContain("nobody has joined yet");
+    expect(roomSummary(room({ peers: 2 }))).toContain("1 player joined");
+    expect(roomSummary(room({ peers: 4 }))).toContain("3 players joined");
+  });
+
+  it("says where the room is and whose name holds it", () => {
+    expect(roomSummary(room({ port: 8452, host: "Ada" }))).toContain(
+      "Hosting on port 8452 as Ada",
+    );
+  });
+
+  it("says whether a joiner needs the password", () => {
+    expect(roomSummary(room({ battle: battle(true) }))).toContain(
+      "password needed",
+    );
+    expect(roomSummary(room({ battle: battle(false) }))).toContain(
+      "no password",
+    );
+  });
+
+  // Between binding the port and opening the battle there is nothing to read the
+  // answer off, and "no password" would be wrong for every passworded room.
+  it("says nothing about a password before there is a battle to ask", () => {
+    const line = roomSummary(room());
+    expect(line).not.toContain("password");
+    expect(line).toBe("Hosting on port 8200 as Tom, nobody has joined yet");
+  });
+
+  // A room's own count never goes below its host, but it is read off another
+  // process and a line reading "-1 players joined" would be worse than a stale one.
+  it("does not go negative if the room answers before the host is counted", () => {
+    expect(roomSummary(room({ peers: 0 }))).toContain("nobody has joined yet");
   });
 });
 
