@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useUnitsyncGameInfo,
   useUnitsyncMapInfo,
@@ -65,6 +65,28 @@ export function useHostContent(initialGame?: string, initialMap?: string) {
       setMapName((c) => (maps.some((m) => m.name === c) ? c : maps[0].name));
   }, [maps]);
 
+  // Radix mirrors a Select into a hidden native `<select>` and dispatches a change
+  // off it once the trigger is measured, which reaches us as a pick of "" while
+  // the option list is still off the DOM. When the scan lands before that, as it
+  // does in a drawer, that empty pick arrives after the default above and unpicks
+  // it, so a host reads "Select a game" over a full list of games and cannot
+  // start. Nothing offers "" as an option, so a pick of it with options to hand is
+  // never a person choosing, and is refused.
+  const pickGame = useCallback(
+    (name: string) => {
+      if (!name && games.length > 0) return;
+      setGameName(name);
+    },
+    [games.length],
+  );
+  const pickMap = useCallback(
+    (name: string) => {
+      if (!name && maps.length > 0) return;
+      setMapName(name);
+    },
+    [maps.length],
+  );
+
   const selectedGame = games.find((g) => g.name === gameName);
   const gameInfo = useUnitsyncGameInfo(
     enginePath,
@@ -93,9 +115,9 @@ export function useHostContent(initialGame?: string, initialMap?: string) {
     /** Nothing to host with, and not merely nothing scanned yet. */
     noEngine: !target && !scan.loading,
     gameName,
-    setGameName,
+    setGameName: pickGame,
     mapName,
-    setMapName,
+    setMapName: pickMap,
     gameInfo,
     mapInfo,
     modhash,
