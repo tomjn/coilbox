@@ -544,7 +544,16 @@ function BattlesPage() {
         onLeave={leave}
         enginePath={selected?.enginePath}
         dataDir={selected?.rootPath}
-        serverAddress={activeKey ? serverAddressFromKey(activeKey) : undefined}
+        // A room of our own is dialled over loopback, so the only address this
+        // connection could put in a link is 127.0.0.1, which reaches nobody
+        // (issue #1615). The room line at the top of this page has the real
+        // addresses and a link for each, so the row says nothing rather than
+        // saying the wrong thing.
+        serverAddress={
+          activeKey && !isDirectKey(activeKey)
+            ? serverAddressFromKey(activeKey)
+            : undefined
+        }
       />
     </main>
   );
