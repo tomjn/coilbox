@@ -14,6 +14,8 @@
 //!
 //! - `coilbox-lobby-protocol::server` decides what every peer is told.
 //! - [`room`] owns the listener, the sockets and the disconnects.
+//! - [`beacon`] is what a room says about itself on the local network.
+//! - [`discovery`] carries that, and hears everybody else's.
 //! - This file is the IPC surface over one running room.
 
 use std::sync::Arc;
@@ -26,8 +28,12 @@ use tauri::{
 };
 use tokio::sync::Mutex;
 
+pub mod beacon;
+pub mod discovery;
 pub mod room;
 
+pub use beacon::{Beacon, LanRoom};
+pub use discovery::Discovery;
 pub use room::{Room, RoomOptions, RoomStatus, DEFAULT_LOBBY_PORT};
 
 /// The reason a stopped room gives its joiners when the host did not name one.
@@ -41,6 +47,13 @@ const DEFAULT_STOP_REASON: &str = "the host stopped hosting this room";
 #[derive(Default)]
 pub struct ActiveRoom(Arc<Mutex<Option<Room>>>);
 
+/// The listener for other people's rooms, once anybody has asked for one.
+///
+/// Separate from [`ActiveRoom`] because the two are independent: a host listens
+/// while hosting, and somebody looking for a room to join is not hosting at all.
+#[derive(Default)]
+pub struct ActiveDiscovery(Arc<Mutex<Option<Discovery>>>);
+
 /// `direct_start_room`: bind the lobby port and start hosting.
 ///
 /// Answers with the port the host's own client should then connect to over
@@ -53,6 +66,7 @@ async fn direct_start_room(
     ip: Option<String>,
     port: Option<u16>,
     approve_joins: Option<bool>,
+    advertise: Option<bool>,
 ) -> Result<CliResult, ()> {
     let mut slot = active.0.lock().await;
     if let Some(running) = slot.as_ref() {
@@ -63,12 +77,19 @@ async fn direct_start_room(
     }
     let options = RoomOptions {
         host,
-        // Loopback is the honest default: it is the only address this crate can
-        // be sure of. The LAN address comes from discovery and the public one
-        // from port mapping, both of which are somebody else's work.
-        ip: ip.unwrap_or_else(|| "127.0.0.1".to_string()),
+        // This machine's address on the network it is actually on. Loopback was
+        // the honest default while nothing here could work out anything better,
+        // and it is still the fallback, but a room announcing 127.0.0.1 is a
+        // room only its own host can reach. The public address behind a router
+        // is port mapping's job and is still somebody else's work.
+        ip: ip
+            .or_else(discovery::lan_address)
+            .unwrap_or_else(|| "127.0.0.1".to_string()),
         port: port.unwrap_or(DEFAULT_LOBBY_PORT),
         approve_joins: approve_joins.unwrap_or(false),
+        // On by default: the point of hosting on a LAN is that the people on it
+        // can find the room without being read an address down the sofa.
+        advertise: advertise.unwrap_or(true),
     };
     Ok(match Room::start(options).await {
         Ok(room) => {
@@ -111,17 +132,74 @@ async fn direct_room_status(active: State<'_, ActiveRoom>) -> Result<CliResult, 
     Ok(CliResult::ok(json!({ "room": status })))
 }
 
+/// `direct_lan_rooms`: the rooms being announced on this network right now.
+///
+/// Starts listening the first time it is asked, so a client that never looks for
+/// a room never binds the beacon port. The first answer is usually empty and the
+/// next one, two seconds later, is not: beacons arrive when their hosts send
+/// them, and there is nothing to ask for.
+///
+/// Answers with everything heard, this client's own room included and marked. A
+/// host who cannot see their own room in the list has no way to tell whether
+/// anybody else can.
+#[tauri::command]
+async fn direct_lan_rooms(
+    active: State<'_, ActiveRoom>,
+    discovery: State<'_, ActiveDiscovery>,
+) -> Result<CliResult, ()> {
+    let mut slot = discovery.0.lock().await;
+    if slot.is_none() {
+        match Discovery::start() {
+            Ok(started) => *slot = Some(started),
+            Err(e) => {
+                return Ok(CliResult::err(format!(
+                    "cannot listen for rooms on this network: {e}"
+                )))
+            }
+        }
+    }
+    let own = active
+        .0
+        .lock()
+        .await
+        .as_ref()
+        .map(|room| room.beacon_id().to_string());
+    let rooms = match slot.as_ref() {
+        Some(listening) => listening.rooms(own.as_deref()),
+        None => Vec::new(),
+    };
+    Ok(CliResult::ok(json!({ "rooms": rooms })))
+}
+
+/// `direct_stop_discovery`: stop listening and free the beacon port.
+///
+/// Nothing breaks if this is never called, but a client that has wandered off
+/// the page holding the beacon port open is one more thing standing between the
+/// next coilbox on this machine and a working listener.
+#[tauri::command]
+async fn direct_stop_discovery(discovery: State<'_, ActiveDiscovery>) -> Result<CliResult, ()> {
+    let listening = discovery.0.lock().await.take();
+    let stopped = listening.is_some();
+    if let Some(listening) = listening {
+        listening.stop();
+    }
+    Ok(CliResult::ok(json!({ "stopped": stopped })))
+}
+
 /// Build the plugin. Registered as `"coilbox-direct"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-direct")
         .setup(|app, _api| {
             tauri::Manager::manage(app, ActiveRoom::default());
+            tauri::Manager::manage(app, ActiveDiscovery::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             direct_start_room,
             direct_stop_room,
-            direct_room_status
+            direct_room_status,
+            direct_lan_rooms,
+            direct_stop_discovery
         ])
         .build()
 }

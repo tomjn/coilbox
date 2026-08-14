@@ -22,6 +22,9 @@ async fn room() -> Room {
         ip: "192.168.0.5".to_string(),
         port: 0,
         approve_joins: false,
+        // No beacon: this is about the bytes on the TCP socket, and a room
+        // announcing itself would put datagrams on the developer's network.
+        advertise: false,
     })
     .await
     .expect("a free port")

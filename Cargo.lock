@@ -5012,6 +5012,7 @@ dependencies = [
  "picoframe-core",
  "serde",
  "serde_json",
+ "socket2",
  "tauri",
  "tauri-plugin",
  "tokio",
