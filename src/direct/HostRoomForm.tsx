@@ -28,6 +28,7 @@ import {
 } from "../multiplayer/battles/useHostContent";
 import {
   DEFAULT_ROOM_PORT,
+  playerNameProblem,
   roomPasswordProblem,
   roomPortProblem,
   startButtonLabel,
@@ -77,16 +78,12 @@ export function HostRoomForm({
   const [error, setError] = useState<string | null>(null);
 
   const trimmedName = name.trim();
-  // A room announces its members by name in single wire fields, so a name with a
-  // space in it arrives as two, and the room refuses the login rather than
-  // guessing. Say so here instead of letting the handshake fail.
-  const nameHasSpace = /\s/.test(trimmedName);
+  const nameProblem = playerNameProblem(name);
   const portProblem = roomPortProblem(port);
   const passwordProblem = roomPasswordProblem(password);
   const canStart =
     content.ready &&
-    !!trimmedName &&
-    !nameHasSpace &&
+    !nameProblem &&
     !portProblem &&
     !passwordProblem &&
     !starting &&
@@ -180,11 +177,8 @@ export function HostRoomForm({
           />
         </label>
       </div>
-      {nameHasSpace && (
-        <span className="text-xs text-destructive">
-          No spaces in your name. A room announces names in single wire fields,
-          so a name with a space in it does not survive the trip.
-        </span>
+      {nameProblem && (
+        <span className="text-xs text-destructive">{nameProblem}</span>
       )}
 
       {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}

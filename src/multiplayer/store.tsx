@@ -342,14 +342,19 @@ interface MultiplayerContextValue {
   /** Open a connection as `username` to `server` (throws if no stored password). */
   connect: (server: LobbyServer, username: string) => Promise<void>;
   /**
-   * Connect to a room this client is hosting, over loopback, and answer with its
-   * `serverKey` so the caller can act on the connection before React has re-rendered.
+   * Connect to a room, and answer with its `serverKey` so the caller can act on
+   * the connection before React has re-rendered. Loopback for a room this client
+   * hosts, or `address` for somebody else's, found on the network or typed in.
    *
    * Separate from `connect` only in where the credential comes from: a room has no
    * accounts, so there is no keychain entry to read and nothing worth remembering
    * as a last-used login.
    */
-  connectDirect: (port: number, username: string) => Promise<string>;
+  connectDirect: (
+    port: number,
+    username: string,
+    address?: string,
+  ) => Promise<string>;
   /**
    * Sign in to a Tachyon server through the system browser, storing the result so
    * `connect` can use it. Resolves once the user has finished in the browser, and
@@ -1224,9 +1229,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // `activeKey`, because a caller that starts a room then opens a battle in it
   // does both before React has re-rendered with the new key.
   const connectDirect = useCallback(
-    async (port: number, username: string) => {
+    async (port: number, username: string, address?: string) => {
       stopReconnect();
-      const server = directServer(port);
+      const server = directServer(port, address);
       await doConnect(server, username, true);
       const serverKey = serverKeyFor(server, username);
       // Connected is not logged in. `mpConnect` answers as soon as the socket is

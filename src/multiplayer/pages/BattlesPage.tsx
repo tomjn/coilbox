@@ -13,6 +13,13 @@ import {
   HostRoomControl,
   type StartRoomArgs,
 } from "../../direct/HostRoomControl";
+import { type JoinRoomArgs, LanRooms } from "../../direct/LanRooms";
+import {
+  joinBlockedReason,
+  joinRoomFailure,
+  noRoomBattleFailure,
+  roomBattle,
+} from "../../direct/lan";
 import {
   battleOpened,
   isDirectKey,
@@ -20,6 +27,7 @@ import {
   roomStopReason,
   startRoomFailure,
 } from "../../direct/room";
+import { useLanRooms } from "../../direct/useLanRooms";
 import { useLastLogin } from "../../lobby-servers/config";
 import { notify } from "../../notify/notify";
 import { getGameMatcher } from "../../profile/profile";
@@ -41,6 +49,7 @@ import {
   mpJoinBattle,
   mpLeaveBattle,
   mpOpenBattle,
+  mpSnapshot,
 } from "../bindings";
 import { newScriptPassword } from "../scriptPassword";
 import { serverAddressFromKey, useMultiplayer } from "../store";
@@ -72,6 +81,10 @@ function BattlesPage() {
   const [roomBusy, setRoomBusy] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const [lastLogin] = useLastLogin();
+  // The rooms other people on this network are announcing. Polled for as long as
+  // this page is open and stopped when it is not, so nothing holds the beacon
+  // port open behind a page nobody is looking at.
+  const lan = useLanRooms();
   useEffect(() => {
     directRoomStatus({})
       .then((r) => setRoom(r.room))
@@ -360,6 +373,61 @@ function BattlesPage() {
     }
   }
 
+  // Join somebody else's room: dial it exactly as the host's own client dials
+  // theirs, then join the battle in it through the ordinary client path. Nothing
+  // here is a second way to join a battle.
+  //
+  // Failures are thrown rather than stored, for the same reason a failed start
+  // is: the only place they can be read is the drawer they were asked for in.
+  async function onJoinRoom(args: JoinRoomArgs) {
+    let key: string;
+    try {
+      key = await connectDirect(args.port, args.name, args.address);
+    } catch (e) {
+      throw new Error(joinRoomFailure(e, args.address, args.port));
+    }
+    try {
+      // Connected is not joinable. The battle arrives as a message behind the
+      // login that has only just been accepted, so there is a gap in which the
+      // room holds a battle this client has not been told about yet.
+      const battle = await roomBattle(
+        () =>
+          mpSnapshot({ serverKey: key }).then((s) =>
+            Object.values(s.state.battles),
+          ),
+        (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      );
+      if (!battle) throw new Error(noRoomBattleFailure());
+      clearJoinError();
+      hostingFromDraftRef.current = false;
+      joiningRef.current = true;
+      await mpJoinBattle({
+        serverKey: key,
+        id: battle.id,
+        key: args.password || undefined,
+        scriptPassword: newScriptPassword(),
+      });
+    } catch (e) {
+      // Connected to a room with nothing to join in it is worse than not
+      // connected: it holds the one lobby connection and shows an empty lobby.
+      joiningRef.current = false;
+      await disconnect().catch(() => {});
+      throw e;
+    }
+  }
+
+  const lanSection = (
+    <LanRooms
+      rooms={lan.rooms}
+      error={lan.error}
+      blocked={joinBlockedReason(activeKey, room !== null)}
+      defaultName={lastLogin?.username}
+      enginePath={selected?.enginePath}
+      dataDir={selected?.rootPath}
+      onJoin={onJoinRoom}
+    />
+  );
+
   const hostControl = (
     <HostRoomControl
       room={room}
@@ -381,8 +449,10 @@ function BattlesPage() {
         <header className="flex items-center justify-between gap-2 border-b border-border p-4">
           <h1 className="text-lg font-semibold">Battles</h1>
         </header>
-        <div className="flex flex-1 items-center justify-center p-10">
-          <div className="flex max-w-md flex-col items-center gap-3 text-center">
+        {/* Scrolls rather than centres once the rooms on the network push it
+            past the window, which a LAN party will. */}
+        <div className="flex flex-1 flex-col items-center overflow-y-auto p-10">
+          <div className="my-auto flex w-full max-w-xl flex-col items-center gap-3 text-center">
             <h2 className="text-base font-semibold">
               Not connected to a server
             </h2>
@@ -396,6 +466,9 @@ function BattlesPage() {
               Or host a room of your own. It needs no server and no account.
             </p>
             {hostControl}
+            <div className="mt-4 w-full border-t border-border pt-4 text-left">
+              {lanSection}
+            </div>
           </div>
         </div>
       </main>
@@ -444,6 +517,8 @@ function BattlesPage() {
           Join failed: {lastJoinError}
         </div>
       )}
+
+      <div className="border-b border-border px-4 py-3">{lanSection}</div>
 
       <BattleList
         battles={shown}
