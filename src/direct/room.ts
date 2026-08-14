@@ -150,3 +150,34 @@ export function roomPasswordProblem(typed: string): string | null {
 export function noBattleFailure(): string {
   return "The room started but its battle never opened, so the room has been stopped. Try again, and if it keeps happening, host on another port.";
 }
+
+/** How long to wait for the battle before calling a start failed, and how often
+ *  to look. Both halves happen in this process, so a second is already long, and
+ *  five is only here so a machine under load is not called a failure. */
+const BATTLE_TRIES = 50;
+const BATTLE_POLL_MS = 100;
+
+/**
+ * Wait for the room to report the battle the host has just asked it to open,
+ * answering `null` if it never does.
+ *
+ * Sending `OPENBATTLE` is not hosting. The command that sends it answers as soon
+ * as the line is queued, so every way the line can come to nothing, whether a
+ * refusal, a login that had not landed or a socket that went, used to leave a
+ * host looking at a running room with no battle in it and nothing said (issue
+ * #1587). Asking the room what it actually holds is the only answer that cannot
+ * lie about that.
+ *
+ * `wait` is passed in so the rule can be tested without a clock.
+ */
+export async function battleOpened(
+  status: () => Promise<DirectRoomStatus | null>,
+  wait: (ms: number) => Promise<void>,
+): Promise<DirectRoomStatus | null> {
+  for (let tries = 0; tries < BATTLE_TRIES; tries++) {
+    const room = await status();
+    if (room?.battle) return room;
+    await wait(BATTLE_POLL_MS);
+  }
+  return null;
+}

@@ -14,7 +14,9 @@ import {
   type StartRoomArgs,
 } from "../../direct/HostRoomControl";
 import {
+  battleOpened,
   isDirectKey,
+  noBattleFailure,
   roomStopReason,
   startRoomFailure,
 } from "../../direct/room";
@@ -303,9 +305,19 @@ function BattlesPage() {
       hostingFromDraftRef.current = false;
       joiningRef.current = true;
       await mpOpenBattle({ serverKey: key, ...args.battle });
+      // Sending the line is not opening the battle. Everything that can swallow
+      // it leaves a room listening with nobody able to join and nothing on
+      // screen to say so, so the room is asked whether it actually has one
+      // (issue #1587). A start that has not produced a battle by now is a
+      // failure, and the catch below takes the room down with it.
+      const opened = await battleOpened(
+        () => directRoomStatus({}).then((r) => r.room),
+        (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      );
+      if (!opened) throw new Error(noBattleFailure());
       stoppedRef.current = false;
       setStopError(null);
-      setRoom(await directRoomStatus({}).then((r) => r.room));
+      setRoom(opened);
     } catch (e) {
       // The room is up but we are not in it, which is a room nobody can host.
       // Take it down rather than leave a listener with no owner behind.
