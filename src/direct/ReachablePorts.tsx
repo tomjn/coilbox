@@ -1,6 +1,6 @@
-import { Button } from "@picoframe/frame";
 import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CopyButton } from "./CopyButton";
 import {
   type DirectReachability,
   isReachabilityProblem,
@@ -118,31 +118,19 @@ function Answer({
   );
 }
 
-/** The address to send a friend, and one press to put it on the clipboard.
- *  Selectable either way, because reading an address off a screen and typing it
- *  wrong is the failure this is here to prevent. */
+/** The address to send a friend, and one press to put it on the clipboard. */
 function CopyableAddress({ address }: { address: string }) {
-  const [copied, setCopied] = useState(false);
   return (
     <span className="flex items-center gap-2">
       <code className="select-all rounded bg-background px-1.5 py-0.5 font-mono text-foreground">
         {address}
       </code>
-      <Button
-        type="button"
-        variant="secondary"
-        className="h-6 shrink-0 px-2"
-        onClick={() => {
-          navigator.clipboard
-            .writeText(address)
-            .then(() => setCopied(true))
-            // The clipboard can be unavailable, and the address is selectable
-            // above, so there is nothing to report and nothing to fix.
-            .catch(() => {});
-        }}
+      <CopyButton
+        value={address}
+        label={`Copy ${address}, the address somebody outside your network joins at`}
       >
-        {copied ? "Copied" : "Copy"}
-      </Button>
+        Copy
+      </CopyButton>
     </span>
   );
 }

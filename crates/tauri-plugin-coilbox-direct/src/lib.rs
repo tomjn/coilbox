@@ -243,6 +243,21 @@ async fn direct_stop_discovery(discovery: State<'_, ActiveDiscovery>) -> Result<
     Ok(CliResult::ok(json!({ "stopped": stopped })))
 }
 
+/// `direct_local_addresses`: every address this machine can be dialled at, best
+/// first and loopback last, each named by the interface it is on.
+///
+/// This is what a host reads out to somebody who wants to join by typing an
+/// address (issue #1611). The room already knows one such address, because it
+/// announces one, but a machine with a VPN or Docker on it has several and only
+/// the person hosting can tell which one their friend can reach. So all of them
+/// are answered, named, and none is chosen here.
+#[tauri::command]
+async fn direct_local_addresses() -> Result<CliResult, ()> {
+    Ok(CliResult::ok(
+        json!({ "addresses": discovery::local_addresses() }),
+    ))
+}
+
 /// `direct_open_ports`: ask the router to open every port given, then look from
 /// outside to see whether it made any difference.
 ///
@@ -344,6 +359,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             direct_answer_join,
             direct_lan_rooms,
             direct_stop_discovery,
+            direct_local_addresses,
             direct_open_ports,
             direct_close_ports,
             direct_port_status
