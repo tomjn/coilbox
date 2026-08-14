@@ -31,9 +31,10 @@
 //!
 //! # Finding the gateway
 //!
-//! NAT-PMP is spoken to the default gateway, and reading the next hop out of the
-//! routing table is per platform work no crate here does. See
-//! [`gateway_candidates`] for what is done instead.
+//! NAT-PMP is spoken to the default gateway, which [`crate::discovery`] reads
+//! out of the OS's own interface list along with everything the beacon needs.
+//! See [`gateway_candidates`] for the order, and for what is left to guess at
+//! when the OS names no gateway at all.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::num::NonZeroU16;
@@ -47,6 +48,8 @@ use igd_next::aio::tokio::{search_gateway, Tokio};
 use igd_next::aio::Gateway;
 use igd_next::{AddPortError, PortMappingProtocol, SearchOptions};
 use serde::{Deserialize, Serialize};
+
+use crate::discovery::LocalNet;
 
 /// How long a mapping is asked to last.
 ///
@@ -186,22 +189,28 @@ pub fn next_step(asked: usize, opened: usize, more_methods: bool) -> Step {
 
 /// The addresses to try NAT-PMP against, best first.
 ///
-/// A UPnP search answers with the router's own address, so when SSDP found one
-/// it is the gateway and there is nothing to guess. When it did not, and that is
-/// exactly the case NAT-PMP exists to cover, the routing table is the real
-/// answer and no dependency here can read it portably. So the guess is the two
-/// addresses a home router is at: the first and the last host of the local /24.
+/// The gateway the OS routes this interface through is the answer, and it comes
+/// first. A UPnP search answers from the router as well, so it is next: the two
+/// are normally one box, and when they are not it is still something that speaks
+/// to routers.
+///
+/// Last come the two addresses a home router is usually at, the first and the
+/// last host of this machine's own subnet. They are only reached when the OS
+/// named no gateway, which is a machine with no default route, and a guess is
+/// better than not asking. Because the subnet comes from the interface rather
+/// than being assumed to be a /24, the guess is right on a /22 as well.
 ///
 /// A guess that is wrong costs one timeout. It cannot cause a wrong mapping,
 /// because a machine that is not a router does not answer on UDP 5351.
-pub fn gateway_candidates(local: Ipv4Addr, discovered: Option<Ipv4Addr>) -> Vec<Ipv4Addr> {
-    let octets = local.octets();
+pub fn gateway_candidates(local: LocalNet, discovered: Option<Ipv4Addr>) -> Vec<Ipv4Addr> {
     let mut out: Vec<Ipv4Addr> = Vec::new();
-    for candidate in discovered.into_iter().chain([
-        Ipv4Addr::new(octets[0], octets[1], octets[2], 1),
-        Ipv4Addr::new(octets[0], octets[1], octets[2], 254),
-    ]) {
-        if candidate != local && !out.contains(&candidate) {
+    for candidate in local
+        .gateway
+        .into_iter()
+        .chain(discovered)
+        .chain(local.ends())
+    {
+        if candidate != local.addr && !out.contains(&candidate) {
             out.push(candidate);
         }
     }
@@ -291,7 +300,7 @@ impl Open {
                 Ok(())
             }
             Held::Upnp { gateway, ports } => {
-                let local = local_ipv4().ok_or("this machine is on no network")?;
+                let local = local_net().ok_or("this machine is on no network")?.addr;
                 for (protocol, external) in ports.iter() {
                     let internal = self
                         .ports
@@ -358,7 +367,7 @@ impl Refused {
 /// Tries each method in [`ORDER`] in turn, rolling back anything a method opened
 /// before moving on, so the router is never left holding half a room's ports.
 pub async fn open(wanted: &[PortRequest]) -> Result<Open, Refused> {
-    let local = match local_ipv4() {
+    let local = match local_net() {
         Some(local) => local,
         None => {
             let nowhere = "this machine is on no network".to_string();
@@ -395,10 +404,10 @@ pub async fn open(wanted: &[PortRequest]) -> Result<Open, Refused> {
         let more_methods = index + 1 < ORDER.len();
         let attempt = match method {
             Method::NatPmp => {
-                try_nat_pmp(wanted, local, &gateway_candidates(local, discovered)).await
+                try_nat_pmp(wanted, local.addr, &gateway_candidates(local, discovered)).await
             }
             Method::Upnp => match &gateway {
-                Ok(found) => try_upnp(wanted, local, found).await,
+                Ok(found) => try_upnp(wanted, local.addr, found).await,
                 Err(e) => Err(format!("no UPnP gateway answered ({e})")),
             },
         };
@@ -632,14 +641,15 @@ async fn add_upnp_port(
     }
 }
 
-/// This machine's address on the network it is actually on.
+/// This machine's address on the network it is actually on, with the subnet and
+/// the gateway that go with it.
 ///
-/// The same routing table probe the beacon already uses, so a host announcing
-/// one address on the LAN is not mapping a different one on the router.
-fn local_ipv4() -> Option<Ipv4Addr> {
-    crate::discovery::local_addrs()
+/// The same enumeration the beacon uses, so a host announcing one address on the
+/// LAN is not mapping a different one on the router.
+fn local_net() -> Option<LocalNet> {
+    crate::discovery::local_nets()
         .into_iter()
-        .find(|a| !a.is_loopback())
+        .find(|net| !net.addr.is_loopback())
 }
 
 #[cfg(test)]
@@ -680,32 +690,57 @@ mod tests {
         assert_eq!(ORDER, [Method::NatPmp, Method::Upnp]);
     }
 
-    /// A gateway SSDP actually found beats both guesses and is not repeated as
-    /// one of them.
+    fn on(addr: [u8; 4], prefix_len: u8, gateway: Option<[u8; 4]>) -> LocalNet {
+        LocalNet {
+            addr: Ipv4Addr::from(addr),
+            prefix_len,
+            gateway: gateway.map(Ipv4Addr::from),
+        }
+    }
+
+    /// The router the OS routes through is the answer, so nothing else is tried
+    /// before it and neither guess repeats it.
     #[test]
-    fn a_discovered_gateway_comes_first_and_only_once() {
-        let local = Ipv4Addr::new(192, 168, 1, 45);
+    fn the_gateway_the_os_names_is_asked_first() {
+        assert_eq!(
+            gateway_candidates(on([192, 168, 1, 45], 24, Some([192, 168, 1, 3])), None),
+            vec![
+                Ipv4Addr::new(192, 168, 1, 3),
+                Ipv4Addr::new(192, 168, 1, 1),
+                Ipv4Addr::new(192, 168, 1, 254)
+            ]
+        );
+    }
+
+    /// A gateway SSDP found is worth asking, and is not repeated when it is the
+    /// same box the routing table named.
+    #[test]
+    fn a_discovered_gateway_is_not_repeated() {
         let found = Ipv4Addr::new(192, 168, 1, 1);
         assert_eq!(
-            gateway_candidates(local, Some(found)),
+            gateway_candidates(
+                on([192, 168, 1, 45], 24, Some([192, 168, 1, 1])),
+                Some(found)
+            ),
             vec![found, Ipv4Addr::new(192, 168, 1, 254)]
         );
     }
 
+    /// No default route at all, so both ends of the subnet are guessed, and the
+    /// subnet is the one the interface is really on rather than an assumed /24.
     #[test]
-    fn with_no_discovery_both_ends_of_the_subnet_are_guessed() {
+    fn with_no_gateway_both_ends_of_the_real_subnet_are_guessed() {
         assert_eq!(
-            gateway_candidates(Ipv4Addr::new(10, 0, 0, 17), None),
-            vec![Ipv4Addr::new(10, 0, 0, 1), Ipv4Addr::new(10, 0, 0, 254)]
+            gateway_candidates(on([10, 12, 5, 9], 22, None), None),
+            vec![Ipv4Addr::new(10, 12, 4, 1), Ipv4Addr::new(10, 12, 7, 254)]
         );
     }
 
     /// Asking ourselves is a guaranteed timeout and never the right answer.
     #[test]
     fn this_machine_is_never_one_of_the_candidates() {
-        let local = Ipv4Addr::new(192, 168, 1, 1);
         assert_eq!(
-            gateway_candidates(local, None),
+            gateway_candidates(on([192, 168, 1, 1], 24, None), None),
             vec![Ipv4Addr::new(192, 168, 1, 254)]
         );
     }
