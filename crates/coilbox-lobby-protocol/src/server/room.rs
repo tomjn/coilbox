@@ -52,6 +52,20 @@ const COMP_FLAGS: [&str; 2] = ["u", "sp"];
 /// wondering whether the second is about something else.
 const KICK_REASON: &str = "you were kicked from this room";
 
+/// What somebody turned away is told when they ask a second time.
+///
+/// A refusal answers a person, not one press of a button. Left to answer only
+/// the one join, a name the host has turned away is back in their prompt a
+/// second later and there is nothing they can press to end it, because kick
+/// lives in the roster and reaches only people already in the battle (issue
+/// #1599).
+///
+/// Deliberately weaker than a kick. A kick ends the connection and refuses the
+/// name at its next login. This refuses the battle and leaves the person where
+/// they are, because being turned away from a game is not being thrown off the
+/// machine, and a host who meant the stronger thing still has it.
+const REFUSED_REASON: &str = "the host has already turned you away from this battle";
+
 /// Where a line goes.
 ///
 /// `All` includes the peer whose command produced it, because that is how a real
@@ -162,6 +176,15 @@ pub struct RoomState {
     /// Names the host has kicked. Blocked for the life of the room, which is what
     /// makes a kick worth anything when anyone can reconnect in a second.
     kicked: BTreeSet<String>,
+    /// Names the host has turned away from this battle. Refused at the door for
+    /// as long as the battle is open rather than queued again, or a reject is
+    /// only an invitation to ask once more (issue #1599).
+    ///
+    /// Scoped to the battle, like [`RoomState::seats`], and for the same reason:
+    /// the next battle the host opens is a different game, and carrying a
+    /// refusal into it would be a decision nobody took. It is also the only
+    /// undo a host who pressed the wrong button has.
+    refused: BTreeSet<String>,
     /// The seat each name held when their connection died under them, so a
     /// player who drops gets their team, ally and colour back rather than
     /// rebuilding them in front of everybody.
@@ -189,6 +212,7 @@ impl RoomState {
             battle: None,
             pending: Vec::new(),
             kicked: BTreeSet::new(),
+            refused: BTreeSet::new(),
             seats: BTreeMap::new(),
             next_battle_id: 1,
         }
@@ -658,6 +682,12 @@ impl RoomState {
         if self.kicked.contains(&name) {
             return refuse(KICK_REASON);
         }
+        // Answered once, answered for good. Queueing this again would put the
+        // same name back in front of a host who has already said no, with
+        // nothing on that prompt able to end it.
+        if self.refused.contains(&name) {
+            return refuse(REFUSED_REASON);
+        }
         // Two refusals rather than one, because they ask for different things: a
         // joiner who sent nothing has to be told there is a password at all, and
         // a joiner who sent one has to be told to try again. An open room takes
@@ -690,6 +720,10 @@ impl RoomState {
     }
 
     /// The host turns a queued join away, with a reason they see verbatim.
+    ///
+    /// The name is refused for as long as the battle is open, so the answer is
+    /// to the person rather than to the one join they happened to send. They
+    /// keep their connection: see [`REFUSED_REASON`].
     fn refuse_join(
         &mut self,
         peer: PeerId,
@@ -699,6 +733,7 @@ impl RoomState {
         let Some(waiting) = self.take_pending(peer, username) else {
             return vec![];
         };
+        self.refused.insert(waiting.name.clone());
         vec![Outbound::To {
             peer: waiting.peer,
             line: line::join_battle_failed(
@@ -863,8 +898,10 @@ impl RoomState {
             self.pending.clear();
             // Seats belong to a battle, not to the room. The next battle the host
             // opens has its own map and its own teams, so an old seat in it would
-            // be a team nobody picked.
+            // be a team nobody picked. A refusal is scoped the same way: it was
+            // an answer about this game.
             self.seats.clear();
+            self.refused.clear();
             for p in self.peers.values_mut() {
                 p.member = None;
             }
@@ -1525,9 +1562,68 @@ mod tests {
         assert_eq!(due(&out, BOB), ["JOINBATTLEFAILED this is a private game"]);
         assert!(room.pending_joins().is_empty());
 
-        // A join nobody but the host can answer.
+        // A join nobody but the host can answer. A fresh room, because bob has
+        // now been turned away from this one and cannot ask again.
+        let mut room = started(true);
+        log_in(&mut room, 3, "carol");
         send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
-        assert!(send(&mut room, BOB, "JOINBATTLEACCEPT bob").is_empty());
+        assert!(send(&mut room, 3, "JOINBATTLEACCEPT bob").is_empty());
+        assert_eq!(room.pending_joins().len(), 1);
+    }
+
+    /// A refusal a second `JOINBATTLE` undoes is not a refusal. The name stays
+    /// out of the battle rather than going back in front of the host, who has
+    /// nothing on that prompt to end it with (issue #1599).
+    #[test]
+    fn a_refused_joiner_cannot_ask_again() {
+        let mut room = started(true);
+        send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        send(&mut room, ALICE, &command::join_battle_deny("bob", None));
+
+        let out = send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        assert_eq!(
+            due(&out, BOB),
+            ["JOINBATTLEFAILED the host has already turned you away from this battle"]
+        );
+        assert!(
+            room.pending_joins().is_empty(),
+            "asking again must not put them back in the host's prompt"
+        );
+    }
+
+    /// Weaker than a kick on purpose. Being turned away from a game is not being
+    /// thrown off the machine, so the connection, the roster entry and the room
+    /// chat all survive it, and the host still has a kick for the other case.
+    #[test]
+    fn a_refusal_leaves_the_person_in_the_room() {
+        let mut room = started(true);
+        send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        let out = send(&mut room, ALICE, &command::join_battle_deny("bob", None));
+        assert!(
+            !out.iter().any(|o| matches!(o, Outbound::Close { .. })),
+            "a refusal may not take the connection down: {out:?}"
+        );
+
+        // Still here, still known to everybody, and free to reconnect under the
+        // same name, which is exactly what a kick refuses.
+        assert!(room.peer_named("bob").is_some());
+        room.disconnect(BOB);
+        let out = log_in(&mut room, 3, "bob");
+        assert_eq!(due(&out, 3).first(), Some(&"ACCEPTED bob"));
+    }
+
+    /// A refusal is an answer about this game. The next battle the host opens is
+    /// another one, and it is the only undo a misplaced press has.
+    #[test]
+    fn a_refusal_does_not_outlive_the_battle_it_was_about() {
+        let mut room = started(true);
+        send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        send(&mut room, ALICE, &command::join_battle_deny("bob", None));
+
+        send(&mut room, ALICE, "LEAVEBATTLE");
+        send(&mut room, ALICE, &open_battle_line());
+
+        assert!(send(&mut room, BOB, "JOINBATTLE 2 * s3cret").is_empty());
         assert_eq!(room.pending_joins().len(), 1);
     }
 

@@ -97,9 +97,13 @@ export function PendingJoinsPanel({
             <Button size="sm" onClick={() => onAnswer(name, true)}>
               Approve {name}
             </Button>
+            {/* Said in a tooltip rather than in the label, because the label is
+                what a screen reader announces and "Reject bob" is the whole of
+                what the button does. The sentence is what it costs. */}
             <Button
               size="sm"
               variant="secondary"
+              title={`${name} cannot ask again while this battle is open.`}
               onClick={() => onAnswer(name, false)}
             >
               Reject {name}
