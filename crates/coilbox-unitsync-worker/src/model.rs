@@ -252,6 +252,11 @@ pub struct GameHeadersOutput {
 
 /// A rendered heightmap, returned by the lazy `heightmap` mode: a downscaled
 /// grayscale PNG plus the world-height bounds needed for correct displacement.
+///
+/// `asset` and `assetSkipped` only appear when the caller asked for hub assets
+/// (`--asset-dir`), and then exactly one of them is set. The asset is the full
+/// resolution 16 bit grid rather than the downscaled picture above, which is the
+/// whole of #1627.
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct HeightmapOutput {
@@ -275,6 +280,13 @@ pub struct HeightmapOutput {
     /// World height at infomap value 65535.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_height: Option<f32>,
+    /// The full resolution 16 bit grid stored as the hub's `overlay:height`
+    /// asset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<MapOverlayAsset>,
+    /// Why there is no asset, when one was asked for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_skipped: Option<MapOverlaySkip>,
     pub errors: Vec<String>,
 }
 
@@ -334,6 +346,15 @@ pub struct MapOverlayAsset {
     pub width: u32,
     pub height: u32,
     pub bytes: u64,
+    /// World height at sample 0 and at sample 65535, for `overlay:height` and
+    /// nothing else. They are what turn samples back into elmos and nothing
+    /// downstream can recover them from the image, so they travel with the asset
+    /// rather than beside it: whatever uploads the bytes has to put these on the
+    /// row in the same request (spec 13.2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_height: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_height: Option<f32>,
 }
 
 /// Why a map produced no overlay asset. Each is a different answer and only some
@@ -345,6 +366,10 @@ pub enum MapOverlaySkip {
     NoSource,
     /// The infomap is there and the read failed, which is coilbox's problem.
     ReadFailed,
+    /// `overlay:height` only: the samples read and the world-height bounds did
+    /// not, so what the samples mean is unknown. Storing them anyway would put a
+    /// grid of numbers in the hub that nothing can convert to elmos.
+    NoBounds,
     /// libwebp refused it.
     EncodeFailed,
     /// Encoded past the class's byte cap, which the hub also applies.

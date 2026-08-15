@@ -117,6 +117,9 @@ fn encode_asset(
         width: encoded.width,
         height: encoded.height,
         bytes: encoded.bytes.len() as u64,
+        // Bounds belong to the height layer. A density is already a number.
+        min_height: None,
+        max_height: None,
     })
 }
 
