@@ -10,6 +10,7 @@
 
 mod sidecar;
 
+use base64::Engine;
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
@@ -17,8 +18,8 @@ use sidecar::{
     build_game_headers_args, build_height_field_args, build_heightmap_args, build_lua_args,
     build_lua_repl_args, build_map_info_args, build_map_meta_args, build_map_skybox_args,
     build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
-    build_unit_buildpics_args, build_unit_dataset_args, build_unit_model_args, find_unitsync,
-    resolve_sidecar,
+    build_unit_buildpics_args, build_unit_dataset_args, build_unit_model_args,
+    build_unit_render_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -85,6 +86,14 @@ const INFO_CACHE_SUBDIR: &str = "coilbox-unitsync-info";
 /// archive for the unit-model viewer, raw and undecoded.
 const MODEL_TEXTURE_SUBDIR: &str = "coilbox-unitsync-model-textures";
 
+/// Subdirectory of the app cache dir holding encoded assets for the hub, named
+/// after the hash of their own bytes.
+///
+/// Under the cache dir rather than the data dir because every file in it can be
+/// made again from the archives, and the hub is where they end up rather than
+/// here. The uploader (#1633) reads the path off the row it is given.
+const HUB_ASSET_SUBDIR: &str = "coilbox-hub-assets";
+
 /// The on-disk PNG cache directory for minimaps/thumbnails, under the app cache
 /// dir. `None` when the platform can't resolve a cache dir — caching is then
 /// simply skipped (same pattern as the mapconv plugin's thumbnail cache). Public
@@ -138,6 +147,15 @@ pub fn model_texture_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(MODEL_TEXTURE_SUBDIR))
+}
+
+/// Where encoded hub assets are written, under the app cache dir. `None` when the
+/// platform cannot resolve a cache dir, and a render then has nowhere to go and
+/// says so rather than writing somewhere arbitrary.
+fn hub_asset_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    coilbox_portable::cache_dir(app)
+        .ok()
+        .map(|d| d.join(HUB_ASSET_SUBDIR))
 }
 
 /// The platform's shared-library search variable.
@@ -266,6 +284,21 @@ fn write_temp_script(source: &str) -> Result<PathBuf, String> {
         .unwrap_or(0);
     path.push(format!("coilbox-lua-{pid}-{nanos}.lua"));
     std::fs::write(&path, source).map_err(|e| format!("could not write temp Lua script: {e}"))?;
+    Ok(path)
+}
+
+/// Write a render's RGBA to a uniquely-named temp file and return its path, for
+/// the same reason `write_temp_script` exists: the payload is far past what an
+/// argument holds. The caller removes it once the worker has exited.
+fn write_temp_pixels(rgba: &[u8]) -> Result<PathBuf, String> {
+    let mut path = std::env::temp_dir();
+    let pid = std::process::id();
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    path.push(format!("coilbox-render-{pid}-{nanos}.rgba"));
+    std::fs::write(&path, rgba).map_err(|e| format!("could not write the render's pixels: {e}"))?;
     Ok(path)
 }
 
@@ -627,6 +660,74 @@ async fn unitsync_unit_model<R: Runtime>(
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit model", None).await)
 }
 
+/// `unitsync_unit_render` encodes a top down render the webview drew as the
+/// hub's `render:<angle>` asset (issue #1631).
+///
+/// `pixels` is base64 RGBA, top row first, straight alpha: `width * height * 4`
+/// bytes once decoded. It goes to the worker in a temp file rather than as an
+/// argument, because a 256 square render is a quarter of a megabyte and no
+/// platform takes that on a command line.
+///
+/// The webview draws it and the worker encodes it, which is the split the corpus
+/// needs. Drawing needs a GL context and the model readers, which are here.
+/// Encoding needs to be the one libwebp the rest of the corpus went through, and
+/// letting the canvas write its own WebP would put a second one on the same
+/// corpus. So the pixels take the long way round.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn unitsync_unit_render<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    game_archive: String,
+    object: String,
+    angle: String,
+    footprint_x: u32,
+    footprint_z: u32,
+    renderer_version: u32,
+    pixels: String,
+    width: u32,
+    height: u32,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let Some(asset_dir) = hub_asset_dir(&app) else {
+        return Ok(CliResult::err(
+            "no cache directory on this platform, so there is nowhere to write the render"
+                .to_string(),
+        ));
+    };
+    let rgba = match base64::engine::general_purpose::STANDARD.decode(&pixels) {
+        Ok(bytes) => bytes,
+        Err(e) => return Ok(CliResult::err(format!("render pixels are not base64: {e}"))),
+    };
+    let pixel_file = match write_temp_pixels(&rgba) {
+        Ok(p) => p,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+
+    let args = build_unit_render_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &game_archive,
+        &object,
+        &angle,
+        footprint_x,
+        footprint_z,
+        renderer_version,
+        &pixel_file.to_string_lossy(),
+        width,
+        height,
+        &asset_dir.to_string_lossy(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "unit render", None).await;
+    let _ = std::fs::remove_file(&pixel_file);
+    Ok(out)
+}
+
 #[tauri::command]
 async fn unitsync_map_info<R: Runtime>(
     app: AppHandle<R>,
@@ -899,6 +1000,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_faction_logos,
             unitsync_unit_dataset,
             unitsync_unit_model,
+            unitsync_unit_render,
             unitsync_map_info,
             unitsync_map_skybox,
             unitsync_skirmish_ais,

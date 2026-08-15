@@ -181,6 +181,52 @@ pub fn build_unit_model_args(
     args
 }
 
+/// Build args for `--unit-render` mode: the unit whose render this is, the frame
+/// it was taken in, the file the pixels are in, and where the encoded asset goes.
+///
+/// The pixels travel by path rather than as an argument because a 256 square
+/// render is a quarter of a megabyte of RGBA, which is past what a command line
+/// takes on any platform.
+#[allow(clippy::too_many_arguments)]
+pub fn build_unit_render_args(
+    lib: &str,
+    datadir: &str,
+    game: &str,
+    object: &str,
+    angle: &str,
+    footprint_x: u32,
+    footprint_z: u32,
+    renderer_version: u32,
+    pixels: &str,
+    width: u32,
+    height: u32,
+    asset_dir: &str,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--unit-render".into());
+    args.push("--game".into());
+    args.push(game.into());
+    args.push("--object".into());
+    args.push(object.into());
+    args.push("--angle".into());
+    args.push(angle.into());
+    args.push("--footprint-x".into());
+    args.push(footprint_x.to_string());
+    args.push("--footprint-z".into());
+    args.push(footprint_z.to_string());
+    args.push("--renderer-version".into());
+    args.push(renderer_version.to_string());
+    args.push("--pixels".into());
+    args.push(pixels.into());
+    args.push("--width".into());
+    args.push(width.to_string());
+    args.push("--height".into());
+    args.push(height.to_string());
+    args.push("--asset-dir".into());
+    args.push(asset_dir.into());
+    args
+}
+
 /// Build args for heightmap mode: scan args plus the map name, the `--heightmap`
 /// flag, the longest-side pixel cap, and the optional on-disk PNG cache directory.
 pub fn build_heightmap_args(
@@ -636,6 +682,42 @@ mod tests {
         let o = a.iter().position(|x| x == "--object").unwrap();
         assert_eq!(a[o + 1], "ARMCOM");
         assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/models"]);
+    }
+
+    /// The frame has to reach the worker intact, because the worker refusing a
+    /// mis-framed render is the only check on the rule. A footprint dropped or
+    /// transposed on the way would either fail every render or pass a wrong one.
+    #[test]
+    fn build_unit_render_args_carry_the_unit_the_frame_and_the_pixels() {
+        let a = build_unit_render_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "BAR.sdd",
+            "armcom.s3o",
+            "top",
+            3,
+            2,
+            1,
+            "/tmp/pixels.bin",
+            255,
+            204,
+            "/assets",
+        );
+        let after = |flag: &str| {
+            let at = a.iter().position(|x| x == flag).expect(flag);
+            a[at + 1].clone()
+        };
+        assert!(a.contains(&"--unit-render".to_string()));
+        assert_eq!(after("--game"), "BAR.sdd");
+        assert_eq!(after("--object"), "armcom.s3o");
+        assert_eq!(after("--angle"), "top");
+        assert_eq!(after("--footprint-x"), "3");
+        assert_eq!(after("--footprint-z"), "2");
+        assert_eq!(after("--renderer-version"), "1");
+        assert_eq!(after("--pixels"), "/tmp/pixels.bin");
+        assert_eq!(after("--width"), "255");
+        assert_eq!(after("--height"), "204");
+        assert_eq!(after("--asset-dir"), "/assets");
     }
 
     #[test]

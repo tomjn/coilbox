@@ -15,6 +15,7 @@ permissions = [
   "allow-unitsync-faction-logos",
   "allow-unitsync-unit-dataset",
   "allow-unitsync-unit-model",
+  "allow-unitsync-unit-render",
   "allow-unitsync-map-info",
   "allow-unitsync-map-skybox",
   "allow-unitsync-skirmish-ais",
