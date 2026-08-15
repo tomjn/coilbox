@@ -48,18 +48,20 @@ fn heightmap_png(raw: &[u16], w: u32, h: u32, max_side: u32) -> Result<Vec<u8>, 
 
 /// The samples as the bytes the map file holds: little endian `u16`, row major.
 ///
-/// This is what `source_hash` is over. unitsync's `GetInfoMap "height"` reads the
-/// SMF's height map block straight into the caller's buffer and swaps it into
-/// host order (`CSMFMapFile::ReadHeightmap`, and `swabWordInPlace` is a no-op on
-/// a little endian host), so writing the samples back out little endian gives the
-/// archive's own bytes on every architecture coilbox builds for. The hash moves
-/// when the map moves, and not when `image`, the display colouring or the host's
-/// endianness changes, which is what the have check at #1632 compares on.
+/// This is what `source_hash` is over, framed by the variant and the grid by
+/// [`crate::assetencode::map_source_hash`]. unitsync's `GetInfoMap "height"`
+/// reads the SMF's height map block straight into the caller's buffer and swaps
+/// it into host order (`CSMFMapFile::ReadHeightmap`, and `swabWordInPlace` is a
+/// no-op on a little endian host), so writing the samples back out little endian
+/// gives the archive's own bytes on every architecture coilbox builds for. The
+/// hash moves when the map moves, and not when `image`, the display colouring or
+/// the host's endianness changes, which is what the have check at #1632 compares
+/// on.
 ///
-/// The grid is `(mapx + 1, mapy + 1)` rather than the metal layer's
-/// `(mapx / 2, mapy / 2)`, and each sample is two bytes rather than one, so the
-/// same map's two overlays hash differently and the hash cannot be mistaken for
-/// the other layer's.
+/// The frame is what keeps two maps apart, rather than the sample width and the
+/// grid shape happening to differ. A flat height map is a run of one value like a
+/// flat type map is, and two of those on transposed grids held the same bytes
+/// until issue #1660.
 fn source_bytes(samples: &[u16]) -> Vec<u8> {
     let mut out = Vec::with_capacity(samples.len() * 2);
     for sample in samples {
@@ -87,7 +89,8 @@ fn encode_asset(
     bounds: Option<(f32, f32)>,
 ) -> Result<MapOverlayAsset, MapOverlaySkip> {
     use crate::assetencode::{
-        encode_height_overlay, ext_for_mime, sha256_hex, EncodeError, HEIGHT_OVERLAY_VARIANT,
+        encode_height_overlay, ext_for_mime, map_source_hash, sha256_hex, EncodeError,
+        HEIGHT_OVERLAY_VARIANT,
     };
 
     let (min_height, max_height) = bounds.ok_or(MapOverlaySkip::NoBounds)?;
@@ -108,7 +111,7 @@ fn encode_asset(
         variant: HEIGHT_OVERLAY_VARIANT.to_string(),
         path: path.to_string_lossy().into_owned(),
         hash,
-        source_hash: sha256_hex(&source_bytes(samples)),
+        source_hash: map_source_hash(HEIGHT_OVERLAY_VARIANT, w, h, &source_bytes(samples)),
         encode_profile: encoded.encode_profile,
         mime: encoded.mime,
         width: encoded.width,
@@ -261,7 +264,7 @@ pub fn emit_error(msg: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assetencode::sha256_hex;
+    use crate::assetencode::{map_source_hash, sha256_hex, HEIGHT_OVERLAY_VARIANT};
 
     /// Heights with the shape real terrain has: a slope whose neighbouring
     /// vertices differ by less than 256, so any 8 bit storage would flatten it
@@ -348,8 +351,37 @@ mod tests {
         let dir = asset_dir("hashes");
         let samples = heights(32, 32);
         let asset = encode_asset(&dir, &samples, 32, 32, Some((0.0, 1.0))).expect("encode");
-        assert_eq!(asset.source_hash, sha256_hex(&source_bytes(&samples)));
+        assert_eq!(
+            asset.source_hash,
+            map_source_hash(HEIGHT_OVERLAY_VARIANT, 32, 32, &source_bytes(&samples))
+        );
         assert_ne!(asset.source_hash, asset.hash);
+    }
+
+    /// A flat height map is a run of one value like a flat type map is, so two
+    /// of them on transposed grids collided before #1660 framed the grid in.
+    #[test]
+    fn a_flat_layer_on_a_transposed_grid_is_a_different_identity() {
+        let dir = asset_dir("transposed");
+        let flat = vec![0u16; 33 * 65];
+        let tall = encode_asset(&dir, &flat, 33, 65, Some((0.0, 1.0))).expect("encode tall");
+        let wide = encode_asset(&dir, &flat, 65, 33, Some((0.0, 1.0))).expect("encode wide");
+        assert_ne!(tall.source_hash, wide.source_hash);
+    }
+
+    /// The bounds scale the samples into elmos and are not the samples, so two
+    /// maps whose grids agree and whose world heights differ are one picture and
+    /// one identity. They are also the only thing on this path that is not the
+    /// map's own bytes, so if anything were going to leak into the identity it
+    /// would be these.
+    #[test]
+    fn the_bounds_are_not_part_of_the_identity() {
+        let dir = asset_dir("bounds-identity");
+        let samples = heights(64, 64);
+        let shallow = encode_asset(&dir, &samples, 64, 64, Some((0.0, 100.0))).expect("encode");
+        let deep = encode_asset(&dir, &samples, 64, 64, Some((-500.0, 900.0))).expect("encode");
+        assert_eq!(shallow.source_hash, deep.source_hash);
+        assert_ne!(shallow.min_height, deep.min_height);
     }
 
     /// `source_hash` is over the map file's own bytes, so the serialisation has

@@ -33,18 +33,27 @@ const TYPE_OVERLAY_VARIANT: &str = "overlay:type";
 /// it would name a different terrain.
 ///
 /// `source_hash` is over `raw`, the samples exactly as `GetInfoMap` returned
-/// them. Those bytes are a verbatim copy of the SMF's type map block
-/// (`CSMFMapFile::ReadInfoMap` seeks `typeMapPtr` and reads `mapx/2 * mapy/2`
-/// bytes with no conversion), so the hash moves when the map moves and not when
-/// coilbox's encoder, `image` or libwebp changes. That is what the have check at
-/// #1632 compares on.
+/// them, framed by the variant and the grid they sit on
+/// ([`crate::assetencode::map_source_hash`]). Those bytes are a verbatim copy of
+/// the SMF's type map block (`CSMFMapFile::ReadInfoMap` seeks `typeMapPtr` and
+/// reads `mapx/2 * mapy/2` bytes with no conversion) and the frame is the hub's
+/// own vocabulary plus the map's own dimensions, so the hash moves when the map
+/// moves and not when coilbox's encoder, `image` or libwebp changes. That is what
+/// the have check at #1632 compares on.
+///
+/// The frame matters more here than anywhere else in the corpus. 59 of this
+/// library's 97 maps have one terrain type across the whole map, so their samples
+/// are a run of one value and the grid is all that tells two of them apart
+/// (issue #1660).
 fn encode_asset(
     asset_dir: &Path,
     raw: &[u8],
     w: u32,
     h: u32,
 ) -> Result<MapOverlayAsset, MapOverlaySkip> {
-    use crate::assetencode::{encode_variant, ext_for_mime, sha256_hex, EncodeError};
+    use crate::assetencode::{
+        encode_variant, ext_for_mime, map_source_hash, sha256_hex, EncodeError,
+    };
 
     let grid = GrayImage::from_raw(w, h, raw.to_vec()).ok_or(MapOverlaySkip::EncodeFailed)?;
     let encoded = encode_variant(TYPE_OVERLAY_VARIANT, &DynamicImage::ImageLuma8(grid)).map_err(
@@ -66,7 +75,7 @@ fn encode_asset(
         variant: TYPE_OVERLAY_VARIANT.to_string(),
         path: path.to_string_lossy().into_owned(),
         hash,
-        source_hash: sha256_hex(raw),
+        source_hash: map_source_hash(TYPE_OVERLAY_VARIANT, w, h, raw),
         encode_profile: encoded.encode_profile,
         mime: encoded.mime,
         width: encoded.width,
@@ -144,7 +153,7 @@ pub fn emit_error(msg: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assetencode::sha256_hex;
+    use crate::assetencode::{map_source_hash, sha256_hex};
     use std::path::PathBuf;
 
     /// A type grid shaped like a real one: a handful of distinct indices in
@@ -218,20 +227,44 @@ mod tests {
         let dir = asset_dir("hashes");
         let raw = types(32, 32);
         let asset = encode_asset(&dir, &raw, 32, 32).expect("encode");
-        assert_eq!(asset.source_hash, sha256_hex(&raw));
+        assert_eq!(
+            asset.source_hash,
+            map_source_hash(TYPE_OVERLAY_VARIANT, 32, 32, &raw)
+        );
         assert_ne!(asset.source_hash, asset.hash);
     }
 
-    /// The type and metal layers are on the same grid and both 8 bit, so the
-    /// only thing keeping a map's two overlays apart is the samples themselves.
-    /// A map whose types happen to equal its densities would legitimately share
-    /// an identity, and nothing else would.
+    /// The layer this library collided on. 59 of its 97 maps are one terrain
+    /// type end to end, so their samples are a run of one value and the grid is
+    /// the only thing left to tell two of them apart: Crystallized Plains 1.1 at
+    /// 384x448 and Heartbreak Hill v4.0.1 at 448x384 shared an identity until
+    /// #1660.
     #[test]
-    fn a_grid_of_one_value_hashes_to_what_that_grid_is() {
+    fn a_flat_layer_on_a_transposed_grid_is_a_different_identity() {
+        let dir = asset_dir("transposed");
+        let flat = vec![0u8; 384 * 448];
+        let tall = encode_asset(&dir, &flat, 384, 448).expect("encode tall");
+        let wide = encode_asset(&dir, &flat, 448, 384).expect("encode wide");
+        assert_ne!(tall.source_hash, wide.source_hash);
+    }
+
+    /// The type and metal layers are on the same grid and both 8 bit, so a map
+    /// whose terrain is one type and whose metal is one density holds the same
+    /// bytes in both. The variant in the frame is what stops the two identities
+    /// merging.
+    #[test]
+    fn a_grid_of_one_value_is_still_this_layers_own_identity() {
         let dir = asset_dir("shared-grid");
         let flat = vec![0u8; 32 * 32];
         let asset = encode_asset(&dir, &flat, 32, 32).expect("encode");
-        assert_eq!(asset.source_hash, sha256_hex(&flat));
+        assert_eq!(
+            asset.source_hash,
+            map_source_hash(TYPE_OVERLAY_VARIANT, 32, 32, &flat)
+        );
+        assert_ne!(
+            asset.source_hash,
+            map_source_hash("overlay:metal", 32, 32, &flat)
+        );
     }
 
     /// An overlay class has no edge cap, so the grid is stored at the resolution
