@@ -31,6 +31,7 @@ mod minimap;
 mod model;
 mod skirmishai;
 mod texture;
+mod typemap;
 mod unitmodel;
 
 use ffi::Unitsync;
@@ -61,6 +62,10 @@ struct Args {
     /// `--metalmap`: render one map's metal infomap as an RGBA overlay PNG, and
     /// with `--asset-dir` also store the raw density as the hub's asset.
     metalmap: bool,
+    /// `--typemap`: store one map's terrain-type infomap as the hub's asset.
+    /// Needs `--asset-dir`: nothing in coilbox draws a type map, so there is no
+    /// other output for this mode to produce.
+    typemap: bool,
     /// `--map-info`: lazily read one map's options (combined with `--map`).
     map_info: bool,
     /// `--map-meta`: batch-read every map's mapinfo metadata in one Init.
@@ -541,6 +546,31 @@ fn run() -> i32 {
         return 1;
     }
 
+    // Typemap: store one map's terrain-type infomap as the hub's overlay asset.
+    // Asset-only, so a missing --asset-dir is an error rather than a quiet no-op.
+    if args.typemap {
+        let Some(map) = args.map.clone() else {
+            typemap::emit_error("missing --map <name> for --typemap".into());
+            return 1;
+        };
+        let Some(asset_dir) = args.asset_dir.clone() else {
+            typemap::emit_error("--typemap needs --asset-dir".into());
+            return 1;
+        };
+        return match std::panic::catch_unwind(|| {
+            typemap::render(&args.lib, &map, Path::new(&asset_dir))
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                typemap::emit_error("worker panicked while reading the type map".into());
+                1
+            }
+        };
+    }
+
     // Single minimap renders one map; default mode scans everything.
     if let Some(map) = args.map.clone() {
         return match std::panic::catch_unwind(|| {
@@ -585,6 +615,7 @@ fn parse_args() -> Result<Args, String> {
     let mut heightmap = false;
     let mut height_field = false;
     let mut metalmap = false;
+    let mut typemap = false;
     let mut map_info = false;
     let mut map_meta = false;
     let mut map_skybox = false;
@@ -622,6 +653,7 @@ fn parse_args() -> Result<Args, String> {
             "--heightmap" => heightmap = true,
             "--height-field" => height_field = true,
             "--metalmap" => metalmap = true,
+            "--typemap" => typemap = true,
             "--map-info" => map_info = true,
             "--map-meta" => map_meta = true,
             "--map-skybox" => map_skybox = true,
@@ -692,6 +724,7 @@ fn parse_args() -> Result<Args, String> {
         heightmap,
         height_field,
         metalmap,
+        typemap,
         map_info,
         map_meta,
         map_skybox,

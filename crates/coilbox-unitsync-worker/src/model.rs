@@ -410,6 +410,30 @@ pub struct MetalmapOutput {
     pub errors: Vec<String>,
 }
 
+/// A map's terrain-type infomap, returned by the `typemap` mode: the raw type
+/// indices stored as the hub's `overlay:type` asset.
+///
+/// No picture and no cache file, unlike the metal and height modes. Nothing in
+/// coilbox draws a type map, so there is no display output to share the read
+/// with, and the mode does nothing at all without `--asset-dir`.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TypemapOutput {
+    /// Type infomap dimensions, `(mapx/2, mapy/2)`, the same grid the metal
+    /// infomap is on.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    /// The raw type indices stored as the hub's `overlay:type` asset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<MapOverlayAsset>,
+    /// Why there is no asset. Exactly one of this and `asset` is always set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_skipped: Option<MapOverlaySkip>,
+    pub errors: Vec<String>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameItem {
