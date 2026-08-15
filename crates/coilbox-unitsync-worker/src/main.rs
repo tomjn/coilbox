@@ -29,6 +29,7 @@ mod mapmeta;
 mod metalmap;
 mod minimap;
 mod model;
+mod seed;
 mod skirmishai;
 mod texture;
 mod typemap;
@@ -114,6 +115,11 @@ struct Args {
     /// intends to upload them, since the pictures the app itself draws come back
     /// in the JSON and need no file.
     asset_dir: Option<String>,
+    /// `--seed`: walk the whole library and write the hub's seed corpus into
+    /// `--asset-dir`, with a manifest describing every file.
+    seed: bool,
+    /// `--dry-run`: report what a mode would write without writing it.
+    dry_run: bool,
 }
 
 fn main() {
@@ -193,6 +199,29 @@ fn run() -> i32 {
             }
             Err(_) => {
                 lua::emit_error("worker panicked while executing Lua".into());
+                1
+            }
+        };
+    }
+
+    // Seed corpus: every map layer and every game's build pics, in one Init.
+    // Checked first because it takes no --map or --game of its own and writes
+    // for all of them.
+    if args.seed {
+        let Some(root) = args.asset_dir.clone() else {
+            seed::emit_error("--seed needs --asset-dir <directory>".into());
+            return 1;
+        };
+        let dry_run = args.dry_run;
+        return match std::panic::catch_unwind(|| {
+            seed::run(&args.lib, Path::new(&root), cache_dir, dry_run)
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                seed::emit_error("worker panicked while walking the library".into());
                 1
             }
         };
@@ -646,6 +675,8 @@ fn parse_args() -> Result<Args, String> {
     let mut max_side = 512u32;
     let mut cache_dir = None;
     let mut asset_dir = None;
+    let mut seed = false;
+    let mut dry_run = false;
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -672,6 +703,8 @@ fn parse_args() -> Result<Args, String> {
             }
             "--cache-dir" => cache_dir = it.next(),
             "--asset-dir" => asset_dir = it.next(),
+            "--seed" => seed = true,
+            "--dry-run" => dry_run = true,
             "--config" => config = true,
             "--config-set" => config_set = true,
             "--config-key" => config_key = it.next(),
@@ -755,6 +788,8 @@ fn parse_args() -> Result<Args, String> {
         max_side,
         cache_dir,
         asset_dir,
+        seed,
+        dry_run,
     })
 }
 
@@ -1160,6 +1195,8 @@ mod tests {
             max_side: 512,
             cache_dir: cache_dir.map(str::to_string),
             asset_dir: asset_dir.map(str::to_string),
+            seed: false,
+            dry_run: false,
         }
     }
 
