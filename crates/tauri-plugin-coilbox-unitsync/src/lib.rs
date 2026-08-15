@@ -567,6 +567,11 @@ async fn unitsync_game_info<R: Runtime>(
 /// session. `game_archive` is the game's primary archive; `units` are the units'
 /// internal names (e.g. `armcom`). Disk-cached under the app cache dir, keyed on
 /// cheap file identity. Returns `{ buildpics: { name: dataUrl }, errors }`.
+///
+/// `assets` additionally encodes each one as the hub's `buildpic` asset and puts
+/// the file where the uploader can read it, reporting it as `asset` on the unit.
+/// Off by default: only the blueprint backfill wants it (issue #1636), and the
+/// pages that draw icons would be paying for a WebP encode nobody sends.
 #[tauri::command]
 async fn unitsync_unit_buildpics<R: Runtime>(
     app: AppHandle<R>,
@@ -574,18 +579,30 @@ async fn unitsync_unit_buildpics<R: Runtime>(
     data_dir: String,
     game_archive: String,
     units: Vec<String>,
+    assets: Option<bool>,
 ) -> Result<CliResult, ()> {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return Ok(CliResult::err(e)),
     };
     let cache_dir = buildpic_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let asset_dir = match assets {
+        Some(true) => match hub_asset_dir(&app) {
+            Some(dir) => Some(dir.to_string_lossy().into_owned()),
+            None => return Ok(CliResult::err(
+                "no cache directory on this platform, so there is nowhere to write the build pics"
+                    .to_string(),
+            )),
+        },
+        _ => None,
+    };
     let args = build_unit_buildpics_args(
         &libpath.to_string_lossy(),
         &data_dir,
         &game_archive,
         &units,
         cache_dir.as_deref(),
+        asset_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit buildpics", None).await)
