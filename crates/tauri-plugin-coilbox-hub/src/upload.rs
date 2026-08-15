@@ -26,15 +26,11 @@
 //! writes each encoded file into a cache directory named after the sha256 of its
 //! own bytes and reports the path (issue #1624), and this reads it.
 //!
-//! # What this deliberately does not decide
+//! # What a refusal is worth doing about
 //!
-//! Which refusals are worth retrying, and how the user hears about them, is issue
-//! #1634. Every refusal here comes back as the hub's own status and the hub's own
-//! words, per asset, with the run carrying on. The one thing this does judge is
-//! when to stop asking at all: an answer about the account or the hub rather than
-//! about the picture (401, 429, 5xx) is the same answer for every remaining asset,
-//! so the run ends there rather than spending several hundred requests learning it
-//! again.
+//! [`Verdict`] is issue #1634: three answers to "is another request going to say
+//! anything different", and every refusal carries one. The run acts on it rather
+//! than on the status, and the frontend words a notification from it.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -76,6 +72,35 @@ const CONNECT_TIMEOUT: Duration = HTTP_TIMEOUT;
 /// never with the picture it was sent, so anything approaching this is not an
 /// answer from a hub.
 const ANSWER_LIMIT: usize = 64 * 1024;
+
+/// How many times one picture may be sent before the run gives up on it.
+///
+/// Only a [`Verdict::Transient`] answer is ever sent twice, and a run that
+/// exhausts these ends, so a hub answering 503 to everything costs three requests
+/// rather than three hundred. That second bound is the point: an unbounded retry
+/// on a persistent 5xx is a worse bug than the one this file is fixing.
+const UPLOAD_ATTEMPTS: u32 = 3;
+
+/// How long to wait before the second attempt, doubled before the third.
+///
+/// Short, because the failure being waited out is an answer rather than a
+/// silence: a cold start is already covered by [`UPLOAD_TIMEOUT`], and a 502 or a
+/// quota read that failed comes back straight away. So the whole of a picture's
+/// retry budget is a second and a half.
+const RETRY_BACKOFF: Duration = Duration::from_millis(500);
+
+/// How many pictures in a row may be refused with the same status before the run
+/// stops asking.
+///
+/// A terminal refusal is about one picture, so the run carries on past it. But a
+/// backfill is one game's roster made by one encoder, so when the encoder is wrong
+/// the hub says the same thing about all three hundred of them, and so does an
+/// account over its storage quota or a game the hub has no licence for. None of
+/// those is a picture worth learning about individually.
+///
+/// Five, because one or two odd pictures in a batch is ordinary and five in a row
+/// saying the same thing is a rule.
+const SAME_REFUSAL_LIMIT: usize = 5;
 
 /// The largest request body the platform the hub runs on will carry.
 ///
@@ -224,9 +249,87 @@ pub struct AssetOutcome {
     pub result: Outcome,
     /// The hub's status, when the hub answered, and `None` when nothing was sent.
     pub status: Option<u16>,
-    /// Why not, in the words of whoever objected. Issue #1634 reads this and
-    /// `status` and decides what is worth retrying and how the user hears it.
+    /// Why not, in the words of whoever objected, naming the picture it was about.
     pub said: Option<String>,
+    /// What that refusal is worth doing about, and `None` when there was no
+    /// refusal. See [`Verdict`].
+    pub verdict: Option<Verdict>,
+}
+
+/// Whether another request would say anything different (issue #1634).
+///
+/// The same split [`coilbox_oauth::AuthError::needs_sign_in`] makes one layer
+/// down, and made for the same reason: a failure that will never come out
+/// differently has to be told apart from one that will, or the client sends the
+/// same bytes until something else stops it.
+///
+/// Read off the hub's status alone. The hub's own words are what a person is
+/// shown, but nothing here parses them: a rule about a message is a rule that
+/// breaks when somebody rewords an error.
+///
+/// # What the hub actually answers, and what each one means
+///
+/// Replayed through the hub's own `checkAssetImage` and read out of its upload
+/// route (`app/api/v1/assets/upload/route.ts`), rather than assumed:
+///
+/// - **400** the bytes are not what the class is: not square, not lossless, too
+///   few bits a channel, not grayscale, no header the hub can measure, a variant
+///   it stores nothing for, or a declaration it will not parse.
+/// - **413** too many pixels on the longest edge, more bytes than the class
+///   allows, or an account over its storage quota.
+/// - **415** the declared type is not the class's, or the bytes are not the
+///   declared type.
+/// - **403** the hub has no recorded permission to redistribute pictures for that
+///   game or map.
+/// - **409** the identity is another account's, or was rejected by a moderator, or
+///   is already held at this `source_hash`, or the unit is at its render ceiling.
+/// - **401** no token, or one the hub will not take.
+/// - **429** more uploads for that game, or for maps, than the hourly cap.
+/// - **5xx** the asset store refused, a quota could not be read, the row could not
+///   be written, or the hub is not configured.
+///
+/// Every one of those is refused before a byte is written, which is why retrying
+/// one costs the hub nothing and buys the sender nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Verdict {
+    /// These bytes get this answer for ever. Sent once, never again, and somebody
+    /// is told: a dimension or type refusal means coilbox made a picture that does
+    /// not match the class it labelled it with, which is a bug here rather than
+    /// anything the hub or the user did.
+    ///
+    /// The run carries on to the next picture, because this is about one picture.
+    /// [`SAME_REFUSAL_LIMIT`] is what stops that being true three hundred times in
+    /// a row.
+    Terminal,
+    /// The hub could not answer just now. Tried again, up to [`UPLOAD_ATTEMPTS`],
+    /// and the run ends if it still cannot.
+    Transient,
+    /// Not about this picture at all: the account, or the allowance. The same
+    /// answer for every asset left in the run and not one another request changes,
+    /// so the run ends without a retry.
+    Blocked,
+}
+
+/// What the hub's status is worth doing about.
+///
+/// 429 is [`Verdict::Blocked`] rather than [`Verdict::Transient`] on purpose. It
+/// is worth trying again, but not in this run: the cap is a count of rows written
+/// in the last hour, so a second attempt half a second later asks a question whose
+/// answer cannot have moved. Ending the run is what "later" means here.
+///
+/// Two of these are imprecise and cannot be made precise from a status. The
+/// account storage quota shares 413 with the pixel and byte caps, and the hub's
+/// monthly allowance shares 503 with the failures that really are transient. Both
+/// err in the affordable direction: the quota costs at most
+/// [`SAME_REFUSAL_LIMIT`] requests before the run stops, and the allowance at most
+/// [`UPLOAD_ATTEMPTS`].
+fn verdict_for(status: u16) -> Verdict {
+    match status {
+        401 | 429 => Verdict::Blocked,
+        500..=599 => Verdict::Transient,
+        _ => Verdict::Terminal,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -247,11 +350,25 @@ pub enum Outcome {
 }
 
 impl AssetOutcome {
+    /// Refused here, before any request. Always terminal: everything [`check`]
+    /// objects to is a fact about the file on disk, and no number of requests
+    /// changes one.
     fn refused_locally(said: String) -> Self {
         Self {
             result: Outcome::Refused,
             status: None,
             said: Some(said),
+            verdict: Some(Verdict::Terminal),
+        }
+    }
+
+    /// An outcome with nothing to explain: taken, already held, or never tried.
+    fn nothing_said(result: Outcome, status: Option<u16>) -> Self {
+        Self {
+            result,
+            status,
+            said: None,
+            verdict: None,
         }
     }
 }
@@ -391,6 +508,63 @@ fn check(asset: &AssetUpload, bytes: u64) -> Result<(), String> {
     Ok(())
 }
 
+/// Why a request produced no answer at all, which is not the same as an answer
+/// that says no.
+struct SendError {
+    said: String,
+    /// Whether the same request is worth making again. A request that never
+    /// arrived or never came back is. An answer that was not an upload never will
+    /// be, and neither is a picture that cannot be framed as a request.
+    worth_another_go: bool,
+}
+
+impl SendError {
+    fn never(said: String) -> Self {
+        Self {
+            said,
+            worth_another_go: false,
+        }
+    }
+}
+
+/// Send one asset, trying again while the answer is one another request could
+/// change.
+///
+/// Bounded twice over, and the second bound is the one that matters: only
+/// [`UPLOAD_ATTEMPTS`] per picture, and a picture that uses them all ends the run,
+/// so a hub answering 503 to everything costs three requests and not three
+/// hundred.
+async fn send_with_retries(
+    client: &reqwest::Client,
+    url: &str,
+    token: &str,
+    asset: &AssetUpload,
+    body: &[u8],
+    cancel: &Arc<AtomicBool>,
+) -> Result<AssetOutcome, String> {
+    let mut waiting = RETRY_BACKOFF;
+    let mut attempt = 1;
+    loop {
+        let sent = send(client, url, token, asset, body.to_vec()).await;
+        let again = match &sent {
+            Ok(outcome) => outcome.verdict == Some(Verdict::Transient),
+            Err(e) => e.worth_another_go,
+        };
+        if !again || attempt >= UPLOAD_ATTEMPTS {
+            return sent.map_err(|e| e.said);
+        }
+        // Raced against the flag rather than slept through, so a cancel during a
+        // wait lands then rather than a second and a half later.
+        tokio::select! {
+            biased;
+            () = watch(cancel) => return sent.map_err(|e| e.said),
+            () = tokio::time::sleep(waiting) => {}
+        }
+        waiting *= 2;
+        attempt += 1;
+    }
+}
+
 /// Send one asset, and say what the hub made of it.
 ///
 /// `bytes` is the file's own length, read by the caller, so the declaration and
@@ -401,8 +575,8 @@ async fn send(
     token: &str,
     asset: &AssetUpload,
     body: Vec<u8>,
-) -> Result<AssetOutcome, String> {
-    let declaration = declaration_json(asset, body.len() as u64)?;
+) -> Result<AssetOutcome, SendError> {
+    let declaration = declaration_json(asset, body.len() as u64).map_err(SendError::never)?;
     // A named part, because the route asks for a `Blob` and a multipart part with
     // no filename arrives as a string. The name is the file's own, which is its
     // content hash and says nothing about this machine.
@@ -415,11 +589,11 @@ async fn send(
         .file_name(file_name)
         .mime_str(&asset.mime)
         .map_err(|_| {
-            format!(
+            SendError::never(format!(
                 "{} is declared as {}, which is not a type.",
                 asset.describe(),
                 asset.mime
-            )
+            ))
         })?;
     let form = reqwest::multipart::Form::new()
         .text("asset", declaration)
@@ -432,44 +606,55 @@ async fn send(
         .multipart(form)
         .send()
         .await
-        .map_err(|e| unreachable_message(url, e.is_timeout()))?;
+        // A request that never arrived or never came back is the most retryable
+        // failure there is, so this is the one thing here worth another go.
+        .map_err(|e| SendError {
+            said: unreachable_message(url, e.is_timeout()),
+            worth_another_go: true,
+        })?;
 
     let status = response.status().as_u16();
-    let read = read_capped(response, ANSWER_LIMIT).await?;
+    let read = read_capped(response, ANSWER_LIMIT)
+        .await
+        .map_err(SendError::never)?;
     if status != 200 && status != 201 {
         return Ok(AssetOutcome {
             result: Outcome::Refused,
             status: Some(status),
-            said: Some(refusal(status, &read, url)),
+            said: Some(refusal(status, &read, url, asset)),
+            verdict: Some(verdict_for(status)),
         });
     }
 
-    let answered: UploadBody = serde_json::from_slice(&read)
-        .map_err(|_| format!("The hub at {} did not answer with an upload.", host_of(url)))?;
+    let answered: UploadBody = serde_json::from_slice(&read).map_err(|_| {
+        SendError::never(format!(
+            "The hub at {} did not answer with an upload.",
+            host_of(url)
+        ))
+    })?;
     if answered.format != UPLOAD_FORMAT {
-        return Err(format!(
+        return Err(SendError::never(format!(
             "The hub at {} answered with something other than an upload.",
             host_of(url)
-        ));
+        )));
     }
     if answered.version > UPLOAD_VERSION {
-        return Err(format!(
+        return Err(SendError::never(format!(
             "The hub at {} speaks version {} of the upload and this version of coilbox understands {UPLOAD_VERSION}. Update coilbox.",
             host_of(url),
             answered.version
-        ));
+        )));
     }
-    Ok(AssetOutcome {
-        // 201 is a row the hub did not have and 200 is one it replaced, which is
-        // the hub's own distinction rather than one read off the body.
-        result: if status == 201 {
+    // 201 is a row the hub did not have and 200 is one it replaced, which is the
+    // hub's own distinction rather than one read off the body.
+    Ok(AssetOutcome::nothing_said(
+        if status == 201 {
             Outcome::Uploaded
         } else {
             Outcome::Replaced
         },
-        status: Some(status),
-        said: None,
-    })
+        Some(status),
+    ))
 }
 
 /// The JSON part, by the names the hub insists on.
@@ -584,13 +769,14 @@ pub(crate) async fn run(
         .build()
         .map_err(|e| e.to_string())?;
 
+    // How many pictures in a row the hub has refused with the same status, which
+    // is what [`SAME_REFUSAL_LIMIT`] reads.
+    let mut same_refusal = 0usize;
+    let mut said_before: Option<u16> = None;
+
     for (slot, &index) in askable.iter().enumerate() {
         if answers[slot].status == HaveStatus::Have {
-            outcomes[index] = Some(AssetOutcome {
-                result: Outcome::AlreadyHad,
-                status: None,
-                said: None,
-            });
+            outcomes[index] = Some(AssetOutcome::nothing_said(Outcome::AlreadyHad, None));
             tally.already_had(report, assets[index].describe());
             continue;
         }
@@ -620,14 +806,37 @@ pub(crate) async fn run(
         let outcome = tokio::select! {
             biased;
             () = watch(cancel) => break,
-            outcome = send(&client, &upload_url, token, asset, body) => outcome?,
+            outcome = send_with_retries(&client, &upload_url, token, asset, &body, cancel) => outcome?,
         };
 
-        let stop = matches!(outcome.status, Some(401 | 429) | Some(500..=599));
         match outcome.result {
             Outcome::Refused => tally.refused(report, asset.describe()),
             _ => tally.uploaded(report, asset.describe(), sent),
         }
+
+        // Two ways a run ends on a refusal, and neither of them is a retry.
+        let stop = match outcome.verdict {
+            // About the account, the allowance, or a hub that will not answer.
+            // Every asset left gets the same, and a `Transient` that reaches here
+            // has already had its attempts.
+            Some(Verdict::Blocked | Verdict::Transient) => true,
+            // One picture the hub will never take does not end a backfill. The
+            // same answer five times running is not about one picture.
+            Some(Verdict::Terminal) => {
+                same_refusal = if outcome.status == said_before {
+                    same_refusal + 1
+                } else {
+                    1
+                };
+                said_before = outcome.status;
+                same_refusal >= SAME_REFUSAL_LIMIT
+            }
+            None => {
+                same_refusal = 0;
+                said_before = None;
+                false
+            }
+        };
         outcomes[index] = Some(outcome);
         if stop {
             break;
@@ -643,13 +852,7 @@ pub(crate) async fn run(
 fn settle(outcomes: Vec<Option<AssetOutcome>>) -> Vec<AssetOutcome> {
     outcomes
         .into_iter()
-        .map(|o| {
-            o.unwrap_or(AssetOutcome {
-                result: Outcome::NotAttempted,
-                status: None,
-                said: None,
-            })
-        })
+        .map(|o| o.unwrap_or(AssetOutcome::nothing_said(Outcome::NotAttempted, None)))
         .collect()
 }
 
@@ -749,17 +952,23 @@ impl Tally {
 
 /// What the hub said no with. Its own words when it gave any, because it is the
 /// side that knows what it objected to.
-fn refusal(status: u16, body: &[u8], url: &str) -> String {
+///
+/// The picture is named, so the sentence stands on its own. A backfill's outcomes
+/// are positional and a notification is not, and "a buildpic is not square" is no
+/// use to anybody without which buildpic. The exception is 401, which is about the
+/// account and would be misleading with a picture's name attached to it.
+fn refusal(status: u16, body: &[u8], url: &str, asset: &AssetUpload) -> String {
     let said = serde_json::from_slice::<serde_json::Value>(body)
         .ok()
         .and_then(|v| v.get("error")?.as_str().map(str::to_owned));
     let host = host_of(url);
+    let what = asset.describe();
     match (status, said) {
         (401, _) => format!(
             "The hub at {host} did not accept the sign-in. Sign in again and try once more."
         ),
-        (_, Some(said)) => format!("The hub at {host} refused the picture: {said}"),
-        (_, None) => format!("The hub at {host} refused the picture, with a {status}."),
+        (_, Some(said)) => format!("The hub at {host} refused {what}: {said}"),
+        (_, None) => format!("The hub at {host} refused {what}, with a {status}."),
     }
 }
 
@@ -1300,9 +1509,9 @@ mod tests {
         assert_eq!(hub.uploads().len(), 2);
     }
 
-    /// The hub's own status and words survive a refusal. Which of them is worth
-    /// retrying and how the user hears it is issue #1634, so nothing here decides
-    /// it.
+    /// The hub's own status and words survive a refusal, and the sentence names
+    /// the picture it is about. A backfill's outcomes are positional and a
+    /// notification is not.
     #[tokio::test]
     async fn a_refusal_comes_back_in_the_hubs_own_words() {
         let dir = asset_dir("refusal");
@@ -1323,16 +1532,268 @@ mod tests {
 
         assert_eq!(results(&outcomes), vec![Outcome::Refused]);
         assert_eq!(outcomes[0].status, Some(400));
-        assert!(outcomes[0]
-            .said
-            .as_ref()
-            .unwrap()
-            .contains("must be square"));
+        let said = outcomes[0].said.as_ref().unwrap();
+        assert!(said.contains("must be square"), "{said}");
+        assert!(said.contains("bar's armsolar buildpic"), "{said}");
     }
 
-    /// An answer about the account or the hub is the same answer for every
-    /// remaining asset, so the run ends rather than spending several hundred
-    /// requests learning it again.
+    // ------------------------------------------------------------- verdicts
+
+    /// The statuses, against what the hub actually answers rather than what a
+    /// status code means in general. Each of these was produced by running the
+    /// hub's own `checkAssetImage` and reading its upload route.
+    #[test]
+    fn the_verdict_is_read_off_the_status_the_hub_answers() {
+        // Bytes that are not the class they were labelled with, which is coilbox's
+        // bug and the whole of issue #1634. 400 is not square, not lossless, the
+        // wrong bit depth, not grayscale, or no header the hub can measure. 413 is
+        // too many pixels or too many bytes. 415 is the wrong type either way
+        // round. 403 is a game the hub may not redistribute and 409 is an identity
+        // that is not this account's to write.
+        for status in [400, 403, 409, 413, 415] {
+            assert_eq!(verdict_for(status), Verdict::Terminal, "{status}");
+        }
+        // The account and the allowance. Neither is about a picture and neither
+        // moves inside one run.
+        for status in [401, 429] {
+            assert_eq!(verdict_for(status), Verdict::Blocked, "{status}");
+        }
+        // The asset store, a quota that could not be read, a row that could not be
+        // written, a hub that is not configured.
+        for status in [500, 502, 503] {
+            assert_eq!(verdict_for(status), Verdict::Transient, "{status}");
+        }
+    }
+
+    /// The point of the issue. A dimension refusal is coilbox having made the
+    /// wrong picture, so the same bytes get the same answer for ever and one
+    /// request is all it costs.
+    #[tokio::test]
+    async fn a_dimension_refusal_costs_exactly_one_request() {
+        let dir = asset_dir("terminalonce");
+        let hub = HubServer::refusing(
+            400,
+            serde_json::json!({ "error": "A \"buildpic\" must be square, and that one is 256x128." }),
+        );
+        let samples = Samples::default();
+
+        let outcomes = upload(
+            &hub,
+            &[unit(file(&dir, "a.webp", 9), "armsolar", "src-a")],
+            &samples,
+            &open(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(hub.uploads().len(), 1);
+        assert_eq!(outcomes[0].verdict, Some(Verdict::Terminal));
+    }
+
+    /// And a type refusal, which is the other half of the pair the issue names.
+    /// 415 is what the hub answers when the declared type is not the class's, or
+    /// when the bytes turn out not to be the declared type.
+    #[tokio::test]
+    async fn a_type_refusal_costs_exactly_one_request() {
+        let dir = asset_dir("mimeonce");
+        let hub = HubServer::refusing(
+            415,
+            serde_json::json!({ "error": "The declaration says image/webp and the bytes are image/png." }),
+        );
+        let samples = Samples::default();
+
+        let outcomes = upload(
+            &hub,
+            &[unit(file(&dir, "a.webp", 9), "armsolar", "src-a")],
+            &samples,
+            &open(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(hub.uploads().len(), 1);
+        assert_eq!(outcomes[0].verdict, Some(Verdict::Terminal));
+    }
+
+    /// A picture refused before any request is terminal too, and joins the same
+    /// taxonomy rather than being a second concept. There is nothing a retry does
+    /// about a file that is too big for the platform to carry.
+    #[tokio::test]
+    async fn a_picture_refused_before_any_request_is_terminal() {
+        let dir = asset_dir("localterminal");
+        let hub = HubServer::holding(&[]);
+        let samples = Samples::default();
+
+        let mut asset = overlay(
+            file(&dir, "huge.png", (MAX_ASSET_BYTES + 1) as usize),
+            "overlay:height",
+        );
+        asset.map_width = Some(16384);
+        let outcomes = upload(&hub, &[asset], &samples, &open()).await.unwrap();
+
+        assert_eq!(outcomes[0].verdict, Some(Verdict::Terminal));
+        assert_eq!(hub.uploads().len(), 0);
+    }
+
+    // -------------------------------------------------------------- retrying
+
+    /// A hub that could not answer is asked again, and then left alone. Both
+    /// bounds in one assertion: three attempts on the picture, and a run that ends
+    /// rather than spending three more on the next one.
+    #[tokio::test]
+    async fn a_hub_that_will_not_answer_is_asked_again_and_then_left_alone() {
+        let dir = asset_dir("transient");
+        let hub = HubServer::refusing(
+            503,
+            serde_json::json!({ "error": "The upload quotas could not be read just now. Try again shortly." }),
+        );
+        let samples = Samples::default();
+        let assets: Vec<AssetUpload> = (0..4)
+            .map(|n| {
+                unit(
+                    file(&dir, &format!("{n}.webp"), 9),
+                    &format!("u{n}"),
+                    "src-a",
+                )
+            })
+            .collect();
+
+        let outcomes = upload(&hub, &assets, &samples, &open()).await.unwrap();
+
+        assert_eq!(hub.uploads().len(), UPLOAD_ATTEMPTS as usize);
+        assert_eq!(outcomes[0].verdict, Some(Verdict::Transient));
+        assert!(outcomes[1..]
+            .iter()
+            .all(|o| o.result == Outcome::NotAttempted));
+    }
+
+    /// The reason retrying is worth doing at all. A hub that fails once and then
+    /// answers gets the picture, on the second request rather than the first.
+    #[tokio::test]
+    async fn a_retry_lands_when_the_hub_recovers() {
+        let dir = asset_dir("recovers");
+        let hub = HubServer::answering_in_turn(&[
+            (
+                503,
+                serde_json::json!({ "error": "The upload quotas could not be read just now. Try again shortly." }),
+            ),
+            (
+                201,
+                serde_json::json!({ "format": UPLOAD_FORMAT, "version": 1, "moderation": "pending" }),
+            ),
+        ]);
+        let samples = Samples::default();
+
+        let outcomes = upload(
+            &hub,
+            &[unit(file(&dir, "a.webp", 9), "armsolar", "src-a")],
+            &samples,
+            &open(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(hub.uploads().len(), 2);
+        assert_eq!(results(&outcomes), vec![Outcome::Uploaded]);
+        assert_eq!(outcomes[0].verdict, None);
+    }
+
+    // ------------------------------------------------------ the same answer
+
+    /// A backfill is one roster made by one encoder, so an encoder that is wrong
+    /// is wrong about all three hundred pictures. The run stops once the hub has
+    /// said the same thing five times running, rather than paying for the rest of
+    /// an answer it already has.
+    #[tokio::test]
+    async fn the_same_refusal_five_times_running_ends_the_run() {
+        let dir = asset_dir("samerefusal");
+        let hub = HubServer::refusing(
+            400,
+            serde_json::json!({ "error": "A \"buildpic\" must be square, and that one is 256x128." }),
+        );
+        let samples = Samples::default();
+        let assets: Vec<AssetUpload> = (0..20)
+            .map(|n| {
+                unit(
+                    file(&dir, &format!("{n}.webp"), 9),
+                    &format!("u{n}"),
+                    "src-a",
+                )
+            })
+            .collect();
+
+        let outcomes = upload(&hub, &assets, &samples, &open()).await.unwrap();
+
+        assert_eq!(hub.uploads().len(), SAME_REFUSAL_LIMIT);
+        assert!(outcomes[..SAME_REFUSAL_LIMIT]
+            .iter()
+            .all(|o| o.result == Outcome::Refused));
+        assert!(outcomes[SAME_REFUSAL_LIMIT..]
+            .iter()
+            .all(|o| o.result == Outcome::NotAttempted));
+    }
+
+    /// And the other side of it. One odd picture here and there is what a backfill
+    /// looks like when nothing is systematically wrong, so a run of refusals that
+    /// are not the same refusal carries on to the end.
+    #[tokio::test]
+    async fn refusals_that_are_not_the_same_refusal_do_not_end_the_run() {
+        let dir = asset_dir("mixedrefusal");
+        let hub = HubServer::answering_in_turn(&[
+            (400, serde_json::json!({ "error": "not square" })),
+            (413, serde_json::json!({ "error": "too many pixels" })),
+            (415, serde_json::json!({ "error": "not that type" })),
+        ]);
+        let samples = Samples::default();
+        let assets: Vec<AssetUpload> = (0..9)
+            .map(|n| {
+                unit(
+                    file(&dir, &format!("{n}.webp"), 9),
+                    &format!("u{n}"),
+                    "src-a",
+                )
+            })
+            .collect();
+
+        let outcomes = upload(&hub, &assets, &samples, &open()).await.unwrap();
+
+        assert_eq!(hub.uploads().len(), 9);
+        assert!(outcomes.iter().all(|o| o.result == Outcome::Refused));
+    }
+
+    /// A picture the hub takes clears the count, so five refusals spread across a
+    /// batch that is otherwise working never adds up to a stop.
+    #[tokio::test]
+    async fn a_picture_the_hub_takes_clears_the_count() {
+        let dir = asset_dir("cleared");
+        let hub = HubServer::answering_in_turn(&[
+            (400, serde_json::json!({ "error": "not square" })),
+            (
+                201,
+                serde_json::json!({ "format": UPLOAD_FORMAT, "version": 1, "moderation": "pending" }),
+            ),
+        ]);
+        let samples = Samples::default();
+        let assets: Vec<AssetUpload> = (0..12)
+            .map(|n| {
+                unit(
+                    file(&dir, &format!("{n}.webp"), 9),
+                    &format!("u{n}"),
+                    "src-a",
+                )
+            })
+            .collect();
+
+        let outcomes = upload(&hub, &assets, &samples, &open()).await.unwrap();
+
+        assert_eq!(hub.uploads().len(), 12);
+        assert!(outcomes.iter().all(|o| o.result != Outcome::NotAttempted));
+    }
+
+    /// A rate limit is worth trying again, and not in this run. The hub's cap is a
+    /// count of rows written in the last hour, so a second request half a second
+    /// later asks a question whose answer cannot have moved. One request, then the
+    /// run ends.
     #[tokio::test]
     async fn a_rate_limit_ends_the_run_rather_than_being_asked_again() {
         let dir = asset_dir("ratelimit");
@@ -1355,6 +1816,7 @@ mod tests {
 
         assert_eq!(hub.uploads().len(), 1);
         assert_eq!(outcomes[0].result, Outcome::Refused);
+        assert_eq!(outcomes[0].verdict, Some(Verdict::Blocked));
         assert!(outcomes[1..]
             .iter()
             .all(|o| o.result == Outcome::NotAttempted));
@@ -1389,6 +1851,9 @@ mod tests {
         .unwrap();
 
         assert!(outcomes[0].said.as_ref().unwrap().contains("Sign in again"));
+        // Not the picture's fault, so it is not filed with the pictures coilbox
+        // got wrong, and not worth another request with the same token either.
+        assert_eq!(outcomes[0].verdict, Some(Verdict::Blocked));
         assert_eq!(outcomes[1].result, Outcome::NotAttempted);
         assert_eq!(hub.uploads().len(), 1);
     }

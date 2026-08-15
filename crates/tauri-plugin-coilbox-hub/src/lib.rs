@@ -189,8 +189,9 @@ fn cancel_slot(op_id: &Option<String>) -> Arc<AtomicBool> {
 /// The have check runs before anything is sent, so an asset the hub already holds
 /// costs one key in a batch rather than a transfer. What comes back is one outcome
 /// per asset in the order they were given, carrying the hub's own status and words
-/// for a refusal rather than a verdict: which refusal is worth retrying and how the
-/// user hears about it is issue #1634.
+/// for a refusal plus an [`upload::Verdict`] saying whether another request would
+/// answer any differently. `src/hub/uploadOutcomes.ts` is what turns a run's worth
+/// of those into something a person is told (issue #1634).
 ///
 /// `op_id` makes the run cancellable by `hub_upload_cancel`. `on_progress` takes a
 /// sample per asset.
