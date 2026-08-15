@@ -31,10 +31,16 @@ const SIDECAR_MISSING: &str =
 /// run in flight. A run removes its own entry when it finishes reaping.
 type SharedRegistry = Arc<Mutex<HashMap<String, Child>>>;
 
-/// Resolve the plugin's settings-file path and results directory under app-data.
+/// Resolve the settings-file path and this plugin's results directory under app-data.
+///
+/// The settings path comes from `coilbox_portable::settings_file`, because the map
+/// this plugin persists is the whole app's settings rather than its own and the hub
+/// reads it too.
 fn data_dirs<R: Runtime>(app: &AppHandle<R>) -> Result<(PathBuf, PathBuf), String> {
-    let base = coilbox_portable::data_dir(app)?.join("uberstress");
-    Ok((base.join("settings.json"), base.join("results")))
+    let results = coilbox_portable::data_dir(app)?
+        .join("uberstress")
+        .join("results");
+    Ok((coilbox_portable::settings_file(app)?, results))
 }
 
 /// Run the sidecar to completion and capture its output (for short commands like
