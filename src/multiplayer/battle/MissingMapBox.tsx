@@ -8,6 +8,8 @@ import { useDownloadQueue } from "@/downloads/DownloadQueueProvider";
 import { downloadMapAnySource } from "@/downloads/downloadMap";
 import { ProgressBar } from "@/downloads/pages/components/ProgressBar";
 import { errMessage } from "@/downloads/pages/components/states";
+import type { MapPicture } from "@/hub/assets/picture";
+import { useMapPictureRung } from "@/hub/assets/useMapPicture";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
 
 /**
@@ -20,15 +22,25 @@ export function MissingMapBox({
   battleId,
   mapName,
   onRescan,
-  previewUrl,
+  picture,
 }: {
   /** The joined battle's id, to key the auto-download once per (battle, map). */
   battleId: number;
   mapName: string;
   onRescan: () => Promise<void>;
-  /** Remote map preview shown behind the controls while the map isn't installed. */
-  previewUrl?: string;
+  /**
+   * Remote pictures of the map, best first, from `@/hub/assets/picture`. Shown
+   * behind the controls while the map isn't installed.
+   *
+   * The drawing at the bottom of the ladder is skipped here, unlike everywhere
+   * else it is used: this box already says the map is not installed and offers
+   * the download, so an outline saying the same thing under it would be the
+   * second answer to a question already answered.
+   */
+  picture: MapPicture[];
 }) {
+  const { picture: rung, onError } = useMapPictureRung(picture);
+  const previewUrl = rung.from === "placeholder" ? undefined : rung.url;
   const writePath = useWriteRootPath();
   const { active, queued } = useDownloadQueue();
   const [autoEnabled] = useSetting<boolean>(AUTO_DOWNLOAD_ON_JOIN_KEY, true);
@@ -85,6 +97,10 @@ export function MissingMapBox({
           src={previewUrl}
           alt=""
           aria-hidden
+          // A picture that fails to load drops to the next rung rather than
+          // leaving a broken image behind the controls. The last rung is the
+          // drawing, which has no URL, so this terminates.
+          onError={onError}
           className="pointer-events-none absolute inset-0 size-full object-cover"
         />
       )}

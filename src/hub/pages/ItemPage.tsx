@@ -24,12 +24,15 @@ import { Link, useNavigate, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { asContainer, decodeContainerText } from "@/container/container";
+import { useScanTargetSelection, useUnitsyncMinimap } from "@/content/config";
 import type { ImportPlan } from "@/deeplink/actions";
 import { ConfirmDialog, type Pending } from "@/deeplink/ConfirmDialog";
 import { fetchImportPlan } from "@/deeplink/fetchImport";
 import { fetchImportText } from "@/deeplink/fetchText";
 import { getGameMatcher, getProfile } from "@/profile/profile";
 import { describeItem, fetchHubItem, type HubItemDetail } from "../api";
+import { MapPictureCard } from "../assets/MapPicture";
+import { useMapPictureLadder } from "../assets/useMapPicture";
 import { describePinnedGame, matchesPinnedGame } from "../browse";
 import { KindIcon } from "../components/KindIcon";
 import { useHubUrl } from "../config";
@@ -329,6 +332,7 @@ export default function ItemPage() {
             </div>
 
             <div className="flex flex-col gap-6">
+              {item.map_name && <ItemMapPicture mapName={item.map_name} />}
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
                 <Meta label="Game">
                   {item.game_name ?? (
@@ -464,6 +468,32 @@ function confirmRemoval(removal: HubRemoval): Pending {
 function importLabel(fetching: boolean, notes: number): string {
   if (fetching) return "Fetching…";
   return notes > 0 ? "Import anyway" : "Import";
+}
+
+/**
+ * The map an item is played on (issue #1637).
+ *
+ * The hub lists things for maps the reader may not own, and until now this page
+ * had the map's name and nothing else, because coilbox draws minimaps out of
+ * local archives and a map that is not installed has no archive to draw from.
+ * The ladder in `../assets/picture.ts` fills that in, and always answers.
+ *
+ * The local rung comes from the same scan target the Maps screen reads, which is
+ * the engine and data directory this session is set up for. Without one there is
+ * no local picture and the ladder starts at the hub.
+ */
+function ItemMapPicture({ mapName }: { mapName: string }) {
+  const { selected } = useScanTargetSelection();
+  const minimap = useUnitsyncMinimap(
+    selected?.enginePath,
+    selected?.rootPath,
+    mapName,
+  );
+  const ladder = useMapPictureLadder(mapName, minimap.url);
+
+  return (
+    <MapPictureCard mapName={mapName} ladder={ladder} className="w-full" />
+  );
 }
 
 /** One labelled fact about the item. */

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ContentState } from "../content/bindings";
 import { contentStateLoad } from "../content/bindings";
 import { getProfileRoot } from "../profile/profile";
-import { dlBarMaps, dlSetEngineDirs } from "./bindings";
+import { type BarMap, dlBarMaps, dlSetEngineDirs } from "./bindings";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 import { healWriteRoot, packageDirOf } from "./writeRoot";
 
@@ -174,54 +174,54 @@ export function useWriteRootPath(): string | undefined {
   return useWriteRoot().path;
 }
 
-// The BAR maps-metadata list keyed springName -> preview thumbnail URL, fetched
-// once per session. The list is large and near-static, so we memoise the promise
-// and share it across every caller; a failed load resets so a later mount retries.
-let barPreviewsPromise: Promise<Map<string, string>> | null = null;
-function loadBarMapPreviews(): Promise<Map<string, string>> {
-  if (!barPreviewsPromise) {
-    barPreviewsPromise = dlBarMaps(undefined)
+// The BAR maps-metadata list keyed springName -> the whole entry, fetched once
+// per session. The list is large and near-static, so we memoise the promise and
+// share it across every caller. A failed load resets so a later mount retries.
+let barMapsPromise: Promise<Map<string, BarMap>> | null = null;
+function loadBarMaps(): Promise<Map<string, BarMap>> {
+  if (!barMapsPromise) {
+    barMapsPromise = dlBarMaps(undefined)
       .then(({ maps }) => {
-        const index = new Map<string, string>();
-        for (const m of maps) {
-          if (m.images?.preview) index.set(m.springName, m.images.preview);
-        }
+        const index = new Map<string, BarMap>();
+        for (const m of maps) index.set(m.springName, m);
         return index;
       })
       .catch((e) => {
-        barPreviewsPromise = null;
+        barMapsPromise = null;
         throw e;
       });
   }
-  return barPreviewsPromise;
+  return barMapsPromise;
 }
 
 /**
- * Resolve a map's remote preview thumbnail (BAR maps-metadata `images.preview`) by
- * springName, or `undefined` while loading or when the map isn't in the list. Used
- * as a fallback picture when a battle's map isn't installed and unitsync has no
- * local minimap to render. Pass `undefined` to skip the fetch entirely.
+ * A map's entry in BAR's validated maps list by springName, or `undefined` while
+ * loading and for a map BAR does not certify. Pass `undefined` to skip the fetch
+ * entirely.
+ *
+ * The whole entry rather than only `images.preview`, which is what this used to
+ * hand back: the picture ladder in `src/hub/assets/picture.ts` wants the preview
+ * as its last remote rung and `mapWidth`/`mapHeight` for the drawing below that,
+ * and both come off the same entry.
  */
-export function useBarMapPreview(
-  springName: string | undefined,
-): string | undefined {
-  const [url, setUrl] = useState<string | undefined>(undefined);
+export function useBarMap(springName: string | undefined): BarMap | undefined {
+  const [map, setMap] = useState<BarMap | undefined>(undefined);
   useEffect(() => {
     if (!springName) {
-      setUrl(undefined);
+      setMap(undefined);
       return;
     }
     let live = true;
-    loadBarMapPreviews()
+    loadBarMaps()
       .then((index) => {
-        if (live) setUrl(index.get(springName));
+        if (live) setMap(index.get(springName));
       })
       .catch(() => {
-        if (live) setUrl(undefined);
+        if (live) setMap(undefined);
       });
     return () => {
       live = false;
     };
   }, [springName]);
-  return url;
+  return map;
 }

@@ -314,6 +314,15 @@ export interface Profile {
    */
   hubUrl?: string;
   /**
+   * Base URL the hub's own pictures are served from, in place of the built-in
+   * `https://tomjn.github.io/coilbox-assets/`. Goes with {@link Profile.hubUrl}:
+   * a distributor pointing Coilbox at their own hub is pointing it at a hub
+   * whose assets are theirs too, and without this it would draw their items
+   * using somebody else's pictures. Read through `assetCdnBase` (see
+   * `../hub/assets/tier`).
+   */
+  hubAssetsUrl?: string;
+  /**
    * Whether Coilbox tells the hub that an import from a hub link finished, so
    * the hub can show an import count (issue #1361). Defaults to true. The
    * request carries the item id and nothing else, so there is no per-player

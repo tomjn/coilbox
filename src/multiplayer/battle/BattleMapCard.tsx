@@ -8,7 +8,7 @@ import {
   useUnitsyncThumbnails,
 } from "@/content/config";
 import { mergeMapTiers } from "@/content/mapTiers";
-import { useBarMapPreview } from "@/downloads/config";
+import { useMapPictureLadder } from "@/hub/assets/useMapPicture";
 import { MapCard } from "@/play/pages/components/MapCard";
 import {
   MapLayerToggle,
@@ -74,10 +74,13 @@ export function BattleMapCard({
   const { thumbs } = useUnitsyncThumbnails(enginePath, dataDir);
   const { meta } = useUnitsyncMapMeta(enginePath, dataDir);
 
-  // When the map isn't installed, unitsync can't render a minimap, so fall back to
-  // BAR's remote preview thumbnail (keyed by the battle's springName) behind the
-  // download controls instead of a blank box. Only fetched while the map is missing.
-  const remotePreview = useBarMapPreview(mapMissing ? battle.map : undefined);
+  // When the map isn't installed, unitsync can't render a minimap, so the remote
+  // rungs of the picture ladder (`@/hub/assets/picture`) go behind the download
+  // controls instead of a blank box. Only asked for while the map is missing.
+  const remoteLadder = useMapPictureLadder(
+    mapMissing ? battle.map : undefined,
+    null,
+  );
 
   // Terrain overlay toggle: reuse the content-side metal/height infomap renders on
   // the battle minimap so hosts/players can read terrain when placing start boxes.
@@ -190,7 +193,7 @@ export function BattleMapCard({
               battleId={battle.id}
               mapName={battle.map}
               onRescan={onRescan}
-              previewUrl={remotePreview}
+              picture={remoteLadder}
             />
           ) : undefined
         }
