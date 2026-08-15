@@ -55,7 +55,8 @@ struct Args {
     /// `--height-field`: write one map's raw 16 bit heights to the cache, for
     /// the terrain check to read without a PNG in the way (issue #1490).
     height_field: bool,
-    /// `--metalmap`: render one map's metal infomap as an RGBA overlay PNG.
+    /// `--metalmap`: render one map's metal infomap as an RGBA overlay PNG, and
+    /// with `--asset-dir` also store the raw density as the hub's asset.
     metalmap: bool,
     /// `--map-info`: lazily read one map's options (combined with `--map`).
     map_info: bool,
@@ -518,8 +519,9 @@ fn run() -> i32 {
     // Metalmap: render one map's metal infomap to a green-on-transparent RGBA PNG.
     if args.metalmap {
         if let Some(map) = args.map.clone() {
+            let asset_dir = args.asset_dir.as_deref().map(Path::new);
             return match std::panic::catch_unwind(|| {
-                metalmap::render(&args.lib, &map, args.max_side, cache_dir)
+                metalmap::render(&args.lib, &map, args.max_side, cache_dir, asset_dir)
             }) {
                 Ok(out) => {
                     println!("{}", serde_json::to_string(&out).unwrap_or_default());
