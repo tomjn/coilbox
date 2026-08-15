@@ -20,6 +20,9 @@ coilbox-oauth = { path = "../coilbox-oauth" }
 # The variant names the have check's keys are built from, read from the same
 # shared/asset-vocabulary.json the hub agrees to.
 coilbox-assets = { path = "../coilbox-assets" }
+# The settings file and the portable root, so the upload consent check reads the
+# user's answer and the distribution profile off disk rather than being told.
+coilbox-portable = { path = "../coilbox-portable" }
 tauri-plugin-opener = "2"
 # rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
 # picks it.

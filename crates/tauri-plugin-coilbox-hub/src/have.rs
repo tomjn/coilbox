@@ -30,6 +30,7 @@ use coilbox_oauth::HTTP_TIMEOUT;
 use serde::{Deserialize, Serialize};
 
 use crate::auth;
+use crate::consent::AssetUploadConsent;
 use crate::endpoint::{api_url, host_of, read_capped};
 
 /// The route that answers the have check.
@@ -155,7 +156,17 @@ struct HaveBody {
 ///
 /// An empty set is answered without asking anybody, which matters because the
 /// callers of this are loops and the hub refuses an empty batch.
-pub async fn have(hub_url: &str, keys: &[AssetKey]) -> Result<Vec<HaveResult>, String> {
+///
+/// `_consent` is the user's agreement to send pictures off this machine, and is the
+/// reason this takes an argument it never reads (issue #1635). It is asked for here
+/// rather than at the upload because this is the first call the upload path makes,
+/// so a path that starts here cannot begin without the check having run. See
+/// [`crate::consent`].
+pub async fn have(
+    hub_url: &str,
+    keys: &[AssetKey],
+    _consent: &AssetUploadConsent,
+) -> Result<Vec<HaveResult>, String> {
     if keys.is_empty() {
         return Ok(Vec::new());
     }
@@ -545,7 +556,12 @@ mod tests {
     async fn an_empty_set_asks_nobody() {
         // No server, no token, no address that could carry one: an empty set must
         // not reach any of it.
-        assert_eq!(have("http://hub.example", &[]).await.unwrap(), Vec::new());
+        assert_eq!(
+            have("http://hub.example", &[], &AssetUploadConsent::for_test())
+                .await
+                .unwrap(),
+            Vec::new()
+        );
     }
 
     /// The comparison the whole design rests on: same `source_hash` is `have`, a
