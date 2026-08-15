@@ -1,6 +1,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
-import { getProfile } from "../../profile/profile";
+import { getProfile, isHubAssetUploadOffered } from "../../profile/profile";
+import { useAssetUploadConsent } from "../assetUploads";
 import {
   DEFAULT_HUB_URL,
   isValidHubUrl,
@@ -8,6 +9,7 @@ import {
   useHubUrlSetting,
 } from "../config";
 import { AccountControl } from "./components/AccountControl";
+import { AssetUploadControl } from "./components/AssetUploadControl";
 import { Field } from "./components/Field";
 
 /**
@@ -35,9 +37,15 @@ import { Field } from "./components/Field";
  * withheld was an item id the hub had just served, with no account and nothing
  * that points at the reader. See `../importCount.ts`. A distribution can still
  * switch the whole thing off with `hubImportCounts`.
+ *
+ * Sending pictures made from local game files (issue #1635) does have a switch,
+ * last, because it is the one thing here that takes something off this machine
+ * and publishes it. It sits under the account control on purpose: it is only
+ * meaningful once you know whose name the uploads would carry.
  */
 export default function HubSettings() {
   const [userUrl, setUserUrl] = useHubUrlSetting();
+  const [uploadsAgreed, setUploadsAgreed] = useAssetUploadConsent();
   const [draft, setDraft] = useState(userUrl);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,6 +103,11 @@ export default function HubSettings() {
       </Field>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <AccountControl hubUrl={effective} />
+      <AssetUploadControl
+        agreed={uploadsAgreed}
+        onChange={setUploadsAgreed}
+        offered={isHubAssetUploadOffered()}
+      />
     </div>
   );
 }

@@ -320,6 +320,17 @@ export interface Profile {
    * switch for it. Set this false to switch it off for a distribution.
    */
   hubImportCounts?: boolean;
+  /**
+   * Whether a player may switch on sending pictures made from their local game
+   * and map archives to the hub (issue #1635). Defaults to true, which only means
+   * the switch is offered: the setting behind it is off until the player turns it
+   * on, so a silent profile changes nothing on its own.
+   *
+   * Set this false in a distribution that does not want its game's assets
+   * published, and the switch goes with it. {@link Profile.hub} being false
+   * already covers this, since there is then no hub at all.
+   */
+  hubAssetUploads?: boolean;
   /** GitHub repo ("owner/name") whose latest release ships this game's archive. */
   release?: { repo: string };
   /**
@@ -623,6 +634,16 @@ export function isHubEnabled(): boolean {
  */
 export function isHubImportCountEnabled(): boolean {
   return loaded.hubImportCounts !== false;
+}
+
+/**
+ * Whether this distribution offers the asset-upload switch at all (profile
+ * `hubAssetUploads`, default true, and only while the hub itself is on). Not
+ * permission to upload: that is the player's own setting, off until they turn it
+ * on. See `../hub/assetUploads`.
+ */
+export function isHubAssetUploadOffered(): boolean {
+  return isHubEnabled() && loaded.hubAssetUploads !== false;
 }
 
 /**
