@@ -572,6 +572,42 @@ impl Unitsync {
         (got != 0).then_some(buf)
     }
 
+    /// Dimensions of the map's terrain-type infomap, `(mapx/2, mapy/2)`, which is
+    /// the same grid the metal infomap is on. The engine spells it out as its own
+    /// case rather than sharing metal's (`CSMFMapFile::GetInfoMapSize`). Cheap (no
+    /// pixel read). `None` if the build lacks `GetInfoMapSize` or the map has no
+    /// type infomap.
+    pub fn typemap_size(&self, map_name: &str) -> Option<(u32, u32)> {
+        let f = self.info_map_size_fn?;
+        let name = CString::new(map_name).ok()?;
+        let which = CString::new("type").ok()?;
+        let mut w: c_int = 0;
+        let mut h: c_int = 0;
+        let ok = unsafe { f(name.as_ptr(), which.as_ptr(), &mut w, &mut h) };
+        (ok != 0 && w > 0 && h > 0).then_some((w as u32, h as u32))
+    }
+
+    /// The map's terrain-type infomap as raw 8-bit type indices (`w*h` long, row
+    /// major). Each sample indexes the map's `mapinfo.lua` terrain type list,
+    /// which is what decides speed, hardness and buildability at that square, so
+    /// the values are labels rather than an amount. `w`/`h` must come from
+    /// `typemap_size`. `None` if the build lacks `GetInfoMap` or the read fails.
+    pub fn typemap_data(&self, map_name: &str, w: u32, h: u32) -> Option<Vec<u8>> {
+        let f = self.info_map_fn?;
+        let name = CString::new(map_name).ok()?;
+        let which = CString::new("type").ok()?;
+        let mut buf = vec![0u8; (w as usize) * (h as usize)];
+        let got = unsafe {
+            f(
+                name.as_ptr(),
+                which.as_ptr(),
+                buf.as_mut_ptr(),
+                BM_GRAYSCALE_8,
+            )
+        };
+        (got != 0).then_some(buf)
+    }
+
     /// The map's `(min_height, max_height)` in world units (the heights at height
     /// infomap values 0 and 65535), honouring any `mapinfo.lua` `smf` override.
     /// `None` if the build lacks the accessors.
