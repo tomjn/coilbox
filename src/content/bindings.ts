@@ -1319,6 +1319,13 @@ export interface MinimapResult {
   /** PNG `data:` URL, only when the render never reached the worker's cache. */
   dataUrl?: string;
   side?: number;
+  /**
+   * The map's size in elmos, which is the space `startPositions` are in and what
+   * an overlay drawn on this minimap is lined up against (issue #1629). Absent
+   * when the map has no metal infomap to derive it from.
+   */
+  widthElmos?: number;
+  heightElmos?: number;
   /** Team start positions, for overlaying on the minimap. */
   startPositions: StartPos[];
   /** Wind power range (`atmosphere.minWind`/`maxWind` from mapinfo.lua). */
@@ -1459,8 +1466,16 @@ export interface ThumbnailsResult {
     file?: string;
     /** PNG `data:` URL, only when the render never reached the cache. */
     dataUrl?: string;
+    /** Metal infomap samples, whose ratio is the map's aspect ratio. */
     width?: number;
     height?: number;
+    /**
+     * The map's size in elmos, which is the space every overlay is in
+     * (issue #1629). Not the samples above, and not the "8 x 8" a player says,
+     * which is this over 512.
+     */
+    widthElmos?: number;
+    heightElmos?: number;
   }[];
   errors: string[];
 }

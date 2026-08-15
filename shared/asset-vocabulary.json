@@ -88,5 +88,8 @@
   "heightOverlay": {
     "elmosPerSample": 8,
     "bytesPerSample": 2
+  },
+  "mapExtent": {
+    "elmosPerMetalSample": 16
   }
 }

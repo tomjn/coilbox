@@ -5,8 +5,10 @@ import {
   BUILDPIC_VARIANT,
   classForVariant,
   ELMOS_PER_BUILD_SQUARE,
+  ELMOS_PER_METAL_SAMPLE,
   heightOverlayMaxBytes,
   MAP_VARIANTS,
+  mapExtentElmos,
   maxObjectBytes,
   RENDER_ANGLES,
   RENDER_BLEED_SQUARES,
@@ -174,6 +176,39 @@ describe("heightOverlayMaxBytes", () => {
   it("is a height overlay's number and no other class's", () => {
     expect(heightOverlayMaxBytes("overlay:metal", 16384, 16384)).toBeNull();
     expect(heightOverlayMaxBytes("minimap", 16384, 16384)).toBeNull();
+  });
+});
+
+describe("mapExtentElmos", () => {
+  it("counts a metal sample as two map squares of eight elmos", () => {
+    expect(ELMOS_PER_METAL_SAMPLE).toBe(16);
+  });
+
+  // Real numbers, read off a map library with the worker's `--thumbnails` pass
+  // and checked against the sizes Beyond All Reason publishes for the same maps
+  // in `lobby_maps.validated.json`. A factor out by two still looks like a map
+  // size, so the check that matters is against a second source.
+  it("turns real maps' metal samples into their size in elmos", () => {
+    // Altored Divide Bar Remake 1.6.2, which BAR calls 16 by 16.
+    expect(mapExtentElmos(512, 512)).toEqual({
+      widthElmos: 8192,
+      heightElmos: 8192,
+    });
+    // Comet Catcher Remake 1.8, 16 by 12.
+    expect(mapExtentElmos(512, 384)).toEqual({
+      widthElmos: 8192,
+      heightElmos: 6144,
+    });
+    // All That Glitters Extended v1.0.2, 30 by 20.
+    expect(mapExtentElmos(960, 640)).toEqual({
+      widthElmos: 15360,
+      heightElmos: 10240,
+    });
+  });
+
+  it("is 512 times the size a player says, which BAR's own list holds", () => {
+    const { widthElmos, heightElmos } = mapExtentElmos(512, 384);
+    expect([widthElmos / 512, heightElmos / 512]).toEqual([16, 12]);
   });
 });
 

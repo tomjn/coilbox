@@ -141,6 +141,24 @@ fn dims_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
     Some(dir.join(format!("{key}-dims.json")))
 }
 
+/// A map's size in elmos, from the same cached proportions the display path
+/// uses (issue #1629).
+///
+/// Kept as a derivation rather than another cached field so the two can never
+/// disagree, and so every `<key>-dims.json` already on disk answers this without
+/// a rescan. What is cached is metal infomap samples, and
+/// [`coilbox_assets::map_extent_elmos`] carries which of the map's several
+/// sample counts that is and what one of them is worth.
+fn dims_elmos(dims: Option<(u32, u32)>) -> (Option<u32>, Option<u32>) {
+    match dims {
+        Some((w, h)) => {
+            let (width, height) = coilbox_assets::map_extent_elmos(w, h);
+            (Some(width), Some(height))
+        }
+        None => (None, None),
+    }
+}
+
 /// A map's proportions, from cache when `file` holds them and from `compute`
 /// otherwise. `GetInfoMapSize` costs about 86ms per map, as much again as the
 /// minimap render this sits beside, and `render_one`'s cache hit skips its own
@@ -182,13 +200,18 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
     };
     us.init(false, 0);
     let _ = us.drain_errors();
-    let file = cache_file(
-        cache_dir,
-        map_cache_key(&us, None, map_name).as_deref(),
-        mip,
-    );
+    let key = map_cache_key(&us, None, map_name);
+    let file = cache_file(cache_dir, key.as_deref(), mip);
     let result = render_one(&us, map_name, mip, file.clone());
     sweep_pictures(cache_dir, file.as_slice());
+
+    // The map's size in elmos, from the same `<key>-dims.json` the thumbnail pass
+    // writes, so a library that has drawn its map grid once pays nothing here
+    // (issue #1629). A miss costs the same 86ms `GetInfoMapSize` the batch pays.
+    let (width_elmos, height_elmos) =
+        dims_elmos(cached_dims(dims_file(cache_dir, key.as_deref()), || {
+            us.map_dimensions(map_name)
+        }));
 
     // Start positions, environment (wind/tidal) and appearance (water/sky/sun) all
     // live in mapinfo.lua, so load the map's archives and parse them via unitsync's
@@ -216,6 +239,8 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
     };
 
     let base = MinimapOutput {
+        width_elmos,
+        height_elmos,
         start_positions,
         min_wind,
         max_wind,
@@ -290,12 +315,15 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
                 let dims = cached_dims(dims_file(cache_dir, key.as_deref()), || {
                     us.map_dimensions(&name)
                 });
+                let (width_elmos, height_elmos) = dims_elmos(dims);
                 thumbnails.push(Thumbnail {
                     name,
                     file: image.file,
                     data_url: image.data_url,
                     width: dims.map(|(w, _)| w),
                     height: dims.map(|(_, h)| h),
+                    width_elmos,
+                    height_elmos,
                 });
             }
             Err(e) => errors.push(format!("{name}: {e}")),
@@ -464,6 +492,21 @@ mod tests {
         let png = cache_file(Some(dir.as_path()), Some("abc"), 3);
         let dims = dims_file(Some(dir.as_path()), Some("abc"));
         assert_ne!(png, dims);
+    }
+
+    /// The proportions the cache holds are metal infomap samples, and the size
+    /// carried beside the minimap is elmos, so this is where the two are told
+    /// apart (issue #1629). Comet Catcher Remake 1.8 is 512 by 384 samples on
+    /// this machine's library, and BAR publishes it as 16 by 12, which is
+    /// 8192 by 6144 elmos.
+    #[test]
+    fn a_maps_size_in_elmos_comes_off_its_cached_metal_samples() {
+        assert_eq!(dims_elmos(Some((512, 384))), (Some(8192), Some(6144)));
+    }
+
+    #[test]
+    fn a_map_with_no_proportions_reports_no_size() {
+        assert_eq!(dims_elmos(None), (None, None));
     }
 
     /// The picture budget is a suffix, so a minimap that stopped being named
