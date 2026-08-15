@@ -29,6 +29,7 @@ mod mapmeta;
 mod metalmap;
 mod minimap;
 mod model;
+mod renderkey;
 mod seed;
 mod skirmishai;
 mod texture;
@@ -99,6 +100,14 @@ struct Args {
     /// `--width`/`--height`/`--footprint-x`/`--footprint-z`, and the unit in
     /// `--game`/`--object`. Needs `--asset-dir`, since the file is the output.
     unit_render: bool,
+    /// `--unit-render-keys`: what a batch of units' renders would be called,
+    /// without drawing any of them. Takes the units in `--units-file`, the angle
+    /// in `--angle` and the renderer in `--renderer-version`.
+    unit_render_keys: bool,
+    /// A JSON file of `{ unit, object, footprintX, footprintZ }` for
+    /// `--unit-render-keys`. A file rather than an argument because a whole
+    /// game's roster is past what Windows takes on a command line.
+    units_file: Option<String>,
     /// The render angle, without the `render:` prefix. Defaults to the one angle
     /// the vocabulary lists.
     angle: Option<String>,
@@ -427,6 +436,52 @@ fn run() -> i32 {
         };
     }
 
+    // Unit render keys: what a batch of units' renders would be called, without
+    // drawing any of them. Keys off --game like the render mode, so it is
+    // checked alongside them.
+    if args.unit_render_keys {
+        let Some(units_file) = args.units_file.clone() else {
+            renderkey::emit_error("--unit-render-keys needs --units-file <json>".into());
+            return 1;
+        };
+        let requests: Vec<model::UnitRenderKeyRequest> = match std::fs::read_to_string(&units_file)
+            .map_err(|e| format!("could not read units file {units_file}: {e}"))
+            .and_then(|raw| {
+                serde_json::from_str(&raw)
+                    .map_err(|e| format!("could not parse units file {units_file}: {e}"))
+            }) {
+            Ok(v) => v,
+            Err(e) => {
+                renderkey::emit_error(e);
+                return 1;
+            }
+        };
+        let game_archive = args.game.clone().unwrap_or_default();
+        let angle = args
+            .angle
+            .clone()
+            .unwrap_or_else(|| coilbox_assets::vocabulary().unit.render_angles[0].clone());
+        let renderer_version = args.renderer_version;
+        return match std::panic::catch_unwind(|| {
+            renderkey::render(
+                &args.lib,
+                &game_archive,
+                &requests,
+                &angle,
+                renderer_version,
+            )
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                renderkey::emit_error("worker panicked while reading unit render keys".into());
+                1
+            }
+        };
+    }
+
     // Archive browsing: list a member tree, read one member for preview, or
     // extract one member to a destination path (download).
     if let Some(archive_name) = args.archive.clone() {
@@ -728,6 +783,8 @@ fn parse_args() -> Result<Args, String> {
     let mut unit_dataset = false;
     let mut unit_model = false;
     let mut unit_render = false;
+    let mut unit_render_keys = false;
+    let mut units_file = None;
     let mut angle = None;
     let mut pixels = None;
     let mut width = 0u32;
@@ -786,6 +843,8 @@ fn parse_args() -> Result<Args, String> {
             "--unit-dataset" => unit_dataset = true,
             "--unit-model" => unit_model = true,
             "--unit-render" => unit_render = true,
+            "--unit-render-keys" => unit_render_keys = true,
+            "--units-file" => units_file = it.next(),
             "--angle" => angle = it.next(),
             "--pixels" => pixels = it.next(),
             "--width" => {
@@ -882,6 +941,8 @@ fn parse_args() -> Result<Args, String> {
         unit_dataset,
         unit_model,
         unit_render,
+        unit_render_keys,
+        units_file,
         angle,
         pixels,
         width,
@@ -926,6 +987,7 @@ fn absolutize(args: &mut Args) {
         args.source_file.as_mut(),
         args.chunks_file.as_mut(),
         args.pixels.as_mut(),
+        args.units_file.as_mut(),
     ]
     .into_iter()
     .flatten()
@@ -1298,6 +1360,8 @@ mod tests {
             unit_dataset: false,
             unit_model: false,
             unit_render: false,
+            unit_render_keys: false,
+            units_file: None,
             angle: None,
             pixels: None,
             width: 0,

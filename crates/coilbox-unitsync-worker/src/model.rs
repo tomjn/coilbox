@@ -749,6 +749,65 @@ pub struct UnitRenderOutput {
     pub errors: Vec<String>,
 }
 
+/// One unit to work out a render key for: which model, and the footprint the
+/// render will be framed on.
+///
+/// The footprint comes from the caller rather than from the archive on purpose.
+/// `--unit-render` frames the pixels with the footprint it is given, so a key
+/// derived from a different one would name a picture nobody is going to draw.
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitRenderKeyRequest {
+    /// The unit's internal name, which is what the hub keys a unit picture on.
+    pub unit: String,
+    /// The unitdef's `objectname`, which is what the model is found by.
+    pub object: String,
+    pub footprint_x: u32,
+    pub footprint_z: u32,
+}
+
+/// What a unit's render will be called before anybody draws it (issue #1672).
+///
+/// `source_hash` is the whole point: it is what the have check compares on, and
+/// every field it is over is here, so a caller can ask the hub whether it already
+/// holds this picture and only render the ones it does not.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitRenderKey {
+    /// The `objectname` the digest was taken of, echoed because several units
+    /// share one model and the caller may want to draw it once.
+    pub object_name: String,
+    /// The archive member the model was read from.
+    pub source_member: String,
+    /// sha256 over the model file and its textures as the archive stores them.
+    pub model_digest: String,
+    /// The hub's variant name, `render:<angle>`.
+    pub variant: String,
+    pub renderer_version: u32,
+    pub footprint_x: u32,
+    pub footprint_z: u32,
+    /// What the footprint frames to, which is part of the identity and also what
+    /// the caller has to draw for the render to be accepted.
+    pub width_px: u32,
+    pub height_px: u32,
+    /// The identity the have check compares on. See
+    /// `assetencode::render_source_hash`.
+    pub source_hash: String,
+}
+
+/// Output of `--unit-render-keys`: what a batch of units' renders would be
+/// called, without drawing any of them.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct UnitRenderKeysOutput {
+    /// Keyed by the unit's internal name, as asked for.
+    pub keys: BTreeMap<String, UnitRenderKey>,
+    /// The units that got no key, and why. A unit is in exactly one of the two
+    /// maps.
+    pub skipped: BTreeMap<String, RenderSkip>,
+    pub errors: Vec<String>,
+}
+
 /// A build pic encoded as the asset the hub takes, written to disk.
 ///
 /// The bytes are not in here on purpose. This worker prints one JSON document

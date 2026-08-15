@@ -1330,6 +1330,73 @@ export const unitsyncUnitRender = defineCommand<
   UnitRenderResult
 >("coilbox-unitsync", "unitsync_unit_render");
 
+/** One unit to work out a render key for. */
+export interface UnitRenderKeyRequest {
+  /** The unit's internal name, which is what the hub keys a unit picture on. */
+  unit: string;
+  /** The unitdef's `objectname`, which is what the model is found by. */
+  object: string;
+  /** The footprint the render will be framed on. It has to be the one the render
+   *  is actually drawn to, or the key names a picture nobody will make. */
+  footprintX: number;
+  footprintZ: number;
+}
+
+/** What a unit's render will be called before anybody draws it. */
+export interface UnitRenderKey {
+  /** The `objectname` the digest was taken of, echoed because several units share
+   *  one model. */
+  objectName: string;
+  /** The archive member the model was read from. */
+  sourceMember: string;
+  /** sha256 over the model file and its textures as the archive stores them. */
+  modelDigest: string;
+  /** `render:<angle>`. */
+  variant: string;
+  rendererVersion: number;
+  footprintX: number;
+  footprintZ: number;
+  /** What the footprint frames to, which is part of the identity and also what
+   *  the renderer has to draw for the render to be accepted. */
+  widthPx: number;
+  heightPx: number;
+  /** The identity the hub's have check compares on. */
+  sourceHash: string;
+}
+
+export interface UnitRenderKeysResult {
+  /** Keyed by the unit's internal name, as asked for. */
+  keys: Record<string, UnitRenderKey>;
+  /** The units that got no key, and why. A unit is in exactly one of the two. */
+  skipped: Record<string, RenderSkip>;
+  errors: string[];
+}
+
+/**
+ * Work out what a batch of units' renders will be called, without drawing any of
+ * them (issues #1672 and #1666).
+ *
+ * This is what lets the hub's have check come first for a render. The identity is
+ * over the model and its textures, so it can be read straight out of the archive,
+ * and until this existed the only route to one was to draw the picture and encode
+ * it, which is the cost asking first exists to avoid.
+ *
+ * One call is one archive mount however many units it names. Ask for the whole
+ * batch at once rather than looping: twenty units one at a time is twenty mounts,
+ * a second or more each on a game like Beyond All Reason.
+ */
+export const unitsyncUnitRenderKeys = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    gameArchive: string;
+    angle: string;
+    rendererVersion: number;
+    units: UnitRenderKeyRequest[];
+  },
+  UnitRenderKeysResult
+>("coilbox-unitsync", "unitsync_unit_render_keys");
+
 export interface MapInfoResult {
   options: ConfigOption[];
   checksum?: string;

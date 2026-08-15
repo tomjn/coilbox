@@ -170,6 +170,37 @@ pub(crate) fn source_digest(
     list: &[(String, String)],
     object_name: &str,
 ) -> Result<(String, String), String> {
+    let teamtex = read_teamtex(us, handle, list);
+    source_digest_with(us, handle, list, &teamtex, object_name)
+}
+
+/// A digest reader for a batch of models against one mounted archive.
+///
+/// A blueprint's worth of renders asks for many models out of one game (issue
+/// #1666), and everything the archive holds in common between them is read here
+/// once: the member listing is the caller's, and `teamtex.txt` is a property of
+/// the archive rather than of a model, so reading it per unit would read the same
+/// file hundreds of times.
+///
+/// Takes the mount rather than making one, so a batch cannot mount per unit even
+/// by mistake.
+pub(crate) fn digest_reader<'a>(
+    us: &'a Unitsync,
+    handle: i32,
+    list: &'a [(String, String)],
+) -> impl Fn(&str) -> Result<(String, String), String> + 'a {
+    let teamtex = read_teamtex(us, handle, list);
+    move |object_name| source_digest_with(us, handle, list, &teamtex, object_name)
+}
+
+/// [`source_digest`] against a `teamtex.txt` the caller has already read.
+fn source_digest_with(
+    us: &Unitsync,
+    handle: i32,
+    list: &[(String, String)],
+    teamtex: &[String],
+    object_name: &str,
+) -> Result<(String, String), String> {
     let path = find_model(list, object_name)
         .ok_or_else(|| format!("no model for {object_name:?} under {MODEL_DIR}/"))?;
     let (_, model_bytes) = us
@@ -177,7 +208,6 @@ pub(crate) fn source_digest(
         .ok_or_else(|| format!("could not read {path}"))?;
 
     let flattened = build(&path, &model_bytes);
-    let teamtex = read_teamtex(us, handle, list);
     let format = flattened.format.clone();
 
     // Ordered by member path so the digest does not depend on the order the
@@ -190,7 +220,7 @@ pub(crate) fn source_digest(
         // A `.3do` team-colour region is a name the engine paints rather than a
         // file, so there is nothing in the archive to hash for it.
         .filter(|tex| !(format == "3do" && teamtex.contains(&tex.name.trim().to_lowercase())))
-        .filter_map(|tex| locate_texture(list, &format, &teamtex, &tex.name))
+        .filter_map(|tex| locate_texture(list, &format, teamtex, &tex.name))
         .collect();
     members.sort();
     members.dedup();
