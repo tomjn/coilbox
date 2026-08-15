@@ -117,6 +117,13 @@ pub struct Thumbnail {
     pub width: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
+    /// The map's size in elmos, which is the space start positions, blueprint
+    /// footprints and every other overlay are in (issue #1629). Derived from the
+    /// proportions above, which are metal infomap samples and not a length.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width_elmos: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height_elmos: Option<u32>,
 }
 
 /// Output of the batch `thumbnails` mode: a small minimap per map, one Init.
@@ -141,6 +148,13 @@ pub struct MinimapOutput {
     /// Side length in pixels.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub side: Option<u32>,
+    /// The map's size in elmos, which is the space the start positions below are
+    /// in, and what an overlay drawn on this minimap is lined up against
+    /// (issue #1629).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width_elmos: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height_elmos: Option<u32>,
     /// Team start positions in map world coordinates (for overlaying on the map).
     pub start_positions: Vec<StartPos>,
     /// Wind power range (`atmosphere.minWind`/`maxWind` from mapinfo.lua).
