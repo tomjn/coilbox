@@ -573,8 +573,9 @@ fn run() -> i32 {
 
     // Single minimap renders one map; default mode scans everything.
     if let Some(map) = args.map.clone() {
+        let asset_dir = args.asset_dir.as_deref().map(Path::new);
         return match std::panic::catch_unwind(|| {
-            minimap::render(&args.lib, &map, args.mip, cache_dir)
+            minimap::render(&args.lib, &map, args.mip, cache_dir, asset_dir)
         }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
