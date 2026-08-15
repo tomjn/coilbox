@@ -27,9 +27,9 @@ import { notify } from "@/notify/notify";
  * or the user did, so it is worded as a failure. A run that stopped is the hub
  * saying not now, so it is worded as information.
  *
- * Nothing calls this yet. `hub_upload_assets` has no frontend caller because the
- * backfill that would run it is not written, and wiring this into it is
- * tomjn/coilbox#1679.
+ * `src/hub/assets/upload.ts` is the only caller, and it is the only door to
+ * `hub_upload_assets`, so a run cannot be started without being reported on
+ * (issue #1679).
  */
 
 /** What became of one asset, as `hub_upload_assets` answers. */
@@ -116,6 +116,33 @@ export function assetUploadReports(outcomes: AssetOutcome[]): NotifyInput[] {
   }
 
   return reports;
+}
+
+/**
+ * What a run that never started is worth telling somebody (issue #1679).
+ *
+ * Not an outcome, because there are none: no usable sign-in, no permission to
+ * send pictures at all, or a hub that never answered stops the run before the
+ * first picture, so there is nothing positional to summarise. It is worded here
+ * rather than at the call site so all of these sentences stay in one module.
+ *
+ * Information rather than an error, and the same title a run that stopped
+ * partway gets, because from the reader's side they are the same event: the
+ * pictures did not go, and the reason is somebody else's to fix.
+ */
+export function assetUploadFailureReport(
+  said: string,
+  assets: number,
+): NotifyInput {
+  const left =
+    assets === 1
+      ? "One picture was not sent."
+      : `${assets} pictures were not sent.`;
+  return {
+    title: "Picture uploads stopped early",
+    body: `${said.trim() || "The hub would not take any just now."} ${left}`,
+    level: "info",
+  };
 }
 
 /**

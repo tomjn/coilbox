@@ -42,6 +42,7 @@ import {
 } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
 import { nextDrawerKey } from "@/general/drawerKey";
+import { useBlueprintBackfill } from "@/hub/assets/useBlueprintBackfill";
 import { hubItemRoute, isHubItemPageReachable } from "@/hub/config";
 import { BlueprintEditor } from "@/placement/BlueprintEditor";
 import { BlueprintOnMap } from "@/placement/BlueprintOnMap";
@@ -83,8 +84,27 @@ export default function BlueprintDetailPage() {
   const record = draft?.id === id ? draft : stored;
 
   const gameName = record ? recordGameName(record) : "";
-  const { units } = useGameUnits(gameName);
+  const { units, archive } = useGameUnits(gameName);
   const footprints = useMemo(() => footprintsFromUnits(units), [units]);
+
+  // Offer the hub pictures of the units this layout names, once, and only when
+  // the user has turned picture uploads on (issues #1636, #1679). The stored
+  // record rather than the draft: it is the layout as it was opened, and an
+  // edit in progress is not a reason to send anything again.
+  useBlueprintBackfill(
+    stored
+      ? {
+          id: stored.id,
+          buildings: stored.layout.buildings,
+          gameName,
+          ...(stored.layout.game?.shortname
+            ? { shortname: stored.layout.game.shortname }
+            : {}),
+        }
+      : null,
+    units,
+    archive,
+  );
   // Held rather than worked out per render: a surface drawing this rebuilds
   // everything downstream of it when it changes, and on a map that means every
   // model read again.

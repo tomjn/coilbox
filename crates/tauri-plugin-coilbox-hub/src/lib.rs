@@ -1,13 +1,15 @@
 //! Coilbox hub account (Rust half).
 //!
-//! Four commands: three about who is signed in to the hub, and one that publishes
-//! as them. None of them hands a token out. Registered as `"coilbox-hub"`, so the
-//! frontend invokes `plugin:coilbox-hub|<cmd>`. The flow they sit on is [`auth`],
-//! and the request that uses its token is [`publish`].
+//! Seven commands: three about who is signed in to the hub, one that publishes as
+//! them, and three about sending pictures made from local archives. None of them
+//! hands a token out. Registered as `"coilbox-hub"`, so the frontend invokes
+//! `plugin:coilbox-hub|<cmd>`. The flow they sit on is [`auth`], and the request
+//! that uses its token is [`publish`].
 //!
-//! [`have`] is the other thing that uses the token, and is not a command. It is
-//! the first call the asset upload path makes, and its caller is the upload itself
-//! rather than the webview.
+//! [`have`] is the first call the upload path makes, and it has two callers. The
+//! upload asks for itself, before it sends anything, and the webview asks through
+//! `hub_assets_have` before it *makes* anything, which is the only way a render's
+//! check can come first (issue #1636).
 //!
 //! [`consent`] is what stands in front of it. Sending pictures made from local game
 //! files to a public gallery is off until the user turns it on, and that check reads
@@ -157,6 +159,37 @@ async fn hub_publish(
     }
 }
 
+/// `hub_assets_have`: ask the hub which of these pictures it still wants.
+///
+/// The same check [`upload::upload_all`] makes for itself, exposed because the
+/// webview has to be able to ask *before* it makes a picture (issue #1636). A
+/// render is drawn in the webview and its `source_hash` is over the model rather
+/// than the pixels, so `unitsync_unit_render_keys` can name one without drawing
+/// it. Asking here is what turns that into a saved render, and rendering to find
+/// out the hub already had it is the cost the whole design exists to avoid.
+///
+/// The consent check runs here for the same reason it runs on the upload: this
+/// spends the hub's request allowance as the signed-in account, so it is not
+/// something a webview gets to start without the user having agreed to it.
+///
+/// Keys the hub cannot answer are refused before anything is sent, so a typo
+/// costs nothing. Answers come back in the order the keys were given.
+#[tauri::command]
+async fn hub_assets_have<R: Runtime>(
+    app: AppHandle<R>,
+    hub_url: String,
+    keys: Vec<have::AssetKey>,
+) -> CliResult {
+    let consent = match consent::AssetUploadConsent::check(&app) {
+        Ok(consent) => consent,
+        Err(refused) => return CliResult::err(refused),
+    };
+    match have::have(&hub_url, &keys, &consent).await {
+        Ok(results) => CliResult::ok(json!({ "results": results })),
+        Err(said) => CliResult::err(said),
+    }
+}
+
 /// Maps a caller-supplied op id to the flag its run polls, so `hub_upload_cancel`
 /// can stop an upload somebody else started. The same shape as the downloads
 /// plugin's registry, minus its child process slot: there is no child here.
@@ -240,6 +273,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             hub_sign_out,
             hub_account,
             hub_publish,
+            hub_assets_have,
             hub_upload_assets,
             hub_upload_cancel
         ])

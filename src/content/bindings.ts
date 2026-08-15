@@ -1048,6 +1048,46 @@ export interface UnitDisplay {
    * which is coilbox's problem and worth saying out loud (#1625).
    */
   iconSkipped?: "no-source" | "undecodable" | "encode-failed";
+  /** The same picture encoded as the hub's `buildpic` asset and written to disk,
+   *  present only when the call asked for `assets` and one came out. */
+  asset?: UnitBuildpicAsset;
+  /** Why there is no {@link asset}, when one was asked for. A unit is never in
+   *  both. `not-square` and `too-large` are pictures the hub refuses on the
+   *  bytes, and cropping one would invent a picture the game does not ship. */
+  assetSkipped?:
+    | "no-source"
+    | "undecodable"
+    | "not-square"
+    | "too-large"
+    | "encode-failed"
+    | "not-written";
+}
+
+/** A build pic encoded as the asset the hub takes, written to disk. The bytes
+ *  are not here: the worker prints one JSON document and a few hundred WebPs is
+ *  the wrong shape for that, so the uploader reads {@link path}. */
+export interface UnitBuildpicAsset {
+  /** Always `buildpic`. */
+  variant: string;
+  /** Always `extracted`, against `rendered` for a picture coilbox drew. */
+  origin: string;
+  /** The name the archive this came out of declares for itself, which is what
+   *  the hub row's `source_archive` holds, and never a file name (#1678). */
+  sourceArchive: string;
+  /** Absolute path to the encoded file. */
+  path: string;
+  /** sha256 of the encoded bytes. */
+  hash: string;
+  /** sha256 of the archive member as read, before any decode. This is what the
+   *  hub's have check compares on, so it does not move when the encoder does. */
+  sourceHash: string;
+  /** The archive member the picture came from. */
+  sourceMember: string;
+  encodeProfile: string;
+  mime: string;
+  width: number;
+  height: number;
+  bytes: number;
 }
 
 export interface UnitBuildpicsResult {
@@ -1059,6 +1099,10 @@ export interface UnitBuildpicsResult {
 /**
  * Resolve build icons for a game's start units — lazy, since it mounts the game's
  * archive set. `gameArchive` is the primary archive; `units` are internal names.
+ *
+ * `assets` also encodes each one as the hub's `buildpic` asset and writes it
+ * where the uploader can read it. Only the blueprint backfill asks for that
+ * (#1636): a page drawing icons would be paying for a WebP encode nobody sends.
  */
 export const unitsyncUnitBuildpics = defineCommand<
   {
@@ -1066,6 +1110,7 @@ export const unitsyncUnitBuildpics = defineCommand<
     dataDir: string;
     gameArchive: string;
     units: string[];
+    assets?: boolean;
   },
   UnitBuildpicsResult
 >("coilbox-unitsync", "unitsync_unit_buildpics");

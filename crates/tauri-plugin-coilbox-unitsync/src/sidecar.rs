@@ -109,12 +109,18 @@ pub fn build_game_headers_args(lib: &str, datadir: &str, cache_dir: Option<&str>
 
 /// Build args for `--unit-buildpics` mode: the game whose start-unit build icons
 /// to resolve, the comma-joined unit names, and the optional on-disk cache dir.
+///
+/// `asset_dir` additionally encodes each build pic as the hub's `buildpic` asset
+/// and writes it there. Only the blueprint backfill asks for that (issue #1636).
+/// Every other caller wants the `data:` icon and nothing on disk, and encoding a
+/// WebP for a picture nobody is going to send is work for nothing.
 pub fn build_unit_buildpics_args(
     lib: &str,
     datadir: &str,
     game: &str,
     units: &[String],
     cache_dir: Option<&str>,
+    asset_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.push("--unit-buildpics".into());
@@ -123,6 +129,10 @@ pub fn build_unit_buildpics_args(
     args.push("--units".into());
     args.push(units.join(","));
     push_cache_dir(&mut args, cache_dir);
+    if let Some(dir) = asset_dir {
+        args.push("--asset-dir".into());
+        args.push(dir.into());
+    }
     args
 }
 
@@ -662,6 +672,7 @@ mod tests {
             "BAR.sdd",
             &["armcom".into(), "corcom".into()],
             Some("/cache/buildpics"),
+            None,
         );
         assert!(a.contains(&"--unit-buildpics".to_string()));
         let g = a.iter().position(|x| x == "--game").unwrap();
@@ -671,9 +682,38 @@ mod tests {
         assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/buildpics"]);
 
         let without =
-            build_unit_buildpics_args("/eng/libunitsync.so", "/data", "BAR.sdd", &[], None);
+            build_unit_buildpics_args("/eng/libunitsync.so", "/data", "BAR.sdd", &[], None, None);
         assert!(without.contains(&"--unit-buildpics".to_string()));
         assert!(!without.iter().any(|x| x == "--cache-dir"));
+    }
+
+    /// The hub's build pic asset is opt-in, so the callers that only want the
+    /// icon never pay for an encode (issue #1636).
+    #[test]
+    fn build_unit_buildpics_args_only_write_assets_when_asked() {
+        let icons_only = build_unit_buildpics_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "BAR.sdd",
+            &["armcom".into()],
+            Some("/cache/buildpics"),
+            None,
+        );
+        assert!(!icons_only.iter().any(|x| x == "--asset-dir"));
+
+        let with_assets = build_unit_buildpics_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "BAR.sdd",
+            &["armcom".into()],
+            Some("/cache/buildpics"),
+            Some("/cache/hub-assets"),
+        );
+        let at = with_assets
+            .iter()
+            .position(|x| x == "--asset-dir")
+            .expect("asset dir");
+        assert_eq!(with_assets[at + 1], "/cache/hub-assets");
     }
 
     #[test]

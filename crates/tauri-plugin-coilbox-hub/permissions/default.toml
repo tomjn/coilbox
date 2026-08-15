@@ -1,12 +1,13 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows signing in to the Coilbox hub with Discord, signing out again, reading who is signed in, publishing as them, and sending pictures made from local archives once the user has agreed to it."
+description = "Allows signing in to the Coilbox hub with Discord, signing out again, reading who is signed in, publishing as them, and asking what pictures it has and sending it pictures made from local archives once the user has agreed to it."
 permissions = [
   "allow-hub-sign-in",
   "allow-hub-sign-out",
   "allow-hub-account",
   "allow-hub-publish",
+  "allow-hub-assets-have",
   "allow-hub-upload-assets",
   "allow-hub-upload-cancel",
 ]
