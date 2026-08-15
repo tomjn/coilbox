@@ -51,6 +51,9 @@ struct Args {
     /// Destination path for `--extract` (download one member to disk).
     extract: Option<String>,
     thumbnails: bool,
+    /// `--heightmap`: render one map's height infomap as a downscaled preview
+    /// PNG, and with `--asset-dir` also store the full resolution 16 bit samples
+    /// as the hub's asset.
     heightmap: bool,
     /// `--height-field`: write one map's raw 16 bit heights to the cache, for
     /// the terrain check to read without a PNG in the way (issue #1490).
@@ -479,8 +482,9 @@ fn run() -> i32 {
     // Heightmap: render one map's height infomap to a grayscale PNG data URL.
     if args.heightmap {
         if let Some(map) = args.map.clone() {
+            let asset_dir = args.asset_dir.as_deref().map(Path::new);
             return match std::panic::catch_unwind(|| {
-                heightmap::render(&args.lib, &map, args.max_side, cache_dir)
+                heightmap::render(&args.lib, &map, args.max_side, cache_dir, asset_dir)
             }) {
                 Ok(out) => {
                     println!("{}", serde_json::to_string(&out).unwrap_or_default());
