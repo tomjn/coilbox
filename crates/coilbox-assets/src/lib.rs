@@ -206,6 +206,66 @@ pub fn height_overlay_max_bytes(variant: &str, width_elmos: u32, height_elmos: u
     Some(samples * vocabulary().height_overlay.bytes_per_sample)
 }
 
+/// The frame one unit's top down render is taken in, from its footprint.
+///
+/// The Rust twin of `RenderFrame` in `src/hub/assets/vocabulary.ts`. The render
+/// itself runs in the webview, so the TS side is what places the camera. This
+/// side exists so the encoder can refuse a picture that is not the shape the
+/// footprint says it should be. That check is the only one anywhere: the hub
+/// does not hold footprints, so a mis-framed render is caught here or nowhere.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenderFraming {
+    /// The framed extent, footprint plus the bleed on both sides.
+    pub squares_x: u32,
+    pub squares_z: u32,
+    /// The same extent in elmos, which is what the orthographic camera is set to.
+    pub width_elmos: u32,
+    pub height_elmos: u32,
+    /// The encoded image, at the class cap or under it, in the footprint's aspect.
+    pub width_px: u32,
+    pub height_px: u32,
+    /// Whole pixels per build square, so the aspect is exact rather than rounded.
+    pub pixels_per_square: u32,
+}
+
+/// The frame for a top down render of a unit with this footprint (issue #1631).
+///
+/// The footprint sets the aspect. A 3 by 2 building renders 3 by 2 and never
+/// square, because the picture exists to tile into a base layout and a square one
+/// does not.
+///
+/// `footprint_x` and `footprint_z` are the unitdef's `footprintx` and
+/// `footprintz` in build squares, as `--unit-dataset` reports them, and the
+/// engine floors both at 1.
+///
+/// Pixels come out as a whole number per square so the encoded aspect is exactly
+/// the framed aspect rather than a rounding of it, and the longest edge lands at
+/// or under the class cap without a separate check.
+pub fn render_frame(footprint_x: u32, footprint_z: u32) -> RenderFraming {
+    let vocab = vocabulary();
+    let bleed = 2 * vocab.render_frame.bleed_squares;
+    let squares_x = footprint_x.max(1) + bleed;
+    let squares_z = footprint_z.max(1) + bleed;
+
+    let cap = vocab
+        .classes
+        .get(RENDER_CLASS)
+        .and_then(|c| c.max_edge_px)
+        .unwrap_or(0);
+    let pixels_per_square = (cap / squares_x.max(squares_z)).max(1);
+    let per = vocab.render_frame.elmos_per_build_square;
+
+    RenderFraming {
+        squares_x,
+        squares_z,
+        width_elmos: squares_x * per,
+        height_elmos: squares_z * per,
+        width_px: squares_x * pixels_per_square,
+        height_px: squares_z * pixels_per_square,
+        pixels_per_square,
+    }
+}
+
 /// A map's size in elmos, from the metal infomap's sample counts (issue #1629).
 ///
 /// This is the number the hub's `map_width` and `map_height` hold, and the one
@@ -479,5 +539,109 @@ mod tests {
         let frame = &vocabulary().render_frame;
         assert_eq!(frame.bleed_squares, 1);
         assert_eq!(frame.elmos_per_build_square, 16);
+    }
+
+    /// The whole of #1631, and the one rule nothing downstream can check: a 3 by
+    /// 2 building comes out 3 by 2. The numbers are worked by hand rather than
+    /// from the function, so a change to the framing is a change to this test.
+    #[test]
+    fn a_footprint_that_is_not_square_frames_a_picture_that_is_not_square() {
+        // 3 by 2 plus a square of bleed each side is 5 by 4 squares. The longest
+        // edge takes floor(256 / 5) = 51 pixels a square, so 255 by 204.
+        let frame = render_frame(3, 2);
+        assert_eq!((frame.squares_x, frame.squares_z), (5, 4));
+        assert_eq!((frame.width_px, frame.height_px), (255, 204));
+        assert_eq!(frame.pixels_per_square, 51);
+
+        // And the aspect really is the footprint's, not the frame's, once the
+        // bleed is taken back off: 3 squares of 51 by 2 squares of 51.
+        let inset_w = frame.width_px - 2 * frame.pixels_per_square;
+        let inset_h = frame.height_px - 2 * frame.pixels_per_square;
+        assert_eq!((inset_w, inset_h), (153, 102));
+        assert_eq!(inset_w * 2, inset_h * 3);
+    }
+
+    /// A transposed footprint transposes the picture. The failure this catches is
+    /// an implementation that takes the larger of the two and squares up.
+    #[test]
+    fn transposing_the_footprint_transposes_the_frame() {
+        let wide = render_frame(3, 2);
+        let tall = render_frame(2, 3);
+        assert_eq!(
+            (wide.width_px, wide.height_px),
+            (tall.height_px, tall.width_px)
+        );
+        assert_ne!(wide.width_px, wide.height_px);
+    }
+
+    #[test]
+    fn the_frame_carries_a_whole_build_square_of_bleed_on_every_side() {
+        for (fx, fz) in [(1, 1), (3, 2), (8, 8), (12, 5)] {
+            let frame = render_frame(fx, fz);
+            assert_eq!(frame.squares_x, fx + 2, "{fx}x{fz}");
+            assert_eq!(frame.squares_z, fz + 2, "{fx}x{fz}");
+            // The consumer adds it back by insetting one square on each side, so
+            // the bleed has to be a whole number of pixels.
+            assert_eq!(frame.width_px % frame.squares_x, 0, "{fx}x{fz}");
+            assert_eq!(frame.height_px % frame.squares_z, 0, "{fx}x{fz}");
+        }
+    }
+
+    /// Whole pixels a square is what makes the encoded aspect exactly the framed
+    /// aspect rather than a rounding of it, so it is asserted over the range of
+    /// footprints games actually ship rather than at one size.
+    #[test]
+    fn every_footprint_gets_a_whole_number_of_pixels_a_square() {
+        for fx in 1..=20u32 {
+            for fz in 1..=20u32 {
+                let frame = render_frame(fx, fz);
+                assert!(frame.pixels_per_square >= 1, "{fx}x{fz}");
+                assert_eq!(
+                    frame.width_px,
+                    frame.squares_x * frame.pixels_per_square,
+                    "{fx}x{fz}"
+                );
+                assert_eq!(
+                    frame.height_px,
+                    frame.squares_z * frame.pixels_per_square,
+                    "{fx}x{fz}"
+                );
+            }
+        }
+    }
+
+    /// The longest edge lands at or under the class cap without a separate check,
+    /// which is why the pixels a square are floored rather than rounded.
+    #[test]
+    fn no_footprint_frames_a_picture_over_the_class_cap() {
+        let cap = class_for_variant("render:top")
+            .unwrap()
+            .max_edge_px
+            .unwrap();
+        for fx in 1..=64u32 {
+            for fz in 1..=64u32 {
+                let frame = render_frame(fx, fz);
+                assert!(frame.width_px <= cap, "{fx}x{fz}");
+                assert!(frame.height_px <= cap, "{fx}x{fz}");
+            }
+        }
+    }
+
+    /// The engine floors a footprint at one square, so a def that declares none
+    /// frames the same picture as a def that declares one.
+    #[test]
+    fn a_footprint_of_zero_frames_as_one_square() {
+        assert_eq!(render_frame(0, 0), render_frame(1, 1));
+        // 1 by 1 is 3 by 3 squares at 85 pixels each, one short of the cap.
+        assert_eq!(render_frame(1, 1).width_px, 255);
+    }
+
+    /// The camera extent is the framed squares in elmos, so a 3 by 2 building is
+    /// looked at across 80 by 64 elmos rather than across its own 48 by 32.
+    #[test]
+    fn the_camera_sees_the_footprint_plus_the_bleed_in_elmos() {
+        let frame = render_frame(3, 2);
+        assert_eq!((frame.width_elmos, frame.height_elmos), (80, 64));
+        assert_eq!(frame.width_elmos, frame.squares_x * 16);
     }
 }

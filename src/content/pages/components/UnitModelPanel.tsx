@@ -10,13 +10,25 @@
 
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+import {
+  RENDER_VERSION,
+  renderTopDown,
+  toBase64,
+} from "@/hub/assets/renderTop";
+import { RENDER_ANGLES, renderFrame } from "@/hub/assets/vocabulary";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
-import type { UnitDatasetEntry, UnitModelResult } from "../../bindings";
+import type {
+  RenderSkip,
+  UnitDatasetEntry,
+  UnitModelResult,
+  UnitRenderResult,
+} from "../../bindings";
+import { unitsyncUnitRender } from "../../bindings";
 import { useUnitsyncUnitModel } from "../../config";
 import { buildModel, countPieces, countTriangles } from "../../unitModel";
 
@@ -75,6 +87,18 @@ export function UnitModelPanel({
         failed={failed}
         gameArchive={gameArchive}
       />
+
+      {model?.root && object && (
+        <HubRender
+          enginePath={enginePath}
+          dataDir={dataDir}
+          gameArchive={gameArchive}
+          object={object}
+          model={model}
+          footprintX={unit?.footprintX ?? 1}
+          footprintZ={unit?.footprintZ ?? 1}
+        />
+      )}
     </aside>
   );
 }
@@ -186,6 +210,150 @@ function Body({
       {model.errors.length > 0 && <Note>{model.errors.join(". ")}</Note>}
     </>
   );
+}
+
+/**
+ * The unit's top down render for the hub (issue #1631).
+ *
+ * A blueprint on the hub draws one rounded square per building, and this is the
+ * picture that replaces it. It lives here because this is the one place in
+ * coilbox that already has a unit's model on screen, so a person can compare what
+ * came out of the encoder against what the model looks like.
+ *
+ * Nothing uploads it yet, which is #1633. What this does is produce the file and
+ * show what is in it, including the two hashes: the encoded one names the object
+ * and the source one is the identity the have check compares on.
+ */
+function HubRender({
+  enginePath,
+  dataDir,
+  gameArchive,
+  object,
+  model,
+  footprintX,
+  footprintZ,
+}: {
+  enginePath: string;
+  dataDir: string;
+  gameArchive: string;
+  object: string;
+  model: UnitModelResult;
+  footprintX: number;
+  footprintZ: number;
+}) {
+  const [result, setResult] = useState<UnitRenderResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const frame = renderFrame(footprintX, footprintZ);
+
+  const run = async () => {
+    setBusy(true);
+    setResult(null);
+    try {
+      const drawn = await renderTopDown(model, footprintX, footprintZ);
+      setResult(
+        await unitsyncUnitRender({
+          enginePath,
+          dataDir,
+          gameArchive,
+          object,
+          angle: RENDER_ANGLES[0],
+          footprintX,
+          footprintZ,
+          rendererVersion: RENDER_VERSION,
+          pixels: toBase64(drawn.rgba),
+          width: drawn.width,
+          height: drawn.height,
+        }),
+      );
+    } catch (e) {
+      setResult({ errors: [e instanceof Error ? e.message : String(e)] });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="border-t border-border/50 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-xs font-medium">Top down render</h4>
+        <Button size="sm" variant="secondary" onClick={run} disabled={busy}>
+          {busy ? "Rendering…" : "Render"}
+        </Button>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {footprintX} by {footprintZ} squares, framed with a square of bleed on
+        each side, so {frame.widthPx} by {frame.heightPx} pixels.
+      </p>
+
+      {result?.dataUrl && (
+        // Checkerboard behind it, because the whole point is that the background
+        // is not there: on a plain card a transparent render and an opaque one
+        // with a matching background look the same.
+        <div
+          className="mt-2 flex justify-center rounded border border-border/50 p-2"
+          style={{
+            backgroundImage:
+              "linear-gradient(45deg,#0002 25%,transparent 25%,transparent 75%,#0002 75%),linear-gradient(45deg,#0002 25%,transparent 25%,transparent 75%,#0002 75%)",
+            backgroundSize: "16px 16px",
+            backgroundPosition: "0 0, 8px 8px",
+          }}
+        >
+          <img
+            src={result.dataUrl}
+            alt={`Top down render of ${object}`}
+            className="max-w-full"
+          />
+        </div>
+      )}
+
+      {result?.asset && (
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+          <dt className="text-muted-foreground">Size</dt>
+          <dd>
+            {result.asset.width} by {result.asset.height},{" "}
+            {(result.asset.bytes / 1024).toFixed(1)} KB,{" "}
+            {result.asset.encodeProfile}
+          </dd>
+
+          <dt className="text-muted-foreground">Identity</dt>
+          <dd className="break-all font-mono">{result.asset.sourceHash}</dd>
+
+          <dt className="text-muted-foreground">File</dt>
+          <dd className="break-all font-mono">{result.asset.path}</dd>
+        </dl>
+      )}
+
+      {result?.assetSkipped && (
+        <Note>
+          No render was stored: {renderSkipReason(result.assetSkipped)}
+        </Note>
+      )}
+      {result && result.errors.length > 0 && (
+        <Note>{result.errors.join(". ")}</Note>
+      )}
+    </section>
+  );
+}
+
+/** What each refusal means, in a sentence, because the reasons are different
+ *  problems with different owners. */
+function renderSkipReason(skip: RenderSkip): string {
+  switch (skip) {
+    case "mis-framed":
+      return "the picture is not the shape this unit's footprint frames to, which is a bug in coilbox rather than in the game.";
+    case "no-pixels":
+      return "the pixels did not reach the worker intact.";
+    case "unknown-angle":
+      return "coilbox asked for an angle the hub does not store.";
+    case "no-model":
+      return "the game's archive has no model for this unit.";
+    case "encode-failed":
+      return "libwebp refused the picture.";
+    case "too-large":
+      return "it encoded past the size the hub accepts.";
+    case "not-written":
+      return "it encoded, and the file could not be written.";
+  }
 }
 
 function Note({ children }: { children: React.ReactNode }) {

@@ -1247,6 +1247,89 @@ export const unitsyncUnitModel = defineCommand<
   UnitModelResult
 >("coilbox-unitsync", "unitsync_unit_model");
 
+/** Why a unit produced no render asset. */
+export type RenderSkip =
+  /** The pixels are not the shape this footprint frames to. The hub cannot check
+   *  this, because it does not hold footprints, so it is checked in the worker or
+   *  nowhere. */
+  | "mis-framed"
+  /** The pixel buffer is missing, unreadable, or not `width * height * 4` long. */
+  | "no-pixels"
+  /** An angle the shared vocabulary does not list. */
+  | "unknown-angle"
+  /** The game archive has no model for this unit's `objectname`. */
+  | "no-model"
+  | "encode-failed"
+  | "too-large"
+  | "not-written";
+
+/** A top down render encoded as the asset the hub takes, written to disk. */
+export interface UnitRenderAsset {
+  /** `render:<angle>`. */
+  variant: string;
+  /** How the bytes were produced, `rendered` rather than `extracted`. */
+  origin: string;
+  /** Absolute path to the encoded file, named after {@link hash}. */
+  path: string;
+  /** sha256 of the encoded bytes, and the hub's object path component. */
+  hash: string;
+  /** The identity dedupe and the have check compare on, over the render's inputs
+   *  rather than its pixels, so it does not move when the encoder does. */
+  sourceHash: string;
+  /** The archive member the model was read from. */
+  sourceMember: string;
+  /** sha256 over the model file and its textures, the part of {@link sourceHash}
+   *  that comes out of the archive. */
+  modelDigest: string;
+  /** Which renderer drew it, from `RENDER_VERSION`. */
+  rendererVersion: number;
+  footprintX: number;
+  footprintZ: number;
+  encodeProfile: string;
+  mime: string;
+  width: number;
+  height: number;
+  bytes: number;
+}
+
+export interface UnitRenderResult {
+  asset?: UnitRenderAsset;
+  assetSkipped?: RenderSkip;
+  /** The encoded bytes as a `data:` URL, so the caller can look at what came out
+   *  of the encoder rather than at what it drew. */
+  dataUrl?: string;
+  errors: string[];
+}
+
+/**
+ * Encode a top down render the webview drew as the hub's `render:<angle>` asset
+ * (issue #1631).
+ *
+ * `pixels` is base64 RGBA, top row first, straight alpha, exactly
+ * `width * height * 4` bytes. The worker recomputes the frame from the footprint
+ * and refuses pixels that are not that shape, which is the only check on the rule
+ * anywhere: the hub does not hold footprints.
+ *
+ * Mounts the game's archive set to read the model the render was taken of, which
+ * is what its `source_hash` is over, so it is as slow as reading a model.
+ */
+export const unitsyncUnitRender = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    gameArchive: string;
+    object: string;
+    angle: string;
+    footprintX: number;
+    footprintZ: number;
+    rendererVersion: number;
+    pixels: string;
+    width: number;
+    height: number;
+  },
+  UnitRenderResult
+>("coilbox-unitsync", "unitsync_unit_render");
+
 export interface MapInfoResult {
   options: ConfigOption[];
   checksum?: string;

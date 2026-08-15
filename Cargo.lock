@@ -5461,6 +5461,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-unitsync"
 version = "0.0.0"
 dependencies = [
+ "base64 0.22.1",
  "coilbox-portable",
  "coilbox-proc",
  "picoframe-core",

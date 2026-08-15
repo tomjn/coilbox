@@ -34,6 +34,7 @@ mod skirmishai;
 mod texture;
 mod typemap;
 mod unitmodel;
+mod unitrender;
 
 use ffi::Unitsync;
 use model::{Archive, ConfigOption, GameItem, MapItem, OptionListItem, ScanOutput};
@@ -93,6 +94,24 @@ struct Args {
     /// `--unit-model`: read one unit's model out of `--game`, named by the
     /// unitdef `objectname` given in `--object`.
     unit_model: bool,
+    /// `--unit-render`: encode a top down render the webview drew as the hub's
+    /// `render:<angle>` asset. Takes the pixels in `--pixels`, the frame in
+    /// `--width`/`--height`/`--footprint-x`/`--footprint-z`, and the unit in
+    /// `--game`/`--object`. Needs `--asset-dir`, since the file is the output.
+    unit_render: bool,
+    /// The render angle, without the `render:` prefix. Defaults to the one angle
+    /// the vocabulary lists.
+    angle: Option<String>,
+    /// A file of raw RGBA pixels for `--unit-render`, top row first.
+    pixels: Option<String>,
+    /// The render's pixel dimensions, which have to be what the footprint frames
+    /// to.
+    width: u32,
+    height: u32,
+    footprint_x: u32,
+    footprint_z: u32,
+    /// Which renderer drew the pixels, for the render's `source_hash`.
+    renderer_version: u32,
     object: Option<String>,
     units: Vec<String>,
     /// `--faction-logos`: resolve `Sidepics/<side>` emblems for `--game`, for the
@@ -359,6 +378,50 @@ fn run() -> i32 {
             }
             Err(_) => {
                 unitmodel::emit_error("worker panicked while reading a unit model".into());
+                1
+            }
+        };
+    }
+
+    // Unit render: encode pixels the webview drew as the hub's render asset.
+    // Keys off --game like the modes above, so it is checked before them. The
+    // asset directory is the whole output, so there is nothing to do without one.
+    if args.unit_render {
+        let Some(asset_dir) = args.asset_dir.clone() else {
+            unitrender::emit_error("--unit-render needs --asset-dir <directory>".into());
+            return 1;
+        };
+        let Some(pixels) = args.pixels.clone() else {
+            unitrender::emit_error("--unit-render needs --pixels <file of RGBA>".into());
+            return 1;
+        };
+        let game_archive = args.game.clone().unwrap_or_default();
+        let object = args.object.clone().unwrap_or_default();
+        let angle = args
+            .angle
+            .clone()
+            .unwrap_or_else(|| coilbox_assets::vocabulary().unit.render_angles[0].clone());
+        let req = unitrender::RenderRequest {
+            game_archive: &game_archive,
+            object_name: &object,
+            angle: &angle,
+            footprint_x: args.footprint_x,
+            footprint_z: args.footprint_z,
+            renderer_version: args.renderer_version,
+            pixels: Path::new(&pixels),
+            width: args.width,
+            height: args.height,
+            asset_dir: Path::new(&asset_dir),
+        };
+        return match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            unitrender::render(&args.lib, &req)
+        })) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                unitrender::emit_error("worker panicked while encoding a unit render".into());
                 1
             }
         };
@@ -664,6 +727,14 @@ fn parse_args() -> Result<Args, String> {
     let mut unit_buildpics = false;
     let mut unit_dataset = false;
     let mut unit_model = false;
+    let mut unit_render = false;
+    let mut angle = None;
+    let mut pixels = None;
+    let mut width = 0u32;
+    let mut height = 0u32;
+    let mut footprint_x = 0u32;
+    let mut footprint_z = 0u32;
+    let mut renderer_version = 0u32;
     let mut object = None;
     let mut units: Vec<String> = Vec::new();
     let mut faction_logos = false;
@@ -714,6 +785,39 @@ fn parse_args() -> Result<Args, String> {
             "--unit-buildpics" => unit_buildpics = true,
             "--unit-dataset" => unit_dataset = true,
             "--unit-model" => unit_model = true,
+            "--unit-render" => unit_render = true,
+            "--angle" => angle = it.next(),
+            "--pixels" => pixels = it.next(),
+            "--width" => {
+                width = it
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--width needs an integer")?
+            }
+            "--height" => {
+                height = it
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--height needs an integer")?
+            }
+            "--footprint-x" => {
+                footprint_x = it
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--footprint-x needs an integer")?
+            }
+            "--footprint-z" => {
+                footprint_z = it
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--footprint-z needs an integer")?
+            }
+            "--renderer-version" => {
+                renderer_version = it
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--renderer-version needs an integer")?
+            }
             "--object" => object = it.next(),
             "--units" => {
                 units = it
@@ -777,6 +881,14 @@ fn parse_args() -> Result<Args, String> {
         unit_buildpics,
         unit_dataset,
         unit_model,
+        unit_render,
+        angle,
+        pixels,
+        width,
+        height,
+        footprint_x,
+        footprint_z,
+        renderer_version,
         object,
         units,
         faction_logos,
@@ -813,6 +925,7 @@ fn absolutize(args: &mut Args) {
         args.extract.as_mut(),
         args.source_file.as_mut(),
         args.chunks_file.as_mut(),
+        args.pixels.as_mut(),
     ]
     .into_iter()
     .flatten()
@@ -1184,6 +1297,14 @@ mod tests {
             unit_buildpics: false,
             unit_dataset: false,
             unit_model: false,
+            unit_render: false,
+            angle: None,
+            pixels: None,
+            width: 0,
+            height: 0,
+            footprint_x: 0,
+            footprint_z: 0,
+            renderer_version: 0,
             object: None,
             units: Vec::new(),
             faction_logos: false,
