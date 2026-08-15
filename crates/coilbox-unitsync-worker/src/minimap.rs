@@ -11,14 +11,34 @@
 //! fetches it over `coilbox://unitsyncthumb/` instead of paying for base64 on the
 //! bridge. A `data:` URL is only the fallback for a render that never reached
 //! disk.
+//!
+//! With `--asset-dir` the single-map mode also produces the hub's `minimap`
+//! asset (#1630), which is neither of the two sizes coilbox draws: it is always
+//! mip 1, 512px square, because that is what the hub caps a minimap at. The
+//! display render keeps whatever mip it was asked for.
 
 use crate::ffi::Unitsync;
-use crate::model::{MinimapOutput, StartPos, Thumbnail, ThumbnailsOutput};
+use crate::model::{MapOverlayAsset, MapOverlaySkip, MinimapOutput, StartPos};
+use crate::model::{Thumbnail, ThumbnailsOutput};
 use base64::Engine;
 use image::{DynamicImage, ImageFormat, RgbImage};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+
+/// The hub's variant name for a map's minimap. One of the vocabulary's closed
+/// list of map variants, which a test below checks.
+const MINIMAP_VARIANT: &str = "minimap";
+
+/// The mip the hub's `minimap` asset is stored at.
+///
+/// unitsync's minimap is `1024 >> mip` on a side, so this is 512px, which is the
+/// longest edge the `minimap` class allows. Neither of coilbox's own callers
+/// wants that size, since the map page takes mip 0 because the same texture is
+/// the diffuse map under the 3D preview and the map grid takes mip 3, so the
+/// asset read is its own, at its own mip, rather than whatever the display asked
+/// for.
+const ASSET_MINIMAP_MIP: i32 = 1;
 
 /// A cheap, stable cache identity for a map's rendered images: the archive's file
 /// identity where it resolves, otherwise the map's versioned name. Neither route
@@ -187,8 +207,107 @@ fn cached_dims(
     Some((width, height))
 }
 
+/// The side of the square texture unitsync returns at `mip`, which is what
+/// `GetMinimap` fills and how many words come back with it.
+fn mip_side(mip: i32) -> u32 {
+    1024u32 >> mip.clamp(0, 10) as u32
+}
+
+/// The texture as unitsync handed it over: RGB565 words, little endian, row
+/// major.
+///
+/// This is what `source_hash` is over, and it is one step further from the
+/// archive than the infomap overlays' is. There are no verbatim minimap bytes to
+/// hash: the SMF stores its minimap as a DXT1 mip chain, and `GetMinimap`
+/// decompresses the requested level into RGB565 through a fixed decoder
+/// (`GetMinimapSMF` in unitsync). So the identity is the decompressed texture,
+/// which moves when the map moves and does not move when coilbox's expansion to
+/// RGB8, `image` or libwebp changes. That is the property the have check at
+/// #1632 needs. It does move if the engine's DXT1 decode ever changes, which the
+/// overlays are immune to and this cannot be.
+///
+/// Little endian rather than the host's `u16` layout, for the same reason as the
+/// height overlay (#1627): the hash has to be the same on every architecture
+/// coilbox builds for.
+///
+/// The mip is part of this identity without being named in it. A mip 1 texture
+/// is 262144 words and a mip 0 texture of the same map is 1048576 different
+/// ones, so the two cannot be confused for each other, and if coilbox ever
+/// stored a different level the hash would change, which is correct because the
+/// stored bytes would be different pixels.
+fn source_bytes(pixels: &[u16]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(pixels.len() * 2);
+    for p in pixels {
+        out.extend_from_slice(&p.to_le_bytes());
+    }
+    out
+}
+
+/// Encode a map's minimap texture as the hub's `minimap` asset and write it into
+/// `asset_dir`, named after the hash of its own bytes like the hub's object path.
+///
+/// The square texture goes in as it comes out of unitsync, stretched over the
+/// map the way `GetMinimap` produced it, and it is not cropped to the map's
+/// aspect. The proportions travel beside it as the elmos on the same output
+/// (#1629) and the consumer stretches, which is why the class leaves aspect
+/// unconstrained. Cropping here would throw away samples for a presentation
+/// choice this end cannot make.
+///
+/// This is the one map class that is lossy: q80 WebP, from the vocabulary rather
+/// than from anything spelled here.
+fn encode_asset(
+    asset_dir: &Path,
+    pixels: &[u16],
+    side: u32,
+) -> Result<MapOverlayAsset, MapOverlaySkip> {
+    use crate::assetencode::{encode_variant, ext_for_mime, sha256_hex, EncodeError};
+
+    let texture = RgbImage::from_raw(side, side, expand_rgb565(pixels))
+        .ok_or(MapOverlaySkip::EncodeFailed)?;
+    let encoded = encode_variant(MINIMAP_VARIANT, &DynamicImage::ImageRgb8(texture)).map_err(
+        |e| match e {
+            EncodeError::TooLarge { .. } => MapOverlaySkip::TooLarge,
+            _ => MapOverlaySkip::EncodeFailed,
+        },
+    )?;
+
+    let hash = sha256_hex(&encoded.bytes);
+    let path = asset_dir.join(format!("{hash}.{}", ext_for_mime(&encoded.mime)));
+    std::fs::create_dir_all(asset_dir).map_err(|_| MapOverlaySkip::NotWritten)?;
+    // Same content, same name, so a file already there is already this asset.
+    if !path.exists() {
+        std::fs::write(&path, &encoded.bytes).map_err(|_| MapOverlaySkip::NotWritten)?;
+    }
+
+    Ok(MapOverlayAsset {
+        variant: MINIMAP_VARIANT.to_string(),
+        path: path.to_string_lossy().into_owned(),
+        hash,
+        source_hash: sha256_hex(&source_bytes(pixels)),
+        encode_profile: encoded.encode_profile,
+        mime: encoded.mime,
+        width: encoded.width,
+        height: encoded.height,
+        bytes: encoded.bytes.len() as u64,
+        // Bounds belong to the height layer. A minimap is already colour.
+        min_height: None,
+        max_height: None,
+    })
+}
+
 /// Render `map_name`'s minimap at `mip` to a PNG data URL (standalone session).
-pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> MinimapOutput {
+///
+/// `asset_dir` `Some` additionally stores the mip 1 texture as the hub's
+/// `minimap` asset, whatever `mip` the display render was asked for. Off by
+/// default: coilbox draws mip 0 and mip 3, so encoding a third size for nobody
+/// is a second `GetMinimap` per map with no reader.
+pub fn render(
+    lib: &str,
+    map_name: &str,
+    mip: i32,
+    cache_dir: Option<&Path>,
+    asset_dir: Option<&Path>,
+) -> MinimapOutput {
     let us = match unsafe { Unitsync::load(Path::new(lib)) } {
         Ok(u) => u,
         Err(e) => {
@@ -202,7 +321,25 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
     let _ = us.drain_errors();
     let key = map_cache_key(&us, None, map_name);
     let file = cache_file(cache_dir, key.as_deref(), mip);
-    let result = render_one(&us, map_name, mip, file.clone());
+
+    // The asset's own read, at its own mip. Only an asset run pays for it, and
+    // when the display was asked for the same mip the two share the one read
+    // rather than opening the map archive twice.
+    let asset_pixels = match asset_dir {
+        Some(_) => us.minimap(map_name, ASSET_MINIMAP_MIP),
+        None => None,
+    };
+    let (asset, asset_skipped) = match (asset_dir, asset_pixels.as_deref()) {
+        (None, _) => (None, None),
+        (Some(_), None) => (None, Some(MapOverlaySkip::NoSource)),
+        (Some(dir), Some(pixels)) => match encode_asset(dir, pixels, mip_side(ASSET_MINIMAP_MIP)) {
+            Ok(a) => (Some(a), None),
+            Err(why) => (None, Some(why)),
+        },
+    };
+
+    let shared = asset_pixels.as_deref().filter(|_| mip == ASSET_MINIMAP_MIP);
+    let result = render_one(&us, map_name, mip, file.clone(), shared);
     sweep_pictures(cache_dir, file.as_slice());
 
     // The map's size in elmos, from the same `<key>-dims.json` the thumbnail pass
@@ -241,6 +378,8 @@ pub fn render(lib: &str, map_name: &str, mip: i32, cache_dir: Option<&Path>) -> 
     let base = MinimapOutput {
         width_elmos,
         height_elmos,
+        asset,
+        asset_skipped,
         start_positions,
         min_wind,
         max_wind,
@@ -310,7 +449,7 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
         if let Some(f) = &file {
             rendered.push(f.clone());
         }
-        match render_one(&us, &name, mip, file) {
+        match render_one(&us, &name, mip, file, None) {
             Ok((image, _)) => {
                 let dims = cached_dims(dims_file(cache_dir, key.as_deref()), || {
                     us.map_dimensions(&name)
@@ -339,17 +478,29 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
 /// Render one map's minimap to `(image, side)` using an already-initialised
 /// session. The caller owns the `Init`/`UnInit` lifecycle. `cache_file`, when set,
 /// serves a previously-encoded PNG and skips the render entirely.
+///
+/// `pixels` is an already-read texture at this same `mip`, which the asset path
+/// has when the two were asked for the same size. `None` reads one, and only on
+/// a cache miss.
 fn render_one(
     us: &Unitsync,
     map_name: &str,
     mip: i32,
     cache_file: Option<PathBuf>,
+    pixels: Option<&[u16]>,
 ) -> Result<(RenderedImage, u32), String> {
-    let side = 1024u32 >> mip.clamp(0, 10) as u32;
+    let side = mip_side(mip);
     let (png, on_disk) = coilbox_thumb_cache::cached_at(cache_file, || {
-        let pixels = us
-            .minimap(map_name, mip)
-            .ok_or_else(|| "no minimap available".to_string())?;
+        let read;
+        let pixels = match pixels {
+            Some(p) => p,
+            None => {
+                read = us
+                    .minimap(map_name, mip)
+                    .ok_or_else(|| "no minimap available".to_string())?;
+                &read
+            }
+        };
         if pixels.len() != (side * side) as usize {
             return Err(format!(
                 "unexpected minimap size: got {} px, expected {}",
@@ -357,20 +508,28 @@ fn render_one(
                 side * side
             ));
         }
-        pixels_to_png(&pixels, side)
+        pixels_to_png(pixels, side)
     })?;
     Ok((rendered_image(&png, on_disk), side))
 }
 
-/// Convert an RGB565 square buffer to PNG bytes.
-fn pixels_to_png(pixels: &[u16], side: u32) -> Result<Vec<u8>, String> {
+/// Expand an RGB565 buffer to 8 bit RGB triples, by shifting each channel up to
+/// the top of its byte. Shared by the display PNG and the hub's asset so the two
+/// cannot drift into different colours for the same map.
+fn expand_rgb565(pixels: &[u16]) -> Vec<u8> {
     let mut rgb = Vec::with_capacity(pixels.len() * 3);
     for &p in pixels {
         rgb.push((((p >> 11) & 0x1f) << 3) as u8);
         rgb.push((((p >> 5) & 0x3f) << 2) as u8);
         rgb.push(((p & 0x1f) << 3) as u8);
     }
-    let img = RgbImage::from_raw(side, side, rgb).ok_or("failed to build minimap image")?;
+    rgb
+}
+
+/// Convert an RGB565 square buffer to PNG bytes.
+fn pixels_to_png(pixels: &[u16], side: u32) -> Result<Vec<u8>, String> {
+    let img = RgbImage::from_raw(side, side, expand_rgb565(pixels))
+        .ok_or("failed to build minimap image")?;
     let mut png = Cursor::new(Vec::new());
     DynamicImage::ImageRgb8(img)
         .write_to(&mut png, ImageFormat::Png)
@@ -420,6 +579,7 @@ pub fn emit_error(msg: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assetencode::sha256_hex;
     use std::cell::Cell;
 
     fn temp_dir(tag: &str) -> PathBuf {
@@ -427,6 +587,179 @@ mod tests {
             std::env::temp_dir().join(format!("coilbox-minimap-test-{}-{tag}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir
+    }
+
+    /// An RGB565 texture with the shape a minimap has: large smooth regions a
+    /// lossy pass reproduces well, and hard coastlines it has to work at.
+    fn texture(side: u32) -> Vec<u16> {
+        (0..side * side)
+            .map(|i| {
+                let (x, y) = (i % side, i / side);
+                // Land in blocks tens of pixels across, the scale terrain comes
+                // in on a minimap, rather than per-pixel noise no map has.
+                let land = ((x / 37) * 7 + (y / 41) * 13) % 5 > 1;
+                if land {
+                    let r = (x * 31 / side.max(1)) as u16;
+                    let g = 20 + (y * 20 / side.max(1)) as u16;
+                    (r << 11) | (g << 5) | 4
+                } else {
+                    // Water: near-constant deep blue, the easiest thing to encode.
+                    2 << 11 | (6 << 5) | 21
+                }
+            })
+            .collect()
+    }
+
+    /// Mean absolute channel error between the stored asset and the texture that
+    /// went in, in 0..255 units. The class is lossy, so the test is that the
+    /// picture is the map rather than that the bytes match.
+    fn channel_error(decoded: &[u8], pixels: &[u16]) -> f64 {
+        let want = expand_rgb565(pixels);
+        assert_eq!(decoded.len(), want.len());
+        let total: u64 = decoded
+            .iter()
+            .zip(&want)
+            .map(|(a, b)| u64::from(a.abs_diff(*b)))
+            .sum();
+        total as f64 / want.len() as f64
+    }
+
+    /// The size the hub takes, checked against the vocabulary rather than
+    /// against the shift arithmetic on its own. Mip 1 is only the right level
+    /// because it lands on the class's edge cap.
+    #[test]
+    fn the_asset_mip_is_the_size_the_hub_caps_a_minimap_at() {
+        assert_eq!(mip_side(ASSET_MINIMAP_MIP), 512);
+        let class = coilbox_assets::class_for_variant(MINIMAP_VARIANT).expect("minimap class");
+        assert_eq!(class.max_edge_px, Some(mip_side(ASSET_MINIMAP_MIP)));
+        // And it is neither of the sizes coilbox itself draws.
+        assert_eq!(mip_side(0), 1024);
+        assert_eq!(mip_side(3), 128);
+    }
+
+    #[test]
+    fn writes_the_asset_as_a_file_named_after_its_own_bytes() {
+        let dir = temp_dir("asset-write");
+        let asset = encode_asset(&dir, &texture(512), 512).expect("encode");
+        let on_disk = std::fs::read(&asset.path).expect("asset file written");
+
+        assert_eq!(
+            asset.path,
+            dir.join(format!("{}.webp", asset.hash)).to_string_lossy()
+        );
+        assert_eq!(asset.hash, sha256_hex(&on_disk));
+        assert_eq!(asset.bytes, on_disk.len() as u64);
+        assert_eq!(asset.mime, "image/webp");
+        assert_eq!(asset.encode_profile, "webp-q80-512");
+        assert_eq!(asset.variant, "minimap");
+        assert_eq!((asset.width, asset.height), (512, 512));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The stored bytes are the map, not noise, and they really did lose
+    /// something: this is the one map class that is lossy, so an exact round trip
+    /// would mean the profile was not applied.
+    #[test]
+    fn the_stored_asset_is_the_map_and_is_lossy() {
+        let dir = temp_dir("asset-roundtrip");
+        let pixels = texture(512);
+        let asset = encode_asset(&dir, &pixels, 512).expect("encode");
+
+        let on_disk = std::fs::read(&asset.path).expect("asset file written");
+        let decoded = webp::Decoder::new(&on_disk).decode().expect("decode webp");
+        assert_eq!((decoded.width(), decoded.height()), (512, 512));
+        assert!(
+            !decoded.is_alpha(),
+            "an opaque texture gained a alpha plane"
+        );
+
+        let error = channel_error(&decoded, &pixels);
+        assert!(error < 8.0, "stored picture is not the map: error {error}");
+        assert!(error > 0.0, "q80 was exact, so nothing lossy happened");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The square texture is stored as unitsync produced it. The map's real
+    /// proportions ride beside it as elmos, and cropping to them here would
+    /// throw away samples for a presentation choice the consumer makes.
+    #[test]
+    fn stores_the_square_texture_rather_than_the_maps_shape() {
+        let dir = temp_dir("asset-square");
+        let asset = encode_asset(&dir, &texture(512), 512).expect("encode");
+        assert_eq!(asset.width, asset.height);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The have check compares on `source_hash`, so it has to be the texture and
+    /// not the encode. Hashing the WebP there would report every map as changed
+    /// the first time libwebp moved.
+    #[test]
+    fn identity_is_the_texture_and_the_path_is_the_encoded_bytes() {
+        let dir = temp_dir("asset-hashes");
+        let pixels = texture(512);
+        let asset = encode_asset(&dir, &pixels, 512).expect("encode");
+        assert_eq!(asset.source_hash, sha256_hex(&source_bytes(&pixels)));
+        assert_ne!(asset.source_hash, asset.hash);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `source_hash` has to be the same on every architecture coilbox builds
+    /// for, so the words are serialised rather than reinterpreted.
+    #[test]
+    fn hashes_the_texture_in_a_fixed_byte_order() {
+        assert_eq!(
+            source_bytes(&[0x0000, 0x1234, 0xffff]),
+            vec![0x00, 0x00, 0x34, 0x12, 0xff, 0xff]
+        );
+    }
+
+    /// The mip is part of the identity by being part of the bytes: the same map
+    /// at another level is a different texture, so it hashes differently without
+    /// the level having to be named in the hash.
+    #[test]
+    fn the_same_map_at_another_mip_is_a_different_identity() {
+        let one = sha256_hex(&source_bytes(&texture(mip_side(ASSET_MINIMAP_MIP))));
+        let zero = sha256_hex(&source_bytes(&texture(mip_side(0))));
+        assert_ne!(one, zero);
+    }
+
+    /// The variant is the hub's own string and the vocabulary holds the list, so
+    /// a typo here would be an upload the hub refuses rather than a build error.
+    #[test]
+    fn names_a_variant_the_hub_stores() {
+        assert!(coilbox_assets::vocabulary()
+            .map_variants
+            .iter()
+            .any(|v| v == MINIMAP_VARIANT));
+    }
+
+    /// The asset is square and the map is not, so what the consumer needs to
+    /// stretch it back is in the same output rather than a second call away
+    /// (issue #1629).
+    #[test]
+    fn the_size_in_elmos_travels_in_the_same_output_as_the_asset() {
+        let dir = temp_dir("asset-elmos");
+        let out = MinimapOutput {
+            width_elmos: Some(8192),
+            height_elmos: Some(6144),
+            asset: Some(encode_asset(&dir, &texture(512), 512).expect("encode")),
+            ..Default::default()
+        };
+        let json: serde_json::Value = serde_json::to_value(&out).expect("serialize");
+        assert_eq!(json["widthElmos"], 8192);
+        assert_eq!(json["heightElmos"], 6144);
+        assert_eq!(json["asset"]["variant"], "minimap");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The display PNG and the asset expand the same words the same way, so a
+    /// map cannot come out one colour on the page and another in the hub.
+    #[test]
+    fn the_picture_and_the_asset_expand_the_texture_the_same_way() {
+        let pixels = texture(8);
+        let png = pixels_to_png(&pixels, 8).expect("encode");
+        let decoded = image::load_from_memory(&png).expect("decode").to_rgb8();
+        assert_eq!(decoded.as_raw().as_slice(), expand_rgb565(&pixels));
     }
 
     #[test]

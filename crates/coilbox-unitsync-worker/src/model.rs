@@ -135,6 +135,13 @@ pub struct ThumbnailsOutput {
 }
 
 /// A rendered minimap, returned by the lazy `minimap` mode.
+///
+/// `asset` and `assetSkipped` only appear when the caller asked for hub assets
+/// (`--asset-dir`), and then exactly one of them is set. The asset is the mip 1
+/// square texture rather than whatever mip the display render used, which is the
+/// whole of #1630. It is square and the map is not, so `widthElmos` and
+/// `heightElmos` above are what a consumer stretches it back to: both travel in
+/// this one output so nothing has to ask twice.
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct MinimapOutput {
@@ -209,6 +216,12 @@ pub struct MinimapOutput {
     pub ground_specular_color: Option<[f32; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ground_shadow_density: Option<f32>,
+    /// The mip 1 texture stored as the hub's `minimap` asset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<MapOverlayAsset>,
+    /// Why there is no asset, when one was asked for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_skipped: Option<MapOverlaySkip>,
     pub errors: Vec<String>,
 }
 
