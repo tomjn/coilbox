@@ -6,11 +6,13 @@ use serde_json::Value;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::TcpListener;
 
-/// What the last request carried, so a test can assert on how it was encoded.
+/// What the last request carried, so a test can assert on how it was encoded, and
+/// how many there have been, so a test can assert on how often it was sent.
 #[derive(Default)]
 struct Seen {
     headers: String,
     body: String,
+    requests: usize,
 }
 
 /// A one-endpoint HTTP server that answers every POST the same way.
@@ -73,10 +75,14 @@ impl TokenServer {
                         Ok(n) => buf.extend_from_slice(&chunk[..n]),
                     }
                 }
-                *recorded.lock().unwrap() = Seen {
-                    headers: head,
-                    body: String::from_utf8_lossy(&buf[head_end..]).into_owned(),
-                };
+                {
+                    let mut seen = recorded.lock().unwrap();
+                    *seen = Seen {
+                        headers: head,
+                        body: String::from_utf8_lossy(&buf[head_end..]).into_owned(),
+                        requests: seen.requests + 1,
+                    };
+                }
                 let response = format!(
                     "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{answer}",
                     answer.len()
@@ -102,5 +108,12 @@ impl TokenServer {
 
     pub fn last_body(&self) -> String {
         self.seen.lock().unwrap().body.clone()
+    }
+
+    /// How many requests have been answered. What a test asserts on when the
+    /// property is a count rather than a result, such as one refresh however many
+    /// callers asked for a token.
+    pub fn requests(&self) -> usize {
+        self.seen.lock().unwrap().requests
     }
 }

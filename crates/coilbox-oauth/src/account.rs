@@ -5,7 +5,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use crate::{AuthError, Tokens};
@@ -49,6 +49,32 @@ static REFUSED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 
 fn refused() -> &'static Mutex<HashSet<String>> {
     REFUSED.get_or_init(Default::default)
+}
+
+/// One lock per account, held across a whole refresh, so callers arriving
+/// together collapse into one (issue #1647).
+///
+/// The access token cache is not enough on its own. It only fills once a refresh
+/// has returned, so callers that arrive in the same moment all miss it and all
+/// spend the same stored refresh token. Supabase rotates: each of those requests
+/// invalidates the token the others are using, only the last answer survives in
+/// the keychain, and a refresh token used twice is what a stolen one looks like,
+/// so the service may revoke the whole family and sign the user out.
+///
+/// A tokio lock rather than a std one, because it is held across awaits. Waiting
+/// on it parks the task rather than the thread, so a caller queued behind a
+/// refresh is not holding a runtime worker while it waits (issue #1407).
+static REFRESH_GATES: OnceLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> =
+    OnceLock::new();
+
+fn refresh_gate(key: &str) -> Arc<tokio::sync::Mutex<()>> {
+    REFRESH_GATES
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .entry(key.to_owned())
+        .or_default()
+        .clone()
 }
 
 /// Run a keychain read off the calling thread, and stop waiting for it after
@@ -103,6 +129,44 @@ where
             "the keychain write did not finish: {joined}"
         ))),
         Err(_) => Err(timed_out),
+    }
+}
+
+/// Where a refresh token is kept between runs.
+///
+/// There is one of these in the app, the OS keychain. The tests have another,
+/// which is the point: a test that reached the real keychain would raise a
+/// permission prompt in front of whoever ran it, and counting the writes is how
+/// "stored exactly once" gets checked at all.
+///
+/// The futures are spelled out as `impl Future + Send` rather than left to
+/// `async fn`, because the callers are Tauri commands and their futures have to
+/// be `Send`.
+trait Keychain {
+    fn load(
+        &self,
+        service: &str,
+        account: &str,
+    ) -> impl Future<Output = Result<Option<String>, AuthError>> + Send;
+
+    fn keep(
+        &self,
+        service: &str,
+        account: &str,
+        refresh: &str,
+    ) -> impl Future<Output = Result<(), AuthError>> + Send;
+}
+
+/// The OS keychain, through the lobby plugin's keyring wrapper.
+struct SystemKeychain;
+
+impl Keychain for SystemKeychain {
+    async fn load(&self, service: &str, account: &str) -> Result<Option<String>, AuthError> {
+        stored_credential(service, account).await
+    }
+
+    async fn keep(&self, service: &str, account: &str, refresh: &str) -> Result<(), AuthError> {
+        store_credential(service, account, refresh).await
     }
 }
 
@@ -198,6 +262,23 @@ fn usable(tokens: &Tokens, now: Instant) -> bool {
     tokens.expires_at > now + REFRESH_MARGIN
 }
 
+/// The access token held for `key`, when there is one with enough life left.
+fn held_access(key: &str) -> Option<String> {
+    let held = access_tokens().lock().unwrap();
+    let tokens = held.get(key)?;
+    usable(tokens, Instant::now()).then(|| tokens.access.clone())
+}
+
+/// What a caller is told once the service has refused this account's stored
+/// token. See [`REFUSED`].
+fn refusal(key: &str) -> Option<AuthError> {
+    refused()
+        .lock()
+        .unwrap()
+        .contains(key)
+        .then(|| AuthError::SignInRefused("it was refused earlier this session".into()))
+}
+
 /// An access token good for the next minute at least, refreshed through `refresh`
 /// when the one in memory is spent or missing.
 ///
@@ -205,6 +286,9 @@ fn usable(tokens: &Tokens, now: Instant) -> bool {
 /// needs, and an account that has none is told to sign in rather than sent to the
 /// browser behind the user's back. `refresh` is handed the stored refresh token
 /// and is where each service puts its own token request.
+///
+/// One account refreshes once at a time, however many callers ask together. See
+/// [`REFRESH_GATES`] for why that matters more than it sounds.
 pub async fn access_token<F, Fut>(
     service: &str,
     account: &str,
@@ -214,23 +298,51 @@ where
     F: FnOnce(String) -> Fut,
     Fut: Future<Output = Result<Tokens, AuthError>>,
 {
+    access_token_from(&SystemKeychain, service, account, refresh).await
+}
+
+/// [`access_token`], with where the refresh token is kept as an argument so the
+/// tests can stand in for the keychain.
+async fn access_token_from<K, F, Fut>(
+    keychain: &K,
+    service: &str,
+    account: &str,
+    refresh: F,
+) -> Result<String, AuthError>
+where
+    K: Keychain,
+    F: FnOnce(String) -> Fut,
+    Fut: Future<Output = Result<Tokens, AuthError>>,
+{
     let key = key(service, account);
-    if let Some(tokens) = access_tokens().lock().unwrap().get(&key) {
-        if usable(tokens, Instant::now()) {
-            return Ok(tokens.access.clone());
-        }
+    if let Some(access) = held_access(&key) {
+        return Ok(access);
     }
-    if refused().lock().unwrap().contains(&key) {
-        return Err(AuthError::SignInRefused(
-            "it was refused earlier this session".into(),
-        ));
+    if let Some(refusal) = refusal(&key) {
+        return Err(refusal);
     }
-    let stored = stored_credential(service, account)
+
+    let gate = refresh_gate(&key);
+    let _held = gate.lock().await;
+    // Whoever we queued behind has refreshed by now, and their token is ours. This
+    // is the whole point of the gate: a caller that got here second must use the
+    // first one's result, not spend the stored token a second time.
+    if let Some(access) = held_access(&key) {
+        return Ok(access);
+    }
+    if let Some(refusal) = refusal(&key) {
+        return Err(refusal);
+    }
+
+    let stored = keychain
+        .load(service, account)
         .await?
         .ok_or(AuthError::NotSignedIn)?;
     let tokens = refresh(stored.clone()).await.map_err(|error| {
         // A refused grant is refused for good, so remember it rather than let a
-        // retry loop ask again every few seconds until it gives up.
+        // retry loop ask again every few seconds until it gives up. Anything else
+        // is left alone, so a service that is down for a minute does not read as a
+        // sign-in that has to be done again.
         if error.needs_sign_in() {
             refused().lock().unwrap().insert(key.clone());
             return AuthError::SignInRefused(error.to_string());
@@ -242,7 +354,7 @@ where
     // every other keychain call, so a prompt nobody clicks cannot hold up the
     // request this token was fetched for (issue #1469).
     if tokens.refresh != stored {
-        store_credential(service, account, &tokens.refresh).await?;
+        keychain.keep(service, account, &tokens.refresh).await?;
     }
     let access = tokens.access.clone();
     access_tokens().lock().unwrap().insert(key, tokens);
@@ -252,6 +364,285 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::TokenServer;
+    use crate::{post_token, TokenBody, TokenRequest};
+    use serde_json::json;
+    use tokio::sync::Semaphore;
+
+    /// A refresh token in a variable rather than in the OS keychain, so a test
+    /// never puts a permission prompt in front of whoever is running it, and so
+    /// the writes can be counted.
+    #[derive(Clone, Default)]
+    struct Kept {
+        held: Arc<Mutex<Option<String>>>,
+        writes: Arc<Mutex<usize>>,
+    }
+
+    impl Kept {
+        fn holding(refresh: &str) -> Self {
+            Self {
+                held: Arc::new(Mutex::new(Some(refresh.to_owned()))),
+                writes: Arc::default(),
+            }
+        }
+
+        fn held(&self) -> Option<String> {
+            self.held.lock().unwrap().clone()
+        }
+
+        fn writes(&self) -> usize {
+            *self.writes.lock().unwrap()
+        }
+    }
+
+    impl Keychain for Kept {
+        async fn load(&self, _service: &str, _account: &str) -> Result<Option<String>, AuthError> {
+            Ok(self.held())
+        }
+
+        async fn keep(
+            &self,
+            _service: &str,
+            _account: &str,
+            refresh: &str,
+        ) -> Result<(), AuthError> {
+            *self.writes.lock().unwrap() += 1;
+            *self.held.lock().unwrap() = Some(refresh.to_owned());
+            Ok(())
+        }
+    }
+
+    /// The refresh grant a service would post, held at `start` until the test
+    /// hands out permits.
+    ///
+    /// Holding it is what makes the count mean something. Without it a refresh
+    /// against a loopback server can finish before the other callers have even
+    /// looked at the token cache, and a test that only ever had one caller in
+    /// flight would pass with no gate at all.
+    fn refresh_through(
+        endpoint: String,
+        start: Arc<Semaphore>,
+    ) -> impl FnOnce(String) -> std::pin::Pin<Box<dyn Future<Output = Result<Tokens, AuthError>> + Send>>
+    {
+        move |stored: String| {
+            Box::pin(async move {
+                start.acquire().await.unwrap().forget();
+                post_token(TokenRequest {
+                    endpoint: &endpoint,
+                    body: TokenBody::Form(vec![
+                        ("grant_type".into(), "refresh_token".into()),
+                        ("refresh_token".into(), stored),
+                    ]),
+                    headers: vec![],
+                    previous_refresh: None,
+                })
+                .await
+                .map(|answer| answer.tokens)
+            })
+        }
+    }
+
+    /// Ask for a token from `callers` tasks at once, and answer with what each
+    /// one got.
+    async fn asked_together(
+        callers: usize,
+        keychain: &Kept,
+        account: &'static str,
+        endpoint: String,
+    ) -> Vec<Result<String, AuthError>> {
+        let start = Arc::new(Semaphore::new(0));
+        let asking: Vec<_> = (0..callers)
+            .map(|_| {
+                let (keychain, start, endpoint) =
+                    (keychain.clone(), start.clone(), endpoint.clone());
+                tokio::spawn(async move {
+                    access_token_from(
+                        &keychain,
+                        "a-service",
+                        account,
+                        refresh_through(endpoint, start),
+                    )
+                    .await
+                })
+            })
+            .collect();
+        // Long enough for every caller to have reached either the refresh or the
+        // gate. Permits rather than a notification, so a caller that is late to
+        // arrive still finds its permit waiting rather than hanging for good.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        start.add_permits(callers);
+        let mut answers = Vec::new();
+        for asked in asking {
+            answers.push(asked.await.unwrap());
+        }
+        answers
+    }
+
+    /// Issue #1647. Supabase rotates refresh tokens: every refresh returns a new
+    /// one and invalidates the one it was asked with. Callers that arrive together
+    /// all miss the token cache, so without a gate they all spend the same stored
+    /// token, only the last answer survives in the keychain, and the rest of them
+    /// are holding tokens that have been rotated away. A refresh token used twice
+    /// is also what a stolen one looks like, and Supabase's answer to that is to
+    /// revoke the whole family, which signs the user out.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn callers_arriving_together_share_one_refresh() {
+        let server = TokenServer::answering(json!({
+            "access_token": "an-access-token",
+            "refresh_token": "the-rotated-one",
+            "expires_in": 1800,
+        }));
+        let kept = Kept::holding("the-stored-one");
+
+        let answers = asked_together(3, &kept, "arriving-together", server.url()).await;
+
+        assert_eq!(answers.len(), 3);
+        for answer in answers {
+            assert_eq!(answer.unwrap(), "an-access-token");
+        }
+        assert_eq!(
+            server.requests(),
+            1,
+            "the stored refresh token was spent more than once"
+        );
+        assert_eq!(
+            kept.writes(),
+            1,
+            "the rotated token was stored more than once"
+        );
+        assert_eq!(kept.held().as_deref(), Some("the-rotated-one"));
+    }
+
+    /// The other half of #1647. A refusal has to reach the callers queued behind
+    /// it, or each of them posts the same token the service has just said no to.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_refusal_stops_the_callers_behind_it_asking_again() {
+        let server = TokenServer::refusing(json!({
+            "error": "invalid_grant",
+            "error_description": "the stand-in server said no",
+        }));
+        let kept = Kept::holding("the-stored-one");
+
+        let answers = asked_together(3, &kept, "refused-together", server.url()).await;
+
+        for answer in answers {
+            let error = answer.unwrap_err();
+            assert!(matches!(error, AuthError::SignInRefused(_)), "{error:?}");
+        }
+        assert_eq!(server.requests(), 1);
+        // A refusal is not a rotation. Nothing was stored, and what is stored is
+        // what was there before: deleting somebody's sign-in on the service's say
+        // so is not ours to do.
+        assert_eq!(kept.writes(), 0);
+        assert_eq!(kept.held().as_deref(), Some("the-stored-one"));
+
+        // And a caller arriving afterwards is answered from the refusal rather
+        // than sent to ask again.
+        let start = Arc::new(Semaphore::new(1));
+        let error = access_token_from(
+            &kept,
+            "a-service",
+            "refused-together",
+            refresh_through(server.url(), start),
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(error, AuthError::SignInRefused(_)), "{error:?}");
+        assert_eq!(server.requests(), 1);
+    }
+
+    /// A refresh that failed for a reason that clears itself must not be
+    /// remembered as a refusal, or a service that was down for a minute would
+    /// leave the user signed out until they restart.
+    #[tokio::test]
+    async fn a_service_fault_is_not_remembered_as_a_refusal() {
+        let server = TokenServer::faulting();
+        let kept = Kept::holding("the-stored-one");
+        let ask = || async {
+            let start = Arc::new(Semaphore::new(1));
+            access_token_from(
+                &kept,
+                "a-service",
+                "a-service-fault",
+                refresh_through(server.url(), start),
+            )
+            .await
+        };
+
+        let error = ask().await.unwrap_err();
+        assert!(
+            matches!(&error, AuthError::Http(m) if m.contains("500")),
+            "{error:?}"
+        );
+        assert_eq!(server.requests(), 1);
+
+        // The next caller tries again rather than being told to sign in, and the
+        // failed refresh left nothing cached as if it had worked.
+        let error = ask().await.unwrap_err();
+        assert!(
+            matches!(&error, AuthError::Http(m) if m.contains("500")),
+            "{error:?}"
+        );
+        assert_eq!(server.requests(), 2);
+        assert_eq!(kept.writes(), 0);
+        assert_eq!(kept.held().as_deref(), Some("the-stored-one"));
+    }
+
+    /// The gate must not become a cache with no expiry. A token with life left is
+    /// served from memory, and one inside [`REFRESH_MARGIN`] is replaced before it
+    /// is handed to a request that would then fail halfway through.
+    #[tokio::test]
+    async fn a_token_is_reused_until_it_reaches_the_margin() {
+        let long = TokenServer::answering(json!({
+            "access_token": "a-long-lived-token",
+            "refresh_token": "the-stored-one",
+            "expires_in": 1800,
+        }));
+        let kept = Kept::holding("the-stored-one");
+        let ask = |server: &TokenServer, account: &'static str, kept: &Kept| {
+            let (endpoint, kept) = (server.url(), kept.clone());
+            async move {
+                let start = Arc::new(Semaphore::new(1));
+                access_token_from(
+                    &kept,
+                    "a-service",
+                    account,
+                    refresh_through(endpoint, start),
+                )
+                .await
+            }
+        };
+
+        assert_eq!(
+            ask(&long, "a-long-life", &kept).await.unwrap(),
+            "a-long-lived-token"
+        );
+        assert_eq!(
+            ask(&long, "a-long-life", &kept).await.unwrap(),
+            "a-long-lived-token"
+        );
+        assert_eq!(
+            long.requests(),
+            1,
+            "a token with life left was refreshed anyway"
+        );
+
+        // Nothing rotated, so nothing was written. Teiserver's case.
+        assert_eq!(kept.writes(), 0);
+
+        let brief = TokenServer::answering(json!({
+            "access_token": "a-nearly-spent-token",
+            "refresh_token": "the-stored-one",
+            "expires_in": 30,
+        }));
+        ask(&brief, "a-short-life", &kept).await.unwrap();
+        ask(&brief, "a-short-life", &kept).await.unwrap();
+        assert_eq!(
+            brief.requests(),
+            2,
+            "a token inside the margin was handed out"
+        );
+    }
 
     /// Issue #1456: a keychain read that never answers used to leave the command
     /// pending for good, and a person looking at a spinner with no way out. On

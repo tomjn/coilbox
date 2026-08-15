@@ -17,7 +17,9 @@ url = "2"
 sha2 = "0.10"
 base64 = "0.22"
 getrandom = "0.3"
-tokio = { version = "1", features = ["net", "io-util", "rt", "time"] }
+# "sync" is for the per-account refresh lock in account.rs, which is held across
+# awaits and so cannot be a std one.
+tokio = { version = "1", features = ["net", "io-util", "rt", "sync", "time"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
