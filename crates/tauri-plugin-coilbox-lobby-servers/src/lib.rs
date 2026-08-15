@@ -21,6 +21,34 @@ use tauri::{
 /// Keychain service name shared by every stored lobby secret.
 const SERVICE: &str = "coilbox-lobby";
 
+/// Run a blocking keychain call somewhere other than the thread polling this
+/// future (issue #1407).
+///
+/// The three IPC commands below are `async fn`s, so Tauri polls them on a runtime
+/// worker. A keychain call made there holds that worker for as long as the OS
+/// takes, and on macOS that is as long as a permission dialog sits unanswered:
+/// #1407 recorded a `security` process blocked for eleven minutes, during which
+/// no other IPC call was answered either and the app looked dead. On the blocking
+/// pool the same wait costs one call rather than the whole app.
+///
+/// There is deliberately no deadline. What a caller is waiting for here is a
+/// person: a lobby password read, stored or deleted at their request, and behind
+/// a prompt they may take a while to find. Telling them the login failed while
+/// the dialog is still on screen would be wrong, and a write given up on may land
+/// anyway, so there would be nothing true to say about it. `coilbox_oauth` does put
+/// its own `KEYCHAIN_TIMEOUT` over these same calls, because a token refresh has
+/// nobody watching it, so the caller that wants a deadline already has one.
+async fn off_the_polling_thread<T, F>(call: F) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+    T: Send + 'static,
+{
+    match tauri::async_runtime::spawn_blocking(call).await {
+        Ok(answer) => answer,
+        Err(joined) => Err(format!("the keychain call did not finish: {joined}")),
+    }
+}
+
 /// Process-lifetime cache of what the keychain holds for each [`account_key`],
 /// including the accounts it holds nothing for. The Rust process survives
 /// webview reloads and reconnect loops, so the OS keychain (and its macOS auth
@@ -134,14 +162,16 @@ fn write_to_keychain(
         .map_err(|e| format!("failed to store credential: {e}"))
 }
 
-/// `ls_store_credential`: [`store_credential`] over IPC.
+/// `ls_store_credential`: [`store_credential`] over IPC, off the polling thread.
 #[tauri::command]
 async fn ls_store_credential(
     server_id: String,
     username: String,
     secret: String,
 ) -> Result<CliResult, ()> {
-    Ok(match store_credential(&server_id, &username, &secret) {
+    let stored =
+        off_the_polling_thread(move || store_credential(&server_id, &username, &secret)).await;
+    Ok(match stored {
         Ok(()) => CliResult::ok(json!({})),
         Err(e) => CliResult::err(e),
     })
@@ -270,6 +300,12 @@ pub fn get_credential(server_id: &str, username: &str) -> Result<Option<String>,
 /// waits, then finds the answer already cached. The lock is per account rather
 /// than global, because two different accounts have no reason to wait on each
 /// other.
+///
+/// A caller giving up does not undo the read. `coilbox_oauth` puts a deadline
+/// over these calls, and an OS call in flight cannot be cancelled, so an
+/// abandoned read runs on. It fills the cache before it lets go of the gate,
+/// which is what leaves whoever queued behind it an answer instead of a second
+/// trip to the OS.
 fn read_once(
     key: &str,
     read: impl FnOnce() -> Result<Option<String>, String>,
@@ -311,11 +347,12 @@ fn read_from_keychain(
     }
 }
 
-/// `ls_get_credential`: [`get_credential`] over IPC. A missing entry resolves with
-/// `{ "secret": null }`.
+/// `ls_get_credential`: [`get_credential`] over IPC, off the polling thread. A
+/// missing entry resolves with `{ "secret": null }`.
 #[tauri::command]
 async fn ls_get_credential(server_id: String, username: String) -> Result<CliResult, ()> {
-    Ok(match get_credential(&server_id, &username) {
+    let read = off_the_polling_thread(move || get_credential(&server_id, &username)).await;
+    Ok(match read {
         Ok(secret) => CliResult::ok(json!({ "secret": secret })),
         Err(e) => CliResult::err(e),
     })
@@ -361,10 +398,11 @@ fn delete_from_keychain(server_id: &str, username: &str, key: &str) -> Result<()
     }
 }
 
-/// `ls_delete_credential`: [`delete_credential`] over IPC.
+/// `ls_delete_credential`: [`delete_credential`] over IPC, off the polling thread.
 #[tauri::command]
 async fn ls_delete_credential(server_id: String, username: String) -> Result<CliResult, ()> {
-    Ok(match delete_credential(&server_id, &username) {
+    let deleted = off_the_polling_thread(move || delete_credential(&server_id, &username)).await;
+    Ok(match deleted {
         Ok(()) => CliResult::ok(json!({})),
         Err(e) => CliResult::err(e),
     })
@@ -383,10 +421,23 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 
 #[cfg(test)]
 mod tests {
-    use super::{account_key, already_stored, delete_once, read_once, write_once};
+    use super::{
+        account_key, already_stored, delete_once, off_the_polling_thread, read_once, write_once,
+    };
+    use std::future::Future;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
-    use std::time::Duration;
+    use std::task::{Context, Poll, Waker};
+    use std::time::{Duration, Instant};
+
+    /// Poll a future once from this thread, the way a runtime worker would, and
+    /// say how it answered. Nothing wakes it afterwards, so a test that needs the
+    /// answer polls it again through a real runtime.
+    fn polled_once<F: Future>(future: &mut std::pin::Pin<Box<F>>) -> Poll<F::Output> {
+        future
+            .as_mut()
+            .poll(&mut Context::from_waker(Waker::noop()))
+    }
 
     #[test]
     fn account_key_joins_server_and_username() {
@@ -559,6 +610,74 @@ mod tests {
         let outcome = delete_once(key, || Err("the keychain was locked".to_owned()));
         assert!(outcome.is_err());
         assert!(already_stored(key, "a-token"));
+    }
+
+    /// Issue #1407: a keychain call made where the command is polled holds that
+    /// runtime worker until the OS answers, and the rest of the app's IPC waits
+    /// with it. The property is about the thread, not the answer, so this asks
+    /// what one poll costs: it has to come back pending while the call is still
+    /// going, leaving the worker free for everything else.
+    #[test]
+    fn a_slow_keychain_call_does_not_hold_the_thread_polling_it() {
+        let call = off_the_polling_thread(|| {
+            std::thread::sleep(Duration::from_millis(300));
+            Ok(Some("a-secret".to_owned()))
+        });
+        let mut call = Box::pin(call);
+
+        let started = Instant::now();
+        assert!(
+            polled_once(&mut call).is_pending(),
+            "one poll answered, so the keychain call ran on the polling thread"
+        );
+        let polling_cost = started.elapsed();
+        assert!(
+            polling_cost < Duration::from_millis(100),
+            "one poll held the thread for {polling_cost:?}, so the keychain call is still on it"
+        );
+
+        // The answer still arrives, once whoever is waiting for the OS gets it.
+        let answer = tauri::async_runtime::block_on(call);
+        assert_eq!(answer.unwrap().as_deref(), Some("a-secret"));
+        assert!(started.elapsed() >= Duration::from_millis(300));
+    }
+
+    /// A caller that gives up does not take the answer with it. `coilbox_oauth`
+    /// puts a deadline over these calls, and an OS call in flight cannot be
+    /// cancelled, so the read runs on and the next caller is served what it
+    /// found rather than asking the OS again.
+    #[test]
+    fn a_read_its_caller_gave_up_on_still_answers_the_next_caller() {
+        let reads = Arc::new(AtomicUsize::new(0));
+        let key = "given-up-on:judy";
+        let (started, reading) = std::sync::mpsc::channel();
+
+        let counted = Arc::clone(&reads);
+        let abandoned = off_the_polling_thread(move || {
+            read_once(key, || {
+                counted.fetch_add(1, Ordering::SeqCst);
+                // Sent from under the account's gate, so the caller below is
+                // certainly queued behind this read rather than racing it.
+                started.send(()).unwrap();
+                std::thread::sleep(Duration::from_millis(100));
+                Ok(Some("a-secret".to_owned()))
+            })
+        });
+        let mut abandoned = Box::pin(abandoned);
+        assert!(
+            polled_once(&mut abandoned).is_pending(),
+            "one poll answered, so the read ran on the polling thread and was never abandoned"
+        );
+        reading.recv().unwrap();
+        drop(abandoned);
+
+        let counted = Arc::clone(&reads);
+        let answer = read_once(key, move || {
+            counted.fetch_add(1, Ordering::SeqCst);
+            Ok(Some("a-second-read".to_owned()))
+        });
+        assert_eq!(answer.unwrap().as_deref(), Some("a-secret"));
+        assert_eq!(reads.load(Ordering::SeqCst), 1);
     }
 
     /// The macOS dev-build route. These are the exact commands `security -i` is
