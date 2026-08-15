@@ -15,7 +15,9 @@ use std::path::Path;
 /// be invalidated on its own. Bump when the icon encoding, cache format, or the
 /// name/buildpic *resolution logic* changes so pre-change records are re-resolved.
 /// v3: nested/scripted Lua defs + legacy `.fbi` name resolution.
-const BUILDPIC_CACHE_VERSION: u32 = 3;
+/// v4: uncompressed DDS decoding, and the reason an icon is missing (#1625), so
+/// records written before it re-resolve rather than staying silently blank.
+const BUILDPIC_CACHE_VERSION: u32 = 4;
 
 /// Read up to this many bytes of a candidate texture before decoding (build pics
 /// are tiny; this is a generous safety bound).
@@ -353,6 +355,7 @@ pub fn render(
                 let display = UnitDisplay {
                     name: Some(name).filter(|s| !s.is_empty()),
                     icon: picture.icon,
+                    icon_skipped: picture.icon_skipped,
                     asset: picture.asset,
                     asset_skipped: picture.skipped,
                 };
@@ -380,12 +383,13 @@ pub fn render(
     }
 }
 
-/// What one unit's build pic turned into: the icon the content pages draw, and
-/// when assets were asked for, either the encoded asset or the reason there is
-/// none.
+/// What one unit's build pic turned into: the icon the content pages draw, or
+/// the reason there is none, and when assets were asked for, either the encoded
+/// asset or the reason there is none of those.
 #[derive(Default)]
 struct Picture {
     icon: Option<String>,
+    icon_skipped: Option<BuildpicSkip>,
     asset: Option<UnitBuildpicAsset>,
     skipped: Option<BuildpicSkip>,
 }
@@ -421,23 +425,35 @@ fn resolve_picture(
             },
             None => (None, None),
         };
+        let icon = crate::texture::encode_icon_png(decoded.into_rgba8());
         return Picture {
-            icon: crate::texture::encode_icon_png(decoded.into_rgba8()),
+            // The picture decoded, so the only way there is no icon now is the
+            // PNG encoder refusing it.
+            icon_skipped: icon.is_none().then_some(BuildpicSkip::EncodeFailed),
+            icon,
             asset,
             skipped,
         };
     }
+    no_picture(members, asset_dir)
+}
+
+/// The answer when nothing in `members` yielded a picture. A `unitpics/` member
+/// that is there and will not decode is coilbox's problem, and a unit with no
+/// member at all is a game that ships it no build pic. They are different
+/// answers and used to read the same, which is #1625.
+///
+/// Reported on `icon_skipped` whether or not assets were asked for, because the
+/// content pages need it too, and mirrored onto the asset answer when they were.
+fn no_picture(members: &[String], asset_dir: Option<&Path>) -> Picture {
+    let why = if members.is_empty() {
+        BuildpicSkip::NoSource
+    } else {
+        BuildpicSkip::Undecodable
+    };
     Picture {
-        skipped: asset_dir.map(|_| {
-            if members.is_empty() {
-                BuildpicSkip::NoSource
-            } else {
-                // A `unitpics/` member is there and coilbox cannot read it, which
-                // is a different answer from the game shipping no build pic
-                // (#1625).
-                BuildpicSkip::Undecodable
-            }
-        }),
+        icon_skipped: Some(why),
+        skipped: asset_dir.map(|_| why),
         ..Default::default()
     }
 }
@@ -693,19 +709,33 @@ mod tests {
 
     #[test]
     fn no_build_pic_and_an_unreadable_one_are_different_answers() {
-        // `resolve_picture` needs a mounted archive, so this covers the decision
-        // it makes on the way out: an empty candidate list means the game ships
-        // no picture, a non-empty one that never decoded means coilbox could not
-        // read what it ships.
-        let record = |skip: BuildpicSkip| {
-            serde_json::to_string(&UnitDisplay {
-                asset_skipped: Some(skip),
-                ..Default::default()
-            })
-            .unwrap()
-        };
-        assert!(record(BuildpicSkip::NoSource).contains("\"no-source\""));
-        assert!(record(BuildpicSkip::Undecodable).contains("\"undecodable\""));
+        let dir = asset_dir("why");
+        let none = no_picture(&[], Some(&dir));
+        let unreadable = no_picture(&["unitpics/armcom.dds".to_string()], Some(&dir));
+        assert_eq!(none.icon_skipped, Some(BuildpicSkip::NoSource));
+        assert_eq!(none.skipped, Some(BuildpicSkip::NoSource));
+        assert_eq!(unreadable.icon_skipped, Some(BuildpicSkip::Undecodable));
+        assert_eq!(unreadable.skipped, Some(BuildpicSkip::Undecodable));
+    }
+
+    #[test]
+    fn the_icon_reason_is_reported_even_when_nobody_asked_for_an_asset() {
+        // The content pages never pass an asset dir, so a reason only carried on
+        // the asset answer would never reach them, which is the half of #1625
+        // that was still open.
+        let unreadable = no_picture(&["unitpics/armcom.dds".to_string()], None);
+        assert_eq!(unreadable.icon_skipped, Some(BuildpicSkip::Undecodable));
+        assert_eq!(unreadable.skipped, None);
+    }
+
+    #[test]
+    fn the_icon_reason_serializes_under_its_own_key() {
+        let json = serde_json::to_string(&UnitDisplay {
+            icon_skipped: Some(BuildpicSkip::Undecodable),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(json, r#"{"iconSkipped":"undecodable"}"#);
     }
 
     #[test]

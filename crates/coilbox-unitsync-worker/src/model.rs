@@ -595,7 +595,14 @@ pub enum BuildpicSkip {
 /// cache record (round-tripped as JSON), so it derives Deserialize too.
 ///
 /// `asset` and `assetSkipped` only appear when the caller asked for hub assets
-/// (`--asset-dir`), and then exactly one of them is set.
+/// (`--asset-dir`), and then exactly one of them is set. `iconSkipped` is always
+/// reported, because the content pages need it whether or not anything wants an
+/// asset: without it a unit the game ships no picture for and a unit whose
+/// picture coilbox cannot read both arrive as a missing `icon` (#1625).
+///
+/// The two fields answer different questions, so both can be set at once. A
+/// picture that decodes but is not square has an `icon` and no `asset`, and one
+/// that never decoded at all has neither, with the same reason in both places.
 #[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct UnitDisplay {
@@ -603,6 +610,11 @@ pub struct UnitDisplay {
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub icon: Option<String>,
+    /// Why there is no `icon`. Only `NoSource`, `Undecodable` and (vanishingly
+    /// rarely) `EncodeFailed` can appear here. The rest of `BuildpicSkip` is
+    /// about encoding the hub's asset, which happens after an icon exists.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub icon_skipped: Option<BuildpicSkip>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub asset: Option<UnitBuildpicAsset>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -610,10 +622,11 @@ pub struct UnitDisplay {
 }
 
 impl UnitDisplay {
-    /// Nothing resolved: no name, no icon, and no answer about an asset.
+    /// Nothing resolved: no name, no icon, and no answer about either.
     pub fn is_empty(&self) -> bool {
         self.name.is_none()
             && self.icon.is_none()
+            && self.icon_skipped.is_none()
             && self.asset.is_none()
             && self.asset_skipped.is_none()
     }
