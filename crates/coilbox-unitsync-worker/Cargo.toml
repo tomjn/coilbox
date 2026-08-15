@@ -40,6 +40,9 @@ base64 = "0.22"
 # optional `image` bridge, because `src/assetencode.rs` feeds libwebp raw
 # RGB/RGBA itself.
 webp = { version = "0.3.1", default-features = false }
+# Both asset hashes are sha256: the hub stores them as text and uses the encoded
+# one as the object path. Same version two other crates here already build.
+sha2 = "0.10"
 # The variant names, encode profiles and dimension caps the hub checks the
 # encoded bytes against. Read, never restated, so the encoder cannot drift from
 # what the hub will accept.
