@@ -169,21 +169,34 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> UnitDa
         }
     };
     us.init(false, 0);
+    let out = resolve(&us, game_archive, cache_dir);
+    us.uninit();
+    out
+}
+
+/// Read a game's unit graph in a session the caller has already initialised,
+/// mounting the game's archive set and unmounting before it returns.
+///
+/// Split out for the seed walk (issue #1638), which reads every game's roster
+/// over one `Init` to know which units to look for build pics for.
+pub(crate) fn resolve(
+    us: &Unitsync,
+    game_archive: &str,
+    cache_dir: Option<&Path>,
+) -> UnitDatasetOutput {
     let mut errors = us.drain_errors();
 
     // Cheap file-identity cache: a hit returns before mounting the archive set.
-    let key = infocache::dataset_key(&us, game_archive);
+    let key = infocache::dataset_key(us, game_archive);
     let cache = cache_dir.zip(key.as_deref());
     if let Some((dir, key)) = cache {
         if let Some(hit) = infocache::read::<UnitDatasetOutput>(dir, key) {
-            us.uninit();
             return hit;
         }
     }
 
     if !us.add_all_archives(game_archive) {
         errors.push("this engine's libunitsync can't load game archives".into());
-        us.uninit();
         return UnitDatasetOutput {
             errors,
             ..Default::default()
@@ -195,7 +208,7 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> UnitDa
     // A game that ships no gamedata/defs.lua (legacy TDF `.fbi` games) has no
     // units to give, and says which of the two it is rather than reading as a
     // game with nothing in it.
-    let mut units = match units_via_shim(&us) {
+    let mut units = match units_via_shim(us) {
         Ok(units) => units,
         Err(e) => {
             errors.push(format!("could not read this game's units: {}", e.trim()));
@@ -222,7 +235,6 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> UnitDa
 
     errors.extend(us.drain_errors());
     us.remove_all_archives();
-    us.uninit();
 
     let out = UnitDatasetOutput {
         units,

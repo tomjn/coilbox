@@ -78,6 +78,29 @@ fn encode_asset(
     })
 }
 
+/// The hub's `overlay:type` asset for one map, in a session the caller has
+/// already initialised. The seed walk's entry point (issue #1638), and what
+/// [`render`] does once it owns a session of its own.
+///
+/// A map with no type infomap is a normal answer, not a failure: unitsync
+/// reports a zero-sized bitmap for anything that is not an SMF it can open.
+pub(crate) fn asset_in_session(
+    us: &Unitsync,
+    map_name: &str,
+    asset_dir: &Path,
+) -> (Option<MapOverlayAsset>, Option<MapOverlaySkip>) {
+    let dims = us.typemap_size(map_name);
+    let raw = dims.and_then(|(w, h)| us.typemap_data(map_name, w, h));
+    match (dims, raw.as_deref()) {
+        (None, _) => (None, Some(MapOverlaySkip::NoSource)),
+        (Some(_), None) => (None, Some(MapOverlaySkip::ReadFailed)),
+        (Some((w, h)), Some(raw)) => match encode_asset(asset_dir, raw, w, h) {
+            Ok(a) => (Some(a), None),
+            Err(why) => (None, Some(why)),
+        },
+    }
+}
+
 /// Read `map_name`'s type infomap and store it as the hub's `overlay:type`
 /// asset in `asset_dir` (standalone unitsync session).
 pub fn render(lib: &str, map_name: &str, asset_dir: &Path) -> TypemapOutput {
@@ -93,19 +116,8 @@ pub fn render(lib: &str, map_name: &str, asset_dir: &Path) -> TypemapOutput {
     us.init(false, 0);
     let _ = us.drain_errors();
 
-    // A map with no type infomap is a normal answer, not a failure: unitsync
-    // reports a zero-sized bitmap for anything that is not an SMF it can open.
     let dims = us.typemap_size(map_name);
-    let raw = dims.and_then(|(w, h)| us.typemap_data(map_name, w, h));
-
-    let (asset, asset_skipped) = match (dims, raw.as_deref()) {
-        (None, _) => (None, Some(MapOverlaySkip::NoSource)),
-        (Some(_), None) => (None, Some(MapOverlaySkip::ReadFailed)),
-        (Some((w, h)), Some(raw)) => match encode_asset(asset_dir, raw, w, h) {
-            Ok(a) => (Some(a), None),
-            Err(why) => (None, Some(why)),
-        },
-    };
+    let (asset, asset_skipped) = asset_in_session(&us, map_name, asset_dir);
 
     let errors = us.drain_errors();
     us.uninit();

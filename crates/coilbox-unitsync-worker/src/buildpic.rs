@@ -239,9 +239,6 @@ pub fn render(
     cache_dir: Option<&Path>,
     asset_dir: Option<&Path>,
 ) -> UnitBuildpicsOutput {
-    let mut resolved = std::collections::BTreeMap::new();
-    let mut errors = Vec::new();
-
     let us = match unsafe { Unitsync::load(Path::new(lib)) } {
         Ok(u) => u,
         Err(e) => {
@@ -252,9 +249,28 @@ pub fn render(
         }
     };
     us.init(false, 0);
-    errors.extend(us.drain_errors());
+    let out = resolve(&us, game_archive, units, cache_dir, asset_dir);
+    us.uninit();
+    out
+}
 
-    let key_base = cache_key_base(&us, game_archive);
+/// Resolve build icons in a session the caller has already initialised, mounting
+/// the game's archive set when there is anything left to read and unmounting
+/// before it returns.
+///
+/// Split out for the seed walk (issue #1638), which covers every game over one
+/// `Init` rather than paying to load unitsync a dozen times.
+pub(crate) fn resolve(
+    us: &Unitsync,
+    game_archive: &str,
+    units: &[String],
+    cache_dir: Option<&Path>,
+    asset_dir: Option<&Path>,
+) -> UnitBuildpicsOutput {
+    let mut resolved = std::collections::BTreeMap::new();
+    let mut errors = us.drain_errors();
+
+    let key_base = cache_key_base(us, game_archive);
     let cache = cache_dir.zip(key_base.as_ref());
 
     // Partition into cache hits (done) and misses (need the archive mounted).
@@ -272,7 +288,6 @@ pub fn render(
     }
 
     if misses.is_empty() {
-        us.uninit();
         return UnitBuildpicsOutput {
             units: resolved,
             errors,
@@ -281,7 +296,6 @@ pub fn render(
 
     if !us.add_all_archives(game_archive) {
         errors.push("this engine's libunitsync can't load game archives".into());
-        us.uninit();
         return UnitBuildpicsOutput {
             units: resolved,
             errors,
@@ -302,7 +316,7 @@ pub fn render(
 
     // Read textures from the primary archive (like game_headers): list once,
     // case-insensitive match against each unit's candidate members.
-    let opened = match crate::archive::resolve_open_path(&us, game_archive)
+    let opened = match crate::archive::resolve_open_path(us, game_archive)
         .as_deref()
         .and_then(|p| us.open_archive(p))
     {
@@ -351,7 +365,7 @@ pub fn render(
                             .map(|(_, real)| real.clone())
                     })
                     .collect();
-                let picture = resolve_picture(&us, handle, &members, asset_dir);
+                let picture = resolve_picture(us, handle, &members, asset_dir);
                 let display = UnitDisplay {
                     name: Some(name).filter(|s| !s.is_empty()),
                     icon: picture.icon,
@@ -375,7 +389,6 @@ pub fn render(
 
     errors.extend(us.drain_errors());
     us.remove_all_archives();
-    us.uninit();
 
     UnitBuildpicsOutput {
         units: resolved,

@@ -377,6 +377,11 @@ pub struct MapOverlayAsset {
 pub enum MapOverlaySkip {
     /// The map has no infomap of this kind, so there is nothing to store.
     NoSource,
+    /// `minimap` only: the texture is one repeated colour, so it is a blank
+    /// square rather than a picture of the map (issue #1658). Storing it would
+    /// beat the placeholder a consumer generates from the map's name, which is
+    /// the better of the two.
+    Blank,
     /// The infomap is there and the read failed, which is coilbox's problem.
     ReadFailed,
     /// `overlay:height` only: the samples read and the world-height bounds did
