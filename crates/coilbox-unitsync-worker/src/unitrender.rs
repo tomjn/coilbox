@@ -11,10 +11,15 @@
 //!   recomputed here from the footprint and the pixels are refused if they are
 //!   not that shape. A mis-framed render is caught here or nowhere.
 //! - **The encoding.** `assetencode::encode_variant` is the corpus's one
-//!   encoder. A canvas can write WebP itself, and letting it would put two
-//!   libwebp builds on one corpus disagreeing about what q80 means and about
-//!   alpha, which is the drift `encode_profile` exists to make legible. Sending
-//!   the pixels the long way keeps one encoder.
+//!   encoder. A canvas can write WebP itself, and the easy path would be to let
+//!   it. Measured on one real render, the Armada Vehicle Plant at 250x200:
+//!   `canvas.toBlob('image/webp', 0.8)` produces 3192 bytes and the `webp`
+//!   crate at quality 80 produces 2720, from the same pixels. Both keep the
+//!   alpha exactly, so the picture is the same picture, but the bytes are not
+//!   the same bytes, and `webp-q80-256` would then name two different things
+//!   depending on which machine encoded a row. That is the drift `encode_profile`
+//!   exists to make legible, so the pixels take the long way round and the
+//!   corpus keeps one encoder.
 //! - **The identity.** `source_hash` is over the render's inputs, not its
 //!   pixels, so the model and its textures are read out of the archive here.
 //!
