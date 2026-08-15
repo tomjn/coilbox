@@ -306,9 +306,60 @@ pub struct HeightFieldOutput {
     pub errors: Vec<String>,
 }
 
+/// One map overlay layer encoded as the asset the hub takes, written to disk.
+///
+/// Like [`UnitBuildpicAsset`], the bytes stay out of the JSON and the file goes
+/// in the asset directory for the uploader (#1633) to read off `path`.
+///
+/// There is no `source_member` here. A unit's picture is an archive member and a
+/// map's overlay is not: unitsync produces it from the map file, so the raw
+/// samples are the only source bytes there are.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct MapOverlayAsset {
+    /// The hub's variant name for this layer, e.g. `overlay:metal`.
+    pub variant: String,
+    /// Absolute path to the encoded file, named after `hash`.
+    pub path: String,
+    /// sha256 of the encoded bytes. The hub's object path component.
+    pub hash: String,
+    /// sha256 of the infomap samples as `GetInfoMap` returned them, before any
+    /// colouring or encoding. Identity and dedupe compare on this, because it
+    /// does not move when the encoder does.
+    pub source_hash: String,
+    pub encode_profile: String,
+    pub mime: String,
+    /// The encoded grid, which is the infomap's own sample counts: an overlay
+    /// class has no edge cap, so nothing is downscaled.
+    pub width: u32,
+    pub height: u32,
+    pub bytes: u64,
+}
+
+/// Why a map produced no overlay asset. Each is a different answer and only some
+/// of them are anyone's bug.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum MapOverlaySkip {
+    /// The map has no infomap of this kind, so there is nothing to store.
+    NoSource,
+    /// The infomap is there and the read failed, which is coilbox's problem.
+    ReadFailed,
+    /// libwebp refused it.
+    EncodeFailed,
+    /// Encoded past the class's byte cap, which the hub also applies.
+    TooLarge,
+    /// Encoded, and the file could not be written to the asset directory.
+    NotWritten,
+}
+
 /// A rendered metal infomap, returned by the lazy `metalmap` mode: a downscaled
 /// green-on-transparent RGBA PNG marking where mexes can extract, for overlaying
 /// on the minimap. Transparent where there's no metal, so it reads over the map.
+///
+/// `asset` and `assetSkipped` only appear when the caller asked for hub assets
+/// (`--asset-dir`), and then exactly one of them is set. They carry the density
+/// values rather than the picture above, which is the whole of #1626.
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct MetalmapOutput {
@@ -325,6 +376,12 @@ pub struct MetalmapOutput {
     pub width: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
+    /// The raw density stored as the hub's `overlay:metal` asset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<MapOverlayAsset>,
+    /// Why there is no asset, when one was asked for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_skipped: Option<MapOverlaySkip>,
     pub errors: Vec<String>,
 }
 
