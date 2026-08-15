@@ -149,6 +149,66 @@ pub fn render(
     out
 }
 
+/// What a render of `object_name` is taken of, as a digest, plus the archive
+/// member the model came from (issue #1631).
+///
+/// Reads the same model and the same textures the viewer draws with, and hands
+/// their archive bytes to [`crate::assetencode::model_source_digest`]. That is
+/// the stable half of a render's `source_hash`: it moves when the game ships a
+/// new model or a re-skin and stays put when coilbox changes how it draws one.
+///
+/// The bytes rather than the cached texture files, which are what the webview
+/// loads: those go through a transcode for `.bmp` and `.tga`, so hashing them
+/// would let a change to that transcoder move every unit's identity. Changes to
+/// how coilbox draws a model belong to `RENDER_VERSION` instead.
+///
+/// Takes a session the caller has already mounted, so a render pays for one
+/// archive mount rather than two.
+pub(crate) fn source_digest(
+    us: &Unitsync,
+    handle: i32,
+    list: &[(String, String)],
+    object_name: &str,
+) -> Result<(String, String), String> {
+    let path = find_model(list, object_name)
+        .ok_or_else(|| format!("no model for {object_name:?} under {MODEL_DIR}/"))?;
+    let (_, model_bytes) = us
+        .read_archive_member(handle, &path, MODEL_READ_CAP)
+        .ok_or_else(|| format!("could not read {path}"))?;
+
+    let flattened = build(&path, &model_bytes);
+    let teamtex = read_teamtex(us, handle, list);
+    let format = flattened.format.clone();
+
+    // Ordered by member path so the digest does not depend on the order the
+    // model file happened to name its textures, and deduped so a model naming
+    // one texture twice does not hash it twice.
+    let mut members: Vec<String> = flattened
+        .textures
+        .iter()
+        .chain(flattened.team_mask.iter())
+        // A `.3do` team-colour region is a name the engine paints rather than a
+        // file, so there is nothing in the archive to hash for it.
+        .filter(|tex| !(format == "3do" && teamtex.contains(&tex.name.trim().to_lowercase())))
+        .filter_map(|tex| locate_texture(list, &format, &teamtex, &tex.name))
+        .collect();
+    members.sort();
+    members.dedup();
+
+    let textures: Vec<Vec<u8>> = members
+        .iter()
+        .filter_map(|member| {
+            us.read_archive_member(handle, member, TEXTURE_READ_CAP)
+                .map(|(_, bytes)| bytes)
+        })
+        .collect();
+
+    Ok((
+        crate::assetencode::model_source_digest(&model_bytes, &textures),
+        path,
+    ))
+}
+
 /// Parse `bytes` by the extension of `path` and flatten the result.
 fn build(path: &str, bytes: &[u8]) -> UnitModelOutput {
     if path.to_lowercase().ends_with(".3do") {

@@ -668,6 +668,87 @@ pub struct UnitModelOutput {
     pub errors: Vec<String>,
 }
 
+/// A top down render encoded as the asset the hub takes, written to disk.
+///
+/// Everything else in the corpus is extracted from an archive. This one is
+/// generated, which is why it carries the two fields that say what generated it:
+/// `model_digest` names what was drawn and `renderer_version` names what drew it.
+/// Together they are what `source_hash` is over.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitRenderAsset {
+    /// The hub's variant name, `render:<angle>`.
+    pub variant: String,
+    /// How the bytes were produced. Always `rendered` here, against `extracted`
+    /// for everything read straight out of an archive.
+    pub origin: String,
+    /// Absolute path to the encoded file, named after `hash`.
+    pub path: String,
+    /// sha256 of the encoded bytes. The hub's object path component.
+    pub hash: String,
+    /// The identity dedupe and the have check compare on, over the render's
+    /// inputs rather than its pixels. See `assetencode::render_source_hash`.
+    pub source_hash: String,
+    /// The archive member the model was read from.
+    pub source_member: String,
+    /// sha256 over the model file and its textures, the part of `source_hash`
+    /// that comes out of the archive.
+    pub model_digest: String,
+    /// Which renderer drew it, declared by the webview side that did the drawing.
+    pub renderer_version: u32,
+    /// The footprint the frame was taken on, in build squares. Reported because
+    /// the consumer insets the bleed by one square to get back to it, and the hub
+    /// does not hold footprints.
+    pub footprint_x: u32,
+    pub footprint_z: u32,
+    pub encode_profile: String,
+    pub mime: String,
+    pub width: u32,
+    pub height: u32,
+    pub bytes: u64,
+}
+
+/// Why a unit produced no render asset.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum RenderSkip {
+    /// The pixels are not the shape this footprint frames to. The hub cannot
+    /// check this, because it does not hold footprints, so it is checked here or
+    /// nowhere.
+    MisFramed,
+    /// The pixel buffer is missing, unreadable, or not `width * height * 4` long.
+    NoPixels,
+    /// An angle the vocabulary does not list, which the hub would refuse too.
+    UnknownAngle,
+    /// The game archive has no model for this unit's `objectname`.
+    NoModel,
+    /// libwebp refused it.
+    EncodeFailed,
+    /// Encoded past the class's byte cap, which the hub also applies.
+    TooLarge,
+    /// Encoded, and the file could not be written to the asset directory.
+    NotWritten,
+}
+
+/// Output of `--unit-render`: one unit's top down render, encoded from pixels the
+/// webview drew.
+///
+/// Exactly one of `asset` and `assetSkipped` is set. `dataUrl` carries the
+/// encoded bytes back as well, unlike the extraction modes: there is one render
+/// per call rather than a roster of them, and the caller drew the picture and has
+/// a reason to look at what came out of the encoder.
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitRenderOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset: Option<UnitRenderAsset>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_skipped: Option<RenderSkip>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_url: Option<String>,
+    pub errors: Vec<String>,
+}
+
 /// A build pic encoded as the asset the hub takes, written to disk.
 ///
 /// The bytes are not in here on purpose. This worker prints one JSON document

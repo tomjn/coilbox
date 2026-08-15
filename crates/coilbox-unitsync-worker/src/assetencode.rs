@@ -300,6 +300,90 @@ pub fn map_source_hash(variant: &str, width: u32, height: u32, samples: &[u8]) -
     format!("{:x}", hasher.finalize())
 }
 
+/// `source_hash` for a top down render (issue #1631).
+///
+/// A render is the one asset in the corpus that is not read out of an archive, so
+/// there is no member to hash. It is a function of a model, a camera and a
+/// renderer, and the identity has to be over those inputs rather than over the
+/// pixels that came out.
+///
+/// **Hashing the pixels would be wrong**, and not subtly. The render runs on the
+/// user's GPU: two people with the same archives and the same coilbox produce
+/// slightly different pixels, so a pixel hash would make one unit two identities
+/// and the have check at #1632 would ask everybody to upload everything. Hashing
+/// the inputs makes the value the same on every machine, which is the property
+/// dedupe rests on.
+///
+/// The frame is `variant` bytes, a `0x00`, then `renderer_version`,
+/// `footprint_x`, `footprint_z`, `width_px` and `height_px` as little endian
+/// `u32`, then `model_digest` as its 64 lowercase hex characters. Every field
+/// after the terminator is fixed width, so one byte stream has one reading, the
+/// same rule [`map_source_hash`] follows for #1660.
+///
+/// What each field is doing:
+///
+/// - `model_digest` is [`model_source_digest`] over the model and its textures,
+///   so a game shipping a new model or a re-skin moves the identity.
+/// - `footprint_x` and `footprint_z` are what the camera is aimed with, and two
+///   footprints can frame to one pixel size, so the frame carries both rather
+///   than trusting the dimensions to imply them.
+/// - `width_px` and `height_px` move when the vocabulary's framing does, so a
+///   change to the bleed or the edge cap moves the identity with nobody having to
+///   remember to say so.
+/// - `renderer_version` is the part a person has to keep honest, and it is the
+///   answer to "how is a renderer change told from an encoder change". An
+///   encoder change moves `encode_profile` and leaves this hash alone, by
+///   design: the have check compares `source_hash`, so re-encoding the corpus at
+///   q85 must not report the corpus as changed. A renderer change is the
+///   opposite case and must move it, so whoever changes the camera, the lights
+///   or the texture handling bumps `RENDER_VERSION` in
+///   `src/hub/assets/renderTop.ts`, beside the code it describes.
+pub fn render_source_hash(
+    variant: &str,
+    renderer_version: u32,
+    footprint_x: u32,
+    footprint_z: u32,
+    width_px: u32,
+    height_px: u32,
+    model_digest: &str,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(variant.as_bytes());
+    hasher.update([0u8]);
+    hasher.update(renderer_version.to_le_bytes());
+    hasher.update(footprint_x.to_le_bytes());
+    hasher.update(footprint_z.to_le_bytes());
+    hasher.update(width_px.to_le_bytes());
+    hasher.update(height_px.to_le_bytes());
+    hasher.update(model_digest.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+/// What the render was taken of: the model file and every texture it draws with,
+/// by content.
+///
+/// The archive bytes rather than anything coilbox derived from them, for the same
+/// reason the build pic hashes its member: a decoder or a transcoder change would
+/// otherwise move the identity of every unit in the corpus. Those are renderer
+/// changes and `renderer_version` is where they are declared.
+///
+/// Textures are in ascending order of their archive member path so the digest
+/// does not depend on the order the model happened to name them, and each is
+/// length prefixed so two textures cannot run together into one reading. The
+/// count is in the frame as well, so a texture that failed to resolve, and is
+/// therefore drawn plain, is a different picture from one that resolved.
+pub fn model_source_digest(model: &[u8], textures: &[Vec<u8>]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update((model.len() as u64).to_le_bytes());
+    hasher.update(model);
+    hasher.update((textures.len() as u32).to_le_bytes());
+    for texture in textures {
+        hasher.update((texture.len() as u64).to_le_bytes());
+        hasher.update(texture);
+    }
+    format!("{:x}", hasher.finalize())
+}
+
 /// The file extension for an asset class's mime, for naming the file on disk.
 pub fn ext_for_mime(mime: &str) -> &str {
     mime.rsplit('/').next().unwrap_or("bin")
@@ -760,6 +844,102 @@ mod tests {
         assert_eq!(
             map_source_hash("minimap", 64, 64, &samples),
             sha256_hex(&frame)
+        );
+    }
+
+    /// The render frame spelled out against the digest of the bytes it claims to
+    /// build, so the layout is pinned rather than described.
+    #[test]
+    fn frames_a_render_as_the_variant_the_camera_and_the_model() {
+        let digest = model_source_digest(b"an s3o", &[b"a dds".to_vec()]);
+        let mut want = Vec::new();
+        want.extend_from_slice(b"render:top");
+        want.push(0);
+        want.extend_from_slice(&1u32.to_le_bytes()); // renderer version
+        want.extend_from_slice(&3u32.to_le_bytes()); // footprint x
+        want.extend_from_slice(&2u32.to_le_bytes()); // footprint z
+        want.extend_from_slice(&255u32.to_le_bytes());
+        want.extend_from_slice(&204u32.to_le_bytes());
+        want.extend_from_slice(digest.as_bytes());
+        assert_eq!(
+            render_source_hash("render:top", 1, 3, 2, 255, 204, &digest),
+            sha256_hex(&want)
+        );
+    }
+
+    /// The point of `source_hash` for a render: it is over the inputs, so it does
+    /// not move when the pixels do. Two GPUs shading one model differently is the
+    /// ordinary case rather than a fault, and a pixel hash would make the have
+    /// check ask every user to upload the whole corpus.
+    #[test]
+    fn one_unit_keeps_one_identity_whatever_the_pixels_came_out_as() {
+        let digest = model_source_digest(b"an s3o", &[]);
+        let first = render_source_hash("render:top", 1, 3, 2, 255, 204, &digest);
+        let second = render_source_hash("render:top", 1, 3, 2, 255, 204, &digest);
+        assert_eq!(first, second);
+
+        // And it is not the encoded bytes: those move with the profile, and the
+        // identity is the thing that does not.
+        let lossy = encode_variant("render:top", &cutout(64)).unwrap();
+        let lossless = encode_variant("buildpic", &cutout(64)).unwrap();
+        assert_ne!(sha256_hex(&lossy.bytes), sha256_hex(&lossless.bytes));
+        assert_ne!(first, sha256_hex(&lossy.bytes));
+    }
+
+    /// Every field in the frame earns its place: change one and the identity
+    /// moves. The footprint is in there separately from the pixels because two
+    /// footprints can frame to one size, which the last pair here is.
+    #[test]
+    fn every_input_the_picture_depends_on_moves_the_identity() {
+        let digest = model_source_digest(b"an s3o", &[]);
+        let other = model_source_digest(b"a different s3o", &[]);
+        let base = render_source_hash("render:top", 1, 3, 2, 255, 204, &digest);
+        let variants = [
+            render_source_hash("render:front", 1, 3, 2, 255, 204, &digest),
+            render_source_hash("render:top", 2, 3, 2, 255, 204, &digest),
+            render_source_hash("render:top", 1, 2, 3, 204, 255, &digest),
+            render_source_hash("render:top", 1, 3, 2, 128, 102, &digest),
+            render_source_hash("render:top", 1, 3, 2, 255, 204, &other),
+            // 1 by 1 and 3 by 3 both frame to 255 by 255, so without the
+            // footprint in the frame these two would be one identity.
+            render_source_hash("render:top", 1, 1, 1, 255, 255, &digest),
+            render_source_hash("render:top", 1, 3, 3, 255, 255, &digest),
+        ];
+        let mut all = vec![base];
+        all.extend(variants);
+        let mut unique = all.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), all.len());
+
+        // The collision that footprint pair would have been, spelled out.
+        assert_eq!(
+            coilbox_assets::render_frame(1, 1).width_px,
+            coilbox_assets::render_frame(3, 3).width_px
+        );
+    }
+
+    /// A re-skin is a different picture of the same geometry, so the textures are
+    /// in the digest. Length prefixes are what stop two textures running together
+    /// into one reading.
+    #[test]
+    fn a_model_digest_covers_the_textures_as_well_as_the_geometry() {
+        let geometry = b"an s3o".to_vec();
+        assert_ne!(
+            model_source_digest(&geometry, &[b"blue.dds".to_vec()]),
+            model_source_digest(&geometry, &[b"red.dds".to_vec()])
+        );
+        // A texture that did not resolve is a unit drawn plain, which is not the
+        // same picture as one that did.
+        assert_ne!(
+            model_source_digest(&geometry, &[]),
+            model_source_digest(&geometry, &[b"blue.dds".to_vec()])
+        );
+        // Two textures cannot be re-split into one boundary that gives the same
+        // bytes, because each carries its own length.
+        assert_ne!(
+            model_source_digest(&geometry, &[b"ab".to_vec(), b"cd".to_vec()]),
+            model_source_digest(&geometry, &[b"a".to_vec(), b"bcd".to_vec()])
         );
     }
 
