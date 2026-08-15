@@ -257,6 +257,49 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+/// `source_hash` for a map layer read off a sample grid: the samples, framed by
+/// which layer they are and how wide and tall the grid is (issue #1660).
+///
+/// The samples on their own are not an identity. Two maps with a uniform layer
+/// and transposed grids hold the same bytes and are different pictures, which
+/// this library has two live pairs of: `overlay:type` for Crystallized Plains 1.1
+/// at 384x448 against Heartbreak Hill v4.0.1 at 448x384, and All That Simmers
+/// v1.1.1 at 448x640 against Industrial_Revolution_V2 at 640x448. Nothing about
+/// the grid reached the hash, so both pairs shared one, and the have check at
+/// #1632 would have read one map's layer as another map's.
+///
+/// The frame is `variant` bytes, a `0x00`, `width` and `height` as little endian
+/// `u32`, then the samples. Every field is fixed width or self delimiting: a
+/// variant name is ASCII from the vocabulary's closed list and holds no `0x00`,
+/// so the terminator ends it, and the two lengths are four bytes each, so what is
+/// left is the samples. One byte stream therefore has exactly one reading.
+/// Decimal digits run together instead would not: `12` then `34` and `1` then
+/// `234` are one string.
+///
+/// Little endian for the lengths, matching how #1627 serialises the height
+/// samples themselves, so the hash is the same on every architecture coilbox
+/// builds for.
+///
+/// The variant is in the frame because metal and type sit on the same
+/// `(mapx/2, mapy/2)` grid at one byte a sample, so a map whose terrain is one
+/// type and whose metal is one density holds the same bytes in both layers. Five
+/// rows in this library did, and a density of 0 and terrain type 0 are not the
+/// same fact about a map. Naming the layer keeps each one's identity its own.
+///
+/// Nothing in the frame comes from the encoder. The variant is the hub's own
+/// vocabulary and the grid is the map's, so two coilbox releases with different
+/// encoders still produce the same `source_hash` from the same map, which is the
+/// whole reason the hub compares on this hash and not on the encoded one.
+pub fn map_source_hash(variant: &str, width: u32, height: u32, samples: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(variant.as_bytes());
+    hasher.update([0u8]);
+    hasher.update(width.to_le_bytes());
+    hasher.update(height.to_le_bytes());
+    hasher.update(samples);
+    format!("{:x}", hasher.finalize())
+}
+
 /// The file extension for an asset class's mime, for naming the file on disk.
 pub fn ext_for_mime(mime: &str) -> &str {
     mime.rsplit('/').next().unwrap_or("bin")
@@ -640,6 +683,83 @@ mod tests {
         assert_eq!(
             sha256_hex(b""),
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    /// The frame spelled out against the digest of the bytes it claims to build,
+    /// so the layout is pinned rather than described. A reader of the manifest
+    /// can reproduce a `source_hash` from this without the source.
+    #[test]
+    fn frames_a_layer_as_the_variant_then_the_grid_then_the_samples() {
+        let mut want = Vec::new();
+        want.extend_from_slice(b"overlay:type");
+        want.push(0);
+        want.extend_from_slice(&384u32.to_le_bytes());
+        want.extend_from_slice(&448u32.to_le_bytes());
+        want.extend_from_slice(&[7, 7, 7]);
+        assert_eq!(
+            map_source_hash("overlay:type", 384, 448, &[7, 7, 7]),
+            sha256_hex(&want)
+        );
+    }
+
+    /// One byte stream, one reading. Decimal digits run together would not give
+    /// that: 12 then 34 and 1 then 234 are the same string, and the fixed width
+    /// fields are why no pair of inputs can produce one frame.
+    #[test]
+    fn no_two_grids_frame_to_the_same_bytes() {
+        let samples = vec![0u8; 12];
+        let hashes = [
+            map_source_hash("overlay:type", 1, 234, &samples),
+            map_source_hash("overlay:type", 12, 34, &samples),
+            map_source_hash("overlay:type", 123, 4, &samples),
+            map_source_hash("overlay:type", 234, 1, &samples),
+        ];
+        let mut unique = hashes.to_vec();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), hashes.len());
+    }
+
+    /// The frame separates the layers as well as the grids. A flat metal layer
+    /// and a flat type layer on one grid are the same bytes, and a density of 0
+    /// is not terrain type 0.
+    #[test]
+    fn two_layers_on_one_grid_are_two_identities() {
+        let flat = vec![0u8; 64];
+        assert_ne!(
+            map_source_hash("overlay:metal", 8, 8, &flat),
+            map_source_hash("overlay:type", 8, 8, &flat)
+        );
+    }
+
+    /// Why `source_hash` exists: it tracks the map, so two coilbox releases whose
+    /// encoders disagree still report one identity for one map. The frame holds
+    /// the layer's name and the map's own grid and nothing a profile decides, so
+    /// putting the same pixels through two profiles moves the encoded hash and
+    /// leaves the identity where it was.
+    #[test]
+    fn one_map_keeps_one_identity_under_two_encode_profiles() {
+        let pixels = cutout(64);
+        let samples: Vec<u8> = pixels.to_luma8().into_raw();
+
+        // Lossless against q80, which is as far apart as two classes get here.
+        let lossless = encode_variant("buildpic", &pixels).unwrap();
+        let lossy = encode_variant("minimap", &pixels).unwrap();
+        assert_ne!(sha256_hex(&lossless.bytes), sha256_hex(&lossy.bytes));
+        assert_ne!(lossless.encode_profile, lossy.encode_profile);
+
+        // The identity is the frame those two profiles are both absent from:
+        // the variant, the grid and the samples, and no third thing.
+        let mut frame = Vec::new();
+        frame.extend_from_slice(b"minimap");
+        frame.push(0);
+        frame.extend_from_slice(&64u32.to_le_bytes());
+        frame.extend_from_slice(&64u32.to_le_bytes());
+        frame.extend_from_slice(&samples);
+        assert_eq!(
+            map_source_hash("minimap", 64, 64, &samples),
+            sha256_hex(&frame)
         );
     }
 
