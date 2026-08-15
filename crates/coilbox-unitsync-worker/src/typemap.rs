@@ -50,9 +50,10 @@ fn encode_asset(
     raw: &[u8],
     w: u32,
     h: u32,
+    source_archive: &str,
 ) -> Result<MapOverlayAsset, MapOverlaySkip> {
     use crate::assetencode::{
-        encode_variant, ext_for_mime, map_source_hash, sha256_hex, EncodeError,
+        encode_variant, ext_for_mime, map_source_hash, sha256_hex, EncodeError, EXTRACTED_ORIGIN,
     };
 
     let grid = GrayImage::from_raw(w, h, raw.to_vec()).ok_or(MapOverlaySkip::EncodeFailed)?;
@@ -73,6 +74,8 @@ fn encode_asset(
 
     Ok(MapOverlayAsset {
         variant: TYPE_OVERLAY_VARIANT.to_string(),
+        origin: EXTRACTED_ORIGIN.to_string(),
+        source_archive: source_archive.to_string(),
         path: path.to_string_lossy().into_owned(),
         hash,
         source_hash: map_source_hash(TYPE_OVERLAY_VARIANT, w, h, raw),
@@ -103,10 +106,13 @@ pub(crate) fn asset_in_session(
     match (dims, raw.as_deref()) {
         (None, _) => (None, Some(MapOverlaySkip::NoSource)),
         (Some(_), None) => (None, Some(MapOverlaySkip::ReadFailed)),
-        (Some((w, h)), Some(raw)) => match encode_asset(asset_dir, raw, w, h) {
-            Ok(a) => (Some(a), None),
-            Err(why) => (None, Some(why)),
-        },
+        (Some((w, h)), Some(raw)) => {
+            let source_archive = crate::archive::archive_name_for_map(us, map_name);
+            match encode_asset(asset_dir, raw, w, h, &source_archive) {
+                Ok(a) => (Some(a), None),
+                Err(why) => (None, Some(why)),
+            }
+        }
     }
 }
 
@@ -156,6 +162,10 @@ mod tests {
     use crate::assetencode::{map_source_hash, sha256_hex};
     use std::path::PathBuf;
 
+    /// A map archive's own versioned name, which is what `asset_in_session`
+    /// resolves and hands the encoder.
+    const ARCHIVE: &str = "Mediterraneum V1";
+
     /// A type grid shaped like a real one: a handful of distinct indices in
     /// runs, the way terrain comes in patches, including neighbouring indices
     /// that any resample would average into a type the map does not have.
@@ -187,7 +197,7 @@ mod tests {
         let dir = asset_dir("roundtrip");
         let (w, h) = (64u32, 48u32);
         let raw = types(w, h);
-        let asset = encode_asset(&dir, &raw, w, h).expect("encode");
+        let asset = encode_asset(&dir, &raw, w, h, ARCHIVE).expect("encode");
 
         let on_disk = std::fs::read(&asset.path).expect("asset file written");
         let decoded = webp::Decoder::new(&on_disk).decode().expect("decode webp");
@@ -205,7 +215,7 @@ mod tests {
     #[test]
     fn writes_the_asset_as_a_file_named_after_its_own_bytes() {
         let dir = asset_dir("write");
-        let asset = encode_asset(&dir, &types(32, 32), 32, 32).expect("encode");
+        let asset = encode_asset(&dir, &types(32, 32), 32, 32, ARCHIVE).expect("encode");
         let on_disk = std::fs::read(&asset.path).expect("asset file written");
 
         assert_eq!(
@@ -226,7 +236,7 @@ mod tests {
     fn identity_is_the_samples_and_the_path_is_the_encoded_bytes() {
         let dir = asset_dir("hashes");
         let raw = types(32, 32);
-        let asset = encode_asset(&dir, &raw, 32, 32).expect("encode");
+        let asset = encode_asset(&dir, &raw, 32, 32, ARCHIVE).expect("encode");
         assert_eq!(
             asset.source_hash,
             map_source_hash(TYPE_OVERLAY_VARIANT, 32, 32, &raw)
@@ -243,8 +253,8 @@ mod tests {
     fn a_flat_layer_on_a_transposed_grid_is_a_different_identity() {
         let dir = asset_dir("transposed");
         let flat = vec![0u8; 384 * 448];
-        let tall = encode_asset(&dir, &flat, 384, 448).expect("encode tall");
-        let wide = encode_asset(&dir, &flat, 448, 384).expect("encode wide");
+        let tall = encode_asset(&dir, &flat, 384, 448, ARCHIVE).expect("encode tall");
+        let wide = encode_asset(&dir, &flat, 448, 384, ARCHIVE).expect("encode wide");
         assert_ne!(tall.source_hash, wide.source_hash);
     }
 
@@ -256,7 +266,7 @@ mod tests {
     fn a_grid_of_one_value_is_still_this_layers_own_identity() {
         let dir = asset_dir("shared-grid");
         let flat = vec![0u8; 32 * 32];
-        let asset = encode_asset(&dir, &flat, 32, 32).expect("encode");
+        let asset = encode_asset(&dir, &flat, 32, 32, ARCHIVE).expect("encode");
         assert_eq!(
             asset.source_hash,
             map_source_hash(TYPE_OVERLAY_VARIANT, 32, 32, &flat)
@@ -273,7 +283,7 @@ mod tests {
     #[test]
     fn keeps_the_grid_the_map_has_rather_than_capping_it() {
         let dir = asset_dir("size");
-        let asset = encode_asset(&dir, &types(1024, 512), 1024, 512).expect("encode");
+        let asset = encode_asset(&dir, &types(1024, 512), 1024, 512, ARCHIVE).expect("encode");
         assert_eq!((asset.width, asset.height), (1024, 512));
     }
 
@@ -281,7 +291,7 @@ mod tests {
     fn refuses_a_grid_that_is_not_the_size_it_says_it_is() {
         let dir = asset_dir("mismatch");
         assert_eq!(
-            encode_asset(&dir, &types(8, 8), 8, 9).unwrap_err(),
+            encode_asset(&dir, &types(8, 8), 8, 9, ARCHIVE).unwrap_err(),
             MapOverlaySkip::EncodeFailed
         );
     }

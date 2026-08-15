@@ -17,7 +17,9 @@ use std::path::Path;
 /// v3: nested/scripted Lua defs + legacy `.fbi` name resolution.
 /// v4: uncompressed DDS decoding, and the reason an icon is missing (#1625), so
 /// records written before it re-resolve rather than staying silently blank.
-const BUILDPIC_CACHE_VERSION: u32 = 4;
+/// v5: the asset carries `origin` and `source_archive` (#1678), which a record
+/// written before it has no way to answer.
+const BUILDPIC_CACHE_VERSION: u32 = 5;
 
 /// Read up to this many bytes of a candidate texture before decoding (build pics
 /// are tiny; this is a generous safety bound).
@@ -294,6 +296,11 @@ pub(crate) fn resolve(
         };
     }
 
+    // Resolved before the mount, from the same scanner data that decides which
+    // archive gets opened below, so what lands on the asset is the archive the
+    // bytes were read out of rather than the argument this was called with.
+    let source_archive = crate::archive::archive_name_for_game(us, game_archive);
+
     if !us.add_all_archives(game_archive) {
         errors.push("this engine's libunitsync can't load game archives".into());
         return UnitBuildpicsOutput {
@@ -365,7 +372,7 @@ pub(crate) fn resolve(
                             .map(|(_, real)| real.clone())
                     })
                     .collect();
-                let picture = resolve_picture(us, handle, &members, asset_dir);
+                let picture = resolve_picture(us, handle, &members, asset_dir, &source_archive);
                 let display = UnitDisplay {
                     name: Some(name).filter(|s| !s.is_empty()),
                     icon: picture.icon,
@@ -418,6 +425,7 @@ fn resolve_picture(
     handle: i32,
     members: &[String],
     asset_dir: Option<&Path>,
+    source_archive: &str,
 ) -> Picture {
     for member in members {
         let ext = member.rsplit('.').next().unwrap_or("").to_lowercase();
@@ -432,7 +440,7 @@ fn resolve_picture(
         };
         let decoded = image::DynamicImage::ImageRgba8(img);
         let (asset, skipped) = match asset_dir {
-            Some(dir) => match encode_asset(dir, member, &raw, &decoded) {
+            Some(dir) => match encode_asset(dir, member, &raw, &decoded, source_archive) {
                 Ok(a) => (Some(a), None),
                 Err(why) => (None, Some(why)),
             },
@@ -482,8 +490,11 @@ fn encode_asset(
     member: &str,
     raw: &[u8],
     decoded: &image::DynamicImage,
+    source_archive: &str,
 ) -> Result<UnitBuildpicAsset, BuildpicSkip> {
-    use crate::assetencode::{encode_variant, ext_for_mime, sha256_hex, EncodeError};
+    use crate::assetencode::{
+        encode_variant, ext_for_mime, sha256_hex, EncodeError, EXTRACTED_ORIGIN,
+    };
 
     let variant = &coilbox_assets::vocabulary().unit.buildpic_variant;
     let encoded = encode_variant(variant, decoded).map_err(|e| match e {
@@ -502,6 +513,8 @@ fn encode_asset(
 
     Ok(UnitBuildpicAsset {
         variant: variant.clone(),
+        origin: EXTRACTED_ORIGIN.to_string(),
+        source_archive: source_archive.to_string(),
         path: path.to_string_lossy().into_owned(),
         hash,
         source_hash: sha256_hex(raw),
@@ -610,6 +623,10 @@ mod tests {
     use crate::assetencode::sha256_hex;
     use image::{DynamicImage, Rgba, RgbaImage};
 
+    /// A game archive's own versioned name, which is what `resolve` hands the
+    /// encoder rather than the file name it was called with.
+    const ARCHIVE: &str = "Beyond All Reason test-30922-8064a43";
+
     /// A square build-pic-shaped picture with a transparent corner.
     fn square(side: u32) -> DynamicImage {
         let mut img = RgbaImage::new(side, side);
@@ -636,7 +653,7 @@ mod tests {
     fn writes_the_asset_as_a_file_named_after_its_own_bytes() {
         let dir = asset_dir("write");
         let raw = b"the archive member bytes, whatever they were".to_vec();
-        let asset = encode_asset(&dir, "unitpics/armcom.dds", &raw, &square(128)).unwrap();
+        let asset = encode_asset(&dir, "unitpics/armcom.dds", &raw, &square(128), ARCHIVE).unwrap();
 
         let on_disk = std::fs::read(&asset.path).expect("asset file written");
         assert_eq!(
@@ -649,6 +666,8 @@ mod tests {
         assert_eq!(asset.encode_profile, "webp-lossless-256");
         assert_eq!(asset.variant, "buildpic");
         assert_eq!(asset.source_member, "unitpics/armcom.dds");
+        assert_eq!(asset.origin, "extracted");
+        assert_eq!(asset.source_archive, ARCHIVE);
     }
 
     #[test]
@@ -657,7 +676,7 @@ mod tests {
         // two hashes have to come from different bytes.
         let dir = asset_dir("hashes");
         let raw = b"a dds nobody here has to be able to decode".to_vec();
-        let asset = encode_asset(&dir, "unitpics/armcom.dds", &raw, &square(64)).unwrap();
+        let asset = encode_asset(&dir, "unitpics/armcom.dds", &raw, &square(64), ARCHIVE).unwrap();
         assert_eq!(asset.source_hash, sha256_hex(&raw));
         assert_ne!(asset.source_hash, asset.hash);
     }
@@ -665,12 +684,13 @@ mod tests {
     #[test]
     fn keeps_a_source_bigger_than_an_icon_wants_up_to_the_hub_cap() {
         let dir = asset_dir("size");
-        let big = encode_asset(&dir, "unitpics/big.png", b"src", &square(512)).unwrap();
+        let big = encode_asset(&dir, "unitpics/big.png", b"src", &square(512), ARCHIVE).unwrap();
         assert_eq!((big.width, big.height), (256, 256));
-        let exact = encode_asset(&dir, "unitpics/exact.png", b"src", &square(256)).unwrap();
+        let exact =
+            encode_asset(&dir, "unitpics/exact.png", b"src", &square(256), ARCHIVE).unwrap();
         assert_eq!((exact.width, exact.height), (256, 256));
         // The point of the issue: 256 and 200 both used to come back as 128.
-        let odd = encode_asset(&dir, "unitpics/odd.png", b"src", &square(200)).unwrap();
+        let odd = encode_asset(&dir, "unitpics/odd.png", b"src", &square(200), ARCHIVE).unwrap();
         assert_eq!((odd.width, odd.height), (200, 200));
     }
 
@@ -679,7 +699,7 @@ mod tests {
         let dir = asset_dir("nonsquare");
         let wide = DynamicImage::ImageRgba8(RgbaImage::new(128, 64));
         assert_eq!(
-            encode_asset(&dir, "unitpics/wide.png", b"src", &wide).unwrap_err(),
+            encode_asset(&dir, "unitpics/wide.png", b"src", &wide, ARCHIVE).unwrap_err(),
             BuildpicSkip::NotSquare
         );
     }
@@ -705,7 +725,8 @@ mod tests {
     #[test]
     fn a_record_whose_asset_file_is_gone_re_resolves() {
         let dir = asset_dir("gone");
-        let asset = encode_asset(&dir, "unitpics/armcom.png", b"src", &square(64)).unwrap();
+        let asset =
+            encode_asset(&dir, "unitpics/armcom.png", b"src", &square(64), ARCHIVE).unwrap();
         let display = UnitDisplay {
             asset: Some(asset.clone()),
             ..Default::default()

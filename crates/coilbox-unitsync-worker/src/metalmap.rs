@@ -91,9 +91,10 @@ fn encode_asset(
     raw: &[u8],
     w: u32,
     h: u32,
+    source_archive: &str,
 ) -> Result<MapOverlayAsset, MapOverlaySkip> {
     use crate::assetencode::{
-        encode_variant, ext_for_mime, map_source_hash, sha256_hex, EncodeError,
+        encode_variant, ext_for_mime, map_source_hash, sha256_hex, EncodeError, EXTRACTED_ORIGIN,
     };
 
     let grid = GrayImage::from_raw(w, h, raw.to_vec()).ok_or(MapOverlaySkip::EncodeFailed)?;
@@ -114,6 +115,8 @@ fn encode_asset(
 
     Ok(MapOverlayAsset {
         variant: METAL_OVERLAY_VARIANT.to_string(),
+        origin: EXTRACTED_ORIGIN.to_string(),
+        source_archive: source_archive.to_string(),
         path: path.to_string_lossy().into_owned(),
         hash,
         source_hash: map_source_hash(METAL_OVERLAY_VARIANT, w, h, raw),
@@ -134,11 +137,12 @@ fn asset_from_samples(
     asset_dir: &Path,
     dims: Option<(u32, u32)>,
     raw: Option<&[u8]>,
+    source_archive: &str,
 ) -> (Option<MapOverlayAsset>, Option<MapOverlaySkip>) {
     match (dims, raw) {
         (None, _) => (None, Some(MapOverlaySkip::NoSource)),
         (Some(_), None) => (None, Some(MapOverlaySkip::ReadFailed)),
-        (Some((w, h)), Some(raw)) => match encode_asset(asset_dir, raw, w, h) {
+        (Some((w, h)), Some(raw)) => match encode_asset(asset_dir, raw, w, h, source_archive) {
             Ok(a) => (Some(a), None),
             Err(why) => (None, Some(why)),
         },
@@ -154,7 +158,8 @@ pub(crate) fn asset_in_session(
 ) -> (Option<MapOverlayAsset>, Option<MapOverlaySkip>) {
     let dims = us.map_dimensions(map_name);
     let raw = dims.and_then(|(w, h)| us.metalmap_data(map_name, w, h));
-    asset_from_samples(asset_dir, dims, raw.as_deref())
+    let source_archive = crate::archive::archive_name_for_map(us, map_name);
+    asset_from_samples(asset_dir, dims, raw.as_deref(), &source_archive)
 }
 
 /// Render `map_name`'s metal infomap to a green-on-transparent RGBA PNG data URL
@@ -200,7 +205,12 @@ pub fn render(
 
     let (asset, asset_skipped) = match asset_dir {
         None => (None, None),
-        Some(dir) => asset_from_samples(dir, dims, raw.as_deref()),
+        Some(dir) => asset_from_samples(
+            dir,
+            dims,
+            raw.as_deref(),
+            &crate::archive::archive_name_for_map(&us, map_name),
+        ),
     };
 
     let result = (|| -> Result<(RenderedImage, u32, u32), String> {
@@ -256,6 +266,10 @@ mod tests {
     use super::*;
     use crate::assetencode::{map_source_hash, sha256_hex};
 
+    /// A map archive's own versioned name, which is what `asset_in_session`
+    /// resolves and hands the encoder.
+    const ARCHIVE: &str = "Mediterraneum V1";
+
     /// A density grid with the shape a real metal map has: mostly nothing, a few
     /// spots, and every one of the values in between that a colour ramp would
     /// round away.
@@ -286,7 +300,7 @@ mod tests {
         let dir = asset_dir("roundtrip");
         let (w, h) = (64u32, 48u32);
         let raw = density(w, h);
-        let asset = encode_asset(&dir, &raw, w, h).expect("encode");
+        let asset = encode_asset(&dir, &raw, w, h, ARCHIVE).expect("encode");
 
         let on_disk = std::fs::read(&asset.path).expect("asset file written");
         let decoded = webp::Decoder::new(&on_disk).decode().expect("decode webp");
@@ -304,7 +318,7 @@ mod tests {
     #[test]
     fn writes_the_asset_as_a_file_named_after_its_own_bytes() {
         let dir = asset_dir("write");
-        let asset = encode_asset(&dir, &density(32, 32), 32, 32).expect("encode");
+        let asset = encode_asset(&dir, &density(32, 32), 32, 32, ARCHIVE).expect("encode");
         let on_disk = std::fs::read(&asset.path).expect("asset file written");
 
         assert_eq!(
@@ -326,7 +340,7 @@ mod tests {
     fn identity_is_the_samples_and_the_path_is_the_encoded_bytes() {
         let dir = asset_dir("hashes");
         let raw = density(32, 32);
-        let asset = encode_asset(&dir, &raw, 32, 32).expect("encode");
+        let asset = encode_asset(&dir, &raw, 32, 32, ARCHIVE).expect("encode");
         assert_eq!(
             asset.source_hash,
             map_source_hash(METAL_OVERLAY_VARIANT, 32, 32, &raw)
@@ -342,8 +356,8 @@ mod tests {
     fn a_flat_layer_on_a_transposed_grid_is_a_different_identity() {
         let dir = asset_dir("transposed");
         let flat = vec![0u8; 32 * 64];
-        let tall = encode_asset(&dir, &flat, 32, 64).expect("encode tall");
-        let wide = encode_asset(&dir, &flat, 64, 32).expect("encode wide");
+        let tall = encode_asset(&dir, &flat, 32, 64, ARCHIVE).expect("encode tall");
+        let wide = encode_asset(&dir, &flat, 64, 32, ARCHIVE).expect("encode wide");
         assert_ne!(tall.source_hash, wide.source_hash);
     }
 
@@ -365,7 +379,7 @@ mod tests {
     #[test]
     fn keeps_the_grid_the_map_has_rather_than_capping_it() {
         let dir = asset_dir("size");
-        let asset = encode_asset(&dir, &density(1024, 512), 1024, 512).expect("encode");
+        let asset = encode_asset(&dir, &density(1024, 512), 1024, 512, ARCHIVE).expect("encode");
         assert_eq!((asset.width, asset.height), (1024, 512));
     }
 
@@ -373,7 +387,7 @@ mod tests {
     fn refuses_a_grid_that_is_not_the_size_it_says_it_is() {
         let dir = asset_dir("mismatch");
         assert_eq!(
-            encode_asset(&dir, &density(8, 8), 8, 9).unwrap_err(),
+            encode_asset(&dir, &density(8, 8), 8, 9, ARCHIVE).unwrap_err(),
             MapOverlaySkip::EncodeFailed
         );
     }
