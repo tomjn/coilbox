@@ -19,7 +19,7 @@ use sidecar::{
     build_lua_repl_args, build_map_info_args, build_map_meta_args, build_map_skybox_args,
     build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
     build_unit_buildpics_args, build_unit_dataset_args, build_unit_model_args,
-    build_unit_render_args, find_unitsync, resolve_sidecar,
+    build_unit_render_args, build_unit_render_keys_args, find_unitsync, resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -299,6 +299,22 @@ fn write_temp_pixels(rgba: &[u8]) -> Result<PathBuf, String> {
         .unwrap_or(0);
     path.push(format!("coilbox-render-{pid}-{nanos}.rgba"));
     std::fs::write(&path, rgba).map_err(|e| format!("could not write the render's pixels: {e}"))?;
+    Ok(path)
+}
+
+/// Write the units of a render-key batch to a uniquely-named temp file, for the
+/// same reason the two above exist: a whole game's roster is tens of kilobytes,
+/// which is past what Windows takes on a command line. The caller removes it once
+/// the worker has exited.
+fn write_temp_units(units: &str) -> Result<PathBuf, String> {
+    let mut path = std::env::temp_dir();
+    let pid = std::process::id();
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    path.push(format!("coilbox-render-keys-{pid}-{nanos}.json"));
+    std::fs::write(&path, units).map_err(|e| format!("could not write the unit list: {e}"))?;
     Ok(path)
 }
 
@@ -728,6 +744,65 @@ async fn unitsync_unit_render<R: Runtime>(
     Ok(out)
 }
 
+/// One unit of a render-key batch, as the frontend sends it. Passed through to
+/// the worker verbatim, so the field names are the worker's.
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UnitRenderKeyRequest {
+    unit: String,
+    object: String,
+    footprint_x: u32,
+    footprint_z: u32,
+}
+
+/// `unitsync_unit_render_keys` works out what a batch of units' renders will be
+/// called, without drawing any of them (issues #1672 and #1666).
+///
+/// This is what lets the have check come first for renders. A render's
+/// `source_hash` is over the model and its textures, so it can be read out of the
+/// archive on its own, and until this existed the only route to one was to draw
+/// the picture and encode it, which is the cost the check exists to avoid.
+///
+/// One call is one archive mount however many units it names, which is the other
+/// half of the same change: a blueprint naming twenty buildings used to be twenty
+/// mounts, a second or more each on a game like Beyond All Reason.
+#[tauri::command]
+async fn unitsync_unit_render_keys<R: Runtime>(
+    _app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    game_archive: String,
+    angle: String,
+    renderer_version: u32,
+    units: Vec<UnitRenderKeyRequest>,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let list = match serde_json::to_string(&units) {
+        Ok(s) => s,
+        Err(e) => return Ok(CliResult::err(format!("could not send the unit list: {e}"))),
+    };
+    let units_file = match write_temp_units(&list) {
+        Ok(p) => p,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+
+    let args = build_unit_render_keys_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &game_archive,
+        &units_file.to_string_lossy(),
+        &angle,
+        renderer_version,
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "unit render keys", None).await;
+    let _ = std::fs::remove_file(&units_file);
+    Ok(out)
+}
+
 #[tauri::command]
 async fn unitsync_map_info<R: Runtime>(
     app: AppHandle<R>,
@@ -1001,6 +1076,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_unit_dataset,
             unitsync_unit_model,
             unitsync_unit_render,
+            unitsync_unit_render_keys,
             unitsync_map_info,
             unitsync_map_skybox,
             unitsync_skirmish_ais,

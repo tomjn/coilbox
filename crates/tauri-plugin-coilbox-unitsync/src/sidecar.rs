@@ -227,6 +227,33 @@ pub fn build_unit_render_args(
     args
 }
 
+/// Build args for `--unit-render-keys` mode: the game the models come out of,
+/// the file naming the units, and the angle and renderer the keys are for.
+///
+/// The units travel by path for the same reason the pixels do: a whole game's
+/// roster is tens of kilobytes, which is past what Windows takes on a command
+/// line.
+pub fn build_unit_render_keys_args(
+    lib: &str,
+    datadir: &str,
+    game: &str,
+    units_file: &str,
+    angle: &str,
+    renderer_version: u32,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--unit-render-keys".into());
+    args.push("--game".into());
+    args.push(game.into());
+    args.push("--units-file".into());
+    args.push(units_file.into());
+    args.push("--angle".into());
+    args.push(angle.into());
+    args.push("--renderer-version".into());
+    args.push(renderer_version.to_string());
+    args
+}
+
 /// Build args for heightmap mode: scan args plus the map name, the `--heightmap`
 /// flag, the longest-side pixel cap, and the optional on-disk PNG cache directory.
 pub fn build_heightmap_args(
@@ -718,6 +745,33 @@ mod tests {
         assert_eq!(after("--width"), "255");
         assert_eq!(after("--height"), "204");
         assert_eq!(after("--asset-dir"), "/assets");
+    }
+
+    /// The key mode's whole point is one call for many units, so the units go by
+    /// file and the angle and renderer travel with them: a key made for the wrong
+    /// renderer would report the hub's corpus as changed.
+    #[test]
+    fn build_unit_render_keys_args_carry_the_game_the_units_and_the_renderer() {
+        let a = build_unit_render_keys_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "BAR.sdd",
+            "/tmp/units.json",
+            "top",
+            1,
+        );
+        let after = |flag: &str| {
+            let at = a.iter().position(|x| x == flag).expect(flag);
+            a[at + 1].clone()
+        };
+        assert!(a.contains(&"--unit-render-keys".to_string()));
+        assert_eq!(after("--game"), "BAR.sdd");
+        assert_eq!(after("--units-file"), "/tmp/units.json");
+        assert_eq!(after("--angle"), "top");
+        assert_eq!(after("--renderer-version"), "1");
+        // Nothing is drawn or written, so neither belongs on this call.
+        assert!(!a.contains(&"--pixels".to_string()));
+        assert!(!a.contains(&"--asset-dir".to_string()));
     }
 
     #[test]
