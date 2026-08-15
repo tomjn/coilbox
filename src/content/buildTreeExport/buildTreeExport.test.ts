@@ -115,6 +115,22 @@ describe("buildExportArtifact html", () => {
     expect(out).toContain("no pic");
   });
 
+  it("marks a unit whose pic coilbox could not read (#1625)", () => {
+    const out = html(
+      buildExportArtifact(
+        input({
+          pics: {
+            ...pics,
+            armsolar: { name: "Solar Collector", iconSkipped: "undecodable" },
+          },
+        }),
+        opts,
+      ),
+    );
+    expect(out).toContain("bad pic");
+    expect(out).toMatch(/<title>Coilbox cannot read/);
+  });
+
   it("carries no coilbox/unitsync/react-flow runtime reference", () => {
     const out = html(buildExportArtifact(input(), opts)).toLowerCase();
     expect(out).not.toContain("xyflow");

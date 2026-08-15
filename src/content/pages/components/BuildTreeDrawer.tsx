@@ -17,8 +17,9 @@ import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
-import type { Side, UnitDatasetEntry } from "../../bindings";
+import type { Side, UnitDatasetEntry, UnitDisplay } from "../../bindings";
 import type { BrandingEntry } from "../../branding";
+import { buildPicMissing } from "../../buildPicMissing";
 import {
   buildBuildGraph,
   buildEdgeMap,
@@ -35,6 +36,8 @@ import { UnitModelPanel } from "./UnitModelPanel";
 interface UnitNodeData extends Record<string, unknown> {
   label: string;
   icon?: string;
+  /** Why there is no `icon`, so the node can say which of the two it is (#1625). */
+  iconSkipped?: UnitDisplay["iconSkipped"];
   isBuilder?: boolean;
   isStart?: boolean;
   /** Mobile (can move) vs a static building — only distinguishes non-builders. */
@@ -46,6 +49,7 @@ interface UnitNodeData extends Record<string, unknown> {
 /** A build-tree node: build-pic (square, fills the node) above the unit name.
  * Commanders get a blue ring, other builders a yellow ring; hovering lifts it. */
 function UnitNode({ data }: NodeProps<Node<UnitNodeData>>) {
+  const missing = buildPicMissing({ iconSkipped: data.iconSkipped });
   return (
     <div
       className={cn(
@@ -79,8 +83,11 @@ function UnitNode({ data }: NodeProps<Node<UnitNodeData>>) {
           className="aspect-square w-full rounded object-contain"
         />
       ) : (
-        <div className="flex aspect-square w-full items-center justify-center rounded bg-muted text-[0.65rem] text-muted-foreground">
-          no pic
+        <div
+          title={missing.title}
+          className="flex aspect-square w-full items-center justify-center rounded bg-muted text-[0.65rem] text-muted-foreground"
+        >
+          {missing.label}
         </div>
       )}
       <span className="line-clamp-2 text-[0.7rem] leading-tight">
@@ -371,6 +378,7 @@ export function BuildTreeDrawer({
           data: {
             label: display?.name ?? prev.label,
             icon: display?.icon,
+            iconSkipped: display?.iconSkipped,
             isBuilder: prev.isBuilder,
             isStart: prev.isStart,
             isMobile: prev.isMobile,

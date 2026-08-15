@@ -8,7 +8,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { UnitBuildpicsResult, UnitDatasetEntry } from "../../bindings";
+import type {
+  UnitBuildpicsResult,
+  UnitDatasetEntry,
+  UnitDisplay,
+} from "../../bindings";
+import { buildPicMissing } from "../../buildPicMissing";
 import { useUnitsyncUnitBuildpics } from "../../config";
 import {
   buildTechForest,
@@ -196,7 +201,7 @@ export function TechTreePicker({
                 key={`${row.depth}:${row.id}`}
                 row={row}
                 label={labels.get(row.id) ?? row.id}
-                icon={buildpics?.units[row.id]?.icon}
+                display={buildpics?.units[row.id]}
                 lit={isSelected(selected, row.id)}
                 readOnly={readOnly}
                 isBuilder={forest.builders.has(row.id)}
@@ -255,7 +260,7 @@ interface Row {
 function UnitRow({
   row,
   label,
-  icon,
+  display,
   lit,
   readOnly,
   isBuilder,
@@ -267,7 +272,8 @@ function UnitRow({
 }: {
   row: Row;
   label: string;
-  icon?: string;
+  /** This unit's resolved build pic, absent until the icons come back. */
+  display?: UnitDisplay;
   lit: boolean;
   readOnly: boolean;
   isBuilder: boolean;
@@ -277,6 +283,7 @@ function UnitRow({
   onToggleUnit: (on: boolean) => void;
   onToggleSubtree: (on: boolean) => void;
 }) {
+  const missing = buildPicMissing(display);
   return (
     <li>
       <div
@@ -322,15 +329,18 @@ function UnitRow({
           />
         )}
 
-        {icon ? (
+        {display?.icon ? (
           <img
-            src={icon}
+            src={display.icon}
             alt=""
             className="size-7 shrink-0 rounded object-contain"
           />
         ) : (
-          <span className="flex size-7 shrink-0 items-center justify-center rounded bg-muted text-[0.55rem] text-muted-foreground">
-            no pic
+          <span
+            title={missing.title}
+            className="flex size-7 shrink-0 items-center justify-center rounded bg-muted text-center text-[0.55rem] leading-tight text-muted-foreground"
+          >
+            {missing.label}
           </span>
         )}
 

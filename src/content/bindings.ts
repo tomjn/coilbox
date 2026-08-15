@@ -1042,6 +1042,12 @@ export interface UnitDisplay {
   name?: string;
   /** Build-icon `data:` URL, when a texture resolved. */
   icon?: string;
+  /**
+   * Why there is no `icon`. `no-source` is a game that ships this unit no build
+   * pic, which is normal. `undecodable` is a picture coilbox could not read,
+   * which is coilbox's problem and worth saying out loud (#1625).
+   */
+  iconSkipped?: "no-source" | "undecodable" | "encode-failed";
 }
 
 export interface UnitBuildpicsResult {
