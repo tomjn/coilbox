@@ -103,7 +103,12 @@ impl AssetIdentity {
 /// One key to ask about: which picture, and the `source_hash` the caller holds for
 /// it. The hash is over the source the picture comes from, so it is known before
 /// the picture is made, which is what lets the check come first.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+///
+/// Deserialised as well as serialised because the webview asks too (issue #1636).
+/// A render's `source_hash` comes out of `unitsync_unit_render_keys` without
+/// drawing anything, and the webview is where the drawing would happen, so it has
+/// to be able to ask before it starts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AssetKey {
     #[serde(flatten)]
     pub identity: AssetIdentity,
@@ -111,7 +116,7 @@ pub struct AssetKey {
 }
 
 /// What the hub wants done with one key.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HaveStatus {
     /// The hub holds this identity at this `source_hash`. Render nothing, encode
@@ -134,7 +139,7 @@ impl HaveStatus {
 }
 
 /// One answer, carrying the key it is about in the shape it was sent.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HaveResult {
     #[serde(flatten)]
     pub identity: AssetIdentity,
@@ -429,6 +434,59 @@ mod tests {
                     "source_hash": "src-b",
                 },
             ]})
+        );
+    }
+
+    /// What `hub_assets_have` is handed by the webview, in the shape
+    /// `src/hub/assets/have.ts` builds (issue #1636). Flat rather than nested,
+    /// because the identity is flattened, and snake case because these are
+    /// struct fields rather than command arguments, which is the one thing about
+    /// this boundary that is easy to get wrong.
+    #[test]
+    fn the_webviews_own_key_deserialises() {
+        let sent: Vec<AssetKey> = serde_json::from_str(
+            r#"[{"keyed_on":"unit","game":"bar","unit_name":"armsolar","variant":"render:top","source_hash":"src-a"},
+                {"keyed_on":"map","map_name":"Isis 1.3","variant":"minimap","source_hash":"src-b"}]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            sent,
+            vec![
+                AssetKey {
+                    identity: AssetIdentity::Unit {
+                        game: "bar".into(),
+                        unit_name: "armsolar".into(),
+                        variant: "render:top".into(),
+                    },
+                    source_hash: "src-a".into(),
+                },
+                map("Isis 1.3", "src-b"),
+            ]
+        );
+        check_keys(&sent).expect("both shapes are askable");
+    }
+
+    /// And what goes back, which the webview reads by index to decide what to
+    /// draw. A status spelled any other way would read as `have` for nothing.
+    #[test]
+    fn an_answer_serialises_as_the_webview_reads_it() {
+        let answered = HaveResult {
+            identity: AssetIdentity::Unit {
+                game: "bar".into(),
+                unit_name: "armsolar".into(),
+                variant: "render:top".into(),
+            },
+            status: HaveStatus::Missing,
+        };
+        assert_eq!(
+            serde_json::to_value(&answered).unwrap(),
+            serde_json::json!({
+                "keyed_on": "unit",
+                "game": "bar",
+                "unit_name": "armsolar",
+                "variant": "render:top",
+                "status": "missing",
+            })
         );
     }
 
