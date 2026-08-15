@@ -119,6 +119,19 @@ pub struct HeightOverlay {
     pub bytes_per_sample: u64,
 }
 
+/// What turns a map's scanned proportions into its size in elmos.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapExtent {
+    /// How many elmos one metal infomap sample spans.
+    ///
+    /// The metal infomap is `(mapx / 2, mapy / 2)` samples
+    /// (`rts/Map/SMF/SMFMapFile.cpp:199`) and a map square is the engine's
+    /// `SQUARE_SIZE` of 8 elmos, which `CSMFMapFile` refuses to load a map
+    /// without, so one sample is exactly 16 elmos on every map that loads.
+    pub elmos_per_metal_sample: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetVocabulary {
@@ -136,6 +149,7 @@ pub struct AssetVocabulary {
     pub max_object_bytes: u64,
     pub render_frame: RenderFrame,
     pub height_overlay: HeightOverlay,
+    pub map_extent: MapExtent,
 }
 
 /// The agreed vocabulary.
@@ -183,6 +197,23 @@ pub fn height_overlay_max_bytes(variant: &str, width_elmos: u32, height_elmos: u
     let samples = u64::from(height_overlay_samples(width_elmos))
         * u64::from(height_overlay_samples(height_elmos));
     Some(samples * vocabulary().height_overlay.bytes_per_sample)
+}
+
+/// A map's size in elmos, from the metal infomap's sample counts (issue #1629).
+///
+/// This is the number the hub's `map_width` and `map_height` hold, and the one
+/// an overlay is lined up against. Three other counts describe the same map and
+/// none of them is this:
+///
+/// - the metal infomap's own samples, which is what goes in, `MapItem.width`
+/// - the height infomap's `(mapx + 1, mapy + 1)` vertices, a fencepost wider
+///   than the squares they bound
+/// - the "8 x 8" the community says, which is these elmos over 512 and a display
+///   convention rather than a length. Beyond All Reason's `BarMap::map_width`
+///   holds that one, so a 12 there is 6144 here.
+pub fn map_extent_elmos(metal_samples_x: u32, metal_samples_z: u32) -> (u32, u32) {
+    let per = vocabulary().map_extent.elmos_per_metal_sample;
+    (metal_samples_x * per, metal_samples_z * per)
 }
 
 #[cfg(test)]
@@ -373,6 +404,43 @@ mod tests {
             None
         );
         assert_eq!(height_overlay_max_bytes("minimap", 16384, 16384), None);
+    }
+
+    #[test]
+    fn a_metal_sample_is_two_map_squares_of_eight_elmos() {
+        let per = vocabulary().map_extent.elmos_per_metal_sample;
+        assert_eq!(per, 16);
+        // The metal infomap is half the map's square grid on each axis, and the
+        // engine refuses to load a map whose square is not the eight elmos the
+        // height overlay is sampled at.
+        assert_eq!(per, 2 * vocabulary().height_overlay.elmos_per_sample);
+    }
+
+    /// Real numbers, read off this machine's map library with
+    /// `--thumbnails`, and checked against the sizes Beyond All Reason
+    /// publishes for the same maps in `lobby_maps.validated.json`. A factor
+    /// that was out by two would still look like a map size, so the check that
+    /// matters is against a second source rather than against arithmetic.
+    #[test]
+    fn turns_real_maps_metal_samples_into_their_size_in_elmos() {
+        // Altored Divide Bar Remake 1.6.2, which BAR calls 16 by 16.
+        assert_eq!(map_extent_elmos(512, 512), (8192, 8192));
+        // Comet Catcher Remake 1.8, 16 by 12.
+        assert_eq!(map_extent_elmos(512, 384), (8192, 6144));
+        // Ancient Bastion Remake 0.5, 32 by 16 and the widest installed here.
+        assert_eq!(map_extent_elmos(1024, 512), (16384, 8192));
+        // All That Glitters Extended v1.0.2, 30 by 20, whose axes are both odd
+        // multiples so a transposed conversion would show.
+        assert_eq!(map_extent_elmos(960, 640), (15360, 10240));
+    }
+
+    /// The size a player says out loud, and what Beyond All Reason's own
+    /// `BarMap::map_width` holds, is these elmos over 512. Keeping the two
+    /// straight is the whole point of the field being named for elmos.
+    #[test]
+    fn the_size_a_player_says_is_this_over_512() {
+        let (width, height) = map_extent_elmos(512, 384);
+        assert_eq!((width / 512, height / 512), (16, 12));
     }
 
     #[test]

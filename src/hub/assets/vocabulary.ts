@@ -83,6 +83,9 @@ export interface AssetVocabulary {
     elmosPerSample: number;
     bytesPerSample: number;
   };
+  mapExtent: {
+    elmosPerMetalSample: number;
+  };
 }
 
 const vocabulary = raw as AssetVocabulary;
@@ -129,6 +132,36 @@ export const maxObjectBytes = vocabulary.maxObjectBytes;
 
 /** How many elmos one heightmap sample spans, the engine's `squareSize`. */
 export const ELMOS_PER_HEIGHT_SAMPLE = vocabulary.heightOverlay.elmosPerSample;
+
+/**
+ * How many elmos one metal infomap sample spans.
+ *
+ * The metal infomap is `(mapx / 2, mapy / 2)` samples
+ * (`rts/Map/SMF/SMFMapFile.cpp:199`) and a map square is the engine's
+ * `SQUARE_SIZE` of 8 elmos, which `CSMFMapFile` refuses to load a map without,
+ * so one sample is exactly 16 elmos on every map that loads.
+ */
+export const ELMOS_PER_METAL_SAMPLE = vocabulary.mapExtent.elmosPerMetalSample;
+
+/**
+ * A map's size in elmos, from the metal infomap's sample counts (issue #1629).
+ *
+ * This is the number the hub's `map_width` and `map_height` hold, and the one an
+ * overlay is lined up against. Three other counts describe the same map and none
+ * of them is this: the metal samples that go in, the height infomap's
+ * `(mapx + 1, mapy + 1)` vertices, and the "8 x 8" the community says, which is
+ * these elmos over 512 and a display convention rather than a length. Beyond All
+ * Reason's `BarMap.mapWidth` holds that last one, so a 12 there is 6144 here.
+ */
+export function mapExtentElmos(
+  metalSamplesX: number,
+  metalSamplesZ: number,
+): { widthElmos: number; heightElmos: number } {
+  return {
+    widthElmos: metalSamplesX * ELMOS_PER_METAL_SAMPLE,
+    heightElmos: metalSamplesZ * ELMOS_PER_METAL_SAMPLE,
+  };
+}
 
 /** The full variant string for one render angle. */
 export function renderVariant(angle: string): string {
