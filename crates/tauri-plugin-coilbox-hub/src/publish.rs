@@ -17,9 +17,9 @@ use coilbox_oauth::HTTP_TIMEOUT;
 use serde::Serialize;
 use serde_json::Value;
 use std::time::Duration;
-use url::Url;
 
 use crate::auth;
+use crate::endpoint::{api_url, host_of, read_capped};
 
 /// The route that takes a publication.
 const ITEMS_PATH: &str = "/api/v1/items";
@@ -62,30 +62,8 @@ pub struct Answer {
 }
 
 /// Where a hub's publish route lives, or why this address cannot carry a token.
-///
-/// https, because a bearer token on the wire in clear text is a token anybody on
-/// the network has. Loopback is the exception: a hub being developed locally is
-/// served over http, and there is no wire for it to be on.
 fn publish_url(hub_url: &str) -> Result<String, String> {
-    let base = hub_url.trim_end_matches('/');
-    let parsed =
-        Url::parse(base).map_err(|_| "The hub address is not a web address.".to_owned())?;
-    let loopback = matches!(parsed.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
-    if parsed.scheme() != "https" && !(parsed.scheme() == "http" && loopback) {
-        return Err(
-            "Publishing needs an https hub address, so your sign-in is not sent in the clear."
-                .to_owned(),
-        );
-    }
-    Ok(format!("{base}{ITEMS_PATH}"))
-}
-
-/// The host of a URL, for a message, or the URL itself if it will not parse.
-fn host_of(url: &str) -> String {
-    Url::parse(url)
-        .ok()
-        .and_then(|u| u.host_str().map(str::to_owned))
-        .unwrap_or_else(|| url.to_owned())
+    api_url(hub_url, ITEMS_PATH, "Publishing")
 }
 
 /// Publish to a hub, as the signed-in account.
@@ -116,7 +94,7 @@ pub async fn publish(hub_url: &str, publication: &Publication) -> Result<Answer,
         .map_err(|e| unreachable_message(hub_url, e.is_timeout()))?;
 
     let status = response.status().as_u16();
-    let bytes = read_capped(response).await?;
+    let bytes = read_capped(response, ANSWER_LIMIT).await?;
     Ok(Answer {
         status,
         body: serde_json::from_slice(&bytes).ok(),
@@ -132,26 +110,6 @@ fn unreachable_message(hub_url: &str, timed_out: bool) -> String {
         format!("The hub at {host} took too long to answer. It may be waking up after a quiet spell, so try again in a moment.")
     } else {
         format!("Could not reach the hub at {host}. Check your connection, and give it a moment if it is waking up after a quiet spell.")
-    }
-}
-
-/// Read a response body, stopping at [`ANSWER_LIMIT`] rather than buffering
-/// whatever arrives. Streamed with the cap applied as it goes, the way
-/// `dl_fetch_text` does, so a body that lies about its length is dropped mid
-/// transfer rather than downloaded first.
-async fn read_capped(mut response: reqwest::Response) -> Result<Vec<u8>, String> {
-    let mut buf: Vec<u8> = Vec::new();
-    loop {
-        match response.chunk().await {
-            Ok(Some(chunk)) => {
-                if buf.len() + chunk.len() > ANSWER_LIMIT {
-                    return Err("That address answered, but it is not a coilbox hub.".to_owned());
-                }
-                buf.extend_from_slice(&chunk);
-            }
-            Ok(None) => return Ok(buf),
-            Err(_) => return Err("The hub stopped answering part way through.".to_owned()),
-        }
     }
 }
 

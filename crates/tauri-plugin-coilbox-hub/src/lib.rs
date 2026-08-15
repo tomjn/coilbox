@@ -10,6 +10,7 @@
 //! frontend is the only place that can resolve it.
 
 pub mod auth;
+mod endpoint;
 pub mod publish;
 
 use picoframe_core::CliResult;
