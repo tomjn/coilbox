@@ -7,7 +7,8 @@
  */
 
 import type { Edge, Node } from "@xyflow/react";
-import type { Side, UnitDatasetEntry } from "../bindings";
+import type { Side, UnitDatasetEntry, UnitDisplay } from "../bindings";
+import { buildPicMissing } from "../buildPicMissing";
 import { buildBuildGraph, buildEdgeMap } from "../buildTree";
 import { layoutBuildTree } from "../pages/components/buildTreeLayout";
 import {
@@ -20,10 +21,12 @@ import {
   type UnitKind,
 } from "./types";
 
-/** One resolved unit display: friendly name and/or a base64 build-pic. */
+/** One resolved unit display: friendly name and/or a base64 build-pic, and why
+ * there is no build-pic when there isn't one. */
 export interface PicEntry {
   name?: string;
   icon?: string;
+  iconSkipped?: UnitDisplay["iconSkipped"];
 }
 
 /** Classify a unit for its ring colour, matching `BuildTreeDrawer`'s precedence:
@@ -73,6 +76,7 @@ export function buildFaction(
       label: pic?.name ?? fullByName.get(id) ?? id,
       kind: kindOf(id, startSet, edges, mobileSet),
       icon: pic?.icon,
+      noPic: pic?.icon ? undefined : buildPicMissing(pic),
     };
   });
 

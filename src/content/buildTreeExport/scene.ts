@@ -78,9 +78,10 @@ function renderNode(
   const pad = 6;
   const img = NODE_W - pad * 2;
   const src = href(n.id);
+  const why = n.noPic?.title ? `<title>${esc(n.noPic.title)}</title>` : "";
   const pic = src
     ? `<image class="pic" href="${esc(src)}" x="${pad}" y="${pad}" width="${img}" height="${img}" preserveAspectRatio="xMidYMid meet" />`
-    : `<rect class="nopic" x="${pad}" y="${pad}" width="${img}" height="${img}" rx="4" /><text class="nopic-label" x="${NODE_W / 2}" y="${pad + img / 2}">no pic</text>`;
+    : `<g class="nopic-box">${why}<rect class="nopic" x="${pad}" y="${pad}" width="${img}" height="${img}" rx="4" /><text class="nopic-label" x="${NODE_W / 2}" y="${pad + img / 2}">${esc(n.noPic?.label ?? "no pic")}</text></g>`;
   // Two-line clamp: crude wrap by splitting the label in half on a space when long.
   const label = esc(n.label);
   return `<g class="node" data-id="${esc(n.id)}" data-kind="${n.kind}" transform="translate(${n.x},${n.y})" tabindex="0" role="listitem" aria-label="${label}">

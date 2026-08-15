@@ -29,6 +29,9 @@ export interface ExportNode {
   kind: UnitKind;
   icon?: string;
   iconExt?: string;
+  /** The placeholder to draw instead of `icon`, and what it means on hover.
+   * Set only when there is no `icon`, from `buildPicMissing`. */
+  noPic?: { label: string; title?: string };
 }
 
 /** One builder→unit edge. `extra` marks the faint dashed "also buildable by"
