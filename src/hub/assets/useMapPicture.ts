@@ -21,7 +21,7 @@ import { assetCdnBase } from "./tier";
  * reader with the map installed has no use for it at all.
  *
  * `held` is what the hub holds for `(mapName, "minimap")`. Nothing passes it
- * yet: the hub has no public route that answers with a path. Issue #1686.
+ * yet: the hub has no public route that answers with a path. Issue #1687.
  */
 export function useMapPictureLadder(
   mapName: string | undefined,

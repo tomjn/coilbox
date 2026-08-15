@@ -51,7 +51,7 @@ import { type AssetTier, assetTierUrl } from "./tier";
  * `/api/v1/assets/have` needs a bearer token and answers `have`, `changed` or
  * `missing` without one. The rungs are here, and tested, because the tier bases
  * and the row's shape are both settled and published, so what is left is a wire
- * rather than a design. Issue #1686 is that wire.
+ * rather than a design. Issue #1687 is that wire.
  */
 
 /** Which rung answered. The two hub tiers keep their own names, because which
