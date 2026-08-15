@@ -189,7 +189,11 @@ pub struct AssetUpload {
     /// The type the bytes are, which the hub checks twice: against the class, and
     /// against the header it sniffs off the bytes themselves.
     pub mime: String,
-    /// The archive the picture came out of, as it is named on disk.
+    /// The name the archive the picture came out of declares for itself, which is
+    /// the worker's `sourceArchive` verbatim and never a file name (issue #1678).
+    /// Provenance on the row, and the field coilbox-hub#116 compares source bytes
+    /// within, so it has to be the same string on two honest installs of one
+    /// build however each was installed.
     pub source_archive: String,
     /// The map's size in elmos, which is what `coilbox_assets::map_extent_elmos`
     /// answers and never the "16 by 12" a player says out loud. Required on a map
@@ -1190,6 +1194,97 @@ mod tests {
             .map_variants
             .iter()
             .any(|v| v == HEIGHT_OVERLAY_VARIANT));
+    }
+
+    // ------------------------------------------- built from the worker's JSON
+
+    /// One build pic row exactly as `--seed` printed it, copied out of a manifest
+    /// written over this machine's library.
+    ///
+    /// Beyond All Reason on purpose, because it installs through the rapid pool:
+    /// the file the bytes came out of is
+    /// `ded9b29714a05164e4b4523b09809af2.sdp` and what the row carries is the
+    /// build's own name (issue #1678).
+    const WORKER_UNIT_ROW: &str = r#"{"kind":"unit","game":"BYAR","unitName":"armaak","variant":"buildpic","origin":"extracted","tier":"static","batch":5,"file":"batch-0005/33ca2586ee23893d0b33d6638b7b9244b188fd42755cd87f8490b0c8bc28acd0.webp","hash":"33ca2586ee23893d0b33d6638b7b9244b188fd42755cd87f8490b0c8bc28acd0","sourceHash":"2ca8d90a74d6b233dfd5469477e78411487c90dd7ab0c26add83764093d38182","encodeProfile":"webp-lossless-256","mime":"image/webp","width":256,"height":256,"bytes":121042,"sourceArchive":"Beyond All Reason test-30922-8064a43","sourceMember":"unitpics/armaak.dds"}"#;
+
+    /// And one map row, which is the other key shape and the only variant
+    /// carrying a world height range.
+    const WORKER_MAP_ROW: &str = r#"{"kind":"map","mapName":"1 Pass Greenland Redux v3","variant":"overlay:height","origin":"extracted","tier":"static","batch":1,"file":"batch-0001/3deb27ba72cf8aa390d7dfb5dc78390af1bfc77dd6240d0b965aa5604cee1da8.png","hash":"3deb27ba72cf8aa390d7dfb5dc78390af1bfc77dd6240d0b965aa5604cee1da8","sourceHash":"430af906ed2a7353a6ebebb24e0a41b40f97b103e11b73892fb1dcaa05108053","encodeProfile":"png16-lossless-source","mime":"image/png","width":769,"height":1281,"bytes":346656,"mapWidth":6144,"mapHeight":10240,"minHeight":90.0,"maxHeight":485.0,"sourceArchive":"1 Pass Greenland Redux v3"}"#;
+
+    /// An [`AssetUpload`] from one of those rows and from nothing else.
+    ///
+    /// Every value is read straight out of the JSON. Nothing is derived from the
+    /// variant, nothing defaults, and the caller passes nothing in, which is the
+    /// whole of what #1678 asked for: a driver that had to invent
+    /// `source_archive` would be inventing it onto a permanent public row.
+    ///
+    /// `path` is the one field the hub never sees, and the row names the file.
+    fn from_worker_row(row: &str) -> (AssetUpload, u64) {
+        let row: serde_json::Value = serde_json::from_str(row).unwrap();
+        let text = |field: &str| row[field].as_str().unwrap().to_owned();
+        let count = |field: &str| row.get(field).and_then(|v| v.as_u64()).map(|n| n as u32);
+        let measure = |field: &str| row.get(field).and_then(|v| v.as_f64()).map(|n| n as f32);
+
+        let identity = match row["kind"].as_str().unwrap() {
+            "unit" => AssetIdentity::Unit {
+                game: text("game"),
+                unit_name: text("unitName"),
+                variant: text("variant"),
+            },
+            _ => AssetIdentity::Map {
+                map_name: text("mapName"),
+                variant: text("variant"),
+            },
+        };
+        let asset = AssetUpload {
+            identity,
+            source_hash: text("sourceHash"),
+            encode_profile: text("encodeProfile"),
+            origin: serde_json::from_value(row["origin"].clone()).unwrap(),
+            mime: text("mime"),
+            source_archive: text("sourceArchive"),
+            map_width: count("mapWidth"),
+            map_height: count("mapHeight"),
+            world_height_min: measure("minHeight"),
+            world_height_max: measure("maxHeight"),
+            path: PathBuf::from(text("file")),
+        };
+        (asset, row["bytes"].as_u64().unwrap())
+    }
+
+    /// The unit declaration as `from_worker_row` builds it, and as the hub's own
+    /// `parseAssetUpload` was run against it. Written out here rather than
+    /// rebuilt from the struct, so this is the string the hub read.
+    ///
+    /// `parseAssetUpload` answered:
+    ///
+    /// ```json
+    /// {"ok":true,"declaration":{"identity":{"keyedOn":"unit","game":"BYAR","unitName":"armaak","variant":"buildpic"},"sourceHash":"2ca8d90a74d6b233dfd5469477e78411487c90dd7ab0c26add83764093d38182","encodeProfile":"webp-lossless-256","origin":"extracted","mime":"image/webp","bytes":121042,"sourceArchive":"Beyond All Reason test-30922-8064a43","mapWidth":null,"mapHeight":null,"worldHeightMin":null,"worldHeightMax":null}}
+    /// ```
+    const WORKER_UNIT_DECLARATION: &str = r#"{"keyed_on":"unit","game":"BYAR","unit_name":"armaak","variant":"buildpic","source_hash":"2ca8d90a74d6b233dfd5469477e78411487c90dd7ab0c26add83764093d38182","encode_profile":"webp-lossless-256","origin":"extracted","mime":"image/webp","source_archive":"Beyond All Reason test-30922-8064a43","bytes":121042}"#;
+
+    /// The map declaration, likewise. `parseAssetUpload` answered:
+    ///
+    /// ```json
+    /// {"ok":true,"declaration":{"identity":{"keyedOn":"map","mapName":"1 Pass Greenland Redux v3","variant":"overlay:height"},"sourceHash":"430af906ed2a7353a6ebebb24e0a41b40f97b103e11b73892fb1dcaa05108053","encodeProfile":"png16-lossless-source","origin":"extracted","mime":"image/png","bytes":346656,"sourceArchive":"1 Pass Greenland Redux v3","mapWidth":6144,"mapHeight":10240,"worldHeightMin":90,"worldHeightMax":485}}
+    /// ```
+    const WORKER_MAP_DECLARATION: &str = r#"{"keyed_on":"map","map_name":"1 Pass Greenland Redux v3","variant":"overlay:height","source_hash":"430af906ed2a7353a6ebebb24e0a41b40f97b103e11b73892fb1dcaa05108053","encode_profile":"png16-lossless-source","origin":"extracted","mime":"image/png","source_archive":"1 Pass Greenland Redux v3","map_width":6144,"map_height":10240,"world_height_min":90.0,"world_height_max":485.0,"bytes":346656}"#;
+
+    /// A driver can build a declaration out of what the worker printed, with no
+    /// second source and no rule of its own.
+    #[test]
+    fn a_declaration_is_built_from_the_workers_json_alone() {
+        let (unit, bytes) = from_worker_row(WORKER_UNIT_ROW);
+        assert_eq!(
+            declaration_json(&unit, bytes).unwrap(),
+            WORKER_UNIT_DECLARATION
+        );
+
+        let (map, bytes) = from_worker_row(WORKER_MAP_ROW);
+        assert_eq!(
+            declaration_json(&map, bytes).unwrap(),
+            WORKER_MAP_DECLARATION
+        );
     }
 
     #[test]
