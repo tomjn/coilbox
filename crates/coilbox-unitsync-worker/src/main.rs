@@ -121,13 +121,19 @@ fn main() {
 }
 
 fn run() -> i32 {
-    let args = match parse_args() {
+    let mut args = match parse_args() {
         Ok(v) => v,
         Err(e) => {
             emit_error(e);
             return 1;
         }
     };
+
+    // Every path the caller gave is resolved against the directory it ran from,
+    // before the chdir below moves us into the engine's (issue #1653). Without
+    // this a relative `--asset-dir assets` writes into the engine directory,
+    // which is nobody's idea of where they asked for it.
+    absolutize(&mut args);
 
     // unitsync reads SPRING_DATADIR via getenv inside Init, so setting it now
     // points the scan at the chosen content root. The loader-path var helps the
@@ -752,6 +758,49 @@ fn parse_args() -> Result<Args, String> {
     })
 }
 
+/// Resolve every caller-supplied path against the current directory, which at
+/// this point is still the one the worker was started in.
+///
+/// `run` chdirs into the engine directory so libunitsync's sibling libraries
+/// load, and that happens before any mode reads its paths, so a relative one
+/// would land beside the engine rather than beside the caller (issue #1653).
+/// The library and data directory are read by unitsync itself and get the same
+/// treatment for the same reason.
+///
+/// Only paths this worker opens or writes are listed. `--config-key`,
+/// `--map`, `--game` and `--archive` are unitsync names, not paths.
+fn absolutize(args: &mut Args) {
+    for path in [
+        Some(&mut args.lib),
+        Some(&mut args.datadir),
+        args.cache_dir.as_mut(),
+        args.asset_dir.as_mut(),
+        args.extract.as_mut(),
+        args.source_file.as_mut(),
+        args.chunks_file.as_mut(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if let Some(abs) = absolute_path(path) {
+            *path = abs;
+        }
+    }
+}
+
+/// `path` joined onto the current directory when it is relative, and `None`
+/// when it is already absolute or the current directory cannot be read.
+///
+/// Deliberately not `canonicalize`: an output directory that does not exist yet
+/// is the normal case for `--asset-dir`, and canonicalizing it would fail.
+fn absolute_path(path: &str) -> Option<String> {
+    if Path::new(path).is_absolute() {
+        return None;
+    }
+    let cwd = std::env::current_dir().ok()?;
+    Some(cwd.join(path).to_string_lossy().into_owned())
+}
+
 /// Prepend `dir` to the platform's shared-library search variable.
 fn prepend_loader_path(dir: &Path) {
     let var = if cfg!(target_os = "macos") {
@@ -1067,5 +1116,91 @@ fn print_json(out: &ScanOutput) {
     match serde_json::to_string(out) {
         Ok(s) => println!("{s}"),
         Err(e) => eprintln!("failed to serialize unitsync output: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args_with(cache_dir: Option<&str>, asset_dir: Option<&str>) -> Args {
+        Args {
+            lib: "/engines/one/libunitsync.dylib".into(),
+            datadir: "data".into(),
+            map: None,
+            game: None,
+            archive: None,
+            file: None,
+            extract: None,
+            thumbnails: false,
+            heightmap: false,
+            height_field: false,
+            metalmap: false,
+            typemap: false,
+            map_info: false,
+            map_meta: false,
+            map_skybox: false,
+            config: false,
+            config_set: false,
+            config_key: None,
+            config_value: None,
+            skirmish_ais: false,
+            game_headers: false,
+            unit_buildpics: false,
+            unit_dataset: false,
+            unit_model: false,
+            object: None,
+            units: Vec::new(),
+            faction_logos: false,
+            sides: Vec::new(),
+            lua: false,
+            source_file: None,
+            chunks_file: None,
+            mip: 1,
+            max_side: 512,
+            cache_dir: cache_dir.map(str::to_string),
+            asset_dir: asset_dir.map(str::to_string),
+        }
+    }
+
+    /// The whole of issue #1653: a relative output directory has to mean the
+    /// caller's, and the only chance to say so is before the chdir into the
+    /// engine directory.
+    #[test]
+    fn a_relative_path_resolves_against_the_directory_the_worker_was_run_in() {
+        let cwd = std::env::current_dir().expect("cwd");
+        let mut args = args_with(Some("cache"), Some("seed/out"));
+        absolutize(&mut args);
+
+        assert_eq!(
+            args.asset_dir.as_deref(),
+            Some(cwd.join("seed/out").to_string_lossy().as_ref())
+        );
+        assert_eq!(
+            args.cache_dir.as_deref(),
+            Some(cwd.join("cache").to_string_lossy().as_ref())
+        );
+        assert_eq!(
+            args.datadir,
+            cwd.join("data").to_string_lossy().into_owned()
+        );
+    }
+
+    #[test]
+    fn an_absolute_path_is_left_exactly_as_it_was_given() {
+        let mut args = args_with(Some("/var/cache"), Some("/var/seed"));
+        absolutize(&mut args);
+        assert_eq!(args.asset_dir.as_deref(), Some("/var/seed"));
+        assert_eq!(args.cache_dir.as_deref(), Some("/var/cache"));
+        assert_eq!(args.lib, "/engines/one/libunitsync.dylib");
+        assert_eq!(absolute_path("/already/there"), None);
+    }
+
+    #[test]
+    fn a_path_nobody_gave_stays_absent() {
+        let mut args = args_with(None, None);
+        absolutize(&mut args);
+        assert_eq!(args.asset_dir, None);
+        assert_eq!(args.cache_dir, None);
     }
 }
