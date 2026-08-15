@@ -9,9 +9,10 @@
 //! during the enumeration scan.
 //!
 //! `buildoptions` is only reachable through the Lua parser (native FFI unit
-//! enumeration doesn't expose it), so — mirroring `game::units_via_shim` — we run
-//! `gamedata/defs.lua` through the parser with the game environment unitsync omits
-//! shimmed in, and read back `name\tfullname\topt1,opt2,...` per unit.
+//! enumeration doesn't expose it), so, mirroring `game::units_via_shim`, we run
+//! `gamedata/defs.lua` through the parser with [`crate::lua::DEFS_ENV_SHIM`]
+//! supplying the game environment unitsync omits, and read back
+//! `name\tfullname\topt1,opt2,...` per unit.
 
 use crate::ffi::Unitsync;
 use crate::infocache;
@@ -23,32 +24,11 @@ use std::path::Path;
 /// game's own files and the base `springcontent` def scripts.
 const VFS_ALL_MODES: &str = "rmMbe";
 
-/// The Lua that [`units_via_shim`] runs, with [`crate::lua::CHUNKED_RESULT`]
-/// prepended. It mirrors `game.rs`'s unit-list shim but also collects each unit's
-/// `buildoptions`. Keys and buildoptions are lowercased so the graph's edges match
-/// its node names.
+/// The Lua that [`units_via_shim`] runs, with [`crate::lua::CHUNKED_RESULT`] and
+/// [`crate::lua::DEFS_ENV_SHIM`] prepended. It mirrors `game.rs`'s unit-list shim
+/// but also collects each unit's `buildoptions`. Keys and buildoptions are
+/// lowercased so the graph's edges match its node names.
 const UNIT_DATASET_SHIM_SCRIPT: &str = r#"
--- Supply the slice of the game environment unitsync doesn't provide but the
--- shipped def scripts assume (same shims as game.rs's unit-list fallback).
--- Without these, gamedata/defs.lua either loads nothing (an engine build whose
--- Spring.TimeCheck no-ops never runs the def-loading callback) or raises
--- (missing Spring.GetModOptions / Game), so no units come back.
-if type(Spring) == 'table' then
-  Spring.TimeCheck = function(_, fn, ...)
-    if type(fn) == 'function' then return fn(...) end
-  end
-  if type(Spring.GetModOptions) ~= 'function' then
-    Spring.GetModOptions = function() return {} end
-  end
-end
--- Stand in for the engine's Game table, which unitsync leaves out of the def
--- parser entirely. Its map fields have no answer here, and the engine omits them
--- too when no map is loaded, so they stay nil. mapName is the exception: def
--- scripts read it to pick per-map config and assume it is always there. An empty
--- name is the honest "no map" and matches none, so a script falls through to its
--- map-independent defaults instead of loading some other map's overrides.
-if type(Game) ~= 'table' then Game = { gameSpeed = 30, mapName = '' } end
-
 local ok, defs = pcall(VFS.Include, 'gamedata/defs.lua')
 if not ok then return { __error = tostring(defs) } end
 local ud = (type(defs) == 'table') and defs.unitdefs or nil
@@ -265,7 +245,11 @@ pub fn emit_error(msg: String) {
 /// whose units cannot be read has to say so: an empty list is indistinguishable
 /// from a game that ships none.
 fn units_via_shim(us: &Unitsync) -> Result<Vec<UnitDatasetEntry>, String> {
-    let script = format!("{}{UNIT_DATASET_SHIM_SCRIPT}", crate::lua::CHUNKED_RESULT);
+    let script = format!(
+        "{}{}{UNIT_DATASET_SHIM_SCRIPT}",
+        crate::lua::CHUNKED_RESULT,
+        crate::lua::DEFS_ENV_SHIM
+    );
     us.run_lua_source(&script, VFS_ALL_MODES)
         .map(|raw| parse_dataset_units(&raw))
 }
@@ -502,8 +486,6 @@ mod tests {
     fn shim_script_reads_buildoptions_and_returns_result() {
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("VFS.Include"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("buildoptions"));
-        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("Spring.TimeCheck"));
-        assert!(UNIT_DATASET_SHIM_SCRIPT.contains("mapName = ''"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("speed_of"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("objectname"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("footprintx"));

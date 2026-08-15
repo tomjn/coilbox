@@ -161,30 +161,11 @@ pub fn emit_error(msg: String) {
 /// game's own files and the base `springcontent` def scripts.
 const VFS_ALL_MODES: &str = "rmMbe";
 
-/// The Lua that [`units_via_shim`] runs, with [`crate::lua::CHUNKED_RESULT`]
-/// prepended. The inline comments explain each shim.
+/// The Lua that [`units_via_shim`] runs, with [`crate::lua::CHUNKED_RESULT`] and
+/// [`crate::lua::DEFS_ENV_SHIM`] prepended. The shim supplies the game
+/// environment unitsync leaves out, without which `gamedata/defs.lua` either
+/// loads nothing or raises, and no units come back.
 const UNIT_DEFS_SHIM_SCRIPT: &str = r#"
--- Load the game's unit defs through unitsync's Lua parser, supplying the slice
--- of the game environment unitsync doesn't provide but the shipped def scripts
--- assume. Without these, gamedata/defs.lua either loads nothing (an engine build
--- whose Spring.TimeCheck no-ops never runs the def-loading callback) or raises
--- (missing Spring.GetModOptions / Game), so no units come back.
-if type(Spring) == 'table' then
-  Spring.TimeCheck = function(_, fn, ...)
-    if type(fn) == 'function' then return fn(...) end
-  end
-  if type(Spring.GetModOptions) ~= 'function' then
-    Spring.GetModOptions = function() return {} end
-  end
-end
--- Stand in for the engine's Game table, which unitsync leaves out of the def
--- parser entirely. Its map fields have no answer here, and the engine omits them
--- too when no map is loaded, so they stay nil. mapName is the exception: def
--- scripts read it to pick per-map config and assume it is always there. An empty
--- name is the honest "no map" and matches none, so a script falls through to its
--- map-independent defaults instead of loading some other map's overrides.
-if type(Game) ~= 'table' then Game = { gameSpeed = 30, mapName = '' } end
-
 local ok, defs = pcall(VFS.Include, 'gamedata/defs.lua')
 if not ok then return { __error = tostring(defs) } end
 local ud = (type(defs) == 'table') and defs.unitdefs or nil
@@ -226,7 +207,11 @@ fn collect_units_native(us: &Unitsync) -> Vec<UnitEntry> {
 /// environment shimmed in, and read back `name\tfullname` per unit. The failure
 /// is returned so the caller can report why a game has no units.
 fn units_via_shim(us: &Unitsync) -> Result<Vec<UnitEntry>, String> {
-    let script = format!("{}{UNIT_DEFS_SHIM_SCRIPT}", crate::lua::CHUNKED_RESULT);
+    let script = format!(
+        "{}{}{UNIT_DEFS_SHIM_SCRIPT}",
+        crate::lua::CHUNKED_RESULT,
+        crate::lua::DEFS_ENV_SHIM
+    );
     us.run_lua_source(&script, VFS_ALL_MODES)
         .map(|raw| parse_shim_units(&raw))
 }
