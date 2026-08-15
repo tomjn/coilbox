@@ -123,6 +123,35 @@ fn encode_asset(
     })
 }
 
+/// The hub's `overlay:metal` asset from samples already read. Exactly one of the
+/// two is set, which is what every asset-producing mode promises.
+fn asset_from_samples(
+    asset_dir: &Path,
+    dims: Option<(u32, u32)>,
+    raw: Option<&[u8]>,
+) -> (Option<MapOverlayAsset>, Option<MapOverlaySkip>) {
+    match (dims, raw) {
+        (None, _) => (None, Some(MapOverlaySkip::NoSource)),
+        (Some(_), None) => (None, Some(MapOverlaySkip::ReadFailed)),
+        (Some((w, h)), Some(raw)) => match encode_asset(asset_dir, raw, w, h) {
+            Ok(a) => (Some(a), None),
+            Err(why) => (None, Some(why)),
+        },
+    }
+}
+
+/// The hub's `overlay:metal` asset for one map, in a session the caller has
+/// already initialised. The seed walk's entry point (issue #1638).
+pub(crate) fn asset_in_session(
+    us: &Unitsync,
+    map_name: &str,
+    asset_dir: &Path,
+) -> (Option<MapOverlayAsset>, Option<MapOverlaySkip>) {
+    let dims = us.map_dimensions(map_name);
+    let raw = dims.and_then(|(w, h)| us.metalmap_data(map_name, w, h));
+    asset_from_samples(asset_dir, dims, raw.as_deref())
+}
+
 /// Render `map_name`'s metal infomap to a green-on-transparent RGBA PNG data URL
 /// (standalone unitsync session).
 ///
@@ -164,14 +193,9 @@ pub fn render(
         _ => None,
     };
 
-    let (asset, asset_skipped) = match (asset_dir, dims, raw.as_deref()) {
-        (None, _, _) => (None, None),
-        (Some(_), None, _) => (None, Some(MapOverlaySkip::NoSource)),
-        (Some(_), Some(_), None) => (None, Some(MapOverlaySkip::ReadFailed)),
-        (Some(dir), Some((w, h)), Some(raw)) => match encode_asset(dir, raw, w, h) {
-            Ok(a) => (Some(a), None),
-            Err(why) => (None, Some(why)),
-        },
+    let (asset, asset_skipped) = match asset_dir {
+        None => (None, None),
+        Some(dir) => asset_from_samples(dir, dims, raw.as_deref()),
     };
 
     let result = (|| -> Result<(RenderedImage, u32, u32), String> {

@@ -295,6 +295,77 @@ fn encode_asset(
     })
 }
 
+/// A texture that is one repeated colour, whatever that colour is.
+///
+/// unitsync returns an entirely black minimap for a map that ships none, and
+/// coilbox has always drawn it that way (issue #1658). Stored as the hub's
+/// asset it is worse than storing nothing: the hub cannot tell a blank square
+/// from a picture, so it draws the square instead of falling back to the
+/// placeholder it generates from the map's name.
+///
+/// The test is one repeated value rather than a darkness threshold, because a
+/// night map is dark and is still a picture of a map. A single value carries no
+/// information at any exposure, which is the only thing that can be said about a
+/// texture without deciding what a map ought to look like.
+///
+/// Only the minimap is judged this way. A metal map of all zeroes is a map with
+/// no metal on it and a type map of one index is ground that is the same
+/// everywhere: both are answers a consumer needs, and neither is a missing
+/// picture.
+fn is_blank(pixels: &[u16]) -> bool {
+    match pixels.split_first() {
+        Some((first, rest)) => rest.iter().all(|p| p == first),
+        None => true,
+    }
+}
+
+/// The hub's `minimap` asset for one map, from a texture already read at
+/// [`ASSET_MINIMAP_MIP`]. Exactly one of the two is set, which is what every
+/// asset-producing mode promises.
+fn asset_from_pixels(
+    asset_dir: &Path,
+    pixels: Option<&[u16]>,
+) -> (Option<MapOverlayAsset>, Option<MapOverlaySkip>) {
+    let Some(pixels) = pixels else {
+        return (None, Some(MapOverlaySkip::NoSource));
+    };
+    if is_blank(pixels) {
+        return (None, Some(MapOverlaySkip::Blank));
+    }
+    match encode_asset(asset_dir, pixels, mip_side(ASSET_MINIMAP_MIP)) {
+        Ok(a) => (Some(a), None),
+        Err(why) => (None, Some(why)),
+    }
+}
+
+/// The hub's `minimap` asset for one map, in a session the caller has already
+/// initialised. The seed walk's entry point, so a whole library's minimaps come
+/// off one `Init` (issue #1638).
+pub(crate) fn asset_in_session(
+    us: &Unitsync,
+    map_name: &str,
+    asset_dir: &Path,
+) -> (Option<MapOverlayAsset>, Option<MapOverlaySkip>) {
+    asset_from_pixels(
+        asset_dir,
+        us.minimap(map_name, ASSET_MINIMAP_MIP).as_deref(),
+    )
+}
+
+/// A map's size in elmos, from the same `<key>-dims.json` the thumbnail pass
+/// writes, so a library that has drawn its map grid once pays nothing (issue
+/// #1629). A miss costs the 86ms `GetInfoMapSize` the batch pays.
+pub(crate) fn map_elmos(
+    us: &Unitsync,
+    map_name: &str,
+    cache_dir: Option<&Path>,
+) -> (Option<u32>, Option<u32>) {
+    let key = map_cache_key(us, None, map_name);
+    dims_elmos(cached_dims(dims_file(cache_dir, key.as_deref()), || {
+        us.map_dimensions(map_name)
+    }))
+}
+
 /// Render `map_name`'s minimap at `mip` to a PNG data URL (standalone session).
 ///
 /// `asset_dir` `Some` additionally stores the mip 1 texture as the hub's
@@ -329,26 +400,16 @@ pub fn render(
         Some(_) => us.minimap(map_name, ASSET_MINIMAP_MIP),
         None => None,
     };
-    let (asset, asset_skipped) = match (asset_dir, asset_pixels.as_deref()) {
-        (None, _) => (None, None),
-        (Some(_), None) => (None, Some(MapOverlaySkip::NoSource)),
-        (Some(dir), Some(pixels)) => match encode_asset(dir, pixels, mip_side(ASSET_MINIMAP_MIP)) {
-            Ok(a) => (Some(a), None),
-            Err(why) => (None, Some(why)),
-        },
+    let (asset, asset_skipped) = match asset_dir {
+        None => (None, None),
+        Some(dir) => asset_from_pixels(dir, asset_pixels.as_deref()),
     };
 
     let shared = asset_pixels.as_deref().filter(|_| mip == ASSET_MINIMAP_MIP);
     let result = render_one(&us, map_name, mip, file.clone(), shared);
     sweep_pictures(cache_dir, file.as_slice());
 
-    // The map's size in elmos, from the same `<key>-dims.json` the thumbnail pass
-    // writes, so a library that has drawn its map grid once pays nothing here
-    // (issue #1629). A miss costs the same 86ms `GetInfoMapSize` the batch pays.
-    let (width_elmos, height_elmos) =
-        dims_elmos(cached_dims(dims_file(cache_dir, key.as_deref()), || {
-            us.map_dimensions(map_name)
-        }));
+    let (width_elmos, height_elmos) = map_elmos(&us, map_name, cache_dir);
 
     // Start positions, environment (wind/tidal) and appearance (water/sky/sun) all
     // live in mapinfo.lua, so load the map's archives and parse them via unitsync's
@@ -760,6 +821,50 @@ mod tests {
         let png = pixels_to_png(&pixels, 8).expect("encode");
         let decoded = image::load_from_memory(&png).expect("decode").to_rgb8();
         assert_eq!(decoded.as_raw().as_slice(), expand_rgb565(&pixels));
+    }
+
+    /// Issue #1658: Hex Farm 8's minimap comes back entirely black, and one
+    /// black square in the hub outranks the placeholder a consumer would draw
+    /// from the map's name.
+    #[test]
+    fn a_texture_of_one_colour_is_skipped_rather_than_stored() {
+        let dir = temp_dir("asset-blank");
+        let black = vec![0u16; 512 * 512];
+        let (asset, skipped) = asset_from_pixels(&dir, Some(&black));
+        assert!(asset.is_none());
+        assert_eq!(skipped, Some(MapOverlaySkip::Blank));
+        assert!(!dir.exists(), "wrote a blank square as a map's picture");
+
+        // Not a darkness test: a map that is all one colour of anything is the
+        // same non-picture, and a map with any variation in it is a picture.
+        let white = vec![0xffffu16; 64];
+        assert_eq!(
+            asset_from_pixels(&dir, Some(&white)).1,
+            Some(MapOverlaySkip::Blank)
+        );
+        assert!(is_blank(&[]));
+        assert!(!is_blank(&[0, 0, 1]));
+    }
+
+    /// A dark map is still a map. The check has to survive one that a
+    /// brightness threshold would have thrown away.
+    #[test]
+    fn a_dark_texture_with_detail_in_it_is_still_stored() {
+        let dir = temp_dir("asset-dark");
+        let night: Vec<u16> = (0..512 * 512).map(|i| u16::from(i % 3 == 0)).collect();
+        assert!(!is_blank(&night));
+        let (asset, skipped) = asset_from_pixels(&dir, Some(&night));
+        assert!(skipped.is_none());
+        assert_eq!(asset.expect("asset").variant, "minimap");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_map_with_no_texture_at_all_says_so() {
+        let dir = temp_dir("asset-nosource");
+        let (asset, skipped) = asset_from_pixels(&dir, None);
+        assert!(asset.is_none());
+        assert_eq!(skipped, Some(MapOverlaySkip::NoSource));
     }
 
     #[test]
