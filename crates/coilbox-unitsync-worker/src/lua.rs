@@ -148,6 +148,92 @@ local function __cb_chunk(s, extra, prefix)
 end
 "#;
 
+/// The game environment a def script expects, prepended to any script that runs
+/// `gamedata/defs.lua` through unitsync's parser.
+///
+/// unitsync's parser is the engine's own `LuaParser` compiled with `UNITSYNC`
+/// defined, and that switch takes three things away from it. Reading
+/// `rts/Lua/LuaParser.cpp` (`SetupEnv`) and `rts/Game/Game.cpp` (`CGame::LoadDefs`)
+/// gives the whole list, so this is a closed gap rather than an open-ended one:
+///
+///  1. the `Game` constants table, behind `#if !defined(UNITSYNC)` and only ever
+///     built for the engine's own defs parser.
+///  2. the `VFS` mode constants (`VFS.MOD` and friends), behind the same switch.
+///  3. sixteen `Spring` team, player and option queries the engine adds to its
+///     defs parser by hand, none of which unitsync installs.
+///
+/// A def script that touches any of them raises, and the whole game then reads as
+/// having no units. Supplying a *partial* `Game` is worse than supplying none:
+/// Beyond All Reason's `common/springUtilities/color.lua` opens with
+/// `if not Game then return end`, so a half-filled table walks it straight past
+/// its own guard and into `Game.textColorCodes`. Supplying none is not an option
+/// either, because Splinter Faction's `gamedata/alldefs_post.lua` indexes `Game`
+/// without checking. The environment has to be whole.
+///
+/// Every value here is either an engine constant read out of the engine source or
+/// the honest answer for "no game is set up and no map is loaded": no teams, no
+/// players, no modoptions. `textColorCodes` is not guessed at all. The engine
+/// installs the same codes on the `Engine` table even under unitsync, so that is
+/// where they come from.
+///
+/// Each shim is applied only where the engine left a hole, so a future engine
+/// build that fills one in wins over the stand-in. `Spring.TimeCheck` is the
+/// exception and is always replaced: builds up to 2026.06 compile it to a no-op
+/// under `UNITSYNC` that never runs its callback, which loads no defs at all.
+pub const DEFS_ENV_SHIM: &str = r#"
+if type(Spring) == 'table' then
+  Spring.TimeCheck = function(_, fn, ...)
+    if type(fn) == 'function' then return fn(...) end
+  end
+  local nothing = function() return nil end
+  local empty = function() return {} end
+  local no = function() return false end
+  local no_game_setup = {
+    GetModOptions = empty, GetModOption = nothing,
+    GetMapOptions = empty, GetMapOption = nothing,
+    GetTeamList = empty, GetPlayerList = empty, GetAllyTeamList = empty,
+    GetGaiaTeamID = function() return -1 end,
+    GetTeamInfo = nothing, GetAllyTeamInfo = nothing, GetAIInfo = nothing,
+    GetTeamAllyTeamID = nothing, GetTeamLuaAI = nothing, GetSideData = nothing,
+    AreTeamsAllied = no, ArePlayersAllied = no,
+  }
+  for name, fn in pairs(no_game_setup) do
+    if type(Spring[name]) ~= 'function' then Spring[name] = fn end
+  end
+end
+
+-- The VFS mode letters, verbatim from rts/System/FileSystem/VFSModes.h. Def
+-- scripts concatenate them to pick which archives an include may read from.
+if type(VFS) == 'table' then
+  local modes = {
+    RAW = 'r', MOD = 'M', GAME = 'M', MAP = 'm', BASE = 'b', MENU = 'e',
+    ZIP = 'Mmeb', RAW_FIRST = 'rMmeb', ZIP_FIRST = 'Mmebr',
+    RAW_ONLY = 'r', ZIP_ONLY = 'Mmeb',
+  }
+  for name, mode in pairs(modes) do
+    if VFS[name] == nil then VFS[name] = mode end
+  end
+end
+
+-- The map-independent half of the engine's Game table, from
+-- rts/Sim/Misc/GlobalConstants.h and rts/Lua/LuaConstGame.cpp. The map fields
+-- have no answer here and the engine omits them too when no map is loaded, so
+-- they stay nil. mapName is the exception: def scripts read it to pick per-map
+-- config and assume it is always there. An empty name is the honest "no map" and
+-- matches none, so a script falls through to its map-independent defaults
+-- instead of loading some other map's overrides.
+if type(Game) ~= 'table' then
+  Game = {
+    maxTeams = 255, maxPlayers = 251, gameSpeed = 30, squareSize = 8,
+    metalMapSquareSize = 16, buildSquareSize = 16, buildGridResolution = 2,
+    footprintScale = 2, mapName = '',
+    speedModClasses = { Tank = 0, KBot = 1, Hover = 2, Boat = 3, Ship = 3 },
+    scriptNotifyTypes = { HitNothing = 0, HitGround = 1, HitLimit = 2 },
+    textColorCodes = (type(Engine) == 'table') and Engine.textColorCodes or nil,
+  }
+end
+"#;
+
 /// A pure-Lua pretty-printer, prepended to every script. Uses only primitives the
 /// unitsync `LuaParser` env keeps (`pairs`/`type`/`tostring`/`string.format`/
 /// `table.concat`/`table.sort`). Handles nil/number/boolean/string/table, sorts
@@ -508,5 +594,132 @@ mod tests {
         assert_eq!(r.result.as_deref(), Some("2"));
         assert!(r.error.is_none());
         assert!(r.prints.is_none());
+    }
+
+    /// Build the globals unitsync's parser really has (measured against a live
+    /// libunitsync): `Spring` with only Echo/Log/TimeCheck, `VFS` with only the
+    /// five file functions and no mode letters, a full `Engine`, and no `Game`.
+    /// Then apply [`DEFS_ENV_SHIM`] and run `body`.
+    fn shimmed_env(body: &str) -> Lua {
+        let lua = Lua::new();
+        lua.load(
+            r#"
+            Spring = { Echo = function() end, Log = function() end,
+                       TimeCheck = function() end }
+            VFS = { Include = function() end, LoadFile = function() end,
+                    DirList = function() return {} end, SubDirs = function() return {} end,
+                    FileExists = function() return false end }
+            Engine = { gameSpeed = 30,
+                       textColorCodes = { Color = string.char(17),
+                                          ColorAndOutline = string.char(18),
+                                          Reset = string.char(8) } }
+            Game = nil
+            "#,
+        )
+        .exec()
+        .unwrap();
+        lua.load(DEFS_ENV_SHIM).exec().unwrap();
+        lua.load(body).exec().unwrap();
+        lua
+    }
+
+    #[test]
+    fn the_shim_fills_every_hole_unitsync_leaves() {
+        let lua = shimmed_env(
+            "ok = type(Game) == 'table' and type(VFS.MOD) == 'string' \
+             and type(Spring.GetGaiaTeamID) == 'function'",
+        );
+        assert!(lua.globals().get::<bool>("ok").unwrap());
+    }
+
+    /// The failure this shim was rewritten for. Beyond All Reason's colour helper
+    /// guards on `Game` being absent, then indexes `Game.textColorCodes`, so a
+    /// half-filled table gets past the guard and raises.
+    #[test]
+    fn a_def_script_can_read_the_colour_codes_off_game() {
+        let lua = shimmed_env(
+            "if not Game then codes = 'guarded out' else codes = Game.textColorCodes.Color end",
+        );
+        assert_eq!(
+            lua.globals().get::<String>("codes").unwrap(),
+            "\u{11}",
+            "the codes must be the engine's own, taken off the Engine table"
+        );
+    }
+
+    /// The other half of the same bind. Splinter Faction's post-processing step
+    /// indexes `Game` with no guard at all, so leaving it nil is not an option.
+    #[test]
+    fn a_def_script_can_index_game_without_guarding() {
+        let lua = shimmed_env("speed = Game.gameSpeed");
+        assert_eq!(lua.globals().get::<i64>("speed").unwrap(), 30);
+    }
+
+    /// `mapName` is an empty string rather than nil: a script that reads it to
+    /// pick per-map config must fall through to its defaults, not raise.
+    #[test]
+    fn there_is_a_map_name_and_it_is_empty() {
+        let lua = shimmed_env("name = Game.mapName");
+        assert_eq!(lua.globals().get::<String>("name").unwrap(), "");
+    }
+
+    /// The VFS mode letters have to be the engine's own, because def scripts
+    /// concatenate them into an access-mode string the parser then honours.
+    #[test]
+    fn the_vfs_mode_letters_match_the_engine() {
+        let lua = shimmed_env("modes = VFS.MAP .. VFS.MOD .. VFS.BASE");
+        assert_eq!(lua.globals().get::<String>("modes").unwrap(), "mMb");
+    }
+
+    /// Always replaced, because builds up to 2026.06 compile `TimeCheck` to a
+    /// no-op under UNITSYNC. The shipped `defs.lua` loads every def table inside
+    /// that callback, so a no-op yields a game with nothing in it.
+    #[test]
+    fn time_check_runs_the_callback_it_is_given() {
+        let lua = shimmed_env("Spring.TimeCheck('loading: ', function() ran = true end)");
+        assert!(lua.globals().get::<bool>("ran").unwrap());
+    }
+
+    /// Every stand-in except `TimeCheck` defers, so an engine build that fills
+    /// one of these holes in wins over the shim.
+    #[test]
+    fn an_engine_that_answers_already_is_left_alone() {
+        let lua = Lua::new();
+        lua.load(
+            r#"
+            Spring = { TimeCheck = function() end,
+                       GetModOptions = function() return { real = true } end }
+            VFS = { MOD = 'X' }
+            Game = { gameSpeed = 99 }
+            "#,
+        )
+        .exec()
+        .unwrap();
+        lua.load(DEFS_ENV_SHIM).exec().unwrap();
+        lua.load("opts = Spring.GetModOptions().real; mode = VFS.MOD; speed = Game.gameSpeed")
+            .exec()
+            .unwrap();
+        let g = lua.globals();
+        assert!(g.get::<bool>("opts").unwrap());
+        assert_eq!(g.get::<String>("mode").unwrap(), "X");
+        assert_eq!(g.get::<i64>("speed").unwrap(), 99);
+    }
+
+    /// With no game set up there are no teams and no players, and the queries
+    /// have to say so rather than raise. Beyond All Reason's def chain asks all
+    /// four of these while deciding whether it is a scavengers or raptors match.
+    #[test]
+    fn the_team_queries_answer_no_game_is_set_up() {
+        let lua = shimmed_env(
+            "gaia = Spring.GetGaiaTeamID() \
+             allies = #Spring.GetAllyTeamList() \
+             teams = #Spring.GetTeamList(0) \
+             info = Spring.GetTeamInfo(0, false)",
+        );
+        let g = lua.globals();
+        assert_eq!(g.get::<i64>("gaia").unwrap(), -1);
+        assert_eq!(g.get::<i64>("allies").unwrap(), 0);
+        assert_eq!(g.get::<i64>("teams").unwrap(), 0);
+        assert_eq!(g.get::<Option<bool>>("info").unwrap(), None);
     }
 }
