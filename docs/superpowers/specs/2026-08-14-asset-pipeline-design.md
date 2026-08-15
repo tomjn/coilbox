@@ -461,6 +461,8 @@ flag on every encoder upgrade: same `source_archive`, different hash, read as
 
 `source_hash` restores determinism exactly where the design depends on it.
 
+**A map layer's samples are framed, not hashed bare.** `minimap`, `overlay:metal`, `overlay:type` and `overlay:height` come off a sample grid rather than out of an archive member, and a grid of samples with nothing else is not an identity: two maps with a uniform layer and transposed dimensions hold the same bytes and are different pictures. So the hashed input is the variant name, a `0x00`, the width and height as little endian `u32`, then the samples. Every field is fixed width or self delimiting, so one byte stream has one reading. Little endian to match how the height and minimap samples are already serialised, so the hash is the same on every architecture. The variant is in there because metal and type share a grid and a sample width, and a flat metal layer is byte for byte a flat type layer. Nothing in the frame is encoder derived, so the property above holds unchanged. A build pic's `source_hash` stays the archive member's own bytes, which is a file identity and needs no frame.
+
 Properties that still hold:
 
 - Immutable URLs → long-lived cache headers, no invalidation logic

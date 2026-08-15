@@ -216,25 +216,27 @@ fn mip_side(mip: i32) -> u32 {
 /// The texture as unitsync handed it over: RGB565 words, little endian, row
 /// major.
 ///
-/// This is what `source_hash` is over, and it is one step further from the
-/// archive than the infomap overlays' is. There are no verbatim minimap bytes to
-/// hash: the SMF stores its minimap as a DXT1 mip chain, and `GetMinimap`
-/// decompresses the requested level into RGB565 through a fixed decoder
-/// (`GetMinimapSMF` in unitsync). So the identity is the decompressed texture,
-/// which moves when the map moves and does not move when coilbox's expansion to
-/// RGB8, `image` or libwebp changes. That is the property the have check at
-/// #1632 needs. It does move if the engine's DXT1 decode ever changes, which the
-/// overlays are immune to and this cannot be.
+/// This is what `source_hash` is over, framed by the variant and the texture's
+/// side by [`crate::assetencode::map_source_hash`], and it is one step further
+/// from the archive than the infomap overlays' is. There are no verbatim minimap
+/// bytes to hash: the SMF stores its minimap as a DXT1 mip chain, and
+/// `GetMinimap` decompresses the requested level into RGB565 through a fixed
+/// decoder (`GetMinimapSMF` in unitsync). So the identity is the decompressed
+/// texture, which moves when the map moves and does not move when coilbox's
+/// expansion to RGB8, `image` or libwebp changes. That is the property the have
+/// check at #1632 needs. It does move if the engine's DXT1 decode ever changes,
+/// which the overlays are immune to and this cannot be.
 ///
 /// Little endian rather than the host's `u16` layout, for the same reason as the
 /// height overlay (#1627): the hash has to be the same on every architecture
 /// coilbox builds for.
 ///
-/// The mip is part of this identity without being named in it. A mip 1 texture
-/// is 262144 words and a mip 0 texture of the same map is 1048576 different
-/// ones, so the two cannot be confused for each other, and if coilbox ever
-/// stored a different level the hash would change, which is correct because the
-/// stored bytes would be different pixels.
+/// A minimap is square, so it cannot collide the way #1660's transposed overlays
+/// did, and the mip was already part of the identity through the word count. It
+/// goes through the same framing anyway: one rule for every map layer beats a
+/// rule with an exception that has to be re-derived each time, and the mip is now
+/// stated rather than implied. It costs a hash move, which is free before the
+/// corpus is committed and not free after.
 fn source_bytes(pixels: &[u16]) -> Vec<u8> {
     let mut out = Vec::with_capacity(pixels.len() * 2);
     for p in pixels {
@@ -260,7 +262,9 @@ fn encode_asset(
     pixels: &[u16],
     side: u32,
 ) -> Result<MapOverlayAsset, MapOverlaySkip> {
-    use crate::assetencode::{encode_variant, ext_for_mime, sha256_hex, EncodeError};
+    use crate::assetencode::{
+        encode_variant, ext_for_mime, map_source_hash, sha256_hex, EncodeError,
+    };
 
     let texture = RgbImage::from_raw(side, side, expand_rgb565(pixels))
         .ok_or(MapOverlaySkip::EncodeFailed)?;
@@ -283,7 +287,7 @@ fn encode_asset(
         variant: MINIMAP_VARIANT.to_string(),
         path: path.to_string_lossy().into_owned(),
         hash,
-        source_hash: sha256_hex(&source_bytes(pixels)),
+        source_hash: map_source_hash(MINIMAP_VARIANT, side, side, &source_bytes(pixels)),
         encode_profile: encoded.encode_profile,
         mime: encoded.mime,
         width: encoded.width,
@@ -640,7 +644,7 @@ pub fn emit_error(msg: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assetencode::sha256_hex;
+    use crate::assetencode::{map_source_hash, sha256_hex};
     use std::cell::Cell;
 
     fn temp_dir(tag: &str) -> PathBuf {
@@ -759,7 +763,10 @@ mod tests {
         let dir = temp_dir("asset-hashes");
         let pixels = texture(512);
         let asset = encode_asset(&dir, &pixels, 512).expect("encode");
-        assert_eq!(asset.source_hash, sha256_hex(&source_bytes(&pixels)));
+        assert_eq!(
+            asset.source_hash,
+            map_source_hash(MINIMAP_VARIANT, 512, 512, &source_bytes(&pixels))
+        );
         assert_ne!(asset.source_hash, asset.hash);
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -774,14 +781,34 @@ mod tests {
         );
     }
 
-    /// The mip is part of the identity by being part of the bytes: the same map
-    /// at another level is a different texture, so it hashes differently without
-    /// the level having to be named in the hash.
+    /// The mip is part of the identity twice over now: the texture differs, and
+    /// since #1660 the side it was read at is in the frame as well, so the level
+    /// is stated rather than left to be inferred from the word count.
     #[test]
     fn the_same_map_at_another_mip_is_a_different_identity() {
-        let one = sha256_hex(&source_bytes(&texture(mip_side(ASSET_MINIMAP_MIP))));
-        let zero = sha256_hex(&source_bytes(&texture(mip_side(0))));
+        let side_one = mip_side(ASSET_MINIMAP_MIP);
+        let side_zero = mip_side(0);
+        let one = map_source_hash(
+            MINIMAP_VARIANT,
+            side_one,
+            side_one,
+            &source_bytes(&texture(side_one)),
+        );
+        let zero = map_source_hash(
+            MINIMAP_VARIANT,
+            side_zero,
+            side_zero,
+            &source_bytes(&texture(side_zero)),
+        );
         assert_ne!(one, zero);
+
+        // And the same words at two sides are two identities, which the word
+        // count alone could not say.
+        let flat = source_bytes(&vec![0u16; 64 * 64]);
+        assert_ne!(
+            map_source_hash(MINIMAP_VARIANT, 64, 64, &flat),
+            map_source_hash(MINIMAP_VARIANT, 32, 128, &flat)
+        );
     }
 
     /// The variant is the hub's own string and the vocabulary holds the list, so

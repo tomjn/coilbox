@@ -78,18 +78,23 @@ fn cache_file(cache_dir: Option<&Path>, key: Option<&str>, max_side: u32) -> Opt
 /// consumer's call, and baking it in is what this issue exists to undo.
 ///
 /// `source_hash` is over `raw`, the samples exactly as `GetInfoMap` returned
-/// them. Those bytes are a verbatim copy of the SMF's metal map block
-/// (`CSMFMapFile::ReadInfoMap` seeks `metalmapPtr` and reads `mapx/2 * mapy/2`
-/// bytes with no conversion), so the hash moves only when the map does, and not
-/// when coilbox's encoder, `image` or libwebp changes. That is the property the
-/// have check at #1632 needs, since it compares on `source_hash`.
+/// them, framed by the variant and the grid they sit on
+/// ([`crate::assetencode::map_source_hash`]). Those bytes are a verbatim copy of
+/// the SMF's metal map block (`CSMFMapFile::ReadInfoMap` seeks `metalmapPtr` and
+/// reads `mapx/2 * mapy/2` bytes with no conversion) and the frame is the hub's
+/// own vocabulary plus the map's own dimensions, so the hash moves only when the
+/// map does, and not when coilbox's encoder, `image` or libwebp changes. That is
+/// the property the have check at #1632 needs, since it compares on
+/// `source_hash`.
 fn encode_asset(
     asset_dir: &Path,
     raw: &[u8],
     w: u32,
     h: u32,
 ) -> Result<MapOverlayAsset, MapOverlaySkip> {
-    use crate::assetencode::{encode_variant, ext_for_mime, sha256_hex, EncodeError};
+    use crate::assetencode::{
+        encode_variant, ext_for_mime, map_source_hash, sha256_hex, EncodeError,
+    };
 
     let grid = GrayImage::from_raw(w, h, raw.to_vec()).ok_or(MapOverlaySkip::EncodeFailed)?;
     let encoded = encode_variant(METAL_OVERLAY_VARIANT, &DynamicImage::ImageLuma8(grid)).map_err(
@@ -111,7 +116,7 @@ fn encode_asset(
         variant: METAL_OVERLAY_VARIANT.to_string(),
         path: path.to_string_lossy().into_owned(),
         hash,
-        source_hash: sha256_hex(raw),
+        source_hash: map_source_hash(METAL_OVERLAY_VARIANT, w, h, raw),
         encode_profile: encoded.encode_profile,
         mime: encoded.mime,
         width: encoded.width,
@@ -249,7 +254,7 @@ pub fn emit_error(msg: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assetencode::sha256_hex;
+    use crate::assetencode::{map_source_hash, sha256_hex};
 
     /// A density grid with the shape a real metal map has: mostly nothing, a few
     /// spots, and every one of the values in between that a colour ramp would
@@ -322,8 +327,36 @@ mod tests {
         let dir = asset_dir("hashes");
         let raw = density(32, 32);
         let asset = encode_asset(&dir, &raw, 32, 32).expect("encode");
-        assert_eq!(asset.source_hash, sha256_hex(&raw));
+        assert_eq!(
+            asset.source_hash,
+            map_source_hash(METAL_OVERLAY_VARIANT, 32, 32, &raw)
+        );
         assert_ne!(asset.source_hash, asset.hash);
+    }
+
+    /// A metal map with no metal on it is a run of zeroes, so before #1660 a
+    /// 32x64 one and a 64x32 one were the same identity while being different
+    /// pictures. Greenest Fields 1.3.1 and mipmip8 1.0 are the real pair this
+    /// library holds, on the same grid.
+    #[test]
+    fn a_flat_layer_on_a_transposed_grid_is_a_different_identity() {
+        let dir = asset_dir("transposed");
+        let flat = vec![0u8; 32 * 64];
+        let tall = encode_asset(&dir, &flat, 32, 64).expect("encode tall");
+        let wide = encode_asset(&dir, &flat, 64, 32).expect("encode wide");
+        assert_ne!(tall.source_hash, wide.source_hash);
+    }
+
+    /// A flat metal layer and a flat type layer on one grid are the same bytes,
+    /// and a density of 0 is not terrain type 0. Five rows in this library hit
+    /// this before #1660 put the variant in the frame.
+    #[test]
+    fn a_flat_layer_does_not_share_an_identity_with_the_type_layer() {
+        let flat = vec![0u8; 32 * 32];
+        assert_ne!(
+            map_source_hash(METAL_OVERLAY_VARIANT, 32, 32, &flat),
+            map_source_hash("overlay:type", 32, 32, &flat)
+        );
     }
 
     /// An overlay class has no edge cap, so a grid bigger than any picture class
