@@ -54,6 +54,11 @@ vi.mock("@/placement/BlueprintOnMap", () => ({
 vi.mock("@/content/useGameUnits", () => ({
   useGameUnits: () => ({ units: [], loading: false }),
 }));
+// The hub backfill reads the hub address off the frame's settings store, which
+// is not mounted here, and it has its own tests (issue #1636).
+vi.mock("@/hub/assets/useBlueprintBackfill", () => ({
+  useBlueprintBackfill: () => {},
+}));
 vi.mock("../store", () => ({
   blueprintRoute: (id: string) => `/content/blueprints/${id}`,
   deleteBlueprint: async () => {},
