@@ -539,6 +539,39 @@ mod tests {
         assert!(refused.contains("already in the set"), "{refused}");
     }
 
+    /// A render is askable like anything else once the caller can get its
+    /// `source_hash` without drawing it, which is what `--unit-render-keys`
+    /// answers (issue #1672). The `source_hash` here is a real one, from that
+    /// mode run over Beyond All Reason's `armsolar`.
+    #[tokio::test]
+    async fn a_render_can_be_asked_about_before_it_is_drawn() {
+        let mut key = unit(
+            "bar",
+            "armsolar",
+            "c02dd0dd13f9bc896c6387b538338a20dd9f46a71dbb87033f0eb31941687512",
+        );
+        if let AssetIdentity::Unit { variant, .. } = &mut key.identity {
+            *variant = "render:top".into();
+        }
+        check_keys(std::slice::from_ref(&key)).expect("a render key is askable");
+
+        let hub = HaveServer::holding(&[(key.identity.clone(), &key.source_hash)]);
+        let answers = ask_in_batches(&hub.url(), "a-token", &[key.clone()])
+            .await
+            .unwrap();
+        assert_eq!(answers[0].status, HaveStatus::Have);
+        assert!(!answers[0].status.wants_upload());
+
+        // And a game that has re-skinned the model since is told apart, which is
+        // the whole reason the key is over the model rather than over the pixels.
+        let mut moved = key;
+        moved.source_hash = "a-different-model-digest".into();
+        let answers = ask_in_batches(&hub.url(), "a-token", &[moved])
+            .await
+            .unwrap();
+        assert_eq!(answers[0].status, HaveStatus::Changed);
+    }
+
     /// The same unit name in two games is two pictures, which is the reason `game`
     /// is in the key at all.
     #[test]
