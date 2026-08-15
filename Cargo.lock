@@ -5301,6 +5301,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-hub"
 version = "0.0.0"
 dependencies = [
+ "coilbox-assets",
  "coilbox-oauth",
  "picoframe-core",
  "reqwest 0.12.28",
