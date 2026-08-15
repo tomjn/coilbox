@@ -261,9 +261,10 @@ fn encode_asset(
     asset_dir: &Path,
     pixels: &[u16],
     side: u32,
+    source_archive: &str,
 ) -> Result<MapOverlayAsset, MapOverlaySkip> {
     use crate::assetencode::{
-        encode_variant, ext_for_mime, map_source_hash, sha256_hex, EncodeError,
+        encode_variant, ext_for_mime, map_source_hash, sha256_hex, EncodeError, EXTRACTED_ORIGIN,
     };
 
     let texture = RgbImage::from_raw(side, side, expand_rgb565(pixels))
@@ -285,6 +286,8 @@ fn encode_asset(
 
     Ok(MapOverlayAsset {
         variant: MINIMAP_VARIANT.to_string(),
+        origin: EXTRACTED_ORIGIN.to_string(),
+        source_archive: source_archive.to_string(),
         path: path.to_string_lossy().into_owned(),
         hash,
         source_hash: map_source_hash(MINIMAP_VARIANT, side, side, &source_bytes(pixels)),
@@ -329,6 +332,7 @@ fn is_blank(pixels: &[u16]) -> bool {
 fn asset_from_pixels(
     asset_dir: &Path,
     pixels: Option<&[u16]>,
+    source_archive: &str,
 ) -> (Option<MapOverlayAsset>, Option<MapOverlaySkip>) {
     let Some(pixels) = pixels else {
         return (None, Some(MapOverlaySkip::NoSource));
@@ -336,7 +340,12 @@ fn asset_from_pixels(
     if is_blank(pixels) {
         return (None, Some(MapOverlaySkip::Blank));
     }
-    match encode_asset(asset_dir, pixels, mip_side(ASSET_MINIMAP_MIP)) {
+    match encode_asset(
+        asset_dir,
+        pixels,
+        mip_side(ASSET_MINIMAP_MIP),
+        source_archive,
+    ) {
         Ok(a) => (Some(a), None),
         Err(why) => (None, Some(why)),
     }
@@ -353,6 +362,7 @@ pub(crate) fn asset_in_session(
     asset_from_pixels(
         asset_dir,
         us.minimap(map_name, ASSET_MINIMAP_MIP).as_deref(),
+        &crate::archive::archive_name_for_map(us, map_name),
     )
 }
 
@@ -406,7 +416,11 @@ pub fn render(
     };
     let (asset, asset_skipped) = match asset_dir {
         None => (None, None),
-        Some(dir) => asset_from_pixels(dir, asset_pixels.as_deref()),
+        Some(dir) => asset_from_pixels(
+            dir,
+            asset_pixels.as_deref(),
+            &crate::archive::archive_name_for_map(&us, map_name),
+        ),
     };
 
     let shared = asset_pixels.as_deref().filter(|_| mip == ASSET_MINIMAP_MIP);
@@ -647,6 +661,10 @@ mod tests {
     use crate::assetencode::{map_source_hash, sha256_hex};
     use std::cell::Cell;
 
+    /// A map archive's own versioned name, which is what `asset_in_session`
+    /// resolves and hands the encoder.
+    const ARCHIVE: &str = "Mediterraneum V1";
+
     fn temp_dir(tag: &str) -> PathBuf {
         let dir =
             std::env::temp_dir().join(format!("coilbox-minimap-test-{}-{tag}", std::process::id()));
@@ -705,7 +723,7 @@ mod tests {
     #[test]
     fn writes_the_asset_as_a_file_named_after_its_own_bytes() {
         let dir = temp_dir("asset-write");
-        let asset = encode_asset(&dir, &texture(512), 512).expect("encode");
+        let asset = encode_asset(&dir, &texture(512), 512, ARCHIVE).expect("encode");
         let on_disk = std::fs::read(&asset.path).expect("asset file written");
 
         assert_eq!(
@@ -728,7 +746,7 @@ mod tests {
     fn the_stored_asset_is_the_map_and_is_lossy() {
         let dir = temp_dir("asset-roundtrip");
         let pixels = texture(512);
-        let asset = encode_asset(&dir, &pixels, 512).expect("encode");
+        let asset = encode_asset(&dir, &pixels, 512, ARCHIVE).expect("encode");
 
         let on_disk = std::fs::read(&asset.path).expect("asset file written");
         let decoded = webp::Decoder::new(&on_disk).decode().expect("decode webp");
@@ -750,7 +768,7 @@ mod tests {
     #[test]
     fn stores_the_square_texture_rather_than_the_maps_shape() {
         let dir = temp_dir("asset-square");
-        let asset = encode_asset(&dir, &texture(512), 512).expect("encode");
+        let asset = encode_asset(&dir, &texture(512), 512, ARCHIVE).expect("encode");
         assert_eq!(asset.width, asset.height);
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -762,7 +780,7 @@ mod tests {
     fn identity_is_the_texture_and_the_path_is_the_encoded_bytes() {
         let dir = temp_dir("asset-hashes");
         let pixels = texture(512);
-        let asset = encode_asset(&dir, &pixels, 512).expect("encode");
+        let asset = encode_asset(&dir, &pixels, 512, ARCHIVE).expect("encode");
         assert_eq!(
             asset.source_hash,
             map_source_hash(MINIMAP_VARIANT, 512, 512, &source_bytes(&pixels))
@@ -830,7 +848,7 @@ mod tests {
         let out = MinimapOutput {
             width_elmos: Some(8192),
             height_elmos: Some(6144),
-            asset: Some(encode_asset(&dir, &texture(512), 512).expect("encode")),
+            asset: Some(encode_asset(&dir, &texture(512), 512, ARCHIVE).expect("encode")),
             ..Default::default()
         };
         let json: serde_json::Value = serde_json::to_value(&out).expect("serialize");
@@ -857,7 +875,7 @@ mod tests {
     fn a_texture_of_one_colour_is_skipped_rather_than_stored() {
         let dir = temp_dir("asset-blank");
         let black = vec![0u16; 512 * 512];
-        let (asset, skipped) = asset_from_pixels(&dir, Some(&black));
+        let (asset, skipped) = asset_from_pixels(&dir, Some(&black), ARCHIVE);
         assert!(asset.is_none());
         assert_eq!(skipped, Some(MapOverlaySkip::Blank));
         assert!(!dir.exists(), "wrote a blank square as a map's picture");
@@ -866,7 +884,7 @@ mod tests {
         // same non-picture, and a map with any variation in it is a picture.
         let white = vec![0xffffu16; 64];
         assert_eq!(
-            asset_from_pixels(&dir, Some(&white)).1,
+            asset_from_pixels(&dir, Some(&white), ARCHIVE).1,
             Some(MapOverlaySkip::Blank)
         );
         assert!(is_blank(&[]));
@@ -880,7 +898,7 @@ mod tests {
         let dir = temp_dir("asset-dark");
         let night: Vec<u16> = (0..512 * 512).map(|i| u16::from(i % 3 == 0)).collect();
         assert!(!is_blank(&night));
-        let (asset, skipped) = asset_from_pixels(&dir, Some(&night));
+        let (asset, skipped) = asset_from_pixels(&dir, Some(&night), ARCHIVE);
         assert!(skipped.is_none());
         assert_eq!(asset.expect("asset").variant, "minimap");
         let _ = std::fs::remove_dir_all(&dir);
@@ -889,7 +907,7 @@ mod tests {
     #[test]
     fn a_map_with_no_texture_at_all_says_so() {
         let dir = temp_dir("asset-nosource");
-        let (asset, skipped) = asset_from_pixels(&dir, None);
+        let (asset, skipped) = asset_from_pixels(&dir, None, ARCHIVE);
         assert!(asset.is_none());
         assert_eq!(skipped, Some(MapOverlaySkip::NoSource));
     }

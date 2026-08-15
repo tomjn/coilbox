@@ -51,10 +51,6 @@ use std::path::{Path, PathBuf};
 /// wrongly, not when a field is added.
 const MANIFEST_VERSION: u32 = 1;
 
-/// How the bytes were produced, from the vocabulary's closed list. Everything a
-/// seed walk writes is read out of an archive rather than rendered or uploaded.
-const SEED_ORIGIN: &str = "extracted";
-
 /// Which tier the hub files these rows under. The seed is committed to the
 /// assets repo and never passes through the staging store (spec section 4.7).
 const SEED_TIER: &str = "static";
@@ -93,7 +89,9 @@ pub struct SeedAsset {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub map_name: Option<String>,
     pub variant: String,
-    pub origin: &'static str,
+    /// How the bytes were produced, off the asset rather than assumed here, so
+    /// the manifest cannot disagree with what the extractor said (#1678).
+    pub origin: String,
     pub tier: &'static str,
     /// Which batch directory holds the file, and what a resuming consumer
     /// counts in.
@@ -124,7 +122,9 @@ pub struct SeedAsset {
     pub min_height: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_height: Option<f32>,
-    /// The archive the bytes came out of. Provenance, never identity.
+    /// The name the archive the bytes came out of declares for itself. Off the
+    /// asset, so this is the archive the extractor read rather than the one the
+    /// walk went looking for. Provenance, never identity.
     pub source_archive: String,
     /// The member inside that archive, for a build pic. A map overlay has none:
     /// unitsync derives it from the map file rather than handing back a member.
@@ -563,7 +563,9 @@ impl Walk {
         cache_dir: Option<&Path>,
         skipped: &mut Vec<SeedSkip>,
     ) {
-        let source_archive = us.map_archives(map_name).into_iter().next();
+        // Only the skips need this here. An asset carries its own, resolved by
+        // the extractor that read it.
+        let source_archive = crate::archive::archive_name_for_map(us, map_name);
         let (map_width, map_height) = crate::minimap::map_elmos(us, map_name, cache_dir);
         let staging = self.staging();
 
@@ -579,7 +581,7 @@ impl Walk {
             };
             let reason = match extracted {
                 Some((Some(asset), _)) => {
-                    self.place_map_asset(map_name, &source_archive, asset, map_width, map_height);
+                    self.place_map_asset(map_name, asset, map_width, map_height);
                     continue;
                 }
                 Some((None, why)) => {
@@ -594,7 +596,7 @@ impl Walk {
                 unit_name: None,
                 map_name: Some(map_name.to_string()),
                 variant: Some(variant.clone()),
-                source_archive: source_archive.clone(),
+                source_archive: Some(source_archive.clone()),
                 reason,
             });
         }
@@ -663,7 +665,6 @@ impl Walk {
     fn place_map_asset(
         &mut self,
         map_name: &str,
-        source_archive: &Option<String>,
         asset: MapOverlayAsset,
         map_width: Option<u32>,
         map_height: Option<u32>,
@@ -675,7 +676,7 @@ impl Walk {
             unit_name: None,
             map_name: Some(map_name.to_string()),
             variant: asset.variant,
-            origin: SEED_ORIGIN,
+            origin: asset.origin,
             tier: SEED_TIER,
             batch,
             file,
@@ -690,7 +691,7 @@ impl Walk {
             map_height,
             min_height: asset.min_height,
             max_height: asset.max_height,
-            source_archive: source_archive.clone().unwrap_or_default(),
+            source_archive: asset.source_archive,
             source_member: None,
         });
     }
@@ -708,7 +709,7 @@ impl Walk {
             unit_name: Some(unit.to_string()),
             map_name: None,
             variant: asset.variant,
-            origin: SEED_ORIGIN,
+            origin: asset.origin,
             tier: SEED_TIER,
             batch,
             file,
@@ -723,7 +724,7 @@ impl Walk {
             map_height: None,
             min_height: None,
             max_height: None,
-            source_archive: game.archive.clone(),
+            source_archive: asset.source_archive,
             source_member: Some(asset.source_member),
         });
     }
@@ -885,15 +886,6 @@ mod tests {
         );
     }
 
-    /// The row's `origin` is one of the vocabulary's, not a word invented here.
-    #[test]
-    fn names_an_origin_the_hub_stores() {
-        assert!(coilbox_assets::vocabulary()
-            .origins
-            .iter()
-            .any(|o| o == SEED_ORIGIN));
-    }
-
     #[test]
     fn files_are_written_into_batches_and_named_after_their_hash() {
         let root = temp_root("batches");
@@ -1027,9 +1019,10 @@ mod tests {
         let staged = stage(&walk, &hash, b"height bytes");
         walk.place_map_asset(
             "Comet Catcher Remake 1.8",
-            &Some("Comet Catcher Remake 1.8".into()),
             MapOverlayAsset {
                 variant: "overlay:height".into(),
+                origin: "extracted".into(),
+                source_archive: "Comet Catcher Remake 1.8".into(),
                 path: staged,
                 hash: hash.clone(),
                 source_hash: test_hash("samples"),
@@ -1085,6 +1078,8 @@ mod tests {
             "armcom",
             crate::model::UnitBuildpicAsset {
                 variant: "buildpic".into(),
+                origin: "extracted".into(),
+                source_archive: "Beyond All Reason test-30922-8064a43".into(),
                 path: staged,
                 hash: hash.clone(),
                 source_hash: test_hash("dds"),
@@ -1103,9 +1098,12 @@ mod tests {
         assert_eq!(json["unitName"], "armcom");
         assert_eq!(json["variant"], "buildpic");
         assert_eq!(json["sourceMember"], "unitpics/armcom.dds");
+        assert_eq!(json["origin"], "extracted");
+        // Off the asset, so it is the archive's own versioned name and not the
+        // `GameInstall`'s file name, which for a rapid install is a pool hash.
         assert_eq!(
             json["sourceArchive"],
-            "ded9b29714a05164e4b4523b09809af2.sdp"
+            "Beyond All Reason test-30922-8064a43"
         );
         // A unit is not a map: no map name, no elmos, no height bounds.
         assert!(json.get("mapName").is_none());

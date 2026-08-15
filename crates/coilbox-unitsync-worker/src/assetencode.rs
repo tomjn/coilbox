@@ -47,6 +47,17 @@ use sha2::{Digest, Sha256};
 /// the bytes were encoded to cannot come apart.
 pub const HEIGHT_OVERLAY_VARIANT: &str = "overlay:height";
 
+/// What the hub's `origin` column says about bytes read out of an archive as the
+/// archive stored them: every build pic and every map infomap layer.
+///
+/// Here rather than in each extractor because coilbox-hub#117 is about exactly
+/// this going four different ways at once. The test below holds both spellings to
+/// the shared vocabulary rather than to a memory of it.
+pub const EXTRACTED_ORIGIN: &str = "extracted";
+
+/// What it says about bytes coilbox drew instead, which is `render:<angle>`.
+pub const RENDERED_ORIGIN: &str = "rendered";
+
 /// Encoded bytes and the profile that produced them.
 ///
 /// The profile travels with the bytes because a later re-encode pass has to be
@@ -426,6 +437,16 @@ fn encode_pixels(image: &DynamicImage, class: &AssetClass) -> Result<Vec<u8>, En
 mod tests {
     use super::*;
     use image::{Rgb, RgbImage, Rgba, RgbaImage};
+
+    #[test]
+    fn the_origins_this_worker_writes_are_the_shared_vocabularys_own() {
+        // A spelling the hub's check constraint would refuse is a whole run's
+        // worth of rows rejected on arrival, so the strings are held to the
+        // vocabulary rather than to a memory of it (coilbox-hub#117).
+        let origins = &vocabulary().origins;
+        assert!(origins.iter().any(|o| o == EXTRACTED_ORIGIN));
+        assert!(origins.iter().any(|o| o == RENDERED_ORIGIN));
+    }
 
     /// A square with a fully transparent quadrant and three opaque coloured
     /// ones, so a round trip has something to lose.

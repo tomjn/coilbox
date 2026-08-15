@@ -344,6 +344,14 @@ pub struct HeightFieldOutput {
 pub struct MapOverlayAsset {
     /// The hub's variant name for this layer, e.g. `overlay:metal`.
     pub variant: String,
+    /// How the bytes were produced. Always `extracted` here: a map layer is read
+    /// out of the archive's infomaps rather than drawn.
+    pub origin: String,
+    /// The name the archive this was read out of declares for itself, which is
+    /// what the hub row's `source_archive` holds. See
+    /// [`crate::archive::archive_name_for_map`] for why a map's repeats its
+    /// `map_name`.
+    pub source_archive: String,
     /// Absolute path to the encoded file, named after `hash`.
     pub path: String,
     /// sha256 of the encoded bytes. The hub's object path component.
@@ -682,6 +690,11 @@ pub struct UnitRenderAsset {
     /// How the bytes were produced. Always `rendered` here, against `extracted`
     /// for everything read straight out of an archive.
     pub origin: String,
+    /// The name the archive the model was read out of declares for itself, which
+    /// is what the hub row's `source_archive` holds. A render is drawn rather
+    /// than read, and it is drawn from a model that came out of an archive, so
+    /// the provenance is the same question with the same answer.
+    pub source_archive: String,
     /// Absolute path to the encoded file, named after `hash`.
     pub path: String,
     /// sha256 of the encoded bytes. The hub's object path component.
@@ -818,6 +831,14 @@ pub struct UnitRenderKeysOutput {
 pub struct UnitBuildpicAsset {
     /// The hub's variant name for this class, always `buildpic` here.
     pub variant: String,
+    /// How the bytes were produced. Always `extracted` here, against `rendered`
+    /// for a picture coilbox drew.
+    pub origin: String,
+    /// The name the archive this was read out of declares for itself, which is
+    /// what the hub row's `source_archive` holds. See
+    /// [`crate::archive::archive_name_for_game`] for why it is that and not the
+    /// file name on disk.
+    pub source_archive: String,
     /// Absolute path to the encoded file, named after `hash`.
     pub path: String,
     /// sha256 of the encoded bytes. The hub's object path component.

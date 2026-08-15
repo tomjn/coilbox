@@ -89,6 +89,49 @@ pub fn tree(lib: &str, archive_name: &str) -> ArchiveTreeOutput {
     }
 }
 
+/// The name the archive holding a game declares for itself, which is what a hub
+/// row's `source_archive` carries (issue #1678).
+///
+/// The versioned name from modinfo, not the file name on disk, and the two are
+/// not the same thing. Beyond All Reason installs through the rapid pool, so its
+/// file is `ded9b29714a05164e4b4523b09809af2.sdp`, an md5 of the package's
+/// contents. That names the file exactly and says nothing a person or a later
+/// re-encode pass can use, while `Beyond All Reason test-30922-8064a43` names the
+/// build. It is also the same string on every honest install of that build,
+/// however it was installed, which is what coilbox-hub#116's anomaly check needs:
+/// it only compares source bytes between rows that agree on this field, so a
+/// value that moved with the install route would take the check off for anyone
+/// who downloaded the archive rather than pulling it from rapid.
+///
+/// `GetPrimaryModArchiveList` gives the game's own archive first and its
+/// dependencies after, so this is the archive the build pic was read out of.
+/// `buildpic::resolve` opens the primary archive and nothing else, so the two
+/// cannot come apart.
+pub(crate) fn archive_name_for_game(us: &Unitsync, game_archive: &str) -> String {
+    (0..us.mod_count())
+        .find(|&i| us.mod_archive(i).as_deref() == Some(game_archive))
+        .and_then(|i| us.mod_archives(i).into_iter().next())
+        .unwrap_or_else(|| game_archive.to_string())
+}
+
+/// The same for the archive holding a map, which `GetMapArchiveName` already
+/// reports under its versioned name.
+///
+/// That name is the map's own, so a map row's `source_archive` repeats its
+/// `map_name`. That is not a stand-in for something better: coilbox-hub#100 makes
+/// the versioned map name the whole of a map's identity precisely because a map
+/// archive holds one map and is named after it, so there is nothing else about
+/// the archive left to say.
+///
+/// The map's own archive comes first and `mapHelper` and friends after, so this
+/// is the archive the infomap was read out of rather than one it depends on.
+pub(crate) fn archive_name_for_map(us: &Unitsync, map_name: &str) -> String {
+    us.map_archives(map_name)
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| map_name.to_string())
+}
+
 /// Resolve an archive's scan-reported `name` to a path `OpenArchive` accepts.
 ///
 /// `OpenArchive` takes a VFS path/filename, not a name — and `GetArchivePath`

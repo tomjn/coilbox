@@ -29,11 +29,9 @@ use std::path::Path;
 
 use base64::Engine;
 
+use crate::assetencode::RENDERED_ORIGIN;
 use crate::ffi::Unitsync;
 use crate::model::{RenderSkip, UnitRenderAsset, UnitRenderOutput};
-
-/// What the origin column says about a picture coilbox drew rather than read.
-const RENDERED_ORIGIN: &str = "rendered";
 
 /// Four channels a pixel, straight alpha, top row first. The webview flips the
 /// framebuffer and un-premultiplies before it gets here, so this is exactly what
@@ -100,6 +98,8 @@ pub fn render(lib: &str, req: &RenderRequest<'_>) -> UnitRenderOutput {
     let mut errors = us.drain_errors();
 
     let digest = read_source_digest(&us, req, &mut errors);
+    // Read inside the session, since the archive list goes with unitsync.
+    let source_archive = crate::archive::archive_name_for_game(&us, req.game_archive);
     us.uninit();
 
     let (model_digest, source_member) = match digest {
@@ -127,6 +127,7 @@ pub fn render(lib: &str, req: &RenderRequest<'_>) -> UnitRenderOutput {
         &model_digest,
         &source_member,
         source_hash,
+        &source_archive,
     ) {
         Ok((asset, data_url)) => UnitRenderOutput {
             asset: Some(asset),
@@ -208,6 +209,7 @@ fn encode_asset(
     model_digest: &str,
     source_member: &str,
     source_hash: String,
+    source_archive: &str,
 ) -> Result<(UnitRenderAsset, String), RenderSkip> {
     use crate::assetencode::{encode_variant, ext_for_mime, sha256_hex, EncodeError};
 
@@ -238,6 +240,7 @@ fn encode_asset(
         UnitRenderAsset {
             variant: variant.to_string(),
             origin: RENDERED_ORIGIN.to_string(),
+            source_archive: source_archive.to_string(),
             path: path.to_string_lossy().into_owned(),
             hash,
             source_hash,
@@ -276,6 +279,10 @@ pub fn emit_error(msg: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A game archive's own versioned name, which is what `render` resolves and
+    /// hands the encoder rather than the file name it was called with.
+    const ARCHIVE: &str = "Beyond All Reason test-30922-8064a43";
 
     fn temp_dir(tag: &str) -> std::path::PathBuf {
         let dir =
@@ -389,6 +396,7 @@ mod tests {
             "a-model-digest",
             "objects3d/armcom.s3o",
             "a-source-hash".into(),
+            ARCHIVE,
         )
         .unwrap();
 
@@ -404,6 +412,7 @@ mod tests {
         assert_eq!(asset.mime, "image/webp");
         assert_eq!(asset.variant, "render:top");
         assert_eq!(asset.origin, "rendered");
+        assert_eq!(asset.source_archive, ARCHIVE);
         assert_eq!((asset.footprint_x, asset.footprint_z), (3, 2));
         assert!(data_url.starts_with("data:image/webp;base64,"));
     }
@@ -423,6 +432,7 @@ mod tests {
             "digest",
             "objects3d/armcom.s3o",
             "source".into(),
+            ARCHIVE,
         )
         .unwrap();
 

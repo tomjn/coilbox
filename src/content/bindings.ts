@@ -1269,6 +1269,9 @@ export interface UnitRenderAsset {
   variant: string;
   /** How the bytes were produced, `rendered` rather than `extracted`. */
   origin: string;
+  /** The name the archive the model was read out of declares for itself, which
+   *  is what the hub row's `source_archive` holds and never a file name. */
+  sourceArchive: string;
   /** Absolute path to the encoded file, named after {@link hash}. */
   path: string;
   /** sha256 of the encoded bytes, and the hub's object path component. */

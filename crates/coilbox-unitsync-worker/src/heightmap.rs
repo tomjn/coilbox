@@ -87,10 +87,11 @@ fn encode_asset(
     w: u32,
     h: u32,
     bounds: Option<(f32, f32)>,
+    source_archive: &str,
 ) -> Result<MapOverlayAsset, MapOverlaySkip> {
     use crate::assetencode::{
         encode_height_overlay, ext_for_mime, map_source_hash, sha256_hex, EncodeError,
-        HEIGHT_OVERLAY_VARIANT,
+        EXTRACTED_ORIGIN, HEIGHT_OVERLAY_VARIANT,
     };
 
     let (min_height, max_height) = bounds.ok_or(MapOverlaySkip::NoBounds)?;
@@ -109,6 +110,8 @@ fn encode_asset(
 
     Ok(MapOverlayAsset {
         variant: HEIGHT_OVERLAY_VARIANT.to_string(),
+        origin: EXTRACTED_ORIGIN.to_string(),
+        source_archive: source_archive.to_string(),
         path: path.to_string_lossy().into_owned(),
         hash,
         source_hash: map_source_hash(HEIGHT_OVERLAY_VARIANT, w, h, &source_bytes(samples)),
@@ -129,14 +132,17 @@ fn asset_from_samples(
     dims: Option<(u32, u32)>,
     raw: Option<&[u16]>,
     bounds: Option<(f32, f32)>,
+    source_archive: &str,
 ) -> (Option<MapOverlayAsset>, Option<MapOverlaySkip>) {
     match (dims, raw) {
         (None, _) => (None, Some(MapOverlaySkip::NoSource)),
         (Some(_), None) => (None, Some(MapOverlaySkip::ReadFailed)),
-        (Some((w, h)), Some(raw)) => match encode_asset(asset_dir, raw, w, h, bounds) {
-            Ok(a) => (Some(a), None),
-            Err(why) => (None, Some(why)),
-        },
+        (Some((w, h)), Some(raw)) => {
+            match encode_asset(asset_dir, raw, w, h, bounds, source_archive) {
+                Ok(a) => (Some(a), None),
+                Err(why) => (None, Some(why)),
+            }
+        }
     }
 }
 
@@ -149,7 +155,13 @@ pub(crate) fn asset_in_session(
 ) -> (Option<MapOverlayAsset>, Option<MapOverlaySkip>) {
     let dims = us.heightmap_size(map_name);
     let raw = dims.and_then(|(w, h)| us.heightmap_data(map_name, w, h));
-    asset_from_samples(asset_dir, dims, raw.as_deref(), us.height_bounds(map_name))
+    asset_from_samples(
+        asset_dir,
+        dims,
+        raw.as_deref(),
+        us.height_bounds(map_name),
+        &crate::archive::archive_name_for_map(us, map_name),
+    )
 }
 
 /// Cache file for a heightmap PNG: `<cache_dir>/<key>-h<max_side>.png`. The `h`
@@ -206,7 +218,13 @@ pub fn render(
 
     let (asset, asset_skipped) = match asset_dir {
         None => (None, None),
-        Some(dir) => asset_from_samples(dir, dims, raw.as_deref(), bounds),
+        Some(dir) => asset_from_samples(
+            dir,
+            dims,
+            raw.as_deref(),
+            bounds,
+            &crate::archive::archive_name_for_map(&us, map_name),
+        ),
     };
 
     let result = (|| -> Result<(RenderedImage, u32, u32), String> {
@@ -266,6 +284,10 @@ mod tests {
     use super::*;
     use crate::assetencode::{map_source_hash, sha256_hex, HEIGHT_OVERLAY_VARIANT};
 
+    /// A map archive's own versioned name, which is what `asset_in_session`
+    /// resolves and hands the encoder.
+    const ARCHIVE: &str = "Mediterraneum V1";
+
     /// Heights with the shape real terrain has: a slope whose neighbouring
     /// vertices differ by less than 256, so any 8 bit storage would flatten it
     /// into steps.
@@ -293,7 +315,8 @@ mod tests {
         let dir = asset_dir("roundtrip");
         let (w, h) = (65u32, 33u32);
         let samples = heights(w, h);
-        let asset = encode_asset(&dir, &samples, w, h, Some((-40.0, 620.5))).expect("encode");
+        let asset =
+            encode_asset(&dir, &samples, w, h, Some((-40.0, 620.5)), ARCHIVE).expect("encode");
 
         let on_disk = std::fs::read(&asset.path).expect("asset file written");
         let decoded = image::load_from_memory(&on_disk).expect("decode png");
@@ -305,7 +328,8 @@ mod tests {
     #[test]
     fn writes_the_asset_as_a_file_named_after_its_own_bytes() {
         let dir = asset_dir("write");
-        let asset = encode_asset(&dir, &heights(32, 32), 32, 32, Some((0.0, 100.0))).expect("code");
+        let asset = encode_asset(&dir, &heights(32, 32), 32, 32, Some((0.0, 100.0)), ARCHIVE)
+            .expect("code");
         let on_disk = std::fs::read(&asset.path).expect("asset file written");
 
         assert_eq!(
@@ -326,7 +350,15 @@ mod tests {
     #[test]
     fn carries_the_bounds_that_turn_the_samples_into_elmos() {
         let dir = asset_dir("bounds");
-        let asset = encode_asset(&dir, &heights(64, 64), 64, 64, Some((-73.5, 412.0))).expect("ok");
+        let asset = encode_asset(
+            &dir,
+            &heights(64, 64),
+            64,
+            64,
+            Some((-73.5, 412.0)),
+            ARCHIVE,
+        )
+        .expect("ok");
         assert_eq!(
             (asset.min_height, asset.max_height),
             (Some(-73.5), Some(412.0))
@@ -337,7 +369,7 @@ mod tests {
     fn stores_nothing_when_the_bounds_did_not_read() {
         let dir = asset_dir("nobounds");
         assert_eq!(
-            encode_asset(&dir, &heights(16, 16), 16, 16, None).unwrap_err(),
+            encode_asset(&dir, &heights(16, 16), 16, 16, None, ARCHIVE).unwrap_err(),
             MapOverlaySkip::NoBounds
         );
         assert!(!dir.exists(), "wrote an asset nothing can convert to elmos");
@@ -350,7 +382,8 @@ mod tests {
     fn identity_is_the_samples_and_the_path_is_the_encoded_bytes() {
         let dir = asset_dir("hashes");
         let samples = heights(32, 32);
-        let asset = encode_asset(&dir, &samples, 32, 32, Some((0.0, 1.0))).expect("encode");
+        let asset =
+            encode_asset(&dir, &samples, 32, 32, Some((0.0, 1.0)), ARCHIVE).expect("encode");
         assert_eq!(
             asset.source_hash,
             map_source_hash(HEIGHT_OVERLAY_VARIANT, 32, 32, &source_bytes(&samples))
@@ -364,8 +397,10 @@ mod tests {
     fn a_flat_layer_on_a_transposed_grid_is_a_different_identity() {
         let dir = asset_dir("transposed");
         let flat = vec![0u16; 33 * 65];
-        let tall = encode_asset(&dir, &flat, 33, 65, Some((0.0, 1.0))).expect("encode tall");
-        let wide = encode_asset(&dir, &flat, 65, 33, Some((0.0, 1.0))).expect("encode wide");
+        let tall =
+            encode_asset(&dir, &flat, 33, 65, Some((0.0, 1.0)), ARCHIVE).expect("encode tall");
+        let wide =
+            encode_asset(&dir, &flat, 65, 33, Some((0.0, 1.0)), ARCHIVE).expect("encode wide");
         assert_ne!(tall.source_hash, wide.source_hash);
     }
 
@@ -378,8 +413,10 @@ mod tests {
     fn the_bounds_are_not_part_of_the_identity() {
         let dir = asset_dir("bounds-identity");
         let samples = heights(64, 64);
-        let shallow = encode_asset(&dir, &samples, 64, 64, Some((0.0, 100.0))).expect("encode");
-        let deep = encode_asset(&dir, &samples, 64, 64, Some((-500.0, 900.0))).expect("encode");
+        let shallow =
+            encode_asset(&dir, &samples, 64, 64, Some((0.0, 100.0)), ARCHIVE).expect("encode");
+        let deep =
+            encode_asset(&dir, &samples, 64, 64, Some((-500.0, 900.0)), ARCHIVE).expect("encode");
         assert_eq!(shallow.source_hash, deep.source_hash);
         assert_ne!(shallow.min_height, deep.min_height);
     }
