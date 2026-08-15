@@ -238,6 +238,9 @@ enum Uploads {
     /// Answer this to every upload, for the shapes a real hub only produces when
     /// something is wrong.
     Canned { status: u16, body: String },
+    /// Answer these in order, cycling once they run out. For a hub that recovers
+    /// between attempts, and for a run of refusals that are not all the same one.
+    InTurn(Vec<(u16, String)>),
     /// Read the request and never answer, so a cancellation has something to
     /// interrupt.
     Hanging,
@@ -274,6 +277,21 @@ impl HubServer {
         )
     }
 
+    /// A hub that wants everything and answers these to the uploads in order,
+    /// cycling once they run out. A success is spelled out by the caller, since
+    /// the point of this one is that the answers differ.
+    pub fn answering_in_turn(answers: &[(u16, Value)]) -> Self {
+        Self::start(
+            HashMap::new(),
+            Uploads::InTurn(
+                answers
+                    .iter()
+                    .map(|(status, body)| (*status, body.to_string()))
+                    .collect(),
+            ),
+        )
+    }
+
     /// A hub that wants everything and never finishes an upload.
     pub fn hanging() -> Self {
         Self::start(HashMap::new(), Uploads::Hanging)
@@ -290,6 +308,8 @@ impl HubServer {
             // Identities this run has already taken, which is what turns the
             // second upload of one picture into the hub's 200.
             let mut stored: HashMap<String, ()> = HashMap::new();
+            // Which of an `InTurn` list the next upload gets.
+            let mut turn = 0usize;
             while let Ok((mut sock, _)) = listener.accept().await {
                 let Some((head, body)) = read_raw(&mut sock).await else {
                     continue;
@@ -312,6 +332,11 @@ impl HubServer {
                             continue;
                         }
                         Uploads::Canned { status, body } => (*status, body.clone()),
+                        Uploads::InTurn(answers) => {
+                            let (status, body) = &answers[turn % answers.len()];
+                            turn += 1;
+                            (*status, body.clone())
+                        }
                         Uploads::Accepting => {
                             let created = stored.insert(key, ()).is_none();
                             (
