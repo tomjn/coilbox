@@ -353,11 +353,18 @@ where
     // rotates them would otherwise leave us holding a dead one. Same deadline as
     // every other keychain call, so a prompt nobody clicks cannot hold up the
     // request this token was fetched for (issue #1469).
-    if tokens.refresh != stored {
-        keychain.keep(service, account, &tokens.refresh).await?;
-    }
+    let rotated = (tokens.refresh != stored).then(|| tokens.refresh.clone());
     let access = tokens.access.clone();
+    // Memory before the keychain, the order [`remember`] uses and for the same
+    // reason. The refresh has already happened, so a keychain that will not take
+    // the new token must not throw away the one thing this process can still use.
+    // Dropping it would leave the next caller reading a stored token the service
+    // has already rotated away, which is the failure this whole gate exists to
+    // avoid.
     access_tokens().lock().unwrap().insert(key, tokens);
+    if let Some(rotated) = rotated {
+        keychain.keep(service, account, &rotated).await?;
+    }
     Ok(access)
 }
 
@@ -376,6 +383,9 @@ mod tests {
     struct Kept {
         held: Arc<Mutex<Option<String>>>,
         writes: Arc<Mutex<usize>>,
+        /// A keychain that will not answer a write, which on macOS is a prompt
+        /// nobody clicked.
+        deaf: bool,
     }
 
     impl Kept {
@@ -383,7 +393,12 @@ mod tests {
             Self {
                 held: Arc::new(Mutex::new(Some(refresh.to_owned()))),
                 writes: Arc::default(),
+                deaf: false,
             }
+        }
+
+        fn that_will_not_write(self) -> Self {
+            Self { deaf: true, ..self }
         }
 
         fn held(&self) -> Option<String> {
@@ -407,6 +422,9 @@ mod tests {
             refresh: &str,
         ) -> Result<(), AuthError> {
             *self.writes.lock().unwrap() += 1;
+            if self.deaf {
+                return Err(AuthError::StorageKeepTimedOut);
+            }
             *self.held.lock().unwrap() = Some(refresh.to_owned());
             Ok(())
         }
@@ -586,6 +604,41 @@ mod tests {
         assert_eq!(server.requests(), 2);
         assert_eq!(kept.writes(), 0);
         assert_eq!(kept.held().as_deref(), Some("the-stored-one"));
+    }
+
+    /// A keychain that will not take the rotated token must not cost us the
+    /// tokens the refresh has already produced. Throwing them away would leave
+    /// the next caller reading a stored token the service has rotated away, and
+    /// spending it is the reuse the gate exists to prevent.
+    #[tokio::test]
+    async fn a_rotated_token_the_keychain_will_not_take_is_still_usable() {
+        let server = TokenServer::answering(json!({
+            "access_token": "an-access-token",
+            "refresh_token": "the-rotated-one",
+            "expires_in": 1800,
+        }));
+        let kept = Kept::holding("the-stored-one").that_will_not_write();
+        let ask = || async {
+            let start = Arc::new(Semaphore::new(1));
+            access_token_from(
+                &kept,
+                "a-service",
+                "a-deaf-keychain",
+                refresh_through(server.url(), start),
+            )
+            .await
+        };
+
+        // The next run is in doubt, which is what this error says, and it is the
+        // caller's to hear.
+        let error = ask().await.unwrap_err();
+        assert!(matches!(error, AuthError::StorageKeepTimedOut), "{error:?}");
+        assert_eq!(server.requests(), 1);
+
+        // This run is not in doubt. The token that came back is in memory, so the
+        // next caller uses it rather than spending the stored one again.
+        assert_eq!(ask().await.unwrap(), "an-access-token");
+        assert_eq!(server.requests(), 1);
     }
 
     /// The gate must not become a cache with no expiry. A token with life left is
