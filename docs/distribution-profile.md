@@ -858,6 +858,22 @@ This is the only thing Coilbox sends to the hub without being asked to, and it e
 
 This is the only switch for it. There's no per-player one: what it would withhold is an item id the hub had just served, with no account and nothing that points back at the player, so there's nothing to ask anybody about. Setting this to `false` means nothing is sent. Turning the hub off with [`hub`](#hub-boolean) also stops it, since there's then no hub to import from.
 
+### `hubAssetUploads` (boolean)
+
+Removes the switch that lets a player send pictures of your game's units and maps to the hub. Offered by default.
+
+```json
+{ "version": 1, "hubAssetUploads": false }
+```
+
+Coilbox can read the game and map archives on a player's machine, make pictures of what's inside them, and upload those pictures to the hub under that player's account. That is **off until the player turns it on**, on every install, so a profile that says nothing here changes nothing: the default is already that nothing is sent.
+
+What this setting decides is whether they're offered the choice at all. Set it to `false` if you don't want pictures made from your game's archives published. The switch disappears from Settings > Coilbox hub, replaced by a line saying you've switched it off, and the upload path refuses even if the player had turned it on before your profile arrived.
+
+Turning the hub off with [`hub`](#hub-boolean) covers this too, since there's then no hub to upload to.
+
+The refusal isn't a UI one. The check reads this file and the player's saved answer from disk inside the plugin that holds the hub access token, so nothing the app's own frontend does can get past it.
+
 ### `authoring` (boolean)
 
 Removes the [profile authoring tools](#writing-and-iterating-on-a-profile) from Settings > Distribution profile. On by default. Set it to `false` in the profile you ship, so a player can't reload or replace your branding by accident.

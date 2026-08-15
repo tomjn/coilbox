@@ -9,11 +9,17 @@
 //! the first call the asset upload path makes, and its caller is the upload itself
 //! rather than the webview.
 //!
+//! [`consent`] is what stands in front of it. Sending pictures made from local game
+//! files to a public gallery is off until the user turns it on, and that check reads
+//! the setting off disk here rather than trusting an argument. Anything that uploads
+//! takes the proof it hands back.
+//!
 //! Every command takes the hub address rather than knowing one. It is a user
 //! setting layered over a distribution profile's own (`src/hub/config.ts`), so the
 //! frontend is the only place that can resolve it.
 
 pub mod auth;
+pub mod consent;
 mod endpoint;
 pub mod have;
 pub mod publish;
