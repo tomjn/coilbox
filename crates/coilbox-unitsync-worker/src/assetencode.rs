@@ -28,13 +28,14 @@
 //! It is 16 bit grayscale PNG, because WebP's lossless mode is 8 bit ARGB and
 //! would throw away half the height precision. Issue #1627 owns it.
 
-// Nothing calls this yet. The build pic, metal map and minimap extraction paths
-// are issues #1624, #1626 and #1630, which land after it, and until one of them
-// does every item here is dead to the binary. The tests exercise all of it.
+// The metal map and minimap extraction paths are issues #1626 and #1630, which
+// land after this, so some variants here still have no caller in the binary.
+// The tests exercise all of it.
 #![allow(dead_code)]
 
 use coilbox_assets::{class_for_variant, vocabulary, AssetClass};
 use image::DynamicImage;
+use sha2::{Digest, Sha256};
 
 /// Encoded bytes and the profile that produced them.
 ///
@@ -142,6 +143,22 @@ pub fn encode_variant(variant: &str, image: &DynamicImage) -> Result<EncodedAsse
         width: encoded.width(),
         height: encoded.height(),
     })
+}
+
+/// Lowercase hex sha256, which is what the hub records in both hash columns and
+/// uses as the object's path component.
+///
+/// Two different bytes get hashed per asset and the difference is load bearing:
+/// `source_hash` is over the archive member exactly as it was read, and `hash`
+/// is over what [`encode_variant`] produced. Only the first is stable across
+/// coilbox releases, so it is the one dedupe and the have check compare on.
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+/// The file extension for an asset class's mime, for naming the file on disk.
+pub fn ext_for_mime(mime: &str) -> &str {
+    mime.rsplit('/').next().unwrap_or("bin")
 }
 
 /// The downscaled image, or `None` when the source already fits and copying it
@@ -393,6 +410,26 @@ mod tests {
         assert_eq!(minimap.quality, Some(80));
         assert_eq!(minimap.max_edge_px, Some(512));
         assert!(class_for_variant("buildpic").unwrap().lossless);
+    }
+
+    #[test]
+    fn hashes_match_the_published_sha256_test_vectors() {
+        // NIST FIPS 180-4 example vectors, so this checks the digest against
+        // something outside this repo rather than against itself.
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(
+            sha256_hex(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    #[test]
+    fn names_a_file_after_the_mime_the_class_declares() {
+        assert_eq!(ext_for_mime("image/webp"), "webp");
+        assert_eq!(ext_for_mime("image/png"), "png");
     }
 
     #[test]
