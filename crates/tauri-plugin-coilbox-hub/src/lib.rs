@@ -25,13 +25,21 @@ pub mod have;
 pub mod publish;
 #[cfg(test)]
 mod testing;
+pub mod upload;
+
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use picoframe_core::CliResult;
 use serde_json::{json, Value};
 use tauri::{
+    ipc::Channel,
     plugin::{Builder, TauriPlugin},
-    Runtime,
+    AppHandle, Runtime,
 };
+
+use upload::{AssetUpload, AssetUploadProgress};
 
 /// `hub_sign_in`: sign in to a hub with Discord, through the system browser.
 ///
@@ -149,6 +157,80 @@ async fn hub_publish(
     }
 }
 
+/// Maps a caller-supplied op id to the flag its run polls, so `hub_upload_cancel`
+/// can stop an upload somebody else started. The same shape as the downloads
+/// plugin's registry, minus its child process slot: there is no child here.
+fn cancel_registry() -> &'static Mutex<HashMap<String, Arc<AtomicBool>>> {
+    static REG: OnceLock<Mutex<HashMap<String, Arc<AtomicBool>>>> = OnceLock::new();
+    REG.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// The flag for a run. Registered when the caller supplied an `op_id`, so
+/// `hub_upload_cancel` can find it, and standalone otherwise.
+fn cancel_slot(op_id: &Option<String>) -> Arc<AtomicBool> {
+    let flag = Arc::new(AtomicBool::new(false));
+    if let Some(id) = op_id {
+        cancel_registry()
+            .lock()
+            .unwrap()
+            .insert(id.clone(), flag.clone());
+    }
+    flag
+}
+
+/// `hub_upload_assets`: send pictures made from local archives to a hub, as
+/// whoever is signed in.
+///
+/// The consent check runs here and nowhere else (issue #1635). It reads the user's
+/// setting and the distribution profile off disk rather than trusting an argument,
+/// so nothing the webview passes can turn an upload on, and the proof it hands back
+/// is what [`upload::upload_all`] requires to be called at all.
+///
+/// The have check runs before anything is sent, so an asset the hub already holds
+/// costs one key in a batch rather than a transfer. What comes back is one outcome
+/// per asset in the order they were given, carrying the hub's own status and words
+/// for a refusal rather than a verdict: which refusal is worth retrying and how the
+/// user hears about it is issue #1634.
+///
+/// `op_id` makes the run cancellable by `hub_upload_cancel`. `on_progress` takes a
+/// sample per asset.
+#[tauri::command]
+async fn hub_upload_assets<R: Runtime>(
+    app: AppHandle<R>,
+    hub_url: String,
+    assets: Vec<AssetUpload>,
+    op_id: Option<String>,
+    on_progress: Channel<AssetUploadProgress>,
+) -> CliResult {
+    let consent = match consent::AssetUploadConsent::check(&app) {
+        Ok(consent) => consent,
+        Err(refused) => return CliResult::err(refused),
+    };
+    let cancel = cancel_slot(&op_id);
+    let report = move |sample: AssetUploadProgress| {
+        let _ = on_progress.send(sample);
+    };
+    let sent = upload::upload_all(&hub_url, &assets, &consent, &report, &cancel).await;
+    if let Some(id) = &op_id {
+        cancel_registry().lock().unwrap().remove(id);
+    }
+    match sent {
+        Ok(outcomes) => CliResult::ok(json!({ "outcomes": outcomes })),
+        Err(said) => CliResult::err(said),
+    }
+}
+
+/// `hub_upload_cancel`: stop a running upload by its `op_id`. The run drops the
+/// request it has in flight and leaves the rest untried. A no-op for an unknown or
+/// finished id.
+#[tauri::command]
+fn hub_upload_cancel(op_id: String) -> CliResult {
+    if let Some(flag) = cancel_registry().lock().unwrap().get(&op_id) {
+        flag.store(true, Ordering::Relaxed);
+    }
+    CliResult::ok(json!({}))
+}
+
 /// Build the plugin. Registered as `"coilbox-hub"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-hub")
@@ -156,7 +238,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             hub_sign_in,
             hub_sign_out,
             hub_account,
-            hub_publish
+            hub_publish,
+            hub_upload_assets,
+            hub_upload_cancel
         ])
         .build()
 }

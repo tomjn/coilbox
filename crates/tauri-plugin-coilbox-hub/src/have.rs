@@ -265,7 +265,13 @@ fn name_of(keyed_on: KeyedOn) -> &'static str {
 ///
 /// One client for all of them, so a set of several batches reuses the connection
 /// rather than paying a fresh TLS handshake per request.
-async fn ask_in_batches(
+///
+/// `pub(crate)` for [`crate::upload`], which already holds a token for the whole
+/// run and would otherwise ask for a second one here. It takes no consent proof
+/// because it is crate private and both of its callers hold one: [`have`] above,
+/// and `upload::run`, which takes a `&AssetUploadConsent` for the same reason
+/// [`have`] does. Nothing outside this crate can reach it.
+pub(crate) async fn ask_in_batches(
     url: &str,
     token: &str,
     keys: &[AssetKey],
