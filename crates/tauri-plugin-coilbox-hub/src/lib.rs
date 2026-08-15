@@ -5,12 +5,20 @@
 //! frontend invokes `plugin:coilbox-hub|<cmd>`. The flow they sit on is [`auth`],
 //! and the request that uses its token is [`publish`].
 //!
+//! [`have`] is the other thing that uses the token, and is not a command. It is
+//! the first call the asset upload path makes, and its caller is the upload itself
+//! rather than the webview.
+//!
 //! Every command takes the hub address rather than knowing one. It is a user
 //! setting layered over a distribution profile's own (`src/hub/config.ts`), so the
 //! frontend is the only place that can resolve it.
 
 pub mod auth;
+mod endpoint;
+pub mod have;
 pub mod publish;
+#[cfg(test)]
+mod testing;
 
 use picoframe_core::CliResult;
 use serde_json::{json, Value};

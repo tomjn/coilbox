@@ -17,6 +17,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 picoframe-core = "0.0.4"
 coilbox-oauth = { path = "../coilbox-oauth" }
+# The variant names the have check's keys are built from, read from the same
+# shared/asset-vocabulary.json the hub agrees to.
+coilbox-assets = { path = "../coilbox-assets" }
 tauri-plugin-opener = "2"
 # rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
 # picks it.
