@@ -544,9 +544,58 @@ pub struct UnitModelOutput {
     pub errors: Vec<String>,
 }
 
+/// A build pic encoded as the asset the hub takes, written to disk.
+///
+/// The bytes are not in here on purpose. This worker prints one JSON document
+/// on stdout and a few hundred WebPs is the wrong shape for that, so the file
+/// goes in the asset directory and the uploader (#1633) reads `path`.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitBuildpicAsset {
+    /// The hub's variant name for this class, always `buildpic` here.
+    pub variant: String,
+    /// Absolute path to the encoded file, named after `hash`.
+    pub path: String,
+    /// sha256 of the encoded bytes. The hub's object path component.
+    pub hash: String,
+    /// sha256 of the archive member as read, before any decode. Identity and
+    /// dedupe compare on this, because it does not move when the encoder does.
+    pub source_hash: String,
+    /// The archive member the picture came from, as the archive stores it.
+    pub source_member: String,
+    pub encode_profile: String,
+    pub mime: String,
+    pub width: u32,
+    pub height: u32,
+    pub bytes: u64,
+}
+
+/// Why a unit produced no build pic asset. Every one of these is a different
+/// answer, and only some of them are anyone's bug.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum BuildpicSkip {
+    /// No `unitpics/` member matched, so the game ships this unit no build pic.
+    NoSource,
+    /// A member matched and coilbox could not decode it, which is #1625.
+    Undecodable,
+    /// Decoded, but not square. The hub rejects that on the bytes, and cropping
+    /// or padding would invent a picture the game does not ship.
+    NotSquare,
+    /// Encoded past the class's byte cap, which the hub also applies.
+    TooLarge,
+    /// libwebp refused it.
+    EncodeFailed,
+    /// Encoded, and the file could not be written to the asset directory.
+    NotWritten,
+}
+
 /// One resolved start unit: its human-friendly name (from the unitdef `name`
 /// field) and its build-icon `data:` URL. Either may be absent. Also the on-disk
 /// cache record (round-tripped as JSON), so it derives Deserialize too.
+///
+/// `asset` and `assetSkipped` only appear when the caller asked for hub assets
+/// (`--asset-dir`), and then exactly one of them is set.
 #[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct UnitDisplay {
@@ -554,12 +603,19 @@ pub struct UnitDisplay {
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub icon: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub asset: Option<UnitBuildpicAsset>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub asset_skipped: Option<BuildpicSkip>,
 }
 
 impl UnitDisplay {
-    /// Nothing resolved — no name and no icon.
+    /// Nothing resolved: no name, no icon, and no answer about an asset.
     pub fn is_empty(&self) -> bool {
-        self.name.is_none() && self.icon.is_none()
+        self.name.is_none()
+            && self.icon.is_none()
+            && self.asset.is_none()
+            && self.asset_skipped.is_none()
     }
 }
 

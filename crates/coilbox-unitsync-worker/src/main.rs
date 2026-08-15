@@ -101,6 +101,10 @@ struct Args {
     max_side: u32,
     /// Directory for the on-disk minimap/thumbnail PNG cache (minimap modes only).
     cache_dir: Option<String>,
+    /// `--asset-dir`: where to write encoded hub assets. Set only when something
+    /// intends to upload them, since the pictures the app itself draws come back
+    /// in the JSON and need no file.
+    asset_dir: Option<String>,
 }
 
 fn main() {
@@ -243,8 +247,9 @@ fn run() -> i32 {
     if args.unit_buildpics {
         let game_archive = args.game.clone().unwrap_or_default();
         let units = args.units.clone();
+        let asset_dir = args.asset_dir.as_deref().map(Path::new);
         return match std::panic::catch_unwind(|| {
-            buildpic::render(&args.lib, &game_archive, &units, cache_dir)
+            buildpic::render(&args.lib, &game_archive, &units, cache_dir, asset_dir)
         }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
@@ -596,6 +601,7 @@ fn parse_args() -> Result<Args, String> {
     let mut mip = 1; // 512x512 by default
     let mut max_side = 512u32;
     let mut cache_dir = None;
+    let mut asset_dir = None;
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -620,6 +626,7 @@ fn parse_args() -> Result<Args, String> {
                     .ok_or("--max-side needs an integer")?
             }
             "--cache-dir" => cache_dir = it.next(),
+            "--asset-dir" => asset_dir = it.next(),
             "--config" => config = true,
             "--config-set" => config_set = true,
             "--config-key" => config_key = it.next(),
@@ -701,6 +708,7 @@ fn parse_args() -> Result<Args, String> {
         mip,
         max_side,
         cache_dir,
+        asset_dir,
     })
 }
 
