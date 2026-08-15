@@ -11,6 +11,7 @@
  * that shows it is `SetupPanel.tsx`.
  */
 
+import { ELMOS_PER_METAL_SAMPLE } from "@/hub/assets/vocabulary";
 import type { SkirmishDraft } from "@/play/drafts";
 import {
   baseBuildings,
@@ -30,8 +31,11 @@ import { ACTION_TYPES, CONDITION_TYPES } from "../../triggerTypes";
  * per two map squares, and a square is 8 elmos. So a map's width in elmos is its
  * scanned width times sixteen, which is the same number `mapSizeLabel` divides by
  * 32 to print the map's size in the community's own units.
+ *
+ * The worker derives the same figure from the same samples now (issue #1629), so
+ * this is an alias of the shared number rather than a second copy of it.
  */
-export const ELMOS_PER_MAP_SAMPLE = 16;
+export const ELMOS_PER_MAP_SAMPLE = ELMOS_PER_METAL_SAMPLE;
 
 /** A map's size in elmos, which is the space a scenario's points are in. */
 export interface MapExtent {
