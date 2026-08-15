@@ -187,6 +187,13 @@ pub fn height_overlay_samples(elmos: u32) -> u32 {
     elmos / vocabulary().height_overlay.elmos_per_sample + 1
 }
 
+/// How long an edge that many height overlay samples span, in elmos. The inverse
+/// of [`height_overlay_samples`], for the extraction side, which is handed the
+/// sample grid by unitsync and has to say what map size that is.
+pub fn height_overlay_elmos(samples: u32) -> u32 {
+    samples.saturating_sub(1) * vocabulary().height_overlay.elmos_per_sample
+}
+
 /// The largest a height overlay for a map this size may be (coilbox-hub#142), and
 /// `None` for every other class. Two bytes a sample, because the layer is 16 bit
 /// grayscale rather than the four bytes a colour image takes.
@@ -404,6 +411,30 @@ mod tests {
             None
         );
         assert_eq!(height_overlay_max_bytes("minimap", 16384, 16384), None);
+    }
+
+    /// The two sides describe the same map from different ends: the hub has the
+    /// row's elmos and works out how many samples that allows, and coilbox has
+    /// the grid unitsync handed it and works out what map size that is. A
+    /// fencepost dropped on either side would put the cap a row and a column out.
+    #[test]
+    fn a_sample_count_and_a_map_edge_convert_both_ways() {
+        for elmos in [512, 6144, 8192, 15360, 16384] {
+            assert_eq!(height_overlay_elmos(height_overlay_samples(elmos)), elmos);
+        }
+        assert_eq!(height_overlay_elmos(2049), 16384);
+        // The height grid and the metal grid are two counts of one map, so what
+        // each says the map measures has to agree. Ancient Bastion Remake 0.5,
+        // 1024x512 metal samples and 2049x1025 height samples.
+        assert_eq!(
+            (
+                height_overlay_elmos(2049),
+                height_overlay_elmos(1025),
+                height_overlay_elmos(1)
+            ),
+            (16384, 8192, 0)
+        );
+        assert_eq!(map_extent_elmos(1024, 512), (16384, 8192));
     }
 
     #[test]
