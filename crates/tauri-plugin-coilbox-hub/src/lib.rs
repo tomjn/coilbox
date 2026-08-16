@@ -226,6 +226,11 @@ fn cancel_slot(op_id: &Option<String>) -> Arc<AtomicBool> {
 /// answer any differently. `src/hub/uploadOutcomes.ts` is what turns a run's worth
 /// of those into something a person is told (issue #1634).
 ///
+/// `out_of_date` comes back true only when the run had a terminal refusal and the
+/// hub names an asset vocabulary this build does not hold (issue #1708). It turns
+/// "the hub would not take 40 pictures" into "update coilbox", which is the one
+/// thing the reader can act on.
+///
 /// `op_id` makes the run cancellable by `hub_upload_cancel`. `on_progress` takes a
 /// sample per asset.
 #[tauri::command]
@@ -249,7 +254,13 @@ async fn hub_upload_assets<R: Runtime>(
         cancel_registry().lock().unwrap().remove(id);
     }
     match sent {
-        Ok(outcomes) => CliResult::ok(json!({ "outcomes": outcomes })),
+        Ok(outcomes) => {
+            // Only on the failing path, and only after the run, so a healthy
+            // backfill spends nothing finding out it was fine (issue #1708).
+            let out_of_date = upload::has_terminal_refusal(&outcomes)
+                && auth::is_behind_hub_vocabulary(&hub_url).await;
+            CliResult::ok(json!({ "outcomes": outcomes, "outOfDate": out_of_date }))
+        }
         Err(said) => CliResult::err(said),
     }
 }

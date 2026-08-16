@@ -57,6 +57,10 @@ pub struct HubAuth {
     /// The project's publishable key. Public by design: it identifies the project
     /// on every request and grants nothing on its own.
     publishable_key: String,
+    /// The hub's digest of the asset vocabulary, when it serves one (issue #1708).
+    /// `None` from a hub that has not shipped tomjn/coilbox-hub#165, which says
+    /// nothing about whether this build agrees with it.
+    asset_vocabulary: Option<String>,
 }
 
 impl HubAuth {
@@ -170,7 +174,36 @@ fn read_auth_document(hub_url: &str, status: u16, body: &str) -> Result<HubAuth,
     Ok(HubAuth {
         supabase_url: supabase_url.trim_end_matches('/').to_owned(),
         publishable_key,
+        asset_vocabulary: field("asset_vocabulary"),
     })
+}
+
+/// Is this build making pictures to a vocabulary the hub has moved on from
+/// (issue #1708)?
+///
+/// Only two digests that are both there and different are a mismatch. A hub that
+/// says nothing has not shipped tomjn/coilbox-hub#165, or is somebody's own hub,
+/// and silence is not disagreement. Coilbox reads this to say so, never to change
+/// what it encodes: `encode_profile` names bytes, so a build that followed a
+/// number it was handed at runtime would make one profile name mean two things.
+fn behind_hub_vocabulary(hub_says: Option<&str>, ours: &str) -> bool {
+    matches!(hub_says, Some(theirs) if theirs != ours)
+}
+
+/// Ask the hub whether this build's vocabulary is the one it takes.
+///
+/// `false` for every kind of not knowing: a hub that serves no digest, a request
+/// that failed, a document that will not read. This only ever adds a sentence to a
+/// message somebody is already getting, so guessing at it would be worse than
+/// leaving the original words alone.
+pub async fn is_behind_hub_vocabulary(hub_url: &str) -> bool {
+    match discover(hub_url).await {
+        Ok(auth) => behind_hub_vocabulary(
+            auth.asset_vocabulary.as_deref(),
+            coilbox_assets::vocabulary_digest(),
+        ),
+        Err(_) => false,
+    }
 }
 
 /// Ask the hub which Supabase project to sign in through.
@@ -491,6 +524,65 @@ mod tests {
         let config = document(&good_document()).unwrap();
         assert_eq!(config.supabase_url, "https://project.supabase.co");
         assert_eq!(config.publishable_key, "sb_publishable_abc");
+    }
+
+    // --------------------------------------------------- vocabulary (issue #1708)
+
+    /// A hub that says nothing is every hub until tomjn/coilbox-hub#165 ships, and
+    /// somebody's own hub after that. Reading silence as disagreement would tell
+    /// all of them to update coilbox.
+    #[test]
+    fn a_hub_that_names_no_vocabulary_is_not_a_disagreement() {
+        assert!(document(&good_document()).unwrap().asset_vocabulary.is_none());
+        assert!(!behind_hub_vocabulary(None, "sha256:aaa"));
+    }
+
+    #[test]
+    fn the_same_digest_is_not_a_disagreement() {
+        assert!(!behind_hub_vocabulary(Some("sha256:aaa"), "sha256:aaa"));
+    }
+
+    #[test]
+    fn two_digests_that_differ_are_a_disagreement() {
+        assert!(behind_hub_vocabulary(Some("sha256:bbb"), "sha256:aaa"));
+    }
+
+    /// Read from the document rather than assumed, and trimmed to nothing the same
+    /// way the other two fields are: a blank string is a hub saying nothing.
+    #[test]
+    fn the_digest_is_read_off_the_document() {
+        let body = json!({
+            "format": "coilbox-hub-auth",
+            "version": 1,
+            "supabase_url": "https://project.supabase.co",
+            "publishable_key": "sb_publishable_abc",
+            "asset_vocabulary": "sha256:abc123",
+        })
+        .to_string();
+        assert_eq!(
+            document(&body).unwrap().asset_vocabulary.as_deref(),
+            Some("sha256:abc123")
+        );
+
+        let blank = json!({
+            "format": "coilbox-hub-auth",
+            "version": 1,
+            "supabase_url": "https://project.supabase.co",
+            "publishable_key": "sb_publishable_abc",
+            "asset_vocabulary": "   ",
+        })
+        .to_string();
+        assert!(document(&blank).unwrap().asset_vocabulary.is_none());
+    }
+
+    /// The build compares against the digest of the document it embeds, so a hub
+    /// serving that same string agrees with it. Guards against the two sides
+    /// spelling one value differently, which is the whole failure this prevents.
+    #[test]
+    fn this_build_agrees_with_a_hub_serving_its_own_digest() {
+        let ours = coilbox_assets::vocabulary_digest();
+        assert!(!behind_hub_vocabulary(Some(ours), ours));
+        assert!(ours.starts_with("sha256:"));
     }
 
     /// A hub with no sign-in at all is the ordinary case, not a fault, and there is
