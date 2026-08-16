@@ -328,6 +328,17 @@ pub enum Verdict {
 /// err in the affordable direction: the quota costs at most
 /// [`SAME_REFUSAL_LIMIT`] requests before the run stops, and the allowance at most
 /// [`UPLOAD_ATTEMPTS`].
+/// Did anything in this run get an answer another request would repeat?
+///
+/// The one question worth spending a request on the hub's vocabulary digest for
+/// (issue #1708). Drift refuses every picture in a run terminally, so a run with
+/// no terminal refusal cannot be drift and is not asked about.
+pub fn has_terminal_refusal(outcomes: &[AssetOutcome]) -> bool {
+    outcomes
+        .iter()
+        .any(|outcome| outcome.verdict == Some(Verdict::Terminal))
+}
+
 fn verdict_for(status: u16) -> Verdict {
     match status {
         401 | 429 => Verdict::Blocked,
@@ -1658,6 +1669,29 @@ mod tests {
         for status in [500, 502, 503] {
             assert_eq!(verdict_for(status), Verdict::Transient, "{status}");
         }
+    }
+
+    /// What decides whether a finished run is worth one more request to ask the
+    /// hub which vocabulary it takes (issue #1708). A run nobody refused
+    /// terminally cannot be drift, and pays nothing to find that out.
+    #[test]
+    fn only_a_terminal_refusal_is_worth_asking_about_the_vocabulary() {
+        let outcome = |verdict| AssetOutcome {
+            result: Outcome::Refused,
+            status: Some(400),
+            said: None,
+            verdict,
+        };
+        assert!(!has_terminal_refusal(&[]));
+        assert!(!has_terminal_refusal(&[outcome(None)]));
+        assert!(!has_terminal_refusal(&[
+            outcome(Some(Verdict::Transient)),
+            outcome(Some(Verdict::Blocked)),
+        ]));
+        assert!(has_terminal_refusal(&[
+            outcome(Some(Verdict::Blocked)),
+            outcome(Some(Verdict::Terminal)),
+        ]));
     }
 
     /// The point of the issue. A dimension refusal is coilbox having made the

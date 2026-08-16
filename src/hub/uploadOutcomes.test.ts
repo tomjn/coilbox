@@ -169,6 +169,61 @@ describe("assetUploadReports", () => {
   });
 });
 
+/** Issue #1708. The plugin has asked the hub which vocabulary it takes, and the
+ * answer was not this build's, so every one of these refusals has one cause and
+ * one thing the reader can do about it. */
+describe("a run refused by a hub this build does not agree with", () => {
+  it("says coilbox is out of date rather than quoting the hub", () => {
+    const outcomes = Array.from({ length: 40 }, (_, n) => notSquare(`u${n}`));
+
+    const reports = assetUploadReports(outcomes, true);
+
+    expect(reports).toHaveLength(1);
+    expect(reports[0].title).toBe("Coilbox is out of date");
+    expect(reports[0].body).toContain("refused all 40 pictures");
+    expect(reports[0].body).toContain("Update coilbox");
+    expect(reports[0].level).toBe("error");
+  });
+
+  /** The hub's sentence describes one picture. What is wrong is the build that
+   * made every one of them, so repeating it would point at the wrong thing. */
+  it("leaves the hub's words about a single picture out of it", () => {
+    const reports = assetUploadReports([notSquare("armsolar")], true);
+
+    expect(reports[0].body).not.toContain("must be square");
+    expect(reports[0].body).toContain("refused a picture");
+  });
+
+  /** A hub serving no digest, or one serving this build's own, leaves the
+   * wording exactly as #1634 wrote it. */
+  it("says nothing about being out of date when nobody said it was", () => {
+    const reports = assetUploadReports([notSquare("armsolar")]);
+
+    expect(reports[0].title).toBe("The hub would not take a picture");
+    expect(reports[0].body).toContain("must be square");
+  });
+
+  /** The flag rides on the whole run, and a run that stopped early stopped for
+   * the hub's own reasons. Only the terminal report changes. */
+  it("leaves a run that stopped early worded as it was", () => {
+    const reports = assetUploadReports(
+      [
+        {
+          result: "refused",
+          status: 503,
+          said: "Try later.",
+          verdict: "transient",
+        },
+        untried(),
+      ],
+      true,
+    );
+
+    expect(reports).toHaveLength(1);
+    expect(reports[0].title).toBe("Picture uploads stopped early");
+  });
+});
+
 describe("reportAssetUploadOutcomes", () => {
   beforeEach(() => notify.mockClear());
 

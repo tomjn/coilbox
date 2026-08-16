@@ -114,6 +114,46 @@ describe("the only door to hub_upload_assets", () => {
     expect(notified[0].body).toContain("not square");
   });
 
+  /** #1708: the plugin says the hub takes a vocabulary this build does not hold,
+   *  so the reader is told the one thing they can act on. */
+  it("passes the plugin's out of date answer through to the wording", async () => {
+    answer.value = {
+      outcomes: [
+        outcome({
+          result: "refused",
+          status: 400,
+          said: "The hub refused bar's armsolar buildpic: unknown variant.",
+          verdict: "terminal",
+        }),
+      ],
+      outOfDate: true,
+    };
+    await uploadAssetsToHub("https://hub.example", [asset("armsolar")], {
+      startedBy: "user",
+    });
+    expect(notified).toHaveLength(1);
+    expect(notified[0].title).toBe("Coilbox is out of date");
+  });
+
+  /** An older plugin, or one that never asked, sends no field at all. Absent is
+   *  not a mismatch (#1708), so the wording stays as #1634 wrote it. */
+  it("treats a missing out of date answer as nobody knowing", async () => {
+    answer.value = {
+      outcomes: [
+        outcome({
+          result: "refused",
+          status: 400,
+          said: "The hub refused bar's armsolar buildpic: not square.",
+          verdict: "terminal",
+        }),
+      ],
+    };
+    await uploadAssetsToHub("https://hub.example", [asset("armsolar")], {
+      startedBy: "user",
+    });
+    expect(notified[0].title).toBe("The hub would not take a picture");
+  });
+
   it("says nothing about a run where everything worked", async () => {
     answer.value = { outcomes: [outcome({}), outcome({})] };
     await uploadAssetsToHub("https://hub.example", [asset("a"), asset("b")], {

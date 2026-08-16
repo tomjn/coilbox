@@ -88,7 +88,7 @@ const hubUploadAssets = defineCommand<
     opId?: string;
     onProgress: Channel<AssetUploadProgress>;
   },
-  { outcomes: AssetOutcome[] }
+  { outcomes: AssetOutcome[]; outOfDate?: boolean }
 >("coilbox-hub", "hub_upload_assets");
 
 const hubUploadCancel = defineCommand<{ opId: string }, Record<string, never>>(
@@ -145,13 +145,13 @@ export async function uploadAssetsToHub(
   if (options.onProgress) onProgress.onmessage = options.onProgress;
 
   try {
-    const { outcomes } = await hubUploadAssets({
+    const { outcomes, outOfDate } = await hubUploadAssets({
       hubUrl,
       assets,
       ...(options.opId ? { opId: options.opId } : {}),
       onProgress,
     });
-    reportAssetUploadOutcomes(outcomes, options.startedBy);
+    reportAssetUploadOutcomes(outcomes, options.startedBy, outOfDate === true);
     return { outcomes, written: written(outcomes), error: null };
   } catch (e) {
     const said = e instanceof Error ? e.message : String(e);
