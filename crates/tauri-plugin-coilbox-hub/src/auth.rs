@@ -533,7 +533,10 @@ mod tests {
     /// all of them to update coilbox.
     #[test]
     fn a_hub_that_names_no_vocabulary_is_not_a_disagreement() {
-        assert!(document(&good_document()).unwrap().asset_vocabulary.is_none());
+        assert!(document(&good_document())
+            .unwrap()
+            .asset_vocabulary
+            .is_none());
         assert!(!behind_hub_vocabulary(None, "sha256:aaa"));
     }
 
@@ -880,6 +883,70 @@ mod tests {
             }
         });
         (base, seen)
+    }
+
+    /// A hub that answers `/api/v1/auth` and nothing else, naming whichever asset
+    /// vocabulary it was told to (issue #1708). Separate from [`stand_in_hub`]
+    /// because these tests want the field to vary and that one is about sign-in.
+    async fn hub_naming_vocabulary(vocabulary: Option<&'static str>) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let served = base.clone();
+        tokio::spawn(async move {
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let base = served.clone();
+                tokio::spawn(async move {
+                    let mut chunk = [0u8; 1024];
+                    if matches!(sock.read(&mut chunk).await, Ok(0) | Err(_)) {
+                        return;
+                    }
+                    let mut doc = json!({
+                        "format": AUTH_FORMAT,
+                        "version": 1,
+                        "supabase_url": base,
+                        "publishable_key": "sb_publishable_abc",
+                    });
+                    if let Some(digest) = vocabulary {
+                        doc["asset_vocabulary"] = json!(digest);
+                    }
+                    let answer = doc.to_string();
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{answer}",
+                        answer.len()
+                    );
+                    let _ = sock.write_all(response.as_bytes()).await;
+                    let _ = sock.flush().await;
+                });
+            }
+        });
+        base
+    }
+
+    /// Over a real request rather than over the comparison alone, because the
+    /// field has to survive the document being fetched and read.
+    #[tokio::test]
+    async fn a_hub_naming_another_vocabulary_is_behind_over_the_wire() {
+        let hub = hub_naming_vocabulary(Some("sha256:0000000000000000")).await;
+        assert!(is_behind_hub_vocabulary(&hub).await);
+    }
+
+    #[tokio::test]
+    async fn a_hub_naming_this_builds_vocabulary_is_not() {
+        let hub = hub_naming_vocabulary(Some(coilbox_assets::vocabulary_digest())).await;
+        assert!(!is_behind_hub_vocabulary(&hub).await);
+    }
+
+    #[tokio::test]
+    async fn a_hub_naming_no_vocabulary_is_not() {
+        let hub = hub_naming_vocabulary(None).await;
+        assert!(!is_behind_hub_vocabulary(&hub).await);
+    }
+
+    /// Not knowing is not a disagreement either. A hub that is not there must not
+    /// put "update coilbox" in front of somebody.
+    #[tokio::test]
+    async fn a_hub_that_cannot_be_reached_is_not() {
+        assert!(!is_behind_hub_vocabulary("http://127.0.0.1:1").await);
     }
 
     /// The one test that walks the whole thing: ask the hub which project to use,
