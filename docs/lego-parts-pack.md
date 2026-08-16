@@ -14,7 +14,7 @@ legoparts/
   LICENCE.txt      provenance
 ```
 
-Coilbox looks for `.coilbox/legoparts/` beside the executable first, then the bundled copy. Dropping a pack into the portable path replaces the built-in one.
+Coilbox looks for `.coilbox/legoparts/` beside the executable first, then the bundled copy. Dropping a pack into the portable path replaces the built-in one. On Windows the bundled copy is one level deeper, in `.coilbox/resources/legoparts/`, which the installer rewrites on every update, so `.coilbox/legoparts/` stays yours.
 
 ## Extension packs
 

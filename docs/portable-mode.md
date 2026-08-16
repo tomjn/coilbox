@@ -43,7 +43,10 @@ Once portable mode is on, Coilbox writes **its own** data and caches inside `.co
   briefings/
   fonts/
   # On Windows the installer also places Coilbox's sidecar binaries
-  # (coilbox-unitsync-worker.exe, uberstress.exe, prdownloader/, mapconv/) here.
+  # (coilbox-unitsync-worker.exe, uberstress.exe, prdownloader/, mapconv/) here,
+  # and its own read-only data (the branding catalog, mission runtime and lego
+  # parts pack) in resources/. Both are the installer's — leave them alone, and
+  # note that resources/ is wiped and rewritten on every update.
 ```
 
 - **`data/` and `cache/`** are Coilbox's business. It creates and manages them on first run. You never edit them by hand. Deleting `cache/` is always safe (it's rebuilt); deleting `data/` resets Coilbox's settings for that package.
