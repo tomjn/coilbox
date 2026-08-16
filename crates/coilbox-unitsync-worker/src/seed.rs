@@ -36,6 +36,22 @@
 //! and starts at the next one. Re-committing a batch it already has is harmless,
 //! because a file is named after the hash of its own bytes.
 //!
+//! ## The only caller of the map encoders, on purpose
+//!
+//! Nothing else in coilbox passes an asset directory for a map. The
+//! `unitsync_minimap`, `unitsync_heightmap` and `unitsync_metalmap` commands all
+//! have frontend callers, and every one asks for the picture the app draws
+//! rather than for the hub's asset. `--typemap` has no Tauri command at all.
+//!
+//! That is the decision from issue #1685 and not an unfinished corner. A unit
+//! picture is backfilled lazily because a roster has a long tail that only turns
+//! up when somebody opens a blueprint naming a unit nobody has opened before. The
+//! map set has no such tail: it is a fixed collection of roughly 3,575 archives,
+//! and a machine holding them can hand the lot over in one walk. Nor is there an
+//! honest trigger to hang a lazy upload on, since a map is opened from the map
+//! page, from a battle, from a scenario and from the launcher, and none of those
+//! means the map is worth a picture.
+//!
 //! ## Renders are not here
 //!
 //! `render:<angle>` scales with units times angles and needs a GPU pass nothing

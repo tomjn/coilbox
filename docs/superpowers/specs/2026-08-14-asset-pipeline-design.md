@@ -537,6 +537,37 @@ knowledge of any game or map.
 references, rather than the whole roster. Sensible default rather than a hard
 constraint; see §4.1.1.
 
+### 4.6.1 Map assets reach the hub through the seed alone
+
+**Section 4.6 is a unit path. There is deliberately no client upload path for
+maps, and adding one is not an outstanding task.** Decided 2026-08-16 on
+coilbox#1685.
+
+The two corpora are different shapes. A game's roster has a long tail that only
+surfaces when somebody opens a blueprint naming a unit nobody has opened before,
+so the client has to be able to fill a gap it discovers. The map set does not
+work that way. It is a fixed collection of roughly 3,575 archives, known in
+advance, and anyone holding the archives can hand the whole thing over in one
+walk. Nothing is waiting to be discovered.
+
+The trigger would be the weak part anyway. A blueprint names its units, so "the
+units this blueprint needs" is a list the client already has. A map is opened
+from the map detail page, from a battle, from a scenario and from the launcher,
+and none of those means "this map is worth a picture". They mean somebody looked
+at it. Any of them as a trigger would spend the shared storage allowance on
+whatever people happened to click.
+
+So the map encoders have exactly one caller: the seed walk at
+`crates/coilbox-unitsync-worker/src/seed.rs`. The `unitsync_minimap`,
+`unitsync_heightmap` and `unitsync_metalmap` commands do have frontend callers,
+and every one of them asks for the picture coilbox draws rather than for the
+hub's asset. None of them passes an asset directory. The `--typemap` mode has no
+Tauri command at all, because a type map has no display path to have one for.
+
+What follows from it: a map nobody has seeded has no picture on the hub, and
+`src/hub/assets/picture.ts` falls through BAR's thumbnail to a drawing of the
+map's outline, so the absence is a handled state rather than a broken one.
+
 ### 4.7 Two-tier storage: Blob as staging, repo as durable
 
 Assets that are approved get promoted out of Blob into the assets repo and
@@ -568,10 +599,14 @@ Seed both classes:
 - **Buildpics and renders** from local installs of the common games (BAR and
   similar), covering what most users are actually looking at.
 
-Blob is then only handling the long tail: games and maps the maintainer does
+Blob is then only handling the long tail: games the maintainer does
 not have installed, arriving from users afterwards. **A steadily growing Blob
 footprint means the promotion job has stalled** — a useful health signal, not
 just a quota to watch.
+
+Maps are not part of that long tail. A map the maintainer does not hold is
+seeded by whoever does hold it, not uploaded by whoever happened to look at it,
+because there is no client upload path for maps at all (section 4.6.1).
 
 ### 4.8 Resolution order at render time
 
@@ -882,6 +917,9 @@ authenticates as a user and receives short-lived scoped upload tokens.
   **overlay layers** (metal, height, typemap), capturing **map dimensions in
   world units** — required for overlay alignment and not conveniently
   recoverable later.
+
+Those map layers go out through the seed export and never through an upload
+from the app, which is section 4.6.1 and is settled rather than pending.
 
 ### 6.6 Promotion job (Blob → assets repo)
 

@@ -22,6 +22,12 @@ import { type AssetTier, assetTierUrl } from "./tier";
  * works with no network at all, and is the exact map the reader will play rather
  * than a picture of something with the same name.
  *
+ * Rungs two and three fill up from the seed export and from nothing else. There
+ * is no client upload path for a map picture and none is planned, so a map
+ * nobody has seeded stays on rung four or five however many people open it. That
+ * is issue #1685, and section 4.6.1 of the asset pipeline design carries the
+ * reasoning.
+ *
  * Two and three are one row rather than two attempts, exactly as the hub says:
  * there is one row per identity and its `tier` column says which store holds it,
  * so the order between them is a fact about promotion rather than a race.
