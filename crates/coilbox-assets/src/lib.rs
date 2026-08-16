@@ -497,7 +497,9 @@ mod tests {
         let digest = vocabulary_digest();
         let hex = digest.strip_prefix("sha256:").expect("prefixed");
         assert_eq!(hex.len(), 64);
-        assert!(hex.chars().all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
+        assert!(hex
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
     }
 
     #[test]

@@ -208,7 +208,12 @@ describe("a run refused by a hub this build does not agree with", () => {
   it("leaves a run that stopped early worded as it was", () => {
     const reports = assetUploadReports(
       [
-        { result: "refused", status: 503, said: "Try later.", verdict: "transient" },
+        {
+          result: "refused",
+          status: 503,
+          said: "Try later.",
+          verdict: "transient",
+        },
         untried(),
       ],
       true,
