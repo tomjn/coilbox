@@ -106,6 +106,14 @@ fn pin_gio_modules_to_bundle() {
     }
 }
 
+/// Called by the frontend after the update has downloaded and before the updater
+/// hands over to the installer. On Windows it lets the installer run outside our
+/// Job Object so it isn't killed when we exit a moment later. A no-op elsewhere.
+#[tauri::command]
+fn prepare_for_update() -> Result<(), String> {
+    win_job::stop_confining_new_children()
+}
+
 fn main() {
     #[cfg(target_os = "linux")]
     pin_gio_modules_to_bundle();
@@ -217,6 +225,7 @@ fn main() {
     }
 
     builder
+        .invoke_handler(tauri::generate_handler![prepare_for_update])
         .run(tauri::generate_context!())
         .expect("error while running coilbox");
 }

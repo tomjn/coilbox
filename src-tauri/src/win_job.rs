@@ -11,6 +11,17 @@
 //!
 //! Best-effort throughout: any failure leaves us running without the guard rather
 //! than refusing to start.
+//!
+//! The guard has to be lifted for one process: the update installer itself. The
+//! updater plugin starts it with `ShellExecuteW` and calls `std::process::exit(0)`
+//! on the next line, so the installer is one of our children and the kernel kills
+//! it the instant we go. See `stop_confining_new_children` below.
+
+/// The job we put ourselves in, as a raw handle value. Zero until
+/// `confine_children_to_job` succeeds. Stored raw because `HANDLE` is a pointer
+/// and so neither `Send` nor `Sync`. Only the two functions here touch it.
+#[cfg(target_os = "windows")]
+static JOB: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
 
 #[cfg(target_os = "windows")]
 pub fn confine_children_to_job() {
@@ -44,7 +55,10 @@ pub fn confine_children_to_job() {
 
         // Children spawned after this inherit the job (none set
         // CREATE_BREAKAWAY_FROM_JOB), so every sidecar is covered.
-        let _ = AssignProcessToJobObject(job, GetCurrentProcess());
+        if AssignProcessToJobObject(job, GetCurrentProcess()).is_err() {
+            return;
+        }
+        JOB.store(job.0 as isize, std::sync::atomic::Ordering::Relaxed);
 
         // `job` is intentionally not closed: the handle must stay open for our whole
         // lifetime, since closing the last handle trips KILL_ON_JOB_CLOSE and would
@@ -54,5 +68,51 @@ pub fn confine_children_to_job() {
     }
 }
 
+/// Let anything we start from now on run outside the job, so it survives us.
+///
+/// Called just before the updater launches the NSIS installer. Adding
+/// SILENT_BREAKAWAY_OK only affects processes created after this point, so every
+/// sidecar already running stays in the job and is still killed when we exit,
+/// which is what frees their .exe files for the installer to overwrite. Without
+/// this the installer is a job member too and dies with us, which is why a Windows
+/// update closed the app and then did nothing at all (issue #1691).
+///
+/// Errors are returned rather than swallowed: if the breakaway does not take, the
+/// update is going to fail the same silent way, and the caller should say so.
+#[cfg(target_os = "windows")]
+pub fn stop_confining_new_children() -> Result<(), String> {
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::JobObjects::{
+        JobObjectExtendedLimitInformation, SetInformationJobObject,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK,
+    };
+
+    let handle = JOB.load(std::sync::atomic::Ordering::Relaxed);
+    if handle == 0 {
+        // We never got into a job, so nothing confines the installer anyway.
+        return Ok(());
+    }
+
+    let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+    info.BasicLimitInformation.LimitFlags =
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK;
+    unsafe {
+        SetInformationJobObject(
+            HANDLE(handle as *mut core::ffi::c_void),
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const core::ffi::c_void,
+            core::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        )
+    }
+    .map_err(|e| format!("could not let the installer leave the job object: {e}"))
+}
+
 #[cfg(not(target_os = "windows"))]
 pub fn confine_children_to_job() {}
+
+/// No job object outside Windows, so nothing to lift.
+#[cfg(not(target_os = "windows"))]
+pub fn stop_confining_new_children() -> Result<(), String> {
+    Ok(())
+}
