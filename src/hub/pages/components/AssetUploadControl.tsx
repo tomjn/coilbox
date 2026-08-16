@@ -27,7 +27,10 @@ export function AssetUploadControl({
 }: {
   agreed: boolean;
   offered: boolean;
-  onChange: (next: boolean) => void;
+  /** May be the async setter from `useAssetUploadConsent`, which resolves once
+   *  the answer is on disk. Nothing here waits for it: the switch moves on the
+   *  frame's own state, and there is nothing to say while a file is written. */
+  onChange: (next: boolean) => void | Promise<void>;
 }) {
   return (
     <section className="space-y-2">
