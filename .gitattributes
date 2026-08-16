@@ -1,0 +1,5 @@
+# The asset vocabulary is digested byte for byte, and coilbox compares its digest
+# against the one the hub serves (issue #1708). A checkout that turned these
+# bytes into CRLF would hash differently and report every build out of date, so
+# the line endings are part of the file's meaning rather than a local preference.
+shared/asset-vocabulary.json text eol=lf

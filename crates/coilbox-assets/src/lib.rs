@@ -22,6 +22,7 @@ use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 
 /// The shared document, embedded rather than read from disk: a sidecar binary and
 /// the app are started from directories that have nothing to do with the repo.
@@ -161,6 +162,25 @@ pub fn vocabulary() -> &'static AssetVocabulary {
     PARSED.get_or_init(|| {
         serde_json::from_str(VOCABULARY_JSON)
             .expect("shared/asset-vocabulary.json is not the shape coilbox-assets reads")
+    })
+}
+
+/// This build's name for the document above: `sha256:` and the lowercase hex
+/// digest of its bytes (issue #1708).
+///
+/// Over the bytes rather than over anything parsed out of them, so neither side
+/// has to agree about key order, indentation or how a number is spelled. The hub
+/// vendors this exact file and digests it the same way, so two builds that hold
+/// the same document produce the same string and two that do not, do not.
+///
+/// The bytes are pinned to LF by `.gitattributes`. Without that a Windows
+/// checkout would embed CRLF, and every Windows build would call itself out of
+/// date against a hub that had never changed.
+pub fn vocabulary_digest() -> &'static str {
+    static DIGEST: OnceLock<String> = OnceLock::new();
+    DIGEST.get_or_init(|| {
+        let digest = Sha256::digest(VOCABULARY_JSON.as_bytes());
+        format!("sha256:{digest:x}")
     })
 }
 
@@ -452,6 +472,32 @@ mod tests {
             class_for_variant("render:top").unwrap(),
             class_for_variant("render:front").unwrap()
         ));
+    }
+
+    /// The expected value comes from `shasum -a 256 shared/asset-vocabulary.json`,
+    /// a tool with no idea this crate exists, so this asserts the digest is over
+    /// the file on disk rather than over whatever the code happened to feed it.
+    ///
+    /// It fails whenever the vocabulary changes, on purpose. A changed vocabulary
+    /// is the moment the hub has to vendor the new one, and a test that quietly
+    /// followed the file would let that pass unnoticed.
+    #[test]
+    fn digests_the_shared_document_as_an_outside_tool_does() {
+        assert_eq!(
+            vocabulary_digest(),
+            "sha256:befd5c62536efaba4a9a48b20b6a226f9a511fe5d68c0da84ca23e09c96bff36"
+        );
+    }
+
+    /// The `sha256:` prefix is part of the value, because the hub serves it that
+    /// way and a comparison that has to strip something is a comparison that can
+    /// strip it differently on the two sides.
+    #[test]
+    fn the_digest_names_its_own_algorithm() {
+        let digest = vocabulary_digest();
+        let hex = digest.strip_prefix("sha256:").expect("prefixed");
+        assert_eq!(hex.len(), 64);
+        assert!(hex.chars().all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
     }
 
     #[test]
