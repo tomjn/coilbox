@@ -6,10 +6,25 @@ import { notify } from "@/notify/notify";
  *
  * A backfill runs in the background and has nowhere to put "the hub says this
  * build pic is not square". Logging it means the first anybody hears of it is a
- * game with no pictures on the website, so it goes through the notification path
- * instead. That is only reasonable because backfill is off until somebody turns
- * it on (issue #1635): an unprompted toast about a job the user started is not
- * an interruption.
+ * game with no pictures on the website, so a run somebody started says it out
+ * loud through the notification path.
+ *
+ * ## Who asked decides where it goes (issue #1690)
+ *
+ * Agreeing to send pictures at all (issue #1635) is permission to upload in the
+ * background. It is not permission to put an error in front of somebody who was
+ * reading a base layout, which is what happened when a Splinter Faction
+ * blueprint was opened and the hub refused the game. So the run carries one more
+ * bit than #1634 gave it: who started it.
+ *
+ * A run a person started is worth interrupting them about, because they are
+ * waiting for the answer. A run coilbox started by itself goes to the console
+ * with the same words, so somebody wondering why a game has no pictures can find
+ * out without being told while they were doing something else.
+ *
+ * Every caller has to answer, because {@link UploadInitiator} is a required
+ * argument rather than one with a default. A default would decide this by
+ * whichever way the next caller was written.
  *
  * ## Why a whole run gets at most two
  *
@@ -31,6 +46,15 @@ import { notify } from "@/notify/notify";
  * `hub_upload_assets`, so a run cannot be started without being reported on
  * (issue #1679).
  */
+
+/**
+ * Who started an upload run (issue #1690).
+ *
+ * `user` is somebody who pressed something and is waiting for the answer.
+ * `coilbox` is everything the app decided to do on its own, which today is the
+ * blueprint backfill and nothing else.
+ */
+export type UploadInitiator = "user" | "coilbox";
 
 /** What became of one asset, as `hub_upload_assets` answers. */
 export type AssetUploadResult =
@@ -146,11 +170,42 @@ export function assetUploadFailureReport(
 }
 
 /**
- * Tell somebody what a finished run came to. Fire and forget, the way the
- * download bindings notify: a failed toast must not fail an upload that worked.
+ * Deliver what a run has to say, to whoever it is for (issue #1690).
+ *
+ * A notification is recorded in the bell's history as well as shown, so a run
+ * somebody started is findable after the toast has gone. A run coilbox started
+ * gets neither, and the console line is what it has instead.
+ *
+ * Fire and forget, the way the download bindings notify: a failed toast must not
+ * fail an upload that worked.
  */
-export function reportAssetUploadOutcomes(outcomes: AssetOutcome[]): void {
-  for (const report of assetUploadReports(outcomes)) {
-    void notify(report);
+function deliver(reports: NotifyInput[], startedBy: UploadInitiator): void {
+  for (const report of reports) {
+    if (startedBy === "user") {
+      void notify(report);
+      continue;
+    }
+    console.warn(
+      report.body
+        ? `hub picture upload: ${report.title}: ${report.body}`
+        : `hub picture upload: ${report.title}`,
+    );
   }
+}
+
+/** Tell whoever it is for what a finished run came to. */
+export function reportAssetUploadOutcomes(
+  outcomes: AssetOutcome[],
+  startedBy: UploadInitiator,
+): void {
+  deliver(assetUploadReports(outcomes), startedBy);
+}
+
+/** Tell whoever it is for that a run never started. */
+export function reportAssetUploadFailure(
+  said: string,
+  assets: number,
+  startedBy: UploadInitiator,
+): void {
+  deliver([assetUploadFailureReport(said, assets)], startedBy);
 }

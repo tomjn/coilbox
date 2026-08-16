@@ -14,6 +14,11 @@
  * on every edit, because a layout is edited by dragging buildings around and
  * firing per drag would be hundreds of runs for one afternoon's work.
  *
+ * That was asked again in issue #1690, after a rejection reached somebody who had
+ * only opened a layout to look at it, and the answer is the same. Doing the work
+ * unasked is what the switch permits. Interrupting somebody about the result is
+ * not, and that is what changed instead.
+ *
  * Once per layout per session, held in a module-level set. Not on disk: a run
  * that failed because the hub was asleep is worth retrying next launch, and the
  * thing that must survive a restart is the rate limit rather than this.
@@ -77,8 +82,8 @@ export interface BlueprintToBackfill {
  * Offer this layout's units to the hub, once, when everything is ready.
  *
  * Returns nothing. A backfill is a background job with no place on a page about
- * a layout, and what it has to say when it goes wrong is said through the
- * notification path in `../uploadOutcomes` (issue #1634).
+ * a layout, and what it has to say when it goes wrong goes to the console rather
+ * than to a toast, because nobody asked for it (issue #1690).
  */
 export function useBlueprintBackfill(
   blueprint: BlueprintToBackfill | null,

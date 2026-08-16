@@ -22,11 +22,11 @@
 
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { Channel } from "@tauri-apps/api/core";
-import { notify } from "@/notify/notify";
 import {
   type AssetOutcome,
-  assetUploadFailureReport,
+  reportAssetUploadFailure,
   reportAssetUploadOutcomes,
+  type UploadInitiator,
 } from "../uploadOutcomes";
 import type { AssetIdentity } from "./have";
 
@@ -119,6 +119,10 @@ export interface AssetUploadRun {
  * summarised rather than narrated and a run of three hundred rejections is still
  * at most two notifications.
  *
+ * `startedBy` says who to report to and has no default, so a new caller cannot
+ * get one by not thinking about it (issue #1690). Say `user` only when somebody
+ * pressed something and is waiting for the answer.
+ *
  * Nothing throws. A backfill is a background job, and a rejected promise from one
  * is a caller that has to remember to catch it or an unhandled rejection in the
  * console. The reason is in {@link AssetUploadRun.error} and has already been
@@ -128,10 +132,12 @@ export async function uploadAssetsToHub(
   hubUrl: string,
   assets: AssetUpload[],
   options: {
+    /** Who asked for this run, which decides whether it interrupts them. */
+    startedBy: UploadInitiator;
     /** Makes the run cancellable by {@link cancelAssetUpload}. */
     opId?: string;
     onProgress?: (sample: AssetUploadProgress) => void;
-  } = {},
+  },
 ): Promise<AssetUploadRun> {
   if (assets.length === 0) return { outcomes: [], written: 0, error: null };
 
@@ -145,11 +151,11 @@ export async function uploadAssetsToHub(
       ...(options.opId ? { opId: options.opId } : {}),
       onProgress,
     });
-    reportAssetUploadOutcomes(outcomes);
+    reportAssetUploadOutcomes(outcomes, options.startedBy);
     return { outcomes, written: written(outcomes), error: null };
   } catch (e) {
     const said = e instanceof Error ? e.message : String(e);
-    void notify(assetUploadFailureReport(said, assets.length));
+    reportAssetUploadFailure(said, assets.length, options.startedBy);
     return { outcomes: [], written: 0, error: said };
   }
 }
