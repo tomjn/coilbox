@@ -10,6 +10,9 @@
 //! green picture above (#1626). The two outputs come off one `GetInfoMap` call:
 //! a metal infomap read costs a map archive open, and asking for it twice to
 //! draw it twice would double that for nothing.
+//!
+//! Only [`crate::seed`] ever passes `--asset-dir` here. The `unitsync_metalmap`
+//! command does not, and no client upload path for a map is planned (#1685).
 
 use crate::ffi::Unitsync;
 use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage};

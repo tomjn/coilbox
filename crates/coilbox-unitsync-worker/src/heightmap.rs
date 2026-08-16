@@ -11,6 +11,9 @@
 //! call: a height read costs a map archive open and the largest maps are 2049 by
 //! 2049 samples, so asking twice would double the most expensive read the worker
 //! makes.
+//!
+//! Only [`crate::seed`] ever passes `--asset-dir` here. The `unitsync_heightmap`
+//! command does not, and no client upload path for a map is planned (#1685).
 
 use crate::ffi::Unitsync;
 use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage};

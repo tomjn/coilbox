@@ -16,6 +16,9 @@
 //! asset (#1630), which is neither of the two sizes coilbox draws: it is always
 //! mip 1, 512px square, because that is what the hub caps a minimap at. The
 //! display render keeps whatever mip it was asked for.
+//!
+//! Only [`crate::seed`] ever passes `--asset-dir` here. The `unitsync_minimap`
+//! command does not, and no client upload path for a map is planned (#1685).
 
 use crate::ffi::Unitsync;
 use crate::model::{MapOverlayAsset, MapOverlaySkip, MinimapOutput, StartPos};

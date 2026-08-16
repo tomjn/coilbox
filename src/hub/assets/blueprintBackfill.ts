@@ -36,6 +36,21 @@
  * of the archive and a GL context of its own, and twenty at once is twenty
  * contexts competing for the same GPU rather than twenty renders in the time of
  * one.
+ *
+ * ## There is no map equivalent of this file, and there is not meant to be
+ *
+ * Nothing in coilbox uploads a map picture. Map assets reach the hub through the
+ * seed export in `crates/coilbox-unitsync-worker/src/seed.rs` and through nothing
+ * else, which is issue #1685 and section 4.6.1 of the asset pipeline design.
+ *
+ * The reason is the reason this file is lazy in the first place. A roster has a
+ * long tail that only appears when somebody opens a blueprint naming a unit
+ * nobody has opened before, so the client has to be able to fill a gap it finds.
+ * The map set is fixed at roughly 3,575 archives and has no such tail, so a
+ * machine that holds them can seed the lot at once. And a blueprint names its
+ * units, whereas a map is opened from the map page, from a battle, from a
+ * scenario and from the launcher, none of which means the map is worth a
+ * picture.
  */
 
 import {
