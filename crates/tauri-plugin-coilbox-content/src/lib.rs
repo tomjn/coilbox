@@ -1238,18 +1238,11 @@ async fn branding_catalog<R: Runtime>(app: AppHandle<R>, url: String) -> Result<
     let cache_file = coilbox_portable::cache_dir(&app)
         .ok()
         .map(|d| d.join("coilbox-branding").join("catalog.json"));
-    // The bundled seed. `catalog.json` moved to the repo root and is bundled via the
-    // `../catalog.json` resource entry. The exact in-bundle location can vary by
-    // bundler, so probe a few candidates and take the first that exists (the old
-    // `branding/` layout is kept last for older installs). This is what makes a
-    // cold offline first run answer at all, so a miss here is the one case that
-    // waits on the network.
-    let seed_file = app.path().resource_dir().ok().and_then(|d| {
-        ["catalog.json", "_up_/catalog.json", "branding/catalog.json"]
-            .into_iter()
-            .map(|p| d.join(p))
-            .find(|p| p.exists())
-    });
+    let seed_file = app
+        .path()
+        .resource_dir()
+        .ok()
+        .and_then(|d| branding::seed_file(&d, |p| p.exists()));
     let res = branding::resolve_catalog(&url, cache_file, seed_file).await;
     Ok(CliResult::ok(json!(res)))
 }

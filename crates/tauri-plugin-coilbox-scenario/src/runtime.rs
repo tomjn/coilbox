@@ -28,23 +28,40 @@ pub const MARKER: &str = "missions/runtime.lua";
 /// install does not write and an update does not touch.
 pub const EXTENSIONS: &str = "missions/extensions.lua";
 
+/// Where the runtime can sit inside the resource directory, in the order we take
+/// them. The Windows installer moves it into `.coilbox\resources` so the install
+/// folder shows little more than the executable. Every other platform leaves it at
+/// the top of the resource directory. The last two are what older bundles made of
+/// the `../lua/mission-runtime` resource entry, and answer for an install that
+/// predates this layout.
+const CANDIDATES: [&str; 4] = [
+    ".coilbox/resources/mission-runtime",
+    "mission-runtime",
+    "lua/mission-runtime",
+    "_up_/lua/mission-runtime",
+];
+
+/// Pure core of [`runtime_dir`]: the first [`CANDIDATES`] entry under
+/// `resource_dir` that is a directory.
+fn bundled_runtime_dir(resource_dir: &Path, is_dir: impl Fn(&Path) -> bool) -> Option<PathBuf> {
+    CANDIDATES
+        .into_iter()
+        .map(|rel| resource_dir.join(rel))
+        .find(|path| is_dir(path))
+}
+
 /// Where the bundled runtime lives.
 ///
-/// `bundle.resources` is assembled by `tauri build`, and the in-bundle layout of
-/// a `../`-relative entry varies by bundler, so the candidates are probed rather
-/// than assumed. Under `tauri dev` there are no resources beside the binary at
-/// all, hence the source-tree fallback in debug builds.
+/// `bundle.resources` is assembled by `tauri build` and the Windows installer
+/// moves it afterwards, so the candidates are probed rather than assumed. Under
+/// `tauri dev` there are no resources beside the binary at all, hence the
+/// source-tree fallback in debug builds.
 pub fn runtime_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
-    let bundled = app.path().resource_dir().ok().and_then(|dir| {
-        [
-            "lua/mission-runtime",
-            "_up_/lua/mission-runtime",
-            "mission-runtime",
-        ]
-        .into_iter()
-        .map(|rel| dir.join(rel))
-        .find(|path| path.is_dir())
-    });
+    let bundled = app
+        .path()
+        .resource_dir()
+        .ok()
+        .and_then(|dir| bundled_runtime_dir(&dir, |path| path.is_dir()));
     if bundled.is_some() {
         return bundled;
     }
@@ -435,6 +452,28 @@ mod tests {
         }
         std::fs::write(root.join("missions/.DS_Store"), "junk").expect("write");
         dir
+    }
+
+    #[test]
+    fn the_runtime_is_found_where_the_windows_installer_tucks_it() {
+        let res = Path::new("C:/Program Files/Coilbox");
+        let tucked = res.join(".coilbox/resources/mission-runtime");
+        assert_eq!(
+            bundled_runtime_dir(res, |path| path == tucked),
+            Some(tucked)
+        );
+    }
+
+    #[test]
+    fn a_bundle_that_kept_its_old_layout_still_answers() {
+        let res = Path::new("/app/resources");
+        let old = res.join("_up_/lua/mission-runtime");
+        assert_eq!(bundled_runtime_dir(res, |path| path == old), Some(old));
+    }
+
+    #[test]
+    fn no_runtime_beside_the_binary_is_no_runtime() {
+        assert_eq!(bundled_runtime_dir(Path::new("/app"), |_| false), None);
     }
 
     #[test]
