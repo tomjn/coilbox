@@ -93,8 +93,17 @@ function firstWords(outcomes: AssetOutcome[]): string | null {
 /**
  * What a finished run is worth telling somebody, as zero, one or two
  * notifications. Pure, so the aggregation can be asserted on without a window.
+ *
+ * `outOfDate` is the plugin's answer to whether the hub names an asset vocabulary
+ * this build does not hold (issue #1708). When it does, the terminal report says
+ * so instead of quoting the hub, because "update coilbox" is something the reader
+ * can act on and "this build pic is not square" is not. Omitted means nobody
+ * knows, which is what a hub serving no digest leaves behind.
  */
-export function assetUploadReports(outcomes: AssetOutcome[]): NotifyInput[] {
+export function assetUploadReports(
+  outcomes: AssetOutcome[],
+  outOfDate = false,
+): NotifyInput[] {
   const reports: NotifyInput[] = [];
 
   // The run ending first, because it is what explains a run having fewer
@@ -124,19 +133,33 @@ export function assetUploadReports(outcomes: AssetOutcome[]): NotifyInput[] {
   const terminal = outcomes.filter((o) => o.verdict === "terminal");
   if (terminal.length > 0) {
     const one = terminal.length === 1;
-    // The reason in front of the consequence, because the reason is the only
-    // part that says which picture and what was wrong with it.
-    const consequence = one
-      ? "Coilbox will not send it again: the same bytes get the same answer."
-      : "Coilbox will not send them again: the same bytes get the same answer.";
     const said = firstWords(terminal);
-    reports.push({
-      title: one
-        ? "The hub would not take a picture"
-        : `The hub would not take ${terminal.length} pictures`,
-      body: said ? `${said} ${consequence}` : consequence,
-      level: "error",
-    });
+    if (outOfDate) {
+      // One cause for the whole run, so the count is the only number worth
+      // saying and the hub's own words are not: they describe a picture, and
+      // what is wrong is the build that made every one of them.
+      const refused = one
+        ? "The hub refused a picture"
+        : `The hub refused all ${terminal.length} pictures`;
+      reports.push({
+        title: "Coilbox is out of date",
+        body: `${refused} because this copy of coilbox makes them the way an older hub took them. Update coilbox and they will go.`,
+        level: "error",
+      });
+    } else {
+      // The reason in front of the consequence, because the reason is the only
+      // part that says which picture and what was wrong with it.
+      const consequence = one
+        ? "Coilbox will not send it again: the same bytes get the same answer."
+        : "Coilbox will not send them again: the same bytes get the same answer.";
+      reports.push({
+        title: one
+          ? "The hub would not take a picture"
+          : `The hub would not take ${terminal.length} pictures`,
+        body: said ? `${said} ${consequence}` : consequence,
+        level: "error",
+      });
+    }
   }
 
   return reports;
@@ -197,8 +220,9 @@ function deliver(reports: NotifyInput[], startedBy: UploadInitiator): void {
 export function reportAssetUploadOutcomes(
   outcomes: AssetOutcome[],
   startedBy: UploadInitiator,
+  outOfDate = false,
 ): void {
-  deliver(assetUploadReports(outcomes), startedBy);
+  deliver(assetUploadReports(outcomes, outOfDate), startedBy);
 }
 
 /** Tell whoever it is for that a run never started. */
