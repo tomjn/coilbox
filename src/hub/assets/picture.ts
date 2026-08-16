@@ -50,14 +50,17 @@ import { type AssetTier, assetTierUrl } from "./tier";
  * map in a battle room or on an item page is not that, and paying a few
  * kilobytes for the right picture is the better trade here.
  *
- * ## Nothing supplies the hub rungs yet
+ * ## Where the hub rungs are told what to show
  *
- * {@link MapPictureSources.held} is always null in the app today. The hub has no
- * public route that answers "what do you hold for this identity" with a path:
- * `/api/v1/assets/have` needs a bearer token and answers `have`, `changed` or
- * `missing` without one. The rungs are here, and tested, because the tier bases
- * and the row's shape are both settled and published, so what is left is a wire
- * rather than a design. Issue #1687 is that wire.
+ * {@link MapPictureSources.held} comes from `POST /api/v1/assets/pictures`,
+ * through `./pictures.ts` and the batching in `./heldPictures.ts` (issue #1687).
+ * The hub has to say the path rather than the client working it out: `asset.path`
+ * is the sha256 of the encoded bytes with a random suffix on top for anything in
+ * the staging tier, so nothing without the bytes can derive it.
+ *
+ * `/api/v1/assets/have` is not that route and is not repurposed as one. It needs
+ * a bearer token, it answers `have`, `changed` or `missing` without a path, and
+ * it exists to decide whether to upload rather than what to show.
  */
 
 /** Which rung answered. The two hub tiers keep their own names, because which

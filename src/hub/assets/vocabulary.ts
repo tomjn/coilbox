@@ -113,6 +113,12 @@ export const RENDER_ANGLES = vocabulary.unit.renderAngles;
  */
 export const MAP_VARIANTS = vocabulary.mapVariants;
 
+/** The picture of the map itself, as against the three overlays. The one the
+ *  picture ladder in `./picture.ts` asks the hub for. Named rather than written
+ *  out at the call site, and `vocabulary.test.ts` holds it inside
+ *  {@link MAP_VARIANTS} so it cannot become a variant the hub refuses. */
+export const MINIMAP_VARIANT = "minimap";
+
 /** How the bytes were produced, not how they arrived. */
 export const ASSET_ORIGINS = vocabulary.origins;
 
