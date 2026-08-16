@@ -21,7 +21,7 @@
  */
 
 import { useSetting } from "@picoframe/frame";
-import { readStoredSetting } from "@/lib/storedSetting";
+import { readStoredSetting, settingsWritten } from "@/lib/storedSetting";
 import { isHubAssetUploadOffered } from "@/profile/profile";
 
 /**
@@ -49,9 +49,23 @@ export function assetUploadsAllowed(
  * The answer alone, without the profile. A distribution that has switched
  * uploads off hides the control rather than flipping the player's saved answer,
  * so the answer is still theirs if the profile goes away again.
+ *
+ * The setter is async, and it resolves when the settings file holds the new
+ * answer rather than when the switch has moved (issue #1674). The plugin reads
+ * that file, so anything meaning to act on a fresh answer has to wait for it.
  */
-export function useAssetUploadConsent() {
-  return useSetting<boolean>(ASSET_UPLOAD_SETTING_KEY, false);
+export function useAssetUploadConsent(): [
+  boolean,
+  (next: boolean) => Promise<void>,
+] {
+  const [agreed, store] = useSetting<boolean>(ASSET_UPLOAD_SETTING_KEY, false);
+  return [
+    agreed,
+    async (next: boolean) => {
+      store(next);
+      await settingsWritten();
+    },
+  ];
 }
 
 /**

@@ -19,14 +19,50 @@ import type { SettingsStorage } from "@picoframe/frame";
  * storage without a Tauri backend.
  */
 
-let installed: SettingsStorage | null = null;
+/**
+ * The frame's storage, plus a way to wait for what it has written.
+ *
+ * The frame's own interface is synchronous and says nothing about durability,
+ * which is right for a UI: a component reads back what it just wrote from the
+ * cache. It is not enough for anything that reads the settings *file*, which is
+ * a write behind the cache until the app's storage has persisted it.
+ *
+ * `flush` is optional because only the app's Tauri-backed storage writes to
+ * anything: a storage held in memory has nothing to wait for.
+ */
+export interface FlushableSettingsStorage extends SettingsStorage {
+  /** Resolves once every write queued before this call has been persisted. */
+  flush?(): Promise<void>;
+}
+
+let installed: FlushableSettingsStorage | null = null;
 
 /**
  * Point these helpers at the storage the frame is using. Called once at boot by
  * `createTauriSettingsStorage`, before anything renders, and by tests.
  */
-export function installSettingsStorage(storage: SettingsStorage | null) {
+export function installSettingsStorage(
+  storage: FlushableSettingsStorage | null,
+) {
   installed = storage;
+}
+
+/**
+ * Wait until the settings written so far are on disk.
+ *
+ * For the few readers that are not this webview. `AssetUploadConsent::check` in
+ * the hub plugin reads the settings file itself, on purpose: it is enforcement
+ * rather than a preference, so no argument sent over IPC can turn an upload on
+ * (issues #1635 and #1674). Between flipping a switch and the file saying so
+ * there is a window where that check reads the old answer, and awaiting this
+ * closes it.
+ *
+ * Resolves rather than rejects when a write failed: the storage logs that
+ * itself, and what a failed write leaves behind is a file that still holds the
+ * old answer, which the plugin then refuses on. Failing safe is the point.
+ */
+export function settingsWritten(): Promise<void> {
+  return installed?.flush?.() ?? Promise.resolve();
 }
 
 /**

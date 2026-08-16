@@ -168,6 +168,37 @@ describe("what has to be true before a blueprint is backfilled", () => {
     expect(runs).toEqual([]);
   });
 
+  /**
+   * The plugin's own consent check reads the settings file, and this webview
+   * writes it a beat after the switch moves. Somebody who agreed and came
+   * straight to a layout would be refused for an answer they had already given
+   * (issue #1674), so a run waits for that write.
+   */
+  it("waits for a fresh answer to reach the file before it asks", async () => {
+    const entries = new Map<string, string>([
+      [ASSET_UPLOAD_SETTING_KEY, JSON.stringify(true)],
+    ]);
+    let land = () => {};
+    const write = new Promise<void>((done) => {
+      land = done;
+    });
+    installSettingsStorage({
+      get: (key) => entries.get(key) ?? null,
+      set: (key, value) => {
+        entries.set(key, value);
+      },
+      flush: () => write,
+    });
+
+    const run = runBlueprintBackfill(inputs());
+    await new Promise((done) => setTimeout(done, 0));
+    expect(runs).toEqual([]);
+
+    land();
+    expect((await run)?.units).toBe(3);
+    expect(runs).toHaveLength(1);
+  });
+
   it("does nothing for a layout of units this game has not got", async () => {
     expect(
       await runBlueprintBackfill(

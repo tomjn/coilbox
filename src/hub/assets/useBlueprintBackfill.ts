@@ -29,12 +29,15 @@
  * The consent check here is advisory, and deliberately so. The one that decides
  * is `AssetUploadConsent::check` in the plugin, which reads the setting and the
  * distribution profile off disk on every call. This only saves starting work the
- * plugin would refuse.
+ * plugin would refuse. Because that one reads a file this webview writes a beat
+ * later, a run waits for any settings write still in flight before it asks
+ * (issue #1674).
  */
 
 import { useEffect, useRef } from "react";
 import { rememberedShortname } from "@/container/shortnames";
 import type { UnitDatasetEntry } from "@/content/bindings";
+import { settingsWritten } from "@/lib/storedSetting";
 import { usePreferredTarget } from "@/play/config";
 import { hubAccountSnapshot } from "../account";
 import { assetUploadsPermitted } from "../assetUploads";
@@ -149,8 +152,15 @@ export async function runBlueprintBackfill(
   if (units.length === 0) return null;
 
   // Claimed before the run rather than after, so a second render of the page
-  // while the first run is still in flight does not start a second one.
+  // while the first run is still in flight does not start a second one. Nothing
+  // above here waits, so two calls in one turn cannot both get past this.
   offered.add(blueprint.id);
+
+  // The consent check above read the settings cache, and the plugin's own check
+  // reads the settings file, which is a write behind it. Somebody who agreed a
+  // moment ago and came straight here would otherwise be refused for an answer
+  // they had already given (issue #1674), so wait for that write first.
+  await settingsWritten();
 
   const report = await backfillBlueprintUnits(
     {
