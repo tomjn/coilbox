@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { notify } = vi.hoisted(() => ({ notify: vi.fn() }));
 vi.mock("@/notify/notify", () => ({ notify }));
@@ -6,6 +6,7 @@ vi.mock("@/notify/notify", () => ({ notify }));
 import {
   type AssetOutcome,
   assetUploadReports,
+  reportAssetUploadFailure,
   reportAssetUploadOutcomes,
 } from "./uploadOutcomes";
 
@@ -174,6 +175,7 @@ describe("reportAssetUploadOutcomes", () => {
   it("fires one notification for forty rejections", () => {
     reportAssetUploadOutcomes(
       Array.from({ length: 40 }, (_, n) => notSquare(`u${n}`)),
+      "user",
     );
 
     expect(notify).toHaveBeenCalledTimes(1);
@@ -183,8 +185,91 @@ describe("reportAssetUploadOutcomes", () => {
   });
 
   it("fires nothing for a run where nothing went wrong", () => {
-    reportAssetUploadOutcomes([taken(), taken()]);
+    reportAssetUploadOutcomes([taken(), taken()], "user");
 
     expect(notify).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Issue #1690. The rejection this is named after arrived while somebody was
+ * reading a base layout: they had not asked for an upload, and the hub refusing
+ * their game is not something to stop them for.
+ */
+describe("a run coilbox started by itself", () => {
+  let logged: string[];
+
+  beforeEach(() => {
+    notify.mockClear();
+    logged = [];
+    vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+      logged.push(args.join(" "));
+    });
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("does not interrupt with a toast when the hub refuses the pictures", () => {
+    reportAssetUploadOutcomes(
+      Array.from({ length: 40 }, (_, n) => notSquare(`u${n}`)),
+      "coilbox",
+    );
+
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  /** Silent to the user is not silent to whoever wonders why a game has no
+   * pictures, so the hub's own words survive into the log. */
+  it("says the same thing in the console instead", () => {
+    reportAssetUploadOutcomes([taken(), notSquare("armsolar")], "coilbox");
+
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toContain("The hub would not take a picture");
+    expect(logged[0]).toContain("bar's armsolar buildpic");
+    expect(logged[0]).toContain("must be square");
+  });
+
+  /** The two-per-run cap is the taxonomy from #1634 and is not re-decided here:
+   * a silent run logs exactly what a loud one would have said. */
+  it("logs both of a run's two reports and no more", () => {
+    reportAssetUploadOutcomes(
+      [
+        notSquare("armsolar"),
+        {
+          result: "refused",
+          status: 429,
+          said: "Too many uploads for that subject in the last hour.",
+          verdict: "blocked",
+        },
+        untried(),
+      ],
+      "coilbox",
+    );
+
+    expect(notify).not.toHaveBeenCalled();
+    expect(logged).toHaveLength(2);
+  });
+
+  /** A run that never started is the licence refusal's own shape: no outcomes,
+   * one sentence from whoever refused it. */
+  it("does not interrupt when the run never started", () => {
+    reportAssetUploadFailure(
+      "The hub at coilbox.example has no recorded permission to redistribute pictures for that game.",
+      12,
+      "coilbox",
+    );
+
+    expect(notify).not.toHaveBeenCalled();
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toContain("no recorded permission");
+    expect(logged[0]).toContain("12 pictures were not sent.");
+  });
+
+  it("still interrupts when a person started the run", () => {
+    reportAssetUploadFailure("The hub would not answer.", 3, "user");
+
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0][0].title).toBe("Picture uploads stopped early");
+    expect(logged).toEqual([]);
   });
 });

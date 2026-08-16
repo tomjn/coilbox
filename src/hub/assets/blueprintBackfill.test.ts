@@ -47,6 +47,8 @@ interface Spy {
   models: string[];
   draws: number;
   uploads: AssetUpload[][];
+  /** Who each run said started it (issue #1690). */
+  startedBy: string[];
 }
 
 /** A tool set that answers everything, with knobs for the two things a test
@@ -69,6 +71,7 @@ function spy(
     models: [] as string[],
     draws: 0,
     uploads: [] as AssetUpload[][],
+    startedBy: [] as string[],
   };
 
   const tools: BackfillTools = {
@@ -176,8 +179,9 @@ function spy(
       },
       errors: [],
     }),
-    upload: async (_hubUrl, assets) => {
+    upload: async (_hubUrl, assets, options) => {
       state.uploads.push(assets);
+      state.startedBy.push(options.startedBy);
       return { outcomes: [], written: assets.length, error: null };
     },
   };
@@ -201,6 +205,9 @@ function spy(
     },
     get uploads() {
       return state.uploads;
+    },
+    get startedBy() {
+      return state.startedBy;
     },
   };
 }
@@ -285,6 +292,18 @@ describe("a run over one layout", () => {
     expect(watch.models).toHaveLength(12);
     expect(watch.uploads).toHaveLength(1);
     expect(watch.uploads[0]).toHaveLength(24);
+  });
+
+  /**
+   * Issue #1690. Opening a layout is coilbox deciding to do this, not somebody
+   * asking for it, and the door reports to the console rather than to a toast on
+   * the strength of this word.
+   */
+  it("tells the upload that coilbox started it, not a person", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
+
+    expect(watch.startedBy).toEqual(["coilbox"]);
   });
 
   /** One mount per question, not one per unit. */

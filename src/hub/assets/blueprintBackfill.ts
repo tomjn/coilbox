@@ -260,8 +260,14 @@ export async function backfillBlueprintUnits(
 
   // A run with nothing to send does not open the door at all. The hub already
   // holding everything is the ordinary answer, not an edge case.
+  //
+  // Started by coilbox, always. A backfill is the app filling gaps it noticed on
+  // its own, so a rejection goes to the console rather than in front of somebody
+  // who was reading a layout (issue #1690). If a button ever starts one of these,
+  // this is what has to become an argument.
   const written = assets.length
-    ? (await tools.upload(target.hubUrl, assets)).written
+    ? (await tools.upload(target.hubUrl, assets, { startedBy: "coilbox" }))
+        .written
     : 0;
   return {
     units: working.length,
