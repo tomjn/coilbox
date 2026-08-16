@@ -1,5 +1,7 @@
-import type { SettingsStorage } from "@picoframe/frame";
-import { installSettingsStorage } from "./lib/storedSetting";
+import {
+  type FlushableSettingsStorage,
+  installSettingsStorage,
+} from "./lib/storedSetting";
 import { usSettingsLoad, usSettingsSave } from "./uberstress/bindings";
 
 /**
@@ -10,8 +12,11 @@ import { usSettingsLoad, usSettingsSave } from "./uberstress/bindings";
  * write-through that persists the whole map (serialized so rapid edits can't
  * interleave). The persistence command lives in the uberstress plugin crate —
  * the only settings consumer today; it would move app-level if others appear.
+ *
+ * `flush` is how anything that cares about the file rather than the cache waits
+ * for that write to land. See `settingsWritten` in `./lib/storedSetting`.
  */
-export async function createTauriSettingsStorage(): Promise<SettingsStorage> {
+export async function createTauriSettingsStorage(): Promise<FlushableSettingsStorage> {
   const cache = new Map<string, string>();
   try {
     const { entries } = await usSettingsLoad(undefined);
@@ -30,12 +35,18 @@ export async function createTauriSettingsStorage(): Promise<SettingsStorage> {
     );
   };
 
-  const storage: SettingsStorage = {
+  const storage: FlushableSettingsStorage = {
     get: (key) => cache.get(key) ?? null,
     set: (key, value) => {
       cache.set(key, value);
       persist();
     },
+    // The queue as it stands, so awaiting it waits for every write made before
+    // the call and for none made after. Each write persists the whole map, so
+    // the one being waited on is the one carrying the caller's value. It never
+    // rejects: `persist` catches, and a chain that rejected would take the next
+    // write down with it.
+    flush: () => queue.then(() => undefined),
   };
   installSettingsStorage(storage);
   return storage;
