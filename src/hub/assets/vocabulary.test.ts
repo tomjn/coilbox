@@ -8,6 +8,7 @@ import {
   ELMOS_PER_METAL_SAMPLE,
   heightOverlayMaxBytes,
   MAP_VARIANTS,
+  MINIMAP_VARIANT,
   mapExtentElmos,
   maxObjectBytes,
   RENDER_ANGLES,
@@ -41,6 +42,12 @@ describe("the variant names", () => {
       "overlay:type",
       "overlay:height",
     ]);
+  });
+
+  it("names the map's own picture as one of them", () => {
+    // The picture ladder asks the hub for this one by name, and a variant
+    // outside the list is a 400 rather than an answer.
+    expect(MAP_VARIANTS).toContain(MINIMAP_VARIANT);
   });
 
   it("renders one angle, because one has a use case", () => {

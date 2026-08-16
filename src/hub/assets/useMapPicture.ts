@@ -1,5 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBarMap } from "@/downloads/config";
+import { isHubEnabled } from "@/profile/profile";
+import { useHubUrl } from "../config";
+import { heldMapAsset, heldPicture } from "./heldPictures";
 import {
   type HeldMapAsset,
   type MapPicture,
@@ -7,6 +10,42 @@ import {
   shownMapPicture,
 } from "./picture";
 import { assetCdnBase } from "./tier";
+import { MINIMAP_VARIANT } from "./vocabulary";
+
+/**
+ * What the hub holds for `(mapName, "minimap")`, or null while it has not
+ * answered, could not be reached, or holds nothing (issue #1687).
+ *
+ * The request is assembled in `./heldPictures.ts`, which turns a screen of maps
+ * asking one at a time into one request. A profile that switched the hub off
+ * asks it nothing, which is the one place a picture would otherwise reach a hub
+ * the distributor turned off: the browse screen is unreachable without it, and
+ * a battle room is not.
+ */
+export function useHeldMapPicture(
+  mapName: string | undefined,
+): HeldMapAsset | null {
+  const hubUrl = useHubUrl();
+  const [held, setHeld] = useState<HeldMapAsset | null>(null);
+
+  useEffect(() => {
+    setHeld(null);
+    if (!mapName || !isHubEnabled()) return;
+    let live = true;
+    heldPicture(hubUrl, {
+      keyed_on: "map",
+      map_name: mapName,
+      variant: MINIMAP_VARIANT,
+    }).then((picture) => {
+      if (live) setHeld(heldMapAsset(picture));
+    });
+    return () => {
+      live = false;
+    };
+  }, [hubUrl, mapName]);
+
+  return held;
+}
 
 /**
  * The picture ladder for one map, assembled from what this session can see
@@ -16,19 +55,17 @@ import { assetCdnBase } from "./tier";
  * screen that shows a map is holding a `useUnitsyncMinimap` result for its own
  * reasons, and asking for a second one here would render the same archive twice.
  *
- * BAR's list is only fetched when there is no local picture, which is what the
- * hook this replaced did. It is one request per session and memoised, but a
- * reader with the map installed has no use for it at all.
- *
- * `held` is what the hub holds for `(mapName, "minimap")`. Nothing passes it
- * yet: the hub has no public route that answers with a path. Issue #1687.
+ * The hub and BAR are both only asked when there is no local picture. An
+ * installed archive wins the ladder outright, so a reader with the map has no
+ * use for either answer, and the hub's is a request somebody else pays for.
  */
 export function useMapPictureLadder(
   mapName: string | undefined,
   local: string | null | undefined,
-  held: HeldMapAsset | null = null,
 ): MapPicture[] {
-  const bar = useBarMap(mapName && !local ? mapName : undefined);
+  const remote = mapName && !local ? mapName : undefined;
+  const bar = useBarMap(remote);
+  const held = useHeldMapPicture(remote);
 
   return useMemo(
     () =>
