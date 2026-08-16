@@ -202,6 +202,28 @@ fn read_catalog_file(path: &Path) -> Option<String> {
     Some(text)
 }
 
+/// Where the bundled seed can sit inside the resource directory, in the order we
+/// take them. The Windows installer moves it into `.coilbox\resources` so the
+/// install folder shows little more than the executable. Every other platform
+/// leaves it at the top of the resource directory. The last two are the layouts
+/// older bundles used, and answer for an install that predates this one.
+const SEED_CANDIDATES: [&str; 4] = [
+    ".coilbox/resources/catalog.json",
+    "catalog.json",
+    "_up_/catalog.json",
+    "branding/catalog.json",
+];
+
+/// The bundled seed inside `resource_dir`, or `None` when this install has none.
+/// The seed is what makes a cold offline first run answer at all, so a miss here
+/// is the one case that waits on the network.
+pub(crate) fn seed_file(resource_dir: &Path, exists: impl Fn(&Path) -> bool) -> Option<PathBuf> {
+    SEED_CANDIDATES
+        .into_iter()
+        .map(|rel| resource_dir.join(rel))
+        .find(|path| exists(path))
+}
+
 /// What the disk can answer with right now: the cache when it is readable and
 /// parses, else the bundled seed. `refresh` is set for anything but a within-TTL
 /// cache, so a stale, missing or unreadable cache sends us back to the network.
@@ -363,6 +385,25 @@ mod tests {
     #[test]
     fn data_url_has_prefix() {
         assert_eq!(data_url("image/png", b"foo"), "data:image/png;base64,Zm9v");
+    }
+
+    #[test]
+    fn the_seed_is_found_where_the_windows_installer_tucks_it() {
+        let res = Path::new("C:/Program Files/Coilbox");
+        let tucked = res.join(".coilbox/resources/catalog.json");
+        assert_eq!(seed_file(res, |path| path == tucked), Some(tucked));
+    }
+
+    #[test]
+    fn an_install_that_kept_its_old_seed_layout_still_answers() {
+        let res = Path::new("/app/resources");
+        let old = res.join("branding/catalog.json");
+        assert_eq!(seed_file(res, |path| path == old), Some(old));
+    }
+
+    #[test]
+    fn a_build_with_no_seed_says_so() {
+        assert_eq!(seed_file(Path::new("/app"), |_| false), None);
     }
 
     #[test]

@@ -215,10 +215,27 @@ async fn lego_open_path(path: String) -> CliResult {
     }
 }
 
+/// Where the bundled pack can sit inside the resource directory, in the order we
+/// take them. The Windows installer moves it into `.coilbox\resources` so the
+/// install folder shows little more than the executable. Every other platform
+/// leaves it at the top of the resource directory, which is also where a build
+/// that has not been through an installer keeps it.
+const BUNDLED: [&str; 2] = [".coilbox/resources/legoparts", "legoparts"];
+
+/// The bundled pack under `resource_dir`, or `None` when neither layout is there.
+fn bundled_pack_dir(resource_dir: &Path, is_dir: impl Fn(&Path) -> bool) -> Option<PathBuf> {
+    BUNDLED
+        .into_iter()
+        .map(|rel| resource_dir.join(rel))
+        .find(|dir| is_dir(dir))
+}
+
 /// Where the parts pack lives, in order of precedence:
 ///
 /// 1. `.coilbox/legoparts` beside the executable, so a distribution can ship its
-///    own parts library without a rebuild.
+///    own parts library without a rebuild. The installer's own copy goes a level
+///    deeper, under `.coilbox/resources`, so this stays the distribution's to
+///    fill in and an update never overwrites it.
 /// 2. The bundled copy under the resource directory.
 /// 3. The source tree, in debug builds only. `bundle.resources` is assembled by
 ///    `tauri build`, so under `tauri dev` there is nothing beside the binary and
@@ -232,8 +249,11 @@ pub fn legopack_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
         return Some(dir);
     }
 
-    let bundled = app.path().resource_dir().ok().map(|d| d.join("legoparts"));
-    if let Some(dir) = bundled.clone().filter(|dir| dir.is_dir()) {
+    let resources = app.path().resource_dir().ok();
+    if let Some(dir) = resources
+        .as_deref()
+        .and_then(|d| bundled_pack_dir(d, |dir| dir.is_dir()))
+    {
         return Some(dir);
     }
 
@@ -246,7 +266,7 @@ pub fn legopack_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
             return Some(dir);
         }
     }
-    bundled
+    resources.map(|d| d.join("legoparts"))
 }
 
 /// Where extension parts packs live: one folder per pack under
@@ -1310,6 +1330,25 @@ mod tests {
             std::fs::read_to_string(dir.path().join("gamedata/sidedata.lua")).expect("read"),
             "second"
         );
+    }
+
+    #[test]
+    fn the_bundled_pack_is_found_where_the_windows_installer_tucks_it() {
+        let res = Path::new("C:/Program Files/Coilbox");
+        let tucked = res.join(".coilbox/resources/legoparts");
+        assert_eq!(bundled_pack_dir(res, |dir| dir == tucked), Some(tucked));
+    }
+
+    #[test]
+    fn a_bundle_the_installer_never_touched_keeps_its_pack_at_the_top() {
+        let res = Path::new("/Coilbox.app/Contents/Resources");
+        let plain = res.join("legoparts");
+        assert_eq!(bundled_pack_dir(res, |dir| dir == plain), Some(plain));
+    }
+
+    #[test]
+    fn no_bundled_pack_is_no_pack() {
+        assert_eq!(bundled_pack_dir(Path::new("/app"), |_| false), None);
     }
 
     #[test]
