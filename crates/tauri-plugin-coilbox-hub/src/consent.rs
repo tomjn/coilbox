@@ -57,7 +57,10 @@ impl AssetUploadConsent {
     ///
     /// Both come off disk on every call rather than from anything the webview said.
     /// The settings file is the frame's own store, written through as soon as the
-    /// switch is flipped, so what is read here is what the user last saved.
+    /// switch is flipped, so what is read here is what the user last saved. That
+    /// write is asynchronous, so the frontend waits for it before starting anything
+    /// that ends up here, rather than this having to allow for a stale file
+    /// (issue #1674, `settingsWritten` in `src/lib/storedSetting.ts`).
     pub fn check<R: Runtime>(app: &AppHandle<R>) -> Result<Self, String> {
         let settings = coilbox_portable::settings_file(app)?;
         let profile = coilbox_portable::portable_root().map(|root| root.join("profile.json"));
