@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
-import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import type { Participant } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { GroupUnit, ScenarioGroup, ScenarioOrder } from "../../model";
@@ -257,7 +257,7 @@ function AddUnit({
   const [def, setDef] = useState("");
 
   return (
-    <UnitDefSelect
+    <UnitPickerButton
       units={units}
       value={def}
       loading={loading}

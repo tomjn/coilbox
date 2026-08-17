@@ -65,7 +65,7 @@ import {
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
-import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { nextDrawerKey } from "@/general/drawerKey";
 import {
   BuildOrderPopover,
@@ -321,7 +321,7 @@ export function BaseControls({
                 </ol>
               )}
 
-              <UnitDefSelect
+              <UnitPickerButton
                 units={buildable ?? units}
                 value=""
                 loading={unitsLoading}

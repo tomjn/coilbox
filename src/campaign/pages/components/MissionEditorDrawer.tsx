@@ -15,7 +15,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useGameUnits } from "@/content/useGameUnits";
-import { UnitDefSelect } from "../../../content/pages/components/UnitDefSelect";
+import { UnitPickerButton } from "../../../content/pages/components/UnitPicker";
 import { mediaKind, refIsVideo } from "../../../lib/assetUrl";
 import {
   campaignImageDelete,
@@ -172,7 +172,7 @@ function UnitSlotEditor({
   return (
     <>
       <div className="flex flex-col gap-3 rounded-md border border-border/50 bg-muted/20 p-3">
-        <UnitDefSelect
+        <UnitPickerButton
           units={units}
           value={config.unitDef}
           onValueChange={(unitDef) => onChange({ ...config, unitDef })}

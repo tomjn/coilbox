@@ -36,7 +36,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
@@ -353,7 +353,7 @@ export function BlueprintEditor({
       bars={
         <>
           <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card/80 p-1 backdrop-blur">
-            <UnitDefSelect
+            <UnitPickerButton
               units={buildings}
               value={unitDef}
               onValueChange={setUnitDef}

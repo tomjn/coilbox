@@ -44,7 +44,7 @@ import { useMemo, useState } from "react";
 
 import { Label } from "@/components/ui/label";
 import type { UnitDatasetEntry } from "@/content/bindings";
-import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ArrivalNote } from "../../arrival";
 import {
@@ -501,7 +501,7 @@ function SubstituteRow({
         </span>
       </div>
       <div className="flex items-center gap-1.5">
-        <UnitDefSelect
+        <UnitPickerButton
           units={units}
           value={to}
           onValueChange={onPick}

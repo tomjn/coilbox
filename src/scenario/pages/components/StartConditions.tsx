@@ -23,7 +23,7 @@ import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
-import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import type { Participant } from "@/play/config";
 import type { Scenario, ScenarioTeam } from "../../model";
@@ -282,7 +282,7 @@ function AddStartUnit({
   const [def, setDef] = useState("");
 
   return (
-    <UnitDefSelect
+    <UnitPickerButton
       units={units}
       value={def}
       loading={loading}

@@ -40,7 +40,7 @@ import {
   useUnitsyncUnitDataset,
   useUnitsyncUnitModel,
 } from "../../../content/config";
-import { UnitDefSelect } from "../../../content/pages/components/UnitDefSelect";
+import { UnitPickerButton } from "../../../content/pages/components/UnitPicker";
 import { unitLabel } from "../../../content/unitChoices";
 import { countTriangles } from "../../../content/unitModel";
 import { withoutGeneratedGames } from "../../../lib/generatedGames";
@@ -157,7 +157,7 @@ export function ReferencePicker({
 
         {game && (
           <Field label="Unit">
-            <UnitDefSelect
+            <UnitPickerButton
               units={units}
               value={unitName}
               onValueChange={setUnitName}
