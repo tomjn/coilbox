@@ -58,6 +58,7 @@ import {
   removePlacement,
   turnPlacement,
 } from "@/scenario/pages/components/editing";
+import { isTypingTarget } from "@/scenario/pages/components/history";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { useLayoutHistory } from "./blueprintHistory";
 import { GRID_EXTENT, GRID_ORIGIN, gridGround, layoutFraming } from "./ground";
@@ -268,6 +269,20 @@ export function BlueprintEditor({
   );
   useScenarioFootprints(handle, turned, GROUND, drawn.groundAt, "offered");
 
+  // Escape puts the building down, the way it puts down anything else being
+  // held (issue #1716). Only while one is picked, so Escape keeps whatever it
+  // means everywhere else, and only outside a field, so it can still leave one.
+  useEffect(() => {
+    if (!unitDef) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (isTypingTarget(event.target as HTMLElement | null)) return;
+      setUnitDef("");
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [unitDef]);
+
   const place = unitDef
     ? (pos: Point) => {
         // Where the engine will stand it rather than where the pointer was, so
@@ -390,6 +405,7 @@ export function BlueprintEditor({
                 units={buildings}
                 value={unitDef}
                 onValueChange={setUnitDef}
+                onClear={() => setUnitDef("")}
                 loading={unitsLoading}
                 size="sm"
                 className="w-48"
@@ -475,7 +491,7 @@ export function BlueprintEditor({
 
             <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
               {unitDef
-                ? "Click the ground to put one down. Drag a building to move it within the layout."
+                ? "Click the ground to put one down. Escape stops placing. Drag a building to move it within the layout."
                 : "Pick a building to start placing. Drag one to move it, click bare ground to deselect."}
             </p>
 

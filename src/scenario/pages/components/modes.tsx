@@ -26,7 +26,7 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { useBlueprintLibrary } from "@/blueprint/store";
 import { blueprintFromPayload } from "@/blueprint/transfer";
@@ -61,6 +61,7 @@ import {
   DEFAULT_GROUP_COUNT,
   MAX_GROUP_COUNT,
 } from "./groups";
+import { isTypingTarget } from "./history";
 import { LayoutPlacer, layoutPlacement } from "./LayoutPlacer";
 import { type LayoutChoice, layoutGhost, layoutOrigin } from "./layoutPlacing";
 import { TeamSelect } from "./TeamSelect";
@@ -392,7 +393,7 @@ const basesMode: EditorMode = {
   id: "bases",
   label: "Bases",
   icon: Factory,
-  hint: "Pick a building and click the map. Clicks add to the base you have selected.",
+  hint: "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape.",
   use: ({
     scenario,
     onChange,
@@ -417,6 +418,20 @@ const basesMode: EditorMode = {
     // Which base the controls are for, which is whichever the selection belongs
     // to. A click works it out again from the document it is given.
     const base = selectedBase(scenario, selected);
+
+    // Escape puts the building down (issue #1716). Only while one is picked, so
+    // Escape keeps whatever it means everywhere else, and only outside a field,
+    // so it can still leave one.
+    useEffect(() => {
+      if (!unitDef) return;
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== "Escape") return;
+        if (isTypingTarget(event.target as HTMLElement | null)) return;
+        setUnitDef("");
+      };
+      window.addEventListener("keydown", onKeyDown);
+      return () => window.removeEventListener("keydown", onKeyDown);
+    }, [unitDef]);
 
     // The square the click will use, drawn under the pointer before the click
     // (issue #1716). A building does not go where it is dropped: the engine
@@ -496,6 +511,7 @@ const basesMode: EditorMode = {
             units={options}
             value={unitDef}
             onValueChange={setUnitDef}
+            onClear={() => setUnitDef("")}
             loading={loading}
             size="sm"
             className="w-48"
