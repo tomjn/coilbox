@@ -54,13 +54,38 @@ function building(index: number): Placement {
 }
 
 describe("a units layer's redraws", () => {
-  it("has no objects between emptying itself and refilling", async () => {
+  it("has no object for a unit whose model it has not read yet", async () => {
     const units = layer();
     await units.draw([building(0)]);
-    const refilling = units.draw([building(0)]);
-    expect(units.objects.size).toBe(0);
-    await refilling;
+    const filling = units.draw([building(0), building(1)]);
     expect(units.objects.size).toBe(1);
+    await filling;
+    expect(units.objects.size).toBe(2);
+  });
+
+  /**
+   * Issue #1716. A redraw is not a rebuild: whatever is standing where the new
+   * pass wants it stays standing, and only its key can have changed.
+   *
+   * Without this an edit to one building is an arrival for every one of them,
+   * so all of them play the animation a unit plays when it is put down. React
+   * runs every effect twice in development, so the pass that lost the map was
+   * running on every edit.
+   */
+  it("leaves the units an edit did not touch standing where they were", async () => {
+    const units = layer();
+    await units.draw([building(0)]);
+    const was = units.objects.get(building(0).key);
+    await units.draw([building(0), building(1)]);
+    expect(units.objects.get(building(0).key)).toBe(was);
+  });
+
+  it("stands a unit up once for two passes over the same document", async () => {
+    const units = layer();
+    const first = units.draw([building(0)]);
+    const second = units.draw([building(0)]);
+    await Promise.all([first, second]);
+    expect(units.root.children).toHaveLength(1);
   });
 
   it("tells a watcher once its objects are there", async () => {

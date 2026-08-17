@@ -179,7 +179,10 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
    * second of five renames three of them. A name is what a unit is and where it
    * stands, so a delete is one departure and a move is one of each.
    */
-  let shown = new Map<string, THREE.Object3D>();
+  let shown = new Map<
+    string,
+    { object: THREE.Object3D; def: string; drawable: boolean }
+  >();
   /** Units shrinking away, and when each started. */
   let leaving: { object: THREE.Object3D; gone: number }[] = [];
   /** Units growing into place, and when each arrived. */
@@ -245,6 +248,22 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
   const nameOf = (placement: Placement) =>
     `${placement.def}|${placement.team}|${placement.pos.x},${placement.pos.z}|${placement.facing}`;
 
+  /**
+   * Which defs are standing as marker boxes rather than as models.
+   *
+   * Read off what is drawn rather than counted as a pass builds it, because a
+   * pass that rebuilt nothing still has to say what is on the map: an edit to
+   * one building must not clear the note saying three others are units this
+   * game has not got.
+   */
+  const drawnMissing = (): string[] => {
+    const out = new Set<string>();
+    for (const standing of shown.values()) {
+      if (!standing.drawable) out.add(standing.def);
+    }
+    return [...out];
+  };
+
   const markerFor = (colour: THREE.Color): BuiltModel => {
     const key = `marker|${colour.getHexString()}`;
     const cached = prototypes.get(key);
@@ -308,61 +327,84 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
   const draw = async (placements: Placement[]): Promise<DrawResult> => {
     generation++;
     const mine = generation;
-    // What was drawn stays drawn until the unit standing in its place is ready
-    // (issue #1716). A pass reads models off disk, so emptying the map at the
-    // start of one is a map that blinks out on every edit and fills back in.
-    const before = shown;
-    shown = new Map();
+
+    // Two units of one type can stand in one place, facing one way, for one
+    // team, which is a mistake an author is allowed to make. A name already
+    // taken gets a number after it.
+    const taken = new Map<string, number>();
+    const names = placements.map((placement) => {
+      const name = nameOf(placement);
+      const seen = taken.get(name) ?? 0;
+      taken.set(name, seen + 1);
+      return seen === 0 ? name : `${name}#${seen}`;
+    });
+
+    // What this pass is not drawing has gone: a unit deleted, or one that moved
+    // and is standing somewhere else now.
+    const wanted = new Set(names);
+    const now = performance.now();
+    for (const [name, standing] of [...shown]) {
+      if (wanted.has(name)) continue;
+      shown.delete(name);
+      leaving.push({ object: standing.object, gone: now });
+    }
+
+    // Whatever is already standing where this pass wants it stays standing: the
+    // same unit, the same team, the same square, the same way round. Only the
+    // key it answers to can have changed, because a base's buildings are keyed
+    // by their place in its list.
+    //
+    // Which is what keeps an edit to one building from being an arrival for all
+    // of them, and what makes a second pass over the same document free. React
+    // runs every effect twice in development, so there is always a second pass.
     objects.clear();
-    const missing: string[] = [];
+    const fresh: { placement: Placement; name: string }[] = [];
+    placements.forEach((placement, at) => {
+      const standing = shown.get(names[at]);
+      if (!standing) {
+        fresh.push({ placement, name: names[at] });
+        return;
+      }
+      standing.object.userData = {
+        placementKey: placement.key,
+        placement,
+      } satisfies PlacementUserData;
+      objects.set(placement.key, standing.object);
+    });
 
     // Grouped by unit type and team, so each model is read once and the scene
     // fills in whole formations at a time rather than one unit per frame.
-    const batches = new Map<string, Placement[]>();
-    for (const placement of placements) {
-      const key = `${placement.def}|${placement.team}`;
+    const batches = new Map<string, typeof fresh>();
+    for (const one of fresh) {
+      const key = `${one.placement.def}|${one.placement.team}`;
       const batch = batches.get(key);
-      if (batch) batch.push(placement);
-      else batches.set(key, [placement]);
+      if (batch) batch.push(one);
+      else batches.set(key, [one]);
     }
 
     for (const batch of batches.values()) {
-      const colour = colorOf(deps.teamColor(batch[0].team));
-      const { built, drawable } = await prototypeFor(batch[0].def, colour);
-      if (disposed || mine !== generation) return { missing };
-      if (!drawable) missing.push(batch[0].def);
-      for (const placement of batch) {
+      const colour = colorOf(deps.teamColor(batch[0].placement.team));
+      const { built, drawable } = await prototypeFor(
+        batch[0].placement.def,
+        colour,
+      );
+      if (disposed || mine !== generation) return { missing: drawnMissing() };
+      for (const { placement, name } of batch) {
         const instance = built.object.clone();
         place(instance, placement);
-        const name = nameOf(placement);
-        // The unit that was standing here goes now that this one is ready, and
-        // takes no part in the departures below: it has been replaced rather
-        // than removed.
-        const had = before.get(name);
-        if (had) {
-          had.removeFromParent();
-          before.delete(name);
-        } else {
-          arriving.push({ object: instance, born: performance.now() });
-          sizeAt(instance, ARRIVE_FROM);
-        }
+        arriving.push({ object: instance, born: performance.now() });
+        sizeAt(instance, ARRIVE_FROM);
         root.add(instance);
-        shown.set(name, instance);
+        shown.set(name, { object: instance, def: placement.def, drawable });
         objects.set(placement.key, instance);
       }
       handle.render();
     }
 
-    // Whatever the pass did not stand something in the place of has gone: a
-    // building deleted, or one that moved and is now standing somewhere else.
-    const now = performance.now();
-    for (const gone of before.values())
-      leaving.push({ object: gone, gone: now });
     wake();
-
     handle.render();
     for (const watcher of watchers) watcher();
-    return { missing: [...new Set(missing)] };
+    return { missing: drawnMissing() };
   };
 
   return {
