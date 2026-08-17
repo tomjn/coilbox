@@ -89,13 +89,23 @@ export interface UnitGroup {
  */
 export function factionGroups(
   forest: TechForest,
+  ids: Iterable<string>,
   label: (id: string) => string,
   heading: (rootId: string) => string,
   match: (id: string) => boolean = () => true,
 ): UnitGroup[] {
+  // `ids` is what to lay out, which is not always the whole game: a blueprint
+  // field offers only buildings, and a warpath only one faction's units. The
+  // forest still comes from the full dataset, because which faction builds a
+  // unit is the game's answer and a filtered list cannot give it.
   const byRoot = new Map<string, string[]>(forest.roots.map((r) => [r, []]));
-  for (const [id, root] of forest.factionOf) {
-    if (match(id)) byRoot.get(root)?.push(id);
+  const rest: string[] = [];
+  for (const raw of ids) {
+    const id = raw.toLowerCase();
+    if (!match(id)) continue;
+    const root = forest.factionOf.get(id);
+    if (root && byRoot.has(root)) byRoot.get(root)?.push(id);
+    else rest.push(id);
   }
   const byName = (a: string, b: string) =>
     label(a).localeCompare(label(b)) || a.localeCompare(b);
@@ -104,9 +114,8 @@ export function factionGroups(
     label: heading(root),
     units: (byRoot.get(root) ?? []).sort(byName),
   }));
-  const rest = forest.ungrouped.filter(match).sort(byName);
   if (rest.length > 0) {
-    groups.push({ id: "", label: "Other units", units: rest });
+    groups.push({ id: "", label: "Other units", units: rest.sort(byName) });
   }
   return groups.filter((g) => g.units.length > 0);
 }

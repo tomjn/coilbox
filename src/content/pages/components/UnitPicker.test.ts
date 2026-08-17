@@ -33,6 +33,9 @@ vi.mock("../../config", () => ({
   useUnitsyncUnitBuildpics: () => null,
   useUnitsyncScan: () => ({ data: null, loading: false }),
   useUnitsyncGameInfo: () => ({ info: null, loading: false }),
+  // No engine to read the whole game from, so the picker falls back to the list
+  // it was handed, which is what a test without unitsync should get.
+  useUnitsyncUnitDataset: () => ({ dataset: null, status: "idle" }),
 }));
 
 const { UnitPicker } = await import("./UnitPicker");

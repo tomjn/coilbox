@@ -103,9 +103,10 @@ describe("factionGroups", () => {
   };
   const label = (id: string) => NAMES[id] ?? id;
   const heading = (root: string) => (root === "armcom" ? "Armada" : "Cortex");
+  const ALL = [...forest.known];
 
   it("lists a faction's units flat, by name, whatever builds them", () => {
-    const [armada] = factionGroups(forest, label, heading);
+    const [armada] = factionGroups(forest, ALL, label, heading);
     // The lab and the unit it makes are siblings here, and the commander is not
     // first: the reader gets one alphabetical list per faction.
     expect(armada.label).toBe("Armada");
@@ -113,20 +114,33 @@ describe("factionGroups", () => {
   });
 
   it("keeps factions in root order and puts the rest last", () => {
-    const groups = factionGroups(forest, label, heading);
+    const groups = factionGroups(forest, ALL, label, heading);
     expect(groups.map((g) => g.label)).toEqual([
       "Armada",
       "Cortex",
       "Other units",
     ]);
+    // Nothing builds the rock, and a scenario may still want to spawn one.
     expect(groups[2].units).toEqual(["scenery"]);
   });
 
   it("drops a block the search empties", () => {
-    const groups = factionGroups(forest, label, heading, (id) =>
+    const groups = factionGroups(forest, ALL, label, heading, (id) =>
       id.startsWith("cor"),
     );
     expect(groups.map((g) => g.label)).toEqual(["Cortex"]);
+  });
+
+  it("blocks a caller's subset by the whole game's factions", () => {
+    // A blueprint field offers buildings only, so the commanders that root each
+    // faction are not in its list. The faction each unit belongs to is still the
+    // game's answer, so the blocks survive the filtering.
+    const buildings = ["armlab", "corsolar"];
+    const groups = factionGroups(forest, buildings, label, heading);
+    expect(groups.map((g) => [g.label, g.units])).toEqual([
+      ["Armada", ["armlab"]],
+      ["Cortex", ["corsolar"]],
+    ]);
   });
 });
 

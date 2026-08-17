@@ -18,6 +18,7 @@ import {
   useUnitsyncGameInfo,
   useUnitsyncScan,
   useUnitsyncUnitBuildpics,
+  useUnitsyncUnitDataset,
 } from "../../config";
 import {
   buildTechForest,
@@ -139,21 +140,22 @@ export function UnitPicker({
   buildpics?: UnitBuildpicsResult | null;
 }) {
   const readOnly = !onChange;
-  const { forest, labels, blocks, icons, iconsPending } = useUnitCatalogue({
-    units,
-    factions,
-    gameName,
-    enginePath,
-    dataDir,
-    gameArchive,
-    buildpics,
-  });
+  const { forest, labels, blocks, allIds, known, icons, iconsPending } =
+    useUnitCatalogue({
+      units,
+      factions,
+      gameName,
+      enginePath,
+      dataDir,
+      gameArchive,
+      buildpics,
+    });
   const unknown = useMemo(
-    () => unknownSelected(selected, forest.known),
-    [selected, forest.known],
+    () => unknownSelected(selected, known),
+    [selected, known],
   );
 
-  if (forest.known.size === 0) {
+  if (known.size === 0) {
     return (
       <div className="rounded-md border border-dashed border-muted-foreground/40 px-3 py-2 text-xs text-muted-foreground">
         No unit data available for this game.
@@ -175,10 +177,11 @@ export function UnitPicker({
         labels={labels}
         icons={icons}
         iconsPending={iconsPending}
+        ids={allIds}
         factions={blocks}
         // Both numbers, because "379 allowed" alone does not say whether that is
         // all of them or most of them.
-        count={`${selected.length} of ${forest.known.size} ${selectedLabel}`}
+        count={`${selected.length} of ${allIds.length} ${selectedLabel}`}
         isOn={(id) => isSelected(selected, id)}
         mode={readOnly ? "read-only" : "multi"}
         onPick={(id, on) => onChange?.(toggleUnit(selected, id, on))}
@@ -238,15 +241,16 @@ export function UnitPickerButton({
   buildpics?: UnitBuildpicsResult | null;
 }) {
   const [open, setOpen] = useState(false);
-  const { forest, labels, blocks, icons, iconsPending } = useUnitCatalogue({
-    units,
-    factions,
-    gameName,
-    enginePath,
-    dataDir,
-    gameArchive,
-    buildpics,
-  });
+  const { forest, labels, blocks, allIds, known, icons, iconsPending } =
+    useUnitCatalogue({
+      units,
+      factions,
+      gameName,
+      enginePath,
+      dataDir,
+      gameArchive,
+      buildpics,
+    });
   const picked = value.toLowerCase();
   const pickedLabel = value ? (labels.get(picked) ?? value) : "";
 
@@ -255,7 +259,7 @@ export function UnitPickerButton({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          disabled={disabled ?? forest.known.size === 0}
+          disabled={disabled ?? known.size === 0}
           className={cn(
             "justify-between gap-2 font-normal",
             size === "sm" ? "h-8 text-xs" : "h-9 text-sm",
@@ -285,6 +289,7 @@ export function UnitPickerButton({
           labels={labels}
           icons={icons}
           iconsPending={iconsPending}
+          ids={allIds}
           factions={blocks}
           autoFocusSearch
           isOn={(id) => id === picked}
@@ -350,13 +355,23 @@ function useUnitCatalogue({
     () => blocks.map((f) => f.startUnit).filter(Boolean),
     [blocks],
   );
-  const forest = useMemo(() => buildTechForest(units, roots), [units, roots]);
+  // The forest is built over the whole game, not the caller's list. A blueprint
+  // field offers buildings only, so the commanders that root each faction are
+  // not in it, and every unit would fall outside a faction and land in one
+  // unheaded block. Which faction builds a unit is the game's answer.
+  const whole = useUnitsyncUnitDataset(engine, root, archive);
+  const forest = useMemo(
+    () => buildTechForest(whole.dataset?.units ?? units, roots),
+    [whole.dataset, units, roots],
+  );
   const labels = useMemo(() => {
     const m = new Map<string, string>();
     for (const u of units) m.set(u.name.toLowerCase(), unitLabel(u));
     return m;
   }, [units]);
-  const allIds = useMemo(() => [...forest.known], [forest]);
+  /** The ids to lay out, which is the caller's list rather than the game's. */
+  const allIds = useMemo(() => units.map((u) => u.name.toLowerCase()), [units]);
+  const known = useMemo(() => new Set(allIds), [allIds]);
   const fetched = useUnitsyncUnitBuildpics(
     buildpics ? undefined : engine,
     root,
@@ -368,6 +383,8 @@ function useUnitCatalogue({
     forest,
     labels,
     blocks,
+    allIds,
+    known,
     icons,
     // No pics yet is not the same as no pics: a row says nothing until the read
     // lands, rather than claiming the game ships nothing.
@@ -381,6 +398,7 @@ function UnitList({
   labels,
   icons,
   iconsPending,
+  ids,
   factions,
   count,
   mode,
@@ -393,6 +411,8 @@ function UnitList({
   icons: UnitBuildpicsResult | null;
   /** The build pics have not come back yet, so a row claims nothing about them. */
   iconsPending: boolean;
+  /** The units to lay out, which can be a subset of the game. */
+  ids: string[];
   factions: UnitPickerFaction[];
   /** Summary shown beside the search box, e.g. "12 available". */
   count?: string;
@@ -413,8 +433,8 @@ function UnitList({
     const match = q
       ? (id: string) => id.includes(q) || name(id).toLowerCase().includes(q)
       : undefined;
-    return factionGroups(forest, name, heading, match);
-  }, [forest, labels, factions, query]);
+    return factionGroups(forest, ids, name, heading, match);
+  }, [forest, ids, labels, factions, query]);
 
   const total = groups.reduce((n, g) => n + g.units.length, 0);
   const capped = total > SEARCH_CAP;
