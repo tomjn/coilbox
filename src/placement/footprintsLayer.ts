@@ -73,13 +73,24 @@ const OUTLINE_LIFT_ELMOS = 0.25;
  * A depth bias rather than a gap: it moves what the depth test makes of the
  * square without moving the square, so it beats the ground they share and still
  * loses to the building standing on it. The terrain's relief comes out of a
- * shader this layer only samples, so the two surfaces are never exactly the
- * same and a plain tie-break would shimmer.
+ * shader this layer only samples, so the two surfaces are never exactly the same
+ * and a plain tie-break would shimmer.
+ *
+ * A flat bias only. `polygonOffsetFactor` multiplies the polygon's own depth
+ * slope, and a square lying on the ground seen from a low camera is as sloped in
+ * depth as a polygon gets: with a factor the bias grew with the angle and the
+ * distance until the square was pulled in front of the whole model standing on
+ * it, which is why zooming out used to wash a building in its own square's
+ * colour.
  */
 const groundBias = {
   polygonOffset: true,
-  polygonOffsetFactor: -1,
-  polygonOffsetUnits: -1,
+  polygonOffsetFactor: 0,
+  // Two of the smallest depth difference the hardware can tell rather than one,
+  // because what that difference is is the driver's business and a bias of
+  // exactly one of them is a square that shimmers on the machines where it is
+  // measured differently.
+  polygonOffsetUnits: -2,
 } as const;
 
 /** How far the corners are rounded, in elmos: half a build square (issue
@@ -173,6 +184,9 @@ export interface FootprintStyle {
   outline: number;
   /** A dashed outline, which is what says nothing judged this building. */
   dashed: boolean;
+  /** What the border is drawn in, which is the colour of the patch inside it
+   *  except on the selected building (issue #1716). */
+  edge: number;
   /** How far the border is thickened inwards, in elmos, which is what says this
    *  building is the selected one (issue #1716). Zero for every other one. */
   band: number;
@@ -212,11 +226,16 @@ export interface FootprintStyle {
  * move. A refusal still keeps its colour, because a turn that will land a
  * building in its neighbour is exactly what this is for.
  *
- * `selected` is the building the author is working on (issue #1716), and it is
- * the same statement `"held"` makes about a building in the air. Its border is
- * thickened inwards and breathes, so what says "this one" is the shape rather
- * than a colour: a selected building that clashes is still red, and its square
- * still covers exactly the ground the engine will give it.
+ * `selected` is the building the author is working on (issue #1716), and it says
+ * so entirely at the edge: the border is thickened inwards and breathes, and the
+ * patch inside it is left exactly as it was.
+ *
+ * That is not a matter of taste. A building's base is flat and lies on its
+ * square, so the two are the same surface and no depth test can put one in front
+ * of the other. Whatever the patch is drawn in is drawn over the bottom of the
+ * model, which is why it is kept at the quiet opacity it has always been at, and
+ * why the loud part of a selection is the one part of a square no model is
+ * standing on.
  */
 export function footprintStyle(
   mark: Pick<FootprintMark, "overlapping" | "standing">,
@@ -226,47 +245,70 @@ export function footprintStyle(
   /** Whether motion is wanted, which is the only thing the pulse turns on. */
   motion = true,
 ): FootprintStyle {
+  const verdict = verdictStyle(mark, as);
+  const plain = { edge: verdict.color, band: 0, pulse: false };
+  if (!selected) return { ...verdict, ...plain };
+  return {
+    ...verdict,
+    // A refusal keeps its own colour at the edge as well as inside, because red
+    // is the answer about this building whether or not it is the one being
+    // worked on. Only the state with nothing to say takes the colour of the
+    // thing in hand, which is the one thing the selection ring was for.
+    edge: verdict.refused ? verdict.color : HELD_COLOR,
+    outline: 1,
+    band: BAND_ELMOS,
+    pulse: motion,
+  };
+}
+
+/** What one square says about the ground under its building, before anything
+ *  about which building the author is working on. */
+function verdictStyle(
+  mark: Pick<FootprintMark, "overlapping" | "standing">,
+  as: MarkAs,
+): Omit<FootprintStyle, "edge" | "band" | "pulse"> & { refused: boolean } {
   const held = as === "held";
   const offered = as === "offered";
-  const fill = offered ? 0 : held ? 0.45 : selected ? 0.4 : 0.32;
-  const outline = held || offered || selected ? 1 : 0.95;
-  // The selected building is picked out by the shape of its border rather than
-  // by a colour, so a refusal keeps saying what it says. The one state with
-  // nothing to say takes the colour too, at the bottom of this.
-  const band = selected ? BAND_ELMOS : 0;
-  const pulse = selected && motion;
-  const picked = { band, pulse };
+  const fill = offered ? 0 : held ? 0.45 : 0.32;
+  const outline = held || offered ? 1 : 0.95;
+  const refused = { dashed: false, refused: true };
   if (mark.overlapping) {
-    return { color: CLASH_COLOR, fill, outline, dashed: false, ...picked };
+    return { color: CLASH_COLOR, fill, outline, ...refused };
   }
   if (mark.standing === "slope") {
-    return { color: SLOPE_COLOR, fill, outline, dashed: false, ...picked };
+    return { color: SLOPE_COLOR, fill, outline, ...refused };
   }
   if (mark.standing === "too-deep" || mark.standing === "too-shallow") {
-    return { color: DEPTH_COLOR, fill, outline, dashed: false, ...picked };
+    return { color: DEPTH_COLOR, fill, outline, ...refused };
   }
   if (mark.standing === "no-def") {
-    return { color: ABSENT_COLOR, fill, outline, dashed: false, ...picked };
+    return { color: ABSENT_COLOR, fill, outline, ...refused };
   }
   if (unjudged(mark.standing)) {
     return {
-      color: held || offered || selected ? HELD_COLOR : UNJUDGED_COLOR,
+      color: held || offered ? HELD_COLOR : UNJUDGED_COLOR,
       fill: 0,
-      outline: held || offered || selected ? 1 : 0.8,
+      outline: held || offered ? 1 : 0.8,
       dashed: true,
-      ...picked,
+      refused: false,
     };
   }
   if (offered) {
-    return { color: HELD_COLOR, fill: 0, outline: 1, dashed: false, ...picked };
-  }
-  if (held || selected) {
     return {
       color: HELD_COLOR,
-      fill: held ? 0.3 : fill,
+      fill: 0,
       outline: 1,
       dashed: false,
-      ...picked,
+      refused: false,
+    };
+  }
+  if (held) {
+    return {
+      color: HELD_COLOR,
+      fill: 0.3,
+      outline: 1,
+      dashed: false,
+      refused: false,
     };
   }
   return {
@@ -274,7 +316,7 @@ export function footprintStyle(
     fill: 0.12,
     outline: 0.55,
     dashed: false,
-    ...picked,
+    refused: false,
   };
 }
 
@@ -495,16 +537,19 @@ export function createFootprintsLayer(
     }
 
     // The selected building's border, thickened into the square rather than out
-    // of it (issue #1716). Depth tested, like the patch it sits on: it is ground
-    // the building is standing on, so the building stands in front of it. Drawn
-    // after that patch, because the two are the same plane and neither writes
-    // depth, so what is drawn second is what is seen.
+    // of it (issue #1716). This is where a selection is said, because the edge
+    // of a square is the part of it no model is standing on: a building's base
+    // lies flat on its own square, so anything drawn across the middle is drawn
+    // across the bottom of the model too.
+    //
+    // Drawn after the patch, because the two are the same plane and neither
+    // writes depth, so what is drawn second is what is seen.
     if (style.band > 0) {
       const bandGeometry = flat(
         bandShape(width, depth, Math.min(style.band, width / 2, depth / 2)),
       );
       const bandMaterial = new THREE.MeshBasicMaterial({
-        color: style.color,
+        color: style.edge,
         transparent: true,
         opacity: style.outline,
         side: THREE.DoubleSide,
@@ -529,7 +574,7 @@ export function createFootprintsLayer(
     );
     const lineMaterial = style.dashed
       ? new THREE.LineDashedMaterial({
-          color: style.color,
+          color: style.edge,
           transparent: true,
           opacity: style.outline,
           // Both the geometry and the distances are in elmos, so the dashes are
@@ -539,7 +584,7 @@ export function createFootprintsLayer(
           gapSize: GAP_ELMOS,
         })
       : new THREE.LineBasicMaterial({
-          color: style.color,
+          color: style.edge,
           transparent: true,
           opacity: style.outline,
         });

@@ -157,6 +157,19 @@ describe("footprintStyle, the selected building", () => {
     expect(chosen("fine").band).toBeGreaterThan(0);
     expect(style("fine").band).toBe(0);
     expect(chosen("fine").outline).toBeGreaterThan(style("fine").outline);
+    expect(chosen("fine").edge).not.toBe(style("fine").edge);
+  });
+
+  /**
+   * A building's base lies flat on its own square, so the two are the same
+   * surface and no depth test can put one in front of the other: whatever the
+   * patch is drawn in is drawn over the bottom of the model. So a selection
+   * changes the edge and leaves the patch alone.
+   */
+  it("leaves the patch under the building exactly as it was", () => {
+    expect(chosen("fine").fill).toBe(style("fine").fill);
+    expect(chosen("fine").color).toBe(style("fine").color);
+    expect(chosen("slope").fill).toBe(style("slope").fill);
   });
 
   /** The whole point of not colouring it: a selected building the engine will

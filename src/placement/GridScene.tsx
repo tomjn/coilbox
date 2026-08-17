@@ -136,7 +136,12 @@ export function GridScene({
       sun.position.set(BASE * 0.5, BASE * 0.9, BASE * 0.35);
       scene.add(sun);
 
-      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+      // The near plane is as far out as the closest the camera may orbit allows
+      // (issue #1716). A near plane of a tenth against a far plane of a thousand
+      // spends most of the depth buffer on ground nothing is standing on, and
+      // what is left cannot tell a building's base from the square it stands on
+      // once the camera pulls back.
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 1000);
       camera.position.set(0, BASE * 0.7, BASE * 1.0);
       const fitCamera = (width: number, height: number) => {
         camera.aspect = width / height;

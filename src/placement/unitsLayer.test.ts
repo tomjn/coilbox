@@ -88,6 +88,34 @@ describe("a units layer's redraws", () => {
     expect(units.root.children).toHaveLength(1);
   });
 
+  /** Issue #1716. A building dragged across the map is the same building, so it
+   *  moves rather than vanishing at one square and appearing at another. */
+  it("moves a unit rather than replacing it", async () => {
+    const units = layer();
+    await units.draw([building(0)]);
+    const was = units.objects.get(building(0).key);
+    const moved = { ...building(0), pos: { x: 800, z: 800 } };
+    await units.draw([moved]);
+    expect(units.objects.get(moved.key)).toBe(was);
+    expect(units.root.children).toHaveLength(1);
+  });
+
+  /**
+   * Issue #1716. A base's buildings are keyed by their place in its list, so
+   * deleting the second of five renumbers the three after it. The ones that did
+   * not move must keep standing where they are: what goes is the one that went.
+   */
+  it("keeps the units a delete renumbered standing where they were", async () => {
+    const units = layer();
+    await units.draw([building(0), building(1), building(2)]);
+    const last = units.objects.get(building(2).key);
+    // The third building under the second's key, which is what the document
+    // looks like once the second is deleted.
+    const after = [building(0), { ...building(2), key: building(1).key }];
+    await units.draw(after);
+    expect(units.objects.get(building(1).key)).toBe(last);
+  });
+
   it("tells a watcher once its objects are there", async () => {
     const units = layer();
     const seen: number[] = [];

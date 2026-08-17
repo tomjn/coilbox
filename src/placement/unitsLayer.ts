@@ -52,6 +52,20 @@ export interface PlacementUserData {
   placement: Placement;
 }
 
+/** One unit standing on the map: what it is, whose it is, where it is, and the
+ *  model drawn for it. */
+interface Standing {
+  object: THREE.Object3D;
+  def: string;
+  team: string;
+  /** Where it stands and which way it points, as {@link standingAt} writes
+   *  it. */
+  at: string;
+  /** Whether that model is the unit's own or the marker box a unit this game
+   *  has not got is drawn as. */
+  drawable: boolean;
+}
+
 export interface UnitsLayerDeps {
   handle: MapScene3D;
   /** Map extent in elmos, as `useMissionMapAssets` reports it. */
@@ -173,16 +187,13 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
   let disposed = false;
 
   /**
-   * What is drawn where, by name rather than by key (issue #1716).
+   * What is standing on the map, by the key it answers to (issue #1716).
    *
-   * A base's buildings are keyed by their place in its list, so deleting the
-   * second of five renames three of them. A name is what a unit is and where it
-   * stands, so a delete is one departure and a move is one of each.
+   * Never replaced, only changed, because a pass reads models off disk and a
+   * second pass can start while the first is waiting. React runs every effect
+   * twice in development, so it always does.
    */
-  let shown = new Map<
-    string,
-    { object: THREE.Object3D; def: string; drawable: boolean }
-  >();
+  const shown = new Map<string, Standing>();
   /** Units shrinking away, and when each started. */
   let leaving: { object: THREE.Object3D; gone: number }[] = [];
   /** Units growing into place, and when each arrived. */
@@ -239,14 +250,15 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
     if (busy && animates && frame === null) frame = requestAnimationFrame(step);
   };
 
-  /**
-   * What names one drawn unit, for telling an arrival from a redraw.
-   *
-   * Everything about it that would make the eye call it a different unit: what
-   * it is, whose it is, where it stands and which way it points.
-   */
-  const nameOf = (placement: Placement) =>
-    `${placement.def}|${placement.team}|${placement.pos.x},${placement.pos.z}|${placement.facing}`;
+  /** Where a unit stands and which way it points, for recognising one that has
+   *  not moved. */
+  const standingAt = (placement: Placement) =>
+    `${placement.pos.x},${placement.pos.z}|${placement.facing}`;
+
+  /** The whole of a unit as the eye sees it, for recognising one whose key
+   *  changed under it. */
+  const looksLike = (one: { def: string; team: string; at: string }) =>
+    `${one.def}|${one.team}|${one.at}`;
 
   /**
    * Which defs are standing as marker boxes rather than as models.
@@ -328,74 +340,103 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
     generation++;
     const mine = generation;
 
-    // Two units of one type can stand in one place, facing one way, for one
-    // team, which is a mistake an author is allowed to make. A name already
-    // taken gets a number after it.
-    const taken = new Map<string, number>();
-    const names = placements.map((placement) => {
-      const name = nameOf(placement);
-      const seen = taken.get(name) ?? 0;
-      taken.set(name, seen + 1);
-      return seen === 0 ? name : `${name}#${seen}`;
-    });
-
-    // What this pass is not drawing has gone: a unit deleted, or one that moved
-    // and is standing somewhere else now.
-    const wanted = new Set(names);
-    const now = performance.now();
-    for (const [name, standing] of [...shown]) {
-      if (wanted.has(name)) continue;
-      shown.delete(name);
-      leaving.push({ object: standing.object, gone: now });
+    /**
+     * Which drawn unit each placement is, out of the ones already standing.
+     *
+     * Twice over, because a unit can keep its key and move, or keep everything
+     * about itself and lose its key: a base's buildings are keyed by their place
+     * in its list, so deleting the second of five renumbers three of them.
+     *
+     * A unit that has not changed at all is claimed first, so deleting one of
+     * five identical solars leaves the four that did not move exactly where they
+     * are and the fifth object over. Only then does a key claim a unit, which is
+     * what a move and a turn are: the same building, somewhere else.
+     */
+    const spare = new Map(shown);
+    const claimed = new Map<string, Standing>();
+    const alike = new Map<string, string[]>();
+    for (const [key, one] of spare) {
+      const look = looksLike(one);
+      const keys = alike.get(look);
+      if (keys) keys.push(key);
+      else alike.set(look, [key]);
+    }
+    for (const placement of placements) {
+      const look = looksLike({
+        def: placement.def,
+        team: placement.team,
+        at: standingAt(placement),
+      });
+      const key = alike.get(look)?.shift();
+      const one = key === undefined ? undefined : spare.get(key);
+      if (key === undefined || !one) continue;
+      spare.delete(key);
+      claimed.set(placement.key, one);
+    }
+    for (const placement of placements) {
+      if (claimed.has(placement.key)) continue;
+      const one = spare.get(placement.key);
+      // The same unit for the same team, or it is a different thing that has
+      // been given the key rather than the building that used to hold it.
+      if (!one || one.def !== placement.def || one.team !== placement.team) {
+        continue;
+      }
+      spare.delete(placement.key);
+      claimed.set(placement.key, one);
     }
 
-    // Whatever is already standing where this pass wants it stays standing: the
-    // same unit, the same team, the same square, the same way round. Only the
-    // key it answers to can have changed, because a base's buildings are keyed
-    // by their place in its list.
-    //
-    // Which is what keeps an edit to one building from being an arrival for all
-    // of them, and what makes a second pass over the same document free. React
-    // runs every effect twice in development, so there is always a second pass.
+    // Whatever nothing claimed has gone: a unit deleted, or one replaced by
+    // something else at its key.
+    const now = performance.now();
+    for (const one of spare.values()) {
+      leaving.push({ object: one.object, gone: now });
+    }
+
+    // Everything claimed keeps standing, moved and turned to where this pass
+    // wants it, which is what makes a move a move rather than one building
+    // vanishing and another appearing. A second pass over the same document
+    // claims all of it and does nothing at all.
+    shown.clear();
     objects.clear();
-    const fresh: { placement: Placement; name: string }[] = [];
-    placements.forEach((placement, at) => {
-      const standing = shown.get(names[at]);
-      if (!standing) {
-        fresh.push({ placement, name: names[at] });
-        return;
+    const fresh: Placement[] = [];
+    for (const placement of placements) {
+      const one = claimed.get(placement.key);
+      if (!one) {
+        fresh.push(placement);
+        continue;
       }
-      standing.object.userData = {
-        placementKey: placement.key,
-        placement,
-      } satisfies PlacementUserData;
-      objects.set(placement.key, standing.object);
-    });
+      place(one.object, placement);
+      shown.set(placement.key, { ...one, at: standingAt(placement) });
+      objects.set(placement.key, one.object);
+    }
 
     // Grouped by unit type and team, so each model is read once and the scene
     // fills in whole formations at a time rather than one unit per frame.
-    const batches = new Map<string, typeof fresh>();
-    for (const one of fresh) {
-      const key = `${one.placement.def}|${one.placement.team}`;
+    const batches = new Map<string, Placement[]>();
+    for (const placement of fresh) {
+      const key = `${placement.def}|${placement.team}`;
       const batch = batches.get(key);
-      if (batch) batch.push(one);
-      else batches.set(key, [one]);
+      if (batch) batch.push(placement);
+      else batches.set(key, [placement]);
     }
 
     for (const batch of batches.values()) {
-      const colour = colorOf(deps.teamColor(batch[0].placement.team));
-      const { built, drawable } = await prototypeFor(
-        batch[0].placement.def,
-        colour,
-      );
+      const colour = colorOf(deps.teamColor(batch[0].team));
+      const { built, drawable } = await prototypeFor(batch[0].def, colour);
       if (disposed || mine !== generation) return { missing: drawnMissing() };
-      for (const { placement, name } of batch) {
+      for (const placement of batch) {
         const instance = built.object.clone();
         place(instance, placement);
         arriving.push({ object: instance, born: performance.now() });
         sizeAt(instance, ARRIVE_FROM);
         root.add(instance);
-        shown.set(name, { object: instance, def: placement.def, drawable });
+        shown.set(placement.key, {
+          object: instance,
+          def: placement.def,
+          team: placement.team,
+          at: standingAt(placement),
+          drawable,
+        });
         objects.set(placement.key, instance);
       }
       handle.render();
@@ -423,7 +464,7 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
       frame = null;
       arriving = [];
       leaving = [];
-      shown = new Map();
+      shown.clear();
       root.clear();
       objects.clear();
       watchers.clear();
