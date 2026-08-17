@@ -181,7 +181,7 @@ mod tests {
         // a known cache dir with content
         let cache = root.join("coilbox-branding-images");
         fs::create_dir_all(&cache).unwrap();
-        fs::write(cache.join("x.dataurl"), b"data").unwrap();
+        fs::write(cache.join("x.png"), b"data").unwrap();
         // an UNRELATED sibling dir that must survive
         let bystander = root.join("important-user-data");
         fs::create_dir_all(&bystander).unwrap();

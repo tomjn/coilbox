@@ -90,11 +90,11 @@ const PHOTO_MAX_H: u32 = 1080;
 const PHOTO_JPEG_QUALITY: u8 = 85;
 
 /// Decode arbitrary raster bytes, downscale to fit `PHOTO_MAX_W`x`PHOTO_MAX_H`
-/// (aspect-preserving, never upscaled), drop alpha, and re-encode as a JPEG
-/// `data:` URL. Returns `None` if the bytes aren't a decodable raster (e.g. SVG or
-/// WebP) so the caller can fall back to passing the original bytes through. Used
-/// only for opaque photographic art — logos keep their original bytes/transparency.
-pub(crate) fn reencode_jpeg(bytes: &[u8]) -> Option<String> {
+/// (aspect-preserving, never upscaled), drop alpha, and re-encode as JPEG bytes.
+/// Returns `None` if the bytes aren't a decodable raster (e.g. SVG or WebP) so
+/// the caller can fall back to passing the original bytes through. Used only for
+/// opaque photographic art, and logos keep their original bytes and transparency.
+pub(crate) fn reencode_jpeg(bytes: &[u8]) -> Option<Vec<u8>> {
     let img = image::load_from_memory(bytes).ok()?;
     let img = if img.width() > PHOTO_MAX_W || img.height() > PHOTO_MAX_H {
         img.thumbnail(PHOTO_MAX_W, PHOTO_MAX_H)
@@ -111,7 +111,7 @@ pub(crate) fn reencode_jpeg(bytes: &[u8]) -> Option<String> {
             image::ExtendedColorType::Rgb8,
         )
         .ok()?;
-    Some(format!("data:image/jpeg;base64,{}", base64_encode(&jpeg)))
+    Some(jpeg)
 }
 
 /// Pick a usable image content type: trust an `image/*` response header, else
@@ -146,23 +146,55 @@ pub(crate) fn image_content_type(header: Option<&str>, url: &str) -> Option<Stri
 }
 
 /// Bumped when the cached encoding changes so stale entries miss and refetch.
-const IMAGE_CACHE_VERSION: u32 = 2;
+/// v3: the picture is a file the webview loads over `coilbox://contentbranding/`
+/// rather than base64 in a `.dataurl` file (#1694).
+const IMAGE_CACHE_VERSION: u32 = 3;
 
-/// A cache-dir subpath helper, mirroring the header/thumb cache layout. The
-/// filename carries a version salt and a `photo`/`raw` variant so re-encoded and
-/// pass-through results for the same URL never collide (and old entries invalidate).
+/// What a cached picture is: the file it was written to, under a name the asset
+/// protocol serves. Its own record because the file's extension comes from the
+/// content type the response declared, which a lookup has no other way to know.
+#[derive(serde::Serialize, serde::Deserialize)]
+pub(crate) struct CachedImage {
+    pub file: String,
+}
+
+/// Where one URL's picture is kept: the record naming the picture, and the
+/// negative marker for a URL that yielded nothing. The stem carries a version
+/// salt and a `photo`/`raw` variant so re-encoded and pass-through results for
+/// the same URL never collide (and old entries invalidate).
 pub(crate) fn image_cache_files(
     cache_dir: &std::path::Path,
     url: &str,
     reencode: bool,
 ) -> (PathBuf, PathBuf) {
-    let key = url_key(url);
-    let variant = if reencode { "photo" } else { "raw" };
-    let stem = format!("{key}.v{IMAGE_CACHE_VERSION}.{variant}");
+    let stem = image_cache_stem(url, reencode);
     (
-        cache_dir.join(format!("{stem}.dataurl")),
+        cache_dir.join(format!("{stem}.json")),
         cache_dir.join(format!("{stem}.none")),
     )
+}
+
+/// The stem both the record and the picture are named after.
+fn image_cache_stem(url: &str, reencode: bool) -> String {
+    let key = url_key(url);
+    let variant = if reencode { "photo" } else { "raw" };
+    format!("{key}.v{IMAGE_CACHE_VERSION}.{variant}")
+}
+
+/// The file extension a picture of `content_type` is stored under, which is also
+/// what the asset protocol reads the served content type back off. Anything not
+/// recognised is kept as `.bin`, which the protocol serves as a byte stream and
+/// an `<img>` sniffs regardless.
+fn extension_for(content_type: &str) -> &'static str {
+    match content_type {
+        "image/png" => "png",
+        "image/jpeg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "image/svg+xml" => "svg",
+        "image/bmp" => "bmp",
+        _ => "bin",
+    }
 }
 
 /// Fetch the catalog JSON text over HTTP, giving up after `CATALOG_FETCH_TIMEOUT`.
@@ -300,14 +332,24 @@ pub(crate) async fn resolve_catalog(
     }
 }
 
-/// Fetch the first URL that yields an image, cache it once as a `data:` URL, and
-/// return it. `.dataurl` positive hits and `.none` negative markers avoid refetch.
-/// Only `https` URLs are attempted (privacy/security).
+/// How a resolved picture reaches the frontend: the cache file name it fetches
+/// over `coilbox://contentbranding/`, or the base64 fallback for a picture that
+/// had nowhere to go. Only one of the two is ever set.
+#[derive(Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResolvedImage {
+    pub file: Option<String>,
+    pub data_url: Option<String>,
+}
+
+/// Fetch the first URL that yields an image, cache the bytes as a file, and name
+/// it. Positive records and `.none` negative markers avoid refetch. Only `https`
+/// URLs are attempted (privacy/security).
 pub(crate) async fn resolve_image(
     urls: &[String],
     cache_dir: Option<PathBuf>,
     reencode: bool,
-) -> Option<String> {
+) -> Option<ResolvedImage> {
     for url in urls {
         if !url.starts_with("https://") {
             continue;
@@ -316,8 +358,17 @@ pub(crate) async fn resolve_image(
             .as_ref()
             .map(|d| image_cache_files(d, url, reencode));
         if let Some((pos, neg)) = &files {
-            if let Ok(text) = std::fs::read_to_string(pos) {
-                return Some(text);
+            // A record naming a picture a cache clean has since removed points
+            // at nothing, so it counts as a miss and the URL is fetched again.
+            if let Some(hit) = std::fs::read(pos)
+                .ok()
+                .and_then(|raw| serde_json::from_slice::<CachedImage>(&raw).ok())
+                .filter(|hit| pos.with_file_name(&hit.file).is_file())
+            {
+                return Some(ResolvedImage {
+                    file: Some(hit.file),
+                    data_url: None,
+                });
             }
             // A negative marker only suppresses refetch until it expires, so a
             // temporarily-down host is retried rather than cached as missing forever.
@@ -326,14 +377,30 @@ pub(crate) async fn resolve_image(
             }
         }
         match fetch_image(url, reencode).await {
-            Some(data_url) => {
+            Some((content_type, bytes)) => {
                 if let Some((pos, _)) = &files {
+                    let name = format!(
+                        "{}.{}",
+                        image_cache_stem(url, reencode),
+                        extension_for(&content_type)
+                    );
                     if let Some(dir) = pos.parent() {
                         let _ = std::fs::create_dir_all(dir);
                     }
-                    let _ = std::fs::write(pos, &data_url);
+                    if std::fs::write(pos.with_file_name(&name), &bytes).is_ok() {
+                        if let Ok(json) = serde_json::to_vec(&CachedImage { file: name.clone() }) {
+                            let _ = std::fs::write(pos, json);
+                        }
+                        return Some(ResolvedImage {
+                            file: Some(name),
+                            data_url: None,
+                        });
+                    }
                 }
-                return Some(data_url);
+                return Some(ResolvedImage {
+                    file: None,
+                    data_url: Some(data_url(&content_type, &bytes)),
+                });
             }
             None => {
                 if let Some((_, neg)) = &files {
@@ -348,10 +415,11 @@ pub(crate) async fn resolve_image(
     None
 }
 
-/// Fetch one image URL → `data:` URL, or `None` on any failure / non-image. When
-/// `reencode` is set the bytes are downsampled and JPEG-encoded (for opaque
-/// photographic art); if they can't be decoded (SVG/WebP) we pass them through raw.
-async fn fetch_image(url: &str, reencode: bool) -> Option<String> {
+/// Fetch one image URL into (content type, bytes), or `None` on any failure or
+/// non-image. When `reencode` is set the bytes are downsampled and JPEG-encoded
+/// (for opaque photographic art). Bytes that can't be decoded (SVG/WebP) pass
+/// through raw.
+async fn fetch_image(url: &str, reencode: bool) -> Option<(String, Vec<u8>)> {
     let resp = reqwest::get(url).await.ok()?.error_for_status().ok()?;
     let header = resp
         .headers()
@@ -362,10 +430,10 @@ async fn fetch_image(url: &str, reencode: bool) -> Option<String> {
     let bytes = resp.bytes().await.ok()?;
     if reencode {
         if let Some(jpeg) = reencode_jpeg(&bytes) {
-            return Some(jpeg);
+            return Some(("image/jpeg".to_string(), jpeg));
         }
     }
-    Some(data_url(&content_type, &bytes))
+    Some((content_type, bytes.to_vec()))
 }
 
 #[cfg(test)]
@@ -424,20 +492,17 @@ mod tests {
 
     #[test]
     fn reencode_downsamples_oversized_and_emits_jpeg() {
-        let url = reencode_jpeg(&png_bytes(3840, 2160)).unwrap();
-        assert!(url.starts_with("data:image/jpeg;base64,"));
-        let b64 = url.trim_start_matches("data:image/jpeg;base64,");
-        let bytes = base64_decode(b64);
-        let out = image::load_from_memory(&bytes).unwrap();
+        let jpeg = reencode_jpeg(&png_bytes(3840, 2160)).unwrap();
+        assert_eq!(&jpeg[..2], b"\xff\xd8");
+        let out = image::load_from_memory(&jpeg).unwrap();
         assert!(out.width() <= PHOTO_MAX_W && out.height() <= PHOTO_MAX_H);
         assert_eq!(out.width(), PHOTO_MAX_W); // 16:9 source hits the width bound
     }
 
     #[test]
     fn reencode_keeps_small_images_unscaled() {
-        let url = reencode_jpeg(&png_bytes(320, 200)).unwrap();
-        let b64 = url.trim_start_matches("data:image/jpeg;base64,");
-        let out = image::load_from_memory(&base64_decode(b64)).unwrap();
+        let jpeg = reencode_jpeg(&png_bytes(320, 200)).unwrap();
+        let out = image::load_from_memory(&jpeg).unwrap();
         assert_eq!((out.width(), out.height()), (320, 200));
     }
 
@@ -457,28 +522,20 @@ mod tests {
         assert!(photo
             .to_string_lossy()
             .contains(&format!(".v{IMAGE_CACHE_VERSION}.")));
+        // The record is JSON and names the picture beside it, which is what
+        // replaced the base64 the cache used to hold (#1694).
+        assert!(photo.to_string_lossy().ends_with(".json"));
     }
 
-    /// Minimal standard-base64 decoder, test-only, to round-trip `base64_encode`.
-    fn base64_decode(s: &str) -> Vec<u8> {
-        const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        let val = |c: u8| T.iter().position(|&t| t == c).unwrap() as u32;
-        let clean: Vec<u8> = s.bytes().filter(|&c| c != b'=').collect();
-        let mut out = Vec::with_capacity(clean.len() / 4 * 3);
-        for chunk in clean.chunks(4) {
-            let mut n = 0u32;
-            for (i, &c) in chunk.iter().enumerate() {
-                n |= val(c) << (18 - 6 * i);
-            }
-            out.push((n >> 16) as u8);
-            if chunk.len() > 2 {
-                out.push((n >> 8) as u8);
-            }
-            if chunk.len() > 3 {
-                out.push(n as u8);
-            }
-        }
-        out
+    /// A picture is stored under the extension its content type implies, so the
+    /// asset protocol serves it back as the type it is.
+    #[test]
+    fn a_picture_is_named_after_its_content_type() {
+        assert_eq!(extension_for("image/png"), "png");
+        assert_eq!(extension_for("image/svg+xml"), "svg");
+        assert_eq!(extension_for("image/jpeg"), "jpg");
+        // Nothing recognised still gets a name, and an `<img>` sniffs it.
+        assert_eq!(extension_for("image/avif"), "bin");
     }
 
     #[test]

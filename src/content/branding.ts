@@ -2,6 +2,8 @@ import { defineCommand } from "@picoframe/plugin-sdk";
 import { useEffect, useState } from "react";
 import type { ConquestNames } from "../conquest/names";
 import type { GameRepo } from "../downloads/gameRepos";
+import { contentBrandingUrl } from "../lib/assetUrl";
+import { fetchAsDataUrl } from "../lib/dataUrl";
 import type { GameAiConfig } from "../play/gameAi";
 import type { GameItem, MapItem } from "./bindings";
 import { withMapSource } from "./mapSource";
@@ -172,6 +174,10 @@ interface CatalogResult {
   errors: string[];
 }
 interface ImageResult {
+  /** The picture's cache file, served over `coilbox://contentbranding/`. How a
+   *  resolved picture normally arrives. */
+  file?: string;
+  /** The picture inline, only when it had nowhere on disk to go. */
   dataUrl?: string;
 }
 
@@ -505,11 +511,17 @@ export function imageCacheKey(urls?: string[], reencode = false): string {
   return `${reencode ? "j" : "r"}\n${urls.join("\n")}`;
 }
 
+/** The `src` to draw a resolved picture with: its cache file where there is one,
+ *  and the inline copy only where the Rust side had nowhere to write it. */
+function imageSrc(res: ImageResult): string | undefined {
+  return res.file ? contentBrandingUrl(res.file) : res.dataUrl;
+}
+
 /**
  * Promise form of {@link useBrandingImage} for imperative resolvers (e.g. the
  * faction-logo layer, which resolves many sides in one effect and can't call a
- * hook per side). Shares the same session cache. Resolves to the cached `data:`
- * URL or `undefined`. `reencode=false` preserves original bytes (logos).
+ * hook per side). Shares the same session cache. Resolves to a `src` or
+ * `undefined`. `reencode=false` preserves original bytes (logos).
  */
 export function resolveBrandingImage(
   urls?: string[],
@@ -522,15 +534,30 @@ export function resolveBrandingImage(
     promise = brandingImageCmd({ urls, reencode });
     imageCache.set(key, promise);
   }
-  return promise.then((r) => r.dataUrl ?? undefined).catch(() => undefined);
+  return promise.then(imageSrc).catch(() => undefined);
 }
 
 /**
- * Resolve the first working URL to a cached `data:` URL via the Rust proxy (fetch
- * once, CSP-safe). No-ops for empty input; session-cached by the joined URL list.
+ * The same picture as a base64 `data:` URL. Only the build-tree export wants
+ * this, because what it writes leaves this machine and a name pointing at this
+ * cache is no use to it.
+ */
+export async function resolveBrandingDataUrl(
+  urls?: string[],
+  reencode = false,
+): Promise<string | undefined> {
+  const src = await resolveBrandingImage(urls, reencode);
+  if (!src || src.startsWith("data:")) return src;
+  return await fetchAsDataUrl(src);
+}
+
+/**
+ * Resolve the first working URL to a `src` via the Rust proxy, which fetches it
+ * once and caches the bytes as a file. No-ops for empty input, and session-cached
+ * by the joined URL list.
  *
  * Set `reencode` for opaque photographic art (banners, screenshots): the Rust side
- * downsamples and JPEG-encodes it to bound the data URL. Leave it off for logos,
+ * downsamples and JPEG-encodes it to bound what is kept. Leave it off for logos,
  * which are usually transparent and small and must keep their original bytes.
  */
 export function useBrandingImage(
@@ -555,7 +582,7 @@ export function useBrandingImage(
     }
     promise
       .then((res) => {
-        if (!cancelled) setDataUrl(res.dataUrl ?? undefined);
+        if (!cancelled) setDataUrl(imageSrc(res));
       })
       .catch(() => {
         if (!cancelled) setDataUrl(undefined);

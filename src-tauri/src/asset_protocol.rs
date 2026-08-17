@@ -38,10 +38,12 @@
 //!     emblem cache (a side's `Sidepics` art)
 //!   - `coilbox://localhost/mapconvthumb/<file>` → the mapconv thumbnail cache
 //!     (a downscaled preview of a map author's source heightmap or texture)
+//!   - `coilbox://localhost/contentbranding/<file>` → the branding-catalog image
+//!     cache (a game's banner and logo, fetched over the network)
 //!
-//! The last five hold content-keyed names, so the same URL always means the same
-//! bytes and they are served `immutable`. Everything else is editable media and
-//! stays `no-cache`.
+//! Five of those hold content-keyed names, so the same URL always means the same
+//! bytes and they are served `immutable`. `contentbranding` is keyed by source
+//! URL rather than by bytes, so it stays `no-cache` along with the editable media.
 //!
 //! Every segment is percent-decoded and rejected if it contains path syntax, so a
 //! request can never escape its root. Any miss (no root, unsafe path, absent file)
@@ -179,7 +181,8 @@ fn resolve_path(
         | "unitsyncheader"
         | "unitsyncbuildpic"
         | "unitsyncfactionlogo"
-        | "mapconvthumb" => {
+        | "mapconvthumb"
+        | "contentbranding" => {
             let [file] = rest else {
                 return None;
             };
@@ -314,6 +317,7 @@ pub fn handle<R: Runtime>(
             "unitsyncbuildpic" => tauri_plugin_coilbox_unitsync::buildpic_cache_dir(app),
             "unitsyncfactionlogo" => tauri_plugin_coilbox_unitsync::faction_logo_cache_dir(app),
             "mapconvthumb" => tauri_plugin_coilbox_mapconv::thumb_cache_dir(app),
+            "contentbranding" => tauri_plugin_coilbox_content::branding_image_dir(app),
             _ => tauri_plugin_coilbox_unitsync::model_texture_dir(app),
         },
     );
@@ -329,8 +333,11 @@ pub fn handle<R: Runtime>(
 
 /// The `Cache-Control` for a root. The unitsync and mapconv caches name their
 /// files after a hash of the source file's path, size and mtime, so a URL there
-/// can never come to mean different bytes and the webview may keep it. Every
-/// other root serves media the user can edit in place under a stable name.
+/// can never come to mean different bytes and the webview may keep it.
+///
+/// `contentbranding` is not one of them: it is keyed by the source URL, and the
+/// picture a catalog serves at one URL can change. It revalidates along with the
+/// roots serving media the user can edit in place under a stable name.
 fn cache_control(root: &str) -> &'static str {
     match root {
         "unitsyncthumb"
@@ -530,6 +537,10 @@ mod tests {
             under_unitsync(&segs(&["mapconvthumb", "abc.png"])),
             Some(PathBuf::from("/cache/mapconvthumb/abc.png"))
         );
+        assert_eq!(
+            under_unitsync(&segs(&["contentbranding", "abc.v3.photo.jpg"])),
+            Some(PathBuf::from("/cache/contentbranding/abc.v3.photo.jpg"))
+        );
         // Each cache is flat, so a nested path is not one of its files.
         assert_eq!(under_unitsync(&segs(&["unitmodel", "sub", "a.dds"])), None);
         assert_eq!(
@@ -563,6 +574,8 @@ mod tests {
             "max-age=31536000, immutable"
         );
         assert_eq!(cache_control("mapconvthumb"), "max-age=31536000, immutable");
+        // Keyed by source URL, not by bytes, so it has to keep asking.
+        assert_eq!(cache_control("contentbranding"), "no-cache");
         // Editable media keeps revalidating, including the raw model textures,
         // which are named after the archive member rather than its bytes.
         assert_eq!(cache_control("unitmodel"), "no-cache");

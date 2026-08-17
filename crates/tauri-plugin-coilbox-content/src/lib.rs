@@ -1247,22 +1247,36 @@ async fn branding_catalog<R: Runtime>(app: AppHandle<R>, url: String) -> Result<
     Ok(CliResult::ok(json!(res)))
 }
 
-/// `branding_image` — fetch the first working image URL (https only), cache it
-/// once as a `data:` URL keyed by URL hash, and return it. Empty `dataUrl` = the
-/// UI falls back to the game's own art / gradient. When `reencode` is set (opaque
-/// photographic art — banners, screenshots), decodable rasters are downsampled and
-/// JPEG-encoded to bound the cached data URL; logos pass through untouched.
+/// `branding_image` fetches the first working image URL (https only), caches the
+/// bytes as a file keyed by URL hash, and names it. Neither field set means the
+/// UI falls back to the game's own art or gradient. When `reencode` is set, for
+/// opaque photographic art like banners and screenshots, decodable rasters are
+/// downsampled and JPEG-encoded to bound what is kept, and logos pass through
+/// untouched.
+///
+/// The picture comes back as `file`, a name under `coilbox://contentbranding/`,
+/// with `dataUrl` holding the bytes only where there was nowhere to cache them.
 #[tauri::command]
 async fn branding_image<R: Runtime>(
     app: AppHandle<R>,
     urls: Vec<String>,
     reencode: bool,
 ) -> Result<CliResult, ()> {
-    let cache_dir = coilbox_portable::cache_dir(&app)
+    let resolved = branding::resolve_image(&urls, branding_image_dir(&app), reencode).await;
+    Ok(CliResult::ok(json!(resolved.unwrap_or_default())))
+}
+
+/// Subdirectory of the app cache dir holding catalog art fetched over the
+/// network. `None` when the platform can't resolve a cache dir, and the pictures
+/// are then not cached at all.
+const BRANDING_IMAGE_SUBDIR: &str = "coilbox-branding-images";
+
+/// Where catalog art is cached. Public because the asset protocol serves this
+/// folder as its `contentbranding` root.
+pub fn branding_image_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    coilbox_portable::cache_dir(app)
         .ok()
-        .map(|d| d.join("coilbox-branding-images"));
-    let data_url = branding::resolve_image(&urls, cache_dir, reencode).await;
-    Ok(CliResult::ok(json!({ "dataUrl": data_url })))
+        .map(|d| d.join(BRANDING_IMAGE_SUBDIR))
 }
 
 /// Directory holding engine-config profile snapshots, under the app data dir.

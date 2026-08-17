@@ -8,7 +8,7 @@
  */
 
 import { unitsyncBuildpicUrl } from "../lib/assetUrl";
-import { toBase64 } from "../lib/base64";
+import { fetchAsDataUrl } from "../lib/dataUrl";
 import type { UnitDisplay } from "./bindings";
 
 /** The `src` to draw a unit's build icon with, or undefined when it has none. */
@@ -31,12 +31,5 @@ export async function unitIconDataUrl(
   display?: UnitDisplay,
 ): Promise<string | undefined> {
   if (!display?.iconFile) return display?.icon;
-  try {
-    const res = await fetch(unitsyncBuildpicUrl(display.iconFile));
-    if (!res.ok) return undefined;
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    return `data:image/png;base64,${toBase64(bytes)}`;
-  } catch {
-    return undefined;
-  }
+  return await fetchAsDataUrl(unitsyncBuildpicUrl(display.iconFile));
 }

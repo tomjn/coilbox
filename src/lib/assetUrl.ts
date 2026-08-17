@@ -117,6 +117,15 @@ export function mapconvThumbUrl(file: string): string {
   return schemeUrl("mapconvthumb", file);
 }
 
+/**
+ * URL for a game's cached catalog art, under `contentbranding/<file>`. A banner
+ * is re-encoded to fit 1920x1080, which is a few hundred kilobytes, and the
+ * games list shows several at once.
+ */
+export function contentBrandingUrl(file: string): string {
+  return schemeUrl("contentbranding", file);
+}
+
 /** URL for a saved unit's overview thumbnail. */
 export function legoThumbUrl(projectId: string): string {
   return schemeUrl("lego", `${projectId}.png`);

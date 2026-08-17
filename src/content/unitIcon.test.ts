@@ -28,6 +28,7 @@ describe("unitIconDataUrl", () => {
   it("reads a cached icon back as base64, which is what an export carries", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
+      headers: new Headers({ "content-type": "image/png" }),
       arrayBuffer: async () => new Uint8Array([104, 105]).buffer,
     }));
     vi.stubGlobal("fetch", fetchMock);
