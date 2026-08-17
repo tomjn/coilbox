@@ -20,6 +20,7 @@ import { SubstitutionPanel } from "@/blueprint/pages/components/SubstitutionPane
 import type { SideUnits, SubstitutionPlan } from "@/blueprint/substitution";
 import { useShippedEquivalents } from "@/blueprint/useShippedEquivalents";
 import type { UnitDatasetEntry } from "@/content/bindings";
+import { UnitGameProvider } from "@/content/pages/components/UnitPicker";
 
 export function SubstituteBaseForm({
   layout,
@@ -50,18 +51,20 @@ export function SubstituteBaseForm({
   const shipped = useShippedEquivalents(gameArchive, sides);
 
   return (
-    <SubstitutionPanel
-      layout={layout}
-      queued={queued}
-      sides={sides}
-      table={table}
-      units={units}
-      unitsLoading={unitsLoading}
-      onApply={onApply}
-      onRemember={remember}
-      onReadShipped={shipped.read}
-      readingShipped={shipped.reading}
-      shippedNote={shipped.note}
-    />
+    <UnitGameProvider gameArchive={gameArchive}>
+      <SubstitutionPanel
+        layout={layout}
+        queued={queued}
+        sides={sides}
+        table={table}
+        units={units}
+        unitsLoading={unitsLoading}
+        onApply={onApply}
+        onRemember={remember}
+        onReadShipped={shipped.read}
+        readingShipped={shipped.reading}
+        shippedNote={shipped.note}
+      />
+    </UnitGameProvider>
   );
 }

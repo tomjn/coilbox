@@ -15,7 +15,10 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useGameUnits } from "@/content/useGameUnits";
-import { UnitPickerButton } from "../../../content/pages/components/UnitPicker";
+import {
+  UnitGameProvider,
+  UnitPickerButton,
+} from "../../../content/pages/components/UnitPicker";
 import { mediaKind, refIsVideo } from "../../../lib/assetUrl";
 import {
   campaignImageDelete,
@@ -170,7 +173,7 @@ function UnitSlotEditor({
   const unit = useMissionUnit(gameName, config);
 
   return (
-    <>
+    <UnitGameProvider gameName={gameName}>
       <div className="flex flex-col gap-3 rounded-md border border-border/50 bg-muted/20 p-3">
         <UnitPickerButton
           units={units}
@@ -205,7 +208,7 @@ function UnitSlotEditor({
           </PreviewBox>
         )
       )}
-    </>
+    </UnitGameProvider>
   );
 }
 

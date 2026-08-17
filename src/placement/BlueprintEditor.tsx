@@ -36,7 +36,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
+import {
+  UnitGameProvider,
+  UnitPickerButton,
+} from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
@@ -344,177 +347,181 @@ export function BlueprintEditor({
       : [];
 
   return (
-    <PlacementSurface
-      ground={{ kind: "grid", extent: GRID_EXTENT }}
-      onScene={setHandle}
-      frame={frame}
-      frameLabel="Frame layout"
-      chrome={undoRedo && <HistoryControls {...undoRedo} />}
-      bars={
-        <>
-          <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card/80 p-1 backdrop-blur">
-            <UnitPickerButton
-              units={buildings}
-              value={unitDef}
-              onValueChange={setUnitDef}
-              loading={unitsLoading}
-              size="sm"
-              className="w-48"
-            />
+    // The unit field in the toolbar picks from this blueprint's game, so it can
+    // show build pics and faction blocks like every other one.
+    <UnitGameProvider gameName={gameName}>
+      <PlacementSurface
+        ground={{ kind: "grid", extent: GRID_EXTENT }}
+        onScene={setHandle}
+        frame={frame}
+        frameLabel="Frame layout"
+        chrome={undoRedo && <HistoryControls {...undoRedo} />}
+        bars={
+          <>
+            <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-card/80 p-1 backdrop-blur">
+              <UnitPickerButton
+                units={buildings}
+                value={unitDef}
+                onValueChange={setUnitDef}
+                loading={unitsLoading}
+                size="sm"
+                className="w-48"
+              />
 
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 max-w-52 gap-1.5 px-2 text-xs"
-                >
-                  <Blocks className="size-3.5 shrink-0" />
-                  <span className="truncate">
-                    {layoutTriggerLabel(
-                      blueprint.name,
-                      blueprint.buildings.length,
-                    )}
-                  </span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-80 space-y-3">
-                <LayoutNameField
-                  id="blueprint-layout-name"
-                  name={blueprint.name}
-                  onRename={(name) =>
-                    applyEdit((current) =>
-                      renameBlueprint(current, BLUEPRINT_BASE_ID, name),
-                    )
-                  }
-                />
-                <p className="text-xs text-muted-foreground">
-                  A layout is a shape rather than a place, so there is no map
-                  here and no team. Every building sits at an offset from the
-                  layout's own middle, and the squares under them are the ground
-                  the engine will give them.
-                </p>
-                <LayoutNotes
-                  overlaps={overlaps}
-                  noSlope={noSlope}
-                  absent={absent}
-                  buildings={blueprint.buildings.length}
-                  strays={strays}
-                  offGrid={offGrid}
-                  // A layout edit like a drag, so the history holds it and the
-                  // library writes it a moment later like any other change.
-                  onSnapToGrid={() =>
-                    applyEdit((current) =>
-                      editBaseLayout(
-                        current,
-                        BLUEPRINT_BASE_ID,
-                        "own",
-                        (buildings) =>
-                          onBuildGrid(
-                            buildings,
-                            buildingFootprints(units),
-                            GRID_ORIGIN,
-                          ),
-                      ),
-                    )
-                  }
-                />
-              </PopoverContent>
-            </Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 max-w-52 gap-1.5 px-2 text-xs"
+                  >
+                    <Blocks className="size-3.5 shrink-0" />
+                    <span className="truncate">
+                      {layoutTriggerLabel(
+                        blueprint.name,
+                        blueprint.buildings.length,
+                      )}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-80 space-y-3">
+                  <LayoutNameField
+                    id="blueprint-layout-name"
+                    name={blueprint.name}
+                    onRename={(name) =>
+                      applyEdit((current) =>
+                        renameBlueprint(current, BLUEPRINT_BASE_ID, name),
+                      )
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    A layout is a shape rather than a place, so there is no map
+                    here and no team. Every building sits at an offset from the
+                    layout's own middle, and the squares under them are the
+                    ground the engine will give them.
+                  </p>
+                  <LayoutNotes
+                    overlaps={overlaps}
+                    noSlope={noSlope}
+                    absent={absent}
+                    buildings={blueprint.buildings.length}
+                    strays={strays}
+                    offGrid={offGrid}
+                    // A layout edit like a drag, so the history holds it and the
+                    // library writes it a moment later like any other change.
+                    onSnapToGrid={() =>
+                      applyEdit((current) =>
+                        editBaseLayout(
+                          current,
+                          BLUEPRINT_BASE_ID,
+                          "own",
+                          (buildings) =>
+                            onBuildGrid(
+                              buildings,
+                              buildingFootprints(units),
+                              GRID_ORIGIN,
+                            ),
+                        ),
+                      )
+                    }
+                  />
+                </PopoverContent>
+              </Popover>
 
-            <BuildOrderPopover
-              buildings={blueprint.buildings}
-              index={picked?.index ?? -1}
-              ordered={blueprint.ordered === true}
-              onOrdered={(on) =>
-                applyEdit((current) =>
-                  setBlueprintOrdered(current, BLUEPRINT_BASE_ID, on),
-                )
-              }
-              onMoveBuilding={(at, delta) =>
-                applyEdit((current) =>
-                  moveBuilding(current, BLUEPRINT_BASE_ID, at, delta),
-                )
-              }
-              onPlay={() => setPlayback({ step: 0, playing: !reduceMotion })}
-            />
-          </div>
+              <BuildOrderPopover
+                buildings={blueprint.buildings}
+                index={picked?.index ?? -1}
+                ordered={blueprint.ordered === true}
+                onOrdered={(on) =>
+                  applyEdit((current) =>
+                    setBlueprintOrdered(current, BLUEPRINT_BASE_ID, on),
+                  )
+                }
+                onMoveBuilding={(at, delta) =>
+                  applyEdit((current) =>
+                    moveBuilding(current, BLUEPRINT_BASE_ID, at, delta),
+                  )
+                }
+                onPlay={() => setPlayback({ step: 0, playing: !reduceMotion })}
+              />
+            </div>
 
-          <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
-            {unitDef
-              ? "Click the ground to put one down. Drag a building to move it within the layout."
-              : "Pick a building to start placing. Drag one to move it, click bare ground to deselect."}
-          </p>
+            <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
+              {unitDef
+                ? "Click the ground to put one down. Drag a building to move it within the layout."
+                : "Pick a building to start placing. Drag one to move it, click bare ground to deselect."}
+            </p>
 
-          {/* Nothing here has been checked, said once in the open rather than
+            {/* Nothing here has been checked, said once in the open rather than
               per layout in a popover (issue #1496). The ground is flat on
               purpose, so the only reason that can be true here is a game whose
               units have not been read. */}
-          <UncheckedNote
-            unchecked={drawn.settled ? sceneUnchecked(footprints) : null}
+            <UncheckedNote
+              unchecked={drawn.settled ? sceneUnchecked(footprints) : null}
+            />
+
+            <TurnNote moves={turning && picked ? turned.length > 0 : null} />
+
+            {picked && (
+              <SelectionBar
+                def={picked.def}
+                what={`building ${picked.index + 1}`}
+                turnable
+                onTurn={() =>
+                  applyEdit((current) => turnPlacement(current, picked.key, 1))
+                }
+                onTurnPreview={setTurning}
+                onDelete={() => {
+                  applyEdit((current) => removePlacement(current, picked.key));
+                  setSelected(null);
+                }}
+              />
+            )}
+
+            {playing && (
+              <PlaybackBar
+                step={playing.step}
+                total={total}
+                def={steps[playing.step - 1]?.def ?? ""}
+                playing={playing.playing}
+                onStep={(step) =>
+                  setPlayback((at) => at && { ...at, step, playing: false })
+                }
+                onPlaying={(on) =>
+                  setPlayback(
+                    (at) =>
+                      at && {
+                        ...at,
+                        playing: on,
+                        // Playing from the end starts again, so the button is
+                        // never one that does nothing.
+                        step: on && at.step >= total ? 0 : at.step,
+                      },
+                  )
+                }
+                onDone={() => setPlayback(null)}
+              />
+            )}
+          </>
+        }
+        note={
+          <DrawnNote
+            gameName={gameName}
+            gameMissing={drawn.gameMissing}
+            missing={drawn.missing}
+            drawing={drawn.drawing}
+            placed={drawn.placed}
           />
-
-          <TurnNote moves={turning && picked ? turned.length > 0 : null} />
-
-          {picked && (
-            <SelectionBar
-              def={picked.def}
-              what={`building ${picked.index + 1}`}
-              turnable
-              onTurn={() =>
-                applyEdit((current) => turnPlacement(current, picked.key, 1))
-              }
-              onTurnPreview={setTurning}
-              onDelete={() => {
-                applyEdit((current) => removePlacement(current, picked.key));
-                setSelected(null);
-              }}
-            />
-          )}
-
-          {playing && (
-            <PlaybackBar
-              step={playing.step}
-              total={total}
-              def={steps[playing.step - 1]?.def ?? ""}
-              playing={playing.playing}
-              onStep={(step) =>
-                setPlayback((at) => at && { ...at, step, playing: false })
-              }
-              onPlaying={(on) =>
-                setPlayback(
-                  (at) =>
-                    at && {
-                      ...at,
-                      playing: on,
-                      // Playing from the end starts again, so the button is
-                      // never one that does nothing.
-                      step: on && at.step >= total ? 0 : at.step,
-                    },
-                )
-              }
-              onDone={() => setPlayback(null)}
-            />
-          )}
-        </>
-      }
-      note={
-        <DrawnNote
-          gameName={gameName}
-          gameMissing={drawn.gameMissing}
-          missing={drawn.missing}
-          drawing={drawn.drawing}
-          placed={drawn.placed}
-        />
-      }
-      footer={
-        <>
-          no map · a build grid, {GRID_EXTENT} elmos square · drag or
-          middle-drag to pan · drag a building to move it · right-drag to turn
-          the view · scroll to zoom
-        </>
-      }
-    />
+        }
+        footer={
+          <>
+            no map · a build grid, {GRID_EXTENT} elmos square · drag or
+            middle-drag to pan · drag a building to move it · right-drag to turn
+            the view · scroll to zoom
+          </>
+        }
+      />
+    </UnitGameProvider>
   );
 }
 

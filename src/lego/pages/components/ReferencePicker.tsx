@@ -158,6 +158,9 @@ export function ReferencePicker({
         {game && (
           <Field label="Unit">
             <UnitPickerButton
+              gameArchive={archive}
+              enginePath={target?.enginePath}
+              dataDir={target?.dataDir}
               units={units}
               value={unitName}
               onValueChange={setUnitName}
