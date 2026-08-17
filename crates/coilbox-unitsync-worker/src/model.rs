@@ -893,9 +893,17 @@ pub enum BuildpicSkip {
 pub struct UnitDisplay {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub name: Option<String>,
+    /// The icon's PNG file in the buildpic cache dir, which the webview fetches
+    /// over `coilbox://unitsyncbuildpic/`. This rather than `icon` in every case
+    /// where there is a cache dir to write it to.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub icon_file: Option<String>,
+    /// The icon inline, only when there was nowhere on disk to keep it. A whole
+    /// roster of these is megabytes of base64 across the bridge, so `icon_file`
+    /// is the normal answer and never set at the same time as this.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub icon: Option<String>,
-    /// Why there is no `icon`. Only `NoSource`, `Undecodable` and (vanishingly
+    /// Why there is neither. Only `NoSource`, `Undecodable` and (vanishingly
     /// rarely) `EncodeFailed` can appear here. The rest of `BuildpicSkip` is
     /// about encoding the hub's asset, which happens after an icon exists.
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -910,6 +918,7 @@ impl UnitDisplay {
     /// Nothing resolved: no name, no icon, and no answer about either.
     pub fn is_empty(&self) -> bool {
         self.name.is_none()
+            && self.icon_file.is_none()
             && self.icon.is_none()
             && self.icon_skipped.is_none()
             && self.asset.is_none()
@@ -927,14 +936,20 @@ pub struct UnitBuildpicsOutput {
     pub errors: Vec<String>,
 }
 
-/// One side's resolved faction emblem: a PNG `data:` URL plus the source image's
-/// longest pixel side. The dimension lets the UI demote a tiny (16px) archive
-/// sidepic below a crisper curated (catalog/profile) image instead of upscaling it.
+/// One side's resolved faction emblem: a PNG plus the source image's longest
+/// pixel side. The dimension lets the UI demote a tiny (16px) archive sidepic
+/// below a crisper curated (catalog/profile) image instead of upscaling it.
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct FactionLogoEntry {
     pub side: String,
-    pub data_uri: String,
+    /// Cache file name, served over `coilbox://unitsyncfactionlogo/`. Set
+    /// whenever the PNG reached disk, and preferred by callers over `dataUri`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+    /// PNG `data:` URL, only set when there was no cache dir or the write failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_uri: Option<String>,
     pub max_dim: u32,
 }
 

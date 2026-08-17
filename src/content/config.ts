@@ -70,6 +70,7 @@ import { liveCacheHit } from "./cachedFile";
 import { newestEngineId } from "./engineVersion";
 import { useRecordMapAppearance } from "./mapAppearanceCache";
 import { deriveSetup } from "./setup";
+import { unitIconDataUrl } from "./unitIcon";
 
 export type { SetupStatus } from "./setup";
 
@@ -844,6 +845,10 @@ export function useUnitsyncUnitBuildpics(
  * all-factions export is complete even for tabs the user never opened. Seeds the
  * shared cache. Returns an id -> display map; units that resolve to nothing are
  * simply absent (the exporter renders a "no pic" placeholder).
+ *
+ * Icons are inlined on the way out. Everywhere else a unit's icon is the cache
+ * file name the page loads over the asset protocol, but an export writes the
+ * bytes into an HTML file or a zip that leaves this machine.
  */
 export async function gatherExportPics(
   enginePath: string,
@@ -869,7 +874,20 @@ export async function gatherExportPics(
     buildpicsCache.set(key, res);
     for (const [id, display] of Object.entries(res.units)) merged[id] = display;
   }
-  return merged;
+  const inlined = await Promise.all(
+    Object.entries(merged).map(
+      async ([id, display]) =>
+        [
+          id,
+          {
+            ...display,
+            iconFile: undefined,
+            icon: await unitIconDataUrl(display),
+          },
+        ] as const,
+    ),
+  );
+  return Object.fromEntries(inlined);
 }
 
 /** Session cache of map info, keyed by `dataDir::enginePath::mapName`. */

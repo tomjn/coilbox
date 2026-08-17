@@ -3,9 +3,13 @@
 //! In one `AddAllArchives` session: run the Lua parser once to read each unit's
 //! `buildpic` field (games that override the default), then read the texture from
 //! `unitpics/` in the primary archive (mirroring `archive::game_headers`), decode
-//! it (via `crate::texture`, which adds DDS), and PNG-encode a small `data:` URL.
+//! it (via `crate::texture`, which adds DDS), and PNG-encode a small icon.
 //! Disk-cached per (game-identity, unit), keyed on cheap file identity like the
 //! header cache.
+//!
+//! The icon is written as a PNG beside its JSON record and named in it, so a
+//! roster of several hundred crosses the bridge as file names the webview
+//! fetches over `coilbox://unitsyncbuildpic/` rather than as base64.
 
 use crate::ffi::Unitsync;
 use crate::model::{BuildpicSkip, UnitBuildpicAsset, UnitBuildpicsOutput, UnitDisplay};
@@ -19,7 +23,9 @@ use std::path::Path;
 /// records written before it re-resolve rather than staying silently blank.
 /// v5: the asset carries `origin` and `source_archive` (#1678), which a record
 /// written before it has no way to answer.
-const BUILDPIC_CACHE_VERSION: u32 = 5;
+/// v6: the icon is a PNG file named by the record rather than base64 inside it
+/// (#1694), and a record written before it holds the icon nowhere else.
+const BUILDPIC_CACHE_VERSION: u32 = 6;
 
 /// Read up to this many bytes of a candidate texture before decoding (build pics
 /// are tiny; this is a generous safety bound).
@@ -280,7 +286,7 @@ pub(crate) fn resolve(
     for unit in units {
         if let Some((dir, base)) = cache {
             if let Some(display) = read_cache(dir, base, unit) {
-                if cache_covers_assets(&display, asset_dir) {
+                if icon_file_present(&display, dir) && cache_covers_assets(&display, asset_dir) {
                     collect_display(&mut resolved, unit, display);
                     continue;
                 }
@@ -373,9 +379,11 @@ pub(crate) fn resolve(
                     })
                     .collect();
                 let picture = resolve_picture(us, handle, &members, asset_dir, &source_archive);
+                let (icon_file, icon) = store_icon(cache, unit, picture.icon_png.as_deref());
                 let display = UnitDisplay {
                     name: Some(name).filter(|s| !s.is_empty()),
-                    icon: picture.icon,
+                    icon_file,
+                    icon,
                     icon_skipped: picture.icon_skipped,
                     asset: picture.asset,
                     asset_skipped: picture.skipped,
@@ -408,7 +416,7 @@ pub(crate) fn resolve(
 /// asset or the reason there is none of those.
 #[derive(Default)]
 struct Picture {
-    icon: Option<String>,
+    icon_png: Option<Vec<u8>>,
     icon_skipped: Option<BuildpicSkip>,
     asset: Option<UnitBuildpicAsset>,
     skipped: Option<BuildpicSkip>,
@@ -446,12 +454,12 @@ fn resolve_picture(
             },
             None => (None, None),
         };
-        let icon = crate::texture::encode_icon_png(decoded.into_rgba8());
+        let icon_png = crate::texture::encode_icon_png(decoded.into_rgba8());
         return Picture {
             // The picture decoded, so the only way there is no icon now is the
             // PNG encoder refusing it.
-            icon_skipped: icon.is_none().then_some(BuildpicSkip::EncodeFailed),
-            icon,
+            icon_skipped: icon_png.is_none().then_some(BuildpicSkip::EncodeFailed),
+            icon_png,
             asset,
             skipped,
         };
@@ -525,6 +533,47 @@ fn encode_asset(
         height: encoded.height,
         bytes: encoded.bytes.len() as u64,
     })
+}
+
+/// Put an icon's bytes where the webview can fetch them: a PNG beside the unit's
+/// cache record, sharing its stem, named on the record as `icon_file`. Returns
+/// the pair `(icon_file, icon)`, of which at most one is ever set.
+///
+/// Inlining is the fallback for the two cases with no file to point at: no cache
+/// dir at all, and a write that failed. A page then still draws the icon, it
+/// just pays base64 for it.
+fn store_icon(
+    cache: Option<(&Path, &String)>,
+    unit: &str,
+    png: Option<&[u8]>,
+) -> (Option<String>, Option<String>) {
+    let Some(png) = png else {
+        return (None, None);
+    };
+    if let Some((dir, base)) = cache {
+        let name = icon_file_name(base, unit);
+        let _ = std::fs::create_dir_all(dir);
+        if std::fs::write(dir.join(&name), png).is_ok() {
+            return (Some(name), None);
+        }
+    }
+    (None, Some(crate::texture::png_data_url(png)))
+}
+
+/// A unit's icon file name: its cache record's stem, as a PNG.
+fn icon_file_name(base: &str, unit: &str) -> String {
+    format!("{}.png", unit_stem(base, unit))
+}
+
+/// Whether the icon file a cached record names is still on disk. A cache clean
+/// removes the PNG and leaves the record, and a hit on that record would draw a
+/// broken picture, so it has to re-resolve. A record naming no file (nothing
+/// resolved, or the icon is inline) has nothing to miss.
+fn icon_file_present(display: &UnitDisplay, dir: &Path) -> bool {
+    display
+        .icon_file
+        .as_ref()
+        .is_none_or(|name| dir.join(name).exists())
 }
 
 /// Whether a cached record already answers what this run is asking for.
@@ -739,6 +788,56 @@ mod tests {
             &display,
             Some(&asset_dir("elsewhere"))
         ));
+    }
+
+    /// The whole of #1694: what a resolved unit carries is a file name, and the
+    /// bytes are on disk under it rather than base64 in the record.
+    #[test]
+    fn an_icon_is_written_as_a_file_and_named_rather_than_inlined() {
+        let dir = asset_dir("icon");
+        let base = "0123456789abcdef".to_string();
+        let png = crate::texture::encode_icon_png(square(64).into_rgba8()).unwrap();
+
+        let (file, inline) = store_icon(Some((&dir, &base)), "armcom", Some(&png));
+        assert_eq!(inline, None);
+        let name = file.expect("the icon is named");
+        assert_eq!(name, "0123456789abcdef_armcom.png");
+        assert_eq!(std::fs::read(dir.join(&name)).unwrap(), png);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// With no cache dir there is no file to point at, so the icon still reaches
+    /// the page, just inline.
+    #[test]
+    fn an_icon_with_nowhere_to_go_falls_back_to_base64() {
+        let png = crate::texture::encode_icon_png(square(64).into_rgba8()).unwrap();
+        let (file, inline) = store_icon(None, "armcom", Some(&png));
+        assert_eq!(file, None);
+        assert!(inline.unwrap().starts_with("data:image/png;base64,"));
+        // And a unit with no picture at all carries neither.
+        assert_eq!(store_icon(None, "armcom", None), (None, None));
+    }
+
+    /// A cache clean takes the PNG and leaves the record. Answering from that
+    /// record would draw a broken picture, so it counts as a miss.
+    #[test]
+    fn a_record_whose_icon_file_is_gone_re_resolves() {
+        let dir = asset_dir("icongone");
+        let base = "0123456789abcdef".to_string();
+        let png = crate::texture::encode_icon_png(square(64).into_rgba8()).unwrap();
+        let (file, _) = store_icon(Some((&dir, &base)), "armcom", Some(&png));
+        let display = UnitDisplay {
+            icon_file: file.clone(),
+            ..Default::default()
+        };
+        assert!(icon_file_present(&display, &dir));
+        std::fs::remove_file(dir.join(file.unwrap())).unwrap();
+        assert!(!icon_file_present(&display, &dir));
+        // A record naming no file has nothing to miss.
+        assert!(icon_file_present(&UnitDisplay::default(), &dir));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

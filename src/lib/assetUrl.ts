@@ -94,6 +94,20 @@ export function unitsyncHeaderUrl(file: string): string {
   return schemeUrl("unitsyncheader", file);
 }
 
+/**
+ * URL for a unit's cached build icon, under `unitsyncbuildpic/<file>`. A game's
+ * roster runs to several hundred, and a build tree draws them all at once, so
+ * the worker names the cache file rather than inlining each icon as base64.
+ */
+export function unitsyncBuildpicUrl(file: string): string {
+  return schemeUrl("unitsyncbuildpic", file);
+}
+
+/** URL for a side's cached faction emblem, under `unitsyncfactionlogo/<file>`. */
+export function unitsyncFactionLogoUrl(file: string): string {
+  return schemeUrl("unitsyncfactionlogo", file);
+}
+
 /** URL for a saved unit's overview thumbnail. */
 export function legoThumbUrl(projectId: string): string {
   return schemeUrl("lego", `${projectId}.png`);

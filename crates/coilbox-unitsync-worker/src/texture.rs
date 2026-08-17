@@ -1,6 +1,6 @@
 //! Shared texture decoding: turn a supported image (incl. DXT/BCn `.dds`) into an
-//! `image::RgbaImage`, and encode a small PNG `data:` URL preserving alpha. Used by
-//! the unit-buildpic mode; deliberately decoupled so archive preview and header art
+//! `image::RgbaImage`, and encode a small PNG preserving alpha. Used by the
+//! unit-buildpic mode, deliberately decoupled so archive preview and header art
 //! can adopt DDS support later.
 
 use base64::Engine;
@@ -144,10 +144,19 @@ fn bc_format(
     }
 }
 
-/// Downscale to fit `ICON_MAX` (preserving aspect, never upscaling) and encode a
-/// PNG `data:` URL. PNG (not JPEG) preserves the transparent backgrounds build pics
+/// Wrap PNG bytes in a base64 `data:` URL, the fallback for an icon the cache
+/// could not keep as a file.
+pub fn png_data_url(png: &[u8]) -> String {
+    format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(png)
+    )
+}
+
+/// Downscale to fit `ICON_MAX` (preserving aspect, never upscaling) and encode
+/// PNG bytes. PNG (not JPEG) preserves the transparent backgrounds build pics
 /// usually have.
-pub fn encode_icon_png(img: image::RgbaImage) -> Option<String> {
+pub fn encode_icon_png(img: image::RgbaImage) -> Option<Vec<u8>> {
     let dynimg = image::DynamicImage::ImageRgba8(img);
     let scaled = if dynimg.width() > ICON_MAX || dynimg.height() > ICON_MAX {
         dynimg.thumbnail(ICON_MAX, ICON_MAX)
@@ -164,10 +173,7 @@ pub fn encode_icon_png(img: image::RgbaImage) -> Option<String> {
             image::ExtendedColorType::Rgba8,
         )
         .ok()?;
-    Some(format!(
-        "data:image/png;base64,{}",
-        base64::engine::general_purpose::STANDARD.encode(&png)
-    ))
+    Some(png)
 }
 
 #[cfg(test)]
@@ -293,11 +299,13 @@ mod tests {
         assert!(decode_texture("dds", &dds).is_none());
     }
 
-    /// Encoding a small RgbaImage yields a PNG data URL.
+    /// Encoding a small RgbaImage yields PNG bytes, which are what the cache
+    /// writes as a file and only base64s when it has nowhere to put them.
     #[test]
-    fn encodes_png_data_url() {
+    fn encodes_png_bytes() {
         let img = image::RgbaImage::from_pixel(8, 8, image::Rgba([1, 2, 3, 128]));
-        let url = encode_icon_png(img).expect("should encode");
-        assert!(url.starts_with("data:image/png;base64,"), "got: {url}");
+        let png = encode_icon_png(img).expect("should encode");
+        assert_eq!(&png[1..4], b"PNG");
+        assert!(png_data_url(&png).starts_with("data:image/png;base64,"));
     }
 }

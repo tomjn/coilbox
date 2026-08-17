@@ -9,6 +9,7 @@ import type {
 } from "../../bindings";
 import type { BrandingEntry } from "../../branding";
 import { buildEdgeMap, reachableCounts } from "../../buildTree";
+import { unitIconSrc } from "../../unitIcon";
 import { BuildTreeDrawer } from "./BuildTreeDrawer";
 
 /**
@@ -145,7 +146,7 @@ export function FactionBuildList({
     <ul className="flex flex-col gap-2">
       {sides.map((s) => {
         const icon = s.startUnit
-          ? buildpics?.units[s.startUnit]?.icon
+          ? unitIconSrc(buildpics?.units[s.startUnit])
           : undefined;
         // Prefer the unitdef's human name; fall back to the engine's start-unit
         // name, then the internal id.
