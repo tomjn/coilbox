@@ -522,7 +522,22 @@ export function ScenarioMapScene({
     () => withoutBuilding(footprints, preview.dragging),
     [footprints, preview.dragging],
   );
-  useScenarioFootprints(handle, standing, assets, units.groundAt);
+  useScenarioFootprints(
+    handle,
+    standing,
+    assets,
+    units.groundAt,
+    "standing",
+    selected,
+  );
+
+  // The ground the selected building stands on: what says it is selected, and
+  // what the pointer can take hold of to move it (issue #1716). Null for
+  // everything else the map can select, which is everything with no footprint.
+  const footprintAt = useCallback(
+    (key: string) => footprints.find((mark) => mark.key === key)?.rect ?? null,
+    [footprints],
+  );
 
   // Where a turn would stand the selected building, drawn while the Turn button
   // is under the pointer or has the focus (issue #1541). A turn is the one edit
@@ -552,6 +567,7 @@ export function ScenarioMapScene({
     worldHeight: assets.worldHeight,
     groundAt: units.groundAt,
     selected,
+    footprintAt,
     // A zone is a sheet lying over the ground, so it steps aside for a mode
     // that puts things on the ground: otherwise a zone covering a corner of the
     // map would be a corner of the map nothing could be placed on. A waypoint

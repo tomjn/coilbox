@@ -133,9 +133,12 @@ export interface ModeBehaviour {
    * before the click (issue #1464). Null in a mode that has nothing worth
    * showing, and then a pointer move over the map does no work at all.
    *
-   * Only the modes that place a whole shape at once set this. A mode placing
-   * one unit puts it where the pointer already is, so drawing it twice would
-   * say nothing.
+   * Every mode that places a building sets this, whether it places one or a
+   * dozen (issue #1716): a building is snapped to the build grid and given as
+   * much ground as its footprint asks for, so where the pointer is and where the
+   * building will stand are two different squares. A mode placing a unit that is
+   * not a building leaves it null, because a tank really does go where it is
+   * dropped and drawing that twice says nothing.
    */
   ghost?: ((pos: Point) => PreviewBuilding[]) | null;
   /**
@@ -415,7 +418,23 @@ const basesMode: EditorMode = {
     // to. A click works it out again from the document it is given.
     const base = selectedBase(scenario, selected);
 
+    // The square the click will use, drawn under the pointer before the click
+    // (issue #1716). A building does not go where it is dropped: the engine
+    // snaps it to the build grid and gives it as much ground as its footprint
+    // asks for, so the pointer alone says neither where it will stand nor how
+    // much room it wants.
+    const ghost = useMemo(
+      () =>
+        unitDef
+          ? (pos: Point) => [
+              { def: unitDef, pos: snap(pos, unitDef, 0), facing: 0 as const },
+            ]
+          : null,
+      [unitDef, snap],
+    );
+
     return {
+      ghost,
       place: unitDef
         ? (pos: Point) => {
             // Where the click lands is decided against the document and the
