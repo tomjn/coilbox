@@ -148,13 +148,18 @@ export const mcReadSkybox = defineCommand<
 >("coilbox-mapconv", "mc_read_skybox");
 
 /**
- * Decode an image to its true pixel size plus a small preview thumbnail (data
- * URL). `max` sets the thumbnail's longest side (default 320 server-side); the
- * 3D preview asks for a larger heightmap so displacement has enough detail.
+ * Decode an image to its true pixel size plus a small preview thumbnail. `max`
+ * sets the thumbnail's longest side, 320 by default, and the 3D preview asks for
+ * a larger heightmap so displacement has enough detail.
+ *
+ * The thumbnail normally arrives as `thumbFile`, a name under
+ * `coilbox://mapconvthumb/`, with `thumb` a `data:` URL only where there was
+ * nowhere to cache it. Read it through `getImageInfo`, which resolves the two
+ * into one `src`.
  */
 export const mcImageInfo = defineCommand<
   { path: string; max?: number },
-  { width: number; height: number; thumb: string }
+  { width: number; height: number; thumbFile?: string; thumb?: string }
 >("coilbox-mapconv", "mc_image_info");
 
 export const mcCompile = defineCommand<

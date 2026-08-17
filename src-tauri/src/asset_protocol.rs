@@ -36,8 +36,10 @@
 //!     cache (a unit's build pic, several hundred to a game's roster)
 //!   - `coilbox://localhost/unitsyncfactionlogo/<file>` → the unitsync faction
 //!     emblem cache (a side's `Sidepics` art)
+//!   - `coilbox://localhost/mapconvthumb/<file>` → the mapconv thumbnail cache
+//!     (a downscaled preview of a map author's source heightmap or texture)
 //!
-//! The last four hold content-keyed names, so the same URL always means the same
+//! The last five hold content-keyed names, so the same URL always means the same
 //! bytes and they are served `immutable`. Everything else is editable media and
 //! stays `no-cache`.
 //!
@@ -105,15 +107,15 @@ fn safe_segments(path: &str) -> Option<Vec<String>> {
 /// the root is unavailable / the shape is wrong. The bases are injected so this is
 /// unit-testable without the real filesystem or app handle. `data_dir` covers every
 /// root that lives under the app-data dir (campaign, scenario, and the three lego
-/// folders), the plugin-owned ones take their own closure. `unitsync_dir` is asked
-/// for one of the unitsync plugin's cache folders by root name.
+/// folders), the plugin-owned ones take their own closure. `plugin_cache_dir` is
+/// asked for a plugin's cache folder by root name.
 fn resolve_path(
     segments: &[String],
     portable: Option<PathBuf>,
     data_dir: impl FnOnce() -> Option<PathBuf>,
     legopack_base: impl FnOnce() -> Option<PathBuf>,
     extra_packs_base: impl FnOnce() -> Option<PathBuf>,
-    unitsync_dir: impl FnOnce(&str) -> Option<PathBuf>,
+    plugin_cache_dir: impl FnOnce(&str) -> Option<PathBuf>,
 ) -> Option<PathBuf> {
     let (root, rest) = segments.split_first()?;
     match root.as_str() {
@@ -164,22 +166,24 @@ fn resolve_path(
             };
             Some(data_dir()?.join("lego").join(folder).join(file))
         }
-        // The unitsync plugin's five flat cache folders, all `<root>/<file>`:
-        // textures copied raw out of a game archive for the unit-model viewer
-        // (the shared atlases are compressed DDS measured in tens of megabytes,
-        // and the webview uploads them as-is), rendered minimap/heightmap/
-        // metalmap PNGs, a game's loading-screen art, a unit's build icon, and a
-        // side's faction emblem. The last two sit beside the JSON records that
-        // name them, which nothing ever asks this for.
+        // Plugin-owned flat cache folders, all `<root>/<file>`: textures copied
+        // raw out of a game archive for the unit-model viewer (the shared
+        // atlases are compressed DDS measured in tens of megabytes, and the
+        // webview uploads them as-is), rendered minimap/heightmap/metalmap PNGs,
+        // a game's loading-screen art, a unit's build icon, a side's faction
+        // emblem, and a map author's source image downscaled for preview. The
+        // last three sit beside the JSON records that name them, which nothing
+        // ever asks this for.
         "unitmodel"
         | "unitsyncthumb"
         | "unitsyncheader"
         | "unitsyncbuildpic"
-        | "unitsyncfactionlogo" => {
+        | "unitsyncfactionlogo"
+        | "mapconvthumb" => {
             let [file] = rest else {
                 return None;
             };
-            Some(unitsync_dir(root)?.join(file))
+            Some(plugin_cache_dir(root)?.join(file))
         }
         _ => None,
     }
@@ -309,6 +313,7 @@ pub fn handle<R: Runtime>(
             "unitsyncheader" => tauri_plugin_coilbox_unitsync::header_cache_dir(app),
             "unitsyncbuildpic" => tauri_plugin_coilbox_unitsync::buildpic_cache_dir(app),
             "unitsyncfactionlogo" => tauri_plugin_coilbox_unitsync::faction_logo_cache_dir(app),
+            "mapconvthumb" => tauri_plugin_coilbox_mapconv::thumb_cache_dir(app),
             _ => tauri_plugin_coilbox_unitsync::model_texture_dir(app),
         },
     );
@@ -322,15 +327,17 @@ pub fn handle<R: Runtime>(
     serve_file(&full, range, cache_control(&segments[0]))
 }
 
-/// The `Cache-Control` for a root. The unitsync caches name their files after a
-/// hash of the source archive's path, size and mtime, so a URL there can never
-/// come to mean different bytes and the webview may keep it. Every other root
-/// serves media the user can edit in place under a stable name.
+/// The `Cache-Control` for a root. The unitsync and mapconv caches name their
+/// files after a hash of the source file's path, size and mtime, so a URL there
+/// can never come to mean different bytes and the webview may keep it. Every
+/// other root serves media the user can edit in place under a stable name.
 fn cache_control(root: &str) -> &'static str {
     match root {
-        "unitsyncthumb" | "unitsyncheader" | "unitsyncbuildpic" | "unitsyncfactionlogo" => {
-            "max-age=31536000, immutable"
-        }
+        "unitsyncthumb"
+        | "unitsyncheader"
+        | "unitsyncbuildpic"
+        | "unitsyncfactionlogo"
+        | "mapconvthumb" => "max-age=31536000, immutable",
         _ => "no-cache",
     }
 }
@@ -519,6 +526,10 @@ mod tests {
             under_unitsync(&segs(&["unitsyncfactionlogo", "abc_Aven.png"])),
             Some(PathBuf::from("/cache/unitsyncfactionlogo/abc_Aven.png"))
         );
+        assert_eq!(
+            under_unitsync(&segs(&["mapconvthumb", "abc.png"])),
+            Some(PathBuf::from("/cache/mapconvthumb/abc.png"))
+        );
         // Each cache is flat, so a nested path is not one of its files.
         assert_eq!(under_unitsync(&segs(&["unitmodel", "sub", "a.dds"])), None);
         assert_eq!(
@@ -551,6 +562,7 @@ mod tests {
             cache_control("unitsyncfactionlogo"),
             "max-age=31536000, immutable"
         );
+        assert_eq!(cache_control("mapconvthumb"), "max-age=31536000, immutable");
         // Editable media keeps revalidating, including the raw model textures,
         // which are named after the archive member rather than its bytes.
         assert_eq!(cache_control("unitmodel"), "no-cache");

@@ -108,6 +108,15 @@ export function unitsyncFactionLogoUrl(file: string): string {
   return schemeUrl("unitsyncfactionlogo", file);
 }
 
+/**
+ * URL for a downscaled preview of a map author's source image, under
+ * `mapconvthumb/<file>`. The 3D preview asks for a large heightmap, which is
+ * megabytes of PNG, so the cache file is named rather than inlined.
+ */
+export function mapconvThumbUrl(file: string): string {
+  return schemeUrl("mapconvthumb", file);
+}
+
 /** URL for a saved unit's overview thumbnail. */
 export function legoThumbUrl(projectId: string): string {
   return schemeUrl("lego", `${projectId}.png`);
