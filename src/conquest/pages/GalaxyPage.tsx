@@ -28,8 +28,7 @@ import {
   useReduceMotion,
 } from "../../general/display";
 import { assetUrl } from "../../lib/assetUrl";
-import { usePreferredTarget, useSkirmishAis } from "../../play/config";
-import { mergeGameAi } from "../../play/gameAi";
+import { usePreferredTarget } from "../../play/config";
 import { getProfile } from "../../profile/profile";
 import { conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
@@ -135,7 +134,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
     [state, galaxy],
   );
   const attackable = useMemo(() => {
-    if (!state || state.status !== "active") return new Set<string>();
+    if (state?.status !== "active") return new Set<string>();
     return new Set(attackableNodes(galaxy, state).map((n) => n.id));
   }, [galaxy, state]);
 
@@ -753,12 +752,7 @@ function RunSetupPanel({
   const effectiveSide = chosenSide || side || undefined;
 
   // Reroll in place: same knobs (persisted on the doc), fresh seed, content
-  // environment (maps/AIs/names) re-resolved from what's installed right now.
-  const { ais } = useSkirmishAis(
-    target?.enginePath,
-    target?.dataDir,
-    installedGame?.primaryArchive.name,
-  );
+  // environment (maps/names) re-resolved from what's installed right now.
   const brandingEntries = useBrandingCatalog();
   const { eligible } = useMapEligibility();
   const brandingEntry = installedGame

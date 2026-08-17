@@ -1,3 +1,5 @@
+// biome-ignore-all lint/style/noNonNullAssertion: a test that parsed a fixture it wrote wants to read the result, and a failed assertion is the test failing
+
 import { describe, expect, it } from "vitest";
 import { parseCampaignJson } from "./model";
 

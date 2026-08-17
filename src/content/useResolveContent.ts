@@ -6,7 +6,7 @@ import {
   type EngineRelease,
   type SpringfilesEngine,
 } from "../downloads/bindings";
-import { useWriteRootPath } from "../downloads/config";
+import { useWriteRoot } from "../downloads/config";
 import {
   identityOf,
   type QueueStatus,
@@ -50,6 +50,14 @@ export interface ResolveContentState {
   /** Whether a requirement can be downloaded at all right now — false with no
    * write-root configured, or (engine requirements only) no catalog match. */
   canDownload: (req: ContentRequirement) => boolean;
+  /**
+   * True only once the download folder has been read and there is none.
+   *
+   * Separate from `!canDownload`, which is also false for the frame or two the
+   * read takes, so a caller that blames the missing folder for a disabled
+   * download only says so when that is what happened (issue #1104).
+   */
+  noWriteRoot: boolean;
 }
 
 /**
@@ -71,7 +79,8 @@ export function useResolveContent(
 ): ResolveContentState {
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const contentTargets = useContentTargets();
-  const writePath = useWriteRootPath();
+  const writeRoot = useWriteRoot();
+  const writePath = writeRoot.path;
   const { enqueue, statusFor: queueStatusFor, items } = useDownloadQueue();
 
   const hasEngineReq = requirements.some((r) => r.kind === "engine");
@@ -226,5 +235,6 @@ export function useResolveContent(
     progressFor,
     errorFor,
     canDownload,
+    noWriteRoot: !writeRoot.loading && !writePath,
   };
 }

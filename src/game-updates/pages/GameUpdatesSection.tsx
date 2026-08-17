@@ -1,7 +1,7 @@
 import { Button } from "@picoframe/frame";
 import Markdown from "react-markdown";
 import { Link } from "react-router";
-import { useWriteRootPath } from "../../downloads/config";
+import { useWriteRoot } from "../../downloads/config";
 import { ProgressBar } from "../../downloads/pages/components/ProgressBar";
 import { useGameUpdates } from "../GameUpdatesProvider";
 
@@ -22,7 +22,10 @@ export default function GameUpdatesSection() {
     install,
     restart,
   } = useGameUpdates();
-  const writePath = useWriteRootPath();
+  const { path: writePath, loading: writeRootLoading } = useWriteRoot();
+  // Only once the read has landed and said there is none. Before that `writePath`
+  // is undefined whatever the user has configured (issue #1104).
+  const noWriteRoot = !writeRootLoading && !writePath;
 
   if (!repo) {
     return (
@@ -52,7 +55,7 @@ export default function GameUpdatesSection() {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {!writePath && (
+      {noWriteRoot && (
         <p className="text-sm text-muted-foreground">
           Set a download folder in{" "}
           <Link

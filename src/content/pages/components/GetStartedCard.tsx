@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { useWriteRootPath } from "../../../downloads/config";
+import { useWriteRoot } from "../../../downloads/config";
 import { MapPacksBanner } from "../../../downloads/pages/components/MapPacksBanner";
 import { useGetStartedOffer } from "../../getStartedOffer";
 import { SuggestionsList } from "./SuggestionsList";
@@ -16,7 +16,7 @@ import { SuggestionsList } from "./SuggestionsList";
  * This file is the card.
  */
 export function GetStartedCard() {
-  const writePath = useWriteRootPath();
+  const writeRoot = useWriteRoot();
   const { offer, installed, refresh } = useGetStartedOffer();
 
   if (!offer || !installed) return null;
@@ -36,7 +36,7 @@ export function GetStartedCard() {
           kind="game"
           heading="Games"
           items={offer.games}
-          writePath={writePath}
+          writeRoot={writeRoot}
           onComplete={refresh}
         />
       )}
@@ -46,10 +46,13 @@ export function GetStartedCard() {
             kind="map"
             heading="Maps"
             items={offer.maps}
-            writePath={writePath}
+            writeRoot={writeRoot}
             onComplete={refresh}
           />
-          <MapPacksBanner installed={installed.maps} writePath={writePath} />
+          <MapPacksBanner
+            installed={installed.maps}
+            writePath={writeRoot.path}
+          />
         </>
       )}
     </Card>

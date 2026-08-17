@@ -17,7 +17,7 @@ import {
   dlInstalledContent,
   dlSpringfilesList,
 } from "../bindings";
-import { useContentRootPaths, useWriteRootPath } from "../config";
+import { useContentRootPaths, useWriteRoot } from "../config";
 import {
   identityOf,
   useDownloadComplete,
@@ -62,7 +62,10 @@ interface GameItem {
  * Requires a configured write root since there's no default destination.
  */
 export default function GamesPage() {
-  const writePath = useWriteRootPath();
+  const { path: writePath, loading: writeRootLoading } = useWriteRoot();
+  // Only once the read has landed and said there is none. Before that `writePath`
+  // is undefined whatever the user has configured (issue #1104).
+  const noWriteRoot = !writeRootLoading && !writePath;
   const { enqueue, statusFor, active } = useDownloadQueue();
   // Unified GitHub game-repo registry (issue #512): the catalog is authoritative
   // once loaded, GAME_REPOS is the fallback seed shown immediately. Memoized so
@@ -256,7 +259,7 @@ export default function GamesPage() {
             </span>
           )}
         </div>
-        {!writePath && (
+        {noWriteRoot && (
           <p className="text-xs text-muted-foreground">
             Set a download folder in{" "}
             <Link

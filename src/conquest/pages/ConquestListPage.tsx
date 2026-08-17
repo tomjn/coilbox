@@ -24,7 +24,6 @@ import { ChallengeCodeView } from "../../challenge/ChallengeCodeView";
 import { challengeDecodeErrorMessage } from "../../challenge/code";
 import { identify } from "../../container/container";
 import { rememberCarriedShortname } from "../../container/shortnames";
-import { unitsyncSkirmishAis } from "../../content/bindings";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
 import { useMapEligibility } from "../../content/mapEligibility";
@@ -46,7 +45,6 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "../../play/config";
-import { mergeGameAi } from "../../play/gameAi";
 import { getGameMatcher, getProfile } from "../../profile/profile";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import { conquestDelete, conquestSave } from "../bindings";
@@ -915,11 +913,6 @@ function ImportChallengeForm({
       width: m.width,
       height: m.height,
     }));
-    const { ais } = await unitsyncSkirmishAis({
-      enginePath: target.enginePath,
-      dataDir: target.dataDir,
-      gameArchive: installedGame.primaryArchive.name,
-    });
     const brandingEntry = resolveBranding(brandingEntries, installedGame);
     const names = mergeConquestNames(
       getProfile().conquest,

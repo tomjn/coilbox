@@ -3,7 +3,7 @@ import { Play } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { dlInstalledContent } from "../../downloads/bindings";
-import { useContentRootPaths, useWriteRootPath } from "../../downloads/config";
+import { useContentRootPaths, useWriteRoot } from "../../downloads/config";
 import { filterUninstalledMaps, useSuggestedMaps } from "../branding";
 import {
   useScanTargetSelection,
@@ -71,7 +71,7 @@ export default function MapsPage() {
   const busy = loading || (!!selected && !data && !error && !cancelled);
 
   // Curated download suggestions shown when this engine sees no maps.
-  const writePath = useWriteRootPath();
+  const writeRoot = useWriteRoot();
   const suggested = useSuggestedMaps();
   const rootPaths = useContentRootPaths();
   const [installed, setInstalled] = useState<Set<string>>(new Set());
@@ -155,7 +155,7 @@ export default function MapsPage() {
             kind="map"
             heading="No maps yet — try one of these"
             items={suggestions}
-            writePath={writePath}
+            writeRoot={writeRoot}
             onComplete={() => run(true)}
           />
         ) : (

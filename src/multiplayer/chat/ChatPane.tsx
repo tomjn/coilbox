@@ -247,7 +247,6 @@ export function ChatPane({
   // also clears an Escape dismissal, so a later `@` at the same offset (the old
   // one deleted and retyped) opens the menu again.
   const queryKey = token ? `${token.start}:${token.query}` : null;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the token, not the value it derives from
   useEffect(() => {
     setMenuIndex(0);
     if (queryKey == null) setDismissedAt(null);

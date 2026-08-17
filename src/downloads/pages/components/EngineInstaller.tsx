@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { dlRecoilEngines, dlSpringfilesEngines } from "../../bindings";
-import { useWriteRootPath } from "../../config";
+import { useWriteRoot } from "../../config";
 import {
   type EnqueueInput,
   identityOf,
@@ -48,7 +48,10 @@ interface EngineItem {
  * plugin's Engines settings page.
  */
 export function EngineInstaller() {
-  const writePath = useWriteRootPath();
+  const { path: writePath, loading: writeRootLoading } = useWriteRoot();
+  // Only once the read has landed and said there is none. Before that `writePath`
+  // is undefined whatever the user has configured (issue #1104).
+  const noWriteRoot = !writeRootLoading && !writePath;
   const { enqueue, statusFor, active } = useDownloadQueue();
   const [source, setSource] = useState<Source>("recoil");
   const [items, setItems] = useState<EngineItem[] | null>(null);
@@ -147,7 +150,7 @@ export function EngineInstaller() {
           { value: "springfiles", label: "springfiles" },
         ]}
       />
-      {!writePath && (
+      {noWriteRoot && (
         <p className="text-xs text-muted-foreground">
           No download destination set — choose a content folder in{" "}
           <Link
