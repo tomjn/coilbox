@@ -37,12 +37,15 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
+import type { Rect } from "@/blueprint/footprint";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import type { Point } from "@/scenario/model";
 import { dragKeys, type Placement } from "./placements";
 import {
   clampToMap,
+  holdCursor,
   isClick,
+  onGround,
   type PointerPos,
   type PointerTargets,
   pointerNdc,
@@ -50,6 +53,7 @@ import {
   pressGesture,
 } from "./pointer";
 import { sceneToWorld, worldToScene } from "./scene";
+import { createSelectionPlate, type SelectionPlate } from "./selectionPlate";
 import type { UnitsLayer } from "./unitsLayer";
 
 /**
@@ -103,8 +107,22 @@ export interface MapEditingDeps {
   worldHeight: number;
   /** The map's ground height in elmos at an engine position. */
   groundAt: (pos: Point) => number;
-  /** Placement key currently selected, so the ring can be drawn on it. */
+  /** Placement key currently selected, so the plate can be drawn under it. */
   selected: string | null;
+  /**
+   * The ground the building a key names stands on, or null for anything that is
+   * not a building (issue #1716).
+   *
+   * Two things read it. A building says it is selected with its own footprint,
+   * so it needs no plate under it and gets none. And the selected building's
+   * square is something the pointer can take hold of: the squares are drawn by
+   * a layer nothing raycasts, so a press on one is answered by arithmetic
+   * instead.
+   *
+   * Left out by a surface that draws no footprints, and then everything
+   * selected gets a plate and only the models can be grabbed.
+   */
+  footprintAt?: ((key: string) => Rect | null) | null;
   /** A click on a drawn unit, or on empty ground with nothing to place. */
   onSelect: (key: string | null) => void;
   /** A click on empty ground in a mode that places something. Null in a mode
@@ -140,10 +158,10 @@ export interface MapEditingDeps {
    * one edit.
    *
    * It answers whether it is showing the drag, and a drag it is showing loses
-   * the selection ring: the ring is there to say which one is selected when the
-   * model is a few pixels across, and a footprint drawn on the squares the
+   * the selection plate: the plate is there to say which one is selected when
+   * the model is a few pixels across, and a footprint drawn on the squares the
    * building will stand on says that and more. Nothing but a building has a
-   * footprint, so a scout being dragged keeps its ring.
+   * footprint, so a scout being dragged keeps its plate.
    */
   onDragUnit?: ((drag: UnitDrag | null) => boolean) | null;
   /**
@@ -170,62 +188,6 @@ export interface MapEditingDeps {
   onMove: (key: string, delta: Point) => void;
 }
 
-/** How wide the selection ring is drawn around the smallest units, in elmos. A
- *  scout is a few pixels across at framing zoom (#830), so the ring is what is
- *  actually visible at that distance. */
-const MIN_RING_ELMOS = 56;
-
-/** The ring drawn under whatever is selected. Its own object rather than a
- *  change to the drawn unit, so a redraw of the units layer cannot lose it. */
-function createSelectionRing(handle: MapScene3D) {
-  const geometry = new THREE.RingGeometry(0.82, 1, 48);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x7dd3fc,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.9,
-    depthTest: false,
-  });
-  const ring = new THREE.Mesh(geometry, material);
-  ring.rotation.x = -Math.PI / 2;
-  ring.renderOrder = 2;
-  ring.visible = false;
-  handle.scene.add(ring);
-
-  /** Put the ring under an object, sized to it. */
-  const show = (object: THREE.Object3D) => {
-    const bounds = new THREE.Box3().setFromObject(object);
-    const size = bounds.getSize(new THREE.Vector3());
-    const radius = Math.max(
-      Math.max(size.x, size.z) * 0.8,
-      MIN_RING_ELMOS * handle.scale,
-    );
-    // Two elmos clear of the ground, which is a hand's breadth on a map, not a
-    // scene unit, which on a 12km map is the height of a tall building.
-    ring.position.set(
-      object.position.x,
-      object.position.y + 2 * handle.scale,
-      object.position.z,
-    );
-    ring.scale.set(radius, radius, 1);
-    ring.visible = true;
-  };
-
-  return {
-    show,
-    hide: () => {
-      ring.visible = false;
-    },
-    dispose: () => {
-      ring.removeFromParent();
-      geometry.dispose();
-      material.dispose();
-    },
-  };
-}
-
-type SelectionRing = ReturnType<typeof createSelectionRing>;
-
 /** The placement a raycast hit belongs to. A hit is always a mesh somewhere
  *  inside the drawn model, so the owning object is found by walking up. */
 function placementOf(object: THREE.Object3D): string | null {
@@ -238,8 +200,9 @@ function placementOf(object: THREE.Object3D): string | null {
   return null;
 }
 
-/** What the pointer looks like: a crosshair wherever a gesture on bare ground
- *  would put something down or draw something, an arrow where it would not. */
+/** What the pointer looks like over bare ground: a crosshair wherever a gesture
+ *  there would put something down or draw something, an arrow where it would
+ *  not. */
 function drawingCursor(
   deps: Pick<MapEditingDeps, "onPlace" | "onDragGround">,
 ): string {
@@ -260,7 +223,7 @@ interface Drag {
   overlay: OverlayLayer | null;
   moved: boolean;
   delta: Point;
-  /** Whether the drag is being drawn as a footprint, which is what the ring
+  /** Whether the drag is being drawn as a footprint, which is what the plate
    *  stands down for (issue #1512). */
   held: boolean;
 }
@@ -288,14 +251,14 @@ export function useMapEditing(deps: MapEditingDeps): void {
   latest.current = deps;
   // Built with the listeners, so the effect that follows the selection can
   // reach it without owning its lifetime.
-  const ringRef = useRef<SelectionRing | null>(null);
+  const plateRef = useRef<SelectionPlate | null>(null);
 
   useEffect(() => {
     if (!handle || !layer) return;
     const dom = handle.renderer.domElement;
     const raycaster = new THREE.Raycaster();
-    const ring = createSelectionRing(handle);
-    ringRef.current = ring;
+    const plate = createSelectionPlate(handle);
+    plateRef.current = plate;
     let drag: Drag | null = null;
     let band: GroundDrag | null = null;
     let pressed: PointerPos | null = null;
@@ -362,6 +325,44 @@ export function useMapEditing(deps: MapEditingDeps): void {
       return pointerTargets(keys, grabbable);
     };
 
+    /** Whether the ray through the pointer passes through one object. Only ever
+     *  asked about the selection, so it is one model rather than the scene. */
+    const hits = (event: PointerEvent, object: THREE.Object3D): boolean => {
+      const rect = dom.getBoundingClientRect();
+      const ndc = pointerNdc({ x: event.clientX, y: event.clientY }, rect);
+      raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), handle.camera);
+      return raycaster.intersectObject(object, true).length > 0;
+    };
+
+    /**
+     * The selected building's own square, when the pointer is on it (issue
+     * #1716).
+     *
+     * A handle in every mode, including the ones that place something. The
+     * ground a building already stands on is ground the engine will not give to
+     * a second building, so a click there was never going to put one down, and a
+     * square that means "drag me" everywhere is one rule rather than a rule per
+     * mode.
+     */
+    const squareHandle = (event: PointerEvent): string | null => {
+      const key = latest.current.selected;
+      if (!key) return null;
+      const rect = footprintOf(key);
+      if (!rect) return null;
+      const at = groundPoint(event);
+      return at && onGround(at, rect) ? key : null;
+    };
+
+    /** Whether the pointer is over the selected thing, by its model or by the
+     *  square it stands on. What the hand cursor is about. */
+    const overSelection = (event: PointerEvent): boolean => {
+      const key = latest.current.selected;
+      if (!key) return false;
+      if (squareHandle(event)) return true;
+      const object = layer.objects.get(key);
+      return !!object && grabbable(key) && hits(event, object);
+    };
+
     /** Move the objects a drag is carrying, without touching the document. */
     const carry = (delta: Point) => {
       const { worldWidth, worldHeight, groundAt } = latest.current;
@@ -374,20 +375,30 @@ export function useMapEditing(deps: MapEditingDeps): void {
         );
         const at = worldToScene(to, worldWidth, worldHeight, handle.scale);
         member.object.position.set(at.x, groundAt(to) * handle.scale, at.z);
-        // The ring follows what is being dragged, unless a footprint is being
-        // drawn for it, which says which one it is far better than a ring.
-        if (member.key === drag.key && !drag.held) ring.show(member.object);
+        // The plate follows what is being dragged, unless a footprint is being
+        // drawn for it, which says which one it is far better than a plate.
+        if (member.key === drag.key && !drag.held) plate.show(member.object);
       }
       handle.render();
     };
 
-    /** Put the ring back under the selection, or take it away when there is
-     *  nothing drawn to put it under. */
+    /** The ground a key's building stands on, when the surface knows and when
+     *  it is a building at all. */
+    const footprintOf = (key: string): Rect | null =>
+      latest.current.footprintAt?.(key) ?? null;
+
+    /**
+     * Put the plate back under the selection, or take it away.
+     *
+     * A building has a footprint and its footprint says it is selected, so it
+     * gets no plate: two things saying the same thing, one of them wider than
+     * the ground the building actually has, is what issue #1716 is about.
+     */
     const followSelection = () => {
       const key = latest.current.selected;
       const object = key ? layer.objects.get(key) : undefined;
-      if (object) ring.show(object);
-      else ring.hide();
+      if (object && key && !footprintOf(key)) plate.show(object);
+      else plate.hide();
       handle.render();
     };
 
@@ -396,7 +407,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
     // are there, because it is the only thing that knows: it empties itself the
     // moment the edit lands and refills over the following frames, and a look
     // taken in between finds nothing (issue #1516). A drag drawing its own
-    // footprint keeps the ring down until it lands.
+    // footprint keeps the plate down until it lands.
     const unwatch = layer.onDrawn(() => {
       if (drag?.held) return;
       followSelection();
@@ -407,8 +418,12 @@ export function useMapEditing(deps: MapEditingDeps): void {
       pressed = { x: event.clientX, y: event.clientY };
       const { select, grab } = pick(event);
       const origin = groundPoint(event);
+      // Nothing drawn was hit, but the selected building's square is a handle
+      // as much as its model is (issue #1716): a low building on a hillside can
+      // be most of a square of ground with very little to aim at.
+      const held = grab ?? squareHandle(event);
       const gesture = pressGesture({
-        grab,
+        grab: held,
         draws: !!latest.current.onDragGround,
       });
       // The pointer is about to mean something else, so what it was showing
@@ -416,7 +431,7 @@ export function useMapEditing(deps: MapEditingDeps): void {
       if (gesture !== "camera") latest.current.onHover?.(null);
       // What a drag would carry, once there is somewhere on the map to carry it
       // from. The two are read together because a gesture needs both.
-      const key = grab;
+      const key = held;
       const owner = key ? overlayFor(key) : null;
 
       if (gesture !== "grab" || !key || !origin) {
@@ -489,6 +504,17 @@ export function useMapEditing(deps: MapEditingDeps): void {
       const hover = latest.current.onHover;
       if (hover && !band && !drag) hover(groundPoint(event));
 
+      // The hand that says the selected thing can be dragged (issue #1716).
+      // Only the selection is asked about, so this is one object's bounds or one
+      // rectangle rather than a ray through the whole scene on every move.
+      if (!band && !drag) {
+        dom.style.cursor = holdCursor({
+          dragging: false,
+          holding: overSelection(event),
+          ground: drawingCursor(latest.current),
+        });
+      }
+
       if (band) {
         if (!band.moved && isClick(band.from, now)) return;
         band.moved = true;
@@ -511,11 +537,11 @@ export function useMapEditing(deps: MapEditingDeps): void {
         return;
       }
       // Asked before the objects are moved, because the answer decides whether
-      // the ring moves with them.
+      // the plate moves with them.
       drag.held =
         latest.current.onDragUnit?.({ key: drag.key, delta: drag.delta }) ??
         false;
-      if (drag.held) ring.hide();
+      if (drag.held) plate.hide();
       carry(drag.delta);
     };
 
@@ -532,13 +558,10 @@ export function useMapEditing(deps: MapEditingDeps): void {
       dom.style.cursor = drawingCursor(latest.current);
       if (gesture) {
         if (gesture.moved) {
-          // Down goes the footprint that was following the pointer, and back
-          // comes the ring: what is drawn from here is the document's own.
-          if (gesture.held) {
-            latest.current.onDragUnit?.(null);
-            const object = layer.objects.get(gesture.key);
-            if (object) ring.show(object);
-          }
+          // Down goes the footprint that was following the pointer: what is
+          // drawn from here is the document's own, and the building's own square
+          // is what says it is the selected one.
+          if (gesture.held) latest.current.onDragUnit?.(null);
           latest.current.onMove(gesture.key, gesture.delta);
         }
         return;
@@ -601,8 +624,8 @@ export function useMapEditing(deps: MapEditingDeps): void {
       dom.removeEventListener("pointerleave", onPointerLeave);
       dom.style.cursor = "";
       handle.controls.enabled = true;
-      ring.dispose();
-      ringRef.current = null;
+      plate.dispose();
+      plateRef.current = null;
       handle.render();
     };
   }, [handle, layer]);
@@ -611,15 +634,17 @@ export function useMapEditing(deps: MapEditingDeps): void {
   // an object just placed, a delete that leaves nothing selected, a bar that
   // chose something. A redraw of the units is followed above, off the layer's
   // own signal rather than off a render.
-  const { selected } = deps;
+  const { selected, footprintAt } = deps;
   useEffect(() => {
-    const ring = ringRef.current;
-    if (!handle || !layer || !ring) return;
+    const plate = plateRef.current;
+    if (!handle || !layer || !plate) return;
     const object = selected ? layer.objects.get(selected) : undefined;
-    if (object) ring.show(object);
-    else ring.hide();
+    // A building has a footprint and its footprint says it is selected, so
+    // nothing goes under it (issue #1716).
+    if (object && selected && !footprintAt?.(selected)) plate.show(object);
+    else plate.hide();
     handle.render();
-  }, [handle, layer, selected]);
+  }, [handle, layer, selected, footprintAt]);
 
   // The cursor says whether a gesture on bare ground will make something.
   const { onPlace, onDragGround } = deps;

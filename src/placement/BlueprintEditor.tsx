@@ -3,7 +3,7 @@
  *
  * This is the scenario editor's placement surface with the mission taken off it.
  * Not a second editor: the ground, the camera, the unit models, the footprint
- * squares, the selection ring, the drag, the turn, the delete, the build order
+ * squares, the selection plate, the drag, the turn, the delete, the build order
  * and the playback are all the same code the scenario editor runs, and every
  * edit goes through the same tested rules in `bases.ts` and `editing.ts`. What is
  * gone is everything that belongs to a base rather than to a layout: the team
@@ -58,6 +58,7 @@ import {
   removePlacement,
   turnPlacement,
 } from "@/scenario/pages/components/editing";
+import { isTypingTarget } from "@/scenario/pages/components/history";
 import { BLUEPRINT_BASE_ID, blueprintDocument } from "./blueprintDocument";
 import { useLayoutHistory } from "./blueprintHistory";
 import { GRID_EXTENT, GRID_ORIGIN, gridGround, layoutFraming } from "./ground";
@@ -197,19 +198,30 @@ export function BlueprintEditor({
   );
 
   // Where a building being dragged will land, drawn while it is in the air
-  // (issue #1512). Nothing is ever shown under the pointer here, because a
-  // click puts down one building rather than a layout, so `ghost` is null and
-  // this costs nothing until something is picked up.
+  // (issue #1512), and where the one being placed would land, drawn under the
+  // pointer before the click (issue #1716).
   const checks = useMemo(
     () => previewChecks(units, drawn.ground),
     [units, drawn.ground],
+  );
+  // A building does not go where it is dropped, so the square under the pointer
+  // is not the square the click will use. Held steady between renders, because
+  // the preview redraws whenever this changes identity.
+  const ghost = useMemo(
+    () =>
+      unitDef
+        ? (pos: Point) => [
+            { def: unitDef, pos: snap(pos, unitDef, 0), facing: 0 as const },
+          ]
+        : null,
+    [unitDef, snap],
   );
   const preview = useLayoutPreview({
     handle,
     worldWidth: GROUND.worldWidth,
     worldHeight: GROUND.worldHeight,
     groundAt: drawn.groundAt,
-    ghost: null,
+    ghost,
     checks,
     occupied: footprints,
     placements: drawn.placements,
@@ -221,7 +233,21 @@ export function BlueprintEditor({
     () => withoutBuilding(footprints, preview.dragging),
     [footprints, preview.dragging],
   );
-  useScenarioFootprints(handle, standing, GROUND, drawn.groundAt);
+  useScenarioFootprints(
+    handle,
+    standing,
+    GROUND,
+    drawn.groundAt,
+    "standing",
+    selected,
+  );
+
+  // The ground the selected building stands on: what says it is selected, and
+  // what the pointer can take hold of to move it (issue #1716).
+  const footprintAt = useCallback(
+    (key: string) => footprints.find((mark) => mark.key === key)?.rect ?? null,
+    [footprints],
+  );
 
   // Where a turn would stand the selected building, drawn while the Turn button
   // is under the pointer or has the focus (issue #1541). A turn is the one edit
@@ -242,6 +268,20 @@ export function BlueprintEditor({
     [turning, selected, doc, checks, footprints],
   );
   useScenarioFootprints(handle, turned, GROUND, drawn.groundAt, "offered");
+
+  // Escape puts the building down, the way it puts down anything else being
+  // held (issue #1716). Only while one is picked, so Escape keeps whatever it
+  // means everywhere else, and only outside a field, so it can still leave one.
+  useEffect(() => {
+    if (!unitDef) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (isTypingTarget(event.target as HTMLElement | null)) return;
+      setUnitDef("");
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [unitDef]);
 
   const place = unitDef
     ? (pos: Point) => {
@@ -278,8 +318,10 @@ export function BlueprintEditor({
     worldHeight: GROUND.worldHeight,
     groundAt: drawn.groundAt,
     selected,
+    footprintAt,
     onSelect: setSelected,
     onPlace: place,
+    onHover: preview.onHover,
     onDragUnit: preview.onDragUnit,
     onDragGround: null,
     onMove: (key, delta) =>
@@ -363,6 +405,7 @@ export function BlueprintEditor({
                 units={buildings}
                 value={unitDef}
                 onValueChange={setUnitDef}
+                onClear={() => setUnitDef("")}
                 loading={unitsLoading}
                 size="sm"
                 className="w-48"
@@ -448,7 +491,7 @@ export function BlueprintEditor({
 
             <p className="w-fit rounded bg-card/70 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur">
               {unitDef
-                ? "Click the ground to put one down. Drag a building to move it within the layout."
+                ? "Click the ground to put one down. Escape stops placing. Drag a building to move it within the layout."
                 : "Pick a building to start placing. Drag one to move it, click bare ground to deselect."}
             </p>
 
@@ -459,8 +502,6 @@ export function BlueprintEditor({
             <UncheckedNote
               unchecked={drawn.settled ? sceneUnchecked(footprints) : null}
             />
-
-            <TurnNote moves={turning && picked ? turned.length > 0 : null} />
 
             {picked && (
               <SelectionBar
@@ -477,6 +518,12 @@ export function BlueprintEditor({
                 }}
               />
             )}
+
+            {/* Below the bar rather than above it (issue #1716). The note
+              appears while the pointer is on the Turn button, and a note above
+              the bar pushes that button out from under the pointer, which takes
+              the note away, which puts the button back. */}
+            <TurnNote moves={turning && picked ? turned.length > 0 : null} />
 
             {playing && (
               <PlaybackBar
@@ -513,11 +560,14 @@ export function BlueprintEditor({
             placed={drawn.placed}
           />
         }
+        // What the ground is and how to move the camera over it. What a click
+        // does is the line above the layout, which is about the mode rather than
+        // about the surface, and saying it twice made the two look like
+        // different statements (issue #1716).
         footer={
           <>
             no map · a build grid, {GRID_EXTENT} elmos square · drag or
-            middle-drag to pan · drag a building to move it · right-drag to turn
-            the view · scroll to zoom
+            middle-drag to pan · right-drag to turn the view · scroll to zoom
           </>
         }
       />

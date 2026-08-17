@@ -72,6 +72,52 @@ export function pressGesture(opts: {
 }
 
 /**
+ * What the pointer looks like over something it can pick up (issue #1716).
+ *
+ * A selected building is dragged to move it, and nothing said so: the pointer
+ * over it looked the same as the pointer over the ground beside it. So it takes
+ * the hand the rest of the web uses for something draggable, open until the
+ * press and closed after it.
+ *
+ * `ground` is what the mode makes of bare ground, which is what the pointer goes
+ * back to the moment it leaves the thing.
+ */
+export function holdCursor(opts: {
+  /** Whether a drag is under way. */
+  dragging: boolean;
+  /** Whether the pointer is over the thing it could pick up. */
+  holding: boolean;
+  ground: string;
+}): string {
+  if (opts.dragging) return "grabbing";
+  return opts.holding ? "grab" : opts.ground;
+}
+
+/**
+ * Whether a point on the map is on a patch of ground (issue #1716).
+ *
+ * How a press reaches the selected building's own square. The squares are drawn
+ * by a layer nothing raycasts, on purpose: they lie under the buildings they
+ * belong to and would swallow every click meant for one. Asking the arithmetic
+ * instead costs nothing and only ever answers about the one building whose
+ * square is being offered as a handle.
+ *
+ * The far edges count, unlike two footprints meeting, because this is one square
+ * being pointed at rather than two of them competing for ground.
+ */
+export function onGround(
+  pos: Point,
+  rect: { minX: number; minZ: number; maxX: number; maxZ: number },
+): boolean {
+  return (
+    pos.x >= rect.minX &&
+    pos.x <= rect.maxX &&
+    pos.z >= rect.minZ &&
+    pos.z <= rect.maxZ
+  );
+}
+
+/**
  * Whether a press and release were the same gesture.
  *
  * The camera pans on the left button, so a left press is not free: press and

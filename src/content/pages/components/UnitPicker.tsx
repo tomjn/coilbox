@@ -220,6 +220,7 @@ export function UnitPickerButton({
   dataDir,
   gameArchive,
   buildpics,
+  onClear,
 }: {
   units: UnitDatasetEntry[];
   factions?: UnitPickerFaction[];
@@ -229,6 +230,16 @@ export function UnitPickerButton({
   /** The internal def name currently picked, or "" for none. */
   value: string;
   onValueChange: (unitDef: string) => void;
+  /**
+   * Put the picked unit down, shown as a button beside the picker while one is
+   * picked (issue #1716).
+   *
+   * For a picker that arms something rather than filling in a field. Picking a
+   * building in an editor turns every click on the map into a building, and
+   * without this there is nothing to pick to stop: the list offers units, and
+   * "none" is not one of them.
+   */
+  onClear?: () => void;
   /** The dataset is still being read, so an empty list is not an answer yet. */
   loading?: boolean;
   placeholder?: string;
@@ -255,52 +266,100 @@ export function UnitPickerButton({
   const pickedLabel = value ? (labels.get(picked) ?? value) : "";
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          disabled={disabled ?? known.size === 0}
-          className={cn(
-            "justify-between gap-2 font-normal",
-            size === "sm" ? "h-8 text-xs" : "h-9 text-sm",
-            className,
-          )}
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            {value && (
-              <UnitIcon
-                display={icons?.units[picked]}
-                pending={iconsPending}
-                size="sm"
-              />
+    <PickedUnit onClear={value ? onClear : undefined} what={pickedLabel}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            disabled={disabled ?? known.size === 0}
+            className={cn(
+              "justify-between gap-2 font-normal",
+              size === "sm" ? "h-8 text-xs" : "h-9 text-sm",
+              className,
             )}
-            <span className={cn("truncate", !value && "text-muted-foreground")}>
-              {value ? pickedLabel : loading ? "Reading units" : placeholder}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              {value && (
+                <UnitIcon
+                  display={icons?.units[picked]}
+                  pending={iconsPending}
+                  size="sm"
+                />
+              )}
+              <span
+                className={cn("truncate", !value && "text-muted-foreground")}
+              >
+                {value ? pickedLabel : loading ? "Reading units" : placeholder}
+              </span>
             </span>
-          </span>
-          <ChevronsUpDown className="size-4 shrink-0 opacity-50" aria-hidden />
-        </Button>
-      </PopoverTrigger>
-      {/* Wide enough for a readable name beside a long internal id, which is what
+            <ChevronsUpDown
+              className="size-4 shrink-0 opacity-50"
+              aria-hidden
+            />
+          </Button>
+        </PopoverTrigger>
+        {/* Wide enough for a readable name beside a long internal id, which is what
           22rem was not: the two columns fought and both truncated. */}
-      <PopoverContent align="start" className="w-[34rem] max-w-[90vw] p-2">
-        <UnitList
-          forest={forest}
-          labels={labels}
-          icons={icons}
-          iconsPending={iconsPending}
-          ids={allIds}
-          factions={blocks}
-          autoFocusSearch
-          isOn={(id) => id === picked}
-          mode="single"
-          onPick={(id) => {
-            onValueChange(id);
-            setOpen(false);
-          }}
-        />
-      </PopoverContent>
-    </Popover>
+        <PopoverContent align="start" className="w-[34rem] max-w-[90vw] p-2">
+          <UnitList
+            forest={forest}
+            labels={labels}
+            icons={icons}
+            iconsPending={iconsPending}
+            ids={allIds}
+            factions={blocks}
+            autoFocusSearch
+            isOn={(id) => id === picked}
+            mode="single"
+            onPick={(id) => {
+              onValueChange(id);
+              setOpen(false);
+            }}
+          />
+        </PopoverContent>
+      </Popover>
+    </PickedUnit>
+  );
+}
+
+/**
+ * The picker, with the way to stop placing beside it (issue #1716).
+ *
+ * A button of its own rather than a cross inside the trigger, because the
+ * trigger is a button and a button inside a button is neither valid nor
+ * clickable. It is only there while something is picked, so a picker nobody has
+ * armed is exactly what it was.
+ *
+ * The children alone when there is nothing to clear, so the wrapper cannot
+ * change the layout of any of the forms that use this as a plain field.
+ */
+function PickedUnit({
+  onClear,
+  what,
+  children,
+}: {
+  onClear?: () => void;
+  /** What is picked, so the button says which unit it is putting down. */
+  what: string;
+  children: ReactNode;
+}) {
+  if (!onClear) return children;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {children}
+      <Button
+        variant="ghost"
+        size="sm"
+        // A cross on its own, beside a picker showing what is picked: the words
+        // would only repeat what the thing next to it already says.
+        className="h-8 w-8 p-0"
+        title={`Stop placing ${what}`}
+        onClick={onClear}
+      >
+        <X className="size-3.5 shrink-0" aria-hidden />
+        <span className="sr-only">Stop placing {what}</span>
+      </Button>
+    </span>
   );
 }
 

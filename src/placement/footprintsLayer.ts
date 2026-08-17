@@ -17,9 +17,16 @@
  * #1491). That is a third state rather than a quieter version of the first: an
  * unknown is not a failure, and it is not an approval either.
  *
+ * The square is also what says a building is selected (issue #1716). It keeps
+ * whatever colour its verdict gave it and thickens its border inwards, so being
+ * selected cannot paint over a refusal and cannot change how much ground the
+ * building is claiming.
+ *
  * Nothing here carries a `placementKey` and the layer is not handed to
  * `useMapEditing`, so a footprint cannot be clicked. It lies under the building
  * it belongs to and would otherwise swallow every click meant for that building.
+ * The pointer does reach the selected building's square, by arithmetic rather
+ * than by a ray: see `useMapEditing`.
  *
  * The arithmetic is `@/blueprint/footprint`, which is tested. This file is the
  * drawing.
@@ -27,19 +34,97 @@
 
 import * as THREE from "three";
 
-import { type FootprintMark, unjudged } from "@/blueprint/footprint";
+import {
+  BUILD_SQUARE,
+  type FootprintMark,
+  unjudged,
+} from "@/blueprint/footprint";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import type { Point } from "@/scenario/model";
+import { animates, arrivals, eased, fadeAt, pulseAt } from "./arrivals";
 import { worldToScene } from "./scene";
 
 /** What the footprints are drawn under, so they can be found and removed as one
  *  thing. */
 const ROOT_NAME = "scenario-footprints";
 
-/** How far above the ground a footprint sits, in elmos. The same clearance the
- *  zones take, for the same reason: the relief is drawn by a shader the layer
- *  only samples. */
-const LIFT_ELMOS = 4;
+/**
+ * How far above the ground a footprint sits, in elmos.
+ *
+ * One, which is a sixteenth of a build square and reads as no gap at all. It was
+ * four, which reads as a plate hovering under the building (issue #1716), and it
+ * was nothing at all, which is worse: a square laid exactly on the ground is the
+ * same surface as the ground, and which of the two a pixel belongs to changes
+ * with the camera. That is the flicker.
+ *
+ * A depth bias holds the two apart as well ({@link groundBias}), but a bias is
+ * measured in whatever the hardware can resolve, and what it can resolve gets
+ * coarser the further the camera pulls back. A gap in elmos does not.
+ */
+const LIFT_ELMOS = 1;
+
+/**
+ * How far the outline stands above the square's own patch, in elmos.
+ *
+ * A line cannot be biased the way a filled shape can: `polygonOffset` is about
+ * polygons and this is not one. So the outline gets the only thing that works on
+ * a line, which is height, and it is the piece that most needs it: a flickering
+ * edge is what an author looks at.
+ */
+const OUTLINE_LIFT_ELMOS = 0.5;
+
+/**
+ * What keeps a square out of the ground it is drawn on.
+ *
+ * A depth bias rather than a gap: it moves what the depth test makes of the
+ * square without moving the square, so it beats the ground they share and still
+ * loses to the building standing on it. The terrain's relief comes out of a
+ * shader this layer only samples, so the two surfaces are never exactly the same
+ * and a plain tie-break would shimmer.
+ *
+ * A flat bias only. `polygonOffsetFactor` multiplies the polygon's own depth
+ * slope, and a square lying on the ground seen from a low camera is as sloped in
+ * depth as a polygon gets: with a factor the bias grew with the angle and the
+ * distance until the square was pulled in front of the whole model standing on
+ * it, which is why zooming out used to wash a building in its own square's
+ * colour.
+ */
+const groundBias = {
+  polygonOffset: true,
+  polygonOffsetFactor: 0,
+  // Two of the smallest depth difference the hardware can tell rather than one,
+  // because what that difference is is the driver's business and a bias of
+  // exactly one of them is a square that shimmers on the machines where it is
+  // measured differently.
+  polygonOffsetUnits: -2,
+} as const;
+
+/** How far the corners are rounded, in elmos: half a build square (issue
+ *  #1716). Enough to read as a plate rather than a wireframe box, small enough
+ *  that the square a building stands on is still square. */
+const CORNER_ELMOS = BUILD_SQUARE / 2;
+
+/**
+ * How far the selected building's border is thickened, in elmos, and inwards
+ * (issue #1716).
+ *
+ * Inwards because the border is not the statement: the ground the building has
+ * is. A border drawn outwards would say the building claims a quarter of a build
+ * square more than it does, which is the one thing these squares exist to be
+ * exact about.
+ */
+const BAND_ELMOS = 3;
+
+/** How long the selected building's border takes to breathe in and out, in
+ *  milliseconds, and how far it dims at the bottom of that. */
+const PULSE_MS = 1800;
+const PULSE_LOW = 0.45;
+
+/** How long a square takes to fade in when a building arrives, and out when one
+ *  goes, in milliseconds. Short: this is the difference between a thing
+ *  appearing and a thing being there all along, not an entrance. */
+const ARRIVE_MS = 220;
+const LEAVE_MS = 160;
 
 /**
  * What ground nobody is fighting over is drawn in, what a pair fighting over it
@@ -105,6 +190,15 @@ export interface FootprintStyle {
   outline: number;
   /** A dashed outline, which is what says nothing judged this building. */
   dashed: boolean;
+  /** What the border is drawn in, which is the colour of the patch inside it
+   *  except on the selected building (issue #1716). */
+  edge: number;
+  /** How far the border is thickened inwards, in elmos, which is what says this
+   *  building is the selected one (issue #1716). Zero for every other one. */
+  band: number;
+  /** Whether that thickened border breathes. Only the selected building's
+   *  does, and only where motion is wanted. */
+  pulse: boolean;
 }
 
 /**
@@ -137,26 +231,64 @@ export interface FootprintStyle {
  * squares half a build square apart read as one smeared square rather than as a
  * move. A refusal still keeps its colour, because a turn that will land a
  * building in its neighbour is exactly what this is for.
+ *
+ * `selected` is the building the author is working on (issue #1716), and it says
+ * so entirely at the edge: the border is thickened inwards and breathes, and the
+ * patch inside it is left exactly as it was.
+ *
+ * That is not a matter of taste. A building's base is flat and lies on its
+ * square, so the two are the same surface and no depth test can put one in front
+ * of the other. Whatever the patch is drawn in is drawn over the bottom of the
+ * model, which is why it is kept at the quiet opacity it has always been at, and
+ * why the loud part of a selection is the one part of a square no model is
+ * standing on.
  */
 export function footprintStyle(
   mark: Pick<FootprintMark, "overlapping" | "standing">,
   as: MarkAs = "standing",
+  /** Whether this is the building the author has selected (issue #1716). */
+  selected = false,
+  /** Whether motion is wanted, which is the only thing the pulse turns on. */
+  motion = true,
 ): FootprintStyle {
+  const verdict = verdictStyle(mark, as);
+  const plain = { edge: verdict.color, band: 0, pulse: false };
+  if (!selected) return { ...verdict, ...plain };
+  return {
+    ...verdict,
+    // A refusal keeps its own colour at the edge as well as inside, because red
+    // is the answer about this building whether or not it is the one being
+    // worked on. Only the state with nothing to say takes the colour of the
+    // thing in hand, which is the one thing the selection ring was for.
+    edge: verdict.refused ? verdict.color : HELD_COLOR,
+    outline: 1,
+    band: BAND_ELMOS,
+    pulse: motion,
+  };
+}
+
+/** What one square says about the ground under its building, before anything
+ *  about which building the author is working on. */
+function verdictStyle(
+  mark: Pick<FootprintMark, "overlapping" | "standing">,
+  as: MarkAs,
+): Omit<FootprintStyle, "edge" | "band" | "pulse"> & { refused: boolean } {
   const held = as === "held";
   const offered = as === "offered";
   const fill = offered ? 0 : held ? 0.45 : 0.32;
   const outline = held || offered ? 1 : 0.95;
+  const refused = { dashed: false, refused: true };
   if (mark.overlapping) {
-    return { color: CLASH_COLOR, fill, outline, dashed: false };
+    return { color: CLASH_COLOR, fill, outline, ...refused };
   }
   if (mark.standing === "slope") {
-    return { color: SLOPE_COLOR, fill, outline, dashed: false };
+    return { color: SLOPE_COLOR, fill, outline, ...refused };
   }
   if (mark.standing === "too-deep" || mark.standing === "too-shallow") {
-    return { color: DEPTH_COLOR, fill, outline, dashed: false };
+    return { color: DEPTH_COLOR, fill, outline, ...refused };
   }
   if (mark.standing === "no-def") {
-    return { color: ABSENT_COLOR, fill, outline, dashed: false };
+    return { color: ABSENT_COLOR, fill, outline, ...refused };
   }
   if (unjudged(mark.standing)) {
     return {
@@ -164,14 +296,34 @@ export function footprintStyle(
       fill: 0,
       outline: held || offered ? 1 : 0.8,
       dashed: true,
+      refused: false,
     };
   }
   if (offered) {
-    return { color: HELD_COLOR, fill: 0, outline: 1, dashed: false };
+    return {
+      color: HELD_COLOR,
+      fill: 0,
+      outline: 1,
+      dashed: false,
+      refused: false,
+    };
   }
-  return held
-    ? { color: HELD_COLOR, fill: 0.3, outline: 1, dashed: false }
-    : { color: GROUND_COLOR, fill: 0.12, outline: 0.55, dashed: false };
+  if (held) {
+    return {
+      color: HELD_COLOR,
+      fill: 0.3,
+      outline: 1,
+      dashed: false,
+      refused: false,
+    };
+  }
+  return {
+    color: GROUND_COLOR,
+    fill: 0.12,
+    outline: 0.55,
+    dashed: false,
+    refused: false,
+  };
 }
 
 export interface FootprintsLayerDeps {
@@ -181,15 +333,77 @@ export interface FootprintsLayerDeps {
   worldHeight: number;
   /** The map's ground height in elmos at an engine position. */
   groundAt: (pos: Point) => number;
+  /**
+   * Whether a square fades in when a building arrives and out when one goes
+   * (issue #1716).
+   *
+   * For the document's own squares. A layer drawing what the pointer is holding
+   * says no: what it draws follows the pointer from square to square, and a
+   * fade would smear that into a trail.
+   */
+  arriving?: boolean;
+  /** Whether motion is wanted at all, read at draw time because it is a
+   *  preference somebody can change while the editor is open. */
+  motion?: () => boolean;
 }
 
 export interface FootprintsLayer {
   root: THREE.Group;
   /** Draw this list, replacing whatever was drawn before. `as` says what the
    *  marks are about: ground being stood on, the building the pointer is
-   *  carrying, or a spot being offered. */
-  draw: (marks: FootprintMark[], as?: MarkAs) => void;
+   *  carrying, or a spot being offered. `selected` is the mark key the author
+   *  has picked, whose square says so (issue #1716). */
+  draw: (marks: FootprintMark[], as?: MarkAs, selected?: string | null) => void;
   dispose: () => void;
+}
+
+/** How far the corners of a footprint this size are rounded. Half a build
+ *  square, except on a building too small to give up that much, which is
+ *  nothing the engine has but is what a footprint of one square would ask for
+ *  if the rounding were any larger. */
+export function cornerRadius(width: number, depth: number): number {
+  return Math.max(0, Math.min(CORNER_ELMOS, width / 2, depth / 2));
+}
+
+/** A footprint as a shape in the ground plane, corners and all, measured in
+ *  elmos around its middle. */
+function roundedShape(width: number, depth: number): THREE.Shape {
+  const x = width / 2;
+  const z = depth / 2;
+  const r = cornerRadius(width, depth);
+  const shape = new THREE.Shape();
+  if (r <= 0) {
+    shape.moveTo(-x, -z);
+    shape.lineTo(x, -z);
+    shape.lineTo(x, z);
+    shape.lineTo(-x, z);
+    shape.closePath();
+    return shape;
+  }
+  shape.moveTo(-x + r, -z);
+  shape.lineTo(x - r, -z);
+  shape.absarc(x - r, -z + r, r, -Math.PI / 2, 0, false);
+  shape.lineTo(x, z - r);
+  shape.absarc(x - r, z - r, r, 0, Math.PI / 2, false);
+  shape.lineTo(-x + r, z);
+  shape.absarc(-x + r, z - r, r, Math.PI / 2, Math.PI, false);
+  shape.lineTo(-x, -z + r);
+  shape.absarc(-x + r, -z + r, r, Math.PI, Math.PI * 1.5, false);
+  shape.closePath();
+  return shape;
+}
+
+/** How finely a rounded corner is drawn. Four segments a corner is smooth at
+ *  the zoom a layout is edited at and is eight triangles a footprint. */
+const CORNER_STEPS = 4;
+
+/** A shape laid flat on the ground, which is where every one of these goes. */
+function flat(shape: THREE.Shape): THREE.ShapeGeometry {
+  const geometry = new THREE.ShapeGeometry(shape, CORNER_STEPS);
+  // A shape's own y becomes the map's z, so the points are read the way they
+  // were written.
+  geometry.rotateX(Math.PI / 2);
+  return geometry;
 }
 
 /**
@@ -200,16 +414,66 @@ export interface FootprintsLayer {
  * measures the segments a geometry actually holds. A loop's closing edge is not
  * one of them, so it would come out solid.
  */
-function corners(width: number, depth: number): THREE.Vector3[] {
-  const x = width / 2;
-  const z = depth / 2;
-  return [
-    new THREE.Vector3(-x, 0, -z),
-    new THREE.Vector3(x, 0, -z),
-    new THREE.Vector3(x, 0, z),
-    new THREE.Vector3(-x, 0, z),
-    new THREE.Vector3(-x, 0, -z),
-  ];
+function outlinePoints(width: number, depth: number): THREE.Vector3[] {
+  const flat2d = roundedShape(width, depth).getPoints(CORNER_STEPS);
+  const points = flat2d.map((at) => new THREE.Vector3(at.x, 0, at.y));
+  points.push(points[0].clone());
+  return points;
+}
+
+/**
+ * The thickened border of the selected building: its own square with a smaller
+ * one cut out of it.
+ *
+ * Cut out rather than drawn as a second, thinner square inside the first,
+ * because the border has to be solid for its breathing to read as one thing
+ * rather than as two edges going in and out of step.
+ */
+function bandShape(width: number, depth: number, band: number): THREE.Shape {
+  const outer = roundedShape(width, depth);
+  const inner = roundedShape(width - band * 2, depth - band * 2);
+  const hole = new THREE.Path();
+  const back = inner.getPoints(CORNER_STEPS).reverse();
+  hole.moveTo(back[0].x, back[0].y);
+  for (const at of back.slice(1)) hole.lineTo(at.x, at.y);
+  hole.closePath();
+  outer.holes.push(hole);
+  return outer;
+}
+
+/**
+ * What one drawn square is, while it is drawn and while it is going.
+ *
+ * A pass rebuilds every square it draws, because an edit can change any of
+ * them and comparing is more work than rebuilding. What survives a pass is when
+ * the building arrived, so a redraw is not an arrival: see `./arrivals.ts`.
+ */
+interface Drawn {
+  group: THREE.Group;
+  /** What one pass allocated, freed when this square is rebuilt or dropped. */
+  spent: { dispose: () => void }[];
+  /** Every material the fade dims, and what each sits at at full strength. */
+  fading: { material: THREE.Material; full: number }[];
+  /** The selected building's border, which breathes rather than sitting
+   *  still. */
+  pulsing: { material: THREE.Material; full: number } | null;
+  /** When this building's square first went up, on the animation clock. */
+  born: number;
+  /** When it stopped being drawn, while it is fading out. */
+  gone: number | null;
+}
+
+/**
+ * What names one drawn square, for telling an arrival from a redraw.
+ *
+ * The ground it stands on and the unit standing there, rather than the key the
+ * document gave it. A base's buildings are keyed by their place in its list, so
+ * deleting the second of five renames three of them, and a diff on those keys
+ * would say three buildings had gone and three arrived.
+ */
+function markName(mark: FootprintMark): string {
+  const { minX, minZ, maxX, maxZ } = mark.rect;
+  return `${mark.def}|${minX},${minZ},${maxX},${maxZ}`;
 }
 
 export function createFootprintsLayer(
@@ -220,14 +484,30 @@ export function createFootprintsLayer(
   root.name = ROOT_NAME;
   handle.scene.add(root);
 
-  /** Everything one pass allocated, so the next pass can free it. Each footprint
-   *  is its own size, so there is nothing to share between two of them. */
-  let owned: { dispose: () => void }[] = [];
+  /** What is drawn now, by name, and what is on its way out. Each footprint is
+   *  its own size, so there is nothing to share between two of them. */
+  let drawn = new Map<string, Drawn>();
+  let leaving: Drawn[] = [];
+  let frame: number | null = null;
 
-  const buildMark = (mark: FootprintMark, as: MarkAs): THREE.Group => {
-    const style = footprintStyle(mark, as);
+  /** Whether this layer animates at all, asked at draw time because reduced
+   *  motion is a preference somebody can change while the editor is open. */
+  const moving = () => animates && deps.motion?.() !== false;
+  const arriveMs = () => (deps.arriving && moving() ? ARRIVE_MS : 0);
+  const leaveMs = () => (deps.arriving && moving() ? LEAVE_MS : 0);
+
+  const buildMark = (
+    mark: FootprintMark,
+    as: MarkAs,
+    selected: boolean,
+    born: number,
+  ): Drawn => {
+    const style = footprintStyle(mark, as, selected, moving());
     const width = mark.rect.maxX - mark.rect.minX;
     const depth = mark.rect.maxZ - mark.rect.minZ;
+    const spent: { dispose: () => void }[] = [];
+    const fading: { material: THREE.Material; full: number }[] = [];
+    let pulsing: { material: THREE.Material; full: number } | null = null;
     const group = new THREE.Group();
     const at = worldToScene(
       mark.pos,
@@ -243,35 +523,66 @@ export function createFootprintsLayer(
     // Everything below is in elmos, so the whole footprint takes the elmo scale.
     group.scale.setScalar(handle.scale);
 
-    // The patch itself is depth tested, so a hill in front of it hides it the
-    // way it hides the building standing on it. A building with no verdict has
-    // no patch at all, so an empty square cannot be read as ground anybody has
-    // approved of.
+    // Everything below is depth tested, so a hill in front of a square hides it
+    // the way it hides the building standing on it, and the building itself
+    // stands on its own square. A building with no verdict has no patch at all,
+    // so an empty square cannot be read as ground anybody has approved of.
     if (style.fill > 0) {
-      const fillGeometry = new THREE.PlaneGeometry(width, depth);
-      fillGeometry.rotateX(-Math.PI / 2);
+      const fillGeometry = flat(roundedShape(width, depth));
       const fillMaterial = new THREE.MeshBasicMaterial({
         color: style.color,
         transparent: true,
         opacity: style.fill,
         side: THREE.DoubleSide,
         depthWrite: false,
+        ...groundBias,
       });
       group.add(new THREE.Mesh(fillGeometry, fillMaterial));
-      owned.push(fillGeometry, fillMaterial);
+      spent.push(fillGeometry, fillMaterial);
+      fading.push({ material: fillMaterial, full: style.fill });
     }
 
-    // The outline is not, so the shape of a building's ground can be read from
-    // above with the model itself standing in the middle of it.
+    // The selected building's border, thickened into the square rather than out
+    // of it (issue #1716). This is where a selection is said, because the edge
+    // of a square is the part of it no model is standing on: a building's base
+    // lies flat on its own square, so anything drawn across the middle is drawn
+    // across the bottom of the model too.
+    //
+    // Drawn after the patch, because the two are the same plane and neither
+    // writes depth, so what is drawn second is what is seen.
+    if (style.band > 0) {
+      const bandGeometry = flat(
+        bandShape(width, depth, Math.min(style.band, width / 2, depth / 2)),
+      );
+      const bandMaterial = new THREE.MeshBasicMaterial({
+        color: style.edge,
+        transparent: true,
+        opacity: style.outline,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        ...groundBias,
+      });
+      const band = new THREE.Mesh(bandGeometry, bandMaterial);
+      band.renderOrder = 1;
+      group.add(band);
+      spent.push(bandGeometry, bandMaterial);
+      if (style.pulse)
+        pulsing = { material: bandMaterial, full: style.outline };
+      else fading.push({ material: bandMaterial, full: style.outline });
+    }
+
+    // The outline is too, so a building stands on its square rather than inside
+    // a box drawn over it (issue #1716). It was drawn through everything, which
+    // put a line across the front of every model on the map and, once the
+    // selected building's border was thickened, a bar across it.
     const lineGeometry = new THREE.BufferGeometry().setFromPoints(
-      corners(width, depth),
+      outlinePoints(width, depth),
     );
     const lineMaterial = style.dashed
       ? new THREE.LineDashedMaterial({
-          color: style.color,
+          color: style.edge,
           transparent: true,
           opacity: style.outline,
-          depthTest: false,
           // Both the geometry and the distances are in elmos, so the dashes are
           // the same length on a small footprint and a large one.
           scale: 1,
@@ -279,34 +590,138 @@ export function createFootprintsLayer(
           gapSize: GAP_ELMOS,
         })
       : new THREE.LineBasicMaterial({
-          color: style.color,
+          color: style.edge,
           transparent: true,
           opacity: style.outline,
-          depthTest: false,
         });
     const outline = new THREE.Line(lineGeometry, lineMaterial);
     // A dashed material draws solid without this, which would put a building
     // with no verdict back to looking like one that passed.
     outline.computeLineDistances();
     outline.renderOrder = 2;
+    outline.position.y = OUTLINE_LIFT_ELMOS;
     group.add(outline);
 
-    owned.push(lineGeometry, lineMaterial);
-    return group;
+    spent.push(lineGeometry, lineMaterial);
+    fading.push({ material: lineMaterial, full: style.outline });
+    return { group, spent, fading, pulsing, born, gone: null };
+  };
+
+  /** A drawn square's materials all take one opacity: a square half faded in is
+   *  half of everything it is made of. */
+  const dim = (square: Drawn, at: number, now: number) => {
+    for (const { material, full } of square.fading)
+      material.opacity = full * at;
+    if (square.pulsing) {
+      const { material, full } = square.pulsing;
+      material.opacity = at * pulseAt(now, PULSE_MS, full * PULSE_LOW, full);
+    }
+  };
+
+  const drop = (square: Drawn) => {
+    square.group.removeFromParent();
+    for (const spent of square.spent) spent.dispose();
+  };
+
+  /**
+   * Every square as it stands at this moment, and whether any of them will want
+   * another frame after it.
+   *
+   * The clock is the browser's, so the pulse of a square drawn a moment ago is
+   * in step with one drawn a minute ago rather than starting again under it.
+   */
+  const apply = (now: number): boolean => {
+    let busy = false;
+    for (const square of drawn.values()) {
+      const at = eased(fadeAt(now - square.born, arriveMs()));
+      dim(square, at, now);
+      if (at < 1 || square.pulsing) busy = true;
+    }
+    const going: Drawn[] = [];
+    for (const square of leaving) {
+      const at = 1 - eased(fadeAt(now - (square.gone ?? now), leaveMs()));
+      if (at <= 0) {
+        drop(square);
+        continue;
+      }
+      dim(square, at, now);
+      going.push(square);
+      busy = true;
+    }
+    leaving = going;
+    return busy;
+  };
+
+  /** Keep drawing while anything is moving, and stop the moment nothing is. A
+   *  scene here renders on demand, so a loop left running is a frame a second
+   *  forever for nothing. */
+  const step = () => {
+    frame = null;
+    const busy = apply(performance.now());
+    handle.render();
+    if (busy) frame = requestAnimationFrame(step);
   };
 
   const clear = () => {
-    root.clear();
-    for (const spent of owned) spent.dispose();
-    owned = [];
+    if (frame !== null && animates) cancelAnimationFrame(frame);
+    frame = null;
+    for (const square of drawn.values()) drop(square);
+    for (const square of leaving) drop(square);
+    drawn = new Map();
+    leaving = [];
   };
 
   return {
     root,
-    draw: (marks, as = "standing") => {
-      clear();
-      for (const mark of marks) root.add(buildMark(mark, as));
+    draw: (marks, as = "standing", selected = null) => {
+      const now = performance.now();
+      // Two buildings of one def can stand on one patch of ground, which is a
+      // clash rather than an impossibility, so a name that is already taken
+      // gets a number after it.
+      const taken = new Map<string, number>();
+      const names = marks.map((mark) => {
+        const name = markName(mark);
+        const seen = taken.get(name) ?? 0;
+        taken.set(name, seen + 1);
+        return seen === 0 ? name : `${name}#${seen}`;
+      });
+
+      const { left } = arrivals(drawn.keys(), names);
+      for (const name of left) {
+        const square = drawn.get(name);
+        drawn.delete(name);
+        if (!square) continue;
+        if (leaveMs() <= 0) drop(square);
+        else {
+          square.gone = now;
+          square.pulsing = null;
+          leaving.push(square);
+        }
+      }
+
+      const next = new Map<string, Drawn>();
+      marks.forEach((mark, at) => {
+        const name = names[at];
+        // Rebuilt rather than compared, because a redraw can have changed
+        // anything about it. What survives is when it arrived, so a redraw is
+        // not an arrival.
+        const had = drawn.get(name);
+        if (had) drop(had);
+        const square = buildMark(
+          mark,
+          as,
+          mark.key === selected,
+          had?.born ?? now,
+        );
+        root.add(square.group);
+        next.set(name, square);
+      });
+      drawn = next;
+
+      const busy = apply(now);
       handle.render();
+      if (busy && animates && frame === null)
+        frame = requestAnimationFrame(step);
     },
     dispose: () => {
       clear();

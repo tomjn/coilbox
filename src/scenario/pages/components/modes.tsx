@@ -26,7 +26,7 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { buildGridSnap } from "@/blueprint/footprint";
 import { useBlueprintLibrary } from "@/blueprint/store";
 import { blueprintFromPayload } from "@/blueprint/transfer";
@@ -61,6 +61,7 @@ import {
   DEFAULT_GROUP_COUNT,
   MAX_GROUP_COUNT,
 } from "./groups";
+import { isTypingTarget } from "./history";
 import { LayoutPlacer, layoutPlacement } from "./LayoutPlacer";
 import { type LayoutChoice, layoutGhost, layoutOrigin } from "./layoutPlacing";
 import { TeamSelect } from "./TeamSelect";
@@ -133,9 +134,12 @@ export interface ModeBehaviour {
    * before the click (issue #1464). Null in a mode that has nothing worth
    * showing, and then a pointer move over the map does no work at all.
    *
-   * Only the modes that place a whole shape at once set this. A mode placing
-   * one unit puts it where the pointer already is, so drawing it twice would
-   * say nothing.
+   * Every mode that places a building sets this, whether it places one or a
+   * dozen (issue #1716): a building is snapped to the build grid and given as
+   * much ground as its footprint asks for, so where the pointer is and where the
+   * building will stand are two different squares. A mode placing a unit that is
+   * not a building leaves it null, because a tank really does go where it is
+   * dropped and drawing that twice says nothing.
    */
   ghost?: ((pos: Point) => PreviewBuilding[]) | null;
   /**
@@ -389,7 +393,7 @@ const basesMode: EditorMode = {
   id: "bases",
   label: "Bases",
   icon: Factory,
-  hint: "Pick a building and click the map. Clicks add to the base you have selected.",
+  hint: "Pick a building and click the map. Clicks add to the base you have selected. Stop placing with the button beside the picker, or Escape.",
   use: ({
     scenario,
     onChange,
@@ -415,7 +419,37 @@ const basesMode: EditorMode = {
     // to. A click works it out again from the document it is given.
     const base = selectedBase(scenario, selected);
 
+    // Escape puts the building down (issue #1716). Only while one is picked, so
+    // Escape keeps whatever it means everywhere else, and only outside a field,
+    // so it can still leave one.
+    useEffect(() => {
+      if (!unitDef) return;
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== "Escape") return;
+        if (isTypingTarget(event.target as HTMLElement | null)) return;
+        setUnitDef("");
+      };
+      window.addEventListener("keydown", onKeyDown);
+      return () => window.removeEventListener("keydown", onKeyDown);
+    }, [unitDef]);
+
+    // The square the click will use, drawn under the pointer before the click
+    // (issue #1716). A building does not go where it is dropped: the engine
+    // snaps it to the build grid and gives it as much ground as its footprint
+    // asks for, so the pointer alone says neither where it will stand nor how
+    // much room it wants.
+    const ghost = useMemo(
+      () =>
+        unitDef
+          ? (pos: Point) => [
+              { def: unitDef, pos: snap(pos, unitDef, 0), facing: 0 as const },
+            ]
+          : null,
+      [unitDef, snap],
+    );
+
     return {
+      ghost,
       place: unitDef
         ? (pos: Point) => {
             // Where the click lands is decided against the document and the
@@ -477,6 +511,7 @@ const basesMode: EditorMode = {
             units={options}
             value={unitDef}
             onValueChange={setUnitDef}
+            onClear={() => setUnitDef("")}
             loading={loading}
             size="sm"
             className="w-48"

@@ -54,13 +54,84 @@ function building(index: number): Placement {
 }
 
 describe("a units layer's redraws", () => {
-  it("has no objects between emptying itself and refilling", async () => {
+  it("has no object for a unit whose model it has not read yet", async () => {
     const units = layer();
     await units.draw([building(0)]);
-    const refilling = units.draw([building(0)]);
-    expect(units.objects.size).toBe(0);
-    await refilling;
+    const filling = units.draw([building(0), building(1)]);
     expect(units.objects.size).toBe(1);
+    await filling;
+    expect(units.objects.size).toBe(2);
+  });
+
+  /**
+   * Issue #1716. A redraw is not a rebuild: whatever is standing where the new
+   * pass wants it stays standing, and only its key can have changed.
+   *
+   * Without this an edit to one building is an arrival for every one of them,
+   * so all of them play the animation a unit plays when it is put down. React
+   * runs every effect twice in development, so the pass that lost the map was
+   * running on every edit.
+   */
+  it("leaves the units an edit did not touch standing where they were", async () => {
+    const units = layer();
+    await units.draw([building(0)]);
+    const was = units.objects.get(building(0).key);
+    await units.draw([building(0), building(1)]);
+    expect(units.objects.get(building(0).key)).toBe(was);
+  });
+
+  it("stands a unit up once for two passes over the same document", async () => {
+    const units = layer();
+    const first = units.draw([building(0)]);
+    const second = units.draw([building(0)]);
+    await Promise.all([first, second]);
+    expect(units.root.children).toHaveLength(1);
+  });
+
+  /**
+   * Issue #1716, and the whole of why an edit used to animate everything.
+   *
+   * The blueprint editor builds its document afresh on every edit, so every
+   * building's team id changes on every edit while the colour it is painted in
+   * stays exactly what it was. A drawn unit is recognised by that colour rather
+   * than by the id, because the colour is what decides whether two placements
+   * can share a model and the id is not about the unit at all.
+   */
+  it("keeps a unit whose team was reminted in the same colour", async () => {
+    const units = layer();
+    await units.draw([building(0)]);
+    const was = units.objects.get(building(0).key);
+    await units.draw([{ ...building(0), team: "p7" }]);
+    expect(units.objects.get(building(0).key)).toBe(was);
+    expect(units.root.children).toHaveLength(1);
+  });
+
+  /** Issue #1716. A building dragged across the map is the same building, so it
+   *  moves rather than vanishing at one square and appearing at another. */
+  it("moves a unit rather than replacing it", async () => {
+    const units = layer();
+    await units.draw([building(0)]);
+    const was = units.objects.get(building(0).key);
+    const moved = { ...building(0), pos: { x: 800, z: 800 } };
+    await units.draw([moved]);
+    expect(units.objects.get(moved.key)).toBe(was);
+    expect(units.root.children).toHaveLength(1);
+  });
+
+  /**
+   * Issue #1716. A base's buildings are keyed by their place in its list, so
+   * deleting the second of five renumbers the three after it. The ones that did
+   * not move must keep standing where they are: what goes is the one that went.
+   */
+  it("keeps the units a delete renumbered standing where they were", async () => {
+    const units = layer();
+    await units.draw([building(0), building(1), building(2)]);
+    const last = units.objects.get(building(2).key);
+    // The third building under the second's key, which is what the document
+    // looks like once the second is deleted.
+    const after = [building(0), { ...building(2), key: building(1).key }];
+    await units.draw(after);
+    expect(units.objects.get(building(1).key)).toBe(last);
   });
 
   it("tells a watcher once its objects are there", async () => {
