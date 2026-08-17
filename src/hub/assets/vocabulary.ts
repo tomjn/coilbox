@@ -106,6 +106,12 @@ export const RENDER_VARIANT_PREFIX = vocabulary.unit.renderVariantPrefix;
  */
 export const RENDER_ANGLES = vocabulary.unit.renderAngles;
 
+/** The angle a plan is drawn from, since a plan is a view from above. Named
+ *  rather than written out at the call site, the way {@link MINIMAP_VARIANT} is,
+ *  and `vocabulary.test.ts` holds it inside {@link RENDER_ANGLES} so it cannot
+ *  become an angle the hub has no pictures for. */
+export const TOP_RENDER_ANGLE = "top";
+
 /**
  * The map side of the vocabulary, and a closed list, unlike the unit side. None
  * of the four is open ended the way a render angle is, so a typo mints an

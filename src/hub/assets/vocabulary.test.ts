@@ -16,6 +16,7 @@ import {
   RENDER_VARIANT_PREFIX,
   renderFrame,
   renderVariant,
+  TOP_RENDER_ANGLE,
 } from "./vocabulary";
 
 /**
@@ -52,6 +53,12 @@ describe("the variant names", () => {
 
   it("renders one angle, because one has a use case", () => {
     expect([...RENDER_ANGLES]).toEqual(["top"]);
+  });
+
+  it("names the angle a plan is drawn from as one of them", () => {
+    // The blueprint plan asks the hub for this one by name, and an angle outside
+    // the list names a picture nothing ever uploaded.
+    expect(RENDER_ANGLES).toContain(TOP_RENDER_ANGLE);
   });
 
   it("names how the bytes were produced", () => {

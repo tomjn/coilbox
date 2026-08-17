@@ -1,14 +1,14 @@
 /**
- * The blueprint drawing, rendered.
+ * What a hub item looks like, rendered.
  *
- * `../../preview.test.ts` covers the arithmetic. What this covers is that the
- * arithmetic reaches the picture: the app has no way to look at a hub item
- * without the hub, an account and somebody's published layout, so rendering the
- * component to markup and reading the geometry back out is the evidence that a
- * blueprint draws anything at all.
+ * `../../preview.test.ts` covers the reading. What this covers is that the
+ * reading reaches the picture: the app has no way to look at a hub item without
+ * the hub, an account and somebody's published container, so rendering the
+ * component to markup and reading it back is the evidence that a blueprint or a
+ * setup pack draws anything at all.
  */
 
-import { createElement } from "react";
+import { memoryStorage, PersistentStoreProvider } from "@picoframe/frame";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { Container } from "@/container/container";
@@ -31,10 +31,23 @@ const BLUEPRINT: Container = {
   },
 };
 
+/**
+ * The preview as markup.
+ *
+ * Inside a settings store, because a setup pack's cards read the session's scan
+ * target to look for a local minimap and the frame's `useSetting` refuses to run
+ * outside one. Nothing else is stood up: server rendering runs no effects, so
+ * every lookup a card makes is still pending and each map draws the outline it
+ * falls back to.
+ */
 function markup(container: Container): string {
   const preview = readPreview(container);
   if (!preview) throw new Error("nothing to draw");
-  return renderToStaticMarkup(createElement(ItemPreview, { preview }));
+  return renderToStaticMarkup(
+    <PersistentStoreProvider storage={memoryStorage()}>
+      <ItemPreview preview={preview} />
+    </PersistentStoreProvider>,
+  );
 }
 
 /** Every rect's attributes, in the order they were drawn. */
@@ -132,5 +145,52 @@ describe("ItemPreview, for a blueprint", () => {
       payload: { ...(BLUEPRINT.payload as object), ordered: true },
     };
     expect(markup(ordered)).toContain("2 buildings, in build order");
+  });
+});
+
+/** A pack of two maps that pins a game and no engine. */
+function pack(payload: object): Container {
+  return {
+    format: "coilbox",
+    container: 1,
+    kind: "setup-pack",
+    kindVersion: 1,
+    payload,
+  };
+}
+
+/** How many map cards there are, counted off the outline every card falls back
+ *  to: nothing in a test has a picture of a map, so every card draws one. */
+function outlines(html: string): number {
+  return [...html.matchAll(/<svg /g)].length;
+}
+
+describe("ItemPreview, for a setup pack", () => {
+  it("gives each sort of thing a heading, and names what is in it", () => {
+    const html = markup(
+      pack({
+        games: [{ name: "Splinter Faction 1.0" }],
+        engineVersion: "105.1.1",
+        maps: ["Comet Catcher Redux", "Supreme Isthmus"],
+      }),
+    );
+    expect(html).toContain("Game<");
+    expect(html).toContain("Splinter Faction 1.0");
+    expect(html).toContain("Engine<");
+    expect(html).toContain("105.1.1");
+    expect(html).toContain("Maps<");
+    // Drawn rather than named, one card each, with the name under the picture.
+    expect(outlines(html)).toBe(2);
+    expect(html).toContain("Comet Catcher Redux");
+    expect(html).toContain("Supreme Isthmus");
+  });
+
+  it("says nothing at all about a sort the pack says nothing about", () => {
+    const html = markup(pack({ maps: ["Supreme Isthmus"] }));
+    expect(html).toContain("Map<");
+    expect(html).not.toContain("Engine");
+    expect(html).not.toContain("Game");
+    expect(html).not.toContain("None");
+    expect(html).not.toContain("Whatever you have");
   });
 });

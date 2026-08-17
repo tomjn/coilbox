@@ -30,16 +30,26 @@
  *   fill as a route between plots and stays out of the way when it doubles back.
  * - A building the payload never sized is outlined and left unfilled, so a guess
  *   at one square does not read as a measurement.
+ *
+ * A building the caller has a picture of is drawn as that unit, seen from above
+ * (issue #1721). The picture sits in the ground the building stands on, the
+ * outline stays over it, and the grid still runs under everything, so a plan with
+ * pictures in it is still a plan and still reads against the grid rather than
+ * becoming a screenshot. Where the pictures come from is
+ * `@/hub/assets/unitPictures.ts`. This file is handed them and fetches nothing,
+ * because the same drawing is used by a card, by a drawer and by the hub page.
  */
 
 import { cn } from "@picoframe/frame";
 import { useEffect, useRef, useState } from "react";
 
+import type { PlanPicture } from "@/hub/assets/unitPictures";
 import {
   type BlueprintShape,
   type BlueprintSheet,
   blueprintSheet,
   type PlanBox,
+  pictureBox,
   planLabel,
   SHEET_MARGIN,
 } from "@/hub/preview";
@@ -115,12 +125,16 @@ function threadOpacity(stops: number): number {
 export function LayoutPlan({
   shape,
   className,
+  pictures,
 }: {
   shape: BlueprintShape;
   /** How big to draw it. The caller owns the size because a card and a page
    *  want very different ones, and it has to settle both sides of the box: the
    *  sheet is the whole of it, so a box with no height has no sheet. */
   className?: string;
+  /** A picture per building, keyed on the lower cased def, from
+   *  `useHeldUnitPictures`. A def with no entry is drawn as its square. */
+  pictures?: ReadonlyMap<string, PlanPicture>;
 }) {
   const [box, setBox] = useState<PlanBox | null>(null);
   const frame = useRef<HTMLDivElement>(null);
@@ -145,13 +159,28 @@ export function LayoutPlan({
 
   return (
     <div ref={frame} className={cn("text-primary", className)}>
-      <Sheet shape={shape} box={box ?? nominalBox(shape)} />
+      <Sheet
+        shape={shape}
+        box={box ?? nominalBox(shape)}
+        pictures={pictures ?? EMPTY}
+      />
     </div>
   );
 }
 
+/** No pictures, as one value rather than one per render. */
+const EMPTY: ReadonlyMap<string, PlanPicture> = new Map();
+
 /** The plan itself, drawn once the box it goes in is known. */
-function Sheet({ shape, box }: { shape: BlueprintShape; box: PlanBox }) {
+function Sheet({
+  shape,
+  box,
+  pictures,
+}: {
+  shape: BlueprintShape;
+  box: PlanBox;
+  pictures: ReadonlyMap<string, PlanPicture>;
+}) {
   const sheet = blueprintSheet(shape, box);
   const centres = shape.squares.map(
     (square) =>
@@ -210,6 +239,28 @@ function Sheet({ shape, box }: { shape: BlueprintShape; box: PlanBox }) {
           vectorEffect="non-scaling-stroke"
         />
       )}
+      {/* Every picture before any outline, rather than a picture and its outline
+          per building. A render's box reaches a build square past the footprint
+          on each side, so interleaved the next building's transparent bleed would
+          be drawn over the last one's outline. */}
+      {shape.squares.map((square) => {
+        const picture = pictures.get(square.def.toLowerCase());
+        if (!picture) return null;
+        const box = pictureBox(square, { framed: picture.framed });
+        return (
+          <image
+            key={`p${square.def}@${square.x},${square.y}`}
+            href={picture.url}
+            x={box.x}
+            y={box.y}
+            width={box.width}
+            height={box.height}
+            // A framed render is already the box's own aspect, so this only bites
+            // on a build pic standing in for one, which is square.
+            preserveAspectRatio="xMidYMid meet"
+          />
+        );
+      })}
       {shape.squares.map((square) => (
         <rect
           // Keyed by where it stands, which is what makes it that building.
@@ -220,7 +271,11 @@ function Sheet({ shape, box }: { shape: BlueprintShape; box: PlanBox }) {
           height={square.height}
           rx={corner(sheet, square.width, square.height)}
           fill="currentColor"
-          fillOpacity={square.sized ? FILL : 0}
+          // A building showing its own picture needs no tint under it, and one
+          // the payload never sized keeps its empty outline.
+          fillOpacity={
+            pictures.has(square.def.toLowerCase()) || !square.sized ? 0 : FILL
+          }
           stroke="currentColor"
           strokeOpacity={OUTLINE}
           strokeWidth={1.25}
