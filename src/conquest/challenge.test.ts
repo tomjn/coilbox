@@ -12,10 +12,6 @@ const maps = Array.from({ length: 12 }, (_, i) => ({
   width: 4 + i,
   height: 4 + i,
 }));
-const ais = [
-  { kind: "native" as const, shortName: "BARb", name: "BARbarIAn" },
-  { kind: "lua" as const, shortName: "STAI" },
-];
 
 const base: GenerateOptions = {
   seed: 4242,

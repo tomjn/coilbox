@@ -78,7 +78,8 @@ export function RenameBlueprintForm({
         </Label>
         <Input
           id={id}
-          // biome-ignore lint/a11y/noAutofocus: the drawer opened for this one box, and reaching it by tab is a step nobody asked for
+          // The drawer opened for this one box, and reaching it by tab is a
+          // step nobody asked for.
           autoFocus
           value={text}
           placeholder="What this layout is called"

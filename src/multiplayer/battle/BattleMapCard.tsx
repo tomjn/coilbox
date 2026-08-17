@@ -1,4 +1,3 @@
-import { Button } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 import type { MapItem } from "@/content/bindings";
 import {
@@ -16,7 +15,7 @@ import {
   useMapOverlayLayer,
 } from "@/play/pages/components/MapOverlay";
 import type { Battle, StartRect } from "../bindings";
-import { allyLetter, hexToI32, type MemberRow, readableText } from "./config";
+import { hexToI32, type MemberRow } from "./config";
 import { MissingMapBox } from "./MissingMapBox";
 import { StartBoxEditor } from "./StartBoxEditor";
 import { StartBoxOverlay } from "./StartBoxOverlay";
