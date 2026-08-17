@@ -49,14 +49,38 @@ import { worldToScene } from "./scene";
 const ROOT_NAME = "scenario-footprints";
 
 /**
- * How far above the ground a footprint sits, in elmos.
+ * How far above the ground a footprint sits, in elmos: none at all.
  *
- * A hair, because the square is the ground the building stands on and anything
- * more reads as a plate hovering under it (issue #1716). Not nothing, because
- * the relief is drawn by a shader this layer only samples, so a square laid
- * exactly on the sampled height would fight the terrain it lies on.
+ * The square is the ground the building stands on, so anything above the ground
+ * is above part of the building too (issue #1716). A building's base is flat and
+ * lies on the ground, and a square a single elmo up covered it: the tall parts
+ * of a model stood clear of the plate and the low ones were washed with it.
+ *
+ * What keeps it out of the ground it lies on is {@link groundBias} rather than a
+ * gap, so it wins where the two are the same surface and loses to everything
+ * standing on it.
  */
-const LIFT_ELMOS = 1;
+const LIFT_ELMOS = 0;
+
+/** How far the outline stands off the ground, in elmos. A hair, because a line
+ *  cannot be biased the way a filled shape can: `polygonOffset` is about
+ *  polygons, and this is not one. */
+const OUTLINE_LIFT_ELMOS = 0.25;
+
+/**
+ * What keeps a square out of the ground it is drawn on.
+ *
+ * A depth bias rather than a gap: it moves what the depth test makes of the
+ * square without moving the square, so it beats the ground they share and still
+ * loses to the building standing on it. The terrain's relief comes out of a
+ * shader this layer only samples, so the two surfaces are never exactly the
+ * same and a plain tie-break would shimmer.
+ */
+const groundBias = {
+  polygonOffset: true,
+  polygonOffsetFactor: -1,
+  polygonOffsetUnits: -1,
+} as const;
 
 /** How far the corners are rounded, in elmos: half a build square (issue
  *  #1716). Enough to read as a plate rather than a wireframe box, small enough
@@ -463,6 +487,7 @@ export function createFootprintsLayer(
         opacity: style.fill,
         side: THREE.DoubleSide,
         depthWrite: false,
+        ...groundBias,
       });
       group.add(new THREE.Mesh(fillGeometry, fillMaterial));
       spent.push(fillGeometry, fillMaterial);
@@ -484,6 +509,7 @@ export function createFootprintsLayer(
         opacity: style.outline,
         side: THREE.DoubleSide,
         depthWrite: false,
+        ...groundBias,
       });
       const band = new THREE.Mesh(bandGeometry, bandMaterial);
       band.renderOrder = 1;
@@ -522,6 +548,7 @@ export function createFootprintsLayer(
     // with no verdict back to looking like one that passed.
     outline.computeLineDistances();
     outline.renderOrder = 2;
+    outline.position.y = OUTLINE_LIFT_ELMOS;
     group.add(outline);
 
     spent.push(lineGeometry, lineMaterial);
