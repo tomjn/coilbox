@@ -44,6 +44,10 @@ interface Spy {
   renderKeyCalls: number;
   buildpicCalls: number;
   asked: AssetKey[][];
+  /** One entry per batch model read, holding the objects it asked for. */
+  modelBatches: string[][];
+  /** Those batches flattened, which is the per-unit work the mounts used to
+   *  cost one archive load each. */
   models: string[];
   draws: number;
   uploads: AssetUpload[][];
@@ -68,7 +72,7 @@ function spy(
     renderKeyCalls: 0,
     buildpicCalls: 0,
     asked: [] as AssetKey[][],
-    models: [] as string[],
+    modelBatches: [] as string[][],
     draws: 0,
     uploads: [] as AssetUpload[][],
     startedBy: [] as string[],
@@ -128,19 +132,28 @@ function spy(
       }
       return { units: out, errors: [] } as never;
     },
-    model: async ({ object }) => {
-      state.models.push(object);
-      return {
-        format: "s3o",
-        path: `objects3d/${object}`,
-        radius: 10,
-        height: 10,
-        mid: [0, 0, 0],
-        textures: [],
-        paletteFaces: 0,
-        errors: [],
-      };
+    models: async ({ objects }) => {
+      state.modelBatches.push([...objects]);
+      const models: Record<string, unknown> = {};
+      for (const object of objects) {
+        models[object] = {
+          file: `abcd_objects3d_${object}.json`,
+          path: `objects3d/${object}`,
+          format: "s3o",
+        };
+      }
+      return { models, skipped: {}, errors: [] } as never;
     },
+    readModel: async (file) => ({
+      format: "s3o",
+      path: file,
+      radius: 10,
+      height: 10,
+      mid: [0, 0, 0],
+      textures: [],
+      paletteFaces: 0,
+      errors: [],
+    }),
     draw: async () => {
       state.draws += 1;
       return {
@@ -197,8 +210,11 @@ function spy(
     get asked() {
       return state.asked;
     },
+    get modelBatches() {
+      return state.modelBatches;
+    },
     get models() {
-      return state.models;
+      return state.modelBatches.flat();
     },
     get draws() {
       return state.draws;
@@ -306,13 +322,37 @@ describe("a run over one layout", () => {
     expect(watch.startedBy).toEqual(["coilbox"]);
   });
 
-  /** One mount per question, not one per unit. */
-  it("reads the archive once for the keys and once for the build pics", async () => {
+  /**
+   * One mount per question, not one per unit. The models one is issue #1684:
+   * thirty units used to be thirty mounts on their own, a second or more each on
+   * a game like Beyond All Reason.
+   */
+  it("reads the archive once for the keys, once for the build pics and once for the models", async () => {
     const watch = spy();
     await backfillBlueprintUnits(TARGET, unitsOf(30), 100, watch.tools);
     expect(watch.renderKeyCalls).toBe(1);
     expect(watch.buildpicCalls).toBe(1);
+    expect(watch.modelBatches).toHaveLength(1);
+    expect(watch.modelBatches[0]).toHaveLength(30);
     expect(watch.asked).toHaveLength(1);
+  });
+
+  /** Two units on one model are one model read, since the batch is keyed on the
+   *  `objectname` and a game's re-skins and wrecks all name the same file. */
+  it("asks for one model however many units name it", async () => {
+    const dataset: UnitDatasetEntry[] = [
+      { name: "armsolar", objectName: "shared.s3o", footprintX: 2 },
+      { name: "armwreck", objectName: "shared.s3o", footprintX: 3 },
+    ];
+    const watch = spy();
+    const units = blueprintBackfillUnits(
+      [{ def: "armsolar" }, { def: "armwreck" }],
+      dataset,
+    );
+    await backfillBlueprintUnits(TARGET, units, 100, watch.tools);
+
+    expect(watch.modelBatches).toEqual([["shared.s3o"]]);
+    expect(watch.draws).toBe(2);
   });
 
   /**
@@ -331,7 +371,9 @@ describe("a run over one layout", () => {
     expect(report.asked).toBe(12);
     expect(report.rendered).toBe(0);
     expect(watch.draws).toBe(0);
-    expect(watch.models).toEqual([]);
+    // And no mount for models either, which is what asking after the have check
+    // rather than before it buys (issue #1684).
+    expect(watch.modelBatches).toEqual([]);
   });
 
   /**

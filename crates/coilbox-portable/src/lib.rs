@@ -190,6 +190,9 @@ pub fn mime_for(path: &Path) -> &'static str {
         Some("woff") => "font/woff",
         Some("ttf") => "font/ttf",
         Some("otf") => "font/otf",
+        // A model the unitsync worker flattened into the texture cache, which
+        // the webview fetches rather than taking over the IPC bridge (#1684).
+        Some("json") => "application/json",
         _ => "application/octet-stream",
     }
 }

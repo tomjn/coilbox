@@ -676,6 +676,41 @@ pub struct UnitModelOutput {
     pub errors: Vec<String>,
 }
 
+/// One model of a `--unit-models` batch: where the flattened model was written,
+/// rather than the model itself (issue #1684).
+///
+/// The bytes stay out of the JSON for the same reason the textures already do. A
+/// flattened model is a list of floats per vertex and runs to megabytes, and a
+/// blueprint asks for twenty at once, so the batch writes each one into the
+/// model-texture cache and names it. The webview reads it back over the
+/// `unitmodel` asset protocol root, beside the textures it refers to.
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitModelFile {
+    /// The file in the model-texture cache dir. Holds one [`UnitModelOutput`]
+    /// as JSON.
+    pub file: String,
+    /// The archive member the model came from, which is what the file is named
+    /// after: two units sharing one model share one file.
+    pub path: String,
+    /// `"s3o"` or `"3do"`.
+    pub format: String,
+}
+
+/// Output of `--unit-models`: a batch of units' models read in one archive
+/// mount, written to the model-texture cache.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct UnitModelsOutput {
+    /// Keyed by the `objectname` as asked for, so a caller looks up what it
+    /// sent rather than what the archive called it.
+    pub models: BTreeMap<String, UnitModelFile>,
+    /// The objects that produced no model, and why. An object is in exactly one
+    /// of the two maps.
+    pub skipped: BTreeMap<String, String>,
+    pub errors: Vec<String>,
+}
+
 /// A top down render encoded as the asset the hub takes, written to disk.
 ///
 /// Everything else in the corpus is extracted from an archive. This one is

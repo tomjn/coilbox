@@ -19,7 +19,8 @@ use sidecar::{
     build_lua_repl_args, build_map_info_args, build_map_meta_args, build_map_skybox_args,
     build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
     build_unit_buildpics_args, build_unit_dataset_args, build_unit_model_args,
-    build_unit_render_args, build_unit_render_keys_args, find_unitsync, resolve_sidecar,
+    build_unit_models_args, build_unit_render_args, build_unit_render_keys_args, find_unitsync,
+    resolve_sidecar,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -697,6 +698,57 @@ async fn unitsync_unit_model<R: Runtime>(
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit model", None).await)
 }
 
+/// `unitsync_unit_models` reads a batch of units' models in one archive mount
+/// (issue #1684).
+///
+/// `unitsync_unit_model` above mounts the game's archive set to read one model,
+/// so a blueprint of twenty buildings drew itself in twenty mounts, a second or
+/// more each on a game like Beyond All Reason. This is the same read for a list.
+///
+/// The models come back as file names rather than as models. Each is written into
+/// the model-texture cache dir the `unitmodel` asset-protocol root serves, beside
+/// the textures it names, so a whole blueprint's geometry never crosses the IPC
+/// bridge at once.
+#[tauri::command]
+async fn unitsync_unit_models<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    game_archive: String,
+    objects: Vec<String>,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let Some(cache_dir) = model_texture_dir(&app) else {
+        return Ok(CliResult::err(
+            "no cache directory on this platform, so there is nowhere to write the models"
+                .to_string(),
+        ));
+    };
+    let list = match serde_json::to_string(&objects) {
+        Ok(s) => s,
+        Err(e) => return Ok(CliResult::err(format!("could not send the unit list: {e}"))),
+    };
+    let units_file = match write_temp_units(&list) {
+        Ok(p) => p,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+
+    let args = build_unit_models_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &game_archive,
+        &units_file.to_string_lossy(),
+        &cache_dir.to_string_lossy(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "unit models", None).await;
+    let _ = std::fs::remove_file(&units_file);
+    Ok(out)
+}
+
 /// `unitsync_unit_render` encodes a top down render the webview drew as the
 /// hub's `render:<angle>` asset (issue #1631).
 ///
@@ -1096,6 +1148,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_faction_logos,
             unitsync_unit_dataset,
             unitsync_unit_model,
+            unitsync_unit_models,
             unitsync_unit_render,
             unitsync_unit_render_keys,
             unitsync_map_info,

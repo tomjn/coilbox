@@ -29,13 +29,18 @@
  * ## One mount per question
  *
  * Every archive read here is batched: one call for all the render keys, one for
- * all the build pics. A blueprint of twenty buildings asked one unit at a time
- * would be twenty archive mounts, a second or more each on a big game.
+ * all the build pics, and one for the models of the units left to draw. A
+ * blueprint of twenty buildings asked one unit at a time would be twenty archive
+ * mounts, a second or more each on a big game.
  *
- * The renders themselves are drawn one at a time. Each needs the model read out
- * of the archive and a GL context of its own, and twenty at once is twenty
- * contexts competing for the same GPU rather than twenty renders in the time of
- * one.
+ * The models one comes last because it is the one that can be narrowed. The keys
+ * and the build pics are asked for the whole layout, and the models only for the
+ * units the have check came back wanting, which on a game somebody has already
+ * uploaded is usually none at all (issue #1684).
+ *
+ * The renders themselves are drawn one at a time. Each needs a GL context of its
+ * own, and twenty at once is twenty contexts competing for the same GPU rather
+ * than twenty renders in the time of one.
  *
  * ## There is no map equivalent of this file, and there is not meant to be
  *
@@ -60,10 +65,11 @@ import {
   type UnitRenderKeysResult,
   type UnitRenderResult,
   unitsyncUnitBuildpics,
-  unitsyncUnitModel,
+  unitsyncUnitModels,
   unitsyncUnitRender,
   unitsyncUnitRenderKeys,
 } from "@/content/bindings";
+import { unitModelTextureUrl } from "@/lib/assetUrl";
 import { toBase64 } from "@/lib/base64";
 import { type AssetKey, assetsTheHubWants, type HaveResult } from "./have";
 import { RENDER_VERSION, renderTopDown, type TopDownRender } from "./renderTop";
@@ -170,7 +176,8 @@ export interface BackfillReport {
 export interface BackfillTools {
   renderKeys: typeof unitsyncUnitRenderKeys;
   buildpics: typeof unitsyncUnitBuildpics;
-  model: typeof unitsyncUnitModel;
+  models: typeof unitsyncUnitModels;
+  readModel: typeof readCachedModel;
   encodeRender: typeof unitsyncUnitRender;
   draw: (
     model: UnitModelResult,
@@ -184,12 +191,26 @@ export interface BackfillTools {
 export const liveBackfillTools: BackfillTools = {
   renderKeys: unitsyncUnitRenderKeys,
   buildpics: unitsyncUnitBuildpics,
-  model: unitsyncUnitModel,
+  models: unitsyncUnitModels,
+  readModel: readCachedModel,
   encodeRender: unitsyncUnitRender,
   draw: renderTopDown,
   ask: assetsTheHubWants,
   upload: uploadAssetsToHub,
 };
+
+/**
+ * Read back a model the batch wrote into the model-texture cache.
+ *
+ * Over the asset protocol rather than through the IPC bridge, which is the point
+ * of the batch writing files at all: a flattened model is megabytes of floats,
+ * and the textures it names are already loaded from this same root.
+ */
+export async function readCachedModel(file: string): Promise<UnitModelResult> {
+  const res = await fetch(unitModelTextureUrl(file));
+  if (!res.ok) throw new Error(`could not read model ${file}: ${res.status}`);
+  return (await res.json()) as UnitModelResult;
+}
 
 /**
  * Offer the hub the pictures of these units, and say what that came to.
@@ -261,10 +282,31 @@ export async function backfillBlueprintUnits(
 
   const assets: AssetUpload[] = buildpicUploads(target.game, working, pictures);
 
+  // The models of what is left to draw, in one mount rather than one each
+  // (issue #1684). Asked for after the have check, so a layout the hub already
+  // holds every render of does not mount for models at all.
+  const drawing = working.filter((unit) => wanted.has(unit.name));
+  const models = drawing.length
+    ? await tools.models({
+        ...archive,
+        objects: [...new Set(drawing.map((unit) => unit.objectName))],
+      })
+    : null;
+
   let rendered = 0;
-  for (const unit of working) {
-    if (!wanted.has(unit.name)) continue;
-    const asset = await renderOne(target, archive, unit, tools);
+  for (const unit of drawing) {
+    const model = models?.models[unit.objectName];
+    // A unit whose model would not read is not a run that stops. The rest of the
+    // layout is still worth sending, and its build pic has already gone.
+    if (!model) {
+      console.warn(
+        "no model for",
+        unit.name,
+        models?.skipped[unit.objectName] ?? "the batch read nothing",
+      );
+      continue;
+    }
+    const asset = await renderOne(target, archive, unit, model.file, tools);
     rendered += 1;
     if (asset) assets.push(asset);
   }
@@ -374,18 +416,19 @@ export function buildpicUploads(
 /**
  * Draw and encode one unit's render, or nothing when it could not be.
  *
- * A unit that will not render is not a run that stops. The reasons are all about
- * one unit, a model the archive does not hold or one the readers will not take,
- * and the rest of the layout is still worth sending.
+ * `modelFile` is what the batch read wrote this unit's model to. A unit that will
+ * not draw is not a run that stops: the reasons are all about one unit, and the
+ * rest of the layout is still worth sending.
  */
 async function renderOne(
   target: BackfillTarget,
   archive: { enginePath: string; dataDir: string; gameArchive: string },
   unit: BackfillUnit,
+  modelFile: string,
   tools: BackfillTools,
 ): Promise<AssetUpload | null> {
   try {
-    const model = await tools.model({ ...archive, object: unit.objectName });
+    const model = await tools.readModel(modelFile);
     const drawn = await tools.draw(model, unit.footprintX, unit.footprintZ);
     const encoded: UnitRenderResult = await tools.encodeRender({
       ...archive,
