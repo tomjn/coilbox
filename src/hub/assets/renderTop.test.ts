@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
+import { toBase64 } from "@/lib/base64";
 import {
   flipRows,
   RENDER_VERSION,
-  toBase64,
   topDownCamera,
   unpremultiply,
 } from "./renderTop";

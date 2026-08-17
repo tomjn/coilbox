@@ -14,12 +14,9 @@ import { useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-import {
-  RENDER_VERSION,
-  renderTopDown,
-  toBase64,
-} from "@/hub/assets/renderTop";
+import { RENDER_VERSION, renderTopDown } from "@/hub/assets/renderTop";
 import { RENDER_ANGLES, renderFrame } from "@/hub/assets/vocabulary";
+import { toBase64 } from "@/lib/base64";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import type {

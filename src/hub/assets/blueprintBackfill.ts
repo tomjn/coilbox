@@ -64,13 +64,9 @@ import {
   unitsyncUnitRender,
   unitsyncUnitRenderKeys,
 } from "@/content/bindings";
+import { toBase64 } from "@/lib/base64";
 import { type AssetKey, assetsTheHubWants, type HaveResult } from "./have";
-import {
-  RENDER_VERSION,
-  renderTopDown,
-  type TopDownRender,
-  toBase64,
-} from "./renderTop";
+import { RENDER_VERSION, renderTopDown, type TopDownRender } from "./renderTop";
 import { type AssetUpload, uploadAssetsToHub } from "./upload";
 
 /**
