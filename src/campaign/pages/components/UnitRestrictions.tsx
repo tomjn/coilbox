@@ -13,8 +13,10 @@ import { unknownSelected } from "@/content/techForest";
 import { usePreferredTarget } from "@/play/config";
 import { allowedFromBans, bansFromAllowed } from "../../unitBans";
 
+// Neutral about what is being edited: the same editor is a campaign mission's
+// restrictions and a hosted battle's.
 const HELPER =
-  "Restrictions are engine-level and apply to ALL teams including enemy AI. Unknown unit names are silently ignored by the engine.";
+  "Ticked units are allowed. Untick a unit to ban it, which the engine applies to ALL teams including enemy AI. Unknown unit names are silently ignored by the engine.";
 
 /**
  * Editor for a mission's engine-level unit restrictions, over the shared
@@ -178,7 +180,7 @@ export function UnitRestrictions({
           factions={factions}
           selected={allowed}
           onChange={setAllowed}
-          selectedLabel="available"
+          selectedLabel="allowed"
           enginePath={target?.enginePath}
           dataDir={target?.dataDir}
           gameArchive={game?.primaryArchive.name}

@@ -29,7 +29,11 @@ vi.mock("@tauri-apps/api/core", () => ({
   Channel: class {},
   invoke: async () => ({}),
 }));
-vi.mock("../../config", () => ({ useUnitsyncUnitBuildpics: () => null }));
+vi.mock("../../config", () => ({
+  useUnitsyncUnitBuildpics: () => null,
+  useUnitsyncScan: () => ({ data: null, loading: false }),
+  useUnitsyncGameInfo: () => ({ info: null, loading: false }),
+}));
 
 const { UnitPicker } = await import("./UnitPicker");
 
@@ -103,7 +107,13 @@ describe("the unit picker's list", () => {
     expect(html).not.toContain("subtree");
   });
 
-  it("counts what is ticked, in the caller's words", () => {
-    expect(render(["armpw"])).toContain("1 selected");
+  it("counts what is ticked against the total, in the caller's words", () => {
+    // "1 selected" on its own reads as a complete answer. The total is what says
+    // whether a fully-ticked list means everything or nearly everything.
+    expect(render(["armpw"])).toContain("1 of 6 selected");
+  });
+
+  it("leaves a ticked row unhighlighted, since the checkbox is the state", () => {
+    expect(render(["armpw"])).not.toContain("bg-primary/10");
   });
 });

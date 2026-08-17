@@ -1,19 +1,24 @@
 import { Button, cn, Input } from "@picoframe/frame";
 import { Check, ChevronsUpDown, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { createContext, type ReactNode, use, useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { usePreferredTarget } from "../../../play/config";
 import type {
   UnitBuildpicsResult,
   UnitDatasetEntry,
   UnitDisplay,
 } from "../../bindings";
 import { buildPicMissing } from "../../buildPicMissing";
-import { useUnitsyncUnitBuildpics } from "../../config";
+import {
+  useUnitsyncGameInfo,
+  useUnitsyncScan,
+  useUnitsyncUnitBuildpics,
+} from "../../config";
 import {
   buildTechForest,
   factionGroups,
@@ -24,9 +29,51 @@ import {
 import { unitLabel } from "../../unitChoices";
 import { unitIconSrc } from "../../unitIcon";
 
-/** Cap on how many rows a search shows at once, so a huge game stays responsive
- * (a 4000-unit game would otherwise render every match). */
-const SEARCH_CAP = 300;
+/** Cap on how many rows the list shows at once, so a huge game stays responsive
+ * (a 4000-unit game would otherwise render every row). */
+const SEARCH_CAP = 500;
+
+/**
+ * Which game the pickers below are picking from.
+ *
+ * An editor screen knows its game once, and the fields that ask for a unit are
+ * nested several components deep inside it. Naming the game here saves threading
+ * it through every one of them, and without it those fields fall back to a list
+ * with no build pics and no faction blocks.
+ */
+const UnitGameContext = createContext<{
+  gameName?: string;
+  gameArchive?: string;
+  enginePath?: string;
+  dataDir?: string;
+}>({});
+
+/**
+ * Name the game for every picker on the screen.
+ *
+ * The engine target is read here rather than in the picker, because the picker
+ * is rendered by components that are deliberately pure and testable without the
+ * app frame around them. This provider is only ever mounted by a screen, where
+ * reading a setting is fine.
+ */
+export function UnitGameProvider({
+  gameName,
+  gameArchive,
+  children,
+}: {
+  gameName?: string;
+  gameArchive?: string;
+  children: ReactNode;
+}) {
+  const { target } = usePreferredTarget();
+  const enginePath = target?.enginePath;
+  const dataDir = target?.dataDir;
+  const value = useMemo(
+    () => ({ gameName, gameArchive, enginePath, dataDir }),
+    [gameName, gameArchive, enginePath, dataDir],
+  );
+  return <UnitGameContext value={value}>{children}</UnitGameContext>;
+}
 
 /** A faction, as the picker heads its block of units. */
 export interface UnitPickerFaction {
@@ -61,6 +108,7 @@ export interface UnitPickerFaction {
 export function UnitPicker({
   units,
   factions = [],
+  gameName,
   selected,
   onChange,
   selectedLabel = "selected",
@@ -71,8 +119,12 @@ export function UnitPicker({
 }: {
   /** The game's units, as `useUnitsyncUnitDataset` reports them. */
   units: UnitDatasetEntry[];
-  /** Faction blocks, in the order they should appear. */
+  /** Faction blocks, in the order they should appear. Resolved from the game's
+   * own sides when absent. */
   factions?: UnitPickerFaction[];
+  /** The game these units came from, so the picker can read its sides and build
+   * pics itself. Unnecessary when `factions` and `buildpics` are both given. */
+  gameName?: string;
   /** The current id set. Meaning is the caller's (allowed or unlocked units). */
   selected: string[];
   /** Apply the next set. Omit for a read-only view of the set. */
@@ -87,9 +139,10 @@ export function UnitPicker({
   buildpics?: UnitBuildpicsResult | null;
 }) {
   const readOnly = !onChange;
-  const { forest, labels, icons } = useUnitCatalogue({
+  const { forest, labels, blocks, icons, iconsPending } = useUnitCatalogue({
     units,
     factions,
+    gameName,
     enginePath,
     dataDir,
     gameArchive,
@@ -121,8 +174,11 @@ export function UnitPicker({
         forest={forest}
         labels={labels}
         icons={icons}
-        factions={factions}
-        count={`${selected.length} ${selectedLabel}`}
+        iconsPending={iconsPending}
+        factions={blocks}
+        // Both numbers, because "379 allowed" alone does not say whether that is
+        // all of them or most of them.
+        count={`${selected.length} of ${forest.known.size} ${selectedLabel}`}
         isOn={(id) => isSelected(selected, id)}
         mode={readOnly ? "read-only" : "multi"}
         onPick={(id, on) => onChange?.(toggleUnit(selected, id, on))}
@@ -149,6 +205,7 @@ export function UnitPicker({
 export function UnitPickerButton({
   units,
   factions = [],
+  gameName,
   value,
   onValueChange,
   loading,
@@ -163,6 +220,9 @@ export function UnitPickerButton({
 }: {
   units: UnitDatasetEntry[];
   factions?: UnitPickerFaction[];
+  /** The game these units came from, so the picker can read its sides and build
+   * pics itself. */
+  gameName?: string;
   /** The internal def name currently picked, or "" for none. */
   value: string;
   onValueChange: (unitDef: string) => void;
@@ -178,9 +238,10 @@ export function UnitPickerButton({
   buildpics?: UnitBuildpicsResult | null;
 }) {
   const [open, setOpen] = useState(false);
-  const { forest, labels, icons } = useUnitCatalogue({
+  const { forest, labels, blocks, icons, iconsPending } = useUnitCatalogue({
     units,
     factions,
+    gameName,
     enginePath,
     dataDir,
     gameArchive,
@@ -202,7 +263,13 @@ export function UnitPickerButton({
           )}
         >
           <span className="flex min-w-0 items-center gap-2">
-            {value && <UnitIcon display={icons?.units[picked]} size="sm" />}
+            {value && (
+              <UnitIcon
+                display={icons?.units[picked]}
+                pending={iconsPending}
+                size="sm"
+              />
+            )}
             <span className={cn("truncate", !value && "text-muted-foreground")}>
               {value ? pickedLabel : loading ? "Reading units" : placeholder}
             </span>
@@ -210,12 +277,15 @@ export function UnitPickerButton({
           <ChevronsUpDown className="size-4 shrink-0 opacity-50" aria-hidden />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[22rem] p-2">
+      {/* Wide enough for a readable name beside a long internal id, which is what
+          22rem was not: the two columns fought and both truncated. */}
+      <PopoverContent align="start" className="w-[34rem] max-w-[90vw] p-2">
         <UnitList
           forest={forest}
           labels={labels}
           icons={icons}
-          factions={factions}
+          iconsPending={iconsPending}
+          factions={blocks}
           autoFocusSearch
           isOn={(id) => id === picked}
           mode="single"
@@ -229,10 +299,19 @@ export function UnitPickerButton({
   );
 }
 
-/** The forest, the names and the build pics, which both pickers need. */
+/**
+ * The forest, the names and the build pics, which both pickers need.
+ *
+ * A caller that already read the game passes what it has. One that only knows
+ * the game by name gets the same list anyway: the target, the archive and the
+ * game's sides are all resolvable from here, through the same cached reads the
+ * caller would have made, so a plain form field earns build pics and faction
+ * blocks without threading four props through it.
+ */
 function useUnitCatalogue({
   units,
   factions,
+  gameName,
   enginePath,
   dataDir,
   gameArchive,
@@ -240,14 +319,36 @@ function useUnitCatalogue({
 }: {
   units: UnitDatasetEntry[];
   factions: UnitPickerFaction[];
+  gameName?: string;
   enginePath?: string;
   dataDir?: string;
   gameArchive?: string;
   buildpics?: UnitBuildpicsResult | null;
 }) {
+  const named = use(UnitGameContext);
+  const engine = enginePath ?? named.enginePath;
+  const root = dataDir ?? named.dataDir;
+  const knownArchive = gameArchive ?? named.gameArchive;
+  const game = gameName ?? named.gameName;
+  const scan = useUnitsyncScan(knownArchive ? undefined : engine, root);
+  const archive =
+    knownArchive ??
+    scan.data?.games.find((g) => g.name === game)?.primaryArchive.name;
+  const info = useUnitsyncGameInfo(
+    factions.length > 0 ? undefined : engine,
+    root,
+    archive,
+  );
+
+  const blocks = useMemo(() => {
+    if (factions.length > 0) return factions;
+    return (info.info?.sides ?? [])
+      .filter((s) => !!s.startUnit)
+      .map((s) => ({ startUnit: s.startUnit as string, name: s.name }));
+  }, [factions, info.info]);
   const roots = useMemo(
-    () => factions.map((f) => f.startUnit).filter(Boolean),
-    [factions],
+    () => blocks.map((f) => f.startUnit).filter(Boolean),
+    [blocks],
   );
   const forest = useMemo(() => buildTechForest(units, roots), [units, roots]);
   const labels = useMemo(() => {
@@ -257,12 +358,21 @@ function useUnitCatalogue({
   }, [units]);
   const allIds = useMemo(() => [...forest.known], [forest]);
   const fetched = useUnitsyncUnitBuildpics(
-    buildpics ? undefined : enginePath,
-    dataDir,
-    gameArchive,
+    buildpics ? undefined : engine,
+    root,
+    archive,
     buildpics ? undefined : allIds,
   );
-  return { forest, labels, icons: buildpics ?? fetched };
+  const icons = buildpics ?? fetched;
+  return {
+    forest,
+    labels,
+    blocks,
+    icons,
+    // No pics yet is not the same as no pics: a row says nothing until the read
+    // lands, rather than claiming the game ships nothing.
+    iconsPending: !icons && allIds.length > 0,
+  };
 }
 
 /** The search box and the list under it, shared by both pickers. */
@@ -270,6 +380,7 @@ function UnitList({
   forest,
   labels,
   icons,
+  iconsPending,
   factions,
   count,
   mode,
@@ -280,6 +391,8 @@ function UnitList({
   forest: ReturnType<typeof buildTechForest>;
   labels: Map<string, string>;
   icons: UnitBuildpicsResult | null;
+  /** The build pics have not come back yet, so a row claims nothing about them. */
+  iconsPending: boolean;
   factions: UnitPickerFaction[];
   /** Summary shown beside the search box, e.g. "12 available". */
   count?: string;
@@ -347,6 +460,7 @@ function UnitList({
                     id={id}
                     label={label(id)}
                     display={icons?.units[id]}
+                    pending={iconsPending}
                     on={isOn(id)}
                     mode={mode}
                     onPick={(on) => onPick(id, on)}
@@ -376,6 +490,7 @@ function UnitRow({
   id,
   label,
   display,
+  pending,
   on,
   mode,
   onPick,
@@ -384,15 +499,18 @@ function UnitRow({
   label: string;
   /** This unit's resolved build pic, absent until the icons come back. */
   display?: UnitDisplay;
+  pending: boolean;
   on: boolean;
   mode: "multi" | "single" | "read-only";
   onPick: (on: boolean) => void;
 }) {
   const body = (
     <>
-      <UnitIcon display={display} />
-      <span className="truncate">{label}</span>
-      <span className="ml-auto shrink-0 font-mono text-xs text-muted-foreground">
+      <UnitIcon display={display} pending={pending} />
+      {/* The name gets the room. An author recognises a clipped internal id more
+          easily than a clipped name, so the id is the column that gives way. */}
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="max-w-[45%] truncate font-mono text-xs text-muted-foreground">
         {id}
       </span>
     </>
@@ -414,10 +532,11 @@ function UnitRow({
             on && "bg-accent",
           )}
         >
-          <span className="flex size-4 shrink-0 items-center justify-center">
-            {on && <Check className="size-4" aria-hidden />}
-          </span>
           {body}
+          {/* At the end, and only when it applies: a single-pick list has no
+              checkbox, so holding a column open for one wasted the width the
+              names needed. */}
+          {on && <Check className="size-4 shrink-0" aria-hidden />}
         </button>
       </li>
     );
@@ -428,7 +547,12 @@ function UnitRow({
       <div
         className={cn(
           "flex items-center gap-2 rounded px-1 py-1 text-sm",
-          on && "bg-primary/10 ring-1 ring-inset ring-primary/40",
+          // Only the read-only view tints the row. Where there are checkboxes the
+          // checkbox is the state, and a tint behind every ticked row in a list
+          // that starts fully ticked is a wall of colour saying nothing.
+          mode === "read-only" &&
+            on &&
+            "bg-primary/10 ring-1 ring-inset ring-primary/40",
         )}
       >
         {mode === "read-only" ? (
@@ -455,9 +579,12 @@ function UnitRow({
 /** A unit's build pic, or a stand-in saying why there isn't one. */
 function UnitIcon({
   display,
+  pending = false,
   size = "default",
 }: {
   display?: UnitDisplay;
+  /** The pics are still being read, so this one is not missing, just not here. */
+  pending?: boolean;
   size?: "sm" | "default";
 }) {
   const src = unitIconSrc(display);
@@ -471,16 +598,26 @@ function UnitIcon({
       />
     );
   }
+  if (pending) {
+    return (
+      <span
+        aria-hidden
+        className={cn(box, "shrink-0 animate-pulse rounded bg-muted")}
+      />
+    );
+  }
   const missing = buildPicMissing(display);
   return (
     <span
       title={missing.title}
       className={cn(
         box,
-        "flex shrink-0 items-center justify-center rounded bg-muted text-center text-[0.55rem] leading-tight text-muted-foreground",
+        "flex shrink-0 items-center justify-center overflow-hidden rounded bg-muted text-center text-[0.55rem] leading-tight text-muted-foreground",
       )}
     >
-      {missing.label}
+      {/* The small box is 20px, which fits a swatch and not two words, so the
+          trigger says it with the tooltip the box already carries. */}
+      {size === "sm" ? null : missing.label}
     </span>
   );
 }
