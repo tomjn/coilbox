@@ -36,6 +36,7 @@ import { generateGalaxy } from "@/conquest/generate";
 import { type GalaxyDoc, NEUTRAL, type NodePos } from "@/conquest/model";
 import type { Container } from "@/container/container";
 import { type Participant, RANDOM_SIDE, type Rgb } from "@/play/participants";
+import { RENDER_BLEED_SQUARES } from "./assets/vocabulary";
 
 /** A labelled fact, ready to draw. Values are strings because a layout name is
  * as much a fact about a challenge as its system count. */
@@ -106,12 +107,30 @@ export interface BlueprintShape {
   ordered: boolean;
 }
 
+/** What a pack installs, a field per sort of thing. Not stats, because a pack
+ * that pins no engine has to be able to say nothing at all about engines, and a
+ * list of map names has to survive as a list so each one can be drawn. */
+export interface SetupPackContents {
+  /** Archive names, in the order the pack lists them. */
+  games: string[];
+  /** The build the pack pins, or null for one that pins none. */
+  engine: string | null;
+  /** Map names, once each, in the order the pack lists them. */
+  maps: string[];
+}
+
 export type HubPreview =
   | { kind: "preset"; teams: PresetTeam[]; playing: number }
-  | { kind: "setup-pack"; stats: PreviewStat[] }
+  | ({ kind: "setup-pack" } & SetupPackContents)
   | { kind: "challenge"; galaxy: GalaxyShape | null; stats: PreviewStat[] }
   | { kind: "scenario"; stats: PreviewStat[] }
-  | { kind: "blueprint"; layout: BlueprintShape };
+  | {
+      kind: "blueprint";
+      layout: BlueprintShape;
+      /** The game's modinfo shortname, which is what a unit's picture is keyed
+       *  on, or null for a layout exported where the game could not be named. */
+      game: string | null;
+    };
 
 /**
  * Read a container into something drawable, or null when there is nothing to
@@ -201,36 +220,41 @@ function css(color: Rgb | undefined): string {
   return `rgb(${to(r)} ${to(g)} ${to(b)})`;
 }
 
-/** A pack has no picture in it. What it has is a list of what it will install,
- * and saying that plainly is more use than a diagram of nothing. */
+/**
+ * What a pack will install, sort by sort (issue #1721).
+ *
+ * A pack has no picture in it, so what it looks like is its contents. Each sort
+ * is read on its own and an absent one stays absent: a pack that pins no engine
+ * says nothing about engines rather than "whatever you have", which is a line of
+ * reassurance in the space a pack of maps wants for its maps.
+ *
+ * Map names are deduped, because a pack that names one twice still installs it
+ * once and the drawing keys its cards on the name.
+ */
 function setupPackPreview(payload: Record<string, unknown>): HubPreview | null {
   const games = gameNames(payload);
-  const maps = (Array.isArray(payload.maps) ? payload.maps : []).filter(
-    (m): m is string => typeof m === "string",
-  );
-  const engine =
-    typeof payload.engineVersion === "string" ? payload.engineVersion : "";
+  const maps = [
+    ...new Set(
+      (Array.isArray(payload.maps) ? payload.maps : []).filter(
+        (m): m is string => typeof m === "string" && m !== "",
+      ),
+    ),
+  ];
+  const engine = pinnedEngine(payload);
   if (games.length === 0 && maps.length === 0 && !engine) return null;
 
-  return {
-    kind: "setup-pack",
-    stats: [
-      {
-        label: games.length === 1 ? "Game" : "Games",
-        value: games.length === 0 ? "None" : games.join(", "),
-      },
-      // ".spring" is the placeholder a pack carries when it does not pin an
-      // engine, which means whatever the importer already has.
-      {
-        label: "Engine",
-        value: engine && engine !== ".spring" ? engine : "Whatever you have",
-      },
-      {
-        label: maps.length === 1 ? "Map" : "Maps",
-        value: maps.length === 0 ? "None" : maps.join(", "),
-      },
-    ],
-  };
+  return { kind: "setup-pack", games, engine, maps };
+}
+
+/** The engine build a pack pins, or null for one that pins none. ".spring" is
+ * the launcher's own word for "no version", so a pack carrying it will not touch
+ * the engine the importer already has. */
+function pinnedEngine(payload: Record<string, unknown>): string | null {
+  const engine = payload.engineVersion;
+  if (typeof engine !== "string" || engine === "" || engine === ".spring") {
+    return null;
+  }
+  return engine;
 }
 
 /** The names of a pack's games, reading the collection shape (`games`) and
@@ -424,7 +448,12 @@ export const BUILDING_GAP = 0.12;
 function blueprintPreview(payload: Record<string, unknown>): HubPreview | null {
   const blueprint = parseBlueprintPayload(payload);
   const layout = blueprint ? blueprintShape(blueprint) : null;
-  return layout ? { kind: "blueprint", layout } : null;
+  if (!layout) return null;
+  return {
+    kind: "blueprint",
+    layout,
+    game: blueprint?.game?.shortname ?? null,
+  };
 }
 
 /**
@@ -477,6 +506,48 @@ export function blueprintShape(
       width: rect.width - BUILDING_GAP * 2,
       height: rect.height - BUILDING_GAP * 2,
     })),
+  };
+}
+
+/** A box on the plan, in build squares, measured from the layout's own origin the
+ *  way a {@link BlueprintSquare} is. */
+export interface PictureBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Where a unit's picture goes on the plan (issue #1721).
+ *
+ * A top down render is framed on the footprint plus {@link RENDER_BLEED_SQUARES}
+ * whole build squares on every side, because models overhang their footprints and
+ * a render framed exactly on the footprint clips them. The bleed is the consumer's
+ * to add back, which is what this does: the picture covers the ground the building
+ * stands on and the bleed round it, so the model lands at the size the footprint
+ * says it is.
+ *
+ * The gap {@link BUILDING_GAP} takes off each side of a square is added back
+ * first. That gap is drawing room between neighbours, not ground the building does
+ * not stand on, and a picture aligned to the shrunken square would be a footprint
+ * short of true scale on both axes.
+ *
+ * A picture that is not a render gets the square itself. The hub stands a unit's
+ * build pic in for a render it has not got, and a build pic is a three quarter
+ * icon at a fixed size with no bleed and no footprint aspect, so widening its box
+ * would scale somebody's icon up by the bleed for no reason.
+ */
+export function pictureBox(
+  square: BlueprintSquare,
+  { framed }: { framed: boolean },
+): PictureBox {
+  const grow = framed ? BUILDING_GAP + RENDER_BLEED_SQUARES : 0;
+  return {
+    x: square.x - grow,
+    y: square.y - grow,
+    width: square.width + grow * 2,
+    height: square.height + grow * 2,
   };
 }
 

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Container, ContainerKind } from "@/container/container";
+import { RENDER_BLEED_SQUARES } from "./assets/vocabulary";
 import {
   type BlueprintShape,
+  BUILDING_GAP,
   blueprintSheet,
+  pictureBox,
   planLabel,
   readPreview,
 } from "./preview";
@@ -110,7 +113,7 @@ describe("readPreview", () => {
     expect(preview).toBeNull();
   });
 
-  it("lists what a setup pack installs", () => {
+  it("reads what a setup pack installs, sort by sort", () => {
     const preview = readPreview(
       container("setup-pack", {
         game: { name: "Splinter Faction 1.0" },
@@ -120,18 +123,13 @@ describe("readPreview", () => {
     );
     expect(preview).toEqual({
       kind: "setup-pack",
-      stats: [
-        { label: "Game", value: "Splinter Faction 1.0" },
-        { label: "Engine", value: "105.1.1" },
-        {
-          label: "Maps",
-          value: "Comet Catcher Redux, Supreme Isthmus",
-        },
-      ],
+      games: ["Splinter Faction 1.0"],
+      engine: "105.1.1",
+      maps: ["Comet Catcher Redux", "Supreme Isthmus"],
     });
   });
 
-  it("reads a pack that pins no engine as taking whatever you have", () => {
+  it("reads a pack that pins no engine as pinning none", () => {
     const preview = readPreview(
       container("setup-pack", {
         game: { name: "BAR" },
@@ -139,12 +137,11 @@ describe("readPreview", () => {
         maps: ["Comet Catcher Redux"],
       }),
     );
-    expect(preview).toMatchObject({
-      stats: [
-        { label: "Game", value: "BAR" },
-        { label: "Engine", value: "Whatever you have" },
-        { label: "Map", value: "Comet Catcher Redux" },
-      ],
+    expect(preview).toEqual({
+      kind: "setup-pack",
+      games: ["BAR"],
+      engine: null,
+      maps: ["Comet Catcher Redux"],
     });
   });
 
@@ -160,27 +157,20 @@ describe("readPreview", () => {
       }),
     );
     expect(preview).toMatchObject({
-      stats: [
-        { label: "Games", value: "Splinter Faction 1.0, BAR" },
-        { label: "Engine", value: "Whatever you have" },
-        { label: "Map", value: "Comet Catcher Redux" },
-      ],
+      games: ["Splinter Faction 1.0", "BAR"],
+      maps: ["Comet Catcher Redux"],
     });
   });
 
   it("previews a pack that names only games", () => {
     const preview = readPreview(
-      container("setup-pack", {
-        games: [{ name: "BAR" }],
-      }),
+      container("setup-pack", { games: [{ name: "BAR" }] }),
     );
     expect(preview).toEqual({
       kind: "setup-pack",
-      stats: [
-        { label: "Game", value: "BAR" },
-        { label: "Engine", value: "Whatever you have" },
-        { label: "Maps", value: "None" },
-      ],
+      games: ["BAR"],
+      engine: null,
+      maps: [],
     });
   });
 
@@ -192,14 +182,24 @@ describe("readPreview", () => {
     );
     expect(preview).toEqual({
       kind: "setup-pack",
-      stats: [
-        { label: "Games", value: "None" },
-        { label: "Engine", value: "Whatever you have" },
-        {
-          label: "Maps",
-          value: "Comet Catcher Redux, Supreme Isthmus",
-        },
-      ],
+      games: [],
+      engine: null,
+      maps: ["Comet Catcher Redux", "Supreme Isthmus"],
+    });
+  });
+
+  it("names a map a pack lists twice once, and drops the blanks", () => {
+    expect(
+      readPreview(
+        container("setup-pack", {
+          maps: ["Supreme Isthmus", "", "Supreme Isthmus", 7],
+        }),
+      ),
+    ).toEqual({
+      kind: "setup-pack",
+      games: [],
+      engine: null,
+      maps: ["Supreme Isthmus"],
     });
   });
 
@@ -403,6 +403,33 @@ describe("readPreview", () => {
     expect(unknown.height).toBeCloseTo(0.76);
   });
 
+  it("names the game a blueprint's units belong to, for looking their pictures up", () => {
+    const preview = readPreview(
+      container("blueprint", {
+        name: "For a game",
+        game: { name: "Beyond All Reason test-1", shortname: "BAR" },
+        buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
+        footprints: { armsolar: { x: 1, z: 1 } },
+      }),
+    );
+    if (preview?.kind !== "blueprint") throw new Error("no blueprint preview");
+    // The shortname and never the archive name: a unit picture is keyed to
+    // survive a version bump.
+    expect(preview.game).toBe("BAR");
+  });
+
+  it("names no game for a layout exported where the game could not be read", () => {
+    const preview = readPreview(
+      container("blueprint", {
+        name: "Nameless",
+        game: { name: "Beyond All Reason test-1" },
+        buildings: [{ def: "armsolar", offset: { x: 0, z: 0 }, facing: 0 }],
+      }),
+    );
+    if (preview?.kind !== "blueprint") throw new Error("no blueprint preview");
+    expect(preview.game).toBeNull();
+  });
+
   it("has nothing to draw for a blueprint with no buildings in it", () => {
     expect(
       readPreview(container("blueprint", { name: "Empty", buildings: [] })),
@@ -506,6 +533,38 @@ describe("blueprintSheet", () => {
     const sheet = blueprintSheet(shape(1, 1), card);
     expect(sheet.scale).toBe(16);
     expect(sheet.width).toBeCloseTo(232 / 16);
+  });
+});
+
+describe("pictureBox", () => {
+  const square = {
+    def: "armlab",
+    sized: true,
+    x: 2 + BUILDING_GAP,
+    y: 1 + BUILDING_GAP,
+    width: 3 - BUILDING_GAP * 2,
+    height: 2 - BUILDING_GAP * 2,
+  };
+
+  it("covers the ground a building stands on and the render's bleed round it", () => {
+    const box = pictureBox(square, { framed: true });
+    // The footprint the square was shrunk from, plus a whole build square on
+    // every side, which is the frame the render was taken in.
+    expect(box.x).toBeCloseTo(2 - RENDER_BLEED_SQUARES);
+    expect(box.y).toBeCloseTo(1 - RENDER_BLEED_SQUARES);
+    expect(box.width).toBeCloseTo(3 + RENDER_BLEED_SQUARES * 2);
+    expect(box.height).toBeCloseTo(2 + RENDER_BLEED_SQUARES * 2);
+  });
+
+  it("gives a picture that is not a render the square itself", () => {
+    // A build pic standing in for a render has no bleed to add back, so widening
+    // its box would scale somebody's icon up for no reason.
+    expect(pictureBox(square, { framed: false })).toEqual({
+      x: square.x,
+      y: square.y,
+      width: square.width,
+      height: square.height,
+    });
   });
 });
 
