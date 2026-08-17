@@ -10,6 +10,7 @@ import {
   dlDownloadMap,
   dlGithubReleaseArchives,
 } from "../../../downloads/bindings";
+import type { WriteRoot } from "../../../downloads/config";
 import {
   GAME_REPOS,
   type GameRepo,
@@ -35,7 +36,10 @@ interface SuggestionsListProps {
   kind: "game" | "map";
   /** Already filtered to uninstalled items. */
   items: Suggestion[];
-  writePath?: string;
+  /** Where downloads go, and whether that has been read yet. The pair travels
+   * together so the "set a folder" line waits for the read rather than showing
+   * on the first render of every visit (issue #1104). */
+  writeRoot: WriteRoot;
   /** Called after a successful download (page rescans; card re-checks). */
   onComplete?: () => void;
   heading?: string;
@@ -111,10 +115,12 @@ async function runDownload(
 export function SuggestionsList({
   kind,
   items,
-  writePath,
+  writeRoot,
   onComplete,
   heading,
 }: SuggestionsListProps) {
+  const writePath = writeRoot.path;
+  const noWriteRoot = !writeRoot.loading && !writePath;
   const entries = useBrandingCatalog();
   // Unified GitHub game-repo registry (issue #512): the catalog is authoritative
   // once loaded, GAME_REPOS is the fallback seed.
@@ -173,7 +179,7 @@ export function SuggestionsList({
               ? "Get started — download a game"
               : "Get started — download a map")}
         </h2>
-        {!writePath && (
+        {noWriteRoot && (
           <p className="text-xs text-muted-foreground">
             Set a download folder in{" "}
             <Link

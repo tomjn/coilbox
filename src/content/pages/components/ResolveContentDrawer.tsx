@@ -67,13 +67,18 @@ function RequirementRow({
         )}
       </div>
       {active && progress && <ProgressBar progress={progress} />}
-      {!resolve.canDownload(req) && !done && (
-        <p className="text-xs text-muted-foreground">
-          {req.kind === "engine"
-            ? "No matching engine build found automatically — install one from Settings → Engines."
-            : "Set a download folder in Downloads settings to enable this."}
-        </p>
-      )}
+      {/* Only ever says why the download is off when it knows why. A write root
+          still being read is neither answer, and saying either would be a guess
+          the reader acts on (issue #1104). */}
+      {!resolve.canDownload(req) &&
+        !done &&
+        (resolve.noWriteRoot || req.kind === "engine") && (
+          <p className="text-xs text-muted-foreground">
+            {req.kind === "engine" && !resolve.noWriteRoot
+              ? "No matching engine build found automatically — install one from Settings → Engines."
+              : "Set a download folder in Downloads settings to enable this."}
+          </p>
+        )}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </li>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { dlInstalledContent } from "../../downloads/bindings";
-import { useContentRootPaths, useWriteRootPath } from "../../downloads/config";
+import { useContentRootPaths, useWriteRoot } from "../../downloads/config";
 import {
   filterUninstalledGames,
   useBrandingCatalog,
@@ -57,7 +57,7 @@ export default function GamesPage() {
   const busy = loading || (!!selected && !data && !error && !cancelled);
 
   // Curated download suggestions shown when this engine sees no games.
-  const writePath = useWriteRootPath();
+  const writeRoot = useWriteRoot();
   const suggested = useSuggestedGames();
   const entries = useBrandingCatalog();
   const rootPaths = useContentRootPaths();
@@ -147,7 +147,7 @@ export default function GamesPage() {
             kind="game"
             heading="No games yet — try one of these"
             items={suggestions}
-            writePath={writePath}
+            writeRoot={writeRoot}
             onComplete={() => run(true)}
           />
         ) : (

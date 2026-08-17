@@ -26,7 +26,7 @@ import {
   dlDownload,
   dlDownloadMap,
 } from "../../downloads/bindings";
-import { useWriteRootPath } from "../../downloads/config";
+import { useWriteRoot, useWriteRootPath } from "../../downloads/config";
 import {
   formatBytes,
   ProgressBar,
@@ -484,7 +484,10 @@ function MapDownload({
   mapName: string;
   onDownloaded: () => void;
 }) {
-  const writePath = useWriteRootPath();
+  const { path: writePath, loading: writeRootLoading } = useWriteRoot();
+  // Only once the read has landed and said there is none. Before that `writePath`
+  // is undefined whatever the user has configured (issue #1104).
+  const noWriteRoot = !writeRootLoading && !writePath;
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [dlError, setDlError] = useState<string | null>(null);
@@ -530,7 +533,7 @@ function MapDownload({
       {downloading && progress && (
         <ProgressBar progress={progress} className="max-w-xs" />
       )}
-      {!writePath && !downloading && (
+      {noWriteRoot && !downloading && (
         <p className="text-xs text-muted-foreground">
           Set a download folder in{" "}
           <Link

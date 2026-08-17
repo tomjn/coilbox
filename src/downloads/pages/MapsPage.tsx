@@ -25,7 +25,7 @@ import {
   type ReleaseArchive,
   type SpringFile,
 } from "../bindings";
-import { useContentRootPaths, useWriteRootPath } from "../config";
+import { useContentRootPaths, useWriteRoot } from "../config";
 import {
   type EnqueueInput,
   identityOf,
@@ -117,7 +117,10 @@ function springSubtitle(f: SpringFile): string {
 }
 
 export default function MapsPage() {
-  const writePath = useWriteRootPath();
+  const { path: writePath, loading: writeRootLoading } = useWriteRoot();
+  // Only once the read has landed and said there is none. Before that `writePath`
+  // is undefined whatever the user has configured (issue #1104).
+  const noWriteRoot = !writeRootLoading && !writePath;
   const { enqueue, statusFor, active } = useDownloadQueue();
   const [source, setSource] = useState<Source>("bar");
   const [items, setItems] = useState<MapItem[] | null>(null);
@@ -417,7 +420,7 @@ export default function MapsPage() {
             </span>
           )}
         </div>
-        {!writePath && (
+        {noWriteRoot && (
           <p className="text-xs text-muted-foreground">
             No download folder set — pick one in{" "}
             <Link
