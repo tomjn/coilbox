@@ -49,23 +49,29 @@ import { worldToScene } from "./scene";
 const ROOT_NAME = "scenario-footprints";
 
 /**
- * How far above the ground a footprint sits, in elmos: none at all.
+ * How far above the ground a footprint sits, in elmos.
  *
- * The square is the ground the building stands on, so anything above the ground
- * is above part of the building too (issue #1716). A building's base is flat and
- * lies on the ground, and a square a single elmo up covered it: the tall parts
- * of a model stood clear of the plate and the low ones were washed with it.
+ * One, which is a sixteenth of a build square and reads as no gap at all. It was
+ * four, which reads as a plate hovering under the building (issue #1716), and it
+ * was nothing at all, which is worse: a square laid exactly on the ground is the
+ * same surface as the ground, and which of the two a pixel belongs to changes
+ * with the camera. That is the flicker.
  *
- * What keeps it out of the ground it lies on is {@link groundBias} rather than a
- * gap, so it wins where the two are the same surface and loses to everything
- * standing on it.
+ * A depth bias holds the two apart as well ({@link groundBias}), but a bias is
+ * measured in whatever the hardware can resolve, and what it can resolve gets
+ * coarser the further the camera pulls back. A gap in elmos does not.
  */
-const LIFT_ELMOS = 0;
+const LIFT_ELMOS = 1;
 
-/** How far the outline stands off the ground, in elmos. A hair, because a line
- *  cannot be biased the way a filled shape can: `polygonOffset` is about
- *  polygons, and this is not one. */
-const OUTLINE_LIFT_ELMOS = 0.25;
+/**
+ * How far the outline stands above the square's own patch, in elmos.
+ *
+ * A line cannot be biased the way a filled shape can: `polygonOffset` is about
+ * polygons and this is not one. So the outline gets the only thing that works on
+ * a line, which is height, and it is the piece that most needs it: a flickering
+ * edge is what an author looks at.
+ */
+const OUTLINE_LIFT_ELMOS = 0.5;
 
 /**
  * What keeps a square out of the ground it is drawn on.
