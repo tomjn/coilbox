@@ -10,6 +10,10 @@
  * A def the game does not have gets a marker box instead of nothing, because a
  * scenario written against one game and opened against another would otherwise
  * look empty rather than wrong.
+ *
+ * A unit put down grows into place and one deleted shrinks away (issue #1716).
+ * Every pass rebuilds the whole scene, so what is animated is worked out by name
+ * rather than by what was rebuilt: see `./arrivals.ts`.
  */
 
 import * as THREE from "three";
@@ -18,6 +22,7 @@ import type { UnitModelResult } from "@/content/bindings";
 import { type BuiltModel, buildModel } from "@/content/unitModel";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import type { Rgb } from "@/play/config";
+import { animates, eased, fadeAt } from "./arrivals";
 import { facingToYaw, type Placement } from "./placements";
 import { worldToScene } from "./scene";
 import { groundHeight, type HeightField } from "./terrain";
@@ -29,6 +34,17 @@ const MARKER_ELMOS = 40;
 /** What a scenario's units are drawn under, so the layer can be found and
  *  removed as one thing. */
 const ROOT_NAME = "scenario-units";
+
+/** How long a unit takes to grow into place, and to shrink away when it is
+ *  deleted, in milliseconds. Short enough to be feedback rather than an
+ *  entrance (issue #1716). */
+const ARRIVE_MS = 200;
+const LEAVE_MS = 160;
+
+/** How small a unit starts, as a fraction of its size. Not from nothing: a
+ *  building that unfolds from a point reads as an animation, and one that
+ *  swells the last fifth reads as it landing. */
+const ARRIVE_FROM = 0.7;
 
 /** What one placement's object carries, for a picker to read off a hit. */
 export interface PlacementUserData {
@@ -51,6 +67,9 @@ export interface UnitsLayerDeps {
   loadModel: (object: string) => Promise<UnitModelResult>;
   /** The colour a team's units are painted in, as 0..1 float RGB. */
   teamColor: (team: string) => Rgb;
+  /** Whether motion is wanted, read at draw time because it is a preference
+   *  somebody can change while the editor is open (issue #1716). */
+  motion?: () => boolean;
 }
 
 /** What one pass of drawing found it could not draw. */
@@ -72,7 +91,7 @@ export interface UnitsLayer {
    *
    * A pass empties `objects` the moment it starts and refills it over the next
    * few frames, so anything hanging off a drawn object, which is the selection
-   * ring, cannot know when to look for it again. The layer is the only thing
+   * plate, cannot know when to look for it again. The layer is the only thing
    * that does know, so it says. A pass a later draw abandoned says nothing:
    * whatever is drawn then belongs to the later one.
    */
@@ -153,6 +172,79 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
   let generation = 0;
   let disposed = false;
 
+  /**
+   * What is drawn where, by name rather than by key (issue #1716).
+   *
+   * A base's buildings are keyed by their place in its list, so deleting the
+   * second of five renames three of them. A name is what a unit is and where it
+   * stands, so a delete is one departure and a move is one of each.
+   */
+  let shown = new Map<string, THREE.Object3D>();
+  /** Units shrinking away, and when each started. */
+  let leaving: { object: THREE.Object3D; gone: number }[] = [];
+  /** Units growing into place, and when each arrived. */
+  let arriving: { object: THREE.Object3D; born: number }[] = [];
+  let frame: number | null = null;
+
+  const moving = () => animates && deps.motion?.() !== false;
+
+  /** A unit part way through arriving or leaving, scaled about where it
+   *  stands. Models are anchored at their base, so one at half size is standing
+   *  on the same ground rather than hovering over it. */
+  const sizeAt = (object: THREE.Object3D, at: number) =>
+    object.scale.setScalar(handle.scale * at);
+
+  const settle = (now: number): boolean => {
+    let busy = false;
+    const growing: typeof arriving = [];
+    for (const one of arriving) {
+      const at = eased(fadeAt(now - one.born, moving() ? ARRIVE_MS : 0));
+      sizeAt(one.object, ARRIVE_FROM + (1 - ARRIVE_FROM) * at);
+      if (at < 1) {
+        growing.push(one);
+        busy = true;
+      }
+    }
+    arriving = growing;
+    const going: typeof leaving = [];
+    for (const one of leaving) {
+      const at = 1 - eased(fadeAt(now - one.gone, moving() ? LEAVE_MS : 0));
+      if (at <= 0) {
+        one.object.removeFromParent();
+        continue;
+      }
+      sizeAt(one.object, at);
+      going.push(one);
+      busy = true;
+    }
+    leaving = going;
+    return busy;
+  };
+
+  const step = () => {
+    frame = null;
+    const busy = settle(performance.now());
+    handle.render();
+    if (busy) frame = requestAnimationFrame(step);
+  };
+
+  /** Keep the loop going while anything is still growing or shrinking. The
+   *  scene renders on demand, so a loop left running costs a frame a second
+   *  forever for nothing. */
+  const wake = () => {
+    const busy = settle(performance.now());
+    if (busy && animates && frame === null) frame = requestAnimationFrame(step);
+  };
+
+  /**
+   * What names one drawn unit, for telling an arrival from a redraw.
+   *
+   * Everything about it that would make the eye call it a different unit: what
+   * it is, whose it is, where it stands and which way it points.
+   */
+  const nameOf = (placement: Placement) =>
+    `${placement.def}|${placement.team}|${placement.pos.x},${placement.pos.z}|${placement.facing}`;
+
   const markerFor = (colour: THREE.Color): BuiltModel => {
     const key = `marker|${colour.getHexString()}`;
     const cached = prototypes.get(key);
@@ -216,7 +308,11 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
   const draw = async (placements: Placement[]): Promise<DrawResult> => {
     generation++;
     const mine = generation;
-    root.clear();
+    // What was drawn stays drawn until the unit standing in its place is ready
+    // (issue #1716). A pass reads models off disk, so emptying the map at the
+    // start of one is a map that blinks out on every edit and fills back in.
+    const before = shown;
+    shown = new Map();
     objects.clear();
     const missing: string[] = [];
 
@@ -238,11 +334,31 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
       for (const placement of batch) {
         const instance = built.object.clone();
         place(instance, placement);
+        const name = nameOf(placement);
+        // The unit that was standing here goes now that this one is ready, and
+        // takes no part in the departures below: it has been replaced rather
+        // than removed.
+        const had = before.get(name);
+        if (had) {
+          had.removeFromParent();
+          before.delete(name);
+        } else {
+          arriving.push({ object: instance, born: performance.now() });
+          sizeAt(instance, ARRIVE_FROM);
+        }
         root.add(instance);
+        shown.set(name, instance);
         objects.set(placement.key, instance);
       }
       handle.render();
     }
+
+    // Whatever the pass did not stand something in the place of has gone: a
+    // building deleted, or one that moved and is now standing somewhere else.
+    const now = performance.now();
+    for (const gone of before.values())
+      leaving.push({ object: gone, gone: now });
+    wake();
 
     handle.render();
     for (const watcher of watchers) watcher();
@@ -261,6 +377,11 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
     },
     dispose: () => {
       disposed = true;
+      if (frame !== null && animates) cancelAnimationFrame(frame);
+      frame = null;
+      arriving = [];
+      leaving = [];
+      shown = new Map();
       root.clear();
       objects.clear();
       watchers.clear();

@@ -17,6 +17,7 @@ import {
   useUnitsyncScan,
   useUnitsyncUnitDataset,
 } from "@/content/config";
+import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/mapconv/pages/components/MapPreview3D";
 import { usePreferredTarget } from "@/play/config";
 import type { Point, Scenario } from "@/scenario/model";
@@ -279,6 +280,12 @@ export function useScenarioUnits(
   const heightsUnread = field === null && standing !== null;
 
   const { worldWidth, worldHeight, minHeight, maxHeight } = map;
+  // Behind a ref like the lookups above: a preference changed while the editor
+  // is open is a reason to stop moving, not a reason to rebuild the layer and
+  // re-read every model in the document.
+  const still = useRef(false);
+  still.current = useReduceMotion();
+
   const [layer, setLayer] = useState<UnitsLayer | null>(null);
   useEffect(() => {
     if (!handle || !standing) return;
@@ -298,6 +305,7 @@ export function useScenarioUnits(
         return loadUnitsyncUnitModel(enginePath, dataDir, gameArchive, object);
       },
       teamColor: (team) => teamColor(lookups.current.participants, team),
+      motion: () => !still.current,
     });
     setLayer(built);
     return () => {
