@@ -278,11 +278,7 @@ describe("the catalog this ships with", () => {
    * settles it. An entry here is one the rotation never reaches, so the list is
    * a statement that we know and it is tracked, not a licence.
    */
-  const NO_THUMBNAIL: Record<string, string> = {
-    // springfiles serves this spring name with a joke map, so there is no
-    // picture of Folsom Dam to point at until the entry is repointed or dropped.
-    "classic-folsom-dam": "https://github.com/tomjn/coilbox/issues/1067",
-  };
+  const NO_THUMBNAIL: Record<string, string> = {};
 
   it("has a rotation at all", () => {
     expect(

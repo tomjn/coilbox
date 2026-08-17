@@ -320,12 +320,6 @@
             }
           },
           {
-            "id": "classic-folsom-dam",
-            "title": "Folsom Dam",
-            "filename": "folsomdam.sd7",
-            "download": { "kind": "map", "springName": "FolsomDam" }
-          },
-          {
             "id": "classic-great-divide",
             "title": "Great Divide",
             "filename": "great_divide_v1.sd7",
