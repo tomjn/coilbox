@@ -29,7 +29,7 @@ import {
 import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
-import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ExtensionTypes } from "../../extensions";
 import {
@@ -476,7 +476,7 @@ function ParamControl({
       // A plain string. A unit type is picked from the game, because the engine
       // needs the internal name and nobody remembers "armestor".
       return isUnitDefParam(name) ? (
-        <UnitDefSelect
+        <UnitPickerButton
           units={units}
           value={asString(value)}
           loading={unitsLoading}
@@ -701,7 +701,7 @@ function StringsField({
         </ul>
       )}
       {units ? (
-        <UnitDefSelect
+        <UnitPickerButton
           units={units}
           value=""
           loading={unitsLoading}

@@ -1,5 +1,5 @@
 import type { UnitDatasetEntry } from "./bindings";
-import { buildEdgeMap, reachableFrom } from "./buildTree";
+import { buildEdgeMap } from "./buildTree";
 
 /**
  * Shared build-graph model for the tech-tree picker. Turns a game's unit dataset
@@ -14,29 +14,30 @@ import { buildEdgeMap, reachableFrom } from "./buildTree";
  * worker's dataset (unit def keys are lowercase), so lookups are case-insensitive.
  */
 
-/** A spanning forest over the build graph, rooted at faction start units. */
+/** Which faction can build each unit, over the game's build graph. */
 export interface TechForest {
   /** Root ids (start units present in the dataset), in the order given. */
   roots: string[];
-  /** Spanning-tree children per unit id (each unit has one parent, so appears
-   * once in the forest). Sorted for stable rendering. */
-  childrenOf: Map<string, string[]>;
-  /** Known unit ids not reachable from any root, so nothing is hidden. Sorted. */
+  /** Unit id to the root that reaches it, so the picker can group by faction.
+   * A root maps to itself. Units no root reaches are absent. */
+  factionOf: Map<string, string>;
+  /** Known unit ids no root reaches, so nothing is hidden. Sorted. */
   ungrouped: string[];
-  /** Ids that build at least one known unit (drives the subtree affordance). */
-  builders: Set<string>;
-  /** The full lowercased edge map, for transitive subtree operations. */
-  edges: Map<string, string[]>;
   /** Every known unit id (lowercased). */
   known: Set<string>;
 }
 
 /**
- * Build the spanning forest. A single multi-source BFS seeds every root first
- * (so a root reachable from another stays top-level), then assigns each other
- * unit to the first root/parent that reaches it. A unit shared by two factions
- * appears once, under whichever root's BFS found it first, rather than
- * duplicating. Dangling build options (edges to unknown units) are dropped.
+ * Work out which faction reaches each unit. A single multi-source BFS seeds
+ * every root first, then assigns each other unit to the first root that reaches
+ * it. Dangling build options (edges to unknown units) are dropped.
+ *
+ * This is a grouping, not a hierarchy. The picker used to render the same walk
+ * as a spanning tree, which forced a graph into one parent per unit: a unit two
+ * builders make appeared under whichever the search hit first, so a builder's
+ * row showed an arbitrary subset of what it builds, and the units it lost were
+ * invisible (#1051). Two factions that share a unit still have to put it
+ * somewhere, but a faction heading claims far less than an indent does.
  */
 export function buildTechForest(
   units: UnitDatasetEntry[],
@@ -46,49 +47,77 @@ export function buildTechForest(
   const known = new Set(units.map((u) => u.name.toLowerCase()));
 
   const rootIds: string[] = [];
-  const seen = new Set<string>();
+  const factionOf = new Map<string, string>();
   for (const r of roots) {
     const id = r?.toLowerCase();
-    if (id && known.has(id) && !seen.has(id)) {
-      seen.add(id);
+    if (id && known.has(id) && !factionOf.has(id)) {
+      factionOf.set(id, id);
       rootIds.push(id);
     }
   }
 
-  const childrenOf = new Map<string, string[]>();
-  const queue = [...rootIds];
+  const queue = rootIds.map((id) => [id, id] as const);
   while (queue.length > 0) {
     // biome-ignore lint/style/noNonNullAssertion: queue is non-empty in the loop
-    const node = queue.shift()!;
+    const [node, root] = queue.shift()!;
     for (const next of edges.get(node) ?? []) {
-      if (next === node || seen.has(next) || !known.has(next)) continue;
-      seen.add(next);
-      const kids = childrenOf.get(node) ?? [];
-      kids.push(next);
-      childrenOf.set(node, kids);
-      queue.push(next);
+      if (factionOf.has(next) || !known.has(next)) continue;
+      factionOf.set(next, root);
+      queue.push([next, root]);
     }
   }
-  for (const [k, v] of childrenOf) childrenOf.set(k, v.sort());
 
-  const ungrouped = [...known].filter((id) => !seen.has(id)).sort();
+  const ungrouped = [...known].filter((id) => !factionOf.has(id)).sort();
 
-  const builders = new Set<string>();
-  for (const [id, opts] of edges) {
-    if (opts.some((o) => known.has(o))) builders.add(id);
-  }
-
-  return { roots: rootIds, childrenOf, ungrouped, builders, edges, known };
+  return { roots: rootIds, factionOf, ungrouped, known };
 }
 
-/** The unit itself plus every unit reachable from it via `buildoptions`
- * (transitive, cycle-guarded), the "whole subtree" for a subtree toggle.
- * Follows every real build edge, not just the spanning tree. */
-export function subtreeOf(
-  unit: string,
-  edges: Map<string, string[]>,
-): Set<string> {
-  return reachableFrom(unit, edges);
+/** A faction's units, as one flat block of the picker's list. */
+export interface UnitGroup {
+  /** The root unit id, or `""` for the units no faction reaches. */
+  id: string;
+  /** Heading for the block. */
+  label: string;
+  /** Unit ids, sorted by the name the reader sees. */
+  units: string[];
+}
+
+/**
+ * The picker's whole list: one block per faction in root order, then whatever no
+ * faction builds, each sorted by unit name. `label` names a unit, `heading` names
+ * a faction, and `match` filters units (the search). Empty blocks are dropped.
+ */
+export function factionGroups(
+  forest: TechForest,
+  ids: Iterable<string>,
+  label: (id: string) => string,
+  heading: (rootId: string) => string,
+  match: (id: string) => boolean = () => true,
+): UnitGroup[] {
+  // `ids` is what to lay out, which is not always the whole game: a blueprint
+  // field offers only buildings, and a warpath only one faction's units. The
+  // forest still comes from the full dataset, because which faction builds a
+  // unit is the game's answer and a filtered list cannot give it.
+  const byRoot = new Map<string, string[]>(forest.roots.map((r) => [r, []]));
+  const rest: string[] = [];
+  for (const raw of ids) {
+    const id = raw.toLowerCase();
+    if (!match(id)) continue;
+    const root = forest.factionOf.get(id);
+    if (root && byRoot.has(root)) byRoot.get(root)?.push(id);
+    else rest.push(id);
+  }
+  const byName = (a: string, b: string) =>
+    label(a).localeCompare(label(b)) || a.localeCompare(b);
+  const groups: UnitGroup[] = forest.roots.map((root) => ({
+    id: root,
+    label: heading(root),
+    units: (byRoot.get(root) ?? []).sort(byName),
+  }));
+  if (rest.length > 0) {
+    groups.push({ id: "", label: "Other units", units: rest.sort(byName) });
+  }
+  return groups.filter((g) => g.units.length > 0);
 }
 
 /** True when `id` is in `selected`, case-insensitively. */
@@ -114,46 +143,6 @@ export function toggleUnit(
     return has ? selected : [...selected, lower];
   }
   return has ? selected.filter((s) => s.toLowerCase() !== lower) : selected;
-}
-
-/**
- * Add or remove a unit and its whole subtree ({@link subtreeOf}) from the
- * selected set in one operation. When adding, appends any subtree ids not
- * already present (preserving existing entries and their order). When removing,
- * drops every subtree id, case-insensitively. Returns the same array reference
- * when nothing changes.
- */
-export function toggleSubtree(
-  selected: string[],
-  unit: string,
-  edges: Map<string, string[]>,
-  on: boolean,
-): string[] {
-  const sub = subtreeOf(unit, edges);
-  if (sub.size === 0) return toggleUnit(selected, unit, on);
-  if (on) {
-    const present = new Set(selected.map((s) => s.toLowerCase()));
-    const additions = [...sub].filter((id) => !present.has(id));
-    return additions.length > 0 ? [...selected, ...additions] : selected;
-  }
-  const next = selected.filter((s) => !sub.has(s.toLowerCase()));
-  return next.length === selected.length ? selected : next;
-}
-
-/** How much of a unit's subtree is selected: "none", "all", or "some", for a
- * tri-state subtree toggle. A leaf (empty subtree) reports on its own state. */
-export function subtreeState(
-  selected: string[],
-  unit: string,
-  edges: Map<string, string[]>,
-): "none" | "some" | "all" {
-  const sub = subtreeOf(unit, edges);
-  if (sub.size === 0) return isSelected(selected, unit) ? "all" : "none";
-  const chosen = new Set(selected.map((s) => s.toLowerCase()));
-  let count = 0;
-  for (const id of sub) if (chosen.has(id)) count++;
-  if (count === 0) return "none";
-  return count === sub.size ? "all" : "some";
 }
 
 /**

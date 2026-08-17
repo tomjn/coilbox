@@ -11,7 +11,7 @@
  * static and every entry is resolved on every render, in order, so that is safe.
  *
  * Every mode picks units the way the others do: `useGameUnits` for the
- * scenario's game, `UnitDefSelect` to pick one of them.
+ * scenario's game, `UnitPickerButton` to pick one of them.
  */
 
 import { Button, Input } from "@picoframe/frame";
@@ -32,7 +32,7 @@ import { useBlueprintLibrary } from "@/blueprint/store";
 import { blueprintFromPayload } from "@/blueprint/transfer";
 import { knownUnits } from "@/blueprint/units";
 import { useUnitsyncScan } from "@/content/config";
-import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import { parsePlacementKey, placementKey } from "@/placement/placements";
 import type { PreviewBuilding } from "@/placement/preview";
@@ -271,7 +271,7 @@ const actorsMode: EditorMode = {
         : null,
       controls: (
         <>
-          <UnitDefSelect
+          <UnitPickerButton
             units={units}
             value={unitDef}
             onValueChange={setUnitDef}
@@ -332,7 +332,7 @@ const groupsMode: EditorMode = {
         : null,
       controls: (
         <>
-          <UnitDefSelect
+          <UnitPickerButton
             units={units}
             value={unitDef}
             onValueChange={setUnitDef}
@@ -473,7 +473,7 @@ const basesMode: EditorMode = {
         : null,
       controls: (
         <>
-          <UnitDefSelect
+          <UnitPickerButton
             units={options}
             value={unitDef}
             onValueChange={setUnitDef}

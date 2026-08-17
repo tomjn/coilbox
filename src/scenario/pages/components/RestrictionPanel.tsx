@@ -16,7 +16,7 @@ import { Button, Input } from "@picoframe/frame";
 import { Lock, Plus, X } from "lucide-react";
 import { useState } from "react";
 import type { UnitDatasetEntry } from "@/content/bindings";
-import { UnitDefSelect } from "@/content/pages/components/UnitDefSelect";
+import { UnitPickerButton } from "@/content/pages/components/UnitPicker";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario } from "../../model";
 import { EditorPanel } from "./panels";
@@ -115,7 +115,7 @@ export function RestrictionPanel({
                 </ul>
               )}
 
-              <UnitDefSelect
+              <UnitPickerButton
                 units={units}
                 value=""
                 loading={unitsLoading}

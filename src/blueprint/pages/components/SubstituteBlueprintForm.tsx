@@ -14,6 +14,7 @@
  * The panel itself is pure and tested. This is the half that cannot be.
  */
 
+import { UnitGameProvider } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useEquivalents } from "../../equivalentsStore";
 import {
@@ -40,17 +41,19 @@ export function SubstituteBlueprintForm({
   const shipped = useShippedEquivalents(archive, sides);
 
   return (
-    <SubstitutionPanel
-      layout={libraryLayout(record)}
-      sides={sides}
-      table={table}
-      units={units}
-      unitsLoading={loading}
-      onApply={onApply}
-      onRemember={remember}
-      onReadShipped={shipped.read}
-      readingShipped={shipped.reading}
-      shippedNote={shipped.note}
-    />
+    <UnitGameProvider gameArchive={archive}>
+      <SubstitutionPanel
+        layout={libraryLayout(record)}
+        sides={sides}
+        table={table}
+        units={units}
+        unitsLoading={loading}
+        onApply={onApply}
+        onRemember={remember}
+        onReadShipped={shipped.read}
+        readingShipped={shipped.reading}
+        shippedNote={shipped.note}
+      />
+    </UnitGameProvider>
   );
 }

@@ -3,6 +3,7 @@ import { ArrowLeft, Rocket } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Textarea } from "@/components/ui/textarea";
+import { UnitGameProvider } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
 import {
   DetailLoading,
@@ -210,114 +211,121 @@ export default function ScenarioEditPage() {
       : null;
 
   return (
-    <div className="flex flex-col gap-5 p-4">
-      <div className="flex items-center gap-3">
-        <Link
-          to={BACK}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
-        >
-          <ArrowLeft className="size-3.5" /> Back to scenarios
-        </Link>
-        {/* Testing belongs with the setup, because the setup is all a launch
+    // Every unit field on this page, however deeply nested, picks from this
+    // scenario's game, so it gets build pics and faction blocks without each
+    // panel being handed the game name.
+    <UnitGameProvider gameName={scenario.setup.gameName}>
+      <div className="flex flex-col gap-5 p-4">
+        <div className="flex items-center gap-3">
+          <Link
+            to={BACK}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+          >
+            <ArrowLeft className="size-3.5" /> Back to scenarios
+          </Link>
+          {/* Testing belongs with the setup, because the setup is all a launch
             consumes: the game named there decides whether the scenario is
             played as itself or through the test mutator. */}
-        <Button size="sm" className="ml-auto shrink-0" onClick={openTest}>
-          <Rocket className="size-4" /> Test in game
-        </Button>
-      </div>
+          <Button size="sm" className="ml-auto shrink-0" onClick={openTest}>
+            <Rocket className="size-4" /> Test in game
+          </Button>
+        </div>
 
-      {error && <ErrorBanner message={error} />}
+        {error && <ErrorBanner message={error} />}
 
-      <header className="flex flex-col gap-3">
-        <Input
-          aria-label="Scenario name"
-          value={scenario.name}
-          onChange={(e) =>
-            setScenario((s) => (s ? { ...s, name: e.target.value } : s))
-          }
-          onBlur={() => apply(scenario)}
-          className="text-base font-semibold"
-        />
-        <Textarea
-          aria-label="Scenario description"
-          value={scenario.description}
-          placeholder="Description"
-          className="min-h-16"
-          onChange={(e) =>
-            setScenario((s) => (s ? { ...s, description: e.target.value } : s))
-          }
-          onBlur={() => apply(scenario)}
-        />
-      </header>
+        <header className="flex flex-col gap-3">
+          <Input
+            aria-label="Scenario name"
+            value={scenario.name}
+            onChange={(e) =>
+              setScenario((s) => (s ? { ...s, name: e.target.value } : s))
+            }
+            onBlur={() => apply(scenario)}
+            className="text-base font-semibold"
+          />
+          <Textarea
+            aria-label="Scenario description"
+            value={scenario.description}
+            placeholder="Description"
+            className="min-h-16"
+            onChange={(e) =>
+              setScenario((s) =>
+                s ? { ...s, description: e.target.value } : s,
+              )
+            }
+            onBlur={() => apply(scenario)}
+          />
+        </header>
 
-      {/* The setup: the game and map the scene below draws, and the
+        {/* The setup: the game and map the scene below draws, and the
           participants everything placed on it belongs to. */}
-      <SetupPanel scenario={scenario} onChange={(next) => apply(next)} />
+        <SetupPanel scenario={scenario} onChange={(next) => apply(next)} />
 
-      {/* The editing surface: the document's units drawn on the map, the mode
+        {/* The editing surface: the document's units drawn on the map, the mode
           strip that places more, and the picking and dragging that moves them.
           Zones and paths arrive in #759 onwards. */}
-      {/* The history is the whole document's, panels included, but its buttons
+        {/* The history is the whole document's, panels included, but its buttons
           live on the map: it is the surface an author spends the time on, and
           the one that covers the page when it is expanded. */}
-      <ScenarioMapScene
-        scenario={scenario}
-        onChange={(next) => apply(next)}
-        extensions={extensions}
-        picking={picking}
-        history={{
-          canUndo: history.past.length > 0,
-          canRedo: history.future.length > 0,
-          undo,
-          redo,
-        }}
-      />
+        <ScenarioMapScene
+          scenario={scenario}
+          onChange={(next) => apply(next)}
+          extensions={extensions}
+          picking={picking}
+          history={{
+            canUndo: history.past.length > 0,
+            canRedo: history.future.length > 0,
+            undo,
+            redo,
+          }}
+        />
 
-      {/* The panels: the parts of the document the map cannot show. Triggers
+        {/* The panels: the parts of the document the map cannot show. Triggers
           first, because everything under them is something a trigger points
           at. */}
-      <TriggerPanel
-        scenario={scenario}
-        onChange={(next) => apply(next)}
-        units={gameUnits.units}
-        unitsLoading={gameUnits.loading}
-        gate={gate}
-        extensions={extensions}
-        note={note}
-        picking={pick}
-        onPick={setPick}
-      />
-      <ObjectivePanel
-        scenario={scenario}
-        onChange={(next) => apply(next)}
-        extensions={extensions}
-      />
-      <DialoguePanel
-        scenario={scenario}
-        onChange={(next) => apply(next)}
-        extensions={extensions}
-      />
-      <RestrictionPanel
-        scenario={scenario}
-        onChange={(next) => apply(next)}
-        units={gameUnits.units}
-        unitsLoading={gameUnits.loading}
-      />
-      {/* The layouts the document holds, and the way in and out of a game's own
+        <TriggerPanel
+          scenario={scenario}
+          onChange={(next) => apply(next)}
+          units={gameUnits.units}
+          unitsLoading={gameUnits.loading}
+          gate={gate}
+          extensions={extensions}
+          note={note}
+          picking={pick}
+          onPick={setPick}
+        />
+        <ObjectivePanel
+          scenario={scenario}
+          onChange={(next) => apply(next)}
+          extensions={extensions}
+        />
+        <DialoguePanel
+          scenario={scenario}
+          onChange={(next) => apply(next)}
+          extensions={extensions}
+        />
+        <RestrictionPanel
+          scenario={scenario}
+          onChange={(next) => apply(next)}
+          units={gameUnits.units}
+          unitsLoading={gameUnits.loading}
+        />
+        {/* The layouts the document holds, and the way in and out of a game's own
           blueprint file. It sits with the panels rather than on the map because
           it is about the whole document, and because a layout arriving from a
           file is not a click on the map. */}
-      <BlueprintPanel
-        scenario={scenario}
-        onChange={(edit) => apply(edit)}
-        units={gameUnits.units}
-      />
-      <VarPanel
-        scenario={scenario}
-        onChange={(next) => apply(next)}
-        extensions={extensions}
-      />
-    </div>
+        <BlueprintPanel
+          scenario={scenario}
+          onChange={(edit) => apply(edit)}
+          units={gameUnits.units}
+        />
+        <VarPanel
+          scenario={scenario}
+          onChange={(next) => apply(next)}
+          extensions={extensions}
+        />
+      </div>
+    </UnitGameProvider>
   );
 }
 

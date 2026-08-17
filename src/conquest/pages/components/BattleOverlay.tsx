@@ -15,7 +15,7 @@ import {
   useUnitsyncUnitDataset,
 } from "../../../content/config";
 import { ErrorBanner } from "../../../content/pages/components/states";
-import { TechTreePicker } from "../../../content/pages/components/TechTreePicker";
+import { UnitPicker } from "../../../content/pages/components/UnitPicker";
 import {
   type DownloadProgress,
   dlDownloadMap,
@@ -109,7 +109,7 @@ export function BattleOverlay({
     : undefined;
   // Scope to the player's own faction tree when it's known, dropping other
   // factions' units so they don't clutter an "Other units" bucket. Otherwise
-  // fall back to the whole dataset, still grouped sensibly by TechTreePicker.
+  // fall back to the whole dataset, which the picker still groups by faction.
   const techUnits = useMemo(() => {
     const units = dataset.dataset?.units ?? [];
     if (!playerStartUnit) return units;
@@ -132,9 +132,9 @@ export function BattleOverlay({
             "Units usable in this fight, lit up against your faction's build tree. Restricted units stay unlit.",
           width: "40rem",
           content: (
-            <TechTreePicker
+            <UnitPicker
               units={techUnits}
-              roots={playerStartUnit ? [playerStartUnit] : []}
+              factions={playerStartUnit ? [{ startUnit: playerStartUnit }] : []}
               selected={availableUnits}
               selectedLabel="available"
               enginePath={target?.enginePath}

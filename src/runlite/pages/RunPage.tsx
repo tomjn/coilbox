@@ -13,7 +13,7 @@ import {
   EmptyState,
   SkeletonList,
 } from "../../content/pages/components/states";
-import { TechTreePicker } from "../../content/pages/components/TechTreePicker";
+import { UnitPicker } from "../../content/pages/components/UnitPicker";
 import { usePreferredTarget } from "../../play/config";
 import { substituteExcludedMaps } from "../generate";
 import { awardMeta } from "../meta";
@@ -131,9 +131,9 @@ export default function RunPage() {
               "Units unlocked into your shared arsenal, lit up against the faction's full build tree.",
             width: "40rem",
             content: (
-              <TechTreePicker
+              <UnitPicker
                 units={arsenalUnits}
-                roots={run.startUnit ? [run.startUnit] : []}
+                factions={run.startUnit ? [{ startUnit: run.startUnit }] : []}
                 selected={run.progress.unlockedUnits}
                 selectedLabel="unlocked"
                 enginePath={target?.enginePath}
