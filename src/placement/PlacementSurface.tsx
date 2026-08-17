@@ -10,7 +10,7 @@
  *
  * The ground underneath is either a map or a plain build grid, and nothing above
  * this line can tell which. Both hand over the same {@link MapScene3D}, so the
- * unit models, the footprint squares, the selection ring and the pointer
+ * unit models, the footprint squares, the selection plate and the pointer
  * arithmetic are one implementation used twice rather than two that will drift.
  *
  * The scene is not owned here either: it is handed out through `onScene` and

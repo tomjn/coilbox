@@ -88,7 +88,7 @@ export interface LayoutPreviewState {
    *  show, which is what stops the pointer layer casting a ray per move. */
   onHover: ((pos: Point | null) => void) | null;
   /** Hand to `useMapEditing` as `onDragUnit`. Answers whether it is drawing
-   *  the drag, which is what takes the selection ring off it. */
+   *  the drag, which is what takes the selection plate off it. */
   onDragUnit: ((drag: UnitDrag | null) => boolean) | null;
   /** The key of the building being dragged, while one is. What is drawn for it
    *  is where it is going, so whoever draws the document's own footprints

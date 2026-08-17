@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   clampToMap,
+  holdCursor,
   isClick,
+  onGround,
   pointerNdc,
   pointerTargets,
   pressGesture,
@@ -15,6 +17,54 @@ describe("isClick", () => {
   it("counts a travelled pointer as a drag", () => {
     expect(isClick({ x: 10, y: 10 }, { x: 40, y: 10 })).toBe(false);
     expect(isClick({ x: 10, y: 10 }, { x: 10, y: 40 })).toBe(false);
+  });
+});
+
+/**
+ * Issue #1716. A selected building is dragged to move it and nothing said so:
+ * the pointer over it looked exactly like the pointer over the ground beside it.
+ */
+describe("holdCursor", () => {
+  it("offers a hand over the thing that can be picked up", () => {
+    expect(holdCursor({ dragging: false, holding: true, ground: "" })).toBe(
+      "grab",
+    );
+  });
+
+  it("closes the hand while a drag is under way", () => {
+    expect(holdCursor({ dragging: true, holding: true, ground: "" })).toBe(
+      "grabbing",
+    );
+  });
+
+  /** The hand is about the one thing under the pointer, so leaving it puts the
+   *  mode's own cursor back rather than an arrow. */
+  it("gives the ground's own cursor back everywhere else", () => {
+    expect(
+      holdCursor({ dragging: false, holding: false, ground: "crosshair" }),
+    ).toBe("crosshair");
+    expect(holdCursor({ dragging: false, holding: false, ground: "" })).toBe(
+      "",
+    );
+  });
+});
+
+/** Issue #1716. How a press reaches the selected building's own square, which
+ *  is drawn by a layer nothing raycasts. */
+describe("onGround", () => {
+  const square = { minX: 100, minZ: 200, maxX: 132, maxZ: 232 };
+
+  it("finds a point inside the square", () => {
+    expect(onGround({ x: 110, z: 210 }, square)).toBe(true);
+  });
+
+  it("finds a point on the edge of it", () => {
+    expect(onGround({ x: 100, z: 232 }, square)).toBe(true);
+  });
+
+  it("passes over a point outside it", () => {
+    expect(onGround({ x: 99, z: 210 }, square)).toBe(false);
+    expect(onGround({ x: 110, z: 233 }, square)).toBe(false);
   });
 });
 

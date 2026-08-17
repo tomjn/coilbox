@@ -4,7 +4,7 @@
  *
  * The blueprint editor draws on this instead of a map. It builds the same
  * {@link MapScene3D} the terrain preview does, so everything that draws on a
- * map, the unit models, the footprint squares, the selection ring and the
+ * map, the unit models, the footprint squares, the selection plate and the
  * pointer's own arithmetic, works here without knowing which of the two it is
  * standing on.
  *
