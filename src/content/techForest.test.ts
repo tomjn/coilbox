@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { UnitDatasetEntry } from "./bindings";
-import { buildEdgeMap } from "./buildTree";
 import {
   buildTechForest,
+  factionGroups,
   isSelected,
-  subtreeOf,
-  subtreeState,
-  toggleSubtree,
   toggleUnit,
   unknownSelected,
 } from "./techForest";
@@ -16,7 +13,7 @@ function unit(name: string, buildOptions: string[] = []): UnitDatasetEntry {
 }
 
 describe("buildTechForest", () => {
-  it("roots each faction and nests its build options once", () => {
+  it("assigns every unit a faction its commander reaches", () => {
     const forest = buildTechForest(
       [
         unit("armcom", ["armsolar", "armlab"]),
@@ -29,31 +26,30 @@ describe("buildTechForest", () => {
       ["armcom", "corcom"],
     );
     expect(forest.roots).toEqual(["armcom", "corcom"]);
-    expect(forest.childrenOf.get("armcom")).toEqual(["armlab", "armsolar"]);
-    expect(forest.childrenOf.get("armlab")).toEqual(["armpw"]);
-    expect(forest.childrenOf.get("corcom")).toEqual(["corsolar"]);
+    // Depth is not recorded: armpw is two build steps from the commander and
+    // sits in the same block as the lab that makes it.
+    expect(forest.factionOf.get("armpw")).toBe("armcom");
+    expect(forest.factionOf.get("armlab")).toBe("armcom");
+    expect(forest.factionOf.get("corsolar")).toBe("corcom");
     expect(forest.ungrouped).toEqual([]);
   });
 
-  it("attaches a shared unit to the first root only (no duplication)", () => {
+  it("gives a unit both factions build to the first of them", () => {
     const forest = buildTechForest(
       [unit("acom", ["shared"]), unit("bcom", ["shared"]), unit("shared")],
       ["acom", "bcom"],
     );
-    // shared is a child of acom (seeded/discovered first), not bcom.
-    expect(forest.childrenOf.get("acom")).toEqual(["shared"]);
-    expect(forest.childrenOf.get("bcom")).toBeUndefined();
+    expect(forest.factionOf.get("shared")).toBe("acom");
   });
 
-  it("keeps roots top-level even if one builds another", () => {
+  it("keeps a root in its own faction even if another root builds it", () => {
     const forest = buildTechForest(
       [unit("acom", ["bcom"]), unit("bcom", ["bot"]), unit("bot")],
       ["acom", "bcom"],
     );
     expect(forest.roots).toEqual(["acom", "bcom"]);
-    // bcom stays a root, so acom does not adopt it as a child.
-    expect(forest.childrenOf.get("acom")).toBeUndefined();
-    expect(forest.childrenOf.get("bcom")).toEqual(["bot"]);
+    expect(forest.factionOf.get("bcom")).toBe("bcom");
+    expect(forest.factionOf.get("bot")).toBe("bcom");
   });
 
   it("collects units unreachable from any root as ungrouped", () => {
@@ -70,7 +66,8 @@ describe("buildTechForest", () => {
       ["nope", "com"],
     );
     expect(forest.roots).toEqual(["com"]);
-    expect(forest.childrenOf.get("com")).toEqual(["real"]);
+    expect(forest.factionOf.get("real")).toBe("com");
+    expect(forest.factionOf.has("ghost")).toBe(false);
   });
 
   it("matches roots case-insensitively and lowercases ids", () => {
@@ -79,35 +76,57 @@ describe("buildTechForest", () => {
       ["armcom"],
     );
     expect(forest.roots).toEqual(["armcom"]);
-    expect(forest.childrenOf.get("armcom")).toEqual(["armsolar"]);
+    expect(forest.factionOf.get("armsolar")).toBe("armcom");
     expect(forest.known.has("armsolar")).toBe(true);
-  });
-
-  it("flags builders that build at least one known unit", () => {
-    const forest = buildTechForest(
-      [unit("com", ["fac"]), unit("fac", ["bot", "ghost"]), unit("bot")],
-      ["com"],
-    );
-    expect(forest.builders.has("com")).toBe(true);
-    expect(forest.builders.has("fac")).toBe(true);
-    expect(forest.builders.has("bot")).toBe(false);
   });
 });
 
-describe("subtreeOf", () => {
-  it("returns the unit plus every transitive build option", () => {
-    const edges = buildEdgeMap([
-      unit("fac", ["bot", "veh"]),
-      unit("bot", ["gun"]),
-      unit("veh"),
-      unit("gun"),
+describe("factionGroups", () => {
+  const forest = buildTechForest(
+    [
+      unit("armcom", ["armlab"]),
+      unit("armlab", ["armpw"]),
+      unit("armpw"),
+      unit("corcom", ["corsolar"]),
+      unit("corsolar"),
+      unit("scenery"),
+    ],
+    ["armcom", "corcom"],
+  );
+  const NAMES: Record<string, string> = {
+    armcom: "Commander",
+    armlab: "Bot Lab",
+    armpw: "Peewee",
+    corcom: "Commander",
+    corsolar: "Solar Collector",
+    scenery: "Rock",
+  };
+  const label = (id: string) => NAMES[id] ?? id;
+  const heading = (root: string) => (root === "armcom" ? "Armada" : "Cortex");
+
+  it("lists a faction's units flat, by name, whatever builds them", () => {
+    const [armada] = factionGroups(forest, label, heading);
+    // The lab and the unit it makes are siblings here, and the commander is not
+    // first: the reader gets one alphabetical list per faction.
+    expect(armada.label).toBe("Armada");
+    expect(armada.units).toEqual(["armlab", "armcom", "armpw"]);
+  });
+
+  it("keeps factions in root order and puts the rest last", () => {
+    const groups = factionGroups(forest, label, heading);
+    expect(groups.map((g) => g.label)).toEqual([
+      "Armada",
+      "Cortex",
+      "Other units",
     ]);
-    expect([...subtreeOf("fac", edges)].sort()).toEqual([
-      "bot",
-      "fac",
-      "gun",
-      "veh",
-    ]);
+    expect(groups[2].units).toEqual(["scenery"]);
+  });
+
+  it("drops a block the search empties", () => {
+    const groups = factionGroups(forest, label, heading, (id) =>
+      id.startsWith("cor"),
+    );
+    expect(groups.map((g) => g.label)).toEqual(["Cortex"]);
   });
 });
 
@@ -130,66 +149,6 @@ describe("toggleUnit", () => {
   it("returns the same reference when removing an absent id", () => {
     const set = ["corcom"];
     expect(toggleUnit(set, "armflash", false)).toBe(set);
-  });
-});
-
-describe("toggleSubtree", () => {
-  const edges = buildEdgeMap([
-    unit("fac", ["bot", "veh"]),
-    unit("bot", ["gun"]),
-    unit("veh"),
-    unit("gun"),
-  ]);
-
-  it("adds the unit and its whole subtree, preserving existing entries", () => {
-    expect(toggleSubtree(["keep"], "fac", edges, true).sort()).toEqual([
-      "bot",
-      "fac",
-      "gun",
-      "keep",
-      "veh",
-    ]);
-  });
-
-  it("does not duplicate already-present subtree members", () => {
-    const next = toggleSubtree(["bot"], "fac", edges, true);
-    expect(next.filter((x) => x === "bot")).toHaveLength(1);
-  });
-
-  it("removes the whole subtree, keeping unrelated entries", () => {
-    const start = ["fac", "bot", "gun", "veh", "keep"];
-    expect(toggleSubtree(start, "fac", edges, false)).toEqual(["keep"]);
-  });
-
-  it("returns the same reference when a removal changes nothing", () => {
-    const set = ["keep"];
-    expect(toggleSubtree(set, "fac", edges, false)).toBe(set);
-  });
-
-  it("falls back to a single toggle for a leaf with no subtree", () => {
-    expect(toggleSubtree([], "gun", edges, true)).toEqual(["gun"]);
-  });
-});
-
-describe("subtreeState", () => {
-  const edges = buildEdgeMap([
-    unit("fac", ["bot", "veh"]),
-    unit("bot", ["gun"]),
-    unit("veh"),
-    unit("gun"),
-  ]);
-
-  it("reports none, some, all across a subtree", () => {
-    expect(subtreeState([], "fac", edges)).toBe("none");
-    expect(subtreeState(["gun"], "fac", edges)).toBe("some");
-    expect(subtreeState(["fac", "bot", "veh", "gun"], "fac", edges)).toBe(
-      "all",
-    );
-  });
-
-  it("reports a leaf on its own selection", () => {
-    expect(subtreeState(["gun"], "gun", edges)).toBe("all");
-    expect(subtreeState([], "gun", edges)).toBe("none");
   });
 });
 
