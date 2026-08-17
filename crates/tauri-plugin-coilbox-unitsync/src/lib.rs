@@ -77,7 +77,8 @@ const THUMB_CACHE_SUBDIR: &str = "coilbox-unitsync-thumbs";
 /// Subdirectory of the app cache dir holding resolved game-header JPEGs.
 const HEADER_CACHE_SUBDIR: &str = "coilbox-unitsync-headers";
 
-/// Subdirectory of the app cache dir holding resolved unit build-icon `data:` URLs.
+/// Subdirectory of the app cache dir holding resolved unit build icons: one JSON
+/// record per unit, and the icon itself as a PNG beside it.
 const BUILDPIC_CACHE_SUBDIR: &str = "coilbox-unitsync-buildpics";
 const FACTION_LOGO_CACHE_SUBDIR: &str = "coilbox-unitsync-faction-logos";
 const INFO_CACHE_SUBDIR: &str = "coilbox-unitsync-info";
@@ -114,16 +115,19 @@ pub fn header_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
 }
 
 /// The on-disk unit build-icon cache directory, under the app cache dir. `None`
-/// when the platform can't resolve a cache dir (caching is then skipped).
-fn buildpic_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+/// when the platform can't resolve a cache dir (caching is then skipped). Public
+/// because the asset protocol serves this folder as its `unitsyncbuildpic` root.
+pub fn buildpic_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(BUILDPIC_CACHE_SUBDIR))
 }
 
 /// The on-disk faction-logo cache directory, under the app cache dir. `None` when
-/// the platform can't resolve a cache dir (caching is then skipped).
-fn faction_logo_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+/// the platform can't resolve a cache dir (caching is then skipped). Public
+/// because the asset protocol serves this folder as its `unitsyncfactionlogo`
+/// root.
+pub fn faction_logo_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(FACTION_LOGO_CACHE_SUBDIR))

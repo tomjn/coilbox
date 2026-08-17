@@ -1,3 +1,4 @@
+import { mapconvThumbUrl } from "../lib/assetUrl";
 import { mcImageInfo } from "./bindings";
 
 /**
@@ -10,9 +11,14 @@ import { mcImageInfo } from "./bindings";
  * e.g. the asset preview and the 3D preview — share one decode) and its result
  * for the rest of the session. Failures are evicted so they can be retried.
  *
- * In-memory only: it intentionally does not persist across restarts (that would
- * mean caching base64 blobs on disk). Use `invalidateImage` when a file at a
+ * In-memory only, saving the round trip rather than the decode: the Rust side
+ * keeps the thumbnail itself on disk. Use `invalidateImage` when a file at a
  * known path has been rewritten.
+ *
+ * `thumb` here is a `src` either way. The command names a cache file the webview
+ * loads over the asset protocol, and only inlines the picture where it had
+ * nowhere to write it, so resolving the two into one string is done once here
+ * rather than at every preview.
  */
 
 type ImageInfo = { width: number; height: number; thumb: string };
@@ -23,7 +29,13 @@ export function getImageInfo(path: string, max?: number): Promise<ImageInfo> {
   const key = `${path}|${max ?? ""}`;
   let p = cache.get(key);
   if (!p) {
-    p = mcImageInfo({ path, max });
+    p = mcImageInfo({ path, max }).then((info) => ({
+      width: info.width,
+      height: info.height,
+      thumb: info.thumbFile
+        ? mapconvThumbUrl(info.thumbFile)
+        : (info.thumb ?? ""),
+    }));
     p.catch(() => cache.delete(key));
     cache.set(key, p);
   }

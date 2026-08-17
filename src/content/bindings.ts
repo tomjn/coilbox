@@ -1036,14 +1036,20 @@ export const unitsyncGameInfo = defineCommand<
   GameInfoResult
 >("coilbox-unitsync", "unitsync_game_info");
 
-/** One resolved start unit: its friendly name and/or build-icon `data:` URL. */
+/** One resolved start unit: its friendly name and/or build icon. */
 export interface UnitDisplay {
   /** Human-friendly name from the unitdef `name` field, when present. */
   name?: string;
-  /** Build-icon `data:` URL, when a texture resolved. */
+  /**
+   * The icon's PNG in the build-icon cache, served over
+   * `coilbox://unitsyncbuildpic/`. This is how a resolved icon normally
+   * arrives. Read it with `unitIconSrc` rather than reaching for either field.
+   */
+  iconFile?: string;
+  /** Build-icon `data:` URL, only when the icon had nowhere on disk to go. */
   icon?: string;
   /**
-   * Why there is no `icon`. `no-source` is a game that ships this unit no build
+   * Why there is neither. `no-source` is a game that ships this unit no build
    * pic, which is normal. `undecodable` is a picture coilbox could not read,
    * which is coilbox's problem and worth saying out loud (#1625).
    */
@@ -1115,11 +1121,15 @@ export const unitsyncUnitBuildpics = defineCommand<
   UnitBuildpicsResult
 >("coilbox-unitsync", "unitsync_unit_buildpics");
 
-/** One side's resolved faction emblem: a PNG `data:` URL plus the source image's
- * longest pixel side (so callers can prefer a crisper image over a 16px upscale). */
+/** One side's resolved faction emblem: a PNG plus the source image's longest
+ * pixel side (so callers can prefer a crisper image over a 16px upscale). */
 export interface FactionLogoEntry {
   side: string;
-  dataUri: string;
+  /** The emblem's PNG in the faction-logo cache, served over
+   * `coilbox://unitsyncfactionlogo/`. How a resolved emblem normally arrives. */
+  file?: string;
+  /** PNG `data:` URL, only when the emblem had nowhere on disk to go. */
+  dataUri?: string;
   maxDim: number;
 }
 

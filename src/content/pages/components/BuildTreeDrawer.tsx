@@ -26,6 +26,7 @@ import {
   focusNeighbours,
 } from "../../buildTree";
 import { useUnitsyncUnitBuildpics } from "../../config";
+import { unitIconSrc } from "../../unitIcon";
 import { BuildTreeExportButton } from "./BuildTreeExportButton";
 import { layoutBuildTree, layoutFocusTree } from "./buildTreeLayout";
 import { UnitModelPanel } from "./UnitModelPanel";
@@ -377,7 +378,7 @@ export function BuildTreeDrawer({
           position: focusPos ?? n.position,
           data: {
             label: display?.name ?? prev.label,
-            icon: display?.icon,
+            icon: unitIconSrc(display),
             iconSkipped: display?.iconSkipped,
             isBuilder: prev.isBuilder,
             isStart: prev.isStart,

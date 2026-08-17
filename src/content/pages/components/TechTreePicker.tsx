@@ -23,6 +23,7 @@ import {
   toggleUnit,
   unknownSelected,
 } from "../../techForest";
+import { unitIconSrc } from "../../unitIcon";
 
 /** Cap on how many rows a search shows at once, so a huge game stays responsive
  * (a 4000-unit game would otherwise render every match). */
@@ -284,6 +285,7 @@ function UnitRow({
   onToggleSubtree: (on: boolean) => void;
 }) {
   const missing = buildPicMissing(display);
+  const iconSrc = unitIconSrc(display);
   return (
     <li>
       <div
@@ -329,9 +331,9 @@ function UnitRow({
           />
         )}
 
-        {display?.icon ? (
+        {iconSrc ? (
           <img
-            src={display.icon}
+            src={iconSrc}
             alt=""
             className="size-7 shrink-0 rounded object-contain"
           />

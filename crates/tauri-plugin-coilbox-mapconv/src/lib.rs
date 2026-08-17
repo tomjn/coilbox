@@ -335,13 +335,36 @@ async fn mc_read_skybox(path: String) -> CliResult {
     }
 }
 
-/// A cached thumbnail: the command's full result, stored as one JSON file per
-/// cache key so a restart can return it without re-decoding the source.
+/// Subdirectory of the app cache dir holding source-image thumbnails: the PNG
+/// itself, and a JSON record of the source's true pixel size beside it.
+const THUMB_CACHE_SUBDIR: &str = "mapconv-thumbs";
+
+/// Where the thumbnails live, under the app cache dir. `None` when the platform
+/// cannot resolve a cache dir, and thumbnails are then simply not cached. Public
+/// because the asset protocol serves this folder as its `mapconvthumb` root.
+pub fn thumb_cache_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    coilbox_portable::cache_dir(app)
+        .ok()
+        .map(|d| d.join(THUMB_CACHE_SUBDIR))
+}
+
+/// The source image's true pixel size, cached beside its thumbnail so a hit can
+/// answer without decoding the source again. The picture itself is the PNG next
+/// to this, not a `data:` URL in it (#1694).
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ThumbEntry {
     width: u32,
     height: u32,
-    thumb: String,
+}
+
+/// One source image's thumbnail pass: the source's true pixel size, and the
+/// picture as either the cache file the webview fetches over
+/// `coilbox://mapconvthumb/` or, when there was nowhere to write it, inline.
+struct ThumbResult {
+    width: u32,
+    height: u32,
+    file: Option<String>,
+    data_url: Option<String>,
 }
 
 /// Cache key for a thumbnail — stable across runs, but invalidated when the
@@ -364,8 +387,8 @@ fn thumb_cache_key(path: &str, max: u32) -> Option<String> {
     Some(format!("{:016x}", h.finish()))
 }
 
-/// Decode `path` into (width, height, thumbnail-as-data-URL).
-fn generate_thumb(path: &str, max: u32) -> Result<(u32, u32, String), String> {
+/// Decode `path` into (width, height, thumbnail PNG bytes).
+fn generate_thumb(path: &str, max: u32) -> Result<(u32, u32, Vec<u8>), String> {
     let img = image::open(path).map_err(|e| format!("could not read image: {e}"))?;
     let (width, height) = img.dimensions();
     let thumb = img.thumbnail(max, max);
@@ -373,60 +396,98 @@ fn generate_thumb(path: &str, max: u32) -> Result<(u32, u32, String), String> {
     thumb
         .write_to(&mut buf, image::ImageFormat::Png)
         .map_err(|e| format!("could not encode thumbnail: {e}"))?;
-    let data_url = format!("data:image/png;base64,{}", base64_encode(&buf.into_inner()));
-    Ok((width, height, data_url))
+    Ok((width, height, buf.into_inner()))
 }
 
-/// Thumbnail with an on-disk cache (one JSON file per path+mtime+size+max) under
-/// `cache_dir`, so a cold start doesn't re-decode every source image. Any cache
-/// miss or failure falls back to a plain decode, then best-effort writes the
-/// result back.
+/// Thumbnail with an on-disk cache under `cache_dir`, keyed on
+/// path+mtime+size+max, so a cold start doesn't re-decode every source image.
+///
+/// Two files per key: `<key>.png` is the picture the webview loads over the
+/// asset protocol, and `<key>.json` is the source's true pixel size, which a hit
+/// needs and the PNG cannot answer. A hit needs both, so a cache clean that took
+/// the picture re-decodes rather than answering with a name pointing at nothing.
+/// Inlining is the fallback for no cache dir or a failed write.
 fn image_info_cached(
     path: &str,
     max: u32,
     cache_dir: Option<&Path>,
-) -> Result<(u32, u32, String), String> {
-    let cache_file = cache_dir
-        .zip(thumb_cache_key(path, max))
-        .map(|(dir, key)| dir.join(format!("{key}.json")));
+) -> Result<ThumbResult, String> {
+    let files = cache_dir.zip(thumb_cache_key(path, max)).map(|(dir, key)| {
+        let name = format!("{key}.png");
+        (dir.join(format!("{key}.json")), dir.join(&name), name)
+    });
 
-    // The cache stores the whole `ThumbEntry` as JSON bytes (we need width/height
-    // back, not just the image), so serialize on a miss and deserialize the result.
-    let bytes = coilbox_thumb_cache::cached(cache_file, || {
-        let (width, height, thumb) = generate_thumb(path, max)?;
-        serde_json::to_vec(&ThumbEntry {
-            width,
-            height,
-            thumb,
-        })
-        .map_err(|e| format!("could not encode thumbnail cache entry: {e}"))
-    })?;
-    let e: ThumbEntry = serde_json::from_slice(&bytes)
-        .map_err(|e| format!("could not decode thumbnail cache entry: {e}"))?;
-    Ok((e.width, e.height, e.thumb))
+    if let Some((dims, png, name)) = &files {
+        if let Some(entry) = std::fs::read(dims)
+            .ok()
+            .and_then(|raw| serde_json::from_slice::<ThumbEntry>(&raw).ok())
+        {
+            if png.is_file() {
+                // Serving an entry is using it, which is what the sweep in the
+                // shared cache reads recency off.
+                coilbox_thumb_cache::touch(png);
+                return Ok(ThumbResult {
+                    width: entry.width,
+                    height: entry.height,
+                    file: Some(name.clone()),
+                    data_url: None,
+                });
+            }
+        }
+    }
+
+    let (width, height, bytes) = generate_thumb(path, max)?;
+    if let Some((dims, png, name)) = &files {
+        if let Some(dir) = png.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if std::fs::write(png, &bytes).is_ok() {
+            if let Ok(json) = serde_json::to_vec(&ThumbEntry { width, height }) {
+                let _ = std::fs::write(dims, json);
+            }
+            return Ok(ThumbResult {
+                width,
+                height,
+                file: Some(name.clone()),
+                data_url: None,
+            });
+        }
+    }
+    Ok(ThumbResult {
+        width,
+        height,
+        file: None,
+        data_url: Some(format!("data:image/png;base64,{}", base64_encode(&bytes))),
+    })
 }
 
-/// `mc_image_info` — decode the image at `path` and return its true pixel
-/// dimensions plus a small downscaled PNG thumbnail as a `data:` URL. Lets the UI
-/// preview chosen source assets and validate texture sizing (multiple of 1024)
-/// up front, without an asset-protocol grant. `max` is the thumbnail's longest
-/// side (default 320; the 3D preview asks for larger so the heightmap displaces
-/// with enough detail). Results are cached on disk (keyed by file mtime/size) so
-/// reopening a page — or relaunching the app — doesn't re-decode large textures.
+/// `mc_image_info` decodes the image at `path` and returns its true pixel
+/// dimensions plus a small downscaled PNG thumbnail. Lets the UI preview chosen
+/// source assets and validate texture sizing (multiple of 1024) up front,
+/// without an asset-protocol grant on the source itself. `max` is the
+/// thumbnail's longest side, 320 by default, and the 3D preview asks for larger
+/// so the heightmap displaces with enough detail. Results are cached on disk
+/// (keyed by file mtime/size) so reopening a page, or relaunching the app,
+/// doesn't re-decode large textures.
+///
+/// The thumbnail comes back as `thumbFile`, a name under
+/// `coilbox://mapconvthumb/`, with `thumb` holding a `data:` URL only where
+/// there was nowhere to cache it.
 #[tauri::command]
 async fn mc_image_info<R: Runtime>(app: AppHandle<R>, path: String, max: Option<u32>) -> CliResult {
     let max = max.unwrap_or(320).max(1);
-    let cache_dir = coilbox_portable::cache_dir(&app)
-        .ok()
-        .map(|d| d.join("mapconv-thumbs"));
+    let cache_dir = thumb_cache_dir(&app);
     let result = tauri::async_runtime::spawn_blocking(move || {
         image_info_cached(&path, max, cache_dir.as_deref())
     })
     .await;
     match result {
-        Ok(Ok((width, height, thumb))) => {
-            CliResult::ok(json!({ "width": width, "height": height, "thumb": thumb }))
-        }
+        Ok(Ok(t)) => CliResult::ok(json!({
+            "width": t.width,
+            "height": t.height,
+            "thumbFile": t.file,
+            "thumb": t.data_url,
+        })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("image task failed: {e}")),
     }
@@ -716,4 +777,91 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mc_settings_save
         ])
         .build()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "coilbox-mapconv-thumb-{}-{tag}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// A source image on disk, wider than it is tall so the thumbnail's own
+    /// proportions cannot be mistaken for the source's reported size.
+    fn source(dir: &Path) -> String {
+        let path = dir.join("source.png");
+        image::RgbaImage::from_pixel(64, 32, image::Rgba([10, 20, 30, 255]))
+            .save(&path)
+            .unwrap();
+        path.to_string_lossy().into_owned()
+    }
+
+    /// The whole of #1694 for this cache: the picture is a file, and what comes
+    /// back names it. The source's true size still comes back with it.
+    #[test]
+    fn a_thumbnail_is_written_as_a_file_and_named_rather_than_inlined() {
+        let dir = temp_dir("write");
+        let path = source(&dir);
+        let cache = dir.join("cache");
+
+        let out = image_info_cached(&path, 16, Some(&cache)).unwrap();
+        assert_eq!((out.width, out.height), (64, 32));
+        assert_eq!(out.data_url, None);
+        let name = out.file.expect("the thumbnail is named");
+        assert_eq!(&std::fs::read(cache.join(&name)).unwrap()[1..4], b"PNG");
+
+        // And a second ask answers from disk without decoding the source again,
+        // which is only visible as the same name over the same bytes.
+        let again = image_info_cached(&path, 16, Some(&cache)).unwrap();
+        assert_eq!(again.file.as_deref(), Some(name.as_str()));
+        assert_eq!((again.width, again.height), (64, 32));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// With no cache dir there is no file to point at, so a preview still gets
+    /// its picture, just inline.
+    #[test]
+    fn a_thumbnail_with_nowhere_to_go_falls_back_to_base64() {
+        let dir = temp_dir("inline");
+        let out = image_info_cached(&source(&dir), 16, None).unwrap();
+        assert_eq!(out.file, None);
+        assert!(out.data_url.unwrap().starts_with("data:image/png;base64,"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A cache clean takes the PNG and leaves the size record. Answering from
+    /// that record would name a file that is not there.
+    #[test]
+    fn a_record_whose_thumbnail_file_is_gone_re_decodes() {
+        let dir = temp_dir("gone");
+        let path = source(&dir);
+        let cache = dir.join("cache");
+
+        let first = image_info_cached(&path, 16, Some(&cache)).unwrap();
+        let name = first.file.unwrap();
+        std::fs::remove_file(cache.join(&name)).unwrap();
+
+        let again = image_info_cached(&path, 16, Some(&cache)).unwrap();
+        assert_eq!(again.file.as_deref(), Some(name.as_str()));
+        assert!(cache.join(&name).is_file(), "the picture is written again");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_unreadable_source_is_an_error_rather_than_an_empty_thumbnail() {
+        let dir = temp_dir("bad");
+        let path = dir.join("not-an-image.png");
+        std::fs::write(&path, b"nonsense").unwrap();
+        assert!(image_info_cached(&path.to_string_lossy(), 16, None).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

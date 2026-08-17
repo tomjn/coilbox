@@ -11,7 +11,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { Side, UnitDatasetEntry } from "../../bindings";
 import type { BrandingEntry } from "../../branding";
-import { resolveBrandingImage } from "../../branding";
+import { resolveBrandingDataUrl } from "../../branding";
 import { buildBuildGraph, buildEdgeMap } from "../../buildTree";
 import { buildExportArtifact } from "../../buildTreeExport";
 import {
@@ -113,8 +113,8 @@ export function BuildTreeExportButton({
       let exportBranding: ExportBranding | undefined;
       if (wrapper === "branded" && branding) {
         const [bannerDataUrl, logoDataUrl] = await Promise.all([
-          resolveBrandingImage(branding.banner, true),
-          resolveBrandingImage(branding.logo, false),
+          resolveBrandingDataUrl(branding.banner, true),
+          resolveBrandingDataUrl(branding.logo, false),
         ]);
         exportBranding = {
           title: branding.title,
