@@ -88,6 +88,24 @@ describe("a units layer's redraws", () => {
     expect(units.root.children).toHaveLength(1);
   });
 
+  /**
+   * Issue #1716, and the whole of why an edit used to animate everything.
+   *
+   * The blueprint editor builds its document afresh on every edit, so every
+   * building's team id changes on every edit while the colour it is painted in
+   * stays exactly what it was. A drawn unit is recognised by that colour rather
+   * than by the id, because the colour is what decides whether two placements
+   * can share a model and the id is not about the unit at all.
+   */
+  it("keeps a unit whose team was reminted in the same colour", async () => {
+    const units = layer();
+    await units.draw([building(0)]);
+    const was = units.objects.get(building(0).key);
+    await units.draw([{ ...building(0), team: "p7" }]);
+    expect(units.objects.get(building(0).key)).toBe(was);
+    expect(units.root.children).toHaveLength(1);
+  });
+
   /** Issue #1716. A building dragged across the map is the same building, so it
    *  moves rather than vanishing at one square and appearing at another. */
   it("moves a unit rather than replacing it", async () => {

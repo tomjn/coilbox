@@ -52,12 +52,21 @@ export interface PlacementUserData {
   placement: Placement;
 }
 
-/** One unit standing on the map: what it is, whose it is, where it is, and the
- *  model drawn for it. */
+/** One unit standing on the map: what it is, what colour it is in, where it is,
+ *  and the model drawn for it. */
 interface Standing {
   object: THREE.Object3D;
   def: string;
-  team: string;
+  /**
+   * The colour it is painted in, rather than the team it belongs to.
+   *
+   * A model is built per unit type and colour, so two placements can share one
+   * only if both agree. The team id cannot stand in for the colour: the
+   * blueprint editor builds its document afresh on every edit, so every
+   * building's team id changes on every edit while the colour stays exactly
+   * what it was (issue #1716).
+   */
+  colour: string;
   /** Where it stands and which way it points, as {@link standingAt} writes
    *  it. */
   at: string;
@@ -255,10 +264,15 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
   const standingAt = (placement: Placement) =>
     `${placement.pos.x},${placement.pos.z}|${placement.facing}`;
 
+  /** What colour a placement's team paints its units, which is what decides
+   *  whether two of them can share a model. */
+  const colourOf = (placement: Placement) =>
+    colorOf(deps.teamColor(placement.team)).getHexString();
+
   /** The whole of a unit as the eye sees it, for recognising one whose key
    *  changed under it. */
-  const looksLike = (one: { def: string; team: string; at: string }) =>
-    `${one.def}|${one.team}|${one.at}`;
+  const looksLike = (one: { def: string; colour: string; at: string }) =>
+    `${one.def}|${one.colour}|${one.at}`;
 
   /**
    * Which defs are standing as marker boxes rather than as models.
@@ -361,10 +375,11 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
       if (keys) keys.push(key);
       else alike.set(look, [key]);
     }
+    const colours = new Map(placements.map((p) => [p.key, colourOf(p)]));
     for (const placement of placements) {
       const look = looksLike({
         def: placement.def,
-        team: placement.team,
+        colour: colours.get(placement.key) ?? "",
         at: standingAt(placement),
       });
       const key = alike.get(look)?.shift();
@@ -376,9 +391,13 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
     for (const placement of placements) {
       if (claimed.has(placement.key)) continue;
       const one = spare.get(placement.key);
-      // The same unit for the same team, or it is a different thing that has
+      // The same unit in the same colour, or it is a different thing that has
       // been given the key rather than the building that used to hold it.
-      if (!one || one.def !== placement.def || one.team !== placement.team) {
+      if (
+        !one ||
+        one.def !== placement.def ||
+        one.colour !== colours.get(placement.key)
+      ) {
         continue;
       }
       spare.delete(placement.key);
@@ -433,7 +452,7 @@ export function createUnitsLayer(deps: UnitsLayerDeps): UnitsLayer {
         shown.set(placement.key, {
           object: instance,
           def: placement.def,
-          team: placement.team,
+          colour: colours.get(placement.key) ?? "",
           at: standingAt(placement),
           drawable,
         });
