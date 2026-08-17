@@ -6,11 +6,13 @@
 //! `Sidepics/<side>.{png,bmp,tga,dds}` in the primary archive (case-insensitive),
 //! decode it (via `crate::texture`, reused from the build-pic path), chroma-key
 //! pure white to transparent for the BMP variant of the convention, and PNG-encode
-//! a small `data:` URL. Each entry also reports the source image's longest pixel
-//! side so the frontend can prefer a crisper curated image over a 16px upscale.
+//! a small icon. Each entry also reports the source image's longest pixel side so
+//! the frontend can prefer a crisper curated image over a 16px upscale.
 //!
 //! Disk-cached per (game-identity, side) like the build-pic cache, so re-runs skip
-//! the archive mount.
+//! the archive mount. The PNG is written beside its JSON record and named in it,
+//! so what crosses the bridge is a file name the webview fetches over
+//! `coilbox://unitsyncfactionlogo/` rather than base64.
 
 use crate::ffi::Unitsync;
 use crate::model::{FactionLogoEntry, FactionLogosOutput};
@@ -18,7 +20,9 @@ use std::path::Path;
 
 /// Salts the faction-logo cache key. Bump when the encoding, chroma-key rule, or
 /// cache format changes so stale entries are ignored.
-const CACHE_VERSION: u32 = 1;
+/// v2: the emblem is a PNG file named by the record rather than base64 inside it
+/// (#1694), and a record written before it holds the picture nowhere else.
+const CACHE_VERSION: u32 = 2;
 
 /// Extensions probed for a side's emblem, in preference order (PNG first: it keeps
 /// its own alpha; BMP is the white-keyed legacy case).
@@ -36,11 +40,22 @@ pub fn emit_error(msg: String) {
     println!("{}", serde_json::to_string(&out).unwrap_or_default());
 }
 
-/// A cached per-side record. An empty `data_uri` means "resolved to nothing" — a
+/// A cached per-side record. Neither picture set means "resolved to nothing", a
 /// hit that still skips the mount (mirrors the build-pic cache's empty records).
+/// `file` is the normal answer and `data_uri` the fallback for a side whose PNG
+/// had nowhere to go, so the two are never both set.
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 struct CachedLogo {
-    data_uri: String,
+    #[serde(default)]
+    file: Option<String>,
+    #[serde(default)]
+    data_uri: Option<String>,
+    max_dim: u32,
+}
+
+/// One side's emblem as it comes out of the archive, before it is put anywhere.
+struct ResolvedLogo {
+    png: Vec<u8>,
     max_dim: u32,
 }
 
@@ -76,8 +91,10 @@ pub fn render(
     for side in sides {
         if let Some((dir, base)) = cache {
             if let Some(cached) = read_cache(dir, base, side) {
-                push_entry(&mut logos, side, cached);
-                continue;
+                if logo_file_present(&cached, dir) {
+                    push_entry(&mut logos, side, cached);
+                    continue;
+                }
             }
         }
         misses.push(side.clone());
@@ -106,8 +123,7 @@ pub fn render(
                 .map(|(path, _)| (path.to_lowercase(), path))
                 .collect();
             for side in &misses {
-                let resolved = resolve_side(&us, handle, &list, side);
-                let cached = resolved.unwrap_or_default();
+                let cached = store_logo(cache, side, resolve_side(&us, handle, &list, side));
                 if let Some((dir, base)) = cache {
                     write_cache(dir, base, side, &cached);
                 }
@@ -133,7 +149,7 @@ fn resolve_side(
     handle: i32,
     list: &[(String, String)],
     side: &str,
-) -> Option<CachedLogo> {
+) -> Option<ResolvedLogo> {
     for ext in SIDEPIC_EXTS {
         let target = format!("sidepics/{}.{ext}", side.to_lowercase());
         let Some(actual) = find_member(list, &target) else {
@@ -154,10 +170,55 @@ fn resolve_side(
         if *ext == "bmp" {
             chroma_key_white(&mut img);
         }
-        let data_uri = crate::texture::encode_icon_png(img)?;
-        return Some(CachedLogo { data_uri, max_dim });
+        let png = crate::texture::encode_icon_png(img)?;
+        return Some(ResolvedLogo { png, max_dim });
     }
     None
+}
+
+/// Put a side's emblem where the webview can fetch it: a PNG beside the side's
+/// cache record, sharing its stem. Inlining is the fallback for the two cases
+/// with no file to point at, no cache dir at all and a write that failed. A side
+/// that resolved to nothing yields the empty record, which is still a cache hit.
+fn store_logo(
+    cache: Option<(&Path, &String)>,
+    side: &str,
+    resolved: Option<ResolvedLogo>,
+) -> CachedLogo {
+    let Some(ResolvedLogo { png, max_dim }) = resolved else {
+        return CachedLogo::default();
+    };
+    if let Some((dir, base)) = cache {
+        let name = logo_file_name(base, side);
+        let _ = std::fs::create_dir_all(dir);
+        if std::fs::write(dir.join(&name), &png).is_ok() {
+            return CachedLogo {
+                file: Some(name),
+                data_uri: None,
+                max_dim,
+            };
+        }
+    }
+    CachedLogo {
+        file: None,
+        data_uri: Some(crate::texture::png_data_url(&png)),
+        max_dim,
+    }
+}
+
+/// A side's emblem file name: its cache record's stem, as a PNG.
+fn logo_file_name(base: &str, side: &str) -> String {
+    format!("{}.png", side_stem(base, side))
+}
+
+/// Whether the PNG a cached record names is still on disk. A cache clean removes
+/// the picture and leaves the record, and a hit on that record would draw a
+/// broken emblem, so it has to re-resolve.
+fn logo_file_present(cached: &CachedLogo, dir: &Path) -> bool {
+    cached
+        .file
+        .as_ref()
+        .is_none_or(|name| dir.join(name).exists())
 }
 
 /// Set pure-white pixels fully transparent (the `Sidepics` BMP convention).
@@ -172,11 +233,12 @@ fn chroma_key_white(img: &mut image::RgbaImage) {
 /// Append a resolved record to the output, skipping empty ones (the UI then falls
 /// through to its curated/bundled layers for that side).
 fn push_entry(out: &mut Vec<FactionLogoEntry>, side: &str, cached: CachedLogo) {
-    if cached.data_uri.is_empty() {
+    if cached.file.is_none() && cached.data_uri.is_none() {
         return;
     }
     out.push(FactionLogoEntry {
         side: side.to_string(),
+        file: cached.file,
         data_uri: cached.data_uri,
         max_dim: cached.max_dim,
     });
@@ -263,5 +325,72 @@ mod tests {
             Some("Sidepics/Aven.bmp")
         );
         assert_eq!(find_member(&list, "sidepics/gear.bmp"), None);
+    }
+
+    fn temp_dir(tag: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-factionlogo-{}-{tag}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir
+    }
+
+    fn emblem() -> ResolvedLogo {
+        let img = image::RgbaImage::from_pixel(16, 16, image::Rgba([10, 20, 30, 255]));
+        ResolvedLogo {
+            png: crate::texture::encode_icon_png(img).unwrap(),
+            max_dim: 16,
+        }
+    }
+
+    /// The whole of #1694: a resolved side carries a file name, and the bytes
+    /// are on disk under it rather than base64 in the record.
+    #[test]
+    fn an_emblem_is_written_as_a_file_and_named_rather_than_inlined() {
+        let dir = temp_dir("write");
+        let base = "0123456789abcdef".to_string();
+        let png = emblem().png.clone();
+
+        let cached = store_logo(Some((&dir, &base)), "Aven", Some(emblem()));
+        assert_eq!(cached.data_uri, None);
+        assert_eq!(cached.max_dim, 16);
+        let name = cached.file.expect("the emblem is named");
+        assert_eq!(name, "0123456789abcdef_Aven.png");
+        assert_eq!(std::fs::read(dir.join(&name)).unwrap(), png);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// With no cache dir there is no file to point at, and a side with no
+    /// sidepic at all still caches as the empty record that skips the mount.
+    #[test]
+    fn an_emblem_with_nowhere_to_go_falls_back_to_base64() {
+        let inline = store_logo(None, "Aven", Some(emblem()));
+        assert_eq!(inline.file, None);
+        assert!(inline
+            .data_uri
+            .unwrap()
+            .starts_with("data:image/png;base64,"));
+
+        let nothing = store_logo(None, "Aven", None);
+        assert!(nothing.file.is_none() && nothing.data_uri.is_none());
+        let mut out = Vec::new();
+        push_entry(&mut out, "Aven", nothing);
+        assert!(out.is_empty(), "a side with no emblem is simply absent");
+    }
+
+    /// A cache clean takes the PNG and leaves the record, and answering from
+    /// that record would draw a broken emblem.
+    #[test]
+    fn a_record_whose_emblem_file_is_gone_re_resolves() {
+        let dir = temp_dir("gone");
+        let base = "0123456789abcdef".to_string();
+        let cached = store_logo(Some((&dir, &base)), "Aven", Some(emblem()));
+        assert!(logo_file_present(&cached, &dir));
+        std::fs::remove_file(dir.join(cached.file.as_ref().unwrap())).unwrap();
+        assert!(!logo_file_present(&cached, &dir));
+        // A record naming no file has nothing to miss.
+        assert!(logo_file_present(&CachedLogo::default(), &dir));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

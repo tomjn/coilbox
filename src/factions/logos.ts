@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { type GameItem, unitsyncFactionLogos } from "../content/bindings";
 import { resolveBrandingImage, useBrandingEntry } from "../content/branding";
+import { unitsyncFactionLogoUrl } from "../lib/assetUrl";
 import { getProfile, resolveProfileImage } from "../profile/profile";
 import { type FactionLogoSrc, fallbackFactionLogo } from "./fallback";
 import { DEFAULT_LOGO_SIZE, selectFactionLogo } from "./select";
@@ -82,7 +83,7 @@ export function useFactionLogos(ctx: FactionLogoCtx): LogoMap {
     }
     let cancelled = false;
     (async () => {
-      // Archive: one batch call for all sides (returns each side's data URI + size).
+      // Archive: one batch call for all sides (returns each side's PNG + size).
       const archive: Record<string, { src: string; maxDim: number }> = {};
       if (enginePath && dataDir && gameArchive) {
         try {
@@ -93,10 +94,11 @@ export function useFactionLogos(ctx: FactionLogoCtx): LogoMap {
             sides: sideNames,
           });
           for (const e of res.logos) {
-            archive[e.side.toLowerCase()] = {
-              src: e.dataUri,
-              maxDim: e.maxDim,
-            };
+            // The cache file where there is one, and the inline copy only where
+            // the worker had nowhere to write the emblem.
+            const src = e.file ? unitsyncFactionLogoUrl(e.file) : e.dataUri;
+            if (!src) continue;
+            archive[e.side.toLowerCase()] = { src, maxDim: e.maxDim };
           }
         } catch {
           // Archive layer unavailable (e.g. worker error) — fall through per side.
