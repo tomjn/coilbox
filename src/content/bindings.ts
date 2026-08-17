@@ -1302,6 +1302,52 @@ export const unitsyncUnitModel = defineCommand<
   UnitModelResult
 >("coilbox-unitsync", "unitsync_unit_model");
 
+/**
+ * One model of a batch: where the flattened model was written, rather than the
+ * model itself (issue #1684).
+ *
+ * A flattened model is megabytes of floats and a blueprint asks for twenty at
+ * once, so the batch writes each into the model-texture cache and names it here.
+ */
+export interface UnitModelFile {
+  /** The file in the model-texture cache, loaded via {@link unitModelTextureUrl}.
+   *  Holds one {@link UnitModelResult} as JSON. */
+  file: string;
+  /** The archive member the model came from, which is what the file is named
+   *  after: two units sharing one model share one file. */
+  path: string;
+  /** `"s3o"` or `"3do"`. */
+  format: string;
+}
+
+export interface UnitModelsResult {
+  /** Keyed by the `objectname` as asked for, so a caller looks up what it sent
+   *  rather than what the archive called it. */
+  models: Record<string, UnitModelFile>;
+  /** The objects that produced no model, and why. An object is in exactly one of
+   *  the two maps. */
+  skipped: Record<string, string>;
+  errors: string[];
+}
+
+/**
+ * Read a batch of units' models out of a game's archive in one mount, writing
+ * each into the model-texture cache (issue #1684).
+ *
+ * The same read {@link unitsyncUnitModel} does, for a list. One call is one
+ * archive mount however many objects it names, which on a game like Beyond All
+ * Reason is a second or more saved per unit past the first.
+ */
+export const unitsyncUnitModels = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    gameArchive: string;
+    objects: string[];
+  },
+  UnitModelsResult
+>("coilbox-unitsync", "unitsync_unit_models");
+
 /** Why a unit produced no render asset. */
 export type RenderSkip =
   /** The pixels are not the shape this footprint frames to. The hub cannot check
