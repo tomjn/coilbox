@@ -1,10 +1,13 @@
+import { useMemo } from "react";
 import { LayoutPlan } from "@/blueprint/LayoutPlan";
+import { useHeldUnitPictures } from "../../assets/useUnitPictures";
 import type {
   BlueprintShape,
   GalaxyShape,
   HubPreview,
   PreviewStat,
 } from "../../preview";
+import { SetupPackContents } from "./SetupPackContents";
 
 /**
  * What a hub item looks like, drawn from the container the item page fetched.
@@ -13,9 +16,11 @@ import type {
  * file only draws, so a kind that gains a preview needs a reader and a branch
  * here and nothing else.
  *
- * Nothing is fetched to draw it and no picture is stored anywhere. A preset is
- * its composition, a pack is its contents, a conquest challenge is its galaxy,
- * and a scenario is how much there is of it.
+ * A preset is its composition, a pack is its contents, a conquest challenge is
+ * its galaxy, and a scenario is how much there is of it. Nothing is fetched to
+ * draw any of that and no picture is stored anywhere, with one exception: a pack
+ * of maps is drawn as its maps, and a picture of a map has to be looked for. That
+ * is `./SetupPackContents.tsx`, kept in its own file for the same reason.
  */
 export function ItemPreview({ preview }: { preview: HubPreview }) {
   if (preview.kind === "preset") {
@@ -69,7 +74,11 @@ export function ItemPreview({ preview }: { preview: HubPreview }) {
   }
 
   if (preview.kind === "blueprint") {
-    return <BlueprintLayout shape={preview.layout} />;
+    return <BlueprintLayout shape={preview.layout} game={preview.game} />;
+  }
+
+  if (preview.kind === "setup-pack") {
+    return <SetupPackContents pack={preview} />;
   }
 
   return <Stats stats={preview.stats} />;
@@ -96,16 +105,33 @@ function Stats({ stats }: { stats: PreviewStat[] }) {
  *
  * The drawing is `@/blueprint/LayoutPlan`, the same one the library card makes
  * of a layout on this machine, and the website makes of the same container. All
- * this adds is the size it is drawn at and the line under it, because a page has
- * room to say what the picture cannot.
+ * this adds is the size it is drawn at, the line under it, and the pictures of the
+ * units it names, because a page has room to say what the picture cannot.
+ *
+ * The pictures are a lookup, which is the exception this file's own note describes.
+ * Coilbox drew and uploaded them in the first place (`../../assets/renderTop.ts`),
+ * so a layout for a game somebody has opened before is drawn as its buildings here
+ * exactly as it is on the website.
  */
-function BlueprintLayout({ shape }: { shape: BlueprintShape }) {
+function BlueprintLayout({
+  shape,
+  game,
+}: {
+  shape: BlueprintShape;
+  game: string | null;
+}) {
   const buildings = shape.squares.length;
+  const defs = useMemo(
+    () => shape.squares.map((square) => square.def),
+    [shape],
+  );
+  const pictures = useHeldUnitPictures(game, defs);
 
   return (
     <div className="flex flex-col gap-3">
       <LayoutPlan
         shape={shape}
+        pictures={pictures}
         // A sheet of fixed proportions rather than a box the shape of the base.
         // A base can be a long thin wall or a tall narrow column, and either one
         // at the column's full width is a shape nobody can take in at a glance.

@@ -332,7 +332,12 @@ export default function ItemPage() {
             </div>
 
             <div className="flex flex-col gap-6">
-              {item.map_name && <ItemMapPicture mapName={item.map_name} />}
+              {/* A pack draws its own maps under a heading, one or twenty
+                  (issue #1721), and the row holds one name at most, so the slot
+                  would show the first of them and no more. */}
+              {item.map_name && item.kind !== "setup-pack" && (
+                <ItemMapPicture mapName={item.map_name} />
+              )}
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
                 <Meta label="Game">
                   {item.game_name ?? (
