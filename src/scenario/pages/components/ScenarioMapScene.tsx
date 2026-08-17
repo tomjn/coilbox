@@ -829,14 +829,6 @@ export function ScenarioMapScene({
             flattened={units.heightsUnread}
           />
           <WaterlessNote floor={waterless} />
-          {/* What the outlined square beside the selected building is, while a
-              turn is being considered (issue #1541). Nothing for an actor,
-              which stands on no build squares at all. */}
-          <TurnNote
-            moves={
-              turning && picked?.kind === "base" ? turned.length > 0 : null
-            }
-          />
           {picked && (
             <ScenarioSelectionBar
               placement={picked}
@@ -1021,6 +1013,19 @@ export function ScenarioMapScene({
               )}
             </ScenarioSelectionBar>
           )}
+          {/* What the outlined square beside the selected building is, while a
+              turn is being considered (issue #1541). Nothing for an actor,
+              which stands on no build squares at all.
+
+              Below the bar rather than above it (issue #1716): the note appears
+              while the pointer is on the Turn button, and a note above the bar
+              pushes that button out from under the pointer, which takes the
+              note away, which puts the button back. */}
+          <TurnNote
+            moves={
+              turning && picked?.kind === "base" ? turned.length > 0 : null
+            }
+          />
           {drawingPath && pickedGroup && (
             <ClickMapBar
               message={

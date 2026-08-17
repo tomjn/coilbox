@@ -503,8 +503,6 @@ export function BlueprintEditor({
               unchecked={drawn.settled ? sceneUnchecked(footprints) : null}
             />
 
-            <TurnNote moves={turning && picked ? turned.length > 0 : null} />
-
             {picked && (
               <SelectionBar
                 def={picked.def}
@@ -520,6 +518,12 @@ export function BlueprintEditor({
                 }}
               />
             )}
+
+            {/* Below the bar rather than above it (issue #1716). The note
+              appears while the pointer is on the Turn button, and a note above
+              the bar pushes that button out from under the pointer, which takes
+              the note away, which puts the button back. */}
+            <TurnNote moves={turning && picked ? turned.length > 0 : null} />
 
             {playing && (
               <PlaybackBar
@@ -556,11 +560,14 @@ export function BlueprintEditor({
             placed={drawn.placed}
           />
         }
+        // What the ground is and how to move the camera over it. What a click
+        // does is the line above the layout, which is about the mode rather than
+        // about the surface, and saying it twice made the two look like
+        // different statements (issue #1716).
         footer={
           <>
             no map · a build grid, {GRID_EXTENT} elmos square · drag or
-            middle-drag to pan · drag a building to move it · right-drag to turn
-            the view · scroll to zoom
+            middle-drag to pan · right-drag to turn the view · scroll to zoom
           </>
         }
       />
