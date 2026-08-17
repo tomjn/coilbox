@@ -35,6 +35,7 @@ mod skirmishai;
 mod texture;
 mod typemap;
 mod unitmodel;
+mod unitmodels;
 mod unitrender;
 
 use ffi::Unitsync;
@@ -95,6 +96,10 @@ struct Args {
     /// `--unit-model`: read one unit's model out of `--game`, named by the
     /// unitdef `objectname` given in `--object`.
     unit_model: bool,
+    /// `--unit-models`: read a batch of units' models out of `--game` in one
+    /// mount, named by the `objectname`s in `--units-file`, and write each into
+    /// `--cache-dir`.
+    unit_models: bool,
     /// `--unit-render`: encode a top down render the webview drew as the hub's
     /// `render:<angle>` asset. Takes the pixels in `--pixels`, the frame in
     /// `--width`/`--height`/`--footprint-x`/`--footprint-z`, and the unit in
@@ -105,8 +110,9 @@ struct Args {
     /// in `--angle` and the renderer in `--renderer-version`.
     unit_render_keys: bool,
     /// A JSON file of `{ unit, object, footprintX, footprintZ }` for
-    /// `--unit-render-keys`. A file rather than an argument because a whole
-    /// game's roster is past what Windows takes on a command line.
+    /// `--unit-render-keys`, or of `objectname` strings for `--unit-models`. A
+    /// file rather than an argument because a whole game's roster is past what
+    /// Windows takes on a command line.
     units_file: Option<String>,
     /// The render angle, without the `render:` prefix. Defaults to the one angle
     /// the vocabulary lists.
@@ -387,6 +393,45 @@ fn run() -> i32 {
             }
             Err(_) => {
                 unitmodel::emit_error("worker panicked while reading a unit model".into());
+                1
+            }
+        };
+    }
+
+    // Unit models: the same read for a batch of units in one mount (issue
+    // #1684). The cache directory is the output, so there is nothing to do
+    // without one.
+    if args.unit_models {
+        let Some(units_file) = args.units_file.clone() else {
+            unitmodels::emit_error("--unit-models needs --units-file <json>".into());
+            return 1;
+        };
+        let Some(cache_dir) = cache_dir else {
+            unitmodels::emit_error("--unit-models needs --cache-dir <directory>".into());
+            return 1;
+        };
+        let objects: Vec<String> = match std::fs::read_to_string(&units_file)
+            .map_err(|e| format!("could not read units file {units_file}: {e}"))
+            .and_then(|raw| {
+                serde_json::from_str(&raw)
+                    .map_err(|e| format!("could not parse units file {units_file}: {e}"))
+            }) {
+            Ok(v) => v,
+            Err(e) => {
+                unitmodels::emit_error(e);
+                return 1;
+            }
+        };
+        let game_archive = args.game.clone().unwrap_or_default();
+        return match std::panic::catch_unwind(|| {
+            unitmodels::render(&args.lib, &game_archive, &objects, cache_dir)
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                unitmodels::emit_error("worker panicked while reading unit models".into());
                 1
             }
         };
@@ -782,6 +827,7 @@ fn parse_args() -> Result<Args, String> {
     let mut unit_buildpics = false;
     let mut unit_dataset = false;
     let mut unit_model = false;
+    let mut unit_models = false;
     let mut unit_render = false;
     let mut unit_render_keys = false;
     let mut units_file = None;
@@ -842,6 +888,7 @@ fn parse_args() -> Result<Args, String> {
             "--unit-buildpics" => unit_buildpics = true,
             "--unit-dataset" => unit_dataset = true,
             "--unit-model" => unit_model = true,
+            "--unit-models" => unit_models = true,
             "--unit-render" => unit_render = true,
             "--unit-render-keys" => unit_render_keys = true,
             "--units-file" => units_file = it.next(),
@@ -940,6 +987,7 @@ fn parse_args() -> Result<Args, String> {
         unit_buildpics,
         unit_dataset,
         unit_model,
+        unit_models,
         unit_render,
         unit_render_keys,
         units_file,
@@ -1359,6 +1407,7 @@ mod tests {
             unit_buildpics: false,
             unit_dataset: false,
             unit_model: false,
+            unit_models: false,
             unit_render: false,
             unit_render_keys: false,
             units_file: None,

@@ -114,7 +114,45 @@ pub fn render(
         .map(|(path, _)| (path.to_lowercase(), path))
         .collect();
 
-    let mut out = match find_model(&list, object_name) {
+    let teamtex = read_teamtex(&us, handle, &list);
+    let key_base = cache_key_base(&us, game_archive);
+    let cache = cache_dir.zip(key_base.as_deref());
+    let mut out = read_model(
+        &us,
+        handle,
+        &list,
+        &teamtex,
+        cache,
+        game_archive,
+        object_name,
+    );
+
+    us.close_archive(handle);
+    errors.extend(us.drain_errors());
+    us.remove_all_archives();
+    us.uninit();
+
+    out.errors.splice(0..0, errors);
+    out
+}
+
+/// Read and flatten one model against a session the caller has already mounted.
+///
+/// Everything the archive holds in common between models is a parameter rather
+/// than something read here: the member listing, `teamtex.txt` and the cache key
+/// are properties of the archive, not of a model, so a batch (issue #1684) pays
+/// for them once. `game_archive` is only used to say which archive a model is
+/// missing from.
+pub(crate) fn read_model(
+    us: &Unitsync,
+    handle: i32,
+    list: &[(String, String)],
+    teamtex: &[String],
+    cache: Option<(&Path, &str)>,
+    game_archive: &str,
+    object_name: &str,
+) -> UnitModelOutput {
+    let mut out = match find_model(list, object_name) {
         Some(path) => match us.read_archive_member(handle, &path, MODEL_READ_CAP) {
             Some((_, bytes)) => build(&path, &bytes),
             None => UnitModelOutput {
@@ -130,22 +168,10 @@ pub fn render(
         },
     };
 
-    if !out.textures.is_empty() {
-        let teamtex = read_teamtex(&us, handle, &list);
-        let key_base = cache_key_base(&us, game_archive);
-        let cache = cache_dir.zip(key_base.as_deref());
-        let format = out.format.clone();
-        for tex in out.textures.iter_mut().chain(out.team_mask.iter_mut()) {
-            resolve_texture(&us, handle, &list, &format, &teamtex, cache, tex);
-        }
+    let format = out.format.clone();
+    for tex in out.textures.iter_mut().chain(out.team_mask.iter_mut()) {
+        resolve_texture(us, handle, list, &format, teamtex, cache, tex);
     }
-
-    us.close_archive(handle);
-    errors.extend(us.drain_errors());
-    us.remove_all_archives();
-    us.uninit();
-
-    out.errors.splice(0..0, errors);
     out
 }
 
@@ -460,10 +486,13 @@ fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
     None
 }
 
-/// Read `unittextures/tatex/teamtex.txt`: the names a `.3do` face can use
+/// Read `unittextures/tatex/teamtex.txt`: the names a `.3do` face can use.
+///
+/// A property of the archive rather than of a model, so a batch reads it once
+/// for the whole list.
 /// without the `00` suffix the engine otherwise appends. Lower cased, because
 /// the file is written in the original mixed case and the models are not.
-fn read_teamtex(us: &Unitsync, handle: i32, list: &[(String, String)]) -> Vec<String> {
+pub(crate) fn read_teamtex(us: &Unitsync, handle: i32, list: &[(String, String)]) -> Vec<String> {
     let Some(actual) = find_member(list, TEAMTEX_LIST) else {
         return Vec::new();
     };
@@ -599,7 +628,7 @@ fn find_member(list: &[(String, String)], target_lc: &str) -> Option<String> {
 
 /// Cheap, stable per-game cache identity (path + size + mtime + version salt).
 /// Mirrors `factionlogo::cache_key_base`.
-fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String> {
+pub(crate) fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String> {
     use std::hash::{Hash, Hasher};
     let dir = us.archive_path(archive_name)?;
     let path = Path::new(&dir).join(archive_name);
@@ -622,7 +651,7 @@ fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String> {
 /// One flat segment, because the asset protocol's root for these serves a single
 /// folder. The extension is the one the file is written in, which is not the
 /// source's when it was transcoded, so the webview can pick a loader from it.
-fn cache_file_name(base: &str, member: &str, source_ext: &str) -> String {
+pub(crate) fn cache_file_name(base: &str, member: &str, source_ext: &str) -> String {
     let lower = member.to_lowercase();
     let ext = match source_ext {
         "bmp" | "tga" => "png",
