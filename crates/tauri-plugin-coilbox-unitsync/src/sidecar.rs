@@ -191,6 +191,28 @@ pub fn build_unit_model_args(
     args
 }
 
+/// Build args for `--unit-models` mode: the game, a file of `objectname`s, and
+/// the directory each flattened model and its textures are written into.
+///
+/// The objects travel by file for the same reason `--unit-render-keys`' units do:
+/// a blueprint's worth of them is past what Windows takes on a command line.
+pub fn build_unit_models_args(
+    lib: &str,
+    datadir: &str,
+    game: &str,
+    units_file: &str,
+    cache_dir: &str,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--unit-models".into());
+    args.push("--game".into());
+    args.push(game.into());
+    args.push("--units-file".into());
+    args.push(units_file.into());
+    push_cache_dir(&mut args, Some(cache_dir));
+    args
+}
+
 /// Build args for `--unit-render` mode: the unit whose render this is, the frame
 /// it was taken in, the file the pixels are in, and where the encoded asset goes.
 ///
@@ -748,6 +770,26 @@ mod tests {
         assert_eq!(a[g + 1], "BA.sdz");
         let o = a.iter().position(|x| x == "--object").unwrap();
         assert_eq!(a[o + 1], "ARMCOM");
+        assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/models"]);
+    }
+
+    /// The batch's units travel in a file, and the cache directory is where the
+    /// models it writes end up, so both have to reach the worker.
+    #[test]
+    fn build_unit_models_args_carry_the_game_the_units_file_and_the_cache_dir() {
+        let a = build_unit_models_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "BAR.sdd",
+            "/tmp/objects.json",
+            "/cache/models",
+        );
+        assert!(a.contains(&"--unit-models".to_string()));
+        assert!(!a.contains(&"--unit-model".to_string()));
+        let g = a.iter().position(|x| x == "--game").unwrap();
+        assert_eq!(a[g + 1], "BAR.sdd");
+        let u = a.iter().position(|x| x == "--units-file").unwrap();
+        assert_eq!(a[u + 1], "/tmp/objects.json");
         assert_eq!(&a[a.len() - 2..], &["--cache-dir", "/cache/models"]);
     }
 
