@@ -10,11 +10,14 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { Standing } from "@/blueprint/footprint";
-import { footprintStyle } from "./footprintsLayer";
+import { BUILD_SQUARE, type Standing } from "@/blueprint/footprint";
+import { cornerRadius, footprintStyle } from "./footprintsLayer";
 
 const style = (standing: Standing, overlapping = false) =>
   footprintStyle({ standing, overlapping });
+
+const chosen = (standing: Standing, overlapping = false, motion = true) =>
+  footprintStyle({ standing, overlapping }, "standing", true, motion);
 
 const held = (standing: Standing, overlapping = false) =>
   footprintStyle({ standing, overlapping }, "held");
@@ -137,6 +140,79 @@ describe("footprintStyle, held by the pointer", () => {
     expect(held("no-ground").dashed).toBe(true);
     expect(held("no-ground").fill).toBe(0);
     expect(held("no-ground").color).toBe(held("fine").color);
+  });
+});
+
+/**
+ * Issue #1716. A ring wider than the building said which one was selected and
+ * nothing else, and at the zoom a layout is edited at it covered the ground
+ * around the building and the squares of everything standing near it.
+ *
+ * The building's own square says it instead. Which means the square has to say
+ * two things at once, so the two are said in different ways: the colour is still
+ * the verdict, and the selection is the shape of the border.
+ */
+describe("footprintStyle, the selected building", () => {
+  it("picks the selected building out of the ones around it", () => {
+    expect(chosen("fine").band).toBeGreaterThan(0);
+    expect(style("fine").band).toBe(0);
+    expect(chosen("fine").outline).toBeGreaterThan(style("fine").outline);
+  });
+
+  /** The whole point of not colouring it: a selected building the engine will
+   *  refuse is still refused, and still says why. */
+  it("keeps a refusal's own colour while it is selected", () => {
+    expect(chosen("fine", true).color).toBe(style("fine", true).color);
+    expect(chosen("slope").color).toBe(style("slope").color);
+    expect(chosen("too-deep").color).toBe(style("too-deep").color);
+    expect(chosen("no-def").color).toBe(style("no-def").color);
+  });
+
+  /** Every refusal keeps its border too, because the border is what says which
+   *  building is being worked on and a refused one can be that. */
+  it("thickens the border whatever the verdict is", () => {
+    for (const mark of [
+      chosen("fine", true),
+      chosen("slope"),
+      chosen("no-def"),
+      chosen("no-ground"),
+    ]) {
+      expect(mark.band).toBeGreaterThan(0);
+    }
+  });
+
+  /** A selected building nothing has judged is still a building nothing has
+   *  judged: the empty dashed square is the statement. */
+  it("keeps an unjudged building empty and dashed", () => {
+    expect(chosen("no-ground").dashed).toBe(true);
+    expect(chosen("no-ground").fill).toBe(0);
+  });
+
+  it("breathes, unless motion is not wanted", () => {
+    expect(chosen("fine").pulse).toBe(true);
+    expect(chosen("fine", false, false).pulse).toBe(false);
+    expect(style("fine").pulse).toBe(false);
+  });
+});
+
+/**
+ * Issue #1716. The corners are rounded so a square reads as a plate the
+ * building stands on rather than as a box drawn round it.
+ */
+describe("cornerRadius", () => {
+  it("rounds by half a build square", () => {
+    expect(cornerRadius(BUILD_SQUARE * 4, BUILD_SQUARE * 3)).toBe(
+      BUILD_SQUARE / 2,
+    );
+  });
+
+  /** A rounding wider than the square itself is a shape with no straight edge
+   *  left, and on the smallest footprint there is that is what half a build
+   *  square would be. */
+  it("never rounds away more than the square has", () => {
+    expect(cornerRadius(BUILD_SQUARE, BUILD_SQUARE)).toBe(BUILD_SQUARE / 2);
+    expect(cornerRadius(4, 40)).toBe(2);
+    expect(cornerRadius(0, 0)).toBe(0);
   });
 });
 
