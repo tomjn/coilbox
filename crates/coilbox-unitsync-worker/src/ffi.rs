@@ -1051,10 +1051,17 @@ impl Unitsync {
     }
 
     /// Parse `mapinfo.lua` (the map's archives must be added) for the map's
-    /// environment settings: `atmosphere.{minWind,maxWind}` and
-    /// `water.tidalStrength` — the wind and tidal power available to wind/tidal
-    /// generators. Returns `(wind (min,max), tidal)`; each is `None` when the map
-    /// omits it or the build lacks the Lua parser.
+    /// environment settings: `atmosphere.minWind`, `atmosphere.maxWind` and the
+    /// root level `tidalStrength`. Those are the wind and tidal power available
+    /// to wind and tidal generators. Returns `(wind (min,max), tidal)`, each
+    /// `None` when the map omits it or the build lacks the Lua parser.
+    ///
+    /// `tidalStrength` sits beside `gravity` and `maphardness` at the root and
+    /// not under `water`, which is where this used to look and why every map
+    /// reported no tidal power at all. `CMapInfo::ReadGlobal` reads it off the
+    /// top table, so a map that put it under `water` would get no tidal power in
+    /// game either, and reading it there would report a number the engine
+    /// ignores.
     pub fn map_env(&self) -> (Option<(f32, f32)>, Option<f32>) {
         let (
             Some(open),
@@ -1080,7 +1087,6 @@ impl Unitsync {
             return (None, None);
         };
         let atmosphere = CString::new("atmosphere").unwrap_or_default();
-        let water = CString::new("water").unwrap_or_default();
         let min_w = CString::new("minWind").unwrap_or_default();
         let max_w = CString::new("maxWind").unwrap_or_default();
         let tidal_k = CString::new("tidalStrength").unwrap_or_default();
@@ -1101,12 +1107,9 @@ impl Unitsync {
                     }
                     pop(); // atmosphere
                 }
-                if sub_str(water.as_ptr()) != 0 {
-                    let t = fval(tidal_k.as_ptr(), f32::MIN);
-                    if t > f32::MIN {
-                        tidal = Some(t);
-                    }
-                    pop(); // water
+                let t = fval(tidal_k.as_ptr(), f32::MIN);
+                if t > f32::MIN {
+                    tidal = Some(t);
                 }
             }
             close();
@@ -1265,6 +1268,62 @@ impl Unitsync {
             close();
         }
         app
+    }
+
+    /// Parse `mapinfo.lua` (the map's archives must be added) for the two names
+    /// the map gives itself: root `name` and root `version`.
+    ///
+    /// Both are `None` on a map that ships no `mapinfo.lua`, which is every SMD
+    /// era map, and that is a true answer rather than a failure: the versioned
+    /// name from `GetMapName` is the identity either way, and these two only say
+    /// how the mapper split it.
+    ///
+    /// Queried case-tolerantly for the same reason [`Self::map_appearance`] is:
+    /// unitsync's parser lowercases keys only when the map calls
+    /// `lowerkeys(mapinfo)`, and not all maps do.
+    pub fn map_identity(&self) -> (Option<String>, Option<String>) {
+        let (Some(open), Some(execute), Some(close), Some(root), Some(str_sval)) = (
+            self.lp_open_file_fn,
+            self.lp_execute_fn,
+            self.lp_close_fn,
+            self.lp_root_table_fn,
+            self.lp_str_key_str_val_fn,
+        ) else {
+            return (None, None);
+        };
+        let (Ok(file), Ok(modes)) = (CString::new("mapinfo.lua"), CString::new("rmMbe")) else {
+            return (None, None);
+        };
+        let empty = CString::new("").unwrap_or_default();
+
+        let mut name = None;
+        let mut version = None;
+        unsafe {
+            if open(file.as_ptr(), modes.as_ptr(), modes.as_ptr()) == 0 {
+                return (None, None);
+            }
+            execute();
+            if root() != 0 {
+                let read = |keys: &[&str]| -> Option<String> {
+                    for key in keys {
+                        let Ok(k) = CString::new(*key) else {
+                            continue;
+                        };
+                        if let Some(s) = cstr(str_sval(k.as_ptr(), empty.as_ptr())) {
+                            let s = s.trim().to_string();
+                            if !s.is_empty() {
+                                return Some(s);
+                            }
+                        }
+                    }
+                    None
+                };
+                name = read(&["name", "Name"]);
+                version = read(&["version", "Version"]);
+            }
+            close();
+        }
+        (name, version)
     }
 
     /// Parse `mapinfo.lua` (the map's archives must be added) for the map's

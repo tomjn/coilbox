@@ -169,7 +169,7 @@ pub struct MinimapOutput {
     pub min_wind: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_wind: Option<f32>,
-    /// Tidal power (`water.tidalStrength` from mapinfo.lua).
+    /// Tidal power (root-level `tidalStrength` from mapinfo.lua).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tidal_strength: Option<f32>,
     /// Water/sky/sun appearance from mapinfo.lua, for the 3D preview's lighting and
