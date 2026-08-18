@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cornerGround,
   FLAT_FIELD,
+  fieldFromGrid,
   groundHeight,
   type HeightField,
   heightGrid,
@@ -109,6 +110,32 @@ describe("heightGrid", () => {
     const bytes = Uint16Array.from([0, 1, 2, 3]).buffer;
     expect(heightGrid(bytes, 3, 3)).toBeNull();
     expect(heightGrid(bytes, 0, 0)).toBeNull();
+  });
+});
+
+describe("fieldFromGrid", () => {
+  /** The point of #1730: what a model stands on and what a building's verdict
+   *  is worked out on come off the same words, so the two cannot disagree about
+   *  the same ground. */
+  it("stands a model on the height the verdict is worked out at", () => {
+    const words = [0, 16384, 32768, 65535];
+    const both = grid(2, 2, words);
+    const field = fieldFromGrid(both);
+    const ground = cornerGround(both, 8, 8, -100, 100);
+    if (!ground) throw new Error("no ground");
+
+    expect([field.width, field.height]).toEqual([2, 2]);
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < 2; col++) {
+        const stood = field.samples[row * 2 + col] * (100 - -100) + -100;
+        expect(stood).toBeCloseTo(ground.cornerAt(col, row));
+      }
+    }
+  });
+
+  it("scales a word by the divisor the engine reads it with", () => {
+    // 65536 rather than 65535, matching `CSMFMapFile::ReadHeightmap`.
+    expect(fieldFromGrid(grid(1, 1, [32768])).samples[0]).toBe(0.5);
   });
 });
 

@@ -36,6 +36,7 @@ export function MissionMapBackground({
           autoSpin={clampSpin(config.spinSpeed)}
           initialWater={config.water}
           heightSrc={assets.heightSrc}
+          heightRange={assets.heightRange}
           textureSrc={assets.textureSrc}
           skyboxSrc={assets.skyboxSrc}
           appearance={assets.appearance}
@@ -87,6 +88,7 @@ export function MissionMapSideGraphic({
       autoSpin={clampSpin(config.spinSpeed)}
       initialWater={config.water}
       heightSrc={assets.heightSrc}
+      heightRange={assets.heightRange}
       textureSrc={assets.textureSrc}
       appearance={assets.appearance}
       minHeight={assets.minHeight}

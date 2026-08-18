@@ -30,6 +30,7 @@ import * as THREE from "three";
 
 import type { MapAppearance } from "@/mapconv/bindings";
 import {
+  type HeightWords,
   MapPreview3D,
   type MapScene3D,
 } from "@/mapconv/pages/components/MapPreview3D";
@@ -43,6 +44,8 @@ export type SurfaceGround =
   | {
       kind: "map";
       heightSrc?: string;
+      heightRange?: { min: number; max: number };
+      heightWords?: HeightWords | null;
       textureSrc?: string;
       skyboxSrc?: string | null;
       appearance?: MapAppearance | null;
@@ -254,6 +257,8 @@ function GroundView({
       showSky
       showClouds={false}
       heightSrc={ground.heightSrc}
+      heightRange={ground.heightRange}
+      heightWords={ground.heightWords}
       textureSrc={ground.textureSrc}
       skyboxSrc={ground.skyboxSrc}
       appearance={ground.appearance}

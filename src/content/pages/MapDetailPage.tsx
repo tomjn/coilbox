@@ -404,6 +404,7 @@ export default function MapDetailPage() {
             <MapPreview3D
               className="w-full min-w-0 lg:flex-1"
               heightSrc={heightmap.url}
+              heightRange={heightmap.range}
               textureSrc={minimap.url}
               appearance={minimap.appearance}
               skyboxSrc={skybox.dataUrl}

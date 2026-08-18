@@ -4,22 +4,23 @@
  * The 3D preview puts the terrain's relief in a `displacementMap` sampled by the
  * vertex shader, so the geometry three.js holds is a flat plane: a raycast
  * against it comes back flat, and a model positioned from it floats or sinks.
- * The heightmap is already in hand as a data URL, so the same values the shader
- * uses are read back off a canvas once and sampled here.
+ * So the same heights the shader displaces by are sampled here instead.
  *
- * Whether a building will stand is a separate read (issue #1490). A canvas
- * hands back eight bits whatever the PNG holds, which cost the check a
- * tolerance of one step of the map's whole range, so the terrain check reads
- * the worker's raw 16 bit grid instead and the drawing keeps the picture.
+ * Both readings come off one source, the worker's raw 16 bit grid (issues #1490
+ * and #1730). It used to be two: a picture read back through a canvas for
+ * standing models, and the grid for whether a building would stand. A canvas
+ * hands back eight bits whatever the file holds, so the picture cost the check a
+ * tolerance of one step of the map's whole range, and the two readings could
+ * disagree about the same ground.
  *
- * The sampling is arithmetic and tested. Fetching the image and the grid is
- * not, because one needs a canvas and the other needs the asset protocol.
+ * The sampling is arithmetic and tested. Fetching the grid is not, because it
+ * needs the asset protocol.
  */
 
 import type { Ground } from "@/blueprint/buildable";
 import { SQUARE_SIZE } from "@/blueprint/footprint";
 
-/** A decoded heightmap: one 0..1 sample per pixel, row 0 at the map's north. */
+/** A decoded heightmap: one 0..1 sample per vertex, row 0 at the map's north. */
 export interface HeightField {
   width: number;
   height: number;
@@ -28,41 +29,12 @@ export interface HeightField {
 }
 
 /**
- * Decode a heightmap data URL into samples, or `null` if it cannot be read.
- *
- * Greyscale, so the red channel is the height. The preview's texture loader
- * flips the image on upload and the plane's V axis is flipped again by lying it
- * down, so the two cancel: image row 0 is the map's north edge, exactly as the
- * image looks.
- */
-export async function readHeightField(
-  src: string,
-): Promise<HeightField | null> {
-  const bitmap = await createImageBitmap(await (await fetch(src)).blob());
-  try {
-    const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) return null;
-    context.drawImage(bitmap, 0, 0);
-    const { data } = context.getImageData(0, 0, bitmap.width, bitmap.height);
-    const samples = new Float32Array(bitmap.width * bitmap.height);
-    for (let i = 0; i < samples.length; i++) samples[i] = data[i * 4] / 255;
-    return { width: bitmap.width, height: bitmap.height, samples };
-  } finally {
-    bitmap.close();
-  }
-}
-
-/**
  * The map's heights as the engine holds them (issue #1490).
  *
- * Not a {@link HeightField}: those are 0..1 samples read back off a rendered
- * PNG through a canvas, which hands back eight bits whatever the PNG holds.
- * These are the stored 16 bit words themselves, written out by the worker's
- * `--height-field` mode and fetched as raw bytes, so the check pays no
- * tolerance for the reading.
+ * The stored 16 bit words themselves, written out by the worker's
+ * `--height-field` mode and fetched as raw bytes, so a verdict pays no
+ * tolerance for the reading. {@link fieldFromGrid} turns them into the 0..1
+ * samples the drawing wants.
  */
 export interface HeightGrid {
   /** `(mapx+1)` by `(mapy+1)`: the engine's own corner grid, 8 elmos apart. */
@@ -101,6 +73,24 @@ export async function readHeightGrid(
   height: number,
 ): Promise<HeightGrid | null> {
   return heightGrid(await (await fetch(src)).arrayBuffer(), width, height);
+}
+
+/**
+ * The grid as the 0..1 samples a model is stood on.
+ *
+ * The same numbers {@link cornerGround} reads, at the same resolution, so a
+ * model and the verdict on the building under it are drawn from one reading of
+ * the ground (issue #1730). 65536 rather than 65535 because that is
+ * `CSMFMapFile::ReadHeightmap`'s own divisor.
+ *
+ * It costs a float per sample, which is 17 MB on the largest map in the corpus,
+ * on top of the words themselves. That is the price of one map being open, and
+ * the alternative was a second, shallower reading of the same ground.
+ */
+export function fieldFromGrid(grid: HeightGrid): HeightField {
+  const samples = new Float32Array(grid.words.length);
+  for (let i = 0; i < samples.length; i++) samples[i] = grid.words[i] / 65536;
+  return { width: grid.width, height: grid.height, samples };
 }
 
 /**
@@ -216,10 +206,10 @@ function sampleAt(field: HeightField, col: number, row: number): number {
 /**
  * The ground height in engine world units at an engine position.
  *
- * Bilinear, because the heightmap the preview fetches is downscaled and nearest
- * sampling on a 512-pixel image of a 4096-elmo map makes a row of units step up
- * and down in 8-elmo jumps. `minHeight` and `maxHeight` are the map's own range,
- * the same pair the preview scales its displacement by.
+ * Bilinear, because a unit stands wherever it was put and the samples are 8
+ * elmos apart. Nearest would make a row of units along a slope step up and down
+ * in 8 elmo jumps. `minHeight` and `maxHeight` are the map's own range, the same
+ * pair the preview scales its displacement by.
  */
 export function groundHeight(
   field: HeightField,

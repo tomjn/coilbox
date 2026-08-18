@@ -381,6 +381,8 @@ export function BlueprintOnMap({
         ground={{
           kind: "map",
           heightSrc: assets.heightSrc,
+          heightRange: assets.heightRange,
+          heightWords: assets.heightWords,
           textureSrc: assets.textureSrc,
           skyboxSrc: assets.skyboxSrc,
           appearance: assets.appearance,
