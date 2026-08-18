@@ -147,8 +147,10 @@ async function loadSkyboxCube(
   }
 }
 
-/** Longest side requested from `mc_image_info` for the colour map. The relief
- * no longer comes from a picture at all, so only this one is left. */
+/** Longest sides requested from `mc_image_info`. The relief normally comes from
+ * the heightmap's own words now, so `HEIGHT_MAX` is only the fallback for a file
+ * that would not read as words. */
+const HEIGHT_MAX = 1024;
 const TEXTURE_MAX = 2048;
 /** Plane subdivisions. ~524k tris — still cheap, and the ≤1024px heightmap is the
  * real detail bound, so more segments wouldn't show. */
@@ -460,15 +462,35 @@ export function MapPreview3D({
         ? getImageInfo(texturePath, TEXTURE_MAX).then((t) => t.thumb)
         : null;
     if (!colour) return;
-    Promise.all([getHeightWords(heightmapPath, GRID_MAX), colour])
-      .then(([words, texture]) => {
+    (async () => {
+      try {
+        const texture = await colour;
         if (cancelled) return;
-        setPathWords(words);
-        setSrcs({ height: null, texture });
-      })
-      .catch(() => {
+        let words: HeightWords | null = null;
+        try {
+          words = await getHeightWords(heightmapPath, GRID_MAX);
+        } catch (why) {
+          // The relief is the one input with something to fall back to. A
+          // picture of the heightmap is what shipped before #1730: eight bits
+          // and prone to banding, but a preview rather than none. Said out loud
+          // because a silent downgrade is one nobody ever fixes.
+          console.warn(
+            `could not read ${heightmapPath} as heights, drawing a picture of it instead`,
+            why,
+          );
+        }
+        if (cancelled) return;
+        if (words) {
+          setPathWords(words);
+          setSrcs({ height: null, texture });
+          return;
+        }
+        const picture = await getImageInfo(heightmapPath, HEIGHT_MAX);
+        if (!cancelled) setSrcs({ height: picture.thumb, texture });
+      } catch {
         if (!cancelled) setFailed(true);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
