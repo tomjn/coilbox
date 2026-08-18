@@ -9,6 +9,7 @@ use crate::model::{
     GameHeadersOutput, MapSkyboxOutput,
 };
 use base64::Engine;
+use std::collections::HashMap;
 use std::path::Path;
 
 /// Text members are previewed up to 512 KiB; larger ones report as too large.
@@ -151,33 +152,84 @@ pub(crate) fn archive_name_for_map(us: &Unitsync, map_name: &str) -> String {
 /// the wrong one of two lookalike archives is a display fault, and a catalog
 /// entry claiming the wrong one is a false fact about somebody's install.
 pub(crate) fn map_archive_file(us: &Unitsync, map_index: i32, map_name: &str) -> Option<String> {
-    let smf = us.map_file_name(map_index)?;
-    let candidates = archives_holding(us, &smf);
-    let chosen = match candidates.len() {
-        0 => return None,
-        1 => candidates.into_iter().next()?,
-        _ => the_one_that_says_it_is_this_map(us, &candidates, map_name)?,
-    };
-    absolute_archive_path(us, &chosen).filter(|p| Path::new(p).is_file())
+    MapArchives::for_one_map(us, map_index).file_for(us, map_index, map_name)
 }
 
-/// Every archive under `maps/` holding a member with this name.
-fn archives_holding(us: &Unitsync, member: &str) -> Vec<String> {
-    us.list_vfs_dir("maps", "*", "r")
-        .into_iter()
-        .filter(|c| is_archive_file(c))
-        .filter(|cand| match us.open_archive(cand) {
-            Some(h) => {
-                let hit = us
-                    .list_archive_files(h)
-                    .iter()
-                    .any(|(p, _)| same_member(p, member));
-                us.close_archive(h);
-                hit
+/// Which archive under `maps/` holds each `.smf`, read once.
+///
+/// A walk over the whole library needs this and a single map does not, which is
+/// the whole of why it is a type. Resolving one map means opening archives until
+/// one holds its `.smf`, so three thousand maps resolved one at a time is
+/// millions of archive opens. Built once it is one open each.
+pub(crate) struct MapArchives {
+    /// Lowercased `.smf` path to every archive holding one. More than one is the
+    /// case [`MapArchives::file_for`] has to break a tie in.
+    by_smf: HashMap<String, Vec<String>>,
+}
+
+impl MapArchives {
+    /// One pass over every archive under `maps/`.
+    pub(crate) fn index(us: &Unitsync) -> Self {
+        let mut by_smf: HashMap<String, Vec<String>> = HashMap::new();
+        for candidate in us.list_vfs_dir("maps", "*", "r") {
+            if !is_archive_file(&candidate) {
+                continue;
             }
-            None => false,
-        })
-        .collect()
+            let Some(handle) = us.open_archive(&candidate) else {
+                continue;
+            };
+            for (path, _) in us.list_archive_files(handle) {
+                if path.to_lowercase().ends_with(".smf") {
+                    by_smf
+                        .entry(path.to_lowercase())
+                        .or_default()
+                        .push(candidate.clone());
+                }
+            }
+            us.close_archive(handle);
+        }
+        Self { by_smf }
+    }
+
+    /// The archives holding one map\'s `.smf`, without reading the rest of the
+    /// library. What a caller asking about a single map pays instead of the pass
+    /// above.
+    fn for_one_map(us: &Unitsync, map_index: i32) -> Self {
+        let mut by_smf = HashMap::new();
+        if let Some(smf) = us.map_file_name(map_index) {
+            let holders = us
+                .list_vfs_dir("maps", "*", "r")
+                .into_iter()
+                .filter(|c| is_archive_file(c))
+                .filter(|cand| match us.open_archive(cand) {
+                    Some(h) => {
+                        let hit = us
+                            .list_archive_files(h)
+                            .iter()
+                            .any(|(p, _)| same_member(p, &smf));
+                        us.close_archive(h);
+                        hit
+                    }
+                    None => false,
+                })
+                .collect();
+            by_smf.insert(smf.to_lowercase(), holders);
+        }
+        Self { by_smf }
+    }
+
+    /// The absolute path of the archive file holding this map, or `None` when
+    /// there is none or the tie cannot be broken.
+    pub(crate) fn file_for(&self, us: &Unitsync, map_index: i32, map_name: &str) -> Option<String> {
+        let smf = us.map_file_name(map_index)?.to_lowercase();
+        let candidates = self.by_smf.get(&smf)?;
+        let chosen = match candidates.len() {
+            0 => return None,
+            1 => candidates[0].clone(),
+            _ => the_one_that_says_it_is_this_map(us, candidates, map_name)?,
+        };
+        absolute_archive_path(us, &chosen).filter(|p| Path::new(p).is_file())
+    }
 }
 
 /// Which of several archives holding one `.smf` is the archive for this map.

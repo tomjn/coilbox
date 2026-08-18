@@ -37,7 +37,9 @@ use coilbox_map_catalog::{AppearanceValue, MapCatalogEntry, MapPoint, MapPoints}
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::archive::MapArchives;
 use crate::ffi::{MapAppearance, Unitsync};
+use crate::infocache;
 
 /// How much of the archive is hashed at a time. A map archive runs to hundreds
 /// of megabytes, so the bytes stream through this rather than being read into
@@ -63,6 +65,10 @@ pub enum MapCatalogSkip {
     /// unitsync reported no world height range, so the height samples cannot be
     /// turned into elmos and nothing can say what is under water.
     NoHeightRange,
+    /// The library lists this map twice, from two installs, and the hub holds one
+    /// row per name. The second one is dropped rather than sent, because a batch
+    /// naming one map twice is refused whole.
+    DuplicateMap,
 }
 
 /// What the `--map-catalog` mode prints: one map's entry, or why there is none.
@@ -78,6 +84,62 @@ pub struct MapCatalogOutput {
     pub errors: Vec<String>,
 }
 
+/// Which archive a map came out of, and what its bytes hash to.
+///
+/// The cheap half of an entry, and the half a have check is made of. Reading it
+/// on its own is what lets a library walk ask the hub about three thousand maps
+/// before doing the expensive work for the handful it still wants (issue #1737).
+pub(crate) struct MapSource {
+    pub archive_file: String,
+    pub source_hash: String,
+}
+
+/// Find the map's archive and hash it.
+///
+/// `archives` is the walk's own index, and `None` is a caller asking about one
+/// map, which pays a search of the map archives rather than a pass over all of
+/// them. It only decides how the file is found, never which one.
+pub(crate) fn source_in_session(
+    us: &Unitsync,
+    map_index: i32,
+    map_name: &str,
+    archives: Option<&MapArchives>,
+    cache_dir: Option<&std::path::Path>,
+) -> Result<MapSource, MapCatalogSkip> {
+    let archive_file = match archives {
+        Some(index) => index.file_for(us, map_index, map_name),
+        None => crate::archive::map_archive_file(us, map_index, map_name),
+    }
+    .ok_or(MapCatalogSkip::NoArchiveFile)?;
+    let source_hash =
+        cached_hash(&archive_file, cache_dir).ok_or(MapCatalogSkip::UnreadableArchive)?;
+    Ok(MapSource {
+        archive_file,
+        source_hash,
+    })
+}
+
+/// The archive\'s sha256, from the cache when the file has not moved since it was
+/// last read.
+///
+/// Keyed on the file\'s own path, size and mtime, which is what every other cache
+/// in this worker is keyed on. Without it a sweep re-reads every byte of a map
+/// library on every run, which is tens of gigabytes to learn that nothing has
+/// changed. With it a second sweep reads no archives at all.
+fn cached_hash(path: &str, cache_dir: Option<&std::path::Path>) -> Option<String> {
+    let key = cache_dir.and_then(|_| infocache::archive_hash_key(std::path::Path::new(path)));
+    if let (Some(dir), Some(key)) = (cache_dir, key.as_deref()) {
+        if let Some(hit) = infocache::read::<String>(dir, key) {
+            return Some(hit);
+        }
+    }
+    let hash = hash_file(path)?;
+    if let (Some(dir), Some(key)) = (cache_dir, key.as_deref()) {
+        infocache::write(dir, key, &hash);
+    }
+    Some(hash)
+}
+
 /// One map's entry, in a session the caller has already initialised.
 ///
 /// `map_index` is the map's position in unitsync's own list, which is what
@@ -91,10 +153,14 @@ pub(crate) fn entry_in_session(
     us: &Unitsync,
     map_index: i32,
     map_name: &str,
+    archives: Option<&MapArchives>,
+    cache_dir: Option<&std::path::Path>,
 ) -> Result<MapCatalogEntry, MapCatalogSkip> {
-    let archive_file = crate::archive::map_archive_file(us, map_index, map_name)
-        .ok_or(MapCatalogSkip::NoArchiveFile)?;
-    let source_hash = hash_file(&archive_file).ok_or(MapCatalogSkip::UnreadableArchive)?;
+    let source = source_in_session(us, map_index, map_name, archives, cache_dir)?;
+    let MapSource {
+        archive_file,
+        source_hash,
+    } = source;
     let archive_filename = std::path::Path::new(&archive_file)
         .file_name()
         .map(|n| n.to_string_lossy().into_owned());
@@ -291,9 +357,179 @@ fn appearance_blob(app: &MapAppearance) -> BTreeMap<String, AppearanceValue> {
     blob
 }
 
+/// One map in a library walk: what a have check needs, and the facts themselves
+/// when they were asked for.
+///
+/// The three key fields are always here, because they are the cheap half and the
+/// half the hub is asked about first. `entry` is absent on a keys-only pass, and
+/// present when the caller asked for the facts of the maps the hub said it
+/// wanted.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapCatalogRow {
+    pub map_name: String,
+    pub source_hash: String,
+    pub catalog_version: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entry: Option<MapCatalogEntry>,
+}
+
+/// A map the walk produced nothing for, and why.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapCatalogSkipped {
+    pub map_name: String,
+    pub reason: MapCatalogSkip,
+}
+
+/// What the library walk prints.
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MapCatalogWalkOutput {
+    pub maps: Vec<MapCatalogRow>,
+    pub skipped: Vec<MapCatalogSkipped>,
+    pub errors: Vec<String>,
+}
+
+/// Walk the installed map library in one session.
+///
+/// Two passes over one library, and which one this is decides what it costs.
+/// `keys_only` finds each map's archive and hashes it, which is what a have
+/// check compares on. Without it, every map named also has its infomaps read,
+/// its `mapinfo.lua` parsed and its whole height grid counted, which is tens of
+/// megabytes a map.
+///
+/// That split is the point of the mode. A library of three thousand maps is
+/// almost entirely maps the hub already holds, so the expensive half is paid for
+/// the handful it does not (issue #1737).
+///
+/// `only` restricts the walk to these names, which is how the second pass is
+/// told what the hub wanted. `None` walks everything.
+pub fn walk(
+    lib: &str,
+    only: Option<&[String]>,
+    keys_only: bool,
+    cache_dir: Option<&std::path::Path>,
+) -> MapCatalogWalkOutput {
+    let us = match unsafe { Unitsync::load(std::path::Path::new(lib)) } {
+        Ok(u) => u,
+        Err(e) => {
+            return MapCatalogWalkOutput {
+                errors: vec![e],
+                ..Default::default()
+            }
+        }
+    };
+    let mut errors = Vec::new();
+    if us.init(false, 0) == 0 {
+        errors.push("unitsync Init returned 0 (failure); the library looks empty".into());
+    }
+    errors.extend(us.drain_errors());
+
+    let (wanted, mut skipped) = map_list(&us, only);
+    // One pass over the map archives, so resolving three thousand maps is three
+    // thousand archive opens rather than three thousand times three thousand.
+    let archives = MapArchives::index(&us);
+    let _ = us.drain_errors();
+
+    let mut maps = Vec::with_capacity(wanted.len());
+    for (index, map_name) in wanted {
+        let read = if keys_only {
+            source_in_session(&us, index, &map_name, Some(&archives), cache_dir).map(|source| {
+                MapCatalogRow {
+                    map_name: map_name.clone(),
+                    source_hash: source.source_hash,
+                    catalog_version: coilbox_map_catalog::catalog_version(),
+                    entry: None,
+                }
+            })
+        } else {
+            entry_in_session(&us, index, &map_name, Some(&archives), cache_dir).map(|entry| {
+                MapCatalogRow {
+                    map_name: map_name.clone(),
+                    source_hash: entry.source_hash.clone(),
+                    catalog_version: entry.catalog_version,
+                    entry: Some(entry),
+                }
+            })
+        };
+        // Whatever unitsync said while reading this map belongs to this map.
+        let _ = us.drain_errors();
+        match read {
+            Ok(row) => maps.push(row),
+            Err(reason) => skipped.push(MapCatalogSkipped { map_name, reason }),
+        }
+    }
+
+    errors.extend(us.drain_errors());
+    us.uninit();
+
+    MapCatalogWalkOutput {
+        maps,
+        skipped,
+        errors,
+    }
+}
+
+/// The maps to walk, with the index unitsync knows each by, and the ones dropped
+/// before any of them is read.
+///
+/// Sorted by name so two runs of one library produce the same order, and deduped
+/// because the hub holds one row per name and refuses a batch that names one map
+/// twice. A library listing a map as both an `.sd7` and an unpacked directory
+/// lists it twice, and this machine has two such maps.
+fn map_list(
+    us: &Unitsync,
+    only: Option<&[String]>,
+) -> (Vec<(i32, String)>, Vec<MapCatalogSkipped>) {
+    choose(
+        (0..us.map_count())
+            .filter_map(|index| us.map_name(index).map(|name| (index, name)))
+            .collect(),
+        only,
+    )
+}
+
+/// The filter, the sort and the dedupe [`map_list`] applies, without the session
+/// it takes to read a name.
+fn choose(
+    named: Vec<(i32, String)>,
+    only: Option<&[String]>,
+) -> (Vec<(i32, String)>, Vec<MapCatalogSkipped>) {
+    let mut named: Vec<(i32, String)> = named
+        .into_iter()
+        .filter(|(_, name)| only.is_none_or(|only| only.iter().any(|wanted| wanted == name)))
+        .collect();
+    named.sort_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)));
+
+    let mut kept: Vec<(i32, String)> = Vec::with_capacity(named.len());
+    let mut duplicates = Vec::new();
+    for (index, name) in named {
+        if kept.last().map(|(_, last)| last) == Some(&name) {
+            duplicates.push(MapCatalogSkipped {
+                map_name: name,
+                reason: MapCatalogSkip::DuplicateMap,
+            });
+            continue;
+        }
+        kept.push((index, name));
+    }
+    (kept, duplicates)
+}
+
+/// Report a failure that stopped the walk running at all, in the walk's own
+/// shape.
+pub fn emit_walk_error(msg: String) {
+    let out = MapCatalogWalkOutput {
+        errors: vec![msg],
+        ..Default::default()
+    };
+    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+}
+
 /// Read one map's entry in a session of its own, which is the `--map-catalog`
 /// mode.
-pub fn read(lib: &str, map_name: &str) -> MapCatalogOutput {
+pub fn read(lib: &str, map_name: &str, cache_dir: Option<&std::path::Path>) -> MapCatalogOutput {
     let us = match unsafe { Unitsync::load(std::path::Path::new(lib)) } {
         Ok(u) => u,
         Err(e) => {
@@ -308,7 +544,7 @@ pub fn read(lib: &str, map_name: &str) -> MapCatalogOutput {
 
     let map_index = (0..us.map_count()).find(|&i| us.map_name(i).as_deref() == Some(map_name));
     let assembled = match map_index {
-        Some(index) => entry_in_session(&us, index, map_name),
+        Some(index) => entry_in_session(&us, index, map_name, None, cache_dir),
         None => Err(MapCatalogSkip::NoArchiveFile),
     };
     let mut errors = us.drain_errors();
@@ -484,6 +720,78 @@ mod tests {
             serde_json::to_value(MapCatalogSkip::NoHeightRange).unwrap(),
             serde_json::json!("no-height-range")
         );
+    }
+
+    fn listed(names: &[&str]) -> Vec<(i32, String)> {
+        names
+            .iter()
+            .enumerate()
+            .map(|(index, name)| (index as i32, (*name).to_string()))
+            .collect()
+    }
+
+    /// The hub holds one row per map name and refuses a batch that names one
+    /// twice, so a library listing a map as both an archive and an unpacked
+    /// directory has to lose one before anything is sent. This machine has two
+    /// such maps.
+    #[test]
+    fn a_map_installed_twice_is_walked_once_and_the_other_is_reported() {
+        let (kept, dropped) = choose(
+            listed(&["Isis 1.3", "AcidicQuarry 5.17", "AcidicQuarry 5.17"]),
+            None,
+        );
+        assert_eq!(
+            kept.iter()
+                .map(|(_, name)| name.as_str())
+                .collect::<Vec<_>>(),
+            ["AcidicQuarry 5.17", "Isis 1.3"]
+        );
+        assert_eq!(dropped.len(), 1);
+        assert_eq!(dropped[0].map_name, "AcidicQuarry 5.17");
+        assert_eq!(dropped[0].reason, MapCatalogSkip::DuplicateMap);
+    }
+
+    /// Sorted by name, so two runs over one library produce the same order and
+    /// the hub sees the same batches.
+    #[test]
+    fn the_walk_is_in_name_order_rather_than_in_scan_order() {
+        let (kept, _) = choose(listed(&["Tabula 3", "Isis 1.3", "AcidicQuarry 5.17"]), None);
+        assert_eq!(
+            kept.iter()
+                .map(|(_, name)| name.as_str())
+                .collect::<Vec<_>>(),
+            ["AcidicQuarry 5.17", "Isis 1.3", "Tabula 3"]
+        );
+        // And each keeps the index unitsync knows it by, which is what the facts
+        // are read against.
+        assert_eq!(kept[0].0, 2);
+    }
+
+    /// The second pass is told which maps the hub wanted, and reads no others.
+    #[test]
+    fn a_named_list_walks_those_maps_and_nothing_else() {
+        let only = vec!["Tabula 3".to_string()];
+        let (kept, dropped) = choose(
+            listed(&["Isis 1.3", "Tabula 3", "Comet Catcher Remake 1.8"]),
+            Some(&only),
+        );
+        assert_eq!(
+            kept.iter()
+                .map(|(_, name)| name.as_str())
+                .collect::<Vec<_>>(),
+            ["Tabula 3"]
+        );
+        assert!(dropped.is_empty());
+    }
+
+    /// A name nothing on this machine answers to is not an error and not a
+    /// guess. The hub asked about a map this library no longer has.
+    #[test]
+    fn a_name_the_library_does_not_have_is_simply_absent() {
+        let only = vec!["A Map Nobody Installed".to_string()];
+        let (kept, dropped) = choose(listed(&["Isis 1.3"]), Some(&only));
+        assert!(kept.is_empty());
+        assert!(dropped.is_empty());
     }
 
     /// One real archive, read twice, against a real unitsync.

@@ -311,15 +311,15 @@ fn write_temp_pixels(rgba: &[u8]) -> Result<PathBuf, String> {
 /// same reason the two above exist: a whole game's roster is tens of kilobytes,
 /// which is past what Windows takes on a command line. The caller removes it once
 /// the worker has exited.
-fn write_temp_units(units: &str) -> Result<PathBuf, String> {
+fn write_temp_list(what: &str, list: &str) -> Result<PathBuf, String> {
     let mut path = std::env::temp_dir();
     let pid = std::process::id();
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    path.push(format!("coilbox-render-keys-{pid}-{nanos}.json"));
-    std::fs::write(&path, units).map_err(|e| format!("could not write the unit list: {e}"))?;
+    path.push(format!("coilbox-{what}-{pid}-{nanos}.json"));
+    std::fs::write(&path, list).map_err(|e| format!("could not write the {what} list: {e}"))?;
     Ok(path)
 }
 
@@ -731,7 +731,7 @@ async fn unitsync_unit_models<R: Runtime>(
         Ok(s) => s,
         Err(e) => return Ok(CliResult::err(format!("could not send the unit list: {e}"))),
     };
-    let units_file = match write_temp_units(&list) {
+    let units_file = match write_temp_list("render-keys", &list) {
         Ok(p) => p,
         Err(e) => return Ok(CliResult::err(e)),
     };
@@ -857,7 +857,7 @@ async fn unitsync_unit_render_keys<R: Runtime>(
         Ok(s) => s,
         Err(e) => return Ok(CliResult::err(format!("could not send the unit list: {e}"))),
     };
-    let units_file = match write_temp_units(&list) {
+    let units_file = match write_temp_list("render-keys", &list) {
         Ok(p) => p,
         Err(e) => return Ok(CliResult::err(e)),
     };
@@ -873,6 +873,60 @@ async fn unitsync_unit_render_keys<R: Runtime>(
     let envs = loader_envs(&engine_dir, &data_dir);
     let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "unit render keys", None).await;
     let _ = std::fs::remove_file(&units_file);
+    Ok(out)
+}
+
+/// `unitsync_map_catalog` reads the installed map library into the entries the
+/// hub takes (issue #1737).
+///
+/// Two passes and the caller chooses which. `keys_only` gives each map\'s name,
+/// the sha256 of its archive and the catalog version, which is a have check\'s
+/// whole question, and `maps` then names the ones the hub said it wanted so the
+/// expensive half is paid for those alone. A map\'s facts cost a read of its
+/// whole height grid, and a library is almost entirely maps the hub already
+/// holds.
+///
+/// One call is one `Init` however many maps it covers, and the archive hashes are
+/// cached on file identity, so a second sweep over an unchanged library reads no
+/// archives at all.
+#[tauri::command]
+async fn unitsync_map_catalog<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    maps: Option<Vec<String>>,
+    keys_only: bool,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let maps_file = match maps {
+        None => None,
+        Some(names) => {
+            let list = match serde_json::to_string(&names) {
+                Ok(s) => s,
+                Err(e) => return Ok(CliResult::err(format!("could not send the map list: {e}"))),
+            };
+            match write_temp_list("map-catalog", &list) {
+                Ok(p) => Some(p),
+                Err(e) => return Ok(CliResult::err(e)),
+            }
+        }
+    };
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = sidecar::build_map_catalog_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        maps_file.as_ref().map(|p| p.to_string_lossy()).as_deref(),
+        keys_only,
+        cache_dir.as_deref(),
+    );
+    let envs = loader_envs(&engine_dir, &data_dir);
+    let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "map catalog", None).await;
+    if let Some(path) = maps_file {
+        let _ = std::fs::remove_file(&path);
+    }
     Ok(out)
 }
 
@@ -1151,6 +1205,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_unit_models,
             unitsync_unit_render,
             unitsync_unit_render_keys,
+            unitsync_map_catalog,
             unitsync_map_info,
             unitsync_map_skybox,
             unitsync_skirmish_ais,

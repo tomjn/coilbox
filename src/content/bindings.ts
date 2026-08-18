@@ -1501,6 +1501,97 @@ export const unitsyncUnitRenderKeys = defineCommand<
   UnitRenderKeysResult
 >("coilbox-unitsync", "unitsync_unit_render_keys");
 
+/**
+ * One map's facts as the hub takes them, in the hub's own snake case (issue
+ * #1732). Passed through to `hub_publish_maps` verbatim rather than translated,
+ * because the hub refuses a field name it does not know.
+ */
+export interface MapCatalogEntry {
+  map_name: string;
+  display_name?: string;
+  description?: string;
+  map_version?: string;
+  author?: string;
+  archive_filename?: string;
+  source_archive: string;
+  source_hash: string;
+  catalog_version: number;
+  width_elmos: number;
+  height_elmos: number;
+  world_height_min: number;
+  world_height_max: number;
+  min_wind?: number;
+  max_wind?: number;
+  tidal_strength?: number;
+  void_water?: boolean;
+  void_ground?: boolean;
+  water_coverage?: number;
+  appearance?: Record<string, number | boolean | number[]>;
+  points?: {
+    start?: { x: number; z: number; y?: number }[];
+    metal?: {
+      x: number;
+      z: number;
+      y?: number;
+      meta?: Record<string, unknown>;
+    }[];
+    geo?: {
+      x: number;
+      z: number;
+      y?: number;
+      meta?: Record<string, unknown>;
+    }[];
+  };
+}
+
+/** One map in a catalog walk: what a have check asks about, and the facts when
+ *  they were asked for. */
+export interface MapCatalogRow {
+  mapName: string;
+  sourceHash: string;
+  catalogVersion: number;
+  /** Absent on a keys-only pass. */
+  entry?: MapCatalogEntry;
+}
+
+/** Why a map produced no row. */
+export type MapCatalogSkip =
+  | "no-archive-file"
+  | "unreadable-archive"
+  | "no-extent"
+  | "no-height-range"
+  | "duplicate-map";
+
+export interface MapCatalogResult {
+  maps: MapCatalogRow[];
+  skipped: { mapName: string; reason: MapCatalogSkip }[];
+  errors: string[];
+}
+
+/**
+ * Read the installed map library into the entries the hub takes (issue #1737).
+ *
+ * Two passes, and the caller picks which. `keysOnly` gives each map's name, the
+ * sha256 of its archive and the catalog version, which is the whole of a have
+ * check's question. `maps` then names the ones the hub said it wanted, and those
+ * come back with their facts, which costs a read of each map's whole height
+ * grid.
+ *
+ * One call is one session however many maps it covers, and the archive hashes
+ * are cached on file identity, so a second sweep over an unchanged library reads
+ * no archives at all.
+ */
+export const unitsyncMapCatalog = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    /** The maps to read. Absent walks the whole library. */
+    maps?: string[];
+    keysOnly: boolean;
+  },
+  MapCatalogResult
+>("coilbox-unitsync", "unitsync_map_catalog");
+
 export interface MapInfoResult {
   options: ConfigOption[];
   checksum?: string;

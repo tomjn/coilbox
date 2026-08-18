@@ -93,6 +93,17 @@ fn name_identity(us: &Unitsync, map_name: &str, kind: &str) -> Option<String> {
     Some(format!("n{:016x}", h.finish()))
 }
 
+/// Cache identity for the sha256 of a map archive's own bytes, which is what the
+/// catalog's `source_hash` is (issue #1737).
+///
+/// The same file identity everything else here is keyed on, in its own
+/// namespace. Hashing a map library is reading every byte of it, tens of
+/// gigabytes on a full collection, and the answer only moves when the file does,
+/// so a sweep that finds nothing changed should cost no reads at all.
+pub fn archive_hash_key(path: &Path) -> Option<String> {
+    identity(path, "maphash")
+}
+
 /// Hash a resolved archive path's file identity into a stable cache key. `kind`
 /// separates the game and map namespaces so an archive can't collide across them.
 fn identity(path: &Path, kind: &str) -> Option<String> {

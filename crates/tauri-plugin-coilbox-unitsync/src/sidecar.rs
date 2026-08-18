@@ -399,6 +399,37 @@ pub fn build_map_info_args(
     args
 }
 
+/// Build args for the map catalog: the whole installed library in one Init,
+/// assembled into the entries the hub takes (issue #1737).
+///
+/// `keys_only` reads each map\'s archive and hashes it and stops there, which is
+/// what a have check compares on. Without it every map named also has its
+/// infomaps read and its whole height grid counted, which is the expensive half
+/// and worth paying only for the maps the hub said it wanted.
+///
+/// `maps_file` is a JSON array of map names, which is how the second pass is
+/// told which those were. A file rather than an argument because three thousand
+/// map names is past what Windows takes on a command line.
+pub fn build_map_catalog_args(
+    lib: &str,
+    datadir: &str,
+    maps_file: Option<&str>,
+    keys_only: bool,
+    cache_dir: Option<&str>,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--map-catalog".into());
+    if keys_only {
+        args.push("--keys-only".into());
+    }
+    if let Some(path) = maps_file {
+        args.push("--maps-file".into());
+        args.push(path.into());
+    }
+    push_cache_dir(&mut args, cache_dir);
+    args
+}
+
 /// Build args for map-skybox mode: scan args plus the map name and the
 /// `--map-skybox` flag (read the map's `atmosphere.skyBox` DDS).
 pub fn build_map_skybox_args(lib: &str, datadir: &str, map_name: &str) -> Vec<String> {

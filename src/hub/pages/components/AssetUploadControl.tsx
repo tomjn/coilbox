@@ -43,7 +43,8 @@ export function AssetUploadControl({
             Off unless you turn it on. When it is on, Coilbox reads the game and
             map files on this computer, makes pictures of the units and maps
             inside them, and sends those pictures to the hub under your account,
-            with your name on them.
+            with your name on them. It can also send what it measured about a
+            map, such as its size, its height range and where players start.
           </p>
           <p className="text-sm text-muted-foreground">
             What you send is public and hard to take back. It goes into a public
