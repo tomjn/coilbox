@@ -1632,7 +1632,7 @@ export interface HeightmapResult {
   /** Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
    * render reached disk, and preferred over `dataUrl`. */
   file?: string;
-  /** Grayscale PNG `data:` URL, only when the render never reached the cache. */
+  /** Grey WebP `data:` URL, only when the render never reached the cache. */
   dataUrl?: string;
   /** Full heightmap dimensions `(mapx+1, mapy+1)`; the ratio is the map's aspect ratio. */
   width?: number;
@@ -1641,17 +1641,29 @@ export interface HeightmapResult {
   minHeight?: number;
   /** World height at heightmap value 65535. */
   maxHeight?: number;
+  /**
+   * World height at the picture's black, and at its white (issue #1730).
+   *
+   * Not `minHeight` and `maxHeight`: the picture is 8 bit and rescaled into the
+   * window its own samples occupy, so these are what a reader displaces it by. A
+   * map whose heights do not reach both ends of the 16 bit scale would come out
+   * flattened against the map's own pair.
+   */
+  pictureMinHeight?: number;
+  pictureMaxHeight?: number;
   errors: string[];
 }
 
 /**
- * Render one map's height infomap as a grayscale PNG data URL plus its world
- * `minHeight`/`maxHeight` (for physically-correct 3D displacement). Lazy — a
- * separate unitsync session, cached on disk. `maxSide` caps the PNG's longest side
- * (default 512).
+ * Render one map's height infomap as a grey WebP plus the world heights that
+ * turn it back into terrain. Lazy, a separate unitsync session, cached on disk.
+ *
+ * No size argument. The shared asset vocabulary caps the picture at 512px, which
+ * is where the preview mesh stops being able to show more, and it is the same
+ * cap the hub's `overlay:height` asset is stored at.
  */
 export const unitsyncHeightmap = defineCommand<
-  { enginePath: string; dataDir: string; mapName: string; maxSide?: number },
+  { enginePath: string; dataDir: string; mapName: string },
   HeightmapResult
 >("coilbox-unitsync", "unitsync_heightmap");
 

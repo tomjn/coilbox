@@ -1,53 +1,33 @@
 //! Heightmap rendering: read a map's full-resolution 16-bit height infomap via
 //! unitsync (`GetInfoMap "height"`, pure static SMF parsing) and turn it into a
-//! downscaled grayscale PNG for the 3D terrain preview. Cached on disk (under
-//! `cache_dir`, keyed by a cheap file identity of the map's archive + max-side)
-//! like minimaps, so the heavy read + encode only runs on a cache miss, and
-//! reported by cache file name so the preview loads it over the asset protocol.
+//! picture of the terrain. Cached on disk (under `cache_dir`, keyed by a cheap
+//! file identity of the map's archive) like minimaps, so the heavy read + encode
+//! only runs on a cache miss, and reported by cache file name so the preview
+//! loads it over the asset protocol.
 //!
-//! With `--asset-dir` the same read also produces the hub's `overlay:height`
-//! asset, which is those samples at full resolution and full precision rather
-//! than the downscaled picture above (#1627). Both come off one `GetInfoMap`
-//! call: a height read costs a map archive open and the largest maps are 2049 by
-//! 2049 samples, so asking twice would double the most expensive read the worker
+//! The picture is 8 bit grey WebP, rescaled into the window the map's own
+//! samples occupy, and capped at the vocabulary's 512px edge (issue #1730). Both
+//! halves of that are the same fact: nothing that draws terrain ever read more
+//! than eight bits, because a browser flattens a 16 bit image to its high byte
+//! on the way in, and nothing can draw past 512 samples a side because the
+//! preview mesh has 513 vertices. A reader that needs the exact heights, rather
+//! than a picture of them, asks [`crate::heightfield`] for the map's own words.
+//!
+//! With `--asset-dir` the same encode is also stored as the hub's
+//! `overlay:height` asset. One `GetInfoMap` call and one encode serve both: a
+//! height read costs a map archive open and the largest maps are 2049 by 2049
+//! samples, so asking twice would double the most expensive read the worker
 //! makes.
 //!
 //! Only [`crate::seed`] ever passes `--asset-dir` here. The `unitsync_heightmap`
 //! command does not, and no client upload path for a map is planned (#1685).
 
+use crate::assetencode::{encode_height_picture, HeightWindow};
 use crate::ffi::Unitsync;
-use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage};
+use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage, WEBP_MIME};
 use crate::model::{HeightmapOutput, MapOverlayAsset, MapOverlaySkip};
-use image::{DynamicImage, ImageBuffer, ImageFormat, Luma};
-use std::io::Cursor;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-
-/// Build a 16-bit grayscale PNG from a raw heightmap grid (`raw.len() == w*h`),
-/// downscaled with `thumbnail` so its longest side is at most `max_side` (aspect
-/// preserved). The linear value→grayscale mapping preserves the engine's
-/// value→world-height relation, so the preview's displacement stays correct.
-fn heightmap_png(raw: &[u16], w: u32, h: u32, max_side: u32) -> Result<Vec<u8>, String> {
-    if raw.len() != (w as usize) * (h as usize) {
-        return Err(format!(
-            "heightmap size mismatch: got {} px, expected {}",
-            raw.len(),
-            w * h
-        ));
-    }
-    let img = ImageBuffer::<Luma<u16>, _>::from_raw(w, h, raw.to_vec())
-        .ok_or("failed to build heightmap image")?;
-    let dyn_img = DynamicImage::ImageLuma16(img);
-    let scaled = if w > max_side || h > max_side {
-        dyn_img.thumbnail(max_side, max_side)
-    } else {
-        dyn_img
-    };
-    let mut png = Cursor::new(Vec::new());
-    scaled
-        .write_to(&mut png, ImageFormat::Png)
-        .map_err(|e| format!("failed to encode heightmap PNG: {e}"))?;
-    Ok(png.into_inner())
-}
 
 /// The samples as the bytes the map file holds: little endian `u16`, row major.
 ///
@@ -73,17 +53,18 @@ fn source_bytes(samples: &[u16]) -> Vec<u8> {
     out
 }
 
-/// Encode a map's height samples as the hub's `overlay:height` asset and write it
-/// into `asset_dir`, named after the hash of its own bytes like the hub's object
-/// path.
+/// Encode a map's height samples as the hub's `overlay:height` asset and write
+/// it into `asset_dir`, named after the hash of its own bytes like the hub's
+/// object path.
 ///
-/// 16 bit grayscale PNG rather than the WebP the rest of the corpus is, because
-/// WebP's lossless mode is 8 bit and would halve the precision without looking
-/// broken. `assetencode::encode_variant` refuses this variant for that reason.
+/// No bounds, no asset. The picture is a 0..255 scale across the window the
+/// encoder reports, and the map's two world heights are what turn that back into
+/// elmos, so a picture stored without them is terrain nobody can measure.
 ///
-/// No bounds, no asset. The samples are a 0..65535 scale and the two world
-/// heights are what turn them into elmos, so a grid stored without them is a
-/// picture of terrain nobody can measure.
+/// `source_hash` stays over the map's full resolution samples rather than over
+/// what the picture kept. The have check at #1632 compares on it, so it has to
+/// move when the map moves and stay put when the encoder does, which a hash of a
+/// downscaled grid would not.
 fn encode_asset(
     asset_dir: &Path,
     samples: &[u16],
@@ -93,15 +74,16 @@ fn encode_asset(
     source_archive: &str,
 ) -> Result<MapOverlayAsset, MapOverlaySkip> {
     use crate::assetencode::{
-        encode_height_overlay, ext_for_mime, map_source_hash, sha256_hex, EncodeError,
-        EXTRACTED_ORIGIN, HEIGHT_OVERLAY_VARIANT,
+        ext_for_mime, map_source_hash, sha256_hex, EncodeError, EXTRACTED_ORIGIN,
+        HEIGHT_OVERLAY_VARIANT,
     };
 
-    let (min_height, max_height) = bounds.ok_or(MapOverlaySkip::NoBounds)?;
-    let encoded = encode_height_overlay(samples, w, h).map_err(|e| match e {
+    let (map_min, map_max) = bounds.ok_or(MapOverlaySkip::NoBounds)?;
+    let (encoded, window) = encode_height_picture(samples, w, h).map_err(|e| match e {
         EncodeError::TooLarge { .. } => MapOverlaySkip::TooLarge,
         _ => MapOverlaySkip::EncodeFailed,
     })?;
+    let (min_height, max_height) = window.elmos(map_min, map_max);
 
     let hash = sha256_hex(&encoded.bytes);
     let path = asset_dir.join(format!("{hash}.{}", ext_for_mime(&encoded.mime)));
@@ -137,15 +119,14 @@ fn asset_from_samples(
     bounds: Option<(f32, f32)>,
     source_archive: &str,
 ) -> (Option<MapOverlayAsset>, Option<MapOverlaySkip>) {
-    match (dims, raw) {
-        (None, _) => (None, Some(MapOverlaySkip::NoSource)),
-        (Some(_), None) => (None, Some(MapOverlaySkip::ReadFailed)),
-        (Some((w, h)), Some(raw)) => {
-            match encode_asset(asset_dir, raw, w, h, bounds, source_archive) {
-                Ok(a) => (Some(a), None),
-                Err(why) => (None, Some(why)),
-            }
-        }
+    let stored = match (dims, raw) {
+        (None, _) => Err(MapOverlaySkip::NoSource),
+        (Some(_), None) => Err(MapOverlaySkip::ReadFailed),
+        (Some((w, h)), Some(raw)) => encode_asset(asset_dir, raw, w, h, bounds, source_archive),
+    };
+    match stored {
+        Ok(a) => (Some(a), None),
+        Err(why) => (None, Some(why)),
     }
 }
 
@@ -167,26 +148,104 @@ pub(crate) fn asset_in_session(
     )
 }
 
-/// Cache file for a heightmap PNG: `<cache_dir>/<key>-h<max_side>.png`. The `h`
-/// prefix keeps it from colliding with the minimap cache (`<key>-<mip>`).
-fn cache_file(cache_dir: Option<&Path>, key: Option<&str>, max_side: u32) -> Option<PathBuf> {
-    let dir = cache_dir?;
-    let key = key?;
-    Some(dir.join(format!("{key}-h{max_side}.png")))
+/// The longest edge a height picture may have, which the shared vocabulary
+/// decides rather than the caller. It is in the cache file's name so a change to
+/// it retires every picture already on disk instead of serving a mixture.
+fn picture_edge() -> u32 {
+    coilbox_assets::class_for_variant(crate::assetencode::HEIGHT_OVERLAY_VARIANT)
+        .and_then(|class| class.max_edge_px)
+        .unwrap_or(0)
 }
 
-/// Render `map_name`'s heightmap to a grayscale PNG data URL plus its world-height
-/// bounds (standalone unitsync session).
+/// Cache file for a height picture: `<cache_dir>/<key>-h<edge>.webp`. The `h`
+/// keeps it from colliding with the minimap cache (`<key>-<mip>`).
+fn cache_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
+    let dir = cache_dir?;
+    let key = key?;
+    Some(dir.join(format!("{key}-h{}.webp", picture_edge())))
+}
+
+/// Cache file for the window that picture is drawn in:
+/// `<cache_dir>/<key>-h<edge>.win.json`, beside it the way the minimap's
+/// proportions sit beside the minimap.
 ///
-/// `asset_dir` `Some` additionally stores the full resolution samples as the
-/// hub's `overlay:height` asset. Off by default: the 3D preview wants the
-/// downscaled picture and nothing else, and a height overlay for a 32x32 map is
-/// megabytes, so encoding a whole map library for nobody is real work with no
-/// reader.
+/// A separate file rather than a field in the picture because the picture is
+/// handed to the webview as an image over the asset protocol, so anything it
+/// carries has to be pixels.
+fn window_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
+    let dir = cache_dir?;
+    let key = key?;
+    Some(dir.join(format!("{key}-h{}.win.json", picture_edge())))
+}
+
+/// The window a cached picture is drawn in, stored beside it.
+#[derive(Serialize, Deserialize)]
+struct CachedWindow {
+    low: u16,
+    high: u16,
+}
+
+/// A height picture and the window it is drawn in, from cache when both are
+/// there and from `compute` otherwise.
+///
+/// Both or neither, on purpose. The bytes are a shape and the window is what
+/// makes them terrain, so a picture whose window went missing is one nothing can
+/// read back, and it is encoded again rather than served as a height it is not.
+fn cached_picture(
+    picture_at: Option<PathBuf>,
+    window_at: Option<PathBuf>,
+    compute: impl FnOnce() -> Result<(Vec<u8>, HeightWindow), String>,
+) -> Result<(Vec<u8>, Option<PathBuf>, HeightWindow), String> {
+    let cached = picture_at.as_deref().zip(window_at.as_deref()).and_then(
+        |(picture, window)| -> Option<(Vec<u8>, HeightWindow)> {
+            let bytes = std::fs::read(picture).ok()?;
+            let held: CachedWindow = serde_json::from_slice(&std::fs::read(window).ok()?).ok()?;
+            Some((
+                bytes,
+                HeightWindow {
+                    low: held.low,
+                    high: held.high,
+                },
+            ))
+        },
+    );
+    if let (Some((bytes, window)), Some(picture)) = (cached, picture_at.as_deref()) {
+        // Serving an entry is using it, and the sweep reads recency off the file.
+        coilbox_thumb_cache::touch(picture);
+        return Ok((bytes, Some(picture.to_path_buf()), window));
+    }
+
+    let (bytes, window) = compute()?;
+    let mut on_disk = None;
+    if let Some(picture) = picture_at.as_deref() {
+        if let Some(dir) = picture.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        if std::fs::write(picture, &bytes).is_ok() {
+            on_disk = Some(picture.to_path_buf());
+        }
+    }
+    if let Some(window_file) = window_at.as_deref() {
+        let held = CachedWindow {
+            low: window.low,
+            high: window.high,
+        };
+        if let Ok(json) = serde_json::to_vec(&held) {
+            let _ = std::fs::write(window_file, json);
+        }
+    }
+    Ok((bytes, on_disk, window))
+}
+
+/// Render `map_name`'s heightmap to a grey WebP plus the world heights that turn
+/// it back into terrain (standalone unitsync session).
+///
+/// `asset_dir` `Some` additionally stores the same picture as the hub's
+/// `overlay:height` asset. Off by default: encoding a whole map library for
+/// nobody is real work with no reader.
 pub fn render(
     lib: &str,
     map_name: &str,
-    max_side: u32,
     cache_dir: Option<&Path>,
     asset_dir: Option<&Path>,
 ) -> HeightmapOutput {
@@ -203,17 +262,14 @@ pub fn render(
     let _ = us.drain_errors();
 
     let bounds = us.height_bounds(map_name);
-    let cache = cache_file(
-        cache_dir,
-        map_cache_key(&us, None, map_name).as_deref(),
-        max_side,
-    );
+    let key = map_cache_key(&us, None, map_name);
+    let cache = cache_file(cache_dir, key.as_deref());
+    let window_cache = window_file(cache_dir, key.as_deref());
 
     let dims = us.heightmap_size(map_name);
     // The sample read, done once and shared. Only an asset run needs it up front:
     // the display path reads it inside the cache miss below, so a map whose
-    // preview PNG is already cached still costs nothing when nobody wants an
-    // asset.
+    // picture is already cached still costs nothing when nobody wants an asset.
     let raw = match (asset_dir, dims) {
         (Some(_), Some((w, h))) => us.heightmap_data(map_name, w, h),
         _ => None,
@@ -230,20 +286,25 @@ pub fn render(
         ),
     };
 
-    let result = (|| -> Result<(RenderedImage, u32, u32), String> {
+    let result = (|| -> Result<(RenderedImage, u32, u32, HeightWindow), String> {
         let (w, h) = dims.ok_or_else(|| "no heightmap available".to_string())?;
         // Only the cache miss pays for the full GetInfoMap read + encode.
-        let (png, on_disk) =
-            coilbox_thumb_cache::cached_at(cache.clone(), || match raw.as_deref() {
-                Some(raw) => heightmap_png(raw, w, h, max_side),
+        let (bytes, on_disk, window) = cached_picture(cache.clone(), window_cache, || {
+            let read;
+            let samples = match raw.as_deref() {
+                Some(raw) => raw,
                 None => {
-                    let raw = us
+                    read = us
                         .heightmap_data(map_name, w, h)
                         .ok_or_else(|| "failed to read heightmap".to_string())?;
-                    heightmap_png(&raw, w, h, max_side)
+                    &read
                 }
-            })?;
-        Ok((rendered_image(&png, on_disk), w, h))
+            };
+            encode_height_picture(samples, w, h)
+                .map(|(encoded, window)| (encoded.bytes, window))
+                .map_err(|e| e.to_string())
+        })?;
+        Ok((rendered_image(&bytes, WEBP_MIME, on_disk), w, h, window))
     })();
     sweep_pictures(cache_dir, cache.as_slice());
 
@@ -251,17 +312,22 @@ pub fn render(
     us.uninit();
 
     match result {
-        Ok((image, w, h)) => HeightmapOutput {
-            file: image.file,
-            data_url: image.data_url,
-            width: Some(w),
-            height: Some(h),
-            min_height: bounds.map(|(lo, _)| lo),
-            max_height: bounds.map(|(_, hi)| hi),
-            asset,
-            asset_skipped,
-            errors,
-        },
+        Ok((image, w, h, window)) => {
+            let picture = bounds.map(|(lo, hi)| window.elmos(lo, hi));
+            HeightmapOutput {
+                file: image.file,
+                data_url: image.data_url,
+                width: Some(w),
+                height: Some(h),
+                min_height: bounds.map(|(lo, _)| lo),
+                max_height: bounds.map(|(_, hi)| hi),
+                picture_min_height: picture.map(|(lo, _)| lo),
+                picture_max_height: picture.map(|(_, hi)| hi),
+                asset,
+                asset_skipped,
+                errors,
+            }
+        }
         Err(e) => HeightmapOutput {
             min_height: bounds.map(|(lo, _)| lo),
             max_height: bounds.map(|(_, hi)| hi),
@@ -310,24 +376,6 @@ mod tests {
         dir
     }
 
-    /// The whole point of #1627: what comes back out of the stored asset is the
-    /// height that went in, sample for sample and bit for bit. The preview PNG
-    /// beside it is downscaled and cannot answer "how high is this vertex".
-    #[test]
-    fn the_stored_asset_gives_back_the_heights_that_went_in() {
-        let dir = asset_dir("roundtrip");
-        let (w, h) = (65u32, 33u32);
-        let samples = heights(w, h);
-        let asset =
-            encode_asset(&dir, &samples, w, h, Some((-40.0, 620.5)), ARCHIVE).expect("encode");
-
-        let on_disk = std::fs::read(&asset.path).expect("asset file written");
-        let decoded = image::load_from_memory(&on_disk).expect("decode png");
-        assert_eq!((decoded.width(), decoded.height()), (w, h));
-        let gray = decoded.as_luma16().expect("not 16 bit grayscale");
-        assert_eq!(gray.as_raw().as_slice(), samples.as_slice());
-    }
-
     #[test]
     fn writes_the_asset_as_a_file_named_after_its_own_bytes() {
         let dir = asset_dir("write");
@@ -337,35 +385,37 @@ mod tests {
 
         assert_eq!(
             asset.path,
-            dir.join(format!("{}.png", asset.hash)).to_string_lossy()
+            dir.join(format!("{}.webp", asset.hash)).to_string_lossy()
         );
         assert_eq!(asset.hash, sha256_hex(&on_disk));
         assert_eq!(asset.bytes, on_disk.len() as u64);
-        assert_eq!(asset.mime, "image/png");
-        assert_eq!(asset.encode_profile, "png16-lossless-source");
+        assert_eq!(asset.mime, "image/webp");
+        assert_eq!(asset.encode_profile, "webp-lossless-512");
         assert_eq!(asset.variant, "overlay:height");
         assert_eq!((asset.width, asset.height), (32, 32));
     }
 
-    /// The bounds are the difference between a grid of numbers and terrain. They
-    /// go on the asset because whatever uploads the bytes has to send them in the
-    /// same request, and nothing can recover them from the PNG.
+    /// The bounds are the difference between a grid of numbers and terrain, and
+    /// they are the picture's own rather than the map's (issue #1730). These
+    /// samples reach nowhere near 65535, so a reader handed the map's own
+    /// ceiling would stretch the picture over relief the map does not have.
     #[test]
-    fn carries_the_bounds_that_turn_the_samples_into_elmos() {
+    fn carries_the_bounds_the_picture_is_drawn_between() {
         let dir = asset_dir("bounds");
-        let asset = encode_asset(
-            &dir,
-            &heights(64, 64),
-            64,
-            64,
-            Some((-73.5, 412.0)),
-            ARCHIVE,
-        )
-        .expect("ok");
+        let samples = heights(64, 64);
+        let asset =
+            encode_asset(&dir, &samples, 64, 64, Some((-73.5, 412.0)), ARCHIVE).expect("ok");
+
+        let step = (412.0f32 - -73.5) / 65536.0;
+        let want = |word: u16| -73.5 + f32::from(word) * step;
         assert_eq!(
             (asset.min_height, asset.max_height),
-            (Some(-73.5), Some(412.0))
+            (
+                Some(want(*samples.iter().min().unwrap())),
+                Some(want(*samples.iter().max().unwrap()))
+            )
         );
+        assert!(asset.max_height < Some(412.0), "took the map's own ceiling");
     }
 
     #[test]
@@ -379,8 +429,8 @@ mod tests {
     }
 
     /// The have check compares on `source_hash`, so it has to be the samples and
-    /// not the encode. Hashing the PNG there would report every map as changed
-    /// the first time the encoder's filtering moved.
+    /// not the encode. Hashing the picture there would report every map as
+    /// changed the first time the encoder moved.
     #[test]
     fn identity_is_the_samples_and_the_path_is_the_encoded_bytes() {
         let dir = asset_dir("hashes");
@@ -435,29 +485,89 @@ mod tests {
         );
     }
 
+    /// The picture budget is a set of suffixes, so a heightmap named anything
+    /// else would quietly stop being bounded (issue #1550), and the window
+    /// beside it is a few bytes that must stay out of a budget measured in
+    /// pictures.
     #[test]
-    fn heightmap_png_downscales_and_preserves_aspect() {
-        // 4x2 grid, max longest side 2 -> thumbnail to 2x1, decodable grayscale PNG.
-        let raw: Vec<u16> = vec![0, 21845, 43690, 65535, 0, 21845, 43690, 65535];
-        let png = heightmap_png(&raw, 4, 2, 2).expect("encode");
-        let decoded = image::load_from_memory(&png).expect("decode");
-        assert_eq!(decoded.width(), 2);
-        assert_eq!(decoded.height(), 1);
+    fn the_picture_sweep_covers_the_picture_and_not_its_window() {
+        let dir = Some(Path::new("/cache"));
+        let picture = cache_file(dir, Some("abc")).expect("cache file");
+        let window = window_file(dir, Some("abc")).expect("window file");
+        assert!(crate::minimap::is_swept_picture(&picture));
+        assert!(!crate::minimap::is_swept_picture(&window));
+    }
+
+    /// The cap is in the name, so raising or lowering the vocabulary's edge
+    /// retires every picture already on disk rather than serving a mixture of
+    /// two sizes under one key.
+    #[test]
+    fn names_the_cached_picture_after_the_edge_it_was_capped_at() {
+        let file = cache_file(Some(Path::new("/cache")), Some("abc")).expect("cache file");
+        assert_eq!(file, PathBuf::from(format!("/cache/abc-h{}.webp", 512)));
+        assert_eq!(picture_edge(), 512);
     }
 
     #[test]
-    fn heightmap_png_rejects_size_mismatch() {
-        let raw: Vec<u16> = vec![0, 1, 2];
-        assert!(heightmap_png(&raw, 4, 2, 2).is_err());
+    fn has_no_cache_file_without_a_directory_or_a_key() {
+        assert_eq!(cache_file(None, Some("abc")), None);
+        assert_eq!(cache_file(Some(Path::new("/cache")), None), None);
     }
 
-    /// The picture budget is a suffix, so a heightmap named anything else would
-    /// quietly stop being bounded (issue #1550).
+    fn cache_dir(tag: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-height-pic-{}-{tag}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("cache dir");
+        dir
+    }
+
+    /// A hit has to hand back the window as well as the bytes, because the
+    /// bytes on their own are a shape rather than terrain.
     #[test]
-    fn the_picture_sweep_covers_what_this_writes() {
-        let file = cache_file(Some(Path::new("/cache")), Some("abc"), 512).expect("cache file");
-        assert!(file
-            .to_string_lossy()
-            .ends_with(crate::minimap::PICTURE_SUFFIX));
+    fn serves_the_window_back_with_the_picture_it_belongs_to() {
+        let dir = cache_dir("hit");
+        let picture = cache_file(Some(&dir), Some("abc"));
+        let window = window_file(Some(&dir), Some("abc"));
+        let made = HeightWindow {
+            low: 1234,
+            high: 54321,
+        };
+
+        let first = cached_picture(picture.clone(), window.clone(), || {
+            Ok((b"pretend webp".to_vec(), made))
+        })
+        .expect("first");
+        assert_eq!((first.0.as_slice(), first.2), (&b"pretend webp"[..], made));
+
+        let second =
+            cached_picture(picture, window, || panic!("re-encoded on a hit")).expect("hit");
+        assert_eq!(
+            (second.0.as_slice(), second.2),
+            (&b"pretend webp"[..], made)
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A picture whose window was lost is one nothing can read a height off, so
+    /// it is encoded again rather than served with a window that is a guess.
+    #[test]
+    fn re_encodes_a_picture_whose_window_went_missing() {
+        let dir = cache_dir("halfhit");
+        let picture = cache_file(Some(&dir), Some("abc"));
+        let window = window_file(Some(&dir), Some("abc"));
+        cached_picture(picture.clone(), window.clone(), || {
+            Ok((b"stale".to_vec(), HeightWindow { low: 0, high: 1 }))
+        })
+        .expect("first");
+        std::fs::remove_file(window.as_ref().unwrap()).expect("drop the window");
+
+        let again = cached_picture(picture, window, || {
+            Ok((b"fresh".to_vec(), HeightWindow { low: 7, high: 9 }))
+        })
+        .expect("second");
+        assert_eq!(again.0.as_slice(), b"fresh");
+        assert_eq!(again.2, HeightWindow { low: 7, high: 9 });
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

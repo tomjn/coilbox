@@ -113,7 +113,7 @@ pub fn render(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> HeightFiel
         // about to be fetched. A map whose grid does go loses its verdicts and
         // says so, rather than getting one off a file that is not there.
         if let Some(dir) = file.parent() {
-            coilbox_thumb_cache::sweep(dir, SUFFIX, BUDGET, std::slice::from_ref(&file));
+            coilbox_thumb_cache::sweep(dir, &[SUFFIX], BUDGET, std::slice::from_ref(&file));
         }
         Ok((name, w, h))
     })();

@@ -15,7 +15,7 @@
 //! command does not, and no client upload path for a map is planned (#1685).
 
 use crate::ffi::Unitsync;
-use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage};
+use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage, PNG_MIME};
 use crate::model::{MapOverlayAsset, MapOverlaySkip, MetalmapOutput};
 use image::{DynamicImage, GrayImage, ImageBuffer, ImageFormat, Rgba};
 use std::io::Cursor;
@@ -229,7 +229,7 @@ pub fn render(
                     metalmap_png(&raw, w, h, max_side)
                 }
             })?;
-        Ok((rendered_image(&png, on_disk), w, h))
+        Ok((rendered_image(&png, PNG_MIME, on_disk), w, h))
     })();
     sweep_pictures(cache_dir, cache.as_slice());
 
@@ -429,13 +429,11 @@ mod tests {
         assert!(metalmap_png(&raw, 4, 2, 2).is_err());
     }
 
-    /// The picture budget is a suffix, so a metal map named anything else would
-    /// quietly stop being bounded (issue #1550).
+    /// The picture budget is a set of suffixes, so a metal map named anything
+    /// else would quietly stop being bounded (issue #1550).
     #[test]
     fn the_picture_sweep_covers_what_this_writes() {
         let file = cache_file(Some(Path::new("/cache")), Some("abc"), 512).expect("cache file");
-        assert!(file
-            .to_string_lossy()
-            .ends_with(crate::minimap::PICTURE_SUFFIX));
+        assert!(crate::minimap::is_swept_picture(&file));
     }
 }

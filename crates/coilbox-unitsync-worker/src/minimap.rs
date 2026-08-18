@@ -105,14 +105,28 @@ pub(crate) fn map_index(us: &Unitsync, map_name: &str) -> Option<i32> {
     (0..us.map_count()).find(|&i| us.map_name(i).as_deref() == Some(map_name))
 }
 
-/// The suffix every rendered picture in the thumb cache carries, and the whole
+/// The suffixes every rendered picture in the thumb cache carries, and the whole
 /// of what [`sweep_pictures`] is allowed to delete: minimaps `<key>-<mip>.png`,
-/// heightmaps `<key>-h<side>.png` and metal maps `<key>-m<side>.png`.
+/// metal maps `<key>-m<side>.png` and heightmaps `<key>-h<side>.webp`.
+///
+/// Two extensions because the height picture is WebP and the other two are PNG
+/// (issue #1730). The budget is one policy over the set: what bounds them is
+/// being a rendered picture, not being a particular format.
 ///
 /// The raw height grids in the same dir are bounded on their own much smaller
-/// budget (issue #1535), and the `-dims.json` entries beside them are a few
-/// bytes each and left alone.
-pub(crate) const PICTURE_SUFFIX: &str = ".png";
+/// budget (issue #1535), and the `-dims.json` and `-hwin.json` entries beside
+/// them are a few bytes each and left alone.
+pub(crate) const PICTURE_SUFFIXES: &[&str] = &[".png", ".webp"];
+
+/// Whether [`sweep_pictures`] would count this file as one of the pictures it
+/// bounds, which is what each render's own tests pin its cache file name
+/// against: a picture named outside the set would grow without a budget (issue
+/// #1550).
+#[cfg(test)]
+pub(crate) fn is_swept_picture(file: &Path) -> bool {
+    let name = file.to_string_lossy();
+    PICTURE_SUFFIXES.iter().any(|suffix| name.ends_with(suffix))
+}
 
 /// How many bytes of rendered pictures the thumb cache holds, across every map
 /// (issue #1550).
@@ -137,7 +151,7 @@ const PICTURE_BUDGET: u64 = 512 * 1024 * 1024;
 /// is answering with. Called by each of the four renders that writes one.
 pub(crate) fn sweep_pictures(cache_dir: Option<&Path>, keep: &[PathBuf]) {
     if let Some(dir) = cache_dir {
-        coilbox_thumb_cache::sweep(dir, PICTURE_SUFFIX, PICTURE_BUDGET, keep);
+        coilbox_thumb_cache::sweep(dir, PICTURE_SUFFIXES, PICTURE_BUDGET, keep);
     }
 }
 
@@ -592,7 +606,7 @@ fn render_one(
         }
         pixels_to_png(pixels, side)
     })?;
-    Ok((rendered_image(&png, on_disk), side))
+    Ok((rendered_image(&png, PNG_MIME, on_disk), side))
 }
 
 /// Expand an RGB565 buffer to 8 bit RGB triples, by shifting each channel up to
@@ -619,13 +633,18 @@ fn pixels_to_png(pixels: &[u16], side: u32) -> Result<Vec<u8>, String> {
     Ok(png.into_inner())
 }
 
-/// Wrap PNG bytes in a base64 `data:` URL.
-fn png_to_data_url(png: &[u8]) -> String {
-    let b64 = base64::engine::general_purpose::STANDARD.encode(png);
-    format!("data:image/png;base64,{b64}")
+/// The type a rendered picture's `data:` URL declares. Every render here is PNG
+/// but the height picture, which is WebP (issue #1730).
+pub(crate) const PNG_MIME: &str = "image/png";
+pub(crate) const WEBP_MIME: &str = "image/webp";
+
+/// Wrap picture bytes in a base64 `data:` URL of the type they are.
+fn to_data_url(bytes: &[u8], mime: &str) -> String {
+    let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+    format!("data:{mime};base64,{b64}")
 }
 
-/// How a rendered PNG reaches the frontend: the cache file name the webview
+/// How a rendered picture reaches the frontend: the cache file name the webview
 /// fetches over `coilbox://unitsyncthumb/`, or the base64 fallback.
 #[derive(Default)]
 pub(crate) struct RenderedImage {
@@ -636,7 +655,7 @@ pub(crate) struct RenderedImage {
 /// Describe a render by its cache file when the bytes are on disk, else inline
 /// them. Only one of the two is ever set, so the normal case puts a short name on
 /// the bridge instead of a megabyte of base64.
-pub(crate) fn rendered_image(png: &[u8], on_disk: Option<PathBuf>) -> RenderedImage {
+pub(crate) fn rendered_image(bytes: &[u8], mime: &str, on_disk: Option<PathBuf>) -> RenderedImage {
     match on_disk.as_deref().and_then(Path::file_name) {
         Some(name) => RenderedImage {
             file: Some(name.to_string_lossy().into_owned()),
@@ -644,7 +663,7 @@ pub(crate) fn rendered_image(png: &[u8], on_disk: Option<PathBuf>) -> RenderedIm
         },
         None => RenderedImage {
             file: None,
-            data_url: Some(png_to_data_url(png)),
+            data_url: Some(to_data_url(bytes, mime)),
         },
     }
 }
@@ -995,15 +1014,15 @@ mod tests {
         assert_eq!(dims_elmos(None), (None, None));
     }
 
-    /// The picture budget is a suffix, so a minimap that stopped being named
-    /// one would quietly stop being bounded (issue #1550), and the proportions
-    /// beside it must stay out of a budget measured in pictures.
+    /// The picture budget is a set of suffixes, so a minimap that stopped being
+    /// named one would quietly stop being bounded (issue #1550), and the
+    /// proportions beside it must stay out of a budget measured in pictures.
     #[test]
     fn the_picture_sweep_covers_a_minimap_and_not_its_proportions() {
         let dir = temp_dir("sweep-scope");
         let png = cache_file(Some(dir.as_path()), Some("abc"), 3).expect("cache file");
         let dims = dims_file(Some(dir.as_path()), Some("abc")).expect("dims file");
-        assert!(png.to_string_lossy().ends_with(PICTURE_SUFFIX));
-        assert!(!dims.to_string_lossy().ends_with(PICTURE_SUFFIX));
+        assert!(is_swept_picture(&png));
+        assert!(!is_swept_picture(&dims));
     }
 }

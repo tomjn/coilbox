@@ -1461,13 +1461,9 @@ export function useUnitsyncMinimap(
   return { url, startPositions, env, appearance, loading, error };
 }
 
-/**
- * Session cache of heightmap results, keyed by
- * `dataDir::enginePath::mapName::maxSide`. The cap is part of the key because a
- * caller may ask for a different one, though every caller now takes the
- * worker's own default: the terrain check reads the raw grid rather than a
- * bigger picture of it (issue #1490).
- */
+/** Session cache of height picture results, keyed by
+ *  `dataDir::enginePath::mapName`. No size in the key: the vocabulary decides
+ *  it, so one map has one picture (issue #1730). */
 const heightmapCache = new Map<string, HeightmapResult>();
 
 /** Session cache of raw height grids, keyed by `dataDir::enginePath::mapName`.
@@ -1506,17 +1502,18 @@ export function invalidateMapPreview(
 }
 
 /**
- * Lazily render and cache a map's heightmap (PNG URL + world-height bounds).
+ * Lazily render and cache a map's height picture (WebP URL plus the world
+ * heights its black and white stand for).
  *
- * `maxSide` caps the render's longest side, and the worker's own default is
- * enough for everyone: this is the picture the preview displaces its terrain
- * with, and the terrain check reads {@link useUnitsyncHeightField} instead.
+ * No size to ask for: the shared asset vocabulary caps it, which is what keeps
+ * the preview and the hub's own copy the same bytes. A caller that has to
+ * measure the ground rather than draw it reads
+ * {@link useUnitsyncHeightField} instead.
  */
 export function useUnitsyncHeightmap(
   enginePath?: string,
   dataDir?: string,
   mapName?: string,
-  maxSide?: number,
 ) {
   const [data, setData] = useState<HeightmapResult | null>(null);
   const [url, setUrl] = useState<string | null>(null);
@@ -1529,7 +1526,7 @@ export function useUnitsyncHeightmap(
       setUrl(null);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${mapName}::${maxSide ?? ""}`;
+    const key = `${dataDir}::${enginePath}::${mapName}`;
     const apply = (res: HeightmapResult) => {
       setData(res);
       const url = renderedUrl(res, unitsyncThumbUrl);
@@ -1550,7 +1547,6 @@ export function useUnitsyncHeightmap(
         enginePath,
         dataDir,
         mapName,
-        maxSide,
       });
       if (cancelled) return;
       // Same rule as the minimap: an empty render is a state, not an answer.
@@ -1566,9 +1562,16 @@ export function useUnitsyncHeightmap(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, mapName, maxSide]);
+  }, [enginePath, dataDir, mapName]);
 
-  return { data, url, loading, error };
+  // What the picture's black and white stand for, which is not the map's own
+  // pair: it is rescaled into the window its samples occupy (issue #1730).
+  // Undefined on a render that did not say, so a caller falls back to the map's.
+  const min = data?.pictureMinHeight;
+  const max = data?.pictureMaxHeight;
+  const range = min != null && max != null ? { min, max } : undefined;
+
+  return { data, url, range, loading, error };
 }
 
 /**

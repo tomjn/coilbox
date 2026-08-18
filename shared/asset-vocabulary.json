@@ -69,25 +69,21 @@
     },
     "overlay:height": {
       "keyedOn": "map",
-      "mime": "image/png",
-      "encodeProfile": "png16-lossless-source",
+      "mime": "image/webp",
+      "encodeProfile": "webp-lossless-512",
       "lossless": true,
       "quality": null,
-      "maxEdgePx": null,
-      "maxBytes": null,
+      "maxEdgePx": 512,
+      "maxBytes": 1048576,
       "square": false,
-      "minBitDepth": 16,
-      "grayscale": true
+      "minBitDepth": null,
+      "grayscale": false
     }
   },
   "maxObjectBytes": 2097152,
   "renderFrame": {
     "bleedSquares": 1,
     "elmosPerBuildSquare": 16
-  },
-  "heightOverlay": {
-    "elmosPerSample": 8,
-    "bytesPerSample": 2
   },
   "mapExtent": {
     "elmosPerMetalSample": 16

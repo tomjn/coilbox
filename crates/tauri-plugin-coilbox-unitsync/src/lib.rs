@@ -411,15 +411,16 @@ async fn unitsync_minimap<R: Runtime>(
 }
 
 /// `unitsync_heightmap` — render one map's height infomap as a downscaled
-/// grayscale PNG data URL, with the world `minHeight`/`maxHeight` for correct 3D
-/// displacement. `max_side` caps the PNG's longest side (defaults to 512).
+/// grey WebP, with the world heights its black and white stand for so the 3D
+/// preview displaces by the right relief. The size is the shared vocabulary's
+/// rather than the caller's, so the preview and the hub's `overlay:height` asset
+/// are the same bytes (issue #1730).
 #[tauri::command]
 async fn unitsync_heightmap<R: Runtime>(
     app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
     map_name: String,
-    max_side: Option<i32>,
 ) -> Result<CliResult, ()> {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
@@ -430,7 +431,6 @@ async fn unitsync_heightmap<R: Runtime>(
         &libpath.to_string_lossy(),
         &data_dir,
         &map_name,
-        max_side.unwrap_or(1024),
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);

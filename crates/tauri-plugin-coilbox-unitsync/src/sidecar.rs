@@ -287,20 +287,21 @@ pub fn build_unit_render_keys_args(
 }
 
 /// Build args for heightmap mode: scan args plus the map name, the `--heightmap`
-/// flag, the longest-side pixel cap, and the optional on-disk PNG cache directory.
+/// flag, and the optional on-disk picture cache directory.
+///
+/// No size cap. The height picture is capped at the shared vocabulary's edge so
+/// the preview and the hub's `overlay:height` asset are the same bytes, which a
+/// caller asking for its own size would break (issue #1730).
 pub fn build_heightmap_args(
     lib: &str,
     datadir: &str,
     map: &str,
-    max_side: i32,
     cache_dir: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.push("--map".into());
     args.push(map.into());
     args.push("--heightmap".into());
-    args.push("--max-side".into());
-    args.push(max_side.to_string());
     push_cache_dir(&mut args, cache_dir);
     args
 }
@@ -554,12 +555,11 @@ mod tests {
     }
 
     #[test]
-    fn heightmap_args_carry_map_flag_and_max_side() {
+    fn heightmap_args_carry_the_map_flag_and_no_size_of_their_own() {
         let a = build_heightmap_args(
             "/eng/libunitsync.dylib",
             "/data",
             "Map v1",
-            512,
             Some("/cache/thumbs"),
         );
         assert!(a.contains(&"--heightmap".to_string()));
@@ -569,8 +569,9 @@ mod tests {
         );
         let i = a.iter().position(|x| x == "--map").unwrap();
         assert_eq!(a[i + 1], "Map v1");
-        let j = a.iter().position(|x| x == "--max-side").unwrap();
-        assert_eq!(a[j + 1], "512");
+        // The vocabulary caps the height picture, so asking for a size here
+        // would produce a preview that is not the asset (issue #1730).
+        assert!(!a.contains(&"--max-side".to_string()));
     }
 
     #[test]

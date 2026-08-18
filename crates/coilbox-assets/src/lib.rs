@@ -68,9 +68,8 @@ pub struct AssetClass {
     /// image `max_edge_px` permits, four bytes a pixel, so no encoding of a
     /// picture this class allows can reach it and anything that does is carrying
     /// something other than the picture. `overlay:metal` and `overlay:type` fall
-    /// through to [`AssetVocabulary::max_object_bytes`], and `overlay:height`
-    /// gets a per-upload number out of the map's own size, which is
-    /// [`height_overlay_max_bytes`].
+    /// through to [`AssetVocabulary::max_object_bytes`], because they are the two
+    /// classes stored at whatever grid the map has.
     pub max_bytes: Option<u64>,
     pub square: bool,
     /// Bits per channel the samples must carry, or `None` for no requirement.
@@ -110,16 +109,6 @@ pub struct RenderFrame {
     pub elmos_per_build_square: u32,
 }
 
-/// What turns a height overlay's declared map size into a byte cap.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HeightOverlay {
-    /// How many elmos one heightmap sample spans, the engine's `squareSize`.
-    pub elmos_per_sample: u32,
-    /// What one 16 bit grayscale sample takes before compression.
-    pub bytes_per_sample: u64,
-}
-
 /// What turns a map's scanned proportions into its size in elmos.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -149,7 +138,6 @@ pub struct AssetVocabulary {
     /// hub's `ASSET_MAX_OBJECT_BYTES`.
     pub max_object_bytes: u64,
     pub render_frame: RenderFrame,
-    pub height_overlay: HeightOverlay,
     pub map_extent: MapExtent,
 }
 
@@ -198,32 +186,6 @@ pub fn class_for_variant(variant: &str) -> Option<&'static AssetClass> {
 /// The full variant string for one render angle.
 pub fn render_variant(angle: &str) -> String {
     format!("{}{angle}", vocabulary().unit.render_variant_prefix)
-}
-
-/// How many samples a height overlay carries along an edge that many elmos long.
-/// One per heightmap vertex, so there is a fencepost more than there are squares:
-/// a 16384 elmo edge is 2048 squares and 2049 samples.
-pub fn height_overlay_samples(elmos: u32) -> u32 {
-    elmos / vocabulary().height_overlay.elmos_per_sample + 1
-}
-
-/// How long an edge that many height overlay samples span, in elmos. The inverse
-/// of [`height_overlay_samples`], for the extraction side, which is handed the
-/// sample grid by unitsync and has to say what map size that is.
-pub fn height_overlay_elmos(samples: u32) -> u32 {
-    samples.saturating_sub(1) * vocabulary().height_overlay.elmos_per_sample
-}
-
-/// The largest a height overlay for a map this size may be (coilbox-hub#142), and
-/// `None` for every other class. Two bytes a sample, because the layer is 16 bit
-/// grayscale rather than the four bytes a colour image takes.
-pub fn height_overlay_max_bytes(variant: &str, width_elmos: u32, height_elmos: u32) -> Option<u64> {
-    if variant != "overlay:height" {
-        return None;
-    }
-    let samples = u64::from(height_overlay_samples(width_elmos))
-        * u64::from(height_overlay_samples(height_elmos));
-    Some(samples * vocabulary().height_overlay.bytes_per_sample)
 }
 
 /// The frame one unit's top down render is taken in, from its footprint.
@@ -350,7 +312,7 @@ mod tests {
         assert_eq!(profile("minimap"), "webp-q80-512");
         assert_eq!(profile("overlay:metal"), "webp-lossless-source");
         assert_eq!(profile("overlay:type"), "webp-lossless-source");
-        assert_eq!(profile("overlay:height"), "png16-lossless-source");
+        assert_eq!(profile("overlay:height"), "webp-lossless-512");
     }
 
     #[test]
@@ -383,11 +345,17 @@ mod tests {
             Some(256)
         );
         assert_eq!(class_for_variant("minimap").unwrap().max_edge_px, Some(512));
+        // 512 is where the terrain mesh stops being able to show more detail,
+        // which is what issue #1730 caps the height picture on.
+        assert_eq!(
+            class_for_variant("overlay:height").unwrap().max_edge_px,
+            Some(512)
+        );
     }
 
     #[test]
-    fn leaves_the_overlays_at_the_resolution_the_map_grid_has() {
-        for variant in ["overlay:metal", "overlay:type", "overlay:height"] {
+    fn leaves_the_sample_overlays_at_the_resolution_the_map_grid_has() {
+        for variant in ["overlay:metal", "overlay:type"] {
             let class = class_for_variant(variant).unwrap();
             assert_eq!(class.max_edge_px, None, "{variant}");
             assert_eq!(class.max_bytes, None, "{variant}");
@@ -416,17 +384,13 @@ mod tests {
         assert_eq!(vocabulary().max_object_bytes, 2 * 1024 * 1024);
     }
 
+    /// Every class is WebP now that the height overlay is (issue #1730). It is
+    /// grey pixels, but nothing may say so: WebP has no grayscale mode, so the
+    /// bytes are RGB with the three channels equal and the hub's header reader
+    /// cannot tell that from any other picture.
     #[test]
-    fn height_is_16_bit_grayscale_png_and_everything_else_is_webp() {
-        let height = class_for_variant("overlay:height").unwrap();
-        assert_eq!(height.mime, "image/png");
-        assert_eq!(height.min_bit_depth, Some(16));
-        assert!(height.grayscale);
-
+    fn every_class_is_webp_and_none_of_them_declares_a_depth_or_a_channel_count() {
         for (name, class) in &vocabulary().classes {
-            if name == "overlay:height" {
-                continue;
-            }
             assert_eq!(class.mime, "image/webp", "{name}");
             assert_eq!(class.min_bit_depth, None, "{name}");
             assert!(!class.grayscale, "{name}");
@@ -485,7 +449,7 @@ mod tests {
     fn digests_the_shared_document_as_an_outside_tool_does() {
         assert_eq!(
             vocabulary_digest(),
-            "sha256:befd5c62536efaba4a9a48b20b6a226f9a511fe5d68c0da84ca23e09c96bff36"
+            "sha256:66f986361a51d8486b619b2f5a541f4e207ad4309e0a8a0ae2597b859daf84bd"
         );
     }
 
@@ -509,50 +473,10 @@ mod tests {
     }
 
     #[test]
-    fn a_height_overlay_gets_one_sample_per_vertex_at_two_bytes_each() {
-        assert_eq!(
-            height_overlay_max_bytes("overlay:height", 16384, 16384),
-            Some(2049 * 2049 * 2)
-        );
-        assert_eq!(
-            height_overlay_max_bytes("overlay:metal", 16384, 16384),
-            None
-        );
-        assert_eq!(height_overlay_max_bytes("minimap", 16384, 16384), None);
-    }
-
-    /// The two sides describe the same map from different ends: the hub has the
-    /// row's elmos and works out how many samples that allows, and coilbox has
-    /// the grid unitsync handed it and works out what map size that is. A
-    /// fencepost dropped on either side would put the cap a row and a column out.
-    #[test]
-    fn a_sample_count_and_a_map_edge_convert_both_ways() {
-        for elmos in [512, 6144, 8192, 15360, 16384] {
-            assert_eq!(height_overlay_elmos(height_overlay_samples(elmos)), elmos);
-        }
-        assert_eq!(height_overlay_elmos(2049), 16384);
-        // The height grid and the metal grid are two counts of one map, so what
-        // each says the map measures has to agree. Ancient Bastion Remake 0.5,
-        // 1024x512 metal samples and 2049x1025 height samples.
-        assert_eq!(
-            (
-                height_overlay_elmos(2049),
-                height_overlay_elmos(1025),
-                height_overlay_elmos(1)
-            ),
-            (16384, 8192, 0)
-        );
-        assert_eq!(map_extent_elmos(1024, 512), (16384, 8192));
-    }
-
-    #[test]
-    fn a_metal_sample_is_two_map_squares_of_eight_elmos() {
-        let per = vocabulary().map_extent.elmos_per_metal_sample;
-        assert_eq!(per, 16);
+    fn a_metal_sample_is_two_map_squares() {
         // The metal infomap is half the map's square grid on each axis, and the
-        // engine refuses to load a map whose square is not the eight elmos the
-        // height overlay is sampled at.
-        assert_eq!(per, 2 * vocabulary().height_overlay.elmos_per_sample);
+        // engine refuses to load a map whose square is not eight elmos.
+        assert_eq!(vocabulary().map_extent.elmos_per_metal_sample, 16);
     }
 
     /// Real numbers, read off this machine's map library with

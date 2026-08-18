@@ -25,24 +25,22 @@
 //! same bytes, with no timestamp in it.
 //!
 //! `overlay:height` is not encodable by [`encode_variant`] and returns
-//! [`EncodeError::NotWebp`]. It is 16 bit grayscale PNG, because WebP's lossless
-//! mode is 8 bit ARGB and would throw away half the height precision.
-//! [`encode_height_overlay`] is its encoder, and the refusal above stays put:
-//! the two entry points take different pixels (`u8` channels against `u16`
-//! samples), so a caller cannot reach the wrong one with the right buffer.
+//! [`EncodeError::WrongEncoder`]. [`encode_height_picture`] is its encoder, and
+//! the refusal stays put now that both produce WebP: the two entry points take
+//! different pixels (`u8` channels against `u16` samples), and a height grid
+//! handed to [`encode_variant`] as an image would be flattened to its high byte
+//! on the way in, which is the loss issue #1730 exists to stop.
 
 // The metal map and minimap extraction paths are issues #1626 and #1630, which
 // land after this, so some variants here still have no caller in the binary.
 // The tests exercise all of it.
 #![allow(dead_code)]
 
-use coilbox_assets::{
-    class_for_variant, height_overlay_elmos, height_overlay_max_bytes, vocabulary, AssetClass,
-};
-use image::{DynamicImage, ImageBuffer, ImageFormat, Luma};
+use coilbox_assets::{class_for_variant, vocabulary, AssetClass};
+use image::{DynamicImage, ImageBuffer, Luma};
 use sha2::{Digest, Sha256};
 
-/// The one variant [`encode_height_overlay`] produces, and the one
+/// The one variant [`encode_height_picture`] produces, and the one
 /// [`encode_variant`] refuses. Spelled once so the row's `variant` and the class
 /// the bytes were encoded to cannot come apart.
 pub const HEIGHT_OVERLAY_VARIANT: &str = "overlay:height";
@@ -82,13 +80,12 @@ pub struct EncodedAsset {
 pub enum EncodeError {
     /// A variant the vocabulary does not list, so the hub would refuse it too.
     UnknownVariant(String),
-    /// A variant that is real but is not WebP, which is `overlay:height` and
-    /// only `overlay:height`.
+    /// A variant that is real but has an encoder of its own, which is
+    /// `overlay:height` and only `overlay:height`.
+    WrongEncoder { variant: String },
+    /// A class the vocabulary says is not WebP. Only reachable by editing the
+    /// vocabulary, which is the point of checking.
     NotWebp { variant: String, mime: String },
-    /// The mirror of [`Self::NotWebp`]: the height encoder was pointed at a class
-    /// the vocabulary says is not PNG. Only reachable by editing the vocabulary,
-    /// which is the point of checking.
-    NotPng { variant: String, mime: String },
     /// The sample buffer is not `width * height` long, so what it is a picture of
     /// is unknown.
     SizeMismatch { got: usize, expected: usize },
@@ -100,8 +97,6 @@ pub enum EncodeError {
     NotSquare { width: u32, height: u32 },
     /// libwebp refused the picture.
     Libwebp(String),
-    /// The PNG encoder refused the height grid.
-    Png(String),
     /// The encode succeeded and is still bigger than the class allows. The hub
     /// applies the same cap, so failing here is failing early.
     TooLarge { bytes: u64, cap: u64 },
@@ -111,8 +106,11 @@ impl std::fmt::Display for EncodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UnknownVariant(v) => write!(f, "no asset class for variant {v}"),
+            Self::WrongEncoder { variant } => write!(
+                f,
+                "variant {variant} is encoded from the map's 16 bit samples, not from an image"
+            ),
             Self::NotWebp { variant, mime } => write!(f, "variant {variant} is {mime}, not WebP"),
-            Self::NotPng { variant, mime } => write!(f, "variant {variant} is {mime}, not PNG"),
             Self::SizeMismatch { got, expected } => {
                 write!(f, "got {got} samples, expected {expected}")
             }
@@ -121,7 +119,6 @@ impl std::fmt::Display for EncodeError {
                 write!(f, "class requires a square, got {width}x{height}")
             }
             Self::Libwebp(msg) => write!(f, "libwebp: {msg}"),
-            Self::Png(msg) => write!(f, "png: {msg}"),
             Self::TooLarge { bytes, cap } => {
                 write!(f, "encoded to {bytes} bytes, over the {cap} byte cap")
             }
@@ -143,6 +140,11 @@ impl std::error::Error for EncodeError {}
 pub fn encode_variant(variant: &str, image: &DynamicImage) -> Result<EncodedAsset, EncodeError> {
     let class = class_for_variant(variant)
         .ok_or_else(|| EncodeError::UnknownVariant(variant.to_string()))?;
+    if variant == HEIGHT_OVERLAY_VARIANT {
+        return Err(EncodeError::WrongEncoder {
+            variant: variant.to_string(),
+        });
+    }
     if class.mime != "image/webp" {
         return Err(EncodeError::NotWebp {
             variant: variant.to_string(),
@@ -180,34 +182,67 @@ pub fn encode_variant(variant: &str, image: &DynamicImage) -> Result<EncodedAsse
     })
 }
 
-/// Encode a map's height samples as the hub's `overlay:height` asset: 16 bit
-/// grayscale PNG, one pixel per heightmap vertex, at the grid the map has.
+/// The window a height picture's 0 and its 255 stand for, in the raw sample
+/// words the map stores.
+///
+/// Without it the picture is a shape rather than a terrain. It comes back from
+/// [`encode_height_picture`] because only the encoder knows it: the window is the
+/// extremes of the samples that survived the downscale, not the extremes of the
+/// grid that went in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeightWindow {
+    pub low: u16,
+    pub high: u16,
+}
+
+impl HeightWindow {
+    /// The world heights the picture's 0 and 255 stand for, given the pair
+    /// unitsync reports for the whole map.
+    ///
+    /// `CSMFMapFile::ReadHeightmap`'s own arithmetic, which
+    /// `rts/Map/SMF/SMFReadMap.cpp:157` spells as
+    /// `minHeight + word * (maxHeight - minHeight) / 65536`. A reader that
+    /// follows it back holds the height the engine holds, to within the step the
+    /// eight bits cost.
+    pub fn elmos(self, min_height: f32, max_height: f32) -> (f32, f32) {
+        let step = (max_height - min_height) / 65536.0;
+        (
+            min_height + f32::from(self.low) * step,
+            min_height + f32::from(self.high) * step,
+        )
+    }
+}
+
+/// Encode a map's height samples as the hub's `overlay:height` asset: 8 bit grey
+/// lossless WebP, rescaled into the window the samples occupy (issue #1730).
 ///
 /// This is a second entry point rather than a branch inside [`encode_variant`],
 /// which keeps refusing this variant. The two take different pixels: everything
-/// else in the corpus is 8 bit channels in a [`DynamicImage`], and a height map
-/// is `u16` samples that have to stay `u16` the whole way through. Routing both
-/// through one signature would mean handing the WebP encoder a buffer it can
-/// only halve, and the refusal exists to make that impossible rather than
-/// unlikely.
+/// else in the corpus arrives as 8 bit channels in a [`DynamicImage`], and a
+/// height grid is `u16` samples that have to stay `u16` until the rescale. A
+/// grid handed in as an image would already have been flattened to its high
+/// byte, and the refusal exists to make that impossible rather than unlikely.
 ///
-/// Nothing is downscaled. The class has no edge cap and resampling heights
-/// averages neighbouring vertices into terrain the map does not have, so the
-/// grid goes out at source size and the size that produces is
-/// coilbox-hub#162's problem rather than this function's.
+/// Eight bits because no reader ever got more. A browser decodes a 16 bit PNG to
+/// eight bits a channel and keeps the high byte, canvas `ImageData` is a
+/// `Uint8ClampedArray` and a three.js texture is `UnsignedByteType`, so the
+/// second byte was being paid for and thrown away. Rescaling into the samples'
+/// own window is strictly better than that truncation, and costs nothing.
 ///
-/// The byte cap is the map's own (coilbox-hub#142): two bytes a sample for the
-/// grid it is, which is what the layer would take uncompressed. A PNG over that
-/// is carrying something other than the height map.
-pub fn encode_height_overlay(
+/// The rescale is lossy and the loss is not height error: the worst map in a 101
+/// map corpus lands within 4 elmos, which nobody can see. What shows is banding,
+/// where a gentle slope collapses into flat steps that shading turns into rings.
+/// A reader that needs the exact words asks the worker's `--height-field` mode,
+/// which hands over the map's own bytes.
+pub fn encode_height_picture(
     samples: &[u16],
     width: u32,
     height: u32,
-) -> Result<EncodedAsset, EncodeError> {
+) -> Result<(EncodedAsset, HeightWindow), EncodeError> {
     let class = class_for_variant(HEIGHT_OVERLAY_VARIANT)
         .ok_or_else(|| EncodeError::UnknownVariant(HEIGHT_OVERLAY_VARIANT.to_string()))?;
-    if class.mime != "image/png" {
-        return Err(EncodeError::NotPng {
+    if class.mime != "image/webp" {
+        return Err(EncodeError::NotWebp {
             variant: HEIGHT_OVERLAY_VARIANT.to_string(),
             mime: class.mime.clone(),
         });
@@ -223,24 +258,25 @@ pub fn encode_height_overlay(
         });
     }
 
-    let grid = ImageBuffer::<Luma<u16>, _>::from_raw(width, height, samples.to_vec()).ok_or(
-        EncodeError::SizeMismatch {
-            got: samples.len(),
-            expected,
-        },
-    )?;
-    let mut png = std::io::Cursor::new(Vec::new());
-    DynamicImage::ImageLuma16(grid)
-        .write_to(&mut png, ImageFormat::Png)
-        .map_err(|e| EncodeError::Png(e.to_string()))?;
-    let bytes = png.into_inner();
+    let (words, w, h) = fit_samples_to_cap(samples, width, height, class.max_edge_px)?;
+    let window = HeightWindow {
+        low: words.iter().copied().min().unwrap_or(0),
+        high: words.iter().copied().max().unwrap_or(0),
+    };
+    // libwebp takes no grey input, so the one channel goes in as three equal
+    // ones. VP8L's colour transform reduces that back to close to a single
+    // plane, which is why a grey lossless WebP is not three times the size of
+    // one.
+    let rgb: Vec<u8> = rescale(&words, window)
+        .into_iter()
+        .flat_map(|v| [v, v, v])
+        .collect();
+    let bytes = webp::Encoder::from_rgb(&rgb, w, h)
+        .encode_simple(true, 0.0)
+        .map_err(|e| EncodeError::Libwebp(format!("{e:?}")))?
+        .to_vec();
 
-    let cap = height_overlay_max_bytes(
-        HEIGHT_OVERLAY_VARIANT,
-        height_overlay_elmos(width),
-        height_overlay_elmos(height),
-    )
-    .unwrap_or(vocabulary().max_object_bytes);
+    let cap = class.max_bytes.unwrap_or(vocabulary().max_object_bytes);
     if bytes.len() as u64 > cap {
         return Err(EncodeError::TooLarge {
             bytes: bytes.len() as u64,
@@ -248,13 +284,69 @@ pub fn encode_height_overlay(
         });
     }
 
-    Ok(EncodedAsset {
-        bytes,
-        encode_profile: class.encode_profile.clone(),
-        mime: class.mime.clone(),
-        width,
-        height,
-    })
+    Ok((
+        EncodedAsset {
+            bytes,
+            encode_profile: class.encode_profile.clone(),
+            mime: class.mime.clone(),
+            width: w,
+            height: h,
+        },
+        window,
+    ))
+}
+
+/// The samples the picture is encoded from, downscaled to the class's cap while
+/// they are still 16 bit.
+///
+/// Downscaling first and rescaling after is what makes the window the picture's
+/// own. Averaging in 16 bits also keeps a slope a slope: rescale first and the
+/// averaging happens between values that have already been rounded to a step.
+///
+/// `thumbnail` rather than the Lanczos3 [`fit_to_cap`] uses on pictures, because
+/// a windowed sinc rings, and a ring beside a cliff is a terrace of ground the
+/// map does not have.
+fn fit_samples_to_cap(
+    samples: &[u16],
+    width: u32,
+    height: u32,
+    max_edge_px: Option<u32>,
+) -> Result<(Vec<u16>, u32, u32), EncodeError> {
+    let grid = ImageBuffer::<Luma<u16>, _>::from_raw(width, height, samples.to_vec()).ok_or(
+        EncodeError::SizeMismatch {
+            got: samples.len(),
+            expected: (width as usize) * (height as usize),
+        },
+    )?;
+    let fits = max_edge_px.is_none_or(|cap| width <= cap && height <= cap);
+    if fits {
+        return Ok((grid.into_raw(), width, height));
+    }
+    let cap = max_edge_px.unwrap_or(u32::MAX);
+    let scaled = DynamicImage::ImageLuma16(grid).thumbnail(cap, cap);
+    let (w, h) = (scaled.width(), scaled.height());
+    let words = scaled
+        .as_luma16()
+        .ok_or_else(|| EncodeError::Libwebp("the downscale dropped the 16 bit samples".into()))?
+        .as_raw()
+        .clone();
+    Ok((words, w, h))
+}
+
+/// The samples as bytes across the window they occupy, rounded to nearest.
+///
+/// Rounding rather than truncating halves the error the eight bits cost, which
+/// is free and is half the reason this beats the high byte a browser would have
+/// kept. A grid with no relief at all is one value, and every byte of it is 0.
+fn rescale(words: &[u16], window: HeightWindow) -> Vec<u8> {
+    let span = u32::from(window.high - window.low);
+    if span == 0 {
+        return vec![0u8; words.len()];
+    }
+    words
+        .iter()
+        .map(|&word| ((u32::from(word - window.low) * 255 + span / 2) / span) as u8)
+        .collect()
 }
 
 /// Lowercase hex sha256, which is what the hub records in both hash columns and
@@ -606,13 +698,14 @@ mod tests {
         assert_eq!((out.width, out.height), (1024, 768));
     }
 
+    /// Both entry points produce WebP now, and the refusal is still the point:
+    /// a height grid that arrives as an image has already lost its low byte.
     #[test]
-    fn refuses_the_height_overlay_because_it_is_16_bit_png() {
+    fn refuses_the_height_overlay_because_it_has_its_own_encoder() {
         assert_eq!(
             encode_variant("overlay:height", &opaque(64, 64)),
-            Err(EncodeError::NotWebp {
+            Err(EncodeError::WrongEncoder {
                 variant: "overlay:height".to_string(),
-                mime: "image/png".to_string(),
             })
         );
     }
@@ -629,61 +722,133 @@ mod tests {
             .collect()
     }
 
-    /// The IHDR fields, which say what the file claims to be independently of any
-    /// decoder: `(width, height, bit depth, colour type)`. Colour type 0 is
-    /// grayscale.
-    fn png_ihdr(bytes: &[u8]) -> (u32, u32, u8, u8) {
-        assert_eq!(&bytes[0..8], b"\x89PNG\r\n\x1a\n", "not a PNG");
-        assert_eq!(&bytes[12..16], b"IHDR");
-        (
-            u32::from_be_bytes(bytes[16..20].try_into().unwrap()),
-            u32::from_be_bytes(bytes[20..24].try_into().unwrap()),
-            bytes[24],
-            bytes[25],
-        )
+    /// The samples a height picture decodes back to, as raw words in the window
+    /// the encoder reported.
+    fn decoded_words(bytes: &[u8], window: HeightWindow) -> Vec<u16> {
+        let decoded = webp::Decoder::new(bytes).decode().expect("decode webp");
+        let span = f64::from(window.high - window.low);
+        decoded
+            .chunks_exact(if decoded.is_alpha() { 4 } else { 3 })
+            .map(|px| {
+                assert!(px[0] == px[1] && px[1] == px[2], "the picture is not grey");
+                window.low + (f64::from(px[0]) / 255.0 * span).round() as u16
+            })
+            .collect()
     }
 
-    /// The whole of #1627: the samples that went in come back out at full
-    /// precision. A WebP of the same grid would return `v & 0xff00`.
+    /// The whole of #1730: eight bits across the samples' own window beats the
+    /// high byte a browser would have kept, and the error it costs is a step of
+    /// that window rather than a step of the whole 16 bit range.
     #[test]
-    fn gives_back_every_one_of_the_sixteen_bits_it_was_given() {
+    fn gives_back_the_heights_to_within_one_step_of_their_own_window() {
         let (w, h) = (64u32, 48u32);
         let samples = heights(w, h);
-        let out = encode_height_overlay(&samples, w, h).unwrap();
+        let (out, window) = encode_height_picture(&samples, w, h).unwrap();
+        assert_eq!((out.width, out.height), (w, h));
 
-        let decoded = image::load_from_memory(&out.bytes).unwrap();
-        assert_eq!((decoded.width(), decoded.height()), (w, h));
-        let gray = decoded.as_luma16().expect("not 16 bit grayscale");
-        assert_eq!(gray.as_raw().as_slice(), samples.as_slice());
+        let (low, high) = (
+            *samples.iter().min().unwrap(),
+            *samples.iter().max().unwrap(),
+        );
+        assert_eq!(window, HeightWindow { low, high });
 
-        // And the loss this exists to prevent would have shown: the source has
-        // detail in the low byte, so an 8 bit round trip could not have passed.
-        assert!(samples.iter().any(|v| v & 0x00ff != 0));
+        let step = f64::from(high - low) / 255.0;
+        for (got, want) in decoded_words(&out.bytes, window).iter().zip(&samples) {
+            assert!(
+                (f64::from(*got) - f64::from(*want)).abs() <= step,
+                "{got} is more than one step of {step} from {want}"
+            );
+        }
+
+        // And the check above had something to prove: neighbouring rows differ
+        // by less than a step of the window, so a scheme that rounded to the
+        // step alone could not have passed it.
+        let stride = w as usize;
+        assert!(
+            samples[..samples.len() - stride]
+                .iter()
+                .zip(&samples[stride..])
+                .any(|(a, b)| {
+                    let apart = a.abs_diff(*b);
+                    apart > 0 && f64::from(apart) < step
+                }),
+            "the test grid has no slope gentler than one step of {step}"
+        );
     }
 
+    /// A grid with no relief is one value everywhere, and a window of nothing
+    /// cannot be divided by. Every byte is 0 and the two bounds are equal, which
+    /// is a reader's cue that the map is flat.
     #[test]
-    fn writes_a_sixteen_bit_grayscale_png_at_the_grid_the_map_has() {
-        let out = encode_height_overlay(&heights(2049, 33), 2049, 33).unwrap();
-        assert_eq!(png_ihdr(&out.bytes), (2049, 33, 16, 0));
-        // No edge cap and no resample: a 2049 wide grid stays 2049 wide.
-        assert_eq!((out.width, out.height), (2049, 33));
-        assert_eq!(out.mime, "image/png");
-        assert_eq!(out.encode_profile, "png16-lossless-source");
+    fn encodes_a_flat_map_as_a_flat_picture_rather_than_dividing_by_nothing() {
+        let (out, window) = encode_height_picture(&vec![32000u16; 16 * 16], 16, 16).unwrap();
+        assert_eq!(
+            window,
+            HeightWindow {
+                low: 32000,
+                high: 32000
+            }
+        );
+        let decoded = webp::Decoder::new(&out.bytes).decode().unwrap();
+        assert!(decoded.iter().all(|&b| b == 0));
+    }
+
+    /// 512 is where the terrain mesh stops being able to show more, so a full
+    /// resolution grid comes down to it rather than being stored twice as fine
+    /// as anything can draw.
+    #[test]
+    fn caps_the_picture_at_the_class_edge_and_keeps_the_aspect_ratio() {
+        let (out, _) = encode_height_picture(&heights(2049, 1025), 2049, 1025).unwrap();
+        assert_eq!((out.width, out.height), (512, 256));
+        assert_eq!(out.mime, "image/webp");
+        assert_eq!(out.encode_profile, "webp-lossless-512");
+        let decoded = webp::Decoder::new(&out.bytes).decode().unwrap();
+        assert_eq!((decoded.width(), decoded.height()), (512, 256));
+    }
+
+    /// The window is the picture's, not the grid's. Downscaling averages the
+    /// extremes away, so a window taken before the resample would stretch the
+    /// bytes across heights the picture no longer holds.
+    #[test]
+    fn windows_the_samples_that_survived_the_downscale() {
+        let (w, h) = (1024u32, 1024u32);
+        // Flat but for one spike and one pit, both of which a box average
+        // dilutes into their neighbours.
+        let mut samples = vec![30000u16; (w * h) as usize];
+        let last = samples.len() - 1;
+        samples[0] = 0;
+        samples[last] = 65535;
+        let (_, window) = encode_height_picture(&samples, w, h).unwrap();
+        assert!(window.low > 0, "kept a low the picture does not hold");
+        assert!(window.high < 65535, "kept a high the picture does not hold");
+    }
+
+    /// The bounds that turn a byte back into elmos, by the engine's own
+    /// arithmetic. Half the raw range is half the world range.
+    #[test]
+    fn names_its_window_in_the_elmos_the_engine_would_read() {
+        let window = HeightWindow {
+            low: 0,
+            high: 32768,
+        };
+        let (low, high) = window.elmos(-100.0, 100.0);
+        assert_eq!((low, high), (-100.0, 0.0));
     }
 
     #[test]
     fn the_same_heights_encode_to_the_same_bytes_every_time() {
-        let first = encode_height_overlay(&heights(96, 96), 96, 96).unwrap();
-        let second = encode_height_overlay(&heights(96, 96), 96, 96).unwrap();
-        assert_eq!(first.bytes, second.bytes);
+        let first = encode_height_picture(&heights(96, 96), 96, 96).unwrap();
+        let second = encode_height_picture(&heights(96, 96), 96, 96).unwrap();
+        assert_eq!(first.0.bytes, second.0.bytes);
     }
 
-    /// The cap is the map's own rather than the 2 MB backstop, and the map's own
-    /// is what the layer takes uncompressed. Noise is the worst case a height map
-    /// could be, and the point is that the number in the refusal is the map's.
+    /// Noise is the worst a height map could be, and at the class's edge cap it
+    /// still comes in well under the class's byte cap. That is the measurement
+    /// behind #1730's numbers: the layer stopped being the corpus's largest by
+    /// an order of magnitude.
     #[test]
-    fn refuses_a_grid_that_encodes_past_what_the_map_size_allows() {
-        let (w, h) = (256u32, 256u32);
+    fn the_worst_case_grid_still_fits_the_cap_the_hub_applies() {
+        let (w, h) = (1024u32, 1024u32);
         let mut state = 0x2545_f491_4f6c_dd1du64;
         let noise: Vec<u16> = (0..w * h)
             .map(|_| {
@@ -693,34 +858,29 @@ mod tests {
                 state as u16
             })
             .collect();
-        let err = encode_height_overlay(&noise, w, h).unwrap_err();
-        let cap = coilbox_assets::height_overlay_max_bytes(
-            "overlay:height",
-            height_overlay_elmos(w),
-            height_overlay_elmos(h),
-        )
-        .unwrap();
-        assert_eq!(cap, u64::from(w) * u64::from(h) * 2);
-        match err {
-            EncodeError::TooLarge { bytes, cap: got } => {
-                assert_eq!(got, cap);
-                assert!(bytes > cap);
-            }
-            other => panic!("expected TooLarge, got {other:?}"),
-        }
+        let (out, _) = encode_height_picture(&noise, w, h).unwrap();
+        let cap = class_for_variant("overlay:height")
+            .unwrap()
+            .max_bytes
+            .unwrap();
+        assert!(
+            out.bytes.len() as u64 <= cap,
+            "{} over {cap}",
+            out.bytes.len()
+        );
     }
 
     #[test]
     fn refuses_a_height_grid_that_is_not_the_size_it_says_it_is() {
         assert_eq!(
-            encode_height_overlay(&heights(8, 8), 8, 9),
+            encode_height_picture(&heights(8, 8), 8, 9),
             Err(EncodeError::SizeMismatch {
                 got: 64,
                 expected: 72
             })
         );
         assert_eq!(
-            encode_height_overlay(&[], 0, 8),
+            encode_height_picture(&[], 0, 8),
             Err(EncodeError::EmptyImage)
         );
     }
