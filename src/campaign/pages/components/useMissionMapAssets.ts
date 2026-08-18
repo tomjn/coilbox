@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { type HeightGrid, readHeightGrid } from "@/placement/terrain";
 import {
   useUnitsyncHeightField,
   useUnitsyncHeightmap,
@@ -5,6 +7,46 @@ import {
   useUnitsyncMinimap,
 } from "../../../content/config";
 import { usePreferredTarget } from "../../../play/config";
+
+/**
+ * The worker's raw height grid, fetched once for everything that wants it.
+ *
+ * One read because there is one grid and two readers: the terrain the preview
+ * displaces and the ground a building's verdict is worked out on (issue #1730).
+ * Tens of megabytes on a large map, so a second fetch is not a rounding error.
+ */
+function useHeightGrid(
+  src?: string,
+  width?: number,
+  height?: number,
+): { grid: HeightGrid | null; read: boolean } {
+  const [grid, setGrid] = useState<HeightGrid | null>(null);
+  const [read, setRead] = useState(true);
+  useEffect(() => {
+    if (!src || !width || !height) {
+      setGrid(null);
+      setRead(true);
+      return;
+    }
+    setRead(false);
+    let cancelled = false;
+    readHeightGrid(src, width, height)
+      .then((got) => {
+        if (cancelled) return;
+        setGrid(got);
+        setRead(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setGrid(null);
+        setRead(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [src, width, height]);
+  return { grid, read };
+}
 
 /**
  * Resolve every {@link MapPreview3D} input for a mission's map by name, reusing the
@@ -35,9 +77,19 @@ export function useMissionMapAssets(
     exactHeights ? mapName : undefined,
   );
   const skybox = useUnitsyncMapSkybox(enginePath, dataDir, mapName);
+  const heights = useHeightGrid(
+    heightField.url ?? undefined,
+    heightField.data?.width,
+    heightField.data?.height,
+  );
 
   const heightUrl = heightmap.url ?? undefined;
   const textureUrl = minimap.url ?? undefined;
+  // Whether the raw heights were asked for and have settled one way or the
+  // other, so an absent grid can be told from a read still in flight.
+  const wordsSettled =
+    !exactHeights ||
+    (!heightField.loading && !!heightField.data && heights.read);
   // The heightmap alone is enough for a wireframe relief; a textured render also
   // needs the minimap diffuse.
   const width = heightmap.data?.width;
@@ -46,17 +98,28 @@ export function useMissionMapAssets(
   return {
     enginePath,
     dataDir,
-    heightSrc: heightUrl,
-    /** The map's own heights, when they were asked for: the file, and the grid
-     *  it holds. Undefined until the write has finished, and on a map whose
-     *  heights would not read. */
-    heightFieldSrc: heightField.url ?? undefined,
-    heightFieldWidth: heightField.data?.width,
-    heightFieldHeight: heightField.data?.height,
+    /**
+     * The height picture, for a surface that draws terrain rather than
+     * measuring it.
+     *
+     * Withheld from a caller that asked for the map's own words until that read
+     * has settled, and then only offered if it came back with nothing. Handing
+     * over both would build the whole scene from the picture and tear it down
+     * again when the words landed, and that rebuild costs a second reflection
+     * capture and a re-read of every model on the map.
+     */
+    heightSrc:
+      exactHeights && (!wordsSettled || !!heights.grid) ? undefined : heightUrl,
+    /** What the height picture's black and white stand for, which is not the
+     *  map's own pair: it is rescaled into the window its samples occupy
+     *  (issue #1730). */
+    heightRange: heightmap.range,
+    /** The map's own 16 bit heights, when they were asked for. Null on a map
+     *  whose heights would not read, and until the read has finished. */
+    heightWords: heights.grid,
     /** Whether the raw heights were asked for and have settled one way or the
      *  other, so an absent grid can be told from a read still in flight. */
-    heightFieldRead:
-      !exactHeights || (!heightField.loading && !!heightField.data),
+    heightFieldRead: wordsSettled,
     textureSrc: textureUrl,
     appearance: minimap.appearance,
     /** The map's own team start positions, in elmos from its north-west corner,

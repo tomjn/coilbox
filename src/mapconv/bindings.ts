@@ -162,6 +162,20 @@ export const mcImageInfo = defineCommand<
   { width: number; height: number; thumbFile?: string; thumb?: string }
 >("coilbox-mapconv", "mc_image_info");
 
+/**
+ * Decode a heightmap to the engine's own 16 bit words, decimated to `max` on the
+ * longest edge, and report the cache file holding them (issue #1730).
+ *
+ * Separate from {@link mcImageInfo} because a picture cannot carry them: a
+ * browser flattens an image to eight bits a channel on the way in whatever the
+ * file holds, so a slope drawn from a thumbnail comes out as contour rings. Read
+ * it through `getHeightWords`, which fetches the bytes and frames them.
+ */
+export const mcHeightField = defineCommand<
+  { path: string; max: number },
+  { width: number; height: number; file: string }
+>("coilbox-mapconv", "mc_height_field");
+
 export const mcCompile = defineCommand<
   { opts: CompileOpts; outDir: string; runId: string; onLog: Channel<LogLine> },
   { smfPath: string; outSuffix: string }

@@ -141,7 +141,8 @@ struct Args {
     /// (combined with `--lua`), an alternative to a single `--source-file`.
     chunks_file: Option<String>,
     mip: i32,
-    /// Longest-side pixel cap for the heightmap PNG downscale (heightmap mode).
+    /// Longest-side pixel cap for the metal map PNG downscale (metalmap mode).
+    /// The height picture takes its cap from the shared vocabulary instead.
     max_side: u32,
     /// Directory for the on-disk minimap/thumbnail PNG cache (minimap modes only).
     cache_dir: Option<String>,
@@ -687,7 +688,7 @@ fn run() -> i32 {
         if let Some(map) = args.map.clone() {
             let asset_dir = args.asset_dir.as_deref().map(Path::new);
             return match std::panic::catch_unwind(|| {
-                heightmap::render(&args.lib, &map, args.max_side, cache_dir, asset_dir)
+                heightmap::render(&args.lib, &map, cache_dir, asset_dir)
             }) {
                 Ok(out) => {
                     println!("{}", serde_json::to_string(&out).unwrap_or_default());

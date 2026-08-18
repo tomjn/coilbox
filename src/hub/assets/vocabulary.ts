@@ -55,8 +55,8 @@ export interface AssetClass {
    * `maxEdgePx` permits, four bytes a pixel, so no encoding of a picture this
    * class allows can reach it and anything that does is carrying something other
    * than the picture. `overlay:metal` and `overlay:type` fall through to
-   * {@link maxObjectBytes}, and `overlay:height` gets a per-upload number out of
-   * the map's own size, which is {@link heightOverlayMaxBytes}.
+   * {@link maxObjectBytes}, because they are the two classes stored at whatever
+   * grid the map has.
    */
   maxBytes: number | null;
   square: boolean;
@@ -78,10 +78,6 @@ export interface AssetVocabulary {
   renderFrame: {
     bleedSquares: number;
     elmosPerBuildSquare: number;
-  };
-  heightOverlay: {
-    elmosPerSample: number;
-    bytesPerSample: number;
   };
   mapExtent: {
     elmosPerMetalSample: number;
@@ -142,9 +138,6 @@ export const RENDER_CLASS = "render";
  * `ASSET_MAX_OBJECT_BYTES`. */
 export const maxObjectBytes = vocabulary.maxObjectBytes;
 
-/** How many elmos one heightmap sample spans, the engine's `squareSize`. */
-export const ELMOS_PER_HEIGHT_SAMPLE = vocabulary.heightOverlay.elmosPerSample;
-
 /**
  * How many elmos one metal infomap sample spans.
  *
@@ -189,32 +182,6 @@ export function classForVariant(variant: string): AssetClass | null {
   if (variant.startsWith(RENDER_VARIANT_PREFIX))
     return ASSET_CLASSES[RENDER_CLASS] ?? null;
   return ASSET_CLASSES[variant] ?? null;
-}
-
-/**
- * How many samples a height overlay carries along an edge that many elmos long.
- * One per heightmap vertex, so there is a fencepost more than there are squares.
- */
-export function heightOverlaySamples(elmos: number): number {
-  return Math.floor(elmos / ELMOS_PER_HEIGHT_SAMPLE) + 1;
-}
-
-/**
- * The largest a height overlay for a map this size may be (coilbox-hub#142), and
- * null for every other class. Two bytes a sample, because the layer is 16 bit
- * grayscale rather than the four bytes a colour image takes.
- */
-export function heightOverlayMaxBytes(
-  variant: string,
-  mapWidthElmos: number,
-  mapHeightElmos: number,
-): number | null {
-  if (variant !== "overlay:height") return null;
-  return (
-    heightOverlaySamples(mapWidthElmos) *
-    heightOverlaySamples(mapHeightElmos) *
-    vocabulary.heightOverlay.bytesPerSample
-  );
 }
 
 /**

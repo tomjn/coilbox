@@ -9,8 +9,9 @@
 //! respectively), kept in one place.
 //!
 //! [`sweep`] and [`touch`] are the other half: a caller whose entries add up can
-//! bound them, least recently used first (issues #1535 and #1550). The budget is
-//! per suffix, so one directory can hold two sets of files on two policies.
+//! bound them, least recently used first (issues #1535 and #1550). The budget
+//! covers a named set of suffixes, so one directory can hold two sets of files
+//! on two policies.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -63,14 +64,16 @@ where
     Ok((bytes, written))
 }
 
-/// Delete the least recently used `suffix` files in `dir` until what is left
-/// fits in `budget` bytes. Returns the bytes deleted.
+/// Delete the least recently used files in `dir` carrying any of `suffixes`,
+/// until what is left fits in `budget` bytes. Returns the bytes deleted.
 ///
 /// Written for the map height grids the terrain check reads (issue #1535): tens
 /// of megabytes each, one per map an author opens a scenario on, and nothing
 /// ever removed them. The rendered pictures beside them are bounded the same way
-/// on a budget of their own (issue #1550), which is what the suffix is for: it
-/// is the whole of one policy's scope, and the two sets of files never meet.
+/// on a budget of their own (issue #1550), which is what the suffixes are for:
+/// they are the whole of one policy's scope, and the two sets of files never
+/// meet. A policy takes more than one because a picture's format is the
+/// renderer's business rather than the budget's.
 ///
 /// Nothing in `keep` is deleted, whatever its age and even if it alone is over
 /// budget. It is what the caller has just produced or handed out, which is the
@@ -85,7 +88,7 @@ where
 /// Only immediate children are considered, and only regular files, so a symlink
 /// in the dir is counted by neither the total nor the deletions and nothing
 /// outside `dir` can be reached.
-pub fn sweep(dir: &Path, suffix: &str, budget: u64, keep: &[PathBuf]) -> u64 {
+pub fn sweep(dir: &Path, suffixes: &[&str], budget: u64, keep: &[PathBuf]) -> u64 {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return 0;
     };
@@ -94,10 +97,10 @@ pub fn sweep(dir: &Path, suffix: &str, budget: u64, keep: &[PathBuf]) -> u64 {
     let mut spent = 0u64;
     for entry in entries.flatten() {
         let path = entry.path();
-        if !path
-            .file_name()
-            .is_some_and(|name| name.to_string_lossy().ends_with(suffix))
-        {
+        if !path.file_name().is_some_and(|name| {
+            let name = name.to_string_lossy();
+            suffixes.iter().any(|suffix| name.ends_with(suffix))
+        }) {
             continue;
         }
         let Ok(meta) = std::fs::symlink_metadata(&path) else {
@@ -169,7 +172,7 @@ mod tests {
         let dir = temp_dir("sweep_under");
         let a = aged(&dir, "a-hf.bin", 100, 60);
         let b = aged(&dir, "b-hf.bin", 100, 30);
-        assert_eq!(sweep(&dir, "-hf.bin", 1000, std::slice::from_ref(&b)), 0);
+        assert_eq!(sweep(&dir, &["-hf.bin"], 1000, std::slice::from_ref(&b)), 0);
         assert!(a.exists() && b.exists());
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -181,7 +184,10 @@ mod tests {
         let middle = aged(&dir, "middle-hf.bin", 100, 200);
         let new = aged(&dir, "new-hf.bin", 100, 10);
         // Room for two of the three.
-        assert_eq!(sweep(&dir, "-hf.bin", 250, std::slice::from_ref(&new)), 100);
+        assert_eq!(
+            sweep(&dir, &["-hf.bin"], 250, std::slice::from_ref(&new)),
+            100
+        );
         assert!(new.exists() && middle.exists());
         assert!(!old.exists());
         let _ = std::fs::remove_dir_all(&dir);
@@ -196,7 +202,7 @@ mod tests {
         // In use, older than the other, and bigger than the whole budget.
         let using = aged(&dir, "using-hf.bin", 500, 900);
         assert_eq!(
-            sweep(&dir, "-hf.bin", 250, std::slice::from_ref(&using)),
+            sweep(&dir, &["-hf.bin"], 250, std::slice::from_ref(&using)),
             100
         );
         assert!(using.exists());
@@ -215,7 +221,7 @@ mod tests {
             .map(|i| aged(&dir, &format!("list{i}-3.png"), 100, 900))
             .collect();
         let spare = aged(&dir, "spare-3.png", 100, 10);
-        assert_eq!(sweep(&dir, ".png", 100, &batch), 100);
+        assert_eq!(sweep(&dir, &[".png"], 100, &batch), 100);
         assert!(batch.iter().all(|f| f.exists()));
         assert!(!spare.exists());
         let _ = std::fs::remove_dir_all(&dir);
@@ -230,10 +236,10 @@ mod tests {
         let png = aged(&dir, "a-0.png", 100, 900);
         let dims = aged(&dir, "a-dims.json", 100, 900);
         let grid = aged(&dir, "a-hf.bin", 100, 10);
-        assert_eq!(sweep(&dir, "-hf.bin", 0, std::slice::from_ref(&grid)), 0);
+        assert_eq!(sweep(&dir, &["-hf.bin"], 0, std::slice::from_ref(&grid)), 0);
         assert!(png.exists() && dims.exists() && grid.exists());
         // And the picture budget cannot reach the grid or the proportions.
-        assert_eq!(sweep(&dir, ".png", 0, &[]), 100);
+        assert_eq!(sweep(&dir, &[".png"], 0, &[]), 100);
         assert!(!png.exists());
         assert!(dims.exists() && grid.exists());
         let _ = std::fs::remove_dir_all(&dir);
@@ -242,7 +248,7 @@ mod tests {
     #[test]
     fn a_dir_that_is_not_there_is_nothing_to_sweep() {
         let dir = temp_dir("sweep_missing");
-        assert_eq!(sweep(&dir, "-hf.bin", 100, &[dir.join("a-hf.bin")]), 0);
+        assert_eq!(sweep(&dir, &["-hf.bin"], 100, &[dir.join("a-hf.bin")]), 0);
     }
 
     /// Recency has to mean used rather than written, or a map list read from
@@ -256,7 +262,7 @@ mod tests {
         let (bytes, _) = cached_at(Some(old.clone()), || Ok(Vec::new())).unwrap();
         assert_eq!(bytes.len(), 100);
         // Room for one, and it is the one that was just served.
-        assert_eq!(sweep(&dir, ".png", 100, &[]), 100);
+        assert_eq!(sweep(&dir, &[".png"], 100, &[]), 100);
         assert!(old.exists());
         assert!(!new.exists());
         let _ = std::fs::remove_dir_all(&dir);

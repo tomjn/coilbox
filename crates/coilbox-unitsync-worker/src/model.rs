@@ -277,8 +277,8 @@ pub struct HeightmapOutput {
     /// render reached disk, and preferred by callers over `dataUrl`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file: Option<String>,
-    /// Grayscale PNG `data:` URL of the (downscaled) heightmap, only set when
-    /// there was no cache dir or the write failed.
+    /// Grey WebP `data:` URL of the (downscaled) heightmap, only set when there
+    /// was no cache dir or the write failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data_url: Option<String>,
     /// Full heightmap dimensions `(mapx+1, mapy+1)` before downscaling (its ratio
@@ -293,8 +293,18 @@ pub struct HeightmapOutput {
     /// World height at infomap value 65535.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_height: Option<f32>,
-    /// The full resolution 16 bit grid stored as the hub's `overlay:height`
-    /// asset.
+    /// World height at the picture's black, and at its white (issue #1730).
+    ///
+    /// Not [`Self::min_height`] and [`Self::max_height`]: the picture is
+    /// rescaled into the window its own samples occupy, so a reader that
+    /// displaced it by the map's range would flatten every map whose heights do
+    /// not reach both ends of the 16 bit scale. Absent when the picture did not
+    /// render.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub picture_min_height: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub picture_max_height: Option<f32>,
+    /// The same picture stored as the hub's `overlay:height` asset.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub asset: Option<MapOverlayAsset>,
     /// Why there is no asset, when one was asked for.

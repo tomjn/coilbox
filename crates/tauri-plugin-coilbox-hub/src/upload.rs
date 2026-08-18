@@ -1049,9 +1049,9 @@ mod tests {
                 variant: variant.into(),
             },
             source_hash: "src-map".into(),
-            encode_profile: "png16-lossless-source".into(),
+            encode_profile: "webp-lossless-512".into(),
             origin: AssetOrigin::Extracted,
-            mime: "image/png".into(),
+            mime: "image/webp".into(),
             source_archive: "mediterraneum_v1.sd7".into(),
             map_width: Some(16384),
             map_height: Some(16384),
@@ -1163,9 +1163,9 @@ mod tests {
                 "map_name": "Mediterraneum_V1",
                 "variant": "overlay:height",
                 "source_hash": "src-map",
-                "encode_profile": "png16-lossless-source",
+                "encode_profile": "webp-lossless-512",
                 "origin": "extracted",
-                "mime": "image/png",
+                "mime": "image/webp",
                 "bytes": 9,
                 "source_archive": "mediterraneum_v1.sd7",
                 "map_width": 16384,
@@ -1220,7 +1220,7 @@ mod tests {
 
     /// And one map row, which is the other key shape and the only variant
     /// carrying a world height range.
-    const WORKER_MAP_ROW: &str = r#"{"kind":"map","mapName":"1 Pass Greenland Redux v3","variant":"overlay:height","origin":"extracted","tier":"static","batch":1,"file":"batch-0001/3deb27ba72cf8aa390d7dfb5dc78390af1bfc77dd6240d0b965aa5604cee1da8.png","hash":"3deb27ba72cf8aa390d7dfb5dc78390af1bfc77dd6240d0b965aa5604cee1da8","sourceHash":"430af906ed2a7353a6ebebb24e0a41b40f97b103e11b73892fb1dcaa05108053","encodeProfile":"png16-lossless-source","mime":"image/png","width":769,"height":1281,"bytes":346656,"mapWidth":6144,"mapHeight":10240,"minHeight":90.0,"maxHeight":485.0,"sourceArchive":"1 Pass Greenland Redux v3"}"#;
+    const WORKER_MAP_ROW: &str = r#"{"kind":"map","mapName":"1 Pass Greenland Redux v3","variant":"overlay:height","origin":"extracted","tier":"static","batch":1,"file":"batch-0001/3deb27ba72cf8aa390d7dfb5dc78390af1bfc77dd6240d0b965aa5604cee1da8.png","hash":"3deb27ba72cf8aa390d7dfb5dc78390af1bfc77dd6240d0b965aa5604cee1da8","sourceHash":"430af906ed2a7353a6ebebb24e0a41b40f97b103e11b73892fb1dcaa05108053","encodeProfile":"webp-lossless-512","mime":"image/webp","width":769,"height":1281,"bytes":346656,"mapWidth":6144,"mapHeight":10240,"minHeight":90.0,"maxHeight":485.0,"sourceArchive":"1 Pass Greenland Redux v3"}"#;
 
     /// An [`AssetUpload`] from one of those rows and from nothing else.
     ///
@@ -1277,9 +1277,9 @@ mod tests {
     /// The map declaration, likewise. `parseAssetUpload` answered:
     ///
     /// ```json
-    /// {"ok":true,"declaration":{"identity":{"keyedOn":"map","mapName":"1 Pass Greenland Redux v3","variant":"overlay:height"},"sourceHash":"430af906ed2a7353a6ebebb24e0a41b40f97b103e11b73892fb1dcaa05108053","encodeProfile":"png16-lossless-source","origin":"extracted","mime":"image/png","bytes":346656,"sourceArchive":"1 Pass Greenland Redux v3","mapWidth":6144,"mapHeight":10240,"worldHeightMin":90,"worldHeightMax":485}}
+    /// {"ok":true,"declaration":{"identity":{"keyedOn":"map","mapName":"1 Pass Greenland Redux v3","variant":"overlay:height"},"sourceHash":"430af906ed2a7353a6ebebb24e0a41b40f97b103e11b73892fb1dcaa05108053","encodeProfile":"webp-lossless-512","origin":"extracted","mime":"image/webp","bytes":346656,"sourceArchive":"1 Pass Greenland Redux v3","mapWidth":6144,"mapHeight":10240,"worldHeightMin":90,"worldHeightMax":485}}
     /// ```
-    const WORKER_MAP_DECLARATION: &str = r#"{"keyed_on":"map","map_name":"1 Pass Greenland Redux v3","variant":"overlay:height","source_hash":"430af906ed2a7353a6ebebb24e0a41b40f97b103e11b73892fb1dcaa05108053","encode_profile":"png16-lossless-source","origin":"extracted","mime":"image/png","source_archive":"1 Pass Greenland Redux v3","map_width":6144,"map_height":10240,"world_height_min":90.0,"world_height_max":485.0,"bytes":346656}"#;
+    const WORKER_MAP_DECLARATION: &str = r#"{"keyed_on":"map","map_name":"1 Pass Greenland Redux v3","variant":"overlay:height","source_hash":"430af906ed2a7353a6ebebb24e0a41b40f97b103e11b73892fb1dcaa05108053","encode_profile":"webp-lossless-512","origin":"extracted","mime":"image/webp","source_archive":"1 Pass Greenland Redux v3","map_width":6144,"map_height":10240,"world_height_min":90.0,"world_height_max":485.0,"bytes":346656}"#;
 
     /// A driver can build a declaration out of what the worker printed, with no
     /// second source and no rule of its own.
@@ -1314,15 +1314,19 @@ mod tests {
 
     // --------------------------------------------------------------- refusals
 
-    /// The size exception. Two height overlays in this machine's map library are
-    /// over the platform's body limit, and the platform refuses the body before any
-    /// hub code runs, so the caller would get an opaque platform error instead of
-    /// anything the hub wrote. Refused here, with what it is and why.
+    /// The size exception, checked before the class cap because it is the one a
+    /// reader cannot act on by re-encoding: the platform refuses the body before
+    /// any hub code runs, so without this the caller gets an opaque platform
+    /// error instead of anything the hub wrote.
+    ///
+    /// Height overlays used to be what reached it, at up to 5.3 MB for a 32x32
+    /// map. Issue #1730 capped them at 512px, so no class can reach it by being
+    /// a large picture any more and this only fires on a file that is not what it
+    /// claims to be. The message is still worth having for that.
     #[test]
     fn a_picture_over_the_platforms_body_limit_is_refused_with_the_reason() {
         let dir = asset_dir("oversize");
-        // Mediterraneum_V1's height overlay, measured at 5,326,359 bytes.
-        let asset = overlay(file(&dir, "med.png", 0), "overlay:height");
+        let asset = overlay(file(&dir, "med.webp", 0), "overlay:height");
         let refused = check(&asset, 5_326_359).unwrap_err();
         assert!(refused.contains("Mediterraneum_V1"), "{refused}");
         assert!(refused.contains("5326359"), "{refused}");
@@ -1334,14 +1338,13 @@ mod tests {
         );
     }
 
-    /// Special Hotstepper 1.1.1's height overlay, at 4,645,750 bytes, lands between
-    /// the two readings of "4.5 MB": over 4,500,000 and under 4,718,592. Which one
-    /// the platform means is not established, so it is refused rather than gambled
-    /// on, and the refusal is the same one that names the issue.
+    /// 4,645,750 bytes lands between the two readings of "4.5 MB": over 4,500,000
+    /// and under 4,718,592. Which one the platform means is not established, so it
+    /// is refused rather than gambled on, and the refusal names the issue.
     #[test]
     fn a_picture_in_the_gap_between_the_two_readings_of_the_limit_is_refused() {
         let dir = asset_dir("gap");
-        let mut asset = overlay(file(&dir, "hotstepper.png", 0), "overlay:height");
+        let mut asset = overlay(file(&dir, "hotstepper.webp", 0), "overlay:height");
         if let AssetIdentity::Map { map_name, .. } = &mut asset.identity {
             *map_name = "Special Hotstepper 1.1.1".into();
         }
@@ -1350,11 +1353,31 @@ mod tests {
         assert!(refused.contains("coilbox-hub#162"), "{refused}");
     }
 
+    /// The metal overlay, because it is one of the two classes with no edge cap
+    /// to derive a byte cap from, so the platform limit is the only bound it has
+    /// and the largest thing that fits is allowed.
     #[test]
     fn a_picture_that_fits_is_not_refused_for_its_size() {
         let dir = asset_dir("fits");
-        let asset = overlay(file(&dir, "ok.png", 0), "overlay:height");
+        let mut asset = overlay(file(&dir, "ok.webp", 0), "overlay:metal");
+        asset.world_height_min = None;
+        asset.world_height_max = None;
         check(&asset, MAX_ASSET_BYTES).expect("the largest that fits is allowed");
+    }
+
+    /// The other side of it, and what #1730 bought: a height overlay is a capped
+    /// class now, so it is held to its own number long before the platform's.
+    #[test]
+    fn a_height_overlay_over_its_class_cap_is_refused_by_the_class() {
+        let dir = asset_dir("heightcap");
+        let asset = overlay(file(&dir, "big.webp", 0), "overlay:height");
+        let cap = class_for_variant("overlay:height")
+            .and_then(|class| class.max_bytes)
+            .expect("the height overlay is a capped class");
+        assert!(cap < MAX_ASSET_BYTES);
+        check(&asset, cap).expect("the largest that fits is allowed");
+        let refused = check(&asset, cap + 1).unwrap_err();
+        assert!(refused.contains("at most"), "{refused}");
     }
 
     #[test]
@@ -2237,12 +2260,12 @@ mod tests {
     /// answered:
     ///
     /// ```json
-    /// {"ok":true,"declaration":{"identity":{"keyedOn":"map","mapName":"Mediterraneum_V1","variant":"overlay:height"},"sourceHash":"src-map","encodeProfile":"png16-lossless-source","origin":"extracted","mime":"image/png","bytes":68,"sourceArchive":"mediterraneum_v1.sd7","mapWidth":8,"mapHeight":8,"worldHeightMin":-120.5,"worldHeightMax":880}}
+    /// {"ok":true,"declaration":{"identity":{"keyedOn":"map","mapName":"Mediterraneum_V1","variant":"overlay:height"},"sourceHash":"src-map","encodeProfile":"webp-lossless-512","origin":"extracted","mime":"image/webp","bytes":68,"sourceArchive":"mediterraneum_v1.sd7","mapWidth":8,"mapHeight":8,"worldHeightMin":-120.5,"worldHeightMax":880}}
     /// ```
     ///
     /// and `checkAssetImage`, which is the dimension read of coilbox-hub#105,
     /// answered `{"ok":true,"width":1,"height":1}` off the header alone.
-    const CAPTURED_MAP_DECLARATION: &str = r#"{"keyed_on":"map","map_name":"Mediterraneum_V1","variant":"overlay:height","source_hash":"src-map","encode_profile":"png16-lossless-source","origin":"extracted","mime":"image/png","source_archive":"mediterraneum_v1.sd7","map_width":8,"map_height":8,"world_height_min":-120.5,"world_height_max":880.0,"bytes":68}"#;
+    const CAPTURED_MAP_DECLARATION: &str = r#"{"keyed_on":"map","map_name":"Mediterraneum_V1","variant":"overlay:height","source_hash":"src-map","encode_profile":"webp-lossless-512","origin":"extracted","mime":"image/webp","source_archive":"mediterraneum_v1.sd7","map_width":8,"map_height":8,"world_height_min":-120.5,"world_height_max":880.0,"bytes":68}"#;
 
     #[tokio::test]
     async fn the_asset_part_is_the_json_the_hubs_parser_was_run_against() {

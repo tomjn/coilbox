@@ -26,31 +26,26 @@ import { type Placement, teamColor } from "./placements";
 import {
   cornerGround,
   FLAT_FIELD,
+  fieldFromGrid,
   flatGround,
   groundHeight,
-  type HeightField,
   type HeightGrid,
-  readHeightField,
-  readHeightGrid,
   standingField,
 } from "./terrain";
 import { createUnitsLayer, type UnitsLayer } from "./unitsLayer";
 
 /** The map inputs the layer needs, as `useMissionMapAssets` reports them. */
 export interface MapExtent {
-  heightSrc?: string;
   /**
-   * The map's own 16 bit heights, which is what a verdict is worked out on
-   * (issue #1490).
+   * The map's own 16 bit heights, which is what the models are stood on and
+   * what a verdict is worked out on (issues #1490 and #1730).
    *
-   * Separate from `heightSrc` because the two are different reads for different
-   * jobs: the PNG is the picture the models are stood on and the terrain is
-   * displaced by, and this is the engine's own numbers. Left out by every
-   * surface that only draws.
+   * One reading for both. It used to be two, a picture read back through a
+   * canvas for the standing and the engine's own words for the verdict, and a
+   * canvas hands back eight bits whatever the picture holds. Left out by every
+   * surface that only draws terrain rather than putting anything on it.
    */
-  heightFieldSrc?: string;
-  heightFieldWidth?: number;
-  heightFieldHeight?: number;
+  heightWords?: HeightGrid | null;
   /** Whether that read has settled, one way or the other. False means one is
    *  still in flight, so an absent grid is not yet an absent verdict. */
   heightFieldRead?: boolean;
@@ -58,8 +53,8 @@ export interface MapExtent {
    * The ground has no relief and there is no heightmap coming (issue #1416).
    *
    * The blueprint editor draws on flat ground rather than on a map, and without
-   * this an absent `heightSrc` is a read still in flight, which is what it is
-   * for every other caller. Still said explicitly now that a map whose heights
+   * this an absent grid is a read still in flight, which is what it is for
+   * every other caller. Still said explicitly now that a map whose heights
    * would not read is flattened too (issue #1497): this floor is level on
    * purpose and is known exactly, so a building on it gets a real verdict, and
    * that one is a guess nothing may be judged against.
@@ -98,9 +93,8 @@ export interface ScenarioUnitsState {
    * Null while the map's heights are being read, and on a map whose heights
    * would not read. Both are "do not ask", which is why this is separate from
    * {@link groundAt}: that one answers 0 rather than nothing, because a model
-   * has to stand somewhere. A caller that wants a verdict has to hand over the
-   * raw grid, because the rendered picture is eight bits deep and a verdict off
-   * it costs a tolerance (issue #1490).
+   * has to stand somewhere. Read off the map's own words at the engine's own 8
+   * elmo spacing, so the verdict pays no tolerance (issue #1490).
    *
    * Flat ground with no map is not null. That floor is level on purpose and is
    * known exactly, so a building on it gets a real verdict.
@@ -205,74 +199,20 @@ export function useScenarioUnits(
   const lookups = useRef({ objectNames, participants, resolve: archive });
   lookups.current = { objectNames, participants, resolve: archive };
 
-  const [field, setField] = useState<HeightField | null>(null);
-  // Whether the read above has finished, which a null field cannot say: a read
-  // in flight and a read that failed both leave it null, and only one of those
-  // is worth telling somebody about (issue #1491).
-  const [heightRead, setHeightRead] = useState(false);
+  // The engine's own heights, fetched upstream so one read serves both the
+  // terrain the preview displaces and the ground a verdict is worked out on.
   const flat = map.flat === true;
-  useEffect(() => {
-    const src = map.heightSrc;
-    if (flat) {
-      setField(FLAT_FIELD);
-      setHeightRead(true);
-      return;
-    }
-    if (!src) {
-      setField(null);
-      setHeightRead(false);
-      return;
-    }
-    setHeightRead(false);
-    let cancelled = false;
-    readHeightField(src)
-      .then((read) => {
-        if (cancelled) return;
-        setField(read);
-        setHeightRead(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setField(null);
-        setHeightRead(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [map.heightSrc, flat]);
-
-  // The engine's own heights, read as raw bytes rather than off the picture
-  // (issue #1490). Its own read because it is its own file, and because a
-  // surface that only draws never asks for it.
-  const gridSettled = map.heightFieldRead !== false;
-  const [gridField, setGridField] = useState<HeightGrid | null>(null);
-  const [gridRead, setGridRead] = useState(true);
-  const gridSrc = map.heightFieldSrc;
-  const gridWidth = map.heightFieldWidth;
-  const gridHeight = map.heightFieldHeight;
-  useEffect(() => {
-    if (!gridSrc || !gridWidth || !gridHeight) {
-      setGridField(null);
-      setGridRead(true);
-      return;
-    }
-    setGridRead(false);
-    let cancelled = false;
-    readHeightGrid(gridSrc, gridWidth, gridHeight)
-      .then((read) => {
-        if (cancelled) return;
-        setGridField(read);
-        setGridRead(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setGridField(null);
-        setGridRead(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [gridSrc, gridWidth, gridHeight]);
+  const grid = map.heightWords ?? null;
+  // Whether that read has finished, which a null grid cannot say: a read in
+  // flight and a read that failed both leave it null, and only one of those is
+  // worth telling somebody about (issue #1491).
+  const heightRead = flat || map.heightFieldRead !== false;
+  // Held rather than recomputed: it is a float a sample, which on the largest
+  // map is a 17 MB array, and the layer below is rebuilt whenever it moves.
+  const field = useMemo(() => {
+    if (flat) return FLAT_FIELD;
+    return grid ? fieldFromGrid(grid) : null;
+  }, [flat, grid]);
 
   // What the models stand on, which is the flat once the map's own heights have
   // been asked for and refused (issue #1497).
@@ -373,10 +313,10 @@ export function useScenarioUnits(
 
   const ground = useMemo(() => {
     if (flat) return flatGround();
-    return gridField
-      ? cornerGround(gridField, worldWidth, worldHeight, minHeight, maxHeight)
+    return grid
+      ? cornerGround(grid, worldWidth, worldHeight, minHeight, maxHeight)
       : null;
-  }, [flat, gridField, worldWidth, worldHeight, minHeight, maxHeight]);
+  }, [flat, grid, worldWidth, worldHeight, minHeight, maxHeight]);
 
   return {
     placed: placements.length,
@@ -387,7 +327,7 @@ export function useScenarioUnits(
     placements,
     groundAt,
     ground,
-    settled: defsReady && heightRead && gridRead && gridSettled,
+    settled: defsReady && heightRead,
     heightsUnread,
   };
 }

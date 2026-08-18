@@ -8,7 +8,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import type { MapAppearance } from "../../bindings";
-import { getImageInfo } from "../../imageCache";
+import { decimateHeights, type HeightWords } from "../../heightGrid";
+import { getHeightWords, getImageInfo } from "../../imageCache";
+
+export type { HeightWords };
 
 type Rgb = [number, number, number];
 
@@ -144,13 +147,19 @@ async function loadSkyboxCube(
   }
 }
 
-/** Longest side requested from `mc_image_info` for each map. The heightmap needs
- * enough samples to displace with relief; the colour can be a touch crisper. */
+/** Longest sides requested from `mc_image_info`. The relief normally comes from
+ * the heightmap's own words now, so `HEIGHT_MAX` is only the fallback for a file
+ * that would not read as words. */
 const HEIGHT_MAX = 1024;
 const TEXTURE_MAX = 2048;
 /** Plane subdivisions. ~524k tris — still cheap, and the ≤1024px heightmap is the
  * real detail bound, so more segments wouldn't show. */
 const SEGMENTS = 512;
+/** Samples a height grid is decimated to on each axis before it becomes a
+ * texture. The mesh has this many vertices a side, so horizontal detail past it
+ * cannot be drawn, and a 2049 sample grid held at full resolution in floats
+ * would be 16 MB rather than the 1 MB this is (issue #1730). */
+const GRID_MAX = SEGMENTS + 1;
 /** Far coarser grid for the wireframe render: at the full `SEGMENTS` the edges
  * merge into a solid fill, so a visible mesh grid needs a low subdivision. Relief
  * still comes from the per-vertex `displacementMap`, just sampled more coarsely. */
@@ -180,7 +189,38 @@ const RIPPLE_WAVES: [number, number, number, number][] = [
   [3.35, 6.6, 0.35, 2.1],
 ];
 
-type Srcs = { height: string; texture: string };
+type Srcs = { height: string | null; texture: string | null };
+
+/**
+ * The map's own heights as a displacement texture.
+ *
+ * Float rather than half float: half carries about 11 bits of mantissa, which
+ * is a smaller version of the eight bit problem this exists to fix. WebGL2 does
+ * not filter float textures without `OES_texture_float_linear`, so a context
+ * without it samples nearest rather than silently drawing nothing.
+ */
+function heightWordsTexture(
+  grid: HeightWords,
+  renderer: THREE.WebGLRenderer,
+): THREE.DataTexture {
+  const { data, width, height } = decimateHeights(grid, GRID_MAX);
+  const tex = new THREE.DataTexture(
+    data,
+    width,
+    height,
+    THREE.RedFormat,
+    THREE.FloatType,
+  );
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.generateMipmaps = false;
+  const smooth = renderer.extensions.has("OES_texture_float_linear");
+  tex.minFilter = smooth ? THREE.LinearFilter : THREE.NearestFilter;
+  tex.magFilter = smooth ? THREE.LinearFilter : THREE.NearestFilter;
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
 
 /**
  * A built scene, handed to a view that has its own content to put on the map.
@@ -223,6 +263,8 @@ export function MapPreview3D({
   heightmapPath,
   texturePath,
   heightSrc,
+  heightWords,
+  heightRange,
   textureSrc,
   detailSrc,
   minHeight,
@@ -255,6 +297,27 @@ export function MapPreview3D({
   /** Optional detail-texture source (data URL) — the map's own `detailtex` when
    * it ships one; otherwise a generic procedural detail texture is used. */
   detailSrc?: string;
+  /**
+   * The map's own 16 bit heights, displaced from directly (issue #1730).
+   *
+   * Preferred over every picture when it is here, because a picture of a
+   * heightmap is eight bits deep however it was stored, so gentle slopes
+   * collapse into flat steps that shading turns into contour rings. A surface
+   * that only draws terrain at a few hundred pixels leaves this out and takes
+   * the picture, which is a fraction of the bytes and shows the same thing at
+   * that size.
+   */
+  heightWords?: HeightWords | null;
+  /**
+   * What the height texture's 0 and 1 stand for in engine world units, when
+   * that is not the map's own `minHeight` and `maxHeight`.
+   *
+   * The unitsync height picture is rescaled into the window its own samples
+   * occupy, so displacing it by the map's pair would flatten every map whose
+   * heights do not reach both ends of the 16 bit scale. Ignored when
+   * `heightWords` is set, since those are already on the map's own scale.
+   */
+  heightRange?: { min: number; max: number };
   minHeight: number;
   maxHeight: number;
   worldWidth: number;
@@ -306,6 +369,9 @@ export function MapPreview3D({
   // itself follows the OS preference in its default "system" mode.
   const reduceMotion = useReduceMotion();
   const [srcs, setSrcs] = useState<Srcs | null>(null);
+  // The heightmap file read as words, for the mapconv flow, which hands over a
+  // path rather than a grid. `heightWords` from the caller wins over it.
+  const [pathWords, setPathWords] = useState<HeightWords | null>(null);
   // True once the three.js scene is actually on screen. Drives the "building"
   // overlay so it stays up through both the image fetch and the build (and while
   // waiting on dimensions), rather than vanishing the moment the data lands.
@@ -353,35 +419,89 @@ export function MapPreview3D({
   // Fetch both maps as downscaled data URLs whenever the inputs change. When
   // pre-resolved sources are supplied (the content flow already has downscaled
   // data URLs), use them directly and skip the file-path fetch.
+  //
+  // A caller that handed over the map's own words needs no height picture at
+  // all, so the relief is ready as soon as the colour is.
   useEffect(() => {
     let cancelled = false;
     setSrcs(null);
+    setPathWords(null);
     setFailed(false);
-    // A wireframe render uses no diffuse texture, so it builds from the heightmap
+    const height = heightWords ? null : (heightSrc ?? null);
+    const haveRelief = !!heightWords || !!height;
+    // A wireframe render uses no diffuse texture, so it builds from the relief
     // alone and needn't wait on the minimap fetch.
-    if (forceWireframe && heightSrc) {
-      setSrcs({ height: heightSrc, texture: heightSrc });
+    if (forceWireframe && haveRelief) {
+      setSrcs({ height, texture: null });
       return;
     }
-    if (heightSrc && textureSrc) {
-      setSrcs({ height: heightSrc, texture: textureSrc });
+    if (haveRelief && textureSrc) {
+      setSrcs({ height, texture: textureSrc });
       return;
     }
-    if (!heightmapPath || !texturePath) return;
-    Promise.all([
-      getImageInfo(heightmapPath, HEIGHT_MAX),
-      getImageInfo(texturePath, TEXTURE_MAX),
-    ])
-      .then(([h, t]) => {
-        if (!cancelled) setSrcs({ height: h.thumb, texture: t.thumb });
-      })
-      .catch(() => {
+    if (haveRelief && texturePath) {
+      getImageInfo(texturePath, TEXTURE_MAX)
+        .then((t) => {
+          if (!cancelled) setSrcs({ height, texture: t.thumb });
+        })
+        .catch(() => {
+          if (!cancelled) setFailed(true);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (!heightmapPath) return;
+    // The mapconv flow, which has a file for each. The relief comes off the
+    // heightmap's own 16 bit words rather than a picture of them, because the
+    // picture would arrive eight bits deep and band the author's own terrain
+    // before they compiled it (issue #1730).
+    const colour = forceWireframe
+      ? Promise.resolve(null)
+      : texturePath
+        ? getImageInfo(texturePath, TEXTURE_MAX).then((t) => t.thumb)
+        : null;
+    if (!colour) return;
+    (async () => {
+      try {
+        const texture = await colour;
+        if (cancelled) return;
+        let words: HeightWords | null = null;
+        try {
+          words = await getHeightWords(heightmapPath, GRID_MAX);
+        } catch (why) {
+          // The relief is the one input with something to fall back to. A
+          // picture of the heightmap is what shipped before #1730: eight bits
+          // and prone to banding, but a preview rather than none. Said out loud
+          // because a silent downgrade is one nobody ever fixes.
+          console.warn(
+            `could not read ${heightmapPath} as heights, drawing a picture of it instead`,
+            why,
+          );
+        }
+        if (cancelled) return;
+        if (words) {
+          setPathWords(words);
+          setSrcs({ height: null, texture });
+          return;
+        }
+        const picture = await getImageInfo(heightmapPath, HEIGHT_MAX);
+        if (!cancelled) setSrcs({ height: picture.thumb, texture });
+      } catch {
         if (!cancelled) setFailed(true);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
-  }, [heightmapPath, texturePath, heightSrc, textureSrc, forceWireframe]);
+  }, [
+    heightmapPath,
+    texturePath,
+    heightSrc,
+    heightWords,
+    textureSrc,
+    forceWireframe,
+  ]);
 
   // Build the three.js scene from the loaded maps + dimensions. Fully torn down
   // on any dependency change or unmount, so navigating away leaks no GL context.
@@ -403,16 +523,31 @@ export function MapPreview3D({
       const s = BASE / longest;
       const planeW = worldWidth * s;
       const planeH = worldHeight * s;
+      // What the height texture's 0 and 1 mean. The map's own words are already
+      // on the map's scale. A picture of them may have been rescaled into a
+      // narrower window and carries its own pair (issue #1730).
+      const grid = heightWords ?? pathWords;
+      const reliefMin = grid ? minHeight : (heightRange?.min ?? minHeight);
+      const reliefMax = grid ? maxHeight : (heightRange?.max ?? maxHeight);
 
       (async () => {
         const loader = new THREE.TextureLoader();
-        let colorTex: THREE.Texture;
+        let colorTex: THREE.Texture | null = null;
         let heightTex: THREE.Texture;
         try {
-          [colorTex, heightTex] = await Promise.all([
-            loader.loadAsync(srcs.texture),
-            loader.loadAsync(srcs.height),
+          // The map's own words when the caller has them, else its picture.
+          const [color, height] = await Promise.all([
+            srcs.texture ? loader.loadAsync(srcs.texture) : null,
+            srcs.height ? loader.loadAsync(srcs.height) : null,
           ]);
+          colorTex = color;
+          if (height) {
+            heightTex = height;
+          } else if (grid) {
+            heightTex = heightWordsTexture(grid, renderer);
+          } else {
+            throw new Error("no relief to displace the terrain with");
+          }
         } catch {
           if (!cancelled) setFailed(true);
           return;
@@ -422,9 +557,12 @@ export function MapPreview3D({
           heightTex?.dispose();
           return;
         }
-        colorTex.colorSpace = THREE.SRGBColorSpace;
+        if (colorTex) {
+          colorTex.colorSpace = THREE.SRGBColorSpace;
+          disposables.push(colorTex);
+        }
         heightTex.colorSpace = THREE.NoColorSpace;
-        disposables.push(colorTex, heightTex);
+        disposables.push(heightTex);
 
         // Detail texture: the map's own `detailtex` (data URL) when supplied, else a
         // generic procedural one. Tiled and multiplied over the base colour below to
@@ -491,11 +629,11 @@ export function MapPreview3D({
         // an unlit uniform-colour grid, so the displaced geometry reads as the terrain
         // shape on its own.
         const material = new THREE.MeshStandardMaterial({
-          map: forceWireframe ? undefined : colorTex,
+          map: forceWireframe ? undefined : (colorTex ?? undefined),
           color: forceWireframe ? 0x8fb3c9 : 0xffffff,
           displacementMap: heightTex,
-          displacementScale: (maxHeight - minHeight) * s,
-          displacementBias: minHeight * s,
+          displacementScale: (reliefMax - reliefMin) * s,
+          displacementBias: reliefMin * s,
           roughness: 1,
           metalness: 0,
           wireframe: forceWireframe || wantWire.current,
@@ -506,7 +644,7 @@ export function MapPreview3D({
         // higher tiling frequency. `detail * 2` centres neutral at mid-grey (engine
         // convention); `detailStrength` fades the whole effect. Skipped for the
         // wireframe render, which has no diffuse to modulate.
-        if (!forceWireframe)
+        if (!forceWireframe && colorTex)
           material.onBeforeCompile = (shader) => {
             shader.uniforms.detailMap = { value: detailTex };
             shader.uniforms.detailRepeat = {
@@ -581,8 +719,8 @@ uniform float detailStrength;`,
             };
             shader.uniforms.wBase = { value: base };
             shader.uniforms.wMin = { value: min };
-            shader.uniforms.wHeightScale = { value: maxHeight - minHeight };
-            shader.uniforms.wHeightBias = { value: minHeight };
+            shader.uniforms.wHeightScale = { value: reliefMax - reliefMin };
+            shader.uniforms.wHeightBias = { value: reliefMin };
             shader.uniforms.wPlane = {
               value: new THREE.Vector2(planeW, planeH),
             };
@@ -911,6 +1049,10 @@ uniform vec2 wPlane;`,
     // forcing a rebuild.
     [
       srcs,
+      heightWords,
+      pathWords,
+      heightRange?.min,
+      heightRange?.max,
       detailSrc,
       minHeight,
       maxHeight,

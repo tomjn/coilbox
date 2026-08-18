@@ -36,7 +36,7 @@ export const GRID_ORIGIN: Point = {
  *  asks a map for. `flat` is what says there is no heightmap to wait for. */
 export interface FlatGround {
   flat: true;
-  heightSrc?: undefined;
+  heightWords?: undefined;
   minHeight: number;
   maxHeight: number;
   worldWidth: number;

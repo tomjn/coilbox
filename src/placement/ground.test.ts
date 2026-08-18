@@ -15,7 +15,7 @@ describe("gridGround", () => {
     expect(ground.flat).toBe(true);
     expect(ground.minHeight).toBe(0);
     expect(ground.maxHeight).toBe(0);
-    expect(ground.heightSrc).toBeUndefined();
+    expect(ground.heightWords).toBeUndefined();
   });
 
   it("is square and a whole number of build squares across", () => {

@@ -6,7 +6,6 @@ import {
   classForVariant,
   ELMOS_PER_BUILD_SQUARE,
   ELMOS_PER_METAL_SAMPLE,
-  heightOverlayMaxBytes,
   MAP_VARIANTS,
   MINIMAP_VARIANT,
   mapExtentElmos,
@@ -78,7 +77,7 @@ describe("the encode profiles", () => {
       "webp-lossless-source",
     );
     expect(ASSET_CLASSES["overlay:height"].encodeProfile).toBe(
-      "png16-lossless-source",
+      "webp-lossless-512",
     );
   });
 
@@ -102,8 +101,14 @@ describe("the dimension caps", () => {
     expect(ASSET_CLASSES.minimap.maxEdgePx).toBe(512);
   });
 
-  it("leaves the overlays at whatever resolution the map's grid has", () => {
-    for (const variant of ["overlay:metal", "overlay:type", "overlay:height"]) {
+  // 512 is where the terrain mesh stops being able to show more detail, which
+  // is what issue #1730 caps the height picture on.
+  it("caps the height overlay at 512px like the minimap", () => {
+    expect(ASSET_CLASSES["overlay:height"].maxEdgePx).toBe(512);
+  });
+
+  it("leaves the sample overlays at whatever resolution the map's grid has", () => {
+    for (const variant of ["overlay:metal", "overlay:type"]) {
       expect(ASSET_CLASSES[variant].maxEdgePx).toBeNull();
       expect(ASSET_CLASSES[variant].maxBytes).toBeNull();
     }
@@ -127,18 +132,14 @@ describe("the dimension caps", () => {
     expect(maxObjectBytes).toBe(2 * 1024 * 1024);
   });
 
-  it("takes height as 16 bit grayscale PNG and everything else as WebP", () => {
-    const height = ASSET_CLASSES["overlay:height"];
-    expect(height.mime).toBe("image/png");
-    expect(height.minBitDepth).toBe(16);
-    expect(height.grayscale).toBe(true);
-
-    for (const [name, asset] of Object.entries(ASSET_CLASSES)) {
-      if (name !== "overlay:height") {
-        expect(asset.mime).toBe("image/webp");
-        expect(asset.minBitDepth).toBeNull();
-        expect(asset.grayscale).toBe(false);
-      }
+  // The height overlay is grey pixels, but nothing may say so: WebP has no
+  // grayscale mode, so the bytes are RGB with the three channels equal and the
+  // hub's header reader cannot tell that from any other picture (issue #1730).
+  it("takes every class as WebP, with no depth or channel count declared", () => {
+    for (const asset of Object.values(ASSET_CLASSES)) {
+      expect(asset.mime).toBe("image/webp");
+      expect(asset.minBitDepth).toBeNull();
+      expect(asset.grayscale).toBe(false);
     }
   });
 
@@ -175,21 +176,6 @@ describe("classForVariant", () => {
   it("has nothing for a variant the hub would refuse", () => {
     expect(classForVariant("overlay:wind")).toBeNull();
     expect(classForVariant("buildpics")).toBeNull();
-  });
-});
-
-describe("heightOverlayMaxBytes", () => {
-  it("counts one sample per heightmap vertex, at two bytes each", () => {
-    // A 16384 elmo edge is 2048 squares and 2049 samples, the fencepost the hub
-    // measured its own cap against.
-    expect(heightOverlayMaxBytes("overlay:height", 16384, 16384)).toBe(
-      2049 * 2049 * 2,
-    );
-  });
-
-  it("is a height overlay's number and no other class's", () => {
-    expect(heightOverlayMaxBytes("overlay:metal", 16384, 16384)).toBeNull();
-    expect(heightOverlayMaxBytes("minimap", 16384, 16384)).toBeNull();
   });
 });
 
