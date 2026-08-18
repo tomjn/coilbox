@@ -28,6 +28,7 @@ mod lua;
 mod mapcatalog;
 mod mapmeta;
 mod metalmap;
+mod metalspots;
 mod minimap;
 mod model;
 mod renderkey;

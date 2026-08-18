@@ -1,5 +1,5 @@
 {
-  "catalogVersion": 2,
+  "catalogVersion": 3,
   "facts": {
     "map_name": {
       "type": "string",
@@ -132,6 +132,7 @@
   },
   "metalClustering": {
     "minDensityShare": 0.02,
+    "minProminenceShare": 0.2,
     "minSeparationElmos": 96,
     "minSpotMetal": 0.5
   },

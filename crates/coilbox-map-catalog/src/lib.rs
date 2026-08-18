@@ -116,10 +116,28 @@ pub struct MetalClustering {
     /// A map with a flat trace of density everywhere produces no spots rather
     /// than one covering the map.
     pub min_density_share: f64,
+    /// How far above the lowest ground it claims a peak has to stand, again as a
+    /// share of full scale, before it is a spot rather than a place on a slope.
+    ///
+    /// The parameter that tells a map with spots from a map that is simply
+    /// metallic. Measured over this machine's 101 maps: it changes nothing at
+    /// all on maps whose metal is placed in discrete blobs, and takes a smeared
+    /// map like SmallDivide from 1,117 spots to 200. A map that really is metal
+    /// everywhere, SpeedMetal or Asteroid Mines, still reports hundreds, which
+    /// is what it is (issue #1734).
+    pub min_prominence_share: f64,
     /// How far apart two spot centres have to be, in elmos, to be two spots.
     pub min_separation_elmos: f64,
-    /// The least a spot may be worth, in the same metal per second its `amount`
-    /// is reported in. Below it the cluster is noise rather than a spot.
+    /// The least a spot may be worth, in the same units its `amount` is reported
+    /// in. Below it the cluster is noise rather than a spot.
+    ///
+    /// It does less work than it looks like it does, and that is worth knowing
+    /// rather than discovering. `amount` is the map's own `maxMetal` times the
+    /// sum of the density under the spot, which runs to hundreds or thousands on
+    /// a map that declares a normal `maxMetal`, so this only excludes spots on
+    /// maps that declare almost none. What separates a spot from noise on a real
+    /// map is [`MetalClustering::min_density_share`] and
+    /// [`MetalClustering::min_prominence_share`].
     pub min_spot_metal: f64,
 }
 
@@ -228,13 +246,14 @@ mod tests {
     // here first. Every expected value is written out by hand, so changing the
     // JSON and changing the test stay two separate decisions.
 
-    /// Version 2 reads a map's geothermal vents out of its feature block, which
-    /// version 1 did not (issue #1733). The bump is what makes the hub take a
-    /// re-read of an archive it already holds as an improvement rather than
-    /// refusing it as a conflict.
+    /// Version 2 reads a map's geothermal vents out of its feature block
+    /// (issue #1733) and version 3 finds its metal spots (issue #1734), neither
+    /// of which version 1 did. The bump is what makes the hub take a re-read of
+    /// an archive it already holds as an improvement rather than refusing it as
+    /// a conflict.
     #[test]
     fn names_the_extraction_that_produced_an_entry() {
-        assert_eq!(catalog_version(), 2);
+        assert_eq!(catalog_version(), 3);
     }
 
     /// The expected value comes from `shasum -a 256 shared/map-catalog.json`, a
@@ -248,7 +267,7 @@ mod tests {
     fn digests_the_shared_document_as_an_outside_tool_does() {
         assert_eq!(
             catalog_digest(),
-            "sha256:6fecb01361f857e828b00f267c8c3291d209445ceda41fe0747a9100773f3c7c"
+            "sha256:f013ff255fef10683673599df2d513e53eab69dddc87c79622ae1d207f611b20"
         );
     }
 
@@ -280,7 +299,7 @@ mod tests {
     /// cannot agree by accident.
     #[test]
     fn a_changed_document_is_a_changed_digest() {
-        let edited = CATALOG_JSON.replace("\"catalogVersion\": 2", "\"catalogVersion\": 3");
+        let edited = CATALOG_JSON.replace("\"catalogVersion\": 3", "\"catalogVersion\": 4");
         assert_ne!(edited, CATALOG_JSON, "the replacement matched nothing");
         let edited_digest = format!("sha256:{:x}", Sha256::digest(edited.as_bytes()));
         assert_ne!(catalog_digest(), edited_digest);
@@ -478,15 +497,21 @@ mod tests {
     fn holds_every_parameter_a_spot_depends_on() {
         let clustering = catalog().metal_clustering;
         assert_eq!(clustering.min_density_share, 0.02);
+        assert_eq!(clustering.min_prominence_share, 0.2);
         assert_eq!(clustering.min_separation_elmos, 96.0);
         assert_eq!(clustering.min_spot_metal, 0.5);
     }
 
-    /// A share of full scale, so a threshold that was really a raw sample value
-    /// would show here rather than as an empty catalog.
+    /// Both are shares of full scale, so a threshold that was really a raw
+    /// sample value would show here rather than as an empty catalog.
     #[test]
-    fn the_density_threshold_is_a_share_of_full_scale() {
-        let share = catalog().metal_clustering.min_density_share;
-        assert!(share > 0.0 && share < 1.0, "{share}");
+    fn the_density_thresholds_are_shares_of_full_scale() {
+        let clustering = catalog().metal_clustering;
+        for share in [
+            clustering.min_density_share,
+            clustering.min_prominence_share,
+        ] {
+            assert!(share > 0.0 && share < 1.0, "{share}");
+        }
     }
 }
