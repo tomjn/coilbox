@@ -29,9 +29,7 @@
 
 import type { ReactNode } from "react";
 import { useScanTargetSelection, useUnitsyncMinimap } from "@/content/config";
-import { useBarMap } from "@/downloads/config";
 import { MapPictureCard } from "../../assets/MapPicture";
-import { mapFactsLabel } from "../../assets/mapFacts";
 import { useMapPictureLadder } from "../../assets/useMapPicture";
 import type { SetupPackContents as PackContents } from "../../preview";
 
@@ -119,21 +117,16 @@ function PackMap({
     PACK_MINIMAP_MIP,
   );
   const ladder = useMapPictureLadder(name, minimap.url);
-  // Asked for whatever the ladder needed, because the caption wants the entry
-  // even for a map that is installed and drew itself from its own archive. The
-  // list is one fetch a session, so this is a second read of it and not a second
-  // request.
-  const bar = useBarMap(name);
 
   return (
     <MapPictureCard
       mapName={name}
       ladder={ladder}
-      // BAR's own spelling where it lists the map, since that is the name a
-      // player sees in a lobby. The pack's own name otherwise, which is all
-      // anything here knows it by.
-      label={bar?.displayName ?? name}
-      detail={mapFactsLabel(bar)}
+      // The pack's own name, which is all anything here knows it by. It used to
+      // prefer BAR's spelling, and say the map's size and player count under it,
+      // off BAR's map list. That list is no longer read (issue #1721 built the
+      // caption, `useMapPicture.ts` says why it went).
+      label={name}
       className="h-full w-full"
     />
   );

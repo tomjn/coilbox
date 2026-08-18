@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useBarMap } from "@/downloads/config";
 import { isHubEnabled } from "@/profile/profile";
 import { useHubUrl } from "../config";
 import { heldMapAsset, heldPicture } from "./heldPictures";
@@ -55,17 +54,23 @@ export function useHeldMapPicture(
  * screen that shows a map is holding a `useUnitsyncMinimap` result for its own
  * reasons, and asking for a second one here would render the same archive twice.
  *
- * The hub and BAR are both only asked when there is no local picture. An
- * installed archive wins the ladder outright, so a reader with the map has no
- * use for either answer, and the hub's is a request somebody else pays for.
+ * The hub is only asked when there is no local picture. An installed archive
+ * wins the ladder outright, so a reader with the map has no use for the answer,
+ * and it is a request somebody else pays for.
+ *
+ * No size is passed, so the drawing at the bottom is square for every map it
+ * has to draw. It used to be shaped from BAR's map list, which is the only
+ * source coilbox can reach that knows the proportions of a map nobody here has
+ * installed. Reading that list is a dependency on BAR's infrastructure for a
+ * rectangle, and the trade went the other way: a square placeholder is the
+ * accepted cost. The hub is where the real shape comes back from, once a seeded
+ * minimap answers instead of the drawing.
  */
 export function useMapPictureLadder(
   mapName: string | undefined,
   local: string | null | undefined,
 ): MapPicture[] {
-  const remote = mapName && !local ? mapName : undefined;
-  const bar = useBarMap(remote);
-  const held = useHeldMapPicture(remote);
+  const held = useHeldMapPicture(mapName && !local ? mapName : undefined);
 
   return useMemo(
     () =>
@@ -73,14 +78,9 @@ export function useMapPictureLadder(
         mapName: mapName ?? "",
         local,
         held,
-        bar: bar?.images?.preview ?? null,
-        size:
-          bar?.mapWidth && bar?.mapHeight
-            ? { width: bar.mapWidth, height: bar.mapHeight }
-            : null,
         cdnBase: assetCdnBase(),
       }),
-    [mapName, local, held, bar],
+    [mapName, local, held],
   );
 }
 
