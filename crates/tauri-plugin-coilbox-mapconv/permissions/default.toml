@@ -8,6 +8,7 @@ permissions = [
   "allow-mc-read-mapinfo",
   "allow-mc-read-skybox",
   "allow-mc-image-info",
+  "allow-mc-height-field",
   "allow-mc-compile",
   "allow-mc-decompile",
   "allow-mc-cancel",

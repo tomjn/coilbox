@@ -399,6 +399,34 @@ fn generate_thumb(path: &str, max: u32) -> Result<(u32, u32, Vec<u8>), String> {
     Ok((width, height, buf.into_inner()))
 }
 
+/// One heightmap file's samples as the engine's own 16 bit words, decimated to
+/// `max` on the longer edge (issue #1730).
+///
+/// The 3D preview displaced its terrain from a thumbnail, and a browser flattens
+/// an image to eight bits a channel on the way in whatever the file holds. A
+/// gentle slope then collapses into flat steps, and shading turns those steps
+/// into contour rings across a surface the author is about to compile.
+///
+/// Decimated here rather than in the webview because nothing downstream can draw
+/// past the preview mesh's vertex count, and a 4097 sample heightmap sent whole
+/// is 33 MB over the asset protocol for detail no pixel shows. `thumbnail`
+/// averages, so a peak between two kept columns lifts its neighbours instead of
+/// vanishing, and it does not ring the way a windowed sinc does.
+///
+/// Little endian, which is what a `Uint16Array` over the bytes reads on every
+/// platform coilbox ships on.
+fn height_words(path: &str, max: u32) -> Result<(u32, u32, Vec<u8>), String> {
+    let img = image::open(path).map_err(|e| format!("could not read image: {e}"))?;
+    let scaled = img.thumbnail(max, max);
+    let (width, height) = scaled.dimensions();
+    let grey = scaled.to_luma16();
+    let mut bytes = Vec::with_capacity(grey.as_raw().len() * 2);
+    for word in grey.as_raw() {
+        bytes.extend_from_slice(&word.to_le_bytes());
+    }
+    Ok((width, height, bytes))
+}
+
 /// Thumbnail with an on-disk cache under `cache_dir`, keyed on
 /// path+mtime+size+max, so a cold start doesn't re-decode every source image.
 ///
@@ -459,6 +487,71 @@ fn image_info_cached(
         file: None,
         data_url: Some(format!("data:image/png;base64,{}", base64_encode(&bytes))),
     })
+}
+
+/// One heightmap's words, written to the cache and reported by file name.
+///
+/// No inline fallback, unlike the thumbnails beside it. These are half a
+/// megabyte of raw samples and base64 on the bridge is no way to move that, so a
+/// run with nowhere to write says so and the preview falls back to the picture.
+///
+/// Two files per key, for the reason the thumbnail path has two: `<key>-hf.bin`
+/// is the words and `<key>-hf.json` is the grid they are on, which a hit needs
+/// and the bytes cannot answer on their own.
+fn height_words_cached(
+    path: &str,
+    max: u32,
+    cache_dir: Option<&Path>,
+) -> Result<(u32, u32, String), String> {
+    let (dir, key) = cache_dir
+        .zip(thumb_cache_key(path, max))
+        .ok_or_else(|| "no cache directory to write the heights to".to_string())?;
+    let name = format!("{key}-hf.bin");
+    let grid = dir.join(&name);
+    let dims = dir.join(format!("{key}-hf.json"));
+
+    if let Some(entry) = std::fs::read(&dims)
+        .ok()
+        .and_then(|raw| serde_json::from_slice::<ThumbEntry>(&raw).ok())
+    {
+        if grid.is_file() {
+            coilbox_thumb_cache::touch(&grid);
+            return Ok((entry.width, entry.height, name));
+        }
+    }
+
+    let (width, height, bytes) = height_words(path, max)?;
+    let _ = std::fs::create_dir_all(dir);
+    std::fs::write(&grid, &bytes).map_err(|e| format!("could not write the heights: {e}"))?;
+    if let Ok(json) = serde_json::to_vec(&ThumbEntry { width, height }) {
+        let _ = std::fs::write(&dims, json);
+    }
+    Ok((width, height, name))
+}
+
+/// `mc_height_field` decodes the heightmap at `path` and writes its samples out
+/// as raw 16 bit words for the 3D preview to displace from, rather than the
+/// eight bits a browser gets out of any picture (issue #1730).
+///
+/// `max` is the grid's longest edge, which the caller sets from the preview
+/// mesh's own vertex count so the number lives in one place.
+#[tauri::command]
+async fn mc_height_field<R: Runtime>(app: AppHandle<R>, path: String, max: u32) -> CliResult {
+    let max = max.max(1);
+    let cache_dir = thumb_cache_dir(&app);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        height_words_cached(&path, max, cache_dir.as_deref())
+    })
+    .await;
+    match result {
+        Ok(Ok((width, height, file))) => CliResult::ok(json!({
+            "width": width,
+            "height": height,
+            "file": file,
+        })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("height task failed: {e}")),
+    }
 }
 
 /// `mc_image_info` decodes the image at `path` and returns its true pixel
@@ -768,6 +861,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mc_read_mapinfo,
             mc_read_skybox,
             mc_image_info,
+            mc_height_field,
             mc_compile,
             mc_decompile,
             mc_cancel,

@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "mc_read_mapinfo",
     "mc_read_skybox",
     "mc_image_info",
+    "mc_height_field",
     "mc_compile",
     "mc_decompile",
     "mc_cancel",

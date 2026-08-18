@@ -9,7 +9,7 @@ import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import type { MapAppearance } from "../../bindings";
 import { decimateHeights, type HeightWords } from "../../heightGrid";
-import { getImageInfo } from "../../imageCache";
+import { getHeightWords, getImageInfo } from "../../imageCache";
 
 export type { HeightWords };
 
@@ -147,9 +147,8 @@ async function loadSkyboxCube(
   }
 }
 
-/** Longest side requested from `mc_image_info` for each map. The heightmap needs
- * enough samples to displace with relief; the colour can be a touch crisper. */
-const HEIGHT_MAX = 1024;
+/** Longest side requested from `mc_image_info` for the colour map. The relief
+ * no longer comes from a picture at all, so only this one is left. */
 const TEXTURE_MAX = 2048;
 /** Plane subdivisions. ~524k tris — still cheap, and the ≤1024px heightmap is the
  * real detail bound, so more segments wouldn't show. */
@@ -368,6 +367,9 @@ export function MapPreview3D({
   // itself follows the OS preference in its default "system" mode.
   const reduceMotion = useReduceMotion();
   const [srcs, setSrcs] = useState<Srcs | null>(null);
+  // The heightmap file read as words, for the mapconv flow, which hands over a
+  // path rather than a grid. `heightWords` from the caller wins over it.
+  const [pathWords, setPathWords] = useState<HeightWords | null>(null);
   // True once the three.js scene is actually on screen. Drives the "building"
   // overlay so it stays up through both the image fetch and the build (and while
   // waiting on dimensions), rather than vanishing the moment the data lands.
@@ -421,6 +423,7 @@ export function MapPreview3D({
   useEffect(() => {
     let cancelled = false;
     setSrcs(null);
+    setPathWords(null);
     setFailed(false);
     const height = heightWords ? null : (heightSrc ?? null);
     const haveRelief = !!heightWords || !!height;
@@ -434,10 +437,10 @@ export function MapPreview3D({
       setSrcs({ height, texture: textureSrc });
       return;
     }
-    if (heightWords && texturePath) {
+    if (haveRelief && texturePath) {
       getImageInfo(texturePath, TEXTURE_MAX)
         .then((t) => {
-          if (!cancelled) setSrcs({ height: null, texture: t.thumb });
+          if (!cancelled) setSrcs({ height, texture: t.thumb });
         })
         .catch(() => {
           if (!cancelled) setFailed(true);
@@ -446,13 +449,22 @@ export function MapPreview3D({
         cancelled = true;
       };
     }
-    if (!heightmapPath || !texturePath) return;
-    Promise.all([
-      getImageInfo(heightmapPath, HEIGHT_MAX),
-      getImageInfo(texturePath, TEXTURE_MAX),
-    ])
-      .then(([h, t]) => {
-        if (!cancelled) setSrcs({ height: h.thumb, texture: t.thumb });
+    if (!heightmapPath) return;
+    // The mapconv flow, which has a file for each. The relief comes off the
+    // heightmap's own 16 bit words rather than a picture of them, because the
+    // picture would arrive eight bits deep and band the author's own terrain
+    // before they compiled it (issue #1730).
+    const colour = forceWireframe
+      ? Promise.resolve(null)
+      : texturePath
+        ? getImageInfo(texturePath, TEXTURE_MAX).then((t) => t.thumb)
+        : null;
+    if (!colour) return;
+    Promise.all([getHeightWords(heightmapPath, GRID_MAX), colour])
+      .then(([words, texture]) => {
+        if (cancelled) return;
+        setPathWords(words);
+        setSrcs({ height: null, texture });
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -492,12 +504,9 @@ export function MapPreview3D({
       // What the height texture's 0 and 1 mean. The map's own words are already
       // on the map's scale. A picture of them may have been rescaled into a
       // narrower window and carries its own pair (issue #1730).
-      const reliefMin = heightWords
-        ? minHeight
-        : (heightRange?.min ?? minHeight);
-      const reliefMax = heightWords
-        ? maxHeight
-        : (heightRange?.max ?? maxHeight);
+      const grid = heightWords ?? pathWords;
+      const reliefMin = grid ? minHeight : (heightRange?.min ?? minHeight);
+      const reliefMax = grid ? maxHeight : (heightRange?.max ?? maxHeight);
 
       (async () => {
         const loader = new THREE.TextureLoader();
@@ -512,8 +521,8 @@ export function MapPreview3D({
           colorTex = color;
           if (height) {
             heightTex = height;
-          } else if (heightWords) {
-            heightTex = heightWordsTexture(heightWords, renderer);
+          } else if (grid) {
+            heightTex = heightWordsTexture(grid, renderer);
           } else {
             throw new Error("no relief to displace the terrain with");
           }
@@ -1019,6 +1028,7 @@ uniform vec2 wPlane;`,
     [
       srcs,
       heightWords,
+      pathWords,
       heightRange?.min,
       heightRange?.max,
       detailSrc,
