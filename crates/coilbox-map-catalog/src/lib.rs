@@ -23,6 +23,10 @@
 //! in the hub repository, which carries the reasoning this crate only records the
 //! outcome of.
 
+mod entry;
+
+pub use entry::{AppearanceValue, MapCatalogEntry, MapPoint, MapPoints};
+
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
