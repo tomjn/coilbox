@@ -229,15 +229,55 @@ pub(crate) fn entry_in_session(
                 .into_iter()
                 .map(|(x, z)| MapPoint::at(x, z))
                 .collect(),
-            // Metal spots are issue #1734 and geothermal vents are #1733. An
-            // empty list here says "this extraction did not read them" rather
-            // than "this map has none", which is why both issues bump the
-            // catalog version when they land: the hub then takes the fuller
-            // entry as an improvement rather than as a conflict.
+            // Metal spots are issue #1734. An empty list here says "this
+            // extraction did not read them" rather than "this map has none",
+            // which is why that issue bumps the catalog version when it lands:
+            // the hub then takes the fuller entry as an improvement rather than
+            // as a conflict.
             metal: Vec::new(),
-            geo: Vec::new(),
+            geo: geo_vents(us, &archive_file, map_index),
         },
     })
+}
+
+/// The map's geothermal vents, as points the hub stores under `geo`.
+///
+/// Read out of the map file's own feature block rather than from unitsync, which
+/// exposes nothing about features. Which of a map's features is a vent is the
+/// engine's rule and not a guess: `CFeatureDefHandler::LoadFeatureDefsFromMap`
+/// gives a default geothermal def to any map feature type whose name contains
+/// `geovent`. See [`crate::smf::is_geovent`].
+///
+/// The type name travels on the point as `feature`, which is what the catalog's
+/// `geo` kind carries, so a map naming its vents something unusual can still be
+/// read back and understood rather than being reduced to a coordinate.
+///
+/// An empty list is the ordinary answer: half of this library's maps place no
+/// features at all. A map file that will not read gives an empty list too, since
+/// a fact that could not be read is not a fact about the map, and the rest of the
+/// entry is still worth having.
+fn geo_vents(us: &Unitsync, archive_file: &str, map_index: i32) -> Vec<MapPoint> {
+    let Some(smf_name) = us.map_file_name(map_index) else {
+        return Vec::new();
+    };
+    let Some(bytes) =
+        crate::archive::read_archive_member(us, archive_file, &smf_name, crate::smf::MAX_SMF_BYTES)
+    else {
+        return Vec::new();
+    };
+    let Ok(features) = crate::smf::features(&bytes) else {
+        return Vec::new();
+    };
+    features
+        .into_iter()
+        .filter(|feature| crate::smf::is_geovent(&feature.kind))
+        .map(|feature| MapPoint {
+            x: feature.x,
+            z: feature.z,
+            y: Some(feature.y),
+            meta: BTreeMap::from([("feature".to_string(), serde_json::json!(feature.kind))]),
+        })
+        .collect()
 }
 
 /// A field the archive filled in, or `None` for one it left blank.

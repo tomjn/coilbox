@@ -33,6 +33,7 @@ mod model;
 mod renderkey;
 mod seed;
 mod skirmishai;
+mod smf;
 mod texture;
 mod typemap;
 mod unitmodel;

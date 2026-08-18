@@ -228,9 +228,13 @@ mod tests {
     // here first. Every expected value is written out by hand, so changing the
     // JSON and changing the test stay two separate decisions.
 
+    /// Version 2 reads a map's geothermal vents out of its feature block, which
+    /// version 1 did not (issue #1733). The bump is what makes the hub take a
+    /// re-read of an archive it already holds as an improvement rather than
+    /// refusing it as a conflict.
     #[test]
-    fn starts_the_catalog_at_version_one() {
-        assert_eq!(catalog_version(), 1);
+    fn names_the_extraction_that_produced_an_entry() {
+        assert_eq!(catalog_version(), 2);
     }
 
     /// The expected value comes from `shasum -a 256 shared/map-catalog.json`, a
@@ -244,7 +248,7 @@ mod tests {
     fn digests_the_shared_document_as_an_outside_tool_does() {
         assert_eq!(
             catalog_digest(),
-            "sha256:b9cda2c02590d03ec9df99d45ba58bb9302eb476c01c73c1b066cb9b1087b172"
+            "sha256:6fecb01361f857e828b00f267c8c3291d209445ceda41fe0747a9100773f3c7c"
         );
     }
 
@@ -276,7 +280,7 @@ mod tests {
     /// cannot agree by accident.
     #[test]
     fn a_changed_document_is_a_changed_digest() {
-        let edited = CATALOG_JSON.replace("\"catalogVersion\": 1", "\"catalogVersion\": 2");
+        let edited = CATALOG_JSON.replace("\"catalogVersion\": 2", "\"catalogVersion\": 3");
         assert_ne!(edited, CATALOG_JSON, "the replacement matched nothing");
         let edited_digest = format!("sha256:{:x}", Sha256::digest(edited.as_bytes()));
         assert_ne!(catalog_digest(), edited_digest);

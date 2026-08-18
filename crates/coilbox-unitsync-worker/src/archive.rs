@@ -328,6 +328,30 @@ fn is_lua_ident(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
+/// Read one member out of an archive file, by a name matched the way the VFS
+/// matches it.
+///
+/// `archive_file` is a path [`map_archive_file`] resolved, and `member` is the
+/// name something else reported, which may differ in case from the name the
+/// archive's own directory holds (issue #1732). `None` when the archive will not
+/// open, the member is not in it, or the read fails.
+pub(crate) fn read_archive_member(
+    us: &Unitsync,
+    archive_file: &str,
+    member: &str,
+    cap: usize,
+) -> Option<Vec<u8>> {
+    let handle = us.open_archive(archive_file)?;
+    let found = us
+        .list_archive_files(handle)
+        .into_iter()
+        .find(|(path, _)| same_member(path, member))
+        .map(|(path, _)| path);
+    let read = found.and_then(|path| us.read_archive_member(handle, &path, cap));
+    us.close_archive(handle);
+    read.map(|(_, bytes)| bytes)
+}
+
 /// Resolve an archive's scan-reported `name` to a path `OpenArchive` accepts.
 ///
 /// `OpenArchive` takes a VFS path/filename, not a name — and `GetArchivePath`
