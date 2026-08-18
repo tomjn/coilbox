@@ -33,6 +33,11 @@ const HEADER_JPEG_QUALITY: u8 = 90;
 /// re-resolved rather than served from an outdated cache. Version 3 switched the
 /// hit file from base64 text to the raw JPEG the asset protocol serves.
 const HEADER_CACHE_VERSION: u32 = 3;
+/// How much of a candidate archive's `mapinfo.lua` is read when two archives
+/// hold one `.smf` and only the declared name tells them apart. The map's own
+/// `name` is at the top of the file, so this reaches it on any real map while
+/// refusing to pull a whole generated file into memory.
+const MAPINFO_CAP: usize = 64 * 1024;
 
 /// List every member of `archive` as `(path, size)`, plus its on-disk path.
 pub fn tree(lib: &str, archive_name: &str) -> ArchiveTreeOutput {
@@ -132,6 +137,145 @@ pub(crate) fn archive_name_for_map(us: &Unitsync, map_name: &str) -> String {
         .unwrap_or_else(|| map_name.to_string())
 }
 
+/// The absolute path of the archive file holding `map_name`, for a caller that
+/// needs the bytes rather than a handle: the catalog's `source_hash` is over
+/// them and its `archive_filename` is the file's own name (issue #1732).
+///
+/// `None` for a map whose archive is not a file under `maps/`, and for one this
+/// cannot pick an archive for with certainty. A map installed through the rapid
+/// pool or unpacked as a directory has no file to hash, and a wrong answer would
+/// put another archive's hash on a public row, so neither produces an entry.
+///
+/// This does not go through [`resolve_open_path`], which stops at the first
+/// archive holding the map's `.smf` and is right to: an archive browser showing
+/// the wrong one of two lookalike archives is a display fault, and a catalog
+/// entry claiming the wrong one is a false fact about somebody's install.
+pub(crate) fn map_archive_file(us: &Unitsync, map_index: i32, map_name: &str) -> Option<String> {
+    let smf = us.map_file_name(map_index)?;
+    let candidates = archives_holding(us, &smf);
+    let chosen = match candidates.len() {
+        0 => return None,
+        1 => candidates.into_iter().next()?,
+        _ => the_one_that_says_it_is_this_map(us, &candidates, map_name)?,
+    };
+    absolute_archive_path(us, &chosen).filter(|p| Path::new(p).is_file())
+}
+
+/// Every archive under `maps/` holding a member with this name.
+fn archives_holding(us: &Unitsync, member: &str) -> Vec<String> {
+    us.list_vfs_dir("maps", "*", "r")
+        .into_iter()
+        .filter(|c| is_archive_file(c))
+        .filter(|cand| match us.open_archive(cand) {
+            Some(h) => {
+                let hit = us
+                    .list_archive_files(h)
+                    .iter()
+                    .any(|(p, _)| same_member(p, member));
+                us.close_archive(h);
+                hit
+            }
+            None => false,
+        })
+        .collect()
+}
+
+/// Which of several archives holding one `.smf` is the archive for this map.
+///
+/// A map made from another map keeps its parent's `.smf` file name, so the file
+/// name is not the signature it looks like: this library has `fullmetal.smf` in
+/// both Full Metal Plate 1.7 and Houses of Tripolis 1.3, and picking the first
+/// hit gave one of them the other's bytes.
+///
+/// So the tie is broken on what each archive says it is. A map's canonical name
+/// is its `mapinfo.lua` `name` and `version` joined, which is what
+/// `GetNameVersioned` returns and therefore what `GetMapName` answered with, so
+/// the archive whose declared name opens the canonical name is this map's.
+///
+/// `None` when no candidate says so, or when more than one does. Both mean the
+/// archive cannot be named with certainty, and the caller wants no answer rather
+/// than a plausible one.
+fn the_one_that_says_it_is_this_map(
+    us: &Unitsync,
+    candidates: &[String],
+    map_name: &str,
+) -> Option<String> {
+    let mut matched: Vec<&String> = Vec::new();
+    for candidate in candidates {
+        let Some(handle) = us.open_archive(candidate) else {
+            continue;
+        };
+        let mapinfo = us
+            .list_archive_files(handle)
+            .into_iter()
+            .find(|(p, _)| same_member(p, "mapinfo.lua"))
+            .and_then(|(p, _)| us.read_archive_member(handle, &p, MAPINFO_CAP))
+            .map(|(_, bytes)| String::from_utf8_lossy(&bytes).into_owned());
+        us.close_archive(handle);
+
+        if let Some(declared) = mapinfo.as_deref().and_then(declared_map_name) {
+            if map_name
+                .to_lowercase()
+                .starts_with(&declared.to_lowercase())
+            {
+                matched.push(candidate);
+            }
+        }
+    }
+    match matched.as_slice() {
+        [only] => Some((*only).clone()),
+        _ => None,
+    }
+}
+
+/// The map's own `name` out of a `mapinfo.lua`, read as a literal.
+///
+/// The first whole-word `name =` wins, which is the map's: the per terrain type
+/// `name` entries come after it, by the convention
+/// `tauri-plugin-coilbox-mapconv`'s own scanner relies on. A computed name is not
+/// read at all, and a map with one is left for the caller to give up on rather
+/// than guessed at.
+fn declared_map_name(mapinfo: &str) -> Option<String> {
+    let bytes = mapinfo.as_bytes();
+    for at in 0..bytes.len().saturating_sub(4) {
+        if !bytes[at..at + 4].eq_ignore_ascii_case(b"name") {
+            continue;
+        }
+        if at > 0 && is_lua_ident(bytes[at - 1]) {
+            continue;
+        }
+        let mut i = at + 4;
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= bytes.len() || bytes[i] != b'=' {
+            continue;
+        }
+        i += 1;
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        let Some(&quote) = bytes.get(i) else { continue };
+        if quote != b'"' && quote != b'\'' {
+            continue;
+        }
+        // The quotes are ASCII, so both offsets are character boundaries and the
+        // slice holds whatever the map wrote between them.
+        let Some(close) = bytes[i + 1..].iter().position(|&b| b == quote) else {
+            continue;
+        };
+        let name = mapinfo[i + 1..i + 1 + close].trim();
+        if !name.is_empty() {
+            return Some(name.to_string());
+        }
+    }
+    None
+}
+
+fn is_lua_ident(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
+}
+
 /// Resolve an archive's scan-reported `name` to a path `OpenArchive` accepts.
 ///
 /// `OpenArchive` takes a VFS path/filename, not a name — and `GetArchivePath`
@@ -143,6 +287,14 @@ pub(crate) fn archive_name_for_map(us: &Unitsync, map_name: &str) -> String {
 /// backing archive among the raw map archives — the only unitsync-API route from
 /// a versioned name to an openable file. (Display-name *dependencies* that are
 /// neither a map nor a filename, e.g. "Map Helper v1", stay unresolved.)
+///
+/// The `.smf` match is case-insensitive, because the two sides disagree and both
+/// are right. `GetMapFileName` answers with the path the engine's map index
+/// recorded and an archive lists the name its own directory holds, so Great
+/// Divide V1 is `maps/Great_divide.smf` to one and `maps/Great_Divide.smf` to
+/// the other. Spring's VFS matches paths case-insensitively itself, so an exact
+/// comparison here was stricter than the thing it stands in for, and three of
+/// this machine's 103 maps resolved to nothing because of it.
 pub(crate) fn resolve_open_path(us: &Unitsync, name: &str) -> Option<String> {
     if let Some(dir) = us.archive_path(name) {
         return Some(Path::new(&dir).join(name).to_string_lossy().into_owned());
@@ -155,12 +307,21 @@ pub(crate) fn resolve_open_path(us: &Unitsync, name: &str) -> Option<String> {
         .filter(|c| is_archive_file(c))
         .find(|cand| match us.open_archive(cand) {
             Some(h) => {
-                let hit = us.list_archive_files(h).iter().any(|(p, _)| *p == smf);
+                let hit = us
+                    .list_archive_files(h)
+                    .iter()
+                    .any(|(p, _)| same_member(p, &smf));
                 us.close_archive(h);
                 hit
             }
             None => false,
         })
+}
+
+/// Whether two VFS paths name the same archive member, which Spring's own VFS
+/// decides case-insensitively.
+fn same_member(a: &str, b: &str) -> bool {
+    a.eq_ignore_ascii_case(b)
 }
 
 /// Whether a VFS path looks like a map/game archive we can open (skips stray
@@ -964,5 +1125,73 @@ mod tests {
     fn raw_data_url_builds_a_valid_base64_data_uri() {
         let url = raw_data_url("audio/ogg", b"hello");
         assert_eq!(url, "data:audio/ogg;base64,aGVsbG8=");
+    }
+
+    /// The three real pairs from this machine's library, where unitsync's map
+    /// index and the archive's own directory spell one file two ways. Matching
+    /// them exactly left those maps with no resolvable archive at all.
+    #[test]
+    fn a_member_is_the_same_member_whatever_its_case() {
+        for (indexed, listed) in [
+            ("maps/Great_divide.smf", "maps/Great_Divide.smf"),
+            (
+                "maps/Industrial_Revolution_V2.smf",
+                "maps/Industrial_Revolution_v2.smf",
+            ),
+            ("maps/Raptor_Crater_V2.smf", "maps/Raptor_Crater_v2.smf"),
+        ] {
+            assert!(same_member(indexed, listed), "{indexed} vs {listed}");
+        }
+        assert!(!same_member(
+            "maps/Great_Divide.smf",
+            "maps/Small_Divide.smf"
+        ));
+    }
+
+    /// The map's own name, which is the first `name =` in the file. The terrain
+    /// types below it have names too, and reading one of those would name the
+    /// wrong archive rather than none.
+    #[test]
+    fn the_declared_name_is_the_maps_own_and_not_a_terrain_types() {
+        let mapinfo = r#"
+            local mapinfo = {
+              name = "Houses of Tripolis",
+              shortname = "HoT",
+              description = "A city map",
+              version = "1.3",
+              terrainTypes = {
+                [0] = { name = "Default", hardness = 1 },
+                [1] = { name = "Road", hardness = 4 },
+              },
+            }
+            return mapinfo
+        "#;
+        assert_eq!(
+            declared_map_name(mapinfo).as_deref(),
+            Some("Houses of Tripolis")
+        );
+    }
+
+    /// The two spellings a map may use, and the whole-word rule that keeps
+    /// `shortname` and `filename` out of it.
+    #[test]
+    fn a_name_is_read_however_the_map_wrote_it() {
+        assert_eq!(declared_map_name("Name='Isis'").as_deref(), Some("Isis"));
+        assert_eq!(
+            declared_map_name("shortname = \"ISIS\"\nname = \"Isis\"").as_deref(),
+            Some("Isis")
+        );
+        assert_eq!(declared_map_name("name = mapName .. version"), None);
+        assert_eq!(declared_map_name("-- no name here"), None);
+        assert_eq!(declared_map_name("name = \"\"").as_deref(), None);
+    }
+
+    /// What the tie break then does with it: a declared name opens the canonical
+    /// name, so Full Metal Plate's archive cannot claim Houses of Tripolis.
+    #[test]
+    fn a_declared_name_opens_the_canonical_name_of_its_own_map_only() {
+        let canonical = "Houses of Tripolis 1.3".to_lowercase();
+        assert!(canonical.starts_with(&"Houses of Tripolis".to_lowercase()));
+        assert!(!canonical.starts_with(&"Full Metal Plate".to_lowercase()));
     }
 }

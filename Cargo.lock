@@ -726,6 +726,7 @@ dependencies = [
  "base64 0.22.1",
  "coilbox-3do",
  "coilbox-assets",
+ "coilbox-map-catalog",
  "coilbox-s3o",
  "coilbox-thumb-cache",
  "ddsfile",
