@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the downloads plugin's commands (version, rapid browsing, springfiles/BAR listing, downloads)."
+description = "Allows the downloads plugin's commands (version, rapid browsing, springfiles listing, downloads)."
 permissions = [
   "allow-dl-version",
   "allow-dl-cancel",
@@ -10,7 +10,6 @@ permissions = [
   "allow-dl-download",
   "allow-dl-springfiles-list",
   "allow-dl-springfiles-engines",
-  "allow-dl-bar-maps",
   "allow-dl-hakora-maps",
   "allow-dl-download-map",
   "allow-dl-download-file",
