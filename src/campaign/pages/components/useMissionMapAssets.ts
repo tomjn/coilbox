@@ -85,6 +85,11 @@ export function useMissionMapAssets(
 
   const heightUrl = heightmap.url ?? undefined;
   const textureUrl = minimap.url ?? undefined;
+  // Whether the raw heights were asked for and have settled one way or the
+  // other, so an absent grid can be told from a read still in flight.
+  const wordsSettled =
+    !exactHeights ||
+    (!heightField.loading && !!heightField.data && heights.read);
   // The heightmap alone is enough for a wireframe relief; a textured render also
   // needs the minimap diffuse.
   const width = heightmap.data?.width;
@@ -93,7 +98,18 @@ export function useMissionMapAssets(
   return {
     enginePath,
     dataDir,
-    heightSrc: heightUrl,
+    /**
+     * The height picture, for a surface that draws terrain rather than
+     * measuring it.
+     *
+     * Withheld from a caller that asked for the map's own words until that read
+     * has settled, and then only offered if it came back with nothing. Handing
+     * over both would build the whole scene from the picture and tear it down
+     * again when the words landed, and that rebuild costs a second reflection
+     * capture and a re-read of every model on the map.
+     */
+    heightSrc:
+      exactHeights && (!wordsSettled || !!heights.grid) ? undefined : heightUrl,
     /** What the height picture's black and white stand for, which is not the
      *  map's own pair: it is rescaled into the window its samples occupy
      *  (issue #1730). */
@@ -103,9 +119,7 @@ export function useMissionMapAssets(
     heightWords: heights.grid,
     /** Whether the raw heights were asked for and have settled one way or the
      *  other, so an absent grid can be told from a read still in flight. */
-    heightFieldRead:
-      !exactHeights ||
-      (!heightField.loading && !!heightField.data && heights.read),
+    heightFieldRead: wordsSettled,
     textureSrc: textureUrl,
     appearance: minimap.appearance,
     /** The map's own team start positions, in elmos from its north-west corner,
