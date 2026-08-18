@@ -1,0 +1,144 @@
+{
+  "catalogVersion": 1,
+  "facts": {
+    "map_name": {
+      "type": "string",
+      "unit": null,
+      "required": true
+    },
+    "display_name": {
+      "type": "string",
+      "unit": null,
+      "required": false
+    },
+    "description": {
+      "type": "string",
+      "unit": null,
+      "required": false
+    },
+    "map_version": {
+      "type": "string",
+      "unit": null,
+      "required": false
+    },
+    "author": {
+      "type": "string",
+      "unit": null,
+      "required": false
+    },
+    "archive_filename": {
+      "type": "string",
+      "unit": null,
+      "required": false
+    },
+    "source_archive": {
+      "type": "string",
+      "unit": null,
+      "required": true
+    },
+    "source_hash": {
+      "type": "string",
+      "unit": null,
+      "required": true
+    },
+    "catalog_version": {
+      "type": "integer",
+      "unit": null,
+      "required": true
+    },
+    "width_elmos": {
+      "type": "integer",
+      "unit": "elmos",
+      "required": true
+    },
+    "height_elmos": {
+      "type": "integer",
+      "unit": "elmos",
+      "required": true
+    },
+    "world_height_min": {
+      "type": "number",
+      "unit": "elmos",
+      "required": true
+    },
+    "world_height_max": {
+      "type": "number",
+      "unit": "elmos",
+      "required": true
+    },
+    "min_wind": {
+      "type": "number",
+      "unit": "strength",
+      "required": false
+    },
+    "max_wind": {
+      "type": "number",
+      "unit": "strength",
+      "required": false
+    },
+    "tidal_strength": {
+      "type": "number",
+      "unit": "strength",
+      "required": false
+    },
+    "void_water": {
+      "type": "boolean",
+      "unit": null,
+      "required": false
+    },
+    "void_ground": {
+      "type": "boolean",
+      "unit": null,
+      "required": false
+    },
+    "water_coverage": {
+      "type": "number",
+      "unit": "share",
+      "required": false
+    },
+    "appearance": {
+      "type": "object",
+      "unit": null,
+      "required": false
+    }
+  },
+  "pointKinds": {
+    "start": {
+      "meta": {}
+    },
+    "metal": {
+      "meta": {
+        "amount": {
+          "type": "number",
+          "unit": "metal per second",
+          "required": true
+        },
+        "radius": {
+          "type": "number",
+          "unit": "elmos",
+          "required": true
+        }
+      }
+    },
+    "geo": {
+      "meta": {
+        "feature": {
+          "type": "string",
+          "unit": null,
+          "required": true
+        }
+      }
+    }
+  },
+  "metalClustering": {
+    "minDensityShare": 0.02,
+    "minSeparationElmos": 96,
+    "minSpotMetal": 0.5
+  },
+  "caps": {
+    "haveKeys": 500,
+    "submitMaps": 50,
+    "submitBytes": 1048576,
+    "lookupNames": 500
+  }
+}

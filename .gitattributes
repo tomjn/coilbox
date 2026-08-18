@@ -3,3 +3,7 @@
 # bytes into CRLF would hash differently and report every build out of date, so
 # the line endings are part of the file's meaning rather than a local preference.
 shared/asset-vocabulary.json text eol=lf
+
+# The map catalog is digested and vendored the same way, and for the same reason
+# (issue #1735).
+shared/map-catalog.json text eol=lf

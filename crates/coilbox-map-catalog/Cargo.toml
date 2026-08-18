@@ -1,0 +1,14 @@
+[package]
+name = "coilbox-map-catalog"
+version = "0.0.0"
+description = "The catalog version, the fact field list with units, the metal clustering parameters and the request caps coilbox and the hub have to agree on, read from the same shared/map-catalog.json the hub vendors."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# The digest of the embedded document, so a client whose copy has drifted from
+# the hub's finds out rather than looking like it is reporting different facts
+# (issue #1735). The same version coilbox-assets digests its own document with.
+sha2 = "0.10"
