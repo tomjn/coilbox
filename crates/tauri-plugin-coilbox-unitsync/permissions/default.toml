@@ -18,6 +18,7 @@ permissions = [
   "allow-unitsync-unit-models",
   "allow-unitsync-unit-render",
   "allow-unitsync-unit-render-keys",
+  "allow-unitsync-map-catalog",
   "allow-unitsync-map-info",
   "allow-unitsync-map-skybox",
   "allow-unitsync-skirmish-ais",

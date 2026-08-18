@@ -18,6 +18,7 @@ const COMMANDS: &[&str] = &[
     "unitsync_unit_models",
     "unitsync_unit_render",
     "unitsync_unit_render_keys",
+    "unitsync_map_catalog",
     "unitsync_map_info",
     "unitsync_map_skybox",
     "unitsync_skirmish_ais",
