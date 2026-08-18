@@ -79,7 +79,7 @@ const ANSWER_LIMIT: usize = 64 * 1024;
 /// exhausts these ends, so a hub answering 503 to everything costs three requests
 /// rather than three hundred. That second bound is the point: an unbounded retry
 /// on a persistent 5xx is a worse bug than the one this file is fixing.
-const UPLOAD_ATTEMPTS: u32 = 3;
+pub(crate) const UPLOAD_ATTEMPTS: u32 = 3;
 
 /// How long to wait before the second attempt, doubled before the third.
 ///
@@ -87,7 +87,7 @@ const UPLOAD_ATTEMPTS: u32 = 3;
 /// silence: a cold start is already covered by [`UPLOAD_TIMEOUT`], and a 502 or a
 /// quota read that failed comes back straight away. So the whole of a picture's
 /// retry budget is a second and a half.
-const RETRY_BACKOFF: Duration = Duration::from_millis(500);
+pub(crate) const RETRY_BACKOFF: Duration = Duration::from_millis(500);
 
 /// How many pictures in a row may be refused with the same status before the run
 /// stops asking.
@@ -339,7 +339,7 @@ pub fn has_terminal_refusal(outcomes: &[AssetOutcome]) -> bool {
         .any(|outcome| outcome.verdict == Some(Verdict::Terminal))
 }
 
-fn verdict_for(status: u16) -> Verdict {
+pub(crate) fn verdict_for(status: u16) -> Verdict {
     match status {
         401 | 429 => Verdict::Blocked,
         500..=599 => Verdict::Transient,
