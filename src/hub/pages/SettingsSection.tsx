@@ -11,6 +11,7 @@ import {
 import { AccountControl } from "./components/AccountControl";
 import { AssetUploadControl } from "./components/AssetUploadControl";
 import { Field } from "./components/Field";
+import { MapCatalogControl } from "./components/MapCatalogControl";
 
 /**
  * The hub plugin's settings section (`/settings/hub`, issue #1353): lets a player
@@ -42,6 +43,12 @@ import { Field } from "./components/Field";
  * last, because it is the one thing here that takes something off this machine
  * and publishes it. It sits under the account control on purpose: it is only
  * meaningful once you know whose name the uploads would carry.
+ *
+ * Sending what the maps say (issue #1737) rides the same agreement rather than a
+ * second switch, and appears only once it has been given. It is a button rather
+ * than something that happens on its own, because a sweep reads every map
+ * archive on the machine and nothing about opening this page says that is wanted
+ * now.
  */
 export default function HubSettings() {
   const [userUrl, setUserUrl] = useHubUrlSetting();
@@ -108,6 +115,9 @@ export default function HubSettings() {
         onChange={setUploadsAgreed}
         offered={isHubAssetUploadOffered()}
       />
+      {isHubAssetUploadOffered() && (
+        <MapCatalogControl hubUrl={effective} agreed={uploadsAgreed} />
+      )}
     </div>
   );
 }
