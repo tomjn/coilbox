@@ -1,7 +1,8 @@
 //! Coilbox hub account (Rust half).
 //!
-//! Seven commands: three about who is signed in to the hub, one that publishes as
-//! them, and three about sending pictures made from local archives. None of them
+//! Nine commands: three about who is signed in to the hub, one that publishes as
+//! them, three about sending pictures made from local archives, and two about
+//! sending what coilbox read out of a map ([`maps`], issue #1736). None of them
 //! hands a token out. Registered as `"coilbox-hub"`, so the frontend invokes
 //! `plugin:coilbox-hub|<cmd>`. The flow they sit on is [`auth`], and the request
 //! that uses its token is [`publish`].
@@ -24,6 +25,7 @@ pub mod auth;
 pub mod consent;
 mod endpoint;
 pub mod have;
+pub mod maps;
 pub mod publish;
 #[cfg(test)]
 mod testing;
@@ -265,6 +267,58 @@ async fn hub_upload_assets<R: Runtime>(
     }
 }
 
+/// `hub_maps_have`: ask the hub which maps' facts it still wants.
+///
+/// The first call the catalog path makes, and the reason a library of three
+/// thousand maps costs six requests rather than three thousand writes. Answers
+/// come back in the order the keys were given, and a batch the hub does not
+/// answer in that order is refused rather than lined up wrongly.
+///
+/// Behind the same consent gate the pictures use. This spends the hub's request
+/// allowance as the signed-in account, and what it is asking about is what
+/// coilbox read off local archives, which is the thing the switch is about.
+#[tauri::command]
+async fn hub_maps_have<R: Runtime>(
+    app: AppHandle<R>,
+    hub_url: String,
+    keys: Vec<maps::MapHaveKey>,
+) -> CliResult {
+    let consent = match consent::AssetUploadConsent::check(&app) {
+        Ok(consent) => consent,
+        Err(refused) => return CliResult::err(refused),
+    };
+    match maps::have_maps(&hub_url, &keys, &consent).await {
+        Ok(results) => CliResult::ok(json!({ "results": results })),
+        Err(said) => CliResult::err(said),
+    }
+}
+
+/// `hub_publish_maps`: send what coilbox read out of these maps to the hub.
+///
+/// One outcome per entry, in the order they were given. The outcomes are inside
+/// a 200 rather than in the status, because a batch carries fifty maps and one
+/// the hub will not take says nothing about the other forty nine, so a caller
+/// reads every result rather than the status code.
+///
+/// Only `conflict` and `refused` are worth surfacing, and only as a count. A
+/// conflict is the interesting one: it means an archive on this machine differs
+/// from the one everybody else has under that name.
+#[tauri::command]
+async fn hub_publish_maps<R: Runtime>(
+    app: AppHandle<R>,
+    hub_url: String,
+    entries: Vec<coilbox_map_catalog::MapCatalogEntry>,
+) -> CliResult {
+    let consent = match consent::AssetUploadConsent::check(&app) {
+        Ok(consent) => consent,
+        Err(refused) => return CliResult::err(refused),
+    };
+    match maps::publish_maps(&hub_url, &entries, &consent).await {
+        Ok(results) => CliResult::ok(json!({ "results": results })),
+        Err(said) => CliResult::err(said),
+    }
+}
+
 /// `hub_upload_cancel`: stop a running upload by its `op_id`. The run drops the
 /// request it has in flight and leaves the rest untried. A no-op for an unknown or
 /// finished id.
@@ -286,7 +340,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             hub_publish,
             hub_assets_have,
             hub_upload_assets,
-            hub_upload_cancel
+            hub_upload_cancel,
+            hub_maps_have,
+            hub_publish_maps
         ])
         .build()
 }

@@ -10,6 +10,8 @@ const COMMANDS: &[&str] = &[
     "hub_assets_have",
     "hub_upload_assets",
     "hub_upload_cancel",
+    "hub_maps_have",
+    "hub_publish_maps",
 ];
 
 fn main() {
