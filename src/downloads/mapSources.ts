@@ -6,13 +6,9 @@
  * counterpart to `gameSources.ts`, kept pure so it can be unit-tested without
  * touching Tauri. `downloadMapAnySource` (in `downloadMap.ts`) consumes it.
  *
- * Tradeoff worth naming: pr-downloader's map search already reaches a BAR mirror
- * through the sidecar (the `BAR_SEARCH_URL` search override hits BAR's files-cdn),
- * so for a common BAR map, putting the springfiles/hakora catalog fetches ahead of
- * it adds two lookups that usually miss before falling through to the search that
- * would have worked immediately. This ordering accepts that cost for policy
- * consistency with games (mirrors first, rapid last, always) rather than special-
- * casing BAR maps to keep rapid first.
+ * Every source here is springfiles-backed, directly or through pr-downloader's
+ * own default search. Beyond All Reason's `files-cdn` search used to sit at the
+ * end of the rapid step and is gone. `downloadMap.ts` carries why.
  */
 
 export type MapSource = "springfiles" | "hakora" | "rapid";
@@ -23,9 +19,8 @@ export type MapSource = "springfiles" | "hakora" | "rapid";
  * - `springfiles`: the springfiles catalog mirror (direct download). Needs a
  *   write root.
  * - `hakora`: the hakora.xyz maps mirror (direct download). Needs a write root.
- * - `rapid`: pr-downloader, tried with both the default (springfiles) search and
- *   the BAR files-cdn search. Always the final fallback, and the only step that
- *   works without a write root.
+ * - `rapid`: pr-downloader on its default (springfiles) search. Always the final
+ *   fallback, and the only step that works without a write root.
  */
 export function mapSourceOrder(opts: { hasWritePath: boolean }): MapSource[] {
   const order: MapSource[] = [];

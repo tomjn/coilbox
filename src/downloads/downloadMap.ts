@@ -9,9 +9,6 @@ import {
 import { withDownloadNotify } from "./downloadNotify";
 import { type MapSource, mapSourceOrder } from "./mapSources";
 
-/** BAR's map search endpoint for pr-downloader (`PRD_HTTP_SEARCH_URL`). */
-const BAR_SEARCH_URL = "https://files-cdn.beyondallreason.dev/find";
-
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** Loose key for matching a catalog entry to a battle's map name. */
@@ -29,12 +26,18 @@ const norm = (s: string) =>
  *
  * 1. springfiles catalog mirror. Match by springname/name, fetch the first mirror.
  * 2. the hakora.xyz mirror. Match by filename, since it carries no springname.
- * 3. rapid via pr-downloader, tried with both the default (springfiles) search and
- *    the BAR files-cdn search. BAR-only maps aren't on springfiles, so both are
- *    attempted before giving up.
+ * 3. rapid via pr-downloader, on its own default search, which is springfiles.
  *
  * Steps 1-2 need a write root. Without one only rapid is attempted. Throws with
  * every attempted source's error when all fail.
+ *
+ * There was a fourth step: retrying rapid against Beyond All Reason's
+ * `files-cdn` search. It is gone, and deliberately not replaced. That endpoint
+ * resolves a springname by fetching the archive and storing a copy, so asking it
+ * for a map BAR does not have makes BAR host somebody else's map at their own
+ * cost. This step asked it for every map the mirrors above had missed, whatever
+ * game it belonged to. The price of removing it is that BAR-exclusive maps
+ * carried by no other mirror can no longer be downloaded here at all.
  */
 async function downloadMapAnySourceImpl(opts: {
   mapName: string;
@@ -80,22 +83,18 @@ async function downloadMapAnySourceImpl(opts: {
         });
         return "hakora";
       }
-      // rapid: try both search URLs before giving up on this step.
       case "rapid": {
-        for (const searchUrl of [undefined, BAR_SEARCH_URL]) {
-          const label = searchUrl ? "BAR" : "springfiles (pr-downloader)";
-          try {
-            await dlDownloadMapRaw({
-              springName: mapName,
-              searchUrl,
-              writePath,
-              opId,
-              onProgress,
-            });
-            return label;
-          } catch (e) {
-            errors.push(`${label}: ${msg(e)}`);
-          }
+        const label = "springfiles (pr-downloader)";
+        try {
+          await dlDownloadMapRaw({
+            springName: mapName,
+            writePath,
+            opId,
+            onProgress,
+          });
+          return label;
+        } catch (e) {
+          errors.push(`${label}: ${msg(e)}`);
         }
         return null;
       }

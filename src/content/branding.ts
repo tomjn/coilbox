@@ -6,7 +6,6 @@ import { contentBrandingUrl } from "../lib/assetUrl";
 import { fetchAsDataUrl } from "../lib/dataUrl";
 import type { GameAiConfig } from "../play/gameAi";
 import type { GameItem, MapItem } from "./bindings";
-import { withMapSource } from "./mapSource";
 
 /**
  * Branding catalog: GitHub-hosted JSON mapping a game identity to branding assets
@@ -271,11 +270,8 @@ function loadCatalog(): Promise<LoadedCatalog> {
         return {
           entries: compile(parsed.entries ?? []),
           games: parsed.suggested?.games ?? [],
-          maps: (parsed.suggested?.maps ?? []).map(withMapSource),
-          mapLists: (parsed.suggested?.mapLists ?? []).map((l) => ({
-            ...l,
-            maps: l.maps.map(withMapSource),
-          })),
+          maps: parsed.suggested?.maps ?? [],
+          mapLists: parsed.suggested?.mapLists ?? [],
           githubGameRepos: parsed.githubGameRepos ?? [],
           excludedMaps: parsed.excludedMaps ?? [],
         };
