@@ -1,6 +1,11 @@
 //! HTTP content sources for the Maps/Games browse screens: the springfiles
-//! catalog API and Beyond All Reason's maps-metadata list. Both return JSON we
-//! reshape into lean records for the frontend.
+//! catalog API and the hakora.xyz mirror, reshaped into lean records for the
+//! frontend.
+//!
+//! Beyond All Reason's maps-metadata list was a third source and is gone, as
+//! part of coilbox retiring its use of BAR-hosted content. It listed BAR's whole
+//! catalogue by name and never said where an archive lived, so every row it
+//! offered still had to be fetched from one of the sources here.
 
 use serde::{Deserialize, Serialize};
 
@@ -133,42 +138,6 @@ pub fn engines_for_platform(all: Vec<SpringFile>, category: &str) -> Vec<Springf
     out
 }
 
-/// Preview images for a BAR map; `preview` is a full HTTPS thumbnail URL.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(default)]
-pub struct BarMapImages {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub preview: Option<String>,
-}
-
-/// One BAR map from maps-metadata `lobby_maps.validated.json`. BAR uses camelCase
-/// keys; we deserialize and re-serialize as camelCase for the frontend.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct BarMap {
-    pub spring_name: String,
-    pub display_name: String,
-    pub author: String,
-    pub filename: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub map_width: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub map_height: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub player_count_min: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub player_count_max: Option<u32>,
-    /// Preview thumbnail (full HTTPS URL) when present.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub images: Option<BarMapImages>,
-}
-
-/// The full Beyond All Reason validated maps list.
-pub const BAR_MAPS_URL: &str =
-    "https://maps-metadata.beyondallreason.dev/latest/lobby_maps.validated.json";
-
 /// Build the springfiles catalog list URL for a category (`map`, `game`).
 /// `springname=**` matches every entry; the wildcard category tolerates the
 /// site's `*map*`-style matching. `images=on`+`metadata=1` enrich the rows.
@@ -184,7 +153,7 @@ pub fn springfiles_list_url(category: &str) -> String {
 /// cleanly to a file URL.
 pub const HAKORA_MAPS_URL: &str = "http://hakora.xyz/files/springrts/maps/";
 
-/// One map archive from the hakora autoindex. Unlike springfiles/BAR there's no
+/// One map archive from the hakora autoindex. Unlike springfiles there's no
 /// springname or metadata — just the file, fetched directly via `dl_download_file`.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -623,15 +592,5 @@ mod tests {
         // camelCase for the frontend.
         let out = serde_json::to_string(&archives[0]).unwrap();
         assert!(out.contains("\"url\":\"http://x/2\""));
-    }
-
-    #[test]
-    fn bar_map_camelcase_roundtrip() {
-        let json = r#"[{"springName":"AcidicQuarry 5.17","displayName":"Acidic Quarry","author":"BasiC","filename":"acidicquarry_5.17.sd7","playerCountMax":4}]"#;
-        let v: Vec<BarMap> = serde_json::from_str(json).unwrap();
-        assert_eq!(v[0].spring_name, "AcidicQuarry 5.17");
-        assert_eq!(v[0].player_count_max, Some(4));
-        let out = serde_json::to_string(&v[0]).unwrap();
-        assert!(out.contains("\"springName\":\"AcidicQuarry 5.17\""));
     }
 }

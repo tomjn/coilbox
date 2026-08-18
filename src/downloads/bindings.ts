@@ -89,21 +89,6 @@ export interface SpringFile {
   metadata: { author: string; width: number; height: number };
 }
 
-/** A Beyond All Reason map from the validated maps list. */
-export interface BarMap {
-  springName: string;
-  displayName: string;
-  author: string;
-  filename: string;
-  description?: string;
-  mapWidth?: number;
-  mapHeight?: number;
-  playerCountMin?: number;
-  playerCountMax?: number;
-  /** Preview thumbnail; `images.preview` is a full HTTPS URL. */
-  images?: { preview?: string };
-}
-
 /** Full springfiles catalog for a category (`map` / `game`); filtered client-side. */
 export const dlSpringfilesList = defineCommand<
   { category: string },
@@ -131,12 +116,6 @@ export const dlSpringfilesEngines = defineCommand<
     listsThisPlatform: boolean;
   }
 >("coilbox-downloads", "dl_springfiles_engines");
-
-/** The Beyond All Reason validated maps list (with thumbnails). */
-export const dlBarMaps = defineCommand<undefined, { maps: BarMap[] }>(
-  "coilbox-downloads",
-  "dl_bar_maps",
-);
 
 /**
  * A map archive from the hakora.xyz mirror (Apache autoindex). No springname or
