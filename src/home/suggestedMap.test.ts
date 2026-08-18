@@ -278,7 +278,26 @@ describe("the catalog this ships with", () => {
    * settles it. An entry here is one the rotation never reaches, so the list is
    * a statement that we know and it is tracked, not a licence.
    */
-  const NO_THUMBNAIL: Record<string, string> = {};
+  const NO_THUMBNAIL: Record<string, string> = {
+    // Every one of these was pictured by BAR's maps-metadata proxy until
+    // coilbox stopped using BAR-hosted content. #1728 puts the pictures back
+    // from the hub, which holds the minimap rather than a photo of the map.
+    "all-that-glitters": "#1728",
+    "supreme-isthmus": "#1728",
+    "crystallized-plains": "#1728",
+    "altair-crossing": "#1728",
+    fallendell: "#1728",
+    "heartbreak-hill": "#1728",
+    "space-asteroid-mines-v3": "#1728",
+    "space-cloud9-v2": "#1728",
+    "space-faster-than-light": "#1728",
+    "space-houses-of-tripolis": "#1728",
+    "space-oort-cloud-v2": "#1728",
+    "space-project-sd-129": "#1728",
+    "classic-evad-river-confluence": "#1728",
+    "classic-great-divide": "#1728",
+    "classic-painted-desert": "#1728",
+  };
 
   it("has a rotation at all", () => {
     expect(

@@ -46,16 +46,19 @@ beforeEach(() => {
 });
 
 describe("downloadGameAnySource, rapid step", () => {
-  it("asks every configured master, not just the springrts default", async () => {
-    // BAR publishes its own rapid master, and pr-downloader only searches the
-    // one it is given, so stopping at the first master loses every BAR game.
-    dlDownloadRaw
-      .mockRejectedValueOnce(new Error("no source could provide"))
-      .mockResolvedValueOnce({ message: "ok" });
+  it("asks every configured master rather than stopping at the first", async () => {
+    // pr-downloader only ever searches the master it is given, and games are
+    // spread across several, so a walk that gives up after one loses whatever
+    // the others publish. Written against however many masters ship, since the
+    // list has been both one and two entries long.
+    for (let i = 1; i < DEFAULT_RAPID_MASTERS.length; i++) {
+      dlDownloadRaw.mockRejectedValueOnce(new Error("no source could provide"));
+    }
+    dlDownloadRaw.mockResolvedValueOnce({ message: "ok" });
 
     await expect(run()).resolves.toBe("rapid");
 
-    expect(dlDownloadRaw).toHaveBeenCalledTimes(2);
+    expect(dlDownloadRaw).toHaveBeenCalledTimes(DEFAULT_RAPID_MASTERS.length);
     expect(dlDownloadRaw.mock.calls.map((c) => c[0].masterUrl)).toEqual(
       DEFAULT_RAPID_MASTERS.map((r) => r.url),
     );
@@ -70,7 +73,10 @@ describe("downloadGameAnySource, rapid step", () => {
 
   it("reports every master it tried when none has the game", async () => {
     dlDownloadRaw.mockRejectedValue(new Error("no source could provide"));
-    await expect(run()).rejects.toThrow(/Beyond All Reason/);
+    const err = await run().catch((e: Error) => e);
+    for (const master of DEFAULT_RAPID_MASTERS) {
+      expect(String(err)).toContain(master.name);
+    }
     expect(dlDownloadRaw).toHaveBeenCalledTimes(DEFAULT_RAPID_MASTERS.length);
   });
 });

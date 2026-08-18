@@ -537,18 +537,6 @@ async fn dl_springfiles_engines() -> CliResult {
     }
 }
 
-/// `dl_bar_maps` — the Beyond All Reason validated maps list (with thumbnails).
-#[tauri::command]
-async fn dl_bar_maps() -> CliResult {
-    match fetch_text(sources::BAR_MAPS_URL.to_string()).await {
-        Ok(body) => match serde_json::from_str::<Vec<sources::BarMap>>(&body) {
-            Ok(maps) => CliResult::ok(json!({ "maps": maps })),
-            Err(e) => CliResult::err(format!("could not parse BAR maps list: {e}")),
-        },
-        Err(e) => CliResult::err(format!("failed to fetch BAR maps list: {e}")),
-    }
-}
-
 /// `dl_hakora_maps` — the hakora.xyz maps mirror (an Apache autoindex of map
 /// archives, HTTP only). Returns filename + url + size; downloads go through the
 /// direct `dl_download_file` path (no springname, so no sidecar).
@@ -1307,7 +1295,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_download,
             dl_springfiles_list,
             dl_springfiles_engines,
-            dl_bar_maps,
             dl_hakora_maps,
             dl_download_map,
             dl_download_file,

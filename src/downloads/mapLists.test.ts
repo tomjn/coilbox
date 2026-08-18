@@ -22,14 +22,29 @@ const list = (id: string, maps: SuggestedMap[] = []): SuggestedMapList => ({
 });
 
 describe("suggestedMapToInput", () => {
-  it("maps a springname download to a queue 'map' input", () => {
+  it("sends a springname download through the source order rather than pinning one", () => {
     const input = suggestedMapToInput(mapEntry(), "/root");
+    expect(input).toEqual({
+      kind: "mapAnySource",
+      label: "A Map",
+      args: { mapName: "A Map v1", writePath: "/root" },
+    });
+  });
+
+  it("honours an author's explicit search source as the single source it names", () => {
+    const explicit = "https://springfiles.springrts.com/json.php";
+    const input = suggestedMapToInput(
+      mapEntry({
+        download: { kind: "map", springName: "A Map v1", searchUrl: explicit },
+      }),
+      "/root",
+    );
     expect(input).toEqual({
       kind: "map",
       label: "A Map",
       args: {
         springName: "A Map v1",
-        searchUrl: undefined,
+        searchUrl: explicit,
         writePath: "/root",
       },
     });

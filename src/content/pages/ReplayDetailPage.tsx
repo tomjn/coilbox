@@ -21,12 +21,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  type DownloadProgress,
-  dlDownload,
-  dlDownloadMap,
-} from "../../downloads/bindings";
+import { type DownloadProgress, dlDownload } from "../../downloads/bindings";
 import { useWriteRoot, useWriteRootPath } from "../../downloads/config";
+import { downloadMapAnySource } from "../../downloads/downloadMap";
 import {
   formatBytes,
   ProgressBar,
@@ -66,9 +63,6 @@ import { RemixPanel } from "./components/RemixPanel";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
 import { WatchButton } from "./components/WatchButton";
 import { OriginBadge } from "./ReplaysPage";
-
-/** BAR maps live on the files-cdn search endpoint (replays here are BAR-dominant). */
-const BAR_SEARCH_URL = "https://files-cdn.beyondallreason.dev/find";
 
 const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -499,12 +493,11 @@ function MapDownload({
     const onProgress = new Channel<DownloadProgress>();
     onProgress.onmessage = setProgress;
     try {
-      await dlDownloadMap({
-        springName: mapName,
-        searchUrl: BAR_SEARCH_URL,
-        writePath,
-        onProgress,
-      });
+      // Replays here are BAR-dominant, and this used to fetch the map straight
+      // from BAR's search endpoint for that reason. It resolves a name by
+      // fetching and storing the archive at BAR's cost, so a replay of any
+      // other game's map made BAR pay to host it. The source order does not.
+      await downloadMapAnySource({ mapName, writePath, onProgress });
       onDownloaded();
     } catch (e) {
       setDlError(errMessage(e));

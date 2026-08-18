@@ -96,9 +96,10 @@ async function downloadGameAnySourceImpl(opts: {
       // index. The last resort.
       //
       // Every configured master is tried, because pr-downloader only ever
-      // searches the one it is given and games are spread across several. BAR
-      // publishes its own (`repos-cdn.beyondallreason.dev`), so on the springrts
-      // default every BAR game comes back as "no source could provide".
+      // searches the one it is given and games are spread across several.
+      // Beyond All Reason's master is no longer one of them (see
+      // `rapidMasters.ts`), so BAR itself now comes back as "no source could
+      // provide" here.
       case "rapid": {
         const rapidErrors: string[] = [];
         for (const master of DEFAULT_RAPID_MASTERS) {

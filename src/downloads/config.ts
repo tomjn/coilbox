@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ContentState } from "../content/bindings";
 import { contentStateLoad } from "../content/bindings";
 import { getProfileRoot } from "../profile/profile";
-import { type BarMap, dlBarMaps, dlSetEngineDirs } from "./bindings";
+import { dlSetEngineDirs } from "./bindings";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
 import { healWriteRoot, packageDirOf } from "./writeRoot";
 
@@ -25,7 +25,7 @@ export interface DownloadsConfig {
   writeRootId?: string;
 }
 
-/** Spring + BAR rapid masters ship pre-configured, and the user can add more. */
+/** The Spring rapid master ships pre-configured, and the user can add more. */
 export const defaultConfig: DownloadsConfig = {
   rapidRepos: [...DEFAULT_RAPID_MASTERS],
 };
@@ -174,54 +174,7 @@ export function useWriteRootPath(): string | undefined {
   return useWriteRoot().path;
 }
 
-// The BAR maps-metadata list keyed springName -> the whole entry, fetched once
-// per session. The list is large and near-static, so we memoise the promise and
-// share it across every caller. A failed load resets so a later mount retries.
-let barMapsPromise: Promise<Map<string, BarMap>> | null = null;
-function loadBarMaps(): Promise<Map<string, BarMap>> {
-  if (!barMapsPromise) {
-    barMapsPromise = dlBarMaps(undefined)
-      .then(({ maps }) => {
-        const index = new Map<string, BarMap>();
-        for (const m of maps) index.set(m.springName, m);
-        return index;
-      })
-      .catch((e) => {
-        barMapsPromise = null;
-        throw e;
-      });
-  }
-  return barMapsPromise;
-}
-
-/**
- * A map's entry in BAR's validated maps list by springName, or `undefined` while
- * loading and for a map BAR does not certify. Pass `undefined` to skip the fetch
- * entirely.
- *
- * The whole entry rather than only `images.preview`, which is what this used to
- * hand back: the picture ladder in `src/hub/assets/picture.ts` wants the preview
- * as its last remote rung and `mapWidth`/`mapHeight` for the drawing below that,
- * and both come off the same entry.
- */
-export function useBarMap(springName: string | undefined): BarMap | undefined {
-  const [map, setMap] = useState<BarMap | undefined>(undefined);
-  useEffect(() => {
-    if (!springName) {
-      setMap(undefined);
-      return;
-    }
-    let live = true;
-    loadBarMaps()
-      .then((index) => {
-        if (live) setMap(index.get(springName));
-      })
-      .catch(() => {
-        if (live) setMap(undefined);
-      });
-    return () => {
-      live = false;
-    };
-  }, [springName]);
-  return map;
-}
+// `useBarMap` lived here: BAR's maps-metadata list keyed by springName, read for
+// a map's preview thumbnail, its size and its player count. Every one of those
+// callers is gone, as part of coilbox retiring its use of BAR-hosted content.
+// The list itself is still fetched by the Maps browse page, which lists it.

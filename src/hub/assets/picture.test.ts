@@ -14,7 +14,6 @@ function sources(over: Partial<MapPictureSources> = {}): MapPictureSources {
 }
 
 const LOCAL = "coilbox://localhost/unitsyncthumb/abc.png";
-const BAR = "https://api.bar-rts.com/maps/isthmus/preview.webp";
 const HELD_STATIC = {
   tier: "static" as const,
   path: "maps/minimap/deadbeef.webp",
@@ -29,20 +28,19 @@ function order(over: Partial<MapPictureSources> = {}): string[] {
 }
 
 describe("mapPictureLadder order", () => {
-  it("puts the installed archive first, ahead of every remote source", () => {
+  it("puts the installed archive first, ahead of the hub", () => {
     // The one that matters. An installed map costs no request, works offline
     // and is the map the reader will actually play.
-    expect(order({ local: LOCAL, held: HELD_STATIC, bar: BAR })).toEqual([
+    expect(order({ local: LOCAL, held: HELD_STATIC })).toEqual([
       "local",
       "static",
-      "bar",
       "placeholder",
     ]);
   });
 
-  it("never reaches a remote source when the map is installed", () => {
+  it("never reaches the hub when the map is installed", () => {
     const ladder = mapPictureLadder(
-      sources({ local: LOCAL, held: HELD_STATIC, bar: BAR }),
+      sources({ local: LOCAL, held: HELD_STATIC }),
     );
     expect(shownMapPicture(ladder, new Set())).toEqual({
       from: "local",
@@ -52,24 +50,12 @@ describe("mapPictureLadder order", () => {
     });
   });
 
-  it("puts the hub's own picture ahead of BAR's preview", () => {
-    expect(order({ held: HELD_STATIC, bar: BAR })).toEqual([
-      "static",
-      "bar",
-      "placeholder",
-    ]);
-  });
-
   it("serves a row still in staging from the staging tier", () => {
-    expect(order({ held: HELD_BLOB, bar: BAR })).toEqual([
-      "blob",
-      "bar",
-      "placeholder",
-    ]);
+    expect(order({ held: HELD_BLOB })).toEqual(["blob", "placeholder"]);
   });
 
-  it("falls to BAR for a map nothing else has", () => {
-    expect(order({ bar: BAR })).toEqual(["bar", "placeholder"]);
+  it("draws a map the hub has not been seeded with rather than asking BAR", () => {
+    expect(order()).toEqual(["placeholder"]);
   });
 
   it("always ends in the drawing, whatever it was given", () => {
@@ -77,8 +63,7 @@ describe("mapPictureLadder order", () => {
       {},
       { local: LOCAL },
       { held: HELD_STATIC },
-      { bar: BAR },
-      { local: LOCAL, held: HELD_BLOB, bar: BAR },
+      { local: LOCAL, held: HELD_BLOB },
     ]) {
       const ladder = mapPictureLadder(sources(over));
       expect(ladder.at(-1)?.from).toBe("placeholder");
@@ -131,18 +116,18 @@ describe("mapPictureLadder URLs", () => {
 });
 
 describe("shownMapPicture", () => {
-  const full = mapPictureLadder(
-    sources({ local: LOCAL, held: HELD_STATIC, bar: BAR }),
-  );
+  const full = mapPictureLadder(sources({ local: LOCAL, held: HELD_STATIC }));
   const staticUrl = `${DEFAULT_ASSET_CDN_BASE}maps/minimap/deadbeef.webp`;
 
   it("demotes one rung at a time as each fails", () => {
     expect(shownMapPicture(full, new Set([LOCAL])).from).toBe("static");
-    expect(shownMapPicture(full, new Set([LOCAL, staticUrl])).from).toBe("bar");
+    expect(shownMapPicture(full, new Set([LOCAL, staticUrl])).from).toBe(
+      "placeholder",
+    );
   });
 
   it("draws the map rather than leaving a broken image when every fetch fails", () => {
-    const every = new Set([LOCAL, staticUrl, BAR]);
+    const every = new Set([LOCAL, staticUrl]);
     expect(shownMapPicture(full, every)).toEqual({
       from: "placeholder",
       name: MAP,
@@ -151,13 +136,17 @@ describe("shownMapPicture", () => {
   });
 
   it("reaches the drawing from a ladder whose only rung is remote", () => {
-    const ladder = mapPictureLadder(sources({ bar: BAR }));
-    expect(shownMapPicture(ladder, new Set([BAR])).from).toBe("placeholder");
+    const ladder = mapPictureLadder(sources({ held: HELD_STATIC }));
+    expect(shownMapPicture(ladder, new Set([staticUrl])).from).toBe(
+      "placeholder",
+    );
   });
 
   it("answers even for a ladder built with no drawing at the bottom", () => {
-    const ladder = mapPictureLadder(sources({ bar: BAR })).slice(0, 1);
-    expect(shownMapPicture(ladder, new Set([BAR])).from).toBe("placeholder");
+    const ladder = mapPictureLadder(sources({ held: HELD_STATIC })).slice(0, 1);
+    expect(shownMapPicture(ladder, new Set([staticUrl])).from).toBe(
+      "placeholder",
+    );
   });
 });
 
@@ -167,9 +156,9 @@ describe("mapPictureAlt", () => {
     expect(mapPictureAlt(rung, MAP)).toBe(`Minimap of ${MAP}`);
   });
 
-  it("calls BAR's thumbnail a preview, because that is what it is", () => {
-    const rung = mapPictureLadder(sources({ bar: BAR }))[0];
-    expect(mapPictureAlt(rung, MAP)).toBe(`Preview of ${MAP}`);
+  it("calls a picture the hub holds a minimap, since that is what it seeded", () => {
+    const rung = mapPictureLadder(sources({ held: HELD_STATIC }))[0];
+    expect(mapPictureAlt(rung, MAP)).toBe(`Minimap of ${MAP}`);
   });
 
   it("gives the drawing no alt text, since it carries its own label", () => {

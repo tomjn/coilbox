@@ -78,9 +78,6 @@
         "title": "All That Glitters",
         "filename": "all_that_glitters_v2.2.3.sd7",
         "blurb": "Large 12-16 player brawl over rich reclaim fields.",
-        "thumb": [
-          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/fR1RVNhtF6IpcVo9ULC0/photo/KD2oyVd0jwnNe3STx9i8-atg223.jpg"
-        ],
         "download": { "kind": "map", "springName": "All That Glitters v2.2.3" }
       },
       {
@@ -88,9 +85,6 @@
         "title": "Supreme Isthmus v2.1",
         "filename": "supreme_isthmus_v2.1.sd7",
         "blurb": "10-16 player clashes across a contested isthmus.",
-        "thumb": [
-          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/ACgCe99NC8yZFecMwRCm/photo/UqqPuTiEnwSHueRztAHk-supreme2.1mini.png"
-        ],
         "download": { "kind": "map", "springName": "Supreme Isthmus v2.1" }
       },
       {
@@ -98,9 +92,6 @@
         "title": "Crystallized Plains",
         "filename": "crystallized_plains_1.1.sd7",
         "blurb": "Compact 2-4 player duel on crystal flats.",
-        "thumb": [
-          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/g7NeIaS3XxFSn2KcrCiL/photo/n2pJT5svY3Z0PnYbv6Cg-crystalmini.png"
-        ],
         "download": { "kind": "map", "springName": "Crystallized Plains 1.1" }
       },
       {
@@ -108,9 +99,6 @@
         "title": "Altair Crossing",
         "filename": "altair_crossing_v4.1.sd7",
         "blurb": "Small 2-6 player map built for fast T1 fights.",
-        "thumb": [
-          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/An6zReiqIWD15Yx7bZ3b/photo/heuM6R3jGDJawc5i0pwn-Altair_Crossing_V4.jpg"
-        ],
         "download": { "kind": "map", "springName": "Altair_Crossing_V4.1" }
       },
       {
@@ -118,9 +106,6 @@
         "title": "Fallendell",
         "filename": "fallendell_v4.sd7",
         "blurb": "2-4 player map with varied terrain and routes.",
-        "thumb": [
-          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/etCTTwexgYVGMV63rOWy/photo/ImLSdU3DQgDs5RFubq77-Fallendell_V4.jpg"
-        ],
         "download": { "kind": "map", "springName": "Fallendell_V4" }
       },
       {
@@ -128,9 +113,6 @@
         "title": "Heartbreak Hill",
         "filename": "heartbreak_hill_v4.0.1.sd7",
         "blurb": "2-6 player fight over ridgelines to the central hill.",
-        "thumb": [
-          "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/44vuVzD9DD5wyzZz0L7i/photo/aM9vt5DiowJMZqxOJJBf-Heartbreak%20Hill.jpg"
-        ],
         "download": { "kind": "map", "springName": "Heartbreak Hill v4.0.1" }
       }
     ],
@@ -145,9 +127,6 @@
             "title": "All That Glitters",
             "filename": "all_that_glitters_v2.2.3.sd7",
             "blurb": "Large 12-16 player brawl over rich reclaim fields.",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/fR1RVNhtF6IpcVo9ULC0/photo/KD2oyVd0jwnNe3STx9i8-atg223.jpg"
-            ],
             "download": {
               "kind": "map",
               "springName": "All That Glitters v2.2.3"
@@ -158,9 +137,6 @@
             "title": "Supreme Isthmus v2.1",
             "filename": "supreme_isthmus_v2.1.sd7",
             "blurb": "10-16 player clashes across a contested isthmus.",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/ACgCe99NC8yZFecMwRCm/photo/UqqPuTiEnwSHueRztAHk-supreme2.1mini.png"
-            ],
             "download": { "kind": "map", "springName": "Supreme Isthmus v2.1" }
           },
           {
@@ -168,9 +144,6 @@
             "title": "Crystallized Plains",
             "filename": "crystallized_plains_1.1.sd7",
             "blurb": "Compact 2-4 player duel on crystal flats.",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/g7NeIaS3XxFSn2KcrCiL/photo/n2pJT5svY3Z0PnYbv6Cg-crystalmini.png"
-            ],
             "download": { "kind": "map", "springName": "Crystallized Plains 1.1" }
           },
           {
@@ -178,9 +151,6 @@
             "title": "Altair Crossing",
             "filename": "altair_crossing_v4.1.sd7",
             "blurb": "Small 2-6 player map built for fast T1 fights.",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/An6zReiqIWD15Yx7bZ3b/photo/heuM6R3jGDJawc5i0pwn-Altair_Crossing_V4.jpg"
-            ],
             "download": { "kind": "map", "springName": "Altair_Crossing_V4.1" }
           },
           {
@@ -188,9 +158,6 @@
             "title": "Fallendell",
             "filename": "fallendell_v4.sd7",
             "blurb": "2-4 player map with varied terrain and routes.",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/etCTTwexgYVGMV63rOWy/photo/ImLSdU3DQgDs5RFubq77-Fallendell_V4.jpg"
-            ],
             "download": { "kind": "map", "springName": "Fallendell_V4" }
           },
           {
@@ -198,9 +165,6 @@
             "title": "Heartbreak Hill",
             "filename": "heartbreak_hill_v4.0.1.sd7",
             "blurb": "2-6 player fight over ridgelines to the central hill.",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/44vuVzD9DD5wyzZz0L7i/photo/aM9vt5DiowJMZqxOJJBf-Heartbreak%20Hill.jpg"
-            ],
             "download": { "kind": "map", "springName": "Heartbreak Hill v4.0.1" }
           }
         ]
@@ -214,40 +178,27 @@
             "id": "space-asteroid-mines-v3",
             "title": "Asteroid Mines V3",
             "filename": "asteroid_mines_v3.sd7",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/NULeDCjbZw5azkUT66rZ/photo/MaIjEsuchC9mvMLlMQSa-Asteroid_Mines_V2.1.jpg"
-            ],
             "download": { "kind": "map", "springName": "Asteroid_Mines_V3" }
           },
           {
             "id": "space-cloud9-v2",
             "title": "Cloud9 V2",
             "filename": "cloud9_v2.sd7",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/c8VOLOtft95bMvYUg60R/photo/5oYKAyg7B30SfNbSo61I-Cloud9_V2.jpg"
-            ],
             "download": { "kind": "map", "springName": "Cloud9_V2" }
           },
           {
             "id": "space-faster-than-light",
             "title": "Faster Than Light 1.1",
             "filename": "faster_than_light_1.1.sd7",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/mzdkzzTL3zgPanW6zQx4/photo/ipAhkXQGdeX0kYWcEHoj-faster_than_light_1.1.jpg"
-            ],
             "download": { "kind": "map", "springName": "Faster Than Light 1.1" }
           },
           {
             "id": "space-houses-of-tripolis",
             "title": "Houses of Tripolis 1.3",
             "filename": "houses_of_tripolis_1.3.sd7",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/EnstsecbggtzPl6Im1aU/photo/Tqm7HNzV9E5Qv1f6x83U-top.png"
-            ],
             "download": {
               "kind": "map",
-              "springName": "Houses of Tripolis 1.3",
-              "searchUrl": "https://files-cdn.beyondallreason.dev/find"
+              "springName": "Houses of Tripolis 1.3"
             }
           },
           {
@@ -263,22 +214,15 @@
             "id": "space-oort-cloud-v2",
             "title": "Oort Cloud V2",
             "filename": "oort_cloud_v2.sd7",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/lJQnSRqDN7rNPS5pe80C/photo/Tna3awRgScCouq7rL174-Oort_Cloud_V2.jpg"
-            ],
             "download": { "kind": "map", "springName": "Oort_Cloud_V2" }
           },
           {
             "id": "space-project-sd-129",
             "title": "Project SD-129 v1.0",
             "filename": "project_sd-129_v1.0.sd7",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/cZDvGpmzKFHbAS6LTqh7/photo/d0I2S7EHPzkW8XoBWoa0-SD129%20Mini.jpg"
-            ],
             "download": {
               "kind": "map",
-              "springName": "Project SD-129 v1.0",
-              "searchUrl": "https://files-cdn.beyondallreason.dev/find"
+              "springName": "Project SD-129 v1.0"
             }
           },
           {
@@ -310,39 +254,27 @@
             "id": "classic-evad-river-confluence",
             "title": "Evad River Confluence",
             "filename": "evad_river_confluence_v2.sd7",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/vTVisQEv3JM2pa0TvUHy/photo/L3jmPAmRhXoMk2bBzE4Y-Evad_River_Confluence_V2.jpg"
-            ],
             "download": {
               "kind": "map",
-              "springName": "Evad River Confluence_V2",
-              "searchUrl": "https://files-cdn.beyondallreason.dev/find"
+              "springName": "Evad River Confluence_V2"
             }
           },
           {
             "id": "classic-great-divide",
             "title": "Great Divide",
             "filename": "great_divide_v1.sd7",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/iQZFWB7rheiOseoQXihq/photo/7ykBk15Flx1FXaV0djj3-great-divide-minimap.png"
-            ],
             "download": {
               "kind": "map",
-              "springName": "Great Divide V1",
-              "searchUrl": "https://files-cdn.beyondallreason.dev/find"
+              "springName": "Great Divide V1"
             }
           },
           {
             "id": "classic-painted-desert",
             "title": "Painted Desert",
             "filename": "painted_desert_v1.0.sd7",
-            "thumb": [
-              "https://maps-metadata.beyondallreason.dev/i/fit-in/1024x1024/filters:format(webp):quality(75)/rowy-1f075.appspot.com/maps/Ti8kGjiegotB9EdlC2co/photo/ULRAHOFJnzXdQkVzbVux-PD%20mini.jpg"
-            ],
             "download": {
               "kind": "map",
-              "springName": "Painted Desert v1.0",
-              "searchUrl": "https://files-cdn.beyondallreason.dev/find"
+              "springName": "Painted Desert v1.0"
             }
           },
           {

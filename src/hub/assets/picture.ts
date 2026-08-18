@@ -14,8 +14,7 @@ import { type AssetTier, assetTierUrl } from "./tier";
  * 1. The local archive, through unitsync.
  * 2. The hub's durable tier, on GitHub Pages.
  * 3. The hub's staging tier, for anything approved but not promoted yet.
- * 4. Beyond All Reason's own preview thumbnail.
- * 5. A drawing of the map's outline, which cannot fail.
+ * 4. A drawing of the map's outline, which cannot fail.
  *
  * Local comes first, which is the reverse of the hub's own order in
  * `lib/assets/resolve.ts` and deliberate. An installed archive costs no request,
@@ -24,31 +23,24 @@ import { type AssetTier, assetTierUrl } from "./tier";
  *
  * Rungs two and three fill up from the seed export and from nothing else. There
  * is no client upload path for a map picture and none is planned, so a map
- * nobody has seeded stays on rung four or five however many people open it. That
- * is issue #1685, and section 4.6.1 of the asset pipeline design carries the
- * reasoning.
+ * nobody has seeded is drawn however many people open it. That is issue #1685,
+ * and section 4.6.1 of the asset pipeline design carries the reasoning.
  *
  * Two and three are one row rather than two attempts, exactly as the hub says:
  * there is one row per identity and its `tier` column says which store holds it,
  * so the order between them is a fact about promotion rather than a race.
  *
- * ## Why BAR sits below both hub tiers rather than above them
+ * ## Why Beyond All Reason's preview thumbnail is not a rung
  *
- * It is the one remote source coilbox has today and it is the only rung with any
- * data in it, since the hub holds no minimaps until somebody runs the seed. It
- * is still last before the drawing, because it is a compatibility rung and not a
- * peer: it answers only for the maps BAR certifies, and it hands back BAR's
- * preview thumbnail rather than the minimap the asset vocabulary names. Anything
- * the hub itself holds is the picture that was asked for, at known dimensions,
- * for any game in the ecosystem, which is the point of coilbox not being a BAR
- * launcher. When the hub holds minimaps this rung stops answering for the maps
- * that matter without anything above it changing.
+ * It used to sit between the hub and the drawing, on the grounds that it was the
+ * only remote source with anything in it. It is gone because it is somebody
+ * else's picture served at somebody else's cost, for a client that is not their
+ * launcher, and coilbox is retiring its use of BAR-hosted content generally.
  *
- * The hub puts BAR ahead of its own tiers, on cost: its staging tier spends Blob
- * data transfer out of 10 GB a month and BAR serves from its own proxy. That
- * argument is about a public website's traffic. One desktop client showing one
- * map in a battle room or on an item page is not that, and paying a few
- * kilobytes for the right picture is the better trade here.
+ * Nothing above it changes, so the loss falls exactly on maps that are neither
+ * installed nor seeded: they are drawn rather than photographed. The fix is to
+ * seed them, which is a walk over a map collection rather than a request to
+ * anyone. Until then the drawing is honest about what coilbox knows.
  *
  * ## Where the hub rungs are told what to show
  *
@@ -66,7 +58,7 @@ import { type AssetTier, assetTierUrl } from "./tier";
 /** Which rung answered. The two hub tiers keep their own names, because which
  *  one served a picture is the difference between a request that costs the hub
  *  nothing and one that spends its Blob allowance. */
-export type MapPictureFrom = AssetTier | "local" | "bar" | "placeholder";
+export type MapPictureFrom = AssetTier | "local" | "placeholder";
 
 /** What the hub holds for one map, off its `asset` row. */
 export interface HeldMapAsset {
@@ -105,9 +97,6 @@ export interface MapPictureSources {
   local?: string | null;
   /** What the hub holds for `(mapName, "minimap")`, or null. */
   held?: HeldMapAsset | null;
-  /** BAR's preview thumbnail for this spring name, or null for a map it does
-   *  not certify. */
-  bar?: string | null;
   /** The map's size, for the drawing at the bottom. Null draws a square. */
   size?: MapSize | null;
   /** The durable tier base, from `assetCdnBase()`. */
@@ -143,10 +132,6 @@ export function mapPictureLadder(sources: MapPictureSources): MapPicture[] {
     });
   }
 
-  if (sources.bar) {
-    ladder.push({ from: "bar", url: sources.bar, width: null, height: null });
-  }
-
   ladder.push({
     from: "placeholder",
     name: sources.mapName,
@@ -160,7 +145,7 @@ export function mapPictureLadder(sources: MapPictureSources): MapPicture[] {
  * The rung to draw, given the URLs that have already failed to load.
  *
  * Keyed on the URLs rather than on a position, because the ladder is rebuilt
- * whenever one of its sources arrives - BAR's list loads after the first render,
+ * whenever one of its sources arrives - the hub answers after the first render,
  * and a map finishes scanning after that - and a remembered index would then
  * point at a different rung than the one that failed.
  *
@@ -178,12 +163,9 @@ export function shownMapPicture(
   return showing ?? { from: "placeholder", name: "", size: null };
 }
 
-/** What to caption a picture with, which depends on whose it is: BAR's preview
- *  is a thumbnail of the map rather than a minimap of it, and saying "minimap"
- *  over it would be labelling somebody else's picture as ours. */
+/** What to caption a picture with. Every rung that has a URL is a minimap, out
+ *  of an archive or out of the hub, so there is one caption. The drawing carries
+ *  its own label and takes none. */
 export function mapPictureAlt(picture: MapPicture, mapName: string): string {
-  if (picture.from === "placeholder") return "";
-  return picture.from === "bar"
-    ? `Preview of ${mapName}`
-    : `Minimap of ${mapName}`;
+  return picture.from === "placeholder" ? "" : `Minimap of ${mapName}`;
 }

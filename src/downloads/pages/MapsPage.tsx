@@ -16,8 +16,6 @@ import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
 import { presetRoute } from "../../play/presets";
 import {
-  type BarMap,
-  dlBarMaps,
   dlGithubReleaseArchives,
   dlHakoraMaps,
   dlInstalledContent,
@@ -38,10 +36,15 @@ import { OptionSelect } from "./components/OptionSelect";
 import { EmptyState, errMessage } from "./components/states";
 import { HIDE_INSTALLED_KEY } from "./hideInstalled";
 
-/** pr-downloader HTTP search endpoint for BAR map files. */
-const BAR_SEARCH_URL = "https://files-cdn.beyondallreason.dev/find";
-
-type Source = "bar" | "springfiles" | "hakora" | "bar-maps-gh" | "tap-maps";
+/**
+ * Beyond All Reason's own list was a source here and no longer is, as part of
+ * coilbox retiring its use of BAR-hosted content. It listed BAR's whole
+ * catalogue out of `maps-metadata`, which names maps and never says where the
+ * archive is, so every row still had to be resolved through the sources below.
+ * `bar-maps-gh` is BAR's maps on GitHub releases, which is a mirror we can
+ * fetch from rather than an index of BAR's.
+ */
+type Source = "springfiles" | "hakora" | "bar-maps-gh" | "tap-maps";
 
 /** Curated GitHub map repos (from skylobby's shipped source list), fetched via
  * their release assets. */
@@ -91,15 +94,6 @@ const area = (m: MapItem) => (m.width ?? 0) * (m.height ?? 0);
 /** How many cards to render per page — the springfiles catalog has thousands. */
 const PAGE = 200;
 
-function barSubtitle(m: BarMap): string {
-  const parts: string[] = [];
-  if (m.author) parts.push(`by ${m.author}`);
-  if (m.mapWidth && m.mapHeight) parts.push(`${m.mapWidth}×${m.mapHeight}`);
-  if (m.playerCountMax)
-    parts.push(`${m.playerCountMin ?? 2}–${m.playerCountMax}p`);
-  return parts.join(" · ");
-}
-
 function archiveSubtitle(a: ReleaseArchive): string {
   const parts: string[] = [];
   if (a.size) parts.push(`${(a.size / 1_048_576).toFixed(1)} MB`);
@@ -122,7 +116,7 @@ export default function MapsPage() {
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
   const { enqueue, statusFor, active } = useDownloadQueue();
-  const [source, setSource] = useState<Source>("bar");
+  const [source, setSource] = useState<Source>("springfiles");
   const [items, setItems] = useState<MapItem[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -179,21 +173,7 @@ export default function MapsPage() {
     setError(null);
     setItems(null);
     try {
-      if (src === "bar") {
-        const { maps } = await dlBarMaps(undefined);
-        setItems(
-          maps.map((m) => ({
-            springName: m.springName,
-            title: m.displayName || m.springName,
-            subtitle: barSubtitle(m),
-            thumb: m.images?.preview,
-            filename: m.filename,
-            author: m.author,
-            width: m.mapWidth,
-            height: m.mapHeight,
-          })),
-        );
-      } else if (src === "hakora") {
+      if (src === "hakora") {
         const { maps } = await dlHakoraMaps(undefined);
         setItems(
           maps.map((m) => ({
@@ -291,14 +271,10 @@ export default function MapsPage() {
       return {
         kind: "map",
         label: item.title,
-        args: {
-          springName: item.springName,
-          searchUrl: source === "bar" ? BAR_SEARCH_URL : undefined,
-          writePath,
-        },
+        args: { springName: item.springName, writePath },
       };
     },
-    [writePath, source],
+    [writePath],
   );
 
   const filtered = useMemo(() => {
@@ -364,7 +340,6 @@ export default function MapsPage() {
             }}
             className="w-48"
             options={[
-              { value: "bar", label: "Beyond All Reason" },
               { value: "springfiles", label: "springfiles" },
               { value: "hakora", label: "hakora" },
               { value: "bar-maps-gh", label: "BAR Maps (GitHub)" },
