@@ -1529,8 +1529,18 @@ export interface MapCatalogEntry {
   appearance?: Record<string, number | boolean | number[]>;
   points?: {
     start?: { x: number; z: number; y?: number }[];
-    metal?: { x: number; z: number; y?: number; meta?: Record<string, unknown> }[];
-    geo?: { x: number; z: number; y?: number; meta?: Record<string, unknown> }[];
+    metal?: {
+      x: number;
+      z: number;
+      y?: number;
+      meta?: Record<string, unknown>;
+    }[];
+    geo?: {
+      x: number;
+      z: number;
+      y?: number;
+      meta?: Record<string, unknown>;
+    }[];
   };
 }
 
