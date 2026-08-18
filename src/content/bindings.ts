@@ -1591,7 +1591,7 @@ export interface MinimapResult {
   /** Wind power range (`atmosphere.minWind`/`maxWind` from mapinfo.lua). */
   minWind?: number;
   maxWind?: number;
-  /** Tidal power (`water.tidalStrength` from mapinfo.lua). */
+  /** Tidal power (root-level `tidalStrength` from mapinfo.lua). */
   tidalStrength?: number;
   /** Water/sky/sun appearance from mapinfo.lua, for the 3D preview's lighting and
    * water colour. Colours are `[r, g, b]` in 0..1. `voidWater`/`voidGround` are the

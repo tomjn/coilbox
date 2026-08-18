@@ -25,6 +25,7 @@ mod heightfield;
 mod heightmap;
 mod infocache;
 mod lua;
+mod mapcatalog;
 mod mapmeta;
 mod metalmap;
 mod minimap;
@@ -70,6 +71,9 @@ struct Args {
     /// Needs `--asset-dir`: nothing in coilbox draws a type map, so there is no
     /// other output for this mode to produce.
     typemap: bool,
+    /// `--map-catalog`: assemble one map's facts into the entry the hub takes
+    /// (combined with `--map`).
+    map_catalog: bool,
     /// `--map-info`: lazily read one map's options (combined with `--map`).
     map_info: bool,
     /// `--map-meta`: batch-read every map's mapinfo metadata in one Init.
@@ -770,6 +774,25 @@ fn run() -> i32 {
         };
     }
 
+    // Map catalog: one map's facts in the shape the hub takes. Reads the archive
+    // rather than drawing anything, so it takes no --asset-dir.
+    if args.map_catalog {
+        let Some(map) = args.map.clone() else {
+            mapcatalog::emit_error("missing --map <name> for --map-catalog".into());
+            return 1;
+        };
+        return match std::panic::catch_unwind(|| mapcatalog::read(&args.lib, &map)) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                mapcatalog::emit_error("worker panicked while reading the map's facts".into());
+                1
+            }
+        };
+    }
+
     // Single minimap renders one map; default mode scans everything.
     if let Some(map) = args.map.clone() {
         let asset_dir = args.asset_dir.as_deref().map(Path::new);
@@ -816,6 +839,7 @@ fn parse_args() -> Result<Args, String> {
     let mut height_field = false;
     let mut metalmap = false;
     let mut typemap = false;
+    let mut map_catalog = false;
     let mut map_info = false;
     let mut map_meta = false;
     let mut map_skybox = false;
@@ -867,6 +891,7 @@ fn parse_args() -> Result<Args, String> {
             "--height-field" => height_field = true,
             "--metalmap" => metalmap = true,
             "--typemap" => typemap = true,
+            "--map-catalog" => map_catalog = true,
             "--map-info" => map_info = true,
             "--map-meta" => map_meta = true,
             "--map-skybox" => map_skybox = true,
@@ -976,6 +1001,7 @@ fn parse_args() -> Result<Args, String> {
         height_field,
         metalmap,
         typemap,
+        map_catalog,
         map_info,
         map_meta,
         map_skybox,
@@ -1396,6 +1422,7 @@ mod tests {
             height_field: false,
             metalmap: false,
             typemap: false,
+            map_catalog: false,
             map_info: false,
             map_meta: false,
             map_skybox: false,

@@ -47,6 +47,10 @@ sha2 = "0.10"
 # encoded bytes against. Read, never restated, so the encoder cannot drift from
 # what the hub will accept.
 coilbox-assets = { path = "../coilbox-assets" }
+# The catalog entry's shape and the version that names this extraction, so the
+# facts a map walk assembles cannot drift from what the hub's submission route
+# reads (issue #1732).
+coilbox-map-catalog = { path = "../coilbox-map-catalog" }
 # Skirmish-AI whitelist: a game's `validais.lua` lists AI name *patterns*, matched
 # as regexes against AI short names (skylobby-compatible `re-find` semantics).
 regex = "1"

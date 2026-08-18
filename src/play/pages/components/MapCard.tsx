@@ -67,8 +67,10 @@ export function MapCard({
     env?.minWind !== undefined && env?.maxWind !== undefined
       ? `Wind ${Math.round(env.minWind)}–${Math.round(env.maxWind)}`
       : null;
+  // A map declaring no tidal power reports 0 rather than nothing, so the chip
+  // would otherwise read "Tidal 0" on most maps.
   const tidal =
-    env?.tidalStrength !== undefined
+    env?.tidalStrength !== undefined && env.tidalStrength > 0
       ? `Tidal ${Math.round(env.tidalStrength)}`
       : null;
 
