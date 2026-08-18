@@ -71,9 +71,19 @@ struct Args {
     /// Needs `--asset-dir`: nothing in coilbox draws a type map, so there is no
     /// other output for this mode to produce.
     typemap: bool,
-    /// `--map-catalog`: assemble one map's facts into the entry the hub takes
-    /// (combined with `--map`).
+    /// `--map-catalog`: assemble a map's facts into the entry the hub takes.
+    /// With `--map`, one map. Without it, the whole installed library.
     map_catalog: bool,
+    /// `--keys-only`: on a `--map-catalog` library walk, read each map's archive
+    /// and hash it and stop there, which is what a have check compares on. The
+    /// rest costs a whole height grid a map, and most of a library is maps the
+    /// hub already holds (issue #1737).
+    keys_only: bool,
+    /// A JSON file of map names for a `--map-catalog` library walk, which is how
+    /// the second pass is told which maps the hub asked for. A file rather than
+    /// an argument because three thousand map names is past what Windows takes
+    /// on a command line.
+    maps_file: Option<String>,
     /// `--map-info`: lazily read one map's options (combined with `--map`).
     map_info: bool,
     /// `--map-meta`: batch-read every map's mapinfo metadata in one Init.
@@ -774,20 +784,46 @@ fn run() -> i32 {
         };
     }
 
-    // Map catalog: one map's facts in the shape the hub takes. Reads the archive
-    // rather than drawing anything, so it takes no --asset-dir.
+    // Map catalog: a map's facts in the shape the hub takes. Reads archives
+    // rather than drawing anything, so it takes no --asset-dir. With --map it is
+    // one map, and without it the whole library in one Init.
     if args.map_catalog {
-        let Some(map) = args.map.clone() else {
-            mapcatalog::emit_error("missing --map <name> for --map-catalog".into());
-            return 1;
+        if let Some(map) = args.map.clone() {
+            return match std::panic::catch_unwind(|| mapcatalog::read(&args.lib, &map, cache_dir)) {
+                Ok(out) => {
+                    println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                    0
+                }
+                Err(_) => {
+                    mapcatalog::emit_error("worker panicked while reading the map's facts".into());
+                    1
+                }
+            };
+        }
+        let only = match args.maps_file.as_deref() {
+            None => None,
+            Some(path) => match std::fs::read_to_string(path)
+                .map_err(|e| e.to_string())
+                .and_then(|text| {
+                    serde_json::from_str::<Vec<String>>(&text).map_err(|e| e.to_string())
+                }) {
+                Ok(names) => Some(names),
+                Err(e) => {
+                    mapcatalog::emit_walk_error(format!("could not read maps file {path}: {e}"));
+                    return 1;
+                }
+            },
         };
-        return match std::panic::catch_unwind(|| mapcatalog::read(&args.lib, &map)) {
+        let keys_only = args.keys_only;
+        return match std::panic::catch_unwind(|| {
+            mapcatalog::walk(&args.lib, only.as_deref(), keys_only, cache_dir)
+        }) {
             Ok(out) => {
                 println!("{}", serde_json::to_string(&out).unwrap_or_default());
                 0
             }
             Err(_) => {
-                mapcatalog::emit_error("worker panicked while reading the map's facts".into());
+                mapcatalog::emit_walk_error("worker panicked while walking the map library".into());
                 1
             }
         };
@@ -840,6 +876,8 @@ fn parse_args() -> Result<Args, String> {
     let mut metalmap = false;
     let mut typemap = false;
     let mut map_catalog = false;
+    let mut keys_only = false;
+    let mut maps_file = None;
     let mut map_info = false;
     let mut map_meta = false;
     let mut map_skybox = false;
@@ -892,6 +930,8 @@ fn parse_args() -> Result<Args, String> {
             "--metalmap" => metalmap = true,
             "--typemap" => typemap = true,
             "--map-catalog" => map_catalog = true,
+            "--keys-only" => keys_only = true,
+            "--maps-file" => maps_file = it.next(),
             "--map-info" => map_info = true,
             "--map-meta" => map_meta = true,
             "--map-skybox" => map_skybox = true,
@@ -1002,6 +1042,8 @@ fn parse_args() -> Result<Args, String> {
         metalmap,
         typemap,
         map_catalog,
+        keys_only,
+        maps_file,
         map_info,
         map_meta,
         map_skybox,
@@ -1423,6 +1465,8 @@ mod tests {
             metalmap: false,
             typemap: false,
             map_catalog: false,
+            keys_only: false,
+            maps_file: None,
             map_info: false,
             map_meta: false,
             map_skybox: false,
