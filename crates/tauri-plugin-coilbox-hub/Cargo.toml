@@ -20,6 +20,9 @@ coilbox-oauth = { path = "../coilbox-oauth" }
 # The variant names the have check's keys are built from, read from the same
 # shared/asset-vocabulary.json the hub agrees to.
 coilbox-assets = { path = "../coilbox-assets" }
+# The map catalog entry's shape and the request caps the hub refuses at, read
+# from the same shared document the hub vendors (issue #1736).
+coilbox-map-catalog = { path = "../coilbox-map-catalog" }
 # The settings file and the portable root, so the upload consent check reads the
 # user's answer and the distribution profile off disk rather than being told.
 coilbox-portable = { path = "../coilbox-portable" }

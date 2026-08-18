@@ -484,3 +484,247 @@ fn identity_key_of(key: &Value) -> String {
         _ => format!("map\u{0}{}\u{0}{}", field("map_name"), field("variant")),
     }
 }
+
+// ---------------------------------------------------------------- map catalog
+
+/// What a stand-in hub holds about one map: the archive it has, and which
+/// extraction read it.
+#[derive(Clone)]
+pub struct HeldMap {
+    pub source_hash: String,
+    pub catalog_version: u32,
+}
+
+/// How the map stand-in answers.
+enum MapAnswers {
+    /// Answer properly, from what it holds, following the hub's own
+    /// `resolveStatus` and its submission outcomes.
+    Holding(HashMap<String, HeldMap>),
+    /// Answer this to everything, for the shapes a real hub only produces when
+    /// something is wrong.
+    Canned { status: u16, body: String },
+    /// Answer these in order, cycling once they run out. For a hub that recovers
+    /// between attempts.
+    InTurn(Vec<(u16, String)>),
+    /// Answer properly and then reverse the results, which is the one thing a
+    /// caller reading by index must not accept.
+    Misordering(HashMap<String, HeldMap>),
+}
+
+#[derive(Default)]
+struct MapSeen {
+    have_batches: Vec<usize>,
+    submit_batches: Vec<usize>,
+    submit_bodies: Vec<usize>,
+    submitted: Vec<Value>,
+    headers: String,
+}
+
+/// A stand-in hub answering both map catalog routes on one address.
+pub struct MapHubServer {
+    base: String,
+    seen: Arc<Mutex<MapSeen>>,
+}
+
+impl MapHubServer {
+    /// A hub holding these maps and nothing else.
+    pub fn holding(rows: &[(&str, &str, u32)]) -> Self {
+        Self::start(MapAnswers::Holding(held_maps(rows)))
+    }
+
+    /// A hub answering this status and body to anything.
+    pub fn answering(status: u16, body: Value) -> Self {
+        Self::start(MapAnswers::Canned {
+            status,
+            body: body.to_string(),
+        })
+    }
+
+    /// A hub answering these in order, cycling once they run out.
+    pub fn answering_in_turn(answers: &[(u16, Value)]) -> Self {
+        Self::start(MapAnswers::InTurn(
+            answers
+                .iter()
+                .map(|(status, body)| (*status, body.to_string()))
+                .collect(),
+        ))
+    }
+
+    /// A hub whose answers are right and in the wrong order.
+    pub fn misordering() -> Self {
+        Self::start(MapAnswers::Misordering(HashMap::new()))
+    }
+
+    fn start(answering: MapAnswers) -> Self {
+        let seen = Arc::new(Mutex::new(MapSeen::default()));
+        let recorded = seen.clone();
+        let bound = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        bound.set_nonblocking(true).unwrap();
+        let port = bound.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let listener = TcpListener::from_std(bound).unwrap();
+            let mut turn = 0usize;
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let Some((head, body)) = read_request(&mut sock).await else {
+                    continue;
+                };
+                let is_have = head.starts_with("post /api/v1/maps/have");
+                let parsed: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
+                {
+                    let mut seen = recorded.lock().unwrap();
+                    seen.headers = head.clone();
+                    if is_have {
+                        seen.have_batches.push(array_len(&parsed, "keys"));
+                    } else {
+                        seen.submit_batches.push(array_len(&parsed, "maps"));
+                        seen.submit_bodies.push(body.len());
+                        if let Some(maps) = parsed.get("maps").and_then(Value::as_array) {
+                            seen.submitted.extend(maps.iter().cloned());
+                        }
+                    }
+                }
+
+                let (status, answer) = match &answering {
+                    MapAnswers::Canned { status, body } => (*status, body.clone()),
+                    MapAnswers::InTurn(answers) => {
+                        let (status, body) = &answers[turn % answers.len()];
+                        turn += 1;
+                        (*status, body.clone())
+                    }
+                    MapAnswers::Holding(held) => (200, map_answer(&parsed, is_have, held, false)),
+                    MapAnswers::Misordering(held) => {
+                        (200, map_answer(&parsed, is_have, held, true))
+                    }
+                };
+                let response = format!(
+                    "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{answer}",
+                    answer.len()
+                );
+                let _ = sock.write_all(response.as_bytes()).await;
+                let _ = sock.flush().await;
+            }
+        });
+        Self {
+            base: format!("http://127.0.0.1:{port}"),
+            seen,
+        }
+    }
+
+    /// The hub address, which both routes hang off.
+    pub fn base(&self) -> String {
+        self.base.clone()
+    }
+
+    /// How many keys each have request carried, in order.
+    pub fn have_batches(&self) -> Vec<usize> {
+        self.seen.lock().unwrap().have_batches.clone()
+    }
+
+    /// How many maps each submission carried, in order.
+    pub fn submit_batches(&self) -> Vec<usize> {
+        self.seen.lock().unwrap().submit_batches.clone()
+    }
+
+    /// How many bytes each submission body was, which is the other cap.
+    pub fn submit_bodies(&self) -> Vec<usize> {
+        self.seen.lock().unwrap().submit_bodies.clone()
+    }
+
+    /// Every entry the hub was sent, in order, exactly as it arrived.
+    pub fn submitted(&self) -> Vec<Value> {
+        self.seen.lock().unwrap().submitted.clone()
+    }
+
+    pub fn last_headers(&self) -> String {
+        self.seen.lock().unwrap().headers.clone()
+    }
+}
+
+fn array_len(body: &Value, field: &str) -> usize {
+    body.get(field)
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0)
+}
+
+fn held_maps(rows: &[(&str, &str, u32)]) -> HashMap<String, HeldMap> {
+    rows.iter()
+        .map(|(name, source_hash, catalog_version)| {
+            (
+                (*name).to_owned(),
+                HeldMap {
+                    source_hash: (*source_hash).to_owned(),
+                    catalog_version: *catalog_version,
+                },
+            )
+        })
+        .collect()
+}
+
+/// The hub's own answer to either map route, built from what it holds.
+///
+/// `resolveStatus` for the have check: absent is `missing`, a different
+/// `source_hash` is `changed` whatever the versions say, and the same hash is
+/// `changed` only when the caller read it with a newer extraction.
+///
+/// The submission follows from the same three facts: an unknown map is `stored`,
+/// the same archive read by a newer extraction is `replaced`, the same or an
+/// older one is `unchanged`, and a different archive under a name the hub already
+/// holds is a `conflict`.
+fn map_answer(
+    body: &Value,
+    is_have: bool,
+    held: &HashMap<String, HeldMap>,
+    reverse: bool,
+) -> String {
+    let field = if is_have { "keys" } else { "maps" };
+    let sent = body
+        .get(field)
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut results: Vec<Value> = sent
+        .iter()
+        .map(|entry| {
+            let name = entry
+                .get("map_name")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let source_hash = entry
+                .get("source_hash")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let version = entry
+                .get("catalog_version")
+                .and_then(Value::as_u64)
+                .unwrap_or(0) as u32;
+            let stored = held.get(name);
+            if is_have {
+                let status = match stored {
+                    None => "missing",
+                    Some(stored) if stored.source_hash != source_hash => "changed",
+                    Some(stored) if version > stored.catalog_version => "changed",
+                    Some(_) => "have",
+                };
+                serde_json::json!({ "map_name": name, "status": status })
+            } else {
+                let outcome = match stored {
+                    None => "stored",
+                    Some(stored) if stored.source_hash != source_hash => "conflict",
+                    Some(stored) if version > stored.catalog_version => "replaced",
+                    Some(_) => "unchanged",
+                };
+                serde_json::json!({ "map_name": name, "outcome": outcome })
+            }
+        })
+        .collect();
+    if reverse {
+        results.reverse();
+    }
+    serde_json::json!({
+        "format": if is_have { "coilbox-hub-map-have" } else { "coilbox-hub-maps" },
+        "version": 1,
+        "results": results,
+    })
+    .to_string()
+}
