@@ -41,6 +41,10 @@ use crate::archive::MapArchives;
 use crate::ffi::{MapAppearance, Unitsync};
 use crate::infocache;
 
+/// What a density sample is worth on a map that says nothing about it, from
+/// `CMapInfo::ReadGlobal`. The engine's default rather than coilbox's choice.
+const ENGINE_DEFAULT_MAX_METAL: f32 = 0.02;
+
 /// How much of the archive is hashed at a time. A map archive runs to hundreds
 /// of megabytes, so the bytes stream through this rather than being read into
 /// memory whole.
@@ -194,10 +198,18 @@ pub(crate) fn entry_in_session(
         us.remove_all_archives();
     }
 
+    // `mapinfo.lua` first, because it carries what the map declared and the
+    // engine's own map info rounds these three to whole numbers. The engine's
+    // second, because it synthesises the block for a map that ships no
+    // `mapinfo.lua` at all: without the fallback the twelve SMD era maps on this
+    // machine report no wind and no tidal, and Beyond All Reason publishes both
+    // for one of them.
+    let engine_number = |key: &str| us.map_number(map_index, key);
     let (min_wind, max_wind) = match wind {
         Some((mn, mx)) => (Some(mn), Some(mx)),
-        None => (None, None),
+        None => (engine_number("minWind"), engine_number("maxWind")),
     };
+    let tidal = tidal.or_else(|| engine_number("tidalStrength"));
 
     Ok(MapCatalogEntry {
         map_name: map_name.to_string(),
@@ -229,15 +241,87 @@ pub(crate) fn entry_in_session(
                 .into_iter()
                 .map(|(x, z)| MapPoint::at(x, z))
                 .collect(),
-            // Metal spots are issue #1734 and geothermal vents are #1733. An
-            // empty list here says "this extraction did not read them" rather
-            // than "this map has none", which is why both issues bump the
-            // catalog version when they land: the hub then takes the fuller
-            // entry as an improvement rather than as a conflict.
-            metal: Vec::new(),
-            geo: Vec::new(),
+            metal: metal_spots(us, map_index, map_name),
+            geo: geo_vents(us, &archive_file, map_index),
         },
     })
+}
+
+/// The map's metal spots, as points the hub stores under `metal`.
+///
+/// The density grid and the map's own `maxMetal` are what a spot is worked out
+/// from, and the rules for working it out come from the shared catalog document
+/// rather than from here (issue #1734). See [`crate::metalspots`].
+///
+/// `maxMetal` comes off the engine's own map info rather than out of
+/// `mapinfo.lua`, so an SMD era map answers with the value from its `.smd`. A map
+/// that declares none has no metal to extract whatever its grid says, and
+/// produces no spots.
+fn metal_spots(us: &Unitsync, map_index: i32, map_name: &str) -> Vec<MapPoint> {
+    let Some((width, height)) = us.map_dimensions(map_name) else {
+        return Vec::new();
+    };
+    let Some(density) = us.metalmap_data(map_name, width, height) else {
+        return Vec::new();
+    };
+    // A map that declares no `maxMetal` still has metal, because the engine
+    // supplies one. unitsync's own map info defaults the field to 0 where
+    // `CMapInfo::ReadGlobal` defaults it to 0.02, so taking unitsync's answer
+    // literally reports no spots at all on a map that plays with plenty: this
+    // machine's Grts_Messa_008 is one, an SMD era map whose `.smd` says nothing
+    // about metal.
+    let max_metal = us
+        .map_number(map_index, "maxMetal")
+        .filter(|declared| *declared > 0.0)
+        .unwrap_or(ENGINE_DEFAULT_MAX_METAL);
+    let spots = crate::metalspots::find(
+        &density,
+        width,
+        height,
+        f64::from(max_metal),
+        &coilbox_map_catalog::catalog().metal_clustering,
+    );
+    crate::metalspots::points(&spots)
+}
+
+/// The map's geothermal vents, as points the hub stores under `geo`.
+///
+/// Read out of the map file's own feature block rather than from unitsync, which
+/// exposes nothing about features. Which of a map's features is a vent is the
+/// engine's rule and not a guess: `CFeatureDefHandler::LoadFeatureDefsFromMap`
+/// gives a default geothermal def to any map feature type whose name contains
+/// `geovent`. See [`crate::smf::is_geovent`].
+///
+/// The type name travels on the point as `feature`, which is what the catalog's
+/// `geo` kind carries, so a map naming its vents something unusual can still be
+/// read back and understood rather than being reduced to a coordinate.
+///
+/// An empty list is the ordinary answer: half of this library's maps place no
+/// features at all. A map file that will not read gives an empty list too, since
+/// a fact that could not be read is not a fact about the map, and the rest of the
+/// entry is still worth having.
+fn geo_vents(us: &Unitsync, archive_file: &str, map_index: i32) -> Vec<MapPoint> {
+    let Some(smf_name) = us.map_file_name(map_index) else {
+        return Vec::new();
+    };
+    let Some(bytes) =
+        crate::archive::read_archive_member(us, archive_file, &smf_name, crate::smf::MAX_SMF_BYTES)
+    else {
+        return Vec::new();
+    };
+    let Ok(features) = crate::smf::features(&bytes) else {
+        return Vec::new();
+    };
+    features
+        .into_iter()
+        .filter(|feature| crate::smf::is_geovent(&feature.kind))
+        .map(|feature| MapPoint {
+            x: feature.x,
+            z: feature.z,
+            y: Some(feature.y),
+            meta: BTreeMap::from([("feature".to_string(), serde_json::json!(feature.kind))]),
+        })
+        .collect()
 }
 
 /// A field the archive filled in, or `None` for one it left blank.

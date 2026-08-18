@@ -194,6 +194,12 @@ pub struct Unitsync {
     info_key_fn: StrByIntFn,
     info_type_fn: Option<StrByIntFn>,
     info_value_string_fn: StrByIntFn,
+    /// `GetInfoValueFloat` and `GetInfoValueInteger`, for the numeric map facts
+    /// `GetMapInfoCount` publishes beside the strings. Optional: an older build
+    /// may not have them, and the caller then has no number rather than a wrong
+    /// one.
+    info_value_float_fn: Option<FloatByIntFn>,
+    info_value_int_fn: Option<IntByIntFn>,
     // optional archive metadata
     archive_path_fn: Option<StrByStrFn>,
     archive_checksum_fn: Option<UintByStrFn>,
@@ -320,6 +326,8 @@ impl Unitsync {
             info_key_fn: req(&lib, b"GetInfoKey\0")?,
             info_type_fn: opt(&lib, b"GetInfoType\0"),
             info_value_string_fn: req(&lib, b"GetInfoValueString\0")?,
+            info_value_float_fn: opt(&lib, b"GetInfoValueFloat\0"),
+            info_value_int_fn: opt(&lib, b"GetInfoValueInteger\0"),
             archive_path_fn: opt(&lib, b"GetArchivePath\0"),
             archive_checksum_fn: opt(&lib, b"GetArchiveChecksum\0"),
             mod_checksum_fn: opt(&lib, b"GetPrimaryModChecksum\0"),
@@ -494,6 +502,48 @@ impl Unitsync {
     pub fn mod_info(&self, i: i32) -> BTreeMap<String, String> {
         let count = unsafe { (self.mod_info_count_fn)(i) };
         self.read_info(count)
+    }
+
+    /// One numeric fact out of a map's info block, by key.
+    ///
+    /// `GetMapInfoCount` publishes `maxMetal`, `extractorRadius`,
+    /// `tidalStrength`, `gravity`, the wind range and the map's size beside the
+    /// two strings [`Self::map_info`] reads. None of those is a string, which is
+    /// why they are absent from that map, and they are not all one type either:
+    /// unitsync's own `InternalMapInfo` holds `maxMetal` as a float and every
+    /// other one as an int, so this asks what each is before reading it. Reading
+    /// an int through the float accessor answers 0 rather than failing, which is
+    /// the shape of mistake that looks like a fact.
+    ///
+    /// Worth reading rather than `mapinfo.lua` when a map may not have one: the
+    /// engine synthesises this block for an SMD era map out of its `.smd`. The
+    /// cost is precision, since the ints here are the engine's rounding of what
+    /// the map declared.
+    ///
+    /// Kept out of [`Self::map_info`] on purpose: that map is displayed as the
+    /// map's tags, and dropping nine numbers into it would put nine chips on
+    /// every map card.
+    pub fn map_number(&self, i: i32, key: &str) -> Option<f32> {
+        let count_fn = self.map_info_count_fn?;
+        let count = unsafe { count_fn(i) };
+        for k in 0..count {
+            let Some(found) = (unsafe { cstr((self.info_key_fn)(k)) }) else {
+                continue;
+            };
+            if found != key {
+                continue;
+            }
+            let kind = self
+                .info_type_fn
+                .and_then(|f| unsafe { cstr(f(k)) })
+                .unwrap_or_default();
+            return match kind.as_str() {
+                "float" => self.info_value_float_fn.map(|f| unsafe { f(k) }),
+                "integer" => self.info_value_int_fn.map(|f| unsafe { f(k) } as f32),
+                _ => None,
+            };
+        }
+        None
     }
 
     /// Key/value metadata for a map (description, author, dimensions, ...), when
