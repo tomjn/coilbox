@@ -721,18 +721,12 @@ impl Walk {
                 }
                 None => {
                     self.count_skip(&variant);
-                    skipped.push(SeedSkip {
-                        kind: "unit",
-                        game: Some(game.shortname.clone()),
-                        unit_name: Some(unit),
-                        map_name: None,
-                        variant: Some(variant.clone()),
-                        source_archive: Some(game.source_archive.clone()),
-                        archive: None,
-                        reason: SeedSkipReason::Buildpic(
-                            display.asset_skipped.unwrap_or(BuildpicSkip::NoSource),
-                        ),
-                    });
+                    skipped.push(unit_skip(
+                        game,
+                        unit,
+                        variant.clone(),
+                        display.asset_skipped.unwrap_or(BuildpicSkip::NoSource),
+                    ));
                 }
             }
         }
@@ -872,6 +866,27 @@ impl Walk {
             });
         }
         self.batches.last().map(|b| b.index).unwrap_or(1)
+    }
+}
+
+/// The skip a unit with no build pic produces.
+///
+/// Its own function so the field the walk cannot be tested through can be tested
+/// here: resolving a build pic needs a unitsync session and a real archive, and
+/// this is where the two archive names could swap without anything noticing
+/// (issue #1682). `sourceArchive` is the install's declared name, and there is no
+/// file name, because which file holds the game is not part of why one unit has
+/// no picture.
+fn unit_skip(game: &GameInstall, unit: String, variant: String, why: BuildpicSkip) -> SeedSkip {
+    SeedSkip {
+        kind: "unit",
+        game: Some(game.shortname.clone()),
+        unit_name: Some(unit),
+        map_name: None,
+        variant: Some(variant),
+        source_archive: Some(game.source_archive.clone()),
+        archive: None,
+        reason: SeedSkipReason::Buildpic(why),
     }
 }
 
@@ -1294,12 +1309,34 @@ mod tests {
 
     /// A picture skip says why one layer is missing, and which file holds the
     /// archive is not part of that answer, so it carries the declared name only.
+    ///
+    /// The unit one is where the file name used to be, and it is the one place
+    /// the walk cannot be driven from a test, so it goes through [`unit_skip`].
     #[test]
     fn a_picture_skip_carries_no_file_name() {
         let (_, dropped) = dedupe_map_names(vec!["Bb 2.0".into(), "Bb 2.0".into()]);
         assert!(dropped[0].archive.is_none());
-
         let json = serde_json::to_value(&dropped[0]).expect("serialize");
+        assert!(json.get("archive").is_none(), "an empty field was written");
+
+        let game = GameInstall {
+            name: "Beyond All Reason test-30922".into(),
+            shortname: "BYAR".into(),
+            archive: "ded9b29714a05164e4b4523b09809af2.sdp".into(),
+            source_archive: "Beyond All Reason test-30922-8064a43".into(),
+        };
+        let skip = unit_skip(
+            &game,
+            "armcom".into(),
+            "buildpic".into(),
+            BuildpicSkip::NoSource,
+        );
+        assert_eq!(
+            skip.source_archive.as_deref(),
+            Some("Beyond All Reason test-30922-8064a43")
+        );
+        assert!(skip.archive.is_none());
+        let json = serde_json::to_value(&skip).expect("serialize");
         assert!(json.get("archive").is_none(), "an empty field was written");
     }
 
