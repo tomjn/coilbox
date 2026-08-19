@@ -14,12 +14,17 @@ serde_json = "1"
 # picks it.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 url = "2"
-sha2 = "0.10"
+sha2 = { workspace = true }
 base64 = "0.22"
 getrandom = "0.3"
 # "sync" is for the per-account refresh lock in account.rs, which is held across
 # awaits and so cannot be a std one.
 tokio = { version = "1", features = ["net", "io-util", "rt", "sync", "time"] }
+
+# The hardware SHA-256 backend, which is a feature on aarch64 and automatic
+# everywhere else. The workspace root says why the block is shaped this way.
+[target.'cfg(all(target_arch = "aarch64", not(target_env = "msvc")))'.dependencies]
+sha2 = { workspace = true, features = ["asm"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

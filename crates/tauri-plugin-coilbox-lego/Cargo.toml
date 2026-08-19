@@ -26,7 +26,7 @@ coilbox-springlua = { path = "../coilbox-springlua" }
 flate2 = "1"
 # The texture store is keyed by content, so a file edited outside coilbox hashes
 # to a new key and cannot be served from a stale cache.
-sha2 = "0.10"
+sha2 = { workspace = true }
 # A webview renders neither `.bmp` nor `.tga`, and they are most of what the
 # legacy games ship, so both are re-encoded to PNG on the way into the store.
 image = { version = "0.25", default-features = false, features = [
@@ -34,6 +34,11 @@ image = { version = "0.25", default-features = false, features = [
   "bmp",
   "tga",
 ] }
+
+# The hardware SHA-256 backend, which is a feature on aarch64 and automatic
+# everywhere else. The workspace root says why the block is shaped this way.
+[target.'cfg(all(target_arch = "aarch64", not(target_env = "msvc")))'.dependencies]
+sha2 = { workspace = true, features = ["asm"] }
 
 [dev-dependencies]
 tempfile = "3"
