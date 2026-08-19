@@ -53,6 +53,14 @@ interface Spy {
   uploads: AssetUpload[][];
   /** Who each run said started it (issue #1690). */
   startedBy: string[];
+  /** What each encode was handed, so a test can see whether the key it was named
+   *  by came with it (issue #1720). */
+  encodes: {
+    object: string;
+    modelDigest?: string;
+    sourceMember?: string;
+    sourceArchive?: string;
+  }[];
 }
 
 /** A tool set that answers everything, with knobs for the two things a test
@@ -76,6 +84,7 @@ function spy(
     draws: 0,
     uploads: [] as AssetUpload[][],
     startedBy: [] as string[],
+    encodes: [] as Spy["encodes"],
   };
 
   const tools: BackfillTools = {
@@ -97,7 +106,12 @@ function spy(
           sourceHash: `render-src-${unit.unit}`,
         };
       }
-      return { keys, skipped: {}, errors: [] } as never;
+      return {
+        keys,
+        sourceArchive: "Beyond All Reason test-1",
+        skipped: {},
+        errors: [],
+      } as never;
     },
     ask: async (_hubUrl, keys) => {
       state.asked.push(keys);
@@ -171,27 +185,35 @@ function spy(
         },
       };
     },
-    encodeRender: async ({ object }) => ({
-      asset: {
-        variant: "render:top",
-        origin: "rendered",
-        sourceArchive: "Beyond All Reason test-1",
-        path: `/cache/${object}.render.webp`,
-        hash: `render-hash-${object}`,
-        sourceHash: `render-src-${object}`,
-        sourceMember: `objects3d/${object}`,
-        modelDigest: `model-${object}`,
-        rendererVersion: 1,
-        footprintX: 2,
-        footprintZ: 3,
-        encodeProfile: "webp-q80-512",
-        mime: "image/webp",
-        width: 128,
-        height: 192,
-        bytes: 4000,
-      },
-      errors: [],
-    }),
+    encodeRender: async ({
+      object,
+      modelDigest,
+      sourceMember,
+      sourceArchive,
+    }) => {
+      state.encodes.push({ object, modelDigest, sourceMember, sourceArchive });
+      return {
+        asset: {
+          variant: "render:top",
+          origin: "rendered",
+          sourceArchive: "Beyond All Reason test-1",
+          path: `/cache/${object}.render.webp`,
+          hash: `render-hash-${object}`,
+          sourceHash: `render-src-${object}`,
+          sourceMember: `objects3d/${object}`,
+          modelDigest: `model-${object}`,
+          rendererVersion: 1,
+          footprintX: 2,
+          footprintZ: 3,
+          encodeProfile: "webp-q80-512",
+          mime: "image/webp",
+          width: 128,
+          height: 192,
+          bytes: 4000,
+        },
+        errors: [],
+      };
+    },
     upload: async (_hubUrl, assets, options) => {
       state.uploads.push(assets);
       state.startedBy.push(options.startedBy);
@@ -224,6 +246,9 @@ function spy(
     },
     get startedBy() {
       return state.startedBy;
+    },
+    get encodes() {
+      return state.encodes;
     },
   };
 }
@@ -335,6 +360,52 @@ describe("a run over one layout", () => {
     expect(watch.modelBatches).toHaveLength(1);
     expect(watch.modelBatches[0]).toHaveLength(30);
     expect(watch.asked).toHaveLength(1);
+  });
+
+  /**
+   * Issue #1720. The keys call already read every one of these models, so the
+   * encode is handed what it would otherwise mount the game's archive set to work
+   * out again: twenty buildings were twenty mounts on top of everything else.
+   *
+   * Each unit gets its own key rather than any key, which is the mis-wiring the
+   * worker used to make impossible by computing the identity itself. That check
+   * now lives here.
+   */
+  it("hands each encode the key its own unit was named by", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(TARGET, unitsOf(20), 100, watch.tools);
+
+    expect(watch.encodes).toHaveLength(20);
+    for (const encode of watch.encodes) {
+      const unit = encode.object.replace(/\.s3o$/, "");
+      expect(encode.modelDigest).toBe(`model-${unit}`);
+      expect(encode.sourceMember).toBe(`objects3d/${unit}.s3o`);
+      expect(encode.sourceArchive).toBe("Beyond All Reason test-1");
+    }
+    // Every unit once, so no unit's key was handed to another unit's picture.
+    expect(new Set(watch.encodes.map((e) => e.modelDigest)).size).toBe(20);
+  });
+
+  /**
+   * The three travel together or not at all. A batch whose mount failed names no
+   * archive, and two thirds of a key is refused rather than mounted for, so the
+   * encode has to be left to work the whole thing out for itself.
+   */
+  it("hands down nothing at all when the batch could not name the archive", async () => {
+    const watch = spy();
+    const keys = watch.tools.renderKeys;
+    watch.tools.renderKeys = async (input) => {
+      const out = await keys(input);
+      return { ...out, sourceArchive: undefined };
+    };
+    await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
+
+    expect(watch.encodes).toHaveLength(3);
+    for (const encode of watch.encodes) {
+      expect(encode.modelDigest).toBeUndefined();
+      expect(encode.sourceMember).toBeUndefined();
+      expect(encode.sourceArchive).toBeUndefined();
+    }
   });
 
   /** Two units on one model are one model read, since the batch is keyed on the
