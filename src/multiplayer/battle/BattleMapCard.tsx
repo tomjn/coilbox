@@ -8,6 +8,8 @@ import {
 } from "@/content/config";
 import { mergeMapTiers } from "@/content/mapTiers";
 import { useMapPictureLadder } from "@/hub/assets/useMapPicture";
+import { mapSampleExtent } from "@/hub/maps/facts";
+import { useMapFacts } from "@/hub/maps/useMapFacts";
 import { MapCard } from "@/play/pages/components/MapCard";
 import {
   MapLayerToggle,
@@ -129,12 +131,35 @@ export function BattleMapCard({
   const showBoxes = boxMode && Object.keys(battle.startRects).length > 0;
   const startPositions = boxMode ? [] : minimap.startPositions;
 
+  // What the hub knows about the map, asked for only while it is missing: an
+  // installed one is extracted locally and that answer is better (issue #1738).
+  const remoteFacts = useMapFacts(mapMissing ? battle.map : undefined);
+  const remoteExtent = mapSampleExtent(remoteFacts);
+  const remoteEnv = remoteFacts
+    ? {
+        ...(remoteFacts.min_wind !== null
+          ? { minWind: remoteFacts.min_wind }
+          : {}),
+        ...(remoteFacts.max_wind !== null
+          ? { maxWind: remoteFacts.max_wind }
+          : {}),
+        ...(remoteFacts.tidal_strength !== null
+          ? { tidalStrength: remoteFacts.tidal_strength }
+          : {}),
+      }
+    : undefined;
+
   // Synthesize a bare map so the card still shows the battle's map name when it
-  // isn't installed locally (the minimap then falls back to "No minimap").
+  // isn't installed locally (the minimap then falls back to "No minimap"). The
+  // hub's proportions and description go on it where it has them, so a map
+  // nobody here has still says how big it is rather than only what it is called.
   const bare: MapItem = localMap ?? {
     name: battle.map,
     archives: [],
-    info: {},
+    info: remoteFacts?.description
+      ? { description: remoteFacts.description }
+      : {},
+    ...(remoteExtent ?? {}),
   };
   // Proportions and mapinfo come from the thumbnail and metadata passes rather
   // than the scan, so fold in whichever has landed for this map.
@@ -151,7 +176,13 @@ export function BattleMapCard({
         startPositions={startPositions}
         minimapLoading={minimap.loading}
         markerColors={markerColors}
-        env={minimap.env}
+        // Wind and tidal come off the local render for an installed map, and
+        // off the hub for one that is not here. The local one is an object
+        // either way, empty until a render lands, so this asks whether it says
+        // anything rather than whether it exists.
+        env={
+          saysAnything(minimap.env) ? minimap.env : (remoteEnv ?? minimap.env)
+        }
         // Dim the base minimap while a terrain overlay is shown so the metal /
         // height layer reads clearly over it.
         dimBase={!!overlayUrl}
@@ -200,5 +231,18 @@ export function BattleMapCard({
 
       {canOverlay && <MapLayerToggle layer={layer} onChange={setLayer} />}
     </div>
+  );
+}
+
+/** Whether a wind and tidal reading has any of the three numbers in it. */
+function saysAnything(env: {
+  minWind?: number;
+  maxWind?: number;
+  tidalStrength?: number;
+}): boolean {
+  return (
+    env.minWind !== undefined ||
+    env.maxWind !== undefined ||
+    env.tidalStrength !== undefined
   );
 }

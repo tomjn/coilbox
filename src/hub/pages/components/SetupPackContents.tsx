@@ -16,21 +16,24 @@
  *   sitting in your data directory is a shelf of your own minimaps and costs no
  *   request at all. Nothing says which of them are installed: what a pack is for
  *   is filling in the ones that are not, and the importer already reports that.
- * - The caption is size and player count rather than the team shapes BAR draws
- *   start boxes for, since the boxes are not on this side's binding. See
- *   `../../assets/mapFacts.ts`.
+ * - The caption is size and player count, read off the hub's map catalog for
+ *   the maps this machine has not got. See `../../maps/facts.ts`. It used to
+ *   come from BAR's own map list, which went with the rest of their hosted
+ *   content in #1729, and the catalog is what puts it back (issue #1738).
  *
  * Unlike the rest of `./ItemPreview.tsx` this is a lookup rather than a reading
- * of the payload: every card asks unitsync, the hub and BAR's list what they have
- * of its map. One request each all the same, however many maps a pack names,
- * because the hub's asks are batched in `../../assets/heldPictures.ts` and BAR's
- * list is fetched once a session.
+ * of the payload: every card asks unitsync and the hub what they have of its
+ * map. One request each all the same, however many maps a pack names, because
+ * the hub's asks are batched in `../../assets/heldPictures.ts` and
+ * `../../maps/knownMaps.ts`.
  */
 
 import type { ReactNode } from "react";
 import { useScanTargetSelection, useUnitsyncMinimap } from "@/content/config";
 import { MapPictureCard } from "../../assets/MapPicture";
 import { useMapPictureLadder } from "../../assets/useMapPicture";
+import { mapDisplayName, mapFactsLabel } from "../../maps/facts";
+import { useMapFacts } from "../../maps/useMapFacts";
 import type { SetupPackContents as PackContents } from "../../preview";
 
 /**
@@ -100,7 +103,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** One map a pack installs, drawn from the best picture this session can find of
- *  it and captioned with what BAR knows about it. */
+ *  it and captioned with what the hub knows about it. */
 function PackMap({
   name,
   enginePath,
@@ -117,16 +120,21 @@ function PackMap({
     PACK_MINIMAP_MIP,
   );
   const ladder = useMapPictureLadder(name, minimap.url);
+  // Only for a map this machine has not got. An installed one is drawing itself
+  // from its own archive above, and its size and start positions are in that
+  // archive too, so asking the hub would be a request for something already
+  // here (issue #1738).
+  const facts = useMapFacts(minimap.url ? undefined : name);
 
   return (
     <MapPictureCard
       mapName={name}
       ladder={ladder}
-      // The pack's own name, which is all anything here knows it by. It used to
-      // prefer BAR's spelling, and say the map's size and player count under it,
-      // off BAR's map list. That list is no longer read (issue #1721 built the
-      // caption, `useMapPicture.ts` says why it went).
-      label={name}
+      // The hub's spelling where it has one, since a pack names a map by its
+      // spring name and that is not what a player reads in a lobby. The pack's
+      // own name otherwise, which is all anything here knows it by.
+      label={mapDisplayName(facts) ?? name}
+      detail={mapFactsLabel(facts)}
       className="h-full w-full"
     />
   );
