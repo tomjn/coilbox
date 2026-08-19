@@ -42,7 +42,7 @@ base64 = "0.22"
 webp = { version = "0.3.1", default-features = false }
 # Both asset hashes are sha256: the hub stores them as text and uses the encoded
 # one as the object path. Same version two other crates here already build.
-sha2 = "0.10"
+sha2 = { workspace = true }
 # The variant names, encode profiles and dimension caps the hub checks the
 # encoded bytes against. Read, never restated, so the encoder cannot drift from
 # what the hub will accept.
@@ -61,6 +61,13 @@ coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
 # dependency-free and read-only here.
 coilbox-s3o = { path = "../coilbox-s3o" }
 coilbox-3do = { path = "../coilbox-3do" }
+
+# The hardware SHA-256 backend, which is a feature on aarch64 and automatic
+# everywhere else. The workspace root says why the block is shaped this way. This
+# is the crate the issue was measured on: a Splinter Faction roster of render
+# keys is nearly all SHA-256 over one shared texture atlas.
+[target.'cfg(all(target_arch = "aarch64", not(target_env = "msvc")))'.dependencies]
+sha2 = { workspace = true, features = ["asm"] }
 
 [dev-dependencies]
 # Stock Lua 5.1 used ONLY to unit-test the injected serializer + wrapper against a
