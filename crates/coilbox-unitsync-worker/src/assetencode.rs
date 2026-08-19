@@ -475,12 +475,17 @@ pub fn render_source_hash(
 /// length prefixed so two textures cannot run together into one reading. The
 /// count is in the frame as well, so a texture that failed to resolve, and is
 /// therefore drawn plain, is a different picture from one that resolved.
-pub fn model_source_digest(model: &[u8], textures: &[Vec<u8>]) -> String {
+///
+/// `textures` is anything that reads as bytes rather than owned buffers, so a
+/// batch can hand over textures it is holding for the next model as well as ones
+/// it has just read (issue #1676). The frame is over the bytes either way.
+pub fn model_source_digest<T: AsRef<[u8]>>(model: &[u8], textures: &[T]) -> String {
     let mut hasher = Sha256::new();
     hasher.update((model.len() as u64).to_le_bytes());
     hasher.update(model);
     hasher.update((textures.len() as u32).to_le_bytes());
     for texture in textures {
+        let texture = texture.as_ref();
         hasher.update((texture.len() as u64).to_le_bytes());
         hasher.update(texture);
     }
@@ -529,6 +534,11 @@ fn encode_pixels(image: &DynamicImage, class: &AssetClass) -> Result<Vec<u8>, En
 mod tests {
     use super::*;
     use image::{Rgb, RgbImage, Rgba, RgbaImage};
+
+    /// A model that draws with no texture at all. Spelled with a type because
+    /// `model_source_digest` takes anything that reads as bytes, so an empty
+    /// slice on its own does not say what it is empty of.
+    const NO_TEXTURES: &[Vec<u8>] = &[];
 
     #[test]
     fn the_origins_this_worker_writes_are_the_shared_vocabularys_own() {
@@ -1054,7 +1064,7 @@ mod tests {
     /// check ask every user to upload the whole corpus.
     #[test]
     fn one_unit_keeps_one_identity_whatever_the_pixels_came_out_as() {
-        let digest = model_source_digest(b"an s3o", &[]);
+        let digest = model_source_digest(b"an s3o", NO_TEXTURES);
         let first = render_source_hash("render:top", 1, 3, 2, 255, 204, &digest);
         let second = render_source_hash("render:top", 1, 3, 2, 255, 204, &digest);
         assert_eq!(first, second);
@@ -1072,8 +1082,8 @@ mod tests {
     /// footprints can frame to one size, which the last pair here is.
     #[test]
     fn every_input_the_picture_depends_on_moves_the_identity() {
-        let digest = model_source_digest(b"an s3o", &[]);
-        let other = model_source_digest(b"a different s3o", &[]);
+        let digest = model_source_digest(b"an s3o", NO_TEXTURES);
+        let other = model_source_digest(b"a different s3o", NO_TEXTURES);
         let base = render_source_hash("render:top", 1, 3, 2, 255, 204, &digest);
         let variants = [
             render_source_hash("render:front", 1, 3, 2, 255, 204, &digest),
@@ -1113,7 +1123,7 @@ mod tests {
         // A texture that did not resolve is a unit drawn plain, which is not the
         // same picture as one that did.
         assert_ne!(
-            model_source_digest(&geometry, &[]),
+            model_source_digest(&geometry, NO_TEXTURES),
             model_source_digest(&geometry, &[b"blue.dds".to_vec()])
         );
         // Two textures cannot be re-split into one boundary that gives the same
@@ -1122,6 +1132,21 @@ mod tests {
             model_source_digest(&geometry, &[b"ab".to_vec(), b"cd".to_vec()]),
             model_source_digest(&geometry, &[b"a".to_vec(), b"bcd".to_vec()])
         );
+    }
+
+    /// A batch hands over textures it is holding for the next model rather than
+    /// buffers it just read (issue #1676), so the digest has to be over the
+    /// bytes and not over how they are held. If it were not, every render
+    /// already uploaded would become unreachable the day the batch changed how
+    /// it keeps a texture.
+    #[test]
+    fn the_digest_is_over_the_bytes_and_not_over_how_they_are_held() {
+        let owned = vec![b"blue.dds".to_vec(), b"mask.dds".to_vec()];
+        let borrowed: Vec<&[u8]> = owned.iter().map(|t| t.as_slice()).collect();
+        let boxed: Vec<Box<[u8]>> = owned.iter().map(|t| t.clone().into_boxed_slice()).collect();
+        let want = model_source_digest(b"an s3o", &owned);
+        assert_eq!(model_source_digest(b"an s3o", &borrowed), want);
+        assert_eq!(model_source_digest(b"an s3o", &boxed), want);
     }
 
     #[test]
