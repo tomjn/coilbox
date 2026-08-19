@@ -257,11 +257,7 @@ impl TextureCache {
     /// lookup in the archive's own index rather than a decompression, and
     /// keeping it would hold "this is missing" against the budget for real
     /// bytes.
-    fn get(
-        &mut self,
-        member: &str,
-        read: impl FnOnce() -> Option<Vec<u8>>,
-    ) -> Option<Rc<Vec<u8>>> {
+    fn get(&mut self, member: &str, read: impl FnOnce() -> Option<Vec<u8>>) -> Option<Rc<Vec<u8>>> {
         if let Some(at) = self.entries.iter().position(|(key, _)| key == member) {
             let entry = self.entries.remove(at);
             let bytes = Rc::clone(&entry.1);
