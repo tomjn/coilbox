@@ -213,6 +213,18 @@ pub fn build_unit_models_args(
     args
 }
 
+/// What a render was drawn from, for a caller that already holds it from
+/// `--unit-render-keys` (issue #1720).
+///
+/// Given, the worker does not mount the game's archive set at all, which is a
+/// second or more per unit on a game like Beyond All Reason. All three travel
+/// together and the worker refuses two of them.
+pub struct RenderSourceArgs<'a> {
+    pub model_digest: &'a str,
+    pub source_member: &'a str,
+    pub source_archive: &'a str,
+}
+
 /// Build args for `--unit-render` mode: the unit whose render this is, the frame
 /// it was taken in, the file the pixels are in, and where the encoded asset goes.
 ///
@@ -233,6 +245,7 @@ pub fn build_unit_render_args(
     width: u32,
     height: u32,
     asset_dir: &str,
+    source: Option<RenderSourceArgs<'_>>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.push("--unit-render".into());
@@ -256,6 +269,14 @@ pub fn build_unit_render_args(
     args.push(height.to_string());
     args.push("--asset-dir".into());
     args.push(asset_dir.into());
+    if let Some(source) = source {
+        args.push("--model-digest".into());
+        args.push(source.model_digest.into());
+        args.push("--source-member".into());
+        args.push(source.source_member.into());
+        args.push("--source-archive".into());
+        args.push(source.source_archive.into());
+    }
     args
 }
 
@@ -843,6 +864,7 @@ mod tests {
             255,
             204,
             "/assets",
+            None,
         );
         let after = |flag: &str| {
             let at = a.iter().position(|x| x == flag).expect(flag);
@@ -859,6 +881,47 @@ mod tests {
         assert_eq!(after("--width"), "255");
         assert_eq!(after("--height"), "204");
         assert_eq!(after("--asset-dir"), "/assets");
+        // A caller with no key still gets the mounting path, so nothing that
+        // exists today changes (issue #1720).
+        assert!(!a.contains(&"--model-digest".to_string()));
+        assert!(!a.contains(&"--source-member".to_string()));
+        assert!(!a.contains(&"--source-archive".to_string()));
+    }
+
+    /// A caller that already has the key from `--unit-render-keys` hands it down,
+    /// and all three fields have to arrive: two of them is refused by the worker
+    /// rather than quietly mounting (issue #1720).
+    #[test]
+    fn build_unit_render_args_carry_a_handed_down_key_whole() {
+        let a = build_unit_render_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "BAR.sdd",
+            "armcom.s3o",
+            "top",
+            3,
+            2,
+            1,
+            "/tmp/pixels.bin",
+            255,
+            204,
+            "/assets",
+            Some(RenderSourceArgs {
+                model_digest: "d5f0",
+                source_member: "objects3d/units/armcom.s3o",
+                source_archive: "Beyond All Reason test-30922",
+            }),
+        );
+        let after = |flag: &str| {
+            let at = a.iter().position(|x| x == flag).expect(flag);
+            a[at + 1].clone()
+        };
+        assert_eq!(after("--model-digest"), "d5f0");
+        assert_eq!(after("--source-member"), "objects3d/units/armcom.s3o");
+        assert_eq!(after("--source-archive"), "Beyond All Reason test-30922");
+        // And the frame is still the frame, since the key does not replace it.
+        assert_eq!(after("--footprint-x"), "3");
+        assert_eq!(after("--width"), "255");
     }
 
     /// The key mode's whole point is one call for many units, so the units go by

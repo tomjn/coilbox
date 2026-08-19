@@ -1415,7 +1415,8 @@ export interface UnitRenderResult {
  * anywhere: the hub does not hold footprints.
  *
  * Mounts the game's archive set to read the model the render was taken of, which
- * is what its `source_hash` is over, so it is as slow as reading a model.
+ * is what its `source_hash` is over, so it is as slow as reading a model, unless
+ * the three `source` fields below say what it was drawn from.
  */
 export const unitsyncUnitRender = defineCommand<
   {
@@ -1430,6 +1431,22 @@ export const unitsyncUnitRender = defineCommand<
     pixels: string;
     width: number;
     height: number;
+    /**
+     * What the render was drawn from, from the `unitsyncUnitRenderKeys` call that
+     * decided this unit was worth drawing (issue #1720). Pass all three and the
+     * worker does not mount the game's archive set at all, which on a blueprint
+     * of twenty buildings is twenty mounts saved.
+     *
+     * All three or none. Two of them is refused rather than mounted for, because
+     * a caller with two has a wiring bug and a mount would hide it.
+     *
+     * Leaving them out is the path for a caller with no key, which is what the
+     * unit model panel does: it renders one unit on its own and the worker
+     * working the identity out is the thing that panel is showing.
+     */
+    modelDigest?: string;
+    sourceMember?: string;
+    sourceArchive?: string;
   },
   UnitRenderResult
 >("coilbox-unitsync", "unitsync_unit_render");
@@ -1471,6 +1488,12 @@ export interface UnitRenderKey {
 export interface UnitRenderKeysResult {
   /** Keyed by the unit's internal name, as asked for. */
   keys: Record<string, UnitRenderKey>;
+  /** The name the game archive declares for itself, which is what a hub row's
+   *  `source_archive` holds. One per batch, because a batch is one game. Here so
+   *  the encode can be handed the whole of what it would otherwise mount to work
+   *  out (issue #1720). Absent when the mount failed, which is also when there
+   *  are no keys. */
+  sourceArchive?: string;
   /** The units that got no key, and why. A unit is in exactly one of the two. */
   skipped: Record<string, RenderSkip>;
   errors: string[];

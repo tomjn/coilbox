@@ -860,6 +860,15 @@ pub struct UnitRenderKey {
 pub struct UnitRenderKeysOutput {
     /// Keyed by the unit's internal name, as asked for.
     pub keys: BTreeMap<String, UnitRenderKey>,
+    /// The name the game archive declares for itself, which is what a hub row's
+    /// `source_archive` holds. One per batch rather than one per key, because a
+    /// batch is one game.
+    ///
+    /// Here so a caller can hand `--unit-render` the whole of what it would
+    /// otherwise mount to work out (issue #1720). Empty when the mount failed,
+    /// which is also when there are no keys.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub source_archive: String,
     /// The units that got no key, and why. A unit is in exactly one of the two
     /// maps.
     pub skipped: BTreeMap<String, RenderSkip>,

@@ -20,7 +20,7 @@ use sidecar::{
     build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
     build_unit_buildpics_args, build_unit_dataset_args, build_unit_model_args,
     build_unit_models_args, build_unit_render_args, build_unit_render_keys_args, find_unitsync,
-    resolve_sidecar,
+    resolve_sidecar, RenderSourceArgs,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -762,6 +762,13 @@ async fn unitsync_unit_models<R: Runtime>(
 /// Encoding needs to be the one libwebp the rest of the corpus went through, and
 /// letting the canvas write its own WebP would put a second one on the same
 /// corpus. So the pixels take the long way round.
+///
+/// `model_digest`, `source_member` and `source_archive` are what the render was
+/// drawn from, and a caller that already has them from `unitsync_unit_render_keys`
+/// should pass them (issue #1720). Given, the worker does not mount the game's
+/// archive set at all, which on a blueprint of twenty buildings is twenty mounts
+/// saved. Left out, the worker mounts and works them out for itself, which is
+/// what a caller with no key needs.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 async fn unitsync_unit_render<R: Runtime>(
@@ -777,6 +784,9 @@ async fn unitsync_unit_render<R: Runtime>(
     pixels: String,
     width: u32,
     height: u32,
+    model_digest: Option<String>,
+    source_member: Option<String>,
+    source_archive: Option<String>,
 ) -> Result<CliResult, ()> {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
@@ -787,6 +797,29 @@ async fn unitsync_unit_render<R: Runtime>(
             "no cache directory on this platform, so there is nowhere to write the render"
                 .to_string(),
         ));
+    };
+    // All three or none, checked before the quarter of a megabyte of pixels is
+    // written anywhere. Two of them is a caller that meant to hand the key down
+    // and got it wrong, and mounting anyway would hide that behind a slow render
+    // nobody would look twice at.
+    let source = match (
+        model_digest.as_deref(),
+        source_member.as_deref(),
+        source_archive.as_deref(),
+    ) {
+        (None, None, None) => None,
+        (Some(model_digest), Some(source_member), Some(source_archive)) => Some(RenderSourceArgs {
+            model_digest,
+            source_member,
+            source_archive,
+        }),
+        _ => {
+            return Ok(CliResult::err(
+                "a render's model digest, source member and source archive travel together or \
+                 not at all"
+                    .to_string(),
+            ))
+        }
     };
     let rgba = match base64::engine::general_purpose::STANDARD.decode(&pixels) {
         Ok(bytes) => bytes,
@@ -810,6 +843,7 @@ async fn unitsync_unit_render<R: Runtime>(
         width,
         height,
         &asset_dir.to_string_lossy(),
+        source,
     );
     let envs = loader_envs(&engine_dir, &data_dir);
     let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "unit render", None).await;

@@ -40,7 +40,8 @@
  *
  * The renders themselves are drawn one at a time. Each needs a GL context of its
  * own, and twenty at once is twenty contexts competing for the same GPU rather
- * than twenty renders in the time of one.
+ * than twenty renders in the time of one. The encode that follows each one costs
+ * no mount, because the key it was named by is handed to it (issue #1720).
  *
  * ## There is no map equivalent of this file, and there is not meant to be
  *
@@ -62,6 +63,7 @@ import {
   type UnitBuildpicsResult,
   type UnitDatasetEntry,
   type UnitModelResult,
+  type UnitRenderKey,
   type UnitRenderKeysResult,
   type UnitRenderResult,
   unitsyncUnitBuildpics,
@@ -306,7 +308,15 @@ export async function backfillBlueprintUnits(
       );
       continue;
     }
-    const asset = await renderOne(target, archive, unit, model.file, tools);
+    const asset = await renderOne(
+      target,
+      archive,
+      unit,
+      model.file,
+      keyed.keys[unit.name],
+      keyed.sourceArchive,
+      tools,
+    );
     rendered += 1;
     if (asset) assets.push(asset);
   }
@@ -419,17 +429,36 @@ export function buildpicUploads(
  * `modelFile` is what the batch read wrote this unit's model to. A unit that will
  * not draw is not a run that stops: the reasons are all about one unit, and the
  * rest of the layout is still worth sending.
+ *
+ * `key` is this unit's own row out of the keys call, and handing it to the encode
+ * is issue #1720: those three fields are what the encode would otherwise mount the
+ * game's archive set to work out, having been worked out a moment ago for exactly
+ * this unit at exactly this footprint. Twenty buildings were twenty mounts.
+ *
+ * The three travel together or not at all, so a key without an archive name, which
+ * is what a batch whose mount failed gives, takes the mounting path rather than
+ * two thirds of the fast one.
  */
 async function renderOne(
   target: BackfillTarget,
   archive: { enginePath: string; dataDir: string; gameArchive: string },
   unit: BackfillUnit,
   modelFile: string,
+  key: UnitRenderKey | undefined,
+  sourceArchive: string | undefined,
   tools: BackfillTools,
 ): Promise<AssetUpload | null> {
   try {
     const model = await tools.readModel(modelFile);
     const drawn = await tools.draw(model, unit.footprintX, unit.footprintZ);
+    const known =
+      key?.modelDigest && key.sourceMember && sourceArchive
+        ? {
+            modelDigest: key.modelDigest,
+            sourceMember: key.sourceMember,
+            sourceArchive,
+          }
+        : {};
     const encoded: UnitRenderResult = await tools.encodeRender({
       ...archive,
       object: unit.objectName,
@@ -440,6 +469,7 @@ async function renderOne(
       pixels: toBase64(drawn.rgba),
       width: drawn.width,
       height: drawn.height,
+      ...known,
     });
     const asset = encoded.asset;
     if (!asset) return null;

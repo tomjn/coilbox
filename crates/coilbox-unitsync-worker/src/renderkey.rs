@@ -128,6 +128,10 @@ pub(crate) fn resolve(
 
     let digest = crate::unitmodel::digest_reader(us, handle, &list);
     let (keys, skipped) = build_keys(requests, variant, renderer_version, digest);
+    // Read inside the session, since the archive list goes with unitsync. One per
+    // batch because a batch is one game, and it is here so `--unit-render` can be
+    // handed the whole of what it would otherwise mount for (issue #1720).
+    let source_archive = crate::archive::archive_name_for_game(us, game_archive);
 
     us.close_archive(handle);
     errors.extend(us.drain_errors());
@@ -135,6 +139,7 @@ pub(crate) fn resolve(
 
     UnitRenderKeysOutput {
         keys,
+        source_archive,
         skipped,
         errors,
     }
@@ -360,8 +365,10 @@ mod tests {
 
     /// The claim this whole mode rests on, against a real game: the key worked
     /// out without drawing anything is the one `--unit-render` produces for the
-    /// same unit. If the two ever differ, the have check reports every render as
-    /// missing and the corpus is uploaded twice.
+    /// same unit, whether the encode mounts the archive to work it out for itself
+    /// or is handed the key (issue #1720). If any of the three ever differ, the
+    /// have check reports every render as missing and the corpus is uploaded
+    /// twice.
     ///
     /// Runs the worker binary rather than calling in, both because that is how a
     /// caller reaches either mode and because unitsync is a global C singleton
@@ -427,8 +434,14 @@ mod tests {
             took / requests.len().max(1) as u32
         );
 
-        // The render path, for a few of them. Blank pixels, because the identity
-        // is over the model rather than over what was drawn.
+        assert!(
+            !batch.source_archive.is_empty(),
+            "the batch has to name the archive, since that is the third field the encode is \
+             handed rather than mounting for"
+        );
+
+        // The render path, for a few of them, both ways round. Blank pixels,
+        // because the identity is over the model rather than over what was drawn.
         let dir = std::env::temp_dir().join(format!("coilbox-live-keys-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let pixel_file = dir.join("pixels.bin");
@@ -439,37 +452,59 @@ mod tests {
                 vec![0u8; (key.width_px * key.height_px * 4) as usize],
             )
             .unwrap();
-            let drawn = run(vec![
-                "--unit-render".into(),
-                "--game".into(),
-                game.clone(),
-                "--object".into(),
-                key.object_name.clone(),
-                "--angle".into(),
-                "top".into(),
-                "--footprint-x".into(),
-                key.footprint_x.to_string(),
-                "--footprint-z".into(),
-                key.footprint_z.to_string(),
-                "--renderer-version".into(),
-                key.renderer_version.to_string(),
-                "--pixels".into(),
-                pixel_file.to_string_lossy().into_owned(),
-                "--width".into(),
-                key.width_px.to_string(),
-                "--height".into(),
-                key.height_px.to_string(),
-                "--asset-dir".into(),
-                dir.to_string_lossy().into_owned(),
+            let encode = |extra: Vec<String>| {
+                let mut args = vec![
+                    "--unit-render".into(),
+                    "--game".into(),
+                    game.clone(),
+                    "--object".into(),
+                    key.object_name.clone(),
+                    "--angle".into(),
+                    "top".into(),
+                    "--footprint-x".into(),
+                    key.footprint_x.to_string(),
+                    "--footprint-z".into(),
+                    key.footprint_z.to_string(),
+                    "--renderer-version".into(),
+                    key.renderer_version.to_string(),
+                    "--pixels".into(),
+                    pixel_file.to_string_lossy().into_owned(),
+                    "--width".into(),
+                    key.width_px.to_string(),
+                    "--height".into(),
+                    key.height_px.to_string(),
+                    "--asset-dir".into(),
+                    dir.to_string_lossy().into_owned(),
+                ];
+                args.extend(extra);
+                run(args)
+            };
+
+            let mounted = encode(Vec::new());
+            let handed = encode(vec![
+                "--model-digest".into(),
+                key.model_digest.clone(),
+                "--source-member".into(),
+                key.source_member.clone(),
+                "--source-archive".into(),
+                batch.source_archive.clone(),
             ]);
-            let asset = drawn
-                .get("asset")
-                .unwrap_or_else(|| panic!("{unit} was not encoded: {drawn}"));
-            let field = |name: &str| asset.get(name).and_then(|v| v.as_str()).unwrap_or_default();
-            assert_eq!(field("modelDigest"), key.model_digest, "{unit}");
-            assert_eq!(field("sourceHash"), key.source_hash, "{unit}");
-            assert_eq!(field("sourceMember"), key.source_member, "{unit}");
-            println!("{unit}: {} matches the render path", key.source_hash);
+
+            for (how, drawn) in [("mounted", &mounted), ("handed the key", &handed)] {
+                let asset = drawn
+                    .get("asset")
+                    .unwrap_or_else(|| panic!("{unit} {how} was not encoded: {drawn}"));
+                let field =
+                    |name: &str| asset.get(name).and_then(|v| v.as_str()).unwrap_or_default();
+                assert_eq!(field("modelDigest"), key.model_digest, "{unit} {how}");
+                assert_eq!(field("sourceHash"), key.source_hash, "{unit} {how}");
+                assert_eq!(field("sourceMember"), key.source_member, "{unit} {how}");
+                assert_eq!(field("sourceArchive"), batch.source_archive, "{unit} {how}");
+            }
+            // And whole, so a field neither the key nor the loop names cannot
+            // move under the fast path either.
+            assert_eq!(mounted["asset"], handed["asset"], "{unit}");
+            println!("{unit}: {} matches both render paths", key.source_hash);
             checked += 1;
         }
         assert_eq!(checked, batch.keys.len().min(3));
@@ -487,13 +522,17 @@ mod tests {
         );
         let json = serde_json::to_string(&UnitRenderKeysOutput {
             keys,
+            source_archive: "Beyond All Reason test-30922-8064a43".into(),
             skipped,
             errors: Vec::new(),
         })
         .unwrap();
         assert!(json.contains("\"sourceHash\""), "{json}");
         assert!(json.contains("\"modelDigest\""), "{json}");
+        assert!(json.contains("\"sourceMember\""), "{json}");
         assert!(json.contains("\"widthPx\""), "{json}");
         assert!(json.contains("\"objectName\""), "{json}");
+        // The third field `--unit-render` would otherwise mount for (issue #1720).
+        assert!(json.contains("\"sourceArchive\""), "{json}");
     }
 }
