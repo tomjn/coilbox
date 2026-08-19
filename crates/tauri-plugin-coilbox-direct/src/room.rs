@@ -153,10 +153,88 @@ enum PeerMsg {
 /// One connected socket.
 struct Peer {
     out: mpsc::UnboundedSender<PeerMsg>,
-    /// When this peer last said anything. See [`IDLE_TIMEOUT`]. The runtime's
-    /// clock rather than the system one, so it is the same clock the sweep
-    /// interval runs on.
+    /// When this peer last said anything, read off the room's own clock so it is
+    /// the same one the sweep is timed against. See [`IDLE_TIMEOUT`].
     heard: Instant,
+}
+
+/// Where the room's idle sweep gets its time.
+///
+/// A test cannot borrow the runtime's clock for this. Pausing it makes it
+/// auto-advance to the next timer whenever the runtime has nothing to run, and a
+/// test waiting on a real socket hands it that chance over and over, so the sweep
+/// interval can tick any number of times before the test gets to look at the
+/// room. Leaving it running instead means waiting out ninety real seconds and
+/// betting the machine is not busy. So the sweep is given a clock, and a test is
+/// given one it drives itself.
+enum Sweeper {
+    /// The runtime's clock, ticking every [`SWEEP_INTERVAL`].
+    Runtime(tokio::time::Interval),
+    /// Stands still until a [`ManualClock`] moves it, and sweeps once per move.
+    Manual {
+        origin: Instant,
+        elapsed: Duration,
+        moves: mpsc::UnboundedReceiver<Duration>,
+    },
+}
+
+impl Sweeper {
+    /// The runtime's clock. Its first tick is a whole [`SWEEP_INTERVAL`] away,
+    /// because nobody should be swept before they have had a chance to speak.
+    fn runtime() -> Sweeper {
+        Sweeper::Runtime(tokio::time::interval_at(
+            Instant::now() + SWEEP_INTERVAL,
+            SWEEP_INTERVAL,
+        ))
+    }
+
+    /// The time to judge [`Peer::heard`] against.
+    fn now(&self) -> Instant {
+        match self {
+            Sweeper::Runtime(_) => Instant::now(),
+            Sweeper::Manual {
+                origin, elapsed, ..
+            } => *origin + *elapsed,
+        }
+    }
+
+    /// Resolves when it is time to look for idle peers.
+    ///
+    /// Cancel safe, because this is one branch of the room's select and the other
+    /// branch wins often. `Interval::tick` and `Receiver::recv` both are.
+    async fn tick(&mut self) {
+        match self {
+            Sweeper::Runtime(interval) => {
+                interval.tick().await;
+            }
+            Sweeper::Manual { elapsed, moves, .. } => match moves.recv().await {
+                Some(by) => *elapsed += by,
+                // Every handle on this clock is gone, so it will never move
+                // again and there is nothing left to wake up for.
+                None => std::future::pending().await,
+            },
+        }
+    }
+}
+
+/// A room's clock, moved by hand.
+///
+/// Only [`Room::start_on_a_manual_clock`] hands one of these out, and it exists
+/// so a test can say when the idle sweep happens rather than hoping. Each
+/// [`ManualClock::advance`] moves the room's clock on and sweeps once at the new
+/// time. Nothing else moves it, so a peer is never swept behind a test's back.
+#[derive(Clone)]
+pub struct ManualClock(mpsc::UnboundedSender<Duration>);
+
+impl ManualClock {
+    /// Move the room's clock on by `by`, and sweep once at the new time.
+    ///
+    /// Returns as soon as the room has been told. Wait on something the sweep
+    /// itself causes, such as the swept peer's socket closing, before asking the
+    /// room what it now holds.
+    pub fn advance(&self, by: Duration) {
+        let _ = self.0.send(by);
+    }
 }
 
 impl Room {
@@ -165,6 +243,25 @@ impl Room {
     /// Fails if the port is taken, which is the failure a host meets most: a
     /// second coilbox, or a room they forgot they left running.
     pub async fn start(options: RoomOptions) -> Result<Room, String> {
+        Room::listen(options, Sweeper::runtime()).await
+    }
+
+    /// Start a room whose idle sweep only happens when the returned clock is
+    /// advanced. For tests: see [`Sweeper`] for why they cannot use the
+    /// runtime's clock for this.
+    pub async fn start_on_a_manual_clock(
+        options: RoomOptions,
+    ) -> Result<(Room, ManualClock), String> {
+        let (moves, rx) = mpsc::unbounded_channel();
+        let sweeper = Sweeper::Manual {
+            origin: Instant::now(),
+            elapsed: Duration::ZERO,
+            moves: rx,
+        };
+        Ok((Room::listen(options, sweeper).await?, ManualClock(moves)))
+    }
+
+    async fn listen(options: RoomOptions, sweeper: Sweeper) -> Result<Room, String> {
         // 0.0.0.0 rather than loopback: the host's own client is not the only
         // one that has to reach this, and a LAN peer cannot dial 127.0.0.1.
         let bind = format!("0.0.0.0:{}", options.port);
@@ -184,7 +281,7 @@ impl Room {
             approve_joins: options.approve_joins,
         });
         let (requests, rx) = mpsc::unbounded_channel();
-        tokio::spawn(run_room(state, options.clone(), port, rx));
+        tokio::spawn(run_room(state, options.clone(), port, rx, sweeper));
         let listener = tokio::spawn(accept_loop(listener, requests.clone()));
 
         let beacon_id = beacon::room_id();
@@ -347,12 +444,9 @@ async fn run_room(
     options: RoomOptions,
     port: u16,
     mut rx: mpsc::UnboundedReceiver<Request>,
+    mut sweep: Sweeper,
 ) {
     let mut peers: BTreeMap<PeerId, Peer> = BTreeMap::new();
-    let mut sweep = tokio::time::interval(SWEEP_INTERVAL);
-    // The first tick fires at once, so skip it. Nobody should be swept before
-    // they have had a chance to speak.
-    sweep.tick().await;
 
     loop {
         tokio::select! {
@@ -360,12 +454,12 @@ async fn run_room(
                 let Some(request) = request else { return };
                 match request {
                     Request::Accept { peer, out } => {
-                        peers.insert(peer, Peer { out, heard: Instant::now() });
+                        peers.insert(peer, Peer { out, heard: sweep.now() });
                         deliver(&peers, state.connect(peer));
                     }
                     Request::Line { peer, line } => {
                         if let Some(p) = peers.get_mut(&peer) {
-                            p.heard = Instant::now();
+                            p.heard = sweep.now();
                         }
                         deliver(&peers, state.apply(peer, parse_client_line(&line)));
                     }
@@ -397,8 +491,8 @@ async fn run_room(
                     }
                 }
             }
-            _ = sweep.tick() => {
-                for peer in idle_peers(&peers, Instant::now()) {
+            () = sweep.tick() => {
+                for peer in idle_peers(&peers, sweep.now()) {
                     peers.remove(&peer);
                     deliver(&peers, state.disconnect(peer));
                 }
