@@ -97,6 +97,18 @@ The lint CI covers the two surfaces above. Tests aren't part of that workflow, b
 bun run test
 ```
 
+### Testing a React hook
+
+Tests run in Node by default, because most of the suite has no React in it and a DOM costs about 150ms per file to stand up. A file that needs one asks for it on its own first line:
+
+```tsx
+// @vitest-environment happy-dom
+```
+
+Then `renderHook` from `@testing-library/react` runs the hook, `waitFor` waits for an effect's answer to arrive, and `act` wraps anything that sets state. `src/hub/assets/useMapPicture.test.tsx` is the worked example, including the wrapper a hook needs when it reads a setting through the frame's store. Call `cleanup()` in an `afterEach`, because this repo doesn't enable Vitest's globals and the library can't register its own.
+
+Prefer this over asserting a hook is correct by reading it. The wiring inside a hook is exactly where a feature is switched on or off, and nothing else in the suite covers it.
+
 ## Pull requests
 
 - Keep commits atomic and prefer several small commits over one large one; it keeps history readable and changes easy to extract.
