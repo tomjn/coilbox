@@ -127,40 +127,39 @@ pub(crate) fn resolve(
         .collect();
 
     let digest = crate::unitmodel::digest_reader(us, handle, &list);
-    let (keys, skipped) = build_keys(requests, variant, renderer_version, digest);
     // Read inside the session, since the archive list goes with unitsync. One per
     // batch because a batch is one game, and it is here so `--unit-render` can be
     // handed the whole of what it would otherwise mount for (issue #1720).
     let source_archive = crate::archive::archive_name_for_game(us, game_archive);
+    let batch = build_keys(requests, variant, renderer_version, digest, source_archive);
 
     us.close_archive(handle);
     errors.extend(us.drain_errors());
     us.remove_all_archives();
 
-    UnitRenderKeysOutput {
-        keys,
-        source_archive,
-        skipped,
-        errors,
-    }
+    UnitRenderKeysOutput { errors, ..batch }
 }
 
-/// Turn each request into a key, asking `digest` for the model's half of it.
+/// Turn each request into a key, asking `digest` for the model's half of it, and
+/// answer with `source_archive` as the batch's own.
 ///
 /// Split from the mount so the batching is testable, and so the two costs are
 /// visible: one digest per distinct model rather than one per unit. Units sharing
 /// a model is the normal case rather than an odd one, since a game's hats, wrecks
 /// and re-skins all name the same `.s3o`, and re-reading a shared 64 MiB texture
 /// atlas per unit would be the whole cost of the batch.
+///
+/// The archive name is an argument for the same reason `digest` is: reading it
+/// takes a session, and carrying it does not (issue #1755). Both halves of what
+/// the session reported are assembled into the answer here, where a test can run
+/// them, rather than in `resolve`, where nothing but a live engine can.
 fn build_keys(
     requests: &[UnitRenderKeyRequest],
     variant: &str,
     renderer_version: u32,
     digest: impl Fn(&str) -> Result<(String, String), String>,
-) -> (
-    BTreeMap<String, UnitRenderKey>,
-    BTreeMap<String, RenderSkip>,
-) {
+    source_archive: String,
+) -> UnitRenderKeysOutput {
     let mut keys = BTreeMap::new();
     let mut skipped = BTreeMap::new();
     let mut seen: BTreeMap<String, Option<(String, String)>> = BTreeMap::new();
@@ -185,7 +184,12 @@ fn build_keys(
             ),
         );
     }
-    (keys, skipped)
+    UnitRenderKeysOutput {
+        keys,
+        source_archive,
+        skipped,
+        errors: Vec::new(),
+    }
 }
 
 /// One key, framed the way `--unit-render` frames the pixels.
@@ -310,13 +314,20 @@ mod tests {
             request("armsolar", "armsolar", 4, 4),
             request("armwreck_c", "WRECK", 3, 3),
         ];
-        let (keys, skipped) = build_keys(&requests, "render:top", 1, |object| {
-            asked.borrow_mut().push(object.to_string());
-            Ok((
-                format!("digest-of-{}", object.to_lowercase()),
-                format!("objects3d/{}.s3o", object.to_lowercase()),
-            ))
-        });
+        let out = build_keys(
+            &requests,
+            "render:top",
+            1,
+            |object| {
+                asked.borrow_mut().push(object.to_string());
+                Ok((
+                    format!("digest-of-{}", object.to_lowercase()),
+                    format!("objects3d/{}.s3o", object.to_lowercase()),
+                ))
+            },
+            "Beyond All Reason test-30922-8064a43".into(),
+        );
+        let (keys, skipped) = (out.keys, out.skipped);
 
         assert_eq!(asked.borrow().len(), 2, "{:?}", asked.borrow());
         assert_eq!(keys.len(), 4);
@@ -340,16 +351,90 @@ mod tests {
             request("armsolar", "armsolar", 4, 4),
             request("hat", "hats/missing", 1, 1),
         ];
-        let (keys, skipped) = build_keys(&requests, "render:top", 1, |object| {
-            if object.contains("missing") {
-                Err("no model".into())
-            } else {
-                Ok(("digest".into(), "objects3d/armsolar.s3o".into()))
+        let out = build_keys(
+            &requests,
+            "render:top",
+            1,
+            |object| {
+                if object.contains("missing") {
+                    Err("no model".into())
+                } else {
+                    Ok(("digest".into(), "objects3d/armsolar.s3o".into()))
+                }
+            },
+            "Beyond All Reason test-30922-8064a43".into(),
+        );
+        assert_eq!(out.keys.len(), 1);
+        assert_eq!(out.skipped.get("hat"), Some(&RenderSkip::NoModel));
+        assert!(!out.keys.contains_key("hat"));
+    }
+
+    /// The third field `--unit-render` is handed rather than mounting for, over
+    /// the half of its journey CI can run: whatever the session reported the
+    /// archive is called, the batch answers with, on every batch rather than the
+    /// convenient ones (issue #1755).
+    ///
+    /// A batch that loses it still draws correct pictures, which is why it wants
+    /// a test of its own. `blueprintBackfill.ts` takes the three fields together
+    /// or not at all, so two thirds of a key is the mounting path, and a
+    /// blueprint's twenty renders are twenty mounts again.
+    #[test]
+    fn the_batch_names_the_archive_the_session_reported() {
+        let reported = "Beyond All Reason test-30922-8064a43";
+        let keyed = |requests: &[UnitRenderKeyRequest]| {
+            build_keys(
+                requests,
+                "render:top",
+                1,
+                |object| {
+                    if object.contains("missing") {
+                        Err("no model".into())
+                    } else {
+                        Ok((
+                            format!("digest-of-{object}"),
+                            format!("objects3d/{object}.s3o"),
+                        ))
+                    }
+                },
+                reported.into(),
+            )
+        };
+
+        // One unit, a few, and a few of which one has no model. The archive is
+        // the batch's own, so none of that is allowed to change what it is called.
+        for requests in [
+            vec![request("armsolar", "armsolar", 4, 4)],
+            vec![
+                request("armsolar", "armsolar", 4, 4),
+                request("armllt", "armllt", 2, 2),
+                request("armwin", "armwin", 3, 3),
+            ],
+            vec![
+                request("armsolar", "armsolar", 4, 4),
+                request("hat", "hats/missing", 1, 1),
+            ],
+        ] {
+            let out = keyed(&requests);
+            assert!(
+                !out.keys.is_empty(),
+                "{} units keyed nothing",
+                requests.len()
+            );
+            assert_eq!(
+                out.source_archive,
+                reported,
+                "{} units, {} keys, {} skipped",
+                requests.len(),
+                out.keys.len(),
+                out.skipped.len()
+            );
+            // And each key carries the other two, so every unit the batch keyed
+            // is one the encode can take without mounting for it.
+            for (unit, key) in &out.keys {
+                assert!(!key.model_digest.is_empty(), "{unit}");
+                assert!(!key.source_member.is_empty(), "{unit}");
             }
-        });
-        assert_eq!(keys.len(), 1);
-        assert_eq!(skipped.get("hat"), Some(&RenderSkip::NoModel));
-        assert!(!keys.contains_key("hat"));
+        }
     }
 
     /// An angle nobody agreed on would key a row the hub has no reader for, so
@@ -514,19 +599,14 @@ mod tests {
     /// The shape the caller reads: the field names the binding expects.
     #[test]
     fn the_output_names_its_fields_the_way_the_caller_reads_them() {
-        let (keys, skipped) = build_keys(
+        let out = build_keys(
             &[request("armsolar", "armsolar", 4, 4)],
             "render:top",
             1,
             |_| Ok(("digest".into(), "objects3d/armsolar.s3o".into())),
+            "Beyond All Reason test-30922-8064a43".into(),
         );
-        let json = serde_json::to_string(&UnitRenderKeysOutput {
-            keys,
-            source_archive: "Beyond All Reason test-30922-8064a43".into(),
-            skipped,
-            errors: Vec::new(),
-        })
-        .unwrap();
+        let json = serde_json::to_string(&out).unwrap();
         assert!(json.contains("\"sourceHash\""), "{json}");
         assert!(json.contains("\"modelDigest\""), "{json}");
         assert!(json.contains("\"sourceMember\""), "{json}");
