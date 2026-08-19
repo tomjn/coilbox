@@ -113,9 +113,14 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   const reduceMotion = useReduceMotion();
   const effects = useEffectsEnabled();
   const performanceMode = usePerformanceMode();
-  // Space maps (voidwater) render as asteroid/comet nodes. Best-effort: fills in
-  // as maps' minimaps are resolved anywhere in the app (see mapAppearanceCache).
-  const spaceMaps = useKnownSpaceMaps();
+  // Space maps (voidwater) render as asteroid/comet nodes. This machine's own
+  // answer for the maps it has, and the hub's catalog for the rest, so a galaxy
+  // of maps nobody here has installed still draws asteroids (issue #1739).
+  const nodeMaps = useMemo(
+    () => galaxy.nodes.map((n) => n.battle.mapName).filter(Boolean),
+    [galaxy.nodes],
+  );
+  const spaceMaps = useKnownSpaceMaps(nodeMaps);
   // Galaxy-wide void bodies (guarantees a comet when any node is a space map);
   // used for the selection-panel label so it matches the rendered body.
   const voidBodies = useMemo(

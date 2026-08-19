@@ -78,7 +78,13 @@ export function RunMapView({
     [run.nodes, run.edges, run.progress.visited],
   );
 
-  const spaceMaps = useKnownSpaceMaps();
+  // The maps this run's nodes are played on, so the hub can say which are void
+  // for the ones this machine has not got (issue #1739).
+  const nodeMaps = useMemo(
+    () => doc.nodes.map((n) => n.battle.mapName).filter(Boolean),
+    [doc.nodes],
+  );
+  const spaceMaps = useKnownSpaceMaps(nodeMaps);
   const reduceMotion = useReduceMotion();
   const effects = useEffectsEnabled();
   const performanceMode = usePerformanceMode();
