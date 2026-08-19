@@ -189,8 +189,33 @@ pub struct SeedSkip {
     pub map_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variant: Option<String>,
+    /// The name the archive declares for itself, which is the same string, read
+    /// the same way, as the `sourceArchive` on an asset row beside it (#1682).
+    ///
+    /// A skip writes no hub row, so coilbox-hub#116's anomaly check, which only
+    /// compares source bytes between rows agreeing on this field, does not reach
+    /// here. What does reach here is the reader: rows and skips sit in one
+    /// document under one field name, so a maintainer who learns the name off a
+    /// row applies that reading to a skip, and a script written against the rows
+    /// would too. One name, one meaning.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_archive: Option<String>,
+    /// The archive's file name on disk, which is a different question and only
+    /// two of these skips ask it.
+    ///
+    /// `superseded` and `no-shortname` are about an install rather than about a
+    /// picture, and what a maintainer does with either is find the install and
+    /// delete it. The declared name will not find it: a rapid pool install
+    /// answers to `Beyond All Reason test-30922-8064a43` and sits on disk as
+    /// `ded9b29714a05164e4b4523b09809af2.sdp`, and nothing outside unitsync maps
+    /// one to the other. So the file name stays, under its own name, rather than
+    /// being either dropped or spelled `sourceArchive`. Same field name as
+    /// `SeedGame::archive`, which already means the file in this manifest.
+    ///
+    /// Absent on a map or unit skip. Those say why one picture is missing, and
+    /// which file holds the archive is not part of that answer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archive: Option<String>,
     pub reason: SeedSkipReason,
 }
 
@@ -426,6 +451,7 @@ fn dedupe_map_names(mut names: Vec<String>) -> (Vec<String>, Vec<SeedSkip>) {
                 map_name: Some(name),
                 variant: None,
                 source_archive: None,
+                archive: None,
                 reason: SeedSkipReason::Walk(DUPLICATE_MAP),
             });
             continue;
@@ -435,23 +461,65 @@ fn dedupe_map_names(mut names: Vec<String>) -> (Vec<String>, Vec<SeedSkip>) {
     (kept, duplicates)
 }
 
-/// One installed game, before the walk decides whether to seed it.
-struct GameInstall {
+/// One installed game as unitsync reports it, before the walk decides whether it
+/// can be seeded at all.
+struct Install {
     name: String,
-    shortname: String,
+    /// The modinfo shortname, absent for a game that declares none.
+    shortname: Option<String>,
+    /// The archive's file name on disk.
     archive: String,
+    /// The name that archive declares for itself.
+    source_archive: String,
     /// When the archive was last written, which is how two installs of one game
     /// are told apart.
     installed_at: u64,
 }
 
+/// An install with a shortname that won it, which is what the walk seeds.
+struct GameInstall {
+    name: String,
+    shortname: String,
+    /// The archive's file name on disk, which is what unitsync opens.
+    archive: String,
+    /// The name that archive declares for itself, which is what a row and a skip
+    /// about this install carry.
+    source_archive: String,
+}
+
+/// Every game unitsync knows, with both of its archive names read once.
+fn read_installs(us: &Unitsync) -> Vec<Install> {
+    (0..us.mod_count())
+        .map(|i| {
+            let archive = us.mod_archive(i).unwrap_or_default();
+            let info = us.mod_info(i);
+            Install {
+                name: info.get("name").cloned().unwrap_or_else(|| archive.clone()),
+                shortname: info
+                    .get("shortname")
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty()),
+                source_archive: crate::archive::archive_name_for_game(us, &archive),
+                installed_at: archive_mtime(us, &archive),
+                archive,
+            }
+        })
+        .collect()
+}
+
 /// The games to seed, and the ones that will not be, with the reason.
+fn choose_games(us: &Unitsync) -> (Vec<GameInstall>, Vec<SeedSkip>) {
+    choose_from(read_installs(us))
+}
+
+/// The two rules [`choose_games`] applies, without the session it takes to read
+/// an install.
 ///
-/// Two rules, both from the hub's key. A game with no modinfo shortname has no
-/// key at all: the engine does not allow one, so the game is broken and is
-/// flagged rather than filed under its archive name, which would pin the assets
-/// to one build and is the opposite of what a key meant to survive a version
-/// bump wants (issue #1383).
+/// Both come from the hub's key. A game with no modinfo shortname has no key at
+/// all: the engine does not allow one, so the game is broken and is flagged
+/// rather than filed under its archive name, which would pin the assets to one
+/// build and is the opposite of what a key meant to survive a version bump wants
+/// (issue #1383).
 ///
 /// And the hub keeps one set of unit assets per shortname, so four installed
 /// SplinterFaction releases are one game here. The newest install wins, by
@@ -459,44 +527,29 @@ struct GameInstall {
 /// whatever the game's author typed, `$VERSION` unexpanded in a development
 /// checkout included, and an ordering invented for it would be a guess dressed
 /// up as a rule. Ties break on the archive name so the choice is stable.
-fn choose_games(us: &Unitsync) -> (Vec<GameInstall>, Vec<SeedSkip>) {
+fn choose_from(installs: Vec<Install>) -> (Vec<GameInstall>, Vec<SeedSkip>) {
     let mut skipped = Vec::new();
-    let mut by_shortname: HashMap<String, Vec<GameInstall>> = HashMap::new();
+    let mut by_shortname: HashMap<String, Vec<Install>> = HashMap::new();
 
-    for i in 0..us.mod_count() {
-        let archive = us.mod_archive(i).unwrap_or_default();
-        let info = us.mod_info(i);
-        let name = info.get("name").cloned().unwrap_or_else(|| archive.clone());
-        let shortname = info
-            .get("shortname")
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty());
-        let Some(shortname) = shortname else {
+    for install in installs {
+        let Some(shortname) = install.shortname.clone() else {
             skipped.push(SeedSkip {
                 kind: "game",
-                game: Some(name),
+                game: Some(install.name),
                 unit_name: None,
                 map_name: None,
                 variant: None,
-                source_archive: Some(archive),
+                source_archive: Some(install.source_archive),
+                archive: Some(install.archive),
                 reason: SeedSkipReason::Walk(NO_SHORTNAME),
             });
             continue;
         };
-        let installed_at = archive_mtime(us, &archive);
-        by_shortname
-            .entry(shortname.clone())
-            .or_default()
-            .push(GameInstall {
-                name,
-                shortname,
-                archive,
-                installed_at,
-            });
+        by_shortname.entry(shortname).or_default().push(install);
     }
 
     let mut chosen = Vec::new();
-    for (_, mut installs) in by_shortname {
+    for (shortname, mut installs) in by_shortname {
         installs.sort_by(|a, b| {
             b.installed_at
                 .cmp(&a.installed_at)
@@ -507,15 +560,21 @@ fn choose_games(us: &Unitsync) -> (Vec<GameInstall>, Vec<SeedSkip>) {
         for loser in it {
             skipped.push(SeedSkip {
                 kind: "game",
-                game: Some(loser.shortname),
+                game: Some(shortname.clone()),
                 unit_name: None,
                 map_name: None,
                 variant: None,
-                source_archive: Some(loser.archive),
+                source_archive: Some(loser.source_archive),
+                archive: Some(loser.archive),
                 reason: SeedSkipReason::Walk(SUPERSEDED),
             });
         }
-        chosen.push(winner);
+        chosen.push(GameInstall {
+            name: winner.name,
+            shortname,
+            archive: winner.archive,
+            source_archive: winner.source_archive,
+        });
     }
     chosen.sort_by(|a, b| a.shortname.cmp(&b.shortname));
     (chosen, skipped)
@@ -613,6 +672,7 @@ impl Walk {
                 map_name: Some(map_name.to_string()),
                 variant: Some(variant.clone()),
                 source_archive: Some(source_archive.clone()),
+                archive: None,
                 reason,
             });
         }
@@ -661,17 +721,12 @@ impl Walk {
                 }
                 None => {
                     self.count_skip(&variant);
-                    skipped.push(SeedSkip {
-                        kind: "unit",
-                        game: Some(game.shortname.clone()),
-                        unit_name: Some(unit),
-                        map_name: None,
-                        variant: Some(variant.clone()),
-                        source_archive: Some(game.archive.clone()),
-                        reason: SeedSkipReason::Buildpic(
-                            display.asset_skipped.unwrap_or(BuildpicSkip::NoSource),
-                        ),
-                    });
+                    skipped.push(unit_skip(
+                        game,
+                        unit,
+                        variant.clone(),
+                        display.asset_skipped.unwrap_or(BuildpicSkip::NoSource),
+                    ));
                 }
             }
         }
@@ -811,6 +866,27 @@ impl Walk {
             });
         }
         self.batches.last().map(|b| b.index).unwrap_or(1)
+    }
+}
+
+/// The skip a unit with no build pic produces.
+///
+/// Its own function so the field the walk cannot be tested through can be tested
+/// here: resolving a build pic needs a unitsync session and a real archive, and
+/// this is where the two archive names could swap without anything noticing
+/// (issue #1682). `sourceArchive` is the install's declared name, and there is no
+/// file name, because which file holds the game is not part of why one unit has
+/// no picture.
+fn unit_skip(game: &GameInstall, unit: String, variant: String, why: BuildpicSkip) -> SeedSkip {
+    SeedSkip {
+        kind: "unit",
+        game: Some(game.shortname.clone()),
+        unit_name: Some(unit),
+        map_name: None,
+        variant: Some(variant),
+        source_archive: Some(game.source_archive.clone()),
+        archive: None,
+        reason: SeedSkipReason::Buildpic(why),
     }
 }
 
@@ -1027,12 +1103,18 @@ mod tests {
     /// The manifest has to say enough for the hub to write its row without
     /// deriving anything: both hashes, the profile, the pixels, the map's size
     /// in elmos and where the bytes came from.
+    ///
+    /// The profile and the type are read out of the vocabulary rather than typed
+    /// here, because a hand written fixture goes on passing after the encoder
+    /// moves: this one described a 16 bit PNG for the two days after #1731 made
+    /// the layer a WebP (issue #1748).
     #[test]
     fn a_map_row_carries_everything_the_hub_writes_on_its_row() {
         let root = temp_root("map-row");
         let mut walk = Walk::new(root.clone());
         let hash = test_hash("height");
         let staged = stage(&walk, &hash, b"height bytes");
+        let class = coilbox_assets::class_for_variant("overlay:height").expect("a height class");
         walk.place_map_asset(
             "Comet Catcher Remake 1.8",
             MapOverlayAsset {
@@ -1042,10 +1124,10 @@ mod tests {
                 path: staged,
                 hash: hash.clone(),
                 source_hash: test_hash("samples"),
-                encode_profile: "png16-lossless-source".into(),
-                mime: "image/png".into(),
-                width: 1025,
-                height: 769,
+                encode_profile: class.encode_profile.clone(),
+                mime: class.mime.clone(),
+                width: 512,
+                height: 384,
                 bytes: 12,
                 min_height: Some(-40.0),
                 max_height: Some(620.5),
@@ -1062,7 +1144,8 @@ mod tests {
         assert_eq!(json["tier"], "static");
         assert_eq!(json["hash"], hash);
         assert_eq!(json["sourceHash"], test_hash("samples"));
-        assert_eq!(json["encodeProfile"], "png16-lossless-source");
+        assert_eq!(json["encodeProfile"], "webp-lossless-512");
+        assert_eq!(json["mime"], "image/webp");
         assert_eq!(json["mapWidth"], 8192);
         assert_eq!(json["mapHeight"], 6144);
         assert_eq!(json["minHeight"], -40.0);
@@ -1087,7 +1170,7 @@ mod tests {
             name: "Beyond All Reason test-30922".into(),
             shortname: "BYAR".into(),
             archive: "ded9b29714a05164e4b4523b09809af2.sdp".into(),
-            installed_at: 0,
+            source_archive: "Beyond All Reason test-30922-8064a43".into(),
         };
         walk.place_unit_asset(
             &game,
@@ -1146,6 +1229,115 @@ mod tests {
             serde_json::to_value(dropped[0].reason).expect("serialize"),
             "duplicate-map"
         );
+    }
+
+    /// An install as unitsync would report it, with the two archive names apart:
+    /// a rapid pool file and the versioned name the archive declares.
+    fn install(shortname: Option<&str>, build: &str, file: &str, installed_at: u64) -> Install {
+        Install {
+            name: format!("Beyond All Reason {build}"),
+            shortname: shortname.map(str::to_string),
+            archive: file.into(),
+            source_archive: format!("Beyond All Reason {build}"),
+            installed_at,
+        }
+    }
+
+    /// The two fields a game skip carries answer two questions, so they hold two
+    /// strings (issue #1682). `sourceArchive` is the name the archive declares,
+    /// the same reading as on an asset row. `archive` is the file to delete, and
+    /// for a rapid install it is a pool hash that names no build.
+    #[test]
+    fn a_game_skip_says_which_build_lost_and_which_file_holds_it() {
+        let (chosen, skipped) = choose_from(vec![
+            install(
+                Some("BYAR"),
+                "test-30922-8064a43",
+                "ded9b29714a05164e4b4523b09809af2.sdp",
+                200,
+            ),
+            install(
+                Some("BYAR"),
+                "test-30400-1111111",
+                "aaaa9b29714a05164e4b4523b09809af.sdp",
+                100,
+            ),
+            install(None, "nightly", "byar-nightly.sd7", 300),
+        ]);
+
+        // The newest install of the shortname is the one seeded.
+        assert_eq!(chosen.len(), 1);
+        assert_eq!(
+            chosen[0].source_archive,
+            "Beyond All Reason test-30922-8064a43"
+        );
+
+        let superseded = skipped
+            .iter()
+            .find(|s| matches!(s.reason, SeedSkipReason::Walk(SUPERSEDED)))
+            .expect("the older install was skipped");
+        assert_eq!(
+            superseded.source_archive.as_deref(),
+            Some("Beyond All Reason test-30400-1111111")
+        );
+        assert_eq!(
+            superseded.archive.as_deref(),
+            Some("aaaa9b29714a05164e4b4523b09809af.sdp")
+        );
+
+        let broken = skipped
+            .iter()
+            .find(|s| matches!(s.reason, SeedSkipReason::Walk(NO_SHORTNAME)))
+            .expect("the game with no shortname was skipped");
+        assert_eq!(
+            broken.source_archive.as_deref(),
+            Some("Beyond All Reason nightly")
+        );
+        assert_eq!(broken.archive.as_deref(), Some("byar-nightly.sd7"));
+
+        // Neither field is the other's string, which is the whole of the defect
+        // this closes: a reader could not tell which kind of name they held.
+        for skip in &skipped {
+            assert_ne!(skip.source_archive, skip.archive);
+            let declared = skip.source_archive.as_deref().expect("a declared name");
+            assert!(
+                !declared.ends_with(".sdp") && !declared.ends_with(".sd7"),
+                "a file name reached sourceArchive: {declared}"
+            );
+        }
+    }
+
+    /// A picture skip says why one layer is missing, and which file holds the
+    /// archive is not part of that answer, so it carries the declared name only.
+    ///
+    /// The unit one is where the file name used to be, and it is the one place
+    /// the walk cannot be driven from a test, so it goes through [`unit_skip`].
+    #[test]
+    fn a_picture_skip_carries_no_file_name() {
+        let (_, dropped) = dedupe_map_names(vec!["Bb 2.0".into(), "Bb 2.0".into()]);
+        assert!(dropped[0].archive.is_none());
+        let json = serde_json::to_value(&dropped[0]).expect("serialize");
+        assert!(json.get("archive").is_none(), "an empty field was written");
+
+        let game = GameInstall {
+            name: "Beyond All Reason test-30922".into(),
+            shortname: "BYAR".into(),
+            archive: "ded9b29714a05164e4b4523b09809af2.sdp".into(),
+            source_archive: "Beyond All Reason test-30922-8064a43".into(),
+        };
+        let skip = unit_skip(
+            &game,
+            "armcom".into(),
+            "buildpic".into(),
+            BuildpicSkip::NoSource,
+        );
+        assert_eq!(
+            skip.source_archive.as_deref(),
+            Some("Beyond All Reason test-30922-8064a43")
+        );
+        assert!(skip.archive.is_none());
+        let json = serde_json::to_value(&skip).expect("serialize");
+        assert!(json.get("archive").is_none(), "an empty field was written");
     }
 
     /// A skip reason serializes as the same string the layer it came from uses,

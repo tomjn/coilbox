@@ -1421,6 +1421,11 @@ because it does not hold footprints. That correctness sits in coilbox.
 
 ### 13.2 Overlay layers are not all WebP
 
+**Reversed by tomjn/coilbox#1730 and tomjn/coilbox-hub#181. They all are WebP
+now, and section 14 holds the current numbers.** The agreement below stands as
+the record of what was decided on 2026-08-14, and what overturned it is at the
+end of the section.
+
 Section 4.5 requires overlay layers to be lossless and the non-goals rule out
 any format but WebP. Those two cannot both hold for a height map.
 
@@ -1435,6 +1440,25 @@ layers, `overlay:metal` and `overlay:type`, stay lossless WebP.
 Height also has to carry its bounds. The minimum and maximum world height are
 what turn samples back into elmos, nothing downstream can recover them, and
 they belong on the row rather than in the image.
+
+**What overturned it.** The reasoning above holds and the premise under it did
+not: nothing downstream ever read the second byte. A browser decodes a 16 bit
+image to eight bits a channel and keeps the high byte, canvas `ImageData` is a
+`Uint8ClampedArray` and a three.js texture defaults to `UnsignedByteType`, so
+every reader of this layer was already working in eight bits and the file was
+twice the size for it.
+
+So the layer splits by what the reader does with it. Anything drawing a picture
+of the ground takes an 8 bit grey lossless WebP, rescaled into the window each
+map's own samples occupy and capped at 512px like a minimap. Anything measuring
+the ground reads the raw 16 bit words out of the map archive on the machine that
+holds it, which is where they always were. Rescaling beats the truncation a
+browser was doing, so the picture is less lossy than the PNG as well as a
+twentieth of the size, and the height overlay stops being 63 per cent of the
+seeded corpus.
+
+The bounds are unaffected. They are still on the row and still the only way back
+to elmos.
 
 ### 13.3 A metal map is stored as values, not as the picture coilbox draws
 
@@ -1514,7 +1538,7 @@ carries the codec, the quality and the size cap and nothing else.
 | `minimap` | `webp-q80-512` |
 | `overlay:metal` | `webp-lossless-source` |
 | `overlay:type` | `webp-lossless-source` |
-| `overlay:height` | `png16-lossless-source` |
+| `overlay:height` | `webp-lossless-512` |
 
 `source` in the cap position means the class has no pixel cap and keeps
 whatever resolution it was extracted at.
@@ -1545,7 +1569,7 @@ it can encode to them rather than discover them from a 413.
 | `minimap` | `image/webp` | 512px | no | no | any | no |
 | `overlay:metal` | `image/webp` | as source | no | yes | any | no |
 | `overlay:type` | `image/webp` | as source | no | yes | any | no |
-| `overlay:height` | `image/png` | as source | no | yes | 16 | yes |
+| `overlay:height` | `image/webp` | 512px | no | yes | any | no |
 
 Bytes are capped too, and the number is derived rather than picked: the
 uncompressed size of the largest image the edge cap permits, four bytes a
@@ -1554,10 +1578,11 @@ encoding of a picture the class allows can reach it, and anything that does is
 carrying something other than the picture, which is how a 256px build pic
 arrives as two megabytes of metadata chunks.
 
-The overlays have no edge cap to derive one from. `overlay:metal` and
-`overlay:type` fall through to a 2 MB backstop. `overlay:height` gets a number
-per upload out of the map's own size, two bytes for each of
-`floor(elmos / 8) + 1` samples on each edge, which is coilbox-hub#142.
+`overlay:metal` and `overlay:type` have no edge cap to derive one from, so they
+fall through to a 2 MB backstop. `overlay:height` had none either and got a
+number per upload out of the map's own size, which was coilbox-hub#142. It has a
+512px cap since section 13.2 was reversed, so it takes the ordinary derivation a
+minimap takes and the per upload rule is gone.
 
 ### 14.6 The render framing rule
 
