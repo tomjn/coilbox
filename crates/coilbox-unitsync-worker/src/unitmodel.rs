@@ -18,8 +18,10 @@
 
 use crate::ffi::Unitsync;
 use crate::model::{ModelGroup, ModelPiece, ModelTexture, UnitModelOutput};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::rc::Rc;
 
 /// Salts the texture cache file names. Bump when the naming scheme changes so
 /// stale files are never picked up under a new meaning.
@@ -32,6 +34,17 @@ const MODEL_READ_CAP: usize = 64 * 1024 * 1024;
 /// Textures go up to Splinter Faction's 64 MiB shared atlas. Anything past this
 /// is not a unit texture.
 const TEXTURE_READ_CAP: usize = 128 * 1024 * 1024;
+
+/// How many bytes of texture a batch keeps between its models (issue #1676).
+///
+/// 256 MiB, which is four of Splinter Faction's atlas and comfortably the whole
+/// working set of every game on this machine: the largest measured was Beyond
+/// All Reason at 84 MiB over 564 units. The number is a ceiling rather than a
+/// target, and it is here because a game nobody has looked at could ship a
+/// gigabyte of distinct unit art. A batch over one of those keeps the last
+/// quarter gigabyte and re-reads the rest, which is slower than holding it all
+/// and is not an allocation failure.
+const TEXTURE_CACHE_BUDGET: usize = 256 * 1024 * 1024;
 
 /// Where the engine looks for a unitdef's `objectname`.
 const MODEL_DIR: &str = "objects3d";
@@ -197,7 +210,73 @@ pub(crate) fn source_digest(
     object_name: &str,
 ) -> Result<(String, String), String> {
     let teamtex = read_teamtex(us, handle, list);
-    source_digest_with(us, handle, list, &teamtex, object_name)
+    // One model, so nothing is shared with a next one and the cache is thrown
+    // away with the call.
+    let mut cache = TextureCache::new(TEXTURE_CACHE_BUDGET);
+    source_digest_with(us, handle, list, &teamtex, &mut cache, object_name)
+}
+
+/// Texture bytes held between the models of one batch, in least recently used
+/// order, so a texture the previous model also drew with is not read again
+/// (issue #1676).
+///
+/// **Keyed on the archive member path alone, and only ever alive inside one
+/// [`digest_reader`].** That is what makes the bare path safe as a key: a reader
+/// is handed a mount and an open handle and never outlives either, so every
+/// entry in it came through the same `handle` and two archives that both hold a
+/// `unittextures/arm01a00.tga` cannot meet in one cache. A process-wide cache
+/// under the same key would be wrong, and it would be wrong quietly: the digests
+/// it fed would be of one game's textures under another game's model. Nothing
+/// here is keyed on the game or the archive because nothing here needs to be.
+struct TextureCache {
+    /// Least recently used first, so eviction takes from the front. A `Vec`
+    /// rather than a map because a game's whole unit texture set is hundreds of
+    /// members at most, and a scan of those costs nothing against the megabytes
+    /// the entry holds.
+    entries: Vec<(String, Rc<Vec<u8>>)>,
+    bytes: usize,
+    budget: usize,
+}
+
+impl TextureCache {
+    fn new(budget: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            bytes: 0,
+            budget,
+        }
+    }
+
+    /// The bytes of `member`, calling `read` only when they are not already held.
+    ///
+    /// `read` rather than the archive itself, so what the cache does can be
+    /// counted in a test without a mounted game.
+    ///
+    /// `None` when the member does not read, which is what the caller then
+    /// leaves out of the digest. A failed read is not remembered: it costs a
+    /// lookup in the archive's own index rather than a decompression, and
+    /// keeping it would hold "this is missing" against the budget for real
+    /// bytes.
+    fn get(&mut self, member: &str, read: impl FnOnce() -> Option<Vec<u8>>) -> Option<Rc<Vec<u8>>> {
+        if let Some(at) = self.entries.iter().position(|(key, _)| key == member) {
+            let entry = self.entries.remove(at);
+            let bytes = Rc::clone(&entry.1);
+            self.entries.push(entry);
+            return Some(bytes);
+        }
+        let bytes = Rc::new(read()?);
+        self.bytes += bytes.len();
+        self.entries.push((member.to_string(), Rc::clone(&bytes)));
+        // Never evicts what was just read, so a texture larger than the whole
+        // budget is still returned rather than read and dropped. The caller
+        // holds its own `Rc` to everything it asked for, so an eviction frees
+        // the bytes at the end of the model rather than under it.
+        while self.bytes > self.budget && self.entries.len() > 1 {
+            let (_, evicted) = self.entries.remove(0);
+            self.bytes -= evicted.len();
+        }
+        Some(bytes)
+    }
 }
 
 /// A digest reader for a batch of models against one mounted archive.
@@ -208,6 +287,11 @@ pub(crate) fn source_digest(
 /// the archive rather than of a model, so reading it per unit would read the same
 /// file hundreds of times.
 ///
+/// Textures are the same argument one level down (issue #1676). A game that
+/// draws its whole roster with one atlas is the case this exists for: Splinter
+/// Faction's is a 64 MiB `.dds`, so 158 units used to decompress 10 GB to
+/// produce 158 digests. Held across the batch it is decompressed once.
+///
 /// Takes the mount rather than making one, so a batch cannot mount per unit even
 /// by mistake.
 pub(crate) fn digest_reader<'a>(
@@ -216,15 +300,27 @@ pub(crate) fn digest_reader<'a>(
     list: &'a [(String, String)],
 ) -> impl Fn(&str) -> Result<(String, String), String> + 'a {
     let teamtex = read_teamtex(us, handle, list);
-    move |object_name| source_digest_with(us, handle, list, &teamtex, object_name)
+    let cache = RefCell::new(TextureCache::new(TEXTURE_CACHE_BUDGET));
+    move |object_name| {
+        source_digest_with(
+            us,
+            handle,
+            list,
+            &teamtex,
+            &mut cache.borrow_mut(),
+            object_name,
+        )
+    }
 }
 
-/// [`source_digest`] against a `teamtex.txt` the caller has already read.
+/// [`source_digest`] against a `teamtex.txt` the caller has already read, and a
+/// texture cache the caller decides the lifetime of.
 fn source_digest_with(
     us: &Unitsync,
     handle: i32,
     list: &[(String, String)],
     teamtex: &[String],
+    cache: &mut TextureCache,
     object_name: &str,
 ) -> Result<(String, String), String> {
     let path = find_model(list, object_name)
@@ -251,13 +347,16 @@ fn source_digest_with(
     members.sort();
     members.dedup();
 
-    let textures: Vec<Vec<u8>> = members
+    let textures: Vec<Rc<Vec<u8>>> = members
         .iter()
         .filter_map(|member| {
-            us.read_archive_member(handle, member, TEXTURE_READ_CAP)
-                .map(|(_, bytes)| bytes)
+            cache.get(member, || {
+                us.read_archive_member(handle, member, TEXTURE_READ_CAP)
+                    .map(|(_, bytes)| bytes)
+            })
         })
         .collect();
+    let textures: Vec<&[u8]> = textures.iter().map(|bytes| bytes.as_slice()).collect();
 
     Ok((
         crate::assetencode::model_source_digest(&model_bytes, &textures),
@@ -772,6 +871,78 @@ mod tests {
             cache_file_name("abcd", "unittextures/tatex/arm01a00.tga", "tga"),
             "abcd_unittextures_tatex_arm01a00_tga.png"
         );
+    }
+
+    /// The whole point of the cache (issue #1676): the second model to draw
+    /// with an atlas does not read it again. Splinter Faction is 158 units on
+    /// one 64 MiB `.dds`, so this is the difference between 64 MiB of reads and
+    /// 10 GB of them.
+    #[test]
+    fn a_texture_a_second_model_draws_with_is_not_read_again() {
+        let reads = RefCell::new(Vec::<String>::new());
+        let mut cache = TextureCache::new(1024);
+        let mut read = |member: &str| {
+            cache.get(member, || {
+                reads.borrow_mut().push(member.to_string());
+                Some(vec![7u8; 16])
+            })
+        };
+
+        assert_eq!(read("unittextures/atlas.dds").unwrap().len(), 16);
+        assert_eq!(read("unittextures/atlas.dds").unwrap().len(), 16);
+        assert_eq!(read("unittextures/other.dds").unwrap().len(), 16);
+        assert_eq!(read("unittextures/atlas.dds").unwrap().len(), 16);
+        assert_eq!(
+            *reads.borrow(),
+            vec!["unittextures/atlas.dds", "unittextures/other.dds"]
+        );
+    }
+
+    /// The identity rests on the cache handing back the bytes the archive gave,
+    /// so a hit and a miss are the same digest input. A cache that returned the
+    /// wrong member's bytes would move every digest that touched it, and every
+    /// render already uploaded would become unreachable.
+    #[test]
+    fn a_hit_returns_the_bytes_that_member_was_read_as() {
+        let mut cache = TextureCache::new(1024);
+        let read = |bytes: &'static [u8]| move || Some(bytes.to_vec());
+        assert_eq!(*cache.get("a.dds", read(b"aaa")).unwrap(), b"aaa".to_vec());
+        assert_eq!(*cache.get("b.dds", read(b"bb")).unwrap(), b"bb".to_vec());
+        // Both again, with a reader that would give the wrong answer if it ran.
+        assert_eq!(*cache.get("a.dds", read(b"xxx")).unwrap(), b"aaa".to_vec());
+        assert_eq!(*cache.get("b.dds", read(b"yy")).unwrap(), b"bb".to_vec());
+    }
+
+    /// A texture that did not read is not remembered as missing, so a caller
+    /// asking again pays a lookup rather than getting a stale "no".
+    #[test]
+    fn a_member_that_does_not_read_holds_nothing() {
+        let mut cache = TextureCache::new(1024);
+        assert!(cache.get("gone.dds", || None).is_none());
+        assert_eq!(cache.entries.len(), 0);
+        assert_eq!(cache.bytes, 0);
+    }
+
+    /// The bound on what a batch holds. Without it a game with hundreds of
+    /// distinct unit textures would keep every one of them for the length of the
+    /// run, which is a roster's worth of art resident to digest a roster.
+    #[test]
+    fn the_cache_evicts_the_least_recently_used_once_it_is_over_budget() {
+        let mut cache = TextureCache::new(100);
+        let read = |n: usize| move || Some(vec![0u8; n]);
+        cache.get("a", read(40));
+        cache.get("b", read(40));
+        // Touching `a` makes `b` the least recently used one.
+        cache.get("a", read(40));
+        cache.get("c", read(40));
+        assert_eq!(cache.bytes, 80);
+        let held: Vec<&str> = cache.entries.iter().map(|(key, _)| key.as_str()).collect();
+        assert_eq!(held, vec!["a", "c"]);
+
+        // A texture bigger than the whole budget is still handed back rather
+        // than read and thrown away.
+        assert_eq!(cache.get("huge", read(500)).unwrap().len(), 500);
+        assert_eq!(cache.bytes, 500);
     }
 
     /// Only the formats a webview cannot read are re-encoded. A `.dds` above
