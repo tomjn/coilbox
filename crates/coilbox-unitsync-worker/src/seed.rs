@@ -1088,12 +1088,18 @@ mod tests {
     /// The manifest has to say enough for the hub to write its row without
     /// deriving anything: both hashes, the profile, the pixels, the map's size
     /// in elmos and where the bytes came from.
+    ///
+    /// The profile and the type are read out of the vocabulary rather than typed
+    /// here, because a hand written fixture goes on passing after the encoder
+    /// moves: this one described a 16 bit PNG for the two days after #1731 made
+    /// the layer a WebP (issue #1748).
     #[test]
     fn a_map_row_carries_everything_the_hub_writes_on_its_row() {
         let root = temp_root("map-row");
         let mut walk = Walk::new(root.clone());
         let hash = test_hash("height");
         let staged = stage(&walk, &hash, b"height bytes");
+        let class = coilbox_assets::class_for_variant("overlay:height").expect("a height class");
         walk.place_map_asset(
             "Comet Catcher Remake 1.8",
             MapOverlayAsset {
@@ -1103,10 +1109,10 @@ mod tests {
                 path: staged,
                 hash: hash.clone(),
                 source_hash: test_hash("samples"),
-                encode_profile: "png16-lossless-source".into(),
-                mime: "image/png".into(),
-                width: 1025,
-                height: 769,
+                encode_profile: class.encode_profile.clone(),
+                mime: class.mime.clone(),
+                width: 512,
+                height: 384,
                 bytes: 12,
                 min_height: Some(-40.0),
                 max_height: Some(620.5),
@@ -1123,7 +1129,8 @@ mod tests {
         assert_eq!(json["tier"], "static");
         assert_eq!(json["hash"], hash);
         assert_eq!(json["sourceHash"], test_hash("samples"));
-        assert_eq!(json["encodeProfile"], "png16-lossless-source");
+        assert_eq!(json["encodeProfile"], "webp-lossless-512");
+        assert_eq!(json["mime"], "image/webp");
         assert_eq!(json["mapWidth"], 8192);
         assert_eq!(json["mapHeight"], 6144);
         assert_eq!(json["minHeight"], -40.0);
