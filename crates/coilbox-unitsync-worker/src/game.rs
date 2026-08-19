@@ -56,13 +56,22 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameIn
         iters += 1;
     }
 
-    // Native enumeration. Some engine builds can't build the unitdef table here
-    // (e.g. a libunitsync whose `Spring.TimeCheck` stub never runs its callback,
-    // so the shipped `gamedata/defs.lua` loads nothing) and return zero units with
-    // a "root unitdef table invalid" error. When that happens, drop that error and
-    // load the unit list ourselves through the Lua parser, shimming in the game
-    // environment unitsync omits. Patched engines take the native path and never
-    // pay for the fallback.
+    // Native enumeration first, and our own Lua route when it comes back empty.
+    //
+    // The Lua route is not a stopgap for old engines. For Beyond All Reason it is
+    // the only route, on every unitsync ever built: `LuaVFS::PushCommon` sits
+    // behind `#if (!defined(UNITSYNC) && !defined(DEDICATED))` in
+    // `rts/Lua/LuaParser.cpp`, so `VFS.MOD` and its siblings are nil and BAR's
+    // `gamedata/defs.lua` raises on `VFS.MAP .. VFS.MOD .. VFS.BASE` before it
+    // loads a single def. That reads back here as zero units and a "root unitdef
+    // table invalid" error. Only an engine change fixes it, so nothing about this
+    // path ages out (issue #1664).
+    //
+    // The other cause is a libunitsync whose `Spring.TimeCheck` stub never runs
+    // its callback, so `gamedata/defs.lua` loads nothing. Either way, drop the
+    // native error and read the list through the Lua parser instead, shimming in
+    // the game environment unitsync omits. An engine whose native path works keeps
+    // it and never runs the second pass.
     let mut units = collect_units_native(&us);
     let unit_errors = us.drain_errors();
     if units.is_empty() {
@@ -156,7 +165,7 @@ pub fn emit_error(msg: String) {
     println!("{}", serde_json::to_string(&out).unwrap_or_default());
 }
 
-/// VFS modes for the fallback parser: raw + map + mod + base (the same set the
+/// VFS modes for the Lua parser: raw + map + mod + base (the same set the
 /// Lua console and buildpic resolver use), so `VFS.Include` reaches both the
 /// game's own files and the base `springcontent` def scripts.
 const VFS_ALL_MODES: &str = "rmMbe";
@@ -202,10 +211,11 @@ fn collect_units_native(us: &Unitsync) -> Vec<UnitEntry> {
     units
 }
 
-/// Fallback unit loader: run the game's `gamedata/defs.lua` through the Lua
-/// parser (archives already mounted by the caller) with the missing game
-/// environment shimmed in, and read back `name\tfullname` per unit. The failure
-/// is returned so the caller can report why a game has no units.
+/// The second unit loader, and for Beyond All Reason the only one that works: run
+/// the game's `gamedata/defs.lua` through the Lua parser (archives already mounted
+/// by the caller) with the missing game environment shimmed in, and read back
+/// `name\tfullname` per unit. The failure is returned so the caller can report why
+/// a game has no units.
 fn units_via_shim(us: &Unitsync) -> Result<Vec<UnitEntry>, String> {
     let script = format!(
         "{}{}{UNIT_DEFS_SHIM_SCRIPT}",
