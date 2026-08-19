@@ -173,8 +173,15 @@ end
 /// Every value here is either an engine constant read out of the engine source or
 /// the honest answer for "no game is set up and no map is loaded": no teams, no
 /// players, no modoptions. `textColorCodes` is not guessed at all. The engine
-/// installs the same codes on the `Engine` table even under unitsync, so that is
-/// where they come from.
+/// installs codes on the `Engine` table even under unitsync, so that is where they
+/// come from.
+///
+/// Those codes are not the ones a running game uses. `rts/Lua/LuaConstEngine.cpp`
+/// picks the new indicators whenever `HEADLESS` is defined, and unitsync is built
+/// with it, so `Engine.textColorCodes.Color` is `\017` here and `\255` in a game
+/// left on the default `TextDisableOldColorIndicators`. The unit list is unharmed,
+/// but a def script that bakes a colour code into a name at parse time bakes in
+/// the wrong one, and showing that raw prints a control character (issue #1664).
 ///
 /// Each shim is applied only where the engine left a hole, so a future engine
 /// build that fills one in wins over the stand-in. `Spring.TimeCheck` is the
@@ -634,7 +641,9 @@ mod tests {
 
     /// The failure this shim was rewritten for. Beyond All Reason's colour helper
     /// guards on `Game` being absent, then indexes `Game.textColorCodes`, so a
-    /// half-filled table gets past the guard and raises.
+    /// half-filled table gets past the guard and raises. The `\017` expected here
+    /// is what unitsync hands out, not what a running game uses, so the assertion
+    /// is that the shim forwards the codes rather than inventing them.
     #[test]
     fn a_def_script_can_read_the_colour_codes_off_game() {
         let lua = shimmed_env(
