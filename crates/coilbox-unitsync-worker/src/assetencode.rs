@@ -1167,7 +1167,9 @@ mod tests {
     /// prefix of one would be caught, and varying so a run-length shortcut would
     /// be too.
     fn atlas(len: usize, seed: u8) -> Vec<u8> {
-        (0..len).map(|i| (i as u8).wrapping_mul(31) ^ seed).collect()
+        (0..len)
+            .map(|i| (i as u8).wrapping_mul(31) ^ seed)
+            .collect()
     }
 
     #[test]
