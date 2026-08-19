@@ -280,10 +280,23 @@ async fn the_sweep_frees_a_name_and_leaves_the_seat_alone() {
 /// reconnect under. So a peer that has said nothing for three of the client's
 /// own keepalives is treated as gone.
 ///
-/// The runtime's clock is paused, so the ninety seconds pass in no time at all.
-#[tokio::test(start_paused = true)]
+/// The room's clock is this test's to move, so the ninety seconds pass in no time
+/// at all and nothing is swept until the test says so. A paused runtime clock
+/// cannot do that job here: it auto-advances to the next timer whenever the
+/// runtime has nothing left to run, and every wait on this test's socket is one
+/// of those, so the sweep used to tick while the test was still connecting
+/// (issue #1644).
+#[tokio::test]
 async fn a_peer_that_stops_talking_is_dropped() {
-    let room = room().await;
+    let (room, clock) = Room::start_on_a_manual_clock(RoomOptions {
+        host: "alice".to_string(),
+        ip: "192.168.0.5".to_string(),
+        port: 0,
+        approve_joins: false,
+        advertise: false,
+    })
+    .await
+    .expect("a free port");
     let mut peer = RawPeer::connect(&room).await;
     peer.next().await.expect("a greeting");
     assert_eq!(room.status().await.map(|s| s.peers), Some(1));
@@ -291,10 +304,17 @@ async fn a_peer_that_stops_talking_is_dropped() {
     // Three times over, so nothing here turns on the exact moment the sweep
     // happens to fall. That a peer inside the timeout is left alone is the
     // `idle_peers` unit test's job.
-    tokio::time::sleep(Duration::from_secs(270)).await;
+    clock.advance(Duration::from_secs(270));
 
+    // The socket first, because the room closes it by dropping the peer it has
+    // just swept. Reading the end of it is how this test knows the sweep is over
+    // and the count it asks for next is the one after. Bounded, because a sweep
+    // that stops working leaves nothing to wait for.
+    let ended = tokio::time::timeout(Duration::from_secs(5), peer.next())
+        .await
+        .expect("the sweep to close the socket");
+    assert_eq!(ended, None, "the socket is closed");
     assert_eq!(room.status().await.map(|s| s.peers), Some(0));
-    assert_eq!(peer.next().await, None, "and the socket is closed");
 
     room.stop("done").await;
 }
