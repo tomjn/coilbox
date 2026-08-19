@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { MapAppearance } from "@/mapconv/bindings";
 import { isHubEnabled } from "@/profile/profile";
 import { useHubUrl } from "../config";
+import { appearanceFromFacts } from "./appearance";
 import { knownMap } from "./knownMaps";
 import type { MapFacts } from "./lookup";
 
@@ -85,4 +87,26 @@ export function useManyMapFacts(
   }, [hubUrl, key]);
 
   return facts;
+}
+
+/**
+ * The appearance of each of these maps, as far as the hub knows (issue #1739).
+ *
+ * Meant to sit behind the local cache rather than beside it: the caller passes
+ * the names it has no local answer for, and merges what comes back underneath
+ * its own. `src/content/mapAppearanceCache.ts` does exactly that in
+ * `useMapAppearances`, which is what every consumer of the cache should use.
+ */
+export function useHubMapAppearances(
+  names: readonly string[],
+): Map<string, MapAppearance> {
+  const facts = useManyMapFacts(names);
+  return useMemo(() => {
+    const out = new Map<string, MapAppearance>();
+    for (const [name, one] of facts) {
+      const appearance = appearanceFromFacts(one);
+      if (appearance) out.set(name, appearance);
+    }
+    return out;
+  }, [facts]);
 }
