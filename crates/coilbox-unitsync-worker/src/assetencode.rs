@@ -1141,12 +1141,33 @@ mod tests {
     /// it keeps a texture.
     #[test]
     fn the_digest_is_over_the_bytes_and_not_over_how_they_are_held() {
-        let owned = vec![b"blue.dds".to_vec(), b"mask.dds".to_vec()];
+        let owned = vec![atlas(4096, 0xa5), atlas(4096, 0x5a)];
         let borrowed: Vec<&[u8]> = owned.iter().map(|t| t.as_slice()).collect();
         let boxed: Vec<Box<[u8]>> = owned.iter().map(|t| t.clone().into_boxed_slice()).collect();
         let want = model_source_digest(b"an s3o", &owned);
         assert_eq!(model_source_digest(b"an s3o", &borrowed), want);
         assert_eq!(model_source_digest(b"an s3o", &boxed), want);
+    }
+
+    /// A texture is 64 MiB in the worst case, so the digest has to be over the
+    /// whole of it rather than over a prefix. Two atlases that differ only in
+    /// their last byte are two re-skins, and a prefix would make them one
+    /// picture.
+    #[test]
+    fn the_digest_covers_a_texture_to_its_last_byte() {
+        let mut late = atlas(4096, 0xa5);
+        *late.last_mut().unwrap() = 0x00;
+        assert_ne!(
+            model_source_digest(b"an s3o", &[atlas(4096, 0xa5)]),
+            model_source_digest(b"an s3o", &[late])
+        );
+    }
+
+    /// Bytes that look like a texture: long enough that a digest reading only a
+    /// prefix of one would be caught, and varying so a run-length shortcut would
+    /// be too.
+    fn atlas(len: usize, seed: u8) -> Vec<u8> {
+        (0..len).map(|i| (i as u8).wrapping_mul(31) ^ seed).collect()
     }
 
     #[test]
