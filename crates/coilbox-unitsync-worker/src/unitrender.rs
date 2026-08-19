@@ -21,7 +21,8 @@
 //!   exists to make legible, so the pixels take the long way round and the
 //!   corpus keeps one encoder.
 //! - **The identity.** `source_hash` is over the render's inputs, not its
-//!   pixels, so the model and its textures are read out of the archive here.
+//!   pixels, so the model and its textures are read out of the archive here,
+//!   unless the caller already holds them (see [`RenderSource`]).
 //!
 //! Reading the archive is the only reason this mode needs unitsync at all.
 
@@ -37,6 +38,29 @@ use crate::model::{RenderSkip, UnitRenderAsset, UnitRenderOutput};
 /// framebuffer and un-premultiplies before it gets here, so this is exactly what
 /// the encoder should see.
 const CHANNELS: usize = 4;
+
+/// What the render was drawn from, when the caller already knows (issue #1720).
+///
+/// These are the three fields `--unit-render-keys` hands back for the same unit
+/// at the same footprint, and reading them again costs a mount of the game's
+/// archive set: a second or more on a game like Beyond All Reason, paid once per
+/// unit a blueprint draws.
+///
+/// Handing them in moves the check that a picture is named after what it is from
+/// this mode to the caller. That is a narrower loss than it reads as, because
+/// both callers are ours and both derive the key from `--unit-render-keys`. The
+/// framing check does not move: a caller can say what the pixels were drawn from
+/// but not what shape they are.
+#[derive(Clone, Copy)]
+pub struct RenderSource<'a> {
+    /// sha256 over the model file and its textures, from the key.
+    pub model_digest: &'a str,
+    /// The archive member the model was read from, from the key.
+    pub source_member: &'a str,
+    /// The name the game archive declares for itself, which is what the hub row
+    /// holds. See [`crate::archive::archive_name_for_game`].
+    pub source_archive: &'a str,
+}
 
 /// What the caller drew and wants encoded.
 pub struct RenderRequest<'a> {
@@ -59,10 +83,14 @@ pub struct RenderRequest<'a> {
     pub width: u32,
     pub height: u32,
     pub asset_dir: &'a Path,
+    /// The identity of what was drawn, when the caller already has it. `None`
+    /// reads it out of the archive, which is what happens for a caller that has
+    /// no key to hand down.
+    pub source: Option<RenderSource<'a>>,
 }
 
 /// Encode one unit's render, mounting `game_archive` to read what it was drawn
-/// from.
+/// from unless `req.source` says.
 pub fn render(lib: &str, req: &RenderRequest<'_>) -> UnitRenderOutput {
     // The checks that need nothing but the request come first, so a mis-framed
     // render costs no archive mount.
@@ -90,23 +118,37 @@ pub fn render(lib: &str, req: &RenderRequest<'_>) -> UnitRenderOutput {
         Err(why) => return skipped(RenderSkip::NoPixels, vec![why]),
     };
 
-    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
-        Ok(u) => u,
-        Err(e) => return skipped(RenderSkip::NoModel, vec![e]),
-    };
-    us.init(false, 0);
-    let mut errors = us.drain_errors();
+    // The caller holding the key is the whole of issue #1720: unitsync is not
+    // loaded at all on this path, so a blueprint's twenty encodes cost no mounts.
+    let (model_digest, source_member, source_archive, errors) = match req.source {
+        Some(source) => (
+            source.model_digest.to_string(),
+            source.source_member.to_string(),
+            source.source_archive.to_string(),
+            Vec::new(),
+        ),
+        None => {
+            let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+                Ok(u) => u,
+                Err(e) => return skipped(RenderSkip::NoModel, vec![e]),
+            };
+            us.init(false, 0);
+            let mut errors = us.drain_errors();
 
-    let digest = read_source_digest(&us, req, &mut errors);
-    // Read inside the session, since the archive list goes with unitsync.
-    let source_archive = crate::archive::archive_name_for_game(&us, req.game_archive);
-    us.uninit();
+            let digest = read_source_digest(&us, req, &mut errors);
+            // Read inside the session, since the archive list goes with unitsync.
+            let source_archive = crate::archive::archive_name_for_game(&us, req.game_archive);
+            us.uninit();
 
-    let (model_digest, source_member) = match digest {
-        Ok(v) => v,
-        Err(why) => {
-            errors.push(why);
-            return skipped(RenderSkip::NoModel, errors);
+            match digest {
+                Ok((model_digest, source_member)) => {
+                    (model_digest, source_member, source_archive, errors)
+                }
+                Err(why) => {
+                    errors.push(why);
+                    return skipped(RenderSkip::NoModel, errors);
+                }
+            }
         }
     };
 
@@ -327,8 +369,16 @@ mod tests {
             width,
             height,
             asset_dir: dir,
+            source: None,
         }
     }
+
+    /// The key a caller holds, in the shape `--unit-render-keys` hands back.
+    const KEY: RenderSource<'static> = RenderSource {
+        model_digest: "d5f0f5b0f3e196176dde8795a43caeed8f76f29ab33c6677791ee886163f0a45",
+        source_member: "objects3d/units/armaak.s3o",
+        source_archive: ARCHIVE,
+    };
 
     /// The framing check, which is the whole reason this mode recomputes the
     /// frame rather than trusting the caller. A 3 by 2 footprint frames to
@@ -363,6 +413,77 @@ mod tests {
         let missing = dir.join("not-here.bin");
         let out = render("nolib", &request(&dir, &missing, 3, 2, 255, 204));
         assert_eq!(out.asset_skipped, Some(RenderSkip::NoPixels));
+    }
+
+    /// The mount, counted the only way a unit test can count it: `"nolib"` is not
+    /// a unitsync, so a path that loads one cannot get past it. Today's caller
+    /// gets `NoModel` and a caller holding the key gets its picture.
+    ///
+    /// This is issue #1720 in one assertion. Twenty units in a blueprint were
+    /// twenty mounts of the game's archive set, and the fields each mount worked
+    /// out are the ones `--unit-render-keys` handed the caller a moment earlier.
+    #[test]
+    fn a_caller_holding_the_key_encodes_without_loading_unitsync() {
+        let dir = temp_dir("passdown");
+        let file = dir.join("pixels.bin");
+        std::fs::write(&file, pixels(255, 204)).unwrap();
+
+        let mut req = request(&dir, &file, 3, 2, 255, 204);
+        assert_eq!(
+            render("nolib", &req).asset_skipped,
+            Some(RenderSkip::NoModel),
+            "without a key the mount is the only route to the identity"
+        );
+
+        req.source = Some(KEY);
+        let out = render("nolib", &req);
+        let asset = out.asset.expect("encoded without an archive to mount");
+        assert_eq!(asset.model_digest, KEY.model_digest);
+        assert_eq!(asset.source_member, KEY.source_member);
+        assert_eq!(asset.source_archive, KEY.source_archive);
+        assert!(out.errors.is_empty(), "{:?}", out.errors);
+    }
+
+    /// The identity handed in is the identity that comes out, hashed the way the
+    /// key path hashes it. If these two ever part, the have check reports every
+    /// render as missing and the corpus is uploaded twice.
+    #[test]
+    fn the_handed_in_digest_produces_the_key_the_have_check_asked_about() {
+        let dir = temp_dir("passdown-hash");
+        let file = dir.join("pixels.bin");
+        std::fs::write(&file, pixels(255, 204)).unwrap();
+        let mut req = request(&dir, &file, 3, 2, 255, 204);
+        req.source = Some(KEY);
+
+        let frame = coilbox_assets::render_frame(3, 2);
+        let asset = render("nolib", &req).asset.expect("encoded");
+        assert_eq!(
+            asset.source_hash,
+            crate::assetencode::render_source_hash(
+                "render:top",
+                1,
+                3,
+                2,
+                frame.width_px,
+                frame.height_px,
+                KEY.model_digest,
+            )
+        );
+    }
+
+    /// The guard that does not move. A caller can say what the pixels were drawn
+    /// from, and still cannot say what shape they are.
+    #[test]
+    fn a_handed_in_key_does_not_buy_a_mis_framed_render() {
+        let dir = temp_dir("passdown-misframed");
+        let file = dir.join("pixels.bin");
+        std::fs::write(&file, pixels(256, 256)).unwrap();
+        let mut req = request(&dir, &file, 3, 2, 256, 256);
+        req.source = Some(KEY);
+        assert_eq!(
+            render("nolib", &req).asset_skipped,
+            Some(RenderSkip::MisFramed)
+        );
     }
 
     /// An angle nobody agreed on would be a row the hub has no reader for, so it

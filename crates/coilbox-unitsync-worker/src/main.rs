@@ -121,6 +121,13 @@ struct Args {
     /// `--width`/`--height`/`--footprint-x`/`--footprint-z`, and the unit in
     /// `--game`/`--object`. Needs `--asset-dir`, since the file is the output.
     unit_render: bool,
+    /// What a `--unit-render` was drawn from, for a caller that already holds it
+    /// from `--unit-render-keys` (issue #1720). All three or none: given, the
+    /// game's archive set is not mounted at all, and a caller that gives two of
+    /// them has a wiring bug rather than a fast path.
+    model_digest: Option<String>,
+    source_member: Option<String>,
+    source_archive: Option<String>,
     /// `--unit-render-keys`: what a batch of units' renders would be called,
     /// without drawing any of them. Takes the units in `--units-file`, the angle
     /// in `--angle` and the renderer in `--renderer-version`.
@@ -472,6 +479,13 @@ fn run() -> i32 {
             .angle
             .clone()
             .unwrap_or_else(|| coilbox_assets::vocabulary().unit.render_angles[0].clone());
+        let source = match render_source(&args) {
+            Ok(source) => source,
+            Err(why) => {
+                unitrender::emit_error(why);
+                return 1;
+            }
+        };
         let req = unitrender::RenderRequest {
             game_archive: &game_archive,
             object_name: &object,
@@ -483,6 +497,7 @@ fn run() -> i32 {
             width: args.width,
             height: args.height,
             asset_dir: Path::new(&asset_dir),
+            source,
         };
         return match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             unitrender::render(&args.lib, &req)
@@ -864,6 +879,45 @@ fn run() -> i32 {
     }
 }
 
+/// What `--unit-render` was drawn from, when the caller said (issue #1720).
+///
+/// All three or none. Two of them is a caller that meant to hand the key down and
+/// got it wrong, and quietly mounting the archive instead would hide that behind
+/// a slow render nobody would look twice at.
+fn render_source(args: &Args) -> Result<Option<unitrender::RenderSource<'_>>, String> {
+    match (
+        args.model_digest.as_deref(),
+        args.source_member.as_deref(),
+        args.source_archive.as_deref(),
+    ) {
+        (None, None, None) => Ok(None),
+        (Some(model_digest), Some(source_member), Some(source_archive)) => {
+            if [model_digest, source_member, source_archive]
+                .iter()
+                .any(|v| v.is_empty())
+            {
+                // An empty digest still hashes, into a `source_hash` naming a
+                // picture of nothing that the have check would then key on.
+                return Err(
+                    "--unit-render was given an empty model digest, source member or \
+                            source archive"
+                        .into(),
+                );
+            }
+            Ok(Some(unitrender::RenderSource {
+                model_digest,
+                source_member,
+                source_archive,
+            }))
+        }
+        _ => Err(
+            "--unit-render takes --model-digest, --source-member and --source-archive together \
+             or not at all"
+                .into(),
+        ),
+    }
+}
+
 fn parse_args() -> Result<Args, String> {
     let mut lib = None;
     let mut datadir = None;
@@ -894,6 +948,9 @@ fn parse_args() -> Result<Args, String> {
     let mut unit_model = false;
     let mut unit_models = false;
     let mut unit_render = false;
+    let mut model_digest = None;
+    let mut source_member = None;
+    let mut source_archive = None;
     let mut unit_render_keys = false;
     let mut units_file = None;
     let mut angle = None;
@@ -958,6 +1015,9 @@ fn parse_args() -> Result<Args, String> {
             "--unit-model" => unit_model = true,
             "--unit-models" => unit_models = true,
             "--unit-render" => unit_render = true,
+            "--model-digest" => model_digest = it.next(),
+            "--source-member" => source_member = it.next(),
+            "--source-archive" => source_archive = it.next(),
             "--unit-render-keys" => unit_render_keys = true,
             "--units-file" => units_file = it.next(),
             "--angle" => angle = it.next(),
@@ -1060,6 +1120,9 @@ fn parse_args() -> Result<Args, String> {
         unit_model,
         unit_models,
         unit_render,
+        model_digest,
+        source_member,
+        source_archive,
         unit_render_keys,
         units_file,
         angle,
@@ -1483,6 +1546,9 @@ mod tests {
             unit_model: false,
             unit_models: false,
             unit_render: false,
+            model_digest: None,
+            source_member: None,
+            source_archive: None,
             unit_render_keys: false,
             units_file: None,
             angle: None,
@@ -1547,5 +1613,46 @@ mod tests {
         absolutize(&mut args);
         assert_eq!(args.asset_dir, None);
         assert_eq!(args.cache_dir, None);
+    }
+
+    /// The three fields of a render's identity travel together or not at all
+    /// (issue #1720). Two of them is a caller that meant to hand the key down and
+    /// mis-wired it, and mounting the archive instead would hide that.
+    #[test]
+    fn the_handed_down_render_key_is_all_three_fields_or_none() {
+        let with = |digest: Option<&str>, member: Option<&str>, archive: Option<&str>| {
+            let mut args = args_with(None, None);
+            args.model_digest = digest.map(str::to_string);
+            args.source_member = member.map(str::to_string);
+            args.source_archive = archive.map(str::to_string);
+            args
+        };
+
+        let none = with(None, None, None);
+        assert!(render_source(&none)
+            .expect("no key is the mounting path")
+            .is_none());
+
+        let all = with(Some("digest"), Some("objects3d/armsolar.s3o"), Some("BAR"));
+        let source = render_source(&all)
+            .expect("all three is the fast path")
+            .expect("a source");
+        assert_eq!(source.model_digest, "digest");
+        assert_eq!(source.source_member, "objects3d/armsolar.s3o");
+        assert_eq!(source.source_archive, "BAR");
+
+        for partial in [
+            with(Some("digest"), None, None),
+            with(Some("digest"), Some("member"), None),
+            with(None, Some("member"), Some("BAR")),
+        ] {
+            assert!(render_source(&partial).is_err());
+        }
+
+        // An empty digest hashes as happily as a real one, into a `source_hash`
+        // naming a picture of nothing.
+        assert!(render_source(&with(Some(""), Some("member"), Some("BAR"))).is_err());
+        assert!(render_source(&with(Some("digest"), Some(""), Some("BAR"))).is_err());
+        assert!(render_source(&with(Some("digest"), Some("member"), Some(""))).is_err());
     }
 }
