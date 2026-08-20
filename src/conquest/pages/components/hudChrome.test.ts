@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
@@ -26,7 +26,13 @@ import {
  * The band fixes that by deciding the backdrop instead of guessing it. What this
  * file proves is that once 78% of the page's own background is between the text
  * and the canvas, both inks clear WCAG AA (4.5:1) whatever the canvas was
- * painting, in either ramp and on every base preset picoframe ships.
+ * painting, on every base preset picoframe ships.
+ *
+ * Every sweep here is over the dark ramp alone. Both maps hold that ramp whoever
+ * is looking at them (#1810), because a starfield has no light version, and
+ * nothing outside those two routes uses this chrome. `no importer outside the
+ * two forced-dark routes` at the foot of this file is what keeps that true, and
+ * a light measurement without it would be measuring a screen nobody sees.
  *
  * The alphas are read out of the shipped class strings, so weakening the band
  * re-runs the measurement rather than leaving a stale number here.
@@ -95,52 +101,31 @@ function tokenAlpha(className: string, token: string): number {
 const BASE_HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
 
 /**
- * The two saturation knobs a base preset moves, paired as the presets pair them:
- * `--base-sat` tints surfaces, `--base-sat-text` tints foregrounds. Taking them
- * separately would measure a text colour no base ships.
+ * The saturation knob a base preset moves surfaces by, `--base-sat`.
+ *
+ * A preset moves foregrounds too, with `--base-sat-text`, and that one does not
+ * appear below: the dark ramp's inks are literal near-whites the base leaves
+ * alone. The light ramp's are the tinted ones, and the light ramp is not on
+ * screen here.
  */
-const BASE_SATS: readonly (readonly [number, number])[] = [
-  [0, 0],
-  [1, 1],
-  [2.6, 2.6],
-  [6, 2],
-  [11, 2],
-];
+const BASE_SATS = [0, 1, 2.6, 6, 11];
 
-/** The two ramps, transcribed from `@picoframe/frame/src/theme.css`. */
-const RAMPS = {
-  dark: {
-    /** `.dark --background`, retinted by the base. */
-    surface: (hue: number, sat: number) => hsl(hue, (sat * 6) / 100, 0.07),
-    /** `.dark --foreground`, a literal near-white the base does not move. */
-    ink: () => hsl(0, 0, 0.95),
-  },
-  light: {
-    /** `:root --background`, a literal white the base does not retint. */
-    surface: () => hsl(0, 0, 1),
-    /** `:root --foreground`, near-black and tinted by the text knob. */
-    ink: (hue: number, satText: number) => hsl(hue, (satText * 10) / 100, 0.12),
-  },
-} as const;
-
-type Scheme = keyof typeof RAMPS;
-const SCHEMES = Object.keys(RAMPS) as Scheme[];
+/** The dark ramp's page surface, transcribed from `@picoframe/frame/src/theme.css`. */
+const DARK_BAND = {
+  /** `.dark --background`, retinted by the base. */
+  surface: (hue: number, sat: number) => hsl(hue, (sat * 6) / 100, 0.07),
+  /** `.dark --foreground`, a literal near-white the base does not move. */
+  ink: hsl(0, 0, 0.95),
+};
 
 const bandAlpha = tokenAlpha(MAP_BAND_CLASS, "background");
 const inkAlpha = tokenAlpha(MAP_INK_CLASS, "foreground");
 const dimAlpha = tokenAlpha(MAP_DIM_INK_CLASS, "foreground");
 
-/** The band and its two inks over `canvas`, in one base of one ramp. */
-function bandOver(
-  canvas: Rgb,
-  scheme: Scheme,
-  hue: number,
-  sat: number,
-  satText: number,
-) {
-  const ramp = RAMPS[scheme];
-  const band = over(canvas, ramp.surface(hue, sat), bandAlpha);
-  const ink = ramp.ink(hue, satText);
+/** The band and its two inks over `canvas`, in one base. */
+function bandOver(canvas: Rgb, hue: number, sat: number) {
+  const band = over(canvas, DARK_BAND.surface(hue, sat), bandAlpha);
+  const ink = DARK_BAND.ink;
   return {
     body: contrast(over(band, ink, inkAlpha), band),
     dim: contrast(over(band, ink, dimAlpha), band),
@@ -163,24 +148,22 @@ describe("the band under a label on the galaxy canvas", () => {
 describe("both inks clear AA over anything the canvas can paint", () => {
   const STEPS = [0, 0.25, 0.5, 0.75, 1];
 
-  for (const scheme of SCHEMES) {
-    it(`holds over every colour a starfield can be, ${scheme}`, () => {
-      let body = { ratio: Number.POSITIVE_INFINITY, at: "" };
-      let dim = { ratio: Number.POSITIVE_INFINITY, at: "" };
-      for (const r of STEPS)
-        for (const g of STEPS)
-          for (const b of STEPS)
-            for (const hue of BASE_HUES)
-              for (const [sat, satText] of BASE_SATS) {
-                const m = bandOver([r, g, b], scheme, hue, sat, satText);
-                const at = `rgb(${r} ${g} ${b}) on base ${hue}/${sat}`;
-                if (m.body < body.ratio) body = { ratio: m.body, at };
-                if (m.dim < dim.ratio) dim = { ratio: m.dim, at };
-              }
-      expect(body.ratio, body.at).toBeGreaterThanOrEqual(4.5);
-      expect(dim.ratio, dim.at).toBeGreaterThanOrEqual(4.5);
-    });
-  }
+  it("holds over every colour a starfield can be", () => {
+    let body = { ratio: Number.POSITIVE_INFINITY, at: "" };
+    let dim = { ratio: Number.POSITIVE_INFINITY, at: "" };
+    for (const r of STEPS)
+      for (const g of STEPS)
+        for (const b of STEPS)
+          for (const hue of BASE_HUES)
+            for (const sat of BASE_SATS) {
+              const m = bandOver([r, g, b], hue, sat);
+              const at = `rgb(${r} ${g} ${b}) on base ${hue}/${sat}`;
+              if (m.body < body.ratio) body = { ratio: m.body, at };
+              if (m.dim < dim.ratio) dim = { ratio: m.dim, at };
+            }
+    expect(body.ratio, body.at).toBeGreaterThanOrEqual(4.5);
+    expect(dim.ratio, dim.at).toBeGreaterThanOrEqual(4.5);
+  });
 });
 
 /**
@@ -265,30 +248,23 @@ describe("the labels that sit straight on the canvas", () => {
  *   `src/index.css` points the token at the card's ink at 75% instead, and this
  *   file reads that number back out of the stylesheet.
  * - The accent inks. Those were Tailwind 300/400 shades, picked for a dark
- *   surface, on a HUD that does not force a dark scheme. On a light one they
+ *   surface, on a HUD that did not force a dark scheme. On a light one they
  *   measured 1.0:1. No card alpha could have fixed that, because the card is
- *   white there too, so they became a value per ramp.
+ *   white there too, so they became a measured value. #1810 then made both maps
+ *   hold the dark ramp, so that is the one value they need (#1811).
  *
  * The sweep is the same one the band uses: the whole sRGB cube for the canvas,
- * both ramps, every base preset. The alphas and the accent triples are read out
- * of the shipped strings, so weakening any of them re-runs the measurement.
+ * every base preset. The alphas and the accent triples are read out of the
+ * shipped strings, so weakening any of them re-runs the measurement.
  */
 
-/** The two card ramps, transcribed from `@picoframe/frame/src/theme.css`. */
-const CARD_RAMPS = {
-  dark: {
-    /** `.dark --card`, retinted by the base. */
-    surface: (hue: number, sat: number) => hsl(hue, (sat * 5) / 100, 0.1),
-    /** `.dark --card-foreground`, a literal near-white. */
-    ink: () => hsl(0, 0, 0.95),
-  },
-  light: {
-    /** `:root --card`, a literal white. */
-    surface: () => hsl(0, 0, 1),
-    /** `:root --card-foreground`, near-black and tinted by the text knob. */
-    ink: (hue: number, satText: number) => hsl(hue, (satText * 10) / 100, 0.12),
-  },
-} as const;
+/** The dark ramp's card, transcribed from `@picoframe/frame/src/theme.css`. */
+const DARK_CARD = {
+  /** `.dark --card`, retinted by the base. */
+  surface: (hue: number, sat: number) => hsl(hue, (sat * 5) / 100, 0.1),
+  /** `.dark --card-foreground`, a literal near-white the base does not move. */
+  ink: hsl(0, 0, 0.95),
+};
 
 const cardAlpha = tokenAlpha(HUD_CARD_CLASS, "card");
 const cardInkAlpha = tokenAlpha(HUD_INK_CLASS, "card-foreground");
@@ -318,42 +294,26 @@ function scopedMutedAlpha(): number {
   return Number(found[1]);
 }
 
-/** An `hsl(H_S%_L%)` arbitrary value, light ramp and dark ramp. */
-function accentInks(className: string): { light: Rgb; dark: Rgb } {
-  const read = (prefix: string) => {
-    const found = new RegExp(
-      `${prefix}text-\\[hsl\\(([0-9.]+)_([0-9.]+)%_([0-9.]+)%\\)\\]`,
-    ).exec(className);
-    if (!found) throw new Error(`no ${prefix || "light"} ink in ${className}`);
-    return hsl(
-      Number(found[1]),
-      Number(found[2]) / 100,
-      Number(found[3]) / 100,
-    );
-  };
-  // The light value is the bare utility, so anchor it to a word boundary that
-  // `dark:` cannot satisfy.
-  return { light: read("(?:^|\\s)"), dark: read("dark:") };
+/** The `hsl(H_S%_L%)` arbitrary value an accent ships as. */
+function accentInk(className: string): Rgb {
+  const found = /text-\[hsl\(([0-9.]+)_([0-9.]+)%_([0-9.]+)%\)\]/.exec(
+    className,
+  );
+  if (!found) throw new Error(`no ink in ${className}`);
+  return hsl(Number(found[1]), Number(found[2]) / 100, Number(found[3]) / 100);
 }
 
-/** The card and everything set on it, over `canvas`, in one base of one ramp. */
-function cardOver(
-  canvas: Rgb,
-  scheme: Scheme,
-  hue: number,
-  sat: number,
-  satText: number,
-) {
-  const ramp = CARD_RAMPS[scheme];
-  const card = over(canvas, ramp.surface(hue, sat), cardAlpha);
-  const ink = ramp.ink(hue, satText);
+/** The card and everything set on it, over `canvas`, in one base. */
+function cardOver(canvas: Rgb, hue: number, sat: number) {
+  const card = over(canvas, DARK_CARD.surface(hue, sat), cardAlpha);
+  const ink = DARK_CARD.ink;
   const ratios: Record<string, number> = {
     body: contrast(over(card, ink, cardInkAlpha), card),
     dim: contrast(over(card, ink, cardDimAlpha), card),
     muted: contrast(over(card, ink, scopedMutedAlpha()), card),
   };
   for (const [name, value] of Object.entries(HUD_ACCENT_INK)) {
-    ratios[name] = contrast(accentInks(value)[scheme], card);
+    ratios[name] = contrast(accentInk(value), card);
   }
   return ratios;
 }
@@ -380,27 +340,25 @@ describe("the card under the HUD", () => {
 describe("everything set on a HUD card clears AA over anything the canvas can paint", () => {
   const STEPS = [0, 0.25, 0.5, 0.75, 1];
 
-  for (const scheme of SCHEMES) {
-    it(`holds over every colour a starfield can be, ${scheme}`, () => {
-      const worst: Record<string, { ratio: number; at: string }> = {};
-      for (const r of STEPS)
-        for (const g of STEPS)
-          for (const b of STEPS)
-            for (const hue of BASE_HUES)
-              for (const [sat, satText] of BASE_SATS) {
-                const at = `rgb(${r} ${g} ${b}) on base ${hue}/${sat}`;
-                for (const [name, ratio] of Object.entries(
-                  cardOver([r, g, b], scheme, hue, sat, satText),
-                )) {
-                  if (!worst[name] || ratio < worst[name].ratio)
-                    worst[name] = { ratio, at };
-                }
+  it("holds over every colour a starfield can be", () => {
+    const worst: Record<string, { ratio: number; at: string }> = {};
+    for (const r of STEPS)
+      for (const g of STEPS)
+        for (const b of STEPS)
+          for (const hue of BASE_HUES)
+            for (const sat of BASE_SATS) {
+              const at = `rgb(${r} ${g} ${b}) on base ${hue}/${sat}`;
+              for (const [name, ratio] of Object.entries(
+                cardOver([r, g, b], hue, sat),
+              )) {
+                if (!worst[name] || ratio < worst[name].ratio)
+                  worst[name] = { ratio, at };
               }
-      for (const [name, { ratio, at }] of Object.entries(worst)) {
-        expect(ratio, `${name} at ${at}`).toBeGreaterThanOrEqual(4.5);
-      }
-    });
-  }
+            }
+    for (const [name, { ratio, at }] of Object.entries(worst)) {
+      expect(ratio, `${name} at ${at}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });
 
 describe("the HUD card reads raw tokens, not Tailwind's utilities", () => {
@@ -419,8 +377,9 @@ describe("the HUD card reads raw tokens, not Tailwind's utilities", () => {
   }
 
   it("keeps the accent inks off the Tailwind palette", () => {
-    // `text-cyan-300` and friends are one value used in both ramps, and the
-    // light ramp is where they measured 1.0:1.
+    // `text-cyan-300` and friends are a shade somebody picked by eye, and the
+    // point of an `hsl()` literal is that this file can read it back and
+    // re-measure it. A palette class it cannot.
     for (const value of Object.values(HUD_ACCENT_INK)) {
       expect(value).not.toMatch(/text-[a-z]+-\d{2,3}/);
     }
@@ -436,45 +395,42 @@ describe("the HUD card reads raw tokens, not Tailwind's utilities", () => {
  * rather than 78% of `--card`.
  *
  * Those are different surfaces, so the card's measurement does not carry over on
- * its own. It happens to be the safe direction in both ramps, the dark
- * `--background` being darker than the dark `--card` and the light one being the
- * same white, but "it happens to be" is exactly the kind of thing that stops
- * being true when picoframe retunes a ramp.
+ * its own. It happens to be the safe direction, the dark `--background` being
+ * darker than the dark `--card`, but "it happens to be" is exactly the kind of
+ * thing that stops being true when picoframe retunes a ramp.
  */
 describe("the accent inks clear AA on the band too", () => {
   const STEPS = [0, 0.25, 0.5, 0.75, 1];
 
-  for (const scheme of SCHEMES) {
-    it(`holds over every colour the map can be, ${scheme}`, () => {
-      const worst: Record<string, { ratio: number; at: string }> = {};
-      for (const r of STEPS)
-        for (const g of STEPS)
-          for (const b of STEPS)
-            for (const hue of BASE_HUES)
-              for (const [sat] of BASE_SATS) {
-                const band = over(
-                  [r, g, b],
-                  RAMPS[scheme].surface(hue, sat),
-                  bandAlpha,
-                );
-                const at = `rgb(${r} ${g} ${b}) on base ${hue}/${sat}`;
-                for (const [name, value] of Object.entries(HUD_ACCENT_INK)) {
-                  const ratio = contrast(accentInks(value)[scheme], band);
-                  if (!worst[name] || ratio < worst[name].ratio)
-                    worst[name] = { ratio, at };
-                }
+  it("holds over every colour the map can be", () => {
+    const worst: Record<string, { ratio: number; at: string }> = {};
+    for (const r of STEPS)
+      for (const g of STEPS)
+        for (const b of STEPS)
+          for (const hue of BASE_HUES)
+            for (const sat of BASE_SATS) {
+              const band = over(
+                [r, g, b],
+                DARK_BAND.surface(hue, sat),
+                bandAlpha,
+              );
+              const at = `rgb(${r} ${g} ${b}) on base ${hue}/${sat}`;
+              for (const [name, value] of Object.entries(HUD_ACCENT_INK)) {
+                const ratio = contrast(accentInk(value), band);
+                if (!worst[name] || ratio < worst[name].ratio)
+                  worst[name] = { ratio, at };
               }
-      for (const [name, { ratio, at }] of Object.entries(worst)) {
-        expect(ratio, `${name} at ${at}`).toBeGreaterThanOrEqual(4.5);
-      }
-    });
-  }
+            }
+    for (const [name, { ratio, at }] of Object.entries(worst)) {
+      expect(ratio, `${name} at ${at}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });
 
 /**
  * The Tailwind palette classes the HUD still writes at a call site (#1801).
  *
- * #1785 moved the shared accents to a measured value per ramp. #1801 was the
+ * #1785 moved the shared accents to a measured ink. #1801 was the
  * same defect at the call sites, roughly two dozen 300/400 shades, and most of
  * what made it a defect was the light ramp: `text-cyan-300` on a white card is
  * 1.0:1. #1810 then made both maps hold the dark ramp whatever theme the player
@@ -492,11 +448,10 @@ describe("the accent inks clear AA on the band too", () => {
  * one is decoration and carries no WCAG requirement at all, but decoration
  * nobody can see is not decoration, and 3:1 is the nearest honest bar.
  *
- * Only the dark ramp is swept. These are one value used in both, and the light
- * ramp cannot be reached on either route, so a light measurement here would be
- * measuring a screen nobody sees. `src/theme/forcedDark.test.ts` is what holds
- * that assumption up. If the forcing ever goes, this file needs the other half
- * back and most of these rows will fail it.
+ * Only the dark ramp is swept, as everywhere else in this file. These are one
+ * value used in both ramps, and the light one cannot be reached on either route,
+ * so a light measurement here would be measuring a screen nobody sees. If the
+ * forcing ever goes, most of these rows fail on the light ramp.
  */
 
 /** The `oklch()` values Tailwind's palette ships, as sRGB. */
@@ -752,15 +707,11 @@ describe("the palette classes the HUD still writes by hand", () => {
         for (const g of STEPS)
           for (const b of STEPS)
             for (const hue of BASE_HUES)
-              for (const [sat] of BASE_SATS) {
+              for (const sat of BASE_SATS) {
                 const surface =
                   site.on === "card"
-                    ? over(
-                        [r, g, b],
-                        CARD_RAMPS.dark.surface(hue, sat),
-                        cardAlpha,
-                      )
-                    : over([r, g, b], RAMPS.dark.surface(hue, sat), bandAlpha);
+                    ? over([r, g, b], DARK_CARD.surface(hue, sat), cardAlpha)
+                    : over([r, g, b], DARK_BAND.surface(hue, sat), bandAlpha);
                 const ratio = contrast(over(surface, ink, inkAlpha), surface);
                 if (ratio < worst.ratio)
                   worst = {
@@ -773,6 +724,66 @@ describe("the palette classes the HUD still writes by hand", () => {
       );
     });
   }
+});
+
+/**
+ * What makes every measurement above a dark-only one (#1811).
+ *
+ * The accent inks used to carry a light value beside the dark one. Both maps hold
+ * the dark ramp now (#1810), so the light half was a colour nobody could reach,
+ * and the next accent would have had to invent one to match its siblings. They
+ * are single values again.
+ *
+ * That is only safe while this chrome stays on those two routes. A HUD card on an
+ * ordinary page would paint a near-white teal on white, and nothing else in this
+ * file would notice, because the sweeps no longer look at the light ramp. So the
+ * list is the check. A new importer either renders inside one of the two roots
+ * and gets added here, or the inks need their light values back.
+ */
+describe("no importer outside the two forced-dark routes", () => {
+  const SRC = fileURLToPath(new URL("../../..", import.meta.url));
+
+  /** The two elements `useForcedDark` goes on. */
+  const ROOTS = ["conquest/pages/GalaxyPage.tsx", "runlite/pages/RunPage.tsx"];
+
+  /** The rest, each rendered inside one of those two. */
+  const INSIDE_A_ROOT = [
+    "conquest/pages/components/BattleOverlay.tsx",
+    "conquest/pages/components/RunSetup.tsx",
+    "runlite/pages/components/EncounterOverlay.tsx",
+    "runlite/pages/components/NodeOverlays.tsx",
+    "runlite/pages/components/RunHud.tsx",
+  ];
+
+  it("is imported only by files on the conquest or warpath map", () => {
+    const importers: string[] = [];
+    for (const entry of readdirSync(SRC, {
+      recursive: true,
+      withFileTypes: true,
+    })) {
+      if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) continue;
+      if (entry.name.startsWith("hudChrome.")) continue;
+      const full = `${entry.parentPath}/${entry.name}`;
+      if (!/from "[^"]*hudChrome"/.test(readFileSync(full, "utf8"))) continue;
+      importers.push(full.slice(SRC.length).replace(/^\/+/, ""));
+    }
+    expect(
+      importers.sort(),
+      "The HUD accent inks are dark-ramp values with no light half (#1811), so " +
+        "this chrome only works inside a useForcedDark subtree. Add the file " +
+        "here if it is one, or give the inks their light values back.",
+    ).toEqual([...ROOTS, ...INSIDE_A_ROOT].sort());
+  });
+
+  it("still forces the dark ramp at both roots", () => {
+    // The other five inherit it. This is the pair that turns it on, and losing
+    // it is what would make the sweeps above measure the wrong screen.
+    for (const rel of ROOTS) {
+      expect(readFileSync(`${SRC}/${rel}`, "utf8"), rel).toContain(
+        "useForcedDark(",
+      );
+    }
+  });
 });
 
 describe("the faction colour a galaxy document names", () => {
