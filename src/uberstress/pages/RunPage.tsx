@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Collapsible,
@@ -399,38 +400,38 @@ export default function RunPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-        <div className="space-y-1">
-          <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
+      <PageHeader
+        className="border-b border-border px-6 py-4"
+        title={
+          <>
             <Zap size={18} /> Run load test
-          </h1>
-          <p className="max-w-prose text-sm text-muted-foreground">
-            Drive a scenario against a lobby server (load) or launch one locally
-            and benchmark it (bench).
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            drawer.open({
-              title: "Generate seed SQL",
-              description:
-                "Pre-seed accounts so a load test can run with registration off.",
-              width: "44rem",
-              content: (
-                <SeedSqlForm
-                  defaultCount={Math.max(conns, 2000)}
-                  defaultPrefix={userPrefix}
-                  defaultPassword={password}
-                />
-              ),
-            })
-          }
-        >
-          <Database /> Seed SQL
-        </Button>
-      </header>
+          </>
+        }
+        description="Drive a scenario against a lobby server (load) or launch one locally and benchmark it (bench)."
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              drawer.open({
+                title: "Generate seed SQL",
+                description:
+                  "Pre-seed accounts so a load test can run with registration off.",
+                width: "44rem",
+                content: (
+                  <SeedSqlForm
+                    defaultCount={Math.max(conns, 2000)}
+                    defaultPrefix={userPrefix}
+                    defaultPassword={password}
+                  />
+                ),
+              })
+            }
+          >
+            <Database /> Seed SQL
+          </Button>
+        }
+      />
 
       <div className="grid min-h-0 flex-1 grid-cols-[28rem_1fr]">
         {/* Left: form */}
