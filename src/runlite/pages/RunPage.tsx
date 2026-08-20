@@ -7,7 +7,9 @@ import { resolveGameByShortname } from "../../conquest/model";
 import {
   BracketFrame,
   HUD_ACCENT_INK,
+  HUD_CARD_CLASS,
   MAP_BAND_CLASS,
+  MAP_DIM_INK_CLASS,
 } from "../../conquest/pages/components/hudChrome";
 import { buildEdgeMap, reachableFrom } from "../../content/buildTree";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../../content/config";
@@ -243,11 +245,16 @@ export default function RunPage() {
           hides the sidebar nav. The inspect panel flows below the gauges in the
           same column, so it shares the gauges' gap and never overlaps them. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4">
-        {/* The run's name is the one label on this page with nothing but the
-            node map behind it, so it takes the band the conquest map's own
-            loose labels take (#1052). It was a drop shadow, which softens an
-            edge but decides no contrast ratio, so over a pale node the ink and
-            what it sat on measured 1.0:1 (#1801). */}
+        {/* The run's name and the chip beside it are the two labels on this page
+            with nothing but the node map behind them, so both take the band the
+            conquest map's own loose labels take (#1052). The name was a drop
+            shadow, which softens an edge but decides no contrast ratio, so over
+            a pale node the ink and what it sat on measured 1.0:1 (#1801). The
+            chip was a card at 70% carrying `text-muted-foreground`, which is a
+            60% grey the theme calibrates against a flat surface, so it measured
+            2.3:1 over a bright node (#1812). A card that thin is not a backdrop
+            anyway. On screen the chip read as loose text on the starfield, which
+            is what the band is for. */}
         <div className="pointer-events-auto flex items-center gap-2">
           <span
             className={`${MAP_BAND_CLASS} px-2 py-1 font-display text-sm font-semibold uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
@@ -255,7 +262,9 @@ export default function RunPage() {
             {run.name}
           </span>
           {run.importedChallenge && (
-            <span className="rounded bg-card/70 px-1.5 py-0.5 text-[10px] tracking-wide text-muted-foreground">
+            <span
+              className={`${MAP_BAND_CLASS} px-1.5 py-0.5 text-[10px] tracking-wide ${MAP_DIM_INK_CLASS}`}
+            >
               Imported challenge
             </span>
           )}
@@ -263,12 +272,15 @@ export default function RunPage() {
         <div className="flex items-stretch gap-3">
           {selectedId && !active ? (
             // A node is selected (read-only inspect): the left control steps
-            // back to the map, mirroring the exit button's box style.
+            // back to the map, mirroring the exit button's box style. Both
+            // controls wear the measured HUD card rather than the hand-written
+            // `bg-card/70` they used to, which is the same 2.3:1 the chip above
+            // had and the same fix #1785 gave every framed tile.
             <button
               type="button"
               onClick={() => setSelectedId(null)}
               aria-label="Back to map"
-              className="pointer-events-auto flex items-center justify-center rounded-md border border-border/50 bg-card/70 px-3 text-muted-foreground transition-colors hover:text-foreground"
+              className={`pointer-events-auto flex items-center justify-center px-3 text-muted-foreground transition-colors hover:text-foreground ${HUD_CARD_CLASS}`}
             >
               <ArrowLeft className="size-5" aria-hidden />
             </button>
@@ -276,7 +288,7 @@ export default function RunPage() {
             <Link
               to="/warpath"
               aria-label="Back to warpath hub"
-              className="pointer-events-auto flex items-center justify-center rounded-md border border-border/50 bg-card/70 px-3 text-muted-foreground transition-colors hover:text-foreground"
+              className={`pointer-events-auto flex items-center justify-center px-3 text-muted-foreground transition-colors hover:text-foreground ${HUD_CARD_CLASS}`}
             >
               <ArrowLeft className="size-5" aria-hidden />
             </Link>
