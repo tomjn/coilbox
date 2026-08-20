@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import runlitePlugin from "../../../runlite";
+import conquestPlugin from "../../index";
 import {
   bracketColor,
   HUD_ACCENT_INK,
@@ -31,8 +33,8 @@ import {
  * Every sweep here is over the dark ramp alone. Both maps hold that ramp whoever
  * is looking at them (#1810), because a starfield has no light version, and
  * nothing outside those two routes uses this chrome. `no importer outside the
- * two forced-dark routes` at the foot of this file is what keeps that true, and
- * a light measurement without it would be measuring a screen nobody sees.
+ * two dark routes` at the foot of this file is what keeps that true, and a light
+ * measurement without it would be measuring a screen nobody sees.
  *
  * The alphas are read out of the shipped class strings, so weakening the band
  * re-runs the measurement rather than leaving a stale number here.
@@ -856,10 +858,10 @@ describe("the palette classes the HUD still writes by hand", () => {
  * list is the check. A new importer either renders inside one of the two roots
  * and gets added here, or the inks need their light values back.
  */
-describe("no importer outside the two forced-dark routes", () => {
+describe("no importer outside the two dark routes", () => {
   const SRC = fileURLToPath(new URL("../../..", import.meta.url));
 
-  /** The two elements `useForcedDark` goes on. */
+  /** The two pages the forced-dark routes mount. */
   const ROOTS = ["conquest/pages/GalaxyPage.tsx", "runlite/pages/RunPage.tsx"];
 
   /** The rest, each rendered inside one of those two. */
@@ -887,19 +889,24 @@ describe("no importer outside the two forced-dark routes", () => {
     expect(
       importers.sort(),
       "The HUD accent inks are dark-ramp values with no light half (#1811), so " +
-        "this chrome only works inside a useForcedDark subtree. Add the file " +
-        "here if it is one, or give the inks their light values back.",
+        "this chrome only works on a route that forces the dark ramp. Add the " +
+        "file here if it is on one, or give the inks their light values back.",
     ).toEqual([...ROOTS, ...INSIDE_A_ROOT].sort());
   });
 
-  it("still forces the dark ramp at both roots", () => {
-    // The other five inherit it. This is the pair that turns it on, and losing
-    // it is what would make the sweeps above measure the wrong screen.
-    for (const rel of ROOTS) {
-      expect(readFileSync(`${SRC}/${rel}`, "utf8"), rel).toContain(
-        "useForcedDark(",
-      );
-    }
+  it("still forces the dark ramp on both routes", () => {
+    // Every file above inherits it from the route that mounts its page. This is
+    // the pair that turns it on, and losing it is what would make the sweeps
+    // above measure the wrong screen.
+    //
+    // The declaration used to be a `useForcedDark` call in each page, so this
+    // read the two page files. picoframe 0.7.0 forces an appearance from the
+    // route instead (#1823), so the route objects are what it reads now, and
+    // they say so about the two map routes and nothing else.
+    const forced = [...conquestPlugin.routes, ...runlitePlugin.routes]
+      .filter((route) => route.appearance === "dark")
+      .map((route) => route.path);
+    expect(forced.sort()).toEqual(["conquest/:id", "warpath/:runId"]);
   });
 });
 

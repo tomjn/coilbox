@@ -50,6 +50,10 @@ const runlitePlugin: FramePlugin = {
     },
     {
       path: "warpath/:runId",
+      // The node map is drawn over the same starfield the conquest galaxy uses,
+      // so it holds the dark ramp whatever theme the player picked (#1809). The
+      // list route above is an ordinary page and keeps their theme.
+      appearance: "dark",
       lazy: gateProfileHidden("runlite.list", () => import("./pages/RunPage")),
       crumb: (c) =>
         (c.params.runId && getCachedRun(c.params.runId)?.name) || "Warpath",

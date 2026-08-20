@@ -56,6 +56,10 @@ const conquestPlugin: FramePlugin = {
       // The battle briefing lives on this page as an overlay (camera zooms to
       // the contested node). There is no separate battle route.
       path: "conquest/:id",
+      // The galaxy is a starfield with a HUD over it and has no light version,
+      // so the map holds the dark ramp whatever theme the player picked (#1809).
+      // The list route above is an ordinary page and keeps their theme.
+      appearance: "dark",
       lazy: gateProfileHidden(
         "conquest.list",
         () => import("./pages/GalaxyPage"),
