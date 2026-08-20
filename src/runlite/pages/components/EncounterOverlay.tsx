@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Download, Loader2, Swords } from "lucide-react";
 import { Link } from "react-router";
+import { SubstitutedMapNote } from "../../../challenge/SubstitutedMapNote";
 import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
 import {
   BracketFrame,
@@ -84,7 +85,11 @@ export function EncounterOverlay({
         {enc.phase === "briefing" && spec && (
           <div className="flex flex-col gap-3">
             <dl className="flex flex-col gap-1.5 text-sm">
-              <Row label="Battlefield" value={spec.mapName} />
+              <Row
+                label="Battlefield"
+                value={spec.mapName}
+                note={spec.mapSubstitutedFrom}
+              />
               <Row
                 label="Opposition"
                 value={`${spec.enemyAiCount} × hostile${spec.handicap > 0 ? ` (+${spec.handicap}%)` : ""}`}
@@ -188,13 +193,25 @@ export function EncounterOverlay({
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  /** The map this encounter should have used, when it is on a stand-in. */
+  note?: string;
+}) {
   return (
     <div className="flex justify-between gap-2">
       <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
         {label}
       </dt>
-      <dd className="truncate">{value}</dd>
+      <dd className="min-w-0 text-right">
+        <span className="block truncate">{value}</span>
+        <SubstitutedMapNote original={note} />
+      </dd>
     </div>
   );
 }
