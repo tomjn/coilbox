@@ -11,9 +11,15 @@ on:
   push:
     branches: [main]
 
+# Every job sets timeout-minutes. GitHub's default is six hours, and a runner
+# that wedges on an apt install holds the pull request's checks pending for all
+# of it. These limits are several times the observed run times, so a healthy but
+# slow run still finishes while a stall turns red within the hour.
+
 jobs:
   frontend:
     runs-on: ubuntu-22.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       # Exact semver keeps setup-bun off api.github.com (see release.yml).
@@ -34,6 +40,7 @@ jobs:
   # a game and a map, none of which a runner has.
   lua:
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - name: Install LuaJIT
@@ -43,8 +50,12 @@ jobs:
       - name: Mission runtime tests
         run: scripts/mission-tests.sh
 
+  # 30 minutes rather than the other two jobs' limits: on a cache miss this job
+  # builds the Tauri app crate and the unitsync worker from cold, which is the
+  # long tail of the workflow.
   rust:
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
