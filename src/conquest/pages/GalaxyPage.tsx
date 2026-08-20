@@ -49,7 +49,12 @@ import {
 import { mergeConquestNames } from "../names";
 import { advanceTurn, attackableNodes } from "../rules";
 import { BattleOverlay } from "./components/BattleOverlay";
-import { BracketFrame } from "./components/hudChrome";
+import {
+  BracketFrame,
+  MAP_BAND_CLASS,
+  MAP_DIM_INK_CLASS,
+  MAP_INK_CLASS,
+} from "./components/hudChrome";
 import { FactionDot, SidePicker } from "./components/RunSetup";
 
 /**
@@ -439,7 +444,9 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
           <TurnRecap galaxy={galaxy} events={state.lastRound} />
         )}
 
-      <p className="pointer-events-none absolute bottom-2 left-3 z-10 text-[11px] text-muted-foreground">
+      <p
+        className={`pointer-events-none absolute bottom-2 left-3 z-10 px-2 py-1 text-[11px] ${MAP_BAND_CLASS} ${MAP_DIM_INK_CLASS}`}
+      >
         drag to pan · scroll to zoom · right-drag to tilt
       </p>
     </div>
@@ -463,21 +470,25 @@ function TurnRecap({
       ? "neutral space"
       : (galaxy.factions.find((f) => f.id === id)?.name ?? id);
   return (
-    <div className="pointer-events-none absolute bottom-9 left-3 z-10 flex max-w-xs flex-col gap-1 rounded-md bg-background/40 px-2.5 py-2 backdrop-blur-sm">
-      <span className="font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+    <div
+      className={`pointer-events-none absolute bottom-11 left-3 z-10 flex max-w-xs flex-col gap-1 px-2.5 py-2 backdrop-blur-sm ${MAP_BAND_CLASS}`}
+    >
+      <span
+        className={`font-display text-[10px] uppercase tracking-[0.18em] ${MAP_DIM_INK_CLASS}`}
+      >
         Last turn
       </span>
       {events.slice(0, 5).map((e) => (
         <span
           key={`${e.factionId}-${e.nodeId}`}
-          className="text-[11px] text-foreground/85"
+          className={`text-[11px] ${MAP_INK_CLASS}`}
         >
           {factionName(e.factionId)} took {nodeName(e.nodeId)}
           {e.from !== NEUTRAL ? ` from ${factionName(e.from)}` : ""}
         </span>
       ))}
       {events.length > 5 && (
-        <span className="text-[10px] text-muted-foreground">
+        <span className={`text-[10px] ${MAP_DIM_INK_CLASS}`}>
           +{events.length - 5} more
         </span>
       )}
