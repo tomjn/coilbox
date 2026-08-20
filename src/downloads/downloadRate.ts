@@ -78,13 +78,20 @@ export const IDLE_RATE: DownloadRate = {
  * A sample that arrived too soon after the last one is dropped, since the
  * sidecar path emits one per terminal redraw with no throttle of its own.
  *
- * A sample that goes backwards starts the window again from itself. That is not
- * a download losing what it had, it is the source changing what it is counting.
- * pr-downloader gives a fetch it has not sized an approximate size of 1 and adds
- * that to the total it prints, so the `1/1` at 100% that opens every download is
- * one unsized fetch finishing, not a one byte file. It is the rapid repo master.
- * The real archive then starts again at 0%, and discarding those samples instead
- * would leave the window stuck on the master and the download reading as stalled.
+ * Unless it is the sample where the source changes what it is counting, which
+ * starts the window again from itself. Two things do that, and the download is
+ * not losing ground in either. The count goes backwards, because pr-downloader
+ * gives a fetch it has not sized an approximate size of 1 and adds that to the
+ * total it prints, so the `1/1` at 100% opening every download is one unsized
+ * fetch finishing rather than a one byte file. It is the rapid repo master, and
+ * the real archive then starts again at 0%. Or the count stops being reported at
+ * all, because an archive served by `streamer.cgi` has taken over from the sdp
+ * fetch that preceded it.
+ *
+ * Both are checked ahead of the throttle. A real rapid download runs the whole
+ * sequence inside a second, so thinning it out on arrival time alone loses the
+ * change and leaves the window on a sample about something that already
+ * finished, with the download reading as stalled.
  */
 export function addSample(
   samples: RateSample[],
@@ -92,13 +99,14 @@ export function addSample(
 ): RateSample[] {
   const last = samples[samples.length - 1];
   if (last) {
-    if (sample.at - last.at < MIN_GAP_MS) return samples;
-    const backwards =
+    const changedSubject =
+      !carriesMeasurement(sample) ||
       sample.bytes < last.bytes ||
       (sample.fraction != null &&
         last.fraction != null &&
         sample.fraction < last.fraction);
-    if (backwards) return [sample];
+    if (changedSubject) return [sample];
+    if (sample.at - last.at < MIN_GAP_MS) return samples;
   }
   const next = [...samples, sample];
   const cutoff = sample.at - WINDOW_MS;
