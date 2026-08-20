@@ -1,6 +1,6 @@
 import { cn } from "@picoframe/frame";
 import type { FramePlugin, FrameRoute } from "@picoframe/plugin-sdk";
-import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { useNavigate } from "react-router";
@@ -8,7 +8,7 @@ import { assetUrl, isLocalRef, mediaKind } from "../lib/assetUrl";
 import { classifyMarkdownLink } from "./pageLinks";
 import { buildPageNav, getProfilePages, type ProfilePage } from "./pages";
 import { splitWidgets } from "./pageWidgets";
-import { getProfileRoot } from "./profile";
+import { openProfileFile } from "./refs";
 import { PageWidget } from "./widgets";
 
 /**
@@ -27,30 +27,20 @@ function resolveSrc(src: unknown): string | undefined {
 }
 
 /**
- * Show a page's bundled file in the OS file manager, with the folder open and the
- * file selected.
+ * Hand a page's bundled file to the OS.
  *
- * Somebody who writes `[our logo](@.coilbox/images/logo.webp)` rather than the
- * `!` image spelling means "click this to get at the file", so the click should
- * lead somewhere. The file manager rather than the file's own viewer because
- * `revealItemInDir` is already granted app-wide by `opener:default`, whereas
- * `openPath` is scope-limited to `$APPDATA` and a `.coilbox` folder sits beside
- * the executable instead. Opening the file itself is issue #1786.
+ * Somebody who writes `[our guide](@.coilbox/docs/guide.pdf)` rather than the `!`
+ * image spelling means "click this to read the PDF", so the click gives the file to
+ * whatever program opens PDFs. A file type with no viewer, and one the OS turns
+ * down, is shown in the file manager instead, so the link always leads somewhere.
+ * Rust picks between the two and owns the list of types it will open (issue #1786).
  *
- * Off the portable path there is no folder to point at, so the click says which
- * link it was and stops: a click that silently does nothing is its own puzzle for
- * the author who wrote the page.
+ * A failure only warns. There is nothing useful to show the reader mid-page, and the
+ * author who wrote the link is the one who needs to know.
  */
-function revealAsset(path: string) {
-  const root = getProfileRoot();
-  if (!root) {
-    console.warn(
-      `profile: ignored a link to "${path}", because this install has no .coilbox folder to find it in.`,
-    );
-    return;
-  }
-  revealItemInDir(`${root}/${path.replace(/^\.?\//, "")}`).catch((err) =>
-    console.warn(`profile: could not show the file "${path}"`, err),
+function openAsset(path: string) {
+  openProfileFile(path).catch((err) =>
+    console.warn(`profile: could not open the file "${path}"`, err),
   );
 }
 
@@ -58,8 +48,8 @@ function revealAsset(path: string) {
  * Renders a markdown link with the page-link scheme applied (issue #274): external URLs
  * open in the system browser (never navigating the webview away from the app), `.md` /
  * `@route/` / app-absolute links navigate in-app via the router, a `@.coilbox` asset is
- * shown in the OS file manager (see {@link revealAsset}), and a `@widget/`/malformed ref
- * renders inert (plain text) so a bad link can't break the page.
+ * handed to the OS (see {@link openAsset}), and a `@widget/`/malformed ref renders inert
+ * (plain text) so a bad link can't break the page.
  */
 function MarkdownLink({
   href,
@@ -94,7 +84,7 @@ function MarkdownLink({
           // #1783). The same stranding was fixed for distribution markup in #1062
           // and #1777.
           e.preventDefault();
-          revealAsset(target.path);
+          openAsset(target.path);
         }}
       >
         {children}

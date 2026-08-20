@@ -12,7 +12,7 @@ import { defineCommand } from "@picoframe/plugin-sdk";
  * - `@route/<app-route>` — an in-app route, e.g. `@route/singleplayer` → `/singleplayer`.
  * - `@widget/<name>[/<arg>]` — a live Coilbox component embedded in place.
  *
- * This module owns only the *parsing* and the file-read binding; each consumer
+ * This module owns only the *parsing* and the file bindings. Each consumer
  * (welcome fields, markdown includes, link resolution, widget rendering) interprets the
  * parsed ref for its own context.
  */
@@ -74,6 +74,29 @@ export function readProfileFile(
   path: string,
 ): Promise<{ text: string; ok: boolean }> {
   return profileFileCmd({ path });
+}
+
+const profileOpenCmd = defineCommand<
+  { path: string },
+  { action: "open" | "reveal" }
+>("coilbox-profile", "profile_open");
+
+/**
+ * Act on a click on a link to a `.coilbox`-relative bundled file (issue #1786): a
+ * picture, document, clip or page opens in whatever program the OS opens its file
+ * type with, and anything else is shown in the file manager. Which of the two
+ * happened comes back as `action`.
+ *
+ * Rust decides, and this side never sees a filesystem path. The `.coilbox` folder
+ * sits beside the executable, so its location is only known once the app has found
+ * itself, and the choice of what may be opened belongs next to the check that the
+ * file is inside that folder at all. Rejects when the path escapes the folder, the
+ * file is not there, or the install is not portable.
+ */
+export function openProfileFile(
+  path: string,
+): Promise<{ action: "open" | "reveal" }> {
+  return profileOpenCmd({ path });
 }
 
 /**
