@@ -168,8 +168,17 @@ pub fn vocabulary_digest() -> &'static str {
     static DIGEST: OnceLock<String> = OnceLock::new();
     DIGEST.get_or_init(|| {
         let digest = Sha256::digest(VOCABULARY_JSON.as_bytes());
-        format!("sha256:{digest:x}")
+        format!("sha256:{}", hex(&digest))
     })
+}
+
+/// Lowercase hex, two digits a byte.
+///
+/// Spelled out because sha2 0.11's output type does not format itself. Its
+/// predecessor's did, and `{:x}` over that produced exactly this, which the
+/// pinned digest below is the check on.
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// The caps for one variant, or `None` when it is not a variant the hub stores

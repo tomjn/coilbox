@@ -72,7 +72,7 @@ pub fn store(dir: &Path, source: &Path) -> Result<Stored, String> {
         None => (if ext.is_empty() { "bin".into() } else { ext }, bytes),
     };
 
-    let key = format!("{:x}.{ext}", Sha256::digest(&payload));
+    let key = format!("{}.{ext}", hex(&Sha256::digest(&payload)));
     let target = dir.join(&key);
     if !target.is_file() {
         std::fs::create_dir_all(dir)
@@ -86,6 +86,15 @@ pub fn store(dir: &Path, source: &Path) -> Result<Stored, String> {
         name,
         bytes: payload.len(),
     })
+}
+
+/// Lowercase hex, two digits a byte.
+///
+/// Spelled out because sha2 0.11's output type does not format itself. Its
+/// predecessor's did, and `{:x}` over that produced exactly this, so a store
+/// filled by an older build still answers to the keys a new one asks for.
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// The texture a model's header names, as a path on disk, if it can be found.

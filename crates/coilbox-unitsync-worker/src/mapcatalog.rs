@@ -346,7 +346,7 @@ fn hash_file(path: &str) -> Option<String> {
         }
         hasher.update(&buf[..read]);
     }
-    Some(format!("{:x}", hasher.finalize()))
+    Some(crate::assetencode::hex(&hasher.finalize()))
 }
 
 /// The share of the map's height samples that sit below the sea plane, between
