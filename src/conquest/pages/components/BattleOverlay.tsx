@@ -15,6 +15,7 @@ import {
 } from "../../../content/config";
 import { ErrorBanner } from "../../../content/pages/components/states";
 import { UnitPicker } from "../../../content/pages/components/UnitPicker";
+import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import { usePreferredTarget } from "../../../play/config";
 import { SaveAsPresetButton } from "../../../play/pages/components/SaveAsPresetButton";
@@ -408,7 +409,6 @@ function RequirementGate({
   if (!missing) return null;
 
   const downloading = mapDl.busy;
-  const progress = mapDl.progress;
 
   const download = async () => {
     const settled = await mapDl.start();
@@ -432,16 +432,17 @@ function RequirementGate({
       </p>
       {mapDl.error && <ErrorBanner message={mapDl.error} />}
       {missing.kind === "map" ? (
-        <Button onClick={download} disabled={downloading} className="w-full">
-          <Download className="mr-1.5 size-4" aria-hidden />
-          {mapDl.status === "queued"
-            ? "Waiting for a slot…"
-            : downloading
-              ? progress?.percent != null
-                ? `Downloading… ${Math.round(progress.percent)}%`
-                : "Downloading…"
-              : "Download map"}
-        </Button>
+        <>
+          <Button onClick={download} disabled={downloading} className="w-full">
+            <Download className="mr-1.5 size-4" aria-hidden />
+            {mapDl.status === "queued"
+              ? "Waiting for a slot…"
+              : downloading
+                ? "Downloading…"
+                : "Download map"}
+          </Button>
+          <QueueProgress item={mapDl} />
+        </>
       ) : (
         <Link to="/downloads/games">
           <Button variant="outline" className="w-full">

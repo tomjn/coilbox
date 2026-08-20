@@ -7,7 +7,7 @@ import {
   identityOf,
   useDownloadQueue,
 } from "@/downloads/DownloadQueueProvider";
-import { ProgressBar } from "@/downloads/pages/components/ProgressBar";
+import { QueueProgress } from "@/downloads/pages/components/ProgressBar";
 import { errMessage } from "@/downloads/pages/components/states";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
 
@@ -99,7 +99,7 @@ export function MissingContentCard({
         download it to join, or rescan if it's already on disk.
       </p>
       {downloading && progress ? (
-        <ProgressBar progress={progress} />
+        <QueueProgress item={item} />
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" disabled={downloading} onClick={downloadGame}>

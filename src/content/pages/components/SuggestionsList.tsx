@@ -11,7 +11,7 @@ import {
   mergeGameRepos,
   resolveGithubRepo,
 } from "../../../downloads/gameRepos";
-import { ProgressBar } from "../../../downloads/pages/components/ProgressBar";
+import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
 import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import {
@@ -325,7 +325,7 @@ function SuggestionCard({
                   ? "Downloading…"
                   : "Download"}
           </Button>
-          {dl.progress && <ProgressBar progress={dl.progress} />}
+          <QueueProgress item={dl} />
         </div>
       </div>
     </li>

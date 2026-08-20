@@ -9,7 +9,7 @@ import {
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import { ProgressBar } from "../../../downloads/pages/components/ProgressBar";
+import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
 import type { ContentRequirement } from "../../resolveContent";
 import { useResolveContent } from "../../useResolveContent";
 
@@ -25,7 +25,7 @@ function RequirementRow({
   resolve: ReturnType<typeof useResolveContent>;
 }) {
   const status = resolve.statusFor(req);
-  const progress = resolve.progressFor(req);
+  const item = resolve.itemFor(req);
   const error = resolve.errorFor(req);
   const done = status === "done";
   const active = status === "active" || status === "queued";
@@ -66,7 +66,7 @@ function RequirementRow({
           </Button>
         )}
       </div>
-      {active && progress && <ProgressBar progress={progress} />}
+      {active && <QueueProgress item={item} />}
       {/* Only ever says why the download is off when it knows why. A write root
           still being read is neither answer, and saying either would be a guess
           the reader acts on (issue #1104). */}

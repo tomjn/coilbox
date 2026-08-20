@@ -3,7 +3,7 @@ import { Download, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useWriteRootPath } from "@/downloads/config";
 import { useDownloadQueue } from "@/downloads/DownloadQueueProvider";
-import { ProgressBar } from "@/downloads/pages/components/ProgressBar";
+import { QueueProgress } from "@/downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "@/downloads/useQueuedDownload";
 import type { MapPicture } from "@/hub/assets/picture";
 import { useMapPictureRung } from "@/hub/assets/useMapPicture";
@@ -105,7 +105,7 @@ export function MissingMapBox({
           Map not installed
         </span>
         {downloading && progress ? (
-          <ProgressBar progress={progress} className="w-full" />
+          <QueueProgress item={mapDl} className="w-full" />
         ) : (
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Button size="sm" disabled={downloading} onClick={downloadMap}>

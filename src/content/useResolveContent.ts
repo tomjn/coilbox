@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  type DownloadProgress,
   dlRecoilEngines,
   dlSpringfilesEngines,
   type EngineRelease,
@@ -9,6 +8,7 @@ import {
 import { useWriteRoot } from "../downloads/config";
 import {
   identityOf,
+  type QueueItem,
   type QueueStatus,
   useDownloadComplete,
   useDownloadQueue,
@@ -43,8 +43,9 @@ export interface ResolveContentState {
   download: (req: ContentRequirement) => void;
   /** The queue's live status for a requirement, or `null` before it's queued. */
   statusFor: (req: ContentRequirement) => QueueStatus | null;
-  /** Live progress while a requirement is downloading. */
-  progressFor: (req: ContentRequirement) => DownloadProgress | null;
+  /** The queue item for a requirement, for its progress bar. Null before it's
+   * queued. */
+  itemFor: (req: ContentRequirement) => QueueItem | null;
   /** The queue's failure message for a requirement's last attempt, if any. */
   errorFor: (req: ContentRequirement) => string | null;
   /** Whether a requirement can be downloaded at all right now — false with no
@@ -211,10 +212,6 @@ export function useResolveContent(
     [enqueueInputFor, items],
   );
 
-  const progressFor = useCallback(
-    (req: ContentRequirement) => itemFor(req)?.progress ?? null,
-    [itemFor],
-  );
   const errorFor = useCallback(
     (req: ContentRequirement) => itemFor(req)?.error ?? null,
     [itemFor],
@@ -232,7 +229,7 @@ export function useResolveContent(
     resolved,
     download,
     statusFor,
-    progressFor,
+    itemFor,
     errorFor,
     canDownload,
     noWriteRoot: !writeRoot.loading && !writePath,
