@@ -910,6 +910,13 @@ uniform vec2 wPlane;`,
         // under the map. Never below the water plane at y 0.
         const camFloor = Math.max(maxHeight * s, 0) + BASE * 0.02;
         const render = () => {
+          // A view that puts its own content on the map asks for a frame when
+          // that content changes, including as it goes away. On unmount its
+          // effect cleanup runs after this one, by which point the scene's
+          // geometries and materials are disposed and the renderer with them,
+          // so the frame draws nothing and three re-allocates storage for a
+          // texture that already has it (issue #1740).
+          if (cancelled) return;
           if (camera.position.y < camFloor) camera.position.y = camFloor;
           renderer.render(scene, camera);
         };
