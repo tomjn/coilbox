@@ -650,8 +650,10 @@ export function MapPreview3D({
         // A wireframe relief drops the diffuse texture entirely and draws the mesh as
         // an unlit uniform-colour grid, so the displaced geometry reads as the terrain
         // shape on its own.
+        // three logs a warning for any option handed to a material with undefined
+        // behind it, so the optional ones are spread in only when they have a value.
         const material = new THREE.MeshStandardMaterial({
-          map: forceWireframe ? undefined : (colorTex ?? undefined),
+          ...(!forceWireframe && colorTex ? { map: colorTex } : {}),
           color: forceWireframe ? 0x8fb3c9 : 0xffffff,
           displacementMap: heightTex,
           displacementScale: (reliefMax - reliefMin) * s,
@@ -659,7 +661,7 @@ export function MapPreview3D({
           roughness: 1,
           metalness: 0,
           wireframe: forceWireframe || wantWire.current,
-          clippingPlanes: voidClip,
+          ...(voidClip ? { clippingPlanes: voidClip } : {}),
         });
         // Tiled detail-texture multiply, patched into the standard material: after
         // the base colour is sampled, modulate it by the detail texture sampled at a
