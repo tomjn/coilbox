@@ -75,10 +75,14 @@ export const IDLE_RATE: DownloadRate = {
  * samples are always kept, so a source that reports once every ten seconds
  * still yields a rate rather than nothing.
  *
- * Returns the list unchanged for a sample that arrived too soon after the last
- * one, or one that goes backwards. The final `done` event from the sidecar
- * reports zero bytes, and taking that at face value would read as the transfer
- * losing everything it had.
+ * A sample that arrived too soon after the last one is dropped, since the
+ * sidecar path emits one per terminal redraw with no throttle of its own.
+ *
+ * A sample that goes backwards starts the window again from itself. That is not
+ * a download losing what it had, it is the source changing what it is counting:
+ * pr-downloader fetches a one byte file, reports it at 100%, and then starts the
+ * real archive at 0%. Discarding those samples instead would leave the window
+ * stuck on the one byte file and the whole download reading as stalled.
  */
 export function addSample(
   samples: RateSample[],
@@ -87,10 +91,12 @@ export function addSample(
   const last = samples[samples.length - 1];
   if (last) {
     if (sample.at - last.at < MIN_GAP_MS) return samples;
-    if (sample.bytes < last.bytes) return samples;
-    if (sample.fraction != null && last.fraction != null) {
-      if (sample.fraction < last.fraction) return samples;
-    }
+    const backwards =
+      sample.bytes < last.bytes ||
+      (sample.fraction != null &&
+        last.fraction != null &&
+        sample.fraction < last.fraction);
+    if (backwards) return [sample];
   }
   const next = [...samples, sample];
   const cutoff = sample.at - WINDOW_MS;

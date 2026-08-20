@@ -52,23 +52,40 @@ describe("addSample", () => {
     expect(second).toBe(first);
   });
 
-  it("ignores a sample whose byte count goes backwards", () => {
-    // The sidecar's terminating event reports zero bytes. Believing it would
-    // read as the download losing everything it had.
+  it("starts again when the byte count goes backwards", () => {
     const samples = steady({ count: 4, stepMs: 1000, bytesPerStep: 1000 });
     const after = addSample(samples, {
       at: latest(samples) + 1000,
       bytes: 0,
       fraction: null,
     });
-    expect(after).toBe(samples);
+    expect(after).toHaveLength(1);
+    expect(after[0].bytes).toBe(0);
   });
 
-  it("ignores a sample whose percentage goes backwards", () => {
-    let samples = addSample([], { at: 1000, bytes: 0, fraction: 0.5 });
-    samples = addSample(samples, { at: 2000, bytes: 0, fraction: 0.6 });
-    const after = addSample(samples, { at: 3000, bytes: 0, fraction: 0.2 });
-    expect(after).toBe(samples);
+  it("starts again when the percentage goes backwards", () => {
+    // pr-downloader fetches a one byte file, reports it at 100%, then starts
+    // the real archive at 0%. Holding on to the first would leave the window
+    // stuck there and the whole download reading as stalled.
+    let samples = addSample([], { at: 1000, bytes: 1, fraction: 1 });
+    samples = addSample(samples, { at: 2000, bytes: 130_000, fraction: 0.002 });
+    expect(samples).toHaveLength(1);
+    expect(samples[0].fraction).toBe(0.002);
+  });
+
+  it("finds a rate again a couple of seconds after a restart", () => {
+    let samples = addSample([], { at: 1000, bytes: 1, fraction: 1 });
+    for (let i = 0; i <= 5; i++) {
+      samples = addSample(samples, {
+        at: 2000 + i * 1000,
+        bytes: i * 1_000_000,
+        fraction: i / 10,
+      });
+    }
+    const rate = rateFrom(samples, 10_000_000, latest(samples));
+    expect(rate.stalled).toBe(false);
+    expect(rate.bytesPerSec).toBeCloseTo(1_000_000, -1);
+    expect(rate.secondsLeft).toBe(5);
   });
 
   it("always keeps two samples, however slowly they arrive", () => {
