@@ -22,6 +22,18 @@ pub struct DownloadProgress {
 }
 
 impl DownloadProgress {
+    /// Whether this sample says anything about how far the download has got.
+    ///
+    /// A sample with no bytes and no percentage is not a measurement of zero, it
+    /// is the absence of one: pr-downloader prints `0/0` for a response that
+    /// carried no length, and its logger then drops every later line because the
+    /// percentage it works out never changes. Anything that reads silence as
+    /// trouble has to know the difference between a download that stopped
+    /// reporting and one that never reported.
+    pub fn is_measured(&self) -> bool {
+        self.downloaded_bytes > 0 || self.percent.is_some()
+    }
+
     /// A terminal "done" sample; `percent` is forced to 100 when a total was known.
     pub fn done(downloaded_bytes: u64, total_bytes: Option<u64>) -> Self {
         DownloadProgress {
@@ -81,6 +93,30 @@ mod tests {
     #[test]
     fn speed_zero_elapsed_is_none() {
         assert_eq!(bytes_per_sec(1000, 0.0), None);
+    }
+
+    fn sample(downloaded: u64, total: Option<u64>) -> DownloadProgress {
+        DownloadProgress {
+            phase: "downloading".into(),
+            downloaded_bytes: downloaded,
+            total_bytes: total,
+            percent: percent(downloaded, total),
+            bytes_per_sec: None,
+        }
+    }
+
+    #[test]
+    fn bytes_or_a_percentage_count_as_a_measurement() {
+        assert!(sample(0, Some(2000)).is_measured());
+        assert!(sample(500, Some(2000)).is_measured());
+        assert!(sample(500, None).is_measured());
+    }
+
+    #[test]
+    fn nothing_at_all_is_not_a_measurement_of_zero() {
+        // What pr-downloader prints for a response with no length: `0/0`.
+        assert!(!sample(0, Some(0)).is_measured());
+        assert!(!sample(0, None).is_measured());
     }
 
     #[test]

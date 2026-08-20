@@ -78,11 +78,20 @@ export const IDLE_RATE: DownloadRate = {
  * A sample that arrived too soon after the last one is dropped, since the
  * sidecar path emits one per terminal redraw with no throttle of its own.
  *
- * A sample that goes backwards starts the window again from itself. That is not
- * a download losing what it had, it is the source changing what it is counting:
- * pr-downloader fetches a one byte file, reports it at 100%, and then starts the
- * real archive at 0%. Discarding those samples instead would leave the window
- * stuck on the one byte file and the whole download reading as stalled.
+ * Unless it is the sample where the source changes what it is counting, which
+ * starts the window again from itself. Two things do that, and the download is
+ * not losing ground in either. The count goes backwards, because pr-downloader
+ * gives a fetch it has not sized an approximate size of 1 and adds that to the
+ * total it prints, so the `1/1` at 100% opening every download is one unsized
+ * fetch finishing rather than a one byte file. It is the rapid repo master, and
+ * the real archive then starts again at 0%. Or the count stops being reported at
+ * all, because an archive served by `streamer.cgi` has taken over from the sdp
+ * fetch that preceded it.
+ *
+ * Both are checked ahead of the throttle. A real rapid download runs the whole
+ * sequence inside a second, so thinning it out on arrival time alone loses the
+ * change and leaves the window on a sample about something that already
+ * finished, with the download reading as stalled.
  */
 export function addSample(
   samples: RateSample[],
@@ -90,18 +99,27 @@ export function addSample(
 ): RateSample[] {
   const last = samples[samples.length - 1];
   if (last) {
-    if (sample.at - last.at < MIN_GAP_MS) return samples;
-    const backwards =
+    const changedSubject =
+      !carriesMeasurement(sample) ||
       sample.bytes < last.bytes ||
       (sample.fraction != null &&
         last.fraction != null &&
         sample.fraction < last.fraction);
-    if (backwards) return [sample];
+    if (changedSubject) return [sample];
+    if (sample.at - last.at < MIN_GAP_MS) return samples;
   }
   const next = [...samples, sample];
   const cutoff = sample.at - WINDOW_MS;
   while (next.length > 2 && next[1].at <= cutoff) next.shift();
   return next;
+}
+
+/**
+ * Whether a sample says anything about how far the download has got. Zero bytes
+ * and no percentage is not a measurement of zero, it is the absence of one.
+ */
+function carriesMeasurement(s: RateSample): boolean {
+  return s.bytes > 0 || s.fraction != null;
 }
 
 /**
@@ -128,9 +146,17 @@ export function rateFrom(
 
   // Two ways to stop. The samples stop arriving, or they keep arriving and say
   // the same thing. Both look identical to somebody watching the bar.
+  //
+  // Neither is a stall unless the download had something to say in the first
+  // place. A rapid game served by streamer.cgi reports `0/0` once and then goes
+  // quiet for the whole transfer, so it looks exactly like a download that
+  // reported 40% and then died. The difference is that this one never had a
+  // signal to lose, and calling it stalled would be a guess dressed as a fact.
   const silentFor = now - last.at;
   const stuckFor = byteDelta === 0 && fractionDelta === 0 ? spanMs : 0;
-  const stalled = Math.max(silentFor, stuckFor) >= STALL_MS;
+  const stalled =
+    samples.some(carriesMeasurement) &&
+    Math.max(silentFor, stuckFor) >= STALL_MS;
 
   const settled = samples.length >= MIN_SAMPLES && spanMs >= MIN_SPAN_MS;
   if (!settled || stalled) {

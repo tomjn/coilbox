@@ -31,6 +31,21 @@ function steady(opts: {
   return samples;
 }
 
+/**
+ * Every sample a 77 MB rapid game served by `streamer.cgi` produces, taken off
+ * a real `chobby:stable` download rather than made up. The shape matches the
+ * `rapid-streamer.stdout.txt` capture the Rust parser tests read, and the gaps
+ * are the ones the events actually arrived with: the repo master and the sdp,
+ * each an unsized fetch finishing at `1/1`, then `0/0` for the archive, all
+ * inside two thirds of a second. Nothing follows for the rest of the transfer.
+ */
+const STREAMER_SAMPLES: RateSample[] = [
+  { at: 404, bytes: 1, fraction: 1 },
+  { at: 564, bytes: 0, fraction: 0 },
+  { at: 564, bytes: 1, fraction: 1 },
+  { at: 638, bytes: 0, fraction: null },
+];
+
 /** The timestamp of the newest sample, for a `now` that is not stale. */
 function latest(samples: RateSample[]): number {
   return samples[samples.length - 1].at;
@@ -207,6 +222,32 @@ describe("rateFrom", () => {
     }
     const rate = rateFrom(samples, 10_000_000, latest(samples));
     expect(rate.stalled).toBe(true);
+  });
+
+  it("does not call a download stalled when it never reported anything", () => {
+    const samples = STREAMER_SAMPLES.reduce(addSample, [] as RateSample[]);
+    const rate = rateFrom(samples, null, STREAMER_SAMPLES[0].at + 60_000);
+    expect(rate.stalled).toBe(false);
+    expect(rate.bytesPerSec).toBeNull();
+    expect(rate.secondsLeft).toBeNull();
+  });
+
+  it("keeps the sample where the source stopped reporting", () => {
+    // The whole sequence lands inside a second, so the 100ms throttle would
+    // drop the last sample and leave the window on the sdp fetch, which did
+    // report a percentage and would then read as a download that went quiet.
+    const samples = STREAMER_SAMPLES.reduce(addSample, [] as RateSample[]);
+    expect(samples).toEqual([STREAMER_SAMPLES[3]]);
+  });
+
+  it("starts watching for a stall again the moment something is reported", () => {
+    // Silence is only exempt while there is nothing to go on. One sample
+    // carrying a percentage is a signal the download can then lose, and losing
+    // it is what a stall is.
+    let samples = STREAMER_SAMPLES.reduce(addSample, [] as RateSample[]);
+    expect(rateFrom(samples, null, 60_000).stalled).toBe(false);
+    samples = addSample(samples, { at: 1000, bytes: 4_000_000, fraction: 0.4 });
+    expect(rateFrom(samples, null, 60_000).stalled).toBe(true);
   });
 
   it("does not call a brief pause a stall", () => {
