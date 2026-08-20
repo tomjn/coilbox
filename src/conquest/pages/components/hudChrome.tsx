@@ -114,20 +114,30 @@ const BRACKET: Record<HudAccent, string> = {
  * be a 90% alpha step below. Both values have to clear AA on their own, so the
  * step was a tenth of an alpha doing nothing the 10px-versus-20px size gap was
  * not already doing louder.
+ *
+ * `violet` is here for its measurement rather than for a tile. Nothing gives a
+ * frame a violet bracket. The warpath's signal overlay marks itself with a violet
+ * icon, `text-violet-400` measured 2.59:1 on the dark card, and an accent that
+ * lives in this map is one `hudChrome.test.ts` sweeps for free (#1801).
  */
-export const HUD_ACCENT_INK: Record<Exclude<HudAccent, "neutral">, string> = {
+export const HUD_ACCENT_INK = {
   teal: "text-[hsl(190_75%_22%)] dark:text-[hsl(190_75%_74%)]",
   amber: "text-[hsl(42_90%_20%)] dark:text-[hsl(42_90%_69%)]",
   danger: "text-[hsl(4_75%_32%)] dark:text-[hsl(4_85%_87%)]",
+  violet: "text-[hsl(258_80%_46%)] dark:text-[hsl(258_70%_88%)]",
 };
 
 const LABEL: Record<HudAccent, string> = {
-  ...HUD_ACCENT_INK,
+  teal: HUD_ACCENT_INK.teal,
+  amber: HUD_ACCENT_INK.amber,
+  danger: HUD_ACCENT_INK.danger,
   neutral: HUD_DIM_INK_CLASS,
 };
 
 const VALUE: Record<HudAccent, string> = {
-  ...HUD_ACCENT_INK,
+  teal: HUD_ACCENT_INK.teal,
+  amber: HUD_ACCENT_INK.amber,
+  danger: HUD_ACCENT_INK.danger,
   neutral: HUD_INK_CLASS,
 };
 
