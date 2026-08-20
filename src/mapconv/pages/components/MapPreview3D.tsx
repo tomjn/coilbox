@@ -1,5 +1,12 @@
 import { cn } from "@picoframe/frame";
-import { Box, ImageOff, Loader2, Maximize2, Minimize2 } from "lucide-react";
+import {
+  Box,
+  CloudOff,
+  ImageOff,
+  Loader2,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -10,6 +17,11 @@ import { useReduceMotion } from "../../../general/display";
 import type { MapAppearance } from "../../bindings";
 import { decimateHeights, type HeightWords } from "../../heightGrid";
 import { getHeightWords, getImageInfo } from "../../imageCache";
+import {
+  type SkyboxProblem,
+  skyboxFromDds,
+  skyboxNote,
+} from "../../skyboxNote";
 
 export type { HeightWords };
 
@@ -93,32 +105,36 @@ type DdsData = {
   mipmaps: { data: Uint8Array; width: number; height: number }[];
   width: number;
   height: number;
-  format: number;
+  format: number | null;
   mipmapCount: number;
 };
 
 /**
  * Decode a skybox DDS `data:` URL into a `CompressedCubeTexture` usable as
- * `scene.background`, or `null` when it isn't a cube map or can't be decoded.
+ * `scene.background`, or say why it could not be.
  *
  * `DDSLoader.load` yields a plain `CompressedTexture` that three's background
  * renderer treats as a flat plane (it only takes the cube path for
  * `isCubeTexture`). So we `parse()` the bytes ourselves and assemble the six faces
  * into a `CompressedCubeTexture` (`isCubeTexture === true`) — the same face layout
- * `CompressedTextureLoader` builds internally. Any failure returns `null`, leaving
- * the caller's flat sky colour in place.
+ * `CompressedTextureLoader` builds internally.
+ *
+ * A failure keeps the caller's flat sky colour, and now names itself so the
+ * preview can say the sky is not the map's own (issue #1650).
  */
 async function loadSkyboxCube(
   src: string,
-): Promise<THREE.CompressedCubeTexture | null> {
+): Promise<
+  | { cube: THREE.CompressedCubeTexture; problem?: undefined }
+  | { cube?: undefined; problem: SkyboxProblem }
+> {
   try {
     const buffer = await (await fetch(src)).arrayBuffer();
     const data = new DDSLoader().parse(buffer, true) as unknown as DdsData;
-    if (!data.isCubemap) return null;
-    const faceCount = data.mipmaps.length / data.mipmapCount;
-    if (faceCount !== 6) return null;
+    const problem = skyboxFromDds(data);
+    if (problem) return { problem };
     const faces = [];
-    for (let f = 0; f < faceCount; f++) {
+    for (let f = 0; f < 6; f++) {
       const mipmaps = [];
       for (let i = 0; i < data.mipmapCount; i++) {
         mipmaps.push(data.mipmaps[f * data.mipmapCount + i]);
@@ -141,9 +157,9 @@ async function loadSkyboxCube(
     if (data.mipmapCount === 1) tex.minFilter = THREE.LinearFilter;
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.needsUpdate = true;
-    return tex;
+    return { cube: tex };
   } catch {
-    return null;
+    return { problem: "unreadable" };
   }
 }
 
@@ -377,6 +393,9 @@ export function MapPreview3D({
   // waiting on dimensions), rather than vanishing the moment the data lands.
   const [built, setBuilt] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Why the map's own skybox is not the sky, when it declared one (issue #1650).
+  // Null both for a map that declared none and for one whose skybox is on screen.
+  const [skyProblem, setSkyProblem] = useState<SkyboxProblem | null>(null);
   const [water, setWater] = useState(true);
   const [wireframe, setWireframe] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -518,6 +537,8 @@ export function MapPreview3D({
       let spinStart: (() => void) | undefined;
       let spinEnd: (() => void) | undefined;
       let handedOver = false;
+      // Claim nothing about the sky until this build has tried to read one.
+      setSkyProblem(null);
 
       const longest = Math.max(worldWidth, worldHeight);
       const s = BASE / longest;
@@ -595,19 +616,20 @@ export function MapPreview3D({
 
         // If the map declares a skybox DDS, decode it and (when it's a cube map) use
         // it as the sky, replacing the flat colour. Done before the water reflection
-        // capture below so the water mirrors the real sky. Any failure — a fetch/parse
-        // error, an unsupported DDS variant (DX10/BC7 fail in DDSLoader), or a
-        // non-cubemap DDS — silently falls back to the flat `skyColor` sky.
+        // capture below so the water mirrors the real sky. A failure still leaves the
+        // flat `skyColor` sky, and now says so on the preview rather than looking the
+        // same as a map that asked for no sky of its own (issue #1650).
         if (showSky && skyboxSrc) {
-          const cube = await loadSkyboxCube(skyboxSrc);
+          const sky = await loadSkyboxCube(skyboxSrc);
           if (cancelled) {
-            cube?.dispose();
+            sky.cube?.dispose();
             return;
           }
-          if (cube) {
-            scene.background = cube;
-            disposables.push(cube);
+          if (sky.cube) {
+            scene.background = sky.cube;
+            disposables.push(sky.cube);
           }
+          setSkyProblem(sky.problem ?? null);
         }
 
         const segments = forceWireframe ? WIRE_SEGMENTS : SEGMENTS;
@@ -910,6 +932,13 @@ uniform vec2 wPlane;`,
         // under the map. Never below the water plane at y 0.
         const camFloor = Math.max(maxHeight * s, 0) + BASE * 0.02;
         const render = () => {
+          // A view that puts its own content on the map asks for a frame when
+          // that content changes, including as it goes away. On unmount its
+          // effect cleanup runs after this one, by which point the scene's
+          // geometries and materials are disposed and the renderer with them,
+          // so the frame draws nothing and three re-allocates storage for a
+          // texture that already has it (issue #1740).
+          if (cancelled) return;
           if (camera.position.y < camFloor) camera.position.y = camFloor;
           renderer.render(scene, camera);
         };
@@ -1129,6 +1158,8 @@ uniform vec2 wPlane;`,
     );
   }
 
+  const sky = skyboxNote(skyProblem);
+
   return (
     <div
       className={
@@ -1185,6 +1216,14 @@ uniform vec2 wPlane;`,
           <p className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur">
             <Box size={12} /> height {minHeight} → {maxHeight} · drag to orbit
           </p>
+          {sky && (
+            <p
+              title={sky.title}
+              className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded bg-card/70 px-2 py-1 font-mono text-[11px] text-muted-foreground backdrop-blur"
+            >
+              <CloudOff size={12} /> {sky.label}
+            </p>
+          )}
         </>
       )}
     </div>
