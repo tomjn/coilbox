@@ -1,5 +1,5 @@
 import type { NotifyInput } from "@/notify/notify";
-import { notify } from "@/notify/notify";
+import { notify, recordQuietly } from "@/notify/notify";
 
 /**
  * Telling somebody the hub would not take their pictures (issue #1634).
@@ -18,13 +18,24 @@ import { notify } from "@/notify/notify";
  * bit than #1634 gave it: who started it.
  *
  * A run a person started is worth interrupting them about, because they are
- * waiting for the answer. A run coilbox started by itself goes to the console
- * with the same words, so somebody wondering why a game has no pictures can find
- * out without being told while they were doing something else.
+ * waiting for the answer. A run coilbox started by itself is filed in the
+ * notifications bell without a toast and without a badge (issue #1703), so
+ * somebody wondering why a game has no pictures can go and read what the hub
+ * said, days later, without having been told while they were doing something
+ * else. The console line stays for whoever has devtools open, which is not the
+ * player this is for.
  *
  * Every caller has to answer, because {@link UploadInitiator} is a required
  * argument rather than one with a default. A default would decide this by
  * whichever way the next caller was written.
+ *
+ * ## Every report names the game
+ *
+ * The refusal issue #1690 was named after read "no recorded permission to
+ * redistribute pictures for that game", which is the hub's sentence about a
+ * request it can see and the reader cannot. Somebody who plays four games and
+ * finds one of them has no pictures is being told about a game they have to
+ * guess. So {@link UploadRun} carries the game, and the sentences say it.
  *
  * ## Why a whole run gets at most two
  *
@@ -90,20 +101,47 @@ function firstWords(outcomes: AssetOutcome[]): string | null {
   return null;
 }
 
+/** What was true of the whole run, as against what was true of one picture in
+ *  it. Both fields are things only the run knows. */
+export interface UploadRun {
+  /**
+   * The game these pictures are for, or null when the run was not for one game.
+   * Every sentence that counts pictures names it, because the reader is looking
+   * at an app that holds several games and the hub's own words say "that game".
+   */
+  game?: string | null;
+  /**
+   * The plugin's answer to whether the hub names an asset vocabulary this build
+   * does not hold (issue #1708). When it does, the terminal report says so
+   * instead of quoting the hub, because "update coilbox" is something the reader
+   * can act on and "this build pic is not square" is not. Omitted means nobody
+   * knows, which is what a hub serving no digest leaves behind.
+   */
+  outOfDate?: boolean;
+}
+
+/**
+ * "picture for bar" or "pictures for bar", and neither half of that when the run
+ * was not for one game. The count goes in front of it at the call site, because
+ * some of these sentences count and some of them say "any more".
+ *
+ * Plural for every count but one, so a sentence with no number in it asks for
+ * the plural by passing anything else.
+ */
+function pictures(count: number, game: string | null | undefined): string {
+  const noun = count === 1 ? "picture" : "pictures";
+  return game ? `${noun} for ${game}` : noun;
+}
+
 /**
  * What a finished run is worth telling somebody, as zero, one or two
  * notifications. Pure, so the aggregation can be asserted on without a window.
- *
- * `outOfDate` is the plugin's answer to whether the hub names an asset vocabulary
- * this build does not hold (issue #1708). When it does, the terminal report says
- * so instead of quoting the hub, because "update coilbox" is something the reader
- * can act on and "this build pic is not square" is not. Omitted means nobody
- * knows, which is what a hub serving no digest leaves behind.
  */
 export function assetUploadReports(
   outcomes: AssetOutcome[],
-  outOfDate = false,
+  run: UploadRun = {},
 ): NotifyInput[] {
+  const { game = null, outOfDate = false } = run;
   const reports: NotifyInput[] = [];
 
   // The run ending first, because it is what explains a run having fewer
@@ -119,10 +157,13 @@ export function assetUploadReports(
       untried === 0
         ? ""
         : untried === 1
-          ? " One more picture was not tried."
-          : ` ${untried} more pictures were not tried.`;
+          ? ` One more ${pictures(1, game)} was not tried.`
+          : ` ${untried} more ${pictures(untried, game)} were not tried.`;
+    // The fallback names the game because it is the one branch here with no
+    // sentence from the hub, and the hub's sentences name the picture.
     const why =
-      stopped.said?.trim() || "The hub would not take any more just now.";
+      stopped.said?.trim() ||
+      `The hub would not take any more ${pictures(0, game)} just now.`;
     reports.push({
       title: "Picture uploads stopped early",
       body: `${why}${left}`,
@@ -139,8 +180,8 @@ export function assetUploadReports(
       // saying and the hub's own words are not: they describe a picture, and
       // what is wrong is the build that made every one of them.
       const refused = one
-        ? "The hub refused a picture"
-        : `The hub refused all ${terminal.length} pictures`;
+        ? `The hub refused a ${pictures(1, game)}`
+        : `The hub refused all ${terminal.length} ${pictures(terminal.length, game)}`;
       reports.push({
         title: "Coilbox is out of date",
         body: `${refused} because this copy of coilbox makes them the way an older hub took them. Update coilbox and they will go.`,
@@ -180,11 +221,13 @@ export function assetUploadReports(
 export function assetUploadFailureReport(
   said: string,
   assets: number,
+  run: UploadRun = {},
 ): NotifyInput {
+  const { game = null } = run;
   const left =
     assets === 1
-      ? "One picture was not sent."
-      : `${assets} pictures were not sent.`;
+      ? `One ${pictures(1, game)} was not sent.`
+      : `${assets} ${pictures(assets, game)} were not sent.`;
   return {
     title: "Picture uploads stopped early",
     body: `${said.trim() || "The hub would not take any just now."} ${left}`,
@@ -193,11 +236,23 @@ export function assetUploadFailureReport(
 }
 
 /**
- * Deliver what a run has to say, to whoever it is for (issue #1690).
+ * Where the bell sends somebody who clicks one of these. The hub settings
+ * section holds the switch that permits uploads at all, which is both the
+ * explanation for a run they did not start and the way to stop the next one.
+ */
+const HUB_SETTINGS = "/settings/hub";
+
+/**
+ * Deliver what a run has to say, to whoever it is for (issues #1690, #1703).
  *
- * A notification is recorded in the bell's history as well as shown, so a run
- * somebody started is findable after the toast has gone. A run coilbox started
- * gets neither, and the console line is what it has instead.
+ * A run somebody started is shown and recorded, so it is still findable after
+ * the toast has gone. A run coilbox started is recorded and not shown: the
+ * notifications bell keeps it, with no toast and no unread badge, and somebody
+ * who wonders why a game has no pictures can open the bell and read the hub's
+ * own words whenever they get round to it.
+ *
+ * The console line stays for both, because it carries the same sentence to
+ * whoever is looking at a log rather than at the app.
  *
  * Fire and forget, the way the download bindings notify: a failed toast must not
  * fail an upload that worked.
@@ -208,6 +263,7 @@ function deliver(reports: NotifyInput[], startedBy: UploadInitiator): void {
       void notify(report);
       continue;
     }
+    recordQuietly({ ...report, to: HUB_SETTINGS });
     console.warn(
       report.body
         ? `hub picture upload: ${report.title}: ${report.body}`
@@ -220,9 +276,9 @@ function deliver(reports: NotifyInput[], startedBy: UploadInitiator): void {
 export function reportAssetUploadOutcomes(
   outcomes: AssetOutcome[],
   startedBy: UploadInitiator,
-  outOfDate = false,
+  run: UploadRun = {},
 ): void {
-  deliver(assetUploadReports(outcomes, outOfDate), startedBy);
+  deliver(assetUploadReports(outcomes, run), startedBy);
 }
 
 /** Tell whoever it is for that a run never started. */
@@ -230,6 +286,7 @@ export function reportAssetUploadFailure(
   said: string,
   assets: number,
   startedBy: UploadInitiator,
+  run: UploadRun = {},
 ): void {
-  deliver([assetUploadFailureReport(said, assets)], startedBy);
+  deliver([assetUploadFailureReport(said, assets, run)], startedBy);
 }
