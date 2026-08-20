@@ -530,19 +530,135 @@ const THEME_MODE_KEY = "picoframe.theme";
 const ACCENT_KEY = "picoframe.accent";
 
 /**
+ * Where the player's own colour scheme and accent wait while a distribution's brand
+ * holds picoframe's keys, so an ordinary launch can hand them back (issue #1118).
+ *
+ * `coilbox.bootBackground` has the same shape and needs no such store, because
+ * nothing but a profile ever writes it. An unbranded launch clears that key and the
+ * theme's own colour returns. picoframe owns the two keys above and rewrites them
+ * every time a player picks a colour in Appearance, so clearing those would throw
+ * away the very choice this is protecting. Hence a copy, taken the launch a brand
+ * first takes a key over, and put back the launch no profile asks for it.
+ */
+const THEME_BEFORE_PROFILE_KEY = "coilbox.theme.beforeProfile";
+
+/** picoframe's stored theme, raw as `localStorage` holds it (null when unset). */
+export interface StoredTheme {
+  /** `picoframe.theme`. */
+  mode: string | null;
+  /** `picoframe.accent`. */
+  accent: string | null;
+  /** {@link THEME_BEFORE_PROFILE_KEY}, what the player had before a brand took over. */
+  before: string | null;
+}
+
+/** One key a launch rewrites. A null `value` means remove the key. */
+export interface ThemeWrite {
+  key: string;
+  value: string | null;
+}
+
+/** The put-aside values, one raw string (or an explicit null "was unset") per field. */
+interface ThemeBeforeProfile {
+  mode?: string | null;
+  accent?: string | null;
+}
+
+/** Read the put-aside values, treating anything unreadable as nothing put aside. */
+function parseBeforeProfile(text: string | null): ThemeBeforeProfile {
+  if (!text) return {};
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return {};
+  }
+  if (!raw || typeof raw !== "object") return {};
+  const fields = raw as Record<string, unknown>;
+  const out: ThemeBeforeProfile = {};
+  for (const field of ["mode", "accent"] as const) {
+    if (!(field in fields)) continue;
+    const value = fields[field];
+    if (value === null || typeof value === "string") out[field] = value;
+  }
+  return out;
+}
+
+/**
+ * Decide what a launch writes to the theme keys, given what is stored and what the
+ * profile forces. Pure, so the sequence of launches is unit-testable. The storage
+ * reads and writes live in {@link forceProfileTheme}.
+ *
+ * Per field, a profile that sets it wins, and the player's value is put aside the
+ * first time that happens. Only the first time, so a second branded launch does not
+ * record the first brand's colour as the player's. A profile that leaves the field
+ * alone hands back whatever was put aside, and forgets it. With nothing put aside
+ * and nothing forced there is no write at all, so a first ever launch keeps
+ * picoframe's own default.
+ */
+export function planProfileTheme(
+  stored: StoredTheme,
+  profile: Pick<Profile, "mode" | "accent">,
+): ThemeWrite[] {
+  const before = parseBeforeProfile(stored.before);
+  const keep: ThemeBeforeProfile = {};
+  const writes: ThemeWrite[] = [];
+  const fields = [
+    {
+      name: "mode",
+      key: THEME_MODE_KEY,
+      stored: stored.mode,
+      force: profile.mode,
+    },
+    {
+      name: "accent",
+      key: ACCENT_KEY,
+      stored: stored.accent,
+      force: profile.accent,
+    },
+  ] as const;
+  for (const field of fields) {
+    if (field.force) {
+      keep[field.name] =
+        field.name in before ? (before[field.name] ?? null) : field.stored;
+      const branded = JSON.stringify(field.force);
+      if (branded !== field.stored)
+        writes.push({ key: field.key, value: branded });
+    } else if (field.name in before) {
+      const mine = before[field.name] ?? null;
+      if (mine !== field.stored) writes.push({ key: field.key, value: mine });
+    }
+  }
+  const kept = Object.keys(keep).length ? JSON.stringify(keep) : null;
+  if (kept !== stored.before)
+    writes.push({ key: THEME_BEFORE_PROFILE_KEY, value: kept });
+  return writes;
+}
+
+/**
  * Force the profile's colour scheme (`mode`) and/or accent (`accent`) by seeding
- * picoframe's persisted theme keys before render. In-session changes via Appearance
- * still apply; they revert to the profile on the next launch. No-op for fields the
- * profile omits, so a user's own choice is untouched when the profile is silent.
+ * picoframe's persisted theme keys before render, and hand the player's own values
+ * back on a launch with no profile to force them. In-session changes via Appearance
+ * still apply for that session. The next launch of the same distribution puts its
+ * brand back, and the next ordinary launch restores what the player had before the
+ * brand ever ran. See {@link planProfileTheme} for the rules.
  */
 export function forceProfileTheme(): void {
   try {
-    if (loaded.mode)
-      localStorage.setItem(THEME_MODE_KEY, JSON.stringify(loaded.mode));
-    if (loaded.accent)
-      localStorage.setItem(ACCENT_KEY, JSON.stringify(loaded.accent));
+    const writes = planProfileTheme(
+      {
+        mode: localStorage.getItem(THEME_MODE_KEY),
+        accent: localStorage.getItem(ACCENT_KEY),
+        before: localStorage.getItem(THEME_BEFORE_PROFILE_KEY),
+      },
+      loaded,
+    );
+    for (const { key, value } of writes) {
+      if (value === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, value);
+    }
   } catch {
-    // localStorage unavailable (private mode / quota) — theme simply isn't forced.
+    // localStorage unavailable (private mode / quota), so nothing is forced.
   }
 }
 
