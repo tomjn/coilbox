@@ -27,7 +27,7 @@ import type { ReactNode } from "react";
  * inks clear 4.5:1 against, whatever the canvas was painting. That is the point
  * of a band rather than a brighter ink. It turns "legible over a starfield",
  * which nothing can measure, into "legible over a known colour", which
- * `hudChrome.test.ts` measures over the whole sRGB cube in both ramps.
+ * `hudChrome.test.ts` measures over the whole sRGB cube.
  *
  * Raw `hsl(var(--token))` rather than `bg-background/78`, for the reason
  * cardShell gives at length: Tailwind's alpha syntax mixes in oklab, and the
@@ -57,9 +57,8 @@ export const MAP_DIM_INK_CLASS = "text-[hsl(var(--foreground)/0.75)]";
  * is not enough on its own, because what the alpha fixes and what it cannot fix
  * are different problems.
  *
- * - It fixes the body ink. `--card-foreground` over this card measures 6.62:1 in
- *   the dark ramp and 8.99:1 in the light one, worst case over any canvas colour
- *   on any base.
+ * - It fixes the body ink. `--card-foreground` over this card measures 6.62:1,
+ *   worst case over any canvas colour on any base.
  * - It does not fix `--muted-foreground`, which is calibrated against a flat
  *   surface and would need the card at 95% to survive a star. That is opaque in
  *   all but name. {@link HUD_DIM_INK_CLASS} steps the card's own ink down
@@ -91,14 +90,27 @@ const BRACKET: Record<HudAccent, string> = {
 };
 
 /**
- * Accent text on the HUD card, one value per ramp.
+ * Accent text on the HUD card, one value each, for the dark ramp.
  *
  * These were `text-cyan-300`, `text-amber-400/90` and friends, and the card's
  * alpha was never their problem. A Tailwind 300/400 shade is picked to sit on a
- * dark surface, and the HUD does not force a dark scheme, so on a light one they
+ * dark surface, and the HUD did not force a dark scheme, so on a light one they
  * were cyan on white: 1.0:1 for the teal and the amber, 1.7:1 for the danger
  * red. Raising the card's opacity cannot help, because the card is white there
- * too. They needed a value per ramp rather than one value used in both.
+ * too. So #1785 gave each accent a value per ramp.
+ *
+ * #1810 then answered the same defect at the root: both maps hold the dark ramp
+ * whatever theme the player picked, because a starfield has no light version to
+ * put a light HUD on. That made the light value unreachable, and an unreachable
+ * value is not free. It is a shape every later accent has to be poured into, and
+ * the violet below was very nearly poured a light value nobody could ever have
+ * seen. So they are single values again, and this time the ramp is decided
+ * rather than guessed (#1811).
+ *
+ * `useForcedDark` in `src/theme/forcedDark.ts` is what decides it, and
+ * `hudChrome.test.ts` holds the assumption up by checking that nothing imports
+ * this file from outside the two routes that call it. If the forcing ever goes,
+ * these need their other half back.
  *
  * Written as `hsl()` literals rather than palette classes so `hudChrome.test.ts`
  * can read the shipped numbers back out and re-measure them. Each clears 4.5:1
@@ -106,9 +118,9 @@ const BRACKET: Record<HudAccent, string> = {
  * with the worst case between 4.85:1 and 5.29:1.
  *
  * The danger red is the one that visibly moved. Red has little luminance to
- * spend, so clearing AA over a card the sky is showing through means a pale red
- * on the dark ramp and a deep one on the light ramp. The corner brackets keep
- * the saturated colour, since they are decoration rather than text.
+ * spend, so clearing AA over a card the sky is showing through means a pale red.
+ * The corner brackets keep the saturated colour, since they are decoration
+ * rather than text.
  *
  * A tile's label and its value now take the same accent, where the label used to
  * be a 90% alpha step below. Both values have to clear AA on their own, so the
@@ -121,10 +133,10 @@ const BRACKET: Record<HudAccent, string> = {
  * lives in this map is one `hudChrome.test.ts` sweeps for free (#1801).
  */
 export const HUD_ACCENT_INK = {
-  teal: "text-[hsl(190_75%_22%)] dark:text-[hsl(190_75%_74%)]",
-  amber: "text-[hsl(42_90%_20%)] dark:text-[hsl(42_90%_69%)]",
-  danger: "text-[hsl(4_75%_32%)] dark:text-[hsl(4_85%_87%)]",
-  violet: "text-[hsl(258_80%_46%)] dark:text-[hsl(258_70%_88%)]",
+  teal: "text-[hsl(190_75%_74%)]",
+  amber: "text-[hsl(42_90%_69%)]",
+  danger: "text-[hsl(4_85%_87%)]",
+  violet: "text-[hsl(258_70%_88%)]",
 };
 
 const LABEL: Record<HudAccent, string> = {
