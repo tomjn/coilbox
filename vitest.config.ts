@@ -11,6 +11,12 @@ export default defineConfig({
     },
   },
   test: {
+    // Node everywhere by default. Most of this suite has no React in it, and a
+    // DOM costs roughly 150ms per file to stand up, so the files that need one
+    // ask for it themselves with a `// @vitest-environment happy-dom` docblock
+    // on their first line (see `src/hub/assets/useMapPicture.test.tsx`). Vitest
+    // 4 dropped `environmentMatchGlobs`, so a directory rule would mean a second
+    // project rather than a pattern.
     environment: "node",
     // `.tsx` for the tests that render a component, which write JSX rather than
     // nesting `createElement` calls by hand.
