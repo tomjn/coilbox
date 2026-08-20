@@ -1,6 +1,7 @@
 import { cn } from "@picoframe/frame";
 import Markdown, { type Components } from "react-markdown";
 import { assetUrl, isLocalRef, mediaKind } from "../../../lib/assetUrl";
+import { externalOnlyLink } from "../../../lib/MarkdownLink";
 
 /**
  * Renders a mission/campaign briefing as Markdown. Unlike the profile welcome screen
@@ -22,6 +23,10 @@ function resolveSrc(src: unknown): string | undefined {
 }
 
 const MEDIA_COMPONENTS: Components = {
+  // A briefing's links are the campaign author's, not Coilbox's, so a click hands
+  // an `https:` link to the browser and refuses the rest rather than letting the
+  // webview follow it out of the app (issue #1789).
+  a: externalOnlyLink("campaign"),
   img({ src, alt, title }) {
     const url = resolveSrc(src);
     if (!url) return null;
