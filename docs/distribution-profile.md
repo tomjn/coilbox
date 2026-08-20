@@ -213,7 +213,7 @@ Overrides the OS window title **and** the in-app title. Defaults to `"Coilbox"`.
 
 ### `mode` (string)
 
-Forces the colour scheme: `"light"`, `"dark"`, or `"system"`. Applied on every launch (it overrides a value the user may have set previously — including one carried over from a vanilla Coilbox install). The user can still switch it for the current session under Settings > Appearance; it reverts to the profile next launch. Omit to leave the colour scheme entirely under the user's control.
+Forces the colour scheme: `"light"`, `"dark"`, or `"system"`. Applied on every launch (it overrides a value the user may have set previously — including one carried over from a vanilla Coilbox install). The user can still switch it for the current session under Settings > Appearance; it reverts to the profile next launch. Omit to leave the colour scheme entirely under the user's control. Coilbox puts the user's own value aside the first launch a profile forces it and hands it back on the first launch that does not, so running a distribution and then an ordinary Coilbox install leaves the ordinary install the colour the user picked. A change made inside the branded run stays with that run.
 
 ```json
 { "version": 1, "mode": "dark" }
