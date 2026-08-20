@@ -324,6 +324,15 @@ export default function BrowsePage() {
             ariaLabel="Filter by map"
             className="h-9 w-36"
           />
+        </div>
+        {/* The kind chips get a row of their own (issue #1795). Sharing one
+            with the search box and the two comboboxes, they reached the right
+            edge at the default 1100px window and pushed the count onto a line
+            by itself, and at the 600px minimum the last chip sat past that
+            edge, reachable only by scrolling the whole page sideways. The
+            chips wrap here rather than scrolling, so every kind is on screen
+            at every width. */}
+        <div className="flex items-center gap-3">
           <ToggleGroup
             type="single"
             variant="outline"
@@ -334,6 +343,7 @@ export default function BrowsePage() {
             // is how "all kinds" is chosen: there is no separate All chip.
             onValueChange={(v) => setFilter("kind", v)}
             aria-label="Kind"
+            className="flex-wrap"
           >
             {HUB_KINDS.map((kind) => (
               <ToggleGroupItem
@@ -345,8 +355,11 @@ export default function BrowsePage() {
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
+          {/* Beside the chips rather than after them in the same wrapping row,
+              so a narrow window wraps the chips under each other and leaves the
+              count where it is, instead of stranding it on a line of its own. */}
           {page && !loading && (
-            <span className="text-sm text-muted-foreground">
+            <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">
               {page.total} {page.total === 1 ? "item" : "items"}
             </span>
           )}
