@@ -5,8 +5,8 @@ import { parseRef } from "./refs";
 /**
  * Where a markdown link in a custom page points, once the `@`-reference scheme and the
  * ".md links resolve to their page route" convention (issue #274) are applied. Pure and
- * unit-tested here; the `a` renderer in CustomPage turns each kind into the right action
- * (system-browser open, in-app navigation, or a plain anchor).
+ * unit-tested here. The `a` renderer in CustomPage turns each kind into the right action:
+ * a system-browser open, in-app navigation, or a scroll down the page.
  */
 export type LinkTarget =
   | { kind: "external"; url: string }
@@ -21,7 +21,7 @@ export type LinkTarget =
 /**
  * Classify a markdown link `href`:
  * - `http(s)/mailto/tel` → external (opened in the system browser, never the webview).
- * - `#frag` → an in-page anchor, left as-is.
+ * - `#frag` → an in-page anchor, which the click scrolls to (issue #1805).
  * - `@route/<path>` → an in-app route.
  * - `@.coilbox/<f>.md` or a plain `*.md` link → the page route `pages/<slug>` (slug from
  *   the filename, so `intro.md` → `/pages/intro`; a nested page links via `@route/...`).

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { useNavigate } from "react-router";
 import { assetUrl, isLocalRef, mediaKind } from "../lib/assetUrl";
+import { scrollToAnchor } from "../lib/markdownAnchors";
 import { GFM_PLUGINS, GFM_PROSE_CLASSES } from "../lib/markdownGfm";
 import { classifyMarkdownLink } from "./pageLinks";
 import { buildPageNav, getProfilePages, type ProfilePage } from "./pages";
@@ -49,16 +50,23 @@ function openAsset(path: string) {
  * Renders a markdown link with the page-link scheme applied (issue #274): external URLs
  * open in the system browser (never navigating the webview away from the app), `.md` /
  * `@route/` / app-absolute links navigate in-app via the router, a `@.coilbox` asset is
- * handed to the OS (see {@link openAsset}), and a `@widget/`/malformed ref renders inert
- * (plain text) so a bad link can't break the page.
+ * handed to the OS (see {@link openAsset}), a `#` link scrolls the page (see
+ * {@link scrollToAnchor}), and a `@widget/`/malformed ref renders inert (plain text) so a
+ * bad link can't break the page.
  */
 function MarkdownLink({
   href,
   title,
+  id,
   children,
 }: {
   href?: string;
   title?: string;
+  /**
+   * The `id` on a GFM footnote reference, which is what the `↩` beside the note
+   * links back to. Dropping it would leave that link pointing at nothing.
+   */
+  id?: string;
   children?: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -68,7 +76,19 @@ function MarkdownLink({
   }
   if (target.kind === "anchor") {
     return (
-      <a href={target.href} title={title}>
+      <a
+        href={target.href}
+        title={title}
+        id={id}
+        onClick={(e) => {
+          // A contents list at the top of a long page, or a GFM footnote, means
+          // "move down this page". Coilbox reads the hash as its route, so
+          // letting the webview follow this would move the app instead, and the
+          // reader would end up somewhere they never asked for (issue #1805).
+          e.preventDefault();
+          scrollToAnchor(target.href, e.currentTarget, "profile");
+        }}
+      >
         {children}
       </a>
     );

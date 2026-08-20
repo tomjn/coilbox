@@ -1,4 +1,5 @@
 import remarkGfm from "remark-gfm";
+import { remarkHeadingIds } from "./markdownAnchors";
 
 /**
  * GitHub Flavored Markdown for the three surfaces that render somebody else's
@@ -16,11 +17,12 @@ import remarkGfm from "remark-gfm";
  * link (see {@link ./MarkdownLink} and `../profile/CustomPage`). All three do.
  *
  * GFM also brings tables, strikethrough, task lists and footnotes. A footnote
- * reference is a `#` link, which the briefing and the changelog refuse and a
- * distribution page renders as a plain anchor: Coilbox routes on the hash, so
- * clicking one moves the app rather than scrolling the text.
+ * reference is a `#` link, and so is the contents list at the top of a long
+ * page, so {@link remarkHeadingIds} rides along here rather than as a list of
+ * its own. It gives each heading the id such a link points at, and the `a`
+ * renderers scroll to it (issue #1805).
  */
-export const GFM_PLUGINS = [remarkGfm];
+export const GFM_PLUGINS = [remarkGfm, remarkHeadingIds];
 
 /**
  * Typography for the elements only GFM can produce. Tailwind's reset leaves a

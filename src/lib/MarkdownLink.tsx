@@ -1,5 +1,6 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ReactNode } from "react";
+import { scrollToAnchor } from "./markdownAnchors";
 
 /** The three `href` schemes that belong to another program rather than to Coilbox. */
 const EXTERNAL = /^(https?:|mailto:|tel:)/i;
@@ -24,6 +25,11 @@ interface MarkdownLinkProps {
   href?: string;
   title?: string;
   children?: ReactNode;
+  /**
+   * The `id` on a GFM footnote reference, which is what the `↩` beside the note
+   * links back to. Dropping it would leave that link pointing at nothing.
+   */
+  id?: string;
 }
 
 /**
@@ -45,19 +51,28 @@ interface MarkdownLinkProps {
  * in-app routes and bundled files. These two surfaces have no such scheme to
  * offer and no reason to grow one: a briefing already shows a bundled picture
  * through the image spelling, and a changelog only ever wants its links opened.
- * A bare `#fragment` is refused with the rest, because Coilbox routes on the hash
- * and following one would move the app rather than scroll the text.
+ *
+ * The exception is a `#` link, which points inside the text rather than out of
+ * it. Coilbox routes on the hash, so the webview still must not follow one, but
+ * the click scrolls to what it names instead of being refused (issue #1805).
+ * That is how a GFM footnote reaches its note and gets back again.
  *
  * `source` names the surface in the console warning, so an author who wrote the
  * link can tell which of their files it came from.
  */
 export function externalOnlyLink(source: string) {
-  return function MarkdownLink({ href, title, children }: MarkdownLinkProps) {
+  return function MarkdownLink({
+    href,
+    title,
+    id,
+    children,
+  }: MarkdownLinkProps) {
     const url = href?.trim() ?? "";
     return (
       <a
         href={href}
         title={title}
+        id={id}
         onClick={(e) => {
           // First, before anything that can throw: whatever else goes wrong, the
           // webview must not be left to follow the link.
@@ -69,6 +84,10 @@ export function externalOnlyLink(source: string) {
             openUrl(url).catch((err) =>
               console.warn(`${source}: could not open the link "${url}"`, err),
             );
+            return;
+          }
+          if (url.startsWith("#")) {
+            scrollToAnchor(url, e.currentTarget, source);
             return;
           }
           // Say which link it was: a click that silently does nothing is its own

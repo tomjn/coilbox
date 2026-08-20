@@ -49,8 +49,8 @@ function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
 }
 
-/** Render a one-link page, click the link, and report what the click did. */
-function clickLink(markdown: string) {
+/** Render a page as a distribution would ship it. */
+function renderPage(markdown: string) {
   render(
     <MemoryRouter initialEntries={["/"]}>
       <MarkdownPage
@@ -65,11 +65,21 @@ function clickLink(markdown: string) {
       <Where />
     </MemoryRouter>,
   );
+}
+
+/** Where the router ended up. */
+function routeNow() {
+  return screen.getByTestId("where").textContent;
+}
+
+/** Render a one-link page, click the link, and report what the click did. */
+function clickLink(markdown: string) {
+  renderPage(markdown);
   const link = screen.getByRole("link");
   // `fireEvent` hands back the `dispatchEvent` result, which is false exactly
   // when something called `preventDefault`.
   const followed = fireEvent.click(link);
-  return { followed, at: screen.getByTestId("where").textContent, link };
+  return { followed, at: routeNow(), link };
 }
 
 beforeEach(() => {
@@ -146,5 +156,65 @@ describe("a link on a distribution's markdown page", () => {
     const route = clickLink("[Play](@route/singleplayer)");
     expect(route.followed).toBe(false);
     expect(route.at).toBe("/singleplayer");
+  });
+});
+
+/**
+ * A `#` link points inside the page rather than out of it, which is the one link
+ * kind Coilbox cannot let the webview follow and cannot hand to anything else:
+ * the app reads the hash as its route, so following one moves the app off the
+ * page (issue #1805). So the click scrolls by hand.
+ */
+describe("a link to a heading on a distribution's markdown page", () => {
+  /** What `scrollIntoView` was called on, newest last. */
+  let scrolled: Element[] = [];
+
+  beforeEach(() => {
+    scrolled = [];
+    vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(function (
+      this: Element,
+    ) {
+      scrolled.push(this);
+    });
+  });
+
+  it("scrolls to the heading rather than moving the app", () => {
+    renderPage("[Installing](#installing)\n\n## Installing\n\nRun it.");
+    const followed = fireEvent.click(screen.getByRole("link"));
+    // The heading has an id to point at, which markdown does not give it.
+    const heading = screen.getByRole("heading", { name: "Installing" });
+    expect(heading.id).toBe("installing");
+    expect(scrolled).toEqual([heading]);
+    // And nothing reached the webview or the router on the way.
+    expect(followed).toBe(false);
+    expect(routeNow()).toBe("/");
+    expect(openUrl).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when no heading on the page has that id", () => {
+    // The author's typo, which must not throw and must not navigate. It says
+    // which link it was, so the author can find it.
+    renderPage("[Installing](#instaling)\n\n## Installing");
+    const followed = fireEvent.click(screen.getByRole("link"));
+    expect(scrolled).toEqual([]);
+    expect(followed).toBe(false);
+    expect(routeNow()).toBe("/");
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("#instaling"),
+    );
+  });
+
+  it("takes a footnote to its note and the note back to the text", () => {
+    // Nobody wrote either of these links. GFM (issue #1791) makes both out of
+    // `[^1]`, which is why the anchor click had to work rather than be refused.
+    renderPage("Cheaper now[^1].\n\n[^1]: Since 1.2.");
+    const [toNote, backAgain] = screen.getAllByRole("link");
+    fireEvent.click(toNote);
+    fireEvent.click(backAgain);
+    expect(scrolled.map((el) => el.id)).toEqual([
+      "user-content-fn-1",
+      "user-content-fnref-1",
+    ]);
+    expect(routeNow()).toBe("/");
   });
 });
