@@ -62,13 +62,6 @@ coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }
 coilbox-s3o = { path = "../coilbox-s3o" }
 coilbox-3do = { path = "../coilbox-3do" }
 
-# The hardware SHA-256 backend, which is a feature on aarch64 and automatic
-# everywhere else. The workspace root says why the block is shaped this way. This
-# is the crate the issue was measured on: a Splinter Faction roster of render
-# keys is nearly all SHA-256 over one shared texture atlas.
-[target.'cfg(all(target_arch = "aarch64", not(target_env = "msvc")))'.dependencies]
-sha2 = { workspace = true, features = ["asm"] }
-
 [dev-dependencies]
 # Stock Lua 5.1 used ONLY to unit-test the injected serializer + wrapper against a
 # faithful interpreter (the real test target, unitsync's LuaParser, needs a live

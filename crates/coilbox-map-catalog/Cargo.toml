@@ -12,8 +12,3 @@ serde_json = "1"
 # the hub's finds out rather than looking like it is reporting different facts
 # (issue #1735). The same version coilbox-assets digests its own document with.
 sha2 = { workspace = true }
-
-# The hardware SHA-256 backend, which is a feature on aarch64 and automatic
-# everywhere else. The workspace root says why the block is shaped this way.
-[target.'cfg(all(target_arch = "aarch64", not(target_env = "msvc")))'.dependencies]
-sha2 = { workspace = true, features = ["asm"] }
