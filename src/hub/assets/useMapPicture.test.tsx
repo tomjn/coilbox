@@ -168,6 +168,28 @@ describe("useMapPictureLadder", () => {
     await waitFor(() => expect(result.current[0].from).toBe("static"));
   });
 
+  /** A battle room's card outlives the map on it, so the picture has to go when
+   *  the map does rather than when its replacement arrives. Held over, a room
+   *  that switched to a map the hub has never seen keeps the old minimap. */
+  it("drops the last map's picture the moment the card's map changes", async () => {
+    stubHub(["Isis 1.3"]);
+
+    const { result, rerender } = renderHook(
+      ({ mapName }: { mapName: string }) => useMapPictureLadder(mapName, null),
+      { wrapper, initialProps: { mapName: "Isis 1.3" } },
+    );
+    await waitFor(() => expect(result.current[0].from).toBe("static"));
+
+    rerender({ mapName: "Nothing Here 1.0" });
+    expect(result.current.map((rung) => rung.from)).toEqual(["placeholder"]);
+
+    // And the hub answering for the new map does not bring the old one back.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(result.current.map((rung) => rung.from)).toEqual(["placeholder"]);
+  });
+
   /** The one place a picture would otherwise reach a hub the distributor turned
    *  off. */
   it("asks a hub the profile switched off for nothing at all", async () => {
