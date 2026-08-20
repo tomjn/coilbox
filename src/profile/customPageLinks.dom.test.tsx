@@ -123,6 +123,19 @@ describe("a link on a distribution's markdown page", () => {
     );
   });
 
+  it("is a link even when the page only wrote the URL", () => {
+    // Autolinking (issue #1791) makes an anchor out of text nobody wrote as a
+    // link, so it has to land on the same guard: the OS opens it and the
+    // webview never follows it off the page.
+    const { followed, at, link } = clickLink(
+      "Ask us at https://discord.gg/example",
+    );
+    expect(link.getAttribute("href")).toBe("https://discord.gg/example");
+    expect(followed).toBe(false);
+    expect(at).toBe("/");
+    expect(openUrl).toHaveBeenCalledWith("https://discord.gg/example");
+  });
+
   it("still hands an external link to the OS and an in-app link to the router", () => {
     const external = clickLink("[Discord](https://discord.gg/example)");
     expect(external.followed).toBe(false);

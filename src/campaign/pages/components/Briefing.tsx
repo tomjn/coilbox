@@ -2,6 +2,7 @@ import { cn } from "@picoframe/frame";
 import Markdown, { type Components } from "react-markdown";
 import { assetUrl, isLocalRef, mediaKind } from "../../../lib/assetUrl";
 import { externalOnlyLink } from "../../../lib/MarkdownLink";
+import { GFM_PLUGINS, GFM_PROSE_CLASSES } from "../../../lib/markdownGfm";
 
 /**
  * Renders a mission/campaign briefing as Markdown. Unlike the profile welcome screen
@@ -73,10 +74,13 @@ export function BriefingProse({
         "[&_code]:font-mono [&_code]:text-xs",
         "[&_h1]:mt-2 [&_h1]:font-semibold [&_h2]:mt-2 [&_h2]:font-semibold",
         "[&_li]:ml-4 [&_li]:list-disc [&_p]:my-1 [&_ul]:my-1",
+        GFM_PROSE_CLASSES,
         className,
       )}
     >
-      <Markdown components={MEDIA_COMPONENTS}>{children}</Markdown>
+      <Markdown components={MEDIA_COMPONENTS} remarkPlugins={GFM_PLUGINS}>
+        {children}
+      </Markdown>
     </div>
   );
 }

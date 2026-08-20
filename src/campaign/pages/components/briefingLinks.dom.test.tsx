@@ -70,6 +70,15 @@ describe("a link in a mission briefing", () => {
     );
   });
 
+  it("is a link even when the author only typed the URL", () => {
+    // A briefing author who pastes a URL gets a link, as they would on GitHub
+    // (issue #1791), and it goes through the same guard as a written link.
+    const { followed, link } = clickLink("Join us at https://example.org/c");
+    expect(link.getAttribute("href")).toBe("https://example.org/c");
+    expect(followed).toBe(false);
+    expect(openUrl).toHaveBeenCalledWith("https://example.org/c");
+  });
+
   it("refuses a link to a bundled file rather than drawing it over the app", () => {
     // A briefing shows a bundled picture with the `!` image spelling, which still
     // works. A plain link to one has nowhere to go that is not on top of Coilbox.

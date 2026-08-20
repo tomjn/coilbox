@@ -49,10 +49,15 @@ vi.mock("../../downloads/config", () => ({
 
 import GameUpdatesSection from "./GameUpdatesSection";
 
+/** Render the section with the given changelog body. */
+function showChangelog(markdown: string) {
+  updates.body = markdown;
+  return render(<GameUpdatesSection />);
+}
+
 /** Render the section with a one-link changelog, click the link, and report. */
 function clickLink(markdown: string) {
-  updates.body = markdown;
-  render(<GameUpdatesSection />);
+  showChangelog(markdown);
   const link = screen.getByRole("link");
   // `fireEvent` hands back the `dispatchEvent` result, which is false exactly
   // when something called `preventDefault`.
@@ -95,6 +100,18 @@ describe("a link in a game's changelog", () => {
     );
   });
 
+  it("is a link even when the release body only wrote the URL", () => {
+    // The line GitHub appends to a generated release body, spelled exactly as
+    // GitHub spells it. It used to be plain text (issue #1791).
+    const url = "https://github.com/example/game/compare/v1...v2";
+    const { followed, link } = clickLink(`**Full Changelog**: ${url}`);
+    expect(link.getAttribute("href")).toBe(url);
+    // And the autolink goes through the same guard as a written link, so the
+    // release page does not replace Coilbox.
+    expect(followed).toBe(false);
+    expect(openUrl).toHaveBeenCalledWith(url);
+  });
+
   it("refuses a relative link, which would resolve against the app itself", () => {
     // A release body written for github.com can carry `[#7](../issues/7)`, which
     // means nothing here and would take the app to a route that does not exist.
@@ -104,5 +121,26 @@ describe("a link in a game's changelog", () => {
     expect(console.warn).toHaveBeenCalledWith(
       expect.stringContaining("../issues/7"),
     );
+  });
+});
+
+describe("the rest of a GitHub release body", () => {
+  it("renders a table as a table rather than as run-together text", () => {
+    const { container } = showChangelog(
+      ["| Unit | Change |", "| --- | --- |", "| Pawn | Cheaper |"].join("\n"),
+    );
+    expect(screen.getByRole("columnheader", { name: "Unit" })).toBeTruthy();
+    expect(screen.getByRole("cell", { name: "Cheaper" })).toBeTruthy();
+    // The wrapper around the changelog carries the borders and padding the
+    // cells are drawn with, because Tailwind's reset gives a table neither.
+    const table = container.querySelector("table");
+    expect(table?.closest("[class*='[&_td]:border']")).toBeTruthy();
+  });
+
+  it("renders a task list and strikethrough", () => {
+    showChangelog("- [x] Ship it\n- [ ] Later\n\n~~Removed~~");
+    const boxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
+    expect(boxes.map((b) => b.checked)).toEqual([true, false]);
+    expect(screen.getByText("Removed").tagName).toBe("DEL");
   });
 });
