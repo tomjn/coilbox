@@ -435,15 +435,31 @@ pub(crate) async fn resolve_image(
 
 /// What one fetch attempt concluded. The two failures are kept apart because only
 /// one of them is worth remembering: see the `.none` marker in `resolve_image`.
+#[derive(Debug, PartialEq)]
 enum Fetched {
     /// The picture, as (content type, bytes).
     Image(String, Vec<u8>),
-    /// The host answered and had nothing for us: a status we can't use, or a body
-    /// that isn't an image. Asking again tomorrow gets the same answer.
+    /// The host said no: the picture isn't there, or the body it sent isn't an
+    /// image. Asking again tomorrow gets the same answer.
     Absent,
-    /// Nothing came back: no name, no route, no answer, or a transfer that stalled.
-    /// This says nothing about whether the picture exists.
+    /// No answer about whether the picture exists: no name, no route, a transfer
+    /// that stalled, or a host telling us it is having a bad minute.
     Unreachable,
+}
+
+/// What a status the host answered with says about the picture. Only a refusal is
+/// the host saying no: the picture isn't there (404, 410), or isn't ours to have
+/// (403). Everything else it can answer with is "not right now" - 429 asking us to
+/// slow down, a 502 or 503 from an origin or a CDN that is broken - and that says
+/// nothing about whether the picture exists. Remembering one of those as missing
+/// costs a day of card art over a minute of somebody else's downtime.
+fn outcome_for_status(status: reqwest::StatusCode) -> Fetched {
+    match status {
+        reqwest::StatusCode::NOT_FOUND
+        | reqwest::StatusCode::GONE
+        | reqwest::StatusCode::FORBIDDEN => Fetched::Absent,
+        _ => Fetched::Unreachable,
+    }
 }
 
 /// Fetch one image URL. When `reencode` is set the bytes are downsampled and
@@ -462,9 +478,9 @@ async fn fetch_image(url: &str, reencode: bool) -> Fetched {
         Ok(resp) => resp,
         Err(_) => return Fetched::Unreachable,
     };
-    let Ok(resp) = resp.error_for_status() else {
-        return Fetched::Absent;
-    };
+    if !resp.status().is_success() {
+        return outcome_for_status(resp.status());
+    }
     let header = resp
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
@@ -712,6 +728,38 @@ mod tests {
     fn closed_port() -> u16 {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         listener.local_addr().unwrap().port()
+    }
+
+    /// Which statuses are the host saying the picture is not there, and which are
+    /// it having a bad minute. Only the first kind is remembered, because a `.none`
+    /// marker hides the picture for 24 hours: a CDN answering 503 for one minute
+    /// costing a day of card art is the same bug as a timeout costing a day of it.
+    #[test]
+    fn only_a_refusal_means_the_picture_is_not_there() {
+        for refusal in [
+            reqwest::StatusCode::NOT_FOUND,
+            reqwest::StatusCode::GONE,
+            reqwest::StatusCode::FORBIDDEN,
+        ] {
+            assert_eq!(
+                outcome_for_status(refusal),
+                Fetched::Absent,
+                "{refusal} is the host saying no, and is worth remembering"
+            );
+        }
+        for later in [
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+            reqwest::StatusCode::BAD_GATEWAY,
+            reqwest::StatusCode::SERVICE_UNAVAILABLE,
+            reqwest::StatusCode::GATEWAY_TIMEOUT,
+        ] {
+            assert_eq!(
+                outcome_for_status(later),
+                Fetched::Unreachable,
+                "{later} is the host saying not right now, so ask again next launch"
+            );
+        }
     }
 
     /// The poisoning this guards: a host we never heard back from must not leave a
