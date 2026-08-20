@@ -17,7 +17,11 @@ import { useReduceMotion } from "../../../general/display";
 import type { MapAppearance } from "../../bindings";
 import { decimateHeights, type HeightWords } from "../../heightGrid";
 import { getHeightWords, getImageInfo } from "../../imageCache";
-import { type SkyboxProblem, skyboxNote } from "../../skyboxNote";
+import {
+  skyboxFromDds,
+  skyboxNote,
+  type SkyboxProblem,
+} from "../../skyboxNote";
 
 export type { HeightWords };
 
@@ -101,7 +105,7 @@ type DdsData = {
   mipmaps: { data: Uint8Array; width: number; height: number }[];
   width: number;
   height: number;
-  format: number;
+  format: number | null;
   mipmapCount: number;
 };
 
@@ -127,11 +131,10 @@ async function loadSkyboxCube(
   try {
     const buffer = await (await fetch(src)).arrayBuffer();
     const data = new DDSLoader().parse(buffer, true) as unknown as DdsData;
-    if (!data.isCubemap) return { problem: "not-a-cube-map" };
-    const faceCount = data.mipmaps.length / data.mipmapCount;
-    if (faceCount !== 6) return { problem: "not-a-cube-map" };
+    const problem = skyboxFromDds(data);
+    if (problem) return { problem };
     const faces = [];
-    for (let f = 0; f < faceCount; f++) {
+    for (let f = 0; f < 6; f++) {
       const mipmaps = [];
       for (let i = 0; i < data.mipmapCount; i++) {
         mipmaps.push(data.mipmaps[f * data.mipmapCount + i]);
