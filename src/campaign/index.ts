@@ -74,6 +74,14 @@ const campaignPlugin: FramePlugin = {
       // No literal segment between the ids, so the breadcrumb trail is
       // Campaigns / <campaign> / <mission> with no phantom intermediate crumb.
       path: "campaign/:id/:missionId",
+      // A briefing is always full-bleed art with a card over it, and all three
+      // things it can be are dark: an authored panorama, a lit 3D unit or map,
+      // or the slate gradient the page falls back to. The scrim over them is the
+      // page background, so on the light theme the art came out smeared white
+      // (#1809 on a third screen). The campaign detail route above is not the
+      // same case, since a campaign with no backdrop is an ordinary list page
+      // and reads correctly on either theme.
+      appearance: "dark",
       lazy: () => import("./pages/MissionBriefingPage"),
       crumb: (c) => {
         const loaded = c.params.id ? getCachedCampaign(c.params.id) : undefined;

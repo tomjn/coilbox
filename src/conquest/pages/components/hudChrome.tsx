@@ -107,10 +107,10 @@ const BRACKET: Record<HudAccent, string> = {
  * seen. So they are single values again, and this time the ramp is decided
  * rather than guessed (#1811).
  *
- * `useForcedDark` in `src/theme/forcedDark.ts` is what decides it, and
- * `hudChrome.test.ts` holds the assumption up by checking that nothing imports
- * this file from outside the two routes that call it. If the forcing ever goes,
- * these need their other half back.
+ * The two map routes are what decide it, with `appearance: "dark"` on the route
+ * itself, and `hudChrome.test.ts` holds the assumption up by checking both that
+ * they still say so and that nothing imports this file from outside them. If the
+ * forcing ever goes, these need their other half back.
  *
  * Written as `hsl()` literals rather than palette classes so `hudChrome.test.ts`
  * can read the shipped numbers back out and re-measure them. Each clears 4.5:1

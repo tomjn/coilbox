@@ -21,7 +21,6 @@ import {
 } from "../../content/pages/components/states";
 import { UnitPicker } from "../../content/pages/components/UnitPicker";
 import { usePreferredTarget } from "../../play/config";
-import { useForcedDark } from "../../theme/forcedDark";
 import { substituteExcludedMaps } from "../generate";
 import { awardMeta } from "../meta";
 import {
@@ -162,14 +161,6 @@ export default function RunPage() {
     saveMeta(awardMeta(meta, run));
   }, [run, meta, saveMeta]);
 
-  // The node map has no light version, so this page holds the dark ramp whatever
-  // theme the player picked (#1809). Everything over the map is inside this
-  // element, the HUD, the inspect panel, the encounter, reward, event and shop
-  // overlays and the end screen alike, so one class covers the lot. The loading
-  // and empty states below are ordinary pages with no map behind them, so they
-  // stay on the player's theme.
-  const dark = useForcedDark("relative h-full overflow-hidden");
-
   if (loading) return <SkeletonList />;
   if (!run) {
     return (
@@ -230,7 +221,7 @@ export default function RunPage() {
   const focusId = active ? active.id : null;
 
   return (
-    <div {...dark}>
+    <div className="relative h-full overflow-hidden">
       <RunMapView
         run={run}
         selectedId={selectedId}
