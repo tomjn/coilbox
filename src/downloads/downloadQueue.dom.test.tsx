@@ -17,7 +17,10 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DownloadProgress } from "./bindings";
-import { DownloadQueueProvider, useDownloadQueue } from "./DownloadQueueProvider";
+import {
+  DownloadQueueProvider,
+  useDownloadQueue,
+} from "./DownloadQueueProvider";
 import { useQueuedDownload } from "./useQueuedDownload";
 
 /** One in-flight fake download, held open so a test can drive it. */
@@ -54,7 +57,9 @@ vi.mock("./bindings", () => ({
 
 vi.mock("./downloadGame", () => ({ downloadGameAnySource: vi.fn() }));
 vi.mock("./downloadMap", () => ({ downloadMapAnySource: vi.fn() }));
-vi.mock("../content/bindings", () => ({ contentRescan: vi.fn(async () => {}) }));
+vi.mock("../content/bindings", () => ({
+  contentRescan: vi.fn(async () => {}),
+}));
 vi.mock("../content/config", () => ({ invalidateScans: vi.fn() }));
 vi.mock("../content/rapidPoolWarm", () => ({
   warmAllRoots: vi.fn(async () => {}),
