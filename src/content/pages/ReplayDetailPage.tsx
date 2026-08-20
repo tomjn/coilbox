@@ -1,5 +1,4 @@
 import { Button, Input } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
   Code2,
@@ -21,13 +20,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { type DownloadProgress, dlDownload } from "../../downloads/bindings";
 import { useWriteRoot, useWriteRootPath } from "../../downloads/config";
-import { downloadMapAnySource } from "../../downloads/downloadMap";
 import {
   formatBytes,
   ProgressBar,
 } from "../../downloads/pages/components/ProgressBar";
+import { useQueuedDownload } from "../../downloads/useQueuedDownload";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import { useReplayTarget } from "../../play/config";
 import type {
@@ -407,42 +405,21 @@ function ReplayMapPreview({
  * not a rapid tag, so an exact-version match isn't guaranteed — surfaced honestly. */
 function GameDownload({ gameType }: { gameType: string }) {
   const writePath = useWriteRootPath();
-  const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
-    null,
-  );
-
-  async function download() {
-    setDownloading(true);
-    setResult(null);
-    setProgress(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = setProgress;
-    try {
-      const { message } = await dlDownload({
-        tag: gameType,
-        writePath,
-        onProgress,
-      });
-      setResult({ ok: true, message });
-    } catch (e) {
-      setResult({ ok: false, message: errMessage(e) });
-    } finally {
-      setDownloading(false);
-      setProgress(null);
-    }
-  }
+  const gameDl = useQueuedDownload({
+    kind: "rapid",
+    label: `Game: ${gameType}`,
+    args: { tag: gameType, writePath },
+  });
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
         <Button
-          onClick={download}
-          disabled={downloading || !writePath}
+          onClick={() => gameDl.start()}
+          disabled={gameDl.busy || !writePath}
           className="gap-1.5"
         >
-          {downloading ? (
+          {gameDl.busy ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
             <Download className="size-4" />
@@ -453,15 +430,14 @@ function GameDownload({ gameType }: { gameType: string }) {
           Best effort — an exact version match isn't guaranteed.
         </span>
       </div>
-      {downloading && progress && (
-        <ProgressBar progress={progress} className="max-w-xs" />
+      {gameDl.progress && (
+        <ProgressBar progress={gameDl.progress} className="max-w-xs" />
       )}
-      {result && (
-        <p
-          className={`text-xs ${result.ok ? "text-muted-foreground" : "text-destructive"}`}
-        >
-          {result.message}
-        </p>
+      {gameDl.status === "done" && (
+        <p className="text-xs text-muted-foreground">Downloaded {gameType}.</p>
+      )}
+      {gameDl.error && (
+        <p className="text-xs text-destructive">{gameDl.error}</p>
       )}
     </div>
   );
@@ -483,29 +459,20 @@ function MapDownload({
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
-  const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [dlError, setDlError] = useState<string | null>(null);
+  // Replays here are BAR-dominant, and this used to fetch the map straight from
+  // BAR's search endpoint for that reason. It resolves a name by fetching and
+  // storing the archive at BAR's cost, so a replay of any other game's map made
+  // BAR pay to host it. The source order does not.
+  const mapDl = useQueuedDownload({
+    kind: "mapAnySource",
+    label: `Map: ${mapName}`,
+    args: { mapName, writePath },
+  });
+  const downloading = mapDl.busy;
 
   async function download() {
-    setDownloading(true);
-    setDlError(null);
-    setProgress(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = setProgress;
-    try {
-      // Replays here are BAR-dominant, and this used to fetch the map straight
-      // from BAR's search endpoint for that reason. It resolves a name by
-      // fetching and storing the archive at BAR's cost, so a replay of any
-      // other game's map made BAR pay to host it. The source order does not.
-      await downloadMapAnySource({ mapName, writePath, onProgress });
-      onDownloaded();
-    } catch (e) {
-      setDlError(errMessage(e));
-    } finally {
-      setDownloading(false);
-      setProgress(null);
-    }
+    const settled = await mapDl.start();
+    if (settled?.status === "done") onDownloaded();
   }
 
   return (
@@ -524,8 +491,8 @@ function MapDownload({
           Download map
         </Button>
       </div>
-      {downloading && progress && (
-        <ProgressBar progress={progress} className="max-w-xs" />
+      {mapDl.progress && (
+        <ProgressBar progress={mapDl.progress} className="max-w-xs" />
       )}
       {noWriteRoot && !downloading && (
         <p className="text-xs text-muted-foreground">
@@ -539,7 +506,7 @@ function MapDownload({
           first.
         </p>
       )}
-      {dlError && <p className="text-xs text-destructive">{dlError}</p>}
+      {mapDl.error && <p className="text-xs text-destructive">{mapDl.error}</p>}
     </div>
   );
 }
