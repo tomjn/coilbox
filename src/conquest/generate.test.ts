@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyChallengeMaps,
   type GenerateOptions,
   generateGalaxy,
   regenerateGalaxy,
@@ -380,5 +381,93 @@ describe("substituteExcludedMaps", () => {
 
   it("leaves the galaxy alone when every installed map is excluded", () => {
     expect(substituteExcludedMaps(doc, maps, () => true)).toBe(doc);
+  });
+});
+
+describe("applyChallengeMaps", () => {
+  const doc = generateGalaxy(base, "t0");
+  const named = Object.fromEntries(
+    doc.nodes.map((n, i) => [n.id, `Map ${i % maps.length}`]),
+  );
+
+  it("returns the same doc when the challenge names no maps", () => {
+    expect(applyChallengeMaps(doc, undefined, maps)).toBe(doc);
+  });
+
+  it("puts every system on the map the challenge names", () => {
+    const next = applyChallengeMaps(doc, named, maps);
+    for (const node of next.nodes) {
+      expect(node.battle.mapName).toBe(named[node.id]);
+      expect(node.battle.mapSubstitutedFrom).toBeUndefined();
+    }
+  });
+
+  it("resolves the same maps on two installs with different map pools", () => {
+    // Same seed, different installed maps: the generated draw differs, the
+    // named maps do not.
+    const other = generateGalaxy({ ...base, maps: maps.slice(0, 5) }, "t0");
+    expect(other.nodes.map((n) => n.battle.mapName)).not.toEqual(
+      doc.nodes.map((n) => n.battle.mapName),
+    );
+    const a = applyChallengeMaps(doc, named, maps);
+    const b = applyChallengeMaps(other, named, maps);
+    expect(b.nodes.map((n) => n.battle.mapName)).toEqual(
+      a.nodes.map((n) => n.battle.mapName),
+    );
+  });
+
+  it("substitutes a named map this install does not have, and says so", () => {
+    const without = maps.filter((m) => m.name !== "Map 3");
+    const next = applyChallengeMaps(doc, named, without);
+    const swapped = next.nodes.filter((n) => n.battle.mapSubstitutedFrom);
+    expect(swapped.length).toBeGreaterThan(0);
+    for (const node of next.nodes) {
+      expect(node.battle.mapName).not.toBe("Map 3");
+      if (named[node.id] === "Map 3") {
+        expect(node.battle.mapSubstitutedFrom).toBe("Map 3");
+      } else {
+        expect(node.battle.mapSubstitutedFrom).toBeUndefined();
+      }
+    }
+  });
+
+  it("picks the same stand-in every time", () => {
+    const without = maps.filter((m) => m.name !== "Map 3");
+    const a = applyChallengeMaps(doc, named, without);
+    const b = applyChallengeMaps(doc, named, without);
+    expect(a.nodes.map((n) => n.battle.mapName)).toEqual(
+      b.nodes.map((n) => n.battle.mapName),
+    );
+  });
+
+  it("keeps the named map when this install has no maps at all", () => {
+    const next = applyChallengeMaps(doc, named, []);
+    for (const node of next.nodes) {
+      expect(node.battle.mapName).toBe(named[node.id]);
+      expect(node.battle.mapSubstitutedFrom).toBeUndefined();
+    }
+  });
+
+  it("drops the old map's download hint along with the map", () => {
+    const withHint = {
+      ...doc,
+      nodes: doc.nodes.map((n) => ({
+        ...n,
+        battle: {
+          ...n.battle,
+          mapName: "Retired Map",
+          mapDownload: { springName: "Retired Map" },
+        },
+      })),
+    };
+    const next = applyChallengeMaps(withHint, named, maps);
+    expect(next.nodes.every((n) => n.battle.mapDownload === undefined)).toBe(
+      true,
+    );
+  });
+
+  it("ignores names for systems the galaxy does not have", () => {
+    const next = applyChallengeMaps(doc, { "node-999": "Map 1" }, maps);
+    expect(next).toBe(doc);
   });
 });

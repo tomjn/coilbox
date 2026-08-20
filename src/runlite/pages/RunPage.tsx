@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Trophy, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
+import { SubstitutedMapNote } from "../../challenge/SubstitutedMapNote";
 import { resolveGameByShortname } from "../../conquest/model";
 import {
   BracketFrame,
@@ -468,7 +469,13 @@ function InspectPanel({
               {NODE_TITLE[node.type]}
             </div>
             {node.battle && (
-              <div className="mt-1 truncate text-sm">{node.battle.mapName}</div>
+              <div className="mt-1 text-sm">
+                <span className="block truncate">{node.battle.mapName}</span>
+                <SubstitutedMapNote
+                  original={node.battle.mapSubstitutedFrom}
+                  className="mt-0.5"
+                />
+              </div>
             )}
             <p className="mt-1 text-xs text-muted-foreground">
               {NODE_DESC[node.type]}

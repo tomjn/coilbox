@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { encodeChallenge } from "../challenge/code";
 import {
   decodeWarpathChallenge,
   encodeWarpathChallenge,
   optionsFromChallenge,
+  runFromChallenge,
+  substitutedMapCount,
 } from "./challenge";
 import {
   type GenBuildGraph,
@@ -50,7 +53,71 @@ describe("warpath challenge codec", () => {
     const run = generateRun(opts());
     const code = encodeWarpathChallenge(run);
     const result = decodeWarpathChallenge(code);
-    expect(result).toEqual({ ok: true, settings: run.settings });
+    if (!result.ok) throw new Error("expected a successful decode");
+    const { nodeMaps, ...settings } = result.settings;
+    expect(settings).toEqual(run.settings);
+    expect(nodeMaps).toEqual(
+      Object.fromEntries(
+        run.nodes
+          .filter((n) => n.battle)
+          .map((n) => [n.id, n.battle?.mapName as string]),
+      ),
+    );
+  });
+
+  it("rebuilds the same maps on an install with a different map pool", () => {
+    const run = generateRun(opts());
+    const result = decodeWarpathChallenge(encodeWarpathChallenge(run));
+    if (!result.ok) throw new Error("expected a successful decode");
+    // The same three maps plus a pile of others, which on its own shifts the
+    // depth-biased draw and hands most encounters a different map.
+    const theirs = [
+      ...MAPS,
+      ...Array.from({ length: 10 }, (_, i) => ({
+        name: `Their Map ${i}`,
+        size: 32 * (i + 1),
+      })),
+    ];
+    const rebuilt = runFromChallenge(result.settings, { maps: theirs });
+    for (const [i, node] of rebuilt.nodes.entries()) {
+      expect(node.battle?.mapName).toBe(run.nodes[i].battle?.mapName);
+    }
+    const localDraw = generateRun(opts({ maps: theirs }));
+    expect(localDraw.nodes.map((n) => n.battle?.mapName)).not.toEqual(
+      run.nodes.map((n) => n.battle?.mapName),
+    );
+  });
+
+  it("marks an encounter whose named map the recipient does not have", () => {
+    const run = generateRun(opts());
+    const result = decodeWarpathChallenge(encodeWarpathChallenge(run));
+    if (!result.ok) throw new Error("expected a successful decode");
+    const theirs = MAPS.filter((m) => m.name !== "Huge");
+    const rebuilt = runFromChallenge(result.settings, { maps: theirs });
+    expect(substitutedMapCount(rebuilt)).toBeGreaterThan(0);
+    for (const node of rebuilt.nodes) {
+      expect(node.battle?.mapName).not.toBe("Huge");
+      if (node.battle?.mapSubstitutedFrom) {
+        expect(node.battle.mapSubstitutedFrom).toBe("Huge");
+      }
+    }
+  });
+
+  it("opens a challenge shared before maps were named", () => {
+    const run = generateRun(opts());
+    const code = encodeChallenge("warpath", run.settings);
+    const result = decodeWarpathChallenge(code);
+    if (!result.ok) throw new Error("expected a successful decode");
+    expect(result.settings.nodeMaps).toBeUndefined();
+    const rebuilt = runFromChallenge(result.settings, {
+      maps: MAPS,
+      build: BUILD,
+      enemyAiKey: "native:BARb",
+    });
+    expect(rebuilt.nodes.map((n) => n.battle?.mapName)).toEqual(
+      run.nodes.map((n) => n.battle?.mapName),
+    );
+    expect(substitutedMapCount(rebuilt)).toBe(0);
   });
 
   it("recreates an identical run from a decoded challenge", () => {

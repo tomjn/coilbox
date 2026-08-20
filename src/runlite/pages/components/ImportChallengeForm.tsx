@@ -14,15 +14,16 @@ import { useUnitsyncScan } from "../../../content/config";
 import { useMapEligibility } from "../../../content/mapEligibility";
 import { ResolveContentGate } from "../../../content/pages/components/ResolveContentDrawer";
 import type { ContentRequirement } from "../../../content/resolveContent";
+import { notify } from "../../../notify/notify";
 import { usePreferredTarget } from "../../../play/config";
 import { getGameMatcher } from "../../../profile/profile";
 import {
   decodeWarpathChallenge,
-  optionsFromChallenge,
+  runFromChallenge,
+  substitutedMapCount,
   type WarpathChallengeSettings,
 } from "../../challenge";
 import type { GenBuildGraph } from "../../generate";
-import { generateRun } from "../../generate";
 import { useRuns } from "../../runs";
 
 /** Best-effort shortname match, filtered by the distribution profile's game
@@ -129,9 +130,16 @@ export function ImportChallengeForm({
     }
 
     const id = `run-${crypto.randomUUID()}`;
-    const run = generateRun(
-      optionsFromChallenge(settings, { maps, build, enemyAiKey }),
-    );
+    const run = runFromChallenge(settings, { maps, build, enemyAiKey });
+    // Say so when this install could not supply every map the challenge names
+    // (issue #1393), the same as conquest's import.
+    const substituted = substitutedMapCount(run);
+    if (substituted > 0) {
+      void notify({
+        title: `Imported with ${substituted} substituted ${substituted === 1 ? "map" : "maps"}`,
+        body: "You do not have every map this challenge names. Those encounters say which map they should have used.",
+      });
+    }
     await saveRun(id, { ...run, importedChallenge: true });
     onImported(id);
   };

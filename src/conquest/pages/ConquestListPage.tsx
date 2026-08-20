@@ -41,6 +41,7 @@ import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
+import { notify } from "../../notify/notify";
 import {
   usePlayReadiness,
   usePreferredTarget,
@@ -54,7 +55,8 @@ import {
   decodeConquestChallenge,
   encodeConquestChallenge,
   encodeConquestChallengeFile,
-  optionsFromChallenge,
+  galaxyFromChallenge,
+  substitutedMapCount,
 } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { type GenerateOptions, generateGalaxy } from "../generate";
@@ -918,16 +920,18 @@ function ImportChallengeForm({
     );
 
     const id = `generated-${crypto.randomUUID()}`;
-    const doc = generateGalaxy(
-      optionsFromChallenge(
-        settings,
-        {
-          maps,
-          names,
-        },
-        id,
-      ),
-    );
+    const doc = galaxyFromChallenge(settings, { maps, names }, id);
+    // Say so when this install could not supply every map the challenge names
+    // (issue #1393). The systems themselves carry the detail. This is the one
+    // moment somebody is watching, and a stand-in they never heard about is
+    // exactly the surprise the naming exists to stop.
+    const substituted = substitutedMapCount(doc);
+    if (substituted > 0) {
+      void notify({
+        title: `Imported with ${substituted} substituted ${substituted === 1 ? "map" : "maps"}`,
+        body: "You do not have every map this challenge names. Those systems say which map they should have used.",
+      });
+    }
     await conquestSave({
       id,
       json: JSON.stringify({ ...doc, importedChallenge: true }),

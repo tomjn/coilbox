@@ -1,3 +1,4 @@
+import type { NodeMaps } from "../challenge/nodeMaps";
 import type { Faction, GalaxyDoc, GalaxyNode } from "./model";
 import { MAX_DIFFICULTY, NEUTRAL } from "./model";
 import type { ConquestNames } from "./names";
@@ -642,6 +643,67 @@ export function substituteExcludedMaps(
     return {
       ...node,
       battle: { ...node.battle, mapName: replacement, mapDownload: undefined },
+    };
+  });
+  return changed ? { ...galaxy, nodes } : galaxy;
+}
+
+/**
+ * Put every system on the map the challenge says it uses (issue #1393).
+ *
+ * Generation draws maps from whatever this machine has installed, so two people
+ * rebuilding the same seed get the same systems and lanes but not the same
+ * battlefields. The challenge names the maps it resolved to, and this is where
+ * that naming wins over the local draw.
+ *
+ * A named map this install cannot offer (not installed, or opted out of
+ * conquest) still gets a stand-in from the same difficulty tier a fresh node
+ * would draw from, keyed on the node id so it is stable. The system remembers
+ * what it should have been in `mapSubstitutedFrom`, which is the whole
+ * difference: a visible substitution from a known original rather than a
+ * quietly different galaxy.
+ *
+ * `maps` is what this install can offer. Returns the doc unchanged when there
+ * is nothing to name, so a challenge shared before #1393 falls straight through
+ * to the maps generation already picked.
+ */
+export function applyChallengeMaps(
+  galaxy: GalaxyDoc,
+  nodeMaps: NodeMaps | undefined,
+  maps: GenMap[],
+): GalaxyDoc {
+  if (!nodeMaps) return galaxy;
+  const available = new Set(maps.map((m) => m.name));
+  const byArea = mapsByArea(maps);
+
+  let changed = false;
+  const nodes = galaxy.nodes.map((node) => {
+    const wanted = nodeMaps[node.id];
+    if (!wanted) return node;
+    let used = wanted;
+    if (!available.has(wanted) && byArea.length > 0) {
+      const tier = mapTier(byArea, node.difficulty);
+      const pool = tier.length > 0 ? tier : byArea;
+      used = pool[hashString(node.id) % pool.length].name;
+    }
+    const substitutedFrom = used === wanted ? undefined : wanted;
+    if (
+      node.battle.mapName === used &&
+      node.battle.mapSubstitutedFrom === substitutedFrom
+    ) {
+      return node;
+    }
+    changed = true;
+    // The generated map's download hint goes with it, or the battle screen
+    // would offer to fetch a map this node no longer uses.
+    return {
+      ...node,
+      battle: {
+        ...node.battle,
+        mapName: used,
+        mapDownload: undefined,
+        mapSubstitutedFrom: substitutedFrom,
+      },
     };
   });
   return changed ? { ...galaxy, nodes } : galaxy;
