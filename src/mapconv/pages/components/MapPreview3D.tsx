@@ -18,9 +18,9 @@ import type { MapAppearance } from "../../bindings";
 import { decimateHeights, type HeightWords } from "../../heightGrid";
 import { getHeightWords, getImageInfo } from "../../imageCache";
 import {
+  type SkyboxProblem,
   skyboxFromDds,
   skyboxNote,
-  type SkyboxProblem,
 } from "../../skyboxNote";
 
 export type { HeightWords };

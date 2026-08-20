@@ -42,7 +42,9 @@ describe("skyboxFromDds", () => {
   });
 
   it("calls a cube map short of faces unreadable", () => {
-    expect(skyboxFromDds(cubeMap({ mipmaps: [{}, {}, {}] }))).toBe("unreadable");
+    expect(skyboxFromDds(cubeMap({ mipmaps: [{}, {}, {}] }))).toBe(
+      "unreadable",
+    );
   });
 });
 
