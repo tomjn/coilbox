@@ -13,6 +13,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { Textarea } from "@/components/ui/textarea";
 import { animBos2cob, animCobDisasm } from "../bindings";
 
@@ -177,52 +178,57 @@ export default function CobPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
+      <PageHeader
+        className="border-b border-border px-6 py-4"
+        title={
+          <>
             <Binary size={18} /> COB tools
-          </h1>
-          <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+          </>
+        }
+        description={
+          <>
             Compile a <code>.bos</code> unit script to <code>.cob</code>, or
             disassemble a <code>.cob</code> into its scripts, pieces, and opcode
             stream.
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={rerun}
-            disabled={!path || busy}
-          >
-            <RefreshCw /> Re-run
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={reveal}
-            disabled={!revealTarget || busy}
-          >
-            <FolderSearch /> Reveal in folder
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={browseBos}
-            disabled={busy}
-          >
-            <Hammer /> Compile .bos…
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={browseCob}
-            disabled={busy}
-          >
-            <FolderOpen /> Open .cob…
-          </Button>
-        </div>
-      </header>
+          </>
+        }
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={rerun}
+              disabled={!path || busy}
+            >
+              <RefreshCw /> Re-run
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={reveal}
+              disabled={!revealTarget || busy}
+            >
+              <FolderSearch /> Reveal in folder
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={browseBos}
+              disabled={busy}
+            >
+              <Hammer /> Compile .bos…
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={browseCob}
+              disabled={busy}
+            >
+              <FolderOpen /> Open .cob…
+            </Button>
+          </>
+        }
+      />
 
       <div
         className={

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { PageHeader } from "@/components/PageHeader";
 import { mcOpenPath } from "../bindings";
 import { getImageInfo } from "../imageCache";
 import { type MapProject, useMapProjects } from "../projects";
@@ -61,21 +62,26 @@ export default function ProjectsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
+      <PageHeader
+        className="border-b border-border px-6 py-4"
+        title={
+          <>
             <LayoutGrid size={18} /> Projects
-          </h1>
-          <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+          </>
+        }
+        description={
+          <>
             Maps you've decompiled or compiled. Open one to recompile with its
             remembered options, or reveal its folder. Decompiling extracts to a{" "}
             <code>.sdd</code> directory the engine can load directly.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={importFolder}>
-          <FolderInput /> Import .sdd folder…
-        </Button>
-      </header>
+          </>
+        }
+        actions={
+          <Button variant="outline" size="sm" onClick={importFolder}>
+            <FolderInput /> Import .sdd folder…
+          </Button>
+        }
+      />
 
       <div className="min-h-0 flex-1 overflow-auto p-6">
         {projects.length === 0 ? (
