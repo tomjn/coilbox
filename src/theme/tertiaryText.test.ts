@@ -22,12 +22,10 @@ import { describe, expect, it } from "vitest";
  * The dark scheme is not overridden by Coilbox and has a one-percentage-point
  * window, which is the same answer.
  *
- * What this does not cover: text drawn over artwork. `GalaxyPage`'s pan/zoom hint
- * sits on the rendered galaxy canvas, so no surface token governs it and none of
- * these numbers describe it. Dropping its alpha cannot make it worse, because
- * compositing ink at less than full opacity always moves it toward the backdrop
- * and so always lowers contrast against that backdrop, but making it legible over
- * a starfield is a different job, filed separately.
+ * What this does not cover: text drawn over artwork, where no surface token
+ * governs the backdrop and none of these numbers describe it. `GalaxyPage`'s
+ * pan/zoom hint was the example, and #1052 settled it by putting a band under the
+ * text rather than by choosing an ink: see `MAP_BAND_CLASS` in `hudChrome.tsx`.
  *
  * The colour maths is transcribed from WCAG 2.2, copied rather than imported for
  * the reason `mutedForeground.test.ts` gives.
