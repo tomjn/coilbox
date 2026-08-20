@@ -70,6 +70,16 @@ describe("what is on screen", () => {
     expect(readRunningUploads()).toEqual([]);
   });
 
+  /** One run ending is not every run ending. Two blueprints opened one after
+   *  the other overlap, and the first to finish must not take the second's
+   *  stop button with it. */
+  it("takes off the run it was asked about and no other", () => {
+    showUploadRun({ opId: "op-1", game: "bar", total: 12 });
+    showUploadRun({ opId: "op-2", game: "sf", total: 3 });
+    hideUploadRun("op-1");
+    expect(readRunningUploads().map((run) => run.game)).toEqual(["sf"]);
+  });
+
   /** Two blueprints opened one after the other, the first still drawing. Each
    *  keeps its own stop button rather than the second hiding the first. */
   it("holds more than one run at a time", () => {
@@ -102,8 +112,16 @@ describe("what is on screen", () => {
     expect(readRunningUploads()).toEqual([]);
   });
 
+  /**
+   * `useSyncExternalStore` re-renders whenever the snapshot's reference moves,
+   * so a run below the threshold reporting its progress into nowhere has to
+   * leave the reference alone. Otherwise every sample of an invisible run
+   * re-renders the topbar to draw nothing.
+   */
   it("gives the same snapshot back until something changes", () => {
     const first = readRunningUploads();
+    expect(readRunningUploads()).toBe(first);
+    updateUploadRun("never-shown", { done: 4 });
     expect(readRunningUploads()).toBe(first);
     showUploadRun({ opId: "op-1", game: "bar", total: 2 });
     expect(readRunningUploads()).not.toBe(first);

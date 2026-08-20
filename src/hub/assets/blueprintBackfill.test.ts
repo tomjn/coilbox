@@ -676,11 +676,19 @@ describe("what a run says about itself while it is going (issue #1686)", () => {
    * archive read, and putting a pill in the topbar for that is noise.
    */
   it("stays silent for a run with nothing to draw", async () => {
-    const watch = spy({ hubHas: () => true });
+    // Read inside the upload, which is the one moment such a run is doing
+    // anything at all. Nothing is drawn, so there is no other moment to look.
+    let shownWhileSending: readonly RunningUpload[] = [];
+    const watch = spy({
+      hubHas: () => true,
+      whileSending: () => {
+        shownWhileSending = readRunningUploads();
+      },
+    });
     await backfillBlueprintUnits(TARGET, unitsOf(12), 100, watch.tools);
 
     expect(watch.draws).toBe(0);
-    expect(watch.shownWhileDrawing).toEqual([]);
+    expect(shownWhileSending).toEqual([]);
     // And the run still happened: the build pics went.
     expect(watch.uploads[0]).toHaveLength(12);
   });
