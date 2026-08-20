@@ -68,18 +68,27 @@ export const isChanged = (o: ConfigOption, value?: string) =>
   o.type !== "section" && value !== undefined && value !== (o.default ?? "");
 
 /**
- * The `[modoptions]` block to write: every option's effective value, defaults
- * included. Sending only user-changed options is wrong — the engine does not
- * fall back to the game's declared defaults for absent keys, it applies its own
- * (`MaxUnits` 32000, `GhostedBuildings` 1, `FixedAllies` 1, ...), and game Lua
- * sees `Spring.GetModOptions()` verbatim. Sections carry no value and are
- * skipped, as is any option with neither a value nor a default.
+ * The `[modoptions]` block to write: the caller's values, with the game's
+ * declared default added for every option they left unset.
+ *
+ * Sending only the options a player changed is wrong. The engine does not fall
+ * back to the game's declared defaults for absent keys. `CGameSetup::Init`
+ * reads its own built-in ones (`MaxUnits` 32000, `GhostedBuildings` 1,
+ * `FixedAllies` 1, `MaxSpeed` 20, ...) and hands game Lua whatever the script
+ * literally said, so `Spring.GetModOptions()` has a hole where the game's
+ * default should be. Everything that launches a game fills first, which is why
+ * this is called from `toBattleConfig` rather than from any one screen.
+ *
+ * Sections carry no value and are skipped, as is any option with neither a
+ * value nor a default. A value whose key the schema does not declare is kept:
+ * a scenario adds `coilbox_mission`, which the game never declares and the
+ * runtime cannot find the mission without.
  */
 export function effectiveOptions(
   options: ConfigOption[],
   values: Record<string, string>,
 ): Record<string, string> {
-  const out: Record<string, string> = {};
+  const out: Record<string, string> = { ...values };
   for (const o of options) {
     if (o.type === "section") continue;
     const v = effectiveValue(o, values[o.key]);
