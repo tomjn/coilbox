@@ -7,6 +7,7 @@ import {
   type QueueStatus,
   useDownloadQueue,
 } from "./DownloadQueueProvider";
+import { type DownloadRate, IDLE_RATE } from "./downloadRate";
 
 /** One screen's view of a download it can start, running on the app-wide queue. */
 export interface QueuedDownload {
@@ -24,6 +25,10 @@ export interface QueuedDownload {
   status: QueueStatus | null;
   /** Live progress while it is downloading. */
   progress: DownloadProgress | null;
+  /** Speed and time left, as the queue estimates them. */
+  rate: DownloadRate;
+  /** When it started downloading, for elapsed time. Null until it does. */
+  startedAt: number | null;
   /** Why the last attempt failed, if it did. */
   error: string | null;
   /** Waiting for a slot, or downloading right now. */
@@ -71,6 +76,8 @@ export function useQueuedDownload(input?: EnqueueInput | null): QueuedDownload {
     start,
     status: item?.status ?? null,
     progress: item?.progress ?? null,
+    rate: item?.rate ?? IDLE_RATE,
+    startedAt: item?.startedAt ?? null,
     error: item?.error ?? null,
     busy: item?.status === "queued" || item?.status === "active",
   };

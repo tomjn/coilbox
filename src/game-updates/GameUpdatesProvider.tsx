@@ -10,12 +10,10 @@ import {
   useState,
 } from "react";
 import { primeScan, useScanTargetSelection } from "../content/config";
-import {
-  type DownloadProgress,
-  dlInstalledContent,
-} from "../downloads/bindings";
+import { dlInstalledContent } from "../downloads/bindings";
 import { useContentRootPaths, useWriteRootPath } from "../downloads/config";
 import { useDownloadQueue } from "../downloads/DownloadQueueProvider";
+import type { ProgressSource } from "../downloads/pages/components/ProgressBar";
 import { notify } from "../notify/notify";
 import { getProfile, getProfileRoot } from "../profile/profile";
 import { dlGithubLatestRelease, type ReleaseInfo } from "./bindings";
@@ -44,7 +42,8 @@ interface GameUpdatesContextValue {
   profileUpdated: boolean;
   /** Filename currently downloading, for the progress label. */
   currentFile: string | null;
-  progress: DownloadProgress | null;
+  /** The queue item for the file being fetched, for its progress bar. */
+  download: ProgressSource | null;
   runCheck: () => Promise<void>;
   install: () => Promise<void>;
   restart: () => Promise<void>;
@@ -78,7 +77,7 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
   // progress bar reads the queue rather than a second copy of the same numbers.
   const { enqueue, waitFor, items } = useDownloadQueue();
   const [queueId, setQueueId] = useState<string | null>(null);
-  const progress = items.find((i) => i.id === queueId)?.progress ?? null;
+  const download = items.find((i) => i.id === queueId) ?? null;
 
   // Lowercased game filenames present in any content root, for the "have we got
   // this release?" check. Mirrors the Games download screen.
@@ -220,7 +219,7 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
         installed,
         profileUpdated,
         currentFile,
-        progress,
+        download,
         runCheck,
         install,
         restart,

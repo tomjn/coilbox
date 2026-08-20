@@ -33,6 +33,7 @@ import {
 import { CachedThumb } from "./components/CachedThumb";
 import { MapPacksBanner } from "./components/MapPacksBanner";
 import { OptionSelect } from "./components/OptionSelect";
+import { QueueProgress } from "./components/ProgressBar";
 import { EmptyState, errMessage } from "./components/states";
 import { HIDE_INSTALLED_KEY } from "./hideInstalled";
 
@@ -115,7 +116,7 @@ export default function MapsPage() {
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
-  const { enqueue, statusFor, active } = useDownloadQueue();
+  const { enqueue, itemFor, active } = useDownloadQueue();
   const [source, setSource] = useState<Source>("springfiles");
   const [items, setItems] = useState<MapItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -440,7 +441,8 @@ export default function MapsPage() {
             {visible?.map((it) => {
               const isInstalled = installed.has(it.filename.toLowerCase());
               const input = mapInput(it);
-              const status = input ? statusFor(identityOf(input)) : null;
+              const item = input ? itemFor(identityOf(input)) : null;
+              const status = item?.status ?? null;
               return (
                 <li
                   key={it.springName}
@@ -514,6 +516,7 @@ export default function MapsPage() {
                                 ? "Add to queue"
                                 : "Download"}
                     </Button>
+                    <QueueProgress item={item} />
                   </div>
                 </li>
               );

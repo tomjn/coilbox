@@ -15,6 +15,7 @@ import {
   emptyEngineListMessage,
 } from "../../emptyEngineList";
 import { OptionSelect } from "./OptionSelect";
+import { QueueProgress } from "./ProgressBar";
 import { errMessage } from "./states";
 
 /** Human-readable byte size for engine archives. */
@@ -52,7 +53,7 @@ export function EngineInstaller() {
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
-  const { enqueue, statusFor, active } = useDownloadQueue();
+  const { enqueue, itemFor, active } = useDownloadQueue();
   const [source, setSource] = useState<Source>("recoil");
   const [items, setItems] = useState<EngineItem[] | null>(null);
   const [platform, setPlatform] = useState("");
@@ -185,7 +186,8 @@ export function EngineInstaller() {
         <ul className="max-h-80 divide-y divide-border overflow-auto rounded-md border border-border">
           {items.map((item) => {
             const input = engineInput(item);
-            const status = input ? statusFor(identityOf(input)) : null;
+            const queueItem = input ? itemFor(identityOf(input)) : null;
+            const status = queueItem?.status ?? null;
             return (
               <li key={item.key} className="flex flex-col gap-2 px-4 py-2">
                 <div className="flex items-center justify-between gap-3">
@@ -242,6 +244,7 @@ export function EngineInstaller() {
                             : "Install"}
                   </Button>
                 </div>
+                <QueueProgress item={queueItem} />
               </li>
             );
           })}

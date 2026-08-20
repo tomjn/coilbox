@@ -2,7 +2,7 @@ import { Button } from "@picoframe/frame";
 import Markdown, { type Components } from "react-markdown";
 import { Link } from "react-router";
 import { useWriteRoot } from "../../downloads/config";
-import { ProgressBar } from "../../downloads/pages/components/ProgressBar";
+import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { externalOnlyLink } from "../../lib/MarkdownLink";
 import { useGameUpdates } from "../GameUpdatesProvider";
 
@@ -32,7 +32,7 @@ export default function GameUpdatesSection() {
     installed,
     profileUpdated,
     currentFile,
-    progress,
+    download,
     runCheck,
     install,
     restart,
@@ -120,7 +120,7 @@ export default function GameUpdatesSection() {
               <div className="text-sm text-muted-foreground">
                 Downloading {currentFile ?? "…"}
               </div>
-              {progress && <ProgressBar progress={progress} />}
+              <QueueProgress item={download} />
             </div>
           ) : (
             <Button onClick={() => void install()} disabled={!writePath}>

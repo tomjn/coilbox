@@ -21,6 +21,7 @@ import {
 import { useDownloadsConfig } from "../../config";
 import { identityOf, useDownloadQueue } from "../../DownloadQueueProvider";
 import { OptionSelect } from "./OptionSelect";
+import { QueueProgress } from "./ProgressBar";
 import { EmptyState, errMessage } from "./states";
 
 const DEFAULT_MASTER = "https://repos.springrts.com";
@@ -73,7 +74,7 @@ function SidecarWarning() {
  * Shared by the Browse Rapid page and the Games page's rapid source.
  */
 export function RapidBrowser({ writePath }: { writePath?: string }) {
-  const { enqueue, statusFor, active } = useDownloadQueue();
+  const { enqueue, itemFor, active } = useDownloadQueue();
   const [cfg] = useDownloadsConfig();
   const [masterUrl, setMasterUrl] = useState(
     () => cfg.rapidRepos[0]?.url ?? DEFAULT_MASTER,
@@ -330,7 +331,8 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                       label: v.name || v.tag,
                       args: { tag: v.tag, masterUrl, writePath },
                     };
-                    const status = statusFor(identityOf(input));
+                    const item = itemFor(identityOf(input));
+                    const status = item?.status ?? null;
                     return (
                       <li
                         key={v.tag}
@@ -374,6 +376,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
                                     : "Download"}
                           </Button>
                         </div>
+                        <QueueProgress item={item} />
                       </li>
                     );
                   })}

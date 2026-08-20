@@ -17,7 +17,7 @@ import { Card } from "@/components/ui/card";
 import { invalidateMapPreview, invalidateScans } from "../../content/config";
 import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
 import { useWriteRootPath } from "../../downloads/config";
-import { ProgressBar } from "../../downloads/pages/components/ProgressBar";
+import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../downloads/useQueuedDownload";
 import { useStillUi } from "../../general/display";
 import { usePreferredTarget } from "../../play/config";
@@ -389,7 +389,6 @@ function MissionRequiredGate({
   const isMap = missing.kind === "map";
   const downloadsLink = isMap ? "/downloads/maps" : "/downloads/games";
   const downloading = mapDl.busy;
-  const progress = mapDl.progress;
   const error = mapDl.error;
 
   const download = async () => {
@@ -442,7 +441,7 @@ function MissionRequiredGate({
                 ? "Downloading…"
                 : "Download & Install"}
           </Button>
-          {downloading && progress && <ProgressBar progress={progress} />}
+          {downloading && <QueueProgress item={mapDl} />}
           {/* Best-effort by name can miss maps whose springname differs; the manual
               Downloads page is the fallback (and the only option for games). */}
           <Link

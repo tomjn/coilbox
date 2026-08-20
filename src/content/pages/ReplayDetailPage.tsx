@@ -23,7 +23,7 @@ import {
 import { useWriteRoot, useWriteRootPath } from "../../downloads/config";
 import {
   formatBytes,
-  ProgressBar,
+  QueueProgress,
 } from "../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../downloads/useQueuedDownload";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
@@ -430,9 +430,7 @@ function GameDownload({ gameType }: { gameType: string }) {
           Best effort — an exact version match isn't guaranteed.
         </span>
       </div>
-      {gameDl.progress && (
-        <ProgressBar progress={gameDl.progress} className="max-w-xs" />
-      )}
+      <QueueProgress item={gameDl} className="max-w-xs" />
       {gameDl.status === "done" && (
         <p className="text-xs text-muted-foreground">Downloaded {gameType}.</p>
       )}
@@ -491,9 +489,7 @@ function MapDownload({
           Download map
         </Button>
       </div>
-      {mapDl.progress && (
-        <ProgressBar progress={mapDl.progress} className="max-w-xs" />
-      )}
+      <QueueProgress item={mapDl} className="max-w-xs" />
       {noWriteRoot && !downloading && (
         <p className="text-xs text-muted-foreground">
           Set a download folder in{" "}

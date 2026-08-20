@@ -6,32 +6,60 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { type QueueItem, useDownloadQueue } from "./DownloadQueueProvider";
-import { ProgressBar } from "./pages/components/ProgressBar";
+import { formatDuration } from "./downloadRate";
+import { QueueProgress } from "./pages/components/ProgressBar";
+
+/**
+ * The one number the pill has room for, or null when there is nothing worth
+ * putting there.
+ *
+ * Time left is the thing somebody glancing at the topbar actually wants, since
+ * it is the one that answers "can I go and do something else". It needs a
+ * settled rate though, so until there is one the percentage stands in, and a
+ * download that reports neither gets no number rather than a made-up one.
+ */
+export function badgeSummary(item: QueueItem | null): string | null {
+  if (!item?.progress) return null;
+  if (item.rate.secondsLeft != null) {
+    return `${formatDuration(item.rate.secondsLeft)} left`;
+  }
+  if (item.progress.percent != null)
+    return `${Math.round(item.progress.percent)}%`;
+  return null;
+}
 
 /**
  * topbar.right slot: a download-queue widget, shown only while something is
- * downloading or waiting. The pill reports the in-flight count; its popover shows
- * the active download's progress on top and the queued items beneath, each
- * cancellable. Returns null when the queue is idle.
+ * downloading or waiting. The pill reports the in-flight count and how much
+ * longer the running one has to go. Its popover shows that download's full
+ * progress on top and the queued items beneath, each cancellable. Returns null
+ * when the queue is idle.
  */
 export default function DownloadQueueBadge() {
   const { active, queued, cancel } = useDownloadQueue();
   if (!active && queued.length === 0) return null;
 
   const count = (active ? 1 : 0) + queued.length;
+  const summary = badgeSummary(active);
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           type="button"
           className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={`Downloads: ${count} in progress`}
+          aria-label={
+            summary
+              ? `Downloads: ${count} in progress, ${summary}`
+              : `Downloads: ${count} in progress`
+          }
         >
           <Download
             size={14}
             className="animate-pulse motion-reduce:animate-none"
           />
-          {count} downloading
+          <span className="tabular-nums">
+            {count} downloading{summary ? ` · ${summary}` : ""}
+          </span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-3">
@@ -52,7 +80,7 @@ export default function DownloadQueueBadge() {
               </Button>
             </div>
             {active.progress ? (
-              <ProgressBar progress={active.progress} />
+              <QueueProgress item={active} />
             ) : (
               <p className="text-xs text-muted-foreground">Starting…</p>
             )}

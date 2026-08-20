@@ -8,7 +8,7 @@ import {
   useWriteRootPath,
 } from "../../../downloads/config";
 import { fetchNewestRecoil } from "../../../downloads/engineInstall";
-import { ProgressBar } from "../../../downloads/pages/components/ProgressBar";
+import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
 import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import { contentCreateStandardRoot, contentRecreateRoot } from "../../bindings";
@@ -194,7 +194,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
                   ? "Installing…"
                   : `Download newest engine${newest.version ? ` (${newest.version})` : ""}`}
             </Button>
-            {engineDl.progress && <ProgressBar progress={engineDl.progress} />}
+            <QueueProgress item={engineDl} />
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">

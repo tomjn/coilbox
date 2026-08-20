@@ -327,3 +327,85 @@ describe("a screen's download", () => {
     expect(pending).toHaveLength(0);
   });
 });
+
+/**
+ * The rate estimator itself is tested in `downloadRate.test.ts`. These cover
+ * the wiring: a screen reads speed and time left off the queue item, computed
+ * from the events that download's own source actually sent (issue #1726).
+ */
+describe("the queue's speed estimate", () => {
+  /** Feed `count` events a second apart, on a clock the test controls. */
+  function stream(
+    run: Pending,
+    count: number,
+    at: (i: number) => DownloadProgress,
+  ) {
+    const clock = vi.spyOn(Date, "now");
+    for (let i = 0; i < count; i++) {
+      clock.mockReturnValue(1_000_000 + i * 1000);
+      act(() => run.progress(at(i)));
+    }
+    clock.mockRestore();
+  }
+
+  it("reads a speed and a time left off an HTTP download's byte counts", async () => {
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+    act(() => {
+      result.current.enqueue(mapRequest("Isis"));
+    });
+    const run = await nextPending(0);
+
+    // 1 MB/s against a 10 MB total, so five seconds in there are five to go.
+    stream(run, 6, (i) => ({
+      phase: "downloading",
+      downloadedBytes: i * 1_000_000,
+      totalBytes: 10_000_000,
+      percent: i * 10,
+      bytesPerSec: null,
+    }));
+
+    expect(result.current.active?.rate.bytesPerSec).toBeCloseTo(1_000_000, -1);
+    expect(result.current.active?.rate.secondsLeft).toBe(5);
+    expect(result.current.active?.rate.stalled).toBe(false);
+  });
+
+  it("still finds a time left when the source only reports a percentage", async () => {
+    // pr-downloader's usual output: a percentage, no byte counts and no rate.
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+    act(() => {
+      result.current.enqueue(mapRequest("Isis"));
+    });
+    const run = await nextPending(0);
+
+    stream(run, 5, (i) => ({
+      phase: "downloading",
+      downloadedBytes: 0,
+      totalBytes: null,
+      percent: i * 10,
+      bytesPerSec: null,
+    }));
+
+    expect(result.current.active?.rate.bytesPerSec).toBeNull();
+    expect(result.current.active?.rate.secondsLeft).toBe(6);
+  });
+
+  it("gives a fresh download no rate to read yet", async () => {
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+    act(() => {
+      result.current.enqueue(mapRequest("Isis"));
+    });
+    const run = await nextPending(0);
+
+    stream(run, 1, () => ({
+      phase: "downloading",
+      downloadedBytes: 1024,
+      totalBytes: 10_000_000,
+      percent: 0.01,
+      bytesPerSec: null,
+    }));
+
+    expect(result.current.active?.rate.bytesPerSec).toBeNull();
+    expect(result.current.active?.rate.secondsLeft).toBeNull();
+    expect(result.current.active?.startedAt).not.toBeNull();
+  });
+});
