@@ -280,6 +280,18 @@ mod tests {
         );
     }
 
+    /// Two lowercase digits a byte, including for a byte below 0x10.
+    ///
+    /// The catalog's own digest cannot check this. Every byte in it happens to
+    /// be 0x10 or over, so a hex that dropped its zero padding would still
+    /// produce the pinned string above and still be 64 characters long. The
+    /// padding is what makes a digest a fixed width, and the hub reads these as
+    /// text, so it is checked on a value chosen to need it.
+    #[test]
+    fn hex_pads_a_byte_below_sixteen() {
+        assert_eq!(hex(&[0x00, 0x0f, 0xa0, 0xff]), "000fa0ff");
+    }
+
     /// The `sha256:` prefix is part of the value, because the hub serves it that
     /// way and a comparison that has to strip something is a comparison that can
     /// strip it differently on the two sides.

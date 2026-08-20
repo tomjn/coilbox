@@ -462,6 +462,18 @@ mod tests {
         );
     }
 
+    /// Two lowercase digits a byte, including for a byte below 0x10.
+    ///
+    /// The vocabulary's own digest checks this only by luck: it has a 0x0a in
+    /// it today, so a hex that dropped its zero padding would come out 62
+    /// characters and the test above would fail. Edit the vocabulary and that
+    /// can stop being true, as it already is for the map catalog's digest, so
+    /// the padding is checked on a value chosen to need it.
+    #[test]
+    fn hex_pads_a_byte_below_sixteen() {
+        assert_eq!(hex(&[0x00, 0x0f, 0xa0, 0xff]), "000fa0ff");
+    }
+
     /// The `sha256:` prefix is part of the value, because the hub serves it that
     /// way and a comparison that has to strip something is a comparison that can
     /// strip it differently on the two sides.

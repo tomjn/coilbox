@@ -285,6 +285,30 @@ mod tests {
         assert_eq!(stored.bytes, 14);
     }
 
+    /// The expected value is `printf 'DDS not really' | shasum -a 256`, a tool
+    /// with no idea this crate exists.
+    ///
+    /// Every other test here compares one key against another, so all of them
+    /// pass just as happily if the key is spelled a new way, as long as it is
+    /// spelled that way consistently. A store already on a user's disk is named
+    /// in the old spelling and would be re-imported file by file, so the
+    /// spelling is pinned to something outside the crate rather than to itself.
+    /// The digest has bytes below 0x10 in it, which is what makes this catch a
+    /// hex that stopped zero padding.
+    #[test]
+    fn the_store_key_is_the_sha256_an_outside_tool_gives() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("atlas.dds");
+        std::fs::write(&source, b"DDS not really").expect("write");
+
+        let stored = store(&dir.path().join("textures"), &source).expect("store");
+
+        assert_eq!(
+            stored.key,
+            "0896cd97a069e9db8f09e053415171fd6faa06e08927c8e4e9ac87e44f88527b.dds"
+        );
+    }
+
     #[test]
     fn a_missing_file_says_so_rather_than_storing_nothing() {
         let dir = tempfile::tempdir().expect("tempdir");
