@@ -427,6 +427,354 @@ describe("the HUD card reads raw tokens, not Tailwind's utilities", () => {
   });
 });
 
+/**
+ * The accent inks over the band rather than over the card (#1801).
+ *
+ * Two accented labels are not on a card at all: the warpath's run name and its
+ * difficulty badge, which sit straight on the node map. Both now take
+ * {@link MAP_BAND_CLASS}, so what is behind their ink is 78% of `--background`
+ * rather than 78% of `--card`.
+ *
+ * Those are different surfaces, so the card's measurement does not carry over on
+ * its own. It happens to be the safe direction in both ramps, the dark
+ * `--background` being darker than the dark `--card` and the light one being the
+ * same white, but "it happens to be" is exactly the kind of thing that stops
+ * being true when picoframe retunes a ramp.
+ */
+describe("the accent inks clear AA on the band too", () => {
+  const STEPS = [0, 0.25, 0.5, 0.75, 1];
+
+  for (const scheme of SCHEMES) {
+    it(`holds over every colour the map can be, ${scheme}`, () => {
+      const worst: Record<string, { ratio: number; at: string }> = {};
+      for (const r of STEPS)
+        for (const g of STEPS)
+          for (const b of STEPS)
+            for (const hue of BASE_HUES)
+              for (const [sat] of BASE_SATS) {
+                const band = over(
+                  [r, g, b],
+                  RAMPS[scheme].surface(hue, sat),
+                  bandAlpha,
+                );
+                const at = `rgb(${r} ${g} ${b}) on base ${hue}/${sat}`;
+                for (const [name, value] of Object.entries(HUD_ACCENT_INK)) {
+                  const ratio = contrast(accentInks(value)[scheme], band);
+                  if (!worst[name] || ratio < worst[name].ratio)
+                    worst[name] = { ratio, at };
+                }
+              }
+      for (const [name, { ratio, at }] of Object.entries(worst)) {
+        expect(ratio, `${name} at ${at}`).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  }
+});
+
+/**
+ * The Tailwind palette classes the HUD still writes at a call site (#1801).
+ *
+ * #1785 moved the shared accents to a measured value per ramp. #1801 was the
+ * same defect at the call sites, roughly two dozen 300/400 shades, and most of
+ * what made it a defect was the light ramp: `text-cyan-300` on a white card is
+ * 1.0:1. #1810 then made both maps hold the dark ramp whatever theme the player
+ * picked, so the light half of that stopped being reachable and the question
+ * became narrower. Which of these fail against a dark backdrop?
+ *
+ * Twelve did and are now measured inks. What is left is the list below, which
+ * passed, and this is what stops it drifting back. A shade is one keystroke from
+ * its neighbour and `text-emerald-400` clears its bar by 0.8, so a later edit
+ * that reaches for a 500 has no way of knowing it just broke this.
+ *
+ * The bar per row is what WCAG asks of that thing, not one figure applied to
+ * everything. 4.5:1 for small text, 3:1 for text at 24px bold, and 3:1 for an
+ * `aria-hidden` icon or a bar that repeats a figure printed beside it. That last
+ * one is decoration and carries no WCAG requirement at all, but decoration
+ * nobody can see is not decoration, and 3:1 is the nearest honest bar.
+ *
+ * Only the dark ramp is swept. These are one value used in both, and the light
+ * ramp cannot be reached on either route, so a light measurement here would be
+ * measuring a screen nobody sees. `src/theme/forcedDark.test.ts` is what holds
+ * that assumption up. If the forcing ever goes, this file needs the other half
+ * back and most of these rows will fail it.
+ */
+
+/** The `oklch()` values Tailwind's palette ships, as sRGB. */
+function tailwindPalette(): Record<string, Rgb> {
+  const css = readFileSync(
+    fileURLToPath(
+      new URL(
+        "../../../../node_modules/tailwindcss/theme.css",
+        import.meta.url,
+      ),
+    ),
+    "utf8",
+  );
+  const out: Record<string, Rgb> = {};
+  for (const [, name, l, c, h] of css.matchAll(
+    /--color-([a-z]+-\d{2,3}):\s*oklch\(([\d.]+)%\s+([\d.]+)\s+([\d.]+)\)/g,
+  )) {
+    out[name] = oklch(Number(l) / 100, Number(c), Number(h));
+  }
+  return out;
+}
+
+/**
+ * One OKLCh colour as sRGB.
+ *
+ * Out-of-gamut channels are clipped, where a browser reduces chroma instead. A
+ * third of Tailwind's palette is outside sRGB, so the two do differ, but the
+ * gap was under 0.02 on every ratio below when this was checked against Chrome's
+ * own painted pixels, and the tightest row here clears its bar by 0.7.
+ */
+function oklch(l: number, c: number, hDeg: number): Rgb {
+  const h = (hDeg * Math.PI) / 180;
+  const a = c * Math.cos(h);
+  const b = c * Math.sin(h);
+  const cube = [
+    (l + 0.3963377774 * a + 0.2158037573 * b) ** 3,
+    (l - 0.1055613458 * a - 0.0638541728 * b) ** 3,
+    (l - 0.0894841775 * a - 1.291485548 * b) ** 3,
+  ];
+  const linear = [
+    [4.0767416621, -3.3077115913, 0.2309699292],
+    [-1.2684380046, 2.6097574011, -0.3413193965],
+    [-0.0041960863, -0.7034186147, 1.707614701],
+  ].map((row) => row.reduce((sum, k, i) => sum + k * cube[i], 0));
+  return linear.map((v) => {
+    const clipped = Math.min(1, Math.max(0, v));
+    return clipped <= 0.0031308
+      ? 12.92 * clipped
+      : 1.055 * clipped ** (1 / 2.4) - 0.055;
+  }) as Rgb;
+}
+
+/** Where a palette class sits, and what WCAG asks of it there. */
+type PaletteSite = {
+  /** A file in `src/conquest/pages` or `src/runlite/pages`, from this one. */
+  file: string;
+  /** The class exactly as the file writes it. */
+  className: string;
+  /** `card` for a `BracketFrame`, `band` for a {@link MAP_BAND_CLASS} label. */
+  on: "card" | "band";
+  /** 4.5 for small text, 3 for large text, an icon or a bar. */
+  bar: number;
+  /** What it colours, for the failure message. */
+  what: string;
+};
+
+const PALETTE_SITES: PaletteSite[] = [
+  {
+    file: "../GalaxyPage.tsx",
+    className: "text-amber-200",
+    on: "card",
+    bar: 4.5,
+    what: "the incursion warning button",
+  },
+  {
+    file: "../GalaxyPage.tsx",
+    className: "hover:text-amber-100",
+    on: "card",
+    bar: 4.5,
+    what: "the incursion warning button, hovered",
+  },
+  {
+    file: "../GalaxyPage.tsx",
+    className: "bg-amber-400",
+    on: "card",
+    bar: 3,
+    what: "a lit difficulty pip",
+  },
+  {
+    file: "../GalaxyPage.tsx",
+    className: "border-cyan-400",
+    on: "card",
+    bar: 3,
+    what: "the chosen faction's outline, which is what says it is chosen",
+  },
+  {
+    file: "../GalaxyPage.tsx",
+    className: "text-emerald-400",
+    on: "card",
+    bar: 3,
+    what: "the Galaxy conquered heading",
+  },
+  {
+    file: "./BattleOverlay.tsx",
+    className: "text-amber-400",
+    on: "card",
+    bar: 3,
+    what: "the shield icon on the Defend heading",
+  },
+  {
+    file: "./BattleOverlay.tsx",
+    className: "text-emerald-400",
+    on: "card",
+    bar: 3,
+    what: "the Victory heading",
+  },
+  {
+    file: "./BattleOverlay.tsx",
+    className: "text-emerald-300",
+    on: "card",
+    bar: 4.5,
+    what: "the galaxy-is-yours line",
+  },
+  {
+    file: "./BattleOverlay.tsx",
+    className: "text-amber-300",
+    on: "card",
+    bar: 4.5,
+    what: "the enemy-incursion line",
+  },
+  {
+    file: "../../../runlite/pages/RunPage.tsx",
+    className: "text-yellow-300",
+    on: "card",
+    bar: 3,
+    what: "the trophy on the end screen",
+  },
+  {
+    file: "../../../runlite/pages/RunPage.tsx",
+    className: "text-emerald-400",
+    on: "card",
+    bar: 3,
+    what: "the Warpath complete heading",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "bg-cyan-400",
+    on: "card",
+    bar: 3,
+    what: "the hull bar, stable",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "bg-amber-400",
+    on: "card",
+    bar: 3,
+    what: "the hull bar strained, and a crossed sector pip",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "bg-red-300",
+    on: "card",
+    bar: 3,
+    what: "the hull bar, critical",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "text-cyan-400",
+    on: "card",
+    bar: 3,
+    what: "the hull icon",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "text-amber-400",
+    on: "card",
+    bar: 3,
+    what: "the depth icon",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "bg-amber-300",
+    on: "card",
+    bar: 3,
+    what: "the sector pip you are on",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "text-yellow-300",
+    on: "card",
+    bar: 3,
+    what: "the salvage icon",
+  },
+  {
+    file: "../../../runlite/pages/components/RunHud.tsx",
+    className: "border-amber-400/80",
+    on: "band",
+    bar: 3,
+    what: "the difficulty badge's dashed outline",
+  },
+  {
+    file: "../../../runlite/pages/components/NodeOverlays.tsx",
+    className: "text-yellow-300",
+    on: "card",
+    bar: 3,
+    what: "the salvage cache icon",
+  },
+  {
+    file: "../../../runlite/pages/components/NodeOverlays.tsx",
+    className: "text-emerald-400",
+    on: "card",
+    bar: 3,
+    what: "the depot icon",
+  },
+  {
+    file: "../../../runlite/pages/components/EncounterOverlay.tsx",
+    className: "text-emerald-400",
+    on: "card",
+    bar: 3,
+    what: "the Victory heading",
+  },
+];
+
+describe("the palette classes the HUD still writes by hand", () => {
+  const palette = tailwindPalette();
+  const STEPS = [0, 0.25, 0.5, 0.75, 1];
+
+  for (const site of PALETTE_SITES) {
+    const source = readFileSync(
+      fileURLToPath(new URL(site.file, import.meta.url)),
+      "utf8",
+    );
+    const name = `${site.className} on ${site.file.split("/").pop()}`;
+
+    it(`still colours ${site.what} with ${name}`, () => {
+      // A row that stops matching its file is measuring a colour nobody
+      // paints, which is worse than not measuring it.
+      expect(source).toContain(site.className);
+    });
+
+    it(`clears ${site.bar}:1 with ${name}`, () => {
+      const shade = /(?:^|:)(?:text|bg|border)-([a-z]+-\d{2,3})/.exec(
+        site.className,
+      );
+      if (!shade) throw new Error(`no palette shade in ${site.className}`);
+      const ink = palette[shade[1]];
+      if (!ink) throw new Error(`${shade[1]} is not in Tailwind's palette`);
+      const alpha = /\/(\d+)$/.exec(site.className);
+      const inkAlpha = alpha ? Number(alpha[1]) / 100 : 1;
+
+      let worst = { ratio: Number.POSITIVE_INFINITY, at: "" };
+      for (const r of STEPS)
+        for (const g of STEPS)
+          for (const b of STEPS)
+            for (const hue of BASE_HUES)
+              for (const [sat] of BASE_SATS) {
+                const surface =
+                  site.on === "card"
+                    ? over(
+                        [r, g, b],
+                        CARD_RAMPS.dark.surface(hue, sat),
+                        cardAlpha,
+                      )
+                    : over([r, g, b], RAMPS.dark.surface(hue, sat), bandAlpha);
+                const ratio = contrast(over(surface, ink, inkAlpha), surface);
+                if (ratio < worst.ratio)
+                  worst = {
+                    ratio,
+                    at: `rgb(${r} ${g} ${b}) on base ${hue}/${sat}`,
+                  };
+              }
+      expect(worst.ratio, `${site.what} at ${worst.at}`).toBeGreaterThanOrEqual(
+        site.bar,
+      );
+    });
+  }
+});
+
 describe("the faction colour a galaxy document names", () => {
   // `parseFaction` accepts any string for `Faction.color`, and a galaxy can
   // arrive from an imported challenge code, so the frame decides for itself what

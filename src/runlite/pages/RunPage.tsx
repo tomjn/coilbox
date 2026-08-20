@@ -4,7 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
 import { resolveGameByShortname } from "../../conquest/model";
-import { BracketFrame } from "../../conquest/pages/components/hudChrome";
+import {
+  BracketFrame,
+  HUD_ACCENT_INK,
+  MAP_BAND_CLASS,
+} from "../../conquest/pages/components/hudChrome";
 import { buildEdgeMap, reachableFrom } from "../../content/buildTree";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../../content/config";
 import { useMapEligibility } from "../../content/mapEligibility";
@@ -239,8 +243,17 @@ export default function RunPage() {
           hides the sidebar nav. The inspect panel flows below the gauges in the
           same column, so it shares the gauges' gap and never overlaps them. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4">
-        <div className="pointer-events-auto flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300/90 drop-shadow-[0_1px_6px_rgba(0,0,0,0.8)]">
-          {run.name}
+        {/* The run's name is the one label on this page with nothing but the
+            node map behind it, so it takes the band the conquest map's own
+            loose labels take (#1052). It was a drop shadow, which softens an
+            edge but decides no contrast ratio, so over a pale node the ink and
+            what it sat on measured 1.0:1 (#1801). */}
+        <div className="pointer-events-auto flex items-center gap-2">
+          <span
+            className={`${MAP_BAND_CLASS} px-2 py-1 font-display text-sm font-semibold uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
+          >
+            {run.name}
+          </span>
           {run.importedChallenge && (
             <span className="rounded bg-card/70 px-1.5 py-0.5 text-[10px] tracking-wide text-muted-foreground">
               Imported challenge
@@ -538,7 +551,7 @@ function EndScreen({
         />
         <div className="flex flex-col gap-1">
           <h2
-            className={`font-display text-2xl font-bold uppercase tracking-wide ${won ? "text-emerald-400" : "text-red-400"}`}
+            className={`font-display text-2xl font-bold uppercase tracking-wide ${won ? "text-emerald-400" : HUD_ACCENT_INK.danger}`}
           >
             {won ? "Warpath complete" : "Warpath ended"}
           </h2>

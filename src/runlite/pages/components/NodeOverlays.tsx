@@ -1,7 +1,10 @@
 import { Button } from "@picoframe/frame";
 import { Gift, Sparkles, Store } from "lucide-react";
 import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
-import { BracketFrame } from "../../../conquest/pages/components/hudChrome";
+import {
+  BracketFrame,
+  HUD_ACCENT_INK,
+} from "../../../conquest/pages/components/hudChrome";
 import type { RewardOption, RogueliteRun, RunNode } from "../../model";
 import {
   applyEvent,
@@ -157,7 +160,9 @@ export function EventOverlay({
   };
   return (
     <Overlay
-      icon={<Sparkles className="size-5 text-violet-400" aria-hidden />}
+      icon={
+        <Sparkles className={`size-5 ${HUD_ACCENT_INK.violet}`} aria-hidden />
+      }
       title={ev?.title ?? "Signal"}
       lede={ev?.body}
       onClose={onClose}

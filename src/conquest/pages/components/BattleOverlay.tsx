@@ -25,7 +25,7 @@ import { resolveGameByShortname } from "../../model";
 import { difficultyHandicap, difficultyTable } from "../../rules";
 import { useConquestBattleRun } from "../../run";
 import { BackToMapButton } from "./BackToMapButton";
-import { BracketFrame } from "./hudChrome";
+import { BracketFrame, HUD_ACCENT_INK } from "./hudChrome";
 import { FactionDot } from "./RunSetup";
 
 /**
@@ -344,7 +344,7 @@ function Briefing({
           </p>
         )}
         {mode === "defend" && (
-          <p className="text-xs text-amber-300/90">
+          <p className={`text-xs ${HUD_ACCENT_INK.amber}`}>
             Lose this defence and the system falls
             {node.kind === "capital" &&
             state.owners[node.id] === state.playerFactionId
@@ -482,7 +482,7 @@ function Outcome({
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       <h2
-        className={`font-display text-2xl font-bold uppercase tracking-wide ${won ? "text-emerald-400" : "text-red-400"}`}
+        className={`font-display text-2xl font-bold uppercase tracking-wide ${won ? "text-emerald-400" : HUD_ACCENT_INK.danger}`}
       >
         {won ? "Victory" : "Defeat"}
       </h2>
@@ -493,7 +493,9 @@ function Outcome({
         </p>
       )}
       {resolved?.status === "lost" && (
-        <p className="text-sm text-red-300">Your capital is lost.</p>
+        <p className={`text-sm ${HUD_ACCENT_INK.danger}`}>
+          Your capital is lost.
+        </p>
       )}
       {resolved?.status === "active" && hasIncursion && (
         <p className="flex items-center gap-1.5 text-sm text-amber-300">
