@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyChallengeMaps,
   type GenBuildGraph,
   type GenerateRunOpts,
   type GenRunMap,
@@ -232,5 +233,72 @@ describe("substituteExcludedMaps", () => {
 
   it("leaves the run alone when every installed map is excluded", () => {
     expect(substituteExcludedMaps(run, MAPS, () => true)).toBe(run);
+  });
+});
+
+describe("applyChallengeMaps", () => {
+  const run = generateRun(opts());
+  const named = Object.fromEntries(
+    run.nodes
+      .filter((n) => n.battle)
+      .map((n, i) => [n.id, MAPS[i % MAPS.length].name]),
+  );
+
+  it("returns the same run when the challenge names no maps", () => {
+    expect(applyChallengeMaps(run, undefined, MAPS)).toBe(run);
+  });
+
+  it("puts every encounter on the map the challenge names", () => {
+    const next = applyChallengeMaps(run, named, MAPS);
+    for (const node of next.nodes) {
+      if (!node.battle) continue;
+      expect(node.battle.mapName).toBe(named[node.id]);
+      expect(node.battle.mapSubstitutedFrom).toBeUndefined();
+    }
+  });
+
+  it("swaps the download hint for the one the new map needs", () => {
+    const withHints = MAPS.map((m) => ({
+      ...m,
+      mapDownload: { springName: `${m.name} v1` },
+    }));
+    const retired = {
+      ...run,
+      nodes: run.nodes.map((n) =>
+        n.battle
+          ? {
+              ...n,
+              battle: {
+                ...n.battle,
+                mapName: "Retired Map",
+                mapDownload: { springName: "Retired Map" },
+              },
+            }
+          : n,
+      ),
+    };
+    const next = applyChallengeMaps(retired, named, withHints);
+    for (const node of next.nodes) {
+      if (!node.battle) continue;
+      expect(node.battle.mapDownload?.springName).toBe(`${named[node.id]} v1`);
+    }
+  });
+
+  it("keeps the named map when this install has no maps at all", () => {
+    const next = applyChallengeMaps(run, named, []);
+    for (const node of next.nodes) {
+      if (!node.battle) continue;
+      expect(node.battle.mapName).toBe(named[node.id]);
+      expect(node.battle.mapDownload).toBeUndefined();
+    }
+  });
+
+  it("picks the same stand-in every time", () => {
+    const without = MAPS.filter((m) => m.name !== "Huge");
+    const a = applyChallengeMaps(run, named, without);
+    const b = applyChallengeMaps(run, named, without);
+    expect(a.nodes.map((n) => n.battle?.mapName)).toEqual(
+      b.nodes.map((n) => n.battle?.mapName),
+    );
   });
 });

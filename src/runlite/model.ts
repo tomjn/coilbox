@@ -57,6 +57,12 @@ export interface EncounterSpec {
   mapName: string;
   /** Optional install-gate download override for the map. */
   mapDownload?: MapDownloadHint;
+  /**
+   * The map this encounter was meant to be fought on, when `mapName` is a
+   * stand-in. Set when an imported challenge names a map this install cannot
+   * offer, so the difference is visible rather than silent (issue #1393).
+   */
+  mapSubstitutedFrom?: string;
   /** Enemy AI count (already depth-scaled by the generator). */
   enemyAiCount: number;
   /** Skirmish AI override for this node's enemies (`kind:shortName`). */
@@ -347,6 +353,11 @@ function parseEncounter(value: unknown): EncounterSpec | null {
   return {
     mapName: value.mapName,
     mapDownload: parseMapDownload(value.mapDownload),
+    mapSubstitutedFrom:
+      typeof value.mapSubstitutedFrom === "string" &&
+      value.mapSubstitutedFrom !== ""
+        ? value.mapSubstitutedFrom
+        : undefined,
     enemyAiCount: clamp(Math.round(num(value.enemyAiCount, 1)), 1, 16),
     enemyAiKey:
       typeof value.enemyAiKey === "string" && value.enemyAiKey !== ""

@@ -1,4 +1,5 @@
 import type { MapDownloadHint } from "../campaign/model";
+import type { NodeMaps } from "../challenge/nodeMaps";
 import type { GameRef } from "../conquest/model";
 import { sectorNameForSeed } from "../conquest/names";
 import {
@@ -465,6 +466,62 @@ export function substituteExcludedMaps(
     return {
       ...node,
       battle: { ...battle, mapName: replacement.name, mapDownload: undefined },
+    };
+  });
+  return changed ? { ...run, nodes } : run;
+}
+
+/**
+ * Put every encounter on the map the challenge says it uses (issue #1393).
+ *
+ * Warpath has conquest's problem for the same reason: the seed decides the
+ * route and the encounters, but the maps come from whatever this machine has
+ * installed, so the same shared run is fought on different ground by different
+ * people. Mirrors conquest's `applyChallengeMaps`, including the stand-in for a
+ * named map this install cannot offer and the `mapSubstitutedFrom` that says so.
+ *
+ * `maps` is what this install can offer. Returns the run unchanged when the
+ * challenge names nothing, so a run shared before #1393 keeps its local draw.
+ */
+export function applyChallengeMaps(
+  run: RogueliteRun,
+  nodeMaps: NodeMaps | undefined,
+  maps: GenRunMap[],
+): RogueliteRun {
+  if (!nodeMaps) return run;
+  const byName = new Map(maps.map((m) => [m.name, m]));
+  const cols = Math.max(...run.nodes.map((n) => n.col)) + 1;
+
+  let changed = false;
+  const nodes = run.nodes.map((node): RunNode => {
+    const battle = node.battle;
+    const wanted = nodeMaps[node.id];
+    if (!battle || !wanted) return node;
+    let used = byName.get(wanted);
+    let substitutedFrom: string | undefined;
+    if (!used && maps.length > 0) {
+      const depthFrac = cols > 1 ? node.col / (cols - 1) : 0;
+      used = pickMap(mulberry32(hashString(node.id)), maps, depthFrac);
+      substitutedFrom = wanted;
+    }
+    const mapName = used?.name ?? wanted;
+    if (
+      battle.mapName === mapName &&
+      battle.mapSubstitutedFrom === substitutedFrom
+    ) {
+      return node;
+    }
+    changed = true;
+    return {
+      ...node,
+      battle: {
+        ...battle,
+        mapName,
+        // The hint follows the map: the new one's if this install knows it,
+        // none at all if the challenge named a map nobody here has heard of.
+        mapDownload: used?.mapDownload,
+        mapSubstitutedFrom: substitutedFrom,
+      },
     };
   });
   return changed ? { ...run, nodes } : run;
