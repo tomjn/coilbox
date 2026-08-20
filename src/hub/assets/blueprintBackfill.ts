@@ -43,6 +43,19 @@
  * than twenty renders in the time of one. The encode that follows each one costs
  * no mount, because the key it was named by is handed to it (issue #1720).
  *
+ * ## A run with renders in it says so, and can be stopped
+ *
+ * The have check is what decides whether anybody hears about the run at all
+ * (issue #1686). Once it comes back wanting a picture drawn, the run puts itself
+ * in the topbar through `./runningUploads`, and a run it comes back wanting
+ * nothing from stays silent as it always has. Drawing is the part that takes a
+ * minute, so it is the part worth showing.
+ *
+ * That flag is read between renders and again before the upload, so a stop lands
+ * in the half the run is actually in rather than only in the upload command.
+ * Stopping during the drawing half sends nothing at all: the pictures drawn so
+ * far are in this machine's cache, which costs nobody anything.
+ *
  * ## There is no map equivalent of this file, and there is not meant to be
  *
  * Nothing in coilbox uploads a map picture. Map assets reach the hub through the
@@ -73,8 +86,15 @@ import {
 } from "@/content/bindings";
 import { unitModelTextureUrl } from "@/lib/assetUrl";
 import { toBase64 } from "@/lib/base64";
+import { reportAssetUploadStopped } from "../uploadOutcomes";
 import { type AssetKey, assetsTheHubWants, type HaveResult } from "./have";
 import { RENDER_VERSION, renderTopDown, type TopDownRender } from "./renderTop";
+import {
+  hideUploadRun,
+  showUploadRun,
+  updateUploadRun,
+  uploadRunStopping,
+} from "./runningUploads";
 import { type AssetUpload, uploadAssetsToHub } from "./upload";
 
 /**
@@ -83,6 +103,10 @@ import { type AssetUpload, uploadAssetsToHub } from "./upload";
  * constant rather than an argument: nothing gets to ask for more of them.
  */
 export const BACKFILL_ANGLE = "top";
+
+/** Why a run did less than the layout when somebody pressed the button. Not a
+ *  sentence anybody is shown: what they are told is in `../uploadOutcomes`. */
+const STOPPED_BY_HAND = "Stopped by hand.";
 
 /** One unit a blueprint names, with what a render of it needs. */
 export interface BackfillUnit {
@@ -288,58 +312,122 @@ export async function backfillBlueprintUnits(
   // (issue #1684). Asked for after the have check, so a layout the hub already
   // holds every render of does not mount for models at all.
   const drawing = working.filter((unit) => wanted.has(unit.name));
-  const models = drawing.length
-    ? await tools.models({
-        ...archive,
-        objects: [...new Set(drawing.map((unit) => unit.objectName))],
-      })
-    : null;
 
-  let rendered = 0;
-  for (const unit of drawing) {
-    const model = models?.models[unit.objectName];
-    // A unit whose model would not read is not a run that stops. The rest of the
-    // layout is still worth sending, and its build pic has already gone.
-    if (!model) {
-      console.warn(
-        "no model for",
-        unit.name,
-        models?.skipped[unit.objectName] ?? "the batch read nothing",
-      );
-      continue;
-    }
-    const asset = await renderOne(
-      target,
-      archive,
-      unit,
-      model.file,
-      keyed.keys[unit.name],
-      keyed.sourceArchive,
-      tools,
-    );
-    rendered += 1;
-    if (asset) assets.push(asset);
+  // The whole of the threshold (issue #1686). A run with a picture to draw is
+  // about to hold the app for seconds each, so it says so. A run with none is
+  // the have check and an archive read, and stays silent.
+  const opId = crypto.randomUUID();
+  if (drawing.length > 0) {
+    showUploadRun({ opId, game: target.game, total: drawing.length });
   }
 
-  // A run with nothing to send does not open the door at all. The hub already
-  // holding everything is the ordinary answer, not an edge case.
-  //
-  // Started by coilbox, always. A backfill is the app filling gaps it noticed on
-  // its own, so a rejection goes to the console rather than in front of somebody
-  // who was reading a layout (issue #1690). If a button ever starts one of these,
-  // this is what has to become an argument.
-  const written = assets.length
-    ? (await tools.upload(target.hubUrl, assets, { startedBy: "coilbox" }))
-        .written
-    : 0;
-  return {
-    units: working.length,
-    asked: keys.length,
-    rendered,
-    offered: assets.length,
-    written,
-    ...(stopped ? { stopped } : {}),
-  };
+  try {
+    const models = drawing.length
+      ? await tools.models({
+          ...archive,
+          objects: [...new Set(drawing.map((unit) => unit.objectName))],
+        })
+      : null;
+
+    let rendered = 0;
+    let halted = false;
+    for (const [at, unit] of drawing.entries()) {
+      // Between pictures rather than inside one. A render is seconds, so this
+      // lands well inside anybody's patience.
+      if (uploadRunStopping(opId)) {
+        halted = true;
+        break;
+      }
+      const model = models?.models[unit.objectName];
+      // A unit whose model would not read is not a run that stops. The rest of
+      // the layout is still worth sending, and its build pic has already gone.
+      if (!model) {
+        console.warn(
+          "no model for",
+          unit.name,
+          models?.skipped[unit.objectName] ?? "the batch read nothing",
+        );
+      } else {
+        const asset = await renderOne(
+          target,
+          archive,
+          unit,
+          model.file,
+          keyed.keys[unit.name],
+          keyed.sourceArchive,
+          tools,
+        );
+        rendered += 1;
+        if (asset) assets.push(asset);
+      }
+      updateUploadRun(opId, { done: at + 1 });
+    }
+
+    // Stopped while drawing means nothing is sent, including the build pics
+    // extracted above. They cost a mount and an encode on this machine and
+    // nothing anybody shares, so throwing them away is the cheap half of
+    // honouring what was asked for.
+    if (halted) {
+      reportAssetUploadStopped(0, { game: target.game });
+      return {
+        units: working.length,
+        asked: keys.length,
+        rendered,
+        offered: assets.length,
+        written: 0,
+        stopped: STOPPED_BY_HAND,
+      };
+    }
+
+    // A run with nothing to send does not open the door at all. The hub already
+    // holding everything is the ordinary answer, not an edge case.
+    //
+    // Started by coilbox, always. A backfill is the app filling gaps it noticed
+    // on its own, so a rejection goes to the console rather than in front of
+    // somebody who was reading a layout (issue #1690). If a button ever starts
+    // one of these, this is what has to become an argument.
+    let written = 0;
+    let stoppedSending = false;
+    if (assets.length) {
+      updateUploadRun(opId, {
+        phase: "sending",
+        done: 0,
+        total: assets.length,
+      });
+      const run = await tools.upload(target.hubUrl, assets, {
+        startedBy: "coilbox",
+        opId,
+        onProgress: (sample) =>
+          updateUploadRun(opId, {
+            done: sample.done,
+            total: sample.total,
+            sent: sample.uploaded,
+          }),
+      });
+      written = run.written;
+      // Read after the run rather than before, because the flag can go up while
+      // the upload is in flight and what the report needs is the count that
+      // actually reached the hub.
+      stoppedSending = uploadRunStopping(opId);
+      if (stoppedSending) {
+        reportAssetUploadStopped(written, { game: target.game });
+      }
+    }
+    return {
+      units: working.length,
+      asked: keys.length,
+      rendered,
+      offered: assets.length,
+      written,
+      ...(stoppedSending
+        ? { stopped: STOPPED_BY_HAND }
+        : stopped
+          ? { stopped }
+          : {}),
+    };
+  } finally {
+    hideUploadRun(opId);
+  }
 }
 
 /**
