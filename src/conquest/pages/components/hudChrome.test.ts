@@ -1,7 +1,16 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { MAP_BAND_CLASS, MAP_DIM_INK_CLASS, MAP_INK_CLASS } from "./hudChrome";
+import {
+  bracketColor,
+  HUD_ACCENT_INK,
+  HUD_CARD_CLASS,
+  HUD_DIM_INK_CLASS,
+  HUD_INK_CLASS,
+  MAP_BAND_CLASS,
+  MAP_DIM_INK_CLASS,
+  MAP_INK_CLASS,
+} from "./hudChrome";
 
 /**
  * The legibility guarantee for a label sitting on the galaxy canvas (#1052).
@@ -237,4 +246,217 @@ describe("the labels that sit straight on the canvas", () => {
       expect(markup).not.toContain("text-muted-foreground");
     });
   }
+});
+
+/**
+ * The legibility guarantee for text on a HUD card over the galaxy canvas (#1785).
+ *
+ * The band above covers the two labels with nothing under them. This covers the
+ * rest of the HUD, which is every tile on the conquest map and the warpath map,
+ * and which does have something under it. The card was `bg-card/70`, so a third
+ * of whatever the starfield rendered landed behind the text, and the worst pixel
+ * a starfield can paint is white.
+ *
+ * Three things had to hold at once and only one of them was the alpha:
+ *
+ * - The card's own ink. Fine at 70% already, and better at 78%.
+ * - `--muted-foreground`. Not fine at any alpha worth having: it needs the card
+ *   at 95% to survive a star, which is opaque in all but name. `.hud-card` in
+ *   `src/index.css` points the token at the card's ink at 75% instead, and this
+ *   file reads that number back out of the stylesheet.
+ * - The accent inks. Those were Tailwind 300/400 shades, picked for a dark
+ *   surface, on a HUD that does not force a dark scheme. On a light one they
+ *   measured 1.0:1. No card alpha could have fixed that, because the card is
+ *   white there too, so they became a value per ramp.
+ *
+ * The sweep is the same one the band uses: the whole sRGB cube for the canvas,
+ * both ramps, every base preset. The alphas and the accent triples are read out
+ * of the shipped strings, so weakening any of them re-runs the measurement.
+ */
+
+/** The two card ramps, transcribed from `@picoframe/frame/src/theme.css`. */
+const CARD_RAMPS = {
+  dark: {
+    /** `.dark --card`, retinted by the base. */
+    surface: (hue: number, sat: number) => hsl(hue, (sat * 5) / 100, 0.1),
+    /** `.dark --card-foreground`, a literal near-white. */
+    ink: () => hsl(0, 0, 0.95),
+  },
+  light: {
+    /** `:root --card`, a literal white. */
+    surface: () => hsl(0, 0, 1),
+    /** `:root --card-foreground`, near-black and tinted by the text knob. */
+    ink: (hue: number, satText: number) => hsl(hue, (satText * 10) / 100, 0.12),
+  },
+} as const;
+
+const cardAlpha = tokenAlpha(HUD_CARD_CLASS, "card");
+const cardInkAlpha = tokenAlpha(HUD_INK_CLASS, "card-foreground");
+const cardDimAlpha = tokenAlpha(HUD_DIM_INK_CLASS, "card-foreground");
+
+/**
+ * The alpha `.hud-card` steps `--muted-foreground` down to, straight out of
+ * `src/index.css`.
+ *
+ * The whole declaration is matched, not just the number. It has to be the
+ * Tailwind theme variable rather than picoframe's raw token, because Tailwind
+ * resolves `--color-muted-foreground` at `:root` and a subtree redefining
+ * `--muted-foreground` would change nothing at all while looking like it had.
+ * It also has to point at the card's ink rather than at a fixed grey, so a base
+ * preset keeps its tint.
+ */
+function scopedMutedAlpha(): number {
+  const css = readFileSync(
+    fileURLToPath(new URL("../../../index.css", import.meta.url)),
+    "utf8",
+  );
+  const found =
+    /\.hud-card\s*\{\s*--color-muted-foreground:\s*hsl\(var\(--card-foreground\)\s*\/\s*([0-9.]+)\);/.exec(
+      css,
+    );
+  if (!found) throw new Error("no .hud-card muted override in src/index.css");
+  return Number(found[1]);
+}
+
+/** An `hsl(H_S%_L%)` arbitrary value, light ramp and dark ramp. */
+function accentInks(className: string): { light: Rgb; dark: Rgb } {
+  const read = (prefix: string) => {
+    const found = new RegExp(
+      `${prefix}text-\\[hsl\\(([0-9.]+)_([0-9.]+)%_([0-9.]+)%\\)\\]`,
+    ).exec(className);
+    if (!found) throw new Error(`no ${prefix || "light"} ink in ${className}`);
+    return hsl(
+      Number(found[1]),
+      Number(found[2]) / 100,
+      Number(found[3]) / 100,
+    );
+  };
+  // The light value is the bare utility, so anchor it to a word boundary that
+  // `dark:` cannot satisfy.
+  return { light: read("(?:^|\\s)"), dark: read("dark:") };
+}
+
+/** The card and everything set on it, over `canvas`, in one base of one ramp. */
+function cardOver(
+  canvas: Rgb,
+  scheme: Scheme,
+  hue: number,
+  sat: number,
+  satText: number,
+) {
+  const ramp = CARD_RAMPS[scheme];
+  const card = over(canvas, ramp.surface(hue, sat), cardAlpha);
+  const ink = ramp.ink(hue, satText);
+  const ratios: Record<string, number> = {
+    body: contrast(over(card, ink, cardInkAlpha), card),
+    dim: contrast(over(card, ink, cardDimAlpha), card),
+    muted: contrast(over(card, ink, scopedMutedAlpha()), card),
+  };
+  for (const [name, value] of Object.entries(HUD_ACCENT_INK)) {
+    ratios[name] = contrast(accentInks(value)[scheme], card);
+  }
+  return ratios;
+}
+
+describe("the card under the HUD", () => {
+  it("still lets the map through, so the HUD is a console and not a wall", () => {
+    // The point of raising 70% at all was to afford the quiet ink. Taking it to
+    // the 95% `--muted-foreground` would have needed loses the map entirely.
+    expect(cardAlpha).toBeGreaterThan(0);
+    expect(cardAlpha).toBeLessThanOrEqual(0.8);
+  });
+
+  it("keeps the quiet ink quieter than the body ink", () => {
+    expect(cardDimAlpha).toBeLessThan(cardInkAlpha);
+  });
+
+  it("carries the class that bounds --muted-foreground inside it", () => {
+    // Without this the stylesheet rule matches nothing and every muted label on
+    // both maps silently goes back to 2.3:1.
+    expect(HUD_CARD_CLASS).toMatch(/(?:^|\s)hud-card(?:\s|$)/);
+  });
+});
+
+describe("everything set on a HUD card clears AA over anything the canvas can paint", () => {
+  const STEPS = [0, 0.25, 0.5, 0.75, 1];
+
+  for (const scheme of SCHEMES) {
+    it(`holds over every colour a starfield can be, ${scheme}`, () => {
+      const worst: Record<string, { ratio: number; at: string }> = {};
+      for (const r of STEPS)
+        for (const g of STEPS)
+          for (const b of STEPS)
+            for (const hue of BASE_HUES)
+              for (const [sat, satText] of BASE_SATS) {
+                const at = `rgb(${r} ${g} ${b}) on base ${hue}/${sat}`;
+                for (const [name, ratio] of Object.entries(
+                  cardOver([r, g, b], scheme, hue, sat, satText),
+                )) {
+                  if (!worst[name] || ratio < worst[name].ratio)
+                    worst[name] = { ratio, at };
+                }
+              }
+      for (const [name, { ratio, at }] of Object.entries(worst)) {
+        expect(ratio, `${name} at ${at}`).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  }
+});
+
+describe("the HUD card reads raw tokens, not Tailwind's utilities", () => {
+  const strings = {
+    "the card": HUD_CARD_CLASS,
+    "the body ink": HUD_INK_CLASS,
+    "the quiet ink": HUD_DIM_INK_CLASS,
+  };
+
+  for (const [name, value] of Object.entries(strings)) {
+    it(`keeps ${name} off the root-resolved colour utilities`, () => {
+      expect(value).not.toMatch(
+        /(?:^|[\s:])(?:bg|text|from|to)-(?:background|foreground|accent|muted|card|popover)(?:\/|\s|$)/,
+      );
+    });
+  }
+
+  it("keeps the accent inks off the Tailwind palette", () => {
+    // `text-cyan-300` and friends are one value used in both ramps, and the
+    // light ramp is where they measured 1.0:1.
+    for (const value of Object.values(HUD_ACCENT_INK)) {
+      expect(value).not.toMatch(/text-[a-z]+-\d{2,3}/);
+    }
+  });
+});
+
+describe("the faction colour a galaxy document names", () => {
+  // `parseFaction` accepts any string for `Faction.color`, and a galaxy can
+  // arrive from an imported challenge code, so the frame decides for itself what
+  // it is willing to paint.
+  it("paints a hex literal", () => {
+    expect(bracketColor("#ff8800")).toBe("#ff8800");
+    expect(bracketColor("#F80")).toBe("#F80");
+    expect(bracketColor("  #ff8800  ")).toBe("#ff8800");
+  });
+
+  it("ignores anything that is not one", () => {
+    for (const hostile of [
+      undefined,
+      "",
+      "   ",
+      "red",
+      "currentColor",
+      "transparent",
+      "inherit",
+      "rgb(255 0 0)",
+      "var(--destructive)",
+      "#ff88",
+      "#ff88000",
+      "#gggggg",
+      "red; background-image: url(https://example.invalid/x.png)",
+      "url(https://example.invalid/x.png)",
+      "attr(data-x)",
+      "#ff8800 !important",
+    ]) {
+      expect(bracketColor(hostile), String(hostile)).toBeUndefined();
+    }
+  });
 });
