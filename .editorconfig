@@ -1,0 +1,23 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.rs]
+indent_size = 4
+
+[*.lua]
+indent_style = tab
+
+# Two trailing spaces are a hard line break in markdown, so trimming them
+# silently changes how the file renders. max_line_length = off stops editors
+# auto-wrapping long lines as you type. The existing hard wrapped specs are
+# left alone deliberately (issue #1641).
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
