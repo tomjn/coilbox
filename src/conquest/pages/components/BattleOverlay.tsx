@@ -25,7 +25,7 @@ import { resolveGameByShortname } from "../../model";
 import { difficultyHandicap, difficultyTable } from "../../rules";
 import { useConquestBattleRun } from "../../run";
 import { BackToMapButton } from "./BackToMapButton";
-import { BracketFrame, HUD_ACCENT_INK } from "./hudChrome";
+import { BracketFrame, HUD_ACCENT_INK, HUD_CARD_CLASS } from "./hudChrome";
 import { FactionDot } from "./RunSetup";
 
 /**
@@ -183,7 +183,7 @@ export function BattleOverlay({
             onClick={openTechTree}
             aria-label="View available units"
             title="View tech tree"
-            className="pointer-events-auto absolute right-full top-32 mr-4 flex items-center justify-center rounded-md border border-border/50 bg-card/70 p-3.5 text-muted-foreground backdrop-blur-sm transition-colors hover:border-border hover:text-foreground"
+            className={`pointer-events-auto absolute right-full top-32 mr-4 flex items-center justify-center p-3.5 text-muted-foreground backdrop-blur-sm transition-colors hover:border-border hover:text-foreground ${HUD_CARD_CLASS}`}
           >
             <ListTree className="size-5" aria-hidden />
           </button>

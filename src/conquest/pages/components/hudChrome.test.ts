@@ -232,6 +232,122 @@ describe("the labels that sit straight on the canvas", () => {
 });
 
 /**
+ * The warpath map's own loose chrome (#1812).
+ *
+ * The block above covers GalaxyPage, which is where the band started. The warpath
+ * map has a HUD block of its own at the top of RunPage, and two things in it were
+ * still hand-written.
+ *
+ * Both were wrong the same way and neither needs a sweep of its own, because the
+ * fix for each is an ink this file already measures:
+ *
+ * - The imported-challenge chip beside the run name. `bg-card/70` under
+ *   `text-muted-foreground`, which is 2.3:1 over a white node on a neutral base
+ *   and 2.0:1 on the worst one. A card at 70% is not a backdrop, it is a tint,
+ *   and on screen the chip read as loose text on the starfield. So it takes the
+ *   band its neighbour the run name already wears, and the band's quiet ink with
+ *   it. 5.03:1, from the sweep above.
+ * - The two back controls under it. Those are boxes rather than loose labels, so
+ *   they take {@link HUD_CARD_CLASS}, which is the same box at 78% and which
+ *   points `--muted-foreground` at the card's own ink for its subtree. 4.56:1,
+ *   from the card sweep below.
+ *
+ * What is checked is which class each one carries. Measuring the same pair of
+ * colours a second time here would only give the two measurements a way to
+ * disagree.
+ */
+describe("the chrome on the warpath map that is not in a frame", () => {
+  const page = readFileSync(
+    fileURLToPath(
+      new URL("../../../runlite/pages/RunPage.tsx", import.meta.url),
+    ),
+    "utf8",
+  );
+
+  /**
+   * The opening tag around `marker`, which may be an attribute inside the tag or
+   * the element's own text. Both end at the next `>`, and a JSX attribute value
+   * has no `>` in it once an arrow function is behind the marker.
+   */
+  function tagAround(marker: string): string {
+    const at = page.indexOf(marker);
+    expect(at, `no ${marker} in RunPage.tsx`).toBeGreaterThan(-1);
+    return page.slice(page.lastIndexOf("<", at), page.indexOf(">", at));
+  }
+
+  it("bands the imported-challenge chip, as the run name beside it is banded", () => {
+    const chip = tagAround("Imported challenge");
+    expect(chip).toContain("MAP_BAND_CLASS");
+    expect(chip).toContain("MAP_DIM_INK_CLASS");
+    expect(chip).not.toContain("text-muted-foreground");
+  });
+
+  for (const control of [
+    'aria-label="Back to map"',
+    'aria-label="Back to warpath hub"',
+  ]) {
+    it(`puts the measured card under ${control}`, () => {
+      // `text-muted-foreground` is fine on these, and only on these, because the
+      // class binds it to the card's ink for everything inside.
+      expect(tagAround(control)).toContain("HUD_CARD_CLASS");
+    });
+  }
+});
+
+/**
+ * What stops a seventh one (#1812).
+ *
+ * Every failure #1785 and #1812 fixed was the same string. Somebody wanted a
+ * translucent box on the map, wrote `bg-card/70`, and got a backdrop that lets a
+ * third of a star through under ink calibrated for a flat surface. It is a
+ * reasonable-looking class and it was written five separate times.
+ *
+ * So the rule is that the two map trees do not hand-write a card alpha at all.
+ * They take {@link HUD_CARD_CLASS}, which is measured, or {@link MAP_BAND_CLASS}
+ * if there is no box to speak of.
+ *
+ * The gap this leaves is a file outside both trees that renders on a map anyway.
+ * `SaveAsPresetButton`'s gutter appearance is the one that does, and it cannot
+ * simply take the class, because the same component renders on ordinary pages
+ * where the HUD chrome does not belong.
+ */
+describe("neither map hand-writes a translucent card", () => {
+  const TREES = ["../..", "../../../runlite"];
+
+  /** The class as a file would paint it, rather than as a comment discusses it. */
+  const HAND_WRITTEN = "bg-card/";
+
+  /**
+   * A file with its comments taken out, so that half this codebase explaining
+   * why the class was wrong does not read as a file still painting it.
+   */
+  function markup(path: string): string {
+    return readFileSync(path, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|\s)\/\/.*$/gm, "$1");
+  }
+
+  it("leaves the card alpha to the measured class", () => {
+    const offenders: string[] = [];
+    for (const tree of TREES) {
+      const root = fileURLToPath(new URL(tree, import.meta.url));
+      const files = readdirSync(root, { recursive: true, withFileTypes: true })
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".tsx"))
+        .map((entry) => `${entry.parentPath}/${entry.name}`);
+      const written = files.filter((f) => markup(f).includes(HAND_WRITTEN));
+      for (const full of written) {
+        offenders.push(full.slice(root.length).replace(/^\/+/, ""));
+      }
+    }
+    expect(
+      offenders,
+      "A hand-written card alpha on the map is the defect #1785 and #1812 both " +
+        "fixed. Use HUD_CARD_CLASS, or MAP_BAND_CLASS if it is a loose label.",
+    ).toEqual([]);
+  });
+});
+
+/**
  * The legibility guarantee for text on a HUD card over the galaxy canvas (#1785).
  *
  * The band above covers the two labels with nothing under them. This covers the
@@ -748,6 +864,7 @@ describe("no importer outside the two forced-dark routes", () => {
 
   /** The rest, each rendered inside one of those two. */
   const INSIDE_A_ROOT = [
+    "conquest/pages/components/BackToMapButton.tsx",
     "conquest/pages/components/BattleOverlay.tsx",
     "conquest/pages/components/RunSetup.tsx",
     "runlite/pages/components/EncounterOverlay.tsx",
