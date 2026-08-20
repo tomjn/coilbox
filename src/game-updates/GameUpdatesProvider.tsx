@@ -1,4 +1,3 @@
-import { Channel } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import {
   createContext,
@@ -13,10 +12,10 @@ import {
 import { primeScan, useScanTargetSelection } from "../content/config";
 import {
   type DownloadProgress,
-  dlDownloadFile,
   dlInstalledContent,
 } from "../downloads/bindings";
 import { useContentRootPaths, useWriteRootPath } from "../downloads/config";
+import { useDownloadQueue } from "../downloads/DownloadQueueProvider";
 import { notify } from "../notify/notify";
 import { getProfile, getProfileRoot } from "../profile/profile";
 import { dlGithubLatestRelease, type ReleaseInfo } from "./bindings";
@@ -75,7 +74,11 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
   const [installed, setInstalled] = useState(false);
   const [profileUpdated, setProfileUpdated] = useState(false);
   const [currentFile, setCurrentFile] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  // The queue item for the file being fetched right now, so the settings page's
+  // progress bar reads the queue rather than a second copy of the same numbers.
+  const { enqueue, waitFor, items } = useDownloadQueue();
+  const [queueId, setQueueId] = useState<string | null>(null);
+  const progress = items.find((i) => i.id === queueId)?.progress ?? null;
 
   // Lowercased game filenames present in any content root, for the "have we got
   // this release?" check. Mirrors the Games download screen.
@@ -136,27 +139,39 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
     if (!updateAvailable) notifiedRef.current = false;
   }, [updateAvailable]);
 
+  // Each file goes on the app-wide download queue rather than straight to the
+  // plugin, so the topbar indicator shows a game update the same as any other
+  // download, and the user can cancel one from there. The progress the settings
+  // page shows is read back off the queue item.
+  const fetchOne = useCallback(
+    async (url: string, destDir: string, filename: string) => {
+      setCurrentFile(filename);
+      const id = enqueue({
+        kind: "file",
+        label: `Game update: ${filename}`,
+        args: { url, destDir, filename },
+      });
+      setQueueId(id);
+      const settled = await waitFor(id);
+      if (settled?.status === "canceled") throw new Error("Download canceled");
+      if (settled?.status !== "done")
+        throw new Error(settled?.error ?? `Could not download ${filename}`);
+    },
+    [enqueue, waitFor],
+  );
+
   const install = useCallback(async () => {
     if (!release || !writePath) return;
     setInstalling(true);
     setInstalled(false);
     setError(null);
-    setProgress(null);
     try {
       // Download every game archive we don't already have into <writeRoot>/games.
       const archives = release.assets.filter(
         (a) => isArchive(a.name) && !installedGames.has(a.name.toLowerCase()),
       );
       for (const asset of archives) {
-        setCurrentFile(asset.name);
-        const onProgress = new Channel<DownloadProgress>();
-        onProgress.onmessage = (p) => setProgress(p);
-        await dlDownloadFile({
-          url: asset.url,
-          destDir: `${writePath}/games`,
-          filename: asset.name,
-          onProgress,
-        });
+        await fetchOne(asset.url, `${writePath}/games`, asset.name);
       }
 
       // If the release ships an updated profile.json, drop it into the portable
@@ -164,15 +179,7 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
       const profileAsset = release.assets.find((a) => a.name === PROFILE_ASSET);
       const profileRoot = getProfileRoot();
       if (profileAsset && profileRoot) {
-        setCurrentFile(profileAsset.name);
-        const onProgress = new Channel<DownloadProgress>();
-        onProgress.onmessage = (p) => setProgress(p);
-        await dlDownloadFile({
-          url: profileAsset.url,
-          destDir: profileRoot,
-          filename: PROFILE_ASSET,
-          onProgress,
-        });
+        await fetchOne(profileAsset.url, profileRoot, PROFILE_ASSET);
         setProfileUpdated(true);
       }
 
@@ -188,9 +195,16 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
     } finally {
       setInstalling(false);
       setCurrentFile(null);
-      setProgress(null);
+      setQueueId(null);
     }
-  }, [release, writePath, installedGames, refreshInstalled, selected]);
+  }, [
+    release,
+    writePath,
+    installedGames,
+    refreshInstalled,
+    selected,
+    fetchOne,
+  ]);
 
   const restart = useCallback(() => relaunch(), []);
 

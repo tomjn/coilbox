@@ -1,5 +1,4 @@
 import { Button, buttonVariants, cn, useHideSidebar } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
   ChevronRight,
@@ -11,16 +10,15 @@ import {
   Target,
   Trophy,
 } from "lucide-react";
-import type { CSSProperties } from "react";
-import { type ReactNode, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
 import { invalidateMapPreview, invalidateScans } from "../../content/config";
 import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
-import { type DownloadProgress, dlDownloadMap } from "../../downloads/bindings";
 import { useWriteRootPath } from "../../downloads/config";
 import { ProgressBar } from "../../downloads/pages/components/ProgressBar";
+import { useQueuedDownload } from "../../downloads/useQueuedDownload";
 import { useStillUi } from "../../general/display";
 import { usePreferredTarget } from "../../play/config";
 import { useCampaigns } from "../campaigns";
@@ -378,41 +376,34 @@ function MissionRequiredGate({
 }) {
   const { target } = usePreferredTarget();
   const writePath = useWriteRootPath();
-  const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const mapDl = useQueuedDownload({
+    kind: "map",
+    label: `Map: ${mission.snapshot.mapName}`,
+    args: {
+      springName: mission.mapDownload?.springName ?? mission.snapshot.mapName,
+      searchUrl: mission.mapDownload?.searchUrl,
+      writePath,
+    },
+  });
 
   const isMap = missing.kind === "map";
   const downloadsLink = isMap ? "/downloads/maps" : "/downloads/games";
+  const downloading = mapDl.busy;
+  const progress = mapDl.progress;
+  const error = mapDl.error;
 
   const download = async () => {
-    setDownloading(true);
-    setProgress(null);
-    setError(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = (p) => setProgress(p);
-    try {
-      await dlDownloadMap({
-        springName: mission.mapDownload?.springName ?? mission.snapshot.mapName,
-        searchUrl: mission.mapDownload?.searchUrl,
-        writePath,
-        onProgress,
-      });
-      // Drop the stale scan + map-preview caches so the rescan sees the new map.
-      invalidateScans();
-      if (target?.enginePath && target?.dataDir)
-        invalidateMapPreview(
-          target.enginePath,
-          target.dataDir,
-          mission.snapshot.mapName,
-        );
-      await run.recheck();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDownloading(false);
-      setProgress(null);
-    }
+    const settled = await mapDl.start();
+    if (settled?.status !== "done") return;
+    // Drop the stale scan + map-preview caches so the rescan sees the new map.
+    invalidateScans();
+    if (target?.enginePath && target?.dataDir)
+      invalidateMapPreview(
+        target.enginePath,
+        target.dataDir,
+        mission.snapshot.mapName,
+      );
+    await run.recheck();
   };
 
   return (
@@ -445,7 +436,11 @@ function MissionRequiredGate({
             ) : (
               <Download className="size-4" />
             )}
-            {downloading ? "Downloading…" : "Download & Install"}
+            {mapDl.status === "queued"
+              ? "Waiting for a slot…"
+              : downloading
+                ? "Downloading…"
+                : "Download & Install"}
           </Button>
           {downloading && progress && <ProgressBar progress={progress} />}
           {/* Best-effort by name can miss maps whose springname differs; the manual

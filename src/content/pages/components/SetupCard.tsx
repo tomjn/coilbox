@@ -1,20 +1,16 @@
 import { Button, useSetting } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
 import { Download, FolderPlus, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Card } from "@/components/ui/card";
-import type { DownloadProgress } from "../../../downloads/bindings";
 import {
   useDefaultWriteRoot,
   useWriteRootPath,
 } from "../../../downloads/config";
-import {
-  fetchNewestRecoil,
-  installRecoil,
-} from "../../../downloads/engineInstall";
+import { fetchNewestRecoil } from "../../../downloads/engineInstall";
 import { ProgressBar } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
+import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import { contentCreateStandardRoot, contentRecreateRoot } from "../../bindings";
 import { useSetupStatus } from "../../config";
 import {
@@ -42,7 +38,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
     null,
   );
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  const engineDl = useQueuedDownload();
   const [newest, setNewest] = useState<{
     version: string;
     available: boolean;
@@ -103,22 +99,29 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
     }
     setBusy("engine");
     setError(null);
-    setProgress(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = (p) => setProgress(p);
     try {
       const { release } = await fetchNewestRecoil();
       if (!release) {
         setError("No engine is available to download for this platform.");
         return;
       }
-      await installRecoil(release, writePath, onProgress);
-      await refresh();
+      // The queue's engineRecoil kind rescans content after the install, which
+      // is what installRecoil used to do here.
+      const settled = await engineDl.start({
+        kind: "engineRecoil",
+        label: `Engine ${release.version}`,
+        args: {
+          version: release.version,
+          assetUrl: release.assetUrl,
+          writePath,
+        },
+      });
+      if (settled?.error) setError(settled.error);
+      else if (settled?.status === "done") await refresh();
     } catch (e) {
       setError(errMessage(e));
     } finally {
       setBusy(null);
-      setProgress(null);
     }
   }
 
@@ -185,13 +188,13 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
               ) : (
                 <Download />
               )}
-              {busy === "engine"
-                ? "Installing…"
-                : `Download newest engine${newest.version ? ` (${newest.version})` : ""}`}
+              {engineDl.status === "queued"
+                ? "Waiting for a slot…"
+                : busy === "engine"
+                  ? "Installing…"
+                  : `Download newest engine${newest.version ? ` (${newest.version})` : ""}`}
             </Button>
-            {busy === "engine" && progress && (
-              <ProgressBar progress={progress} />
-            )}
+            {engineDl.progress && <ProgressBar progress={engineDl.progress} />}
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">

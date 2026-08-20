@@ -25,6 +25,18 @@ vi.mock("@tauri-apps/api/core", () => ({
   Channel: class {},
   invoke: async () => ({}),
 }));
+// Each card now runs its download on the app-wide queue, which needs a provider
+// this render has no reason to stand up. `downloadQueue.dom.test.tsx` covers the
+// queue itself. Here the card is only being asked what it says about the folder.
+vi.mock("../../../downloads/useQueuedDownload", () => ({
+  useQueuedDownload: () => ({
+    start: async () => null,
+    status: null,
+    progress: null,
+    error: null,
+    busy: false,
+  }),
+}));
 
 const { SuggestionsList } = await import("./SuggestionsList");
 

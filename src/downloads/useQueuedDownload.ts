@@ -1,0 +1,77 @@
+import { useCallback, useRef, useState } from "react";
+import type { DownloadProgress } from "./bindings";
+import {
+  type EnqueueInput,
+  identityOf,
+  type QueueItem,
+  type QueueStatus,
+  useDownloadQueue,
+} from "./DownloadQueueProvider";
+
+/** One screen's view of a download it can start, running on the app-wide queue. */
+export interface QueuedDownload {
+  /**
+   * Put the download on the queue and resolve once it stops running. Pass
+   * `override` when the request can only be built at click time, such as a
+   * GitHub release archive that has to be looked up first.
+   *
+   * Resolves with the settled item, so a caller can rescan or re-check straight
+   * after, exactly as it did when it ran the download itself. Resolves with
+   * null when there is nothing to enqueue.
+   */
+  start: (override?: EnqueueInput) => Promise<QueueItem | null>;
+  /** Where this download has got to, or null before it is started. */
+  status: QueueStatus | null;
+  /** Live progress while it is downloading. */
+  progress: DownloadProgress | null;
+  /** Why the last attempt failed, if it did. */
+  error: string | null;
+  /** Waiting for a slot, or downloading right now. */
+  busy: boolean;
+}
+
+/**
+ * Run one screen's download through the app-wide queue rather than beside it.
+ *
+ * A screen that calls a `dl*` binding directly gets its own progress bar and
+ * nothing else: the topbar download indicator never hears about it, and it can
+ * write a content folder at the same time as a queued download. This hook keeps
+ * the screen's own progress UI working while the download itself goes on the
+ * queue, so it shows up in the indicator and takes its turn.
+ *
+ * `input` is the request this screen would make, or null while it cannot make
+ * one yet (no download folder, nothing selected). Reading state back by that
+ * request's identity means a download already running for the same map or game,
+ * started anywhere in the app, shows here as busy too.
+ */
+export function useQueuedDownload(input?: EnqueueInput | null): QueuedDownload {
+  const { enqueue, waitFor, items } = useDownloadQueue();
+  const [startedId, setStartedId] = useState<string | null>(null);
+
+  const inputRef = useRef(input);
+  inputRef.current = input;
+
+  const start = useCallback(
+    async (override?: EnqueueInput) => {
+      const request = override ?? inputRef.current;
+      if (!request) return null;
+      const id = enqueue(request);
+      setStartedId(id);
+      return waitFor(id);
+    },
+    [enqueue, waitFor],
+  );
+
+  const identity = input ? identityOf(input) : null;
+  const item =
+    items.find((i) => i.id === startedId) ??
+    (identity ? items.find((i) => i.identity === identity) : undefined);
+
+  return {
+    start,
+    status: item?.status ?? null,
+    progress: item?.progress ?? null,
+    error: item?.error ?? null,
+    busy: item?.status === "queued" || item?.status === "active",
+  };
+}

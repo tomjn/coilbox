@@ -1,16 +1,10 @@
 import { Button, cn } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import {
-  type DownloadProgress,
-  dlDownload,
-  dlDownloadFile,
-  dlDownloadMap,
-  dlGithubReleaseArchives,
-} from "../../../downloads/bindings";
+import { dlGithubReleaseArchives } from "../../../downloads/bindings";
 import type { WriteRoot } from "../../../downloads/config";
+import type { EnqueueInput } from "../../../downloads/DownloadQueueProvider";
 import {
   GAME_REPOS,
   type GameRepo,
@@ -19,6 +13,7 @@ import {
 } from "../../../downloads/gameRepos";
 import { ProgressBar } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
+import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import {
   resolveSuggestedArt,
   type SuggestedDownload,
@@ -45,42 +40,59 @@ interface SuggestionsListProps {
   heading?: string;
 }
 
-/** Dispatch a suggestion to the matching downloads-plugin command. `repos` is the
- * unified GitHub game-repo registry (issue #512), used to resolve a `github`
- * download's `sourceKey`. */
-async function runDownload(
+/**
+ * Turn a suggestion into a download-queue request, so it runs on the app-wide
+ * queue and shows in the topbar indicator like every other download. `repos` is
+ * the unified GitHub game-repo registry (issue #512), used to resolve a `github`
+ * download's `sourceKey`.
+ *
+ * Async because a `github` suggestion names a repo, not a file: the release
+ * archive has to be looked up before there is a URL to queue.
+ */
+export async function suggestionRequest(
   dl: SuggestedDownload,
   kind: "game" | "map",
+  label: string,
   writePath: string,
-  onProgress: Channel<DownloadProgress>,
   repos: GameRepo[],
-): Promise<{ message: string }> {
+): Promise<EnqueueInput> {
+  const destDir = (subdir?: string) =>
+    `${writePath}/${subdir ?? (kind === "game" ? "games" : "maps")}`;
   switch (dl.kind) {
     case "rapid":
       // Default to the standard rapid master when the catalog entry omits one:
       // a non-empty master pins PRD_RAPID_REPO_MASTER and disables the rapid
       // streamer in the sidecar, matching every working rapid caller. Left
       // unset, the streamer path can exit 0 without installing (a silent no-op).
-      return dlDownload({
-        tag: dl.tag,
-        masterUrl: dl.masterUrl || "https://repos.springrts.com",
-        writePath,
-        onProgress,
-      });
+      return {
+        kind: "rapid",
+        label,
+        args: {
+          tag: dl.tag,
+          masterUrl: dl.masterUrl || "https://repos.springrts.com",
+          writePath,
+        },
+      };
     case "map":
-      return dlDownloadMap({
-        springName: dl.springName,
-        searchUrl: dl.searchUrl,
-        writePath,
-        onProgress,
-      });
+      return {
+        kind: "map",
+        label,
+        args: {
+          springName: dl.springName,
+          searchUrl: dl.searchUrl,
+          writePath,
+        },
+      };
     case "url":
-      return dlDownloadFile({
-        url: dl.url,
-        filename: dl.filename,
-        destDir: `${writePath}/${dl.subdir ?? (kind === "game" ? "games" : "maps")}`,
-        onProgress,
-      });
+      return {
+        kind: "file",
+        label,
+        args: {
+          url: dl.url,
+          filename: dl.filename,
+          destDir: destDir(dl.subdir),
+        },
+      };
     case "github": {
       // Resolve the repo directly, or via the unified registry's sourceKey (issue
       // 512), then stream the matching (or newest) release archive directly.
@@ -94,12 +106,15 @@ async function runDownload(
           )
         : archives[0];
       if (!pick) throw new Error(`No release archive found for ${repo}.`);
-      return dlDownloadFile({
-        url: pick.url,
-        filename: pick.filename,
-        destDir: `${writePath}/${dl.subdir ?? (kind === "game" ? "games" : "maps")}`,
-        onProgress,
-      });
+      return {
+        kind: "file",
+        label,
+        args: {
+          url: pick.url,
+          filename: pick.filename,
+          destDir: destDir(dl.subdir),
+        },
+      };
     }
   }
 }
@@ -129,8 +144,6 @@ export function SuggestionsList({
     () => mergeGameRepos(catalogRepos, GAME_REPOS),
     [catalogRepos],
   );
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
     null,
   );
@@ -142,32 +155,12 @@ export function SuggestionsList({
 
   if (items.length === 0) return null;
 
-  async function onDownload(item: Suggestion) {
-    if (!writePath || downloading !== null) return;
-    setDownloading(item.id);
-    setProgress(null);
-    setResult(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = (p) => setProgress(p);
-    try {
-      const { message } = await runDownload(
-        item.download,
-        kind,
-        writePath,
-        onProgress,
-        repos,
-      );
-      setResult({ ok: true, message });
-      setDoneIds((prev) => new Set(prev).add(item.id));
-      // A newly-downloaded game/map must appear without a manual rescan.
-      invalidateScans();
-      onComplete?.();
-    } catch (e) {
-      setResult({ ok: false, message: errMessage(e) });
-    } finally {
-      setDownloading(null);
-      setProgress(null);
-    }
+  function onDownloaded(item: Suggestion) {
+    setResult({ ok: true, message: `${item.title} downloaded.` });
+    setDoneIds((prev) => new Set(prev).add(item.id));
+    // A newly-downloaded game/map must appear without a manual rescan.
+    invalidateScans();
+    onComplete?.();
   }
 
   return (
@@ -201,16 +194,17 @@ export function SuggestionsList({
           <SuggestionCard
             key={item.id}
             item={item}
+            kind={kind}
+            repos={repos}
+            writePath={writePath}
             art={
               kind === "game"
                 ? resolveSuggestedArt(entries, item as SuggestedGame)
                 : (item as SuggestedMap).thumb
             }
-            active={downloading === item.id}
             done={doneIds.has(item.id)}
-            progress={progress}
-            disabled={!writePath || downloading !== null}
-            onDownload={() => onDownload(item)}
+            onDownloaded={() => onDownloaded(item)}
+            onFailed={(message) => setResult({ ok: false, message })}
           />
         ))}
       </ul>
@@ -241,24 +235,48 @@ export function SuggestionsList({
 
 function SuggestionCard({
   item,
+  kind,
+  repos,
+  writePath,
   art,
-  active,
   done,
-  progress,
-  disabled,
-  onDownload,
+  onDownloaded,
+  onFailed,
 }: {
   item: Suggestion;
+  kind: "game" | "map";
+  repos: GameRepo[];
+  writePath?: string;
   art?: string[];
-  active: boolean;
   /** This item's download already succeeded this visit (issue #526): stays in
    * place, marked done, instead of vanishing or re-offering the download. */
   done: boolean;
-  progress: DownloadProgress | null;
-  disabled: boolean;
-  onDownload: () => void;
+  onDownloaded: () => void;
+  onFailed: (message: string) => void;
 }) {
   const imageUrl = useBrandingImage(art, true);
+  const dl = useQueuedDownload();
+  const active = dl.busy;
+  const disabled = !writePath || active;
+
+  async function onDownload() {
+    if (!writePath) return;
+    try {
+      const request = await suggestionRequest(
+        item.download,
+        kind,
+        `${kind === "game" ? "Game" : "Map"}: ${item.title}`,
+        writePath,
+        repos,
+      );
+      const settled = await dl.start(request);
+      if (settled?.status === "done") onDownloaded();
+      else if (settled?.error) onFailed(settled.error);
+    } catch (e) {
+      onFailed(errMessage(e));
+    }
+  }
+
   return (
     <li className="flex flex-col overflow-hidden rounded-lg border border-border/50 bg-card">
       <div className="aspect-video w-full overflow-hidden bg-muted">
@@ -299,9 +317,15 @@ function SuggestionCard({
             ) : (
               <Download />
             )}
-            {done ? "Downloaded" : active ? "Downloading…" : "Download"}
+            {done
+              ? "Downloaded"
+              : dl.status === "queued"
+                ? "Queued…"
+                : active
+                  ? "Downloading…"
+                  : "Download"}
           </Button>
-          {active && progress && <ProgressBar progress={progress} />}
+          {dl.progress && <ProgressBar progress={dl.progress} />}
         </div>
       </div>
     </li>
