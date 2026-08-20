@@ -1,5 +1,5 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows reading the bundler-supplied distribution profile, its assets, and custom pages, and scaffolding a new profile."
-permissions = ["allow-profile-load", "allow-profile-asset", "allow-profile-file", "allow-profile-pages", "allow-profile-scaffold"]
+description = "Allows reading the bundler-supplied distribution profile, its assets, and custom pages, opening one of those assets in the program the OS opens its file type with, and scaffolding a new profile."
+permissions = ["allow-profile-load", "allow-profile-asset", "allow-profile-file", "allow-profile-pages", "allow-profile-scaffold", "allow-profile-open"]

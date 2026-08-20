@@ -8,6 +8,11 @@
 //! Registered as `"coilbox-profile"`; the frontend invokes
 //! `plugin:coilbox-profile|profile_load`.
 //!
+//! The one thing here that is not a read is [`profile_open`], which acts on a link
+//! to a bundled file. It lives in this crate because the folder those files are in
+//! is only known once the app has found itself on disk, so no capability file can
+//! name it.
+//!
 //! Never hard-fails: a missing file — or a non-portable install with no `.coilbox`
 //! folder at all — resolves to an empty `{"version":1}` default, leaving vanilla
 //! behaviour untouched.
@@ -241,6 +246,93 @@ async fn profile_scaffold(json: String) -> CliResult {
     }
 }
 
+/// Whether a bundled file is one Coilbox will hand to the OS to open.
+///
+/// A markdown link is something a reader clicks, and on Windows the program the OS
+/// opens a `.bat` or a `.exe` with is the file itself. A distribution page has no
+/// other way to start a program, and a link captioned "our logo" must not become
+/// one, so this lists file types a viewer shows rather than types an interpreter
+/// runs. Archives are off the list too: opening a `.zip` on macOS unpacks it into
+/// the distribution's own folder, which is not what the click asked for.
+///
+/// Anything absent is shown in the file manager instead, which is where a link to a
+/// bundled file already led (#1783). Being wrong about a type therefore costs the
+/// reader one extra click, not a dead link.
+fn opens_in_a_viewer(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref(),
+        Some(
+            // Pictures
+            "webp" | "png" | "jpg" | "jpeg" | "gif" | "bmp" | "svg" | "avif"
+            // Things somebody reads
+            | "pdf" | "txt" | "md" | "rtf" | "csv" | "html" | "htm"
+            // Audio
+            | "ogg" | "oga" | "mp3" | "wav" | "flac" | "opus" | "m4a"
+            // Video
+            | "mp4" | "webm" | "mov" | "ogv"
+        )
+    )
+}
+
+/// Pure core of [`profile_open`]: resolve `<root>/<rel>` and decide what a click on it
+/// does. A type with a viewer goes to the OS. Anything else, and anything the OS
+/// refuses, is shown in the file manager. Returns which of the two happened.
+///
+/// The only paths this ever acts on are `<portable_root>/<rel>`, and that bound is
+/// enforced here rather than in `src-tauri/capabilities/`. A capability file names a
+/// directory ahead of time, and no path variable describes the folder beside the
+/// executable: `$EXE` is the user's own bin directory, `$RESOURCE` is inside the
+/// bundle, and on macOS and in an AppImage the folder is not the executable's parent
+/// at all. Granting `<root>/**` at runtime instead would hand the webview every file
+/// under `.coilbox`, which in portable mode includes Coilbox's own `data` and `cache`
+/// folders. This grants one bundled file, by a relative path, and is the same fence
+/// [`read_asset_from`] already puts around reading that file.
+fn open_asset_in(
+    root: Option<PathBuf>,
+    rel: &str,
+    is_file: impl Fn(&Path) -> bool,
+    open: impl Fn(&Path) -> Result<(), String>,
+    reveal: impl Fn(&Path) -> Result<(), String>,
+) -> Result<&'static str, String> {
+    let root = root.ok_or_else(|| "this install has no .coilbox folder".to_string())?;
+    let rel_path = Path::new(rel);
+    if !is_safe_rel(rel_path) {
+        return Err(format!("{rel} is not a path inside the .coilbox folder"));
+    }
+    let full = root.join(rel_path);
+    if !is_file(&full) {
+        return Err(format!("there is no file at {rel}"));
+    }
+    if opens_in_a_viewer(&full) && open(&full).is_ok() {
+        return Ok("open");
+    }
+    reveal(&full).map(|_| "reveal")
+}
+
+/// `profile_open` — act on a link to a file bundled in the portable `.coilbox/` folder
+/// (issue #1786), given the path relative to that folder. A picture, document, clip or
+/// page opens in whatever program the OS opens its file type with. Anything else is
+/// shown in the file manager with its folder open and the file selected. Returns
+/// `{ action: "open" | "reveal" }`, or an error for a path that escapes the folder, a
+/// file that is not there, or an install with no `.coilbox` folder at all.
+#[tauri::command]
+async fn profile_open(path: String) -> CliResult {
+    let acted = open_asset_in(
+        coilbox_portable::portable_root(),
+        &path,
+        |p| p.is_file(),
+        |p| tauri_plugin_opener::open_path(p, None::<&str>).map_err(|e| e.to_string()),
+        |p| tauri_plugin_opener::reveal_item_in_dir(p).map_err(|e| e.to_string()),
+    );
+    match acted {
+        Ok(action) => CliResult::ok(json!({ "action": action })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-profile"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-profile")
@@ -249,7 +341,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             profile_asset,
             profile_file,
             profile_pages,
-            profile_scaffold
+            profile_scaffold,
+            profile_open
         ])
         .build()
 }
@@ -485,6 +578,151 @@ mod tests {
         );
         let err = out.expect_err("a failed write must surface");
         assert!(err.contains("/pkg/.coilbox/profile.json"), "{err}");
+    }
+
+    /// What [`open_asset_in`] did, so a test can assert both the choice and the path
+    /// it acted on. The path is the whole point: it must always be the resolved root
+    /// joined with the link's own relative path, and nothing else.
+    #[derive(Debug, Default)]
+    struct Acted {
+        opened: std::cell::RefCell<Option<PathBuf>>,
+        revealed: std::cell::RefCell<Option<PathBuf>>,
+    }
+
+    /// Run a click on `rel` against a `.coilbox` at `/pkg/.coilbox` where every file
+    /// exists and both the OS handler and the file manager succeed.
+    fn click(rel: &str) -> (Result<&'static str, String>, Acted) {
+        let acted = Acted::default();
+        let out = open_asset_in(
+            Some(PathBuf::from("/pkg/.coilbox")),
+            rel,
+            |_| true,
+            |p| {
+                *acted.opened.borrow_mut() = Some(p.to_path_buf());
+                Ok(())
+            },
+            |p| {
+                *acted.revealed.borrow_mut() = Some(p.to_path_buf());
+                Ok(())
+            },
+        );
+        (out, acted)
+    }
+
+    #[test]
+    fn open_hands_a_bundled_file_under_the_root_to_the_os() {
+        let (out, acted) = click("images/logo.webp");
+        assert_eq!(out, Ok("open"));
+        assert_eq!(
+            acted.opened.into_inner(),
+            Some(PathBuf::from("/pkg/.coilbox/images/logo.webp"))
+        );
+        assert_eq!(acted.revealed.into_inner(), None);
+    }
+
+    #[test]
+    fn open_covers_the_pdf_the_issue_asked_for() {
+        let (out, acted) = click("docs/guide.pdf");
+        assert_eq!(out, Ok("open"));
+        assert_eq!(
+            acted.opened.into_inner(),
+            Some(PathBuf::from("/pkg/.coilbox/docs/guide.pdf"))
+        );
+    }
+
+    #[test]
+    fn open_reveals_a_file_the_os_would_run_rather_than_show() {
+        // The reason the list exists: the program Windows opens a `.bat` with is the
+        // file, so a link captioned "our guide" would run it.
+        for rel in ["setup.bat", "install.exe", "tool.sh", "pack.zip"] {
+            let (out, acted) = click(rel);
+            assert_eq!(out, Ok("reveal"), "{rel}");
+            assert_eq!(acted.opened.into_inner(), None, "{rel}");
+            assert_eq!(
+                acted.revealed.into_inner(),
+                Some(PathBuf::from("/pkg/.coilbox").join(rel)),
+                "{rel}"
+            );
+        }
+    }
+
+    #[test]
+    fn open_falls_back_to_reveal_when_the_os_has_no_handler() {
+        let acted = Acted::default();
+        let out = open_asset_in(
+            Some(PathBuf::from("/pkg/.coilbox")),
+            "images/logo.webp",
+            |_| true,
+            |_| Err("no application knows how to open this".to_string()),
+            |p| {
+                *acted.revealed.borrow_mut() = Some(p.to_path_buf());
+                Ok(())
+            },
+        );
+        assert_eq!(out, Ok("reveal"));
+        assert_eq!(
+            acted.revealed.into_inner(),
+            Some(PathBuf::from("/pkg/.coilbox/images/logo.webp"))
+        );
+    }
+
+    #[test]
+    fn open_refuses_a_path_outside_the_root() {
+        for rel in ["../secret.pdf", "/etc/passwd", "a/../../b.png", ""] {
+            let out = open_asset_in(
+                Some(PathBuf::from("/pkg/.coilbox")),
+                rel,
+                |_| panic!("existence check must not run for a path outside the root"),
+                |_| panic!("the OS must not be asked to open a path outside the root"),
+                |_| panic!("the file manager must not be shown a path outside the root"),
+            );
+            assert!(out.is_err(), "{rel} was allowed");
+        }
+    }
+
+    #[test]
+    fn open_errors_without_a_portable_root() {
+        let out = open_asset_in(
+            None,
+            "images/logo.webp",
+            |_| panic!("existence check must not run without a portable root"),
+            |_| panic!("the OS must not be asked to open anything without a root"),
+            |_| panic!("the file manager must not be shown anything without a root"),
+        );
+        assert!(out.is_err());
+    }
+
+    #[test]
+    fn open_errors_when_the_file_is_not_there() {
+        let out = open_asset_in(
+            Some(PathBuf::from("/pkg/.coilbox")),
+            "images/missing.webp",
+            |_| false,
+            |_| panic!("the OS must not be asked to open a file that is absent"),
+            |_| panic!("the file manager must not be shown a file that is absent"),
+        );
+        let err = out.expect_err("a missing file must surface");
+        assert!(err.contains("images/missing.webp"), "{err}");
+    }
+
+    #[test]
+    fn open_reports_a_file_manager_failure() {
+        let out = open_asset_in(
+            Some(PathBuf::from("/pkg/.coilbox")),
+            "pack.zip",
+            |_| true,
+            |_| panic!("an archive must not be handed to the OS"),
+            |_| Err("no file manager".to_string()),
+        );
+        assert_eq!(out, Err("no file manager".to_string()));
+    }
+
+    #[test]
+    fn viewer_list_ignores_extension_case_and_unknown_types() {
+        assert!(opens_in_a_viewer(Path::new("a/LOGO.WEBP")));
+        assert!(opens_in_a_viewer(Path::new("a/notes.MD")));
+        assert!(!opens_in_a_viewer(Path::new("a/parts.sd7")));
+        assert!(!opens_in_a_viewer(Path::new("a/README")));
     }
 
     #[test]

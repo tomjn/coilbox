@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "profile_file",
     "profile_pages",
     "profile_scaffold",
+    "profile_open",
 ];
 
 fn main() {
