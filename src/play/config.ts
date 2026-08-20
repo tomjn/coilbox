@@ -1,11 +1,13 @@
 import { useSetting } from "@picoframe/frame";
 import { useEffect, useState } from "react";
 import {
+  type ConfigOption,
   type SkirmishAi,
   type SkirmishAisResult,
   unitsyncSkirmishAis,
 } from "../content/bindings";
 import {
+  primeGameInfo,
   useContentState,
   usePreferredEngine,
   useUnitsyncScan,
@@ -93,6 +95,34 @@ export function usePreferredTarget(): {
     if (r) target = build(r.path, r.engines[0]);
   }
   return { target, loading, error };
+}
+
+/**
+ * The game's option list, for a caller about to build a `BattleConfig` but with
+ * no loaded schema to hand. Reads through the same session cache
+ * `useUnitsyncGameInfo` fills, so a screen that already showed the game's
+ * options pays nothing, and awaiting it is safe where waiting a render for a
+ * hook to settle is not.
+ *
+ * Answers `[]` rather than throwing. A game unitsync cannot read is one the
+ * engine is about to refuse anyway, and a launch without the game's defaults
+ * beats no launch at all.
+ */
+export async function gameOptionSchema(
+  target: PlayTarget | null | undefined,
+  gameArchive: string | undefined,
+): Promise<ConfigOption[]> {
+  if (!target || !gameArchive) return [];
+  try {
+    const info = await primeGameInfo(
+      target.enginePath,
+      target.dataDir,
+      gameArchive,
+    );
+    return info.options;
+  } catch {
+    return [];
+  }
 }
 
 /**
