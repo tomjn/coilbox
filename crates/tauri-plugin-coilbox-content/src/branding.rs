@@ -27,6 +27,20 @@ const CATALOG_TTL: Duration = Duration::from_secs(6 * 60 * 60);
 /// and the fetch runs behind it.
 const CATALOG_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// How long we wait to reach an image host before giving up. Covers the name
+/// lookup, the TCP connect and the TLS handshake. Without it a network that
+/// black-holes packets rather than refusing them costs the OS TCP timeout, about
+/// 75 seconds, and `resolve_image` pays that per candidate URL.
+const IMAGE_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// How long a connected transfer may sit idle before we give up. This is an
+/// idle timeout, not a deadline: it resets on every chunk that arrives, so a big
+/// banner on a slow link takes as long as it takes and only a stalled transfer is
+/// cut off. A whole-request timeout would be wrong here, because clipping a
+/// download that was working writes a negative marker saying the picture does not
+/// exist, on exactly the connections that need the art most.
+const IMAGE_READ_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// True when a file modified at `modified` is older than `ttl` relative to `now`.
 /// A modification time in the future (clock skew) counts as fresh.
 fn is_stale(modified: SystemTime, now: SystemTime, ttl: Duration) -> bool {
@@ -377,7 +391,7 @@ pub(crate) async fn resolve_image(
             }
         }
         match fetch_image(url, reencode).await {
-            Some((content_type, bytes)) => {
+            Fetched::Image(content_type, bytes) => {
                 if let Some((pos, _)) = &files {
                     let name = format!(
                         "{}.{}",
@@ -402,7 +416,7 @@ pub(crate) async fn resolve_image(
                     data_url: Some(data_url(&content_type, &bytes)),
                 });
             }
-            None => {
+            Fetched::Absent => {
                 if let Some((_, neg)) = &files {
                     if let Some(dir) = neg.parent() {
                         let _ = std::fs::create_dir_all(dir);
@@ -410,30 +424,80 @@ pub(crate) async fn resolve_image(
                     let _ = std::fs::write(neg, b"");
                 }
             }
+            // No marker. The marker means "the host had nothing for us", and a
+            // fetch we gave up on never got that far, so writing one would hide
+            // the picture for a day over a network that was down for a minute.
+            Fetched::Unreachable => {}
         }
     }
     None
 }
 
-/// Fetch one image URL into (content type, bytes), or `None` on any failure or
-/// non-image. When `reencode` is set the bytes are downsampled and JPEG-encoded
-/// (for opaque photographic art). Bytes that can't be decoded (SVG/WebP) pass
-/// through raw.
-async fn fetch_image(url: &str, reencode: bool) -> Option<(String, Vec<u8>)> {
-    let resp = reqwest::get(url).await.ok()?.error_for_status().ok()?;
+/// What one fetch attempt concluded. The two failures are kept apart because only
+/// one of them is worth remembering: see the `.none` marker in `resolve_image`.
+#[derive(Debug, PartialEq)]
+enum Fetched {
+    /// The picture, as (content type, bytes).
+    Image(String, Vec<u8>),
+    /// The host said no: the picture isn't there, or the body it sent isn't an
+    /// image. Asking again tomorrow gets the same answer.
+    Absent,
+    /// No answer about whether the picture exists: no name, no route, a transfer
+    /// that stalled, or a host telling us it is having a bad minute.
+    Unreachable,
+}
+
+/// What a status the host answered with says about the picture. Only a refusal is
+/// the host saying no: the picture isn't there (404, 410), or isn't ours to have
+/// (403). Everything else it can answer with is "not right now" - 429 asking us to
+/// slow down, a 502 or 503 from an origin or a CDN that is broken - and that says
+/// nothing about whether the picture exists. Remembering one of those as missing
+/// costs a day of card art over a minute of somebody else's downtime.
+fn outcome_for_status(status: reqwest::StatusCode) -> Fetched {
+    match status {
+        reqwest::StatusCode::NOT_FOUND
+        | reqwest::StatusCode::GONE
+        | reqwest::StatusCode::FORBIDDEN => Fetched::Absent,
+        _ => Fetched::Unreachable,
+    }
+}
+
+/// Fetch one image URL. When `reencode` is set the bytes are downsampled and
+/// JPEG-encoded (for opaque photographic art). Bytes that can't be decoded
+/// (SVG/WebP) pass through raw.
+async fn fetch_image(url: &str, reencode: bool) -> Fetched {
+    let client = match reqwest::Client::builder()
+        .connect_timeout(IMAGE_CONNECT_TIMEOUT)
+        .read_timeout(IMAGE_READ_TIMEOUT)
+        .build()
+    {
+        Ok(client) => client,
+        Err(_) => return Fetched::Unreachable,
+    };
+    let resp = match client.get(url).send().await {
+        Ok(resp) => resp,
+        Err(_) => return Fetched::Unreachable,
+    };
+    if !resp.status().is_success() {
+        return outcome_for_status(resp.status());
+    }
     let header = resp
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .map(str::to_owned);
-    let content_type = image_content_type(header.as_deref(), url)?;
-    let bytes = resp.bytes().await.ok()?;
+    let Some(content_type) = image_content_type(header.as_deref(), url) else {
+        return Fetched::Absent;
+    };
+    let Ok(bytes) = resp.bytes().await else {
+        return Fetched::Unreachable;
+    };
     if reencode {
         if let Some(jpeg) = reencode_jpeg(&bytes) {
-            return Some(("image/jpeg".to_string(), jpeg));
+            return Fetched::Image("image/jpeg".to_string(), jpeg);
         }
     }
-    Some((content_type, bytes.to_vec()))
+    Fetched::Image(content_type, bytes.to_vec())
 }
 
 #[cfg(test)]
@@ -647,6 +711,126 @@ mod tests {
         assert!(
             waited < Duration::from_secs(1),
             "answered from disk in {waited:?}, so it waited on the network"
+        );
+    }
+
+    /// A fresh empty image cache directory for one test, named after the test.
+    fn image_dir(tag: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-image-test-{}-{tag}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// A port on the loopback that nothing is listening on, so a connect to it is
+    /// refused straight away.
+    fn closed_port() -> u16 {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.local_addr().unwrap().port()
+    }
+
+    /// Which statuses are the host saying the picture is not there, and which are
+    /// it having a bad minute. Only the first kind is remembered, because a `.none`
+    /// marker hides the picture for 24 hours: a CDN answering 503 for one minute
+    /// costing a day of card art is the same bug as a timeout costing a day of it.
+    #[test]
+    fn only_a_refusal_means_the_picture_is_not_there() {
+        for refusal in [
+            reqwest::StatusCode::NOT_FOUND,
+            reqwest::StatusCode::GONE,
+            reqwest::StatusCode::FORBIDDEN,
+        ] {
+            assert_eq!(
+                outcome_for_status(refusal),
+                Fetched::Absent,
+                "{refusal} is the host saying no, and is worth remembering"
+            );
+        }
+        for later in [
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+            reqwest::StatusCode::BAD_GATEWAY,
+            reqwest::StatusCode::SERVICE_UNAVAILABLE,
+            reqwest::StatusCode::GATEWAY_TIMEOUT,
+        ] {
+            assert_eq!(
+                outcome_for_status(later),
+                Fetched::Unreachable,
+                "{later} is the host saying not right now, so ask again next launch"
+            );
+        }
+    }
+
+    /// The poisoning this guards: a host we never heard back from must not leave a
+    /// `.none` marker, because that marker means "the host had nothing for us" and
+    /// suppresses a refetch for 24 hours. Somebody who was offline for a minute
+    /// would lose their card art for a day.
+    #[test]
+    fn a_host_we_could_not_reach_leaves_no_negative_marker() {
+        let dir = image_dir("unreachable");
+        let url = format!("https://127.0.0.1:{}/banner.png", closed_port());
+        let (pos, neg) = image_cache_files(&dir, &url, false);
+
+        let res = tauri::async_runtime::block_on(resolve_image(
+            std::slice::from_ref(&url),
+            Some(dir.clone()),
+            false,
+        ));
+
+        assert!(res.is_none());
+        assert!(
+            !neg.exists(),
+            "a refused connection wrote a negative marker"
+        );
+        assert!(!pos.exists());
+    }
+
+    /// The other half: a marker that has been written does still suppress the
+    /// refetch. 192.0.2.1 is TEST-NET-1 (RFC 5737), routable and assigned to
+    /// nobody, so reaching it costs the connect timeout. The answer must come back
+    /// long before that, which it only can if the marker was honoured.
+    #[test]
+    fn a_fresh_negative_marker_still_suppresses_the_refetch() {
+        let dir = image_dir("marker");
+        let url = "https://192.0.2.1/banner.png".to_string();
+        let (_, neg) = image_cache_files(&dir, &url, false);
+        std::fs::write(&neg, b"").unwrap();
+
+        let started = std::time::Instant::now();
+        let res = tauri::async_runtime::block_on(resolve_image(
+            std::slice::from_ref(&url),
+            Some(dir),
+            false,
+        ));
+        let waited = started.elapsed();
+
+        assert!(res.is_none());
+        assert!(
+            waited < Duration::from_secs(1),
+            "answered in {waited:?}, so it went to the network anyway"
+        );
+    }
+
+    /// And the wait itself is bounded. Without a connect timeout a black-holed
+    /// host costs the OS TCP timeout, about 75 seconds, per candidate URL.
+    #[test]
+    fn a_black_holed_image_host_gives_up_on_the_connect() {
+        let dir = image_dir("blackhole");
+        let url = "https://192.0.2.1/banner.png".to_string();
+
+        let started = std::time::Instant::now();
+        let res = tauri::async_runtime::block_on(resolve_image(
+            std::slice::from_ref(&url),
+            Some(dir),
+            false,
+        ));
+        let waited = started.elapsed();
+
+        assert!(res.is_none());
+        assert!(
+            waited < IMAGE_CONNECT_TIMEOUT + Duration::from_secs(5),
+            "waited {waited:?}, so the connect is not bounded"
         );
     }
 
