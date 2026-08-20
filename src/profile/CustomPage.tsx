@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { useNavigate } from "react-router";
 import { assetUrl, isLocalRef, mediaKind } from "../lib/assetUrl";
+import { GFM_PLUGINS, GFM_PROSE_CLASSES } from "../lib/markdownGfm";
 import { classifyMarkdownLink } from "./pageLinks";
 import { buildPageNav, getProfilePages, type ProfilePage } from "./pages";
 import { splitWidgets } from "./pageWidgets";
@@ -153,6 +154,7 @@ const PROSE_CLASSES = cn(
   "[&_h3]:mt-4 [&_h3]:mb-1 [&_h3]:font-semibold",
   "[&_li]:ml-4 [&_li]:list-disc [&_p]:my-2 [&_ul]:my-2 [&_ol]:my-2",
   "[&_ol_li]:list-decimal",
+  GFM_PROSE_CLASSES,
 );
 
 /**
@@ -167,7 +169,9 @@ function PageProse({ children }: { children: string }) {
   if (segments.length === 1 && segments[0].kind === "text") {
     return (
       <div className={PROSE_CLASSES}>
-        <Markdown components={MEDIA_COMPONENTS}>{segments[0].text}</Markdown>
+        <Markdown components={MEDIA_COMPONENTS} remarkPlugins={GFM_PLUGINS}>
+          {segments[0].text}
+        </Markdown>
       </div>
     );
   }
@@ -177,7 +181,9 @@ function PageProse({ children }: { children: string }) {
         seg.kind === "text" ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: segments derive from a static body and never reorder
           <div key={i} className={PROSE_CLASSES}>
-            <Markdown components={MEDIA_COMPONENTS}>{seg.text}</Markdown>
+            <Markdown components={MEDIA_COMPONENTS} remarkPlugins={GFM_PLUGINS}>
+              {seg.text}
+            </Markdown>
           </div>
         ) : (
           // biome-ignore lint/suspicious/noArrayIndexKey: segments derive from a static body and never reorder
