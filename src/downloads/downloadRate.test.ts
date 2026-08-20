@@ -46,6 +46,52 @@ const STREAMER_SAMPLES: RateSample[] = [
   { at: 638, bytes: 0, fraction: null },
 ];
 
+const ENGINE_TOTAL = 17_985_637;
+
+/**
+ * The transfer half of a real engine install through pr-downloader, off the run
+ * that produced the `engine-bar105.stdout.txt` capture. Each pair is the time a
+ * segment arrived and the byte count it reported, rounded to whole milliseconds
+ * because `Date.now()` has nothing finer to record them with. pr-downloader
+ * throttles its own redraws to 150ms, which is the gap these land at.
+ */
+const ENGINE_TRANSFER: RateSample[] = (
+  [
+    [576, 1],
+    [1265, 8259],
+    [1431, 376_624],
+    [1585, 1_015_573],
+    [1731, 1_802_005],
+    [1883, 2_866_956],
+    [2033, 3_850_032],
+    [2185, 5_013_269],
+    [2335, 6_405_900],
+    [2485, 7_421_726],
+    [2638, 8_453_927],
+    [2789, 9_568_039],
+    [2941, 10_811_231],
+    [3092, 12_318_577],
+    [3250, 13_678_422],
+    [3402, 15_169_375],
+    [3558, 16_299_862],
+    [3709, 17_528_662],
+    [3776, ENGINE_TOTAL],
+  ] as [number, number][]
+).map(([at, bytes], i) => ({
+  at,
+  bytes,
+  // The first is the rapid repo master, an unsized fetch pr-downloader sizes at
+  // one and reports complete. The archive itself starts again below it.
+  fraction: i === 0 ? 1 : bytes / ENGINE_TOTAL,
+}));
+
+/**
+ * What the same run said next: it had started unpacking. Nothing else is said
+ * until the engine is installed, which for 223 files took another 657ms here and
+ * takes far longer on a bigger engine or a slower disk.
+ */
+const ENGINE_EXTRACT: RateSample = { at: 4108, bytes: 0, fraction: null };
+
 /** The timestamp of the newest sample, for a `now` that is not stale. */
 function latest(samples: RateSample[]): number {
   return samples[samples.length - 1].at;
@@ -248,6 +294,37 @@ describe("rateFrom", () => {
     expect(rateFrom(samples, null, 60_000).stalled).toBe(false);
     samples = addSample(samples, { at: 1000, bytes: 4_000_000, fraction: 0.4 });
     expect(rateFrom(samples, null, 60_000).stalled).toBe(true);
+  });
+
+  it("would call an engine being unpacked stalled if nobody said so", () => {
+    // The bug in issue #1826, and the reason the sidecar has to report the
+    // phase: a transfer that ends at 100% and goes quiet is indistinguishable
+    // from one that died at 100%, and unpacking an engine is minutes of quiet.
+    const samples = ENGINE_TRANSFER.reduce(addSample, [] as RateSample[]);
+    const rate = rateFrom(samples, ENGINE_TOTAL, ENGINE_EXTRACT.at + 60_000);
+    expect(rate.stalled).toBe(true);
+  });
+
+  it("does not call an engine being unpacked stalled", () => {
+    const samples = [...ENGINE_TRANSFER, ENGINE_EXTRACT].reduce(
+      addSample,
+      [] as RateSample[],
+    );
+    // The transfer is over and the sample saying so is the only one left, so
+    // there is no rate to quote and nothing has been lost to call a stall.
+    expect(samples).toEqual([ENGINE_EXTRACT]);
+    const rate = rateFrom(samples, null, ENGINE_EXTRACT.at + 60_000);
+    expect(rate.stalled).toBe(false);
+    expect(rate.bytesPerSec).toBeNull();
+    expect(rate.secondsLeft).toBeNull();
+  });
+
+  it("quotes a real rate for the transfer before the unpacking", () => {
+    const samples = ENGINE_TRANSFER.reduce(addSample, [] as RateSample[]);
+    const rate = rateFrom(samples, ENGINE_TOTAL, latest(ENGINE_TRANSFER));
+    // 18 MB off GitHub in two and a half seconds.
+    expect(rate.bytesPerSec).toBeGreaterThan(6 * 1024 * 1024);
+    expect(rate.stalled).toBe(false);
   });
 
   it("does not call a brief pause a stall", () => {
