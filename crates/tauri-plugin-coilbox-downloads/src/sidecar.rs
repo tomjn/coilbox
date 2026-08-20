@@ -147,9 +147,14 @@ use crate::progress::{percent, DownloadProgress};
 /// `[Progress]`/`Progress` marker and an `NN%` token, and additionally captures a
 /// `downloaded/total` byte pair when present (e.g.
 /// `[Progress] 42% [===>   ] 123456/294000`).
+///
+/// The `%` is required as well as the word, because pr-downloader prints one
+/// `extracting (<path>)` line per file in an archive, so any path with
+/// "progress" in its name walks into the word match and comes back out with a
+/// percentage scraped from whatever number the path happens to end in.
 pub fn parse_progress_line(line: &str) -> Option<DownloadProgress> {
     let lower = line.to_lowercase();
-    if !lower.contains("progress") {
+    if !lower.contains("progress") || !line.contains('%') {
         return None;
     }
     // Percent: the token immediately before a '%'.
@@ -160,14 +165,22 @@ pub fn parse_progress_line(line: &str) -> Option<DownloadProgress> {
     })?;
 
     // Optional "downloaded/total" pair: first whitespace-delimited token of the
-    // form <digits>/<digits>.
+    // form <digits>/<digits>. Taking the first is safe rather than lucky:
+    // pr-downloader has one progress format string, and the only other token in
+    // it is a bar drawn from `=` and spaces.
     let pair = line.split_whitespace().find_map(|tok| {
         let (a, b) = tok.split_once('/')?;
         Some((a.parse::<u64>().ok()?, b.parse::<u64>().ok()?))
     });
 
+    // A zero total is pr-downloader saying it does not know the size, not a
+    // download of nothing: a rapid download served by streamer.cgi reports the
+    // whole archive as `0/0`. Passing that on as a measured zero draws a
+    // determinate bar pinned at 0% captioned "0 B of 0 B". Unknown draws the
+    // indeterminate bar instead, which is what the app has for a size nobody
+    // reported.
     let (downloaded, total) = match pair {
-        Some((d, t)) => (d, Some(t)),
+        Some((d, t)) => (d, (t > 0).then_some(t)),
         None => (0, None),
     };
 
@@ -175,8 +188,14 @@ pub fn parse_progress_line(line: &str) -> Option<DownloadProgress> {
         phase: "downloading".into(),
         downloaded_bytes: downloaded,
         total_bytes: total,
-        // Prefer a byte-derived percent when we have the pair, else the printed %.
-        percent: percent(downloaded, total).or(Some(pct.min(100.0))),
+        // Prefer a byte-derived percent when the pair carries a usable total.
+        // Only a line with no pair at all falls back to the printed number,
+        // because pr-downloader works its own percentage out from that same
+        // total: the 0% beside `0/0` means "size unknown", not "nothing yet".
+        percent: match pair {
+            Some(_) => percent(downloaded, total),
+            None => Some(pct.min(100.0)),
+        },
         bytes_per_sec: None,
     })
 }
