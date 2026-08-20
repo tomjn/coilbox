@@ -6,6 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * The plugin's consent check reads the settings file rather than anything this
  * webview says, so "the switch has moved" and "the file says so" are two
  * different moments. `flush` is the second one.
+ *
+ * What a failed save then says to the person who made it is
+ * `./settings-storage.dom.test.tsx`, which needs a DOM to read it off the
+ * screen. It is stubbed here so this file stays about the queue.
  */
 
 /** The Tauri commands, replaced by a save this test controls the timing of. */
@@ -44,6 +48,8 @@ vi.mock("./uberstress/bindings", () => ({
     });
   },
 }));
+
+vi.mock("./notify/notify", () => ({ notify: vi.fn() }));
 
 import { installSettingsStorage } from "./lib/storedSetting";
 import { createTauriSettingsStorage } from "./settings-storage";

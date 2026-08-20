@@ -2,6 +2,7 @@ import {
   type FlushableSettingsStorage,
   installSettingsStorage,
 } from "./lib/storedSetting";
+import { notify } from "./notify/notify";
 import { usSettingsLoad, usSettingsSave } from "./uberstress/bindings";
 
 /**
@@ -15,6 +16,14 @@ import { usSettingsLoad, usSettingsSave } from "./uberstress/bindings";
  *
  * `flush` is how anything that cares about the file rather than the cache waits
  * for that write to land. See `settingsWritten` in `./lib/storedSetting`.
+ *
+ * A save that fails raises a notification (issue #1701). It used to be a
+ * `console.error` and nothing else, so the switch stayed where it was put, the
+ * file kept the old answer, and the first anybody heard of it was the hub plugin
+ * refusing an upload and telling them to turn on a switch they could see was
+ * already on. A notification is right here where it was wrong for a background
+ * backfill (#1690): somebody changed a setting, so somebody is looking at the
+ * screen, and the answer they were given is untrue until they are told.
  */
 export async function createTauriSettingsStorage(): Promise<FlushableSettingsStorage> {
   const cache = new Map<string, string>();
@@ -25,12 +34,28 @@ export async function createTauriSettingsStorage(): Promise<FlushableSettingsSto
     console.error("uberstress: failed to load settings; starting empty", e);
   }
 
+  // Whether the save before this one failed, so a disk that has stopped taking
+  // writes is said once rather than once per setting anybody touches.
+  let failing = false;
   let queue: Promise<unknown> = Promise.resolve();
+
   const persist = () => {
     const entries = Object.fromEntries(cache);
     queue = queue.then(() =>
-      usSettingsSave({ entries }).catch((e) =>
-        console.error("uberstress: settings save failed", e),
+      usSettingsSave({ entries }).then(
+        () => {
+          failing = false;
+        },
+        (e) => {
+          console.error("uberstress: settings save failed", e);
+          if (failing) return;
+          failing = true;
+          void notify({
+            level: "error",
+            title: "Coilbox could not save your settings",
+            body: "Your change will be lost when Coilbox closes, and anything that reads the settings file still has the old answer. Check the disk is not full, then change the setting again to try saving it.",
+          });
+        },
       ),
     );
   };
