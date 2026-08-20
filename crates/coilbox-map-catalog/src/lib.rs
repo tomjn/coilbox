@@ -212,8 +212,17 @@ pub fn catalog_digest() -> &'static str {
     static DIGEST: OnceLock<String> = OnceLock::new();
     DIGEST.get_or_init(|| {
         let digest = Sha256::digest(CATALOG_JSON.as_bytes());
-        format!("sha256:{digest:x}")
+        format!("sha256:{}", hex(&digest))
     })
+}
+
+/// Lowercase hex, two digits a byte.
+///
+/// Spelled out because sha2 0.11's output type does not format itself. Its
+/// predecessor's did, and `{:x}` over that produced exactly this, which the
+/// pinned digest below is the check on.
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// What goes in `catalog_version` on every entry this build submits.
@@ -271,6 +280,18 @@ mod tests {
         );
     }
 
+    /// Two lowercase digits a byte, including for a byte below 0x10.
+    ///
+    /// The catalog's own digest cannot check this. Every byte in it happens to
+    /// be 0x10 or over, so a hex that dropped its zero padding would still
+    /// produce the pinned string above and still be 64 characters long. The
+    /// padding is what makes a digest a fixed width, and the hub reads these as
+    /// text, so it is checked on a value chosen to need it.
+    #[test]
+    fn hex_pads_a_byte_below_sixteen() {
+        assert_eq!(hex(&[0x00, 0x0f, 0xa0, 0xff]), "000fa0ff");
+    }
+
     /// The `sha256:` prefix is part of the value, because the hub serves it that
     /// way and a comparison that has to strip something is a comparison that can
     /// strip it differently on the two sides.
@@ -301,7 +322,7 @@ mod tests {
     fn a_changed_document_is_a_changed_digest() {
         let edited = CATALOG_JSON.replace("\"catalogVersion\": 3", "\"catalogVersion\": 4");
         assert_ne!(edited, CATALOG_JSON, "the replacement matched nothing");
-        let edited_digest = format!("sha256:{:x}", Sha256::digest(edited.as_bytes()));
+        let edited_digest = format!("sha256:{}", hex(&Sha256::digest(edited.as_bytes())));
         assert_ne!(catalog_digest(), edited_digest);
     }
 

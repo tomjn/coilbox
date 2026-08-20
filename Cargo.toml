@@ -37,12 +37,11 @@ members = [
 # uploads goes through it too, so the five members that hash share one
 # declaration rather than five that can drift apart (issue #1751).
 #
-# Each of those members also declares sha2 a second time, in a target block, and
-# that block is the point of this entry. On x86 sha2 always builds its SHA-NI
-# backend and chooses it at runtime, so a plain build already runs on hardware
-# there. On aarch64 the hardware backend is behind the `asm` feature, and
-# without it an Apple Silicon build hashes at 338 MiB/s instead of 1,972 MiB/s.
-# The block excludes MSVC because `asm` brings in sha2-asm, whose GNU-syntax .S
-# sources cl.exe will not assemble (RustCrypto/asm-hashes#17), so an unguarded
-# feature would stop windows-arm64 building.
-sha2 = "0.10"
+# 0.11 compiles both the aarch64 and the x86 hardware backend and picks between
+# them and the portable code at runtime through cpufeatures. 0.10 only did that
+# on x86: aarch64 needed the `asm` feature, which pulled in sha2-asm, whose
+# GNU-syntax .S sources cl.exe will not assemble (RustCrypto/asm-hashes#17), so
+# each of these five crates carried a second declaration guarded on
+# `cfg(all(target_arch = "aarch64", not(target_env = "msvc")))` and windows-arm64
+# was left on the portable code. None of that is needed here (issue #1757).
+sha2 = "0.11"

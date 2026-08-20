@@ -168,8 +168,17 @@ pub fn vocabulary_digest() -> &'static str {
     static DIGEST: OnceLock<String> = OnceLock::new();
     DIGEST.get_or_init(|| {
         let digest = Sha256::digest(VOCABULARY_JSON.as_bytes());
-        format!("sha256:{digest:x}")
+        format!("sha256:{}", hex(&digest))
     })
+}
+
+/// Lowercase hex, two digits a byte.
+///
+/// Spelled out because sha2 0.11's output type does not format itself. Its
+/// predecessor's did, and `{:x}` over that produced exactly this, which the
+/// pinned digest below is the check on.
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// The caps for one variant, or `None` when it is not a variant the hub stores
@@ -451,6 +460,18 @@ mod tests {
             vocabulary_digest(),
             "sha256:66f986361a51d8486b619b2f5a541f4e207ad4309e0a8a0ae2597b859daf84bd"
         );
+    }
+
+    /// Two lowercase digits a byte, including for a byte below 0x10.
+    ///
+    /// The vocabulary's own digest checks this only by luck: it has a 0x0a in
+    /// it today, so a hex that dropped its zero padding would come out 62
+    /// characters and the test above would fail. Edit the vocabulary and that
+    /// can stop being true, as it already is for the map catalog's digest, so
+    /// the padding is checked on a value chosen to need it.
+    #[test]
+    fn hex_pads_a_byte_below_sixteen() {
+        assert_eq!(hex(&[0x00, 0x0f, 0xa0, 0xff]), "000fa0ff");
     }
 
     /// The `sha256:` prefix is part of the value, because the hub serves it that

@@ -21,10 +21,5 @@ getrandom = "0.3"
 # awaits and so cannot be a std one.
 tokio = { version = "1", features = ["net", "io-util", "rt", "sync", "time"] }
 
-# The hardware SHA-256 backend, which is a feature on aarch64 and automatic
-# everywhere else. The workspace root says why the block is shaped this way.
-[target.'cfg(all(target_arch = "aarch64", not(target_env = "msvc")))'.dependencies]
-sha2 = { workspace = true, features = ["asm"] }
-
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

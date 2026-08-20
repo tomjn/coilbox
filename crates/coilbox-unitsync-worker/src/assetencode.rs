@@ -357,7 +357,17 @@ fn rescale(words: &[u16], window: HeightWindow) -> Vec<u8> {
 /// is over what [`encode_variant`] produced. Only the first is stable across
 /// coilbox releases, so it is the one dedupe and the have check compare on.
 pub fn sha256_hex(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    hex(&Sha256::digest(bytes))
+}
+
+/// Lowercase hex, two digits a byte.
+///
+/// Spelled out because sha2 0.11's output type does not format itself. Its
+/// predecessor's did, and `{:x}` over that produced exactly this. Every
+/// `source_hash` on the hub was written by the older spelling, so this one has
+/// to agree with it byte for byte or the corpus is orphaned.
+pub(crate) fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// `source_hash` for a map layer read off a sample grid: the samples, framed by
@@ -400,7 +410,7 @@ pub fn map_source_hash(variant: &str, width: u32, height: u32, samples: &[u8]) -
     hasher.update(width.to_le_bytes());
     hasher.update(height.to_le_bytes());
     hasher.update(samples);
-    format!("{:x}", hasher.finalize())
+    hex(&hasher.finalize())
 }
 
 /// `source_hash` for a top down render (issue #1631).
@@ -459,7 +469,7 @@ pub fn render_source_hash(
     hasher.update(width_px.to_le_bytes());
     hasher.update(height_px.to_le_bytes());
     hasher.update(model_digest.as_bytes());
-    format!("{:x}", hasher.finalize())
+    hex(&hasher.finalize())
 }
 
 /// What the render was taken of: the model file and every texture it draws with,
@@ -489,7 +499,7 @@ pub fn model_source_digest<T: AsRef<[u8]>>(model: &[u8], textures: &[T]) -> Stri
         hasher.update((texture.len() as u64).to_le_bytes());
         hasher.update(texture);
     }
-    format!("{:x}", hasher.finalize())
+    hex(&hasher.finalize())
 }
 
 /// The file extension for an asset class's mime, for naming the file on disk.
