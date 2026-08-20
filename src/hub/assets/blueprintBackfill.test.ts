@@ -1,4 +1,31 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+/** Everything the run filed in the bell without showing it (issue #1703), which
+ *  is where a stopped run lands (issue #1686). */
+const recorded: { title: string; body: string; to?: string }[] = [];
+vi.mock("@/notify/notify", () => ({
+  notify: async () => {},
+  recordQuietly: (input: { title: string; body: string; to?: string }) => {
+    recorded.push(input);
+  },
+}));
+
+/** What `hub_upload_cancel` was handed. The fake upload below is what a run
+ *  actually calls, so this only fires when the stop reaches the plugin. */
+const cancelled: unknown[] = [];
+vi.mock("@picoframe/plugin-sdk", () => ({
+  defineCommand:
+    (_plugin: string, command: string) => async (args: unknown) => {
+      if (command === "hub_upload_cancel") cancelled.push(args);
+      return {};
+    },
+}));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  Channel: class {
+    onmessage: ((sample: unknown) => void) | null = null;
+  },
+}));
 
 import type { UnitDatasetEntry } from "@/content/bindings";
 import {
@@ -9,7 +36,13 @@ import {
   unitsWanted,
 } from "./blueprintBackfill";
 import type { AssetKey, HaveResult, HaveStatus } from "./have";
-import type { AssetUpload } from "./upload";
+import {
+  forgetRunningUploads,
+  type RunningUpload,
+  readRunningUploads,
+  stopUploadRun,
+} from "./runningUploads";
+import type { AssetUpload, AssetUploadProgress } from "./upload";
 
 /**
  * Beyond All Reason's roster after #1663, which is the number this file exists
@@ -53,6 +86,13 @@ interface Spy {
   uploads: AssetUpload[][];
   /** Who each run said started it (issue #1690). */
   startedBy: string[];
+  /** The id each run made itself cancellable by, and whether it offered a
+   *  progress channel at all (issue #1686). */
+  uploadOpIds: (string | undefined)[];
+  uploadReported: boolean[];
+  /** What the topbar held at each moment a picture was drawn, so a test can see
+   *  the run while it is going rather than only after it. */
+  shownWhileDrawing: RunningUpload[][];
   /** What each encode was handed, so a test can see whether the key it was named
    *  by came with it (issue #1720). */
   encodes: {
@@ -70,11 +110,23 @@ function spy(
     hubHas?: (unit: string) => boolean;
     shipsBuildpic?: (unit: string) => boolean;
     modelless?: (unit: string) => boolean;
+    /** Run before each draw, given how many have been drawn already. Where a
+     *  test presses stop partway through the drawing half. */
+    beforeDraw?: (drawn: number) => void | Promise<void>;
+    /** Run inside the upload, given the progress channel the run handed over.
+     *  Where a test presses stop partway through the sending half. */
+    whileSending?: (
+      report: (sample: AssetUploadProgress) => void,
+    ) => void | Promise<void>;
+    /** How many of the set the fake hub took, when the run was stopped partway.
+     *  Defaults to all of them. */
+    takes?: (assets: AssetUpload[]) => number;
   } = {},
 ): Spy {
   const hubHas = options.hubHas ?? (() => false);
   const shipsBuildpic = options.shipsBuildpic ?? (() => true);
   const modelless = options.modelless ?? (() => false);
+  const takes = options.takes ?? ((assets: AssetUpload[]) => assets.length);
 
   const state = {
     renderKeyCalls: 0,
@@ -84,6 +136,9 @@ function spy(
     draws: 0,
     uploads: [] as AssetUpload[][],
     startedBy: [] as string[],
+    uploadOpIds: [] as (string | undefined)[],
+    uploadReported: [] as boolean[],
+    shownWhileDrawing: [] as RunningUpload[][],
     encodes: [] as Spy["encodes"],
   };
 
@@ -169,7 +224,11 @@ function spy(
       errors: [],
     }),
     draw: async () => {
+      await options.beforeDraw?.(state.draws);
       state.draws += 1;
+      state.shownWhileDrawing.push(
+        readRunningUploads().map((run) => ({ ...run })),
+      );
       return {
         width: 4,
         height: 4,
@@ -214,10 +273,13 @@ function spy(
         errors: [],
       };
     },
-    upload: async (_hubUrl, assets, options) => {
+    upload: async (_hubUrl, assets, given) => {
       state.uploads.push(assets);
-      state.startedBy.push(options.startedBy);
-      return { outcomes: [], written: assets.length, error: null };
+      state.startedBy.push(given.startedBy);
+      state.uploadOpIds.push(given.opId);
+      state.uploadReported.push(Boolean(given.onProgress));
+      await options.whileSending?.(given.onProgress ?? (() => {}));
+      return { outcomes: [], written: takes(assets), error: null };
     },
   };
 
@@ -247,6 +309,15 @@ function spy(
     get startedBy() {
       return state.startedBy;
     },
+    get uploadOpIds() {
+      return state.uploadOpIds;
+    },
+    get uploadReported() {
+      return state.uploadReported;
+    },
+    get shownWhileDrawing() {
+      return state.shownWhileDrawing;
+    },
     get encodes() {
       return state.encodes;
     },
@@ -264,6 +335,12 @@ const TARGET = {
 function unitsOf(count: number): BackfillUnit[] {
   return blueprintBackfillUnits(buildings(count), roster());
 }
+
+beforeEach(() => {
+  forgetRunningUploads();
+  recorded.length = 0;
+  cancelled.length = 0;
+});
 
 describe("which units a layout names", () => {
   /** The property the whole issue is about. */
@@ -589,5 +666,242 @@ describe("lining the answers up", () => {
    *  so an answer that does not cover the batch draws none. */
   it("draws nothing when the answers do not cover the keys", () => {
     expect(unitsWanted(keys, [{ ...keys[0], status: "missing" }])).toEqual([]);
+  });
+});
+
+describe("what a run says about itself while it is going (issue #1686)", () => {
+  /**
+   * The ordinary case, and the reason there is a threshold at all. A layout of
+   * twelve units whose pictures the hub already holds is a have check and an
+   * archive read, and putting a pill in the topbar for that is noise.
+   */
+  it("stays silent for a run with nothing to draw", async () => {
+    const watch = spy({ hubHas: () => true });
+    await backfillBlueprintUnits(TARGET, unitsOf(12), 100, watch.tools);
+
+    expect(watch.draws).toBe(0);
+    expect(watch.shownWhileDrawing).toEqual([]);
+    // And the run still happened: the build pics went.
+    expect(watch.uploads[0]).toHaveLength(12);
+  });
+
+  /** The case the issue is about: twelve model reads and twelve renders, which
+   *  can be a minute with nothing on screen saying why. */
+  it("puts a run with pictures to draw on screen, named by its game", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(TARGET, unitsOf(12), 100, watch.tools);
+
+    const first = watch.shownWhileDrawing[0];
+    expect(first).toHaveLength(1);
+    expect(first[0].game).toBe("bar");
+    expect(first[0].phase).toBe("drawing");
+    expect(first[0].total).toBe(12);
+  });
+
+  it("counts the pictures off as they are drawn", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(TARGET, unitsOf(4), 100, watch.tools);
+
+    expect(watch.shownWhileDrawing.map((shown) => shown[0].done)).toEqual([
+      0, 1, 2, 3,
+    ]);
+  });
+
+  it("leaves the topbar when the run ends", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(TARGET, unitsOf(4), 100, watch.tools);
+
+    expect(readRunningUploads()).toEqual([]);
+  });
+
+  /** A run that threw has still finished, and a pill nothing will ever clear is
+   *  worse than no pill. */
+  it("leaves the topbar when the run falls over", async () => {
+    const watch = spy();
+    watch.tools.models = async () => {
+      throw new Error("the archive would not mount");
+    };
+    await expect(
+      backfillBlueprintUnits(TARGET, unitsOf(4), 100, watch.tools),
+    ).rejects.toThrow("would not mount");
+
+    expect(readRunningUploads()).toEqual([]);
+  });
+
+  /** #1636 passed neither, which is the whole of why a run could not be
+   *  stopped. */
+  it("makes the upload cancellable and asks it for progress", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
+
+    expect(watch.uploadOpIds[0]).toEqual(expect.any(String));
+    expect(watch.uploadReported).toEqual([true]);
+  });
+
+  it("gives each run an id of its own", async () => {
+    const first = spy();
+    const second = spy();
+    await backfillBlueprintUnits(TARGET, unitsOf(3), 100, first.tools);
+    await backfillBlueprintUnits(TARGET, unitsOf(3), 100, second.tools);
+
+    expect(first.uploadOpIds[0]).not.toBe(second.uploadOpIds[0]);
+  });
+
+  it("shows the sending half once the drawing is done", async () => {
+    let sending: RunningUpload | undefined;
+    const watch = spy({
+      whileSending: () => {
+        sending = readRunningUploads()[0];
+      },
+    });
+    await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
+
+    expect(sending?.phase).toBe("sending");
+    // Six pictures rather than three: a build pic and a render each.
+    expect(sending?.total).toBe(6);
+  });
+
+  it("moves the sending half on from what the plugin reports", async () => {
+    let midway: RunningUpload | undefined;
+    const watch = spy({
+      whileSending: (report) => {
+        report({
+          phase: "uploading",
+          done: 4,
+          total: 6,
+          percent: 66,
+          uploaded: 3,
+          alreadyHad: 1,
+          refused: 0,
+          uploadedBytes: 900,
+          subject: "bar's unit1 buildpic",
+        });
+        midway = readRunningUploads()[0];
+      },
+    });
+    await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
+
+    expect(midway?.done).toBe(4);
+    expect(midway?.sent).toBe(3);
+  });
+});
+
+describe("stopping a run that is going (issue #1686)", () => {
+  /**
+   * The proof that a stop stops the work rather than hiding it. Twelve units to
+   * draw, stopped while the third is being drawn, and the run draws three. A
+   * button that only cleared the pill would leave this at twelve.
+   *
+   * Three rather than two, because the flag is read between pictures: the one in
+   * hand when the button is pressed is finished. That is the design, not a
+   * rounding error, and unwinding a GL draw halfway through to save one render
+   * is not worth the machinery.
+   */
+  it("stops drawing where it was told to, rather than running on", async () => {
+    const watch = spy({
+      beforeDraw: async (drawn) => {
+        if (drawn === 2) await stopUploadRun(readRunningUploads()[0].opId);
+      },
+    });
+    const report = await backfillBlueprintUnits(
+      TARGET,
+      unitsOf(12),
+      100,
+      watch.tools,
+    );
+
+    expect(watch.draws).toBe(3);
+    expect(report.rendered).toBe(3);
+  });
+
+  /**
+   * And nothing goes. The pictures drawn so far are in this machine's cache,
+   * which costs nobody anything, and the build pics were extracted before the
+   * hub was asked, so a stop while drawing has nothing to be honest about.
+   */
+  it("sends nothing at all when it was stopped while drawing", async () => {
+    const watch = spy({
+      beforeDraw: async (drawn) => {
+        if (drawn === 2) await stopUploadRun(readRunningUploads()[0].opId);
+      },
+    });
+    const report = await backfillBlueprintUnits(
+      TARGET,
+      unitsOf(12),
+      100,
+      watch.tools,
+    );
+
+    expect(watch.uploads).toEqual([]);
+    expect(report.written).toBe(0);
+    expect(recorded).toEqual([
+      {
+        title: "You stopped the picture uploads",
+        body: "Coilbox has stopped sending pictures for bar. Nothing had been sent, so nothing was added to the hub.",
+        level: "info",
+        to: "/settings/hub",
+      },
+    ]);
+  });
+
+  /** The other half. `hub_upload_cancel` is what stops a run the plugin has
+   *  already started, and nothing reached it before this. */
+  it("asks the plugin to stop an upload it is in the middle of", async () => {
+    const watch = spy({
+      whileSending: async () => {
+        await stopUploadRun(readRunningUploads()[0].opId);
+      },
+    });
+    await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
+
+    expect(cancelled).toEqual([{ opId: watch.uploadOpIds[0] }]);
+  });
+
+  /**
+   * A stop is not an undo. Three pictures reached the hub before the button was
+   * pressed and they are on the hub, in a public repository, so the sentence
+   * left behind says so and counts them.
+   */
+  it("says what had already gone when it was stopped while sending", async () => {
+    const watch = spy({
+      takes: () => 3,
+      whileSending: async () => {
+        await stopUploadRun(readRunningUploads()[0].opId);
+      },
+    });
+    const report = await backfillBlueprintUnits(
+      TARGET,
+      unitsOf(3),
+      100,
+      watch.tools,
+    );
+
+    expect(report.written).toBe(3);
+    expect(recorded).toEqual([
+      {
+        title: "You stopped the picture uploads",
+        body: "Coilbox has stopped sending pictures for bar. 3 pictures had already gone, and they stay on the hub.",
+        level: "info",
+        to: "/settings/hub",
+      },
+    ]);
+  });
+
+  it("leaves nothing in the bell for a run nobody stopped", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
+
+    expect(recorded).toEqual([]);
+  });
+
+  it("takes a stopped run off the topbar", async () => {
+    const watch = spy({
+      beforeDraw: async (drawn) => {
+        if (drawn === 1) await stopUploadRun(readRunningUploads()[0].opId);
+      },
+    });
+    await backfillBlueprintUnits(TARGET, unitsOf(12), 100, watch.tools);
+
+    expect(readRunningUploads()).toEqual([]);
   });
 });

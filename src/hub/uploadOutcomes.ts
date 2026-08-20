@@ -318,7 +318,10 @@ export function reportAssetUploadOutcomes(
  * they just did. What the bell holds is the part they may want later: what had
  * already gone.
  */
-export function reportAssetUploadStopped(sent: number, run: UploadRun = {}): void {
+export function reportAssetUploadStopped(
+  sent: number,
+  run: UploadRun = {},
+): void {
   deliver([assetUploadStoppedReport(sent, run)], "coilbox");
 }
 
