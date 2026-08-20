@@ -22,6 +22,8 @@
  * handler and its two confirmations.
  */
 
+import { containerKindName } from "@/container/names";
+
 /** Response envelopes, from `lib/api/items.ts` in tomjn/coilbox-hub. */
 const ITEMS_FORMAT = "coilbox-hub-items";
 const ITEM_FORMAT = "coilbox-hub-item";
@@ -298,15 +300,6 @@ export function kindLabelPlural(kind: HubKind): string {
   return KIND_PLURAL[kind];
 }
 
-/** Singular kind names, for a card's badge. */
-const KIND_SINGULAR: Record<HubKind, string> = {
-  preset: "Preset",
-  challenge: "Challenge",
-  "setup-pack": "Setup pack",
-  scenario: "Scenario",
-  blueprint: "Blueprint",
-};
-
 /**
  * What the hub carries, to open a sentence with: "Presets, challenges, setup
  * packs, scenarios and blueprints".
@@ -328,15 +321,31 @@ export function kindsPlural(): string {
     : `${[first, ...said].join(", ")} and ${last}`;
 }
 
+/** A label to start with a capital, since a badge is not part of a sentence. */
+function opened(label: string): string {
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
+}
+
 /**
  * What a card calls an item. A challenge's `mode` says which of the two it is,
  * which is the difference between a galactic conquest and a warpath run and
  * worth more to a reader than the word "challenge" on its own.
+ *
+ * The words come from {@link containerKindName} (issue #1520), so a badge calls
+ * a thing what the rest of coilbox calls it: a Singleplayer preset rather than a
+ * Preset, a Base blueprint rather than a Blueprint. The hub's own copy of these
+ * names said neither, and was the only place in the app that did. The plurals
+ * above stay written out: they name a filter rather than a thing, and the chip
+ * row has no room to spell them out in full.
+ *
+ * A listing is read without checking each row's kind, so a hub carrying a kind
+ * this build has never heard of reaches here as a string with no name. Fall back
+ * to the kind itself: an ugly badge beats a card that throws.
  */
 export function describeItem(kind: HubKind, mode: string | null): string {
-  const label = KIND_SINGULAR[kind] ?? kind;
   if (kind === "challenge" && mode) {
-    return `${mode.charAt(0).toUpperCase()}${mode.slice(1)} challenge`;
+    return `${opened(mode)} challenge`;
   }
-  return label;
+  const name: string | undefined = containerKindName(kind);
+  return opened(name ?? kind);
 }

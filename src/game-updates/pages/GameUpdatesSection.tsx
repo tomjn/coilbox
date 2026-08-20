@@ -1,9 +1,24 @@
 import { Button } from "@picoframe/frame";
-import Markdown from "react-markdown";
+import Markdown, { type Components } from "react-markdown";
 import { Link } from "react-router";
 import { useWriteRoot } from "../../downloads/config";
 import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
+import { externalOnlyLink } from "../../lib/MarkdownLink";
 import { useGameUpdates } from "../GameUpdatesProvider";
+
+/**
+ * A release body is written by whoever cut the release, and points at github.com
+ * when it points anywhere. Clicking one of its links opens it in the browser
+ * instead of drawing the release page over Coilbox, which has no way back (issue
+ * #1789).
+ *
+ * A bare URL, which is how GitHub writes the "Full Changelog" line it appends to
+ * a generated body, is not a link here at all: this render has no `remark-gfm`,
+ * so nothing autolinks. That is issue #1791 rather than this one.
+ */
+const CHANGELOG_COMPONENTS: Components = {
+  a: externalOnlyLink("game updates"),
+};
 
 /** Settings section at /settings/game-updates. */
 export default function GameUpdatesSection() {
@@ -81,7 +96,9 @@ export default function GameUpdatesSection() {
           </div>
           {release.body && (
             <div className="max-h-64 overflow-auto rounded-md bg-muted/40 p-3 text-sm [&_a]:text-primary [&_a]:underline [&_code]:font-mono [&_h1]:mt-2 [&_h1]:font-semibold [&_h2]:mt-2 [&_h2]:font-semibold [&_li]:ml-4 [&_li]:list-disc [&_p]:my-1">
-              <Markdown>{release.body}</Markdown>
+              <Markdown components={CHANGELOG_COMPONENTS}>
+                {release.body}
+              </Markdown>
             </div>
           )}
 
