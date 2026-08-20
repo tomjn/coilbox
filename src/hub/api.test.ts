@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { containerKindName } from "@/container/names";
 import {
+  describeItem,
   fetchHubItems,
   HUB_KINDS,
   hubItemsUrl,
@@ -214,5 +216,31 @@ describe("the kinds, as a sentence", () => {
         kindLabelPlural(kind).toLowerCase(),
       );
     }
+  });
+});
+
+/**
+ * The badge on a card (issue #1520). It used to read from a second map of names
+ * kept here, which said "Preset" and "Blueprint" where every other screen in
+ * coilbox says Singleplayer preset and Base blueprint.
+ */
+describe("what a card's badge calls an item", () => {
+  it("uses the name the rest of coilbox gives the kind", () => {
+    for (const kind of HUB_KINDS) {
+      expect(describeItem(kind, null).toLowerCase()).toBe(
+        containerKindName(kind),
+      );
+    }
+  });
+
+  it("opens with a capital, because a badge is not part of a sentence", () => {
+    expect(describeItem("preset", null)).toBe("Singleplayer preset");
+    expect(describeItem("blueprint", null)).toBe("Base blueprint");
+  });
+
+  it("says which of the two a challenge is, in place of the kind", () => {
+    expect(describeItem("challenge", "conquest")).toBe("Conquest challenge");
+    expect(describeItem("challenge", "warpath")).toBe("Warpath challenge");
+    expect(describeItem("challenge", null)).toBe("Challenge");
   });
 });
