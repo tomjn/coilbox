@@ -236,6 +236,35 @@ export function assetUploadFailureReport(
 }
 
 /**
+ * What a run somebody stopped is worth leaving behind (issue #1686).
+ *
+ * Pressing the button is its own answer, so this is not news. It is here because
+ * a stop is not an undo: a picture the hub took before the button was pressed is
+ * on the hub, in a public repository, and the person who has just changed their
+ * mind about uploading is exactly the person that matters to.
+ *
+ * The count is what actually reached the hub, not what the run was working
+ * through, so a stop during the drawing half says nothing went and means it.
+ */
+export function assetUploadStoppedReport(
+  sent: number,
+  run: UploadRun = {},
+): NotifyInput {
+  const { game = null } = run;
+  const already =
+    sent === 0
+      ? "Nothing had been sent, so nothing was added to the hub."
+      : sent === 1
+        ? "One picture had already gone, and it stays on the hub."
+        : `${sent} pictures had already gone, and they stay on the hub.`;
+  return {
+    title: "You stopped the picture uploads",
+    body: `Coilbox has stopped sending ${pictures(0, game)}. ${already}`,
+    level: "info",
+  };
+}
+
+/**
  * Where the bell sends somebody who clicks one of these. The hub settings
  * section holds the switch that permits uploads at all, which is both the
  * explanation for a run they did not start and the way to stop the next one.
@@ -279,6 +308,21 @@ export function reportAssetUploadOutcomes(
   run: UploadRun = {},
 ): void {
   deliver(assetUploadReports(outcomes, run), startedBy);
+}
+
+/**
+ * File what a run somebody stopped left behind (issue #1686).
+ *
+ * Always the quiet path, whoever started the run. The person pressed the button
+ * a moment ago and watched the badge go, so a toast would be telling them what
+ * they just did. What the bell holds is the part they may want later: what had
+ * already gone.
+ */
+export function reportAssetUploadStopped(
+  sent: number,
+  run: UploadRun = {},
+): void {
+  deliver([assetUploadStoppedReport(sent, run)], "coilbox");
 }
 
 /** Tell whoever it is for that a run never started. */

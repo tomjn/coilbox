@@ -10,8 +10,10 @@ import {
   type AssetOutcome,
   assetUploadFailureReport,
   assetUploadReports,
+  assetUploadStoppedReport,
   reportAssetUploadFailure,
   reportAssetUploadOutcomes,
+  reportAssetUploadStopped,
 } from "./uploadOutcomes";
 
 /** The hub's own words for the refusal issue #1634 is named after, as its
@@ -494,5 +496,54 @@ describe("a run coilbox started by itself", () => {
 
     expect(notify).toHaveBeenCalledTimes(1);
     expect(recordQuietly).not.toHaveBeenCalled();
+  });
+});
+
+describe("assetUploadStoppedReport", () => {
+  beforeEach(() => {
+    notify.mockClear();
+    recordQuietly.mockClear();
+  });
+
+  /** A stop is not an undo, and the person who has just changed their mind is
+   * exactly the one that matters to. */
+  it("says what had already gone and that the hub keeps it", () => {
+    expect(assetUploadStoppedReport(3, { game: "bar" })).toEqual({
+      title: "You stopped the picture uploads",
+      body: "Coilbox has stopped sending pictures for bar. 3 pictures had already gone, and they stay on the hub.",
+      level: "info",
+    });
+  });
+
+  it("says so plainly when nothing had gone", () => {
+    expect(assetUploadStoppedReport(0, { game: "bar" }).body).toBe(
+      "Coilbox has stopped sending pictures for bar. Nothing had been sent, so nothing was added to the hub.",
+    );
+  });
+
+  it("counts one picture in the singular", () => {
+    expect(assetUploadStoppedReport(1, { game: "bar" }).body).toBe(
+      "Coilbox has stopped sending pictures for bar. One picture had already gone, and it stays on the hub.",
+    );
+  });
+
+  /** A run that was not for one game names none, the same way every other
+   * sentence here does. */
+  it("names no game when the run was not for one", () => {
+    expect(assetUploadStoppedReport(2).body).toBe(
+      "Coilbox has stopped sending pictures. 2 pictures had already gone, and they stay on the hub.",
+    );
+  });
+
+  /** The bell, never a toast. The button was pressed a moment ago and the badge
+   * has already gone, so showing it would be telling somebody what they just
+   * did. Clicking through goes to the switch that starts these runs. */
+  it("goes to the bell without showing, and links to the hub settings", () => {
+    reportAssetUploadStopped(3, { game: "bar" });
+
+    expect(notify).not.toHaveBeenCalled();
+    expect(recordQuietly).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "/settings/hub" }),
+    );
   });
 });

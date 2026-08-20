@@ -3,6 +3,7 @@ import type { FramePlugin } from "@picoframe/plugin-sdk";
 import type { ComponentType } from "react";
 import { CoilboxGlyph } from "../components/CoilboxGlyph";
 import { isHubEnabled } from "../profile/profile";
+import UploadRunBadge from "./assets/UploadRunBadge";
 import { isHubItemPageReachable } from "./config";
 import HubSettings from "./pages/SettingsSection";
 
@@ -54,6 +55,11 @@ function gated(loader: () => Promise<{ default: ComponentType }>) {
 const hubPlugin: FramePlugin = {
   id: "hub",
   version: "0.0.0",
+  // Between the download queue and the notifications bell, because it is the
+  // same kind of thing as the queue: work coilbox is doing now, with a way to
+  // stop it. Ungated, unlike the nav item: it only ever renders while a run is
+  // going, and a run can only start once somebody has agreed to uploads.
+  slots: [{ slot: "topbar.right", order: 2.5, Component: UploadRunBadge }],
   settings: [
     {
       id: "hub",
