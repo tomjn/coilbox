@@ -90,8 +90,28 @@ describe("a link in a mission briefing", () => {
     );
   });
 
-  it("refuses a bare fragment, which would move the app rather than scroll", () => {
-    // Coilbox routes on the hash, so following `#part-two` changes the route.
+  it("scrolls a fragment down the briefing rather than moving the app", () => {
+    // Coilbox routes on the hash, so the webview still must not follow this one.
+    // It scrolls to the heading instead of being refused (issue #1805), which is
+    // also how a GFM footnote reaches its note.
+    const scrolled: Element[] = [];
+    vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(function (
+      this: Element,
+    ) {
+      scrolled.push(this);
+    });
+    render(
+      <BriefingProse>{"[part two](#part-two)\n\n## Part two"}</BriefingProse>,
+    );
+    const followed = fireEvent.click(screen.getByRole("link"));
+    expect(scrolled).toEqual([
+      screen.getByRole("heading", { name: "Part two" }),
+    ]);
+    expect(followed).toBe(false);
+    expect(openUrl).not.toHaveBeenCalled();
+  });
+
+  it("says so when a fragment names nothing in the briefing", () => {
     const { followed } = clickLink("[part two](#part-two)");
     expect(followed).toBe(false);
     expect(openUrl).not.toHaveBeenCalled();

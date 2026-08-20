@@ -112,6 +112,27 @@ describe("a link in a game's changelog", () => {
     expect(openUrl).toHaveBeenCalledWith(url);
   });
 
+  it("scrolls a fragment down the changelog rather than moving the app", () => {
+    // A release body written on GitHub can carry a footnote, which GFM (issue
+    // #1791) writes as a `#` link nobody typed. Coilbox routes on the hash, so
+    // the webview must not follow it, but the reader still wants the note.
+    const scrolled: Element[] = [];
+    vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(function (
+      this: Element,
+    ) {
+      scrolled.push(this);
+    });
+    showChangelog("Cheaper now[^1].\n\n[^1]: Since 1.2.");
+    const [toNote, backAgain] = screen.getAllByRole("link");
+    expect(fireEvent.click(toNote)).toBe(false);
+    fireEvent.click(backAgain);
+    expect(scrolled.map((el) => el.id)).toEqual([
+      "user-content-fn-1",
+      "user-content-fnref-1",
+    ]);
+    expect(openUrl).not.toHaveBeenCalled();
+  });
+
   it("refuses a relative link, which would resolve against the app itself", () => {
     // A release body written for github.com can carry `[#7](../issues/7)`, which
     // means nothing here and would take the app to a route that does not exist.
