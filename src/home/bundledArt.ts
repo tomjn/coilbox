@@ -722,8 +722,8 @@ const archives: Drawing = {
   paint: (p) => {
     const drum = (cx: number, cy: number, rx: number, ry: number, o: number) =>
       `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" stroke-opacity="${o}"/>` +
-      `<path d="M${cx - rx} ${cy} L${cx - rx} ${cy + 28}"/>` +
-      `<path d="M${cx + rx} ${cy} L${cx + rx} ${cy + 28}"/>` +
+      `<path d="M${cx - rx} ${cy} L${cx - rx} ${cy + 28}" stroke-opacity="${o}"/>` +
+      `<path d="M${cx + rx} ${cy} L${cx + rx} ${cy + 28}" stroke-opacity="${o}"/>` +
       `<ellipse cx="${cx}" cy="${cy + 28}" rx="${rx}" ry="${ry}" stroke-opacity="${round(o * 0.6)}"/>`;
     return (
       `<g fill="none" stroke="${p.faint}" stroke-width="1.8">` +

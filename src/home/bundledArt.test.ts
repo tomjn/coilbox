@@ -113,6 +113,25 @@ describe("bundledCardArtSvg", () => {
   });
 });
 
+describe("content.archives", () => {
+  it("gives each drum's side walls the same opacity as the rim above them", () => {
+    // Issue #1382: the rim ellipse took a per-ring stroke-opacity but the
+    // vertical paths beside it did not, so the drum's sides stayed fully
+    // opaque whatever the palette set.
+    const svg = bundledCardArtSvg("content.archives", THEME, DARK) ?? "";
+    const rings = [
+      ...svg.matchAll(
+        /<ellipse[^>]*stroke-opacity="([\d.]+)"\/><path[^>]*stroke-opacity="([\d.]+)"\/><path[^>]*stroke-opacity="([\d.]+)"\/>/g,
+      ),
+    ];
+    expect(rings.length).toBe(3);
+    for (const [, rim, left, right] of rings) {
+      expect(left).toBe(rim);
+      expect(right).toBe(rim);
+    }
+  });
+});
+
 describe("bundledCardArt", () => {
   it("hands the chain a data url for a covered tool", () => {
     const url = bundledCardArt({
