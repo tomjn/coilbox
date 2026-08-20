@@ -24,6 +24,26 @@ function showToast({ title, body, level = "info" }: NotifyInput): void {
 }
 
 /**
+ * Put a notification in the bell without showing it anywhere (issue #1703).
+ *
+ * The bell looks like a record of what the app has been doing and until now it
+ * was only a record of what the app had interrupted somebody about, because
+ * `notify()` was the one way in and it always showed as well as recorded. Work
+ * nobody asked for needs the recording half on its own: a backfill the app
+ * started by itself has something worth reading afterwards and nothing worth
+ * stopping anybody for.
+ *
+ * No badge either, which is the rest of the split. A badge is a call to look
+ * now, and calling somebody over is the interruption this exists to avoid.
+ *
+ * Synchronous, because there is no window to ask about focus and no OS banner to
+ * send. Callers that use both should not have to await one of them.
+ */
+export function recordQuietly(input: NotifyInput): void {
+  recordNotification(input, false);
+}
+
+/**
  * Deliver a notification, routed by window focus. Focused -> in-app toast.
  * Unfocused (and OS notifications enabled + permission granted) -> native OS
  * banner plus a dock-bounce / taskbar-flash. Never throws: any failure in the OS

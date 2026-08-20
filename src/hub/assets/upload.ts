@@ -144,6 +144,8 @@ export async function uploadAssetsToHub(
   const onProgress = new Channel<AssetUploadProgress>();
   if (options.onProgress) onProgress.onmessage = options.onProgress;
 
+  const run = { game: gameUploadedFor(assets) };
+
   try {
     const { outcomes, outOfDate } = await hubUploadAssets({
       hubUrl,
@@ -151,13 +153,35 @@ export async function uploadAssetsToHub(
       ...(options.opId ? { opId: options.opId } : {}),
       onProgress,
     });
-    reportAssetUploadOutcomes(outcomes, options.startedBy, outOfDate === true);
+    reportAssetUploadOutcomes(outcomes, options.startedBy, {
+      ...run,
+      outOfDate: outOfDate === true,
+    });
     return { outcomes, written: written(outcomes), error: null };
   } catch (e) {
     const said = e instanceof Error ? e.message : String(e);
-    reportAssetUploadFailure(said, assets.length, options.startedBy);
+    reportAssetUploadFailure(said, assets.length, options.startedBy, run);
     return { outcomes: [], written: 0, error: said };
   }
+}
+
+/**
+ * The game a run's pictures are all for, or null when they are not all for one
+ * (issue #1703).
+ *
+ * Read off the assets rather than passed in alongside them, so a caller cannot
+ * name one game in the report and send another game's pictures. A map picture
+ * has no game at all, which makes the whole run unattributable rather than
+ * attributable to whatever the units in it happened to say.
+ */
+export function gameUploadedFor(assets: readonly AssetUpload[]): string | null {
+  let game: string | null = null;
+  for (const asset of assets) {
+    if (asset.keyed_on !== "unit") return null;
+    if (game === null) game = asset.game;
+    else if (game !== asset.game) return null;
+  }
+  return game;
 }
 
 /** Stop a running upload by its `opId`. A no-op for an unknown or finished id. */

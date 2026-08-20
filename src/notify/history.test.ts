@@ -63,4 +63,21 @@ describe("history store", () => {
     clearHistory();
     expect(readHistory()).toEqual({ entries: [], unread: 0 });
   });
+
+  /**
+   * Issue #1703. Work nobody asked for is kept without lighting the badge,
+   * because the badge is a call to look now and nothing here needs looking at.
+   */
+  it("keeps an entry nobody is being shown out of the badge", () => {
+    recordNotification({ title: "quiet" }, false);
+    const { entries, unread } = readHistory();
+    expect(entries.map((e) => e.title)).toEqual(["quiet"]);
+    expect(unread).toBe(0);
+  });
+
+  it("still counts the ones somebody was shown", () => {
+    recordNotification({ title: "quiet" }, false);
+    recordNotification({ title: "loud" });
+    expect(readHistory().unread).toBe(1);
+  });
 });

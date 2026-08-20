@@ -88,8 +88,16 @@ export interface RecordInput {
   to?: string;
 }
 
-/** Record a notification into history. Called once from `notify()`. */
-export function recordNotification(input: RecordInput): void {
+/**
+ * Record a notification into history. Called from `notify()` and from
+ * `recordQuietly()`.
+ *
+ * `unread` is what the badge counts, and it is false for anything nobody is
+ * being shown (issue #1703). The badge is a call to look now, and a run coilbox
+ * started by itself has nothing anybody has to act on: the entry is here for
+ * whoever comes looking, not to send them.
+ */
+export function recordNotification(input: RecordInput, unread = true): void {
   const entry: NotifyHistoryEntry = {
     id: nextId(),
     title: input.title,
@@ -100,7 +108,7 @@ export function recordNotification(input: RecordInput): void {
   };
   const entries = capEntries(state.entries, entry);
   persist(entries);
-  setState({ entries, unread: state.unread + 1 });
+  setState({ entries, unread: state.unread + (unread ? 1 : 0) });
 }
 
 /** Empty the history and reset the unread count. */

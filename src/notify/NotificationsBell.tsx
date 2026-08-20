@@ -118,7 +118,11 @@ function NotificationRow({
           </span>
         </div>
         {entry.body && (
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          // Wrapped rather than clipped to one line (issue #1703). A background
+          // upload's entry is here to be read, and the sentence that says which
+          // picture the hub refused and what was wrong with it is longer than
+          // the popover is wide. The list already scrolls.
+          <p className="mt-0.5 break-words text-xs text-muted-foreground">
             {entry.body}
           </p>
         )}

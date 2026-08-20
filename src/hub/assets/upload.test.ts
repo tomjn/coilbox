@@ -25,19 +25,24 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 /** Every notification the run produced. */
 const notified: { title: string; body: string; level?: string }[] = [];
+/** Everything the run filed in the bell without showing it (issue #1703). */
+const recorded: { title: string; body: string; to?: string }[] = [];
 vi.mock("@/notify/notify", () => ({
   notify: async (input: { title: string; body: string; level?: string }) => {
     notified.push(input);
   },
+  recordQuietly: (input: { title: string; body: string; to?: string }) => {
+    recorded.push(input);
+  },
 }));
 
 import type { AssetOutcome } from "../uploadOutcomes";
-import { type AssetUpload, uploadAssetsToHub } from "./upload";
+import { type AssetUpload, gameUploadedFor, uploadAssetsToHub } from "./upload";
 
-function asset(unit: string): AssetUpload {
+function asset(unit: string, game = "bar"): AssetUpload {
   return {
     keyed_on: "unit",
-    game: "bar",
+    game,
     unit_name: unit,
     variant: "buildpic",
     source_hash: `src-${unit}`,
@@ -62,6 +67,7 @@ function outcome(over: Partial<AssetOutcome>): AssetOutcome {
 beforeEach(() => {
   for (const key of Object.keys(sent)) sent[key] = [];
   notified.length = 0;
+  recorded.length = 0;
   answer.value = { outcomes: [] };
   answer.throws = null;
 });
@@ -178,7 +184,7 @@ describe("the only door to hub_upload_assets", () => {
     expect(run.outcomes).toEqual([]);
     expect(notified).toHaveLength(1);
     expect(notified[0].title).toBe("Picture uploads stopped early");
-    expect(notified[0].body).toContain("2 pictures were not sent.");
+    expect(notified[0].body).toContain("2 pictures for bar were not sent.");
   });
 
   it("carries the op id through so the run can be cancelled", async () => {
@@ -233,5 +239,67 @@ describe("the only door to hub_upload_assets", () => {
     expect(notified).toEqual([]);
     expect(logged).toHaveBeenCalledTimes(1);
     logged.mockRestore();
+  });
+
+  /**
+   * Issue #1703. The console was the whole of what #1690 left behind, and a
+   * release build has no console anybody can open, so the same run also leaves
+   * a bell entry naming the game whose pictures did not go.
+   */
+  it("files a run coilbox started in the bell, naming the game", async () => {
+    const logged = vi.spyOn(console, "warn").mockImplementation(() => {});
+    answer.throws =
+      "The hub at hub.example has no recorded permission to redistribute pictures for that game.";
+
+    await uploadAssetsToHub("https://hub.example", [asset("a"), asset("b")], {
+      startedBy: "coilbox",
+    });
+
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0].title).toBe("Picture uploads stopped early");
+    expect(recorded[0].body).toContain("no recorded permission");
+    expect(recorded[0].body).toContain("2 pictures for bar were not sent.");
+    logged.mockRestore();
+  });
+});
+
+/**
+ * Read off the assets rather than taken on trust, so the game a report names is
+ * the game whose pictures were actually sent (issue #1703).
+ */
+describe("the game a run was for", () => {
+  it("is the one every picture in it named", () => {
+    expect(gameUploadedFor([asset("armsolar"), asset("armcom")])).toBe("bar");
+  });
+
+  it("is nobody's when the run mixed two games", () => {
+    expect(
+      gameUploadedFor([asset("armsolar"), asset("kbot", "sf")]),
+    ).toBeNull();
+  });
+
+  /** A map picture is keyed on the map and belongs to no game, so a run holding
+   * one cannot be attributed to whatever the units in it happened to say. */
+  it("is nobody's when a picture is not a unit's", () => {
+    expect(
+      gameUploadedFor([
+        asset("armsolar"),
+        {
+          keyed_on: "map",
+          map_name: "Comet Catcher Redux 1.8",
+          variant: "minimap",
+          source_hash: "src-map",
+          encode_profile: "webp-q80-512",
+          origin: "extracted",
+          mime: "image/webp",
+          source_archive: "Comet Catcher Redux 1.8",
+          path: "/cache/comet.webp",
+        },
+      ]),
+    ).toBeNull();
+  });
+
+  it("is nobody's when there are no pictures at all", () => {
+    expect(gameUploadedFor([])).toBeNull();
   });
 });
