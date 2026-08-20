@@ -2,17 +2,19 @@
 
 /**
  * What happens when somebody clicks a link in a distribution's own markup
- * (issue #1062).
+ * (issues #1062 and #1777).
  *
  * `./welcomeActions.test.ts` covers which marker resolves to which action, and
  * notices nothing about the anchor the marker is written on. The bug this file
  * drives is the anchor Coilbox never looked at: a link with no marker, or with a
  * marker that does not resolve, was followed by the webview, which took the app
- * off screen until it was restarted.
+ * off screen until it was restarted. A working `https:` link did the same thing,
+ * because the webview follows that one just as happily.
  *
  * So each case is a real click on real markup, through the real asset rewrite,
- * asserting the two things the author cares about: whether the webview was
- * allowed to follow the link, and whether the app moved.
+ * asserting the three things the author cares about: whether the webview was
+ * allowed to follow the link, whether the app moved, and what the OS was asked
+ * to open.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -24,6 +26,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand: () => async () => ({}),
 }));
+
+// Stands in for the OS browser, mail client and dialler. `vi.hoisted` so the
+// mock factory below, which is hoisted above the imports, can reach it.
+const openUrl = vi.hoisted(() => vi.fn(async (_url: string) => {}));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
 
 import { useWelcomeActionRef } from "./welcomeActionRef";
 import { rewriteBrandedHtml } from "./welcomeAssets";
@@ -61,6 +68,8 @@ function clickLink(html: string) {
 
 beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
+  openUrl.mockReset();
+  openUrl.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -129,20 +138,51 @@ describe("a link in distribution markup", () => {
     expect(at).toBe("/");
   });
 
-  it("is followed when it is an external link", () => {
+  it("goes to the OS rather than the webview when it is an external link", () => {
+    // The four schemes that leave Coilbox for another program. Following any of
+    // them in the webview loads the site over the app with no way back, which is
+    // the whole of issue #1777, so each one is handed to the OS instead.
     for (const href of [
       "https://example.org/forum",
       "http://example.org/forum",
       "mailto:someone@example.org",
       "tel:+441234567890",
     ]) {
-      const { followed } = clickLink(
+      openUrl.mockClear();
+      const { followed, at } = clickLink(
         `<a data-testid="link" href="${href}">Elsewhere</a>`,
       );
-      expect(followed, href).toBe(true);
+      expect(openUrl, href).toHaveBeenCalledWith(href);
+      expect(followed, href).toBe(false);
+      expect(at, href).toBe("/");
       expect(console.warn).not.toHaveBeenCalled();
       cleanup();
     }
+  });
+
+  it("is still not followed when the OS refuses to open it", async () => {
+    // The failure that must not fall back to letting the webview navigate,
+    // because that is the bug. The click says so in the console instead.
+    openUrl.mockRejectedValue(new Error("no handler"));
+    const { followed, at } = clickLink(
+      '<a data-testid="link" href="https://example.org/forum">Elsewhere</a>',
+    );
+    expect(followed).toBe(false);
+    expect(at).toBe("/");
+    await vi.waitFor(() =>
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining("https://example.org/forum"),
+        expect.any(Error),
+      ),
+    );
+  });
+
+  it("does not open the OS browser for the Windows spelling of an asset URL", () => {
+    // `http://coilbox.localhost/…` is a picture inside the app, not a website.
+    clickLink(
+      '<a data-testid="link" href="http://coilbox.localhost/portable/images/logo.webp">Our logo</a>',
+    );
+    expect(openUrl).not.toHaveBeenCalled();
   });
 
   it("is followed when it is a hash link, which is how in-app links are written", () => {
@@ -151,6 +191,8 @@ describe("a link in distribution markup", () => {
         `<a data-testid="link" href="${href}">Inside</a>`,
       );
       expect(followed, href).toBe(true);
+      // An in-app link, so nothing goes to the OS.
+      expect(openUrl, href).not.toHaveBeenCalled();
       expect(console.warn).not.toHaveBeenCalled();
       cleanup();
     }
