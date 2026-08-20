@@ -148,6 +148,7 @@ Markdown links resolve intelligently:
 - `[Rules](rules.md)` → the page `#/pages/rules` (a `.md` link maps to its page by filename; a nested page can be linked with `@route/pages/...`).
 - `[Play](@route/singleplayer)` → navigates in-app.
 - `[Discord](https://discord.gg/…)` → opens in the system browser (never navigates the app's own window away).
+- `[Our logo](@.coilbox/images/logo.webp)` → shows the file in the system file manager, with its folder open and the file selected. A link to a bundled file is never followed in the app's own window, because that would draw the file over Coilbox with no way back.
 
 ### Widget catalogue
 

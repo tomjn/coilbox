@@ -11,7 +11,10 @@ import { parseRef } from "./refs";
 export type LinkTarget =
   | { kind: "external"; url: string }
   | { kind: "route"; to: string }
-  | { kind: "asset"; url: string }
+  // `path` is the same `.coilbox`-relative path `url` was built from, kept so a
+  // click can point the file manager at the file. The `coilbox://` URL is not a
+  // filesystem path and nothing outside the webview can follow it.
+  | { kind: "asset"; url: string; path: string }
   | { kind: "anchor"; href: string }
   | { kind: "inert" };
 
@@ -39,7 +42,7 @@ export function classifyMarkdownLink(href: string | undefined): LinkTarget {
     if (ref?.kind === "file") {
       return /\.md$/i.test(ref.path)
         ? { kind: "route", to: `/pages/${slugFromPath(ref.path)}` }
-        : { kind: "asset", url: assetUrl(ref.path) };
+        : { kind: "asset", url: assetUrl(ref.path), path: ref.path };
     }
     return { kind: "inert" };
   }
@@ -47,6 +50,6 @@ export function classifyMarkdownLink(href: string | undefined): LinkTarget {
   if (/\.md$/i.test(h))
     return { kind: "route", to: `/pages/${slugFromPath(h)}` };
   if (h.startsWith("/")) return { kind: "route", to: h };
-  if (isLocalRef(h)) return { kind: "asset", url: assetUrl(h) };
+  if (isLocalRef(h)) return { kind: "asset", url: assetUrl(h), path: h };
   return { kind: "inert" };
 }
