@@ -165,6 +165,12 @@ async fn run_sidecar_env(
 /// gives curl a low-speed abort of its own, 10 bytes a second over 30 seconds,
 /// so a transfer that genuinely wedges still ends with an error, sooner than
 /// this timer would have reached it.
+///
+/// Unpacking an engine reports nothing measurable either, and stands the
+/// watchdog down for the same reason. One file of an 18 MB engine took 638 of
+/// the 657 milliseconds its extraction lasted, so a big enough archive on a slow
+/// enough disk can go quiet for minutes, and killing it there would leave a half
+/// unpacked engine behind.
 fn next_idle(idle: Duration, active: bool, unsized_transfer: bool) -> Duration {
     if active || unsized_transfer {
         Duration::ZERO

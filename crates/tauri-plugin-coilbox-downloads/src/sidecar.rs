@@ -142,6 +142,17 @@ pub fn parse_download(stdout: &str, stderr: &str, exit_code: Option<i32>) -> Dow
 
 use crate::progress::{percent, DownloadProgress};
 
+/// pr-downloader's first word about unpacking an archive, and very nearly its
+/// last. It prints this once, then one `extracting (<path>)` per file, then
+/// `done`. None of those carries a byte count or a percentage.
+///
+/// The header is what coilbox reads, rather than the per-file lines, because one
+/// line per file is a burst rather than a heartbeat: a real 18 MB engine printed
+/// 223 of them in 657 milliseconds, and 638 of those milliseconds went on a
+/// single file. The other 222 events tell a player nothing the first one has not
+/// told them already.
+const EXTRACT_START: &str = "extract():Extracting ";
+
 /// Parse one line of pr-downloader stdout into a progress sample, or `None` when
 /// the line carries no progress. Tolerant by design: matches a line containing a
 /// `[Progress]`/`Progress` marker and an `NN%` token, and additionally captures a
@@ -152,7 +163,25 @@ use crate::progress::{percent, DownloadProgress};
 /// `extracting (<path>)` line per file in an archive, so any path with
 /// "progress" in its name walks into the word match and comes back out with a
 /// percentage scraped from whatever number the path happens to end in.
+///
+/// Unpacking is its own phase and is reported as one. `--download-engine`
+/// downloads and unpacks the archive itself, and an engine is thousands of
+/// files, so a transfer that ends at 100% followed by minutes of silence is the
+/// unpacking rather than a download that died (issue #1826).
 pub fn parse_progress_line(line: &str) -> Option<DownloadProgress> {
+    if line.contains(EXTRACT_START) {
+        // No bytes and no percentage because there are none to be had: this is
+        // the absence of a measurement, not a measurement of zero, and both the
+        // watchdog and the bar read it that way. See
+        // [`DownloadProgress::is_measured`].
+        return Some(DownloadProgress {
+            phase: "extracting".into(),
+            downloaded_bytes: 0,
+            total_bytes: None,
+            percent: None,
+            bytes_per_sec: None,
+        });
+    }
     let lower = line.to_lowercase();
     if !lower.contains("progress") || !line.contains('%') {
         return None;
@@ -277,6 +306,30 @@ mod tests {
         assert!(parse_progress_line("[Info] connecting to repo").is_none());
         assert!(parse_progress_line("Download complete!").is_none());
     }
+
+    #[test]
+    fn the_line_that_opens_an_extraction_is_a_phase_of_its_own() {
+        let p = parse_progress_line(
+            "[Info] src/FileSystem/FileSystem.cpp:587:extract():Extracting \
+             /data/engine/spring.7z to /data/engine/linux64/105.1.1",
+        )
+        .unwrap();
+        assert_eq!(p.phase, "extracting");
+        assert_eq!(p.total_bytes, None);
+        assert_eq!(p.percent, None);
+        assert!(!p.is_measured());
+    }
+
+    #[test]
+    fn the_files_an_extraction_names_are_not_samples_of_their_own() {
+        // One of these per file is a burst, not a heartbeat, and the phase has
+        // already been reported by the line above them.
+        assert!(parse_progress_line(
+            "[Info] src/FileSystem/FileSystem.cpp:632:extract():extracting \
+             (/data/engine/linux64/105.1.1/springsettings.cfg)"
+        )
+        .is_none());
+    }
 }
 
 /// The parsers run over stdout captured from real `pr-downloader` runs, one
@@ -311,17 +364,16 @@ mod fixture_tests {
     }
 
     /// One line per sample, carrying everything the frontend reads off it:
-    /// `downloaded/total percent`, with `?` for a total nobody reported and `-`
-    /// for no percentage. Written out as text so a whole run reads as one
-    /// assertion rather than a pile of indexed field checks.
+    /// `phase downloaded/total percent`, with `?` for a total nobody reported
+    /// and `-` for no percentage. Written out as text so a whole run reads as
+    /// one assertion rather than a pile of indexed field checks.
     fn transcript(raw: &str) -> String {
         events(raw)
             .iter()
             .map(|p| {
-                assert_eq!(p.phase, "downloading");
                 let total = p.total_bytes.map_or("?".to_string(), |t| t.to_string());
                 let pct = p.percent.map_or("-".to_string(), |v| format!("{v:.1}%"));
-                format!("{}/{total} {pct}", p.downloaded_bytes)
+                format!("{} {}/{total} {pct}", p.phase, p.downloaded_bytes)
             })
             .collect::<Vec<_>>()
             .join("\n")
@@ -333,10 +385,10 @@ mod fixture_tests {
     fn map_download_reports_bytes_throughout() {
         assert_eq!(
             transcript(MAP),
-            "1/1 100.0%\n\
-             7981/2631449 0.3%\n\
-             447981/2631449 17.0%\n\
-             2631449/2631449 100.0%"
+            "downloading 1/1 100.0%\n\
+             downloading 7981/2631449 0.3%\n\
+             downloading 447981/2631449 17.0%\n\
+             downloading 2631449/2631449 100.0%"
         );
     }
 
@@ -346,16 +398,16 @@ mod fixture_tests {
     fn rapid_pool_download_reports_bytes_throughout() {
         assert_eq!(
             transcript(RAPID_POOL),
-            "1/1 100.0%\n\
-             2995/2766069 0.1%\n\
-             90555/2766069 3.3%\n\
-             573104/2766069 20.7%\n\
-             680739/2766069 24.6%\n\
-             942284/2766069 34.1%\n\
-             1624254/2766069 58.7%\n\
-             1769397/2766069 64.0%\n\
-             1849537/2766069 66.9%\n\
-             2446295/2766069 88.4%"
+            "downloading 1/1 100.0%\n\
+             downloading 2995/2766069 0.1%\n\
+             downloading 90555/2766069 3.3%\n\
+             downloading 573104/2766069 20.7%\n\
+             downloading 680739/2766069 24.6%\n\
+             downloading 942284/2766069 34.1%\n\
+             downloading 1624254/2766069 58.7%\n\
+             downloading 1769397/2766069 64.0%\n\
+             downloading 1849537/2766069 66.9%\n\
+             downloading 2446295/2766069 88.4%"
         );
     }
 
@@ -372,28 +424,34 @@ mod fixture_tests {
     fn rapid_streamer_download_reports_no_size_at_all() {
         assert_eq!(
             transcript(RAPID_STREAMER),
-            "1/1 100.0%\n\
-             0/1 0.0%\n\
-             1/1 100.0%\n\
-             0/? -"
+            "downloading 1/1 100.0%\n\
+             downloading 0/1 0.0%\n\
+             downloading 1/1 100.0%\n\
+             downloading 0/? -"
         );
     }
 
-    /// An engine archive over HTTP. Nothing in the several hundred
-    /// `extracting (<path>)` lines that follow the transfer parses as progress.
+    /// An engine archive over HTTP, and then the unpacking, which is the part a
+    /// player used to spend staring at the word "stalled" (issue #1826).
+    ///
+    /// The transfer ends at 100% and the next thing pr-downloader says is that
+    /// it has started extracting. That one sample is the whole of the phase: the
+    /// several hundred `extracting (<path>)` lines under it still parse as
+    /// nothing, and the `done` that closes it is not a sample either.
     #[test]
-    fn engine_download_reports_bytes_and_ignores_extraction() {
+    fn engine_download_reports_bytes_then_says_it_is_extracting() {
         assert_eq!(
             transcript(ENGINE),
-            "1/1 100.0%\n\
-             0/17985637 0.0%\n\
-             2202081/17985637 12.2%\n\
-             5242054/17985637 29.1%\n\
-             8339438/17985637 46.4%\n\
-             10485760/17985637 58.3%\n\
-             13434066/17985637 74.7%\n\
-             16596196/17985637 92.3%\n\
-             17985637/17985637 100.0%"
+            "downloading 1/1 100.0%\n\
+             downloading 0/17985637 0.0%\n\
+             downloading 2202081/17985637 12.2%\n\
+             downloading 5242054/17985637 29.1%\n\
+             downloading 8339438/17985637 46.4%\n\
+             downloading 10485760/17985637 58.3%\n\
+             downloading 13434066/17985637 74.7%\n\
+             downloading 16596196/17985637 92.3%\n\
+             downloading 17985637/17985637 100.0%\n\
+             extracting 0/? -"
         );
     }
 
@@ -424,39 +482,54 @@ mod fixture_tests {
 
     /// Which downloads have a signal a watching timer can trust.
     ///
-    /// Every sample in a map, pool or engine download carries bytes or a
-    /// percentage, so silence from one of those means something went wrong and
-    /// the watchdog should act. The streamer capture ends on a sample carrying
-    /// neither, and the silence after it is the transfer working. `next_idle`
-    /// reads exactly this to decide whether to kill a quiet download.
+    /// Every sample of a map or pool download carries bytes or a percentage, so
+    /// silence from one of those means something went wrong and the watchdog
+    /// should act. Two runs end on a sample carrying neither, and in both the
+    /// silence that follows is work rather than trouble: an archive served by
+    /// `streamer.cgi`, and an engine being unpacked. `next_idle` reads exactly
+    /// this to decide whether to kill a quiet download.
     #[test]
-    fn the_streamer_path_reports_nothing_measurable() {
-        for raw in [MAP, RAPID_POOL, ENGINE] {
+    fn a_run_that_ends_unmeasured_is_one_that_is_still_working() {
+        for raw in [MAP, RAPID_POOL] {
             assert!(
                 events(raw).iter().all(DownloadProgress::is_measured),
                 "every sample of a sized download is a measurement"
             );
         }
-        let streamer = events(RAPID_STREAMER);
-        let (last, earlier) = streamer.split_last().expect("progress samples");
-        assert!(earlier.iter().all(DownloadProgress::is_measured));
-        // The repo master and the sdp, both of which finish. Then 77 MB with
-        // nothing said about it at all.
-        assert_eq!(earlier.len(), 3);
-        assert!(!last.is_measured());
+        for raw in [RAPID_STREAMER, ENGINE] {
+            let samples = events(raw);
+            let (last, earlier) = samples.split_last().expect("progress samples");
+            assert!(earlier.iter().all(DownloadProgress::is_measured));
+            assert!(!last.is_measured());
+        }
+        // The streamer run: the repo master and the sdp, both of which finish,
+        // then 77 MB with nothing said about it at all.
+        assert_eq!(events(RAPID_STREAMER).len(), 4);
+        // The engine run: a transfer reported to the byte, then the unpacking.
+        assert_eq!(events(ENGINE).last().unwrap().phase, "extracting");
     }
 
     /// The `[Info]` lines carry version strings, timings, file paths and repo
     /// counts, and plenty of them hold an `a/b` shaped token (`HTTP/1.1`,
-    /// `AI/Interfaces/C/0.1`). None of them is read as progress, which is the
-    /// worry issue #1798 was filed on.
+    /// `AI/Interfaces/C/0.1`). Two kinds of line say something about a download
+    /// and every other kind says nothing, which is the worry issue #1798 was
+    /// filed on. Naming the phase each one produces keeps the second kind from
+    /// widening into "any line with the word extract in it": there are 223
+    /// `extracting (<path>)` lines under the one that counts.
     #[test]
-    fn no_log_line_is_mistaken_for_progress() {
+    fn only_a_progress_bar_or_the_start_of_an_extraction_is_read() {
         for raw in [MAP, RAPID_POOL, RAPID_STREAMER, ENGINE, ENGINE_MISSING_OUT] {
             for seg in raw.split(['\n', '\r']).filter(|s| !s.is_empty()) {
+                let expected = if seg.starts_with("[Progress]") {
+                    Some("downloading")
+                } else if seg.contains("extract():Extracting ") {
+                    Some("extracting")
+                } else {
+                    None
+                };
                 assert_eq!(
-                    parse_progress_line(seg).is_some(),
-                    seg.starts_with("[Progress]"),
+                    parse_progress_line(seg).map(|p| p.phase).as_deref(),
+                    expected,
                     "wrong verdict on {seg:?}"
                 );
             }
