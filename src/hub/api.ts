@@ -22,7 +22,7 @@
  * handler and its two confirmations.
  */
 
-import { containerKindName } from "@/container/names";
+import { containerKindName, containerKindPlural } from "@/container/names";
 
 /** Response envelopes, from `lib/api/items.ts` in tomjn/coilbox-hub. */
 const ITEMS_FORMAT = "coilbox-hub-items";
@@ -287,22 +287,24 @@ export function fetchHubItem(
   return getJson(hubItemUrl(base, id), readItemBody, signal);
 }
 
-/** Plural kind names, for the filter chips. */
-const KIND_PLURAL: Record<HubKind, string> = {
-  preset: "Presets",
-  challenge: "Challenges",
-  "setup-pack": "Setup packs",
-  scenario: "Scenarios",
-  blueprint: "Blueprints",
-};
-
+/**
+ * What a filter chip calls a kind, in the plural.
+ *
+ * The words come from {@link containerKindPlural} (issue #1795), so a chip
+ * offers a thing under the name the rest of coilbox gives it. The hub used to
+ * keep its own shorter set here, saying Presets and Blueprints where a card's
+ * badge beside it said Singleplayer preset and Base blueprint. That was not a
+ * choice about wording: the chips shared a row with the search box and the two
+ * comboboxes, and the row could not afford the longer words at any width it was
+ * given. The chips have a row of their own now, so it can.
+ */
 export function kindLabelPlural(kind: HubKind): string {
-  return KIND_PLURAL[kind];
+  return opened(containerKindPlural(kind));
 }
 
 /**
- * What the hub carries, to open a sentence with: "Presets, challenges, setup
- * packs, scenarios and blueprints".
+ * What the hub carries, to open a sentence with: "Singleplayer presets,
+ * challenges, setup packs, scenarios and base blueprints".
  *
  * Built from {@link HUB_KINDS} rather than written out (issue #1502). The hand
  * written version of this sentence sat directly above a row of filter chips
@@ -334,9 +336,7 @@ function opened(label: string): string {
  * The words come from {@link containerKindName} (issue #1520), so a badge calls
  * a thing what the rest of coilbox calls it: a Singleplayer preset rather than a
  * Preset, a Base blueprint rather than a Blueprint. The hub's own copy of these
- * names said neither, and was the only place in the app that did. The plurals
- * above stay written out: they name a filter rather than a thing, and the chip
- * row has no room to spell them out in full.
+ * names said neither, and was the only place in the app that did.
  *
  * A listing is read without checking each row's kind, so a hub carrying a kind
  * this build has never heard of reaches here as a string with no name. Fall back

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { containerKindName } from "@/container/names";
+import { containerKindName, containerKindPlural } from "@/container/names";
 import {
   describeItem,
   fetchHubItems,
@@ -206,7 +206,7 @@ describe("fetchHubItems", () => {
 describe("the kinds, as a sentence", () => {
   it("lists every kind the hub carries, in the plural", () => {
     expect(kindsPlural()).toBe(
-      "Presets, challenges, setup packs, scenarios and blueprints",
+      "Singleplayer presets, challenges, setup packs, scenarios and base blueprints",
     );
   });
 
@@ -216,6 +216,27 @@ describe("the kinds, as a sentence", () => {
         kindLabelPlural(kind).toLowerCase(),
       );
     }
+  });
+});
+
+/**
+ * What a filter chip calls a kind (issue #1795). The chips used to keep their
+ * own shorter plurals here, because they shared a row with the search box and
+ * had no room for the longer words. The chips have a row of their own now, so
+ * they read from the same names as everything else.
+ */
+describe("what a filter chip calls a kind", () => {
+  it("uses the name the rest of coilbox gives the kind", () => {
+    for (const kind of HUB_KINDS) {
+      expect(kindLabelPlural(kind).toLowerCase()).toBe(
+        containerKindPlural(kind),
+      );
+    }
+  });
+
+  it("opens with a capital, because a chip is not part of a sentence", () => {
+    expect(kindLabelPlural("preset")).toBe("Singleplayer presets");
+    expect(kindLabelPlural("blueprint")).toBe("Base blueprints");
   });
 });
 
