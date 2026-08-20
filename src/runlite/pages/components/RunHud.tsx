@@ -19,6 +19,7 @@ import {
   type HudAccent,
   StatCard,
 } from "../../../conquest/pages/components/hudChrome";
+import { useForcedDark } from "../../../theme/forcedDark";
 import type { RogueliteRun } from "../../model";
 
 const clamp = (v: number, lo: number, hi: number) =>
@@ -208,6 +209,9 @@ export function RunHud({
 
 /** A subtle top-right help affordance for a stat tile. */
 function HelpDot({ label, help }: { label: string; help: string }) {
+  const dark = useForcedDark(
+    "w-64 text-xs leading-relaxed text-muted-foreground",
+  );
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -219,7 +223,13 @@ function HelpDot({ label, help }: { label: string; help: string }) {
           <HelpCircle className="size-3" aria-hidden />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 text-xs leading-relaxed text-muted-foreground">
+      {/* Radix portals this to the body, so it lands outside the map's
+          forced-dark subtree and would come back on the player's theme, a white
+          card hanging off a dark HUD tile. It is anchored to the tile and reads
+          as part of it, so it takes the same treatment. A drawer opened from the
+          HUD does not: that is an edge panel with its own header, the same class
+          of surface as the top bar, and it keeps the player's theme. */}
+      <PopoverContent {...dark}>
         <p className="mb-1 font-display font-semibold uppercase tracking-wider text-foreground">
           {label}
         </p>

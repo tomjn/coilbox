@@ -30,6 +30,7 @@ import {
 import { assetUrl } from "../../lib/assetUrl";
 import { usePreferredTarget } from "../../play/config";
 import { getProfile } from "../../profile/profile";
+import { useForcedDark } from "../../theme/forcedDark";
 import { conquestSave } from "../bindings";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { factionFocusNode } from "../focusTarget";
@@ -232,12 +233,21 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
             "#05070f",
         };
 
+  // The starfield has no light version, so this page holds the dark ramp whatever
+  // theme the player picked (#1809). Everything on the map is inside this element,
+  // the HUD cards, the selection panel, the battle briefing, the run setup panel
+  // and the end screen alike, so one class covers the lot.
+  const dark = useForcedDark("relative h-full overflow-hidden bg-[#05070f]");
+  const darkSpinner = useForcedDark(
+    "flex h-full items-center justify-center bg-[#05070f]",
+  );
+
   // Wait for the saved run to load before building the map: otherwise the first
   // build frames the *default* faction (state not yet known) and recentres with
   // a jump once the played faction resolves.
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#05070f]">
+      <div {...darkSpinner}>
         <Loader2
           className="size-6 animate-spin text-muted-foreground"
           aria-hidden
@@ -247,10 +257,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   }
 
   return (
-    <div
-      className="relative h-full overflow-hidden bg-[#05070f]"
-      style={backdrop}
-    >
+    <div {...dark} style={backdrop}>
       <GalaxyView
         galaxy={themedGalaxy}
         owners={owners}
