@@ -65,6 +65,12 @@ export interface NodeBattleSpec {
   mapName: string;
   /** Optional install-gate download override for the map. */
   mapDownload?: MapDownloadHint;
+  /**
+   * The map this node was meant to be fought on, when `mapName` is a stand-in.
+   * Set when an imported challenge names a map this install cannot offer, so
+   * the difference is visible rather than silent (issue #1393).
+   */
+  mapSubstitutedFrom?: string;
   /** Enemy AI count override (default derives from node difficulty). */
   enemyAiCount?: number;
   /** Skirmish AI override for this node's enemies (`kind:shortName`). */
@@ -303,6 +309,10 @@ function parseBattle(value: unknown): NodeBattleSpec | null {
   return {
     mapName: b.mapName,
     mapDownload: parseMapDownload(b.mapDownload),
+    mapSubstitutedFrom:
+      typeof b.mapSubstitutedFrom === "string" && b.mapSubstitutedFrom !== ""
+        ? b.mapSubstitutedFrom
+        : undefined,
     enemyAiCount:
       typeof b.enemyAiCount === "number" && Number.isFinite(b.enemyAiCount)
         ? clamp(Math.round(b.enemyAiCount), 1, 8)

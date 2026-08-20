@@ -3,7 +3,13 @@ import {
   encodeChallenge,
   encodeChallengeFile,
 } from "../challenge/code";
+import {
+  type NodeMaps,
+  nodeMapsFrom,
+  parseNodeMaps,
+} from "../challenge/nodeMaps";
 import type { GalaxyLayout, GenerateOptions } from "./generate";
+import { applyChallengeMaps, generateGalaxy } from "./generate";
 import { type GalaxyDoc, type GameRef, MIN_NODE_COUNT } from "./model";
 
 /**
@@ -26,6 +32,13 @@ export interface ConquestChallengeSettings {
   skin: "galaxy" | "theatre";
   startingSystems?: number;
   fogOfWar?: boolean;
+  /**
+   * The map each system uses, by node id (issue #1393). The one part of a
+   * galaxy the seed cannot reproduce, because the generator draws maps from the
+   * maps installed on the machine that generated it. Absent on challenges
+   * shared before #1393, which resolve their maps locally as they always did.
+   */
+  nodeMaps?: NodeMaps;
 }
 
 const LAYOUTS: readonly (GalaxyLayout | "random" | "realstars")[] = [
@@ -63,6 +76,7 @@ export function challengeSettingsFromGalaxy(
     skin: g.skin ?? "galaxy",
     startingSystems: g.startingSystems,
     fogOfWar: g.fogOfWar,
+    nodeMaps: nodeMapsFrom(galaxy.nodes),
   };
 }
 
@@ -122,6 +136,7 @@ export function parseConquestChallengeSettings(
         ? clamp(Math.round(v.startingSystems), 1, 4)
         : undefined,
     fogOfWar: v.fogOfWar === true ? true : undefined,
+    nodeMaps: parseNodeMaps(v.nodeMaps),
   };
 }
 
@@ -178,4 +193,30 @@ export function optionsFromChallenge(
     id,
     title: settings.title,
   };
+}
+
+/**
+ * Build the galaxy a challenge describes: generate from the seed, then put each
+ * system on the map the challenge names (issue #1393). The two steps belong
+ * together, because a galaxy generated without the second one is the silently
+ * different galaxy this exists to prevent.
+ *
+ * `hub/preview.ts` deliberately calls {@link optionsFromChallenge} on its own
+ * instead: it draws topology with no maps installed at all, so there is nothing
+ * for the naming step to honour.
+ */
+export function galaxyFromChallenge(
+  settings: ConquestChallengeSettings,
+  env: Pick<GenerateOptions, "maps" | "names">,
+  id: string,
+  now?: string,
+): GalaxyDoc {
+  const doc = generateGalaxy(optionsFromChallenge(settings, env, id), now);
+  return applyChallengeMaps(doc, settings.nodeMaps, env.maps);
+}
+
+/** How many of a galaxy's systems stand in for a map this install cannot offer.
+ * The count worth telling somebody about after an import. */
+export function substitutedMapCount(galaxy: GalaxyDoc): number {
+  return galaxy.nodes.filter((n) => n.battle.mapSubstitutedFrom).length;
 }
