@@ -43,6 +43,30 @@
   --muted-foreground: var(--base-hue) calc(var(--base-sat-text) * 4%) 41%;
 }
 
+/* Secondary text on the conquest and warpath HUD, where the surface under it is a
+   live 3D starfield rather than a page (#1785). Every tile on those two maps is a
+   `BracketFrame`, and the card it paints is deliberately see-through, so a bright
+   star reaches the text. `--muted-foreground` is calibrated against a flat surface
+   and does not survive that: on a card over a white pixel it measures 2.3:1 in the
+   dark scheme. Keeping it would mean an opaque card and no map showing through.
+
+   The frame points the token at its own ink at 75% instead, which is what
+   `HUD_DIM_INK_CLASS` in `conquest/pages/components/hudChrome.tsx` is, and what
+   `ART_DIM_CLASS` already does for text on card artwork. Worst case over any
+   canvas colour on any base preset: 4.56:1 dark, 4.93:1 light.
+
+   It is the Tailwind theme variable that is redefined here, not picoframe's
+   `--muted-foreground`. Tailwind resolves `--color-muted-foreground` where it is
+   declared, at `:root`, and `.text-muted-foreground` reads the resolved value, so
+   redefining the raw token in a subtree changes nothing. `cardShell.ts` documents
+   the same trap from the other side. Doing it here rather than at each call site
+   means a HUD label written as `text-muted-foreground` is bounded wherever it is,
+   including one written tomorrow. `hudChrome.test.ts` reads the value back out of
+   this file and re-measures it. */
+.hud-card {
+  --color-muted-foreground: hsl(var(--card-foreground) / 0.75);
+}
+
 html,
 body,
 #root {

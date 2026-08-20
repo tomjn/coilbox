@@ -41,6 +41,45 @@ export const MAP_INK_CLASS = "text-[hsl(var(--foreground))]";
 /** The quieter ink in the band, for a label or a hint. */
 export const MAP_DIM_INK_CLASS = "text-[hsl(var(--foreground)/0.75)]";
 
+/**
+ * The card a {@link BracketFrame} paints between the galaxy canvas and its text
+ * (#1785).
+ *
+ * The band above is for the two labels with nothing under them. This is every
+ * other tile on both maps, which does have something under it, just not enough
+ * of it: the card was `bg-card/70`, so 30% of whatever the starfield was
+ * rendering landed behind the text. Over empty space that is fine. Over a star
+ * it is not, and `text-muted-foreground` on a card over a white pixel measured
+ * 2.3:1 in the dark scheme against the 4.5:1 small text needs.
+ *
+ * 78% is the same figure `ART_BAND_CLASS` and {@link MAP_BAND_CLASS} use, and it
+ * buys the same thing: a backdrop bounded by the card rather than by the sky. It
+ * is not enough on its own, because what the alpha fixes and what it cannot fix
+ * are different problems.
+ *
+ * - It fixes the body ink. `--card-foreground` over this card measures 6.62:1 in
+ *   the dark ramp and 8.99:1 in the light one, worst case over any canvas colour
+ *   on any base.
+ * - It does not fix `--muted-foreground`, which is calibrated against a flat
+ *   surface and would need the card at 95% to survive a star. That is opaque in
+ *   all but name. {@link HUD_DIM_INK_CLASS} steps the card's own ink down
+ *   instead, which is `cardShell.ts`'s fact three reached again from the other
+ *   direction. `.hud-card` in `src/index.css` points the token at that ink for
+ *   the whole subtree, so a HUD label written as `text-muted-foreground` is
+ *   bounded wherever it is.
+ *
+ * Raw `hsl(var(--card)/0.78)` rather than `bg-card/78`, for the oklab reason
+ * cardShell gives.
+ */
+export const HUD_CARD_CLASS =
+  "hud-card rounded-md border border-border/50 bg-[hsl(var(--card)/0.78)]";
+
+/** Body ink on the HUD card. */
+export const HUD_INK_CLASS = "text-[hsl(var(--card-foreground))]";
+
+/** The quieter ink on the HUD card, for a label, a hint or a meta figure. */
+export const HUD_DIM_INK_CLASS = "text-[hsl(var(--card-foreground)/0.75)]";
+
 /** Semantic accent driving value colour + corner-bracket colour. */
 export type HudAccent = "teal" | "amber" | "neutral" | "danger";
 
@@ -51,19 +90,68 @@ const BRACKET: Record<HudAccent, string> = {
   danger: "border-red-500/70",
 };
 
+/**
+ * Accent text on the HUD card, one value per ramp.
+ *
+ * These were `text-cyan-300`, `text-amber-400/90` and friends, and the card's
+ * alpha was never their problem. A Tailwind 300/400 shade is picked to sit on a
+ * dark surface, and the HUD does not force a dark scheme, so on a light one they
+ * were cyan on white: 1.0:1 for the teal and the amber, 1.7:1 for the danger
+ * red. Raising the card's opacity cannot help, because the card is white there
+ * too. They needed a value per ramp rather than one value used in both.
+ *
+ * Written as `hsl()` literals rather than palette classes so `hudChrome.test.ts`
+ * can read the shipped numbers back out and re-measure them. Each clears 4.5:1
+ * over {@link HUD_CARD_CLASS} whatever the canvas paints, on every base preset,
+ * with the worst case between 4.85:1 and 5.29:1.
+ *
+ * The danger red is the one that visibly moved. Red has little luminance to
+ * spend, so clearing AA over a card the sky is showing through means a pale red
+ * on the dark ramp and a deep one on the light ramp. The corner brackets keep
+ * the saturated colour, since they are decoration rather than text.
+ *
+ * A tile's label and its value now take the same accent, where the label used to
+ * be a 90% alpha step below. Both values have to clear AA on their own, so the
+ * step was a tenth of an alpha doing nothing the 10px-versus-20px size gap was
+ * not already doing louder.
+ */
+export const HUD_ACCENT_INK: Record<Exclude<HudAccent, "neutral">, string> = {
+  teal: "text-[hsl(190_75%_22%)] dark:text-[hsl(190_75%_74%)]",
+  amber: "text-[hsl(42_90%_20%)] dark:text-[hsl(42_90%_69%)]",
+  danger: "text-[hsl(4_75%_32%)] dark:text-[hsl(4_85%_87%)]",
+};
+
 const LABEL: Record<HudAccent, string> = {
-  teal: "text-cyan-400/90",
-  amber: "text-amber-400/90",
-  neutral: "text-muted-foreground",
-  danger: "text-red-400/90",
+  ...HUD_ACCENT_INK,
+  neutral: HUD_DIM_INK_CLASS,
 };
 
 const VALUE: Record<HudAccent, string> = {
-  teal: "text-cyan-300",
-  amber: "text-amber-300",
-  neutral: "text-foreground",
-  danger: "text-red-400",
+  ...HUD_ACCENT_INK,
+  neutral: HUD_INK_CLASS,
 };
+
+/** A `#rgb` or `#rrggbb` literal, which is all a galaxy document may name. */
+const HEX_COLOUR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+/**
+ * The faction colour a frame will paint, or nothing.
+ *
+ * `Faction.color` is documented as `#rrggbb` and parsed as "any string at all"
+ * (`parseFaction` in `../../model.ts`), and a galaxy can arrive from an imported
+ * challenge code rather than from this app. What reaches the DOM here is a
+ * corner bracket's `border-color`, so an unrecognised value falls back to the
+ * accent's own bracket instead of being handed to the style property.
+ *
+ * The bound is on the format, not the luminance. The corners are `aria-hidden`
+ * decoration and the panel names the faction in text beside its dot, so nothing
+ * here has a contrast requirement to meet, and a galaxy is entitled to a dark
+ * faction colour.
+ */
+export function bracketColor(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed && HEX_COLOUR.test(trimmed) ? trimmed : undefined;
+}
 
 /**
  * A translucent card with L-shaped corner accents (top-left + bottom-right),
@@ -82,8 +170,9 @@ export function BracketFrame({
   className?: string;
   children: ReactNode;
 }) {
-  const corner = accentColor ? "" : BRACKET[accent];
-  const cornerStyle = accentColor ? { borderColor: accentColor } : undefined;
+  const colour = bracketColor(accentColor);
+  const corner = colour ? "" : BRACKET[accent];
+  const cornerStyle = colour ? { borderColor: colour } : undefined;
   // The corner accents are absolutely positioned, so the frame must establish a
   // positioning context. Add `relative` only when the caller hasn't set its own
   // position — otherwise Tailwind's `.relative` would override a caller's
@@ -94,7 +183,7 @@ export function BracketFrame({
   );
   return (
     <div
-      className={`${positioned ? "" : "relative"} rounded-md border border-border/50 bg-card/70 ${className ?? ""}`}
+      className={`${positioned ? "" : "relative"} ${HUD_CARD_CLASS} ${className ?? ""}`}
     >
       <span
         aria-hidden
@@ -151,7 +240,9 @@ export function StatCard({
           {action}
         </span>
         {meta && (
-          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span
+            className={`font-mono text-[11px] tabular-nums ${HUD_DIM_INK_CLASS}`}
+          >
             {meta}
           </span>
         )}
