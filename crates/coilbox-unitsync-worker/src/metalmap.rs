@@ -311,10 +311,10 @@ mod tests {
 
         // Grayscale in, so every channel carries the sample and any one of them
         // reads back as the amount.
-        let pixels: Vec<&[u8]> = decoded.chunks_exact(3).collect();
+        let pixels: Vec<&[u8; 3]> = decoded.as_chunks::<3>().0.iter().collect();
         assert_eq!(pixels.len(), raw.len());
         for (px, want) in pixels.iter().zip(&raw) {
-            assert_eq!(px, &[*want, *want, *want]);
+            assert_eq!(**px, [*want, *want, *want]);
         }
     }
 
