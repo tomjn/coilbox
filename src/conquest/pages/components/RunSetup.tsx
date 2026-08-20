@@ -4,6 +4,7 @@ import { useFactionLogos } from "@/factions/logos";
 import { useUnitsyncGameInfo } from "../../../content/config";
 import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
 import { shapeClipPath } from "../../galaxy3d/factionShape";
+import { HUD_ACCENT_INK } from "./hudChrome";
 
 /** Small coloured swatch for a faction, matching its map marker shape
  * (`sides` from `factionSides`; omitted/0 = circle). */
@@ -60,7 +61,9 @@ export function SidePicker({
   if (sides.length < 2) return null;
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="font-display text-[10px] font-medium uppercase tracking-[0.2em] text-cyan-400/80">
+      <span
+        className={`font-display text-[10px] font-medium uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
+      >
         Side
       </span>
       <OptionSelect

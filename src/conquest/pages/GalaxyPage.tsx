@@ -52,6 +52,7 @@ import { advanceTurn, attackableNodes } from "../rules";
 import { BattleOverlay } from "./components/BattleOverlay";
 import {
   BracketFrame,
+  HUD_ACCENT_INK,
   MAP_BAND_CLASS,
   MAP_DIM_INK_CLASS,
   MAP_INK_CLASS,
@@ -563,7 +564,9 @@ function TerritoryTally({
                 {f.name}
               </span>
               {isPlayer && (
-                <span className="font-display text-[9px] uppercase tracking-[0.18em] text-cyan-400/90">
+                <span
+                  className={`font-display text-[9px] uppercase tracking-[0.18em] ${HUD_ACCENT_INK.teal}`}
+                >
                   You
                 </span>
               )}
@@ -815,7 +818,9 @@ function RunSetupPanel({
       className="pointer-events-auto absolute right-3 top-16 z-10 flex max-h-[calc(100%-5rem)] w-[22rem] max-w-[90%] flex-col gap-4 overflow-auto p-4 backdrop-blur-sm"
     >
       <header className="flex flex-col gap-1 border-b border-border/40 pb-3">
-        <span className="font-display text-[10px] font-medium uppercase tracking-[0.24em] text-cyan-400/90">
+        <span
+          className={`font-display text-[10px] font-medium uppercase tracking-[0.24em] ${HUD_ACCENT_INK.teal}`}
+        >
           New campaign
         </span>
         <h2 className="font-display text-2xl font-bold uppercase leading-none tracking-wide text-foreground">
@@ -827,7 +832,9 @@ function RunSetupPanel({
       </header>
       {choices.length > 1 && (
         <div className="flex flex-col gap-1.5">
-          <span className="font-display text-[10px] font-medium uppercase tracking-[0.2em] text-cyan-400/80">
+          <span
+            className={`font-display text-[10px] font-medium uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
+          >
             Play as
           </span>
           <div className="flex flex-wrap gap-1.5">
@@ -838,7 +845,7 @@ function RunSetupPanel({
                 onClick={() => onFaction(f.id)}
                 className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-display text-[11px] uppercase tracking-wide transition-colors ${
                   faction === f.id
-                    ? "border-cyan-400/70 bg-cyan-400/10 text-foreground"
+                    ? "border-cyan-400 bg-cyan-400/10 text-foreground"
                     : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
                 }`}
               >
@@ -863,7 +870,9 @@ function RunSetupPanel({
       )}
       {chosenSide ? (
         <div className="flex flex-col gap-1.5">
-          <span className="font-display text-[10px] font-medium uppercase tracking-[0.2em] text-cyan-400/80">
+          <span
+            className={`font-display text-[10px] font-medium uppercase tracking-[0.2em] ${HUD_ACCENT_INK.teal}`}
+          >
             Side
           </span>
           <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/20 px-2.5 py-2">
@@ -946,7 +955,7 @@ function EndScreen({
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 backdrop-blur-sm">
       <BracketFrame className="flex w-[26rem] max-w-[90%] flex-col items-center gap-3 p-6 text-center">
         <h2
-          className={`font-display text-2xl font-bold uppercase tracking-wide ${won ? "text-emerald-400" : "text-red-400"}`}
+          className={`font-display text-2xl font-bold uppercase tracking-wide ${won ? "text-emerald-400" : HUD_ACCENT_INK.danger}`}
         >
           {won ? "Galaxy conquered" : "Conquest lost"}
         </h2>

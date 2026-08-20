@@ -2,7 +2,10 @@ import { Button } from "@picoframe/frame";
 import { Download, Loader2, Swords } from "lucide-react";
 import { Link } from "react-router";
 import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
-import { BracketFrame } from "../../../conquest/pages/components/hudChrome";
+import {
+  BracketFrame,
+  HUD_ACCENT_INK,
+} from "../../../conquest/pages/components/hudChrome";
 import { invalidateMapPreview, invalidateScans } from "../../../content/config";
 import { ErrorBanner } from "../../../content/pages/components/states";
 import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
@@ -156,7 +159,7 @@ export function EncounterOverlay({
         {(enc.phase === "victory" || enc.phase === "defeat") && (
           <div className="flex flex-col items-center gap-3 text-center">
             <h2
-              className={`font-display text-2xl font-bold uppercase tracking-wide ${enc.phase === "victory" ? "text-emerald-400" : "text-red-400"}`}
+              className={`font-display text-2xl font-bold uppercase tracking-wide ${enc.phase === "victory" ? "text-emerald-400" : HUD_ACCENT_INK.danger}`}
             >
               {enc.phase === "victory" ? "Victory" : "Defeat"}
             </h2>
