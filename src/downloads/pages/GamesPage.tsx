@@ -25,6 +25,7 @@ import {
 } from "../DownloadQueueProvider";
 import { GAME_REPOS, mergeGameRepos, repoForKey } from "../gameRepos";
 import { OptionSelect } from "./components/OptionSelect";
+import { QueueProgress } from "./components/ProgressBar";
 import { EmptyState, errMessage } from "./components/states";
 import { HIDE_INSTALLED_KEY } from "./hideInstalled";
 
@@ -66,7 +67,7 @@ export default function GamesPage() {
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
-  const { enqueue, statusFor, active } = useDownloadQueue();
+  const { enqueue, itemFor, active } = useDownloadQueue();
   // Unified GitHub game-repo registry (issue #512): the catalog is authoritative
   // once loaded, GAME_REPOS is the fallback seed shown immediately. Memoized so
   // `load`'s identity (and the effect that calls it) doesn't churn every render.
@@ -298,8 +299,8 @@ export default function GamesPage() {
           <ul className="divide-y divide-border">
             {sorted.map((g) => {
               const isInstalled = installed.has(g.filename.toLowerCase());
-              const status = g.url
-                ? statusFor(
+              const item = g.url
+                ? itemFor(
                     identityOf({
                       kind: "file",
                       label: g.name,
@@ -311,6 +312,7 @@ export default function GamesPage() {
                     }),
                   )
                 : null;
+              const status = item?.status ?? null;
               return (
                 <li key={g.id} className="flex flex-col gap-2 px-6 py-2.5">
                   <div className="flex items-center justify-between gap-3">
@@ -358,6 +360,7 @@ export default function GamesPage() {
                                 : "Download"}
                     </Button>
                   </div>
+                  <QueueProgress item={item} />
                 </li>
               );
             })}

@@ -12,7 +12,11 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { SuggestedMap, SuggestedMapList } from "@/content/branding";
-import { identityOf, useDownloadQueue } from "../../DownloadQueueProvider";
+import {
+  identityOf,
+  type QueueItem,
+  useDownloadQueue,
+} from "../../DownloadQueueProvider";
 import {
   type PackMapState,
   packMapState,
@@ -20,6 +24,7 @@ import {
   suggestedMapToInput,
 } from "../../mapLists";
 import { CachedThumb } from "./CachedThumb";
+import { QueueProgress } from "./ProgressBar";
 
 /**
  * A right-hand slide-in sheet for browsing curated map packs. Two levels: a list
@@ -109,20 +114,21 @@ function usePackStates(
   writePath: string | undefined,
   installed: Set<string>,
 ) {
-  const { statusFor } = useDownloadQueue();
+  const { itemFor } = useDownloadQueue();
   return useMemo(() => {
     const rows = pack.maps.map((map) => {
       const input = suggestedMapToInput(map, writePath);
+      const item = input ? itemFor(identityOf(input)) : null;
       const state = packMapState({
         input,
         filename: map.filename,
         installed,
-        queueStatus: input ? statusFor(identityOf(input)) : null,
+        queueStatus: item?.status ?? null,
       });
-      return { map, input, state };
+      return { map, input, item, state };
     });
     return { rows, summary: packSummary(rows.map((r) => r.state)) };
-  }, [pack, writePath, installed, statusFor]);
+  }, [pack, writePath, installed, itemFor]);
 }
 
 function PackList({
@@ -233,12 +239,13 @@ function PackDetail({
             : `Download all (${summary.pending})`}
       </Button>
       <ul className="flex flex-col gap-2">
-        {rows.map(({ map, input, state }) => (
+        {rows.map(({ map, input, item, state }) => (
           <MapRow
             key={map.id}
             map={map}
             thumb={thumbFor?.(map)}
             state={state}
+            item={item}
             canDownload={!!writePath && !!input}
             onDownload={() => input && enqueue(input)}
           />
@@ -252,12 +259,14 @@ function MapRow({
   map,
   thumb,
   state,
+  item,
   canDownload,
   onDownload,
 }: {
   map: SuggestedMap;
   thumb?: string;
   state: PackMapState;
+  item: QueueItem | null;
   canDownload: boolean;
   onDownload: () => void;
 }) {
@@ -273,10 +282,16 @@ function MapRow({
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{map.title}</p>
-        {map.blurb && (
-          <p className="line-clamp-1 text-xs text-muted-foreground">
-            {map.blurb}
-          </p>
+        {/* The bar takes the blurb's line rather than adding one, so a row that
+            is downloading is the same height as a row that is not. */}
+        {item?.progress ? (
+          <QueueProgress item={item} />
+        ) : (
+          map.blurb && (
+            <p className="line-clamp-1 text-xs text-muted-foreground">
+              {map.blurb}
+            </p>
+          )
         )}
       </div>
       <MapAction
