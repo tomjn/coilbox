@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { ChallengeCodeInput } from "@/challenge/ChallengeCodeInput";
 import { containerKindsSentence } from "@/container/names";
+import { nextDrawerKey } from "@/general/drawerKey";
 import { importContainerFile } from "../bindings";
 import { dispatchDeepLink } from "../bus";
 import { ConfirmDialog, type Pending } from "../ConfirmDialog";
@@ -37,13 +38,26 @@ export default function ImportSection() {
     null,
   );
   const [chosen, setChosen] = useState<string | undefined>(undefined);
+  // A fresh key for every arrival, so a form that already ran a code is never
+  // handed the same code again (issue #1398). It is the same fragility, and
+  // the same fix, as `nextDrawerKey` (see `../../general/drawerKey.ts`) gave
+  // the hub and content drawers for issue #1395: a key derived from the code
+  // itself cannot tell two arrivals of the same code apart.
+  const [formKey, setFormKey] = useState(() => nextDrawerKey());
 
   // A campaign deep link lands here with the code in the query string, because
   // campaigns are the one recognised kind with no code importer.
-  const { code: linkCode } = useImportParam();
+  const importParams = useImportParam();
   // Remounting `ChallengeCodeInput` under a new key is what fills and submits
   // it, which is also how a deep-linked code reaches every other importer.
-  const seed = chosen ?? linkCode;
+  const seed = chosen ?? importParams.code;
+
+  // `importParams` is a fresh object only on a genuine new arrival (see
+  // `useImportParam`), so this cannot miss a repeat of the same code the way
+  // comparing the code string itself would.
+  useEffect(() => {
+    if (importParams.code !== undefined) setFormKey(nextDrawerKey());
+  }, [importParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +135,7 @@ export default function ImportSection() {
             size="sm"
             onClick={() => {
               setChosen(offer.text);
+              setFormKey(nextDrawerKey());
               setOffer(null);
             }}
           >
@@ -139,7 +154,7 @@ export default function ImportSection() {
 
       <div className="rounded-lg border">
         <ChallengeCodeInput
-          key={seed ?? "empty"}
+          key={formKey}
           // The list is back, built from the kinds a container can hold rather
           // than written out (issue #1515). Written out is how it came to be
           // two kinds short, and how it stayed short until somebody counted.
