@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Popover,
   PopoverContent,
@@ -208,41 +209,41 @@ export default function CampaignBuilderPage() {
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">Campaign Builder</h1>
-          <p className="text-sm text-muted-foreground">
-            Author a sequence of skirmish missions from your saved presets.
-            Local campaigns are editable; bundled campaigns are read-only.
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Button
-            variant="outline"
-            className="gap-1.5"
-            onClick={rescan}
-            disabled={rescanning}
-          >
-            {rescanning ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <RefreshCw className="size-4" />
-            )}
-            Rescan
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-1.5"
-            onClick={importCampaign}
-            disabled={busy}
-          >
-            <Download className="size-4" /> Import
-          </Button>
-          <Button className="gap-1.5" onClick={() => openNew()}>
-            <Plus className="size-4" /> New campaign
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title="Campaign Builder"
+        description={
+          "Author a sequence of skirmish missions from your saved presets. " +
+          "Local campaigns are editable; bundled campaigns are read-only."
+        }
+        actions={
+          <>
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              onClick={rescan}
+              disabled={rescanning}
+            >
+              {rescanning ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <RefreshCw className="size-4" />
+              )}
+              Rescan
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              onClick={importCampaign}
+              disabled={busy}
+            >
+              <Download className="size-4" /> Import
+            </Button>
+            <Button className="gap-1.5" onClick={() => openNew()}>
+              <Plus className="size-4" /> New campaign
+            </Button>
+          </>
+        }
+      />
 
       {actionError && <ErrorBanner message={actionError} />}
       {error && <ErrorBanner message={error} />}

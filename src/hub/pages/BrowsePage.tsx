@@ -15,6 +15,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { CoilboxGlyph } from "@/components/CoilboxGlyph";
+import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -255,25 +256,19 @@ export default function BrowsePage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex flex-col gap-3 border-b border-border px-6 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <h1 className="text-lg font-semibold leading-none">Coilbox hub</h1>
-            <p className="max-w-prose text-sm text-muted-foreground">
-              {/* Built from the kinds the chips below offer, so the sentence
-                  cannot say four when there are five (issue #1502). */}
-              {kindsPlural()} shared by other players. Importing needs no
-              account, and nothing is imported until you have seen what it is
-              and said yes.
-            </p>
-            {pinnedMatcher && (
-              <p className="max-w-prose text-sm text-muted-foreground">
-                This copy of Coilbox is set up for {pinnedGame ?? "one game"},
-                so the hub shows its things, plus anything not tied to a game.
-              </p>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
+      <PageHeader
+        className="gap-3 border-b border-border px-6 py-4"
+        title="Coilbox hub"
+        description={
+          <>
+            {/* Built from the kinds the chips below offer, so the sentence
+                cannot say four when there are five (issue #1502). */}
+            {kindsPlural()} shared by other players. Importing needs no account,
+            and nothing is imported until you have seen what it is and said yes.
+          </>
+        }
+        actions={
+          <>
             <HeaderAccount hubUrl={hubUrl} />
             {!isProfileHidden("content.setupPacks") && (
               <Button variant="outline" size="sm" onClick={openExport}>
@@ -287,8 +282,15 @@ export default function BrowsePage() {
             >
               <CoilboxGlyph size={16} /> Hub website
             </Button>
-          </div>
-        </div>
+          </>
+        }
+      >
+        {pinnedMatcher && (
+          <p className="text-sm text-muted-foreground">
+            This copy of Coilbox is set up for {pinnedGame ?? "one game"}, so
+            the hub shows its things, plus anything not tied to a game.
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative max-w-xs flex-1">
             <Search
@@ -366,7 +368,7 @@ export default function BrowsePage() {
             ))}
           </div>
         )}
-      </header>
+      </PageHeader>
 
       <div className="min-h-0 flex-1 overflow-auto p-4">
         {importError && (

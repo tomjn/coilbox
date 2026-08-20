@@ -30,6 +30,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
+import { PageHeader } from "@/components/PageHeader";
 import {
   Popover,
   PopoverContent,
@@ -96,49 +97,45 @@ export default function BlueprintsPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">Base blueprints</h1>
-          <p className="text-sm text-muted-foreground">
-            Layouts of buildings you can put down anywhere. A blueprint has no
-            map and no team, so the same one works in a mission, in a skirmish,
-            and in somebody else's game.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <BlueprintPackButton
-            onImported={(kept) => {
-              toast.success(
-                kept.length === 1
-                  ? `"${kept[0].layout.name}" is in your library.`
-                  : `${kept.length} layouts are in your library.`,
-              );
-            }}
-          />
-          {records.length > 0 && (
-            <BlueprintPackWriteButton
-              onWritten={(said) => toast.success(said)}
+      <PageHeader
+        title="Base blueprints"
+        description="Layouts of buildings you can put down anywhere. A blueprint has no map and no team, so the same one works in a mission, in a skirmish, and in somebody else's game."
+        actions={
+          <>
+            <BlueprintPackButton
+              onImported={(kept) => {
+                toast.success(
+                  kept.length === 1
+                    ? `"${kept[0].layout.name}" is in your library.`
+                    : `${kept.length} layouts are in your library.`,
+                );
+              }}
             />
-          )}
-          <BlueprintImportButton
-            initialCode={importCode}
-            hubItemId={hubItemId}
-            onImported={(record) => {
-              recordHubImport(
-                hubItemId,
-                [record.id],
-                blueprintRoute(record.id),
-              );
-              toast.success(`"${record.layout.name}" is in your library.`);
-            }}
-          />
-          <NewBlueprintButton
-            games={installed}
-            taken={names}
-            scanning={scan.loading}
-          />
-        </div>
-      </header>
+            {records.length > 0 && (
+              <BlueprintPackWriteButton
+                onWritten={(said) => toast.success(said)}
+              />
+            )}
+            <BlueprintImportButton
+              initialCode={importCode}
+              hubItemId={hubItemId}
+              onImported={(record) => {
+                recordHubImport(
+                  hubItemId,
+                  [record.id],
+                  blueprintRoute(record.id),
+                );
+                toast.success(`"${record.layout.name}" is in your library.`);
+              }}
+            />
+            <NewBlueprintButton
+              games={installed}
+              taken={names}
+              scanning={scan.loading}
+            />
+          </>
+        }
+      />
 
       {error && <ErrorBanner message={error} />}
 

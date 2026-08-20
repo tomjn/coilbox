@@ -2,7 +2,7 @@ import { Button, Input } from "@picoframe/frame";
 import { Blocks, FileUp, ImageOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-
+import { PageHeader } from "@/components/PageHeader";
 import {
   Select,
   SelectContent,
@@ -147,46 +147,46 @@ export default function ProjectsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
+      <PageHeader
+        className="border-b border-border px-6 py-4"
+        title={
+          <>
             <Blocks size={18} /> Units
-          </h1>
-          <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-            Units assembled from lego parts. Every part shares one texture, so a
-            unit built here needs no UV work.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {/* Only when there is something to choose between. With one atlas
-              installed a control with one option is noise. */}
-          {atlases.length > 1 ? (
-            <Select
-              value={atlas ?? atlases[0].tex1}
-              onValueChange={(value) =>
-                setAtlas(value === atlases[0].tex1 ? null : value)
-              }
-            >
-              <SelectTrigger size="sm" className="w-52" aria-label="Atlas">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {atlases.map((option) => (
-                  <SelectItem key={option.tex1} value={option.tex1}>
-                    {option.packId}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-          <Button variant="outline" onClick={() => setOpening(true)}>
-            <FileUp size={16} /> Open a model
-          </Button>
-          <Button onClick={create} disabled={busy}>
-            <Plus size={16} /> New unit
-          </Button>
-        </div>
-      </header>
+          </>
+        }
+        description="Units assembled from lego parts. Every part shares one texture, so a unit built here needs no UV work."
+        actions={
+          <>
+            {/* Only when there is something to choose between. With one atlas
+                installed a control with one option is noise. */}
+            {atlases.length > 1 ? (
+              <Select
+                value={atlas ?? atlases[0].tex1}
+                onValueChange={(value) =>
+                  setAtlas(value === atlases[0].tex1 ? null : value)
+                }
+              >
+                <SelectTrigger size="sm" className="w-52" aria-label="Atlas">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {atlases.map((option) => (
+                    <SelectItem key={option.tex1} value={option.tex1}>
+                      {option.packId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            <Button variant="outline" onClick={() => setOpening(true)}>
+              <FileUp size={16} /> Open a model
+            </Button>
+            <Button onClick={create} disabled={busy}>
+              <Plus size={16} /> New unit
+            </Button>
+          </>
+        }
+      />
 
       <ImportDrawer
         open={opening}

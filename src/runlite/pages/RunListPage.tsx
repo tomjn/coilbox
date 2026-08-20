@@ -6,6 +6,7 @@ import { Link, useNavigate } from "react-router";
 import { challengeExport } from "@/challenge/bindings";
 import { ChallengeCodeView } from "@/challenge/ChallengeCodeView";
 import { ContinueBadge } from "@/components/ContinueBadge";
+import { PageHeader } from "@/components/PageHeader";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
 import { mostRecentOpen } from "@/lib/recency";
@@ -115,29 +116,27 @@ export default function RunListPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2 text-lg font-semibold">
+      <PageHeader
+        title={
+          <>
             <Rocket className="size-5 text-primary" aria-hidden /> Warpath
-          </h1>
-          <p className="max-w-xl text-sm text-muted-foreground">
-            Cross a forward-only map once — fight, take rewards, grow your
-            build, and reach the warlord before your health runs out. Win or
-            die, then set out again.
-          </p>
-        </div>
-        {hasGames && (
-          <div className="flex shrink-0 gap-2">
-            <Button variant="outline" onClick={() => openImportChallenge()}>
-              <Download className="mr-1.5 size-4" aria-hidden /> Import
-              challenge
-            </Button>
-            <Button onClick={() => openSetup()}>
-              <Rocket className="mr-1.5 size-4" aria-hidden /> New warpath
-            </Button>
-          </div>
-        )}
-      </header>
+          </>
+        }
+        description="Cross a forward-only map once — fight, take rewards, grow your build, and reach the warlord before your health runs out. Win or die, then set out again."
+        actions={
+          hasGames && (
+            <>
+              <Button variant="outline" onClick={() => openImportChallenge()}>
+                <Download className="mr-1.5 size-4" aria-hidden /> Import
+                challenge
+              </Button>
+              <Button onClick={() => openSetup()}>
+                <Rocket className="mr-1.5 size-4" aria-hidden /> New warpath
+              </Button>
+            </>
+          )
+        }
+      />
 
       {!scan.data ? (
         target ? (

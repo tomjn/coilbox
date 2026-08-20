@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
@@ -269,23 +270,21 @@ export default function HistoryPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-4">
-        <div className="space-y-1">
-          <h1 className="text-lg font-semibold leading-none">Run history</h1>
-          <p className="max-w-prose text-sm text-muted-foreground">
-            Past load-test reports, newest first. Select a run to see its
-            latency breakdown.
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Button variant="outline" size="sm" onClick={importReport}>
-            <Upload /> Import
-          </Button>
-          <Button variant="outline" size="sm" onClick={openFolder}>
-            <FolderOpen /> Open folder
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        className="border-b border-border px-6 py-4"
+        title="Run history"
+        description="Past load-test reports, newest first. Select a run to see its latency breakdown."
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={importReport}>
+              <Upload /> Import
+            </Button>
+            <Button variant="outline" size="sm" onClick={openFolder}>
+              <FolderOpen /> Open folder
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid min-h-0 flex-1 grid-cols-[22rem_1fr]">
         {/* Left: run list */}

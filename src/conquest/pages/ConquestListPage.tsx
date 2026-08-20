@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ContinueBadge } from "@/components/ContinueBadge";
+import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { FactionLogo } from "@/factions/FactionLogo";
@@ -186,27 +187,24 @@ export default function ConquestListPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">Conquest</h1>
-          <p className="text-sm text-muted-foreground">
-            Wage a campaign across a galaxy of star systems. Win skirmishes to
-            capture territory, defend against counterattacks, and take every
-            enemy capital.
-          </p>
-        </div>
-        {!needsGame && (
-          <div className="flex shrink-0 gap-2">
-            <Button variant="outline" onClick={() => openImportChallenge()}>
-              <Download className="mr-1.5 size-4" aria-hidden /> Import
-              challenge
-            </Button>
-            <Button onClick={() => openGenerate()}>
-              <Dices className="mr-1.5 size-4" aria-hidden /> Generate a galaxy
-            </Button>
-          </div>
-        )}
-      </header>
+      <PageHeader
+        title="Conquest"
+        description="Wage a campaign across a galaxy of star systems. Win skirmishes to capture territory, defend against counterattacks, and take every enemy capital."
+        actions={
+          !needsGame && (
+            <>
+              <Button variant="outline" onClick={() => openImportChallenge()}>
+                <Download className="mr-1.5 size-4" aria-hidden /> Import
+                challenge
+              </Button>
+              <Button onClick={() => openGenerate()}>
+                <Dices className="mr-1.5 size-4" aria-hidden /> Generate a
+                galaxy
+              </Button>
+            </>
+          )
+        }
+      />
 
       {error && <ErrorBanner message={error} />}
 

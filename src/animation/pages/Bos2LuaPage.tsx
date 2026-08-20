@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Check, Copy, FileCode2, Upload } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { bos2lua } from "../bos2lua";
@@ -45,40 +46,45 @@ export default function Bos2LuaPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
+      <PageHeader
+        className="border-b border-border px-6 py-4"
+        title={
+          <>
             <FileCode2 size={18} /> BOS → Lua
-          </h1>
-          <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+          </>
+        }
+        description={
+          <>
             Convert an old <code>.bos</code> unit script to a Lua unit script.
             Best-effort (a port of CarRepairer's converter) — it does the bulk
             of the mechanical work, but expect to hand-fix the result.
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".bos,.txt"
-            className="hidden"
-            onChange={(e) => {
-              void loadFile(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fileRef.current?.click()}
-          >
-            <Upload /> Load .bos…
-          </Button>
-          <Button size="sm" onClick={copyLua} disabled={!lua}>
-            {copied ? <Check /> : <Copy />} {copied ? "Copied" : "Copy Lua"}
-          </Button>
-        </div>
-      </header>
+          </>
+        }
+        actions={
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".bos,.txt"
+              className="hidden"
+              onChange={(e) => {
+                void loadFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload /> Load .bos…
+            </Button>
+            <Button size="sm" onClick={copyLua} disabled={!lua}>
+              {copied ? <Check /> : <Copy />} {copied ? "Copied" : "Copy Lua"}
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-4 p-6">
         <Label

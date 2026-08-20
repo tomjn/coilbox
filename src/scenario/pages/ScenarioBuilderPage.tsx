@@ -2,6 +2,7 @@ import { Button, Input, useDrawer } from "@picoframe/frame";
 import { Loader2, Pencil, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Popover,
   PopoverContent,
@@ -111,40 +112,36 @@ export default function ScenarioBuilderPage() {
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">Scenario Builder</h1>
-          <p className="text-sm text-muted-foreground">
-            Author a mission's in-engine content: what spawns, what the triggers
-            watch for, and what wins it. A scenario stands alone, so you can
-            play one on its own or attach it to a campaign mission later.
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Button
-            variant="outline"
-            className="gap-1.5"
-            onClick={rescan}
-            disabled={rescanning}
-          >
-            {rescanning ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <RefreshCw className="size-4" />
-            )}
-            Rescan
-          </Button>
-          <ReclaimClipsButton />
-          <ScenarioImportButton
-            onImported={(scenario) =>
-              navigate(`/scenario-builder/${scenario.id}`)
-            }
-          />
-          <Button className="gap-1.5" onClick={openNew}>
-            <Plus className="size-4" /> New scenario
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title="Scenario Builder"
+        description="Author a mission's in-engine content: what spawns, what the triggers watch for, and what wins it. A scenario stands alone, so you can play one on its own or attach it to a campaign mission later."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              onClick={rescan}
+              disabled={rescanning}
+            >
+              {rescanning ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <RefreshCw className="size-4" />
+              )}
+              Rescan
+            </Button>
+            <ReclaimClipsButton />
+            <ScenarioImportButton
+              onImported={(scenario) =>
+                navigate(`/scenario-builder/${scenario.id}`)
+              }
+            />
+            <Button className="gap-1.5" onClick={openNew}>
+              <Plus className="size-4" /> New scenario
+            </Button>
+          </>
+        }
+      />
 
       {actionError && <ErrorBanner message={actionError} />}
       {error && <ErrorBanner message={error} />}
