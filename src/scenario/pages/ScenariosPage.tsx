@@ -2,6 +2,7 @@ import { Button, useDrawer } from "@picoframe/frame";
 import { Play } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/PageHeader";
 import { useUnitsyncScan } from "@/content/config";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { useOneShotParam } from "@/deeplink/useOneShotParam";
@@ -111,21 +112,16 @@ export default function ScenariosPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-lg font-semibold">Scenarios</h1>
-          <p className="text-sm text-muted-foreground">
-            Standalone missions: a map, a starting force and something to do.
-            Play one on its own, without a campaign around it.
-          </p>
-        </div>
-        <div className="shrink-0">
+      <PageHeader
+        title="Scenarios"
+        description="Standalone missions: a map, a starting force and something to do. Play one on its own, without a campaign around it."
+        actions={
           <ScenarioImportButton
             initialCode={importCode}
             onImported={imported}
           />
-        </div>
-      </header>
+        }
+      />
 
       {error && <ErrorBanner message={error} />}
 
