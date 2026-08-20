@@ -2,7 +2,7 @@
 
 /**
  * What happens when somebody clicks a link on a distribution's markdown page
- * (issue #1783).
+ * (issues #1783 and #1786).
  *
  * `./pageLinks.test.ts` covers where each `href` spelling points, and notices
  * nothing about the click. The bug this file drives is the one link the click
@@ -21,24 +21,27 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Stands in for the Rust side and the system browser. `vi.hoisted` so the mock
+// factories below, which are hoisted above the imports, can reach them.
+const { openUrl, profileOpen } = vi.hoisted(() => ({
+  openUrl: vi.fn(async (_url: string) => {}),
+  profileOpen: vi.fn(async (_args: { path: string }) => ({
+    action: "open" as const,
+  })),
+}));
+
 // Matching `./pageLinks.test.ts`: the link classifier reaches refs/pages, whose
-// published `defineCommand` will not load under Vitest's resolver.
+// published `defineCommand` will not load under Vitest's resolver. `profile_open`
+// gets a real spy, because what it was asked to act on is what these cases assert.
 vi.mock("@picoframe/plugin-sdk", () => ({
-  defineCommand: () => async () => ({}),
+  defineCommand: (_plugin: string, command: string) =>
+    command === "profile_open" ? profileOpen : async () => ({}),
 }));
 
 // A widget embed pulls in most of the app, and no case here embeds one.
 vi.mock("./widgets", () => ({ PageWidget: () => null }));
 
-// Stands in for the OS file manager and browser. `vi.hoisted` so the mock
-// factories below, which are hoisted above the imports, can reach them.
-const { openUrl, revealItemInDir, root } = vi.hoisted(() => ({
-  openUrl: vi.fn(async (_url: string) => {}),
-  revealItemInDir: vi.fn(async (_path: string) => {}),
-  root: { path: "/pkg/.coilbox" },
-}));
-vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl, revealItemInDir }));
-vi.mock("./profile", () => ({ getProfileRoot: () => root.path }));
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
 
 import { MarkdownPage } from "./CustomPage";
 
@@ -71,11 +74,10 @@ function clickLink(markdown: string) {
 
 beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
-  root.path = "/pkg/.coilbox";
   openUrl.mockReset();
   openUrl.mockResolvedValue(undefined);
-  revealItemInDir.mockReset();
-  revealItemInDir.mockResolvedValue(undefined);
+  profileOpen.mockReset();
+  profileOpen.mockResolvedValue({ action: "open" });
 });
 
 afterEach(() => {
@@ -84,7 +86,7 @@ afterEach(() => {
 });
 
 describe("a link on a distribution's markdown page", () => {
-  it("shows the file in the file manager rather than drawing it over the app", () => {
+  it("gives the file to the OS rather than drawing it over the app", () => {
     const { followed, at, link } = clickLink(
       "[our logo](@.coilbox/images/logo.webp)",
     );
@@ -93,23 +95,21 @@ describe("a link on a distribution's markdown page", () => {
     expect(link.getAttribute("href")).toMatch(/coilbox/);
     expect(followed).toBe(false);
     expect(at).toBe("/");
-    expect(revealItemInDir).toHaveBeenCalledWith(
-      "/pkg/.coilbox/images/logo.webp",
-    );
+    // The path stays relative to the `.coilbox` folder. Nothing in the webview
+    // knows or builds a filesystem path, because Rust owns where that folder is.
+    expect(profileOpen).toHaveBeenCalledWith({ path: "images/logo.webp" });
   });
 
   it("does the same for a plain relative link, which means the same file", () => {
     const { followed } = clickLink("[our guide](docs/guide.pdf)");
     expect(followed).toBe(false);
-    expect(revealItemInDir).toHaveBeenCalledWith(
-      "/pkg/.coilbox/docs/guide.pdf",
-    );
+    expect(profileOpen).toHaveBeenCalledWith({ path: "docs/guide.pdf" });
   });
 
-  it("is still not followed when the OS refuses to show the file", async () => {
+  it("is still not followed when the file cannot be opened or shown", async () => {
     // The failure that must not fall back to letting the webview navigate,
     // because that is the bug. The click says so in the console instead.
-    revealItemInDir.mockRejectedValue(new Error("no such file"));
+    profileOpen.mockRejectedValue(new Error("there is no file at that path"));
     const { followed, at } = clickLink(
       "[our logo](@.coilbox/images/logo.webp)",
     );
@@ -123,26 +123,11 @@ describe("a link on a distribution's markdown page", () => {
     );
   });
 
-  it("is still not followed when there is no .coilbox folder to look in", () => {
-    // Off the portable path there is no folder to point at. The click says which
-    // link it was, because a click that silently does nothing is its own puzzle.
-    root.path = "";
-    const { followed, at } = clickLink(
-      "[our logo](@.coilbox/images/logo.webp)",
-    );
-    expect(followed).toBe(false);
-    expect(at).toBe("/");
-    expect(revealItemInDir).not.toHaveBeenCalled();
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining("images/logo.webp"),
-    );
-  });
-
   it("still hands an external link to the OS and an in-app link to the router", () => {
     const external = clickLink("[Discord](https://discord.gg/example)");
     expect(external.followed).toBe(false);
     expect(openUrl).toHaveBeenCalledWith("https://discord.gg/example");
-    expect(revealItemInDir).not.toHaveBeenCalled();
+    expect(profileOpen).not.toHaveBeenCalled();
     cleanup();
 
     const route = clickLink("[Play](@route/singleplayer)");

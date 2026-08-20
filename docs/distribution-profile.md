@@ -148,7 +148,7 @@ Markdown links resolve intelligently:
 - `[Rules](rules.md)` → the page `#/pages/rules` (a `.md` link maps to its page by filename; a nested page can be linked with `@route/pages/...`).
 - `[Play](@route/singleplayer)` → navigates in-app.
 - `[Discord](https://discord.gg/…)` → opens in the system browser (never navigates the app's own window away).
-- `[Our logo](@.coilbox/images/logo.webp)` → shows the file in the system file manager, with its folder open and the file selected. A link to a bundled file is never followed in the app's own window, because that would draw the file over Coilbox with no way back.
+- `[Our guide](@.coilbox/docs/guide.pdf)` → opens the bundled file in whatever program the OS opens that file type with. Pictures, PDFs, plain text, HTML, audio and video open. Any other type, and anything the OS turns down, is shown in the system file manager instead, with its folder open and the file selected. Coilbox will not open a file the OS would run rather than show, such as a `.exe` or a `.sh`, so a link cannot be used to start a program. A link to a bundled file is never followed in the app's own window, because that would draw the file over Coilbox with no way back.
 
 ### Widget catalogue
 
