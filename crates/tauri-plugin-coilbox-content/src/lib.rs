@@ -28,6 +28,7 @@ mod scan;
 mod settings_backup;
 mod stats;
 mod stats_watcher;
+mod steam;
 mod storage;
 
 use model::{
@@ -154,7 +155,7 @@ fn base_dirs<R: Runtime>(app: &AppHandle<R>, include_zerok: bool) -> BaseDirs {
     let spring_datadir = std::env::var_os("SPRING_DATADIR")
         .map(|v| std::env::split_paths(&v).collect())
         .unwrap_or_default();
-    BaseDirs {
+    let mut base = BaseDirs {
         home,
         documents,
         local_data,
@@ -164,7 +165,14 @@ fn base_dirs<R: Runtime>(app: &AppHandle<R>, include_zerok: bool) -> BaseDirs {
         spring_writedir: std::env::var_os("SPRING_WRITEDIR").map(PathBuf::from),
         spring_datadir,
         include_zerok,
+        steam_libraries: Vec::new(),
+    };
+    // Only the Zero-K probe uses these, and finding them costs a few file reads
+    // plus a registry lookup on Windows, so leave them empty when it is off.
+    if include_zerok {
+        base.steam_libraries = steam::library_dirs(current_os(), &base);
     }
+    base
 }
 
 // ---- root assembly ---------------------------------------------------------

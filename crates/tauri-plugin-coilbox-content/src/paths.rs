@@ -10,6 +10,7 @@
 //! (`~/.skylobby/spring`), the spring(6) data-dir search order, and BAR/Zero-K
 //! installer locations.
 
+use crate::steam;
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -51,6 +52,10 @@ pub struct BaseDirs {
     pub spring_datadir: Vec<PathBuf>,
     /// Whether to probe Steam/Zero-K locations (off by default; a UI pref).
     pub include_zerok: bool,
+    /// Steam library folders found on this machine, each holding a `steamapps`.
+    /// Filled by the command layer (see [`crate::steam::library_dirs`]) when the
+    /// Zero-K probe is on, because finding them means reading Steam's own config.
+    pub steam_libraries: Vec<PathBuf>,
 }
 
 pub struct Candidate {
@@ -171,56 +176,24 @@ pub fn candidate_roots(os: Os, b: &BaseDirs) -> Vec<Candidate> {
     };
     push(&mut out, bar_assets, "bar-assets");
 
-    // Zero-K via Steam (opt-in).
+    // Zero-K via Steam (opt-in). Steam installs it at
+    // `<library>/steamapps/common/Zero-K` and runs it in isolation mode, so that
+    // folder is the whole data root. A machine can have libraries on any drive, so
+    // probe every one the command layer found as well as the default install
+    // folders (issue #1695).
     if b.include_zerok {
-        match os {
-            Os::Windows => push(
-                &mut out,
-                b.program_files_x86.as_ref().map(|p| {
-                    p.join("Steam")
-                        .join("steamapps")
-                        .join("common")
-                        .join("Zero-K")
-                }),
-                "zerok",
-            ),
-            Os::Mac => push(
-                &mut out,
-                home.as_ref().map(|h| {
-                    h.join("Library")
-                        .join("Application Support")
-                        .join("Steam")
-                        .join("steamapps")
-                        .join("common")
-                        .join("Zero-K")
-                }),
-                "zerok",
-            ),
-            Os::Linux => {
-                push(
-                    &mut out,
-                    home.as_ref().map(|h| {
-                        h.join(".steam")
-                            .join("steam")
-                            .join("steamapps")
-                            .join("common")
-                            .join("Zero-K")
-                    }),
-                    "zerok",
-                );
-                push(
-                    &mut out,
-                    home.as_ref().map(|h| {
-                        h.join(".local")
-                            .join("share")
-                            .join("Steam")
-                            .join("steamapps")
-                            .join("common")
-                            .join("Zero-K")
-                    }),
-                    "zerok",
-                );
+        let mut libraries = steam::default_install_dirs(os, b);
+        for lib in &b.steam_libraries {
+            if !libraries.contains(lib) {
+                libraries.push(lib.clone());
             }
+        }
+        for lib in libraries {
+            push(
+                &mut out,
+                Some(lib.join("steamapps").join("common").join("Zero-K")),
+                "zerok",
+            );
         }
     }
 
@@ -249,6 +222,7 @@ mod tests {
             spring_writedir: None,
             spring_datadir: vec![],
             include_zerok: false,
+            steam_libraries: vec![],
         }
     }
 
@@ -330,6 +304,33 @@ mod tests {
         assert!(candidate_roots(Os::Linux, &b)
             .iter()
             .any(|c| c.origin == "zerok"));
+    }
+
+    #[test]
+    fn zerok_is_probed_in_every_steam_library() {
+        // The common Windows case behind issue #1695: Steam is where the installer
+        // put it, but the game is in a library on a second drive.
+        let mut b = base();
+        b.include_zerok = true;
+        b.steam_libraries = vec![
+            PathBuf::from("C:\\Program Files (x86)").join("Steam"),
+            PathBuf::from("D:\\SteamLibrary"),
+        ];
+        let zerok: Vec<PathBuf> = candidate_roots(Os::Windows, &b)
+            .into_iter()
+            .filter(|c| c.origin == "zerok")
+            .map(|c| c.path)
+            .collect();
+        let default = PathBuf::from("C:\\Program Files (x86)")
+            .join("Steam")
+            .join("steamapps")
+            .join("common")
+            .join("Zero-K");
+        let second_drive = PathBuf::from("D:\\SteamLibrary")
+            .join("steamapps")
+            .join("common")
+            .join("Zero-K");
+        assert_eq!(zerok, vec![default, second_drive]);
     }
 
     #[test]
