@@ -59,6 +59,14 @@ describe("progressCaption", () => {
     expect(progressCaption(sample(), IDLE_RATE, 1)).toBe("");
   });
 
+  it("admits the size is unknown when the source reports nothing", () => {
+    // A rapid game served by streamer.cgi: `0/0` once and then silence. No
+    // size, no bytes, no percentage, and not stalled either.
+    const caption = progressCaption(sample(), IDLE_RATE, 84);
+    expect(caption).toBe("Size unknown · 1m 20s elapsed");
+    expect(caption).not.toContain("stalled");
+  });
+
   it("shows bytes and rate with no time left when the total is unknown", () => {
     // A chunked HTTP response with no Content-Length.
     const caption = progressCaption(

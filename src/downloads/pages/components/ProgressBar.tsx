@@ -22,7 +22,7 @@ export function formatSpeed(bytesPerSec: number): string {
   return `${formatBytes(bytesPerSec)}/s`;
 }
 
-/** Below this, elapsed time says nothing anyone wants to read. */
+/** Below this, a download has not been going long enough to say much about. */
 const MIN_ELAPSED_SEC = 2;
 
 /**
@@ -32,8 +32,8 @@ const MIN_ELAPSED_SEC = 2;
  * Which of those appear depends on what the source reported, so a download
  * whose size nobody knows reads as deliberate rather than broken. It falls back
  * down the chain: bytes of a known total, then bytes alone, then the percentage
- * on its own. Time left needs a settled rate, and elapsed time stands in for it
- * until there is one.
+ * on its own, and finally an admission that there is none of that. Time left
+ * needs a settled rate, and elapsed time stands in for it until there is one.
  *
  * The percentage is left out when the byte total is known, because the bar
  * beside it already says the same thing.
@@ -54,6 +54,13 @@ export function progressCaption(
     parts.push(formatBytes(p.downloadedBytes));
   } else if (p.percent != null) {
     parts.push(`${Math.round(p.percent)}%`);
+  } else if (elapsedSec >= MIN_ELAPSED_SEC) {
+    // Nothing to put in the size slot, so say why rather than leave a bar
+    // pulsing beside a bare elapsed time. A rapid game served by streamer.cgi
+    // arrives with no length, and pr-downloader reports it once and never
+    // again. Held back for a second or two so a download that is merely
+    // starting does not announce it.
+    parts.push("Size unknown");
   }
 
   if (p.phase !== "extracting") {

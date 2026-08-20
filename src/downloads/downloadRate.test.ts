@@ -209,6 +209,29 @@ describe("rateFrom", () => {
     expect(rate.stalled).toBe(true);
   });
 
+  it("does not call a download stalled when it never reported anything", () => {
+    // The four samples a 77 MB rapid game served by streamer.cgi produces, from
+    // `rapid-streamer.stdout.txt`: the repo master and the sdp, each an unsized
+    // fetch finishing at `1/1`, and then `0/0` for the archive itself. A minute
+    // of silence after that is the transfer working, not a stall.
+    let samples = addSample([], { at: 1000, bytes: 1, fraction: 1 });
+    samples = addSample(samples, { at: 2000, bytes: 0, fraction: 0 });
+    samples = addSample(samples, { at: 3000, bytes: 1, fraction: 1 });
+    samples = addSample(samples, { at: 4000, bytes: 0, fraction: null });
+    const rate = rateFrom(samples, null, 64_000);
+    expect(rate.stalled).toBe(false);
+    expect(rate.bytesPerSec).toBeNull();
+    expect(rate.secondsLeft).toBeNull();
+  });
+
+  it("still calls a download stalled once it has reported something", () => {
+    // The same silence, but after a sample that carried a real percentage.
+    // This one had a signal and lost it, which is what a stall looks like.
+    let samples = addSample([], { at: 1000, bytes: 0, fraction: 0.4 });
+    samples = addSample(samples, { at: 2000, bytes: 0, fraction: null });
+    expect(rateFrom(samples, null, 64_000).stalled).toBe(true);
+  });
+
   it("does not call a brief pause a stall", () => {
     const samples = steady({ count: 6, stepMs: 1000, bytesPerStep: 1_000_000 });
     const rate = rateFrom(samples, 10_000_000, latest(samples) + 2000);
