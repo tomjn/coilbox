@@ -8,7 +8,11 @@ import { primeScan, useUnitsyncScan } from "../content/config";
 import { useReplayUserState } from "../content/replayUserState";
 import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
-import { toBattleConfig, usePreferredTarget } from "../play/config";
+import {
+  gameOptionSchema,
+  toBattleConfig,
+  usePreferredTarget,
+} from "../play/config";
 import {
   type DetectedResult,
   diffNewReplays,
@@ -201,6 +205,12 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         executable: target.executable,
         dataDir: target.dataDir,
       });
+    // Read once for both branches. A scenario mission runs as a mutator over
+    // this game, so the mutator's options are this game's options.
+    const optionSchema = await gameOptionSchema(
+      target,
+      game.primaryArchive.name,
+    );
     try {
       let exitCode: number | null;
       // The start script the engine was actually given. Detection reads the
@@ -225,6 +235,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           reader: "player",
           dataDir: target.dataDir,
           games,
+          optionSchema,
           disabledUnits: mission.disabledUnits,
           rescan: async () =>
             (await primeScan(target.enginePath, target.dataDir, true)).games,
@@ -239,14 +250,15 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
       } else {
         // Build the engine config exactly as the skirmish launcher does, from
         // the snapshot's five draft fields, plus the mission's disabled-unit
-        // list. The snapshot already holds only the options the author set, so
-        // they pass straight through (see the run.ts note in the page).
+        // list. The snapshot holds only the options the author set, and the
+        // game's own defaults fill the rest in `toBattleConfig`.
         launched = toBattleConfig({
           participants: snapshot.participants,
           mapName: map.name,
           gameType: game.name,
           startPosType: snapshot.startPosType,
           modOptions: snapshot.modOptionValues,
+          optionSchema,
           disabledUnits: mission.disabledUnits,
         });
         const res = await startEngine(launched);

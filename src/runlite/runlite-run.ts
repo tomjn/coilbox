@@ -13,6 +13,7 @@ import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
 import {
   applyRestrictions,
+  gameOptionSchema,
   toBattleConfig,
   usePreferredTarget,
   useSkirmishAis,
@@ -230,6 +231,10 @@ export function useRunEncounter(
         gameType: draft.gameName,
         startPosType: draft.startPosType,
         modOptions: draft.modOptionValues,
+        optionSchema: await gameOptionSchema(
+          target,
+          installedGame.primaryArchive.name,
+        ),
         disabledUnits: draft.restrictions?.disabledUnits,
       }),
       draft.restrictions,
