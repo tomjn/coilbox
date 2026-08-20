@@ -1,0 +1,13 @@
+pr-downloader 0.7-768-g09a1f37 (macos_arm64)
+[Info] /Users/tomjn/dev/pr-downloader/src/FileSystem/FileSystem.cpp:203:setWritePath():Using filesystem-writepath: /Users/tomjn/dev/prd-capture/rdata3
+[Info] /Users/tomjn/dev/pr-downloader/src/pr-downloader.cpp:202:DownloadSetConfig():Free disk space: 4305 MB
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/CurlWrapper.cpp:32:DumpVersion():libcurl 8.7.1 SecureTransport (LibreSSL/3.3.6)
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/CurlWrapper.cpp:81:ConfigureCertificates():CURLOPT_CAINFO is nullptr (can be overriden by PRD_SSL_CERT_FILE env variable)
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/CurlWrapper.cpp:83:ConfigureCertificates():CURLOPT_CAPATH is nullptr (can be overriden by PRD_SSL_CERT_DIR env variable)
+[Progress] 100% [==============================] 1/1 [Info] /Users/tomjn/dev/pr-downloader/src/Downloader/Http/HttpDownloader.cpp:732:download():Download: num files: 1, protocol: HTTP/1.1, to first byte: 124.023ms, transfer: 124.087ms, num retried errors: 0
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/Rapid/RapidDownloader.cpp:254:ParseFD():Found 50 repos in /Users/tomjn/dev/prd-capture/rdata3/rapid/repos.springrts.com/repos.gz
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/Http/HttpDownloader.cpp:732:download():Download: num files: 1, protocol: HTTP/1.1, to first byte: 33.231ms, transfer: 33.245ms, num retried errors: 0
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/Rapid/RapidDownloader.cpp:78:download_name():[Download] Chili Framework v2014.0
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/Http/HttpDownloader.cpp:732:download():Download: num files: 1, protocol: HTTP/1.1, to first byte: 34.985ms, transfer: 35.006ms, num retried errors: 0
+[Progress]   0% [=                             ] 2995/2766069 [Progress]   3% [=                             ] 90555/2766069 [Progress]  21% [=======                       ] 573104/2766069 [Progress]  25% [========                      ] 680739/2766069 [Progress]  34% [===========                   ] 942284/2766069 [Progress]  59% [==================            ] 1624254/2766069 [Progress]  64% [====================          ] 1769397/2766069 [Progress]  67% [=====================         ] 1849537/2766069 [Progress]  88% [===========================   ] 2446295/2766069 [Info] /Users/tomjn/dev/pr-downloader/src/Downloader/Http/HttpDownloader.cpp:732:download():Download: num files: 153, protocol: HTTP/1.1, to first byte: [max: 122.402ms 95%: 58.462ms median: 35.581ms mean: 39.180ms], transfer: [max: 1300.054ms 95%: 1179.773ms median: 555.648ms mean: 605.432ms], num retried errors: 0
+[Info] /Users/tomjn/dev/pr-downloader/src/main.cpp:185:main():Download complete!

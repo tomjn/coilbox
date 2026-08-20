@@ -1,0 +1,15 @@
+pr-downloader 0.7-768-g09a1f37 (macos_arm64)
+[Info] /Users/tomjn/dev/pr-downloader/src/FileSystem/FileSystem.cpp:203:setWritePath():Using filesystem-writepath: /Users/tomjn/dev/prd-capture/edata2
+[Info] /Users/tomjn/dev/pr-downloader/src/pr-downloader.cpp:202:DownloadSetConfig():Free disk space: 4254 MB
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/CurlWrapper.cpp:32:DumpVersion():libcurl 8.7.1 SecureTransport (LibreSSL/3.3.6)
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/CurlWrapper.cpp:81:ConfigureCertificates():CURLOPT_CAINFO is nullptr (can be overriden by PRD_SSL_CERT_FILE env variable)
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/CurlWrapper.cpp:83:ConfigureCertificates():CURLOPT_CAPATH is nullptr (can be overriden by PRD_SSL_CERT_DIR env variable)
+[Progress] 100% [==============================] 1/1 [Info] /Users/tomjn/dev/pr-downloader/src/Downloader/Http/HttpDownloader.cpp:732:download():Download: num files: 1, protocol: HTTP/1.1, to first byte: 111.705ms, transfer: 111.775ms, num retried errors: 0
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/Rapid/RapidDownloader.cpp:254:ParseFD():Found 50 repos in /Users/tomjn/dev/prd-capture/edata2/rapid/repos.springrts.com/repos.gz
+[Progress]   0% [                              ] 0/17985637 [Progress]  12% [====                          ] 2202081/17985637 [Progress]  29% [=========                     ] 5242054/17985637 [Progress]  46% [==============                ] 8339438/17985637 [Progress]  58% [==================            ] 10485760/17985637 [Progress]  75% [=======================       ] 13434066/17985637 [Progress]  92% [============================  ] 16596196/17985637 [Progress] 100% [==============================] 17985637/17985637 [Info] /Users/tomjn/dev/pr-downloader/src/Downloader/Http/HttpDownloader.cpp:732:download():Download: num files: 1, protocol: HTTP/2, to first byte: 634.443ms, transfer: 1612.286ms, num retried errors: 0
+[Info] /Users/tomjn/dev/pr-downloader/src/FileSystem/FileSystem.cpp:587:extract():Extracting /Users/tomjn/dev/prd-capture/edata2/engine/spring_bar_.BAR105.105.1.1-2314-g9e0bf7d_linux-64-minimal-portable.7z to /Users/tomjn/dev/prd-capture/edata2/engine/macos_arm64/105.1.1-2314-g9e0bf7d BAR105
+[Info] /Users/tomjn/dev/pr-downloader/src/FileSystem/FileSystem.cpp:632:extract():extracting (/Users/tomjn/dev/prd-capture/edata2/engine/macos_arm64/105.1.1-2314-g9e0bf7d BAR105/springsettings.cfg)
+[Info] /Users/tomjn/dev/pr-downloader/src/FileSystem/FileSystem.cpp:632:extract():extracting (/Users/tomjn/dev/prd-capture/edata2/engine/macos_arm64/105.1.1-2314-g9e0bf7d BAR105/AI/Interfaces/C/0.1/InterfaceInfo.lua)
+[Info] /Users/tomjn/dev/pr-downloader/src/FileSystem/FileSystem.cpp:632:extract():extracting (/Users/tomjn/dev/prd-capture/edata2/engine/macos_arm64/105.1.1-2314-g9e0bf7d BAR105/AI/Interfaces/C/0.1/libAIInterface.so)
+[Info] /Users/tomjn/dev/pr-downloader/src/FileSystem/FileSystem.cpp:655:extract():done
+[Info] /Users/tomjn/dev/pr-downloader/src/main.cpp:185:main():Download complete!
