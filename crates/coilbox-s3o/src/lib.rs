@@ -121,14 +121,18 @@ impl Piece {
         match self.primitive_type {
             PrimitiveType::Triangles => self
                 .indices
-                .chunks_exact(3)
+                .as_chunks::<3>()
+                .0
+                .iter()
                 .filter(|t| t.iter().all(valid))
                 .flatten()
                 .copied()
                 .collect(),
             PrimitiveType::Quads => self
                 .indices
-                .chunks_exact(4)
+                .as_chunks::<4>()
+                .0
+                .iter()
                 .filter(|q| q.iter().all(valid))
                 .flat_map(|q| [q[0], q[1], q[2], q[0], q[2], q[3]])
                 .collect(),
