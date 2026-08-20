@@ -12,6 +12,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogos } from "@/factions/logos";
+import { SubstitutedMapNote } from "../../challenge/SubstitutedMapNote";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncGameInfo, useUnitsyncScan } from "../../content/config";
 import { useKnownSpaceMaps } from "../../content/mapAppearanceCache";
@@ -674,7 +675,10 @@ function SelectionPanel({
           <dt className="font-display text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Battlefield
           </dt>
-          <dd className="truncate">{node.battle.mapName}</dd>
+          <dd className="min-w-0 text-right">
+            <span className="block truncate">{node.battle.mapName}</span>
+            <SubstitutedMapNote original={node.battle.mapSubstitutedFrom} />
+          </dd>
         </div>
       </dl>
       {node.blurb && (

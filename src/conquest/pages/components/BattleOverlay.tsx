@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogos } from "@/factions/logos";
+import { SubstitutedMapNote } from "../../../challenge/SubstitutedMapNote";
 import { buildEdgeMap, reachableFrom } from "../../../content/buildTree";
 import {
   invalidateMapPreview,
@@ -299,7 +300,10 @@ function Briefing({
           <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
             Battlefield
           </dt>
-          <dd className="truncate">{node.battle.mapName}</dd>
+          <dd className="min-w-0 text-right">
+            <span className="block truncate">{node.battle.mapName}</span>
+            <SubstitutedMapNote original={node.battle.mapSubstitutedFrom} />
+          </dd>
         </div>
         <div className="flex justify-between gap-2">
           <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
