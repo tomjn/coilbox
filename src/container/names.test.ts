@@ -9,7 +9,11 @@
 
 import { describe, expect, it } from "vitest";
 import { CONTAINER_KINDS } from "./container";
-import { containerKindName, containerKindsSentence } from "./names";
+import {
+  containerKindName,
+  containerKindPlural,
+  containerKindsSentence,
+} from "./names";
 
 describe("what a container kind is called", () => {
   it("names every kind, in the singular and without an article", () => {
@@ -24,6 +28,31 @@ describe("what a container kind is called", () => {
   it("calls no two kinds the same thing", () => {
     const names = CONTAINER_KINDS.map(containerKindName);
     expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe("what more than one of a kind is called", () => {
+  /** Written out rather than derived from the singular, so a kind added later
+   *  whose name does not take a plain "s" fails here, instead of reaching a
+   *  filter chip as a word nobody wrote. */
+  it("pluralises every kind", () => {
+    expect(CONTAINER_KINDS.map(containerKindPlural)).toEqual([
+      "campaigns",
+      "singleplayer presets",
+      "challenges",
+      "setup packs",
+      "scenarios",
+      "keymaps",
+      "base blueprints",
+    ]);
+  });
+
+  it("stays lowercase, so a caller can put it mid-sentence", () => {
+    for (const kind of CONTAINER_KINDS) {
+      const plural = containerKindPlural(kind);
+      expect(plural).toBe(plural.toLowerCase());
+      expect(plural.startsWith(containerKindName(kind))).toBe(true);
+    }
   });
 });
 

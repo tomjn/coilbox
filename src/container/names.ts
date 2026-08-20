@@ -35,6 +35,17 @@ export function containerKindName(kind: ContainerKind): string {
 }
 
 /**
+ * What to call more than one of a kind: "singleplayer presets".
+ *
+ * Every name above is a regular noun, so a plain "s" is right for all of them.
+ * Lowercase like the singular, for a caller that wants it mid-sentence. A
+ * caller that wants it to open one raises the first letter itself.
+ */
+export function containerKindPlural(kind: ContainerKind): string {
+  return `${containerKindName(kind)}s`;
+}
+
+/**
  * Every kind, as the middle of a sentence: "a campaign, a singleplayer preset,
  * … or a base blueprint".
  *
