@@ -118,8 +118,19 @@ interface DownloadQueueValue {
   items: QueueItem[];
   active: QueueItem | null;
   queued: QueueItem[];
-  /** Add a download; a no-op if an equal item is already queued or active. */
-  enqueue: (input: EnqueueInput) => void;
+  /**
+   * Add a download and return its id. When an equal item is already queued or
+   * active nothing is added and that item's id comes back, so the caller can
+   * still wait on the download it asked for.
+   */
+  enqueue: (input: EnqueueInput) => string;
+  /**
+   * Resolve once the item with this id stops running, whether it finished,
+   * failed or was cancelled. Resolves with the settled item, or null for an id
+   * the queue no longer holds. Never rejects: read `status` and `error` on the
+   * result instead.
+   */
+  waitFor: (id: string) => Promise<QueueItem | null>;
   /** Cancel a queued item (dropped) or the active one (backend cancel). */
   cancel: (id: string) => void;
   /** Current status of the item with this identity, or null if not tracked. */
@@ -142,6 +153,11 @@ export function useDownloadQueue(): DownloadQueueValue {
 
 /** How long a finished/failed/canceled row lingers before it's pruned. */
 const PRUNE_MS = 4000;
+
+/** Still on its way: waiting for a slot, or downloading right now. */
+function isPending(item: QueueItem): boolean {
+  return item.status === "queued" || item.status === "active";
+}
 
 /**
  * App-wide serial download queue. Downloads run one at a time (two ops must never
@@ -166,6 +182,17 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     return () => {
       completeListeners.current.delete(fn);
     };
+  }, []);
+
+  // Callers waiting on a specific item, by id. Drained (and dropped) the moment
+  // that item settles, so a caller can queue a download and still run whatever
+  // it used to run straight after its own inline download.
+  const settleWaiters = useRef(new Map<string, ((i: QueueItem) => void)[]>());
+  const settle = useCallback((item: QueueItem) => {
+    const waiters = settleWaiters.current.get(item.id);
+    if (!waiters) return;
+    settleWaiters.current.delete(item.id);
+    for (const fn of waiters) fn(item);
   }, []);
 
   // Only ever updates the runtime meta fields; the cast keeps the discriminated
@@ -244,25 +271,28 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     async (item: QueueItem) => {
       const onProgress = new Channel<DownloadProgress>();
       onProgress.onmessage = (p) => patch(item.id, { progress: p });
+      let settled = { ...item, status: "done", progress: null } as QueueItem;
       try {
         await start(item, onProgress);
         patch(item.id, { status: "done", progress: null });
-        const done = { ...item, status: "done", progress: null } as QueueItem;
-        for (const fn of completeListeners.current) fn(done);
+        for (const fn of completeListeners.current) fn(settled);
       } catch (e) {
         const msg = errMessage(e);
         const canceled = /cancel/i.test(msg);
-        patch(item.id, {
+        const meta = {
           status: canceled ? "canceled" : "error",
           error: canceled ? null : msg,
           progress: null,
-        });
+        } as const;
+        patch(item.id, meta);
+        settled = { ...item, ...meta } as QueueItem;
       } finally {
         activeIdRef.current = null;
+        settle(settled);
         prune(item.id);
       }
     },
-    [patch, prune, start],
+    [patch, prune, settle, start],
   );
 
   // Promote the next queued item whenever nothing is active. `activeIdRef` guards
@@ -281,39 +311,60 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     startNext();
   }, [startNext, items]);
 
-  const enqueue = useCallback((input: EnqueueInput) => {
+  const enqueue = useCallback((input: EnqueueInput): string => {
     const identity = identityOf(input);
-    setItems((list) => {
-      if (
-        list.some(
-          (i) =>
-            i.identity === identity &&
-            (i.status === "queued" || i.status === "active"),
-        )
-      )
-        return list;
-      const item = {
-        ...input,
-        id: crypto.randomUUID(),
-        identity,
-        status: "queued",
-        progress: null,
-        error: null,
-      } as QueueItem;
-      return [...list, item];
+    const already = itemsRef.current.find(
+      (i) => i.identity === identity && isPending(i),
+    );
+    if (already) return already.id;
+    const item = {
+      ...input,
+      id: crypto.randomUUID(),
+      identity,
+      status: "queued",
+      progress: null,
+      error: null,
+    } as QueueItem;
+    // Push into the ref as well as state: two enqueues in the same tick both
+    // read the ref, so without this the second would miss the first and add a
+    // duplicate of a download already on its way.
+    itemsRef.current = [...itemsRef.current, item];
+    setItems((list) =>
+      list.some((i) => i.identity === identity && isPending(i))
+        ? list
+        : [...list, item],
+    );
+    return item.id;
+  }, []);
+
+  const waitFor = useCallback((id: string): Promise<QueueItem | null> => {
+    const item = itemsRef.current.find((i) => i.id === id);
+    // Already finished, or an id the queue never held: there is nothing left to
+    // wait for, so answer now rather than leaving the caller hanging.
+    if (!item || !isPending(item)) return Promise.resolve(item ?? null);
+    return new Promise((resolve) => {
+      const list = settleWaiters.current.get(id) ?? [];
+      list.push(resolve);
+      settleWaiters.current.set(id, list);
     });
   }, []);
 
-  const cancel = useCallback((id: string) => {
-    const item = itemsRef.current.find((i) => i.id === id);
-    if (!item) return;
-    if (item.status === "active") {
-      // Best-effort backend stop; `run`'s catch marks it canceled.
-      dlCancel({ opId: id }).catch(() => {});
-    } else if (item.status === "queued") {
-      setItems((list) => list.filter((i) => i.id !== id));
-    }
-  }, []);
+  const cancel = useCallback(
+    (id: string) => {
+      const item = itemsRef.current.find((i) => i.id === id);
+      if (!item) return;
+      if (item.status === "active") {
+        // Best-effort backend stop, and `run`'s catch marks it canceled.
+        dlCancel({ opId: id }).catch(() => {});
+      } else if (item.status === "queued") {
+        itemsRef.current = itemsRef.current.filter((i) => i.id !== id);
+        setItems((list) => list.filter((i) => i.id !== id));
+        // A dropped item never reaches `run`, so settle its waiters here.
+        settle({ ...item, status: "canceled", progress: null } as QueueItem);
+      }
+    },
+    [settle],
+  );
 
   const statusByIdentity = useMemo(() => {
     const m = new Map<string, QueueStatus>();
@@ -335,8 +386,17 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   );
 
   const value: DownloadQueueValue = useMemo(
-    () => ({ items, active, queued, enqueue, cancel, statusFor, onComplete }),
-    [items, active, queued, enqueue, cancel, statusFor, onComplete],
+    () => ({
+      items,
+      active,
+      queued,
+      enqueue,
+      waitFor,
+      cancel,
+      statusFor,
+      onComplete,
+    }),
+    [items, active, queued, enqueue, waitFor, cancel, statusFor, onComplete],
   );
 
   return (
