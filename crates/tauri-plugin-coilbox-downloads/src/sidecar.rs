@@ -364,9 +364,10 @@ mod fixture_tests {
     /// pr-downloader prints `0/0` once and then nothing at all for the rest of
     /// the archive. This fixture is a 77 MB download reported in four lines.
     ///
-    /// The parser's job here is to say the size is unknown rather than zero. It
-    /// cannot do anything about the silence that follows, which leaves the
-    /// download reading as stalled. That is issue #1820.
+    /// The parser's job here is to say the size is unknown rather than zero, so
+    /// that what follows can tell a download with nothing to report apart from
+    /// one that stopped reporting. See
+    /// [`the_streamer_path_reports_nothing_measurable`].
     #[test]
     fn rapid_streamer_download_reports_no_size_at_all() {
         assert_eq!(
@@ -419,6 +420,30 @@ mod fixture_tests {
                 "the next sample should start again from the bottom"
             );
         }
+    }
+
+    /// Which downloads have a signal a watching timer can trust.
+    ///
+    /// Every sample in a map, pool or engine download carries bytes or a
+    /// percentage, so silence from one of those means something went wrong and
+    /// the watchdog should act. The streamer capture ends on a sample carrying
+    /// neither, and the silence after it is the transfer working. `next_idle`
+    /// reads exactly this to decide whether to kill a quiet download.
+    #[test]
+    fn the_streamer_path_reports_nothing_measurable() {
+        for raw in [MAP, RAPID_POOL, ENGINE] {
+            assert!(
+                events(raw).iter().all(DownloadProgress::is_measured),
+                "every sample of a sized download is a measurement"
+            );
+        }
+        let streamer = events(RAPID_STREAMER);
+        let (last, earlier) = streamer.split_last().expect("progress samples");
+        assert!(earlier.iter().all(DownloadProgress::is_measured));
+        // The repo master and the sdp, both of which finish. Then 77 MB with
+        // nothing said about it at all.
+        assert_eq!(earlier.len(), 3);
+        assert!(!last.is_measured());
     }
 
     /// The `[Info]` lines carry version strings, timings, file paths and repo

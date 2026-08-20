@@ -150,6 +150,29 @@ async fn run_sidecar_env(
     .map_err(|e| format!("failed to run pr-downloader: {e}"))
 }
 
+/// How long the watchdog has now gone without evidence the download is alive.
+/// `active` is whether stdout produced anything since the last poll.
+///
+/// Silence normally means trouble, and that is what the watchdog is for. It does
+/// not mean trouble while pr-downloader is fetching something the server gave no
+/// length for: its logger prints one `0/0` line and then drops every later one,
+/// because it works its percentage out from a total of zero and that percentage
+/// never changes. A 77 MB rapid game served by `streamer.cgi` therefore prints
+/// nothing for the whole transfer, and killing it after two minutes of quiet
+/// takes out a download that was running perfectly (issue #1820).
+///
+/// Standing the watchdog down there loses less than it sounds. pr-downloader
+/// gives curl a low-speed abort of its own, 10 bytes a second over 30 seconds,
+/// so a transfer that genuinely wedges still ends with an error, sooner than
+/// this timer would have reached it.
+fn next_idle(idle: Duration, active: bool, unsized_transfer: bool) -> Duration {
+    if active || unsized_transfer {
+        Duration::ZERO
+    } else {
+        idle + DL_POLL
+    }
+}
+
 /// Captured result of a streamed sidecar run, shaped for [`sidecar::parse_download`].
 struct SidecarRun {
     stdout: String,
@@ -209,13 +232,18 @@ async fn run_sidecar_streaming(
         // stdout activity. `activity` is set by the read loop on every byte; a
         // stalled connection produces none, so the idle timer runs out and we
         // kill — turning a permanent spinner into an actionable error.
+        //
+        // `unsized_transfer` is the exception to that, and it is why the read
+        // loop below hands its parsed progress back here. See [`next_idle`].
         let activity = Arc::new(AtomicBool::new(true));
+        let unsized_transfer = Arc::new(AtomicBool::new(false));
         let done = Arc::new(AtomicBool::new(false));
         let stalled = Arc::new(AtomicBool::new(false));
         {
             let child_slot = child_slot.clone();
             let cancel = cancel.clone();
             let activity = activity.clone();
+            let unsized_transfer = unsized_transfer.clone();
             let done = done.clone();
             let stalled = stalled.clone();
             std::thread::spawn(move || {
@@ -225,11 +253,11 @@ async fn run_sidecar_streaming(
                     if done.load(Ordering::Relaxed) {
                         return;
                     }
-                    if activity.swap(false, Ordering::Relaxed) {
-                        idle = Duration::ZERO;
-                    } else {
-                        idle += DL_POLL;
-                    }
+                    idle = next_idle(
+                        idle,
+                        activity.swap(false, Ordering::Relaxed),
+                        unsized_transfer.load(Ordering::Relaxed),
+                    );
                     let is_stall = idle >= DL_IDLE_LIMIT;
                     if cancel.load(Ordering::Relaxed) || is_stall {
                         if is_stall {
@@ -261,6 +289,9 @@ async fn run_sidecar_streaming(
                 }
                 let line = String::from_utf8_lossy(seg).into_owned();
                 if let Some(p) = sidecar::parse_progress_line(&line) {
+                    // Tell the watchdog whether the transfer now under way is
+                    // one pr-downloader will keep reporting on.
+                    unsized_transfer.store(!p.is_measured(), Ordering::Relaxed);
                     let _ = on_progress.send(p);
                 }
                 out.push_str(&line);
@@ -1309,6 +1340,65 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_fetch_text
         ])
         .build()
+}
+
+/// The watchdog's idle clock, which decides whether a quiet download gets
+/// killed. Its whole job is telling a wedged transfer apart from a working one,
+/// and the two look identical from outside.
+#[cfg(test)]
+mod watchdog_tests {
+    use super::{next_idle, DL_IDLE_LIMIT, DL_POLL};
+    use std::time::Duration;
+
+    /// Run the clock forward `polls` times with no stdout at all, and answer
+    /// whether the watchdog would have killed the download by then.
+    fn killed_after(polls: u32, unsized_transfer: bool) -> bool {
+        let mut idle = Duration::ZERO;
+        for _ in 0..polls {
+            idle = next_idle(idle, false, unsized_transfer);
+            if idle >= DL_IDLE_LIMIT {
+                return true;
+            }
+        }
+        false
+    }
+
+    #[test]
+    fn stdout_activity_resets_the_clock() {
+        assert_eq!(
+            next_idle(Duration::from_secs(90), true, false),
+            Duration::ZERO
+        );
+    }
+
+    #[test]
+    fn silence_accumulates_towards_the_limit() {
+        assert_eq!(
+            next_idle(Duration::from_secs(90), false, false),
+            Duration::from_secs(90) + DL_POLL
+        );
+    }
+
+    #[test]
+    fn a_sized_download_that_goes_quiet_is_killed() {
+        let polls = (DL_IDLE_LIMIT.as_secs() / DL_POLL.as_secs()) as u32;
+        assert!(killed_after(polls, false));
+    }
+
+    #[test]
+    fn an_unsized_transfer_is_left_alone_however_long_it_is_quiet() {
+        // A 77 MB rapid game through `streamer.cgi` prints one `0/0` line and
+        // then nothing until it finishes. An hour of that is not a stall.
+        assert!(!killed_after(3600, true));
+    }
+
+    #[test]
+    fn the_clock_starts_again_once_a_sized_transfer_follows() {
+        let mut idle = Duration::from_secs(90);
+        idle = next_idle(idle, false, true);
+        assert_eq!(idle, Duration::ZERO);
+        assert_eq!(next_idle(idle, false, false), DL_POLL);
+    }
 }
 
 #[cfg(test)]
