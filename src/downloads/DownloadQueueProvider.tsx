@@ -23,6 +23,13 @@ import {
 } from "./bindings";
 import { downloadGameAnySource } from "./downloadGame";
 import { downloadMapAnySource } from "./downloadMap";
+import {
+  addSample,
+  type DownloadRate,
+  IDLE_RATE,
+  type RateSample,
+  rateFrom,
+} from "./downloadRate";
 import { errMessage } from "./pages/components/states";
 
 /**
@@ -83,6 +90,15 @@ interface QueueItemMeta {
   identity: string;
   status: QueueStatus;
   progress: DownloadProgress | null;
+  /**
+   * Speed and time left, estimated from this item's own progress samples. The
+   * queue owns the estimate rather than each screen, so a download reads the
+   * same in the topbar as it does on the page that started it, and so closing
+   * the popover does not throw the history away.
+   */
+  rate: DownloadRate;
+  /** When this item started downloading, for elapsed time. Null until it does. */
+  startedAt: number | null;
   /** Failure message (non-cancel errors only). */
   error: string | null;
 }
@@ -135,6 +151,9 @@ interface DownloadQueueValue {
   cancel: (id: string) => void;
   /** Current status of the item with this identity, or null if not tracked. */
   statusFor: (identity: string) => QueueStatus | null;
+  /** The tracked item with this identity, or null. For pages that enqueue
+   * directly and want to draw the download's progress themselves. */
+  itemFor: (identity: string) => QueueItem | null;
   /** Subscribe to items completing (done). Returns an unsubscribe fn. */
   onComplete: (fn: (item: QueueItem) => void) => () => void;
 }
@@ -175,6 +194,13 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   // Set synchronously in startNext so the pump can't launch a second item before
   // the "active" status commits to state.
   const activeIdRef = useRef<string | null>(null);
+
+  // The progress samples behind each running item's rate estimate. Kept out of
+  // React state because they change far faster than anything drawn from them,
+  // and dropped as soon as the item settles.
+  const samplesRef = useRef(
+    new Map<string, { samples: RateSample[]; totalBytes: number | null }>(),
+  );
 
   const completeListeners = useRef(new Set<(item: QueueItem) => void>());
   const onComplete = useCallback((fn: (item: QueueItem) => void) => {
@@ -270,11 +296,29 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   const run = useCallback(
     async (item: QueueItem) => {
       const onProgress = new Channel<DownloadProgress>();
-      onProgress.onmessage = (p) => patch(item.id, { progress: p });
+      let samples: RateSample[] = [];
+      onProgress.onmessage = (p) => {
+        const now = Date.now();
+        // The sidecar's final event reports zero bytes and no percentage, so it
+        // is a terminator rather than a measurement. `addSample` drops it, but
+        // feeding it in at all would only move the stall clock.
+        if (p.phase !== "done") {
+          samples = addSample(samples, {
+            at: now,
+            bytes: p.downloadedBytes,
+            fraction: p.percent == null ? null : p.percent / 100,
+          });
+        }
+        samplesRef.current.set(item.id, { samples, totalBytes: p.totalBytes });
+        patch(item.id, {
+          progress: p,
+          rate: rateFrom(samples, p.totalBytes, now),
+        });
+      };
       let settled = { ...item, status: "done", progress: null } as QueueItem;
       try {
         await start(item, onProgress);
-        patch(item.id, { status: "done", progress: null });
+        patch(item.id, { status: "done", progress: null, rate: IDLE_RATE });
         for (const fn of completeListeners.current) fn(settled);
       } catch (e) {
         const msg = errMessage(e);
@@ -283,11 +327,13 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           status: canceled ? "canceled" : "error",
           error: canceled ? null : msg,
           progress: null,
+          rate: IDLE_RATE,
         } as const;
         patch(item.id, meta);
         settled = { ...item, ...meta } as QueueItem;
       } finally {
         activeIdRef.current = null;
+        samplesRef.current.delete(item.id);
         settle(settled);
         prune(item.id);
       }
@@ -302,7 +348,12 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     const next = itemsRef.current.find((i) => i.status === "queued");
     if (!next) return;
     activeIdRef.current = next.id;
-    patch(next.id, { status: "active", progress: null });
+    patch(next.id, {
+      status: "active",
+      progress: null,
+      rate: IDLE_RATE,
+      startedAt: Date.now(),
+    });
     void run(next);
   }, [patch, run]);
 
@@ -323,6 +374,8 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       identity,
       status: "queued",
       progress: null,
+      rate: IDLE_RATE,
+      startedAt: null,
       error: null,
     } as QueueItem;
     // Push into the ref as well as state: two enqueues in the same tick both
@@ -376,6 +429,16 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     [statusByIdentity],
   );
 
+  const itemByIdentity = useMemo(() => {
+    const m = new Map<string, QueueItem>();
+    for (const i of items) m.set(i.identity, i);
+    return m;
+  }, [items]);
+  const itemFor = useCallback(
+    (identity: string) => itemByIdentity.get(identity) ?? null,
+    [itemByIdentity],
+  );
+
   const active = useMemo(
     () => items.find((i) => i.status === "active") ?? null,
     [items],
@@ -384,6 +447,23 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     () => items.filter((i) => i.status === "queued"),
     [items],
   );
+
+  // A download that goes quiet sends no event saying so, so the rate has to be
+  // re-read against the clock for the stall to ever show. Only runs while
+  // something is active, and only writes when the answer actually changed.
+  const activeId = active?.id ?? null;
+  useEffect(() => {
+    if (!activeId) return;
+    const timer = setInterval(() => {
+      const tracked = samplesRef.current.get(activeId);
+      if (!tracked) return;
+      const next = rateFrom(tracked.samples, tracked.totalBytes, Date.now());
+      const current = itemsRef.current.find((i) => i.id === activeId)?.rate;
+      if (current && current.stalled === next.stalled) return;
+      patch(activeId, { rate: next });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [activeId, patch]);
 
   const value: DownloadQueueValue = useMemo(
     () => ({
@@ -394,9 +474,20 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       waitFor,
       cancel,
       statusFor,
+      itemFor,
       onComplete,
     }),
-    [items, active, queued, enqueue, waitFor, cancel, statusFor, onComplete],
+    [
+      items,
+      active,
+      queued,
+      enqueue,
+      waitFor,
+      cancel,
+      statusFor,
+      itemFor,
+      onComplete,
+    ],
   );
 
   return (
