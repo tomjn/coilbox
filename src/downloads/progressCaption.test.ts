@@ -86,6 +86,18 @@ describe("progressCaption", () => {
     expect(caption).toBe("12.0 MB of 48.0 MB · stalled · 2m 10s elapsed");
   });
 
+  it("names the extraction phase when there is nothing else to name", () => {
+    // The pr-downloader path's shape: it knows unpacking has started and
+    // nothing else, so the caption has to carry the phase on its own.
+    const caption = progressCaption(
+      sample({ phase: "extracting" }),
+      IDLE_RATE,
+      130,
+    );
+    expect(caption).toBe("Extracting… · 2m 10s elapsed");
+    expect(caption).not.toContain("Size unknown");
+  });
+
   it("names the extraction phase and gives it no speed or time left", () => {
     const caption = progressCaption(
       sample({ phase: "extracting", downloadedBytes: 48 * MB }),
