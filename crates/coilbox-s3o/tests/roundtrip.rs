@@ -54,7 +54,7 @@ fn front_faces_wind_counter_clockwise() {
         if piece.primitive_type != PrimitiveType::Triangles {
             continue;
         }
-        for tri in piece.indices.chunks_exact(3) {
+        for tri in piece.indices.as_chunks::<3>().0 {
             let v: Vec<Vertex> = tri.iter().map(|&i| piece.vertices[i as usize]).collect();
             let u = sub(v[1].pos, v[0].pos);
             let w = sub(v[2].pos, v[0].pos);

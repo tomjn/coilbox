@@ -649,7 +649,7 @@ mod tests {
         // libwebp compresses the alpha plane losslessly even in a lossy encode,
         // so the transparent quadrant comes back exactly transparent rather than
         // nearly so, and no background colour has been composited in.
-        let round_tripped = decoded.chunks_exact(4).collect::<Vec<_>>();
+        let round_tripped = decoded.as_chunks::<4>().0.iter().collect::<Vec<_>>();
         let expected = source.to_rgba8();
         for (px, want) in round_tripped.iter().zip(expected.pixels()) {
             assert_eq!(px[3], want.0[3], "alpha changed under a lossy encode");
