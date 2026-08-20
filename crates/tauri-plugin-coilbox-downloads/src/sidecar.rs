@@ -278,3 +278,199 @@ mod tests {
         assert!(parse_progress_line("Download complete!").is_none());
     }
 }
+
+/// The parsers run over stdout captured from real `pr-downloader` runs, one
+/// fixture per download kind. `tests/fixtures/README.md` records the exact
+/// commands and what was trimmed.
+///
+/// These exist because the numbers this parser pulls out are now the size, the
+/// rate, the time left and the stall verdict on every download surface in the
+/// app (issue #1798), and nothing had checked them against output pr-downloader
+/// actually produces.
+#[cfg(test)]
+mod fixture_tests {
+    use super::*;
+
+    const MAP: &str = include_str!("../tests/fixtures/map-smalldivide.stdout.txt");
+    const RAPID_POOL: &str = include_str!("../tests/fixtures/rapid-pool.stdout.txt");
+    const RAPID_STREAMER: &str = include_str!("../tests/fixtures/rapid-streamer.stdout.txt");
+    const ENGINE: &str = include_str!("../tests/fixtures/engine-bar105.stdout.txt");
+    const ENGINE_MISSING_OUT: &str =
+        include_str!("../tests/fixtures/engine-unavailable.stdout.txt");
+    const ENGINE_MISSING_ERR: &str =
+        include_str!("../tests/fixtures/engine-unavailable.stderr.txt");
+
+    /// Every progress sample the reader in `lib.rs` would emit for this output,
+    /// in order. That reader ends a segment at either `\n` or `\r`, because
+    /// pr-downloader redraws its progress bar in place.
+    fn events(raw: &str) -> Vec<DownloadProgress> {
+        raw.split(['\n', '\r'])
+            .filter(|s| !s.is_empty())
+            .filter_map(parse_progress_line)
+            .collect()
+    }
+
+    /// One line per sample, carrying everything the frontend reads off it:
+    /// `downloaded/total percent`, with `?` for a total nobody reported and `-`
+    /// for no percentage. Written out as text so a whole run reads as one
+    /// assertion rather than a pile of indexed field checks.
+    fn transcript(raw: &str) -> String {
+        events(raw)
+            .iter()
+            .map(|p| {
+                assert_eq!(p.phase, "downloading");
+                let total = p.total_bytes.map_or("?".to_string(), |t| t.to_string());
+                let pct = p.percent.map_or("-".to_string(), |v| format!("{v:.1}%"));
+                format!("{}/{total} {pct}", p.downloaded_bytes)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// A map fetched over HTTP from springfiles: a byte pair on every line, and
+    /// a byte-derived percentage that agrees with the one pr-downloader printed.
+    #[test]
+    fn map_download_reports_bytes_throughout() {
+        assert_eq!(
+            transcript(MAP),
+            "1/1 100.0%\n\
+             7981/2631449 0.3%\n\
+             447981/2631449 17.0%\n\
+             2631449/2631449 100.0%"
+        );
+    }
+
+    /// A rapid tag fetched file by file from the pool, which is the path a
+    /// Beyond All Reason download takes. Byte accurate the whole way.
+    #[test]
+    fn rapid_pool_download_reports_bytes_throughout() {
+        assert_eq!(
+            transcript(RAPID_POOL),
+            "1/1 100.0%\n\
+             2995/2766069 0.1%\n\
+             90555/2766069 3.3%\n\
+             573104/2766069 20.7%\n\
+             680739/2766069 24.6%\n\
+             942284/2766069 34.1%\n\
+             1624254/2766069 58.7%\n\
+             1769397/2766069 64.0%\n\
+             1849537/2766069 66.9%\n\
+             2446295/2766069 88.4%"
+        );
+    }
+
+    /// The same kind of rapid tag served by `streamer.cgi`, which is the default
+    /// when no rapid master is named. The response has no length, so
+    /// pr-downloader prints `0/0` once and then nothing at all for the rest of
+    /// the archive. This fixture is a 77 MB download reported in four lines.
+    ///
+    /// The parser's job here is to say the size is unknown rather than zero. It
+    /// cannot do anything about the silence that follows, which leaves the
+    /// download reading as stalled. That is issue #1820.
+    #[test]
+    fn rapid_streamer_download_reports_no_size_at_all() {
+        assert_eq!(
+            transcript(RAPID_STREAMER),
+            "1/1 100.0%\n\
+             0/1 0.0%\n\
+             1/1 100.0%\n\
+             0/? -"
+        );
+    }
+
+    /// An engine archive over HTTP. Nothing in the several hundred
+    /// `extracting (<path>)` lines that follow the transfer parses as progress.
+    #[test]
+    fn engine_download_reports_bytes_and_ignores_extraction() {
+        assert_eq!(
+            transcript(ENGINE),
+            "1/1 100.0%\n\
+             0/17985637 0.0%\n\
+             2202081/17985637 12.2%\n\
+             5242054/17985637 29.1%\n\
+             8339438/17985637 46.4%\n\
+             10485760/17985637 58.3%\n\
+             13434066/17985637 74.7%\n\
+             16596196/17985637 92.3%\n\
+             17985637/17985637 100.0%"
+        );
+    }
+
+    /// Every download opens with a `1/1` at 100% before the real archive starts
+    /// again from the bottom. It is pr-downloader fetching the rapid repo
+    /// master, and it is the sequence that broke an earlier version of the rate
+    /// smoothing in #1796, so it is worth naming rather than leaving implied by
+    /// the transcripts above.
+    ///
+    /// The `1` is not a byte. pr-downloader gives a download it has not sized
+    /// yet an `approx_size` of 1 and sums those into the total it prints, so a
+    /// fetch of unknown size counts as one unit and finishes at `1/1`. Coilbox
+    /// therefore shows "1 B of 1 B" for a moment on every download, which is
+    /// wrong but harmless next to the real archive that follows.
+    #[test]
+    fn every_download_opens_with_an_unsized_fetch_at_full() {
+        for raw in [MAP, RAPID_POOL, RAPID_STREAMER, ENGINE] {
+            let e = events(raw);
+            assert_eq!(e[0].downloaded_bytes, 1);
+            assert_eq!(e[0].total_bytes, Some(1));
+            assert_eq!(e[0].percent, Some(100.0));
+            assert!(
+                e[1].percent < Some(100.0),
+                "the next sample should start again from the bottom"
+            );
+        }
+    }
+
+    /// The `[Info]` lines carry version strings, timings, file paths and repo
+    /// counts, and plenty of them hold an `a/b` shaped token (`HTTP/1.1`,
+    /// `AI/Interfaces/C/0.1`). None of them is read as progress, which is the
+    /// worry issue #1798 was filed on.
+    #[test]
+    fn no_log_line_is_mistaken_for_progress() {
+        for raw in [MAP, RAPID_POOL, RAPID_STREAMER, ENGINE, ENGINE_MISSING_OUT] {
+            for seg in raw.split(['\n', '\r']).filter(|s| !s.is_empty()) {
+                assert_eq!(
+                    parse_progress_line(seg).is_some(),
+                    seg.starts_with("[Progress]"),
+                    "wrong verdict on {seg:?}"
+                );
+            }
+        }
+    }
+
+    /// pr-downloader prints one of these per file it extracts, so an archive
+    /// holding a path with "progress" in its name walks straight into the word
+    /// match, and the percentage comes out of whatever number the path ends in.
+    /// No capture happens to contain such a path, so this line is made up. The
+    /// hundreds of real ones it sits among are not.
+    #[test]
+    fn an_extracted_path_named_progress_is_not_progress() {
+        let line = "[Info] src/FileSystem/FileSystem.cpp:632:extract():extracting \
+                    (/data/games/anims/progressbar_02.png)";
+        assert!(parse_progress_line(line).is_none());
+    }
+
+    /// The verdict lines, read off the same captures.
+    #[test]
+    fn finished_runs_report_their_own_last_word() {
+        for raw in [MAP, RAPID_POOL, RAPID_STREAMER, ENGINE] {
+            let o = parse_download(raw, "", Some(0));
+            assert!(o.success);
+            assert!(o.message.ends_with("Download complete!"), "{}", o.message);
+        }
+    }
+
+    /// springfiles publishes no `engine_macosx_arm64` builds, so asking for an
+    /// engine on an Apple Silicon Mac gets as far as the repo master and stops.
+    /// The reason is on stderr and the exit code is 1.
+    #[test]
+    fn an_engine_with_no_build_for_this_platform_fails() {
+        let o = parse_download(ENGINE_MISSING_OUT, ENGINE_MISSING_ERR, Some(1));
+        assert!(!o.success);
+        assert!(
+            o.message.ends_with("Error occurred while downloading: 1"),
+            "{}",
+            o.message
+        );
+    }
+}
