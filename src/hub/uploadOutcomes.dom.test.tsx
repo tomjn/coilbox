@@ -120,6 +120,27 @@ describe("a backfill nobody asked for that the hub refused", () => {
     expect(screen.getByText("The hub would not take 40 pictures")).toBeTruthy();
   });
 
+  /**
+   * The bell clipped every body to one line, which is fine for "Download
+   * finished" and loses everything after about the fortieth character of a
+   * sentence naming a picture and what was wrong with it.
+   *
+   * Asserted on the class rather than on what is visible, because happy-dom
+   * does no layout and clipped text is present in the DOM either way. This is
+   * the one part of the issue no test can see, so it is also the part the
+   * screenshot in the pull request is for.
+   */
+  it("does not clip the hub's sentence to one line", () => {
+    mountApp();
+    reportAssetUploadOutcomes([notSquare("armsolar")], "coilbox");
+
+    openTheBell();
+
+    const body = screen.getByText(/must be square/);
+    expect(body.className).not.toContain("truncate");
+    expect(body.className).toContain("break-words");
+  });
+
   /** A run somebody started keeps the toast it had, and is not filed twice. */
   it("still shows a run a person started", async () => {
     mountApp();
