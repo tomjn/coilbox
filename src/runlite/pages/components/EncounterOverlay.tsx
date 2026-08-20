@@ -1,16 +1,11 @@
 import { Button } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
 import { Download, Loader2, Swords } from "lucide-react";
-import { useState } from "react";
 import { Link } from "react-router";
 import { BackToMapButton } from "../../../conquest/pages/components/BackToMapButton";
 import { BracketFrame } from "../../../conquest/pages/components/hudChrome";
 import { invalidateMapPreview, invalidateScans } from "../../../content/config";
 import { ErrorBanner } from "../../../content/pages/components/states";
-import {
-  type DownloadProgress,
-  dlDownloadMap,
-} from "../../../downloads/bindings";
+import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import { usePreferredTarget } from "../../../play/config";
 import { SaveAsPresetButton } from "../../../play/pages/components/SaveAsPresetButton";
 import type { RogueliteRun, RunNode } from "../../model";
@@ -210,39 +205,32 @@ function RequirementGate({
 }) {
   const { target } = usePreferredTarget();
   const missing = enc.missing;
-  const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const mapDl = useQueuedDownload({
+    kind: "map",
+    label: `Map: ${node.battle?.mapName ?? ""}`,
+    args: {
+      springName:
+        node.battle?.mapDownload?.springName ?? node.battle?.mapName ?? "",
+      searchUrl: node.battle?.mapDownload?.searchUrl,
+    },
+  });
   if (!missing) return null;
 
+  const downloading = mapDl.busy;
+  const progress = mapDl.progress;
+
   const download = async () => {
-    setDownloading(true);
-    setProgress(null);
-    setError(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = (p) => setProgress(p);
-    try {
-      await dlDownloadMap({
-        springName:
-          node.battle?.mapDownload?.springName ?? node.battle?.mapName ?? "",
-        searchUrl: node.battle?.mapDownload?.searchUrl,
-        onProgress,
-      });
-      invalidateScans();
-      if (target?.enginePath && target?.dataDir && node.battle) {
-        invalidateMapPreview(
-          target.enginePath,
-          target.dataDir,
-          node.battle.mapName,
-        );
-      }
-      await enc.recheck();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDownloading(false);
-      setProgress(null);
+    const settled = await mapDl.start();
+    if (settled?.status !== "done") return;
+    invalidateScans();
+    if (target?.enginePath && target?.dataDir && node.battle) {
+      invalidateMapPreview(
+        target.enginePath,
+        target.dataDir,
+        node.battle.mapName,
+      );
     }
+    await enc.recheck();
   };
 
   return (
@@ -251,15 +239,17 @@ function RequirementGate({
         {missing.kind === "map" ? "Map" : "Game"} not installed:{" "}
         <span className="text-foreground">{missing.name}</span>
       </p>
-      {error && <ErrorBanner message={error} />}
+      {mapDl.error && <ErrorBanner message={mapDl.error} />}
       {missing.kind === "map" ? (
         <Button onClick={download} disabled={downloading} className="w-full">
           <Download className="mr-1.5 size-4" aria-hidden />
-          {downloading
-            ? progress?.percent != null
-              ? `Downloading… ${Math.round(progress.percent)}%`
-              : "Downloading…"
-            : "Download map"}
+          {mapDl.status === "queued"
+            ? "Waiting for a slot…"
+            : downloading
+              ? progress?.percent != null
+                ? `Downloading… ${Math.round(progress.percent)}%`
+                : "Downloading…"
+              : "Download map"}
         </Button>
       ) : (
         <Link to="/downloads/games">

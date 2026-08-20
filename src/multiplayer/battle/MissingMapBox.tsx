@@ -1,13 +1,10 @@
 import { Button, useSetting } from "@picoframe/frame";
-import { Channel } from "@tauri-apps/api/core";
 import { Download, RefreshCw } from "lucide-react";
 import { useState } from "react";
-import type { DownloadProgress } from "@/downloads/bindings";
 import { useWriteRootPath } from "@/downloads/config";
 import { useDownloadQueue } from "@/downloads/DownloadQueueProvider";
-import { downloadMapAnySource } from "@/downloads/downloadMap";
 import { ProgressBar } from "@/downloads/pages/components/ProgressBar";
-import { errMessage } from "@/downloads/pages/components/states";
+import { useQueuedDownload } from "@/downloads/useQueuedDownload";
 import type { MapPicture } from "@/hub/assets/picture";
 import { useMapPictureRung } from "@/hub/assets/useMapPicture";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY, useAutoDownload } from "./autoDownload";
@@ -44,31 +41,24 @@ export function MissingMapBox({
   const writePath = useWriteRootPath();
   const { active, queued } = useDownloadQueue();
   const [autoEnabled] = useSetting<boolean>(AUTO_DOWNLOAD_ON_JOIN_KEY, true);
-  const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  const mapDl = useQueuedDownload({
+    kind: "mapAnySource",
+    label: `Map: ${mapName}`,
+    args: { mapName, writePath },
+  });
   const [rescanning, setRescanning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const downloading = mapDl.busy;
+  const progress = mapDl.progress;
 
   async function downloadMap() {
-    setDownloading(true);
-    setProgress(null);
-    setError(null);
-    const onProgress = new Channel<DownloadProgress>();
-    onProgress.onmessage = (p) => setProgress(p);
-    try {
-      await downloadMapAnySource({ mapName, writePath, onProgress });
-      await onRescan();
-    } catch (e) {
-      setError(errMessage(e));
-    } finally {
-      setDownloading(false);
-      setProgress(null);
-    }
+    const settled = await mapDl.start();
+    if (settled?.status !== "done") return;
+    await onRescan();
   }
 
   async function rescan() {
     setRescanning(true);
-    setError(null);
     try {
       await onRescan();
     } finally {
@@ -120,7 +110,11 @@ export function MissingMapBox({
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Button size="sm" disabled={downloading} onClick={downloadMap}>
               <Download className="size-4" />
-              {downloading ? "Downloading…" : "Download"}
+              {mapDl.status === "queued"
+                ? "Queued…"
+                : downloading
+                  ? "Downloading…"
+                  : "Download"}
             </Button>
             <Button
               variant="secondary"
@@ -135,7 +129,9 @@ export function MissingMapBox({
             </Button>
           </div>
         )}
-        {error && <span className="text-xs text-destructive">{error}</span>}
+        {mapDl.error && (
+          <span className="text-xs text-destructive">{mapDl.error}</span>
+        )}
       </div>
     </>
   );
