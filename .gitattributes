@@ -7,3 +7,9 @@ shared/asset-vocabulary.json text eol=lf
 # The map catalog is digested and vendored the same way, and for the same reason
 # (issue #1735).
 shared/map-catalog.json text eol=lf
+
+# These are captures of what pr-downloader printed, and it redraws its progress
+# bar with a bare carriage return (issue #1798). One of them arrived with CRLF
+# endings, which `core.autocrlf` would quietly flatten on the way in, so the
+# tests would be reading something pr-downloader never wrote.
+crates/tauri-plugin-coilbox-downloads/tests/fixtures/*.txt -text

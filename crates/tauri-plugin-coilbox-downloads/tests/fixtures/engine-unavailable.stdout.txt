@@ -1,0 +1,8 @@
+pr-downloader 0.7-768-g09a1f37 (macos_arm64)
+[Info] /Users/tomjn/dev/pr-downloader/src/FileSystem/FileSystem.cpp:203:setWritePath():Using filesystem-writepath: /Users/tomjn/dev/prd-capture/edata
+[Info] /Users/tomjn/dev/pr-downloader/src/pr-downloader.cpp:202:DownloadSetConfig():Free disk space: 4383 MB
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/CurlWrapper.cpp:32:DumpVersion():libcurl 8.7.1 SecureTransport (LibreSSL/3.3.6)
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/CurlWrapper.cpp:81:ConfigureCertificates():CURLOPT_CAINFO is nullptr (can be overriden by PRD_SSL_CERT_FILE env variable)
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/CurlWrapper.cpp:83:ConfigureCertificates():CURLOPT_CAPATH is nullptr (can be overriden by PRD_SSL_CERT_DIR env variable)
+[Progress] 100% [==============================] 1/1 [Info] /Users/tomjn/dev/pr-downloader/src/Downloader/Http/HttpDownloader.cpp:732:download():Download: num files: 1, protocol: HTTP/1.1, to first byte: 111.734ms, transfer: 111.823ms, num retried errors: 0
+[Info] /Users/tomjn/dev/pr-downloader/src/Downloader/Rapid/RapidDownloader.cpp:254:ParseFD():Found 50 repos in /Users/tomjn/dev/prd-capture/edata/rapid/repos.springrts.com/repos.gz

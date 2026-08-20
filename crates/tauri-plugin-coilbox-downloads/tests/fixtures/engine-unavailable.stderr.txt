@@ -1,0 +1,32 @@
+* Host springfiles.springrts.com:443 was resolved.
+* IPv6: (none)
+* IPv4: 46.225.144.165
+*   Trying 46.225.144.165:443...
+* Connected to springfiles.springrts.com (46.225.144.165) port 443
+* ALPN: curl offers h2,http/1.1
+*  CAfile: /etc/ssl/cert.pem
+*  CApath: none
+* SSL connection using TLSv1.3 / AEAD-AES256-GCM-SHA384 / [blank] / UNDEF
+* ALPN: server accepted http/1.1
+* Server certificate:
+*  subject: CN=springfiles.springrts.com
+*  start date: Aug 13 19:29:43 2026 GMT
+*  expire date: Nov 11 19:29:42 2026 GMT
+*  subjectAltName: host "springfiles.springrts.com" matched cert's "springfiles.springrts.com"
+*  issuer: C=US; O=Let's Encrypt; CN=YR1
+*  SSL certificate verify ok.
+* using HTTP/1.x
+> GET /json.php?category=engine_macosx_arm64&springname=95.0 HTTP/1.1
+Host: springfiles.springrts.com
+User-Agent: pr-downloader/0.7-768-g09a1f37
+Accept: */*
+
+* Request completely sent off
+< HTTP/1.1 200 OK
+< Date: Thu, 20 Aug 2026 17:15:33 GMT
+< Server: Apache/2.4.68 (Debian)
+< Transfer-Encoding: chunked
+< Content-Type: application/json
+< 
+* Connection #0 to host springfiles.springrts.com left intact
+[Error] /Users/tomjn/dev/pr-downloader/src/main.cpp:187:main():Error occurred while downloading: 1
