@@ -88,6 +88,16 @@ function UploadRunRow({ run }: { run: RunningUpload }) {
         aria-label={`${run.game} pictures`}
       />
       <p className="text-xs tabular-nums text-muted-foreground">{counted}</p>
+      {run.sent > 0 && (
+        // Above the button rather than below it. A stop is not an undo, and the
+        // person who needs that is the one deciding whether to press, not the
+        // one who already has.
+        <p className="text-xs text-muted-foreground">
+          {run.sent === 1
+            ? "One picture has already gone, and it stays on the hub."
+            : `${run.sent} pictures have already gone, and they stay on the hub.`}
+        </p>
+      )}
       <Button
         variant="outline"
         size="sm"
@@ -97,15 +107,6 @@ function UploadRunRow({ run }: { run: RunningUpload }) {
       >
         {run.stopping ? "Stopping…" : "Stop sending pictures"}
       </Button>
-      {run.sent > 0 && (
-        // Said before the button is pressed, not after. A stop is not an undo,
-        // and the person deciding whether to press it is the one that matters to.
-        <p className="text-xs text-muted-foreground">
-          {run.sent === 1
-            ? "One picture has already gone, and it stays on the hub."
-            : `${run.sent} pictures have already gone, and they stay on the hub.`}
-        </p>
-      )}
     </div>
   );
 }
