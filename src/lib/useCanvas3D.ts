@@ -96,6 +96,13 @@ export function useCanvas3D(
     resize();
 
     return () => {
+      // A view hands its own render out to whatever draws on its scene, and a
+      // layer that draws asks for one more frame as it goes, from a passive
+      // effect cleanup React runs after this one. Nothing it holds can tell
+      // that the canvas is already gone, so the renderer says so itself: a
+      // disposed one draws nothing rather than re-allocating storage for a
+      // texture that already has it (issue #1740).
+      renderer.render = () => {};
       stopWatchingTextures();
       observer.disconnect();
       scene?.dispose();
