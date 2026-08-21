@@ -65,12 +65,12 @@ describe("the content region is clipped sideways", () => {
     ).not.toMatch(/overflow-y:/);
   });
 
-  it("hides rather than clips, so focus can still reach a cut-off control", () => {
+  it("hides rather than clips, so a cut-off control can still be scrolled to", () => {
     expect(
       rule?.[2] ?? "",
       "overflow-x: clip would stop the region being a scroll container, so " +
-        "focusing a control past the edge could no longer bring it into view. " +
-        "A keyboard user would be shut out of it entirely.",
+        "scrollIntoView could no longer bring a control past the edge onto " +
+        "screen. hidden keeps that working and takes away only the drag.",
     ).not.toMatch(/overflow-x:\s*clip/);
   });
 });

@@ -85,8 +85,13 @@
    defect.
 
    `hidden` rather than `clip`, deliberately. `hidden` leaves the region a
-   scroll container, so focusing a clipped control still scrolls it into view
-   and a keyboard user is not shut out of anything. `clip` would shut them out.
+   scroll container, so `scrollIntoView` still reaches a clipped control and
+   anything that puts one on screen keeps working. `clip` would take that away
+   as well as the scrollbar. Measured either way in the running app: `focus()`
+   alone does not scroll the region sideways under `hidden`, and it did not
+   under `auto` either, so nothing that worked before stops working here. What
+   changes is the drag and the scrollbar, and only at widths where the page was
+   already broken.
 
    This does not stop a page overflowing, and it is not meant to. The ten
    routes that overflow at 600px are filed separately, because each needs a
