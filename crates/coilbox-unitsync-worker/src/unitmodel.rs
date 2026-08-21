@@ -652,16 +652,19 @@ fn resolve_texture(
 ///
 /// `.bmp` and `.tga` are most of what the legacy games ship, 358 and 192 files
 /// respectively in Balanced Annihilation, and a webview will render neither.
-/// The archive preview already transcodes `.tga` to PNG for the same reason.
-/// Alpha is dropped along with it, on the same grounds preview states: Spring's
-/// unit textures use it as a team-colour or specular mask rather than as
-/// transparency, so honouring it renders half a unit invisible.
+/// `.pcx` joins them as the third format of that era, rarer on a model than on a
+/// build pic but read by the same engine loader. The archive preview already
+/// transcodes `.tga` and `.pcx` to PNG for the same reason. Alpha is dropped
+/// along with it, on the same grounds preview states for `.tga`: Spring's unit
+/// textures use it as a team-colour or specular mask rather than as
+/// transparency, so honouring it renders half a unit invisible. Preview keeps a
+/// `.pcx`'s alpha because it is showing a picture, not a texture.
 ///
 /// Everything else passes through. `.dds` above all, because decoding a shared
 /// 8192 square atlas would cost 256 MiB for one texture and the webview can
 /// upload it compressed.
 fn to_webview_format(ext: &str, bytes: &[u8]) -> Option<Vec<u8>> {
-    if !matches!(ext, "bmp" | "tga") {
+    if !matches!(ext, "bmp" | "tga" | "pcx") {
         return None;
     }
     let img = crate::texture::decode_texture(ext, bytes)?;
@@ -948,12 +951,33 @@ mod tests {
     /// Only the formats a webview cannot read are re-encoded. A `.dds` above
     /// all must reach the GPU still compressed.
     #[test]
-    fn only_bmp_and_tga_are_transcoded() {
+    fn only_the_legacy_formats_are_transcoded() {
         assert!(to_webview_format("dds", b"not really a dds").is_none());
         assert!(to_webview_format("png", b"not really a png").is_none());
         assert!(to_webview_format("jpg", b"not really a jpeg").is_none());
         // Undecodable bytes fall through to being written as they are, rather
         // than the texture going missing.
         assert!(to_webview_format("bmp", b"not really a bmp").is_none());
+        assert!(to_webview_format("pcx", b"not really a pcx").is_none());
+    }
+
+    /// A `.pcx` model texture is the third format of the legacy era, and a
+    /// webview renders it no better than the other two.
+    #[test]
+    fn a_pcx_texture_is_re_encoded_as_png() {
+        // One red pixel: a 128-byte header then three 8-bit planes. 0xff cannot
+        // travel as a literal, so the red plane goes out as a run of one.
+        let mut raw = vec![0u8; 128];
+        raw[0] = 0x0a;
+        raw[1] = 5;
+        raw[2] = 1;
+        raw[3] = 8;
+        raw[65] = 3;
+        raw[66] = 1;
+        raw.extend_from_slice(&[0xc1, 0xff, 0x00, 0x00]);
+
+        let png = to_webview_format("pcx", &raw).expect("a pcx is transcoded");
+        let img = image::load_from_memory(&png).expect("the output is a png");
+        assert_eq!(img.to_rgba8().get_pixel(0, 0).0, [0xff, 0, 0, 255]);
     }
 }

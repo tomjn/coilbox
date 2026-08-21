@@ -24,9 +24,13 @@ use std::path::Path;
 /// (#1694), and a record written before it holds the picture nowhere else.
 const CACHE_VERSION: u32 = 2;
 
-/// Extensions probed for a side's emblem, in preference order (PNG first: it keeps
-/// its own alpha; BMP is the white-keyed legacy case).
-const SIDEPIC_EXTS: &[&str] = &["png", "tga", "dds", "bmp"];
+/// Extensions probed for a side's emblem, in preference order. PNG first, since
+/// it keeps its own alpha. BMP and PCX are the white-keyed legacy cases.
+const SIDEPIC_EXTS: &[&str] = &["png", "tga", "dds", "bmp", "pcx"];
+
+/// The extensions whose emblem is painted on an opaque white field rather than
+/// carrying alpha of its own, so it needs keying out. See [`chroma_key_white`].
+const WHITE_FIELD_EXTS: &[&str] = &["bmp", "pcx"];
 
 /// Sidepics are tiny (16px), but bound the read anyway.
 const READ_CAP: usize = 4 * 1024 * 1024;
@@ -164,10 +168,10 @@ fn resolve_side(
             None => continue,
         };
         let max_dim = img.width().max(img.height());
-        // The legacy BMP variant of the convention paints the emblem on an opaque
-        // white field; key pure white out so it sits on the dark UI. PNG/TGA/DDS
-        // carry their own alpha and are left untouched.
-        if *ext == "bmp" {
+        // The legacy BMP and PCX variants of the convention paint the emblem on
+        // an opaque white field, so key pure white out and it sits on the dark
+        // UI. PNG/TGA/DDS carry their own alpha and are left untouched.
+        if WHITE_FIELD_EXTS.contains(ext) {
             chroma_key_white(&mut img);
         }
         let png = crate::texture::encode_icon_png(img)?;
@@ -305,6 +309,22 @@ fn write_cache(dir: &Path, base: &str, side: &str, cached: &CachedLogo) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A PCX emblem is the same era as the BMP one and has no alpha of its own,
+    /// so it needs the white field keying out too. The formats that carry alpha
+    /// must not be touched.
+    #[test]
+    fn the_legacy_formats_are_the_keyed_ones() {
+        assert!(WHITE_FIELD_EXTS.contains(&"pcx"));
+        assert!(WHITE_FIELD_EXTS.contains(&"bmp"));
+        for carries_alpha in ["png", "tga", "dds"] {
+            assert!(!WHITE_FIELD_EXTS.contains(&carries_alpha));
+            assert!(SIDEPIC_EXTS.contains(&carries_alpha));
+        }
+        // PNG is preferred over every legacy form, whichever a game ships.
+        assert_eq!(SIDEPIC_EXTS[0], "png");
+        assert!(SIDEPIC_EXTS.contains(&"pcx"));
+    }
 
     /// White pixels become transparent; non-white keep their alpha.
     #[test]
