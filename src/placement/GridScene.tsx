@@ -17,7 +17,7 @@
  * actually stand on rather than against nothing.
  */
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
@@ -91,10 +91,15 @@ function buildGridTexture(): THREE.Texture {
  */
 export function GridScene({
   extent,
+  grid = true,
   className,
   onScene,
 }: {
   extent: number;
+  /** Whether the build squares are ruled on the ground. Switched off, the
+   *  ground is the same plain slab lit the same way, so a layout can be looked
+   *  at as a model rather than read against the squares (issue #1870). */
+  grid?: boolean;
   className?: string;
   /** Handed the built scene, and null when it is torn down. */
   onScene?: (handle: MapScene3D | null) => void;
@@ -104,6 +109,11 @@ export function GridScene({
   // rebuilds the scene nor is called back stale.
   const onSceneRef = useRef(onScene);
   onSceneRef.current = onScene;
+  // The ground, so the grid can be ruled on and off it without rebuilding the
+  // scene, which would throw the camera back to where it opened.
+  const groundRef = useRef<Ground | null>(null);
+  const wantGrid = useRef(grid);
+  wantGrid.current = grid;
 
   useCanvas3D(
     hostRef,
@@ -165,6 +175,9 @@ export function GridScene({
       controls.addEventListener("change", render);
       renderer.setClearColor(0x000000, 0);
 
+      groundRef.current = { material, texture, render };
+      ruleGrid(groundRef.current, wantGrid.current);
+
       fitCanvas();
       let handedOver = false;
       if (onSceneRef.current) {
@@ -188,6 +201,7 @@ export function GridScene({
           // Withdrawn first, so whoever put things on this scene drops them
           // before the scene itself goes.
           if (handedOver) onSceneRef.current?.(null);
+          groundRef.current = null;
           controls.removeEventListener("change", render);
           controls.dispose();
           geometry.dispose();
@@ -199,5 +213,29 @@ export function GridScene({
     [extent],
   );
 
+  useEffect(() => {
+    if (groundRef.current) ruleGrid(groundRef.current, grid);
+  }, [grid]);
+
   return <div ref={hostRef} className={className} />;
+}
+
+/** What the grid is drawn on, kept so it can be redrawn without the scene. */
+interface Ground {
+  material: THREE.MeshStandardMaterial;
+  texture: THREE.Texture;
+  render: () => void;
+}
+
+/** Rule the build squares on the ground, or take them off it.
+ *
+ *  The lines are in the texture rather than in geometry, so taking them off
+ *  means dropping the texture. The ground's own colour then has to be set on
+ *  the material, because a material with no map is lit by its colour alone and
+ *  the colour under the lines is the texture's. */
+function ruleGrid({ material, texture, render }: Ground, on: boolean) {
+  material.map = on ? texture : null;
+  material.color.set(on ? 0xffffff : GROUND_HEX);
+  material.needsUpdate = true;
+  render();
 }

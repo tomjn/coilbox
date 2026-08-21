@@ -24,7 +24,6 @@ import {
   Copy,
   Crosshair,
   FlipHorizontal2,
-  Grid3x3,
   Keyboard,
   Move,
   PackagePlus,
@@ -44,6 +43,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  GridToggle,
+  ViewButton,
+  ViewControls,
+  ViewToggle,
+} from "@/components/ViewControls";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
 import { aimPoint } from "../../aimPoint";
@@ -1385,46 +1390,26 @@ export function ModelViewport({
       {/* Camera and scene, in the opposite corner from the notes. Stacked
           rather than side by side, so the compass keeps the corner and the
           buttons do not push it inward. */}
-      <ButtonGroup className="absolute bottom-3 right-3">
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => setShowGrid(!showGrid)}
-          aria-pressed={showGrid}
-          title={
-            showGrid
-              ? "Hide the ground grid"
-              : "Show the ground grid, marked in footprint steps and plate sizes"
-          }
-        >
-          <Grid3x3 className="size-4" />
-        </Button>
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => setShowCollision(!showCollision)}
-          aria-pressed={showCollision}
-          title={
-            showCollision
-              ? "Hide the collision volume"
-              : "Show the collision volume, the shape the engine hits and clicks"
-          }
-        >
-          <Box className="size-4" />
-        </Button>
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => setShowAim(!showAim)}
-          aria-pressed={showAim}
-          title={
-            showAim
-              ? "Hide the aim point"
-              : "Show the aim point, the one point another unit shoots at"
-          }
-        >
-          <Crosshair className="size-4" />
-        </Button>
+      <ViewControls>
+        <GridToggle
+          on={showGrid}
+          onChange={setShowGrid}
+          showTitle="Show the ground grid, marked in footprint steps and plate sizes"
+        />
+        <ViewToggle
+          icon={Box}
+          on={showCollision}
+          onChange={setShowCollision}
+          hideTitle="Hide the collision volume"
+          showTitle="Show the collision volume, the shape the engine hits and clicks"
+        />
+        <ViewToggle
+          icon={Crosshair}
+          on={showAim}
+          onChange={setShowAim}
+          hideTitle="Hide the aim point"
+          showTitle="Show the aim point, the one point another unit shoots at"
+        />
         <EnvironmentPicker
           backdrop={backdrop}
           onBackdrop={setBackdrop}
@@ -1441,16 +1426,14 @@ export function ModelViewport({
             if (choice) setShowReference(true);
           }}
         />
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => setShortcutsOpen(true)}
+        <ViewButton
           title="Keyboard shortcuts (?)"
+          onClick={() => setShortcutsOpen(true)}
         >
           <Keyboard className="size-4" />
-        </Button>
+        </ViewButton>
         <AxisCompass svgRef={compassRef} onClick={resetView} />
-      </ButtonGroup>
+      </ViewControls>
 
       <ShortcutSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 
@@ -1529,7 +1512,14 @@ const COMPASS_SIZE = 32;
 const COMPASS_MID = COMPASS_SIZE / 2;
 const COMPASS_ARM = 11;
 
-/** The three world axes as seen from here, and a click to face front again. */
+/**
+ * The three world axes as seen from here, and a click to face front again.
+ *
+ * The builder's own {@link ResetViewButton}, and richer than the plain one: it
+ * frames the unit like any reset, and while it waits it says which way round the
+ * camera is, which is how somebody notices they are lost in the first place. It
+ * is still one of the bar's buttons, so it is drawn as one.
+ */
 function AxisCompass({
   svgRef,
   onClick,
@@ -1538,13 +1528,7 @@ function AxisCompass({
   onClick: () => void;
 }) {
   return (
-    <Button
-      size="icon"
-      variant="outline"
-      onClick={onClick}
-      title="Reset the view"
-      aria-label="Reset the view"
-    >
+    <ViewButton title="Reset the view" onClick={onClick}>
       {/* A `size-` class of its own, or the button's own icon rule shrinks any
           bare svg to 16px and the compass becomes a smudge. */}
       <svg
@@ -1586,7 +1570,7 @@ function AxisCompass({
           </g>
         ))}
       </svg>
-    </Button>
+    </ViewButton>
   );
 }
 

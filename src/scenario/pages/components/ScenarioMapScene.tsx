@@ -1377,7 +1377,8 @@ function UnitsNote({
       : null;
 
   return (
-    <div className="pointer-events-none absolute bottom-2 right-2 flex max-w-[60%] flex-col items-end gap-1 text-right">
+    // The corner is the surface's, which stacks this above the view controls.
+    <>
       {problem && (
         <p className="rounded bg-amber-950/70 px-2 py-1 text-[11px] text-amber-200 backdrop-blur">
           {problem}
@@ -1387,6 +1388,6 @@ function UnitsNote({
         {drawing ? "drawing " : ""}
         {units.placed} unit{units.placed === 1 ? "" : "s"}
       </p>
-    </div>
+    </>
   );
 }

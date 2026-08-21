@@ -17,8 +17,8 @@
  * withdrawn with a null, and whoever took it puts their own layers on it.
  */
 
-import { Button, cn } from "@picoframe/frame";
-import { Frame, Maximize2, Minimize2 } from "lucide-react";
+import { cn } from "@picoframe/frame";
+import { Maximize2, Minimize2 } from "lucide-react";
 import {
   type ReactNode,
   useCallback,
@@ -28,6 +28,12 @@ import {
 } from "react";
 import * as THREE from "three";
 
+import {
+  GridToggle,
+  ResetViewButton,
+  ViewControls,
+  ViewToggle,
+} from "@/components/ViewControls";
 import type { MapAppearance } from "@/mapconv/bindings";
 import {
   type HeightWords,
@@ -117,15 +123,20 @@ export function PlacementSurface({
   /** The column down the top left: mode strip, selection bar, whatever is
    *  waiting for a click. */
   bars?: ReactNode;
-  /** Buttons along the top right, before Frame and Expand. */
+  /** Buttons along the top right: undo and redo, a contents list, whatever acts
+   *  on the document. What acts on the view instead goes in the bar of view
+   *  controls in the bottom right, which this owns. */
   chrome?: ReactNode;
-  /** The bottom right corner, for what was drawn and what could not be. */
+  /** Said above the view controls, for what was drawn and what could not be. */
   note?: ReactNode;
   /** The strip under the view, for what the mouse does here. */
   footer?: ReactNode;
 }) {
   const sceneRef = useRef<MapScene3D | null>(null);
   const [expanded, setExpanded] = useExpanded();
+  // Only ever asked about by a build grid ground. Held for as long as the
+  // surface is open and no longer, the way the unit builder holds its own.
+  const [grid, setGrid] = useState(true);
   // Read when the scene arrives rather than captured, so a caller passing an
   // inline framing function does not have to memoise it to avoid a rebuild.
   const frameRef = useRef(frame);
@@ -181,7 +192,7 @@ export function PlacementSurface({
       {stand ?? (
         <>
           <div className="relative min-h-0 flex-1">
-            <GroundView ground={ground} onScene={takeScene} />
+            <GroundView ground={ground} grid={grid} onScene={takeScene} />
 
             {bars && (
               <div className="absolute left-2 top-2 flex max-w-[calc(100%-21rem)] flex-col gap-1.5">
@@ -189,37 +200,50 @@ export function PlacementSurface({
               </div>
             )}
 
-            <div className="absolute right-2 top-2 flex items-center gap-1.5">
-              {chrome}
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 bg-card/80 backdrop-blur"
+            {chrome && (
+              <div className="absolute right-2 top-2 flex items-center gap-1.5">
+                {chrome}
+              </div>
+            )}
+
+            {/* Clear of the view controls below it, so a long warning about
+                units that could not be drawn does not sit on top of them. */}
+            {note && (
+              <div className="pointer-events-none absolute bottom-14 right-3 flex max-w-[60%] flex-col items-end gap-1 text-right">
+                {note}
+              </div>
+            )}
+
+            {/* The same bar in the same corner as the unit builder's, so a
+                person who has learned one editor's view controls has learned
+                this one's (issue #1870). What is here is what a surface with a
+                camera over ground has: put the view back, and take the window
+                over. A grid only where there is one to hide - a map has no
+                grid on it, and the build grid the blueprint editor stands on
+                is the ground itself. */}
+            <ViewControls>
+              {ground.kind === "grid" && (
+                <GridToggle
+                  on={grid}
+                  onChange={setGrid}
+                  showTitle="Show the build grid the layout stands on"
+                />
+              )}
+              <ResetViewButton
+                title={frameLabel}
                 onClick={() => {
                   if (sceneRef.current) frameRef.current(sceneRef.current);
                 }}
-              >
-                <Frame className="size-3.5" /> {frameLabel}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 bg-card/80 backdrop-blur"
-                onClick={() => setExpanded(!expanded)}
-                title={expanded ? "Back to the page (Esc)" : "Fill the window"}
-              >
-                {expanded ? (
-                  <>
-                    <Minimize2 className="size-3.5" /> Collapse
-                  </>
-                ) : (
-                  <>
-                    <Maximize2 className="size-3.5" /> Expand
-                  </>
-                )}
-              </Button>
-            </div>
-            {note}
+              />
+              <ViewToggle
+                icon={Maximize2}
+                onIcon={Minimize2}
+                on={expanded}
+                onChange={setExpanded}
+                hideTitle="Back to the page (Esc)"
+                showTitle="Fill the window"
+              />
+            </ViewControls>
           </div>
           {footer && (
             <p className="shrink-0 border-t border-border/50 bg-card/40 px-2 py-1 font-mono text-[11px] text-muted-foreground">
@@ -235,15 +259,19 @@ export function PlacementSurface({
 /** The ground itself, whichever kind it is. */
 function GroundView({
   ground,
+  grid,
   onScene,
 }: {
   ground: SurfaceGround;
+  /** Whether the build grid is ruled on the ground. Nothing to a map. */
+  grid: boolean;
   onScene: (handle: MapScene3D | null) => void;
 }) {
   if (ground.kind === "grid") {
     return (
       <GridScene
         extent={ground.extent}
+        grid={grid}
         className="h-full w-full"
         onScene={onScene}
       />
