@@ -1,5 +1,13 @@
 import { Button, Input } from "@picoframe/frame";
-import { Blocks, FileUp, ImageOff, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  Blocks,
+  FileUp,
+  ImageOff,
+  Package,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
@@ -16,6 +24,7 @@ import { type LegoProject, newProject } from "../model";
 import { loadPack } from "../pack";
 import { validateProjectName } from "../projectNames";
 import { deleteProject, saveProject, useLegoProjects } from "../projects";
+import { GameModelDrawer } from "./components/GameModelDrawer";
 import { ImportDrawer } from "./components/ImportDrawer";
 
 /** The name field being edited, and why it cannot be saved yet, if at all. */
@@ -37,9 +46,10 @@ interface Renaming {
  * while editing: the parts are the same in every atlas, so switching costs
  * nothing.
  *
- * A unit can also come from a model file rather than being started empty. See
- * `ImportDrawer`, which covers both a project recovered from an export and a
- * model imported whole as raw geometry.
+ * A unit can also come from somebody else's model rather than being started
+ * empty, either by choosing a game and then a unit in it (`GameModelDrawer`) or
+ * by pointing at a file (`ImportDrawer`). Both cover a project recovered from an
+ * export and a model imported whole as raw geometry.
  */
 export default function ProjectsPage() {
   const { projects, loading, error } = useLegoProjects();
@@ -49,6 +59,7 @@ export default function ProjectsPage() {
   const [atlases, setAtlases] = useState<LegoAtlas[]>([]);
   const [atlas, setAtlas] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
+  const [picking, setPicking] = useState(false);
   /** The units whose thumbnail would not load, so the card says so instead. */
   const [noPicture, setNoPicture] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
@@ -102,6 +113,7 @@ export default function ProjectsPage() {
    */
   async function opened(project: LegoProject) {
     setOpening(false);
+    setPicking(false);
     setProblem(null);
     try {
       await saveProject(project);
@@ -178,6 +190,9 @@ export default function ProjectsPage() {
                 </SelectContent>
               </Select>
             ) : null}
+            <Button variant="outline" onClick={() => setPicking(true)}>
+              <Package size={16} /> Open from a game
+            </Button>
             <Button variant="outline" onClick={() => setOpening(true)}>
               <FileUp size={16} /> Open a model
             </Button>
@@ -186,6 +201,16 @@ export default function ProjectsPage() {
             </Button>
           </>
         }
+      />
+
+      <GameModelDrawer
+        open={picking}
+        onOpenChange={setPicking}
+        onOpened={(project) => void opened(project)}
+        onExisting={(id) => {
+          setPicking(false);
+          navigate(`/lego/${id}`);
+        }}
       />
 
       <ImportDrawer
