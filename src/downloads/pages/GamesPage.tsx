@@ -67,7 +67,7 @@ export default function GamesPage() {
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
-  const { enqueue, itemFor, active } = useDownloadQueue();
+  const { enqueue, itemFor, failureFor, active } = useDownloadQueue();
   // Unified GitHub game-repo registry (issue #512): the catalog is authoritative
   // once loaded, GAME_REPOS is the fallback seed shown immediately. Memoized so
   // `load`'s identity (and the effect that calls it) doesn't churn every render.
@@ -299,20 +299,23 @@ export default function GamesPage() {
           <ul className="divide-y divide-border">
             {sorted.map((g) => {
               const isInstalled = installed.has(g.filename.toLowerCase());
-              const item = g.url
-                ? itemFor(
-                    identityOf({
-                      kind: "file",
-                      label: g.name,
-                      args: {
-                        url: g.url,
-                        destDir: `${writePath}/games`,
-                        filename: g.filename,
-                      },
-                    }),
-                  )
+              const identity = g.url
+                ? identityOf({
+                    kind: "file",
+                    label: g.name,
+                    args: {
+                      url: g.url,
+                      destDir: `${writePath}/games`,
+                      filename: g.filename,
+                    },
+                  })
                 : null;
+              const item = identity ? itemFor(identity) : null;
               const status = item?.status ?? null;
+              // Read here rather than per row through `useQueuedDownload`: the
+              // springfiles catalogue is hundreds of rows, and the queue is
+              // already being read once for the whole page (issue #1863).
+              const failure = identity ? failureFor(identity) : null;
               return (
                 <li key={g.id} className="flex flex-col gap-2 px-6 py-2.5">
                   <div className="flex items-center justify-between gap-3">
@@ -361,6 +364,11 @@ export default function GamesPage() {
                     </Button>
                   </div>
                   <QueueProgress item={item} />
+                  {failure && (
+                    <p className="break-words text-xs text-destructive">
+                      {failure}
+                    </p>
+                  )}
                 </li>
               );
             })}

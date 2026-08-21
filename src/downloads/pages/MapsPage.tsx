@@ -116,7 +116,7 @@ export default function MapsPage() {
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
-  const { enqueue, itemFor, active } = useDownloadQueue();
+  const { enqueue, itemFor, failureFor, active } = useDownloadQueue();
   const [source, setSource] = useState<Source>("springfiles");
   const [items, setItems] = useState<MapItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -441,8 +441,13 @@ export default function MapsPage() {
             {visible?.map((it) => {
               const isInstalled = installed.has(it.filename.toLowerCase());
               const input = mapInput(it);
-              const item = input ? itemFor(identityOf(input)) : null;
+              const identity = input ? identityOf(input) : null;
+              const item = identity ? itemFor(identity) : null;
               const status = item?.status ?? null;
+              // Read here rather than per row through `useQueuedDownload`: this
+              // grid draws hundreds of cards, and the queue is already being
+              // read once for the whole page (issue #1863).
+              const failure = identity ? failureFor(identity) : null;
               return (
                 <li
                   key={it.springName}
@@ -517,6 +522,11 @@ export default function MapsPage() {
                                 : "Download"}
                     </Button>
                     <QueueProgress item={item} />
+                    {failure && (
+                      <p className="break-words text-xs text-destructive">
+                        {failure}
+                      </p>
+                    )}
                   </div>
                 </li>
               );
