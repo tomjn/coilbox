@@ -294,6 +294,65 @@ describe("parseLegoProjectJson", () => {
     expect(parsed?.pieces[1].meshId).toBe("m1");
   });
 
+  it("round-trips the game an imported unit was opened out of", () => {
+    // Written by the picker and read by the units page, so a field that does
+    // not survive the trip through disk is a field nothing ever sees.
+    const doc = {
+      ...project([piece("root", null)]),
+      imported: {
+        source: "/games/Game.sdd/objects3d/armcom.s3o",
+        game: {
+          name: "Some Game",
+          archive: "Game.sdd",
+          member: "objects3d/armcom.s3o",
+          unit: "armcom",
+        },
+      },
+    };
+
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+
+    expect(parsed?.imported?.game).toEqual(doc.imported.game);
+  });
+
+  it("keeps an imported unit when half a game is recorded on it", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      imported: {
+        source: "/games/Game.sdd/objects3d/armcom.s3o",
+        game: { name: "Some Game" },
+      },
+    };
+
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+
+    expect(parsed?.imported?.source).toBe(
+      "/games/Game.sdd/objects3d/armcom.s3o",
+    );
+    expect(parsed?.imported?.game).toBeUndefined();
+  });
+
+  it("takes a game with no unitdef naming it, which is a feature or a wreck", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      imported: {
+        source: "/games/Game.sdd/objects3d/wreck.s3o",
+        game: {
+          name: "Some Game",
+          archive: "Game.sdd",
+          member: "objects3d/wreck.s3o",
+        },
+      },
+    };
+
+    expect(
+      parseLegoProjectJson(JSON.stringify(doc))?.imported?.game?.unit,
+    ).toBe(undefined);
+    expect(
+      parseLegoProjectJson(JSON.stringify(doc))?.imported?.game?.archive,
+    ).toBe("Game.sdd");
+  });
+
   it("keeps an imported unit when one of its textures will not parse", () => {
     const doc = {
       ...project([piece("root", null)]),

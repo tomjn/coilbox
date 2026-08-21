@@ -623,8 +623,10 @@ function parseImported(value: unknown): LegoImported | null {
 
   const texture = parseTexture(v.texture);
   const teamMask = parseTexture(v.teamMask);
+  const game = parseImportedGame(v.game);
   return {
     source: v.source,
+    ...(game ? { game } : {}),
     ...(texture ? { texture } : {}),
     ...(teamMask ? { teamMask } : {}),
     ...(typeof v.missingTexture === "string"
@@ -633,6 +635,35 @@ function parseImported(value: unknown): LegoImported | null {
     ...(typeof v.missingTeamMask === "string"
       ? { missingTeamMask: v.missingTeamMask }
       : {}),
+  };
+}
+
+/**
+ * The game a unit was opened out of.
+ *
+ * The name, the archive and the member are all required, because the three are
+ * written together and two of them are no use on their own: a name with no
+ * archive cannot be matched against a game and an archive with no member cannot
+ * be matched against a model. Half a record is dropped rather than kept, which
+ * puts the unit back on the path fallback, exactly where one opened before this
+ * field existed already sits.
+ */
+function parseImportedGame(value: unknown): LegoImportedGame | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.name !== "string" ||
+    typeof v.archive !== "string" ||
+    typeof v.member !== "string"
+  ) {
+    return null;
+  }
+  return {
+    name: v.name,
+    archive: v.archive,
+    member: v.member,
+    // Absent for a feature or a wreck, which no unitdef names.
+    ...(typeof v.unit === "string" ? { unit: v.unit } : {}),
   };
 }
 
