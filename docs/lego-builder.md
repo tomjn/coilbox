@@ -129,7 +129,7 @@ A unit definition that names no volume gets the engine's own, a sphere around th
 The **Collision** tab beside Pieces and Animation shows what will be written, and lets you replace it. Pick a shape, then set its size and where it sits:
 
 - **Size** is the volume's full width on each axis, not its radius. The engine halves it.
-- **Offset** is measured from the middle of the unit, so zero is centred on it.
+- **Offset** is measured from the unit's [aim point](#the-aim-point), which most units leave on the middle of their bounding box, so zero is centred on the unit.
 
 Changing anything takes the volume over, and it is then saved with the unit. **Use the bounding box** hands it back, and the derived volume follows the geometry again as you build.
 
@@ -151,6 +151,23 @@ Neither switch turns the other on. The engine reads them in two functions, `Pars
 There is nothing to set per piece either way, and that is the engine's doing rather than a gap here. No `.s3o` piece carries a collision volume and no unit definition can name one. The engine measures a box around each piece's own vertices as it loads the model, and the only choice a unit definition has is whether to use them. A game can change one while a unit is alive, with `Spring.SetUnitPieceCollisionVolumeData`, but that is a unit script's job rather than the builder's. So the boxes are a reading: turn either switch on and the viewport draws the ones the engine will build, in fainter orange over the model, whenever the volume is being shown.
 
 The volume above still matters with either switch on. It is the sphere an explosion measures to decide whether the unit was caught at all. And with only the shooting switch on it is still the shape you click, because `ParseSelectionVolume` reads no shape of its own and falls back to the `collisionvolume` keys.
+
+## The aim point
+
+The aim point is the one point on the unit that another unit shoots at. A weapon does not fire at a model, it fires at a position, and the engine uses that same position as the unit's middle for range checks and for leading a moving target.
+
+Left alone it is the middle of the model's bounding box. That is the wrong point whenever a long outlying piece drags the box off the body: a crane arm, an aircraft tail, a raised dish. The point ends up in the air beside the unit, or down in its legs, so shots aimed at it miss what a player is looking at.
+
+The **Aim** tab beside Collision sets it. It opens on the measured middle, and typing anything takes it over. **Use the bounding box centre** hands it back, and it follows the geometry again as you build. The crosshair button in the viewport's camera group draws the point as a red dot, and opening the tab draws it whether or not that button is on.
+
+Two other numbers are measured from this point rather than from the model's origin, so both move with it, and the builder keeps both right:
+
+- **The collision sphere.** The s3o header's radius is that sphere's radius and it is centred on the header's mid, so the radius is re-measured from wherever you put the point. Without that a unit gets a sphere that no longer covers it.
+- **The collision volume's offsets.** `CollisionVolume::GetWorldSpacePos` adds them to the unit's `midPos`, which is this point. Move the point and the volume would slide off the geometry with it, so the offsets absorb the move: the shape in the viewport stays where you put it and only the numbers in the Collision tab change.
+
+One thing this is not: which piece a weapon fires from. That is `AimFromWeapon` and `QueryWeapon` in the unit's script, and the builder has no weapon definitions to fire.
+
+The header's mid is the only lever a model file has. `CUnit::PreInit` sets both the middle and the aim point from it with `SetMidAndAimPos(model->relMidPos, model->relMidPos, true)`, so setting one sets the other. Prising them apart needs `Spring.SetUnitMidAndAimPos` from a game's own Lua, which an exported unit cannot carry.
 
 ## Test in game
 
