@@ -1042,14 +1042,7 @@ async fn install_recoil_engine(
         return Err(e);
     }
 
-    // Extraction has no easy byte count — report it as an indeterminate phase.
-    let _ = on_progress.send(DownloadProgress {
-        phase: "extracting".into(),
-        downloaded_bytes: downloaded,
-        total_bytes: None,
-        percent: None,
-        bytes_per_sec: None,
-    });
+    let _ = on_progress.send(DownloadProgress::extracting());
 
     let tmp_for_extract = tmp.clone();
     let dest_for_extract = dest.clone();

@@ -34,6 +34,30 @@ impl DownloadProgress {
         self.downloaded_bytes > 0 || self.percent.is_some()
     }
 
+    /// The one thing coilbox says while an archive is being unpacked, whichever
+    /// path downloaded it.
+    ///
+    /// Unpacking has no byte count either path can offer: coilbox hands the file
+    /// to `sevenz_rust2` and waits, and pr-downloader prints a path per file and
+    /// no numbers at all. So the sample carries none, and reads as unmeasured
+    /// rather than as a transfer that has stopped moving. The alternative, an
+    /// honest-looking byte count that cannot change until the unpack ends, is
+    /// indistinguishable from a stall to anything watching for one (issue #1830).
+    ///
+    /// Nothing on screen loses a number by this. The caption switches to
+    /// "Extracting…" on the phase before it reads any of these fields, the bar is
+    /// indeterminate without a percentage, and the topbar badge shows a
+    /// percentage or a time left or nothing.
+    pub fn extracting() -> Self {
+        DownloadProgress {
+            phase: "extracting".into(),
+            downloaded_bytes: 0,
+            total_bytes: None,
+            percent: None,
+            bytes_per_sec: None,
+        }
+    }
+
     /// A terminal "done" sample; `percent` is forced to 100 when a total was known.
     pub fn done(downloaded_bytes: u64, total_bytes: Option<u64>) -> Self {
         DownloadProgress {
@@ -117,6 +141,19 @@ mod tests {
         // What pr-downloader prints for a response with no length: `0/0`.
         assert!(!sample(0, Some(0)).is_measured());
         assert!(!sample(0, None).is_measured());
+    }
+
+    /// Both install paths unpack an archive and both send this, so the sample
+    /// has to say "nothing is being measured" rather than carry a number that
+    /// happens to be true and cannot move (issue #1830).
+    #[test]
+    fn an_unpack_carries_no_measurement_of_any_kind() {
+        let p = DownloadProgress::extracting();
+        assert_eq!(p.phase, "extracting");
+        assert_eq!(p.downloaded_bytes, 0);
+        assert_eq!(p.total_bytes, None);
+        assert_eq!(p.percent, None);
+        assert!(!p.is_measured());
     }
 
     #[test]
