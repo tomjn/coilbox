@@ -220,7 +220,11 @@ export function GameModelDrawer({
                 onAccept={accept}
               />
               {stage.state === "failed" ? (
-                <Button variant="outline" size="sm" onClick={back}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setStage({ state: "idle" })}
+                >
                   Pick another
                 </Button>
               ) : null}
@@ -256,7 +260,7 @@ export function GameModelDrawer({
                   <Footnotes
                     shown={Math.min(matched.length, ROW_CAP)}
                     matched={matched.length}
-                    threeDo={models.threeDo}
+                    threeDoUnits={models.threeDoUnits}
                     unresolved={models.unresolvedUnits}
                   />
                 </>
@@ -420,12 +424,12 @@ function BuildPic({
 function Footnotes({
   shown,
   matched,
-  threeDo,
+  threeDoUnits,
   unresolved,
 }: {
   shown: number;
   matched: number;
-  threeDo: number;
+  threeDoUnits: number;
   unresolved: number;
 }) {
   const notes: string[] = [];
@@ -434,14 +438,14 @@ function Footnotes({
       `Showing the first ${shown} of ${matched}. Search to narrow it down.`,
     );
   }
-  if (threeDo > 0) {
+  if (threeDoUnits > 0) {
     notes.push(
-      `${threeDo} of this game's models are .3do, an older format the builder cannot read.`,
+      `${threeDoUnits} of this game's units are drawn with a .3do, an older model format the builder cannot read.`,
     );
   }
   if (unresolved > 0) {
     notes.push(
-      `${unresolved} of its units name a model this archive does not hold, usually because the model lives in a game it depends on.`,
+      `${unresolved} name a model this archive does not hold at all, usually one that lives in a game this one depends on.`,
     );
   }
   if (notes.length === 0) return null;

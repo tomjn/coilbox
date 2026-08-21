@@ -44,13 +44,15 @@ export interface GameModelRow {
 
 export interface GameModels {
   rows: GameModelRow[];
-  /** Models drawn in the older `.3do` format, which the builder cannot read.
-   *  Counted rather than listed: Balanced Annihilation is 720 of them against 7
-   *  `.s3o`, so listing them greyed out would bury the openable ones. */
-  threeDo: number;
-  /** Units naming a model this archive does not hold, which is normally a game
-   *  whose models live in a dependency archive. Counted so a game that lists
-   *  nothing says why. */
+  /** Units drawn with a `.3do`, the older format the builder cannot read.
+   *  Counted rather than listed: Balanced Annihilation is 720 `.3do` models
+   *  against 7 `.s3o`, so listing them greyed out would bury the openable ones.
+   *  Counted per unit rather than per file because a unit is what somebody came
+   *  looking for, and most of the files are wrecks and features nobody named. */
+  threeDoUnits: number;
+  /** Units naming a model this archive does not hold at all, which is normally
+   *  a game whose models live in an archive it depends on. Kept apart from the
+   *  `.3do` count so neither footnote claims the other's reason. */
   unresolvedUnits: number;
 }
 
@@ -93,12 +95,12 @@ export function gameModelRows(input: {
   const { archive, archivePath } = input;
 
   const models = new Map<string, string>();
-  let threeDo = 0;
+  const threeDo = new Set<string>();
   for (const file of input.files) {
     const path = file.path.replace(/\\/g, "/");
     if (!path.toLowerCase().startsWith(MODELS_DIR)) continue;
     if (/\.3do$/i.test(path)) {
-      threeDo += 1;
+      threeDo.add(modelKey(path));
       continue;
     }
     if (!/\.s3o$/i.test(path)) continue;
@@ -108,6 +110,7 @@ export function gameModelRows(input: {
   const opened = openedProjects(input.projects, archive, archivePath);
   const rows: GameModelRow[] = [];
   const named = new Set<string>();
+  let threeDoUnits = 0;
   let unresolvedUnits = 0;
 
   for (const unit of input.units) {
@@ -115,9 +118,8 @@ export function gameModelRows(input: {
     const key = modelKey(unit.objectName);
     const member = models.get(key);
     if (!member) {
-      // Either the model is a `.3do`, already counted above, or it is not in
-      // this archive at all. Both leave the unit with nothing to open.
-      unresolvedUnits += 1;
+      if (threeDo.has(key)) threeDoUnits += 1;
+      else unresolvedUnits += 1;
       continue;
     }
     named.add(key);
@@ -143,7 +145,7 @@ export function gameModelRows(input: {
       a.label.localeCompare(b.label, undefined, { sensitivity: "base" }) ||
       a.member.localeCompare(b.member),
   );
-  return { rows, threeDo, unresolvedUnits };
+  return { rows, threeDoUnits, unresolvedUnits };
 }
 
 /**

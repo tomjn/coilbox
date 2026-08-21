@@ -71,8 +71,8 @@ describe("gameModelRows", () => {
     expect(wreck?.unit).toBeUndefined();
   });
 
-  it("counts the 3do models out rather than listing ones that cannot be opened", () => {
-    const { rows, threeDo } = gameModelRows({
+  it("counts a 3do unit out rather than listing one that cannot be opened", () => {
+    const { rows, threeDoUnits, unresolvedUnits } = gameModelRows({
       files,
       units: [unit("peewee", "PEEWEE")],
       projects: [],
@@ -80,11 +80,14 @@ describe("gameModelRows", () => {
     });
 
     expect(rows.some((r) => r.member.endsWith(".3do"))).toBe(false);
-    expect(threeDo).toBe(1);
+    expect(threeDoUnits).toBe(1);
+    // Not both: a 3do is a format this cannot read, not a missing file, and a
+    // footnote claiming the wrong reason is worse than no footnote.
+    expect(unresolvedUnits).toBe(0);
   });
 
-  it("counts a unit whose model this archive does not hold", () => {
-    const { unresolvedUnits } = gameModelRows({
+  it("counts a unit whose model this archive does not hold apart from a 3do one", () => {
+    const { threeDoUnits, unresolvedUnits } = gameModelRows({
       files,
       units: [unit("ghost", "nothing/here")],
       projects: [],
@@ -92,6 +95,7 @@ describe("gameModelRows", () => {
     });
 
     expect(unresolvedUnits).toBe(1);
+    expect(threeDoUnits).toBe(0);
   });
 
   it("says which project a model is already open as, so it is not opened twice", () => {
