@@ -2725,7 +2725,7 @@ function showBaked(
  * content, so new bytes are a new key and a new material.
  */
 function unitMaterial(
-  state: SceneState,
+  state: Pick<SceneState, "imported">,
   pack: LoadedPack,
   project: LegoProject,
 ): THREE.MeshStandardMaterial {
@@ -3256,13 +3256,25 @@ function pieceIdOf(object: THREE.Object3D | null): string | null {
 }
 
 /**
+ * The whole of the scene that mirroring the document reaches for.
+ *
+ * Named and exported because none of it is drawing: the hierarchy this builds
+ * is the same with or without a WebGL context behind it, so it can be checked
+ * without one. See `ModelViewport.dom.test.tsx`.
+ */
+export type SceneGraph = Pick<
+  SceneState,
+  "root" | "groups" | "gizmo" | "imported"
+>;
+
+/**
  * Make the scene match the document.
  *
  * Groups are reused across edits, so moving a piece does not rebuild its
  * geometry and the renderer keeps its uploaded buffers.
  */
-function syncScene(
-  state: SceneState,
+export function syncScene(
+  state: SceneGraph,
   pack: LoadedPack,
   raw: RawGeometry | null,
   project: LegoProject,
