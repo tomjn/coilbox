@@ -930,9 +930,7 @@ export function useBattleRoom(): BattleRoomView {
     if (mapInfo.status !== "ready" || mapInfo.loadedMap !== battle.map) return;
     const stamp = `${battle.id}::${battle.map}`;
     if (seededMapRef.current === stamp) return;
-    const changedMap =
-      seededMapRef.current !== null &&
-      seededMapRef.current.startsWith(`${battle.id}::`);
+    const changedMap = !!seededMapRef.current?.startsWith(`${battle.id}::`);
     seededMapRef.current = stamp;
 
     const stale = changedMap
