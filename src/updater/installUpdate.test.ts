@@ -71,7 +71,7 @@ describe("installing a downloaded update", () => {
     expect(seen).toEqual([
       { status: "downloading", downloaded: 0, total: 40 },
       { status: "downloading", downloaded: 40, total: 40 },
-      { status: "installed" },
+      { status: "installing" },
     ]);
   });
 });
