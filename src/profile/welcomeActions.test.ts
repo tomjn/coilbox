@@ -34,6 +34,19 @@ describe("resolveWelcomeAction", () => {
     });
   });
 
+  it("resolves navigate + a bundled file to opening that file", () => {
+    // The link the welcome screen used to swallow (issue #1802). Both spellings
+    // name the same file, and the path stays relative to the `.coilbox` folder
+    // because Rust is the side that knows where that folder is.
+    expect(
+      resolveWelcomeAction("navigate", "@.coilbox/docs/guide.pdf"),
+    ).toEqual({ kind: "open", path: "docs/guide.pdf" });
+    expect(resolveWelcomeAction("navigate", "docs/guide.pdf")).toEqual({
+      kind: "open",
+      path: "docs/guide.pdf",
+    });
+  });
+
   it("is a no-op for a navigate whose route doesn't resolve to a route", () => {
     expect(resolveWelcomeAction("navigate", "@widget/build-tree")).toBeNull();
     expect(resolveWelcomeAction("navigate", "https://example.org")).toBeNull();

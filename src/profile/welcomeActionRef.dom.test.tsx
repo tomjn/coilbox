@@ -21,16 +21,31 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Matching `./welcomeActions.test.ts`: the route classifier reaches refs/pages,
-// whose published `defineCommand` will not load under Vitest's resolver.
-vi.mock("@picoframe/plugin-sdk", () => ({
-  defineCommand: () => async () => ({}),
+// Stands in for the OS browser, mail client and dialler, for the Rust side, and
+// for the toast. `vi.hoisted` so the mock factories below, which are hoisted
+// above the imports, can reach them.
+const { openUrl, profileOpen, notify } = vi.hoisted(() => ({
+  openUrl: vi.fn(async (_url: string) => {}),
+  profileOpen: vi.fn(async (_args: { path: string }) => ({
+    action: "open" as const,
+  })),
+  notify: vi.fn(async (_input: { title: string; body?: string }) => {}),
 }));
 
-// Stands in for the OS browser, mail client and dialler. `vi.hoisted` so the
-// mock factory below, which is hoisted above the imports, can reach it.
-const openUrl = vi.hoisted(() => vi.fn(async (_url: string) => {}));
+// Matching `./welcomeActions.test.ts`: the route classifier reaches refs/pages,
+// whose published `defineCommand` will not load under Vitest's resolver.
+// `profile_open` gets a real spy, because what it was asked to act on is what
+// the bundled-file cases assert.
+vi.mock("@picoframe/plugin-sdk", () => ({
+  defineCommand: (_plugin: string, command: string) =>
+    command === "profile_open" ? profileOpen : async () => ({}),
+}));
+
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl }));
+
+// The real one reaches sonner and the Tauri window. What matters here is only
+// that a click that achieved nothing said so.
+vi.mock("../notify/notify", () => ({ notify }));
 
 import { useWelcomeActionRef } from "./welcomeActionRef";
 import { rewriteBrandedHtml } from "./welcomeAssets";
@@ -70,6 +85,10 @@ beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
   openUrl.mockReset();
   openUrl.mockResolvedValue(undefined);
+  profileOpen.mockReset();
+  profileOpen.mockResolvedValue({ action: "open" });
+  notify.mockReset();
+  notify.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -78,29 +97,6 @@ afterEach(() => {
 });
 
 describe("a link in distribution markup", () => {
-  it("is not followed when a relative href has become an asset URL", () => {
-    const { followed, at, href } = clickLink(
-      '<a data-testid="link" href="images/logo.webp">Our logo</a>',
-    );
-    // The rewrite ran, so this is the shape the guard actually meets.
-    expect(href.getAttribute("href")).toMatch(/^coilbox:/);
-    expect(followed).toBe(false);
-    expect(at).toBe("/");
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining("images/logo.webp"),
-    );
-  });
-
-  it("is not followed when it is an asset URL in the Windows spelling", () => {
-    // Windows serves `coilbox://` as `http://coilbox.localhost/`, which would
-    // otherwise read as an ordinary `http:` link and be let through there only.
-    const { followed, at } = clickLink(
-      '<a data-testid="link" href="http://coilbox.localhost/portable/images/logo.webp">Our logo</a>',
-    );
-    expect(followed).toBe(false);
-    expect(at).toBe("/");
-  });
-
   it("is not followed when a route reference has lost its marker", () => {
     const { followed, at } = clickLink(
       '<a data-testid="link" href="@route/play/replays">Replays</a>',
@@ -177,14 +173,6 @@ describe("a link in distribution markup", () => {
     );
   });
 
-  it("does not open the OS browser for the Windows spelling of an asset URL", () => {
-    // `http://coilbox.localhost/…` is a picture inside the app, not a website.
-    clickLink(
-      '<a data-testid="link" href="http://coilbox.localhost/portable/images/logo.webp">Our logo</a>',
-    );
-    expect(openUrl).not.toHaveBeenCalled();
-  });
-
   it("is followed when it is a hash link, which is how in-app links are written", () => {
     for (const href of ["#/play/skirmish", "#news"]) {
       const { followed } = clickLink(
@@ -220,5 +208,97 @@ describe("a link in distribution markup", () => {
     expect(followed).toBe(true);
     expect(at).toBe("/");
     expect(console.warn).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A link to a file the distribution bundled in its `.coilbox` folder (issue
+ * #1802). It used to be swallowed here while the same link on a markdown page
+ * opened the file, so the welcome screen read as broken rather than as strict.
+ *
+ * The asset rewrite has already turned every spelling of the path into the same
+ * `coilbox://` URL by the time the click lands, so these cases are what the
+ * handler actually meets rather than what the author typed.
+ */
+describe("a link in distribution markup to a bundled file", () => {
+  it("gives the file to the OS rather than drawing it over the app", () => {
+    const { followed, at, href } = clickLink(
+      '<a data-testid="link" href="docs/guide.pdf">Our guide</a>',
+    );
+    // The href is still the asset URL, so the link reads as a link. It is the
+    // click that must not reach the webview.
+    expect(href.getAttribute("href")).toMatch(/^coilbox:/);
+    expect(followed).toBe(false);
+    expect(at).toBe("/");
+    // The path stays relative to the `.coilbox` folder. Nothing in the webview
+    // knows or builds a filesystem path, because Rust owns where that folder is.
+    expect(profileOpen).toHaveBeenCalledWith({ path: "docs/guide.pdf" });
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it("does the same for the Windows spelling of the same URL", () => {
+    // Windows serves `coilbox://` as `http://coilbox.localhost/`, which must not
+    // read as an ordinary `http:` link and go to the browser there only.
+    const { followed } = clickLink(
+      '<a data-testid="link" href="http://coilbox.localhost/portable/docs/guide.pdf">Our guide</a>',
+    );
+    expect(followed).toBe(false);
+    expect(profileOpen).toHaveBeenCalledWith({ path: "docs/guide.pdf" });
+    expect(openUrl).not.toHaveBeenCalled();
+  });
+
+  it("does the same for a marker that names the file rather than a route", () => {
+    // `data-coilbox-route` is not rewritten, so this is the one place the raw
+    // `@.coilbox/` reference still reaches the handler.
+    const { followed, at } = clickLink(
+      '<a data-testid="link" data-coilbox-action="navigate" data-coilbox-route="@.coilbox/docs/guide.pdf">Our guide</a>',
+    );
+    expect(followed).toBe(false);
+    expect(at).toBe("/");
+    expect(profileOpen).toHaveBeenCalledWith({ path: "docs/guide.pdf" });
+  });
+
+  it("says so when the file cannot be opened or shown", async () => {
+    // The welcome screen is the first thing somebody sees, so a click that
+    // achieved nothing has to be visible rather than console-only.
+    profileOpen.mockRejectedValue(
+      new Error("there is no file at docs/guide.pdf"),
+    );
+    const { followed, at } = clickLink(
+      '<a data-testid="link" href="docs/guide.pdf">Our guide</a>',
+    );
+    expect(followed).toBe(false);
+    expect(at).toBe("/");
+    await vi.waitFor(() =>
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: "error",
+          body: "there is no file at docs/guide.pdf",
+        }),
+      ),
+    );
+  });
+
+  it("does not act on an asset URL under another root", () => {
+    // `campaign/` and the other roots are Coilbox's own storage, not files the
+    // distribution bundled, so a link to one is an author's mistake.
+    const { followed } = clickLink(
+      '<a data-testid="link" href="coilbox://localhost/campaign/camp-1/a.mp4">A clip</a>',
+    );
+    expect(followed).toBe(false);
+    expect(profileOpen).not.toHaveBeenCalled();
+    expect(openUrl).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalled();
+  });
+
+  it("does not act on a path that climbs out of the folder", () => {
+    // Rust refuses this too, but refusing it here keeps it an author's mistake
+    // in the console rather than an error shown to the reader.
+    const { followed } = clickLink(
+      '<a data-testid="link" href="../../secrets.txt">Nothing to see</a>',
+    );
+    expect(followed).toBe(false);
+    expect(profileOpen).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalled();
   });
 });

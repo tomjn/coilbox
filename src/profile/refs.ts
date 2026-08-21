@@ -28,7 +28,7 @@ export type Ref =
  * drive prefix, no `..`/empty segment. Mirrors the Rust `is_safe_rel` fence so a bad
  * ref is caught before the command call (Rust re-checks as the authoritative backstop).
  */
-function isSafeRel(path: string): boolean {
+export function isSafeRel(path: string): boolean {
   if (!path) return false;
   if (path.startsWith("/") || path.startsWith("\\")) return false;
   if (/^[A-Za-z]:/.test(path)) return false;
