@@ -80,6 +80,7 @@ import {
   useSkirmishDraft,
 } from "../drafts";
 import { mergeGameAi } from "../gameAi";
+import { withOption } from "../modOptions";
 import { usePlay } from "../PlayProvider";
 import {
   PRESET_KIND_VERSION,
@@ -952,7 +953,7 @@ export default function SkirmishPage() {
             options={modOptions}
             optionValues={modOptionValues}
             onOptionChange={(key, value) =>
-              setModOptionValues((m) => ({ ...m, [key]: value }))
+              setModOptionValues((m) => withOption(m, key, value))
             }
             disabled={running}
           />

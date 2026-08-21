@@ -1,5 +1,6 @@
 import { Input } from "@picoframe/frame";
 import { ChevronDown } from "lucide-react";
+import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Collapsible,
@@ -31,6 +32,15 @@ const effective = (o: ConfigOption, value?: string) =>
   effectiveValue(o, value) ?? "";
 
 /**
+ * What a control reports when it is changed. `undefined` means the option is no
+ * longer overridden and falls back to the game's default, which is not the same
+ * as setting it to the default: an option nobody chose stays out of a saved
+ * preset, so it follows the game if the game's default changes (see
+ * `withOption`).
+ */
+export type OptionChange = (value: string | undefined) => void;
+
+/**
  * Collapsible panel holding everything about the *game*: which game, the
  * start-position mode, and the game's mod options (rendered as checkboxes /
  * number / select / text inputs by type). Collapsed, its header shows a one-line
@@ -50,7 +60,7 @@ export function GameOptionsPanel({
   onStartPosType: (v: number) => void;
   options: ConfigOption[];
   optionValues: Record<string, string>;
-  onOptionChange: (key: string, value: string) => void;
+  onOptionChange: (key: string, value: string | undefined) => void;
   disabled?: boolean;
 }) {
   const groups = groupOptions(options);
@@ -133,7 +143,7 @@ interface GroupProps {
   group: OptionGroup;
   optionValues: Record<string, string>;
   disabled?: boolean;
-  onOptionChange: (key: string, value: string) => void;
+  onOptionChange: (key: string, value: string | undefined) => void;
 }
 
 /** A group's options in the two-column grid, with no header of their own. */
@@ -210,7 +220,7 @@ export function ModOptionField({
   option: ConfigOption;
   value?: string;
   disabled?: boolean;
-  onChange: (value: string) => void;
+  onChange: OptionChange;
 }) {
   const id = `modopt-${o.key}`;
 
@@ -253,7 +263,46 @@ export function ModOptionField({
     );
   }
 
+  return (
+    <TypedOptionField
+      option={o}
+      value={value}
+      disabled={disabled}
+      onChange={onChange}
+    />
+  );
+}
+
+/**
+ * A number or text option. The box holds the game's default as real text, the
+ * way the tick box and the dropdown beside it show theirs, so no setting in the
+ * panel reads as blank when the game will in fact use a value for it.
+ *
+ * Emptying the box is a state of its own: it stays empty while you retype, and
+ * the default returns when you leave it. Leaving is also when an option you had
+ * changed drops its override, so the box and the stored value agree. An empty
+ * box is not a number the engine can use, and reverting to the default is what
+ * clearing a field that always has a value can honestly mean. Dropping the
+ * override rather than storing the default keeps an option nobody chose out of
+ * saved state, so it still follows the game if the game changes its mind.
+ */
+function TypedOptionField({
+  option: o,
+  value,
+  disabled,
+  onChange,
+}: {
+  option: ConfigOption;
+  value?: string;
+  disabled?: boolean;
+  onChange: OptionChange;
+}) {
+  const id = `modopt-${o.key}`;
   const isNumber = o.type === "number";
+  // Held here rather than reported, so clearing the box writes nothing until
+  // the edit is finished (and writes nothing at all if it never was).
+  const [emptied, setEmptied] = useState(false);
+
   return (
     <Label htmlFor={id} className="block font-normal">
       <span
@@ -268,10 +317,19 @@ export function ModOptionField({
         min={isNumber ? o.numberMin : undefined}
         max={isNumber ? o.numberMax : undefined}
         step={isNumber ? o.numberStep : undefined}
-        value={value ?? ""}
+        value={emptied ? "" : effective(o, value)}
         placeholder={o.default}
         disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          const next = e.target.value;
+          setEmptied(next === "");
+          if (next !== "") onChange(next);
+        }}
+        onBlur={() => {
+          if (!emptied) return;
+          setEmptied(false);
+          if (value !== undefined) onChange(undefined);
+        }}
       />
     </Label>
   );

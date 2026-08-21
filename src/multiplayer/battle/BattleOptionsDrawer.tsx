@@ -197,7 +197,20 @@ function OptionSection({
               option={o}
               value={displayedValue(pending, battle.scriptTags, scope, o.key)}
               disabled={!canEdit}
-              onChange={(v) => setOption(scriptTagKey(scope, o.key), o.key, v)}
+              // A field reports `undefined` when the host clears an option they
+              // had set, and it only does so for one that already has a script
+              // tag. A battle's options are shared state other clients read, and
+              // a tag can only be set here, not withdrawn, so the closest we can
+              // say is the game's own default. That rewrites a tag the battle
+              // already published rather than publishing a new one, which is the
+              // question #1837 is about.
+              onChange={(v) =>
+                setOption(
+                  scriptTagKey(scope, o.key),
+                  o.key,
+                  v ?? o.default ?? "",
+                )
+              }
             />
           ))}
         </div>
