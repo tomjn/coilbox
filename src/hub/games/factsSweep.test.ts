@@ -4,8 +4,8 @@ import { MUTATOR_FOLDER, SCRATCH_FOLDER } from "@/lib/generatedGames";
 import type { GameFacts, GameFactsResult } from "./facts";
 import {
   factionKeys,
-  gameFactions,
   type GameSweepTools,
+  gameFactions,
   gameSweepSummary,
   gamesToSend,
   sweepGameFacts,
@@ -287,9 +287,13 @@ describe("sweepGameFacts", () => {
   /// Factions are a replaced set, so an empty list is the hub being told this
   /// game has none. A read that found no sides has not learnt that.
   it("says nothing about factions when no side declares a start unit", async () => {
-    const kit = tools([game("Balanced Annihilation 12.24", "ba1224.sdz")], {}, {
-      "ba1224.sdz": [{ name: "Spectator" }],
-    });
+    const kit = tools(
+      [game("Balanced Annihilation 12.24", "ba1224.sdz")],
+      {},
+      {
+        "ba1224.sdz": [{ name: "Spectator" }],
+      },
+    );
 
     await sweepGameFacts(target, () => {}, kit);
 

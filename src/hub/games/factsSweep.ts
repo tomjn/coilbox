@@ -7,8 +7,8 @@ import {
 import { isSddName } from "@/content/format";
 import { buildTechForest } from "@/content/techForest";
 import {
-  type GameFacts,
   type GameFaction,
+  type GameFacts,
   type GameFactsResult,
   type GameUnitFacts,
   publishGameFacts,
