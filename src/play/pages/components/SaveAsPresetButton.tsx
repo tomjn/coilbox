@@ -24,6 +24,15 @@ import { presetMatchesDraft, useSkirmishPresets } from "../../presets";
  * the name the user gave it), so the player can see this fight is already kept and
  * needn't re-save it. The cue is derived from the saved presets, not local state, so
  * it survives leaving and re-entering the battle overlay.
+ *
+ * The gutter look paints no background of its own (#1818). It is the one appearance
+ * that sits over a live starfield, where a hand-written `bg-card/70` measured 1.97:1
+ * under `text-muted-foreground` over a bright node, and the answer both maps already
+ * use is `HUD_CARD_CLASS` from `src/conquest/pages/components/hudChrome.tsx`. This
+ * file cannot import that, because the HUD's inks are dark-ramp values and this
+ * button also renders on ordinary pages that can go light. So the caller passes the
+ * box in through `className` and the two overlays pass the measured card, which
+ * takes `--muted-foreground` to 4.56:1 for everything inside it.
  */
 export function SaveAsPresetButton({
   getDraft,
@@ -44,6 +53,7 @@ export function SaveAsPresetButton({
   appearance?: "button" | "gutter";
   variant?: ComponentProps<typeof Button>["variant"];
   size?: ComponentProps<typeof Button>["size"];
+  /** Position, and for `gutter` the box itself, which paints no background. */
   className?: string;
   label?: string;
 }) {
@@ -96,7 +106,7 @@ export function SaveAsPresetButton({
       disabled={disabled}
       aria-label={title}
       title={title}
-      className={`pointer-events-auto flex items-center justify-center rounded-md border border-border/50 bg-card/70 p-3.5 backdrop-blur-sm transition-colors hover:border-border disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`pointer-events-auto flex items-center justify-center p-3.5 backdrop-blur-sm transition-colors hover:border-border disabled:cursor-not-allowed disabled:opacity-50 ${
         saved ? "text-primary" : "text-muted-foreground hover:text-foreground"
       } ${className ?? ""}`}
     >
