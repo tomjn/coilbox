@@ -913,6 +913,24 @@ export async function gatherExportPics(
 /** Session cache of map info, keyed by `dataDir::enginePath::mapName`. */
 const mapInfoCache = new Map<string, MapInfoResult>();
 
+/**
+ * Read one map's info through the same session cache `useUnitsyncMapInfo` fills,
+ * for a caller with no loaded hook to hand. The map-side twin of
+ * `primeGameInfo`, down to caching only a syncable result.
+ */
+export async function primeMapInfo(
+  enginePath: string,
+  dataDir: string,
+  mapName: string,
+): Promise<MapInfoResult> {
+  const key = `${dataDir}::${enginePath}::${mapName}`;
+  const cached = mapInfoCache.get(key);
+  if (cached) return cached;
+  const res = await unitsyncMapInfo({ enginePath, dataDir, mapName });
+  if (res.checksum) mapInfoCache.set(key, res);
+  return res;
+}
+
 /** Lazily load one map's options + warnings (mounts the map's archive). */
 export function useUnitsyncMapInfo(
   enginePath?: string,
@@ -921,6 +939,11 @@ export function useUnitsyncMapInfo(
 ) {
   const [info, setInfo] = useState<MapInfoResult | null>(null);
   const [status, setStatus] = useState<UnitsyncInfoStatus>("idle");
+  // The map `info` describes. A read settles a render or more after `mapName`
+  // changes, so until then both `info` and `status` still belong to the previous
+  // map. A caller acting on the options (rather than just displaying them) has to
+  // be able to tell, which is why this is returned rather than kept private.
+  const [loadedMap, setLoadedMap] = useState<string | undefined>(undefined);
   const [nonce, setNonce] = useState(0);
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
@@ -929,6 +952,7 @@ export function useUnitsyncMapInfo(
     if (!enginePath || !dataDir || !mapName) {
       setInfo(null);
       setStatus("idle");
+      setLoadedMap(undefined);
       return;
     }
     const key = `${dataDir}::${enginePath}::${mapName}`;
@@ -936,6 +960,7 @@ export function useUnitsyncMapInfo(
     if (cached) {
       setInfo(cached);
       setStatus("ready");
+      setLoadedMap(mapName);
       return;
     }
     let cancelled = false;
@@ -944,6 +969,7 @@ export function useUnitsyncMapInfo(
       .then((res) => {
         if (cancelled) return;
         setInfo(res);
+        setLoadedMap(mapName);
         // Only a syncable result is cached (mirrors the worker's disk cache), so
         // a zero-checksum result stays retryable rather than sticking forever.
         if (res.checksum) {
@@ -957,6 +983,7 @@ export function useUnitsyncMapInfo(
         if (!cancelled) {
           setInfo(null);
           setStatus("error");
+          setLoadedMap(mapName);
         }
       });
     return () => {
@@ -964,7 +991,7 @@ export function useUnitsyncMapInfo(
     };
   }, [enginePath, dataDir, mapName, nonce]);
 
-  return { info, status, reload, loading: status === "loading" };
+  return { info, status, loadedMap, reload, loading: status === "loading" };
 }
 
 /** Session cache of engine config reads, keyed by `dataDir::enginePath`. */

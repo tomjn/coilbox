@@ -3,11 +3,12 @@ import type { ConfigOption } from "@/content/bindings";
 import {
   changedCount,
   displayedValue,
-  missingModOptionTags,
+  missingOptionTags,
   optionValue,
   rawOptionEntries,
   reconcilePending,
   scriptTagKey,
+  staleMapOptionTags,
 } from "./battleOptions";
 
 const opt = (over: Partial<ConfigOption> = {}): ConfigOption => ({
@@ -81,7 +82,7 @@ describe("battleOptions", () => {
  * SplinterFaction 0.1.80 asks for 5000 units, unlocked allies and a speed cap of
  * 1, and got 32000, locked, and 20.
  */
-describe("missingModOptionTags", () => {
+describe("missingOptionTags for a game", () => {
   // The three the issue names, at SplinterFaction 0.1.80's real defaults.
   const schema: ConfigOption[] = [
     { key: "engineoptions", name: "Engine options", type: "section" },
@@ -102,7 +103,7 @@ describe("missingModOptionTags", () => {
   ];
 
   it("offers every declared default a fresh hosted battle is missing", () => {
-    expect(missingModOptionTags(schema, {})).toEqual({
+    expect(missingOptionTags("mod", schema, {})).toEqual({
       "game/modoptions/maxunits": "5000",
       "game/modoptions/fixedallies": "0",
       "game/modoptions/maxspeed": "1",
@@ -111,7 +112,7 @@ describe("missingModOptionTags", () => {
 
   it("never overwrites a value the host or a preset already set", () => {
     expect(
-      missingModOptionTags(schema, { "game/modoptions/maxunits": "500" }),
+      missingOptionTags("mod", schema, { "game/modoptions/maxunits": "500" }),
     ).toEqual({
       "game/modoptions/fixedallies": "0",
       "game/modoptions/maxspeed": "1",
@@ -120,18 +121,19 @@ describe("missingModOptionTags", () => {
 
   it("treats a tag SPADS lowercased as already set", () => {
     expect(
-      missingModOptionTags(schema, { "GAME/MODOPTIONS/MaxUnits": "500" }),
+      missingOptionTags("mod", schema, { "GAME/MODOPTIONS/MaxUnits": "500" }),
     ).not.toHaveProperty("game/modoptions/maxunits");
   });
 
   it("is empty once every option has a tag, so filling settles", () => {
-    const filled = missingModOptionTags(schema, {});
-    expect(missingModOptionTags(schema, filled)).toEqual({});
+    const filled = missingOptionTags("mod", schema, {});
+    expect(missingOptionTags("mod", schema, filled)).toEqual({});
   });
 
   it("skips sections and any option the game declares no default for", () => {
     expect(
-      missingModOptionTags(
+      missingOptionTags(
+        "mod",
         [
           { key: "presets", name: "Presets", type: "section" },
           opt({ key: "tweakdefs", type: "string", default: undefined }),
@@ -142,12 +144,12 @@ describe("missingModOptionTags", () => {
   });
 
   it("answers nothing when the game's option list has not loaded", () => {
-    expect(missingModOptionTags([], {})).toEqual({});
+    expect(missingOptionTags("mod", [], {})).toEqual({});
   });
 
   it("leaves map options and unit restrictions alone", () => {
     expect(
-      missingModOptionTags(schema, {
+      missingOptionTags("mod", schema, {
         "game/mapoptions/waterlevel": "0",
         "game/restrict/unit0": "corbhmth",
       }),
@@ -156,5 +158,78 @@ describe("missingModOptionTags", () => {
       "game/modoptions/fixedallies": "0",
       "game/modoptions/maxspeed": "1",
     });
+  });
+});
+
+/**
+ * The bug this guards against (#1868): a battle coilbox hosts published no map
+ * options at all, so a map's own declared defaults never reached the script.
+ * `Spring.GetMapOptions()` hands game Lua exactly the script's section and the
+ * engine substitutes nothing for a missing key, so the map's Lua reads `nil`.
+ *
+ * Real defaults, read from unitsync: BlockFort v1 wants fog on and an extractor
+ * radius of 100, and airport 0.6 declares the same `fog` key and wants it off.
+ * Two maps sharing a generic key with opposite defaults is the ordinary case,
+ * which is why a map change has to clear the previous map's tags rather than
+ * fill around them.
+ */
+describe("map options across a map change", () => {
+  const blockfort: ConfigOption[] = [
+    { key: "atmosphere", name: "Atmosphere Settings", type: "section" },
+    opt({ key: "fog", type: "bool", default: "1", section: "atmosphere" }),
+    opt({ key: "extractorradius", default: "100" }),
+  ];
+  const airport: ConfigOption[] = [
+    opt({ key: "fog", type: "bool", default: "0" }),
+    opt({ key: "timeofday", type: "list", default: "day" }),
+  ];
+
+  it("offers the map's own declared defaults", () => {
+    expect(missingOptionTags("map", blockfort, {})).toEqual({
+      "game/mapoptions/fog": "1",
+      "game/mapoptions/extractorradius": "100",
+    });
+  });
+
+  it("names a key the new map does not declare as the old map's to clear", () => {
+    const seeded = missingOptionTags("map", airport, {});
+    expect(staleMapOptionTags(blockfort, seeded)).toEqual([
+      "game/mapoptions/timeofday",
+    ]);
+  });
+
+  it("leaves a shared key to be overwritten rather than removed", () => {
+    // `fog` is declared by both, so clearing it would blank the room between the
+    // remove and the set. The new map's default is written over it instead.
+    const seeded = missingOptionTags("map", airport, {});
+    expect(staleMapOptionTags(blockfort, seeded)).not.toContain(
+      "game/mapoptions/fog",
+    );
+    expect(missingOptionTags("map", blockfort, {})).toHaveProperty(
+      "game/mapoptions/fog",
+      "1",
+    );
+  });
+
+  it("leaves mod options and unit restrictions alone", () => {
+    expect(
+      staleMapOptionTags(blockfort, {
+        "game/modoptions/maxunits": "5000",
+        "game/restrict/unit0": "corbhmth",
+        "game/startpostype": "2",
+      }),
+    ).toEqual([]);
+  });
+
+  it("clears every map option when the new map declares none", () => {
+    expect(staleMapOptionTags([], { "game/mapoptions/dry": "0" })).toEqual([
+      "game/mapoptions/dry",
+    ]);
+  });
+
+  it("matches a tag SPADS lowercased", () => {
+    expect(
+      staleMapOptionTags(airport, { "GAME/MAPOPTIONS/ExtractorRadius": "100" }),
+    ).toEqual(["GAME/MAPOPTIONS/ExtractorRadius"]);
   });
 });

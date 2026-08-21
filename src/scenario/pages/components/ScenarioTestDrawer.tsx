@@ -29,7 +29,11 @@ import {
   useUnitsyncScan,
 } from "@/content/config";
 import { useGameUnits } from "@/content/useGameUnits";
-import { gameOptionSchema, usePreferredTarget } from "@/play/config";
+import {
+  gameOptionSchema,
+  mapOptionSchema,
+  usePreferredTarget,
+} from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import { MUTATOR_FOLDER } from "../../../lib/generatedGames";
 import {
@@ -148,6 +152,7 @@ export function ScenarioTestDrawer({
         dataDir: target.dataDir,
         games: scan.data?.games ?? [],
         optionSchema: await gameOptionSchema(target, gameUnits.archive),
+        mapOptionSchema: await mapOptionSchema(target, scenario.setup.mapName),
         map: mapExtent,
         units: gameUnits.units,
         rescan: async () => {

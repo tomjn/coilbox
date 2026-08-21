@@ -41,7 +41,8 @@ import { useMultiplayer } from "../store";
 import {
   battleOptionTags,
   canEditBattleOptions,
-  missingModOptionTags,
+  missingOptionTags,
+  staleMapOptionTags,
 } from "./battleOptions";
 import {
   battleStartable,
@@ -824,14 +825,16 @@ export function useBattleRoom(): BattleRoomView {
       if (!activeKey || !battle) return;
       if (isFounder) {
         // A preset stores only what its author changed, so top the founder's set
-        // up with the game's own defaults for the rest (#1837). Without that,
-        // loading one would strip the defaults the room was seeded with and hand
-        // the match back to the engine's built-in values. The autohost path below
-        // stays sparse on purpose: that battle's script is SPADS's to write, and
-        // 177 `!bSet` lines (Beyond All Reason's option count) is a flood ban.
+        // up with the game's and the map's own defaults for the rest (#1837,
+        // #1868). Without that, loading one would strip the defaults the room was
+        // seeded with and hand the match back to the engine's built-in values.
+        // The autohost path below stays sparse on purpose: that battle's script
+        // is SPADS's to write, and 177 `!bSet` lines (Beyond All Reason's option
+        // count) is a flood ban.
         const filled = {
           ...tags,
-          ...missingModOptionTags(modOptionsSchema, tags),
+          ...missingOptionTags("mod", modOptionsSchema, tags),
+          ...missingOptionTags("map", mapOptionsSchema, tags),
         };
         if (Object.keys(filled).length > 0) {
           mpSetScriptTags({ serverKey: activeKey, tags: filled }).then(
@@ -862,6 +865,7 @@ export function useBattleRoom(): BattleRoomView {
       battle,
       isFounder,
       modOptionsSchema,
+      mapOptionsSchema,
       autohostSend,
       clearErr,
       setErr,
@@ -887,7 +891,11 @@ export function useBattleRoom(): BattleRoomView {
   const seededDefaultsRef = useRef<string | null>(null);
   useEffect(() => {
     if (!activeKey || !battle || !isFounder) return;
-    const missing = missingModOptionTags(modOptionsSchema, battle.scriptTags);
+    const missing = missingOptionTags(
+      "mod",
+      modOptionsSchema,
+      battle.scriptTags,
+    );
     const keys = Object.keys(missing);
     if (keys.length === 0) return;
     const stamp = `${battle.id}::${battle.modname}::${keys.sort().join(",")}`;
@@ -898,6 +906,61 @@ export function useBattleRoom(): BattleRoomView {
       setErr,
     );
   }, [activeKey, battle, isFounder, modOptionsSchema, clearErr, setErr]);
+
+  // The same for the map's own options (#1868), which the engine is even less
+  // forgiving about: it substitutes nothing for an absent map option, so game
+  // Lua asking `Spring.GetMapOptions()` gets `nil` where the map author declared
+  // a value and the map plays a way nobody asked for.
+  //
+  // This has to follow the map rather than run once, because the host can change
+  // it mid-room and map option keys are generic enough to collide. BlockFort v1
+  // and airport 0.6 both declare `fog`, wanting opposite defaults, so on a change
+  // the previous map's leftover keys are removed and every key the new map
+  // declares is written afresh rather than filled around. SPADS clears and
+  // republishes the whole scope on a map change for the same reason.
+  //
+  // The first sight of a battle only fills what is missing. Reloading the page
+  // resets this ref while the room, which the Rust side holds, keeps its tags, so
+  // treating that as a map change would throw away the host's choices.
+  const seededMapRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeKey || !battle || !isFounder) return;
+    // An unsettled read still holds the previous map's options, and seeding those
+    // would be worse than seeding nothing.
+    if (mapInfo.status !== "ready" || mapInfo.loadedMap !== battle.map) return;
+    const stamp = `${battle.id}::${battle.map}`;
+    if (seededMapRef.current === stamp) return;
+    const changedMap = !!seededMapRef.current?.startsWith(`${battle.id}::`);
+    seededMapRef.current = stamp;
+
+    const stale = changedMap
+      ? staleMapOptionTags(mapOptionsSchema, battle.scriptTags)
+      : [];
+    const set = changedMap
+      ? missingOptionTags("map", mapOptionsSchema, {})
+      : missingOptionTags("map", mapOptionsSchema, battle.scriptTags);
+    if (stale.length > 0) {
+      mpRemoveScriptTags({ serverKey: activeKey, tags: stale }).then(
+        clearErr,
+        setErr,
+      );
+    }
+    if (Object.keys(set).length > 0) {
+      mpSetScriptTags({ serverKey: activeKey, tags: set }).then(
+        clearErr,
+        setErr,
+      );
+    }
+  }, [
+    activeKey,
+    battle,
+    isFounder,
+    mapOptionsSchema,
+    mapInfo.status,
+    mapInfo.loadedMap,
+    clearErr,
+    setErr,
+  ]);
 
   // Apply a unit-restriction change (founder only). The engine-native
   // `game/restrict/*` tags are host-authoritative script tags we own directly, so

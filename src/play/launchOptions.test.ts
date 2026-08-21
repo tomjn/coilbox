@@ -48,6 +48,29 @@ const SCHEMA: ConfigOption[] = [
 /** The one thing the player changed. Everything else is the game's to decide. */
 const CHOSEN = { deathmode: "com" };
 
+/**
+ * A map declaring two of its own options. Nothing in singleplayer can change
+ * these, so every launch path should write both at the map's default (#1868).
+ */
+const MAP_SCHEMA: ConfigOption[] = [
+  { key: "atmosphere", name: "Atmosphere Settings", type: "section" },
+  {
+    key: "fog",
+    name: "Fog",
+    type: "bool",
+    default: "1",
+    section: "atmosphere",
+  },
+  {
+    key: "extractorradius",
+    name: "Extractor Radius",
+    type: "number",
+    default: "100",
+  },
+];
+
+const MAP_DEFAULTS = { fog: "1", extractorradius: "100" };
+
 const GAME = "Splinter Faction test";
 const MAP = "Comet Catcher Redux";
 
@@ -81,6 +104,7 @@ const fromDraft = (d: SkirmishDraft) =>
     startPosType: d.startPosType,
     modOptions: d.modOptionValues,
     optionSchema: SCHEMA,
+    mapOptionSchema: MAP_SCHEMA,
   });
 
 describe("the same game and the same choices, launched different ways", () => {
@@ -115,6 +139,10 @@ describe("the same game and the same choices, launched different ways", () => {
       startmetal: "1000",
       zombies: "0",
     });
+  });
+
+  it("writes the map's own defaults, which nothing in singleplayer can change", () => {
+    expect(fromDraft(draft).mapOptions).toEqual(MAP_DEFAULTS);
   });
 
   it("agrees between a skirmish and a refight of that skirmish's replay", () => {
@@ -166,6 +194,7 @@ describe("the same game and the same choices, launched different ways", () => {
       dataDir: "/data",
       games: [loose],
       optionSchema: SCHEMA,
+      mapOptionSchema: MAP_SCHEMA,
       rescan,
       launch,
     });
@@ -177,5 +206,8 @@ describe("the same game and the same choices, launched different ways", () => {
       ...fromDraft(draft).modOptions,
       [MISSION_MODOPTION]: "s1",
     });
+    // The map's own options are the map's to decide, so a scenario writes the
+    // same block a skirmish on that map would.
+    expect(result.ok && result.config.mapOptions).toEqual(MAP_DEFAULTS);
   });
 });
