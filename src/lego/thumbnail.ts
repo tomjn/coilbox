@@ -39,6 +39,11 @@ export const THUMBNAIL_VIEW: Vec3 = [9, 7, 11];
  *  overview that it is in the editor. */
 const THUMBNAIL_FOV = 40;
 
+/** How far the camera can see when the unit is no bigger than one built out of
+ *  lego parts. It grows with the unit: see `thumbnailCamera`. The same figure
+ *  the viewport's own far plane starts at. */
+const MIN_THUMBNAIL_FAR = 500;
+
 /**
  * Draw `unit` on its own and hand back a canvas holding the pixels.
  *
@@ -108,7 +113,12 @@ export function readyToCapture(unit: THREE.Object3D): boolean {
  * view's own distance and looks at the origin, which is where an empty unit is.
  */
 export function thumbnailCamera(unit: THREE.Object3D): THREE.PerspectiveCamera {
-  const camera = new THREE.PerspectiveCamera(THUMBNAIL_FOV, 1, 0.05, 500);
+  const camera = new THREE.PerspectiveCamera(
+    THUMBNAIL_FOV,
+    1,
+    0.05,
+    MIN_THUMBNAIL_FAR,
+  );
   const box = new THREE.Box3().setFromObject(unit);
   if (box.isEmpty()) {
     camera.position.set(...THUMBNAIL_VIEW);
@@ -126,6 +136,17 @@ export function thumbnailCamera(unit: THREE.Object3D): THREE.PerspectiveCamera {
   );
   camera.position.set(...position);
   camera.lookAt(...target);
+
+  // Far enough to still draw the back of the unit from wherever framing put the
+  // camera. A unit big enough to want a camera past the fixed 500 this started
+  // at would be cut off whole by the far plane, which is the same cropping the
+  // framing distance used to cause, one step further along.
+  camera.far = Math.max(
+    MIN_THUMBNAIL_FAR,
+    camera.position.distanceTo(new THREE.Vector3(...target)) +
+      box.getBoundingSphere(new THREE.Sphere()).radius,
+  );
+  camera.updateProjectionMatrix();
   return camera;
 }
 
