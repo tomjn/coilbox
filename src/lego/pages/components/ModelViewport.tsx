@@ -961,6 +961,13 @@ export function ModelViewport({
     const state = sceneRef.current;
     if (!state) return;
     syncScene(state, pack, raw, project);
+    if (playing && !reduceMotion) showBaked(state, pack, raw, project);
+    // Before the frame below, not after it. Framing sets the camera's distance
+    // and then hands it to the orbit controls, which pull it back in to
+    // whatever `maxDistance` is at the time. Left until afterwards, that was
+    // the builder's own starting limit of 120, so a unit read out of a game
+    // opened clipped even once nothing capped the framing distance itself.
+    applySceneScale(state);
     // Framed once per scene, the moment the whole unit's geometry first has
     // something in it. A brand new unit's root piece is empty, so this keeps
     // retrying on every sync (each one is cheap: an empty box, nothing more)
@@ -969,8 +976,6 @@ export function ModelViewport({
     // running again for this scene, so it never fights a camera the user has
     // since moved.
     if (!state.framed && frameObject(state, state.root)) state.framed = true;
-    if (playing && !reduceMotion) showBaked(state, pack, raw, project);
-    applySceneScale(state);
     state.render();
   }, [pack, raw, project, playing, reduceMotion]);
 
