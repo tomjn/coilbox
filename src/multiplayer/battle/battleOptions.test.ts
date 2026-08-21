@@ -3,6 +3,7 @@ import type { ConfigOption } from "@/content/bindings";
 import {
   changedCount,
   displayedValue,
+  missingModOptionTags,
   optionValue,
   rawOptionEntries,
   reconcilePending,
@@ -70,5 +71,90 @@ describe("battleOptions", () => {
     expect(displayedValue(pending, tags, "mod", "maxunits")).toBe("2000");
     expect(displayedValue({}, tags, "mod", "maxunits")).toBe("1000");
     expect(displayedValue({}, {}, "mod", "maxunits")).toBeUndefined();
+  });
+});
+
+/**
+ * The bug this guards against (#1837): a battle coilbox hosts published only the
+ * options somebody had changed, so the engine substituted its own built-in
+ * values for the rest and the match played nothing like the game intends.
+ * SplinterFaction 0.1.80 asks for 5000 units, unlocked allies and a speed cap of
+ * 1, and got 32000, locked, and 20.
+ */
+describe("missingModOptionTags", () => {
+  // The three the issue names, at SplinterFaction 0.1.80's real defaults.
+  const schema: ConfigOption[] = [
+    { key: "engineoptions", name: "Engine options", type: "section" },
+    opt({ key: "maxunits", default: "5000", section: "engineoptions" }),
+    opt({
+      key: "fixedallies",
+      name: "Fixed ingame alliances",
+      type: "bool",
+      default: "0",
+      section: "engineoptions",
+    }),
+    opt({
+      key: "maxspeed",
+      name: "Maximum game speed",
+      default: "1",
+      section: "limitspeed",
+    }),
+  ];
+
+  it("offers every declared default a fresh hosted battle is missing", () => {
+    expect(missingModOptionTags(schema, {})).toEqual({
+      "game/modoptions/maxunits": "5000",
+      "game/modoptions/fixedallies": "0",
+      "game/modoptions/maxspeed": "1",
+    });
+  });
+
+  it("never overwrites a value the host or a preset already set", () => {
+    expect(
+      missingModOptionTags(schema, { "game/modoptions/maxunits": "500" }),
+    ).toEqual({
+      "game/modoptions/fixedallies": "0",
+      "game/modoptions/maxspeed": "1",
+    });
+  });
+
+  it("treats a tag SPADS lowercased as already set", () => {
+    expect(
+      missingModOptionTags(schema, { "GAME/MODOPTIONS/MaxUnits": "500" }),
+    ).not.toHaveProperty("game/modoptions/maxunits");
+  });
+
+  it("is empty once every option has a tag, so filling settles", () => {
+    const filled = missingModOptionTags(schema, {});
+    expect(missingModOptionTags(schema, filled)).toEqual({});
+  });
+
+  it("skips sections and any option the game declares no default for", () => {
+    expect(
+      missingModOptionTags(
+        [
+          { key: "presets", name: "Presets", type: "section" },
+          opt({ key: "tweakdefs", type: "string", default: undefined }),
+        ],
+        {},
+      ),
+    ).toEqual({});
+  });
+
+  it("answers nothing when the game's option list has not loaded", () => {
+    expect(missingModOptionTags([], {})).toEqual({});
+  });
+
+  it("leaves map options and unit restrictions alone", () => {
+    expect(
+      missingModOptionTags(schema, {
+        "game/mapoptions/waterlevel": "0",
+        "game/restrict/unit0": "corbhmth",
+      }),
+    ).toEqual({
+      "game/modoptions/maxunits": "5000",
+      "game/modoptions/fixedallies": "0",
+      "game/modoptions/maxspeed": "1",
+    });
   });
 });

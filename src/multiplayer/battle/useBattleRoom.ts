@@ -38,7 +38,11 @@ import {
   mpUpdateBot,
 } from "../bindings";
 import { useMultiplayer } from "../store";
-import { battleOptionTags, canEditBattleOptions } from "./battleOptions";
+import {
+  battleOptionTags,
+  canEditBattleOptions,
+  missingModOptionTags,
+} from "./battleOptions";
 import {
   battleStartable,
   deriveSync,
@@ -819,14 +823,24 @@ export function useBattleRoom(): BattleRoomView {
     (tags: Record<string, string>) => {
       if (!activeKey || !battle) return;
       if (isFounder) {
-        if (Object.keys(tags).length > 0) {
-          mpSetScriptTags({ serverKey: activeKey, tags }).then(
+        // A preset stores only what its author changed, so top the founder's set
+        // up with the game's own defaults for the rest (#1837). Without that,
+        // loading one would strip the defaults the room was seeded with and hand
+        // the match back to the engine's built-in values. The autohost path below
+        // stays sparse on purpose: that battle's script is SPADS's to write, and
+        // 177 `!bSet` lines (Beyond All Reason's option count) is a flood ban.
+        const filled = {
+          ...tags,
+          ...missingModOptionTags(modOptionsSchema, tags),
+        };
+        if (Object.keys(filled).length > 0) {
+          mpSetScriptTags({ serverKey: activeKey, tags: filled }).then(
             clearErr,
             setErr,
           );
         }
         const current = battleOptionTags(battle.scriptTags);
-        const wanted = new Set(Object.keys(tags).map((k) => k.toLowerCase()));
+        const wanted = new Set(Object.keys(filled).map((k) => k.toLowerCase()));
         const remove = Object.keys(current).filter(
           (k) => !wanted.has(k.toLowerCase()),
         );
@@ -843,8 +857,47 @@ export function useBattleRoom(): BattleRoomView {
         }
       }
     },
-    [activeKey, battle, isFounder, autohostSend, clearErr, setErr],
+    [
+      activeKey,
+      battle,
+      isFounder,
+      modOptionsSchema,
+      autohostSend,
+      clearErr,
+      setErr,
+    ],
   );
+
+  // Publish the game's own option defaults into a battle we found, for every
+  // option no script tag sets yet (#1837). A room opened with no preset behind
+  // it has no option tags at all, so without this its `[modoptions]` block is
+  // empty and the engine substitutes its own values for the lot.
+  //
+  // The tags are shared state the server holds, so this is a real publish: other
+  // clients in the room see every option the game declares, at its default,
+  // rather than nothing. That is the point. The alternative leaves everyone in
+  // the battle playing a game the host's own singleplayer would play
+  // differently.
+  //
+  // Founder only. On an autohost battle SPADS owns the script and writes its own
+  // defaults, and we could only ask via `!bSet`, one flood-protected chat line
+  // per option. Guarded on the exact key set sent for this battle and game, so a
+  // server that drops the write cannot turn this into a resend loop, while a
+  // later game change still seeds the new game's options.
+  const seededDefaultsRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeKey || !battle || !isFounder) return;
+    const missing = missingModOptionTags(modOptionsSchema, battle.scriptTags);
+    const keys = Object.keys(missing);
+    if (keys.length === 0) return;
+    const stamp = `${battle.id}::${battle.modname}::${keys.sort().join(",")}`;
+    if (seededDefaultsRef.current === stamp) return;
+    seededDefaultsRef.current = stamp;
+    mpSetScriptTags({ serverKey: activeKey, tags: missing }).then(
+      clearErr,
+      setErr,
+    );
+  }, [activeKey, battle, isFounder, modOptionsSchema, clearErr, setErr]);
 
   // Apply a unit-restriction change (founder only). The engine-native
   // `game/restrict/*` tags are host-authoritative script tags we own directly, so
