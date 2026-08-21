@@ -58,6 +58,7 @@ import {
   useSkirmishAis,
 } from "@/play/config";
 import { mergeGameAi } from "@/play/gameAi";
+import { withOption } from "@/play/modOptions";
 import { GameOptionsPanel } from "@/play/pages/components/GameOptionsPanel";
 import { GameSelectCard } from "@/play/pages/components/GameSelectCard";
 import { MapCard } from "@/play/pages/components/MapCard";
@@ -459,7 +460,7 @@ export function SetupPanel({
               options={modOptions}
               optionValues={options}
               onOptionChange={(key, value) =>
-                edit(rows, { ...options, [key]: value })
+                edit(rows, withOption(options, key, value))
               }
             />
           </div>

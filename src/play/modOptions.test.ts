@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ConfigOption } from "@/content/bindings";
-import { effectiveOptions, groupOptions } from "./modOptions";
+import { effectiveOptions, groupOptions, withOption } from "./modOptions";
 
 const section = (key: string, name: string): ConfigOption => ({
   key,
@@ -70,6 +70,27 @@ describe("groupOptions", () => {
 
   it("returns nothing for an empty option list", () => {
     expect(groupOptions([])).toEqual([]);
+  });
+});
+
+describe("withOption", () => {
+  it("records what the user set", () => {
+    expect(withOption({ maxunits: "5000" }, "startmetal", "2000")).toEqual({
+      maxunits: "5000",
+      startmetal: "2000",
+    });
+  });
+
+  it("drops the key when the override goes away, keeping the map sparse", () => {
+    // Storing the default instead would pin it, so the setup would stop
+    // following the game if the game later changed its mind.
+    expect(withOption({ maxunits: "5000" }, "maxunits", undefined)).toEqual({});
+  });
+
+  it("leaves an untouched map alone", () => {
+    expect(withOption({ maxunits: "5000" }, "startmetal", undefined)).toEqual({
+      maxunits: "5000",
+    });
   });
 });
 
