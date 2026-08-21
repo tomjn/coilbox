@@ -129,7 +129,7 @@ describe("a unit that has never had a volume set", () => {
     show(unit());
     expect(screen.getByLabelText("Size X")).toHaveProperty("value", "2");
     expect(screen.getByLabelText("Size Z")).toHaveProperty("value", "2");
-    expect(screen.getByLabelText("Offset from the middle X")).toHaveProperty(
+    expect(screen.getByLabelText("Offset from the aim point X")).toHaveProperty(
       "value",
       "0",
     );
@@ -163,7 +163,7 @@ describe("a unit that has never had a volume set", () => {
 
   it("does the same for an offset", () => {
     show(unit());
-    type("Offset from the middle Z", "-3");
+    type("Offset from the aim point Z", "-3");
 
     expect(sent()).toEqual({
       type: "box",
@@ -183,7 +183,7 @@ describe("a unit with a volume of its own", () => {
   it("shows what was stored rather than the bounding box", () => {
     show(unit({ collisionVolume: custom }));
     expect(screen.getByLabelText("Size Y")).toHaveProperty("value", "9");
-    expect(screen.getByLabelText("Offset from the middle Y")).toHaveProperty(
+    expect(screen.getByLabelText("Offset from the aim point Y")).toHaveProperty(
       "value",
       "1",
     );

@@ -12,16 +12,19 @@
  *
  * - `scales` are full extents, not radii. `SetAxisScales` keeps what it is
  *   given as `fullAxisScales` and halves it itself.
- * - `offsets` are measured from the model's middle, not its origin.
+ * - `offsets` are measured from the unit's aim point, not from its origin.
  *   `GetWorldSpacePos` adds them to the object's `midPos`, which comes from
- *   the s3o header's `mid`, and that is the centre of the same bounding box.
- *   So a volume that matches the box exactly has offsets of zero.
+ *   the s3o header's `mid`. That is the middle of the same bounding box until
+ *   somebody moves it, so a volume matching the box has offsets of zero on a
+ *   unit that has not been given an aim point of its own, and offsets that
+ *   undo the move on one that has. See `aimPoint.ts`.
  *
  * The whole unit gets one volume. A unit can instead be hit piece by piece,
  * which is `pieceCollisionVolume` at the bottom of this file, and which is a
  * reading rather than a setting.
  */
 
+import { aimPoint } from "./aimPoint";
 import {
   type CollisionVolumeType,
   childrenOf,
@@ -47,16 +50,25 @@ export const COLLISION_VOLUME_LABELS: Record<CollisionVolumeType, string> = {
  *
  * A box rather than a sphere because that is the tighter of the two around
  * the geometry that was actually built, and the engine already provides the
- * sphere for anyone who wants it. Offsets are zero because the box's centre
- * is exactly the point the engine measures offsets from.
+ * sphere for anyone who wants it.
+ *
+ * `aim` is the point the engine measures offsets from, which is the middle of
+ * the box for most units and gives offsets of zero. A unit given an aim point
+ * of its own gets offsets that carry the box back onto the geometry, because
+ * the box is the geometry and moving the aim point must not move it.
  */
 export function derivedCollisionVolume(
   bounds: UnitBounds,
+  aim: [number, number, number],
 ): LegoCollisionVolume {
   return {
     type: "box",
     scales: [bounds.sizeX, bounds.sizeY, bounds.sizeZ],
-    offsets: [0, 0, 0],
+    offsets: [
+      bounds.mid[0] - aim[0],
+      bounds.mid[1] - aim[1],
+      bounds.mid[2] - aim[2],
+    ],
   };
 }
 
@@ -65,7 +77,32 @@ export function effectiveCollisionVolume(
   project: LegoProject,
   bounds: UnitBounds,
 ): LegoCollisionVolume {
-  return project.collisionVolume ?? derivedCollisionVolume(bounds);
+  return (
+    project.collisionVolume ??
+    derivedCollisionVolume(bounds, aimPoint(project, bounds))
+  );
+}
+
+/**
+ * The same volume, in the same place, once the point its offsets are measured
+ * from has moved.
+ *
+ * Moving a unit's aim point moves everything measured from it, so a volume
+ * somebody fitted to the geometry would slide off it. This is what the aim
+ * point control writes back so that it does not: the shape on screen stays
+ * where it was put, and only the numbers describing it change.
+ */
+export function reanchorCollisionVolume(
+  volume: LegoCollisionVolume,
+  from: [number, number, number],
+  to: [number, number, number],
+): LegoCollisionVolume {
+  return {
+    ...volume,
+    offsets: [0, 1, 2].map(
+      (axis) => volume.offsets[axis] + from[axis] - to[axis],
+    ) as [number, number, number],
+  };
 }
 
 /**
