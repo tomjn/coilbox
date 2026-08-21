@@ -16,7 +16,21 @@ export function formatBytes(n?: number): string | null {
 
 /** Whether an archive is a loose `.sdd` directory (uncompressed dev content). */
 export function isSdd(archive?: Archive): boolean {
-  return !!archive && archive.name.toLowerCase().endsWith(".sdd");
+  return isSddName(archive?.name);
+}
+
+/**
+ * The same test on the archive's name alone, for a caller holding the string
+ * rather than the record.
+ *
+ * The four formats are four things rather than four names for one, which is what
+ * makes this a safe test to hang a rule on: a rapid pool install is a `.sdp`
+ * package somebody plays, and only a `.sdd` is a folder somebody is editing. The
+ * Rust side applies the same suffix test in
+ * `crates/coilbox-unitsync-worker/src/archive.rs`.
+ */
+export function isSddName(name?: string): boolean {
+  return !!name && name.toLowerCase().endsWith(".sdd");
 }
 
 const DELETABLE_EXTS = ["sd7", "sdz", "sdd", "sdp"];

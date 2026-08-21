@@ -209,6 +209,7 @@ pub struct Unitsync {
     open_archive_fn: Option<IntByStrFn>,
     close_archive_fn: Option<VoidByIntFn>,
     init_dir_list_vfs_fn: Option<LpOpenFn>,
+    init_sub_dirs_vfs_fn: Option<LpOpenFn>,
     find_files_vfs_fn: Option<FindFilesVfsFn>,
     find_files_archive_fn: Option<FindFilesFn>,
     open_archive_file_fn: Option<OpenArchiveFileFn>,
@@ -335,6 +336,7 @@ impl Unitsync {
             open_archive_fn: opt(&lib, b"OpenArchive\0"),
             close_archive_fn: opt(&lib, b"CloseArchive\0"),
             init_dir_list_vfs_fn: opt(&lib, b"InitDirListVFS\0"),
+            init_sub_dirs_vfs_fn: opt(&lib, b"InitSubDirsVFS\0"),
             find_files_vfs_fn: opt(&lib, b"FindFilesVFS\0"),
             find_files_archive_fn: opt(&lib, b"FindFilesArchive\0"),
             open_archive_file_fn: opt(&lib, b"OpenArchiveFile\0"),
@@ -734,7 +736,29 @@ impl Unitsync {
     /// an internal list; FindFilesVFS(idx) copies entry `idx` and returns `idx+1`,
     /// or 0 once `idx` is past the end. So iterate from index 0.
     pub fn list_vfs_dir(&self, path: &str, pattern: &str, modes: &str) -> Vec<String> {
-        let (Some(init), Some(find)) = (self.init_dir_list_vfs_fn, self.find_files_vfs_fn) else {
+        self.enumerate_vfs(self.init_dir_list_vfs_fn, path, pattern, modes)
+    }
+
+    /// The directories directly under `path`, which the file listing above never
+    /// returns: the engine's raw listing asks for files and leaves folders out
+    /// (`FileHandler.cpp`, `InsertRawFiles`).
+    ///
+    /// A `.sdd` is a folder, so this is the only way to see one. Same iteration
+    /// contract as [`Unitsync::list_vfs_dir`], through `InitSubDirsVFS`.
+    pub fn list_vfs_subdirs(&self, path: &str, pattern: &str, modes: &str) -> Vec<String> {
+        self.enumerate_vfs(self.init_sub_dirs_vfs_fn, path, pattern, modes)
+    }
+
+    /// The iteration both listings share, once the engine has been told what to
+    /// put in its internal list.
+    fn enumerate_vfs(
+        &self,
+        init: Option<LpOpenFn>,
+        path: &str,
+        pattern: &str,
+        modes: &str,
+    ) -> Vec<String> {
+        let (Some(init), Some(find)) = (init, self.find_files_vfs_fn) else {
             return Vec::new();
         };
         let (Ok(cp), Ok(cpat), Ok(cm)) = (

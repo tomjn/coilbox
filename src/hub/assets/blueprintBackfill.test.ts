@@ -786,6 +786,128 @@ describe("a render this machine already drew (issue #1724)", () => {
   });
 });
 
+describe("a game in a loose working folder (issue #1890)", () => {
+  /** The same target, installed as the folder somebody edits rather than as the
+   *  release they hand out. SplinterFaction is installed both ways here. */
+  const LOOSE = { ...TARGET, archive: "SplinterFaction.sdd" };
+
+  /**
+   * The half the issue is about. A `.sdd` is somebody's half finished checkout
+   * and a shared hub every other player reads from does not get it.
+   */
+  it("sends the hub nothing at all, and does not even ask", async () => {
+    const watch = spy();
+    const report = await backfillBlueprintUnits(
+      LOOSE,
+      unitsOf(4),
+      100,
+      watch.tools,
+    );
+
+    expect(watch.uploads).toEqual([]);
+    expect(watch.asked).toEqual([]);
+    // A have check is itself a request carrying this machine's archive hashes.
+    expect(report.asked).toBe(0);
+    expect(report.offered).toBe(0);
+    expect(report.written).toBe(0);
+    // And no build pics were extracted, because the only reason to encode one is
+    // to upload it.
+    expect(watch.buildpicCalls).toBe(0);
+  });
+
+  /**
+   * The other half, and the one an over-broad filter breaks. Somebody developing
+   * a game wants to see their own work in coilbox, which is the whole reason for
+   * working in a folder at all.
+   */
+  it("still draws its pictures and writes them down for the app to show", async () => {
+    const watch = spy();
+    const report = await backfillBlueprintUnits(
+      LOOSE,
+      unitsOf(4),
+      100,
+      watch.tools,
+    );
+
+    expect(watch.draws).toBe(4);
+    expect(report.rendered).toBe(4);
+    // Written down under the unit they are of, which is what `localRenders`
+    // reads back so a plan draws its buildings rather than squares.
+    expect(watch.remembered.map((r) => r.unit)).toEqual([
+      "unit0",
+      "unit1",
+      "unit2",
+      "unit3",
+    ]);
+  });
+
+  /** Drawing is the slow half, so a picture this machine already has is not
+   *  drawn again just because nothing is going anywhere. */
+  it("does not redraw a render this machine already holds", async () => {
+    const watch = spy({
+      alreadyDrawn: (unit) =>
+        unit === "unit0"
+          ? {
+              game: "bar",
+              unit,
+              variant: "render:top",
+              file: `render-hash-${unit}.s3o.webp`,
+              path: `/cache/hub/render-hash-${unit}.webp`,
+              mime: "image/webp",
+              encodeProfile: "webp-q80-512",
+              sourceHash: `render-src-${unit}`,
+              modelDigest: `model-${unit}`,
+              sourceArchive: "Beyond All Reason test-1",
+              rendererVersion: 1,
+              width: 128,
+              height: 192,
+            }
+          : undefined,
+    });
+    const report = await backfillBlueprintUnits(
+      LOOSE,
+      unitsOf(4),
+      100,
+      watch.tools,
+    );
+
+    expect(watch.draws).toBe(3);
+    expect(report.rendered).toBe(3);
+    // The one it held was not offered either, which is the point.
+    expect(watch.uploads).toEqual([]);
+  });
+
+  /** A packed install of the same game is untouched, so the rule is about the
+   *  format rather than about the game. */
+  it("leaves a packed install of the same game sending as it always did", async () => {
+    const watch = spy();
+    const report = await backfillBlueprintUnits(
+      { ...TARGET, archive: "SplinterFaction_0.1.80.sdz" },
+      unitsOf(4),
+      100,
+      watch.tools,
+    );
+
+    expect(watch.asked).toHaveLength(1);
+    expect(watch.uploads).toHaveLength(1);
+    expect(report.offered).toBe(8);
+  });
+
+  /** A rapid pool install is a `.sdp` package somebody plays, and Beyond All
+   *  Reason installs no other way. */
+  it("leaves a rapid pool install alone", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(
+      { ...TARGET, archive: "ded9b29714a05164e4b4523b09809af2.sdp" },
+      unitsOf(4),
+      100,
+      watch.tools,
+    );
+
+    expect(watch.uploads).toHaveLength(1);
+  });
+});
+
 describe("the rate limit's say", () => {
   it("does nothing at all when the game has none of the hour left", async () => {
     const watch = spy();

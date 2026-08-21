@@ -61,6 +61,20 @@
  * Stopping during the drawing half sends nothing at all: the pictures drawn so
  * far are in this machine's cache, which costs nobody anything.
  *
+ * ## A game in a loose folder is drawn and never sent
+ *
+ * A `.sdd` is the format you develop in rather than the format you hand to
+ * players, so what is in one is half finished by definition and belongs to
+ * whoever is editing it (issue #1890). A run against one draws its renders,
+ * encodes them and writes them down exactly as any other run does, because
+ * seeing your own work in coilbox is the whole reason for working in a folder.
+ * What stops is everything that touches the hub: no have check, no build pic
+ * extraction, no upload.
+ *
+ * The test is on `target.archive`, which is the primary archive's file name, and
+ * it is the suffix test `isSdd` applies everywhere else in the app. A rapid pool
+ * install is a `.sdp` and is untouched by it.
+ *
  * ## There is no map equivalent of this file, and there is not meant to be
  *
  * Nothing in coilbox uploads a map picture. Map assets reach the hub through the
@@ -90,6 +104,7 @@ import {
   unitsyncUnitRender,
   unitsyncUnitRenderKeys,
 } from "@/content/bindings";
+import { isSddName } from "@/content/format";
 import { unitModelTextureUrl } from "@/lib/assetUrl";
 import { toBase64 } from "@/lib/base64";
 import { reportAssetUploadStopped } from "../uploadOutcomes";
@@ -293,6 +308,13 @@ export async function backfillBlueprintUnits(
     gameArchive: target.archive,
   };
 
+  // A game in a loose folder is drawn and never sent (issue #1890). Everything
+  // below the hub line still happens: the renders are made, encoded, written
+  // down and shown, which is the whole reason somebody works in a folder. What
+  // stops is the three things that reach the hub, so a run against one asks
+  // nothing, extracts no build pics and uploads nothing.
+  const loose = isSddName(target.archive);
+
   // One mount, and the answer is what a render will be called rather than a
   // render. Nothing has been drawn at this point and nothing needs to be.
   const keyed = await tools.renderKeys({
@@ -308,19 +330,36 @@ export async function backfillBlueprintUnits(
   });
 
   const keys = renderKeysToAsk(target.game, working, keyed);
-  const answers = await tools.ask(target.hubUrl, keys);
-  const wanted = new Set(unitsWanted(keys, answers));
+  // Nothing to ask about a picture that is not going anywhere, and a have check
+  // is itself a request carrying this machine's archive hashes. So a loose
+  // folder wants every unit it minted a key for: what the hub holds has no
+  // bearing on what this machine still has to draw for itself.
+  const asked = loose ? 0 : keys.length;
+  const wanted = new Set(
+    loose
+      ? keys.map((key) => (key.keyed_on === "unit" ? key.unit_name : ""))
+      : unitsWanted(keys, await tools.ask(target.hubUrl, keys)),
+  );
 
   // Extracted rather than drawn, so this costs a mount and an encode and nothing
   // the community shares. The upload's own have check is what stops the ones the
   // hub already holds from being sent.
-  const pictures = await tools.buildpics({
-    ...archive,
-    units: working.map((unit) => unit.name),
-    assets: true,
-  });
-
-  const assets: AssetUpload[] = buildpicUploads(target.game, working, pictures);
+  //
+  // Skipped whole for a loose folder rather than extracted and dropped. The
+  // build pic a page shows comes from `useBuildpics` in `@/content/config`,
+  // which reads the same archive without asking for an encoded asset, so this
+  // call exists only to produce something to upload.
+  const assets: AssetUpload[] = loose
+    ? []
+    : buildpicUploads(
+        target.game,
+        working,
+        await tools.buildpics({
+          ...archive,
+          units: working.map((unit) => unit.name),
+          assets: true,
+        }),
+      );
 
   // What this machine already drew and the hub still has not got (issue #1724).
   // A run that drew a render and then failed to send it used to draw the whole
@@ -346,7 +385,10 @@ export async function backfillBlueprintUnits(
     }
     already.set(unit.name, heldRenderUpload(target.game, unit.name, render));
   }
-  assets.push(...already.values());
+  // Still read for a loose folder, because what it answers is which units this
+  // machine has already drawn, and redrawing those would be the run doing its
+  // slowest work twice. Only the offering of them stops.
+  if (!loose) assets.push(...already.values());
 
   // The models of what is left to draw, in one mount rather than one each
   // (issue #1684). Asked for after the have check, so a layout the hub already
@@ -403,7 +445,9 @@ export async function backfillBlueprintUnits(
           tools,
         );
         rendered += 1;
-        if (asset) assets.push(asset);
+        // Drawn, encoded and written down above whatever happens here. This is
+        // only the offering of it, which a loose folder does not do.
+        if (asset && !loose) assets.push(asset);
       }
       updateUploadRun(opId, { done: at + 1 });
     }
@@ -416,7 +460,7 @@ export async function backfillBlueprintUnits(
       reportAssetUploadStopped(0, { game: target.game });
       return {
         units: working.length,
-        asked: keys.length,
+        asked,
         rendered,
         offered: assets.length,
         written: 0,
@@ -425,7 +469,9 @@ export async function backfillBlueprintUnits(
     }
 
     // A run with nothing to send does not open the door at all. The hub already
-    // holding everything is the ordinary answer, not an edge case.
+    // holding everything is the ordinary answer, not an edge case, and so is a
+    // loose folder: nothing was put in `assets` for one, so a run against a
+    // checkout arrives here empty however many pictures it drew.
     //
     // Started by coilbox, always. A backfill is the app filling gaps it noticed
     // on its own, so a rejection goes to the console rather than in front of
@@ -475,7 +521,7 @@ export async function backfillBlueprintUnits(
     }
     return {
       units: working.length,
-      asked: keys.length,
+      asked,
       rendered,
       offered: assets.length,
       written,
