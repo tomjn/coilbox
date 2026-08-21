@@ -176,6 +176,11 @@ const NO_EXTRACTOR: &str = "no-extractor";
 /// identity, so two archives answering to one name are one map here.
 const DUPLICATE_MAP: &str = "duplicate-map";
 
+/// A loose `.sdd` working folder, which the corpus never carries (issue #1890).
+/// The format you develop in is not the format you hand to players, so what is in
+/// one is half finished by definition and belongs to the person editing it.
+const WORKING_FOLDER: &str = "working-folder";
+
 /// One thing that is in the library and not in the corpus.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -431,34 +436,58 @@ pub fn run(lib: &str, root: &Path, cache_dir: Option<&Path>, dry_run: bool) -> S
 /// twice, and the hub's key would collide on the second row. The one that is
 /// dropped is reported rather than swallowed, since two installs of one map is
 /// something a maintainer would want to know about their own library.
+///
+/// A map any working folder holds is dropped whole (issue #1890), including the
+/// one installed both ways. [`crate::archive::maps_in_working_folders`] has why:
+/// the extractors ask unitsync for a map by name, so nothing here can point one
+/// at the release copy rather than at the checkout beside it.
 fn map_names(us: &Unitsync) -> (Vec<String>, Vec<SeedSkip>) {
-    dedupe_map_names((0..us.map_count()).filter_map(|i| us.map_name(i)).collect())
+    let listed: Vec<(i32, String)> = (0..us.map_count())
+        .filter_map(|i| us.map_name(i).map(|name| (i, name)))
+        .collect();
+    let working = crate::archive::maps_in_working_folders(us, &listed);
+    dedupe_map_names(listed.into_iter().map(|(_, name)| name).collect(), &working)
 }
 
-/// The sort and the dedupe [`map_names`] applies, without the session it takes
-/// to read a name.
-fn dedupe_map_names(mut names: Vec<String>) -> (Vec<String>, Vec<SeedSkip>) {
+/// The sort, the dedupe and the working folder rule [`map_names`] applies,
+/// without the session it takes to read a name.
+fn dedupe_map_names(
+    mut names: Vec<String>,
+    working: &std::collections::HashSet<String>,
+) -> (Vec<String>, Vec<SeedSkip>) {
     names.sort();
 
-    let mut kept: Vec<String> = Vec::with_capacity(names.len());
-    let mut duplicates = Vec::new();
+    let skip = |name: String, reason: &'static str| SeedSkip {
+        kind: "map",
+        game: None,
+        unit_name: None,
+        map_name: Some(name),
+        variant: None,
+        source_archive: None,
+        archive: None,
+        reason: SeedSkipReason::Walk(reason),
+    };
+
+    // Deduped first, so a map listed twice is one decision either way: one
+    // `duplicate-map` for the second listing, and then at most one more for the
+    // name itself.
+    let mut once: Vec<String> = Vec::with_capacity(names.len());
+    let mut dropped = Vec::new();
     for name in names {
-        if kept.last() == Some(&name) {
-            duplicates.push(SeedSkip {
-                kind: "map",
-                game: None,
-                unit_name: None,
-                map_name: Some(name),
-                variant: None,
-                source_archive: None,
-                archive: None,
-                reason: SeedSkipReason::Walk(DUPLICATE_MAP),
-            });
-            continue;
+        match once.last() == Some(&name) {
+            true => dropped.push(skip(name, DUPLICATE_MAP)),
+            false => once.push(name),
         }
-        kept.push(name);
     }
-    (kept, duplicates)
+
+    let mut kept = Vec::with_capacity(once.len());
+    for name in once {
+        match working.contains(&name) {
+            true => dropped.push(skip(name, WORKING_FOLDER)),
+            false => kept.push(name),
+        }
+    }
+    (kept, dropped)
 }
 
 /// One installed game as unitsync reports it, before the walk decides whether it
@@ -527,11 +556,32 @@ fn choose_games(us: &Unitsync) -> (Vec<GameInstall>, Vec<SeedSkip>) {
 /// whatever the game's author typed, `$VERSION` unexpanded in a development
 /// checkout included, and an ordering invented for it would be a guess dressed
 /// up as a rule. Ties break on the archive name so the choice is stable.
+///
+/// A `.sdd` working folder is out before either rule runs (issue #1890), so it
+/// is neither seeded on its own nor entered in the tiebreak. That second part is
+/// the point: mtime is the right signal between two releases and exactly the
+/// wrong one once a checkout is in the running, because a folder somebody is
+/// working in is almost always the newest thing on disk. Dropping it first means
+/// the packed install wins whatever the mtimes say, so editing a checkout no
+/// longer flips which build the hub hears about.
 fn choose_from(installs: Vec<Install>) -> (Vec<GameInstall>, Vec<SeedSkip>) {
     let mut skipped = Vec::new();
     let mut by_shortname: HashMap<String, Vec<Install>> = HashMap::new();
 
     for install in installs {
+        if crate::archive::is_working_folder(&install.archive) {
+            skipped.push(SeedSkip {
+                kind: "game",
+                game: install.shortname.or(Some(install.name)),
+                unit_name: None,
+                map_name: None,
+                variant: None,
+                source_archive: Some(install.source_archive),
+                archive: Some(install.archive),
+                reason: SeedSkipReason::Walk(WORKING_FOLDER),
+            });
+            continue;
+        }
         let Some(shortname) = install.shortname.clone() else {
             skipped.push(SeedSkip {
                 kind: "game",
@@ -1218,7 +1268,7 @@ mod tests {
     #[test]
     fn a_map_installed_twice_is_one_map() {
         let names = ["Cc 3.0", "Bb 2.0", "Aa 1.0", "Bb 2.0"].map(str::to_string);
-        let (kept, dropped) = dedupe_map_names(names.to_vec());
+        let (kept, dropped) = dedupe_map_names(names.to_vec(), &Default::default());
 
         // Sorted, so the batches a library produces do not depend on the order
         // the archive scanner happened to walk it in.
@@ -1314,7 +1364,8 @@ mod tests {
     /// the walk cannot be driven from a test, so it goes through [`unit_skip`].
     #[test]
     fn a_picture_skip_carries_no_file_name() {
-        let (_, dropped) = dedupe_map_names(vec!["Bb 2.0".into(), "Bb 2.0".into()]);
+        let (_, dropped) =
+            dedupe_map_names(vec!["Bb 2.0".into(), "Bb 2.0".into()], &Default::default());
         assert!(dropped[0].archive.is_none());
         let json = serde_json::to_value(&dropped[0]).expect("serialize");
         assert!(json.get("archive").is_none(), "an empty field was written");
@@ -1340,6 +1391,112 @@ mod tests {
         assert!(json.get("archive").is_none(), "an empty field was written");
     }
 
+    /// A game somebody is editing is not a game anybody else can be given
+    /// (issue #1890), and the checkout does not get to win the tiebreak on its
+    /// way out. SplinterFaction is installed both ways on the machine this was
+    /// written on, and the folder becomes the newest thing on disk the moment
+    /// anybody saves a file in it.
+    #[test]
+    fn a_working_folder_never_beats_the_release_it_sits_beside() {
+        let (chosen, skipped) = choose_from(vec![
+            Install {
+                name: "SplinterFaction $VERSION".into(),
+                shortname: Some("SF".into()),
+                archive: "SplinterFaction.sdd".into(),
+                source_archive: "SplinterFaction $VERSION".into(),
+                // Newer than the release, which is what editing a checkout does.
+                installed_at: 500,
+            },
+            Install {
+                name: "SplinterFaction 0.1.80".into(),
+                shortname: Some("SF".into()),
+                archive: "SplinterFaction_0.1.80.sdz".into(),
+                source_archive: "SplinterFaction 0.1.80".into(),
+                installed_at: 100,
+            },
+        ]);
+
+        assert_eq!(chosen.len(), 1);
+        assert_eq!(chosen[0].archive, "SplinterFaction_0.1.80.sdz");
+
+        assert_eq!(skipped.len(), 1);
+        assert_eq!(skipped[0].archive.as_deref(), Some("SplinterFaction.sdd"));
+        assert_eq!(skipped[0].game.as_deref(), Some("SF"));
+        assert_eq!(
+            serde_json::to_value(skipped[0].reason).expect("serialize"),
+            "working-folder",
+            "the folder was dropped for the wrong reason, or won"
+        );
+    }
+
+    /// And where the folder is the only install, the game contributes nothing
+    /// rather than contributing its development state. MechCommander: Legacy is
+    /// installed this way here and was seeded whole.
+    #[test]
+    fn a_game_installed_only_as_a_working_folder_is_seeded_at_all() {
+        let (chosen, skipped) = choose_from(vec![Install {
+            name: "MechCommander: Legacy $VERSION".into(),
+            shortname: Some("MCL".into()),
+            archive: "SpringMCLegacy.sdd".into(),
+            source_archive: "MechCommander: Legacy $VERSION".into(),
+            installed_at: 100,
+        }]);
+
+        assert!(chosen.is_empty(), "a working folder was seeded");
+        assert_eq!(skipped.len(), 1);
+        assert_eq!(skipped[0].game.as_deref(), Some("MCL"));
+        assert_eq!(
+            serde_json::to_value(skipped[0].reason).expect("serialize"),
+            "working-folder"
+        );
+    }
+
+    /// A rapid pool install is a `.sdp` package somebody plays, so the rule
+    /// cannot reach it. Beyond All Reason is the whole of why this matters: it
+    /// installs no other way and is the most played game there is.
+    #[test]
+    fn a_rapid_pool_install_is_untouched() {
+        let (chosen, skipped) = choose_from(vec![install(
+            Some("BYAR"),
+            "test-30922-8064a43",
+            "ded9b29714a05164e4b4523b09809af2.sdp",
+            200,
+        )]);
+        assert_eq!(chosen.len(), 1);
+        assert_eq!(chosen[0].shortname, "BYAR");
+        assert!(skipped.is_empty());
+    }
+
+    /// A map inside a working folder is a map somebody is still making, and it
+    /// is dropped by name, so the release copy installed beside it goes too. The
+    /// extractors ask unitsync for a map by name and get whichever archive the
+    /// scanner indexed first, so keeping the name would be sending a picture
+    /// nothing could say the provenance of.
+    #[test]
+    fn a_map_a_working_folder_holds_is_not_in_the_corpus() {
+        let working = ["AcidicQuarry 5.17".to_string()].into_iter().collect();
+        let (kept, dropped) = dedupe_map_names(
+            vec![
+                "AcidicQuarry 5.17".into(),
+                "AcidicQuarry 5.17".into(),
+                "Comet Catcher Remake 1.8".into(),
+            ],
+            &working,
+        );
+
+        assert_eq!(kept, ["Comet Catcher Remake 1.8"]);
+        // One decision per listing: the second one is the duplicate it always
+        // was, and the name itself is the working folder.
+        let reasons: Vec<_> = dropped
+            .iter()
+            .map(|s| serde_json::to_value(s.reason).expect("serialize"))
+            .collect();
+        assert_eq!(reasons, ["duplicate-map", "working-folder"]);
+        for skip in &dropped {
+            assert_eq!(skip.map_name.as_deref(), Some("AcidicQuarry 5.17"));
+        }
+    }
+
     /// A skip reason serializes as the same string the layer it came from uses,
     /// so a consumer reads one vocabulary rather than three.
     #[test]
@@ -1359,6 +1516,10 @@ mod tests {
         );
         assert_eq!(reason(SeedSkipReason::Walk(NO_SHORTNAME)), "no-shortname");
         assert_eq!(reason(SeedSkipReason::Walk(SUPERSEDED)), "superseded");
+        assert_eq!(
+            reason(SeedSkipReason::Walk(WORKING_FOLDER)),
+            "working-folder"
+        );
     }
 
     /// A dry run reports the shape of the corpus and leaves the disk alone, so

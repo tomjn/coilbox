@@ -161,6 +161,12 @@ pub(crate) fn map_archive_file(us: &Unitsync, map_index: i32, map_name: &str) ->
 /// the whole of why it is a type. Resolving one map means opening archives until
 /// one holds its `.smf`, so three thousand maps resolved one at a time is
 /// millions of archive opens. Built once it is one open each.
+///
+/// Working folders are left out of both passes (issue #1890). What this names is
+/// what the map catalog sends the hub, and a `.sdd` is a map somebody is still
+/// making. The engine's raw listing would not hand one over anyway, since it asks
+/// for files and a `.sdd` is a directory, but the rule is stated here rather than
+/// left resting on that.
 pub(crate) struct MapArchives {
     /// Lowercased `.smf` path to every archive holding one. More than one is the
     /// case [`MapArchives::file_for`] has to break a tie in.
@@ -172,7 +178,7 @@ impl MapArchives {
     pub(crate) fn index(us: &Unitsync) -> Self {
         let mut by_smf: HashMap<String, Vec<String>> = HashMap::new();
         for candidate in us.list_vfs_dir("maps", "*", "r") {
-            if !is_archive_file(&candidate) {
+            if !is_archive_file(&candidate) || is_working_folder(&candidate) {
                 continue;
             }
             let Some(handle) = us.open_archive(&candidate) else {
@@ -200,7 +206,7 @@ impl MapArchives {
             let holders = us
                 .list_vfs_dir("maps", "*", "r")
                 .into_iter()
-                .filter(|c| is_archive_file(c))
+                .filter(|c| is_archive_file(c) && !is_working_folder(c))
                 .filter(|cand| match us.open_archive(cand) {
                     Some(h) => {
                         let hit = us
@@ -278,6 +284,68 @@ fn the_one_that_says_it_is_this_map(
         [only] => Some((*only).clone()),
         _ => None,
     }
+}
+
+/// Which of `maps` are held by a loose working folder under `maps/`
+/// (issue #1890).
+///
+/// The names, not the indices, because a map installed twice answers to one name
+/// and the seed corpus is keyed on that name. A name in here is dropped whole,
+/// even where a packed install of the same map sits beside the folder, and that
+/// is deliberate rather than blunt: unitsync's map API is keyed on the name from
+/// end to end, so an extractor asked for "AcidicQuarry 5.17" reads whichever of
+/// the two archives the scanner indexed first and nothing here can say which.
+/// Sending a picture that might have come out of somebody's working copy is the
+/// thing this closes, so the map contributes nothing until the folder goes.
+///
+/// Found through `InitSubDirsVFS` rather than the file listing every other
+/// archive lookup uses, because a `.sdd` is a directory and the raw file listing
+/// leaves directories out. That is also why [`MapArchives`] can never name one.
+///
+/// A folder claims a map by the `name` its `mapinfo.lua` declares, the same test
+/// [`the_one_that_says_it_is_this_map`] breaks a tie with, because that name is
+/// what unitsync built the map's versioned name out of. A folder with no
+/// `mapinfo.lua` is an SMD era map whose name the engine took from the `.smf`, so
+/// that one falls back to matching the `.smf` member instead.
+pub(crate) fn maps_in_working_folders(
+    us: &Unitsync,
+    maps: &[(i32, String)],
+) -> std::collections::HashSet<String> {
+    let mut held = std::collections::HashSet::new();
+    for folder in us.list_vfs_subdirs("maps", "*", "r") {
+        if !is_working_folder(&folder) {
+            continue;
+        }
+        let Some(handle) = us.open_archive(folder.trim_end_matches(['/', '\\'])) else {
+            continue;
+        };
+        let members: Vec<String> = us
+            .list_archive_files(handle)
+            .into_iter()
+            .map(|(path, _)| path)
+            .collect();
+        let declared = members
+            .iter()
+            .find(|p| same_member(p, "mapinfo.lua"))
+            .and_then(|p| us.read_archive_member(handle, p, MAPINFO_CAP))
+            .map(|(_, bytes)| String::from_utf8_lossy(&bytes).into_owned())
+            .as_deref()
+            .and_then(declared_map_name);
+        us.close_archive(handle);
+
+        for (index, name) in maps {
+            let claimed = match &declared {
+                Some(declared) => name.to_lowercase().starts_with(&declared.to_lowercase()),
+                None => us
+                    .map_file_name(*index)
+                    .is_some_and(|smf| members.iter().any(|p| same_member(p, &smf))),
+            };
+            if claimed {
+                held.insert(name.clone());
+            }
+        }
+    }
+    held
 }
 
 /// The map's own `name` out of a `mapinfo.lua`, read as a literal.
@@ -407,6 +475,27 @@ fn is_archive_file(path: &str) -> bool {
     [".sd7", ".sdz", ".sdd", ".sdp"]
         .iter()
         .any(|ext| lower.ends_with(ext))
+}
+
+/// Whether an archive is a loose working folder rather than a release
+/// (issue #1890).
+///
+/// A `.sdd` is a directory somebody is editing. It is the format you develop in
+/// and never the format you hand to players, so its contents are half finished
+/// by definition and coilbox does not send them anywhere other people read from.
+///
+/// A suffix test on the archive's own name, the same one `isSdd` in
+/// `src/content/format.ts` applies on the frontend. The other three formats are
+/// separate things rather than other names for this one: a rapid pool install is
+/// a `.sdp`, which is a real install somebody plays, so nothing here touches it.
+///
+/// Trailing separators are trimmed because a directory listing carries one and a
+/// file listing does not, and both spell the same folder.
+pub(crate) fn is_working_folder(archive: &str) -> bool {
+    archive
+        .trim_end_matches(['/', '\\'])
+        .to_lowercase()
+        .ends_with(".sdd")
 }
 
 /// The absolute on-disk path for an openable archive path (which may be VFS-
@@ -1333,6 +1422,24 @@ mod tests {
         assert_eq!(declared_map_name("name = mapName .. version"), None);
         assert_eq!(declared_map_name("-- no name here"), None);
         assert_eq!(declared_map_name("name = \"\"").as_deref(), None);
+    }
+
+    /// The four formats are four things, and only one of them is a folder
+    /// somebody is editing (issue #1890). A rapid pool install is a `.sdp` and
+    /// stays a real install this cannot touch.
+    #[test]
+    fn only_a_sdd_is_a_working_folder() {
+        assert!(is_working_folder("SplinterFaction.sdd"));
+        assert!(is_working_folder("maps/acidicquarry_5.17.SDD"));
+        // A directory listing carries a separator and a file listing does not.
+        assert!(is_working_folder("maps/acidicquarry_5.17.sdd/"));
+        assert!(is_working_folder("maps\\acidicquarry_5.17.sdd\\"));
+
+        assert!(!is_working_folder("SplinterFaction_0.1.80.sdz"));
+        assert!(!is_working_folder("xta-9.65.sd7"));
+        assert!(!is_working_folder("ded9b29714a05164e4b4523b09809af2.sdp"));
+        // A name that merely mentions the extension is not one.
+        assert!(!is_working_folder("sdd_remake.sd7"));
     }
 
     /// What the tie break then does with it: a declared name opens the canonical
