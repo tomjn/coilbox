@@ -44,9 +44,10 @@ import { buildObj } from "../../exportObj";
 import { unitScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
+import { buildPieceCollisionScript } from "../../pieceCollisionScript";
 import type { RawGeometry } from "../../rawGeometry";
 import { importedTextures } from "../../rawImport";
-import { buildS3o, unitBounds } from "../../s3oBuild";
+import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
 import { buildUnitDef } from "../../unitDef";
 
 interface Props {
@@ -78,6 +79,8 @@ type Result =
       texturesKept: string[];
       script: string | null;
       scriptKept: boolean;
+      pieceCollision: string | null;
+      pieceCollisionRemoved: boolean;
       unitDef: string | null;
       unitDefKept: boolean;
       glb: string | null;
@@ -156,6 +159,13 @@ export function ExportDrawer({
             }
           : null,
         script: withScript ? unitScript(project) : null,
+        // Not behind the script checkbox. That one is about not clobbering a
+        // game's own hand-written script, and this file is coilbox's: it is
+        // rewritten, or taken away, on every export.
+        pieceCollision: buildPieceCollisionScript(
+          project,
+          bakedPieces(project, pack, raw).pieces,
+        ),
         // Unlike the atlas and the script, there is no scenario where a
         // built unit should export without one: with no unit definition the
         // engine has nothing to spawn.
@@ -434,6 +444,15 @@ export function ExportDrawer({
                 {result.scriptKept ? (
                   <p className="text-muted-foreground">
                     The unit script was already there and has been left alone.
+                  </p>
+                ) : null}
+                {result.pieceCollision ? (
+                  <code className="break-all">{result.pieceCollision}</code>
+                ) : null}
+                {result.pieceCollisionRemoved ? (
+                  <p className="text-muted-foreground">
+                    This unit no longer changes any piece's collision box, so
+                    the file that set them has been removed.
                   </p>
                 ) : null}
                 {result.unitDef ? (

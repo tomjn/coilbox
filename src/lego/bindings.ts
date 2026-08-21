@@ -97,6 +97,14 @@ export const legoExport = defineCommand<
     textures: ExportTextures | null;
     /** Written only when the game has no script for this unit yet. */
     script: string | null;
+    /**
+     * The per-piece collision volumes, for `scripts/coilbox/<unit>_collision.lua`.
+     *
+     * Coilbox's own file, so unlike the script it is rewritten on every export.
+     * Null takes an earlier one away, since a stale copy would go on applying
+     * volumes the unit no longer asks for. See `pieceCollisionScript.ts`.
+     */
+    pieceCollision: string | null;
     /** Written only when the game has no unit definition for it yet. */
     unitDef: string | null;
     model: S3oBuild;
@@ -107,6 +115,9 @@ export const legoExport = defineCommand<
     script: string | null;
     /** True when a script was already there and was left as it was. */
     scriptKept: boolean;
+    pieceCollision: string | null;
+    /** True when an earlier collision file was taken away. */
+    pieceCollisionRemoved: boolean;
     unitDef: string | null;
     /** True when a unit definition was already there and was left as it was. */
     unitDefKept: boolean;

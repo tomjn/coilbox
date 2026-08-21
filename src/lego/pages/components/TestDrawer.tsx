@@ -33,9 +33,10 @@ import { legoExport, legoOpenPath, legoScratchGame } from "../../bindings";
 import { unitScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
+import { buildPieceCollisionScript } from "../../pieceCollisionScript";
 import type { RawGeometry } from "../../rawGeometry";
 import { importedTextures } from "../../rawImport";
-import { buildS3o, unitBounds } from "../../s3oBuild";
+import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
 import {
   buildModInfo,
   buildSideData,
@@ -169,6 +170,10 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
           stored: imported?.place ?? [],
         },
         script: unitScript(project),
+        pieceCollision: buildPieceCollisionScript(
+          project,
+          bakedPieces(project, pack, raw).pieces,
+        ),
         // Measured rather than taken off the build: a build's `mid` is the
         // header's, which is the aim point, and the definition is derived from
         // the bounding box.
