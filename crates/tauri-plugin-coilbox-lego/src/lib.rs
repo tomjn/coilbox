@@ -799,8 +799,11 @@ fn stored_texture_target(dir: &Path, write_as: &str) -> Result<PathBuf, String> 
 /// The unit script and the unit definition both land under their own folder,
 /// and all three of the texture, the script and the definition are written once
 /// and then left alone: a re-export never overwrites one that is already there
-/// (see [`keep_existing`]). Only the model is rewritten every time, because it
-/// is the one file the builder alone owns.
+/// (see [`keep_existing`]). Only the model and the per-piece collision file are
+/// rewritten every time, because those are the files the builder alone owns.
+// Each argument is one field of the IPC payload, so grouping them would only
+// move the width into a struct the frontend then has to nest.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 async fn lego_export<R: Runtime>(
     app: AppHandle<R>,
@@ -808,6 +811,7 @@ async fn lego_export<R: Runtime>(
     unit_name: String,
     textures: Option<ExportTextures>,
     script: Option<String>,
+    piece_collision: Option<String>,
     unit_def: Option<String>,
     model: ExportModel,
 ) -> CliResult {
@@ -932,6 +936,34 @@ async fn lego_export<R: Runtime>(
         }
     }
 
+    // The per-piece collision volumes, which are the one generated Lua file
+    // coilbox keeps ownership of. Rewritten every export, unlike the script and
+    // the definition either side of it, and that is the whole reason it is a
+    // file of its own: the script is the user's and is never rewritten, so
+    // nothing in it could ever be brought up to date.
+    //
+    // A unit that stops overriding anything still gets a file, an empty one. The
+    // include line lives in that script nothing rewrites, so taking the file
+    // away would leave it pointing at nothing, which the unit script framework
+    // logs as an error for every unit created.
+    //
+    // It goes in a `coilbox` folder under `scripts/` so overwriting only ever
+    // touches coilbox's own files, and because the framework walks `scripts/`
+    // recursively and would otherwise be one basename collision away from
+    // loading it as somebody's unit script.
+    let mut piece_collision_path = None;
+    if let Some(lua) = piece_collision {
+        let generated = root.join("scripts").join("coilbox");
+        if let Err(e) = std::fs::create_dir_all(&generated) {
+            return CliResult::err(format!("could not create {}: {e}", generated.display()));
+        }
+        let target = generated.join(format!("{unit_name}_collision.lua"));
+        if let Err(e) = std::fs::write(&target, lua) {
+            return CliResult::err(format!("could not write {}: {e}", target.display()));
+        }
+        piece_collision_path = Some(target.to_string_lossy().to_string());
+    }
+
     // The unit definition follows the same rule as the script, scratch
     // exception included: written once and left alone in a real game folder,
     // always refreshed in coilbox's own scratch game.
@@ -960,6 +992,7 @@ async fn lego_export<R: Runtime>(
         "texturesKept": stored_kept,
         "script": script_path,
         "scriptKept": script_kept,
+        "pieceCollision": piece_collision_path,
         "unitDef": unit_def_path,
         "unitDefKept": unit_def_kept,
     }))

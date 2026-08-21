@@ -20,8 +20,9 @@
  *   undo the move on one that has. See `aimPoint.ts`.
  *
  * The whole unit gets one volume. A unit can instead be hit piece by piece,
- * which is `pieceCollisionVolume` at the bottom of this file, and which is a
- * reading rather than a setting.
+ * which is `pieceCollisionVolume` at the bottom of this file. That one is a
+ * reading of what the engine builds by itself, and a piece can be given
+ * something else instead: see `pieceCollisionScript.ts`.
  */
 
 import { aimPoint } from "./aimPoint";
@@ -29,6 +30,7 @@ import {
   type CollisionVolumeType,
   childrenOf,
   type LegoCollisionVolume,
+  type LegoPiece,
   type LegoProject,
   pieceById,
 } from "./model";
@@ -238,9 +240,10 @@ export const MIN_PIECE_COLLISION_SIZE = 1;
  * none in a unit definition either: every model parser derives one the same
  * way the moment the model loads, `CollisionVolume('b', 'z', maxs - mins,
  * (maxs + mins) * 0.5f)` over the piece's own vertices, in
- * `SS3OParser::LoadPiece` and `ModelUtils::CalculateModelDimensions`. So this
- * is a reading of what a game will hit, not a number anyone can set. The only
- * choice a unit definition has is whether to use these at all.
+ * `CS3OParser::LoadPiece` and `ModelUtils::CalculateModelDimensions`. So this
+ * is a reading of what a game will hit by default. The only choice a unit
+ * definition has is whether to use these at all. Changing one is a call on the
+ * live unit, which is `pieceCollisionScript.ts`.
  *
  * Always a box, always centred on the geometry it wraps, and always in the
  * piece's own space, which is why `pieceCollisionVolumes` carries the piece's
@@ -288,7 +291,29 @@ export interface PieceCollisionVolume {
    * piece a script has not moved.
    */
   origin: [number, number, number];
+  /** The box the engine measures round this piece's own vertices. */
+  derived: LegoCollisionVolume;
+  /** What the unit is hit with here: `derived` unless the piece carries its own. */
   volume: LegoCollisionVolume;
+  /** False when the piece has been switched off, so nothing hits it. */
+  hit: boolean;
+}
+
+/**
+ * The volume in force on one piece, and whether anything hits it.
+ *
+ * The derived box until the piece is given one of its own, which is the same
+ * shape of rule as `effectiveCollisionVolume` above and for the same reason:
+ * the panel opens on a reading, and touching it takes it over.
+ */
+export function effectivePieceCollision(
+  piece: LegoPiece,
+  derived: LegoCollisionVolume,
+): { hit: boolean; volume: LegoCollisionVolume } {
+  return {
+    hit: piece.collision?.hit !== false,
+    volume: piece.collision?.volume ?? derived,
+  };
 }
 
 /**
@@ -305,14 +330,23 @@ export function pieceCollisionVolumes(
 ): PieceCollisionVolume[] {
   const out: PieceCollisionVolume[] = [];
   const visit = (pieceId: string, parent: [number, number, number]) => {
-    const piece = baked.get(pieceId);
-    if (!piece) return;
+    const baked_ = baked.get(pieceId);
+    if (!baked_) return;
     const origin: [number, number, number] = [
-      parent[0] + piece.offset[0],
-      parent[1] + piece.offset[1],
-      parent[2] + piece.offset[2],
+      parent[0] + baked_.offset[0],
+      parent[1] + baked_.offset[1],
+      parent[2] + baked_.offset[2],
     ];
-    out.push({ pieceId, origin, volume: pieceCollisionVolume(piece) });
+    const derived = pieceCollisionVolume(baked_);
+    const piece = pieceById(project, pieceId);
+    out.push({
+      pieceId,
+      origin,
+      derived,
+      ...(piece
+        ? effectivePieceCollision(piece, derived)
+        : { hit: true, volume: derived }),
+    });
     for (const child of childrenOf(project, pieceId)) visit(child.id, origin);
   };
 

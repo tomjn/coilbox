@@ -1048,6 +1048,21 @@ function Builder({ id }: { id: string | undefined }) {
                       return rest;
                     })
                   }
+                  selectedId={selectedId}
+                  onSelectPiece={(pieceId) => setSelectedId(pieceId)}
+                  onPieceVolumeChange={(pieceId, collision) =>
+                    edit((project) => ({
+                      ...project,
+                      pieces: project.pieces.map((piece) => {
+                        if (piece.id !== pieceId) return piece;
+                        if (collision) return { ...piece, collision };
+                        // Back on the box the engine measures, which is the
+                        // absence of the key rather than a stored copy of it.
+                        const { collision: _dropped, ...rest } = piece;
+                        return rest;
+                      }),
+                    }))
+                  }
                 />
               ) : aside === "animation" ? (
                 <AnimationPanel

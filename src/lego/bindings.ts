@@ -97,6 +97,16 @@ export const legoExport = defineCommand<
     textures: ExportTextures | null;
     /** Written only when the game has no script for this unit yet. */
     script: string | null;
+    /**
+     * The per-piece collision volumes, for `scripts/coilbox/<unit>_collision.lua`.
+     *
+     * Coilbox's own file, so unlike the script it is rewritten on every export.
+     * A unit that overrides nothing still sends one, which does nothing: the
+     * unit script may already include it, and an include that finds no file is
+     * an error the engine logs for every unit created. See
+     * `pieceCollisionScript.ts`.
+     */
+    pieceCollision: string;
     /** Written only when the game has no unit definition for it yet. */
     unitDef: string | null;
     model: S3oBuild;
@@ -107,6 +117,7 @@ export const legoExport = defineCommand<
     script: string | null;
     /** True when a script was already there and was left as it was. */
     scriptKept: boolean;
+    pieceCollision: string | null;
     unitDef: string | null;
     /** True when a unit definition was already there and was left as it was. */
     unitDefKept: boolean;

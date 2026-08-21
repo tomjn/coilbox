@@ -995,6 +995,23 @@ fn install_stubs(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         "GetUnitValue",
         lua.create_function(|_, _: MultiValue| Ok(0))?,
     )?;
+
+    // `include` pulls in another file out of the game archive, which a preview
+    // running off one script in memory has nothing to read. Coilbox's own unit
+    // scripts carry one, for the per-piece collision volumes, and none of what
+    // is behind it moves a piece, so a preview that skipped it silently would
+    // still be right about the animation. Left as a note rather than a failure
+    // for the same reason the sound calls are.
+    let state = Rc::clone(sim);
+    globals.set(
+        "include",
+        lua.create_function(move |_, _: MultiValue| {
+            state
+                .borrow_mut()
+                .note("include reads nothing in the preview.".to_string());
+            Ok(())
+        })?,
+    )?;
     Ok(())
 }
 

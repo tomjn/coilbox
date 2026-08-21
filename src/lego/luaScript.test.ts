@@ -374,6 +374,38 @@ describe("buildLuaScript", () => {
     );
   });
 
+  it("says nothing about collision while every piece keeps its derived box", () => {
+    expect(buildLuaScript(project(LEGS))).not.toContain("include(");
+  });
+
+  it("pulls in the collision file once a piece overrides its box (#1842)", () => {
+    const doc = project([
+      { id: "dish", name: "dish", collision: { hit: false } },
+    ]);
+
+    // Relative to scripts/, because that is what the framework's own include
+    // prepends. And at the top of the file, above the piece locals, so an
+    // edited script is unlikely to lose it.
+    expect(buildLuaScript(doc)).toContain(
+      'include("coilbox/cakebot_collision.lua")',
+    );
+    expect(buildLuaScript(doc).indexOf("include(")).toBeLessThan(
+      buildLuaScript(doc).indexOf("function script."),
+    );
+  });
+
+  it("carries the include line into a script the user takes over", () => {
+    // Taking ownership seeds the user's copy from the generated text, so the
+    // line survives by construction rather than by anything preserving it.
+    const doc = project([
+      { id: "dish", name: "dish", collision: { hit: false } },
+    ]);
+
+    expect(unitScript({ ...doc, script: buildLuaScript(doc) })).toContain(
+      'include("coilbox/cakebot_collision.lua")',
+    );
+  });
+
   it("ends with exactly one newline and no triple blank lines", () => {
     const lua = buildLuaScript(project(LEGS));
 

@@ -81,8 +81,10 @@ function unit(over: Partial<LegoProject> = {}): LegoProject {
 const onChange = vi.fn();
 const onPieceCollisionChange = vi.fn();
 const onPieceSelectionChange = vi.fn();
+const onSelectPiece = vi.fn();
+const onPieceVolumeChange = vi.fn();
 
-function panel(project: LegoProject) {
+function panel(project: LegoProject, selectedId: string | null = "hull") {
   return (
     <CollisionPanel
       project={project}
@@ -91,6 +93,9 @@ function panel(project: LegoProject) {
       onChange={onChange}
       onPieceCollisionChange={onPieceCollisionChange}
       onPieceSelectionChange={onPieceSelectionChange}
+      selectedId={selectedId}
+      onSelectPiece={onSelectPiece}
+      onPieceVolumeChange={onPieceVolumeChange}
     />
   );
 }
@@ -114,10 +119,19 @@ function sent(): LegoCollisionVolume {
   return call[0];
 }
 
+/** The last piece override the panel handed back, with the piece it was for. */
+function sentPiece(): [string, unknown] {
+  const call = onPieceVolumeChange.mock.calls.at(-1);
+  if (!call) throw new Error("the panel sent nothing for a piece");
+  return [call[0], call[1]];
+}
+
 beforeEach(() => {
   onChange.mockClear();
   onPieceCollisionChange.mockClear();
   onPieceSelectionChange.mockClear();
+  onSelectPiece.mockClear();
+  onPieceVolumeChange.mockClear();
 });
 
 afterEach(() => {
@@ -344,5 +358,138 @@ describe("clicking the unit piece by piece", () => {
       screen.queryByText(/still what you click to select the unit/),
     ).toBeNull();
     expect(screen.getByText(/sphere an explosion measures/)).toBeTruthy();
+  });
+});
+
+/**
+ * The per-piece fields (issue #1842). Same rule as the unit's own volume, one
+ * level down: the panel opens on the box the engine measures and the first
+ * thing touched has to hand back that whole box, not the one number typed.
+ *
+ * The unit's hull is the two elmo triangle from `pack()` above, flat in y, so
+ * the engine's box round it is 2 by 1 by 2: the y axis clamps up to one elmo
+ * because `InitShape` will not take less.
+ */
+describe("changing one piece's box", () => {
+  it("opens on the box the engine measures round that piece", () => {
+    show(unit({ pieceCollision: true }));
+    expect(screen.getByLabelText("Box size X")).toHaveProperty("value", "2");
+    expect(screen.getByLabelText("Offset in the piece X")).toHaveProperty(
+      "value",
+      "1",
+    );
+  });
+
+  it("hands back the whole measured box when one number is typed", () => {
+    show(unit({ pieceCollision: true }));
+    type("Box size Y", "8");
+
+    expect(sentPiece()).toEqual([
+      "hull",
+      {
+        hit: true,
+        volume: { type: "box", scales: [2, 8, 2], offsets: [1, 0, 1] },
+      },
+    ]);
+  });
+
+  it("will not take a size under an elmo, since the engine clamps it anyway", () => {
+    show(unit({ pieceCollision: true }));
+    type("Box size X", "0.2");
+
+    expect(sentPiece()[1]).toHaveProperty("volume.scales", [1, 1, 2]);
+  });
+
+  it("switches a piece out of the hit test with no volume of its own", () => {
+    show(unit({ pieceCollision: true }));
+    fireEvent.click(screen.getByLabelText("Anything hits hull"));
+
+    expect(sentPiece()).toEqual(["hull", { hit: false }]);
+  });
+
+  it("keeps a box somebody set when the piece is switched off", () => {
+    const volume: LegoCollisionVolume = {
+      type: "box",
+      scales: [9, 9, 9],
+      offsets: [0, 0, 0],
+    };
+    const project = unit({ pieceCollision: true });
+    show({
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === "hull"
+          ? { ...piece, collision: { hit: true, volume } }
+          : piece,
+      ),
+    });
+    fireEvent.click(screen.getByLabelText("Anything hits hull"));
+
+    expect(sentPiece()).toEqual(["hull", { hit: false, volume }]);
+  });
+
+  /** Null is the absence of the key, so the piece goes back to being measured
+   *  rather than storing a copy of what was measured. */
+  it("hands a piece back to its measured box on request", () => {
+    const project = unit({ pieceCollision: true });
+    show({
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === "hull" ? { ...piece, collision: { hit: false } } : piece,
+      ),
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use the measured box" }),
+    );
+
+    expect(onPieceVolumeChange).toHaveBeenCalledWith("hull", null);
+  });
+
+  it("says the fields reach nothing while neither piece switch is on", () => {
+    show(unit());
+    expect(
+      screen.getByText(/the engine never looks at a piece's box/),
+    ).toBeTruthy();
+  });
+
+  it("says nothing of the sort once the unit is hit piece by piece", () => {
+    show(unit({ pieceCollision: true }));
+    expect(
+      screen.queryByText(/the engine never looks at a piece's box/),
+    ).toBeNull();
+  });
+
+  /**
+   * A script taken over before any of this existed has no include line, and an
+   * export will never add one to a script the user owns. So the file would be
+   * written and never read, silently. The only fix is a line the user adds.
+   */
+  it("says so when an owned script does not pull the file in", () => {
+    const project = unit({ pieceCollision: true, script: "-- mine\n" });
+    show({
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === "hull" ? { ...piece, collision: { hit: false } } : piece,
+      ),
+    });
+
+    expect(screen.getByText(/does not pull the file in/)).toBeTruthy();
+    expect(
+      screen.getByText('include("coilbox/walker_collision.lua")'),
+    ).toBeTruthy();
+  });
+
+  it("says nothing of the sort about a script that does pull it in", () => {
+    const project = unit({
+      pieceCollision: true,
+      script: '-- mine\ninclude("coilbox/walker_collision.lua")\n',
+    });
+    show({
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === "hull" ? { ...piece, collision: { hit: false } } : piece,
+      ),
+    });
+
+    expect(screen.queryByText(/does not pull the file in/)).toBeNull();
   });
 });

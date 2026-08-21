@@ -1840,13 +1840,17 @@ function showCollisionVolume(
 }
 
 /**
- * Draw the box the engine will put round each piece, or take them away again.
+ * Draw the box the engine will hit on each piece, or take them away again.
  *
- * These are a reading and nothing else: nothing in a model or a unit definition
- * declares them, the engine measures one off every piece's vertices as it loads
- * the model, and the unit definition only chooses whether to hit them. Drawing
- * them is the only way to see what a shot will meet before the unit is in a
- * game.
+ * Mostly a reading: nothing in a model or a unit definition declares these, the
+ * engine measures one off every piece's vertices as it loads the model, and the
+ * unit definition only chooses whether to hit them. Drawing them is the only way
+ * to see what a shot will meet before the unit is in a game.
+ *
+ * A piece given a box of its own draws that one instead, and a piece switched
+ * out of the hit test draws nothing, because nothing is what it will stop. Both
+ * come out of `pieceCollisionVolumes`, so the shape on screen is the shape the
+ * generated collision file sets. See `pieceCollisionScript.ts`.
  *
  * A null project means "not showing", which covers both the toggle being off
  * and the unit not asking for piece collision.
@@ -1862,7 +1866,11 @@ function showPieceCollisionVolumes(
 
   const { pieces } = bakedPieces(project, pack, raw);
   const group = new THREE.Group();
-  for (const { origin, volume } of pieceCollisionVolumes(project, pieces)) {
+  for (const { origin, volume, hit } of pieceCollisionVolumes(
+    project,
+    pieces,
+  )) {
+    if (!hit) continue;
     const lines = new THREE.LineSegments(
       collisionWireframe(volume),
       state.pieceCollisionMaterial,
@@ -1872,7 +1880,10 @@ function showPieceCollisionVolumes(
       origin[1] + volume.offsets[1],
       origin[2] + volume.offsets[2],
     );
-    lines.scale.set(...volume.scales);
+    // What the engine will build rather than what was typed, the same way the
+    // unit volume is drawn: `FixTypeAndScale` makes a sphere uniform and a
+    // cylinder round whatever the numbers say.
+    lines.scale.set(...engineScales(volume));
     lines.renderOrder = 4;
     lines.raycast = () => {};
     group.add(lines);
