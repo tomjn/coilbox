@@ -25,14 +25,19 @@ use std::path::Path;
 /// written before it has no way to answer.
 /// v6: the icon is a PNG file named by the record rather than base64 inside it
 /// (#1694), and a record written before it holds the icon nowhere else.
-const BUILDPIC_CACHE_VERSION: u32 = 6;
+/// v7: `.pcx` is a candidate and decodes, so every unit a game like Expand and
+/// Exterminate ships one for is cached as having no build pic at all.
+const BUILDPIC_CACHE_VERSION: u32 = 7;
 
 /// Read up to this many bytes of a candidate texture before decoding (build pics
 /// are tiny; this is a generous safety bound).
 const BUILDPIC_READ_CAP: usize = 8 * 1024 * 1024;
 
-/// Extensions tried under `unitpics/`, in the engine's resolution order.
-const BUILDPIC_EXTS: &[&str] = &["dds", "png", "tga", "bmp"];
+/// Extensions tried under `unitpics/`, in the engine's resolution order. The
+/// engine's own chain is `dds`, `png`, `pcx`, `bmp` (`UnitDrawerData.cpp`).
+/// `tga` is coilbox's extra, since an explicit `buildpic` can name one and the
+/// engine reads it through DevIL like the rest.
+const BUILDPIC_EXTS: &[&str] = &["dds", "png", "pcx", "tga", "bmp"];
 
 /// Legacy `.fbi` unit files are small TDF text; cap the read generously.
 const FBI_READ_CAP: usize = 256 * 1024;
@@ -896,6 +901,16 @@ mod tests {
         let c = candidate_members("armcom", "");
         assert_eq!(c[0], "unitpics/armcom.dds");
         assert!(c.contains(&"unitpics/armcom.png".to_string()));
+    }
+
+    /// The engine tries `.pcx` after `.png` and before `.bmp`, and games like
+    /// Expand and Exterminate ship every build pic that way.
+    #[test]
+    fn candidates_try_pcx_where_the_engine_does() {
+        let c = candidate_members("alienaaa", "");
+        let at = |ext: &str| c.iter().position(|m| m.ends_with(ext)).expect(ext);
+        assert!(c.contains(&"unitpics/alienaaa.pcx".to_string()));
+        assert!(at(".png") < at(".pcx") && at(".pcx") < at(".bmp"));
     }
 
     #[test]
