@@ -1,0 +1,63 @@
+{
+  "note": "What coilbox reads out of a game's unitdefs and sends to the hub as a unit's stats (issue #1876). Documentation, not an agreement: the hub stores stats as schemaless JSON and validates nothing about them beyond their size, so nothing vendors this file or digests it. The reader is crates/coilbox-unitsync-worker/src/dataset.rs, in the Lua shim it runs over gamedata/defs.lua.",
+  "absentMeansAbsent": "A key is written only where the unitdef declares the field it comes from. A def that says nothing gets no key, never a zero: zero is a claim about the game and absence is a fact about the reader.",
+  "caseFolding": "A def's keys arrive in whatever case its author typed. A Lua unitdef keeps them as written, a legacy .fbi arrives lowercased from the TDF parser, and the engine's own lookups ignore the difference, so the shim indexes every def by lowercased key before it reads one. The `from` names below are spelled the way the engine spells them.",
+  "maxStatsJson": 8192,
+  "unit": {
+    "health": {
+      "from": ["health", "maxDamage"],
+      "unit": "hit points"
+    },
+    "metalCost": {
+      "from": ["metalCost", "buildCostMetal"],
+      "unit": "metal"
+    },
+    "energyCost": {
+      "from": ["energyCost", "buildCostEnergy"],
+      "unit": "energy"
+    },
+    "buildTime": {
+      "from": ["buildTime"],
+      "unit": "build time"
+    },
+    "sightDistance": {
+      "from": ["sightDistance"],
+      "unit": "elmos"
+    },
+    "maxVelocity": {
+      "from": ["speed", "maxVelocity"],
+      "unit": "elmos per second",
+      "note": "Modern `speed` is elmos a second and legacy `maxVelocity` is elmos a frame, so a legacy value is multiplied by the 30 frames the engine runs a second, which is the conversion the engine itself does. Reporting the two as written would stand two units in one encyclopedia thirty times apart."
+    },
+    "range": {
+      "from": ["weapons[].range"],
+      "unit": "elmos",
+      "note": "The longest range among the unit's weapons. Derived rather than declared, because a unitdef has no range of its own, and derived the way the engine derives maxWeaponRange. A unit with no weapon that declares a range has no key."
+    },
+    "weapons": {
+      "from": ["weapons[]"],
+      "unit": null,
+      "note": "An array of objects, one per weapon the unitdef's `weapons` list names, in the order it names them, capped at the 32 the engine reads. A weapon whose name resolves to no weapondef, or whose weapondef declares none of the four fields below, is left out. The hub renders a nested value as compact JSON, so this shows raw on a unit page until it grows a renderer for it."
+    }
+  },
+  "weapon": {
+    "damage": {
+      "from": ["damage.default", "damage.*"],
+      "unit": "hit points",
+      "note": "A weapondef's `damage` is a table keyed by armour class. The default is what a unit page shows; a game that names every class and declares no default gets the largest of them."
+    },
+    "reload": {
+      "from": ["reloadTime"],
+      "unit": "seconds"
+    },
+    "range": {
+      "from": ["range"],
+      "unit": "elmos"
+    },
+    "projectile": {
+      "from": ["weaponType"],
+      "unit": null,
+      "note": "The engine's own name for the projectile the weapon fires: Cannon, BeamLaser, MissileLauncher, StarburstLauncher, TorpedoLauncher, LaserCannon, LightningCannon, EmgCannon, Flame, AircraftBomb, DGun, Melee, Rifle, Shield. A def that declares none has one worked out for it by the engine's own weapondefs_post before this is read."
+    }
+  }
+}
