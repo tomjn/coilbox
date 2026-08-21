@@ -69,11 +69,13 @@ const ANSWER_LIMIT: usize = 1024 * 1024;
 const MAX_BYTES: usize = 2_000_000;
 const MAX_UNITS: usize = 2_000;
 const MAX_START_UNITS: usize = 64;
+const MAX_FACTIONS: usize = 64;
 const MAX_SHORTNAME: usize = 64;
 const MAX_RELEASE: usize = 64;
 const MAX_UNIT_NAME: usize = 128;
 const MAX_FULL_NAME: usize = 256;
 const MAX_FACTION_KEY: usize = 128;
+const MAX_FACTION_NAME: usize = 256;
 const MAX_BUILD_OPTION: usize = 128;
 
 /// One unit as the game declares it.
@@ -105,6 +107,17 @@ pub struct GameUnitFacts {
     pub stats: Map<String, Value>,
 }
 
+/// One faction, as the game's modinfo spells it (issue #1878).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GameFaction {
+    /// What a unit's `faction_key` points at. The hub joins the two character
+    /// for character and normalises nothing beyond trimming, so the caller owns
+    /// the agreement between them.
+    pub key: String,
+    /// The name a player sees, in the game's own spelling.
+    pub name: String,
+}
+
 /// One whole game, as the webview read it off the archive.
 ///
 /// No `complete` and no envelope: both are this module's to decide, and
@@ -123,6 +136,12 @@ pub struct GameFacts {
     /// graph the faction keys came from.
     #[serde(default)]
     pub start_units: Vec<String>,
+    /// Every faction the game has. Sending them replaces the set the hub holds
+    /// for this game, so `None` and an empty list say different things: nothing
+    /// about the factions, against this game having none. A caller that could
+    /// not read the sides sends `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub factions: Option<Vec<GameFaction>>,
     pub units: Vec<GameUnitFacts>,
 }
 
@@ -195,7 +214,7 @@ pub async fn publish_game_facts(
 /// is the only one of these the hub measures in the same units.
 fn check_and_build(game: &GameFacts) -> Result<String, String> {
     check_game(game)?;
-    let body = serde_json::json!({
+    let mut built = serde_json::json!({
         "format": SUBMIT_FORMAT,
         "version": SUBMIT_VERSION,
         "shortname": game.shortname.trim(),
@@ -204,8 +223,13 @@ fn check_and_build(game: &GameFacts) -> Result<String, String> {
         "complete": true,
         "startUnits": game.start_units,
         "units": game.units,
-    })
-    .to_string();
+    });
+    // Absent rather than null, because the hub reads both as "say nothing" and
+    // absent is the one that does not depend on it carrying on doing so.
+    if let Some(factions) = &game.factions {
+        built["factions"] = serde_json::json!(factions);
+    }
+    let body = built.to_string();
     if body.len() > MAX_BYTES {
         return Err(format!(
             "{}'s units come to {} bytes and the hub takes at most {MAX_BYTES} in one request.",
@@ -246,6 +270,24 @@ fn check_game(game: &GameFacts) -> Result<(), String> {
     }
     for start in &game.start_units {
         text("a start unit", start, MAX_UNIT_NAME)?;
+    }
+
+    if let Some(factions) = &game.factions {
+        if factions.len() > MAX_FACTIONS {
+            return Err(format!(
+                "{} declares {} factions and the hub takes at most {MAX_FACTIONS}.",
+                game.shortname.trim(),
+                factions.len()
+            ));
+        }
+        for faction in factions {
+            text("a faction key", &faction.key, MAX_FACTION_KEY)?;
+            text(
+                &format!("{}'s name", faction.key),
+                &faction.name,
+                MAX_FACTION_NAME,
+            )?;
+        }
     }
 
     for unit in &game.units {
@@ -324,11 +366,22 @@ mod tests {
         }
     }
 
+    fn faction(key: &str, name: &str) -> GameFaction {
+        GameFaction {
+            key: key.into(),
+            name: name.into(),
+        }
+    }
+
     fn game() -> GameFacts {
         GameFacts {
             shortname: "BA".into(),
             release: "12.24".into(),
             start_units: vec!["armcom".into(), "corcom".into()],
+            factions: Some(vec![
+                faction("armada", "Armada"),
+                faction("cortex", "Cortex"),
+            ]),
             units: vec![unit("armcom"), unit("corcom")],
         }
     }
@@ -351,6 +404,13 @@ mod tests {
         assert_eq!(sent["shortname"], "BA");
         assert_eq!(sent["release"], "12.24");
         assert_eq!(sent["startUnits"], serde_json::json!(["armcom", "corcom"]));
+        assert_eq!(
+            sent["factions"],
+            serde_json::json!([
+                { "key": "armada", "name": "Armada" },
+                { "key": "cortex", "name": "Cortex" },
+            ])
+        );
         assert_eq!(sent["units"][0]["name"], "armcom");
         assert_eq!(sent["units"][0]["fullName"], "The armcom");
         assert_eq!(sent["units"][0]["factionKey"], "armada");
@@ -370,6 +430,7 @@ mod tests {
             fields,
             vec![
                 "complete",
+                "factions",
                 "format",
                 "release",
                 "shortname",
@@ -385,6 +446,50 @@ mod tests {
             unit_fields,
             vec!["buildOptions", "factionKey", "fullName", "name", "stats"]
         );
+
+        let mut faction_fields: Vec<&String> =
+            sent["factions"][0].as_object().unwrap().keys().collect();
+        faction_fields.sort();
+        assert_eq!(faction_fields, vec!["key", "name"]);
+    }
+
+    /// The hub reads a missing `factions` and a null one the same way, and both
+    /// leave the set it holds alone. Absent is the one that stays true if it
+    /// ever stops reading null that way.
+    #[test]
+    fn a_game_whose_sides_could_not_be_read_says_nothing_about_its_factions() {
+        let sent: Value = serde_json::from_str(
+            &check_and_build(&GameFacts {
+                factions: None,
+                ..game()
+            })
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert!(sent.get("factions").is_none());
+    }
+
+    /// A faction key is only worth anything if a unit points at it, and the hub
+    /// joins the two verbatim. Nothing here rewrites either.
+    #[test]
+    fn a_faction_key_travels_exactly_as_the_unit_spells_it() {
+        let sent: Value = serde_json::from_str(
+            &check_and_build(&GameFacts {
+                factions: Some(vec![faction("legião", "Legião")]),
+                units: vec![GameUnitFacts {
+                    faction_key: Some("legião".into()),
+                    ..unit("legcom")
+                }],
+                ..game()
+            })
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(sent["factions"][0]["key"], "legião");
+        assert_eq!(sent["factions"][0]["name"], "Legião");
+        assert_eq!(sent["units"][0]["factionKey"], "legião");
     }
 
     /// The hub computes the digest over the normalised entry, and a declared one
@@ -507,6 +612,34 @@ mod tests {
             .collect();
         let refused = check_game(&GameFacts { units, ..game() }).unwrap_err();
         assert!(refused.contains("at most 2000"), "{refused}");
+    }
+
+    /// The hub answers 413 for the whole game past this, which would say nothing
+    /// about which game.
+    #[test]
+    fn a_game_past_the_faction_cap_is_refused_before_it_is_sent() {
+        let factions: Vec<GameFaction> = (0..MAX_FACTIONS + 1)
+            .map(|n| faction(&format!("side{n}"), &format!("Side {n}")))
+            .collect();
+        let refused = check_game(&GameFacts {
+            factions: Some(factions),
+            ..game()
+        })
+        .unwrap_err();
+        assert!(refused.contains("at most 64"), "{refused}");
+    }
+
+    /// Named by the key, which is the half of the pair somebody can find in the
+    /// modinfo.
+    #[test]
+    fn an_overlong_faction_name_is_refused_by_the_key_that_carries_it() {
+        let refused = check_game(&GameFacts {
+            factions: Some(vec![faction("armada", &"x".repeat(MAX_FACTION_NAME + 1))]),
+            ..game()
+        })
+        .unwrap_err();
+        assert!(refused.contains("armada"), "{refused}");
+        assert!(refused.contains("name"), "{refused}");
     }
 
     /// The byte cap, measured on the finished body because that is what the hub
@@ -753,6 +886,10 @@ mod tests {
             shortname: "CBTEST".into(),
             release: "1.0".into(),
             start_units: vec!["armcom".into(), "corcom".into()],
+            factions: Some(vec![
+                faction("armada", "Armada"),
+                faction("cortex", "Cortex"),
+            ]),
             units: vec![
                 GameUnitFacts {
                     build_options: vec!["armlab".into()],

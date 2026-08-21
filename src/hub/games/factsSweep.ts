@@ -7,6 +7,7 @@ import {
 import { isSddName } from "@/content/format";
 import { buildTechForest } from "@/content/techForest";
 import {
+  type GameFaction,
   type GameFacts,
   type GameFactsResult,
   type GameUnitFacts,
@@ -181,13 +182,54 @@ export function gamesToSend(games: readonly GameItem[]): {
 }
 
 /**
+ * The key the hub joins a unit to its faction on.
+ *
+ * One expression, called from both the places that need it, because a unit's
+ * `factionKey` and the `factions[].key` it points at have to agree character for
+ * character or the hub's join finds nothing. Two of these that happen to agree
+ * today would drift apart the first time either changed.
+ */
+function keyOf(side: Side): string {
+  return side.name.trim().toLowerCase();
+}
+
+/**
+ * The sides that are factions: a name to call one and a start unit to reach its
+ * units from. A side missing either contributes nothing, which is what
+ * `UnitPicker` asks of a side too.
+ */
+function rootedSides(sides: readonly Side[]): (Side & { startUnit: string })[] {
+  return sides.filter(
+    (side): side is Side & { startUnit: string } =>
+      !!side.startUnit?.trim() && !!side.name?.trim(),
+  );
+}
+
+/**
+ * The factions this game has, in the order its modinfo lists them (issue #1878).
+ *
+ * The name is the modinfo spelling with nothing done to it but a trim, because
+ * it is what the game calls the faction and the hub prints it as it arrives.
+ * Two sides whose names lowercase to one key are one faction, keeping the first
+ * spelling: sending the key twice would be the same row written twice.
+ *
+ * Exported for its own test.
+ */
+export function gameFactions(sides: readonly Side[]): GameFaction[] {
+  const factions = new Map<string, GameFaction>();
+  for (const side of rootedSides(sides)) {
+    const key = keyOf(side);
+    if (!factions.has(key)) factions.set(key, { key, name: side.name.trim() });
+  }
+  return [...factions.values()];
+}
+
+/**
  * Which faction reaches each unit, by the key the hub joins on.
  *
  * The forest is built over the whole dataset from every side's start unit at
  * once, which is what `UnitPicker` does, so a unit two factions can build is
- * attributed to whichever side comes first rather than appearing twice. The key
- * is the side's name lowercased, which is the spelling issue #1878 will file the
- * factions themselves under.
+ * attributed to whichever side comes first rather than appearing twice.
  *
  * Exported for its own test.
  */
@@ -195,10 +237,7 @@ export function factionKeys(
   units: readonly UnitDatasetEntry[],
   sides: readonly Side[],
 ): Map<string, string> {
-  const rooted = sides.filter(
-    (side): side is Side & { startUnit: string } =>
-      !!side.startUnit?.trim() && !!side.name?.trim(),
-  );
+  const rooted = rootedSides(sides);
   const forest = buildTechForest(
     [...units],
     rooted.map((side) => side.startUnit),
@@ -210,8 +249,7 @@ export function factionKeys(
   const sideOfRoot = new Map<string, string>();
   for (const side of rooted) {
     const root = side.startUnit.toLowerCase();
-    if (!sideOfRoot.has(root))
-      sideOfRoot.set(root, side.name.trim().toLowerCase());
+    if (!sideOfRoot.has(root)) sideOfRoot.set(root, keyOf(side));
   }
 
   const keys = new Map<string, string>();
@@ -223,19 +261,28 @@ export function factionKeys(
   return keys;
 }
 
-/** The units and start units of one game, ready to send. */
+/** The factions, units and start units of one game, ready to send. */
 function factsFor(
   { shortname, release }: Sendable,
   units: readonly UnitDatasetEntry[],
   sides: readonly Side[],
 ): GameFacts {
   const keys = factionKeys(units, sides);
+
+  // A game whose sides did not read is a game with nothing to say about its
+  // factions, and the field is left off rather than sent empty. Sending it empty
+  // would retire the ones the hub holds, which is what a game that really did
+  // lose all of its factions looks like, and no read failure should be able to
+  // claim that.
+  const factions = gameFactions(sides);
+
   return {
     shortname,
     release,
     startUnits: sides
       .map((side) => side.startUnit?.trim())
       .filter((start): start is string => !!start),
+    ...(factions.length > 0 ? { factions } : {}),
     units: units.map((unit): GameUnitFacts => {
       const key = keys.get(unit.name.toLowerCase());
       return {
@@ -343,7 +390,8 @@ export async function sweepGameFacts(
  * What to tell somebody a sweep did, in one sentence.
  *
  * The counts a person can act on are the games the hub would not take and the
- * units inside a game it would not take. Everything else is the hub deciding
+ * factions and units inside a game it would not take. Everything else is the
+ * hub deciding
  * about facts it already holds, which nobody can do anything with.
  */
 export function gameSweepSummary(report: GameSweepReport): string {
@@ -359,8 +407,16 @@ export function gameSweepSummary(report: GameSweepReport): string {
     return `${sent} The hub would not take ${would}.`;
   }
   if (report.refused.length > 0) {
-    const units = report.refused.length === 1 ? "unit" : "units";
-    return `${sent} It would not take ${report.refused.length} ${units}.`;
+    // A result names the list it came from, so a refused faction is not reported
+    // as a refused unit. They are fixed in different places.
+    const counted = ([one, many]: [string, string]) => {
+      const how = report.refused.filter((r) => r.kind === one).length;
+      return how === 0 ? "" : `${how} ${how === 1 ? one : many}`;
+    };
+    const said = [counted(["unit", "units"]), counted(["faction", "factions"])]
+      .filter(Boolean)
+      .join(" and ");
+    return `${sent} It would not take ${said}.`;
   }
   return sent;
 }
