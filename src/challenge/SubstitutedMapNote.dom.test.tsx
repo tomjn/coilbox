@@ -89,7 +89,7 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   <DownloadQueueProvider>{children}</DownloadQueueProvider>
 );
 
-const renderNote = (original: string | undefined, onRestore?: () => void) =>
+const renderNote = (original: string | undefined, onRestore = () => {}) =>
   render(<SubstitutedMapNote original={original} onRestore={onRestore} />, {
     wrapper,
   });
@@ -144,18 +144,6 @@ describe("the substituted map note", () => {
     expect(noteText()).toContain(
       "You have this map, but it is hidden from warpath and galactic conquest.",
     );
-    expect(screen.queryByRole("button")).toBeNull();
-  });
-
-  it("says a map has since been installed where nothing can act on it", () => {
-    scan.data = { maps: [{ name: "Nowhere Atoll" }] };
-    renderNote("Nowhere Atoll");
-
-    // "Not available here" has stopped being true, so it stops being said.
-    expect(noteText()).toContain(
-      "You have that map now, but this battle keeps the stand-in.",
-    );
-    expect(noteText()).not.toContain("not available here");
     expect(screen.queryByRole("button")).toBeNull();
   });
 

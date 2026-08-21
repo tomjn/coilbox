@@ -210,7 +210,8 @@ function Row({
   value: string;
   /** The map this encounter should have used, when it is on a stand-in. */
   note?: string;
-  /** Move the encounter onto `note`, once this install can offer it. */
+  /** Move the encounter onto `note`, once this install can offer it. Only the
+   * battlefield row has one, so only that row can carry a note. */
   onRestoreNote?: () => Promise<void>;
 }) {
   return (
@@ -220,7 +221,9 @@ function Row({
       </dt>
       <dd className="min-w-0 text-right">
         <span className="block truncate">{value}</span>
-        <SubstitutedMapNote original={note} onRestore={onRestoreNote} />
+        {onRestoreNote && (
+          <SubstitutedMapNote original={note} onRestore={onRestoreNote} />
+        )}
       </dd>
     </div>
   );

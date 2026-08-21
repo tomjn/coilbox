@@ -29,8 +29,8 @@ import { usePreferredTarget } from "@/play/config";
  * is how it ends (issue #1834). Never on its own: a map turning up is not a
  * reason to move a battle somebody has already fought around, so the swap
  * happens when it is asked for. Pressing Download here is that asking, so the
- * swap follows the download it started. A map that arrived some other way gets
- * a button instead.
+ * swap follows the download it started. A map that arrived some other way, from
+ * a download elsewhere or from being un-hidden in Content, gets a button.
  */
 export function SubstitutedMapNote({
   original,
@@ -40,11 +40,10 @@ export function SubstitutedMapNote({
   /** The map the challenge names. Nothing renders without one. */
   original: string | undefined;
   className?: string;
-  /**
-   * Move this node onto `original`, for a surface that can write the change
-   * back. Without it the note only reports, and says so.
-   */
-  onRestore?: () => void | Promise<void>;
+  /** Move this node onto `original`. Required: every surface this note appears
+   * on can write the change back, and one that could not would be reporting a
+   * problem it offers no way out of. */
+  onRestore: () => void | Promise<void>;
 }) {
   if (!original) return null;
   return (
@@ -64,7 +63,7 @@ function SubstitutedMap({
 }: {
   original: string;
   className?: string;
-  onRestore?: () => void | Promise<void>;
+  onRestore: () => void | Promise<void>;
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -91,7 +90,6 @@ function SubstitutedMap({
   const [restoring, setRestoring] = useState(false);
 
   const restore = async () => {
-    if (!onRestore) return;
     setRestoring(true);
     try {
       await onRestore();
@@ -117,12 +115,10 @@ function SubstitutedMap({
     <div className={cn("text-[10px] text-muted-foreground", className)}>
       <span className="block">
         {arrived
-          ? onRestore
-            ? `Stands in for ${original}, which you now have.`
-            : `Stands in for ${original}. You have that map now, but this battle keeps the stand-in.`
+          ? `Stands in for ${original}, which you now have.`
           : `Stands in for ${original}, which is not available here.`}
       </span>
-      {arrived && onRestore && (
+      {arrived && (
         <Button
           size="sm"
           variant="outline"
