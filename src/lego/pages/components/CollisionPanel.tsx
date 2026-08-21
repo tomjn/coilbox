@@ -28,11 +28,13 @@ import {
 import type {
   CollisionVolumeType,
   LegoCollisionVolume,
+  LegoPieceCollision,
   LegoProject,
 } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
 import { unitBounds } from "../../s3oBuild";
+import { PieceCollisionFields } from "./PieceCollisionFields";
 import { Vec3Row } from "./TransformFields";
 
 interface Props {
@@ -44,6 +46,14 @@ interface Props {
   onChange: (volume: LegoCollisionVolume | null) => void;
   onPieceCollisionChange: (on: boolean) => void;
   onPieceSelectionChange: (on: boolean) => void;
+  /** The piece the per-piece fields at the bottom edit. */
+  selectedId: string | null;
+  onSelectPiece: (pieceId: string) => void;
+  /** Null puts that piece back on the box the engine measures for it. */
+  onPieceVolumeChange: (
+    pieceId: string,
+    collision: LegoPieceCollision | null,
+  ) => void;
 }
 
 export function CollisionPanel({
@@ -53,6 +63,9 @@ export function CollisionPanel({
   onChange,
   onPieceCollisionChange,
   onPieceSelectionChange,
+  selectedId,
+  onSelectPiece,
+  onPieceVolumeChange,
 }: Props) {
   // Every vertex in the unit, so not on every keystroke elsewhere in the page.
   const bounds = useMemo(
@@ -197,8 +210,9 @@ export function CollisionPanel({
       </p>
 
       <p className="text-xs text-muted-foreground">
-        There is nothing to set per piece either way. Turn a switch on and the
-        viewport draws the boxes the engine will build.
+        Turn a switch on and the viewport draws the boxes the engine will build.
+        A piece whose box is the wrong answer can be given another one, or taken
+        out of the hit test entirely, below.
       </p>
 
       {project.pieceCollision || project.pieceSelection ? (
@@ -209,6 +223,15 @@ export function CollisionPanel({
             : "It is still what you click to select the unit, and it is the sphere an explosion measures to decide whether the unit was caught."}
         </p>
       ) : null}
+
+      <PieceCollisionFields
+        project={project}
+        pack={pack}
+        raw={raw}
+        selectedId={selectedId}
+        onSelect={onSelectPiece}
+        onChange={onPieceVolumeChange}
+      />
     </div>
   );
 }
