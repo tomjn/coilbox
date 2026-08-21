@@ -1,7 +1,8 @@
 import type { SkirmishDraft } from "@/play/drafts";
 import { standardAi } from "@/play/gameAi";
+import { sparseOptions } from "@/play/modOptions";
 import { PALETTE, type Participant, RANDOM_SIDE } from "@/play/participants";
-import type { DemoInfo, Side, SkirmishAi } from "./bindings";
+import type { ConfigOption, DemoInfo, Side, SkirmishAi } from "./bindings";
 
 /**
  * Convert a decoded replay (`DemoInfo`) into a launchable `SkirmishDraft`, so a
@@ -17,6 +18,15 @@ import type { DemoInfo, Side, SkirmishAi } from "./bindings";
  * the draft stays launchable. The player can flip off spectating and take a seat
  * from the Skirmish page afterwards.
  *
+ * The options are the match's, minus anything that is only the target game's own
+ * default (#1838). A replay's start script lists every option the match was
+ * given and records nothing about which of them a player chose, while
+ * `modOptionValues` is the "changed away from the default" map everywhere else,
+ * so copying the block wholesale saved a preset that pinned 36 of
+ * SplinterFaction's 38 defaults and showed every option as changed. Refighting
+ * is unaffected, because `toBattleConfig` fills the gaps back in from the same
+ * option list and the start script comes out identical either way.
+ *
  * Pure and testable: the caller resolves the target game's sides/AI list
  * first (see `useRefightSetup`), and supplies which AI fills every converted
  * player slot. Returns `null` for a roster with no seated players (spectator-
@@ -31,11 +41,16 @@ export function demoInfoToSkirmishDraft(opts: {
    * (an empty list means "not known yet" — recorded sides are kept as-is and
    * healed later once the Skirmish page's own sides load). */
   sides: Side[];
+  /** The target game's declared options, to tell what the match changed from
+   * what the game itself chose. Required rather than optional, so that a new
+   * caller cannot quietly go back to storing the whole block. An empty list
+   * means "not known yet" and keeps everything. */
+  options: ConfigOption[];
   /** AI reference to fill every converted player slot. Falls back to a
    * sensible default (skips do-nothing test bots) when omitted or unresolved. */
   ai?: Participant["ai"];
 }): SkirmishDraft | null {
-  const { info, ais, sides, ai } = opts;
+  const { info, ais, sides, options, ai } = opts;
   const fallback = standardAi(ais);
   const chosenAi: Participant["ai"] | undefined =
     ai ??
@@ -109,7 +124,7 @@ export function demoInfoToSkirmishDraft(opts: {
     gameName: info.gameType,
     mapName: info.mapName,
     startPosType: info.startPosType ?? 0,
-    modOptionValues: { ...info.modOptions },
+    modOptionValues: sparseOptions(options, info.modOptions),
   };
 }
 

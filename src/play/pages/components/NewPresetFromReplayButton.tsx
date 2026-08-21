@@ -74,6 +74,8 @@ function ReplayPickerForm({
     missingGame,
     missingMap,
     sides,
+    options,
+    optionsLoading,
     ais,
     scanLoading,
   } = useRefightSetup(info);
@@ -106,9 +108,11 @@ function ReplayPickerForm({
   }));
 
   const draft: SkirmishDraft | null = info
-    ? demoInfoToSkirmishDraft({ info, ais, sides, ai: chosenAi() })
+    ? demoInfoToSkirmishDraft({ info, ais, sides, options, ai: chosenAi() })
     : null;
-  const ready = !!replayPath && !infoLoading && !scanLoading;
+  // The preset stores only what the match changed, so it waits for the game's
+  // option list as well as for the replay and the content scan (#1838).
+  const ready = !!replayPath && !infoLoading && !scanLoading && !optionsLoading;
   const canSave = !!draft && !!name.trim() && !missingGame && !missingMap;
 
   const save = () => {
@@ -142,7 +146,7 @@ function ReplayPickerForm({
         )}
       </div>
 
-      {replayPath && (infoLoading || scanLoading) && (
+      {replayPath && (infoLoading || scanLoading || optionsLoading) && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" /> Reading replay…
         </div>

@@ -87,6 +87,8 @@ function RefightForm({
     missingGame,
     missingMap,
     sides,
+    options,
+    optionsLoading,
     ais,
   } = useRefightSetup(info);
   const { running, launch } = usePlay();
@@ -109,7 +111,7 @@ function RefightForm({
   }, [aiKey, ais]);
 
   const getDraft = (): SkirmishDraft | null =>
-    demoInfoToSkirmishDraft({ info, ais, sides, ai: chosenAi });
+    demoInfoToSkirmishDraft({ info, ais, sides, options, ai: chosenAi });
 
   if (scanLoading) {
     return (
@@ -264,7 +266,10 @@ function RefightForm({
         <SaveAsPresetButton
           getDraft={getDraft}
           defaultName={`Refight: ${info.mapName}`}
-          disabled={pending}
+          // A preset stores only what the match changed, which needs the game's
+          // option list to compare against. Refighting now does not, because it
+          // sends the match's values whatever they are.
+          disabled={pending || optionsLoading}
           variant="outline"
         />
       </div>
