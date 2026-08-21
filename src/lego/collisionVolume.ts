@@ -23,8 +23,8 @@
  */
 
 import {
-  childrenOf,
   type CollisionVolumeType,
+  childrenOf,
   type LegoCollisionVolume,
   type LegoProject,
   pieceById,

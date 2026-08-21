@@ -238,7 +238,10 @@ describe("buildUnitDef", () => {
   });
 
   it("asks for piece collision only when the unit wants it", () => {
-    const off = buildUnitDef(project("Probe", "probe"), bounds({ x: 40, z: 8 }));
+    const off = buildUnitDef(
+      project("Probe", "probe"),
+      bounds({ x: 40, z: 8 }),
+    );
     const on = buildUnitDef(
       { ...project("Probe", "probe"), pieceCollision: true },
       bounds({ x: 40, z: 8 }),

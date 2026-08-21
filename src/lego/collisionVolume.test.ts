@@ -215,10 +215,14 @@ describe("pieceCollisionVolume", () => {
   it("boxes a piece's own vertices, centred on them", () => {
     expect(
       pieceCollisionVolume(
-        baked("hull", [0, 0, 0], [
-          [-4, 0, -10],
-          [6, 8, 10],
-        ]),
+        baked(
+          "hull",
+          [0, 0, 0],
+          [
+            [-4, 0, -10],
+            [6, 8, 10],
+          ],
+        ),
       ),
     ).toEqual({ type: "box", scales: [10, 8, 20], offsets: [1, 4, 0] });
   });
@@ -237,10 +241,14 @@ describe("pieceCollisionVolume", () => {
   it("holds a flat piece open to an elmo, as InitShape does", () => {
     expect(
       pieceCollisionVolume(
-        baked("plate", [0, 0, 0], [
-          [-8, 0, -8],
-          [8, 0.2, 8],
-        ]),
+        baked(
+          "plate",
+          [0, 0, 0],
+          [
+            [-8, 0, -8],
+            [8, 0.2, 8],
+          ],
+        ),
       ).scales,
     ).toEqual([16, 1, 16]);
   });
@@ -293,10 +301,14 @@ describe("pieceCollisionVolumes", () => {
       new Map([
         [
           "base",
-          baked("base", [0, 40, 0], [
-            [-2, -2, -2],
-            [2, 2, 2],
-          ]),
+          baked(
+            "base",
+            [0, 40, 0],
+            [
+              [-2, -2, -2],
+              [2, 2, 2],
+            ],
+          ),
         ],
       ]),
     );
