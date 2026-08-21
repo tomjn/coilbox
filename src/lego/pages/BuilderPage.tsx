@@ -1163,6 +1163,15 @@ function Builder({ id }: { id: string | undefined }) {
                       return rest;
                     })
                   }
+                  onPieceCollisionChange={(on) =>
+                    edit((project) => {
+                      if (on) return { ...project, pieceCollision: true };
+                      // Off is the engine's own default, so it is the absence
+                      // of the key rather than a stored false.
+                      const { pieceCollision: _off, ...rest } = project;
+                      return rest;
+                    })
+                  }
                 />
               ) : aside === "animation" ? (
                 <AnimationPanel

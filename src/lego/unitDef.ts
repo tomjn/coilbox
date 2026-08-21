@@ -98,6 +98,13 @@ export function luaString(value: string): string {
  * subtable beside it: that one reads `type` as a number, so a shape named
  * there as a string quietly becomes a sphere. What goes in them is
  * `collisionVolume.ts`.
+ *
+ * They are written whether or not the unit is hit piece by piece, because the
+ * volume still has three jobs when it is not hitting anything.
+ * `ParseSelectionVolume` falls back to these keys, so this is still the shape
+ * you click; `QuadField::GetUnitsAndFeaturesExact` measures its bounding
+ * radius, so this is still what an explosion catches; and it is still the
+ * shape of any unit whose owner turns piece collision back off.
  */
 export function buildUnitDef(project: LegoProject, bounds: UnitBounds): string {
   const footprintx = footprintSteps(bounds.sizeX);
@@ -117,6 +124,12 @@ export function buildUnitDef(project: LegoProject, bounds: UnitBounds): string {
     ["collisionvolumetype", luaString(volume.type)],
     ["collisionvolumescales", luaString(luaFloat3(volume.scales))],
     ["collisionvolumeoffsets", luaString(luaFloat3(volume.offsets))],
+    // Only written when it is on. The engine's default is false, and a unit
+    // that has never asked for piece collision should not carry a line saying
+    // it does not want it.
+    ...(project.pieceCollision
+      ? ([["usepiececollisionvolumes", "true"]] as [string, string][])
+      : []),
     ["maxdamage", String(DEFAULT_MAX_DAMAGE)],
     ["canmove", "false"],
   ];

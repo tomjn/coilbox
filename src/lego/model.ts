@@ -189,6 +189,15 @@ export interface LegoProject {
    * opens and still exports a volume that fits it.
    */
   collisionVolume?: LegoCollisionVolume;
+  /**
+   * Whether shots are tested against each piece instead of the whole unit.
+   *
+   * There is nothing to store per piece. The engine derives a box around every
+   * piece's own vertices when it loads the model, and the only thing a unit
+   * definition can say is whether to use them, so this is one flag for the
+   * unit. See `collisionVolume.ts`.
+   */
+  pieceCollision?: boolean;
   unitDef?: Record<string, string | number | boolean>;
   notes?: string;
   /** Canned animations applied to this unit, from `animPresets.ts`. */
@@ -497,6 +506,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(typeof d.height === "number" ? { height: d.height } : {}),
     ...(mid ? { mid } : {}),
     ...(collisionVolume ? { collisionVolume } : {}),
+    ...(d.pieceCollision === true ? { pieceCollision: true } : {}),
     ...(typeof d.unitDef === "object" && d.unitDef !== null
       ? { unitDef: d.unitDef as Record<string, string | number | boolean> }
       : {}),

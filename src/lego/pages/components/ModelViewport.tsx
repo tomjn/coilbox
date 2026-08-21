@@ -63,6 +63,7 @@ import {
 import {
   effectiveCollisionVolume,
   engineScales,
+  pieceCollisionVolumes,
   resizeCollisionFace,
 } from "../../collisionVolume";
 import {
@@ -495,6 +496,16 @@ export function ModelViewport({
       const collisionHandles = buildCollisionHandles(collisionHandleMaterial);
       scene.add(collisionHandles);
 
+      // The per-piece boxes, when the unit is hit piece by piece. Fainter than
+      // the unit's own volume because both are drawn at once and one of them
+      // is a thing you can change.
+      const pieceCollisionMaterial = new THREE.LineBasicMaterial({
+        color: COLLISION_COLOUR,
+        transparent: true,
+        opacity: 0.4,
+        depthTest: false,
+      });
+
       const root = new THREE.Group();
       scene.add(root);
 
@@ -604,6 +615,8 @@ export function ModelViewport({
         collisionHandleHotMaterial,
         collisionDrag: null,
         onCollisionChangeRef,
+        pieceCollision: null,
+        pieceCollisionMaterial,
         sky: null,
         terrain: null,
         groups: new Map(),
@@ -895,6 +908,8 @@ export function ModelViewport({
           (collisionHandles.children[0] as THREE.Mesh).geometry.dispose();
           collisionHandleMaterial.dispose();
           collisionHandleHotMaterial.dispose();
+          disposePieceCollision(state);
+          pieceCollisionMaterial.dispose();
           sceneRef.current = null;
         },
       };
@@ -932,6 +947,12 @@ export function ModelViewport({
     state.editCollision = editCollision;
     const shown = showCollision || editCollision;
     showCollisionVolume(state, shown ? project : null, pack, raw);
+    showPieceCollisionVolumes(
+      state,
+      shown && project.pieceCollision ? project : null,
+      pack,
+      raw,
+    );
     // The handles move between the volume and the selected piece with this, so
     // they are re-pointed here rather than left until the selection changes.
     attachGizmo(
@@ -1601,6 +1622,11 @@ interface SceneState {
   onCollisionChangeRef: {
     current: ((volume: LegoCollisionVolume) => void) | undefined;
   };
+  /** A box per piece, while the unit is hit piece by piece and the volume is
+   *  being shown. Null the rest of the time, including for a unit that leaves
+   *  piece collision off. */
+  pieceCollision: THREE.Group | null;
+  pieceCollisionMaterial: THREE.LineBasicMaterial;
   /** The sky now drawn, and which backdrop built it, so going back to one
    *  already seen does not draw its gradient again. Null while the plain
    *  backdrop shows, which is what the canvas does with no background at all. */
@@ -1736,6 +1762,59 @@ function showCollisionVolume(
   lines.raycast = () => {};
   state.collision = lines;
   state.scene.add(lines);
+}
+
+/**
+ * Draw the box the engine will put round each piece, or take them away again.
+ *
+ * These are a reading and nothing else: nothing in a model or a unit definition
+ * declares them, the engine measures one off every piece's vertices as it loads
+ * the model, and the unit definition only chooses whether to hit them. Drawing
+ * them is the only way to see what a shot will meet before the unit is in a
+ * game.
+ *
+ * A null project means "not showing", which covers both the toggle being off
+ * and the unit not asking for piece collision.
+ */
+function showPieceCollisionVolumes(
+  state: SceneState,
+  project: LegoProject | null,
+  pack: LoadedPack,
+  raw: RawGeometry | null,
+) {
+  disposePieceCollision(state);
+  if (!project) return;
+
+  const { pieces } = bakedPieces(project, pack, raw);
+  const group = new THREE.Group();
+  for (const { origin, volume } of pieceCollisionVolumes(project, pieces)) {
+    const lines = new THREE.LineSegments(
+      collisionWireframe(volume),
+      state.pieceCollisionMaterial,
+    );
+    lines.position.set(
+      origin[0] + volume.offsets[0],
+      origin[1] + volume.offsets[1],
+      origin[2] + volume.offsets[2],
+    );
+    lines.scale.set(...volume.scales);
+    lines.renderOrder = 4;
+    lines.raycast = () => {};
+    group.add(lines);
+  }
+  state.pieceCollision = group;
+  state.scene.add(group);
+}
+
+/** Free the per-piece boxes. Each carries its own geometry, and they share the
+ *  one material, which outlives them. */
+function disposePieceCollision(state: SceneState) {
+  if (!state.pieceCollision) return;
+  for (const lines of state.pieceCollision.children) {
+    (lines as THREE.LineSegments).geometry.dispose();
+  }
+  state.pieceCollision.removeFromParent();
+  state.pieceCollision = null;
 }
 
 /**

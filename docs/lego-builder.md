@@ -139,7 +139,13 @@ Two shapes cannot be stretched, and the engine says so rather than the panel: a 
 
 The box button in the viewport's camera group draws the volume as an orange wireframe, over the model, so you can keep an eye on it while building rather than only while setting it.
 
-Nothing here is per piece. The engine can also collide a model piece by piece, which is a different job with a different answer, and coilbox does not write it.
+### Shoot at each piece instead
+
+A unit can be hit piece by piece rather than as one shape. Turn on **Shoot at each piece instead** and the export adds `usepiececollisionvolumes = true`, so a shot is tested against a box around every piece and can pass between a walker's legs or under a gantry rather than stopping at the shape above.
+
+There is nothing to set per piece, and that is the engine's doing rather than a gap here. No `.s3o` piece carries a collision volume and no unit definition can name one. The engine measures a box around each piece's own vertices as it loads the model, and the only choice a unit definition has is whether to hit them. A game can change one while a unit is alive, with `Spring.SetUnitPieceCollisionVolumeData`, but that is a unit script's job rather than the builder's. So the boxes are a reading: turn this on and the viewport draws the ones the engine will build, in fainter orange over the model, whenever the volume is being shown.
+
+The volume above still matters with this on, and in two ways. It is the shape you click to select the unit, because selecting by piece is a second switch that coilbox does not write. And it is the sphere an explosion measures to decide whether the unit was caught at all.
 
 ## Test in game
 
