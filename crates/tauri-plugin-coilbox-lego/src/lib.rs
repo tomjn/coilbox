@@ -937,43 +937,31 @@ async fn lego_export<R: Runtime>(
     }
 
     // The per-piece collision volumes, which are the one generated Lua file
-    // coilbox keeps ownership of. Rewritten every export, and taken away again
-    // when the unit stops overriding anything, because a stale copy would go on
-    // applying volumes the unit no longer asks for. That is the whole reason it
-    // is a file of its own rather than something in the unit script: the script
-    // is the user's and is never rewritten, so nothing in it could be updated.
-    // It goes in a `coilbox` folder under `scripts/`, both so overwriting and
-    // deleting only ever touch coilbox's own files, and because the unit script
-    // framework walks `scripts/` recursively and would otherwise be one
-    // basename collision away from loading it as somebody's unit script.
+    // coilbox keeps ownership of. Rewritten every export, unlike the script and
+    // the definition either side of it, and that is the whole reason it is a
+    // file of its own: the script is the user's and is never rewritten, so
+    // nothing in it could ever be brought up to date.
+    //
+    // A unit that stops overriding anything still gets a file, an empty one. The
+    // include line lives in that script nothing rewrites, so taking the file
+    // away would leave it pointing at nothing, which the unit script framework
+    // logs as an error for every unit created.
+    //
+    // It goes in a `coilbox` folder under `scripts/` so overwriting only ever
+    // touches coilbox's own files, and because the framework walks `scripts/`
+    // recursively and would otherwise be one basename collision away from
+    // loading it as somebody's unit script.
     let mut piece_collision_path = None;
-    let mut piece_collision_removed = false;
-    let generated = root.join("scripts").join("coilbox");
-    let collision_target = generated.join(format!("{unit_name}_collision.lua"));
-    match piece_collision {
-        Some(lua) => {
-            if let Err(e) = std::fs::create_dir_all(&generated) {
-                return CliResult::err(format!("could not create {}: {e}", generated.display()));
-            }
-            if let Err(e) = std::fs::write(&collision_target, lua) {
-                return CliResult::err(format!(
-                    "could not write {}: {e}",
-                    collision_target.display()
-                ));
-            }
-            piece_collision_path = Some(collision_target.to_string_lossy().to_string());
+    if let Some(lua) = piece_collision {
+        let generated = root.join("scripts").join("coilbox");
+        if let Err(e) = std::fs::create_dir_all(&generated) {
+            return CliResult::err(format!("could not create {}: {e}", generated.display()));
         }
-        None => {
-            if collision_target.is_file() {
-                if let Err(e) = std::fs::remove_file(&collision_target) {
-                    return CliResult::err(format!(
-                        "could not remove {}: {e}",
-                        collision_target.display()
-                    ));
-                }
-                piece_collision_removed = true;
-            }
+        let target = generated.join(format!("{unit_name}_collision.lua"));
+        if let Err(e) = std::fs::write(&target, lua) {
+            return CliResult::err(format!("could not write {}: {e}", target.display()));
         }
+        piece_collision_path = Some(target.to_string_lossy().to_string());
     }
 
     // The unit definition follows the same rule as the script, scratch
@@ -1005,7 +993,6 @@ async fn lego_export<R: Runtime>(
         "script": script_path,
         "scriptKept": script_kept,
         "pieceCollision": piece_collision_path,
-        "pieceCollisionRemoved": piece_collision_removed,
         "unitDef": unit_def_path,
         "unitDefKept": unit_def_kept,
     }))

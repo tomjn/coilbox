@@ -457,4 +457,39 @@ describe("changing one piece's box", () => {
       screen.queryByText(/the engine never looks at a piece's box/),
     ).toBeNull();
   });
+
+  /**
+   * A script taken over before any of this existed has no include line, and an
+   * export will never add one to a script the user owns. So the file would be
+   * written and never read, silently. The only fix is a line the user adds.
+   */
+  it("says so when an owned script does not pull the file in", () => {
+    const project = unit({ pieceCollision: true, script: "-- mine\n" });
+    show({
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === "hull" ? { ...piece, collision: { hit: false } } : piece,
+      ),
+    });
+
+    expect(screen.getByText(/does not pull the file in/)).toBeTruthy();
+    expect(
+      screen.getByText('include("coilbox/walker_collision.lua")'),
+    ).toBeTruthy();
+  });
+
+  it("says nothing of the sort about a script that does pull it in", () => {
+    const project = unit({
+      pieceCollision: true,
+      script: '-- mine\ninclude("coilbox/walker_collision.lua")\n',
+    });
+    show({
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === "hull" ? { ...piece, collision: { hit: false } } : piece,
+      ),
+    });
+
+    expect(screen.queryByText(/does not pull the file in/)).toBeNull();
+  });
 });

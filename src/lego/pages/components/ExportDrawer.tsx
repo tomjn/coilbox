@@ -80,7 +80,6 @@ type Result =
       script: string | null;
       scriptKept: boolean;
       pieceCollision: string | null;
-      pieceCollisionRemoved: boolean;
       unitDef: string | null;
       unitDefKept: boolean;
       glb: string | null;
@@ -448,12 +447,6 @@ export function ExportDrawer({
                 ) : null}
                 {result.pieceCollision ? (
                   <code className="break-all">{result.pieceCollision}</code>
-                ) : null}
-                {result.pieceCollisionRemoved ? (
-                  <p className="text-muted-foreground">
-                    This unit no longer changes any piece's collision box, so
-                    the file that set them has been removed.
-                  </p>
                 ) : null}
                 {result.unitDef ? (
                   <code className="break-all">{result.unitDef}</code>

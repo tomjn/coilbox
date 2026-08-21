@@ -608,7 +608,10 @@ fn a_script_that_includes_another_file_still_plays() {
     );
     assert_eq!(timeline.error, None);
     assert!(
-        timeline.warnings.iter().any(|note| note.contains("include")),
+        timeline
+            .warnings
+            .iter()
+            .any(|note| note.contains("include")),
         "{:?}",
         timeline.warnings
     );

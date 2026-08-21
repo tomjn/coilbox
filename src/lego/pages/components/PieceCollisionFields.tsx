@@ -37,6 +37,10 @@ import type {
 } from "../../model";
 import { orderedPieces } from "../../model";
 import type { LoadedPack } from "../../pack";
+import {
+  pieceCollisionInclude,
+  pieceCollisionScriptPath,
+} from "../../pieceCollisionScript";
 import type { RawGeometry } from "../../rawGeometry";
 import { bakedPieces } from "../../s3oBuild";
 import { Vec3Row } from "./TransformFields";
@@ -81,6 +85,13 @@ export function PieceCollisionFields({
   const overridden = project.pieces.filter(
     (piece) => piece.collision !== undefined,
   );
+  // A script taken over before any of this was set has no include line, and an
+  // export will never add one, so the file would be written and never read. The
+  // only fix is a line the user adds, so the panel says which line.
+  const missingInclude =
+    overridden.length > 0 &&
+    project.script !== undefined &&
+    !project.script.includes(pieceCollisionScriptPath(project.unitName));
 
   if (!picked || !entry) return null;
 
@@ -208,6 +219,15 @@ export function PieceCollisionFields({
         <p className="text-xs text-destructive">
           Neither switch above is on, so the engine never looks at a piece's box
           and none of this reaches a game.
+        </p>
+      ) : null}
+
+      {missingInclude ? (
+        <p className="text-xs text-destructive">
+          This unit's script is your own and does not pull the file in, so
+          nothing set here reaches a game. Add{" "}
+          <code>{pieceCollisionInclude(project.unitName)}</code> near the top of
+          it. A script generated after these were set carries that line already.
         </p>
       ) : null}
 

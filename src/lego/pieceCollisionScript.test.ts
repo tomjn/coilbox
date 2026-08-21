@@ -104,9 +104,17 @@ describe("hasPieceCollision", () => {
 });
 
 describe("buildPieceCollisionScript", () => {
-  it("is null when nothing is overridden, so the export can take an old one away", () => {
+  /**
+   * The include line lives in a script an export never rewrites, so a unit that
+   * stops overriding things must still leave a file behind. `LoadChunk` logs an
+   * error for every unit created when an include finds nothing.
+   */
+  it("is still a file, doing nothing, when nothing is overridden", () => {
     const project = unit([piece({ id: "dish" })]);
-    expect(buildPieceCollisionScript(project, baked(project))).toBeNull();
+    const lua = buildPieceCollisionScript(project, baked(project));
+
+    expect(lua).toContain("does nothing");
+    expect(lua).not.toContain("SetUnitPieceCollisionVolumeData");
   });
 
   it("writes only the pieces that override something", () => {
@@ -114,7 +122,7 @@ describe("buildPieceCollisionScript", () => {
       piece({ id: "dish", collision: { hit: false } }),
       piece({ id: "hull" }),
     ]);
-    const lua = buildPieceCollisionScript(project, baked(project)) ?? "";
+    const lua = buildPieceCollisionScript(project, baked(project));
     expect(lua).toContain('local dish = piece("dish")');
     expect(lua).not.toContain("hull");
   });
@@ -123,7 +131,7 @@ describe("buildPieceCollisionScript", () => {
     // LuaSyncedCtrl.cpp: luaL_checkboolean(L, 3) is luaL_checktype LUA_TBOOLEAN,
     // so a 0 or a nil raises rather than converting.
     const project = unit([piece({ id: "aerial", collision: { hit: false } })]);
-    const lua = buildPieceCollisionScript(project, baked(project)) ?? "";
+    const lua = buildPieceCollisionScript(project, baked(project));
     expect(lua).toContain(
       "Spring.SetUnitPieceCollisionVolumeData(unitID, aerial, false, 10, 4, 10, 0, 0, 0, 2, 2)",
     );
@@ -134,7 +142,7 @@ describe("buildPieceCollisionScript", () => {
     // written on every call, so the honest numbers are the ones the engine
     // built for itself.
     const project = unit([piece({ id: "aerial", collision: { hit: false } })]);
-    const lua = buildPieceCollisionScript(project, baked(project)) ?? "";
+    const lua = buildPieceCollisionScript(project, baked(project));
     expect(lua).toContain(", 10, 4, 10, 0, 0, 0,");
   });
 
@@ -151,7 +159,7 @@ describe("buildPieceCollisionScript", () => {
         },
       }),
     ]);
-    const lua = buildPieceCollisionScript(project, baked(project)) ?? "";
+    const lua = buildPieceCollisionScript(project, baked(project));
     expect(lua).toContain(
       "Spring.SetUnitPieceCollisionVolumeData(unitID, dish, true, 30, 4, 30, 0, 2, 0, 2, 2)",
     );
@@ -177,7 +185,7 @@ describe("buildPieceCollisionScript", () => {
           },
         }),
       ]);
-      const lua = buildPieceCollisionScript(project, baked(project)) ?? "";
+      const lua = buildPieceCollisionScript(project, baked(project));
       expect(lua).toContain(`, ${args})`);
     }
   });
@@ -186,7 +194,7 @@ describe("buildPieceCollisionScript", () => {
     const project = unit([
       piece({ id: "end", name: "end", collision: { hit: false } }),
     ]);
-    const lua = buildPieceCollisionScript(project, baked(project)) ?? "";
+    const lua = buildPieceCollisionScript(project, baked(project));
     expect(lua).toContain('local p_end = piece("end")');
     expect(lua).toContain("unitID, p_end, false");
   });
@@ -203,7 +211,7 @@ describe("buildPieceCollisionScript", () => {
         },
       }),
     ]);
-    const lua = buildPieceCollisionScript(project, baked(project)) ?? "";
+    const lua = buildPieceCollisionScript(project, baked(project));
 
     const result = spawnSync(
       "luajit",
@@ -220,7 +228,7 @@ describe("buildPieceCollisionScript", () => {
 
   it("says in the file itself that coilbox owns it", () => {
     const project = unit([piece({ id: "dish", collision: { hit: false } })]);
-    const lua = buildPieceCollisionScript(project, baked(project)) ?? "";
+    const lua = buildPieceCollisionScript(project, baked(project));
     expect(lua).toContain("Rewritten on every export");
     expect(lua.endsWith("\n")).toBe(true);
   });
