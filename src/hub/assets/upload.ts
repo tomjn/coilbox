@@ -79,6 +79,15 @@ export interface AssetUploadProgress {
   uploadedBytes: number;
   /** Which picture this sample is about, when it is about one. */
   subject: string | null;
+  /**
+   * How many of the set are really going, which is everything the have check did
+   * not answer `have` for. Null until it has answered (issue #1768).
+   *
+   * Nothing on this side can work it out. A caller knows how many pictures it
+   * declared, and whether the hub wants any of them is decided in the plugin,
+   * after the frontend has finished deciding anything.
+   */
+  wanted: number | null;
 }
 
 const hubUploadAssets = defineCommand<

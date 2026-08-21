@@ -41,6 +41,7 @@ import {
   type RunningUpload,
   readRunningUploads,
   stopUploadRun,
+  uploadRunStopping,
 } from "./runningUploads";
 import type { AssetUpload, AssetUploadProgress } from "./upload";
 
@@ -321,6 +322,29 @@ function spy(
     get encodes() {
       return state.encodes;
     },
+  };
+}
+
+/**
+ * One progress sample as the plugin sends them, of which a test varies a field or
+ * two. `wanted` is the one the topbar reads: null until the upload's have check
+ * has answered, and how many pictures are really going from then on.
+ */
+function progress(
+  patch: Partial<AssetUploadProgress> = {},
+): AssetUploadProgress {
+  return {
+    phase: "uploading",
+    done: 0,
+    total: 12,
+    percent: 0,
+    uploaded: 0,
+    alreadyHad: 0,
+    refused: 0,
+    uploadedBytes: 0,
+    subject: null,
+    wanted: null,
+    ...patch,
   };
 }
 
@@ -773,17 +797,18 @@ describe("what a run says about itself while it is going (issue #1686)", () => {
     let midway: RunningUpload | undefined;
     const watch = spy({
       whileSending: (report) => {
-        report({
-          phase: "uploading",
-          done: 4,
-          total: 6,
-          percent: 66,
-          uploaded: 3,
-          alreadyHad: 1,
-          refused: 0,
-          uploadedBytes: 900,
-          subject: "bar's unit1 buildpic",
-        });
+        report(
+          progress({
+            done: 4,
+            total: 6,
+            percent: 66,
+            uploaded: 3,
+            alreadyHad: 1,
+            uploadedBytes: 900,
+            subject: "bar's unit1 buildpic",
+            wanted: 5,
+          }),
+        );
         midway = readRunningUploads()[0];
       },
     });
@@ -791,6 +816,93 @@ describe("what a run says about itself while it is going (issue #1686)", () => {
 
     expect(midway?.done).toBe(4);
     expect(midway?.sent).toBe(3);
+  });
+});
+
+describe("a run that only has build pics to send (issue #1768)", () => {
+  /**
+   * The case #1767 left out. Every render is already on the hub so nothing is
+   * drawn, and the build pics the hub has never seen go anyway. On a slow
+   * connection that is minutes of upload with nothing on screen saying so and no
+   * way to stop it.
+   */
+  it("goes on screen once the upload says the hub wants some", async () => {
+    let shownWhileSending: RunningUpload[] = [];
+    const watch = spy({
+      hubHas: () => true,
+      whileSending: (report) => {
+        report(progress({ wanted: 12, total: 12, subject: "bar's unit0" }));
+        shownWhileSending = readRunningUploads().map((run) => ({ ...run }));
+      },
+    });
+    await backfillBlueprintUnits(TARGET, unitsOf(12), 100, watch.tools);
+
+    expect(watch.draws).toBe(0);
+    expect(shownWhileSending).toHaveLength(1);
+    expect(shownWhileSending[0].game).toBe("bar");
+    expect(shownWhileSending[0].phase).toBe("sending");
+    expect(shownWhileSending[0].total).toBe(12);
+  });
+
+  /**
+   * The hard constraint. A layout whose pictures the hub already holds is two
+   * requests, and a pill in the topbar for that is noise. Neither the samples
+   * before the have check has answered nor the answer that it wants none of them
+   * may put one there.
+   */
+  it("stays silent when the hub wants none of what it was offered", async () => {
+    let shownWhileSending: readonly RunningUpload[] = [];
+    const watch = spy({
+      hubHas: () => true,
+      whileSending: (report) => {
+        report(progress({ phase: "asking", total: 12 }));
+        report(progress({ wanted: 0, total: 12, done: 12, alreadyHad: 12 }));
+        shownWhileSending = readRunningUploads();
+      },
+    });
+    await backfillBlueprintUnits(TARGET, unitsOf(12), 100, watch.tools);
+
+    expect(shownWhileSending).toEqual([]);
+    // And the run still happened: the build pics were offered.
+    expect(watch.uploads[0]).toHaveLength(12);
+  });
+
+  /** The point of being on screen at all. A run nobody can stop is a run that
+   *  only had to be watched. */
+  it("can be stopped, and says so where the run reads it", async () => {
+    let stopping = false;
+    const watch = spy({
+      hubHas: () => true,
+      whileSending: async (report) => {
+        report(progress({ wanted: 12, total: 12 }));
+        const [run] = readRunningUploads();
+        await stopUploadRun(run.opId);
+        stopping = uploadRunStopping(run.opId);
+      },
+    });
+    await backfillBlueprintUnits(TARGET, unitsOf(12), 100, watch.tools);
+
+    expect(stopping).toBe(true);
+    expect(cancelled).toEqual([{ opId: watch.uploadOpIds[0] }]);
+  });
+
+  /** Counted off from the plugin's own samples, the same as the sending half of
+   *  a run that drew something. */
+  it("counts the pictures off as the hub takes them", async () => {
+    let midway: RunningUpload | undefined;
+    const watch = spy({
+      hubHas: () => true,
+      whileSending: (report) => {
+        report(progress({ wanted: 12, total: 12 }));
+        report(progress({ wanted: 12, total: 12, done: 5, uploaded: 5 }));
+        midway = readRunningUploads()[0];
+      },
+    });
+    await backfillBlueprintUnits(TARGET, unitsOf(12), 100, watch.tools);
+
+    expect(midway?.done).toBe(5);
+    expect(midway?.sent).toBe(5);
+    expect(readRunningUploads()).toEqual([]);
   });
 });
 
