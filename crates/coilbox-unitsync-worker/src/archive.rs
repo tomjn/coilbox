@@ -651,7 +651,12 @@ pub fn extract(lib: &str, archive_name: &str, inner: &str, dest: &str) -> Archiv
     match handle {
         Some(handle) => {
             match us.read_archive_member(handle, inner, usize::MAX) {
-                Some((real, bytes)) => match std::fs::write(dest, &bytes) {
+                // The destination's folder is made first. A save dialog always
+                // picks one that exists, but unpacking a member into a layout
+                // (the lego builder rebuilds `objects3d/` beside `unittextures/`
+                // so a model finds its own textures) names folders that do not,
+                // and failing on that would be a limit with nothing behind it.
+                Some((real, bytes)) => match write_member(Path::new(dest), &bytes) {
                     Ok(()) => size = real,
                     Err(e) => errors.push(format!("could not write {dest}: {e}")),
                 },
@@ -666,6 +671,14 @@ pub fn extract(lib: &str, archive_name: &str, inner: &str, dest: &str) -> Archiv
     us.uninit();
 
     ArchiveExtractOutput { size, errors }
+}
+
+/// Write a member's bytes, making the folder they go in if it is not there.
+fn write_member(dest: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(dest, bytes)
 }
 
 /// Resolve every game's header art in one `Init` session, for the Games grid.
@@ -1166,6 +1179,21 @@ mod header_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Unpacking a member into a layout names folders nothing has made yet, and
+    /// a caller that has to make them first would be doing the write's job.
+    #[test]
+    fn a_member_is_written_into_a_folder_that_is_not_there_yet() {
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-extract-parents-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let dest = dir.join("objects3d").join("hull.s3o");
+
+        write_member(&dest, b"model bytes").expect("the member was written");
+
+        assert_eq!(std::fs::read(&dest).unwrap(), b"model bytes");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn classify_routes_known_extensions_to_their_kind() {
