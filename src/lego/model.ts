@@ -96,9 +96,40 @@ export interface LegoTexture {
  * one swaps the texture and leaves the geometry and its UVs exactly as they
  * are: whether the new image suits them is the user's call to make and to undo.
  */
+/**
+ * The game a model was opened out of, recorded at the moment it was picked.
+ *
+ * Only a unit opened through the game picker has one. A unit opened through the
+ * file dialog has {@link LegoImported.source} and nothing else, and reading a
+ * game's name back out of a path is guesswork, so this is the field anything
+ * grouping units by game reads first (#1819).
+ */
+export interface LegoImportedGame {
+  /** The game's name as unitsync reports it, which is what a list shows. */
+  name: string;
+  /** The primary archive's file name, e.g. `SpringMCLegacy.sdd`. The identity
+   *  behind the name, since two installs of one game share a name and a version
+   *  bump changes it. */
+  archive: string;
+  /** Where the model sits inside that archive, e.g. `objects3d/arm/com.s3o`. */
+  member: string;
+  /** The unitdef that names this model, when one does. Absent for a feature, a
+   *  wreck, or anything else no unitdef points at. */
+  unit?: string;
+}
+
 export interface LegoImported {
-  /** The `.s3o` this came from, for saying where the unit came from. */
+  /**
+   * The `.s3o` this came from, for saying where the unit came from.
+   *
+   * A file the user pointed at, or, for a model picked out of a game, the
+   * archive's own path with the member appended. The second is not a file that
+   * can be opened when the archive is packed, so it is a description of where
+   * the model was rather than somewhere to read it again.
+   */
   source: string;
+  /** Present when the model was picked by game and unit rather than by path. */
+  game?: LegoImportedGame;
   /** What the unit is painted with. Absent when it could not be found. */
   texture?: LegoTexture;
   /**

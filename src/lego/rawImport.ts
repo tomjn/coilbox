@@ -24,6 +24,7 @@ import type {
 import {
   LEGO_SCHEMA_VERSION,
   type LegoImported,
+  type LegoImportedGame,
   type LegoPiece,
   type LegoProject,
   type LegoTexture,
@@ -62,6 +63,10 @@ export function projectFromImport(
     /** The project's id, which the geometry sidecar is already named after. */
     id: string;
     source: string;
+    /** The game and unit this model was picked as, when it was picked out of a
+     *  game rather than off disk. Recorded here because this is the only moment
+     *  anything knows it (#1819). */
+    game?: LegoImportedGame;
     name: string;
     unitName: string;
     packId: string;
@@ -98,6 +103,7 @@ export function projectFromImport(
 
   const imported: LegoImported = {
     source: options.source,
+    ...(options.game ? { game: options.game } : {}),
     ...textureFields("texture", "missingTexture", result.texture),
     ...textureFields("teamMask", "missingTeamMask", result.teamMask),
   };
