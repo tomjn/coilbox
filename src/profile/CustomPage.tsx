@@ -7,10 +7,10 @@ import { useNavigate } from "react-router";
 import { assetUrl, isLocalRef, mediaKind } from "../lib/assetUrl";
 import { scrollToAnchor } from "../lib/markdownAnchors";
 import { GFM_PLUGINS, GFM_PROSE_CLASSES } from "../lib/markdownGfm";
+import { openBundledFile } from "./openBundledFile";
 import { classifyMarkdownLink } from "./pageLinks";
 import { buildPageNav, getProfilePages, type ProfilePage } from "./pages";
 import { splitWidgets } from "./pageWidgets";
-import { openProfileFile } from "./refs";
 import { PageWidget } from "./widgets";
 
 /**
@@ -29,28 +29,10 @@ function resolveSrc(src: unknown): string | undefined {
 }
 
 /**
- * Hand a page's bundled file to the OS.
- *
- * Somebody who writes `[our guide](@.coilbox/docs/guide.pdf)` rather than the `!`
- * image spelling means "click this to read the PDF", so the click gives the file to
- * whatever program opens PDFs. A file type with no viewer, and one the OS turns
- * down, is shown in the file manager instead, so the link always leads somewhere.
- * Rust picks between the two and owns the list of types it will open (issue #1786).
- *
- * A failure only warns. There is nothing useful to show the reader mid-page, and the
- * author who wrote the link is the one who needs to know.
- */
-function openAsset(path: string) {
-  openProfileFile(path).catch((err) =>
-    console.warn(`profile: could not open the file "${path}"`, err),
-  );
-}
-
-/**
  * Renders a markdown link with the page-link scheme applied (issue #274): external URLs
  * open in the system browser (never navigating the webview away from the app), `.md` /
  * `@route/` / app-absolute links navigate in-app via the router, a `@.coilbox` asset is
- * handed to the OS (see {@link openAsset}), a `#` link scrolls the page (see
+ * handed to the OS (see {@link openBundledFile}), a `#` link scrolls the page (see
  * {@link scrollToAnchor}), and a `@widget/`/malformed ref renders inert (plain text) so a
  * bad link can't break the page.
  */
@@ -105,7 +87,7 @@ function MarkdownLink({
           // #1783). The same stranding was fixed for distribution markup in #1062
           // and #1777.
           e.preventDefault();
-          openAsset(target.path);
+          openBundledFile(target.path);
         }}
       >
         {children}

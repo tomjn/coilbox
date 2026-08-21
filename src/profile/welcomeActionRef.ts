@@ -2,6 +2,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { type RefObject, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { quitApp } from "../general/quit";
+import { portableAssetPath } from "../lib/assetUrl";
+import { openBundledFile } from "./openBundledFile";
+import { isSafeRel } from "./refs";
 import { resolveWelcomeAction } from "./welcomeActions";
 
 /** The four `href` schemes that belong to another program rather than to Coilbox. */
@@ -10,13 +13,17 @@ const EXTERNAL = /^(https?:|mailto:|tel:)/i;
 const ASSET_URL = /^https?:[/][/]coilbox[.]localhost[/]/i;
 
 /** What clicking an `<a href>` in distribution markup should do. See {@link classifyLink}. */
-export type LinkHandling = "in-app" | "external" | "ignore";
+export type LinkHandling =
+  | { kind: "in-app" }
+  | { kind: "external" }
+  | { kind: "asset"; path: string }
+  | { kind: "ignore" };
 
 /**
  * Where a link written in distribution markup is allowed to lead.
  *
  * An allowlist, because the shapes that strand the webview outnumber the ones
- * that work and an author can invent more of them. Three answers:
+ * that work and an author can invent more of them. Four answers:
  *
  * - `"in-app"` for `#/play/skirmish`, the documented spelling of an in-app link
  *   under hash routing. The webview follows it and the router picks it up.
@@ -26,15 +33,20 @@ export type LinkHandling = "in-app" | "external" | "ignore";
  *   Coilbox stays on screen (issue #1777). These are also exactly the four
  *   schemes `opener:default` permits, so nothing here can ask for more than the
  *   capability grants.
+ * - `"asset"` for a file the distribution bundled in its `.coilbox` folder, which
+ *   the rewrite has already turned into a `coilbox://` URL by the time the click
+ *   lands. Following it would replace Coilbox with the file, so the click hands
+ *   the path to Rust instead and Rust decides between opening it and showing it
+ *   in the file manager (issue #1802). Only the `portable` root, which is that
+ *   folder: the other roots are Coilbox's own storage rather than anything the
+ *   distribution shipped, and a link to one of those is an author's mistake.
  * - `"ignore"` for everything else, which is an author's mistake:
- *   - a relative `href="images/logo.webp"`, which the asset rewrite has already
- *     turned into the `coilbox://` URL of a picture, so following it replaces
- *     Coilbox with that picture
  *   - an `@route/` or `@widget/` reference whose `data-coilbox-action` marker is
  *     missing or misspelled, which resolves against the app origin as a path that
  *     does not exist
  *   - an app-absolute `/play/skirmish`, which is a full page load rather than the
  *     in-app navigation it looks like
+ *   - a path that climbs out of the `.coilbox` folder, which Rust refuses anyway
  *
  * The Windows asset URL is spelled `http://coilbox.localhost/…` rather than
  * `coilbox://…` (see {@link ../lib/assetUrl}), so it has to be excluded by hand
@@ -42,9 +54,11 @@ export type LinkHandling = "in-app" | "external" | "ignore";
  */
 export function classifyLink(href: string): LinkHandling {
   const h = href.trim();
-  if (h.startsWith("#")) return "in-app";
-  if (EXTERNAL.test(h) && !ASSET_URL.test(h)) return "external";
-  return "ignore";
+  if (h.startsWith("#")) return { kind: "in-app" };
+  const path = portableAssetPath(h);
+  if (path && isSafeRel(path)) return { kind: "asset", path };
+  if (EXTERNAL.test(h) && !ASSET_URL.test(h)) return { kind: "external" };
+  return { kind: "ignore" };
 }
 
 /**
@@ -89,6 +103,7 @@ export function useWelcomeActionRef(): RefObject<HTMLDivElement | null> {
         // webview to a bogus URL. The resolved action drives the app instead.
         e.preventDefault();
         if (action.kind === "quit") quitApp();
+        else if (action.kind === "open") openBundledFile(action.path);
         else navigate(action.to);
         return;
       }
@@ -98,9 +113,16 @@ export function useWelcomeActionRef(): RefObject<HTMLDivElement | null> {
       if (!anchor) return;
       const href = anchor.getAttribute("href") ?? "";
       const handling = classifyLink(href);
-      if (handling === "in-app") return;
+      if (handling.kind === "in-app") return;
       e.preventDefault();
-      if (handling === "external") {
+      if (handling.kind === "asset") {
+        // A link the distribution wrote to a file it shipped. The same link on a
+        // markdown page opens the file, and the welcome screen is markup by the
+        // same author for the same reader, so it leads to the same place.
+        openBundledFile(handling.path);
+        return;
+      }
+      if (handling.kind === "external") {
         // The OS opens it beside Coilbox instead of on top of it. A rejection is
         // logged and swallowed, as everywhere else the app opens a link: the
         // user asked to leave, and Coilbox has nothing to show them if the OS

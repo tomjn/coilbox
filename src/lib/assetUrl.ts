@@ -39,6 +39,33 @@ export function assetUrl(rel: string): string {
   return schemeUrl("portable", rel);
 }
 
+/** Both spellings of an {@link assetUrl} under the portable root, with the path after. */
+const PORTABLE_URL =
+  /^(?:coilbox:\/\/localhost|https?:\/\/coilbox\.localhost)\/portable\/(.+)$/i;
+
+/**
+ * The `.coilbox`-relative path an {@link assetUrl} was built from, or `undefined`
+ * when the URL is not one of those: a different root, another site, or not a URL
+ * at all.
+ *
+ * The inverse of {@link assetUrl}, and here rather than at the caller because the
+ * two spellings of the scheme are this module's business. A distribution's markup
+ * is rewritten before it reaches the DOM, so a click handler meeting
+ * `<a href="docs/guide.pdf">` only ever sees the URL. Naming the file again is what
+ * lets the click hand it back to Rust, which is the side that knows where the
+ * `.coilbox` folder is (issue #1802).
+ */
+export function portableAssetPath(url: string): string | undefined {
+  const match = PORTABLE_URL.exec(url.trim());
+  if (!match) return undefined;
+  try {
+    return match[1].split("/").map(decodeURIComponent).join("/");
+  } catch {
+    // A malformed `%` escape is not a path, and `decodeURIComponent` throws on one.
+    return undefined;
+  }
+}
+
 /** URL for a user-authored campaign's imported AV, under `campaign/<id>/<file>`. */
 export function campaignMediaUrl(campaignId: string, file: string): string {
   return schemeUrl("campaign", `${campaignId}/${file}`);

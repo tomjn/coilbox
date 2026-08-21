@@ -23,12 +23,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Stands in for the Rust side and the system browser. `vi.hoisted` so the mock
 // factories below, which are hoisted above the imports, can reach them.
-const { openUrl, profileOpen } = vi.hoisted(() => ({
+const { openUrl, profileOpen, notify } = vi.hoisted(() => ({
   openUrl: vi.fn(async (_url: string) => {}),
   profileOpen: vi.fn(async (_args: { path: string }) => ({
     action: "open" as const,
   })),
+  notify: vi.fn(async (_input: { title: string; body?: string }) => {}),
 }));
+
+// The real one reaches sonner and the Tauri window. What matters here is only
+// that a click that achieved nothing said so.
+vi.mock("../notify/notify", () => ({ notify }));
 
 // Matching `./pageLinks.test.ts`: the link classifier reaches refs/pages, whose
 // published `defineCommand` will not load under Vitest's resolver. `profile_open`
@@ -88,6 +93,8 @@ beforeEach(() => {
   openUrl.mockResolvedValue(undefined);
   profileOpen.mockReset();
   profileOpen.mockResolvedValue({ action: "open" });
+  notify.mockReset();
+  notify.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -118,7 +125,9 @@ describe("a link on a distribution's markdown page", () => {
 
   it("is still not followed when the file cannot be opened or shown", async () => {
     // The failure that must not fall back to letting the webview navigate,
-    // because that is the bug. The click says so in the console instead.
+    // because that is the bug. The click says so instead: in the console for
+    // whoever wrote the link, and on screen for the reader, who would otherwise
+    // be looking at a link that ignored them (issue #1802).
     profileOpen.mockRejectedValue(new Error("there is no file at that path"));
     const { followed, at } = clickLink(
       "[our logo](@.coilbox/images/logo.webp)",
@@ -130,6 +139,12 @@ describe("a link on a distribution's markdown page", () => {
         expect.stringContaining("images/logo.webp"),
         expect.any(Error),
       ),
+    );
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "error",
+        body: "there is no file at that path",
+      }),
     );
   });
 
