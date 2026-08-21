@@ -110,14 +110,25 @@ local function waterline_of(d)
   return tonumber(d.waterline) or tonumber(d.WaterLine) or tonumber(d.waterLine) or 0
 end
 
--- A number as JSON, or nil for anything that is not one. %.14g is what a double
--- round trips through, and it never produces a form JSON cannot read. An
--- infinity or a NaN is not JSON at all, and a def that wrote one has said
--- nothing usable.
+-- A number as JSON, or nil for anything that is not one. An infinity or a NaN
+-- is not JSON at all, and a def that wrote one has said nothing usable.
+--
+-- A whole number is printed whole, and everything else to the four decimal
+-- places the rest of this shim writes, which is more precision than a unitdef's
+-- numbers ever carry. Two things rule out the obvious `%g`: the parser this
+-- runs in holds numbers as 32 bit floats, so a def declaring a reload of 8.6
+-- hands over 8.600000381 and the noise has to be dropped, and its `%g` is not
+-- C's - it prints fixed point and keeps every trailing zero, so `%.7g` of that
+-- reload comes back as 8.6000004 rather than 8.6.
 local function json_number(n)
   n = tonumber(n)
   if n == nil or n ~= n or n == math.huge or n == -math.huge then return nil end
-  return string.format('%.14g', n)
+  if n == math.floor(n) and math.abs(n) < 1e15 then return string.format('%d', n) end
+  local s = string.format('%.4f', n):gsub('0+$', ''):gsub('%.$', '')
+  -- A value too small to write in four places is one this cannot report, and
+  -- no number is better than a zero the def never claimed.
+  if tonumber(s) == 0 then return nil end
+  return s
 end
 
 -- A string as JSON, with every control character escaped, so nothing a game
@@ -962,6 +973,41 @@ mod tests {
             serde_json::json!([{ "range": 250, "projectile": "DGun" }])
         );
         assert_eq!(stat(&units[0], "range"), Some(250.0));
+    }
+
+    /// The numbers arrive through a parser that holds them as 32 bit floats, so
+    /// a def saying a weapon reloads in 0.4 seconds hands over
+    /// 0.40000000596046. Four decimal places is where the game's number ends
+    /// and that noise begins, and a whole number stays whole however big.
+    #[test]
+    fn a_number_is_printed_as_the_game_meant_it_rather_than_as_a_float() {
+        let units = extract(
+            r#"{
+              unitdefs = {
+                a = { buildtime = 1234567, health = 0.40000000596046448, speed = 8.600000381469727 },
+              },
+              weapondefs = {},
+            }"#,
+        );
+
+        assert_eq!(units[0].stats["buildTime"].to_string(), "1234567");
+        assert_eq!(units[0].stats["health"].to_string(), "0.4");
+        assert_eq!(units[0].stats["maxVelocity"].to_string(), "8.6");
+    }
+
+    /// A number too small to write in four places is one the shim cannot
+    /// report, and no key is better than a zero the def never claimed.
+    #[test]
+    fn a_number_too_small_to_write_is_left_out_rather_than_reported_as_zero() {
+        let units = extract(
+            r#"{
+              unitdefs = { a = { health = 0.0000001, metalcost = 5 } },
+              weapondefs = {},
+            }"#,
+        );
+
+        assert!(!units[0].stats.contains_key("health"));
+        assert_eq!(stat(&units[0], "metalCost"), Some(5.0));
     }
 
     /// Nothing a game wrote can break the line the stats sit in. The column is
