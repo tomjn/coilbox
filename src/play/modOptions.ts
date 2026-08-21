@@ -63,6 +63,23 @@ export const effectiveValue = (
   value?: string,
 ): string | undefined => value ?? o.default;
 
+/**
+ * Apply one edit to a setup's option values. A value of `undefined` removes the
+ * key rather than writing a blank, because these maps are deliberately sparse:
+ * an option nobody changed is absent, so a saved preset follows the game when
+ * the game changes its default, and the launch paths fill the gaps themselves
+ * (see `effectiveOptions`).
+ */
+export function withOption(
+  values: Record<string, string>,
+  key: string,
+  value: string | undefined,
+): Record<string, string> {
+  if (value !== undefined) return { ...values, [key]: value };
+  const { [key]: _dropped, ...rest } = values;
+  return rest;
+}
+
 /** Whether the user has overridden an option away from its default. */
 export const isChanged = (o: ConfigOption, value?: string) =>
   o.type !== "section" && value !== undefined && value !== (o.default ?? "");
