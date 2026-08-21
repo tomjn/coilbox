@@ -801,6 +801,9 @@ fn stored_texture_target(dir: &Path, write_as: &str) -> Result<PathBuf, String> 
 /// and then left alone: a re-export never overwrites one that is already there
 /// (see [`keep_existing`]). Only the model and the per-piece collision file are
 /// rewritten every time, because those are the files the builder alone owns.
+// Each argument is one field of the IPC payload, so grouping them would only
+// move the width into a struct the frontend then has to nest.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 async fn lego_export<R: Runtime>(
     app: AppHandle<R>,
