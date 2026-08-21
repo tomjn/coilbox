@@ -22,6 +22,7 @@ import {
   Box,
   ClipboardPaste,
   Copy,
+  Crosshair,
   FlipHorizontal2,
   Grid3x3,
   Keyboard,
@@ -45,6 +46,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useCanvas3D } from "@/lib/useCanvas3D";
 import { useReduceMotion } from "../../../general/display";
+import { aimPoint } from "../../aimPoint";
 import {
   type AnimPreset,
   ENGINE_ROTATION_ORDER,
@@ -193,6 +195,14 @@ const TARGET_COLD = 0x64748b;
  */
 const COLLISION_COLOUR = 0xf97316;
 
+/**
+ * The aim point. Red and larger than the origin dot, because it is the one
+ * thing in the scene another unit is shooting at, and because it is usually
+ * buried inside the model rather than out on a surface.
+ */
+const AIM_COLOUR = 0xef4444;
+const AIM_DOT = 13;
+
 /** Where the camera starts, and where Reset view puts it back. */
 const HOME_CAMERA: [number, number, number] = [9, 7, 11];
 
@@ -309,6 +319,9 @@ interface Props {
   editCollision?: boolean;
   /** Where a dragged volume goes. Committed on release, like a piece's. */
   onCollisionChange?: (volume: LegoCollisionVolume) => void;
+  /** Draws the aim point whether or not its own toggle is on, so the panel
+   *  that sets it has the point it is about on screen. */
+  showAimPoint?: boolean;
 }
 
 export function ModelViewport({
@@ -340,6 +353,7 @@ export function ModelViewport({
   onCancelAnchor,
   editCollision = false,
   onCollisionChange,
+  showAimPoint = false,
 }: Props) {
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
@@ -361,6 +375,7 @@ export function ModelViewport({
   const [gameReference, setGameReference] =
     useState<GameReferenceChoice | null>(null);
   const [showCollision, setShowCollision] = useState(false);
+  const [showAim, setShowAim] = useState(false);
   // View settings, held for as long as the viewport is open and no longer,
   // exactly as the two above are. Both open on what the builder has always
   // shown, so nothing about opening a project changes.
@@ -506,6 +521,19 @@ export function ModelViewport({
         depthTest: false,
       });
 
+      // The aim point: one dot, moved rather than rebuilt, drawn over the
+      // collision wireframe so it is still findable inside a volume.
+      const aimMaterial = dotMaterial(
+        AIM_DOT,
+        renderer.getPixelRatio(),
+        false,
+        AIM_COLOUR,
+      );
+      const aimMark = points([0, 0, 0], null, aimMaterial);
+      aimMark.renderOrder = 5;
+      aimMark.visible = false;
+      scene.add(aimMark);
+
       const root = new THREE.Group();
       scene.add(root);
 
@@ -617,6 +645,7 @@ export function ModelViewport({
         onCollisionChangeRef,
         pieceCollision: null,
         pieceCollisionMaterial,
+        aimMark,
         sky: null,
         terrain: null,
         groups: new Map(),
@@ -910,6 +939,8 @@ export function ModelViewport({
           collisionHandleHotMaterial.dispose();
           disposePieceCollision(state);
           pieceCollisionMaterial.dispose();
+          state.aimMark.geometry.dispose();
+          aimMaterial.dispose();
           sceneRef.current = null;
         },
       };
@@ -969,6 +1000,22 @@ export function ModelViewport({
     showCollisionHandles(state);
     state.render();
   }, [showCollision, editCollision, project, pack, raw]);
+
+  // Follows the document as well as the toggle, for the same reason the volume
+  // does: a unit that has not been given an aim point is aimed at the middle of
+  // its own bounding box, which moves every time a piece does.
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    const shown = showAim || showAimPoint;
+    state.aimMark.visible = shown;
+    if (shown) {
+      state.aimMark.position.set(
+        ...aimPoint(project, unitBounds(project, pack, raw)),
+      );
+    }
+    state.render();
+  }, [showAim, showAimPoint, project, pack, raw]);
 
   useEffect(() => {
     const state = sceneRef.current;
@@ -1365,6 +1412,19 @@ export function ModelViewport({
         >
           <Box className="size-4" />
         </Button>
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={() => setShowAim(!showAim)}
+          aria-pressed={showAim}
+          title={
+            showAim
+              ? "Hide the aim point"
+              : "Show the aim point, the one point another unit shoots at"
+          }
+        >
+          <Crosshair className="size-4" />
+        </Button>
         <EnvironmentPicker
           backdrop={backdrop}
           onBackdrop={setBackdrop}
@@ -1410,6 +1470,11 @@ export function ModelViewport({
                 <Dot colour="#fbbf24" label="Corners" />
               </>
             )}
+          </div>
+        ) : null}
+        {showAim || showAimPoint ? (
+          <div className="flex gap-3">
+            <Dot colour="#ef4444" label="Aim point" />
           </div>
         ) : null}
         <span>
@@ -1632,6 +1697,9 @@ interface SceneState {
    *  piece collision off. */
   pieceCollision: THREE.Group | null;
   pieceCollisionMaterial: THREE.LineBasicMaterial;
+  /** The dot on the unit's aim point. Built with the scene and moved, since it
+   *  is one point wherever it is and there is nothing to rebuild. */
+  aimMark: THREE.Points;
   /** The sky now drawn, and which backdrop built it, so going back to one
    *  already seen does not draw its gradient again. Null while the plain
    *  backdrop shows, which is what the canvas does with no background at all. */
@@ -1725,9 +1793,10 @@ function applyBackdrop(state: SceneState, id: BackdropId) {
 /**
  * Draw the collision volume the export would write, or take it away again.
  *
- * The volume is positioned from the model's middle, because that is where the
- * engine measures its offsets from, so a volume with no offset sits on the
- * middle of the unit's bounding box exactly as it will in a game.
+ * The volume is positioned from the unit's aim point, because that is where the
+ * engine measures its offsets from, so what is drawn sits exactly where it will
+ * in a game. On most units the aim point is the middle of the bounding box and
+ * a volume with no offset sits on it.
  *
  * A null project means "not showing", which is also what leaves nothing behind
  * to keep in step with the document.
@@ -1751,15 +1820,16 @@ function showCollisionVolume(
   if (!project) return;
 
   const bounds = unitBounds(project, pack, raw);
+  const aim = aimPoint(project, bounds);
   const volume = effectiveCollisionVolume(project, bounds);
   const lines = new THREE.LineSegments(
     collisionWireframe(volume),
     state.collisionMaterial,
   );
   lines.position.set(
-    bounds.mid[0] + volume.offsets[0],
-    bounds.mid[1] + volume.offsets[1],
-    bounds.mid[2] + volume.offsets[2],
+    aim[0] + volume.offsets[0],
+    aim[1] + volume.offsets[1],
+    aim[2] + volume.offsets[2],
   );
   lines.scale.set(...engineScales(volume));
   // Over the model, to match the material's own `depthTest: false`.
@@ -1918,7 +1988,7 @@ function beginFaceDrag(state: SceneState, raycaster: THREE.Raycaster): boolean {
       normal.normalize(),
       hit.point,
     ),
-    mid: bounds.mid,
+    mid: aimPoint(project, bounds),
     from: volume,
     volume,
   };
@@ -3208,7 +3278,7 @@ function layGround(state: SceneState, reachElmos: number) {
  *
  * Only the offsets: the gizmo moves the volume, and the face handles are what
  * size it. The wireframe's position is the volume's own numbers, since the
- * offsets run from the model's middle, which is where the wireframe was put.
+ * offsets run from the unit's aim point, which is where the wireframe was put.
  * Its scale is not, because a round shape is drawn at the size the engine will
  * build rather than the size typed in, so reading it back would quietly round
  * off a cylinder nobody asked to change.
@@ -3225,12 +3295,13 @@ function commitCollision(state: SceneState) {
     state.rawRef.current,
   );
   const volume = effectiveCollisionVolume(project, bounds);
+  const aim = aimPoint(project, bounds);
   change({
     ...volume,
     offsets: [
-      lines.position.x - bounds.mid[0],
-      lines.position.y - bounds.mid[1],
-      lines.position.z - bounds.mid[2],
+      lines.position.x - aim[0],
+      lines.position.y - aim[1],
+      lines.position.z - aim[2],
     ],
   });
 }
