@@ -527,6 +527,40 @@ export function applyChallengeMaps(
   return changed ? { ...run, nodes } : run;
 }
 
+/**
+ * Put one encounter back on the map its challenge named, now that this install
+ * can offer it (issue #1834). Mirrors conquest's `restoreChallengeMap`, down to
+ * doing one node at a time because the offer is made on one node's briefing.
+ *
+ * Caller's job to know the map is usable here, meaning installed and not hidden
+ * from warpath. Returns the run unchanged when the node is not standing in for
+ * anything, so callers can memo on identity.
+ */
+export function restoreChallengeMap(
+  run: RogueliteRun,
+  nodeId: string,
+): RogueliteRun {
+  const node = run.nodes.find((n) => n.id === nodeId);
+  const wanted = node?.battle?.mapSubstitutedFrom;
+  if (!node?.battle || !wanted) return run;
+  const nodes = run.nodes.map((n): RunNode =>
+    n.id === nodeId && n.battle
+      ? {
+          ...n,
+          battle: {
+            ...n.battle,
+            mapName: wanted,
+            // The stand-in's download hint goes with the stand-in, and the map
+            // taking its place is already here.
+            mapDownload: undefined,
+            mapSubstitutedFrom: undefined,
+          },
+        }
+      : n,
+  );
+  return { ...run, nodes };
+}
+
 export function generateRun(opts: GenerateRunOpts): RogueliteRun {
   const rng = mulberry32(opts.seed >>> 0);
   const cols = COLUMNS[opts.length];
