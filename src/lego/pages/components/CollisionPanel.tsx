@@ -39,6 +39,7 @@ interface Props {
   /** Null puts the unit back on the derived volume. */
   onChange: (volume: LegoCollisionVolume | null) => void;
   onPieceCollisionChange: (on: boolean) => void;
+  onPieceSelectionChange: (on: boolean) => void;
 }
 
 export function CollisionPanel({
@@ -47,6 +48,7 @@ export function CollisionPanel({
   raw,
   onChange,
   onPieceCollisionChange,
+  onPieceSelectionChange,
 }: Props) {
   // Every vertex in the unit, so not on every keystroke elsewhere in the page.
   const bounds = useMemo(
@@ -143,9 +145,19 @@ export function CollisionPanel({
         </p>
       )}
 
-      <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+      <div className="border-t border-border/60 pt-3">
+        <p className="text-xs font-medium">Use each piece instead</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          The engine measures a box around every piece as it loads the model,
+          and can use those boxes rather than the shape above. Shooting and
+          clicking ask for them separately, so these are two switches: a walker
+          can be shot between its legs and still be easy to click on.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
         <Label htmlFor="piece-collision" className="text-xs font-medium">
-          Shoot at each piece instead
+          Shoot at each piece
         </Label>
         <Switch
           id="piece-collision"
@@ -155,18 +167,40 @@ export function CollisionPanel({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Shots are then tested against a box around every piece, so one can pass
-        between a walker's legs or under a gantry rather than stopping at the
-        shape above. The engine measures those boxes off the geometry itself and
-        there is nothing to set: turn this on and the viewport draws what it
-        will build.
+        Writes <code>usepiececollisionvolumes</code>. A shot is then tested
+        against each piece's box, so one can pass between a walker's legs or
+        under a gantry rather than stopping at the shape above.
       </p>
 
-      {project.pieceCollision ? (
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor="piece-selection" className="text-xs font-medium">
+          Click on each piece
+        </Label>
+        <Switch
+          id="piece-selection"
+          checked={project.pieceSelection === true}
+          onCheckedChange={onPieceSelectionChange}
+        />
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Writes <code>usepieceselectionvolumes</code>. The click target is then
+        the pieces rather than the shape above, which is what a gantry or a
+        spindly walker wants: it is otherwise selectable from the empty air it
+        encloses.
+      </p>
+
+      <p className="text-xs text-muted-foreground">
+        There is nothing to set per piece either way. Turn a switch on and the
+        viewport draws the boxes the engine will build.
+      </p>
+
+      {project.pieceCollision || project.pieceSelection ? (
         <p className="text-xs text-muted-foreground">
-          The volume above still does two other jobs, so it is still worth
-          getting right. It is what you click to select the unit, and it is the
-          sphere an explosion measures to decide whether the unit was caught.
+          The volume above is still worth getting right.{" "}
+          {project.pieceSelection
+            ? "It is the sphere an explosion measures to decide whether the unit was caught."
+            : "It is still what you click to select the unit, and it is the sphere an explosion measures to decide whether the unit was caught."}
         </p>
       ) : null}
     </div>

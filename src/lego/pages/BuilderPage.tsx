@@ -1172,6 +1172,13 @@ function Builder({ id }: { id: string | undefined }) {
                       return rest;
                     })
                   }
+                  onPieceSelectionChange={(on) =>
+                    edit((project) => {
+                      if (on) return { ...project, pieceSelection: true };
+                      const { pieceSelection: _off, ...rest } = project;
+                      return rest;
+                    })
+                  }
                 />
               ) : aside === "animation" ? (
                 <AnimationPanel

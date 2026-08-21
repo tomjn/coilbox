@@ -80,17 +80,23 @@ function unit(over: Partial<LegoProject> = {}): LegoProject {
 
 const onChange = vi.fn();
 const onPieceCollisionChange = vi.fn();
+const onPieceSelectionChange = vi.fn();
 
-function show(project: LegoProject) {
-  return render(
+function panel(project: LegoProject) {
+  return (
     <CollisionPanel
       project={project}
       pack={loaded}
       raw={null}
       onChange={onChange}
       onPieceCollisionChange={onPieceCollisionChange}
-    />,
+      onPieceSelectionChange={onPieceSelectionChange}
+    />
   );
+}
+
+function show(project: LegoProject) {
+  return render(panel(project));
 }
 
 /** Type into one of the three boxes on a row and leave it, which is what
@@ -111,6 +117,7 @@ function sent(): LegoCollisionVolume {
 beforeEach(() => {
   onChange.mockClear();
   onPieceCollisionChange.mockClear();
+  onPieceSelectionChange.mockClear();
 });
 
 afterEach(() => {
@@ -261,36 +268,24 @@ describe("hitting the unit piece by piece", () => {
   it("is off unless the unit asked for it", () => {
     show(unit());
     expect(
-      screen
-        .getByLabelText("Shoot at each piece instead")
-        .getAttribute("aria-checked"),
+      screen.getByLabelText("Shoot at each piece").getAttribute("aria-checked"),
     ).toBe("false");
   });
 
   it("is on for a unit that asked for it", () => {
     show(unit({ pieceCollision: true }));
     expect(
-      screen
-        .getByLabelText("Shoot at each piece instead")
-        .getAttribute("aria-checked"),
+      screen.getByLabelText("Shoot at each piece").getAttribute("aria-checked"),
     ).toBe("true");
   });
 
   it("reports the switch being thrown, each way", () => {
     const { rerender } = show(unit());
-    fireEvent.click(screen.getByLabelText("Shoot at each piece instead"));
+    fireEvent.click(screen.getByLabelText("Shoot at each piece"));
     expect(onPieceCollisionChange).toHaveBeenLastCalledWith(true);
 
-    rerender(
-      <CollisionPanel
-        project={unit({ pieceCollision: true })}
-        pack={loaded}
-        raw={null}
-        onChange={onChange}
-        onPieceCollisionChange={onPieceCollisionChange}
-      />,
-    );
-    fireEvent.click(screen.getByLabelText("Shoot at each piece instead"));
+    rerender(panel(unit({ pieceCollision: true })));
+    fireEvent.click(screen.getByLabelText("Shoot at each piece"));
     expect(onPieceCollisionChange).toHaveBeenLastCalledWith(false);
   });
 
@@ -298,6 +293,56 @@ describe("hitting the unit piece by piece", () => {
    *  it is worth getting right even once shots go past it. */
   it("says the volume above still has a job once pieces are hit instead", () => {
     show(unit({ pieceCollision: true }));
-    expect(screen.getByText(/still does two other jobs/)).toBeTruthy();
+    expect(
+      screen.getByText(/still what you click to select the unit/),
+    ).toBeTruthy();
+  });
+});
+
+describe("clicking the unit piece by piece", () => {
+  it("is off unless the unit asked for it", () => {
+    show(unit());
+    expect(
+      screen.getByLabelText("Click on each piece").getAttribute("aria-checked"),
+    ).toBe("false");
+  });
+
+  it("is on for a unit that asked for it", () => {
+    show(unit({ pieceSelection: true }));
+    expect(
+      screen.getByLabelText("Click on each piece").getAttribute("aria-checked"),
+    ).toBe("true");
+  });
+
+  it("reports the switch being thrown, each way", () => {
+    const { rerender } = show(unit());
+    fireEvent.click(screen.getByLabelText("Click on each piece"));
+    expect(onPieceSelectionChange).toHaveBeenLastCalledWith(true);
+
+    rerender(panel(unit({ pieceSelection: true })));
+    fireEvent.click(screen.getByLabelText("Click on each piece"));
+    expect(onPieceSelectionChange).toHaveBeenLastCalledWith(false);
+  });
+
+  /**
+   * The pair is two switches, not one setting. Throwing one must leave the
+   * other alone, and the panel must not claim the volume above is still the
+   * click target once the pieces are.
+   */
+  it("leaves the other switch alone when it is thrown", () => {
+    show(unit());
+    fireEvent.click(screen.getByLabelText("Click on each piece"));
+    expect(onPieceCollisionChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText("Shoot at each piece"));
+    expect(onPieceSelectionChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops saying the volume above is what you click", () => {
+    show(unit({ pieceCollision: true, pieceSelection: true }));
+    expect(
+      screen.queryByText(/still what you click to select the unit/),
+    ).toBeNull();
+    expect(screen.getByText(/sphere an explosion measures/)).toBeTruthy();
   });
 });
