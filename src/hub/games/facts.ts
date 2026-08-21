@@ -27,6 +27,10 @@ export interface GameUnitFacts {
   /** The units this one can build, in whatever order the game listed them. The
    *  hub sorts and deduplicates before it digests. */
   buildOptions: string[];
+  /** Everything the unitdef declares about the unit (issue #1876). The hub
+   *  stores it as schemaless JSON and renders what arrives, so nothing here
+   *  narrows it. Sent even when empty, the way `buildOptions` is. */
+  stats: Record<string, unknown>;
 }
 
 /** One faction, as the game's modinfo spells it. */
