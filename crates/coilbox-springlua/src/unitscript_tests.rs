@@ -592,6 +592,28 @@ fn a_call_the_preview_cannot_honour_is_reported() {
     );
 }
 
+/// Every coilbox unit script with per-piece collision volumes opens with an
+/// `include`, and the preview has no archive to read one out of. It must note
+/// that and carry on: a script that will not play means no animation preview at
+/// all, for a file that never moves a piece.
+#[test]
+fn a_script_that_includes_another_file_still_plays() {
+    let timeline = play(
+        r#"
+        include("coilbox/thing_collision.lua")
+        local flare = piece("flare")
+        function script.Create() Turn(flare, y_axis, 1.0, 10.0) end
+        "#,
+        3,
+    );
+    assert_eq!(timeline.error, None);
+    assert!(
+        timeline.warnings.iter().any(|note| note.contains("include")),
+        "{:?}",
+        timeline.warnings
+    );
+}
+
 #[test]
 fn the_frame_count_is_capped() {
     let timeline = play("function script.Create() end", MAX_FRAMES + 500);
