@@ -297,6 +297,45 @@ describe("the chrome on the warpath map that is not in a frame", () => {
 });
 
 /**
+ * The one box on a map that a map does not own (#1818).
+ *
+ * `SaveAsPresetButton` lives in `src/play`, because the same control saves a
+ * fight from the multiplayer room and the debrief drawer as well. Its `gutter`
+ * look is only ever rendered by the two overlays below, stacked under the back
+ * arrow over the starfield, and it was the last box still painting `bg-card/70`
+ * with `text-muted-foreground` on it. 1.97:1 over a white node on the worst base.
+ *
+ * It could not take {@link HUD_CARD_CLASS} itself. The HUD accent inks are
+ * dark-ramp values with no light half, so `no importer outside the two dark
+ * routes` at the foot of this file keeps this chrome off any page that can go
+ * light, and that component renders on several. So the gutter look names no
+ * surface at all now, and the two callers hand it one. That is what these check:
+ * a caller that stops passing the card gets a transparent box rather than a
+ * quietly wrong one, which nothing else here would catch.
+ */
+describe("the save-as-preset box in the gutter of either overlay", () => {
+  const OVERLAYS = {
+    "the conquest battle overlay": "./BattleOverlay.tsx",
+    "the warpath encounter overlay":
+      "../../../runlite/pages/components/EncounterOverlay.tsx",
+  };
+
+  for (const [name, file] of Object.entries(OVERLAYS)) {
+    it(`hands the measured card to the gutter button on ${name}`, () => {
+      const source = readFileSync(
+        fileURLToPath(new URL(file, import.meta.url)),
+        "utf8",
+      );
+      const at = source.indexOf("<SaveAsPresetButton");
+      expect(at, `no SaveAsPresetButton in ${file}`).toBeGreaterThan(-1);
+      const tag = source.slice(at, source.indexOf("/>", at));
+      expect(tag).toContain('appearance="gutter"');
+      expect(tag).toContain("HUD_CARD_CLASS");
+    });
+  }
+});
+
+/**
  * What stops a seventh one (#1812).
  *
  * Every failure #1785 and #1812 fixed was the same string. Somebody wanted a
@@ -308,13 +347,18 @@ describe("the chrome on the warpath map that is not in a frame", () => {
  * They take {@link HUD_CARD_CLASS}, which is measured, or {@link MAP_BAND_CLASS}
  * if there is no box to speak of.
  *
- * The gap this leaves is a file outside both trees that renders on a map anyway.
- * `SaveAsPresetButton`'s gutter appearance is the one that does, and it cannot
- * simply take the class, because the same component renders on ordinary pages
- * where the HUD chrome does not belong.
+ * The gap that left was a file outside both trees rendering on a map anyway,
+ * which is how the button above survived both rounds of fixing. It is swept by
+ * name now, so the rule follows what ends up on screen rather than what happens
+ * to sit in the right folder (#1818).
  */
 describe("neither map hand-writes a translucent card", () => {
   const TREES = ["../..", "../../../runlite"];
+
+  /** Files outside both trees that render on a map. See the block above. */
+  const ON_A_MAP_FROM_OUTSIDE = [
+    "../../../play/pages/components/SaveAsPresetButton.tsx",
+  ];
 
   /** The class as a file would paint it, rather than as a comment discusses it. */
   const HAND_WRITTEN = "bg-card/";
@@ -340,6 +384,10 @@ describe("neither map hand-writes a translucent card", () => {
       for (const full of written) {
         offenders.push(full.slice(root.length).replace(/^\/+/, ""));
       }
+    }
+    for (const path of ON_A_MAP_FROM_OUTSIDE) {
+      const full = fileURLToPath(new URL(path, import.meta.url));
+      if (markup(full).includes(HAND_WRITTEN)) offenders.push(path);
     }
     expect(
       offenders,
