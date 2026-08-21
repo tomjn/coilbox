@@ -64,16 +64,24 @@ use serde::{Deserialize, Serialize};
 /// is added or changes meaning.
 const INDEX_VERSION: u32 = 1;
 
-/// What the renders and their records may take up, least recently used first.
+/// What this folder may take up, least recently used first.
 ///
-/// A render is a few kilobytes: the two in this folder on the machine this was
-/// written on are 2.6 KB and 3.2 KB, and a record is about 400 bytes. So 64 MiB is
-/// on the order of twenty thousand units, which is more than a person will open
-/// blueprints for and small next to the 512 MiB the map pictures already get.
+/// A render is a few kilobytes: the two on the machine this was written on are
+/// 14 KB and 15 KB, and a record is about 330 bytes. So 64 MiB is thousands of
+/// units, which is far more than a person opens blueprints for and small next to
+/// the 512 MiB the map pictures already get.
 const BUDGET: u64 = 64 * 1024 * 1024;
 
-/// What the budget covers: the encoded pictures and the records naming them. The
-/// two age together because they are written together, so one policy covers both.
+/// What the budget covers.
+///
+/// Everything in the folder, not only the renders. A backfill's build pics are
+/// encoded in here too, waiting for the upload to read them, and a policy that
+/// counted only renders would let those grow without bound instead.
+///
+/// A run's own output is what the budget is spent on first, because the sweep is
+/// most recently used first and a run's files are the newest in the folder. So a
+/// build pic extracted a second ago cannot be swept out from under the upload that
+/// is about to send it, which is the one way this could have gone wrong.
 const SUFFIXES: &[&str] = &[".webp", ".png", ".json"];
 
 /// One drawn render, as the index holds it.
@@ -150,6 +158,12 @@ fn stem(game: &str, unit: &str, variant: &str) -> String {
 /// The picture and its record are both held out of the sweep, because they are the
 /// thing that has just been made and the sweep is least recently used.
 pub fn remember(dir: &Path, record: &RenderRecord) -> bool {
+    remember_within(dir, record, BUDGET)
+}
+
+/// [`remember`] on a stated budget, so a test can drive the sweep without writing
+/// 64 MiB of renders to find out what it does.
+fn remember_within(dir: &Path, record: &RenderRecord, budget: u64) -> bool {
     if std::fs::create_dir_all(dir).is_err() {
         return false;
     }
@@ -158,7 +172,7 @@ pub fn remember(dir: &Path, record: &RenderRecord) -> bool {
         return false;
     };
     let written = std::fs::write(&path, json).is_ok();
-    coilbox_thumb_cache::sweep(dir, SUFFIXES, BUDGET, &[path, dir.join(&record.file)]);
+    coilbox_thumb_cache::sweep(dir, SUFFIXES, budget, &[path, dir.join(&record.file)]);
     written
 }
 
@@ -395,6 +409,52 @@ mod tests {
         );
         assert_eq!(found.len(), 3);
         assert!(!found.contains_key("armmex"));
+    }
+
+    /// The bound on the folder, driven rather than described.
+    ///
+    /// The one way this could have gone wrong is the build pics: a backfill
+    /// encodes those into this same folder and the upload reads them a moment
+    /// later, so a sweep that took one would break a run that was working. It
+    /// cannot, because the sweep is most recently used first and a run's own
+    /// output is the newest thing in the folder.
+    #[test]
+    fn a_sweep_spends_the_budget_on_what_the_run_just_made() {
+        let dir = temp_dir("sweep");
+        // An old corpus: renders and build pics from runs long finished.
+        let old: Vec<PathBuf> = (0..4)
+            .map(|at| {
+                let file = dir.join(format!("old{at}.webp"));
+                std::fs::write(&file, vec![0u8; 4000]).unwrap();
+                std::fs::File::options()
+                    .write(true)
+                    .open(&file)
+                    .unwrap()
+                    .set_modified(
+                        std::time::SystemTime::now() - std::time::Duration::from_secs(9000),
+                    )
+                    .unwrap();
+                file
+            })
+            .collect();
+        // And this run: a build pic extracted a moment ago, then a render drawn.
+        let pic = dir.join("this-run-buildpic.webp");
+        std::fs::write(&pic, vec![0u8; 4000]).unwrap();
+        let record = drawn(&dir, "armsolar", 1, ARCHIVE);
+
+        // Room for about two files, so most of the folder has to go.
+        assert!(remember_within(&dir, &record, 9000));
+
+        assert!(dir.join(&record.file).is_file(), "the render just drawn");
+        assert!(pic.is_file(), "the build pic the upload is about to read");
+        assert!(
+            look_up(&dir, "bar", "render:top", 1, None, &units(&["armsolar"])).len() == 1,
+            "the record just written"
+        );
+        assert!(
+            old.iter().any(|f| !f.exists()),
+            "nothing was swept, so the budget is not doing anything"
+        );
     }
 
     /// Nothing at all is a miss rather than a failure. A machine that has never
