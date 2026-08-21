@@ -540,15 +540,15 @@ enum Kind {
     Binary,
 }
 
-/// Map an extension to a preview kind and its byte cap. `.tga` is decoded to PNG
-/// for preview, other formats browsers can't render (`.dds`, ...) fall through to
-/// binary.
+/// Map an extension to a preview kind and its byte cap. `.tga` and `.pcx` are
+/// decoded to PNG for preview, other formats browsers can't render (`.dds`, ...)
+/// fall through to binary.
 fn classify(ext: &str) -> (Kind, usize) {
     const TEXT: &[&str] = &[
         "lua", "txt", "cfg", "json", "xml", "ini", "md", "glsl", "h", "tdf", "smd", "fbi", "gui",
         "bos", "yml", "yaml", "csv", "html", "css", "js",
     ];
-    const IMAGE: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "tga"];
+    const IMAGE: &[&str] = &["png", "jpg", "jpeg", "gif", "bmp", "tga", "pcx"];
     const AUDIO: &[&str] = &["ogg", "oga", "mp3", "wav", "flac", "opus", "m4a"];
     if TEXT.contains(&ext) {
         (Kind::Text, TEXT_CAP)
@@ -600,8 +600,9 @@ fn text_fallback(bytes: &[u8], size: u64) -> Option<ArchiveFileOutput> {
 }
 
 /// Build a `data:` URL for an image member, or `None` if it can't be rendered.
-/// Browser-native formats pass through as-is; `.tga` is decoded and re-encoded to
-/// PNG (browsers don't render TGA). Returns `None` if a TGA fails to decode.
+/// Browser-native formats pass through as-is. `.tga` and `.pcx` are decoded and
+/// re-encoded to PNG, since browsers render neither. Returns `None` when one of
+/// those fails to decode.
 fn encode_preview_image(ext: &str, bytes: &[u8]) -> Option<String> {
     let (mime, payload) = match ext {
         "png" => ("image/png", bytes.to_vec()),
@@ -609,6 +610,7 @@ fn encode_preview_image(ext: &str, bytes: &[u8]) -> Option<String> {
         "gif" => ("image/gif", bytes.to_vec()),
         "bmp" => ("image/bmp", bytes.to_vec()),
         "tga" => ("image/png", tga_to_png(bytes)?),
+        "pcx" => ("image/png", pcx_to_png(bytes)?),
         _ => return None,
     };
     let b64 = base64::engine::general_purpose::STANDARD.encode(&payload);
@@ -625,6 +627,16 @@ fn tga_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
     let rgb = image::DynamicImage::ImageRgb8(img.to_rgb8());
     let mut png = std::io::Cursor::new(Vec::new());
     rgb.write_to(&mut png, image::ImageFormat::Png).ok()?;
+    Some(png.into_inner())
+}
+
+/// Decode PCX bytes and re-encode them as PNG. Alpha is kept, unlike
+/// `tga_to_png`: the legacy games use PCX for build pics rather than for unit
+/// textures, so the rare file that has an alpha plane means it as transparency.
+fn pcx_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
+    let img = image::DynamicImage::ImageRgba8(crate::pcx::decode(bytes)?);
+    let mut png = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut png, image::ImageFormat::Png).ok()?;
     Some(png.into_inner())
 }
 
@@ -1193,6 +1205,39 @@ mod tests {
 
         assert_eq!(std::fs::read(&dest).unwrap(), b"model bytes");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A `.pcx` browsers cannot render is transcoded to PNG for preview, the
+    /// same way `.tga` is, so the archive explorer shows the picture.
+    #[test]
+    fn previews_a_pcx_as_a_png() {
+        // One red pixel: a 128-byte header then three 8-bit planes, RLE-packed.
+        let mut raw = vec![0u8; 128];
+        raw[0] = 0x0a;
+        raw[1] = 5;
+        raw[2] = 1;
+        raw[3] = 8;
+        raw[65] = 3;
+        raw[66] = 1;
+        // 0xff cannot travel as a literal (its top two bits mark a run), so the
+        // red plane goes out as a run of one.
+        raw.extend_from_slice(&[0xc1, 0xff, 0x00, 0x00]);
+
+        assert!(matches!(classify("pcx").0, Kind::Image));
+        let url = encode_preview_image("pcx", &raw).expect("a pcx previews");
+        assert!(url.starts_with("data:image/png;base64,"));
+        let png = base64::engine::general_purpose::STANDARD
+            .decode(url.trim_start_matches("data:image/png;base64,"))
+            .unwrap();
+        let img = image::load_from_memory(&png).unwrap();
+        assert_eq!(img.to_rgba8().get_pixel(0, 0).0, [0xff, 0, 0, 255]);
+    }
+
+    /// Bytes with a `.pcx` name that are not a PCX fall through rather than
+    /// previewing as a broken picture.
+    #[test]
+    fn a_pcx_that_does_not_decode_has_no_preview() {
+        assert!(encode_preview_image("pcx", b"not a pcx").is_none());
     }
 
     #[test]
