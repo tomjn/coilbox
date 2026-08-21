@@ -36,12 +36,15 @@
 //!     cache (a unit's build pic, several hundred to a game's roster)
 //!   - `coilbox://localhost/unitsyncfactionlogo/<file>` → the unitsync faction
 //!     emblem cache (a side's `Sidepics` art)
+//!   - `coilbox://localhost/hubasset/<file>` → the render cache (a top down
+//!     picture coilbox drew of a unit, found again through the index in
+//!     `tauri-plugin-coilbox-unitsync`'s `renderindex.rs`)
 //!   - `coilbox://localhost/mapconvthumb/<file>` → the mapconv thumbnail cache
 //!     (a downscaled preview of a map author's source heightmap or texture)
 //!   - `coilbox://localhost/contentbranding/<file>` → the branding-catalog image
 //!     cache (a game's banner and logo, fetched over the network)
 //!
-//! Five of those hold content-keyed names, so the same URL always means the same
+//! Six of those hold content-keyed names, so the same URL always means the same
 //! bytes and they are served `immutable`. `contentbranding` is keyed by source
 //! URL rather than by bytes, so it stays `no-cache` along with the editable media.
 //!
