@@ -127,9 +127,11 @@ export function PieceCollisionFields({
       <p className="text-xs text-muted-foreground">
         Nothing in a model or a unit definition can set these, so coilbox writes
         them as Lua instead:{" "}
-        <code>scripts/coilbox/{project.unitName}_collision.lua</code>, which the
-        unit script pulls in with one line. That file is coilbox's own and is
-        rewritten on every export, so it keeps up with what you set here even
+        <code className="break-all">
+          scripts/{pieceCollisionScriptPath(project.unitName)}
+        </code>
+        , which the unit script pulls in with one line. That file is its own and
+        is rewritten on every export, so it keeps up with what you set here even
         after you have taken the script over.
       </p>
 
@@ -226,8 +228,11 @@ export function PieceCollisionFields({
         <p className="text-xs text-destructive">
           This unit's script is your own and does not pull the file in, so
           nothing set here reaches a game. Add{" "}
-          <code>{pieceCollisionInclude(project.unitName)}</code> near the top of
-          it. A script generated after these were set carries that line already.
+          <code className="break-all">
+            {pieceCollisionInclude(project.unitName)}
+          </code>{" "}
+          near the top of it. A script generated after these were set carries
+          that line already.
         </p>
       ) : null}
 
