@@ -237,6 +237,28 @@ describe("buildUnitDef", () => {
     expect(lua).toContain('collisionvolumescales = "0 0 0"');
   });
 
+  it("asks for piece collision only when the unit wants it", () => {
+    const off = buildUnitDef(project("Probe", "probe"), bounds({ x: 40, z: 8 }));
+    const on = buildUnitDef(
+      { ...project("Probe", "probe"), pieceCollision: true },
+      bounds({ x: 40, z: 8 }),
+    );
+
+    expect(off).not.toContain("usepiececollisionvolumes");
+    expect(on).toContain("usepiececollisionvolumes = true");
+  });
+
+  it("still writes the unit's own volume when pieces do the hitting", () => {
+    // It is still the selection shape and still the sphere an explosion
+    // measures, so dropping it would break both.
+    const lua = buildUnitDef(
+      { ...project("Probe", "probe"), pieceCollision: true },
+      bounds({ x: 40, y: 12, z: 88 }),
+    );
+
+    expect(lua).toContain('collisionvolumescales = "40 12 88"');
+  });
+
   it("gives the same output for the same project, every time", () => {
     const doc = project("Cake Bot", "cakebot");
 

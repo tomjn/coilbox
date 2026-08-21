@@ -360,6 +360,17 @@ describe("parseLegoProjectJson", () => {
     }
   });
 
+  it("keeps piece collision on, and leaves it off for everyone else", () => {
+    const doc = project([piece("root", null)]);
+    expect(
+      parseLegoProjectJson(JSON.stringify({ ...doc, pieceCollision: true }))
+        ?.pieceCollision,
+    ).toBe(true);
+    expect(parseLegoProjectJson(JSON.stringify(doc))).not.toHaveProperty(
+      "pieceCollision",
+    );
+  });
+
   it("puts pieces parent-first, for a document saved before that was true", () => {
     const doc = project([
       piece("root", null),
