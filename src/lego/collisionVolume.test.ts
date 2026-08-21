@@ -6,10 +6,12 @@ import {
   engineScales,
   isIgnoredByEngine,
   MIN_COLLISION_SIZE,
+  pieceCollisionVolume,
+  pieceCollisionVolumes,
   resizeCollisionFace,
 } from "./collisionVolume";
-import { type LegoProject, newProject } from "./model";
-import type { UnitBounds } from "./s3oBuild";
+import { type LegoPiece, type LegoProject, newProject } from "./model";
+import type { BakedPiece, UnitBounds } from "./s3oBuild";
 
 function bounds(
   sizeX: number,
@@ -192,5 +194,122 @@ describe("isIgnoredByEngine", () => {
         offsets: [0, 0, 0],
       }),
     ).toBe(false);
+  });
+});
+
+/** A baked piece holding a box of geometry, given as its two far corners. */
+function baked(
+  name: string,
+  offset: [number, number, number],
+  corners?: [[number, number, number], [number, number, number]],
+): BakedPiece {
+  const vertices = (corners ?? []).map((pos) => ({
+    pos,
+    normal: [0, 1, 0] as [number, number, number],
+    uv: [0, 0] as [number, number],
+  }));
+  return { name, offset, vertices, indices: [] };
+}
+
+describe("pieceCollisionVolume", () => {
+  it("boxes a piece's own vertices, centred on them", () => {
+    expect(
+      pieceCollisionVolume(
+        baked("hull", [0, 0, 0], [
+          [-4, 0, -10],
+          [6, 8, 10],
+        ]),
+      ),
+    ).toEqual({ type: "box", scales: [10, 8, 20], offsets: [1, 4, 0] });
+  });
+
+  it("gives an empty piece a one-elmo box on its own origin", () => {
+    // A hierarchy node, flare or aim point. The engine's starting extents are
+    // 10000 to -10000, so the extent is negative and clamps to one elmo, and
+    // the two cancel to an offset of zero.
+    expect(pieceCollisionVolume(baked("flare", [0, 20, 0]))).toEqual({
+      type: "box",
+      scales: [1, 1, 1],
+      offsets: [0, 0, 0],
+    });
+  });
+
+  it("holds a flat piece open to an elmo, as InitShape does", () => {
+    expect(
+      pieceCollisionVolume(
+        baked("plate", [0, 0, 0], [
+          [-8, 0, -8],
+          [8, 0.2, 8],
+        ]),
+      ).scales,
+    ).toEqual([16, 1, 16]);
+  });
+});
+
+describe("pieceCollisionVolumes", () => {
+  /** A project of three pieces: root, a child and a grandchild. */
+  function tower(): LegoProject {
+    const piece = (id: string, parentId: string | null): LegoPiece => ({
+      id,
+      name: id,
+      parentId,
+      partId: null,
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+    });
+    return {
+      ...project(),
+      rootPieceId: "base",
+      pieces: [
+        piece("base", null),
+        piece("body", "base"),
+        piece("turret", "body"),
+      ],
+    };
+  }
+
+  it("adds up the offsets down the tree, so each piece knows where it sits", () => {
+    const volumes = pieceCollisionVolumes(
+      tower(),
+      new Map([
+        ["base", baked("base", [0, 2, 0])],
+        ["body", baked("body", [0, 6, 0])],
+        ["turret", baked("turret", [1, 4, 0])],
+      ]),
+    );
+
+    expect(volumes.map((v) => v.pieceId)).toEqual(["base", "body", "turret"]);
+    expect(volumes.map((v) => v.origin)).toEqual([
+      [0, 2, 0],
+      [0, 8, 0],
+      [1, 12, 0],
+    ]);
+  });
+
+  it("measures each piece's box in the piece's own space, not the model's", () => {
+    const [volume] = pieceCollisionVolumes(
+      tower(),
+      new Map([
+        [
+          "base",
+          baked("base", [0, 40, 0], [
+            [-2, -2, -2],
+            [2, 2, 2],
+          ]),
+        ],
+      ]),
+    );
+
+    expect(volume.volume).toEqual({
+      type: "box",
+      scales: [4, 4, 4],
+      offsets: [0, 0, 0],
+    });
+    expect(volume.origin).toEqual([0, 40, 0]);
+  });
+
+  it("returns nothing for a project whose root was never baked", () => {
+    expect(pieceCollisionVolumes(tower(), new Map())).toEqual([]);
   });
 });

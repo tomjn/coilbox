@@ -17,16 +17,19 @@
  *   the s3o header's `mid`, and that is the centre of the same bounding box.
  *   So a volume that matches the box exactly has offsets of zero.
  *
- * The whole unit gets one volume. The engine can also collide a model piece by
- * piece, which is a different job with a different answer, and is not this.
+ * The whole unit gets one volume. A unit can instead be hit piece by piece,
+ * which is `pieceCollisionVolume` at the bottom of this file, and which is a
+ * reading rather than a setting.
  */
 
-import type {
-  CollisionVolumeType,
-  LegoCollisionVolume,
-  LegoProject,
+import {
+  childrenOf,
+  type CollisionVolumeType,
+  type LegoCollisionVolume,
+  type LegoProject,
+  pieceById,
 } from "./model";
-import type { UnitBounds } from "./s3oBuild";
+import type { BakedPiece, UnitBounds } from "./s3oBuild";
 
 /** What each shape is called in the picker. Keyed by the type, so a shape
  *  added to the union has to be named here before this compiles. */
@@ -171,4 +174,112 @@ function resizedScales(
  */
 export function isIgnoredByEngine(volume: LegoCollisionVolume): boolean {
   return volume.scales.every((scale) => scale <= 1);
+}
+
+/**
+ * The extents a piece starts with, before any vertex has been measured.
+ *
+ * The engine's own `DEF_MIN_SIZE` and `DEF_MAX_SIZE`, which are deliberately
+ * the wrong way round so the first vertex replaces both. A piece with no
+ * vertices keeps them, and the negative extent that falls out of them is what
+ * makes an empty piece's volume the clamped minimum below.
+ */
+const PIECE_MIN_EXTENT = 10000;
+
+/**
+ * The smallest a piece's volume can be on any axis. `InitShape` clamps every
+ * scale up to one elmo, and unlike the unit volume there is nothing that reads
+ * an all-ones piece volume as "none set": `InitDefault` is only ever called on
+ * a unit or a feature, so a one-elmo piece box is a real one-elmo piece box.
+ */
+export const MIN_PIECE_COLLISION_SIZE = 1;
+
+/**
+ * The volume the engine will build around one piece.
+ *
+ * Nothing declares this. There is no collision volume in an `.s3o` piece and
+ * none in a unit definition either: every model parser derives one the same
+ * way the moment the model loads, `CollisionVolume('b', 'z', maxs - mins,
+ * (maxs + mins) * 0.5f)` over the piece's own vertices, in
+ * `SS3OParser::LoadPiece` and `ModelUtils::CalculateModelDimensions`. So this
+ * is a reading of what a game will hit, not a number anyone can set. The only
+ * choice a unit definition has is whether to use these at all.
+ *
+ * Always a box, always centred on the geometry it wraps, and always in the
+ * piece's own space, which is why `pieceCollisionVolumes` carries the piece's
+ * position separately.
+ */
+export function pieceCollisionVolume(piece: BakedPiece): LegoCollisionVolume {
+  const min: [number, number, number] = [
+    PIECE_MIN_EXTENT,
+    PIECE_MIN_EXTENT,
+    PIECE_MIN_EXTENT,
+  ];
+  const max: [number, number, number] = [
+    -PIECE_MIN_EXTENT,
+    -PIECE_MIN_EXTENT,
+    -PIECE_MIN_EXTENT,
+  ];
+  for (const vertex of piece.vertices) {
+    for (const axis of [0, 1, 2] as const) {
+      min[axis] = Math.min(min[axis], vertex.pos[axis]);
+      max[axis] = Math.max(max[axis], vertex.pos[axis]);
+    }
+  }
+
+  return {
+    type: "box",
+    scales: [0, 1, 2].map((axis) =>
+      Math.max(MIN_PIECE_COLLISION_SIZE, max[axis] - min[axis]),
+    ) as [number, number, number],
+    offsets: [0, 1, 2].map((axis) => (max[axis] + min[axis]) / 2) as [
+      number,
+      number,
+      number,
+    ],
+  };
+}
+
+/** One piece's volume, with the piece's own position in the model. */
+export interface PieceCollisionVolume {
+  pieceId: string;
+  /**
+   * Where the piece sits in the model, which is what its volume's offsets are
+   * measured from. An `.s3o` piece carries a translation and nothing else, so
+   * a piece's place in the model is its own offset plus every offset above it,
+   * which is exactly what the engine's `GetModelSpaceMatrix` composes for a
+   * piece a script has not moved.
+   */
+  origin: [number, number, number];
+  volume: LegoCollisionVolume;
+}
+
+/**
+ * Every piece's volume, in the order the model stores the pieces.
+ *
+ * Takes the baked pieces rather than the pack, because these have to be
+ * measured off the vertices an export writes, not off the parts they came
+ * from: a piece's rotation and scale are baked into its own vertices, so a
+ * rotated part has a different box from the one it was cut out of.
+ */
+export function pieceCollisionVolumes(
+  project: LegoProject,
+  baked: Map<string, BakedPiece>,
+): PieceCollisionVolume[] {
+  const out: PieceCollisionVolume[] = [];
+  const visit = (pieceId: string, parent: [number, number, number]) => {
+    const piece = baked.get(pieceId);
+    if (!piece) return;
+    const origin: [number, number, number] = [
+      parent[0] + piece.offset[0],
+      parent[1] + piece.offset[1],
+      parent[2] + piece.offset[2],
+    ];
+    out.push({ pieceId, origin, volume: pieceCollisionVolume(piece) });
+    for (const child of childrenOf(project, pieceId)) visit(child.id, origin);
+  };
+
+  const root = pieceById(project, project.rootPieceId);
+  if (root) visit(root.id, [0, 0, 0]);
+  return out;
 }
