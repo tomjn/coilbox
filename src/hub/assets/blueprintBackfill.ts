@@ -78,6 +78,7 @@
  */
 
 import {
+  type LocalRender,
   type UnitBuildpicsResult,
   type UnitDatasetEntry,
   type UnitModelResult,
@@ -93,6 +94,7 @@ import { unitModelTextureUrl } from "@/lib/assetUrl";
 import { toBase64 } from "@/lib/base64";
 import { reportAssetUploadStopped } from "../uploadOutcomes";
 import { type AssetKey, assetsTheHubWants, type HaveResult } from "./have";
+import { localRenders, rememberLocalRender } from "./localRenders";
 import { RENDER_VERSION, renderTopDown, type TopDownRender } from "./renderTop";
 import {
   hideUploadRun,
@@ -101,6 +103,7 @@ import {
   uploadRunStopping,
 } from "./runningUploads";
 import { type AssetUpload, uploadAssetsToHub } from "./upload";
+import { renderVariant } from "./vocabulary";
 
 /**
  * The one angle that ships (issue #1631). A second angle would double the render
@@ -217,6 +220,10 @@ export interface BackfillTools {
   ) => Promise<TopDownRender>;
   ask: typeof assetsTheHubWants;
   upload: typeof uploadAssetsToHub;
+  /** What this machine has already drawn, from `./localRenders.ts`. */
+  held: typeof localRenders;
+  /** Write one down, so the next run and every plan can find it. */
+  remember: typeof rememberLocalRender;
 }
 
 export const liveBackfillTools: BackfillTools = {
@@ -228,6 +235,8 @@ export const liveBackfillTools: BackfillTools = {
   draw: renderTopDown,
   ask: assetsTheHubWants,
   upload: uploadAssetsToHub,
+  held: localRenders,
+  remember: rememberLocalRender,
 };
 
 /**
@@ -313,10 +322,38 @@ export async function backfillBlueprintUnits(
 
   const assets: AssetUpload[] = buildpicUploads(target.game, working, pictures);
 
+  // What this machine already drew and the hub still has not got (issue #1724).
+  // A run that drew a render and then failed to send it used to draw the whole
+  // lot again next time, because the encoded file is named after its own bytes
+  // and nothing said which unit it was of.
+  //
+  // Only a render of the same identity counts: the key was worked out against
+  // the archive a moment ago, so a game update is a different `sourceHash` and
+  // the old picture is not offered under the new one.
+  const held = await tools.held(
+    target.game,
+    renderVariant(BACKFILL_ANGLE),
+    RENDER_VERSION,
+    working.filter((unit) => wanted.has(unit.name)).map((unit) => unit.name),
+    keyed.sourceArchive,
+  );
+  const already = new Map<string, AssetUpload>();
+  for (const unit of working) {
+    const render = held.get(unit.name.toLowerCase());
+    const key = keyed.keys[unit.name];
+    if (!render || !key?.sourceHash || render.sourceHash !== key.sourceHash) {
+      continue;
+    }
+    already.set(unit.name, heldRenderUpload(target.game, unit.name, render));
+  }
+  assets.push(...already.values());
+
   // The models of what is left to draw, in one mount rather than one each
   // (issue #1684). Asked for after the have check, so a layout the hub already
   // holds every render of does not mount for models at all.
-  const drawing = working.filter((unit) => wanted.has(unit.name));
+  const drawing = working.filter(
+    (unit) => wanted.has(unit.name) && !already.has(unit.name),
+  );
 
   // Half the threshold (issue #1686). A run with a picture to draw is about to
   // hold the app for seconds each, so it says so. The other half is the upload's
@@ -505,6 +542,37 @@ export function unitsWanted(
   return wanted;
 }
 
+/**
+ * A render this machine already holds, as a declaration the upload takes.
+ *
+ * The same shape `renderOne` produces, because it is the same picture: the bytes
+ * in the file the index named are what a fresh draw of that unit at that
+ * footprint would encode to, which is what `sourceHash` matching means.
+ *
+ * Every field is the record's own rather than anything reconstructed here, which
+ * is why the record holds the encode profile: a build that encoded renders
+ * differently wrote a different one down, and guessing it would declare the wrong
+ * bytes to the hub.
+ */
+export function heldRenderUpload(
+  game: string,
+  unit: string,
+  render: LocalRender,
+): AssetUpload {
+  return {
+    keyed_on: "unit",
+    game,
+    unit_name: unit,
+    variant: render.variant,
+    source_hash: render.sourceHash,
+    encode_profile: render.encodeProfile,
+    origin: "rendered",
+    mime: render.mime,
+    source_archive: render.sourceArchive,
+    path: render.path,
+  };
+}
+
 /** The build pics that came out, as declarations. A unit the game ships no
  *  picture for, or one coilbox could not read, simply is not here. */
 export function buildpicUploads(
@@ -549,6 +617,12 @@ export function buildpicUploads(
  * The three travel together or not at all, so a key without an archive name, which
  * is what a batch whose mount failed gives, takes the mounting path rather than
  * two thirds of the fast one.
+ *
+ * This is also the one place holding the encoded file, its identity, its angle and
+ * the unit's name together, so it is where the render is written down for a second
+ * reader (issue #1724). Before the upload rather than after it, and whether or not
+ * one happens: keeping a picture and sending it are two decisions, and only the
+ * second is the one the consent switch governs.
  */
 async function renderOne(
   target: BackfillTarget,
@@ -584,6 +658,7 @@ async function renderOne(
     });
     const asset = encoded.asset;
     if (!asset) return null;
+    await tools.remember(target.game, unit.name, asset);
     return {
       keyed_on: "unit",
       game: target.game,

@@ -5491,6 +5491,7 @@ dependencies = [
  "base64 0.22.1",
  "coilbox-portable",
  "coilbox-proc",
+ "coilbox-thumb-cache",
  "picoframe-core",
  "serde",
  "serde_json",

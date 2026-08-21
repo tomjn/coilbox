@@ -25,6 +25,7 @@ pub(crate) const CACHE_SUBDIRS: &[(&str, &str)] = &[
     ("coilbox-unitsync-buildpics", "Unit build icons"),
     ("coilbox-unitsync-faction-logos", "Faction logos"),
     ("coilbox-unitsync-info", "Game and map info"),
+    ("coilbox-hub-assets", "Unit renders"),
     ("coilbox-branding", "Branding catalog"),
     ("coilbox-branding-images", "Branding images"),
 ];

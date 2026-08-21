@@ -19,3 +19,4 @@ serde_json = "1"
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 coilbox-proc = { path = "../coilbox-proc" }
+coilbox-thumb-cache = { path = "../coilbox-thumb-cache" }

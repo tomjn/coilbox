@@ -27,7 +27,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   },
 }));
 
-import type { UnitDatasetEntry } from "@/content/bindings";
+import type { LocalRender, UnitDatasetEntry } from "@/content/bindings";
 import {
   type BackfillTools,
   type BackfillUnit,
@@ -94,6 +94,11 @@ interface Spy {
   /** What the topbar held at each moment a picture was drawn, so a test can see
    *  the run while it is going rather than only after it. */
   shownWhileDrawing: RunningUpload[][];
+  /** The units each lookup of this machine\'s own renders asked about, and what
+   *  archive it named, so a test can see the local check happen (issue #1724). */
+  heldAsks: { units: string[]; sourceArchive?: string }[];
+  /** Every render written down after it was drawn, in order. */
+  remembered: { unit: string; sourceHash: string }[];
   /** What each encode was handed, so a test can see whether the key it was named
    *  by came with it (issue #1720). */
   encodes: {
@@ -122,12 +127,16 @@ function spy(
     /** How many of the set the fake hub took, when the run was stopped partway.
      *  Defaults to all of them. */
     takes?: (assets: AssetUpload[]) => number;
+    /** What this machine already drew, by unit name. Defaults to nothing, which is
+     *  a machine that has never rendered anything (issue #1724). */
+    alreadyDrawn?: (unit: string) => LocalRender | undefined;
   } = {},
 ): Spy {
   const hubHas = options.hubHas ?? (() => false);
   const shipsBuildpic = options.shipsBuildpic ?? (() => true);
   const modelless = options.modelless ?? (() => false);
   const takes = options.takes ?? ((assets: AssetUpload[]) => assets.length);
+  const alreadyDrawn = options.alreadyDrawn ?? (() => undefined);
 
   const state = {
     renderKeyCalls: 0,
@@ -141,6 +150,8 @@ function spy(
     uploadReported: [] as boolean[],
     shownWhileDrawing: [] as RunningUpload[][],
     encodes: [] as Spy["encodes"],
+    heldAsks: [] as Spy["heldAsks"],
+    remembered: [] as Spy["remembered"],
   };
 
   const tools: BackfillTools = {
@@ -274,6 +285,18 @@ function spy(
         errors: [],
       };
     },
+    held: async (_game, _variant, _version, units, sourceArchive) => {
+      state.heldAsks.push({ units: [...units], sourceArchive });
+      const found = new Map<string, LocalRender>();
+      for (const unit of units) {
+        const render = alreadyDrawn(unit);
+        if (render) found.set(unit.toLowerCase(), render);
+      }
+      return found;
+    },
+    remember: async (_game, unit, asset) => {
+      state.remembered.push({ unit, sourceHash: asset.sourceHash });
+    },
     upload: async (_hubUrl, assets, given) => {
       state.uploads.push(assets);
       state.startedBy.push(given.startedBy);
@@ -321,6 +344,12 @@ function spy(
     },
     get encodes() {
       return state.encodes;
+    },
+    get heldAsks() {
+      return state.heldAsks;
+    },
+    get remembered() {
+      return state.remembered;
     },
   };
 }
@@ -617,6 +646,143 @@ describe("a run over one layout", () => {
     expect(
       sent.every((asset) => asset.keyed_on === "unit" && asset.game === "bar"),
     ).toBe(true);
+  });
+});
+
+describe("a render this machine already drew (issue #1724)", () => {
+  /** One record in the shape the index answers with, for `unit`. */
+  const drawn = (
+    unit: string,
+    patch: Partial<LocalRender> = {},
+  ): LocalRender => ({
+    game: "bar",
+    unit,
+    variant: "render:top",
+    file: `render-hash-${unit}.s3o.webp`,
+    path: `/cache/hub/render-hash-${unit}.webp`,
+    mime: "image/webp",
+    encodeProfile: "webp-q80-512",
+    sourceHash: `render-src-${unit}`,
+    modelDigest: `model-${unit}`,
+    sourceArchive: "Beyond All Reason test-1",
+    rendererVersion: 1,
+    width: 128,
+    height: 192,
+    ...patch,
+  });
+
+  /**
+   * The whole point of keeping one. A run that drew a picture and then failed to
+   * send it used to draw the lot again next time, because the file is named after
+   * its own bytes and nothing said which unit it was of.
+   */
+  it("is offered to the hub without being drawn again", async () => {
+    const watch = spy({ alreadyDrawn: (unit) => drawn(unit) });
+    const report = await backfillBlueprintUnits(
+      TARGET,
+      unitsOf(4),
+      100,
+      watch.tools,
+    );
+
+    expect(watch.draws).toBe(0);
+    expect(report.rendered).toBe(0);
+    // Still four renders and four build pics offered, so nothing was lost by not
+    // drawing them.
+    expect(report.offered).toBe(8);
+    const renders = watch.uploads[0].filter((a) => a.origin === "rendered");
+    expect(renders).toHaveLength(4);
+    expect(renders[0].path).toBe("/cache/hub/render-hash-unit0.webp");
+    expect(renders[0].source_hash).toBe("render-src-unit0");
+    // And no models were mounted for, because nothing needed drawing.
+    expect(watch.models).toHaveLength(0);
+  });
+
+  /**
+   * The check that keeps a stale picture out. The key was worked out against the
+   * archive a moment ago, so a game update is a different `sourceHash` and the old
+   * picture must not go up under the new identity.
+   */
+  it("is drawn again when the game has moved under it", async () => {
+    const watch = spy({
+      alreadyDrawn: (unit) => drawn(unit, { sourceHash: "render-src-old" }),
+    });
+    await backfillBlueprintUnits(TARGET, unitsOf(4), 100, watch.tools);
+
+    expect(watch.draws).toBe(4);
+    const renders = watch.uploads[0].filter((a) => a.origin === "rendered");
+    expect(renders.map((a) => a.source_hash)).toEqual([
+      "render-src-unit0.s3o",
+      "render-src-unit1.s3o",
+      "render-src-unit2.s3o",
+      "render-src-unit3.s3o",
+    ]);
+  });
+
+  /** Asked for the archive the keys call reported, so the lookup can refuse a
+   *  render of a different build without anybody mounting anything again. */
+  it("is looked for under the archive the keys were taken against", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
+
+    expect(watch.heldAsks).toHaveLength(1);
+    expect(watch.heldAsks[0].sourceArchive).toBe("Beyond All Reason test-1");
+    expect(watch.heldAsks[0].units).toEqual(["unit0", "unit1", "unit2"]);
+  });
+
+  /** Only the units something is going to be done about. A layout the hub already
+   *  holds every render of asks this nothing either. */
+  it("is not looked for at all when the hub holds every render", async () => {
+    const watch = spy({ hubHas: () => true });
+    await backfillBlueprintUnits(TARGET, unitsOf(5), 100, watch.tools);
+
+    expect(watch.heldAsks[0].units).toEqual([]);
+    expect(watch.draws).toBe(0);
+  });
+
+  /** Written down as it is drawn, so the next run finds it. Before the upload
+   *  rather than after, because a run that failed to send is the case this is
+   *  for. */
+  it("is written down for every render the run draws", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
+
+    expect(watch.remembered).toEqual([
+      { unit: "unit0", sourceHash: "render-src-unit0.s3o" },
+      { unit: "unit1", sourceHash: "render-src-unit1.s3o" },
+      { unit: "unit2", sourceHash: "render-src-unit2.s3o" },
+    ]);
+  });
+
+  /**
+   * Stopping partway sends nothing, and every picture that was drawn is still
+   * kept: it is on this machine and costs nobody anything, and next time is the
+   * run that gets to send it.
+   *
+   * Three rather than two, because the stop is read between pictures and the one
+   * already in flight finishes.
+   */
+  it("is kept for the pictures drawn before somebody pressed stop", async () => {
+    const watch = spy({
+      beforeDraw: (drawnSoFar) => {
+        if (drawnSoFar === 2) {
+          stopUploadRun(readRunningUploads()[0].opId);
+        }
+      },
+    });
+    const report = await backfillBlueprintUnits(
+      TARGET,
+      unitsOf(6),
+      100,
+      watch.tools,
+    );
+
+    expect(report.written).toBe(0);
+    expect(watch.remembered.map((r) => r.unit)).toEqual([
+      "unit0",
+      "unit1",
+      "unit2",
+    ]);
   });
 });
 

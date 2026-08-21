@@ -8,6 +8,7 @@
 //! set *after* launch is ignored), runs it under a timeout, and passes its JSON
 //! straight through inside the [`CliResult`] envelope.
 
+mod renderindex;
 mod sidecar;
 
 use base64::Engine;
@@ -157,7 +158,12 @@ pub fn model_texture_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
 /// Where encoded hub assets are written, under the app cache dir. `None` when the
 /// platform cannot resolve a cache dir, and a render then has nowhere to go and
 /// says so rather than writing somewhere arbitrary.
-fn hub_asset_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+///
+/// Public because the asset protocol serves this folder as its `hubasset` root:
+/// a render coilbox drew is a picture of a unit whether or not it ever reaches
+/// the hub, and the webview reads it back through `./renderindex.rs` (issue
+/// #1724).
+pub fn hub_asset_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     coilbox_portable::cache_dir(app)
         .ok()
         .map(|d| d.join(HUB_ASSET_SUBDIR))
@@ -910,6 +916,119 @@ async fn unitsync_unit_render_keys<R: Runtime>(
     Ok(out)
 }
 
+/// `unitsync_remember_render` writes down which unit a drawn render is of, so it
+/// can be found again on this machine (issue #1724).
+///
+/// The encoded file is named after the sha256 of its own bytes, which is the name
+/// the hub's object path wants and is unusable to anybody who has not already got
+/// the bytes. This records the other name: the game, the unit and the angle a
+/// reader actually holds.
+///
+/// The arguments are the fields `unitsync_unit_render` handed back, so the caller
+/// passes them through rather than assembling anything. Called whether or not the
+/// picture is then uploaded: see `./renderindex.rs`.
+///
+/// `path` is the absolute path the encode answered with, and only its file name is
+/// kept: the folder is this plugin's own, and a record naming somewhere else would
+/// be a record the asset protocol cannot serve.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn unitsync_remember_render<R: Runtime>(
+    app: AppHandle<R>,
+    game: String,
+    unit: String,
+    variant: String,
+    path: String,
+    mime: String,
+    encode_profile: String,
+    source_hash: String,
+    model_digest: String,
+    source_archive: String,
+    renderer_version: u32,
+    width: u32,
+    height: u32,
+) -> Result<CliResult, ()> {
+    let Some(dir) = hub_asset_dir(&app) else {
+        return Ok(CliResult::err(
+            "no cache directory on this platform, so there is nowhere to keep the render"
+                .to_string(),
+        ));
+    };
+    let Some(file) = Path::new(&path)
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+    else {
+        return Ok(CliResult::err(format!("{path} does not name a file")));
+    };
+    if !dir.join(&file).is_file() {
+        return Ok(CliResult::err(format!(
+            "{file} is not in the render folder, so there is nothing to point at"
+        )));
+    }
+    let record = renderindex::RenderRecord {
+        game,
+        unit: unit.to_lowercase(),
+        variant,
+        file,
+        mime,
+        encode_profile,
+        source_hash,
+        model_digest,
+        source_archive,
+        renderer_version,
+        width,
+        height,
+    };
+    if !renderindex::remember(&dir, &record) {
+        return Ok(CliResult::err(
+            "could not write the render's index record".to_string(),
+        ));
+    }
+    Ok(CliResult::ok(serde_json::json!({ "remembered": true })))
+}
+
+/// `unitsync_local_renders` finds the renders this machine has already drawn for a
+/// batch of units (issue #1724).
+///
+/// One call for a whole layout, and it reads a few hundred bytes per unit off
+/// disk. Nothing is mounted, nothing is drawn, and a unit with no render is simply
+/// absent from the answer.
+///
+/// `renderer_version` is the caller's `RENDER_VERSION` and a record that does not
+/// match it is not answered with, so a bump misses everything ever drawn.
+/// `source_archive` is the game's archive when the caller knows it, and a record
+/// of a different one is then refused too. A caller that does not know gets the
+/// version check alone: see `./renderindex.rs` for what that costs.
+#[tauri::command]
+async fn unitsync_local_renders<R: Runtime>(
+    app: AppHandle<R>,
+    game: String,
+    variant: String,
+    renderer_version: u32,
+    source_archive: Option<String>,
+    units: Vec<String>,
+) -> Result<CliResult, ()> {
+    let Some(dir) = hub_asset_dir(&app) else {
+        return Ok(CliResult::ok(
+            serde_json::json!({ "renders": serde_json::Map::new() }),
+        ));
+    };
+    let found = renderindex::look_up(
+        &dir,
+        &game,
+        &variant,
+        renderer_version,
+        source_archive.as_deref(),
+        &units,
+    );
+    match serde_json::to_value(found) {
+        Ok(renders) => Ok(CliResult::ok(serde_json::json!({ "renders": renders }))),
+        Err(e) => Ok(CliResult::err(format!(
+            "could not read back the local renders: {e}"
+        ))),
+    }
+}
+
 /// `unitsync_map_catalog` reads the installed map library into the entries the
 /// hub takes (issue #1737).
 ///
@@ -1239,6 +1358,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_unit_models,
             unitsync_unit_render,
             unitsync_unit_render_keys,
+            unitsync_remember_render,
+            unitsync_local_renders,
             unitsync_map_catalog,
             unitsync_map_info,
             unitsync_map_skybox,

@@ -18,6 +18,8 @@ permissions = [
   "allow-unitsync-unit-models",
   "allow-unitsync-unit-render",
   "allow-unitsync-unit-render-keys",
+  "allow-unitsync-remember-render",
+  "allow-unitsync-local-renders",
   "allow-unitsync-map-catalog",
   "allow-unitsync-map-info",
   "allow-unitsync-map-skybox",
