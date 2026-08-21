@@ -460,7 +460,9 @@ async fn the_hosts_options_reach_joiners_whenever_they_arrived() {
     let mut tags = BTreeMap::new();
     tags.insert("game/startpostype".to_string(), "2".to_string());
     tags.insert("game/modoptions/startmetal".to_string(), "5000".to_string());
-    host.send(command::set_script_tags(&tags));
+    for line in command::set_script_tags(&tags) {
+        host.send(line);
+    }
     host.send(command::update_battle_info(0, false, 1234, "Comet Catcher"));
 
     let has_the_options = |client: &Client| {

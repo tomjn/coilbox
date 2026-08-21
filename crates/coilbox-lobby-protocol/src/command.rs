@@ -278,14 +278,40 @@ pub fn remove_start_rect(ally: u8) -> String {
     format!("REMOVESTARTRECT {ally}")
 }
 
-/// `SETSCRIPTTAGS <key=val\tkey=val...>`.
-pub fn set_script_tags(tags: &BTreeMap<String, String>) -> String {
-    let body = tags
-        .iter()
-        .map(|(k, v)| format!("{k}={v}"))
-        .collect::<Vec<_>>()
-        .join("\t");
-    format!("SETSCRIPTTAGS {body}")
+/// The most bytes of `key=value` payload to put in one `SETSCRIPTTAGS` line.
+///
+/// The TASServer protocol names no line limit and neither does this crate, but
+/// SPADS, the autohost every real lobby runs, packs its own script-tag lines to
+/// 900 characters and sends as many lines as it takes (`limitLineSize` in
+/// `spads.pl`). That is the only length evidence there is, so follow it. It
+/// started to matter when a battle began publishing its game's whole option list
+/// (#1837): Beyond All Reason declares 177 options, which is 6.7 KB.
+pub const SCRIPT_TAG_LINE_BUDGET: usize = 900;
+
+/// `SETSCRIPTTAGS <key=val\tkey=val...>`, packed into as many lines as
+/// [`SCRIPT_TAG_LINE_BUDGET`] takes. A receiver merges each line into the
+/// battle's tags, so splitting means the same thing as one long line.
+///
+/// Empty for no tags. A single pair wider than the budget goes out alone and
+/// over it, because dropping it would silently lose an option.
+pub fn set_script_tags(tags: &BTreeMap<String, String>) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut body = String::new();
+    for (k, v) in tags {
+        let pair = format!("{k}={v}");
+        if !body.is_empty() && body.len() + 1 + pair.len() > SCRIPT_TAG_LINE_BUDGET {
+            lines.push(format!("SETSCRIPTTAGS {body}"));
+            body.clear();
+        }
+        if !body.is_empty() {
+            body.push('\t');
+        }
+        body.push_str(&pair);
+    }
+    if !body.is_empty() {
+        lines.push(format!("SETSCRIPTTAGS {body}"));
+    }
+    lines
 }
 
 /// `REMOVESCRIPTTAGS <space-sep tags>`.
@@ -470,7 +496,67 @@ mod tests {
         let mut m = BTreeMap::new();
         m.insert("game/b".to_string(), "2".to_string());
         m.insert("game/a".to_string(), "1".to_string());
-        assert_eq!(set_script_tags(&m), "SETSCRIPTTAGS game/a=1\tgame/b=2");
+        assert_eq!(
+            set_script_tags(&m),
+            vec!["SETSCRIPTTAGS game/a=1\tgame/b=2"]
+        );
+    }
+
+    #[test]
+    fn set_script_tags_says_nothing_about_nothing() {
+        assert!(set_script_tags(&BTreeMap::new()).is_empty());
+    }
+
+    /// A battle now publishes its game's whole option list (#1837), which for
+    /// Beyond All Reason's 177 options is 6.7 KB. SPADS packs its own script-tag
+    /// lines to 900 characters, so match that rather than find out which servers
+    /// truncate.
+    #[test]
+    fn set_script_tags_packs_a_long_list_into_budgeted_lines() {
+        let mut m = BTreeMap::new();
+        for i in 0..100 {
+            m.insert(format!("game/modoptions/option{i:03}"), "value".to_string());
+        }
+        let lines = set_script_tags(&m);
+        assert!(lines.len() > 1, "100 options should not fit one line");
+        for line in &lines {
+            let body = line.strip_prefix("SETSCRIPTTAGS ").expect("line prefix");
+            assert!(
+                body.len() <= SCRIPT_TAG_LINE_BUDGET,
+                "line body of {} exceeds the budget",
+                body.len()
+            );
+        }
+        // Splitting must lose nothing: a receiver merges each line into the
+        // battle's tags, so the pairs across all lines are the whole map.
+        let pairs: Vec<&str> = lines
+            .iter()
+            .flat_map(|l| {
+                l.strip_prefix("SETSCRIPTTAGS ")
+                    .expect("line prefix")
+                    .split('\t')
+            })
+            .collect();
+        assert_eq!(pairs.len(), 100);
+        assert!(pairs.contains(&"game/modoptions/option042=value"));
+    }
+
+    /// One pair wider than the budget still goes out. Dropping it would silently
+    /// lose an option, which is the bug this whole area is about.
+    #[test]
+    fn set_script_tags_sends_an_oversized_pair_alone() {
+        let mut m = BTreeMap::new();
+        m.insert("game/modoptions/tweakdefs".to_string(), "x".repeat(2000));
+        m.insert("game/modoptions/maxunits".to_string(), "5000".to_string());
+        let lines = set_script_tags(&m);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(
+            lines[1],
+            format!(
+                "SETSCRIPTTAGS game/modoptions/tweakdefs={}",
+                "x".repeat(2000)
+            )
+        );
     }
 
     #[test]

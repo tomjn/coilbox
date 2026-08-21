@@ -162,7 +162,9 @@ fn hosted_session() -> Session {
     let mut tags = BTreeMap::new();
     tags.insert("game/startpostype".to_string(), "2".to_string());
     tags.insert("game/modoptions/maxunits".to_string(), "2000".to_string());
-    s.send(ALICE, &command::set_script_tags(&tags));
+    for line in command::set_script_tags(&tags) {
+        s.send(ALICE, &line);
+    }
     s.send(ALICE, &command::add_start_rect(0, 0, 0, 50, 200));
     s.send(ALICE, &command::add_start_rect(1, 150, 0, 200, 200));
     s.send(
@@ -253,6 +255,42 @@ fn options_and_boxes_set_before_the_joiner_arrived_still_reach_them() {
     assert_eq!(battle.members.len(), 2);
     assert!(battle.members["alice"].battle_status.mode);
     assert_eq!(battle.members["alice"].team_color, 255);
+}
+
+/// A battle publishes its game's whole option list now (#1837), so its tags no
+/// longer fit one line and go out packed to a budget. Both the live broadcast
+/// and the replay a joiner gets after their acknowledgement have to carry every
+/// line, or an option the host set silently never arrives.
+#[test]
+fn a_games_whole_option_list_reaches_a_joiner_however_many_lines_it_takes() {
+    let mut s = hosted_session();
+
+    // Beyond All Reason declares 177 options. 150 here is comfortably several
+    // lines at the 900-character budget.
+    let mut tags = BTreeMap::new();
+    for i in 0..150 {
+        tags.insert(
+            format!("game/modoptions/option{i:03}"),
+            format!("value{i:03}"),
+        );
+    }
+    let lines = command::set_script_tags(&tags);
+    assert!(lines.len() > 1, "150 options should not fit one line");
+    for line in &lines {
+        s.send(ALICE, line);
+    }
+
+    s.log_in(BOB, "bob");
+    s.send(BOB, "JOINBATTLE 1 * s3cret");
+
+    for (key, value) in &tags {
+        assert_eq!(
+            s.battle_seen_by(BOB).script_tags.get(key),
+            Some(value),
+            "{key} never reached the joiner"
+        );
+        assert_eq!(s.battle_seen_by(ALICE).script_tags.get(key), Some(value));
+    }
 }
 
 /// There is no start message in the protocol. The host's client sets its own

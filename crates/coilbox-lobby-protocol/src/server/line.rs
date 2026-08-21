@@ -250,13 +250,12 @@ pub fn remove_start_rect(ally: u8) -> String {
 
 /// `SETSCRIPTTAGS <key=val\tkey=val...>`. Current-battle scoped, like
 /// [`add_start_rect`].
-pub fn set_script_tags(tags: &BTreeMap<String, String>) -> String {
-    let body = tags
-        .iter()
-        .map(|(k, v)| format!("{k}={v}"))
-        .collect::<Vec<_>>()
-        .join("\t");
-    format!("SETSCRIPTTAGS {body}")
+///
+/// Same wire format in both directions, and the same line budget applies, so
+/// this is the client builder. A battle carrying its game's whole option list
+/// (#1837) is several lines rather than one, and each is sent on its own.
+pub fn set_script_tags(tags: &BTreeMap<String, String>) -> Vec<String> {
+    crate::command::set_script_tags(tags)
 }
 
 /// `REMOVESCRIPTTAGS <space-sep tags>`. Current-battle scoped.
