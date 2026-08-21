@@ -14,7 +14,7 @@ import {
   Undo,
   Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
 import { toast } from "sonner";
 
@@ -51,21 +51,13 @@ import {
   type PieceTransform,
   transformRoots,
 } from "../groupTransform";
+import { canMirror, mirrorCopy, mirrorPiece } from "../mirror";
 import {
-  canMirror,
-  followMirror,
-  mirrorCopy,
-  mirrorPiece,
-  mirrorTwin,
-} from "../mirror";
-import {
-  childrenOf,
   descendantIds,
   type LegoImported,
   type LegoPiece,
   type LegoProject,
   normalisePieceName,
-  pieceById,
   projectProblems,
   uniquePieceName,
 } from "../model";
@@ -85,12 +77,14 @@ import {
 } from "../projects";
 import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
-import { canReparent, reparentPiece } from "../reparent";
+import { parentOptions, reparentPiece } from "../reparent";
 import { sitOnGround, unitBounds } from "../s3oBuild";
 import type { ScriptTimeline } from "../scriptPlayback";
-import { isShortcut, shortcutLabel } from "../shortcuts";
+import { shortcutLabel } from "../shortcuts";
+import { useEditShortcuts } from "../useEditShortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { useRawGeometry } from "../useRawGeometry";
+import { useSymmetry } from "../useSymmetry";
 import { AimPointPanel } from "./components/AimPointPanel";
 import { AnchorList } from "./components/AnchorList";
 import { AnimationPanel } from "./components/AnimationPanel";
@@ -103,6 +97,7 @@ import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
 import { PieceTree } from "./components/PieceTree";
+import { SetPanel } from "./components/SetPanel";
 import { TestDrawer } from "./components/TestDrawer";
 import { TexturePicker } from "./components/TexturePicker";
 import { TransformFields } from "./components/TransformFields";
@@ -176,63 +171,15 @@ function Builder({ id }: { id: string | undefined }) {
    * Symmetry mode: a piece added now gets a mirrored twin the first time it is
    * put somewhere off the centre line, and the twin then follows it for as long
    * as it stays selected. A preference for the session, like the scale lock
-   * above, rather than something the unit carries.
+   * above, rather than something the unit carries. See `../useSymmetry`.
    */
-  const [symmetry, setSymmetry] = useState(false);
-  /**
-   * The pieces added since symmetry came on that have not been placed off the
-   * centre line yet.
-   *
-   * Every piece arrives at its parent's origin and is dragged into place after,
-   * so the moment a piece is added is too early to know where its twin belongs.
-   * These wait here until they are somewhere, and are twinned then. A ref, not
-   * state: nothing on screen reads it, and it is written from the same handlers
-   * that edit the document.
-   */
-  const awaitingTwin = useRef(new Set<string>());
-  /**
-   * The pairs symmetry mode is currently holding together: a piece and the twin
-   * that follows it.
-   *
-   * Kept only while the piece stays selected. Moving on to something else ends
-   * it, and the two are ordinary pieces from then on. That is the whole of the
-   * pairing: nothing is written to the document, so a unit reopened tomorrow
-   * has two pieces and no memory of which made which.
-   */
-  const twins = useRef(new Map<string, string>());
+  const symmetry = useSymmetry({ project: draft, selectedIds, edit });
+  const { queueTwin, place } = symmetry;
   const filter = usePartFilter(pack);
 
   useEffect(() => {
     loadPack().then(setPack, () => setPack(null));
   }, []);
-
-  // A piece that has left the document is not waiting for anything and has
-  // nothing following it: deleting it, or undoing the add that made it, takes it
-  // off both rather than leaving an id that could be twinned or moved if a redo
-  // brought it back.
-  useEffect(() => {
-    if (!draft) return;
-    const present = new Set(draft.pieces.map((piece) => piece.id));
-    for (const pieceId of awaitingTwin.current) {
-      if (!present.has(pieceId)) awaitingTwin.current.delete(pieceId);
-    }
-    for (const [pieceId, twinId] of twins.current) {
-      if (!present.has(pieceId) || !present.has(twinId))
-        twins.current.delete(pieceId);
-    }
-  }, [draft]);
-
-  // Selecting something else ends whatever symmetry was holding together. Read
-  // during the render that brings the new selection in, so the pair is already
-  // broken by the time anything can act on it, and compared by the contents of
-  // the selection rather than the array, which is rebuilt on every edit and
-  // would otherwise break the pair on the first drag.
-  const selectionKey = selectedIds.join(" ");
-  const pairedFor = useRef(selectionKey);
-  if (pairedFor.current !== selectionKey) {
-    pairedFor.current = selectionKey;
-    twins.current.clear();
-  }
 
   // The document's own problems, plus anything wrong between it and the packs
   // installed. Both are things to say rather than reasons to refuse the unit.
@@ -283,47 +230,6 @@ function Builder({ id }: { id: string | undefined }) {
       };
     });
     queueTwin(pieceId);
-  }
-
-  /**
-   * Remember a piece that arrived while symmetry was on, so its first placement
-   * mirrors it. Off, this is nothing: the piece is an ordinary piece.
-   */
-  function queueTwin(pieceId: string) {
-    if (symmetry) awaitingTwin.current.add(pieceId);
-  }
-
-  /**
-   * Apply a placement, then let symmetry mode answer for each piece it moved:
-   * bring the piece's twin along, or give it one if it is still owed one.
-   *
-   * One `edit` either way, so a piece and its twin arrive together, move
-   * together and take one undo step between them.
-   *
-   * A piece owed a twin keeps its place in the queue until it is somewhere a
-   * mirror means something. Dropped down the middle it is its own reflection,
-   * so it waits there rather than spending its turn.
-   */
-  function place(
-    pieceIds: string[],
-    change: (project: LegoProject) => LegoProject,
-  ) {
-    if (!draft) return;
-    let next = change(draft);
-    for (const pieceId of pieceIds) {
-      const twinId = twins.current.get(pieceId);
-      if (twinId) {
-        next = followMirror(next, pieceId, twinId);
-        continue;
-      }
-      if (!awaitingTwin.current.has(pieceId)) continue;
-      const twinned = mirrorTwin(next, pieceId, () => crypto.randomUUID());
-      if (!twinned) continue;
-      awaitingTwin.current.delete(pieceId);
-      twins.current.set(pieceId, twinned.twinId);
-      next = twinned.project;
-    }
-    edit(() => next);
   }
 
   function addEmpty() {
@@ -380,74 +286,6 @@ function Builder({ id }: { id: string | undefined }) {
     if (!additive) setSelectedId(pieceId);
     else if (pieceId) doc.toggleSelect(pieceId);
   }
-
-  // The key handler is registered once, so it reaches the current selection
-  // through a ref rather than the one it was created with.
-  const shortcutsRef = useRef({
-    remove: removeSelected,
-    undo: doc.undo,
-    redo: doc.redo,
-    copy: () => {},
-    paste: () => {},
-    duplicate: () => {},
-    symmetry: () => {},
-  });
-
-  // Backspace deletes the selected piece, which is what it does in every other
-  // 3D tool. Without this the webview treats it as browser Back and the whole
-  // page navigates away mid-edit.
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target;
-      // Never steal a key from a field. Undo in a text box is the browser's.
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        (target instanceof HTMLElement && target.isContentEditable)
-      ) {
-        return;
-      }
-
-      const shortcuts = shortcutsRef.current;
-
-      if (isShortcut("undo", event)) {
-        event.preventDefault();
-        shortcuts.undo();
-        return;
-      }
-      if (isShortcut("redo", event)) {
-        event.preventDefault();
-        shortcuts.redo();
-        return;
-      }
-      if (isShortcut("copy", event)) {
-        event.preventDefault();
-        void shortcuts.copy();
-        return;
-      }
-      if (isShortcut("paste", event)) {
-        event.preventDefault();
-        void shortcuts.paste();
-        return;
-      }
-      if (isShortcut("duplicate", event)) {
-        event.preventDefault();
-        shortcuts.duplicate();
-        return;
-      }
-      if (isShortcut("symmetry", event)) {
-        event.preventDefault();
-        shortcuts.symmetry();
-        return;
-      }
-      if (isShortcut("delete", event)) {
-        event.preventDefault();
-        shortcuts.remove();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
 
   // The pieces stay where they are on screen: only what carries them changes.
   function reparentAll(pieceIds: string[], parentId: string) {
@@ -660,19 +498,6 @@ function Builder({ id }: { id: string | undefined }) {
     if (copies.length > 0) doc.selectMany(copies);
   }
 
-  /**
-   * Turning symmetry off forgets what was waiting: those pieces are ordinary
-   * pieces now, and turning it back on hours later should not suddenly twin one
-   * of them.
-   */
-  function setSymmetryMode(on: boolean) {
-    setSymmetry(on);
-    if (!on) {
-      awaitingTwin.current.clear();
-      twins.current.clear();
-    }
-  }
-
   function mirrorSelection() {
     if (!selectedId) return;
     edit((project) => mirrorPiece(project, selectedId));
@@ -688,17 +513,15 @@ function Builder({ id }: { id: string | undefined }) {
     setSelectedId(copy.pieceId);
   }
 
-  // Rebound every render, so a shortcut always runs against the current
-  // selection rather than the one the listener was created with.
-  shortcutsRef.current = {
+  useEditShortcuts({
     remove: removeSelected,
     undo: doc.undo,
     redo: doc.redo,
     copy: copySelection,
     paste: pasteClipboard,
     duplicate: duplicateSelection,
-    symmetry: () => setSymmetryMode(!symmetry),
-  };
+    symmetry: () => symmetry.setOn(!symmetry.on),
+  });
 
   function setRole(pieceId: string, role: string | undefined) {
     edit((project) => ({
@@ -1002,8 +825,8 @@ function Builder({ id }: { id: string | undefined }) {
                 canSaveAsCompound={selectedIds.length > 0 && !imported}
                 onDelete={removeSelected}
                 canDelete={transformRoots(draft, selectedIds).length > 0}
-                symmetry={symmetry}
-                onSymmetryChange={setSymmetryMode}
+                symmetry={symmetry.on}
+                onSymmetryChange={symmetry.setOn}
                 placingAnchor={placingAnchor}
                 onPlaceAnchor={placeAnchor}
                 onCancelAnchor={() => setPlacingAnchor(false)}
@@ -1520,129 +1343,5 @@ function Builder({ id }: { id: string | undefined }) {
         </div>
       </div>
     </Collapsible>
-  );
-}
-
-/**
- * Every piece that could carry all of `pieceIds`, in tree order and with its
- * depth.
- *
- * The picker reads as the hierarchy it is choosing from, rather than a flat
- * list in which two pieces called `barrel` are indistinguishable. A set only
- * offers a parent every piece in it can move to, so the move never half
- * happens.
- */
-function parentOptions(
-  project: LegoProject,
-  pieceIds: string[],
-): { piece: LegoPiece; depth: number }[] {
-  const options: { piece: LegoPiece; depth: number }[] = [];
-  const visit = (parentId: string | null, depth: number) => {
-    for (const child of childrenOf(project, parentId)) {
-      if (pieceIds.every((id) => canReparent(project, id, child.id))) {
-        options.push({ piece: child, depth });
-      }
-      visit(child.id, depth + 1);
-    }
-  };
-  visit(null, 0);
-  return options;
-}
-
-/** Radix needs a non-empty value, and "they do not agree" needs one of its own. */
-const MIXED_PARENT = "mixed";
-
-/**
- * The panel for a set: what is in it, and the one thing that can be said about
- * all of it at once.
- *
- * No name, transform, pivot, role or anchor list, because those are one
- * piece's answers and three pieces do not have one between them. A field
- * showing the last-clicked piece's name in a panel headed "3 pieces" would
- * invite an edit that only landed on one of them. What is left is what a set
- * genuinely shares: what carries it, and the gizmo in the viewport.
- */
-function SetPanel({
-  project,
-  selectedIds,
-  onSelect,
-  onReparent,
-}: {
-  project: LegoProject;
-  selectedIds: string[];
-  onSelect: (pieceId: string) => void;
-  onReparent: (parentId: string, pieceIds: string[]) => void;
-}) {
-  const roots = transformRoots(project, selectedIds);
-  const parents = new Set(
-    roots.map((id) => pieceById(project, id)?.parentId ?? project.rootPieceId),
-  );
-  const shared = parents.size === 1 ? [...parents][0] : MIXED_PARENT;
-
-  return (
-    <div className="max-h-[55%] min-h-0 overflow-y-auto border-t border-border px-3 py-2">
-      <p className="text-xs text-muted-foreground">
-        {selectedIds.length} pieces selected
-      </p>
-      <ul className="mt-1 flex flex-wrap gap-1">
-        {selectedIds.map((pieceId) => {
-          const piece = pieceById(project, pieceId);
-          if (!piece) return null;
-          return (
-            <li key={pieceId}>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 px-2 text-xs"
-                onClick={() => onSelect(pieceId)}
-                title={`Select ${piece.name} on its own`}
-              >
-                {piece.name}
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
-
-      {roots.length > 0 ? (
-        <div className="mt-2">
-          <span className="text-xs text-muted-foreground">Hangs off</span>
-          <Select
-            value={shared}
-            onValueChange={(parentId) => onReparent(parentId, roots)}
-          >
-            <SelectTrigger
-              size="sm"
-              className="mt-1 w-full"
-              aria-label="Parent piece"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {shared === MIXED_PARENT ? (
-                <SelectItem value={MIXED_PARENT} disabled>
-                  Several
-                </SelectItem>
-              ) : null}
-              {parentOptions(project, roots).map(({ piece, depth }) => (
-                <SelectItem
-                  key={piece.id}
-                  value={piece.id}
-                  style={{ paddingLeft: 8 + depth * 12 }}
-                >
-                  {piece.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-
-      <p className="mt-2 text-xs text-muted-foreground">
-        Moving, turning or scaling this set works on each piece about the middle
-        of the set, so it keeps its shape. A piece already carried by another in
-        the set is left to its parent.
-      </p>
-    </div>
   );
 }

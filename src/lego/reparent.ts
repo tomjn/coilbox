@@ -12,7 +12,39 @@
 
 import * as THREE from "three";
 
-import { descendantIds, type LegoProject, pieceById } from "./model";
+import {
+  childrenOf,
+  descendantIds,
+  type LegoPiece,
+  type LegoProject,
+  pieceById,
+} from "./model";
+
+/**
+ * Every piece that could carry all of `pieceIds`, in tree order and with its
+ * depth.
+ *
+ * What the "hangs off" pickers offer. The list reads as the hierarchy it is
+ * choosing from, rather than a flat list in which two pieces called `barrel`
+ * are indistinguishable. A set only offers a parent every piece in it can move
+ * to, so the move never half happens.
+ */
+export function parentOptions(
+  project: LegoProject,
+  pieceIds: string[],
+): { piece: LegoPiece; depth: number }[] {
+  const options: { piece: LegoPiece; depth: number }[] = [];
+  const visit = (parentId: string | null, depth: number) => {
+    for (const child of childrenOf(project, parentId)) {
+      if (pieceIds.every((id) => canReparent(project, id, child.id))) {
+        options.push({ piece: child, depth });
+      }
+      visit(child.id, depth + 1);
+    }
+  };
+  visit(null, 0);
+  return options;
+}
 
 /** Where a piece sits in the unit, with every ancestor's transform applied. */
 export function worldMatrix(

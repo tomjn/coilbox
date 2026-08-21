@@ -2,7 +2,12 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
 import { type LegoPiece, type LegoProject, newProject } from "./model";
-import { canReparent, reparentPiece, worldMatrix } from "./reparent";
+import {
+  canReparent,
+  parentOptions,
+  reparentPiece,
+  worldMatrix,
+} from "./reparent";
 
 function project(pieces: Partial<LegoPiece>[]): LegoProject {
   const base = newProject({
@@ -147,5 +152,45 @@ describe("reparentPiece", () => {
     ]);
 
     expect(reparentPiece(doc, "arm", "hand")).toBe(doc);
+  });
+});
+
+describe("parentOptions", () => {
+  /** A hull off the root, a leg off the hull, a foot off the leg, an arm off
+   *  the root. */
+  const doc = project([
+    { id: "hull", parentId: "root" },
+    { id: "leg", parentId: "hull" },
+    { id: "foot", parentId: "leg" },
+    { id: "arm", parentId: "root" },
+  ]);
+
+  /** What the picker would print, in the order it would print it. */
+  function offered(pieceIds: string[]): string[] {
+    return parentOptions(doc, pieceIds).map(({ piece }) => piece.id);
+  }
+
+  it("offers every piece in the unit, in tree order, when nothing is moving", () => {
+    expect(offered([])).toEqual(["root", "hull", "leg", "foot", "arm"]);
+  });
+
+  it("indents each piece by how deep it hangs", () => {
+    expect(parentOptions(doc, []).map(({ depth }) => depth)).toEqual([
+      0, 1, 2, 3, 1,
+    ]);
+  });
+
+  it("leaves out the piece itself and everything under it", () => {
+    // A piece cannot hang off its own leg, and it is already where it is.
+    expect(offered(["leg"])).toEqual(["root", "hull", "arm"]);
+  });
+
+  it("offers only what every piece of a set could move to", () => {
+    // The arm could go into the leg. The hull carries the leg, so it cannot.
+    expect(offered(["hull", "arm"])).toEqual(["root"]);
+  });
+
+  it("offers nothing at all for the root, which hangs off nothing", () => {
+    expect(offered(["root"])).toEqual([]);
   });
 });
