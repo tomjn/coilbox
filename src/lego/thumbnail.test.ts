@@ -147,6 +147,34 @@ describe("thumbnailCamera", () => {
     );
   });
 
+  it("gets the whole of a unit read out of a game into shot", () => {
+    // Cortex's laboratory in Beyond All Reason, 166 by 97 by 121 elmos. The
+    // thumbnail of it was a close-up of one corner of the pad: framing stopped
+    // 60 out, and the far plane stopped at a fixed 500, either of which crops
+    // a unit this big.
+    const unit = new THREE.Group();
+    unit.add(new THREE.Mesh(new THREE.BoxGeometry(166, 97, 121)));
+    unit.updateMatrixWorld(true);
+
+    const camera = thumbnailCamera(unit);
+    camera.updateMatrixWorld(true);
+    const frustum = new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(
+        camera.projectionMatrix,
+        camera.matrixWorldInverse,
+      ),
+    );
+
+    const box = new THREE.Box3().setFromObject(unit);
+    for (const x of [box.min.x, box.max.x]) {
+      for (const y of [box.min.y, box.max.y]) {
+        for (const z of [box.min.z, box.max.z]) {
+          expect(frustum.containsPoint(new THREE.Vector3(x, y, z))).toBe(true);
+        }
+      }
+    }
+  });
+
   it("still points somewhere for a unit with nothing in it", () => {
     const camera = thumbnailCamera(new THREE.Group());
 
