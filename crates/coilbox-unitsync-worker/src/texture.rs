@@ -1,7 +1,7 @@
-//! Shared texture decoding: turn a supported image (incl. DXT/BCn `.dds`) into an
-//! `image::RgbaImage`, and encode a small PNG preserving alpha. Used by the
-//! unit-buildpic mode, deliberately decoupled so archive preview and header art
-//! can adopt DDS support later.
+//! Shared texture decoding: turn a supported image (incl. DXT/BCn `.dds` and
+//! `.pcx`) into an `image::RgbaImage`, and encode a small PNG preserving alpha.
+//! Used by the unit-buildpic mode, deliberately decoupled so archive preview and
+//! header art can adopt DDS support later.
 
 use base64::Engine;
 use image::ImageEncoder;
@@ -11,11 +11,12 @@ const ICON_MAX: u32 = 128;
 
 /// Decode a texture by file extension into an `RgbaImage`, or `None` if the format
 /// isn't supported or the bytes don't decode. `.dds` is unpacked here (see
-/// [`decode_dds`]), everything else goes through the `image` crate
-/// (extension-driven because TGA has no magic bytes).
+/// [`decode_dds`]) and `.pcx` in [`crate::pcx`], everything else goes through the
+/// `image` crate (extension-driven because TGA has no magic bytes).
 pub fn decode_texture(ext: &str, bytes: &[u8]) -> Option<image::RgbaImage> {
     match ext.to_lowercase().as_str() {
         "dds" => decode_dds(bytes),
+        "pcx" => crate::pcx::decode(bytes),
         "png" => load_rgba(bytes, image::ImageFormat::Png),
         "jpg" | "jpeg" => load_rgba(bytes, image::ImageFormat::Jpeg),
         "tga" => load_rgba(bytes, image::ImageFormat::Tga),
@@ -195,6 +196,22 @@ mod tests {
     #[test]
     fn unknown_extension_is_none() {
         assert!(decode_texture("xyz", &[0, 1, 2]).is_none());
+    }
+
+    /// `.pcx` reaches the PCX decoder, which is the wire a build pic travels
+    /// down. One green pixel: a 128-byte header then three 8-bit planes.
+    #[test]
+    fn routes_pcx_to_its_own_decoder() {
+        let mut raw = vec![0u8; 128];
+        raw[0] = 0x0a;
+        raw[1] = 5;
+        raw[2] = 1;
+        raw[3] = 8;
+        raw[65] = 3;
+        raw[66] = 1;
+        raw.extend_from_slice(&[0x00, 0x40, 0x00]);
+        let img = decode_texture("PCX", &raw).expect("pcx should decode");
+        assert_eq!(img.get_pixel(0, 0).0, [0x00, 0x40, 0x00, 255]);
     }
 
     /// DXT fourcc + BCn DXGI formats map to the right texpresso format.

@@ -31,6 +31,7 @@ mod metalmap;
 mod metalspots;
 mod minimap;
 mod model;
+mod pcx;
 mod renderkey;
 mod seed;
 mod skirmishai;
