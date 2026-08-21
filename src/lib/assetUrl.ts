@@ -136,6 +136,19 @@ export function unitsyncFactionLogoUrl(file: string): string {
 }
 
 /**
+ * URL for a top down render coilbox drew of a unit, under `hubasset/<file>`
+ * (issue #1724).
+ *
+ * The file name comes out of the render index rather than being built here: the
+ * encode names a render after the sha256 of its own bytes, which is the hub's
+ * object path and tells nobody which unit it is of, so
+ * `@/hub/assets/localRenders.ts` asks Rust which file a unit's render is in.
+ */
+export function hubAssetUrl(file: string): string {
+  return schemeUrl("hubasset", file);
+}
+
+/**
  * URL for a downscaled preview of a map author's source image, under
  * `mapconvthumb/<file>`. The 3D preview asks for a large heightmap, which is
  * megabytes of PNG, so the cache file is named rather than inlined.

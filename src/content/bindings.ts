@@ -1525,6 +1525,89 @@ export const unitsyncUnitRenderKeys = defineCommand<
 >("coilbox-unitsync", "unitsync_unit_render_keys");
 
 /**
+ * Write down which unit a drawn render is of, so this machine can find it again
+ * (issue #1724).
+ *
+ * The encoded file is named after the sha256 of its own bytes, which is the name
+ * the hub's object path wants and tells a second reader nothing. This records the
+ * other name. Pass back the fields {@link unitsyncUnitRender} answered with.
+ *
+ * Called whether or not the picture is then sent anywhere. Renders are only drawn
+ * today when picture uploads are on, so this does not on its own give pictures to
+ * somebody who has never turned them on, but keeping one is not the same decision
+ * as sending it and the gate belongs on the sending.
+ */
+export const unitsyncRememberRender = defineCommand<
+  {
+    /** The game's modinfo shortname, which is what a plan asks by. */
+    game: string;
+    /** The unit's internal name. Lower cased on the way in, so the case a layout
+     *  happens to carry cannot decide whether the picture is found. */
+    unit: string;
+    /** `render:<angle>`. */
+    variant: string;
+    /** The absolute path the encode answered with. Only the file name is kept. */
+    path: string;
+    mime: string;
+    encodeProfile: string;
+    sourceHash: string;
+    modelDigest: string;
+    sourceArchive: string;
+    rendererVersion: number;
+    width: number;
+    height: number;
+  },
+  { remembered: boolean }
+>("coilbox-unitsync", "unitsync_remember_render");
+
+/** One render this machine has already drawn, as the index holds it. */
+export interface LocalRender {
+  game: string;
+  unit: string;
+  variant: string;
+  /** The file in the render cache, loaded via `hubAssetUrl`. */
+  file: string;
+  /** Where those bytes are now, for a caller that has to hand them on rather than
+   *  draw them: the uploader takes a path. Worked out when the record is found,
+   *  because where the cache folder is depends on the machine. */
+  path: string;
+  mime: string;
+  encodeProfile: string;
+  sourceHash: string;
+  modelDigest: string;
+  sourceArchive: string;
+  rendererVersion: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The renders this machine has already drawn for a batch of units (issue #1724).
+ *
+ * One call for a whole layout. Nothing is mounted and nothing is drawn: it reads a
+ * few hundred bytes per unit off disk, so a plan of twenty buildings can ask on a
+ * page load. A unit with no render is absent from the answer rather than null.
+ *
+ * `rendererVersion` is the caller's `RENDER_VERSION` and a render drawn by a
+ * different one is not answered with, so a bump misses everything ever drawn.
+ * `sourceArchive` is the game's archive when the caller knows it, and a render of
+ * a different one is then refused too.
+ */
+export const unitsyncLocalRenders = defineCommand<
+  {
+    game: string;
+    variant: string;
+    rendererVersion: number;
+    /** The game's archive, when the caller knows it. A caller that does not gets
+     *  the renderer-version check alone, and can be handed a render of a model the
+     *  game has since replaced. */
+    sourceArchive?: string;
+    units: string[];
+  },
+  { renders: Record<string, LocalRender> }
+>("coilbox-unitsync", "unitsync_local_renders");
+
+/**
  * One map's facts as the hub takes them, in the hub's own snake case (issue
  * #1732). Passed through to `hub_publish_maps` verbatim rather than translated,
  * because the hub refuses a field name it does not know.
