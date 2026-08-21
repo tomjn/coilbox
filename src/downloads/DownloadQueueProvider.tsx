@@ -187,6 +187,13 @@ interface DownloadQueueValue {
   cancel: (id: string) => void;
   /** Current status of the item with this identity, or null if not tracked. */
   statusFor: (identity: string) => QueueStatus | null;
+  /**
+   * Why the last attempt at this identity failed, or null if the last attempt
+   * did not fail. Outlives the row it came from, so a screen can still say what
+   * went wrong once the queue has pruned it (issue #1860). Cleared when the same
+   * download is asked for again.
+   */
+  failureFor: (identity: string) => string | null;
   /** The tracked item with this identity, or null. For pages that enqueue
    * directly and want to draw the download's progress themselves. */
   itemFor: (identity: string) => QueueItem | null;
@@ -228,6 +235,20 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   itemsRef.current = items;
 
   const [reported, setReported] = useState<ReportedDownload[]>([]);
+
+  /**
+   * The last failure for each request identity, kept beside the queue rather
+   * than in it. A settled row is pruned within seconds so the indicator does not
+   * fill with downloads that are over, and that used to take the only copy of
+   * the message with it (issue #1860). Holding it here by identity means the
+   * screen that asked for the download can still say why it failed, including
+   * after it has been navigated away from and come back to.
+   *
+   * There is no timer on these. A failure stops being worth showing when the
+   * download is asked for again, which is where it is cleared, and there is no
+   * span of time after which "this failed" stops being the truth.
+   */
+  const [failures, setFailures] = useState<Record<string, string>>({});
 
   // Set synchronously in startNext so the pump can't launch a second item before
   // the "active" status commits to state.
@@ -369,6 +390,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           rate: IDLE_RATE,
         } as const;
         patch(item.id, meta);
+        if (!canceled) setFailures((f) => ({ ...f, [item.identity]: msg }));
         settled = { ...item, ...meta } as QueueItem;
       } finally {
         activeIdRef.current = null;
@@ -403,6 +425,13 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
 
   const enqueue = useCallback((input: EnqueueInput): string => {
     const identity = identityOf(input);
+    // Asking for the download again is what ends the last attempt's failure
+    // message, whether or not a new item is added for it.
+    setFailures((f) => {
+      if (!(identity in f)) return f;
+      const { [identity]: _gone, ...rest } = f;
+      return rest;
+    });
     const already = itemsRef.current.find(
       (i) => i.identity === identity && isPending(i),
     );
@@ -508,6 +537,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     [statusByIdentity],
   );
 
+  const failureFor = useCallback(
+    (identity: string) => failures[identity] ?? null,
+    [failures],
+  );
+
   const itemByIdentity = useMemo(() => {
     const m = new Map<string, QueueItem>();
     for (const i of items) m.set(i.identity, i);
@@ -569,6 +603,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       waitFor,
       cancel,
       statusFor,
+      failureFor,
       itemFor,
       onComplete,
     }),
@@ -582,6 +617,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       waitFor,
       cancel,
       statusFor,
+      failureFor,
       itemFor,
       onComplete,
     ],
