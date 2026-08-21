@@ -29,6 +29,15 @@ export interface GameUnitFacts {
   buildOptions: string[];
 }
 
+/** One faction, as the game's modinfo spells it. */
+export interface GameFaction {
+  /** What a unit's `factionKey` points at. The hub joins the two character for
+   *  character. */
+  key: string;
+  /** The name a player sees, in the game's own spelling. */
+  name: string;
+}
+
 /** One whole game. There is no `complete` here: the Rust side always sends the
  *  whole game, because a partial batch would retire the units it left out. */
 export interface GameFacts {
@@ -38,6 +47,10 @@ export interface GameFacts {
   release: string;
   /** The start unit of each side that has one. */
   startUnits: string[];
+  /** Every faction the game has. Sending them replaces the hub's held set for
+   *  this game, so leaving the field off is how a caller says nothing about
+   *  them rather than saying there are none. */
+  factions?: GameFaction[];
   units: GameUnitFacts[];
 }
 

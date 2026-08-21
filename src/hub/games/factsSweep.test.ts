@@ -4,6 +4,7 @@ import { MUTATOR_FOLDER, SCRATCH_FOLDER } from "@/lib/generatedGames";
 import type { GameFacts, GameFactsResult } from "./facts";
 import {
   factionKeys,
+  gameFactions,
   type GameSweepTools,
   gameSweepSummary,
   gamesToSend,
@@ -206,7 +207,95 @@ describe("factionKeys", () => {
   });
 });
 
+describe("gameFactions", () => {
+  it("names a faction the way the modinfo names it, trimmed and nothing else", () => {
+    expect(gameFactions([{ name: "  Armada ", startUnit: "armcom" }])).toEqual([
+      { key: "armada", name: "Armada" },
+    ]);
+  });
+
+  it("ignores a side with no start unit, the way the unit picker does", () => {
+    expect(
+      gameFactions([
+        { name: "Armada", startUnit: "armcom" },
+        { name: "Spectator" },
+      ]),
+    ).toEqual([{ key: "armada", name: "Armada" }]);
+  });
+
+  /// A duplicate key would be the hub writing one row twice, and the two
+  /// spellings would take turns winning.
+  it("makes two sides that lowercase to one key one faction", () => {
+    expect(
+      gameFactions([
+        { name: "Armada", startUnit: "armcom" },
+        { name: "ARMADA", startUnit: "arm2com" },
+      ]),
+    ).toEqual([{ key: "armada", name: "Armada" }]);
+  });
+});
+
 describe("sweepGameFacts", () => {
+  /// The join the hub does at read time is exact, so the key a unit carries and
+  /// the key the faction is filed under have to come out of one expression. This
+  /// is the assertion that they do, over a modinfo spelt the way a real one is:
+  /// padded, capitalised however the author felt, and not always ASCII.
+  it("sends faction names verbatim and keys that its units point at", async () => {
+    const kit = tools(
+      [game("Beyond All Reason test", "bar.sdz")],
+      {
+        "bar.sdz": [
+          unit("armcom", ["armlab"], "Armada Commander"),
+          unit("armlab", [], "Armada Bot Lab"),
+          unit("legcom", ["leglab"], "Legion Commander"),
+          unit("leglab", [], "Legion Bot Lab"),
+          unit("gaiatree", [], "Tree"),
+        ],
+      },
+      {
+        "bar.sdz": [
+          { name: "  ARMada ", startUnit: "armcom" },
+          { name: "Legião", startUnit: "legcom" },
+          { name: "Gaia" },
+        ],
+      },
+    );
+
+    await sweepGameFacts(target, () => {}, kit);
+    const [facts] = kit.sent();
+
+    expect(facts.factions).toEqual([
+      { key: "armada", name: "ARMada" },
+      { key: "legião", name: "Legião" },
+    ]);
+    const keyed = Object.fromEntries(
+      facts.units.map((sent) => [sent.name, sent.factionKey]),
+    );
+    expect(keyed).toEqual({
+      armcom: "armada",
+      armlab: "armada",
+      legcom: "legião",
+      leglab: "legião",
+      gaiatree: undefined,
+    });
+    const keys = facts.factions?.map((sent) => sent.key) ?? [];
+    for (const sent of facts.units) {
+      if (sent.factionKey) expect(keys).toContain(sent.factionKey);
+    }
+  });
+
+  /// Factions are a replaced set, so an empty list is the hub being told this
+  /// game has none. A read that found no sides has not learnt that.
+  it("says nothing about factions when no side declares a start unit", async () => {
+    const kit = tools([game("Balanced Annihilation 12.24", "ba1224.sdz")], {}, {
+      "ba1224.sdz": [{ name: "Spectator" }],
+    });
+
+    await sweepGameFacts(target, () => {}, kit);
+
+    expect(kit.sent()[0]).not.toHaveProperty("factions");
+  });
+
   it("sends what one game says about its units", async () => {
     const kit = tools(
       [game("Balanced Annihilation 12.24", "ba1224.sdz")],
@@ -227,6 +316,7 @@ describe("sweepGameFacts", () => {
         shortname: "BA",
         release: "12.24",
         startUnits: ["armcom"],
+        factions: [{ key: "armada", name: "Armada" }],
         units: [
           {
             name: "armcom",
@@ -389,5 +479,19 @@ describe("gameSweepSummary", () => {
       refused: [{ kind: "unit", name: "armodd", outcome: "refused" }],
     });
     expect(said).toContain("would not take 1 unit");
+  });
+
+  /// A refused faction and a refused unit are fixed in different places, so the
+  /// sentence does not call one the other.
+  it("counts a refused faction as a faction", () => {
+    const said = gameSweepSummary({
+      ...base,
+      refused: [
+        { kind: "unit", name: "armodd", outcome: "refused" },
+        { kind: "unit", name: "corodd", outcome: "refused" },
+        { kind: "faction", name: "", outcome: "refused" },
+      ],
+    });
+    expect(said).toContain("would not take 2 units and 1 faction");
   });
 });
