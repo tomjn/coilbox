@@ -732,4 +732,57 @@ mod tests {
         println!("{status}: {}", response.text().await.unwrap_or_default());
         assert_eq!(status, 401);
     }
+
+    /// A two faction game landing in a local hub's catalog, and staying put the
+    /// second time. Needs a hub at the address below and an access token for an
+    /// account on it in `COILBOX_HUB_TOKEN`.
+    ///
+    /// This is the one thing the stand-in above cannot prove: that the body this
+    /// module builds is a body the hub's own parser accepts. Point it at a local
+    /// hub only. It writes to whatever it is pointed at.
+    ///
+    /// ```text
+    /// COILBOX_HUB_TOKEN=... cargo test -p tauri-plugin-coilbox-hub live_game_facts_land -- --ignored --nocapture
+    /// ```
+    #[tokio::test]
+    #[ignore = "writes to a running hub, so it cannot run in CI"]
+    async fn live_game_facts_land_in_the_catalog() {
+        let token = std::env::var("COILBOX_HUB_TOKEN").expect("COILBOX_HUB_TOKEN is not set");
+        let url = api_url("http://localhost:3000", SUBMIT_PATH, "Sending").unwrap();
+        let two_factions = GameFacts {
+            shortname: "CBTEST".into(),
+            release: "1.0".into(),
+            start_units: vec!["armcom".into(), "corcom".into()],
+            units: vec![
+                GameUnitFacts {
+                    build_options: vec!["armlab".into()],
+                    ..unit("armcom")
+                },
+                GameUnitFacts {
+                    faction_key: Some("armada".into()),
+                    ..unit("armlab")
+                },
+                GameUnitFacts {
+                    faction_key: Some("cortex".into()),
+                    build_options: vec!["corlab".into()],
+                    ..unit("corcom")
+                },
+                GameUnitFacts {
+                    faction_key: Some("cortex".into()),
+                    ..unit("corlab")
+                },
+            ],
+        };
+        let body = check_and_build(&two_factions).unwrap();
+
+        let first = send_facts(&url, &token, &body).await.unwrap();
+        println!("first: {first:?}");
+        assert!(first.iter().all(|r| r.outcome != GameFactsOutcome::Refused));
+
+        let again = send_facts(&url, &token, &body).await.unwrap();
+        println!("again: {again:?}");
+        assert!(again
+            .iter()
+            .all(|r| r.outcome == GameFactsOutcome::Unchanged));
+    }
 }
