@@ -251,6 +251,36 @@ describe("buildUnitDef", () => {
     expect(on).toContain("usepiececollisionvolumes = true");
   });
 
+  it("asks for piece selection only when the unit wants it", () => {
+    const off = buildUnitDef(
+      project("Probe", "probe"),
+      bounds({ x: 40, z: 8 }),
+    );
+    const on = buildUnitDef(
+      { ...project("Probe", "probe"), pieceSelection: true },
+      bounds({ x: 40, z: 8 }),
+    );
+
+    expect(off).not.toContain("usepieceselectionvolumes");
+    expect(on).toContain("usepieceselectionvolumes = true");
+  });
+
+  it("keeps the two piece switches independent of each other", () => {
+    // The engine reads them in two different functions, and shot at piece by
+    // piece while clicked as one box is a unit somebody meant to build.
+    const shot = buildUnitDef(
+      { ...project("Probe", "probe"), pieceCollision: true },
+      bounds({ x: 40, z: 8 }),
+    );
+    const clicked = buildUnitDef(
+      { ...project("Probe", "probe"), pieceSelection: true },
+      bounds({ x: 40, z: 8 }),
+    );
+
+    expect(shot).not.toContain("usepieceselectionvolumes");
+    expect(clicked).not.toContain("usepiececollisionvolumes");
+  });
+
   it("still writes the unit's own volume when pieces do the hitting", () => {
     // It is still the selection shape and still the sphere an explosion
     // measures, so dropping it would break both.

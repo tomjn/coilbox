@@ -198,6 +198,15 @@ export interface LegoProject {
    * unit. See `collisionVolume.ts`.
    */
   pieceCollision?: boolean;
+  /**
+   * Whether a click picks the unit off each piece instead of the whole unit.
+   *
+   * The engine's own second switch, read in `ParseSelectionVolume` rather than
+   * `ParseCollisionVolume`, over the same boxes. Separate from
+   * `pieceCollision` because it is a separate choice: a unit can be shot at
+   * piece by piece and still be clicked as one easy shape.
+   */
+  pieceSelection?: boolean;
   unitDef?: Record<string, string | number | boolean>;
   notes?: string;
   /** Canned animations applied to this unit, from `animPresets.ts`. */
@@ -507,6 +516,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(mid ? { mid } : {}),
     ...(collisionVolume ? { collisionVolume } : {}),
     ...(d.pieceCollision === true ? { pieceCollision: true } : {}),
+    ...(d.pieceSelection === true ? { pieceSelection: true } : {}),
     ...(typeof d.unitDef === "object" && d.unitDef !== null
       ? { unitDef: d.unitDef as Record<string, string | number | boolean> }
       : {}),

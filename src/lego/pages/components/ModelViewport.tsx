@@ -947,9 +947,14 @@ export function ModelViewport({
     state.editCollision = editCollision;
     const shown = showCollision || editCollision;
     showCollisionVolume(state, shown ? project : null, pack, raw);
+    // One set of boxes for both switches: the engine builds them once and
+    // hit-tests and click-tests against the same tree, so either switch alone
+    // is reason to draw them.
     showPieceCollisionVolumes(
       state,
-      shown && project.pieceCollision ? project : null,
+      shown && (project.pieceCollision || project.pieceSelection)
+        ? project
+        : null,
       pack,
       raw,
     );
