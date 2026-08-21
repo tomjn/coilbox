@@ -8,7 +8,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -22,10 +22,16 @@ import { legoThumbUrl } from "../../lib/assetUrl";
 import type { LegoAtlas } from "../atlas";
 import { type LegoProject, newProject } from "../model";
 import { loadPack } from "../pack";
+import { groupProjects } from "../projectGroups";
 import { validateProjectName } from "../projectNames";
 import { deleteProject, saveProject, useLegoProjects } from "../projects";
 import { GameModelDrawer } from "./components/GameModelDrawer";
 import { ImportDrawer } from "./components/ImportDrawer";
+
+/** A section label, sized as a label rather than as a title so the game names
+ *  under it stay the thing you read. */
+const SECTION =
+  "text-xs font-medium uppercase tracking-wide text-muted-foreground";
 
 /** The name field being edited, and why it cannot be saved yet, if at all. */
 interface Renaming {
@@ -50,6 +56,11 @@ interface Renaming {
  * empty, either by choosing a game and then a unit in it (`GameModelDrawer`) or
  * by pointing at a file (`ImportDrawer`). Both cover a project recovered from an
  * export and a model imported whole as raw geometry.
+ *
+ * Those arrive in sections rather than in one list, because a unit you built and
+ * a unit you opened look alike in a list and neither says where it came from
+ * (#1819). The sections only appear once there is something to separate, so
+ * somebody who has never opened a model sees the page exactly as it was.
  */
 export default function ProjectsPage() {
   const { projects, loading, error } = useLegoProjects();
@@ -63,6 +74,10 @@ export default function ProjectsPage() {
   /** The units whose thumbnail would not load, so the card says so instead. */
   const [noPicture, setNoPicture] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
+  const grouped = useMemo(() => groupProjects(projects), [projects]);
+  /** Whether anything here came from somebody else's model, which is the only
+   *  reason to split the page up at all. */
+  const sectioned = grouped.games.length > 0 || grouped.files.length > 0;
 
   // Only to know whether there is a choice to offer. Creating a unit loads the
   // pack again, which is the same cached promise.
@@ -157,6 +172,120 @@ export default function ProjectsPage() {
     });
   }
 
+  /**
+   * One unit's card.
+   *
+   * A function rather than a component so that renaming, which lives in this
+   * component's state, does not have to be threaded through props, and so a
+   * re-render never remounts the card and loses the open name field.
+   */
+  function card(project: LegoProject) {
+    const isRenaming = renaming?.id === project.id;
+    return (
+      <li
+        key={project.id}
+        className="group relative rounded border border-border transition-colors hover:border-foreground/30"
+      >
+        <Link to={`/lego/${project.id}`} className="block">
+          {noPicture.has(project.id) ? (
+            // Said rather than left blank: a unit gets its picture the first
+            // time it is drawn, so one with nothing to show has either never
+            // been opened or has nothing in it yet.
+            <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-t bg-muted px-3 text-center">
+              <ImageOff className="text-muted-foreground" size={20} />
+              <span className="text-xs text-muted-foreground">
+                No picture yet. Open it to make one.
+              </span>
+            </div>
+          ) : (
+            <img
+              src={legoThumbUrl(project.id)}
+              alt=""
+              className="aspect-square w-full rounded-t bg-muted object-cover"
+              onError={() =>
+                setNoPicture((known) => new Set(known).add(project.id))
+              }
+            />
+          )}
+          <div className="px-3 py-2">
+            <p className="truncate text-sm font-medium">
+              {isRenaming ? "" : project.name}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {isRenaming
+                ? ""
+                : `${project.pieces.length} ${
+                    project.pieces.length === 1 ? "piece" : "pieces"
+                  } · ${project.unitName}`}
+            </p>
+          </div>
+        </Link>
+        {isRenaming ? (
+          // A sibling of the Link, not a descendant, so a click here never
+          // bubbles into its navigation.
+          <div className="absolute inset-x-0 bottom-0 rounded-b bg-background px-3 py-2">
+            <Input
+              autoFocus
+              value={renaming.draft}
+              onChange={(event) =>
+                setRenaming({
+                  id: project.id,
+                  draft: event.target.value,
+                  error: null,
+                })
+              }
+              onFocus={(event) => event.target.select()}
+              onBlur={commitRename}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitRename();
+                } else if (event.key === "Escape") {
+                  event.preventDefault();
+                  cancelRename();
+                }
+              }}
+              aria-label={`Rename ${project.name}`}
+              aria-invalid={renaming.error ? true : undefined}
+              className="h-6 text-sm"
+            />
+            {renaming.error ? (
+              <p className="mt-0.5 truncate text-xs text-destructive">
+                {renaming.error}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        <Button
+          size="sm"
+          variant="ghost"
+          className="absolute left-1 top-1 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+          aria-label={`Rename ${project.name}`}
+          onClick={() => startRename(project.id, project.name)}
+        >
+          <Pencil size={14} />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="absolute right-1 top-1 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+          aria-label={`Delete ${project.name}`}
+          onClick={() => remove(project.id, project.name)}
+        >
+          <Trash2 size={14} />
+        </Button>
+      </li>
+    );
+  }
+
+  function grid(items: LegoProject[]) {
+    return (
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] content-start gap-4">
+        {items.map((project) => card(project))}
+      </ul>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader
@@ -247,106 +376,35 @@ export default function ProjectsPage() {
           </Button>
         </div>
       ) : (
-        <ul className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(220px,1fr))] content-start gap-4 overflow-y-auto p-6">
-          {projects.map((project) => {
-            const isRenaming = renaming?.id === project.id;
-            return (
-              <li
-                key={project.id}
-                className="group relative rounded border border-border transition-colors hover:border-foreground/30"
-              >
-                <Link to={`/lego/${project.id}`} className="block">
-                  {noPicture.has(project.id) ? (
-                    // Said rather than left blank: a unit gets its picture the
-                    // first time it is drawn, so one with nothing to show has
-                    // either never been opened or has nothing in it yet.
-                    <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-t bg-muted px-3 text-center">
-                      <ImageOff className="text-muted-foreground" size={20} />
-                      <span className="text-xs text-muted-foreground">
-                        No picture yet. Open it to make one.
-                      </span>
-                    </div>
-                  ) : (
-                    <img
-                      src={legoThumbUrl(project.id)}
-                      alt=""
-                      className="aspect-square w-full rounded-t bg-muted object-cover"
-                      onError={() =>
-                        setNoPicture((known) => new Set(known).add(project.id))
-                      }
-                    />
-                  )}
-                  <div className="px-3 py-2">
-                    <p className="truncate text-sm font-medium">
-                      {isRenaming ? "" : project.name}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {isRenaming
-                        ? ""
-                        : `${project.pieces.length} ${
-                            project.pieces.length === 1 ? "piece" : "pieces"
-                          } · ${project.unitName}`}
-                    </p>
-                  </div>
-                </Link>
-                {isRenaming ? (
-                  // A sibling of the Link, not a descendant, so a click here
-                  // never bubbles into its navigation.
-                  <div className="absolute inset-x-0 bottom-0 rounded-b bg-background px-3 py-2">
-                    <Input
-                      autoFocus
-                      value={renaming.draft}
-                      onChange={(event) =>
-                        setRenaming({
-                          id: project.id,
-                          draft: event.target.value,
-                          error: null,
-                        })
-                      }
-                      onFocus={(event) => event.target.select()}
-                      onBlur={commitRename}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          commitRename();
-                        } else if (event.key === "Escape") {
-                          event.preventDefault();
-                          cancelRename();
-                        }
-                      }}
-                      aria-label={`Rename ${project.name}`}
-                      aria-invalid={renaming.error ? true : undefined}
-                      className="h-6 text-sm"
-                    />
-                    {renaming.error ? (
-                      <p className="mt-0.5 truncate text-xs text-destructive">
-                        {renaming.error}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="absolute left-1 top-1 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-                  aria-label={`Rename ${project.name}`}
-                  onClick={() => startRename(project.id, project.name)}
-                >
-                  <Pencil size={14} />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="absolute right-1 top-1 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-                  aria-label={`Delete ${project.name}`}
-                  onClick={() => remove(project.id, project.name)}
-                >
-                  <Trash2 size={14} />
-                </Button>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="flex-1 space-y-6 overflow-y-auto p-6">
+          {/* A heading over your own units only earns its space once there is
+              something else below it to tell it apart from. */}
+          {grouped.own.length > 0 ? (
+            <section className="space-y-3">
+              {sectioned ? <h2 className={SECTION}>Built from parts</h2> : null}
+              {grid(grouped.own)}
+            </section>
+          ) : null}
+
+          {grouped.games.length > 0 ? (
+            <section className="space-y-4">
+              <h2 className={SECTION}>Opened from a game</h2>
+              {grouped.games.map((game) => (
+                <div key={game.key} className="space-y-3">
+                  <h3 className="text-sm font-medium">{game.label}</h3>
+                  {grid(game.projects)}
+                </div>
+              ))}
+            </section>
+          ) : null}
+
+          {grouped.files.length > 0 ? (
+            <section className="space-y-3">
+              <h2 className={SECTION}>Opened from a file</h2>
+              {grid(grouped.files)}
+            </section>
+          ) : null}
+        </div>
       )}
     </div>
   );
