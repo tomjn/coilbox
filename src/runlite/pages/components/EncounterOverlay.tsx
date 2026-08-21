@@ -6,6 +6,7 @@ import { BackToMapButton } from "../../../conquest/pages/components/BackToMapBut
 import {
   BracketFrame,
   HUD_ACCENT_INK,
+  HUD_CARD_CLASS,
 } from "../../../conquest/pages/components/hudChrome";
 import { invalidateMapPreview, invalidateScans } from "../../../content/config";
 import { ErrorBanner } from "../../../content/pages/components/states";
@@ -66,13 +67,15 @@ export function EncounterOverlay({
         {/* Its own gutter box beneath the back arrow — save this fight as a
             skirmish preset to replay later. Prefers the exact draft last launched
             (so an outcome save captures the fight as fought, with its restrictions
-            and perks), else the live briefing snapshot. */}
+            and perks), else the live briefing snapshot.
+            The button is shared with pages that can go light, so it paints no
+            box of its own and takes the measured card from here (#1818). */}
         {enc.installedGame && (
           <SaveAsPresetButton
             appearance="gutter"
             getDraft={() => enc.lastSnapshot ?? enc.snapshot()}
             defaultName={`${kindLabel} — ${spec?.mapName ?? "battle"}`}
-            className="absolute right-full top-16 mr-4"
+            className={`absolute right-full top-16 mr-4 ${HUD_CARD_CLASS}`}
           />
         )}
         <header className="flex flex-col gap-1">

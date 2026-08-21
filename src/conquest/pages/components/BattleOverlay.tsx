@@ -167,13 +167,15 @@ export function BattleOverlay({
         {/* Its own gutter box beneath the back arrow — save this fight as a
             skirmish preset to replay later. Prefers the exact draft last launched
             (so an outcome save captures the fight as fought, not the node's
-            now-advanced next matchup), else the live briefing snapshot. */}
+            now-advanced next matchup), else the live briefing snapshot.
+            The button is shared with pages that can go light, so it paints no
+            box of its own and takes the measured card from here (#1818). */}
         {run.installedGame && (
           <SaveAsPresetButton
             appearance="gutter"
             getDraft={() => run.lastSnapshot ?? run.snapshot()}
             defaultName={`${node.name} vs ${enemyFaction?.name ?? "garrison"}`}
-            className="absolute right-full top-16 mr-4"
+            className={`absolute right-full top-16 mr-4 ${HUD_CARD_CLASS}`}
           />
         )}
         {/* Another gutter box beneath the preset save button. Read-only lit
