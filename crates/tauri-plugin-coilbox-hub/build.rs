@@ -12,6 +12,7 @@ const COMMANDS: &[&str] = &[
     "hub_upload_cancel",
     "hub_maps_have",
     "hub_publish_maps",
+    "hub_publish_game_facts",
 ];
 
 fn main() {

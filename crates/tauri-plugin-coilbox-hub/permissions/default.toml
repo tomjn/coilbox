@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows signing in to the Coilbox hub with Discord, signing out again, reading who is signed in, publishing as them, and asking what pictures and maps it has and sending it pictures and map facts read from local archives once the user has agreed to it."
+description = "Allows signing in to the Coilbox hub with Discord, signing out again, reading who is signed in, publishing as them, and asking what pictures and maps it has and sending it pictures, map facts and game facts read from local archives once the user has agreed to it."
 permissions = [
   "allow-hub-sign-in",
   "allow-hub-sign-out",
@@ -12,4 +12,5 @@ permissions = [
   "allow-hub-upload-cancel",
   "allow-hub-maps-have",
   "allow-hub-publish-maps",
+  "allow-hub-publish-game-facts",
 ]

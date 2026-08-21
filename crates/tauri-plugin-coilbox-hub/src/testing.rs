@@ -640,6 +640,194 @@ impl MapHubServer {
     }
 }
 
+// --------------------------------------------------------------- game catalog
+
+/// How the game stand-in answers.
+enum GameAnswers {
+    /// Answer properly, per unit, following `submit_game_facts`: facts the hub
+    /// has never held are `accepted`, facts it holds under a release it has not
+    /// seen are `recorded`, and the same facts under the same release again are
+    /// `unchanged`.
+    Accepting,
+    /// Answer this to everything, for the shapes a real hub only produces when
+    /// something is wrong.
+    Canned { status: u16, body: String },
+    /// Answer these in order, cycling once they run out. For a hub that recovers
+    /// between attempts.
+    InTurn(Vec<(u16, String)>),
+}
+
+#[derive(Default)]
+struct GameSeen {
+    requests: usize,
+    headers: String,
+    body: String,
+}
+
+/// A stand-in hub answering `POST /api/v1/games/facts`.
+pub struct GameHubServer {
+    base: String,
+    seen: Arc<Mutex<GameSeen>>,
+}
+
+impl GameHubServer {
+    /// A hub holding nothing, taking whatever it is sent.
+    pub fn accepting() -> Self {
+        Self::start(GameAnswers::Accepting)
+    }
+
+    /// A hub answering this status and body to anything.
+    pub fn answering(status: u16, body: Value) -> Self {
+        Self::start(GameAnswers::Canned {
+            status,
+            body: body.to_string(),
+        })
+    }
+
+    /// A hub answering these in order, cycling once they run out.
+    pub fn answering_in_turn(answers: &[(u16, Value)]) -> Self {
+        Self::start(GameAnswers::InTurn(
+            answers
+                .iter()
+                .map(|(status, body)| (*status, body.to_string()))
+                .collect(),
+        ))
+    }
+
+    fn start(answering: GameAnswers) -> Self {
+        let seen = Arc::new(Mutex::new(GameSeen::default()));
+        let recorded = seen.clone();
+        let bound = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        bound.set_nonblocking(true).unwrap();
+        let port = bound.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let listener = TcpListener::from_std(bound).unwrap();
+            let mut turn = 0usize;
+            // Unit key to the facts held for it, and every release each unit has
+            // been reported under.
+            let mut held: HashMap<String, String> = HashMap::new();
+            let mut releases: HashMap<String, ()> = HashMap::new();
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let Some((head, body)) = read_request(&mut sock).await else {
+                    continue;
+                };
+                let parsed: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
+                {
+                    let mut seen = recorded.lock().unwrap();
+                    seen.requests += 1;
+                    seen.headers = head;
+                    seen.body = body;
+                }
+
+                let (status, answer) = match &answering {
+                    GameAnswers::Canned { status, body } => (*status, body.clone()),
+                    GameAnswers::InTurn(answers) => {
+                        let (status, body) = &answers[turn % answers.len()];
+                        turn += 1;
+                        (*status, body.clone())
+                    }
+                    GameAnswers::Accepting => (200, game_answer(&parsed, &mut held, &mut releases)),
+                };
+                let response = format!(
+                    "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{answer}",
+                    answer.len()
+                );
+                let _ = sock.write_all(response.as_bytes()).await;
+                let _ = sock.flush().await;
+            }
+        });
+        Self {
+            base: format!("http://127.0.0.1:{port}"),
+            seen,
+        }
+    }
+
+    /// The hub address, which the route hangs off.
+    pub fn base(&self) -> String {
+        self.base.clone()
+    }
+
+    pub fn requests(&self) -> usize {
+        self.seen.lock().unwrap().requests
+    }
+
+    pub fn last_headers(&self) -> String {
+        self.seen.lock().unwrap().headers.clone()
+    }
+}
+
+/// The hub's own answer to a game submission, built from what it holds.
+///
+/// The comparison is over the same facts `unitDigest` hashes, build options
+/// sorted and deduplicated, so a client that lists them in a different order
+/// gets `unchanged` here exactly as it would there.
+fn game_answer(
+    body: &Value,
+    held: &mut HashMap<String, String>,
+    releases: &mut HashMap<String, ()>,
+) -> String {
+    let shortname = body
+        .get("shortname")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let release = body
+        .get("release")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let units = body
+        .get("units")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    let results: Vec<Value> = units
+        .iter()
+        .map(|unit| {
+            let name = unit.get("name").and_then(Value::as_str).unwrap_or_default();
+            let key = format!("{shortname}\u{0}{name}");
+            let mut options: Vec<String> = unit
+                .get("buildOptions")
+                .and_then(Value::as_array)
+                .map(|o| {
+                    o.iter()
+                        .filter_map(|v| v.as_str().map(str::to_owned))
+                        .collect()
+                })
+                .unwrap_or_default();
+            options.sort();
+            options.dedup();
+            let facts = serde_json::json!({
+                "fullName": unit.get("fullName"),
+                "factionKey": unit.get("factionKey"),
+                "buildOptions": options,
+                "stats": unit.get("stats"),
+            })
+            .to_string();
+
+            let outcome = if held.get(&key) != Some(&facts) {
+                held.insert(key.clone(), facts);
+                releases.insert(format!("{key}\u{0}{release}"), ());
+                "accepted"
+            } else if releases
+                .insert(format!("{key}\u{0}{release}"), ())
+                .is_none()
+            {
+                "recorded"
+            } else {
+                "unchanged"
+            };
+            serde_json::json!({ "kind": "unit", "name": name, "outcome": outcome })
+        })
+        .collect();
+
+    serde_json::json!({
+        "format": "coilbox-hub-games",
+        "version": 1,
+        "results": results,
+    })
+    .to_string()
+}
+
 fn array_len(body: &Value, field: &str) -> usize {
     body.get(field)
         .and_then(Value::as_array)
