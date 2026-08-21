@@ -143,6 +143,7 @@ describe("launchScenario", () => {
       reader: "author",
       dataDir: "/data",
       games,
+      optionSchema: [],
       rescan,
       launch,
     });
@@ -242,6 +243,7 @@ describe("launchScenario", () => {
       reader: "author",
       dataDir: "/data",
       games: [LOOSE],
+      optionSchema: [],
       rescan,
       launch,
       disabledUnits: ["corbhmth"],
@@ -319,6 +321,7 @@ describe("launchScenario", () => {
       reader: "author",
       dataDir: "/data",
       games: [LOOSE],
+      optionSchema: [],
       rescan,
       launch,
       units: [{ name: "ak" }, { name: "lifter" }],

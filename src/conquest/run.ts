@@ -10,6 +10,7 @@ import { useReplayUserState } from "../content/replayUserState";
 import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
 import {
+  gameOptionSchema,
   toBattleConfig,
   usePreferredTarget,
   useSkirmishAis,
@@ -224,6 +225,10 @@ export function useConquestBattleRun(
       gameType: draft.gameName,
       startPosType: draft.startPosType,
       modOptions: draft.modOptionValues,
+      optionSchema: await gameOptionSchema(
+        target,
+        installedGame.primaryArchive.name,
+      ),
       disabledUnits: draft.restrictions?.disabledUnits,
     });
     setError(null);

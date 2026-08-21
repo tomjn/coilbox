@@ -80,7 +80,6 @@ import {
   useSkirmishDraft,
 } from "../drafts";
 import { mergeGameAi } from "../gameAi";
-import { effectiveOptions } from "../modOptions";
 import { usePlay } from "../PlayProvider";
 import {
   PRESET_KIND_VERSION,
@@ -452,7 +451,8 @@ export default function SkirmishPage() {
         mapName: selectedMap.name,
         gameType: selectedGame.name,
         startPosType,
-        modOptions: effectiveOptions(modOptions, modOptionValues),
+        modOptions: modOptionValues,
+        optionSchema: modOptions,
         disabledUnits: restrictions?.disabledUnits,
       }),
       restrictions,

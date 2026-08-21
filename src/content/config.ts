@@ -564,6 +564,26 @@ export type UnitsyncInfoStatus =
 /** Session cache of game info, keyed by `dataDir::enginePath::gameArchive`. */
 const gameInfoCache = new Map<string, GameInfoResult>();
 
+/**
+ * Fetch (or read from cache) a game's info, sharing `useUnitsyncGameInfo`'s
+ * session cache. For a caller that needs the answer at a moment rather than as
+ * render state: a launch has to know the game's options before it writes the
+ * start script, and cannot wait a render for a hook to settle. Only a syncable
+ * result is cached, matching the hook.
+ */
+export async function primeGameInfo(
+  enginePath: string,
+  dataDir: string,
+  gameArchive: string,
+): Promise<GameInfoResult> {
+  const key = `${dataDir}::${enginePath}::${gameArchive}`;
+  const cached = gameInfoCache.get(key);
+  if (cached) return cached;
+  const res = await unitsyncGameInfo({ enginePath, dataDir, gameArchive });
+  if (res.checksum) gameInfoCache.set(key, res);
+  return res;
+}
+
 /** Lazily load a game's sides + unit count (loads the game's archive set). */
 export function useUnitsyncGameInfo(
   enginePath?: string,

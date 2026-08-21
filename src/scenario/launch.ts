@@ -21,7 +21,7 @@
  * answer to a bad id is silence, so the refusal has to come first.
  */
 
-import type { GameItem } from "../content/bindings";
+import type { ConfigOption, GameItem } from "../content/bindings";
 import { isSdd } from "../content/format";
 import { isMutatorArchive } from "../lib/generatedGames";
 import type { BattleConfig } from "../play/bindings";
@@ -176,6 +176,14 @@ export interface ScenarioLaunchInput {
   /** The installed games, from the current content scan. */
   games: GameItem[];
   /**
+   * The scenario's game's option list, read from unitsync by the caller (see
+   * `gameOptionSchema`). Every option it declares that the setup left alone is
+   * written into the start script at the game's default, so a scenario plays
+   * the game the way the game intends. Empty means the caller could not read
+   * them, and the engine falls back to its own built-in values.
+   */
+  optionSchema: ConfigOption[];
+  /**
    * Force a fresh unitsync scan and hand back the games it found. The engine
    * takes its game list from the same archive cache unitsync writes, so a
    * generated mutator is only launchable once one has run.
@@ -284,6 +292,7 @@ export async function launchScenario(
     reader,
     dataDir,
     games,
+    optionSchema,
     rescan,
     launch,
     disabledUnits,
@@ -372,6 +381,7 @@ export async function launchScenario(
         ...scenario.setup.modOptionValues,
         [MISSION_MODOPTION]: scenario.id,
       },
+      optionSchema,
     }),
     captured,
   );

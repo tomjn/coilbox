@@ -116,4 +116,11 @@ describe("effectiveOptions", () => {
     );
     expect(out).toEqual({ note: "" });
   });
+
+  it("keeps a value the game never declared, which is how a scenario arms the runtime", () => {
+    const out = effectiveOptions([opt("startmetal", { default: "1000" })], {
+      coilbox_mission: "s1",
+    });
+    expect(out).toEqual({ startmetal: "1000", coilbox_mission: "s1" });
+  });
 });

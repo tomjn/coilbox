@@ -21,6 +21,7 @@ import {
   withoutGeneratedGames,
 } from "../../../lib/generatedGames";
 import {
+  gameOptionSchema,
   initialParticipants,
   toBattleConfig,
   usePreferredTarget,
@@ -202,6 +203,12 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
           gameType: scratch.name,
           startPosType: START_POS_RANDOM,
           modOptions: {},
+          // The scratch game is a mutator over the picked game and declares no
+          // options of its own, so the base game's are the ones that apply.
+          optionSchema: await gameOptionSchema(
+            target,
+            game.primaryArchive.name,
+          ),
         }),
         executable: target.executable,
         dataDir: target.dataDir,

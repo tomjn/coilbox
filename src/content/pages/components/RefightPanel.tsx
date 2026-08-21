@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/popover";
 import {
   aiByline,
+  gameOptionSchema,
   type Participant,
   resolveRandomSides,
   toBattleConfig,
@@ -82,6 +83,7 @@ function RefightForm({
     gameCandidates,
     selectedGameName,
     setSelectedGameName,
+    installedGame,
     missingGame,
     missingMap,
     sides,
@@ -175,6 +177,12 @@ function RefightForm({
         gameType: draft.gameName,
         startPosType: draft.startPosType,
         modOptions: draft.modOptionValues,
+        // The replay's own options win. This only supplies the target game's
+        // defaults for anything the replay did not record.
+        optionSchema: await gameOptionSchema(
+          target,
+          installedGame?.primaryArchive.name,
+        ),
       });
       const res = await launch("skirmish", {
         config,

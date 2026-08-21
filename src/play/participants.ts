@@ -1,7 +1,8 @@
 import { isBlackHex, pickTeamColorHex } from "@/lib/teamColor";
-import type { SkirmishAi } from "../content/bindings";
+import type { ConfigOption, SkirmishAi } from "../content/bindings";
 import type { BattleConfig } from "./bindings";
 import type { BattleRestrictions } from "./drafts";
+import { effectiveOptions } from "./modOptions";
 
 /**
  * The pure participant model and its derivation to an engine `BattleConfig`,
@@ -309,13 +310,27 @@ export function rgbToHex([r, g, b]: Rgb): string {
  * native or game Lua — becomes an `[AI]` block: `LoadSkirmishAIs` is the engine's
  * only route into the script, and it decides Lua-ness itself by matching the
  * shortname against the game's `LuaAI.lua`.
+ *
+ * Mod options are filled from `optionSchema` on the way through, so every
+ * screen that launches a game writes the same `[modoptions]` block for the same
+ * choices.
  */
 export function toBattleConfig(opts: {
   participants: Participant[];
   mapName: string;
   gameType: string;
   startPosType: number;
+  /** Only the options the setup actually chose. Defaults are filled in here. */
   modOptions: Record<string, string>;
+  /**
+   * The game's own option list, from unitsync. Every option it declares and
+   * `modOptions` leaves unset is written into the script at the game's default,
+   * because the engine substitutes its own built-in value otherwise (see
+   * `effectiveOptions`). Required so a new launch path cannot quietly skip it,
+   * which is how skirmish came to be the only screen that filled defaults
+   * (issue #1835). Pass `[]` only for a game with no options to read.
+   */
+  optionSchema: ConfigOption[];
   /** Units to disable entirely (rendered as `[RESTRICT]` limit 0). */
   disabledUnits?: string[];
 }): BattleConfig {
@@ -324,9 +339,10 @@ export function toBattleConfig(opts: {
     mapName,
     gameType,
     startPosType,
-    modOptions,
+    optionSchema,
     disabledUnits,
   } = opts;
+  const modOptions = effectiveOptions(optionSchema, opts.modOptions);
   const you = participants[0];
   const active = participants.filter((p) => !(p.kind === "you" && p.spectator));
 

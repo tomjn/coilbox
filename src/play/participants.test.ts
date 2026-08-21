@@ -146,6 +146,7 @@ describe("toBattleConfig AI blocks", () => {
     gameType: "SplinterFaction 0.1.75",
     startPosType: 0,
     modOptions: {},
+    optionSchema: [],
   };
 
   const withAi = (kind: "native" | "lua", shortName: string) =>
@@ -292,6 +293,7 @@ describe("toBattleConfig team slots", () => {
     gameType: "g",
     startPosType: 0,
     modOptions: {},
+    optionSchema: [],
   };
 
   it("emits teams in effective slot order with players and AIs following", () => {
@@ -362,6 +364,7 @@ describe("applyRestrictions", () => {
       gameType: "g",
       startPosType: 0,
       modOptions: {},
+      optionSchema: [],
     });
 
   it("adds advantage and income onto the player team (team 0)", () => {
@@ -394,6 +397,7 @@ describe("applyRestrictions", () => {
       gameType: "g",
       startPosType: 0,
       modOptions: {},
+      optionSchema: [],
     });
     const out = applyRestrictions(permuted, { advantage: 0.1 });
     expect(out.teams[1].advantage).toBeCloseTo(0.1, 5); // yours
