@@ -8,6 +8,10 @@
  *
  * The viewport draws the same volume, so the numbers here have a shape on
  * screen: see the collision toggle in its camera group.
+ *
+ * Offsets are measured from the unit's aim point, which is `AimPointPanel`
+ * next door. Moving that point would carry the volume with it, so the panel
+ * there writes offsets that hold it still instead.
  */
 
 import { Button } from "@picoframe/frame";
@@ -18,7 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
 import {
   COLLISION_VOLUME_LABELS,
-  derivedCollisionVolume,
+  effectiveCollisionVolume,
   isIgnoredByEngine,
 } from "../../collisionVolume";
 import type {
@@ -56,7 +60,7 @@ export function CollisionPanel({
     [project, pack, raw],
   );
   const custom = project.collisionVolume;
-  const volume = custom ?? derivedCollisionVolume(bounds);
+  const volume = effectiveCollisionVolume(project, bounds);
 
   function setAxis(
     field: "scales" | "offsets",
@@ -98,14 +102,16 @@ export function CollisionPanel({
         onCommit={(axis, value) => setAxis("scales", axis, value)}
       />
       <Vec3Row
-        label="Offset from the middle"
+        label="Offset from the aim point"
         values={volume.offsets}
         onCommit={(axis, value) => setAxis("offsets", axis, value)}
       />
 
       <p className="text-xs text-muted-foreground">
         Size is the volume's full width on each axis, not its radius. The offset
-        is measured from the middle of the unit, so zero is centred on it.
+        is measured from the unit's aim point, which the Aim panel sets and
+        which most units leave on the middle of their bounding box. Move the aim
+        point and these change to keep the volume where it is.
       </p>
 
       <p className="text-xs text-muted-foreground">

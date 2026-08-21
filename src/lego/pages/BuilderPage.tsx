@@ -37,11 +37,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { aimPoint } from "../aimPoint";
 import { addAnchor, removeAnchor, updateAnchor } from "../anchors";
 import { ROLES, restAngleWarnings } from "../animPresets";
 import { unitAtlas } from "../atlas";
 import { legoTexturePrune } from "../bindings";
 import { parseClipboardPiece, serializeClipboardPiece } from "../clipboard";
+import { reanchorCollisionVolume } from "../collisionVolume";
 import { selectionAsCompound } from "../compounds";
 import { usePartFilter } from "../filter";
 import {
@@ -84,11 +86,12 @@ import {
 import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { canReparent, reparentPiece } from "../reparent";
-import { sitOnGround } from "../s3oBuild";
+import { sitOnGround, unitBounds } from "../s3oBuild";
 import type { ScriptTimeline } from "../scriptPlayback";
 import { isShortcut, shortcutLabel } from "../shortcuts";
 import { useLegoDocument } from "../useLegoDocument";
 import { useRawGeometry } from "../useRawGeometry";
+import { AimPointPanel } from "./components/AimPointPanel";
 import { AnchorList } from "./components/AnchorList";
 import { AnimationPanel } from "./components/AnimationPanel";
 import { AtlasPicker } from "./components/AtlasPicker";
@@ -149,9 +152,9 @@ function Builder({ id }: { id: string | undefined }) {
   // the side panel always comes back on Pieces. See `../panels`.
   const [stripOpen, setStripOpen] = usePanelOpen("strip");
   const [asideOpen, setAsideOpen] = usePanelOpen("aside");
-  const [aside, setAside] = useState<"pieces" | "animation" | "collision">(
-    "pieces",
-  );
+  const [aside, setAside] = useState<
+    "pieces" | "animation" | "collision" | "aim"
+  >("pieces");
   const [exporting, setExporting] = useState(false);
   const [testing, setTesting] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -1013,6 +1016,9 @@ function Builder({ id }: { id: string | undefined }) {
                 onCollisionChange={(collisionVolume) =>
                   edit((project) => ({ ...project, collisionVolume }))
                 }
+                // The same reasoning, for the marker the aim point panel is
+                // about: opening the panel draws the point it is describing.
+                showAimPoint={asideOpen && aside === "aim"}
               />
             </div>
 
@@ -1146,9 +1152,49 @@ function Builder({ id }: { id: string | undefined }) {
                 >
                   Collision
                 </Button>
+                <Button
+                  size="sm"
+                  variant={aside === "aim" ? "default" : "outline"}
+                  onClick={() => setAside("aim")}
+                  aria-pressed={aside === "aim"}
+                >
+                  Aim
+                </Button>
               </ButtonGroup>
 
-              {aside === "collision" ? (
+              {aside === "aim" ? (
+                <AimPointPanel
+                  project={draft}
+                  pack={pack}
+                  raw={raw}
+                  onChange={(mid) =>
+                    edit((project) => {
+                      const bounds = unitBounds(project, pack, raw);
+                      const from = aimPoint(project, bounds);
+                      const to = mid ?? bounds.mid;
+                      // A volume somebody fitted to the geometry is measured
+                      // from the aim point, so moving the point would drag it
+                      // off. Its offsets absorb the move instead.
+                      const held = project.collisionVolume
+                        ? {
+                            ...project,
+                            collisionVolume: reanchorCollisionVolume(
+                              project.collisionVolume,
+                              from,
+                              to,
+                            ),
+                          }
+                        : project;
+                      // A pinned radius came out of an imported header and was
+                      // measured from that header's own mid, so deciding the
+                      // aim point here makes it stale. Dropping it has the
+                      // export measure a sphere round the point instead.
+                      const { radius: _stale, mid: _replaced, ...rest } = held;
+                      return mid ? { ...rest, mid } : rest;
+                    })
+                  }
+                />
+              ) : aside === "collision" ? (
                 <CollisionPanel
                   project={draft}
                   pack={pack}

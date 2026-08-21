@@ -200,6 +200,23 @@ describe("buildUnitDef", () => {
     expect(lua).toContain('collisionvolumeoffsets = "0 0 0"');
   });
 
+  /** The engine adds these offsets to the unit's midPos, which is the aim
+   *  point, so a unit aimed at somewhere other than the middle of its box
+   *  needs offsets that put the box back where the geometry is. */
+  it("offsets the derived volume back onto the box when the aim point has moved", () => {
+    const doc: LegoProject = {
+      ...project("Probe", "probe"),
+      mid: [0, 6, 0],
+    };
+
+    const lua = buildUnitDef(
+      doc,
+      bounds({ x: 10, y: 40, z: 10, mid: [0, 20, 0] }),
+    );
+
+    expect(lua).toContain('collisionvolumeoffsets = "0 14 0"');
+  });
+
   it("writes the unit's own volume rather than the derived one", () => {
     const doc: LegoProject = {
       ...project("Probe", "probe"),

@@ -8,9 +8,15 @@ import {
   MIN_COLLISION_SIZE,
   pieceCollisionVolume,
   pieceCollisionVolumes,
+  reanchorCollisionVolume,
   resizeCollisionFace,
 } from "./collisionVolume";
-import { type LegoPiece, type LegoProject, newProject } from "./model";
+import {
+  type LegoCollisionVolume,
+  type LegoPiece,
+  type LegoProject,
+  newProject,
+} from "./model";
 import type { BakedPiece, UnitBounds } from "./s3oBuild";
 
 function bounds(
@@ -35,7 +41,7 @@ function project(): LegoProject {
 
 describe("derivedCollisionVolume", () => {
   it("is the model's own bounding box, centred on the middle", () => {
-    expect(derivedCollisionVolume(bounds(40, 12, 88))).toEqual({
+    expect(derivedCollisionVolume(bounds(40, 12, 88), [0, 0, 0])).toEqual({
       type: "box",
       scales: [40, 12, 88],
       offsets: [0, 0, 0],
@@ -43,11 +49,45 @@ describe("derivedCollisionVolume", () => {
   });
 
   it("stays centred however far the unit is built from the origin", () => {
-    // Offsets are measured from the model's middle, so moving the unit moves
-    // the point they start from with it.
+    // Offsets are measured from the aim point, and a unit that has not been
+    // given one is aimed at the middle of its own box.
     expect(
-      derivedCollisionVolume(bounds(4, 4, 4, [30, 9, -12])).offsets,
+      derivedCollisionVolume(bounds(4, 4, 4, [30, 9, -12]), [30, 9, -12])
+        .offsets,
     ).toEqual([0, 0, 0]);
+  });
+
+  /** The derived volume is the bounding box, and it has to stay on the box
+   *  once the aim point offsets are measured from has moved off it. */
+  it("stays on the bounding box when the aim point is somewhere else", () => {
+    expect(
+      derivedCollisionVolume(bounds(10, 40, 10, [0, 20, 0]), [0, 6, 0]).offsets,
+    ).toEqual([0, 14, 0]);
+  });
+});
+
+describe("reanchorCollisionVolume", () => {
+  const volume: LegoCollisionVolume = {
+    type: "box",
+    scales: [4, 4, 4],
+    offsets: [0, 2, 0],
+  };
+
+  /** Moving the aim point moves everything measured from it. A volume somebody
+   *  fitted to the geometry has to stay on the geometry. */
+  it("leaves the volume where it is when the aim point moves", () => {
+    const moved = reanchorCollisionVolume(volume, [0, 20, 0], [0, 6, 0]);
+
+    expect(moved.offsets).toEqual([0, 16, 0]);
+    // Same place in the model: 20 + 2 before, 6 + 16 after.
+    expect(moved.scales).toEqual([4, 4, 4]);
+    expect(moved.type).toBe("box");
+  });
+
+  it("has nothing to do when the aim point has not moved", () => {
+    expect(reanchorCollisionVolume(volume, [1, 2, 3], [1, 2, 3])).toEqual(
+      volume,
+    );
   });
 });
 
@@ -73,6 +113,15 @@ describe("effectiveCollisionVolume", () => {
         bounds(4, 6, 8),
       ),
     ).toEqual(volume);
+  });
+
+  it("holds the derived volume on the box when the unit has an aim point", () => {
+    expect(
+      effectiveCollisionVolume(
+        { ...project(), mid: [0, 6, 0] },
+        bounds(10, 40, 10, [0, 20, 0]),
+      ).offsets,
+    ).toEqual([0, 14, 0]);
   });
 });
 
@@ -181,9 +230,9 @@ describe("isIgnoredByEngine", () => {
     expect(
       isIgnoredByEngine({ type: "box", scales: [1, 1, 1], offsets: [0, 0, 0] }),
     ).toBe(true);
-    expect(isIgnoredByEngine(derivedCollisionVolume(bounds(0, 0, 0)))).toBe(
-      true,
-    );
+    expect(
+      isIgnoredByEngine(derivedCollisionVolume(bounds(0, 0, 0), [0, 0, 0])),
+    ).toBe(true);
   });
 
   it("passes a volume with any axis wider than an elmo", () => {

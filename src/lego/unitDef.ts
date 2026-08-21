@@ -73,8 +73,11 @@ export function luaString(value: string): string {
 }
 
 /**
- * `bounds` is the model's world-space bounding box, in elmos, as `buildS3o`'s
- * header measures it. Both the footprint and the collision volume come off it.
+ * `bounds` is the model's world-space bounding box, in elmos, as `unitBounds`
+ * measures it. Both the footprint and the collision volume come off it. It has
+ * to be the measured box rather than an `S3oBuild`, whose `mid` is the header's
+ * and so is the aim point: the volume's offsets are the distance between the
+ * two, and a build has already collapsed them into one number.
  *
  * Each footprint axis gets its own step rather than one step shared from a
  * collision radius, so a unit longer than it is wide claims a rectangle of

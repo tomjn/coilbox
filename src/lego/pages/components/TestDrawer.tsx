@@ -35,7 +35,7 @@ import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import type { RawGeometry } from "../../rawGeometry";
 import { importedTextures } from "../../rawImport";
-import { buildS3o } from "../../s3oBuild";
+import { buildS3o, unitBounds } from "../../s3oBuild";
 import {
   buildModInfo,
   buildSideData,
@@ -169,7 +169,10 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
           stored: imported?.place ?? [],
         },
         script: unitScript(project),
-        unitDef: buildUnitDef(project, model),
+        // Measured rather than taken off the build: a build's `mid` is the
+        // header's, which is the aim point, and the definition is derived from
+        // the bounding box.
+        unitDef: buildUnitDef(project, unitBounds(project, pack, raw)),
         model,
       });
 

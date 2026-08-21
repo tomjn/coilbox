@@ -275,6 +275,24 @@ describe("buildS3o", () => {
     expect(far?.radius).toBeCloseTo(near?.radius ?? -1, 5);
   });
 
+  /**
+   * The collision sphere is centred on the header's mid, so a unit given an
+   * aim point of its own needs its radius measured from there. Keeping the
+   * measurement on the bounding box's middle would leave the sphere short of
+   * the geometry by however far the aim point had been moved.
+   */
+  it("measures the radius from an aim point the unit was given", () => {
+    // The triangle's corners are (0,0,0), (1,0,0) and (0,0,1), so its box is
+    // centred on (0.5, 0, 0.5) and every corner is hypot(0.5, 0.5) from there.
+    const doc = project([{ id: "a", name: "a", parentId: "root" }]);
+
+    const build = buildS3o({ ...doc, mid: [0, 0, 0] }, pack(), null, TEXTURES);
+
+    // From the corner instead, the two far corners are a whole elmo away.
+    expect(build?.radius).toBeCloseTo(1);
+    expect(build?.mid).toEqual([0, 0, 0]);
+  });
+
   it("writes zeros for a unit with no geometry, deferring to the engine", () => {
     const build = buildS3o(project([]), pack(), null, TEXTURES);
 

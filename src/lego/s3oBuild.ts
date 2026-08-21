@@ -55,6 +55,12 @@ export interface UnitBounds {
   sizeZ: number;
 }
 
+/**
+ * `mid` here is the header's own mid, which is the unit's aim point and is not
+ * always the middle of the measured box: see `aimPoint.ts`. The sizes beside it
+ * are still the box. Anything that needs the box's middle has to measure it
+ * with `unitBounds` rather than read it off a build.
+ */
 export interface S3oBuild extends UnitBounds {
   radius: number;
   height: number;
@@ -153,7 +159,10 @@ export function buildS3o(
 ): S3oBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
   const { pieces, world } = bakedPieces(project, pack, raw);
-  const measured = header(world);
+  // The radius is the collision sphere's, and that sphere is centred on the
+  // header's mid, so it is measured from the aim point the unit will ship with
+  // rather than from the middle of its box.
+  const measured = header(world, project.mid);
 
   return {
     ...measured,
@@ -340,6 +349,11 @@ function geometrySource(
  * where the furthest from the origin is 17.6037. Measuring from the origin
  * inflates the sphere of any unit not built centred on it.
  *
+ * `aim` is the mid the unit will ship with, when it is not the box's middle.
+ * The radius is measured from there for the same reason, so a unit given an aim
+ * point of its own still gets a sphere that covers it. The `mid` returned is
+ * always the box's middle: what the header writes is decided by `buildS3o`.
+ *
  * `radius` and `height` are only honoured above 0.01, so a unit with no
  * geometry writes zeros and lets the engine work them out.
  *
@@ -348,7 +362,10 @@ function geometrySource(
  * straight off `box` rather than off `radius`, because a unit longer than it
  * is wide has no single sphere that describes both axes.
  */
-function header(world: THREE.Vector3[]): UnitBounds & {
+function header(
+  world: THREE.Vector3[],
+  aim?: [number, number, number],
+): UnitBounds & {
   radius: number;
   height: number;
 } {
@@ -357,10 +374,11 @@ function header(world: THREE.Vector3[]): UnitBounds & {
   }
   const box = new THREE.Box3().setFromPoints(world);
   const centre = box.getCenter(new THREE.Vector3());
+  const from = aim ? new THREE.Vector3(...aim) : centre;
   let radius = 0;
   let height = 0;
   for (const point of world) {
-    radius = Math.max(radius, point.distanceTo(centre));
+    radius = Math.max(radius, point.distanceTo(from));
     height = Math.max(height, point.y);
   }
   return {
