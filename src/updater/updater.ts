@@ -3,11 +3,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 
-/** Download progress for the settings-section progress bar. */
+/** How far an update has got, for whatever is drawing it. */
 export type DownloadPhase =
   | { status: "idle" }
   | { status: "downloading"; downloaded: number; total?: number }
-  | { status: "installed" };
+  /**
+   * The transfer is done and the installer is next. Distinct from downloading
+   * because nothing is coming down the wire any more, and the topbar download
+   * indicator should stop claiming otherwise.
+   */
+  | { status: "installing" };
 
 /** Check GitHub for a newer release. Resolves null when up to date. */
 export async function checkForUpdate(): Promise<Update | null> {
@@ -47,7 +52,7 @@ export async function installUpdate(
         onProgress({ status: "downloading", downloaded, total });
         break;
       case "Finished":
-        onProgress({ status: "installed" });
+        onProgress({ status: "installing" });
         break;
     }
   });

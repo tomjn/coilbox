@@ -1,12 +1,7 @@
 import { Button } from "@picoframe/frame";
+import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { isUpdaterEnabled } from "../../profile/profile";
 import { useUpdater } from "../UpdaterProvider";
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /**
  * Why the check/install controls are absent, or null when they should show. The
@@ -31,6 +26,7 @@ export default function UpdatesSettingsSection() {
     lastChecked,
     error,
     progress,
+    download,
     installed,
     runCheck,
     runInstall,
@@ -83,10 +79,12 @@ export default function UpdatesSettingsSection() {
                   <Button onClick={() => void restart()}>Restart now</Button>
                 </div>
               ) : progress.status === "downloading" ? (
-                <div className="text-sm text-muted-foreground">
-                  Downloading… {formatBytes(progress.downloaded)}
-                  {progress.total ? ` / ${formatBytes(progress.total)}` : ""}
-                </div>
+                // The same bar, size, speed and time left as every other
+                // download in the app, read off the download indicator this
+                // transfer now reports to.
+                <QueueProgress item={download} />
+              ) : progress.status === "installing" ? (
+                <div className="text-sm text-muted-foreground">Installing…</div>
               ) : (
                 <Button onClick={() => void runInstall()}>
                   Download &amp; install

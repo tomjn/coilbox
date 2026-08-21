@@ -7,7 +7,10 @@ import {
 } from "@/components/ui/popover";
 import { type QueueItem, useDownloadQueue } from "./DownloadQueueProvider";
 import { formatDuration } from "./downloadRate";
-import { QueueProgress } from "./pages/components/ProgressBar";
+import {
+  type ProgressSource,
+  QueueProgress,
+} from "./pages/components/ProgressBar";
 
 /**
  * The one number the pill has room for, or null when there is nothing worth
@@ -18,7 +21,7 @@ import { QueueProgress } from "./pages/components/ProgressBar";
  * settled rate though, so until there is one the percentage stands in, and a
  * download that reports neither gets no number rather than a made-up one.
  */
-export function badgeSummary(item: QueueItem | null): string | null {
+export function badgeSummary(item: ProgressSource | null): string | null {
   if (!item?.progress) return null;
   if (item.rate.secondsLeft != null) {
     return `${formatDuration(item.rate.secondsLeft)} left`;
@@ -29,18 +32,63 @@ export function badgeSummary(item: QueueItem | null): string | null {
 }
 
 /**
+ * One running download's name and progress bar, with a cancel button when
+ * there is something to cancel. A download reported from outside the queue has
+ * no cancel, because the queue has no way to stop something it is not running.
+ */
+function RunningDownload({
+  item,
+  onCancel,
+}: {
+  item: ProgressSource & { label: string };
+  onCancel?: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+          {item.label}
+        </span>
+        {onCancel && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 shrink-0 px-2"
+            onClick={onCancel}
+            aria-label={`Cancel downloading ${item.label}`}
+          >
+            <X size={14} />
+          </Button>
+        )}
+      </div>
+      {item.progress ? (
+        <QueueProgress item={item} />
+      ) : (
+        <p className="text-xs text-muted-foreground">Starting…</p>
+      )}
+    </div>
+  );
+}
+
+/**
  * topbar.right slot: a download-queue widget, shown only while something is
  * downloading or waiting. The pill reports the in-flight count and how much
- * longer the running one has to go. Its popover shows that download's full
- * progress on top and the queued items beneath, each cancellable. Returns null
- * when the queue is idle.
+ * longer the running one has to go. Its popover shows the running downloads'
+ * full progress on top and the queued items beneath, each cancellable. Returns
+ * null when nothing is downloading.
+ *
+ * "Running" is the queue's own download plus anything reported to it from
+ * outside, which today means coilbox downloading its own update. That one is
+ * counted and drawn here rather than given a pill of its own, because the point
+ * of this widget is to be the single place on screen that means something is
+ * downloading (issue #1790).
  */
 export default function DownloadQueueBadge() {
-  const { active, queued, cancel } = useDownloadQueue();
-  if (!active && queued.length === 0) return null;
+  const { active, queued, reported, cancel } = useDownloadQueue();
+  if (!active && queued.length === 0 && reported.length === 0) return null;
 
-  const count = (active ? 1 : 0) + queued.length;
-  const summary = badgeSummary(active);
+  const count = (active ? 1 : 0) + reported.length + queued.length;
+  const summary = badgeSummary(active ?? reported[0] ?? null);
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -64,28 +112,11 @@ export default function DownloadQueueBadge() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-3">
         {active && (
-          <div className="space-y-2">
-            <div className="flex items-start justify-between gap-2">
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                {active.label}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 shrink-0 px-2"
-                onClick={() => cancel(active.id)}
-                aria-label={`Cancel downloading ${active.label}`}
-              >
-                <X size={14} />
-              </Button>
-            </div>
-            {active.progress ? (
-              <QueueProgress item={active} />
-            ) : (
-              <p className="text-xs text-muted-foreground">Starting…</p>
-            )}
-          </div>
+          <RunningDownload item={active} onCancel={() => cancel(active.id)} />
         )}
+        {reported.map((item) => (
+          <RunningDownload key={item.id} item={item} />
+        ))}
         {queued.length > 0 && (
           <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
