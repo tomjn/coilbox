@@ -692,12 +692,10 @@ mod tests {
 
     #[test]
     fn a_stats_column_that_is_not_an_object_carries_no_stats() {
-        let broken = parse_dataset_units(
-            "odd\tOdd\t\t0\t\t1\t1\t0.0000\t0\t0\t0\t0\t{not json at all",
-        );
+        let broken =
+            parse_dataset_units("odd\tOdd\t\t0\t\t1\t1\t0.0000\t0\t0\t0\t0\t{not json at all");
         assert!(broken[0].stats.is_empty());
-        let list =
-            parse_dataset_units("odd\tOdd\t\t0\t\t1\t1\t0.0000\t0\t0\t0\t0\t[1,2,3]");
+        let list = parse_dataset_units("odd\tOdd\t\t0\t\t1\t1\t0.0000\t0\t0\t0\t0\t[1,2,3]");
         assert!(list[0].stats.is_empty());
     }
 
@@ -732,7 +730,10 @@ mod tests {
              __cb_chunk = function(s) return s end\n\
              return (function()\n{UNIT_DATASET_SHIM_SCRIPT}\nend)()"
         );
-        let raw: String = lua.load(script).eval().expect("the shim script did not run");
+        let raw: String = lua
+            .load(script)
+            .eval()
+            .expect("the shim script did not run");
         parse_dataset_units(&raw)
     }
 
@@ -809,7 +810,10 @@ mod tests {
             }"#,
         );
 
-        assert_eq!(units[0].stats["weapons"], serde_json::json!([{ "damage": 240 }]));
+        assert_eq!(
+            units[0].stats["weapons"],
+            serde_json::json!([{ "damage": 240 }])
+        );
     }
 
     /// A building declares no speed, and no speed must not read as a speed of
