@@ -2168,10 +2168,8 @@ mod tests {
         let dir = asset_dir("wantednone");
         let a = unit(file(&dir, "a.webp", 9), "armsolar", "src-a");
         let b = unit(file(&dir, "b.webp", 40), "armcom", "src-b");
-        let hub = HubServer::holding(&[
-            (a.identity.clone(), "src-a"),
-            (b.identity.clone(), "src-b"),
-        ]);
+        let hub =
+            HubServer::holding(&[(a.identity.clone(), "src-a"), (b.identity.clone(), "src-b")]);
         let samples = Samples::default();
 
         upload(&hub, &[a, b], &samples, &open()).await.unwrap();
