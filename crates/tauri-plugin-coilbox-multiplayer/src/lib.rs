@@ -128,6 +128,23 @@ fn enqueue(registry: &Registry, server_key: &str, line: String) -> CliResult {
     }
 }
 
+/// Queue several lines as one command, stopping at the first refusal so a
+/// caller sees the failure rather than a partial send reported as success.
+///
+/// For a command the protocol splits across lines because one would be too long
+/// (see `command::SCRIPT_TAG_LINE_BUDGET`). No lines at all is a success: there
+/// was nothing to say.
+fn enqueue_all(registry: &Registry, server_key: &str, lines: Vec<String>) -> CliResult {
+    let mut last = CliResult::ok(json!({ "sent": true }));
+    for line in lines {
+        last = enqueue(registry, server_key, line);
+        if !last.success {
+            return last;
+        }
+    }
+    last
+}
+
 /// Queue a lobby action on a Tachyon connection, or `None` when this connection
 /// is not one and the caller should send its TASServer line instead.
 ///
@@ -1517,13 +1534,16 @@ fn mp_remove_start_rect(registry: State<'_, Registry>, server_key: String, ally:
 }
 
 /// `mp_set_script_tags` — host: set game script tags.
+///
+/// Several lines for a long tag list, since a battle publishes its game's whole
+/// option list (#1837) and SPADS packs script tags to 900 characters a line.
 #[tauri::command]
 fn mp_set_script_tags(
     registry: State<'_, Registry>,
     server_key: String,
     tags: BTreeMap<String, String>,
 ) -> CliResult {
-    enqueue(
+    enqueue_all(
         registry.inner(),
         &server_key,
         command::set_script_tags(&tags),

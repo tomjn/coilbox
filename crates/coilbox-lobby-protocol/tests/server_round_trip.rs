@@ -75,7 +75,9 @@ fn a_joiner_reads_back_the_room_the_host_built() {
         &mut state,
         &line::client_battle_status("bob", bob_status, 16_711_680),
     );
-    feed(&mut state, &line::set_script_tags(&tags));
+    for line in line::set_script_tags(&tags) {
+        feed(&mut state, &line);
+    }
     feed(&mut state, &line::add_start_rect(0, 0, 0, 50, 200));
     feed(&mut state, &line::add_start_rect(1, 150, 0, 200, 200));
     feed(
@@ -156,7 +158,9 @@ fn current_battle_scoped_lines_need_the_join_ack_first() {
     let mut early = LobbyState::new();
     feed(&mut early, &line::accepted("bob"));
     feed(&mut early, &line::battle_opened(&room_battle()));
-    feed(&mut early, &line::set_script_tags(&tags));
+    for line in line::set_script_tags(&tags) {
+        feed(&mut early, &line);
+    }
     feed(&mut early, &line::add_start_rect(0, 0, 0, 50, 200));
     feed(&mut early, &line::join_battle(1, -1, Some("__battle__1")));
     let battle = &early.battles[&1];
@@ -167,7 +171,9 @@ fn current_battle_scoped_lines_need_the_join_ack_first() {
     feed(&mut ordered, &line::accepted("bob"));
     feed(&mut ordered, &line::battle_opened(&room_battle()));
     feed(&mut ordered, &line::join_battle(1, -1, Some("__battle__1")));
-    feed(&mut ordered, &line::set_script_tags(&tags));
+    for line in line::set_script_tags(&tags) {
+        feed(&mut ordered, &line);
+    }
     feed(&mut ordered, &line::add_start_rect(0, 0, 0, 50, 200));
     let battle = &ordered.battles[&1];
     assert_eq!(battle.script_tags["game/startpostype"], "2");

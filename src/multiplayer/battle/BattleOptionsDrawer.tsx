@@ -198,12 +198,11 @@ function OptionSection({
               value={displayedValue(pending, battle.scriptTags, scope, o.key)}
               disabled={!canEdit}
               // A field reports `undefined` when the host clears an option they
-              // had set, and it only does so for one that already has a script
-              // tag. A battle's options are shared state other clients read, and
-              // a tag can only be set here, not withdrawn, so the closest we can
-              // say is the game's own default. That rewrites a tag the battle
-              // already published rather than publishing a new one, which is the
-              // question #1837 is about.
+              // had set. Writing the game's own default is the right answer, not
+              // a compromise: a battle we host carries a tag for every option
+              // the game declares (#1837), so withdrawing one would hand that
+              // option back to the engine's built-in value rather than to the
+              // game's.
               onChange={(v) =>
                 setOption(
                   scriptTagKey(scope, o.key),

@@ -671,7 +671,7 @@ mod tests {
         tags.insert("game/startpostype".to_string(), "2".to_string());
         tags.insert("game/hosttype".to_string(), "coilbox".to_string());
         assert_eq!(
-            parse_client_line(&command::set_script_tags(&tags)),
+            parse_client_line(&command::set_script_tags(&tags)[0]),
             ClientCommand::SetScriptTags {
                 tags: vec![
                     ("game/hosttype".into(), "coilbox".into()),

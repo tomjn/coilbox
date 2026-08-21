@@ -442,9 +442,12 @@ impl RoomState {
                     return None;
                 }
                 battle.script_tags.extend(changed.clone());
-                Some(vec![Outbound::All {
-                    line: line::set_script_tags(&changed),
-                }])
+                Some(
+                    line::set_script_tags(&changed)
+                        .into_iter()
+                        .map(|line| Outbound::All { line })
+                        .collect(),
+                )
             }),
             ClientCommand::RemoveScriptTags { tags } => self.host_only(peer, |room| {
                 let battle = room.battle.as_mut()?;
@@ -793,11 +796,8 @@ impl RoomState {
             });
         }
         let battle = self.battle.as_ref().expect("battle checked above");
-        if !battle.script_tags.is_empty() {
-            out.push(Outbound::To {
-                peer,
-                line: line::set_script_tags(&battle.script_tags),
-            });
+        for line in line::set_script_tags(&battle.script_tags) {
+            out.push(Outbound::To { peer, line });
         }
         for (ally, rect) in &battle.start_rects {
             out.push(Outbound::To {

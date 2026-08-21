@@ -1,4 +1,5 @@
 import type { ConfigOption } from "@/content/bindings";
+import { effectiveOptions } from "@/play/modOptions";
 
 /** Engine script-tag prefixes for the two option scopes + the start-pos tag. */
 export const MODOPT_PREFIX = "game/modoptions/";
@@ -66,6 +67,39 @@ export function battleOptionTags(
     ) {
       out[k] = v;
     }
+  }
+  return out;
+}
+
+/**
+ * The mod-option script tags a battle is missing: the game's own declared
+ * default for every option `scriptTags` does not already set.
+ *
+ * A battle's `[modoptions]` block comes entirely from its script tags, and only
+ * the options somebody changed ever got written, so the engine substituted its
+ * own built-in values for the rest (`MaxUnits` 32000, `FixedAllies` 1,
+ * `MaxSpeed` 20, ...) and game Lua saw a hole where the game's default should
+ * be. Everyone in the battle got that, not just the host, since the host's
+ * script is what the match runs on (#1837). Singleplayer fills the same gaps at
+ * launch instead (#1835), which a battle cannot do: its options are shared
+ * state the server holds and other clients read, so they have to be published.
+ *
+ * Only what is missing, so this never overwrites a host's choice, and empty once
+ * every option has a tag, so repeated calls settle rather than looping. Values
+ * come from `effectiveOptions`, the one place that decides what value a game
+ * wants. Map options are left alone: the engine substitutes nothing for those,
+ * and the map is the host's to change mid-room.
+ */
+export function missingModOptionTags(
+  options: ConfigOption[],
+  scriptTags: Record<string, string>,
+): Record<string, string> {
+  const already = new Set(Object.keys(scriptTags).map((k) => k.toLowerCase()));
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(effectiveOptions(options, {}))) {
+    const tagKey = scriptTagKey("mod", key);
+    if (already.has(tagKey.toLowerCase())) continue;
+    out[tagKey] = value;
   }
   return out;
 }
