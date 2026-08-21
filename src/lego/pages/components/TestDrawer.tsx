@@ -23,6 +23,7 @@ import {
 import {
   gameOptionSchema,
   initialParticipants,
+  mapOptionSchema,
   toBattleConfig,
   usePreferredTarget,
 } from "../../../play/config";
@@ -217,6 +218,7 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
             target,
             game.primaryArchive.name,
           ),
+          mapOptionSchema: await mapOptionSchema(target, map.name),
         }),
         executable: target.executable,
         dataDir: target.dataDir,

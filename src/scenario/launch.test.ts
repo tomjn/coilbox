@@ -144,6 +144,7 @@ describe("launchScenario", () => {
       dataDir: "/data",
       games,
       optionSchema: [],
+      mapOptionSchema: [],
       rescan,
       launch,
     });
@@ -244,6 +245,7 @@ describe("launchScenario", () => {
       dataDir: "/data",
       games: [LOOSE],
       optionSchema: [],
+      mapOptionSchema: [],
       rescan,
       launch,
       disabledUnits: ["corbhmth"],
@@ -322,6 +324,7 @@ describe("launchScenario", () => {
       dataDir: "/data",
       games: [LOOSE],
       optionSchema: [],
+      mapOptionSchema: [],
       rescan,
       launch,
       units: [{ name: "ak" }, { name: "lifter" }],

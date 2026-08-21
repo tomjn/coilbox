@@ -62,6 +62,7 @@ import {
   effectiveTeams,
   initialParticipants,
   makeAiParticipant,
+  mapOptionSchema,
   type Participant,
   RANDOM_SIDE,
   resolveRandomSides,
@@ -436,9 +437,9 @@ export default function SkirmishPage() {
   // `parts` defaults to the live participants so callers only need to pass an
   // override when launching a tweaked roster (see "Rematch with a tweak"),
   // where a freshly-computed array must be used instead of stale state.
-  function buildConfig(
+  async function buildConfig(
     parts: Participant[] = participants,
-  ): BattleConfig | null {
+  ): Promise<BattleConfig | null> {
     if (!selectedGame || !selectedMap) return null;
     // Roll each Random-faction bot to a concrete side here, at the impure launch
     // boundary, so the start script gets a real side and each Random AI rolls
@@ -454,6 +455,10 @@ export default function SkirmishPage() {
         startPosType,
         modOptions: modOptionValues,
         optionSchema: modOptions,
+        // Read here rather than off a hook: the map's option list settles a
+        // render behind the picker, and starting in that gap would write the
+        // previous map's block.
+        mapOptionSchema: await mapOptionSchema(target, selectedMap.name),
         disabledUnits: restrictions?.disabledUnits,
       }),
       restrictions,
@@ -501,7 +506,7 @@ export default function SkirmishPage() {
 
   async function onStart(parts: Participant[] = participants) {
     if (!target) return;
-    const config = buildConfig(parts);
+    const config = await buildConfig(parts);
     if (!config) return;
     setError(null);
     resetDebrief();

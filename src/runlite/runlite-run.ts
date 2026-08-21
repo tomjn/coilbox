@@ -14,6 +14,7 @@ import type { PlayTarget } from "../play/config";
 import {
   applyRestrictions,
   gameOptionSchema,
+  mapOptionSchema,
   toBattleConfig,
   usePreferredTarget,
   useSkirmishAis,
@@ -235,6 +236,7 @@ export function useRunEncounter(
           target,
           installedGame.primaryArchive.name,
         ),
+        mapOptionSchema: await mapOptionSchema(target, draft.mapName),
         disabledUnits: draft.restrictions?.disabledUnits,
       }),
       draft.restrictions,

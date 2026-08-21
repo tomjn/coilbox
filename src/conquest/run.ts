@@ -11,6 +11,7 @@ import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
 import {
   gameOptionSchema,
+  mapOptionSchema,
   toBattleConfig,
   usePreferredTarget,
   useSkirmishAis,
@@ -229,6 +230,7 @@ export function useConquestBattleRun(
         target,
         installedGame.primaryArchive.name,
       ),
+      mapOptionSchema: await mapOptionSchema(target, draft.mapName),
       disabledUnits: draft.restrictions?.disabledUnits,
     });
     setError(null);

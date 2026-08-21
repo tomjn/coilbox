@@ -9,6 +9,7 @@ import {
 import {
   aiByline,
   gameOptionSchema,
+  mapOptionSchema,
   type Participant,
   resolveRandomSides,
   toBattleConfig,
@@ -185,6 +186,7 @@ function RefightForm({
           target,
           installedGame?.primaryArchive.name,
         ),
+        mapOptionSchema: await mapOptionSchema(target, draft.mapName),
       });
       const res = await launch("skirmish", {
         config,

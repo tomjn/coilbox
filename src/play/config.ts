@@ -8,6 +8,7 @@ import {
 } from "../content/bindings";
 import {
   primeGameInfo,
+  primeMapInfo,
   useContentState,
   usePreferredEngine,
   useUnitsyncScan,
@@ -119,6 +120,28 @@ export async function gameOptionSchema(
       target.dataDir,
       gameArchive,
     );
+    return info.options;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The map's own option list, for a caller about to build a `BattleConfig`. The
+ * map-side twin of {@link gameOptionSchema}, reading through the same session
+ * cache `useUnitsyncMapInfo` fills and answering `[]` rather than throwing.
+ *
+ * Fetched at launch rather than read off a hook, because a hook still holds the
+ * previous map's options for a render after the map changes, and a launch that
+ * lands a render early would write the wrong map's block.
+ */
+export async function mapOptionSchema(
+  target: PlayTarget | null | undefined,
+  mapName: string | undefined,
+): Promise<ConfigOption[]> {
+  if (!target || !mapName) return [];
+  try {
+    const info = await primeMapInfo(target.enginePath, target.dataDir, mapName);
     return info.options;
   } catch {
     return [];

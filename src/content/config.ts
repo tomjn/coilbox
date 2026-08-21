@@ -913,6 +913,24 @@ export async function gatherExportPics(
 /** Session cache of map info, keyed by `dataDir::enginePath::mapName`. */
 const mapInfoCache = new Map<string, MapInfoResult>();
 
+/**
+ * Read one map's info through the same session cache `useUnitsyncMapInfo` fills,
+ * for a caller with no loaded hook to hand. The map-side twin of
+ * `primeGameInfo`, down to caching only a syncable result.
+ */
+export async function primeMapInfo(
+  enginePath: string,
+  dataDir: string,
+  mapName: string,
+): Promise<MapInfoResult> {
+  const key = `${dataDir}::${enginePath}::${mapName}`;
+  const cached = mapInfoCache.get(key);
+  if (cached) return cached;
+  const res = await unitsyncMapInfo({ enginePath, dataDir, mapName });
+  if (res.checksum) mapInfoCache.set(key, res);
+  return res;
+}
+
 /** Lazily load one map's options + warnings (mounts the map's archive). */
 export function useUnitsyncMapInfo(
   enginePath?: string,

@@ -10,6 +10,7 @@ import type { BattleConfig } from "../play/bindings";
 import type { PlayTarget } from "../play/config";
 import {
   gameOptionSchema,
+  mapOptionSchema,
   toBattleConfig,
   usePreferredTarget,
 } from "../play/config";
@@ -236,6 +237,12 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           dataDir: target.dataDir,
           games,
           optionSchema,
+          // A scenario mission is set on its own map, which is the snapshot's
+          // for every mission built from one but is the scenario's to say.
+          mapOptionSchema: await mapOptionSchema(
+            target,
+            mission.scenario.setup.mapName,
+          ),
           disabledUnits: mission.disabledUnits,
           rescan: async () =>
             (await primeScan(target.enginePath, target.dataDir, true)).games,
@@ -259,6 +266,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           startPosType: snapshot.startPosType,
           modOptions: snapshot.modOptionValues,
           optionSchema,
+          mapOptionSchema: await mapOptionSchema(target, map.name),
           disabledUnits: mission.disabledUnits,
         });
         const res = await startEngine(launched);

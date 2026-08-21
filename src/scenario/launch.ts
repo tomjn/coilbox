@@ -184,6 +184,15 @@ export interface ScenarioLaunchInput {
    */
   optionSchema: ConfigOption[];
   /**
+   * The map's own option list, read from unitsync by the caller (see
+   * `mapOptionSchema`). Every option the map declares is written into the start
+   * script at its default, because the engine substitutes nothing for an absent
+   * map option and the map's Lua reads `nil` instead (#1868). Empty means the
+   * caller could not read them, and the scenario runs with no `[mapoptions]`
+   * block at all.
+   */
+  mapOptionSchema: ConfigOption[];
+  /**
    * Force a fresh unitsync scan and hand back the games it found. The engine
    * takes its game list from the same archive cache unitsync writes, so a
    * generated mutator is only launchable once one has run.
@@ -293,6 +302,7 @@ export async function launchScenario(
     dataDir,
     games,
     optionSchema,
+    mapOptionSchema,
     rescan,
     launch,
     disabledUnits,
@@ -382,6 +392,7 @@ export async function launchScenario(
         [MISSION_MODOPTION]: scenario.id,
       },
       optionSchema,
+      mapOptionSchema,
     }),
     captured,
   );

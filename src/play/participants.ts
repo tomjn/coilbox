@@ -311,9 +311,9 @@ export function rgbToHex([r, g, b]: Rgb): string {
  * only route into the script, and it decides Lua-ness itself by matching the
  * shortname against the game's `LuaAI.lua`.
  *
- * Mod options are filled from `optionSchema` on the way through, so every
- * screen that launches a game writes the same `[modoptions]` block for the same
- * choices.
+ * Mod options are filled from `optionSchema` on the way through, and the map's
+ * own from `mapOptionSchema`, so every screen that launches a game writes the
+ * same `[modoptions]` and `[mapoptions]` blocks for the same choices.
  */
 export function toBattleConfig(opts: {
   participants: Participant[];
@@ -331,6 +331,17 @@ export function toBattleConfig(opts: {
    * (issue #1835). Pass `[]` only for a game with no options to read.
    */
   optionSchema: ConfigOption[];
+  /**
+   * The map's own option list, from unitsync. Every option it declares is
+   * written into the script at the map's default, because the engine
+   * substitutes nothing at all here: `CGameSetup::Init` copies the
+   * `[mapoptions]` section verbatim, so `Spring.GetMapOptions()` returns `nil`
+   * for a key the script left out and the map's Lua takes whatever branch that
+   * leads to (issue #1868). Singleplayer offers no way to change one, so there
+   * is no matching values argument. Required for the same reason `optionSchema`
+   * is: a new launch path should not be able to quietly skip it.
+   */
+  mapOptionSchema: ConfigOption[];
   /** Units to disable entirely (rendered as `[RESTRICT]` limit 0). */
   disabledUnits?: string[];
 }): BattleConfig {
@@ -340,9 +351,11 @@ export function toBattleConfig(opts: {
     gameType,
     startPosType,
     optionSchema,
+    mapOptionSchema,
     disabledUnits,
   } = opts;
   const modOptions = effectiveOptions(optionSchema, opts.modOptions);
+  const mapOptions = effectiveOptions(mapOptionSchema, {});
   const you = participants[0];
   const active = participants.filter((p) => !(p.kind === "you" && p.spectator));
 
@@ -398,6 +411,7 @@ export function toBattleConfig(opts: {
     teams,
     allyTeams: allyValues.map(() => ({ numAllies: 0 })),
     modOptions: Object.keys(modOptions).length > 0 ? modOptions : undefined,
+    mapOptions: Object.keys(mapOptions).length > 0 ? mapOptions : undefined,
     restrictedUnits:
       disabledUnits && disabledUnits.length > 0
         ? Object.fromEntries(disabledUnits.map((name) => [name, 0]))
