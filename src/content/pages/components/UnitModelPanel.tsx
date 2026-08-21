@@ -380,10 +380,15 @@ function ModelViewport({ model }: { model: UnitModelResult }) {
       scene.add(built.object);
 
       // Framed on the model's own bounding box rather than the header's radius,
-      // which both formats let the engine work out and so is often absent. Not
-      // `frameBox` from the unit builder: its distance is capped at 60 for the
-      // builder's grid, and a game unit is engine units across, so a commander
-      // at 32 units of radius wants a camera about 105 out and would be clipped.
+      // which both formats let the engine work out and so is often absent.
+      //
+      // Still not `frameBox` from the unit builder, now that nothing caps its
+      // distance. `frameBox` fits the bounding sphere and pads it, which is
+      // 4.3 radii at this lens; sitting at 2.8 fills the panel with the model
+      // rather than the space around it, and this is a preview nobody orbits
+      // out of. Its floor of 1.5 world units would work against a small model
+      // here too, where the near plane scales with the model instead of being
+      // fixed, so there is no absolute distance to be too close from.
       const centre = built.box.getCenter(new THREE.Vector3());
       const radius = Math.max(
         built.box.getBoundingSphere(new THREE.Sphere()).radius,
