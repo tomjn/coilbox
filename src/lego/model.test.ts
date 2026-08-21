@@ -371,6 +371,17 @@ describe("parseLegoProjectJson", () => {
     );
   });
 
+  it("keeps piece selection on, and leaves it off for everyone else", () => {
+    const doc = project([piece("root", null)]);
+    expect(
+      parseLegoProjectJson(JSON.stringify({ ...doc, pieceSelection: true }))
+        ?.pieceSelection,
+    ).toBe(true);
+    expect(parseLegoProjectJson(JSON.stringify(doc))).not.toHaveProperty(
+      "pieceSelection",
+    );
+  });
+
   it("puts pieces parent-first, for a document saved before that was true", () => {
     const doc = project([
       piece("root", null),

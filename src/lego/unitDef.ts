@@ -101,10 +101,12 @@ export function luaString(value: string): string {
  *
  * They are written whether or not the unit is hit piece by piece, because the
  * volume still has three jobs when it is not hitting anything.
- * `ParseSelectionVolume` falls back to these keys, so this is still the shape
- * you click; `QuadField::GetUnitsAndFeaturesExact` measures its bounding
- * radius, so this is still what an explosion catches; and it is still the
- * shape of any unit whose owner turns piece collision back off.
+ * `ParseSelectionVolume` reads no `selectionvolume` key of its own and falls
+ * back to these, so this is still the shape you click unless the unit also
+ * asks for piece selection; `QuadField::GetUnitsAndFeaturesExact` measures its
+ * bounding radius, so this is still what an explosion catches, whichever piece
+ * switch is on; and it is still the shape of any unit whose owner turns either
+ * switch back off.
  */
 export function buildUnitDef(project: LegoProject, bounds: UnitBounds): string {
   const footprintx = footprintSteps(bounds.sizeX);
@@ -129,6 +131,12 @@ export function buildUnitDef(project: LegoProject, bounds: UnitBounds): string {
     // it does not want it.
     ...(project.pieceCollision
       ? ([["usepiececollisionvolumes", "true"]] as [string, string][])
+      : []),
+    // The engine's second switch over the same boxes, read by
+    // `ParseSelectionVolume`. Written on its own, because neither implies the
+    // other in the engine and neither should here.
+    ...(project.pieceSelection
+      ? ([["usepieceselectionvolumes", "true"]] as [string, string][])
       : []),
     ["maxdamage", String(DEFAULT_MAX_DAMAGE)],
     ["canmove", "false"],
