@@ -43,13 +43,18 @@
  * than twenty renders in the time of one. The encode that follows each one costs
  * no mount, because the key it was named by is handed to it (issue #1720).
  *
- * ## A run with renders in it says so, and can be stopped
+ * ## A run with pictures going anywhere says so, and can be stopped
  *
- * The have check is what decides whether anybody hears about the run at all
- * (issue #1686). Once it comes back wanting a picture drawn, the run puts itself
- * in the topbar through `./runningUploads`, and a run it comes back wanting
- * nothing from stays silent as it always has. Drawing is the part that takes a
- * minute, so it is the part worth showing.
+ * A have check is what decides whether anybody hears about the run at all
+ * (issue #1686), and there are two of them. The render one here: once it comes
+ * back wanting a picture drawn, the run puts itself in the topbar through
+ * `./runningUploads`, because drawing is the part that takes a minute. And the
+ * upload's own, inside the plugin, which is the first thing that knows how many
+ * build pics the hub wants: a run with nothing to draw and pictures to send is
+ * minutes of upload on a slow connection, and it announces itself off that number
+ * rather than staying silent through the lot (issue #1768).
+ *
+ * A run neither wants anything from stays silent, which is the ordinary one.
  *
  * That flag is read between renders and again before the upload, so a stop lands
  * in the half the run is actually in rather than only in the upload command.
@@ -313,11 +318,14 @@ export async function backfillBlueprintUnits(
   // holds every render of does not mount for models at all.
   const drawing = working.filter((unit) => wanted.has(unit.name));
 
-  // The whole of the threshold (issue #1686). A run with a picture to draw is
-  // about to hold the app for seconds each, so it says so. A run with none is
-  // the have check and an archive read, and stays silent.
+  // Half the threshold (issue #1686). A run with a picture to draw is about to
+  // hold the app for seconds each, so it says so. The other half is the upload's
+  // own have check, below: a run with nothing to draw and build pics the hub
+  // wants is minutes of upload on a slow connection, and it was invisible until
+  // issue #1768.
   const opId = crypto.randomUUID();
-  if (drawing.length > 0) {
+  let announced = drawing.length > 0;
+  if (announced) {
     showUploadRun({ opId, game: target.game, total: drawing.length });
   }
 
@@ -397,12 +405,27 @@ export async function backfillBlueprintUnits(
       const run = await tools.upload(target.hubUrl, assets, {
         startedBy: "coilbox",
         opId,
-        onProgress: (sample) =>
+        onProgress: (sample) => {
+          // The first moment anybody knows how many pictures are really going
+          // (issue #1768). `wanted` is null until the upload's have check has
+          // answered and a count from then on, and the first sample carrying one
+          // arrives before the first transfer starts, so a run on a slow
+          // connection is on screen for the whole of it rather than after it.
+          if (!announced && (sample.wanted ?? 0) > 0) {
+            announced = true;
+            showUploadRun({
+              opId,
+              game: target.game,
+              phase: "sending",
+              total: sample.total,
+            });
+          }
           updateUploadRun(opId, {
             done: sample.done,
             total: sample.total,
             sent: sample.uploaded,
-          }),
+          });
+        },
       });
       written = run.written;
       // Read after the run rather than before, because the flag can go up while

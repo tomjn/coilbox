@@ -10,17 +10,21 @@
  *
  * ## What makes a run loud enough to show
  *
- * Renders, and nothing else. A run announces itself at the moment it knows it has
- * at least one picture to draw, which is after the have check and before the
- * models are read. Everything before that point is two requests, and everything
- * that stays silent is a run that had none to draw.
+ * Pictures that are really going anywhere, in either half of a run. A run with
+ * renders to draw announces itself at the moment the have check comes back
+ * wanting one, before the models are read. A run with none of those announces
+ * itself when the upload's own have check says how many of its build pics the hub
+ * wants, which is the first thing that knows (issue #1768).
  *
- * That is a rule about the work rather than about the clock, so it is the same on
- * a fast machine and a slow one. What it does not cover is a run with no renders
- * and a long list of build pics to send, which stays invisible: those are already
- * extracted, cost nothing anybody shares, and are a few dozen files of about
- * 100 KB. If that turns out to be worth showing, this is the one predicate to
- * change.
+ * Both are rules about the work rather than about the clock, so they are the same
+ * on a fast machine and a slow one. What stays silent is the ordinary run: a
+ * layout whose pictures the hub already holds, which is two requests and an
+ * archive read.
+ *
+ * The build pic half was left out of #1686 on purpose, reasoning that a few dozen
+ * files of about 100 KB is nothing next to a minute of GPU. That holds on a fast
+ * connection and stops holding on a slow one, where it is minutes of upload with
+ * nothing on screen saying why.
  *
  * ## Stopping covers both halves of a run
  *
@@ -87,8 +91,13 @@ export function useRunningUploads(): readonly RunningUpload[] {
 }
 
 /**
- * Put a run on screen. Called once the run knows it has pictures to draw, and
- * never for one that has not.
+ * Put a run on screen. Called once the run knows it has pictures to draw or
+ * pictures the hub wants, and never for one that has neither.
+ *
+ * `phase` says which half it is appearing in, and a run that starts in `sending`
+ * is one with nothing to draw that the hub turned out to want pictures from
+ * (issue #1768). It defaults to `drawing`, which is where a run that had renders
+ * appears.
  *
  * A second call for the same id replaces the entry rather than adding one, so a
  * run cannot appear twice.
@@ -97,11 +106,12 @@ export function showUploadRun(run: {
   opId: string;
   game: string;
   total: number;
+  phase?: UploadRunPhase;
 }): void {
   const entry: RunningUpload = {
     opId: run.opId,
     game: run.game,
-    phase: "drawing",
+    phase: run.phase ?? "drawing",
     done: 0,
     total: run.total,
     sent: 0,

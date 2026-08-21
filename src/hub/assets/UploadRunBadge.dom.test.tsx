@@ -82,6 +82,18 @@ describe("the topbar while a backfill is going", () => {
     act(() => updateUploadRun("op-1", { phase: "sending", total: 24 }));
     expect(screen.getByText("Sending pictures")).toBeTruthy();
   });
+
+  /** A run with nothing to draw arrives in the sending half rather than passing
+   *  through the drawing one, so it must not read as making anything (issue
+   *  #1768). */
+  it("appears in the sending half for a run that had nothing to draw", () => {
+    render(<UploadRunBadge />);
+    act(() =>
+      showUploadRun({ opId: "op-1", game: "bar", phase: "sending", total: 12 }),
+    );
+    expect(screen.getByText("Sending pictures")).toBeTruthy();
+    expect(screen.queryByText("Making pictures")).toBeNull();
+  });
 });
 
 describe("what the pill says when it is opened", () => {

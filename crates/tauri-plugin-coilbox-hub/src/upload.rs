@@ -411,6 +411,15 @@ pub struct AssetUploadProgress {
     pub already_had: usize,
     pub refused: usize,
     pub uploaded_bytes: u64,
+    /// How many of the set are really going, which is everything the have check
+    /// did not answer `have` for. `None` until it has answered (issue #1768).
+    ///
+    /// The caller cannot work this out for itself. It knows how many pictures it
+    /// declared, and whether the hub wants any of them is decided here, after the
+    /// frontend has finished deciding anything. `src/hub/assets/blueprintBackfill.ts`
+    /// is what reads it: a run with pictures going says so in the topbar and can be
+    /// stopped, and a run the hub wants nothing from stays silent.
+    pub wanted: Option<usize>,
     /// Which picture this sample is about, when it is about one.
     pub subject: Option<String>,
 }
@@ -777,6 +786,12 @@ pub(crate) async fn run(
             askable.len()
         ));
     }
+    tally.wants(
+        answers
+            .iter()
+            .filter(|answer| answer.status != HaveStatus::Have)
+            .count(),
+    );
 
     let client = reqwest::Client::builder()
         .connect_timeout(CONNECT_TIMEOUT)
@@ -900,6 +915,7 @@ struct Tally {
     already_had: usize,
     refused: usize,
     uploaded_bytes: u64,
+    wanted: Option<usize>,
 }
 
 impl Tally {
@@ -911,6 +927,7 @@ impl Tally {
             already_had: 0,
             refused: 0,
             uploaded_bytes: 0,
+            wanted: None,
         }
     }
 
@@ -925,11 +942,19 @@ impl Tally {
             refused: self.refused,
             uploaded_bytes: self.uploaded_bytes,
             subject,
+            wanted: self.wanted,
         }
     }
 
     fn asking(&self, report: &(dyn Fn(AssetUploadProgress) + Send + Sync)) {
         report(self.sample("asking", None));
+    }
+
+    /// What the have check came back wanting. Carried by every sample from here
+    /// on, so the first one after the answers is what tells the caller a run is
+    /// really going to send something.
+    fn wants(&mut self, wanted: usize) {
+        self.wanted = Some(wanted);
     }
 
     fn uploading(&self, report: &(dyn Fn(AssetUploadProgress) + Send + Sync), what: String) {
@@ -2104,6 +2129,58 @@ mod tests {
         // And the count never runs backwards.
         let done: Vec<usize> = taken.iter().map(|s| s.done).collect();
         assert!(done.windows(2).all(|w| w[1] >= w[0]), "{done:?}");
+    }
+
+    /// How many pictures are really going, which is the one number the have check
+    /// knows and nothing outside this crate could work out (issue #1768). Null
+    /// until the answers are in, and a count from then on.
+    #[tokio::test]
+    async fn progress_says_how_many_the_hub_wants_once_it_has_answered() {
+        let dir = asset_dir("wanted");
+        let held = unit(file(&dir, "a.webp", 9), "armsolar", "src-a");
+        let hub = HubServer::holding(&[(held.identity.clone(), "src-a")]);
+        let samples = Samples::default();
+
+        upload(
+            &hub,
+            &[held, unit(file(&dir, "b.webp", 40), "armcom", "src-b")],
+            &samples,
+            &open(),
+        )
+        .await
+        .unwrap();
+
+        let taken = samples.taken();
+        assert_eq!(taken[0].phase, "asking");
+        assert_eq!(taken[0].wanted, None);
+        // One of the two, and said before the transfer rather than after it.
+        let first_after = taken.iter().find(|s| s.phase != "asking").unwrap();
+        assert_eq!(first_after.wanted, Some(1));
+        assert_eq!(first_after.uploaded, 0);
+        assert_eq!(taken.last().unwrap().wanted, Some(1));
+    }
+
+    /// The silent case, from the plugin's side. A layout whose pictures the hub
+    /// already holds is two requests, and the badge that reads this number is what
+    /// must not appear for one.
+    #[tokio::test]
+    async fn progress_wants_none_when_the_hub_holds_the_lot() {
+        let dir = asset_dir("wantednone");
+        let a = unit(file(&dir, "a.webp", 9), "armsolar", "src-a");
+        let b = unit(file(&dir, "b.webp", 40), "armcom", "src-b");
+        let hub =
+            HubServer::holding(&[(a.identity.clone(), "src-a"), (b.identity.clone(), "src-b")]);
+        let samples = Samples::default();
+
+        upload(&hub, &[a, b], &samples, &open()).await.unwrap();
+
+        let taken = samples.taken();
+        assert!(
+            taken.iter().all(|s| s.wanted.unwrap_or(0) == 0),
+            "{:?}",
+            taken.iter().map(|s| s.wanted).collect::<Vec<_>>()
+        );
+        assert_eq!(taken.last().unwrap().already_had, 2);
     }
 
     #[tokio::test]
