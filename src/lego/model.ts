@@ -68,6 +68,29 @@ export interface LegoCollisionVolume {
 }
 
 /**
+ * What one piece is hit with, when the box the engine measures for it is the
+ * wrong answer.
+ *
+ * The engine builds a box round every piece's own vertices as the model loads
+ * and nothing declares that, so this is not a volume the export can write down.
+ * It is applied on the live unit by `Spring.SetUnitPieceCollisionVolumeData`,
+ * out of the file `pieceCollisionScript.ts` generates. See that file for why it
+ * is a file of its own rather than something in the unit script.
+ */
+export interface LegoPieceCollision {
+  /** False tells the engine to hit nothing on this piece at all. */
+  hit: boolean;
+  /**
+   * Absent means the box the engine measures off the piece's own vertices,
+   * which is what a piece switched off but not resized carries.
+   *
+   * Its offsets are in the piece's own space, unlike the unit volume's, which
+   * are measured from the aim point.
+   */
+  volume?: LegoCollisionVolume;
+}
+
+/**
  * A texture in the shared store, which is where an imported unit's textures
  * live.
  *
@@ -178,6 +201,12 @@ export interface LegoPiece {
   /** Editor only, never affects export. */
   hidden?: boolean;
   customAnchors?: LegoAnchor[];
+  /**
+   * What this piece is hit with, when the box the engine measures round its own
+   * vertices is not what should stop a shot. Absent means that box, which is
+   * where every piece starts.
+   */
+  collision?: LegoPieceCollision;
 }
 
 export interface LegoProject {
@@ -598,6 +627,10 @@ function parsePiece(raw: unknown): LegoPiece | null {
       ? { tags: p.tags.filter((t): t is string => typeof t === "string") }
       : {}),
     ...(p.hidden === true ? { hidden: true } : {}),
+    ...(() => {
+      const collision = parsePieceCollision(p.collision);
+      return collision ? { collision } : {};
+    })(),
     ...(Array.isArray(p.customAnchors)
       ? {
           customAnchors: p.customAnchors
@@ -716,6 +749,23 @@ function parseCollisionVolume(value: unknown): LegoCollisionVolume | null {
   const offsets = parseVec3(v.offsets);
   if (!type || !scales || !offsets) return null;
   return { type, scales, offsets };
+}
+
+/**
+ * One piece's collision override.
+ *
+ * A record saying only `hit: true` with no volume is what a piece switched off
+ * and back on again leaves behind, and is the same as no record at all, so it
+ * is dropped rather than stored. That keeps "does this unit override anything"
+ * an honest question to ask of the document.
+ */
+function parsePieceCollision(value: unknown): LegoPieceCollision | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const volume = parseCollisionVolume(v.volume);
+  const hit = v.hit !== false;
+  if (hit && !volume) return null;
+  return { hit, ...(volume ? { volume } : {}) };
 }
 
 function parseAnchor(raw: unknown): LegoAnchor | null {

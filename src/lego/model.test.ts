@@ -269,6 +269,65 @@ describe("parseLegoProjectJson", () => {
     expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
   });
 
+  it("round-trips a piece's own collision volume (#1842)", () => {
+    const doc = project([
+      piece("root", null),
+      {
+        ...piece("dish", "root"),
+        collision: {
+          hit: true,
+          volume: {
+            type: "box" as const,
+            scales: [30, 4, 30] as [number, number, number],
+            offsets: [0, 2, 0] as [number, number, number],
+          },
+        },
+      },
+    ]);
+
+    expect(parseLegoProjectJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it("round-trips a piece switched off with no volume of its own", () => {
+    const doc = project([
+      piece("root", null),
+      { ...piece("aerial", "root"), collision: { hit: false } },
+    ]);
+
+    expect(
+      parseLegoProjectJson(JSON.stringify(doc))?.pieces[1].collision,
+    ).toEqual({ hit: false });
+  });
+
+  it("drops a collision record that says nothing, so overrides stay countable", () => {
+    // A piece switched off and back on again leaves { hit: true } behind, which
+    // is the derived box. Keeping it would make "does this unit override
+    // anything" answer yes for a unit that overrides nothing, and that question
+    // decides whether the script gets an include line.
+    const doc = project([
+      piece("root", null),
+      { ...piece("aerial", "root"), collision: { hit: true } },
+    ]);
+
+    expect(
+      parseLegoProjectJson(JSON.stringify(doc))?.pieces[1].collision,
+    ).toBeUndefined();
+  });
+
+  it("drops a half-written piece volume rather than keeping half a shape", () => {
+    // Half derived and half set, with nothing to say which half, is the same
+    // call the unit's own volume makes. Written as text because the type will
+    // not let a half-written volume be built here.
+    const json = JSON.stringify(
+      project([piece("root", null), piece("dish", "root")]),
+    ).replace(
+      '"name":"dish"',
+      '"name":"dish","collision":{"hit":true,"volume":{"type":"box"}}',
+    );
+
+    expect(parseLegoProjectJson(json)?.pieces[1].collision).toBeUndefined();
+  });
+
   it("round-trips an imported unit's meshes and textures", () => {
     const doc = {
       ...project([
