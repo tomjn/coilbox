@@ -27,9 +27,12 @@
  * to put back.
  *
  * Tooltips are the `title` attribute rather than a Radix `Tooltip`, which is
- * what the unit builder's bar already used. A `title` is also the button's
- * accessible name, so an icon button with one needs nothing else, and the state
- * of a toggle is carried in `aria-pressed` alongside it.
+ * what the unit builder's bar already used. Every button also carries that same
+ * text as its `aria-label`: a `title` alone does name a button, but only if the
+ * screen reader is set to read titles, and none of these buttons has any text of
+ * its own to fall back on. A toggle carries its state in `aria-pressed`
+ * alongside it, because a toggle that does not say which way it is set is worse
+ * than no toggle at all.
  */
 
 import { Button } from "@picoframe/frame";
@@ -72,13 +75,15 @@ export function ViewToggle({
   /** What it does while the thing is hidden. */
   showTitle: string;
 }) {
+  const title = on ? hideTitle : showTitle;
   return (
     <Button
       size="icon"
       variant="outline"
       onClick={() => onChange(!on)}
       aria-pressed={on}
-      title={on ? hideTitle : showTitle}
+      title={title}
+      aria-label={title}
     >
       <Icon className="size-4" />
     </Button>
@@ -102,7 +107,13 @@ export function ViewButton({
   children: ReactNode;
 }) {
   return (
-    <Button size="icon" variant="outline" onClick={onClick} title={title}>
+    <Button
+      size="icon"
+      variant="outline"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+    >
       {children}
     </Button>
   );
