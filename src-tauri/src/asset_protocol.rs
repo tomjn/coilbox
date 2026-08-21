@@ -173,14 +173,15 @@ fn resolve_path(
         // atlases are compressed DDS measured in tens of megabytes, and the
         // webview uploads them as-is), rendered minimap/heightmap/metalmap PNGs,
         // a game's loading-screen art, a unit's build icon, a side's faction
-        // emblem, and a map author's source image downscaled for preview. The
-        // last three sit beside the JSON records that name them, which nothing
-        // ever asks this for.
+        // emblem, a top down render coilbox drew of a unit, and a map author's
+        // source image downscaled for preview. Several sit beside the JSON
+        // records that name them, which nothing ever asks this for.
         "unitmodel"
         | "unitsyncthumb"
         | "unitsyncheader"
         | "unitsyncbuildpic"
         | "unitsyncfactionlogo"
+        | "hubasset"
         | "mapconvthumb"
         | "contentbranding" => {
             let [file] = rest else {
@@ -316,6 +317,7 @@ pub fn handle<R: Runtime>(
             "unitsyncheader" => tauri_plugin_coilbox_unitsync::header_cache_dir(app),
             "unitsyncbuildpic" => tauri_plugin_coilbox_unitsync::buildpic_cache_dir(app),
             "unitsyncfactionlogo" => tauri_plugin_coilbox_unitsync::faction_logo_cache_dir(app),
+            "hubasset" => tauri_plugin_coilbox_unitsync::hub_asset_dir(app),
             "mapconvthumb" => tauri_plugin_coilbox_mapconv::thumb_cache_dir(app),
             "contentbranding" => tauri_plugin_coilbox_content::branding_image_dir(app),
             _ => tauri_plugin_coilbox_unitsync::model_texture_dir(app),
@@ -333,7 +335,9 @@ pub fn handle<R: Runtime>(
 
 /// The `Cache-Control` for a root. The unitsync and mapconv caches name their
 /// files after a hash of the source file's path, size and mtime, so a URL there
-/// can never come to mean different bytes and the webview may keep it.
+/// can never come to mean different bytes and the webview may keep it. `hubasset`
+/// is named after a hash of the bytes themselves, which is the same promise made
+/// more strongly.
 ///
 /// `contentbranding` is not one of them: it is keyed by the source URL, and the
 /// picture a catalog serves at one URL can change. It revalidates along with the
@@ -344,6 +348,7 @@ fn cache_control(root: &str) -> &'static str {
         | "unitsyncheader"
         | "unitsyncbuildpic"
         | "unitsyncfactionlogo"
+        | "hubasset"
         | "mapconvthumb" => "max-age=31536000, immutable",
         _ => "no-cache",
     }
