@@ -72,36 +72,71 @@ export function battleOptionTags(
 }
 
 /**
- * The mod-option script tags a battle is missing: the game's own declared
- * default for every option `scriptTags` does not already set.
+ * The script tags a battle is missing for one option scope: the game's or the
+ * map's own declared default for every option `scriptTags` does not already set.
  *
- * A battle's `[modoptions]` block comes entirely from its script tags, and only
- * the options somebody changed ever got written, so the engine substituted its
- * own built-in values for the rest (`MaxUnits` 32000, `FixedAllies` 1,
- * `MaxSpeed` 20, ...) and game Lua saw a hole where the game's default should
- * be. Everyone in the battle got that, not just the host, since the host's
- * script is what the match runs on (#1837). Singleplayer fills the same gaps at
- * launch instead (#1835), which a battle cannot do: its options are shared
- * state the server holds and other clients read, so they have to be published.
+ * A battle's `[modoptions]` and `[mapoptions]` blocks come entirely from its
+ * script tags, and only the options somebody changed ever got written. For a
+ * game that meant the engine substituted its own built-in values for the rest
+ * (`MaxUnits` 32000, `FixedAllies` 1, `MaxSpeed` 20, ...) and game Lua saw a
+ * hole where the game's default should be (#1837). For a map the engine
+ * substitutes nothing at all: `CGameSetup::Init` copies the script's section
+ * verbatim, so `Spring.GetMapOptions()` returns `nil` for a key the map
+ * declared a default for, and the map's own Lua takes whatever branch it takes
+ * (#1868). Everyone in the battle gets that, not just the host, since the host's
+ * script is what the match runs on.
+ *
+ * Singleplayer fills the same gaps at launch instead (#1835), which a battle
+ * cannot do: its options are shared state the server holds and other clients
+ * read, so they have to be published. SPADS publishes both scopes the same way
+ * (`sendBattleSettings`), so this is what the rest of the ecosystem already
+ * does.
  *
  * Only what is missing, so this never overwrites a host's choice, and empty once
  * every option has a tag, so repeated calls settle rather than looping. Values
  * come from `effectiveOptions`, the one place that decides what value a game
- * wants. Map options are left alone: the engine substitutes nothing for those,
- * and the map is the host's to change mid-room.
+ * wants.
  */
-export function missingModOptionTags(
+export function missingOptionTags(
+  scope: OptionScope,
   options: ConfigOption[],
   scriptTags: Record<string, string>,
 ): Record<string, string> {
   const already = new Set(Object.keys(scriptTags).map((k) => k.toLowerCase()));
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(effectiveOptions(options, {}))) {
-    const tagKey = scriptTagKey("mod", key);
+    const tagKey = scriptTagKey(scope, key);
     if (already.has(tagKey.toLowerCase())) continue;
     out[tagKey] = value;
   }
   return out;
+}
+
+/**
+ * The map-option tags left over from a previous map: every `game/mapoptions/*`
+ * key the given map does not declare.
+ *
+ * Map option keys are generic and collide across maps. BlockFort v1 and airport
+ * 0.6 both declare `fog`, one wanting it on and the other off, so a room that
+ * changes map cannot simply fill the gaps around what is already set: the old
+ * map's value would win over the new map's default. A key both maps declare is
+ * left here to be overwritten by `missingOptionTags` rather than removed, so the
+ * room never blanks between the removal and the write. SPADS does the same job
+ * with a blanket wipe in `sendBattleMapOptions`.
+ */
+export function staleMapOptionTags(
+  options: ConfigOption[],
+  scriptTags: Record<string, string>,
+): string[] {
+  const declared = new Set(
+    options
+      .filter((o) => o.type !== "section")
+      .map((o) => scriptTagKey("map", o.key).toLowerCase()),
+  );
+  return Object.keys(scriptTags).filter((k) => {
+    const low = k.toLowerCase();
+    return low.startsWith(MAPOPT_PREFIX) && !declared.has(low);
+  });
 }
 
 /** How many of `options` are set away from their default. */
