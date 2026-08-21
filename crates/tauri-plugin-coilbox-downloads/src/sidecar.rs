@@ -170,17 +170,7 @@ const EXTRACT_START: &str = "extract():Extracting ";
 /// unpacking rather than a download that died (issue #1826).
 pub fn parse_progress_line(line: &str) -> Option<DownloadProgress> {
     if line.contains(EXTRACT_START) {
-        // No bytes and no percentage because there are none to be had: this is
-        // the absence of a measurement, not a measurement of zero, and both the
-        // watchdog and the bar read it that way. See
-        // [`DownloadProgress::is_measured`].
-        return Some(DownloadProgress {
-            phase: "extracting".into(),
-            downloaded_bytes: 0,
-            total_bytes: None,
-            percent: None,
-            bytes_per_sec: None,
-        });
+        return Some(DownloadProgress::extracting());
     }
     let lower = line.to_lowercase();
     if !lower.contains("progress") || !line.contains('%') {
@@ -307,6 +297,10 @@ mod tests {
         assert!(parse_progress_line("Download complete!").is_none());
     }
 
+    /// Word for word what the coilbox-owned downloader sends when it starts
+    /// unpacking, because both go through `DownloadProgress::extracting`. The
+    /// two used to differ, and the one that carried a byte count read as a stall
+    /// for the length of the unpack (issue #1830).
     #[test]
     fn the_line_that_opens_an_extraction_is_a_phase_of_its_own() {
         let p = parse_progress_line(
@@ -314,9 +308,7 @@ mod tests {
              /data/engine/spring.7z to /data/engine/linux64/105.1.1",
         )
         .unwrap();
-        assert_eq!(p.phase, "extracting");
-        assert_eq!(p.total_bytes, None);
-        assert_eq!(p.percent, None);
+        assert_eq!(p, DownloadProgress::extracting());
         assert!(!p.is_measured());
     }
 
