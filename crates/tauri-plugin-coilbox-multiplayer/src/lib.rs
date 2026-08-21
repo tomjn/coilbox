@@ -1551,6 +1551,10 @@ fn mp_set_script_tags(
 }
 
 /// `mp_remove_script_tags` — host: clear game script tags by key.
+///
+/// Several lines for a long key list, the same as setting them. Cutting a unit
+/// restriction list back removes two tags per unit (#1867), so a hundred units
+/// is 201 keys and four times the budget SPADS packs a removal line to.
 #[tauri::command]
 fn mp_remove_script_tags(
     registry: State<'_, Registry>,
@@ -1558,7 +1562,7 @@ fn mp_remove_script_tags(
     tags: Vec<String>,
 ) -> CliResult {
     let refs: Vec<&str> = tags.iter().map(String::as_str).collect();
-    enqueue(
+    enqueue_all(
         registry.inner(),
         &server_key,
         command::remove_script_tags(&refs),

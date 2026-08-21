@@ -182,10 +182,9 @@ fn current_battle_scoped_lines_need_the_join_ack_first() {
     // Removals are scoped the same way, so a box cleared before the ack would
     // leave the joiner holding one the host has already dropped.
     feed(&mut ordered, &line::remove_start_rect(0));
-    feed(
-        &mut ordered,
-        &line::remove_script_tags(&["game/startpostype"]),
-    );
+    for line in line::remove_script_tags(&["game/startpostype"]) {
+        feed(&mut ordered, &line);
+    }
     let battle = &ordered.battles[&1];
     assert!(battle.start_rects.is_empty());
     assert!(battle.script_tags.is_empty());

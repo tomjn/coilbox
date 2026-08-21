@@ -278,15 +278,42 @@ pub fn remove_start_rect(ally: u8) -> String {
     format!("REMOVESTARTRECT {ally}")
 }
 
-/// The most bytes of `key=value` payload to put in one `SETSCRIPTTAGS` line.
+/// The most bytes of payload to put in one `SETSCRIPTTAGS` or `REMOVESCRIPTTAGS`
+/// line.
 ///
 /// The TASServer protocol names no line limit and neither does this crate, but
-/// SPADS, the autohost every real lobby runs, packs its own script-tag lines to
+/// SPADS, the autohost every real lobby runs, packs both its script-tag lines to
 /// 900 characters and sends as many lines as it takes (`limitLineSize` in
-/// `spads.pl`). That is the only length evidence there is, so follow it. It
-/// started to matter when a battle began publishing its game's whole option list
-/// (#1837): Beyond All Reason declares 177 options, which is 6.7 KB.
+/// `spads.pl`, used for the set list in `sendBattleSettings` and for the removal
+/// list in `sendBattleMapOptions`). That is the only length evidence there is, so
+/// follow it. It started to matter when a battle began publishing its game's
+/// whole option list (#1837): Beyond All Reason declares 177 options, which is
+/// 6.7 KB.
 pub const SCRIPT_TAG_LINE_BUDGET: usize = 900;
+
+/// Pack `items` into `COMMAND <item><sep><item>...` lines, each carrying at most
+/// [`SCRIPT_TAG_LINE_BUDGET`] bytes of payload.
+///
+/// Empty for no items. A single item wider than the budget goes out alone and
+/// over it, because dropping it would silently lose a tag.
+fn packed_lines(command: &str, sep: char, items: impl Iterator<Item = String>) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut body = String::new();
+    for item in items {
+        if !body.is_empty() && body.len() + 1 + item.len() > SCRIPT_TAG_LINE_BUDGET {
+            lines.push(format!("{command} {body}"));
+            body.clear();
+        }
+        if !body.is_empty() {
+            body.push(sep);
+        }
+        body.push_str(&item);
+    }
+    if !body.is_empty() {
+        lines.push(format!("{command} {body}"));
+    }
+    lines
+}
 
 /// `SETSCRIPTTAGS <key=val\tkey=val...>`, packed into as many lines as
 /// [`SCRIPT_TAG_LINE_BUDGET`] takes. A receiver merges each line into the
@@ -295,28 +322,26 @@ pub const SCRIPT_TAG_LINE_BUDGET: usize = 900;
 /// Empty for no tags. A single pair wider than the budget goes out alone and
 /// over it, because dropping it would silently lose an option.
 pub fn set_script_tags(tags: &BTreeMap<String, String>) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut body = String::new();
-    for (k, v) in tags {
-        let pair = format!("{k}={v}");
-        if !body.is_empty() && body.len() + 1 + pair.len() > SCRIPT_TAG_LINE_BUDGET {
-            lines.push(format!("SETSCRIPTTAGS {body}"));
-            body.clear();
-        }
-        if !body.is_empty() {
-            body.push('\t');
-        }
-        body.push_str(&pair);
-    }
-    if !body.is_empty() {
-        lines.push(format!("SETSCRIPTTAGS {body}"));
-    }
-    lines
+    packed_lines(
+        "SETSCRIPTTAGS",
+        '\t',
+        tags.iter().map(|(k, v)| format!("{k}={v}")),
+    )
 }
 
-/// `REMOVESCRIPTTAGS <space-sep tags>`.
-pub fn remove_script_tags(tags: &[&str]) -> String {
-    format!("REMOVESCRIPTTAGS {}", tags.join(" "))
+/// `REMOVESCRIPTTAGS <space-sep tags>`, packed into as many lines as
+/// [`SCRIPT_TAG_LINE_BUDGET`] takes. A receiver drops the keys each line names,
+/// so splitting means the same thing as one long line.
+///
+/// Empty for no tags. Bare keys rather than pairs, so a line holds more of them
+/// than a `SETSCRIPTTAGS` line does, but cutting a restriction list back removes
+/// two tags per unit (#1867) and that outgrows the budget just as fast.
+pub fn remove_script_tags(tags: &[&str]) -> Vec<String> {
+    packed_lines(
+        "REMOVESCRIPTTAGS",
+        ' ',
+        tags.iter().map(|t| (*t).to_string()),
+    )
 }
 
 /// `FRIENDREQUEST userName=<user>[\tmsg=<msg>]` — send a friend request.
@@ -563,8 +588,49 @@ mod tests {
     fn remove_script_tags_line() {
         assert_eq!(
             remove_script_tags(&["game/a", "game/b"]),
-            "REMOVESCRIPTTAGS game/a game/b"
+            vec!["REMOVESCRIPTTAGS game/a game/b"]
         );
+    }
+
+    #[test]
+    fn remove_script_tags_says_nothing_about_nothing() {
+        assert!(remove_script_tags(&[]).is_empty());
+    }
+
+    /// Clearing a restriction set removes `game/restrict/unit<N>` and
+    /// `.../limit<N>` for every unit that goes (#1867), so 100 units is 201 keys
+    /// and about 4 KB in one line. SPADS packs its own removal list to 900
+    /// characters, so match that rather than find out which servers truncate.
+    #[test]
+    fn remove_script_tags_packs_a_long_list_into_budgeted_lines() {
+        let mut keys = vec!["game/restrict/numrestrictions".to_string()];
+        for i in 0..100 {
+            keys.push(format!("game/restrict/unit{i}"));
+            keys.push(format!("game/restrict/limit{i}"));
+        }
+        let refs: Vec<&str> = keys.iter().map(String::as_str).collect();
+        let lines = remove_script_tags(&refs);
+        assert!(lines.len() > 1, "201 keys should not fit one line");
+        for line in &lines {
+            let body = line.strip_prefix("REMOVESCRIPTTAGS ").expect("line prefix");
+            assert!(
+                body.len() <= SCRIPT_TAG_LINE_BUDGET,
+                "line body of {} exceeds the budget",
+                body.len()
+            );
+        }
+        // Splitting must lose nothing: a key left on a dropped line stays set,
+        // and a stale restriction the host thinks it cleared still binds the
+        // match.
+        let sent: Vec<&str> = lines
+            .iter()
+            .flat_map(|l| {
+                l.strip_prefix("REMOVESCRIPTTAGS ")
+                    .expect("line prefix")
+                    .split(' ')
+            })
+            .collect();
+        assert_eq!(sent, keys);
     }
 
     #[test]
