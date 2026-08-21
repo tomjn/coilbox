@@ -168,6 +168,11 @@ pub fn remember(dir: &Path, record: &RenderRecord) -> bool {
 /// A unit with nothing to answer with is absent from the map rather than null, so
 /// a caller finds its answer by finding it.
 ///
+/// Keyed on the lower cased name rather than on the spelling it was asked for. The
+/// record is found case-insensitively, so answering in the caller's case would
+/// have a caller that asked in one case and reads in another find nothing, which
+/// looks exactly like a machine that has drawn nothing.
+///
 /// `source_archive` is the game's archive as the caller knows it, and `None` means
 /// the caller does not know: see this module's note about what that costs.
 pub fn look_up(
@@ -199,7 +204,7 @@ pub fn look_up(
         coilbox_thumb_cache::touch(&picture);
         coilbox_thumb_cache::touch(&record_path(dir, game, unit, variant));
         found.insert(
-            unit.clone(),
+            unit.trim().to_lowercase(),
             FoundRender {
                 record,
                 path: picture.to_string_lossy().into_owned(),
@@ -291,7 +296,14 @@ mod tests {
         remember(&dir, &drawn(&dir, "armsolar", 1, ARCHIVE));
         for asked in ["ARMSOLAR", "ArmSolar", " armsolar "] {
             let found = look_up(&dir, "BAR", "render:top", 1, None, &units(&[asked]));
-            assert_eq!(found.len(), 1, "{asked:?} found nothing");
+            // And answered under the lower cased name whatever was asked for, or
+            // a caller that asked in one case and reads in another finds nothing,
+            // which looks exactly like a machine that has drawn nothing.
+            assert!(
+                found.contains_key("armsolar"),
+                "{asked:?} answered {found:?}"
+            );
+            assert_eq!(found.len(), 1, "{asked:?} answered {found:?}");
         }
     }
 
