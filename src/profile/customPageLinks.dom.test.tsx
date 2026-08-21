@@ -18,6 +18,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -54,19 +55,22 @@ function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
 }
 
+/** A page as a distribution would ship it. */
+function aPage(markdown: string) {
+  return {
+    route: "pages/about",
+    title: "About",
+    nav: true,
+    order: 0,
+    body: markdown,
+  };
+}
+
 /** Render a page as a distribution would ship it. */
 function renderPage(markdown: string) {
   render(
     <MemoryRouter initialEntries={["/"]}>
-      <MarkdownPage
-        page={{
-          route: "pages/about",
-          title: "About",
-          nav: true,
-          order: 0,
-          body: markdown,
-        }}
-      />
+      <MarkdownPage page={aPage(markdown)} />
       <Where />
     </MemoryRouter>,
   );
@@ -217,6 +221,52 @@ describe("a link to a heading on a distribution's markdown page", () => {
     expect(console.warn).toHaveBeenCalledWith(
       expect.stringContaining("#instaling"),
     );
+  });
+
+  it("keeps counting repeated headings across a widget", () => {
+    // A page is one markdown render per widget segment, so this page is three
+    // renders. The counter that numbers a repeated heading has to span them, or
+    // both of these are `#setup` and the link lands on the wrong one (issue
+    // #1808).
+    renderPage(
+      "[Setup again](#setup-1)\n\n## Setup\n\nFirst.\n\n@widget/onboarding\n\n## Setup\n\nSecond.",
+    );
+    const [first, second] = screen.getAllByRole("heading", { name: "Setup" });
+    expect([first.id, second.id]).toEqual(["setup", "setup-1"]);
+    fireEvent.click(screen.getByRole("link"));
+    expect(scrolled).toEqual([second]);
+  });
+
+  it("starts the count again on the next page, not where the last one left off", () => {
+    // The counter is shared by one page's segments and by nothing else. Were it
+    // a module-level one, two pages open at once would number each other's
+    // headings and every link on the second page would miss.
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <MarkdownPage page={aPage("## Setup\n\n@widget/onboarding\n\nOne.")} />
+        <MarkdownPage page={aPage("## Setup\n\n@widget/onboarding\n\nTwo.")} />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getAllByRole("heading", { name: "Setup" }).map((h) => h.id),
+    ).toEqual(["setup", "setup"]);
+  });
+
+  it("gives the same heading the same id however often the page renders", () => {
+    // React renders a component twice under StrictMode, and `react-markdown`
+    // re-runs the plugins every render, so a counter that only ever counts up
+    // would turn `#setup` into `#setup-1` on the second pass and break every
+    // link on the page in development.
+    render(
+      <StrictMode>
+        <MemoryRouter initialEntries={["/"]}>
+          <MarkdownPage
+            page={aPage("## Setup\n\n@widget/onboarding\n\nOnly one heading.")}
+          />
+        </MemoryRouter>
+      </StrictMode>,
+    );
+    expect(screen.getByRole("heading", { name: "Setup" }).id).toBe("setup");
   });
 
   it("takes a footnote to its note and the note back to the text", () => {

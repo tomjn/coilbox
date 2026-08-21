@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import { useNavigate } from "react-router";
 import { assetUrl, isLocalRef, mediaKind } from "../lib/assetUrl";
-import { scrollToAnchor } from "../lib/markdownAnchors";
-import { GFM_PLUGINS, GFM_PROSE_CLASSES } from "../lib/markdownGfm";
+import { createHeadingScope, scrollToAnchor } from "../lib/markdownAnchors";
+import { GFM_PLUGINS, GFM_PROSE_CLASSES, gfmPlugins } from "../lib/markdownGfm";
 import { openBundledFile } from "./openBundledFile";
 import { classifyMarkdownLink } from "./pageLinks";
 import { buildPageNav, getProfilePages, type ProfilePage } from "./pages";
@@ -177,13 +177,21 @@ function PageProse({ children }: { children: string }) {
       </div>
     );
   }
+  // Heading ids belong to the page rather than to a segment, so the second
+  // `## Setup` is `#setup-1` wherever the widgets fall (issue #1808). The scope
+  // is built here, per render of this page, because that is the smallest thing
+  // that holds all of one page's renders and none of another page's.
+  const headings = createHeadingScope();
   return (
     <div className="space-y-4">
       {segments.map((seg, i) =>
         seg.kind === "text" ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: segments derive from a static body and never reorder
           <div key={i} className={PROSE_CLASSES}>
-            <Markdown components={MEDIA_COMPONENTS} remarkPlugins={GFM_PLUGINS}>
+            <Markdown
+              components={MEDIA_COMPONENTS}
+              remarkPlugins={gfmPlugins(headings.pass())}
+            >
               {seg.text}
             </Markdown>
           </div>

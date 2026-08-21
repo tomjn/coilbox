@@ -1,4 +1,5 @@
 import remarkGfm from "remark-gfm";
+import type { HeadingIdPlugin } from "./markdownAnchors";
 import { remarkHeadingIds } from "./markdownAnchors";
 
 /**
@@ -22,7 +23,19 @@ import { remarkHeadingIds } from "./markdownAnchors";
  * its own. It gives each heading the id such a link points at, and the `a`
  * renderers scroll to it (issue #1805).
  */
-export const GFM_PLUGINS = [remarkGfm, remarkHeadingIds];
+export const GFM_PLUGINS = gfmPlugins(remarkHeadingIds);
+
+/**
+ * The same plugins with somebody else's heading ids.
+ *
+ * A distribution page is rendered a segment at a time, so its headings are
+ * numbered by a scope covering the whole page rather than by the plugin that
+ * only sees one document (see {@link ./markdownAnchors#createHeadingScope}).
+ * Every other surface renders in one pass and wants {@link GFM_PLUGINS}.
+ */
+export function gfmPlugins(headingIds: HeadingIdPlugin) {
+  return [remarkGfm, headingIds];
+}
 
 /**
  * Typography for the elements only GFM can produce. Tailwind's reset leaves a
