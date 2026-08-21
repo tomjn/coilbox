@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ConfigOption } from "@/content/bindings";
-import { effectiveOptions, groupOptions, withOption } from "./modOptions";
+import {
+  effectiveOptions,
+  groupOptions,
+  sparseOptions,
+  withOption,
+} from "./modOptions";
 
 const section = (key: string, name: string): ConfigOption => ({
   key,
@@ -143,5 +148,53 @@ describe("effectiveOptions", () => {
       coilbox_mission: "s1",
     });
     expect(out).toEqual({ startmetal: "1000", coilbox_mission: "s1" });
+  });
+});
+
+describe("sparseOptions", () => {
+  const schema = [
+    section("engine", "Engine Options"),
+    opt("maxunits", { default: "5000", section: "engine" }),
+    opt("startmetal", { default: "1000" }),
+  ];
+
+  it("keeps what was changed and drops what is only the game's own default", () => {
+    expect(
+      sparseOptions(schema, { maxunits: "5000", startmetal: "2000" }),
+    ).toEqual({ startmetal: "2000" });
+  });
+
+  it("undoes effectiveOptions, so filling and sparsifying round-trip exactly", () => {
+    const chosen = { startmetal: "2000" };
+    expect(sparseOptions(schema, effectiveOptions(schema, chosen))).toEqual(
+      chosen,
+    );
+  });
+
+  it("keeps a value the game never declared, so a scenario keeps its mission", () => {
+    expect(sparseOptions(schema, { coilbox_mission: "s1" })).toEqual({
+      coilbox_mission: "s1",
+    });
+  });
+
+  it("keeps everything when the option list is not known yet", () => {
+    const values = { maxunits: "5000", startmetal: "1000" };
+    expect(sparseOptions([], values)).toEqual(values);
+  });
+
+  it("keeps a value for an option the game declares no default for", () => {
+    expect(
+      sparseOptions([opt("note", { type: "string", default: undefined })], {
+        note: "hi",
+      }),
+    ).toEqual({ note: "hi" });
+  });
+
+  it("drops an empty value for an option whose default is empty", () => {
+    expect(
+      sparseOptions([opt("tweakdefs", { type: "string", default: "" })], {
+        tweakdefs: "",
+      }),
+    ).toEqual({});
   });
 });

@@ -113,3 +113,36 @@ export function effectiveOptions(
   }
   return out;
 }
+
+/**
+ * The inverse of {@link effectiveOptions}: drop every value that is only the
+ * game's own default, leaving what was actually chosen.
+ *
+ * For turning a full `[modoptions]` block back into something worth saving. A
+ * replay records every option its match ran with and says nothing about who
+ * chose what, so a preset made from one pinned 36 of SplinterFaction's 38
+ * defaults as if a player had picked them (#1838). Sparse is what a preset, a
+ * shared scenario and a campaign snapshot all store, and it is what lets a saved
+ * setup follow the game when the game changes its mind.
+ *
+ * A value whose key `options` does not declare is kept, for the same reason
+ * `effectiveOptions` keeps it: coilbox cannot tell a stale option from
+ * `coilbox_mission`, which the game never declares and the scenario runtime
+ * cannot find its mission without. An empty `options` list means "not known
+ * yet", so nothing is dropped. The round trip through `effectiveOptions` is
+ * exact either way, which is why sparsifying costs a refight nothing.
+ */
+export function sparseOptions(
+  options: ConfigOption[],
+  values: Record<string, string>,
+): Record<string, string> {
+  const declared = new Map(
+    options.filter((o) => o.type !== "section").map((o) => [o.key, o] as const),
+  );
+  return Object.fromEntries(
+    Object.entries(values).filter(([key, value]) => {
+      const o = declared.get(key);
+      return o ? isChanged(o, value) : true;
+    }),
+  );
+}
