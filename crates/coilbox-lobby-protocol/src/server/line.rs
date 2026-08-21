@@ -259,8 +259,12 @@ pub fn set_script_tags(tags: &BTreeMap<String, String>) -> Vec<String> {
 }
 
 /// `REMOVESCRIPTTAGS <space-sep tags>`. Current-battle scoped.
-pub fn remove_script_tags(tags: &[&str]) -> String {
-    format!("REMOVESCRIPTTAGS {}", tags.join(" "))
+///
+/// Same wire format in both directions and the same line budget, so this is the
+/// client builder. Cutting a long unit-restriction list back is several lines
+/// rather than one (#1867), and each is sent on its own.
+pub fn remove_script_tags(tags: &[&str]) -> Vec<String> {
+    crate::command::remove_script_tags(tags)
 }
 
 /// `HOSTPORT <port>`, the UDP port the host's engine will bind, which the host's

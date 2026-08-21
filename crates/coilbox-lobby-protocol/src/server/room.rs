@@ -458,9 +458,12 @@ impl RoomState {
                     battle.script_tags.remove(k);
                 }
                 let refs: Vec<&str> = tags.iter().map(String::as_str).collect();
-                Some(vec![Outbound::All {
-                    line: line::remove_script_tags(&refs),
-                }])
+                Some(
+                    line::remove_script_tags(&refs)
+                        .into_iter()
+                        .map(|line| Outbound::All { line })
+                        .collect(),
+                )
             }),
             ClientCommand::SayBattle { message } => self.say_battle(peer, &message, false),
             ClientCommand::SayBattleEx { message } => self.say_battle(peer, &message, true),
@@ -1430,6 +1433,47 @@ mod tests {
             due(&second, ALICE),
             ["OPENBATTLEFAILED this room already has a battle"]
         );
+    }
+
+    /// Cutting a unit-restriction list back removes `game/restrict/unit<N>` and
+    /// `.../limit<N>` for every unit that goes (#1867), so clearing a hundred is
+    /// 200 keys and about 4 KB. A host that hands that over as one line gets it
+    /// relayed as lines a lobby server would take, rather than one nobody
+    /// promises to read.
+    #[test]
+    fn a_long_tag_removal_reaches_the_room_in_budgeted_lines() {
+        let mut room = started(false);
+
+        let mut keys = Vec::new();
+        for i in 0..100 {
+            keys.push(format!("game/restrict/unit{i}"));
+            keys.push(format!("game/restrict/limit{i}"));
+        }
+        let one_long_line = format!("REMOVESCRIPTTAGS {}", keys.join(" "));
+        assert!(one_long_line.len() > command::SCRIPT_TAG_LINE_BUDGET);
+
+        let out = send(&mut room, ALICE, &one_long_line);
+        let lines = due(&out, BOB);
+        assert!(lines.len() > 1, "200 keys should not go out as one line");
+        for line in &lines {
+            let body = line.strip_prefix("REMOVESCRIPTTAGS ").expect("line prefix");
+            assert!(
+                body.len() <= command::SCRIPT_TAG_LINE_BUDGET,
+                "line body of {} exceeds the budget",
+                body.len()
+            );
+        }
+        // A key left off the relay stays set on every client but the host, so a
+        // restriction the host thinks it cleared still binds the match.
+        let relayed: Vec<&str> = lines
+            .iter()
+            .flat_map(|l| {
+                l.strip_prefix("REMOVESCRIPTTAGS ")
+                    .expect("line prefix")
+                    .split(' ')
+            })
+            .collect();
+        assert_eq!(relayed, keys);
     }
 
     /// The ordering constraint, checked on the lines a joiner actually receives:
