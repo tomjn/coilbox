@@ -112,12 +112,21 @@ describe("committing a number", () => {
     expect(sent()).toEqual({ position: [1, 10, 3] });
   });
 
-  /** A number is not parsed as it is typed, or "1." and "-" would move the
-   *  piece somewhere odd mid-keystroke. */
-  it("says nothing until the field is left", () => {
+  /**
+   * A number is not parsed as it is typed. Half of "-12" is "-", which is not a
+   * number at all, and half of "120" is "12", which is a number and the wrong
+   * one. Parsing as you go would send the piece to both on the way.
+   */
+  it("says nothing until the field is left, however typeable the half is", () => {
     show(hull());
-    fireEvent.change(field("Position Y"), { target: { value: "-" } });
+    for (const half of ["-", "1", "12"]) {
+      fireEvent.change(field("Position Y"), { target: { value: half } });
+    }
     expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.blur(field("Position Y"));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(sent()).toEqual({ position: [1, 12, 3] });
   });
 
   it("turns rubbish back into what the piece actually is", () => {

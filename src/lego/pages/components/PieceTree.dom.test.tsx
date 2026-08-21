@@ -88,6 +88,11 @@ function row(pieceId: string): HTMLElement {
   return found;
 }
 
+/** The label that follows the pointer while a piece is being carried, if one is. */
+function ghost(): HTMLElement | null {
+  return document.querySelector("span.fixed");
+}
+
 /** The row's own button: the one that selects the piece, not the eye beside it. */
 function rowButton(pieceId: string): HTMLButtonElement {
   const found = row(pieceId).querySelector("button");
@@ -240,10 +245,18 @@ describe("dragging a row onto another", () => {
     expect(handlers.onReparent).not.toHaveBeenCalled();
   });
 
-  /** The root is the unit, so it has nowhere to move to. It still takes drops. */
-  it("will not carry the root piece anywhere", () => {
+  /**
+   * The root is the unit, so it has nowhere to move to and never picks up:
+   * pressing on it and pulling shows no ghost, rather than carrying a label
+   * around for a move that could never land. It still takes drops.
+   */
+  it("will not pick the root piece up, and still takes drops onto it", () => {
     show(walker());
-    drag("base", "hull");
+    document.elementFromPoint = () => row("hull");
+    fireEvent.pointerDown(row("base"), { clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(row("base"), { clientX: 0, clientY: 40 });
+    expect(ghost()).toBeNull();
+    fireEvent.pointerUp(row("base"), { clientX: 0, clientY: 40 });
     expect(handlers.onReparent).not.toHaveBeenCalled();
 
     drag("turret", "base");
