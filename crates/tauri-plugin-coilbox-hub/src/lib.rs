@@ -1,8 +1,9 @@
 //! Coilbox hub account (Rust half).
 //!
-//! Nine commands: three about who is signed in to the hub, one that publishes as
-//! them, three about sending pictures made from local archives, and two about
-//! sending what coilbox read out of a map ([`maps`], issue #1736). None of them
+//! Ten commands: three about who is signed in to the hub, one that publishes as
+//! them, three about sending pictures made from local archives, two about
+//! sending what coilbox read out of a map ([`maps`], issue #1736) and one about
+//! sending what it read out of a game ([`games`], issue #1875). None of them
 //! hands a token out. Registered as `"coilbox-hub"`, so the frontend invokes
 //! `plugin:coilbox-hub|<cmd>`. The flow they sit on is [`auth`], and the request
 //! that uses its token is [`publish`].
@@ -24,6 +25,7 @@
 pub mod auth;
 pub mod consent;
 mod endpoint;
+pub mod games;
 pub mod have;
 pub mod maps;
 pub mod publish;
@@ -319,6 +321,34 @@ async fn hub_publish_maps<R: Runtime>(
     }
 }
 
+/// `hub_publish_game_facts`: send what a game says about its units to the hub.
+///
+/// One request is one whole game (issue #1875). The submission declares itself
+/// complete, so the hub retires every unit it did not name, and half a game
+/// would retire the other half.
+///
+/// One outcome per unit inside a 200. `accepted` and `recorded` are the hub
+/// writing something down, `unchanged` is the ordinary answer for a game that
+/// has not moved since the last run, and `refused` carries the hub's own words
+/// for the one unit it objected to. A body the hub will not parse at all is an
+/// error rather than a list of refusals, because nothing in that answer is about
+/// any particular unit.
+#[tauri::command]
+async fn hub_publish_game_facts<R: Runtime>(
+    app: AppHandle<R>,
+    hub_url: String,
+    game: games::GameFacts,
+) -> CliResult {
+    let consent = match consent::AssetUploadConsent::check(&app) {
+        Ok(consent) => consent,
+        Err(refused) => return CliResult::err(refused),
+    };
+    match games::publish_game_facts(&hub_url, &game, &consent).await {
+        Ok(results) => CliResult::ok(json!({ "results": results })),
+        Err(said) => CliResult::err(said),
+    }
+}
+
 /// `hub_upload_cancel`: stop a running upload by its `op_id`. The run drops the
 /// request it has in flight and leaves the rest untried. A no-op for an unknown or
 /// finished id.
@@ -342,7 +372,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             hub_upload_assets,
             hub_upload_cancel,
             hub_maps_have,
-            hub_publish_maps
+            hub_publish_maps,
+            hub_publish_game_facts
         ])
         .build()
 }

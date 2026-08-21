@@ -37,16 +37,15 @@
 //! one.
 
 use std::collections::HashSet;
-use std::time::Duration;
 
 use coilbox_map_catalog::{caps, MapCatalogEntry};
-use coilbox_oauth::HTTP_TIMEOUT;
 use serde::{Deserialize, Serialize};
 
 use crate::auth;
 use crate::consent::AssetUploadConsent;
-use crate::endpoint::{api_url, host_of, read_capped};
-use crate::upload::{verdict_for, Verdict, RETRY_BACKOFF, UPLOAD_ATTEMPTS};
+use crate::endpoint::{
+    api_url, check_envelope, host_of, json_client, post_json_with_retries, refusal,
+};
 
 /// The route that answers what the hub already holds.
 const HAVE_PATH: &str = "/api/v1/maps/have";
@@ -61,15 +60,6 @@ const HAVE_FORMAT: &str = "coilbox-hub-map-have";
 const HAVE_VERSION: u32 = 1;
 const SUBMIT_FORMAT: &str = "coilbox-hub-maps";
 const SUBMIT_VERSION: u32 = 1;
-
-/// Longest one request may take end to end, matching the other hub routes for
-/// the same reason: a hub asleep on a free tier is woken by the first request,
-/// which is slow rather than broken.
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
-
-/// Bound the initial connect on its own, so a dead host fails before any of the
-/// above is spent waiting.
-const CONNECT_TIMEOUT: Duration = HTTP_TIMEOUT;
 
 /// Largest answer that will be read.
 ///
@@ -228,7 +218,7 @@ async fn have_in_batches(
     token: &str,
     keys: &[MapHaveKey],
 ) -> Result<Vec<MapHaveResult>, String> {
-    let client = client()?;
+    let client = json_client()?;
     let mut answers = Vec::with_capacity(keys.len());
     for batch in keys.chunks(caps().have_keys) {
         answers.extend(ask(&client, url, token, batch).await?);
@@ -277,7 +267,7 @@ async fn ask(
     batch: &[MapHaveKey],
 ) -> Result<Vec<MapHaveResult>, String> {
     let body = serde_json::json!({ "keys": batch }).to_string();
-    let read = send_with_retries(client, url, token, &body).await?;
+    let read = post_json_with_retries(client, url, token, &body, ANSWER_LIMIT).await?;
     if read.status != 200 {
         return Err(refusal(read.status, &read.bytes, url));
     }
@@ -349,7 +339,7 @@ async fn publish_in_batches(
     token: &str,
     entries: &[MapCatalogEntry],
 ) -> Result<Vec<MapSubmitResult>, String> {
-    let client = client()?;
+    let client = json_client()?;
     let mut results: Vec<Option<MapSubmitResult>> = vec![None; entries.len()];
     let mut batch: Vec<(usize, &MapCatalogEntry)> = Vec::new();
     let mut batch_bytes = 0usize;
@@ -456,7 +446,7 @@ async fn send_batch(
     })
     .to_string();
 
-    let read = send_with_retries(client, url, token, &body).await?;
+    let read = post_json_with_retries(client, url, token, &body, ANSWER_LIMIT).await?;
     if read.status != 200 {
         return Err(refusal(read.status, &read.bytes, url));
     }
@@ -482,96 +472,6 @@ async fn send_batch(
 
     for ((index, _), result) in batch.iter().zip(answered.results) {
         into[*index] = Some(result);
-    }
-    Ok(())
-}
-
-/// A hub's answer, once it has one.
-struct Read {
-    status: u16,
-    bytes: Vec<u8>,
-}
-
-/// Send a body, trying again while the answer is one another request could
-/// change.
-///
-/// The same taxonomy the picture upload reads off a status
-/// ([`crate::upload::Verdict`]) rather than a second copy of it: a 5xx or a
-/// request that never arrived is worth another go, a 401 or a 429 is not about
-/// this batch and is not, and everything else is the same answer for ever.
-///
-/// Bounded at [`UPLOAD_ATTEMPTS`], so a hub answering 503 to everything costs
-/// three requests per batch rather than three hundred.
-async fn send_with_retries(
-    client: &reqwest::Client,
-    url: &str,
-    token: &str,
-    body: &str,
-) -> Result<Read, String> {
-    let mut waiting = RETRY_BACKOFF;
-    let mut attempt = 1;
-    loop {
-        let sent = send(client, url, token, body).await;
-        let again = match &sent {
-            Ok(read) => verdict_for(read.status) == Verdict::Transient,
-            Err(_) => true,
-        };
-        if !again || attempt >= UPLOAD_ATTEMPTS {
-            return sent;
-        }
-        tokio::time::sleep(waiting).await;
-        waiting *= 2;
-        attempt += 1;
-    }
-}
-
-async fn send(
-    client: &reqwest::Client,
-    url: &str,
-    token: &str,
-    body: &str,
-) -> Result<Read, String> {
-    let response = client
-        .post(url)
-        .header(reqwest::header::AUTHORIZATION, format!("Bearer {token}"))
-        .header(reqwest::header::ACCEPT, "application/json")
-        .header(reqwest::header::CONTENT_TYPE, "application/json")
-        .body(body.to_owned())
-        .send()
-        .await
-        .map_err(|e| unreachable_message(url, e.is_timeout()))?;
-    let status = response.status().as_u16();
-    let bytes = read_capped(response, ANSWER_LIMIT).await?;
-    Ok(Read { status, bytes })
-}
-
-fn client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .connect_timeout(CONNECT_TIMEOUT)
-        .timeout(REQUEST_TIMEOUT)
-        .build()
-        .map_err(|e| e.to_string())
-}
-
-/// Whether the answer is the document this build knows how to read.
-fn check_envelope(
-    format: &str,
-    version: u32,
-    wanted_format: &str,
-    wanted_version: u32,
-    url: &str,
-) -> Result<(), String> {
-    if format != wanted_format {
-        return Err(format!(
-            "The hub at {} answered with something other than {wanted_format}.",
-            host_of(url)
-        ));
-    }
-    if version > wanted_version {
-        return Err(format!(
-            "The hub at {} speaks version {version} of {wanted_format} and this version of coilbox understands {wanted_version}. Update coilbox.",
-            host_of(url)
-        ));
     }
     Ok(())
 }
@@ -605,40 +505,11 @@ fn check_order<'a>(
     Ok(())
 }
 
-/// What the hub said no with. Its own words when it gave any, because it is the
-/// side that knows which map it objected to.
-fn refusal(status: u16, body: &[u8], url: &str) -> String {
-    let said = serde_json::from_slice::<serde_json::Value>(body)
-        .ok()
-        .and_then(|v| v.get("error")?.as_str().map(str::to_owned));
-    let host = host_of(url);
-    match (status, said) {
-        (401, _) => {
-            format!(
-                "The hub at {host} did not accept the sign-in. Sign in again and try once more."
-            )
-        }
-        (_, Some(said)) => format!("The hub at {host} refused the request: {said}"),
-        (_, None) => format!("The hub at {host} refused the request, with a {status}."),
-    }
-}
-
-/// Why the hub was never reached. Both cases name the host, because it is a
-/// setting and often not the default one, and both name waking up, because a hub
-/// asleep on a free tier is the likeliest reason a request never lands.
-fn unreachable_message(url: &str, timed_out: bool) -> String {
-    let host = host_of(url);
-    if timed_out {
-        format!("The hub at {host} took too long to answer. It may be waking up after a quiet spell, so try again in a moment.")
-    } else {
-        format!("Could not reach the hub at {host}. Check your connection, and give it a moment if it is waking up after a quiet spell.")
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::testing::MapHubServer;
+    use crate::upload::UPLOAD_ATTEMPTS;
     use std::collections::BTreeMap;
 
     fn key(map_name: &str, source_hash: &str) -> MapHaveKey {

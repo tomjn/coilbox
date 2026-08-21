@@ -1,0 +1,393 @@
+import { describe, expect, it, vi } from "vitest";
+import type { GameItem, Side, UnitDatasetEntry } from "@/content/bindings";
+import { MUTATOR_FOLDER, SCRATCH_FOLDER } from "@/lib/generatedGames";
+import type { GameFacts, GameFactsResult } from "./facts";
+import {
+  factionKeys,
+  type GameSweepTools,
+  gameSweepSummary,
+  gamesToSend,
+  sweepGameFacts,
+} from "./factsSweep";
+
+const target = {
+  hubUrl: "https://hub.example",
+  enginePath: "/engines/105",
+  dataDir: "/data",
+};
+
+function game(
+  name: string,
+  archive: string,
+  info: Record<string, string> = {},
+): GameItem {
+  return {
+    name,
+    primaryArchive: { name: archive },
+    dependencyArchives: [],
+    info: { shortname: "BA", version: "12.24", ...info },
+  };
+}
+
+function unit(
+  name: string,
+  buildOptions: string[] = [],
+  fullName?: string,
+): UnitDatasetEntry {
+  return { name, buildOptions, ...(fullName ? { fullName } : {}) };
+}
+
+/**
+ * A machine holding `games`, whose archives each answer with `sides` and
+ * `units`, and a hub that takes everything.
+ *
+ * `units` and `sides` are keyed by primary archive name, so a test can give two
+ * games different unit graphs.
+ */
+function tools(
+  games: GameItem[],
+  units: Record<string, UnitDatasetEntry[]> = {},
+  sides: Record<string, Side[]> = {},
+  outcomes: GameFactsResult[] = [],
+): GameSweepTools & { sent: () => GameFacts[]; mounted: () => string[] } {
+  const sent: GameFacts[] = [];
+  const mounted: string[] = [];
+  return {
+    scan: vi.fn(async () => ({
+      maps: [],
+      games,
+      errors: [],
+    })) as unknown as GameSweepTools["scan"],
+    info: vi.fn(async ({ gameArchive }: { gameArchive: string }) => {
+      mounted.push(gameArchive);
+      return {
+        sides: sides[gameArchive] ?? [{ name: "Armada", startUnit: "armcom" }],
+        unitCount: 0,
+        units: [],
+        options: [],
+        errors: [],
+      };
+    }) as unknown as GameSweepTools["info"],
+    dataset: vi.fn(async ({ gameArchive }: { gameArchive: string }) => ({
+      units: units[gameArchive] ?? [unit("armcom")],
+      errors: [],
+    })) as unknown as GameSweepTools["dataset"],
+    send: vi.fn(async (_hubUrl: string, facts: GameFacts) => {
+      sent.push(facts);
+      return outcomes;
+    }) as unknown as GameSweepTools["send"],
+    sent: () => sent,
+    mounted: () => mounted,
+  };
+}
+
+describe("gamesToSend", () => {
+  /// The rule the whole issue rests on: a public catalog gets released games and
+  /// nothing somebody is in the middle of editing.
+  it("sends the packaged release and neither a working folder nor coilbox's own games", () => {
+    const { sendable, skipped } = gamesToSend([
+      game("Balanced Annihilation 12.24", "ba1224.sdz"),
+      game("SplinterFaction 0.1.78", "SplinterFaction.sdd", {
+        shortname: "SF",
+      }),
+      game("Coilbox unit test scratch", SCRATCH_FOLDER, {
+        shortname: "coilbox-lego",
+      }),
+      game("Coilbox mission test", MUTATOR_FOLDER, {
+        shortname: "coilbox-mission",
+      }),
+    ]);
+
+    expect(sendable.map((s) => s.game.name)).toEqual([
+      "Balanced Annihilation 12.24",
+    ]);
+    expect(skipped).toEqual([
+      { game: "SplinterFaction 0.1.78", reason: "development-folder" },
+      { game: "Coilbox unit test scratch", reason: "development-folder" },
+      { game: "Coilbox mission test", reason: "development-folder" },
+    ]);
+  });
+
+  /// `release` is required, so a game with no version is a 400 for the whole
+  /// submission. Skipping it with a reason beats sending it to be refused.
+  it("skips a game whose modinfo declares no version", () => {
+    const { sendable, skipped } = gamesToSend([
+      game("Nameless Mod", "nameless.sdz", { version: "  " }),
+      game("Balanced Annihilation 12.24", "ba1224.sdz"),
+    ]);
+
+    expect(sendable.map((s) => s.game.name)).toEqual([
+      "Balanced Annihilation 12.24",
+    ]);
+    expect(skipped).toEqual([{ game: "Nameless Mod", reason: "no-release" }]);
+  });
+
+  it("skips a game with no modinfo shortname, since the hub files games under one", () => {
+    const { sendable, skipped } = gamesToSend([
+      game("Odd Mod", "odd.sdz", { shortname: "" }),
+    ]);
+
+    expect(sendable).toEqual([]);
+    expect(skipped).toEqual([{ game: "Odd Mod", reason: "no-shortname" }]);
+  });
+
+  /// The hub holds one set of current facts per shortname, so two installs
+  /// posted in one run would leave them pointing at whichever went last and the
+  /// next run would move them again.
+  it("sends one install per game, and the same one every time", () => {
+    const installs = [
+      game("SplinterFaction 0.1.77", "sf0177.sdz", { shortname: "SF" }),
+      game("SplinterFaction 0.1.78", "sf0178.sdz", { shortname: "SF" }),
+    ];
+
+    const forwards = gamesToSend(installs);
+    const backwards = gamesToSend([...installs].reverse());
+
+    expect(forwards.sendable.map((s) => s.game.name)).toEqual([
+      "SplinterFaction 0.1.78",
+    ]);
+    expect(backwards.sendable.map((s) => s.game.name)).toEqual([
+      "SplinterFaction 0.1.78",
+    ]);
+    expect(forwards.skipped).toEqual([
+      { game: "SplinterFaction 0.1.77", reason: "another-install" },
+    ]);
+  });
+});
+
+describe("factionKeys", () => {
+  const units = [
+    unit("armcom", ["armlab", "armsolar"]),
+    unit("armlab", ["armflash"]),
+    unit("armsolar"),
+    unit("armflash"),
+    unit("corcom", ["corlab"]),
+    unit("corlab", ["corraid"]),
+    unit("corraid"),
+    unit("gaiatree"),
+  ];
+  const sides: Side[] = [
+    { name: "Armada", startUnit: "armcom" },
+    { name: "Cortex", startUnit: "corcom" },
+  ];
+
+  it("attributes a unit to the side whose start unit reaches it", () => {
+    const keys = factionKeys(units, sides);
+
+    expect(keys.get("armflash")).toBe("armada");
+    expect(keys.get("corraid")).toBe("cortex");
+    expect(keys.get("armcom")).toBe("armada");
+  });
+
+  it("leaves a unit no start unit reaches without a faction", () => {
+    expect(factionKeys(units, sides).get("gaiatree")).toBeUndefined();
+  });
+
+  /// The forest keeps the first side to claim a start unit, and a unit two
+  /// factions can build goes to whichever root reached it first, so a key is one
+  /// answer rather than two.
+  it("gives a unit both factions build one faction, the first", () => {
+    const shared = [
+      unit("armcom", ["shared"]),
+      unit("corcom", ["shared"]),
+      unit("shared"),
+    ];
+
+    expect(factionKeys(shared, sides).get("shared")).toBe("armada");
+    expect(factionKeys(shared, [...sides].reverse()).get("shared")).toBe(
+      "cortex",
+    );
+  });
+
+  it("ignores a side with no start unit", () => {
+    const keys = factionKeys(units, [...sides, { name: "Spectator" } as Side]);
+
+    expect([...new Set(keys.values())].sort()).toEqual(["armada", "cortex"]);
+  });
+});
+
+describe("sweepGameFacts", () => {
+  it("sends what one game says about its units", async () => {
+    const kit = tools(
+      [game("Balanced Annihilation 12.24", "ba1224.sdz")],
+      {
+        "ba1224.sdz": [
+          unit("armcom", ["armlab"], "Commander"),
+          unit("armlab", [], "Vehicle Lab"),
+        ],
+      },
+      { "ba1224.sdz": [{ name: "Armada", startUnit: "armcom" }] },
+    );
+
+    const report = await sweepGameFacts(target, () => {}, kit);
+
+    expect(report.sent).toBe(1);
+    expect(kit.sent()).toEqual([
+      {
+        shortname: "BA",
+        release: "12.24",
+        startUnits: ["armcom"],
+        units: [
+          {
+            name: "armcom",
+            fullName: "Commander",
+            factionKey: "armada",
+            buildOptions: ["armlab"],
+          },
+          {
+            name: "armlab",
+            fullName: "Vehicle Lab",
+            factionKey: "armada",
+            buildOptions: [],
+          },
+        ],
+      },
+    ]);
+  });
+
+  /// The whole point of the skip rules, end to end: a working folder's archives
+  /// are never even mounted.
+  it("never reads or sends a working folder", async () => {
+    const kit = tools([
+      game("Balanced Annihilation 12.24", "ba1224.sdz"),
+      game("SplinterFaction 0.1.78", "SplinterFaction.sdd", {
+        shortname: "SF",
+      }),
+      game("Coilbox unit test scratch", SCRATCH_FOLDER, {
+        shortname: "coilbox-lego",
+      }),
+    ]);
+
+    const report = await sweepGameFacts(target, () => {}, kit);
+
+    expect(kit.mounted()).toEqual(["ba1224.sdz"]);
+    expect(kit.sent().map((facts) => facts.shortname)).toEqual(["BA"]);
+    expect(report.found).toBe(3);
+    expect(report.sent).toBe(1);
+    expect(report.skipped).toHaveLength(2);
+  });
+
+  /// A complete submission with no units is an instruction to retire the lot, so
+  /// a read that came back empty must not travel as one.
+  it("skips a game whose archives produced no units", async () => {
+    const kit = tools([game("Balanced Annihilation 12.24", "ba1224.sdz")], {
+      "ba1224.sdz": [],
+    });
+
+    const report = await sweepGameFacts(target, () => {}, kit);
+
+    expect(kit.send).not.toHaveBeenCalled();
+    expect(report.skipped).toEqual([
+      { game: "Balanced Annihilation 12.24", reason: "no-units" },
+    ]);
+  });
+
+  it("carries on past a game the hub would not take", async () => {
+    const kit = tools([
+      game("Balanced Annihilation 12.24", "ba1224.sdz"),
+      game("Zero-K 1.2", "zk12.sdz", { shortname: "ZK" }),
+    ]);
+    let first = true;
+    kit.send = vi.fn(async (_hubUrl: string, facts: GameFacts) => {
+      if (first) {
+        first = false;
+        throw new Error("The hub at hub.example refused the request: no.");
+      }
+      return [
+        { kind: "unit", name: facts.units[0].name, outcome: "accepted" },
+      ] as GameFactsResult[];
+    }) as unknown as GameSweepTools["send"];
+
+    const report = await sweepGameFacts(target, () => {}, kit);
+
+    expect(report.sent).toBe(1);
+    expect(report.failed).toEqual([
+      {
+        game: "Balanced Annihilation 12.24",
+        said: "The hub at hub.example refused the request: no.",
+      },
+    ]);
+  });
+
+  /// A refusal is per unit inside a 200, so it does not lose the game it was in.
+  it("keeps the units the hub refused inside an otherwise fine submission", async () => {
+    const kit = tools(
+      [game("Balanced Annihilation 12.24", "ba1224.sdz")],
+      {},
+      {},
+      [
+        { kind: "unit", name: "armcom", outcome: "accepted" },
+        { kind: "unit", name: "armodd", outcome: "refused", said: "no" },
+      ],
+    );
+
+    const report = await sweepGameFacts(target, () => {}, kit);
+
+    expect(report.sent).toBe(1);
+    expect(report.refused).toEqual([
+      { kind: "unit", name: "armodd", outcome: "refused", said: "no" },
+    ]);
+  });
+
+  it("does nothing with a machine that has no games", async () => {
+    const kit = tools([]);
+
+    const report = await sweepGameFacts(target, () => {}, kit);
+
+    expect(report.found).toBe(0);
+    expect(kit.send).not.toHaveBeenCalled();
+  });
+
+  it("counts games as it goes", async () => {
+    const kit = tools([
+      game("Balanced Annihilation 12.24", "ba1224.sdz"),
+      game("Zero-K 1.2", "zk12.sdz", { shortname: "ZK" }),
+    ]);
+    const seen: string[] = [];
+
+    await sweepGameFacts(target, (p) => seen.push(p.phase), kit);
+
+    expect(seen[0]).toBe("scanning");
+    expect(seen).toContain("reading");
+    expect(seen.at(-1)).toBe("sending");
+  });
+});
+
+describe("gameSweepSummary", () => {
+  const base = {
+    found: 3,
+    sent: 2,
+    skipped: [],
+    failed: [],
+    refused: [],
+    errors: [],
+  };
+
+  it("says what was sent", () => {
+    expect(gameSweepSummary(base)).toBe(
+      "Sent what 2 games say about their units.",
+    );
+  });
+
+  it("says nothing was worth sending when only working folders were found", () => {
+    expect(gameSweepSummary({ ...base, sent: 0 })).toContain(
+      "Only released games are sent",
+    );
+  });
+
+  it("counts the games the hub would not take", () => {
+    const said = gameSweepSummary({
+      ...base,
+      failed: [{ game: "Zero-K 1.2", said: "no" }],
+    });
+    expect(said).toContain("would not take one game");
+  });
+
+  it("counts the units the hub would not take", () => {
+    const said = gameSweepSummary({
+      ...base,
+      refused: [{ kind: "unit", name: "armodd", outcome: "refused" }],
+    });
+    expect(said).toContain("would not take 1 unit");
+  });
+});
