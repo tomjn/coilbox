@@ -46,31 +46,78 @@ function nodeText(node: MdastNode): string {
 }
 
 /**
+ * Give every heading in one tree the `id` its text slugifies to, adding to the
+ * ids `used` already holds and recording the ones it hands out.
+ */
+function assignHeadingIds(tree: MdastNode, used: Set<string>) {
+  const visit = (node: MdastNode) => {
+    if (node.type === "heading") {
+      const base = headingSlug(nodeText(node));
+      if (base) {
+        let slug = base;
+        for (let n = 1; used.has(slug); n++) slug = `${base}-${n}`;
+        used.add(slug);
+        node.data = {
+          ...node.data,
+          hProperties: { ...node.data?.hProperties, id: slug },
+        };
+      }
+    }
+    for (const child of node.children ?? []) visit(child);
+  };
+  visit(tree);
+}
+
+/** A remark plugin that gives a document's headings their ids. */
+export type HeadingIdPlugin = () => (tree: unknown) => void;
+
+/**
  * Give every heading the `id` its text slugifies to, so a `#` link can find it.
  *
  * A second heading with the same text gets `-1`, then `-2`, which is what GitHub
  * does and means a link at least lands on one of them. A heading of nothing but
  * punctuation slugifies to an empty string and is left without an id.
  */
-export function remarkHeadingIds() {
-  return (tree: unknown) => {
-    const used = new Set<string>();
-    const visit = (node: MdastNode) => {
-      if (node.type === "heading") {
-        const base = headingSlug(nodeText(node));
-        if (base) {
-          let slug = base;
-          for (let n = 1; used.has(slug); n++) slug = `${base}-${n}`;
-          used.add(slug);
-          node.data = {
-            ...node.data,
-            hProperties: { ...node.data?.hProperties, id: slug },
-          };
-        }
-      }
-      for (const child of node.children ?? []) visit(child);
-    };
-    visit(tree as MdastNode);
+export function remarkHeadingIds(): (tree: unknown) => void {
+  return (tree) => assignHeadingIds(tree as MdastNode, new Set());
+}
+
+/**
+ * The same ids for a page that is rendered in several passes rather than one.
+ *
+ * A distribution page is split at each `@widget/` token and rendered a segment
+ * at a time, so `## Setup` before a widget and `## Setup` after it are two
+ * documents as far as the parser is concerned. Counting from scratch in each
+ * gives both of them `#setup`, and a link to the second lands on the first
+ * (issue #1808). A scope covers one page: {@link HeadingScope.pass} hands out a
+ * plugin per segment, in the order the segments are written, and each pass
+ * starts from the ids the passes before it used.
+ *
+ * A pass keeps the ids it started with rather than accumulating, so running the
+ * same one again gives the same answer. It has to: React renders a component
+ * twice under StrictMode and `react-markdown` re-runs its plugins on every
+ * render, so a pass that only counted up would rename `#setup` to `#setup-1`
+ * behind the reader's back.
+ */
+export interface HeadingScope {
+  /** The plugin for the next segment of this page. */
+  pass(): HeadingIdPlugin;
+}
+
+/** Heading ids for one page. See {@link HeadingScope}. */
+export function createHeadingScope(): HeadingScope {
+  // `used[n]` is the ids the first n passes handed out between them.
+  const used: Set<string>[] = [new Set()];
+  let passes = 0;
+  return {
+    pass() {
+      const index = passes++;
+      return () => (tree) => {
+        const ids = new Set(used[index] ?? []);
+        assignHeadingIds(tree as MdastNode, ids);
+        used[index + 1] = ids;
+      };
+    },
   };
 }
 

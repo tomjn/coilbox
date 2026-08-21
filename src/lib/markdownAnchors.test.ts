@@ -5,7 +5,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { headingSlug, remarkHeadingIds } from "./markdownAnchors";
+import {
+  createHeadingScope,
+  type HeadingIdPlugin,
+  headingSlug,
+  remarkHeadingIds,
+} from "./markdownAnchors";
 
 /** As much of an mdast tree as these cases build by hand. */
 interface Probe {
@@ -15,17 +20,37 @@ interface Probe {
   data?: { hProperties?: { id?: string } };
 }
 
-/** Run the plugin over a tree of headings and report the id each one got. */
-function idsFor(...headings: string[][]): (string | undefined)[] {
-  const tree: Probe = {
+/** A document of headings, each one written as its run of inline pieces. */
+function docOf(headings: string[][]): Probe {
+  return {
     type: "root",
     children: headings.map((parts) => ({
       type: "heading",
       children: parts.map((value) => ({ type: "text", value })),
     })),
   };
-  remarkHeadingIds()(tree);
-  return (tree.children ?? []).map((h) => h.data?.hProperties?.id);
+}
+
+/** The id each heading in a document got. */
+function idsIn(doc: Probe): (string | undefined)[] {
+  return (doc.children ?? []).map((h) => h.data?.hProperties?.id);
+}
+
+/** Run the plugin over a tree of headings and report the id each one got. */
+function idsFor(...headings: string[][]): (string | undefined)[] {
+  const doc = docOf(headings);
+  remarkHeadingIds()(doc);
+  return idsIn(doc);
+}
+
+/**
+ * Run one of a scope's passes over its segment's headings, as a render does:
+ * on a tree freshly parsed from the same markdown.
+ */
+function runPass(pass: HeadingIdPlugin, ...headings: string[][]) {
+  const doc = docOf(headings);
+  pass()(doc);
+  return idsIn(doc);
 }
 
 describe("the id a heading gets", () => {
@@ -54,6 +79,37 @@ describe("the id a heading gets", () => {
     // There is no slug to give it, and an empty `id` is not something a link can
     // point at anyway.
     expect(idsFor(["***"])).toEqual([undefined]);
+  });
+
+  it("keeps counting across the passes of one page", () => {
+    // The page is rendered a segment at a time, so the numbering has to survive
+    // the gap between them (issue #1808).
+    const page = createHeadingScope();
+    expect(runPass(page.pass(), ["Setup"], ["Other"])).toEqual([
+      "setup",
+      "other",
+    ]);
+    expect(runPass(page.pass(), ["Setup"])).toEqual(["setup-1"]);
+  });
+
+  it("gives a pass the same ids however often it is run", () => {
+    // A render is not a promise to render once. React renders twice under
+    // StrictMode, and `react-markdown` runs its plugins on each render, so a
+    // pass that counted up as it went would rename its own headings.
+    const page = createHeadingScope();
+    const first = page.pass();
+    const second = page.pass();
+    expect(runPass(first, ["Setup"])).toEqual(["setup"]);
+    expect(runPass(second, ["Setup"])).toEqual(["setup-1"]);
+    expect(runPass(first, ["Setup"])).toEqual(["setup"]);
+    expect(runPass(second, ["Setup"])).toEqual(["setup-1"]);
+  });
+
+  it("counts nothing from another page's scope", () => {
+    // Two scopes are two pages, and a heading on one is not a repeat of the
+    // same heading on the other.
+    expect(runPass(createHeadingScope().pass(), ["Setup"])).toEqual(["setup"]);
+    expect(runPass(createHeadingScope().pass(), ["Setup"])).toEqual(["setup"]);
   });
 
   it("reads the whole heading, formatting and all", () => {
