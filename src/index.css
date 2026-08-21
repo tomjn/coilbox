@@ -67,6 +67,42 @@
   --color-muted-foreground: hsl(var(--card-foreground) / 0.75);
 }
 
+/* The app's content region scrolls down, never sideways (#1804).
+
+   picoframe renders the region as `main[data-slot="content-scroll"]` with
+   `overflow-auto`, so a route whose content runs past the right edge does not
+   break: the page silently gains horizontal scroll and whatever ran over sits
+   off screen. That is how #1795 went unreported. At a 600px window, which is
+   the narrowest size coilbox supports, the hub's last filter chip ended 96px
+   past the content edge and nothing looked wrong.
+
+   Clipping the axis does not make the overflow go away, but it does make it
+   somebody's problem. A control cut in half at the edge gets reported. A
+   control 96px off screen behind a gesture nobody knows about does not. On
+   macOS the scrollbar is an overlay, so today the two look identical at rest
+   and the only difference is a drag nobody performs. On Windows and Linux the
+   scrollbar is real estate, and it reads as an accident rather than as a
+   defect.
+
+   `hidden` rather than `clip`, deliberately. `hidden` leaves the region a
+   scroll container, so focusing a clipped control still scrolls it into view
+   and a keyboard user is not shut out of anything. `clip` would shut them out.
+
+   This does not stop a page overflowing, and it is not meant to. The ten
+   routes that overflow at 600px are filed separately, because each needs a
+   layout decision rather than a container. What this stops is the next one
+   going unnoticed.
+
+   Overriding a token or a slot from the consuming app is picoframe's
+   documented extension point, but the region belongs to picoframe and the same
+   change belongs upstream. `src/general/contentScroll.test.ts` reads this rule
+   back out of this file and checks the selector still matches markup picoframe
+   ships, so a release that renames the slot fails there rather than quietly
+   restoring the scroll. */
+main[data-slot="content-scroll"] {
+  overflow-x: hidden;
+}
+
 html,
 body,
 #root {
