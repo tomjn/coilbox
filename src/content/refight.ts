@@ -98,6 +98,12 @@ export function useRefightSetup(info: DemoInfo | null | undefined) {
     missingGame: !!info && !scan.loading && gameCandidates.length === 0,
     missingMap: !!info && !scan.loading && !installedMap,
     sides: gameInfo.info?.sides ?? [],
+    /** The target game's declared options, so a draft made from the replay can
+     * tell what the match changed from what the game itself chose (#1838). */
+    options: gameInfo.info?.options ?? [],
+    /** Whether that option list is still being read. A save taken before it
+     * lands would keep the whole recorded block, which is the bug. */
+    optionsLoading: gameInfo.loading,
     ais,
   };
 }

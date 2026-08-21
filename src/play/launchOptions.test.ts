@@ -132,9 +132,15 @@ describe("the same game and the same choices, launched different ways", () => {
       info: replay,
       ais: [],
       sides: [],
+      options: SCHEMA,
     });
     if (!refought) throw new Error("the replay had nobody to refight");
 
+    // The draft keeps only what the match changed (#1838), so what a preset
+    // made from it would store is the player's one choice and nothing else.
+    expect(refought.modOptionValues).toEqual(CHOSEN);
+    // Refighting is still exact: filling from the same option list puts every
+    // default back, so the script the engine gets is the one it recorded.
     expect(fromDraft(refought).modOptions).toEqual(skirmish.modOptions);
   });
 

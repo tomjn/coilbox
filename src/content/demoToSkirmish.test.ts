@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DemoInfo, SkirmishAi } from "./bindings";
+import type { ConfigOption, DemoInfo, SkirmishAi } from "./bindings";
 import { demoInfoToSkirmishDraft } from "./demoToSkirmish";
 
 const ais: SkirmishAi[] = [
@@ -48,9 +48,17 @@ function demoInfo(overrides: Partial<DemoInfo> = {}): DemoInfo {
 
 const sides = [{ name: "Armada" }, { name: "Cortex" }];
 
+/** No option list, as when the target game's info hasn't loaded yet. */
+const options: ConfigOption[] = [];
+
 describe("demoInfoToSkirmishDraft", () => {
   it("converts every seated player into an AI opponent, dropping spectators", () => {
-    const draft = demoInfoToSkirmishDraft({ info: demoInfo(), ais, sides });
+    const draft = demoInfoToSkirmishDraft({
+      info: demoInfo(),
+      ais,
+      sides,
+      options,
+    });
     expect(draft).not.toBeNull();
     expect(draft?.participants).toHaveLength(3); // you + Alice + Bob
     const [you, alice, bob] = draft?.participants ?? [];
@@ -72,15 +80,67 @@ describe("demoInfoToSkirmishDraft", () => {
   });
 
   it("keeps the map, game, start-pos type and mod options", () => {
-    const draft = demoInfoToSkirmishDraft({ info: demoInfo(), ais, sides });
+    const draft = demoInfoToSkirmishDraft({
+      info: demoInfo(),
+      ais,
+      sides,
+      options,
+    });
     expect(draft?.mapName).toBe("Comet Catcher");
     expect(draft?.gameName).toBe("Beyond All Reason test-30018");
     expect(draft?.startPosType).toBe(2);
     expect(draft?.modOptionValues).toEqual({ zombies: "disabled" });
   });
 
+  it("records only the options the match changed away from the game", () => {
+    // The bug (#1838): a replay lists every option the match ran with, so a
+    // preset made from one pinned the game's own defaults as if a person had
+    // picked them, and every option showed as changed on the Skirmish page.
+    const draft = demoInfoToSkirmishDraft({
+      info: demoInfo({
+        modOptions: {
+          maxunits: "1000",
+          startmetal: "5000",
+          zombies: "disabled",
+        },
+      }),
+      ais,
+      sides,
+      options: [
+        { key: "maxunits", name: "Max units", type: "number", default: "1000" },
+        {
+          key: "startmetal",
+          name: "Start metal",
+          type: "number",
+          default: "1000",
+        },
+        { key: "zombies", name: "Zombies", type: "bool", default: "disabled" },
+      ],
+    });
+    expect(draft?.modOptionValues).toEqual({ startmetal: "5000" });
+  });
+
+  it("keeps a value the target game never declared, so a scenario replay still arms its mission", () => {
+    const draft = demoInfoToSkirmishDraft({
+      info: demoInfo({
+        modOptions: { maxunits: "1000", coilbox_mission: "siege" },
+      }),
+      ais,
+      sides,
+      options: [
+        { key: "maxunits", name: "Max units", type: "number", default: "1000" },
+      ],
+    });
+    expect(draft?.modOptionValues).toEqual({ coilbox_mission: "siege" });
+  });
+
   it("defaults every converted slot to the game's standard AI", () => {
-    const draft = demoInfoToSkirmishDraft({ info: demoInfo(), ais, sides });
+    const draft = demoInfoToSkirmishDraft({
+      info: demoInfo(),
+      ais,
+      sides,
+      options,
+    });
     for (const p of draft?.participants.filter((p) => p.kind === "ai") ?? []) {
       expect(p.ai?.shortName).toBe("E323AI");
     }
@@ -91,6 +151,7 @@ describe("demoInfoToSkirmishDraft", () => {
       info: demoInfo(),
       ais,
       sides,
+      options,
       ai: { kind: "native", shortName: "E323AI", name: "E323AI" },
     });
     for (const p of draft?.participants.filter((p) => p.kind === "ai") ?? []) {
@@ -112,6 +173,7 @@ describe("demoInfoToSkirmishDraft", () => {
       }),
       ais,
       sides,
+      options,
     });
     expect(draft?.participants[1]?.side).toBe("__random__");
   });
@@ -125,6 +187,7 @@ describe("demoInfoToSkirmishDraft", () => {
       }),
       ais,
       sides: [],
+      options,
     });
     expect(draft?.participants[1]?.side).toBe("Legion");
   });
@@ -135,10 +198,16 @@ describe("demoInfoToSkirmishDraft", () => {
         info: demoInfo({ players: [{ name: "Referee", spectator: true }] }),
         ais,
         sides,
+        options,
       }),
     ).toBeNull();
     expect(
-      demoInfoToSkirmishDraft({ info: demoInfo({ players: [] }), ais, sides }),
+      demoInfoToSkirmishDraft({
+        info: demoInfo({ players: [] }),
+        ais,
+        sides,
+        options,
+      }),
     ).toBeNull();
   });
 
@@ -160,6 +229,7 @@ describe("demoInfoToSkirmishDraft", () => {
       }),
       ais,
       sides,
+      options,
     });
     expect(draft?.participants).toHaveLength(3); // you + Alice + the bot
     expect(draft?.participants[2]).toMatchObject({
@@ -181,6 +251,7 @@ describe("demoInfoToSkirmishDraft", () => {
       }),
       ais,
       sides,
+      options,
     });
     expect(draft?.participants[2]?.name).toBe("SurvivalAI");
     expect(draft?.participants[2]?.ai?.shortName).toBe("E323AI");
@@ -197,6 +268,7 @@ describe("demoInfoToSkirmishDraft", () => {
       }),
       ais,
       sides,
+      options,
     });
     expect(draft?.participants).toHaveLength(3); // you + two bots
     expect(draft?.participants.map((p) => p.allyTeam)).toEqual([0, 0, 1]);
@@ -209,6 +281,7 @@ describe("demoInfoToSkirmishDraft", () => {
       }),
       ais,
       sides,
+      options,
     });
     expect(draft?.participants[1]?.name).toBe("Player 1");
   });
