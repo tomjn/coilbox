@@ -107,6 +107,31 @@ interface QueueItemMeta {
 export type QueueItem = EnqueueInput & QueueItemMeta;
 
 /**
+ * A download the queue does not run, but the indicator should still show. The
+ * app updater fetching its own installer is the one of these: it goes through
+ * `@tauri-apps/plugin-updater` rather than the downloads plugin, writes no
+ * content folder, and ends in a restart (issue #1790).
+ *
+ * It sits beside the queue rather than in it, so an app update never waits
+ * behind a map and never holds one up. The rate is estimated here all the same,
+ * from the same trailing window as everything else, so it reads identically
+ * wherever it is drawn.
+ *
+ * There is no cancel. Whoever reported the download owns stopping it, and the
+ * updater plugin offers no way to abort a download it has started.
+ */
+export interface ReportedDownload {
+  /** Caller-chosen id, stable for the life of the download. */
+  id: string;
+  /** Human name shown in the indicator. */
+  label: string;
+  progress: DownloadProgress;
+  rate: DownloadRate;
+  /** When the first sample arrived, for elapsed time. */
+  startedAt: number;
+}
+
+/**
  * A stable identity for an enqueued request, used to dedupe (a second add of an
  * item already queued or active is ignored) and to let a page's button read the
  * status of the item it would enqueue.
@@ -147,6 +172,17 @@ interface DownloadQueueValue {
    * result instead.
    */
   waitFor: (id: string) => Promise<QueueItem | null>;
+  /** Downloads running outside the queue, shown alongside it. */
+  reported: ReportedDownload[];
+  /**
+   * Report where a download the queue is not running has got to, so the
+   * indicator can show it. Call again with the same id on every progress event,
+   * and with null once it is over, however it ended.
+   */
+  report: (
+    id: string,
+    update: { label: string; progress: DownloadProgress } | null,
+  ) => void;
   /** Cancel a queued item (dropped) or the active one (backend cancel). */
   cancel: (id: string) => void;
   /** Current status of the item with this identity, or null if not tracked. */
@@ -191,13 +227,16 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   const itemsRef = useRef(items);
   itemsRef.current = items;
 
+  const [reported, setReported] = useState<ReportedDownload[]>([]);
+
   // Set synchronously in startNext so the pump can't launch a second item before
   // the "active" status commits to state.
   const activeIdRef = useRef<string | null>(null);
 
-  // The progress samples behind each running item's rate estimate. Kept out of
-  // React state because they change far faster than anything drawn from them,
-  // and dropped as soon as the item settles.
+  // The progress samples behind each running download's rate estimate, queued
+  // and reported alike, keyed by id. Kept out of React state because they change
+  // far faster than anything drawn from them, and dropped as soon as the
+  // download settles.
   const samplesRef = useRef(
     new Map<string, { samples: RateSample[]; totalBytes: number | null }>(),
   );
@@ -419,6 +458,46 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     [settle],
   );
 
+  const report = useCallback(
+    (
+      id: string,
+      next: { label: string; progress: DownloadProgress } | null,
+    ) => {
+      if (!next) {
+        samplesRef.current.delete(id);
+        setReported((list) => list.filter((r) => r.id !== id));
+        return;
+      }
+      const now = Date.now();
+      const tracked = samplesRef.current.get(id);
+      const samples = addSample(tracked?.samples ?? [], {
+        at: now,
+        bytes: next.progress.downloadedBytes,
+        fraction:
+          next.progress.percent == null ? null : next.progress.percent / 100,
+      });
+      samplesRef.current.set(id, {
+        samples,
+        totalBytes: next.progress.totalBytes,
+      });
+      const rate = rateFrom(samples, next.progress.totalBytes, now);
+      setReported((list) => {
+        const was = list.find((r) => r.id === id);
+        const entry: ReportedDownload = {
+          id,
+          label: next.label,
+          progress: next.progress,
+          rate,
+          startedAt: was?.startedAt ?? now,
+        };
+        return was
+          ? list.map((r) => (r.id === id ? entry : r))
+          : [...list, entry];
+      });
+    },
+    [],
+  );
+
   const statusByIdentity = useMemo(() => {
     const m = new Map<string, QueueStatus>();
     for (const i of items) m.set(i.identity, i.status);
@@ -449,27 +528,43 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   );
 
   // A download that goes quiet sends no event saying so, so the rate has to be
-  // re-read against the clock for the stall to ever show. Only runs while
-  // something is active, and only writes when the answer actually changed.
-  const activeId = active?.id ?? null;
+  // re-read against the clock for the stall to ever show. Covers the reported
+  // downloads too, since an app update can lose its connection the same way a
+  // map can. Only writes when the answer actually changed.
+  const runningIds = useRef<string[]>([]);
+  runningIds.current = [active?.id, ...reported.map((r) => r.id)].filter(
+    (id): id is string => id != null,
+  );
+  const anyRunning = runningIds.current.length > 0;
   useEffect(() => {
-    if (!activeId) return;
+    if (!anyRunning) return;
     const timer = setInterval(() => {
-      const tracked = samplesRef.current.get(activeId);
-      if (!tracked) return;
-      const next = rateFrom(tracked.samples, tracked.totalBytes, Date.now());
-      const current = itemsRef.current.find((i) => i.id === activeId)?.rate;
-      if (current && current.stalled === next.stalled) return;
-      patch(activeId, { rate: next });
+      for (const id of runningIds.current) {
+        const tracked = samplesRef.current.get(id);
+        if (!tracked) continue;
+        const next = rateFrom(tracked.samples, tracked.totalBytes, Date.now());
+        const item = itemsRef.current.find((i) => i.id === id);
+        if (item) {
+          if (item.rate.stalled !== next.stalled) patch(id, { rate: next });
+          continue;
+        }
+        setReported((list) =>
+          list.some((r) => r.id === id && r.rate.stalled !== next.stalled)
+            ? list.map((r) => (r.id === id ? { ...r, rate: next } : r))
+            : list,
+        );
+      }
     }, 1000);
     return () => clearInterval(timer);
-  }, [activeId, patch]);
+  }, [anyRunning, patch]);
 
   const value: DownloadQueueValue = useMemo(
     () => ({
       items,
       active,
       queued,
+      reported,
+      report,
       enqueue,
       waitFor,
       cancel,
@@ -481,6 +576,8 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       items,
       active,
       queued,
+      reported,
+      report,
       enqueue,
       waitFor,
       cancel,

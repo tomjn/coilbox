@@ -409,3 +409,78 @@ describe("the queue's speed estimate", () => {
     expect(result.current.active?.startedAt).not.toBeNull();
   });
 });
+
+/**
+ * A download the queue does not run but the indicator should still show: the
+ * app updater fetching its own installer (issue #1790). It must not take a
+ * queue slot, because an app update waiting behind a map is the wrong answer,
+ * and it must still get the same speed and time left as everything else.
+ */
+describe("a download reported from outside the queue", () => {
+  const bytes = (downloadedBytes: number): DownloadProgress => ({
+    phase: "downloading",
+    downloadedBytes,
+    totalBytes: 10_000_000,
+    percent: downloadedBytes / 100_000,
+    bytesPerSec: null,
+  });
+
+  it("shows in the indicator without taking the running slot", async () => {
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    act(() => {
+      result.current.enqueue(mapRequest("Isis"));
+      result.current.report("app-update", {
+        label: "Coilbox 1.2.3",
+        progress: bytes(0),
+      });
+    });
+
+    await waitFor(() => expect(result.current.active?.label).toBe("Map: Isis"));
+    expect(result.current.reported.map((r) => r.label)).toEqual([
+      "Coilbox 1.2.3",
+    ]);
+    expect(result.current.queued).toHaveLength(0);
+    // The map still ran: a reported download waits for nothing and blocks
+    // nothing.
+    expect(pending).toHaveLength(1);
+  });
+
+  it("estimates its speed and time left the same way the queue does", async () => {
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    const clock = vi.spyOn(Date, "now");
+    for (let i = 0; i < 6; i++) {
+      clock.mockReturnValue(1_000_000 + i * 1000);
+      act(() => {
+        result.current.report("app-update", {
+          label: "Coilbox 1.2.3",
+          progress: bytes(i * 1_000_000),
+        });
+      });
+    }
+    clock.mockRestore();
+
+    const item = result.current.reported[0];
+    expect(item.rate.bytesPerSec).toBeCloseTo(1_000_000, -1);
+    expect(item.rate.secondsLeft).toBe(5);
+    expect(item.startedAt).toBe(1_000_000);
+  });
+
+  it("drops out of the indicator when the reporter says it is over", async () => {
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    act(() => {
+      result.current.report("app-update", {
+        label: "Coilbox 1.2.3",
+        progress: bytes(0),
+      });
+    });
+    expect(result.current.reported).toHaveLength(1);
+
+    act(() => {
+      result.current.report("app-update", null);
+    });
+    expect(result.current.reported).toHaveLength(0);
+  });
+});
