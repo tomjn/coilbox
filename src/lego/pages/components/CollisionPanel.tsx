@@ -13,6 +13,8 @@
 import { Button } from "@picoframe/frame";
 import { useMemo } from "react";
 
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
 import {
   COLLISION_VOLUME_LABELS,
@@ -36,9 +38,16 @@ interface Props {
   raw: RawGeometry | null;
   /** Null puts the unit back on the derived volume. */
   onChange: (volume: LegoCollisionVolume | null) => void;
+  onPieceCollisionChange: (on: boolean) => void;
 }
 
-export function CollisionPanel({ project, pack, raw, onChange }: Props) {
+export function CollisionPanel({
+  project,
+  pack,
+  raw,
+  onChange,
+  onPieceCollisionChange,
+}: Props) {
   // Every vertex in the unit, so not on every keystroke elsewhere in the page.
   const bounds = useMemo(
     () => unitBounds(project, pack, raw),
@@ -133,6 +142,33 @@ export function CollisionPanel({ project, pack, raw, onChange }: Props) {
           changes. Changing anything above takes it over.
         </p>
       )}
+
+      <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+        <Label htmlFor="piece-collision" className="text-xs font-medium">
+          Shoot at each piece instead
+        </Label>
+        <Switch
+          id="piece-collision"
+          checked={project.pieceCollision === true}
+          onCheckedChange={onPieceCollisionChange}
+        />
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Shots are then tested against a box around every piece, so one can pass
+        between a walker's legs or under a gantry rather than stopping at the
+        shape above. The engine measures those boxes off the geometry itself and
+        there is nothing to set: turn this on and the viewport draws what it
+        will build.
+      </p>
+
+      {project.pieceCollision ? (
+        <p className="text-xs text-muted-foreground">
+          The volume above still does two other jobs, so it is still worth
+          getting right. It is what you click to select the unit, and it is the
+          sphere an explosion measures to decide whether the unit was caught.
+        </p>
+      ) : null}
     </div>
   );
 }
