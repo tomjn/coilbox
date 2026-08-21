@@ -22,7 +22,7 @@ import {
 } from "../../content/pages/components/states";
 import { UnitPicker } from "../../content/pages/components/UnitPicker";
 import { usePreferredTarget } from "../../play/config";
-import { substituteExcludedMaps } from "../generate";
+import { restoreChallengeMap, substituteExcludedMaps } from "../generate";
 import { awardMeta } from "../meta";
 import {
   isBattleNode,
@@ -212,6 +212,14 @@ export default function RunPage() {
   const applyAndSave = async (next: typeof run) => {
     await save(next);
   };
+  // Put an encounter standing in for a challenge's map back on that map, once
+  // this install has it (issue #1834). Nothing to save when the node is not
+  // standing in for anything, which is what the identity check reads.
+  const restoreMap = async (nodeId: string) => {
+    if (!run) return;
+    const next = restoreChallengeMap(run, nodeId);
+    if (next !== run) await save(next);
+  };
   // Fire a one-shot win burst on a node, then clear so it can replay next win.
   const celebrate = (id: string) => {
     setBurstId(id);
@@ -307,6 +315,7 @@ export default function RunPage() {
               runId={runId}
               dataDir={target?.dataDir}
               onEnter={() => onSelect(selectedId)}
+              onRestoreMap={restoreMap}
               onClose={() => setSelectedId(null)}
             />
           </div>
@@ -320,6 +329,7 @@ export default function RunPage() {
             runId={runId}
             node={active}
             onResolved={applyAndSave}
+            onRestoreMap={restoreMap}
             onClose={closeOverlay}
             onCelebrate={() => celebrate(active.id)}
           />
@@ -435,6 +445,7 @@ function InspectPanel({
   runId,
   dataDir,
   onEnter,
+  onRestoreMap,
   onClose,
 }: {
   node: RunNode | undefined;
@@ -446,6 +457,8 @@ function InspectPanel({
   runId?: string;
   dataDir?: string;
   onEnter: () => void;
+  /** Put this encounter back on the map the challenge named (issue #1834). */
+  onRestoreMap: (nodeId: string) => Promise<void>;
   onClose: () => void;
 }) {
   if (!node) return null;
@@ -474,6 +487,7 @@ function InspectPanel({
                 <SubstitutedMapNote
                   original={node.battle.mapSubstitutedFrom}
                   className="mt-0.5"
+                  onRestore={() => onRestoreMap(node.id)}
                 />
               </div>
             )}

@@ -543,20 +543,21 @@ export function restoreChallengeMap(
   const node = run.nodes.find((n) => n.id === nodeId);
   const wanted = node?.battle?.mapSubstitutedFrom;
   if (!node?.battle || !wanted) return run;
-  const nodes = run.nodes.map((n): RunNode =>
-    n.id === nodeId && n.battle
-      ? {
-          ...n,
-          battle: {
-            ...n.battle,
-            mapName: wanted,
-            // The stand-in's download hint goes with the stand-in, and the map
-            // taking its place is already here.
-            mapDownload: undefined,
-            mapSubstitutedFrom: undefined,
-          },
-        }
-      : n,
+  const nodes = run.nodes.map(
+    (n): RunNode =>
+      n.id === nodeId && n.battle
+        ? {
+            ...n,
+            battle: {
+              ...n.battle,
+              mapName: wanted,
+              // The stand-in's download hint goes with the stand-in, and the map
+              // taking its place is already here.
+              mapDownload: undefined,
+              mapSubstitutedFrom: undefined,
+            },
+          }
+        : n,
   );
   return { ...run, nodes };
 }
