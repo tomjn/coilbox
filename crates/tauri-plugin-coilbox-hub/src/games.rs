@@ -77,6 +77,10 @@ const MAX_FULL_NAME: usize = 256;
 const MAX_FACTION_KEY: usize = 128;
 const MAX_FACTION_NAME: usize = 256;
 const MAX_BUILD_OPTION: usize = 128;
+/// The largest serialised stats blob one unit may carry. The hub answers a 400
+/// for the whole game past this and names the field rather than the unit, which
+/// is the one thing whoever has to fix the extraction needs.
+const MAX_STATS_JSON: usize = 8_192;
 
 /// One unit as the game declares it.
 ///
@@ -307,6 +311,14 @@ fn check_game(game: &GameFacts) -> Result<(), String> {
         }
         for option in &unit.build_options {
             text(&about("build options"), option, MAX_BUILD_OPTION)?;
+        }
+        let stats = serde_json::to_string(&unit.stats).unwrap_or_default();
+        if stats.len() > MAX_STATS_JSON {
+            return Err(format!(
+                "{}'s stats come to {} bytes and the hub stores at most {MAX_STATS_JSON} per unit.",
+                unit.name,
+                stats.len()
+            ));
         }
     }
     Ok(())
@@ -654,6 +666,68 @@ mod tests {
             .collect();
         let refused = check_and_build(&GameFacts { units, ..game() }).unwrap_err();
         assert!(refused.contains("at most 2000000"), "{refused}");
+    }
+
+    /// Stats travel as the extraction wrote them, which is the whole of what a
+    /// unit page shows. Nothing here reshapes them: the hub stores schemaless
+    /// JSON and renders what arrives.
+    #[test]
+    fn a_units_stats_travel_as_the_extraction_wrote_them() {
+        let mut stats = Map::new();
+        stats.insert("health".into(), serde_json::json!(3000));
+        stats.insert(
+            "weapons".into(),
+            serde_json::json!([{ "damage": 450, "projectile": "DGun" }]),
+        );
+        let sent: Value = serde_json::from_str(
+            &check_and_build(&GameFacts {
+                units: vec![GameUnitFacts {
+                    stats,
+                    ..unit("armcom")
+                }],
+                ..game()
+            })
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(sent["units"][0]["stats"]["health"], 3000);
+        assert_eq!(
+            sent["units"][0]["stats"]["weapons"],
+            serde_json::json!([{ "damage": 450, "projectile": "DGun" }])
+        );
+    }
+
+    /// A unit that declares nothing measurable sends an empty object rather
+    /// than none, so the field is one shape whatever the game turned out to
+    /// have.
+    #[test]
+    fn a_unit_with_nothing_to_say_still_carries_a_stats_object() {
+        let sent: Value = serde_json::from_str(&check_and_build(&game()).unwrap()).unwrap();
+        assert_eq!(sent["units"][0]["stats"], serde_json::json!({}));
+    }
+
+    /// Past the hub's per-unit cap the answer is a 400 for the whole game
+    /// naming the field, which says nothing about which unit blew it. Naming
+    /// the unit is what whoever has to fix the extraction can act on.
+    #[test]
+    fn a_unit_past_the_stats_cap_is_refused_by_name() {
+        let mut stats = Map::new();
+        stats.insert(
+            "weapons".into(),
+            serde_json::json!(vec!["x".repeat(64); MAX_STATS_JSON / 32]),
+        );
+        let refused = check_game(&GameFacts {
+            units: vec![GameUnitFacts {
+                stats,
+                ..unit("armcom")
+            }],
+            ..game()
+        })
+        .unwrap_err();
+
+        assert!(refused.contains("armcom"), "{refused}");
+        assert!(refused.contains("at most 8192"), "{refused}");
     }
 
     /// A game that could never be accepted fails before a token refresh is spent
