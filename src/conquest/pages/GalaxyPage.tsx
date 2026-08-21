@@ -39,7 +39,11 @@ import { isVoidNode, type VoidBody, voidBodiesFor } from "../galaxy3d/bodies";
 import { factionSides } from "../galaxy3d/factionShape";
 import { GalaxyView, nodeBodyLabel } from "../galaxy3d/GalaxyView";
 import { galaxyPalette } from "../galaxy3d/palette";
-import { regenerateGalaxy, substituteExcludedMaps } from "../generate";
+import {
+  regenerateGalaxy,
+  restoreChallengeMap,
+  substituteExcludedMaps,
+} from "../generate";
 import type { ConquestState, GalaxyDoc, GalaxyNode, TurnEvent } from "../model";
 import {
   NEUTRAL,
@@ -173,6 +177,18 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   // A faction header card flies the camera to that faction's territory; another
   // map interaction (selecting a node / clicking empty space) releases it.
   const [factionFocus, setFactionFocus] = useState<string | null>(null);
+
+  // Put a system standing in for a challenge's map back on that map, once this
+  // install has it (issue #1834). Written to the document rather than the run
+  // state, because the map a system fights on is part of the galaxy. A bundled
+  // galaxy never carries a substitution, so the identity check keeps this from
+  // ever writing a local copy of a read-only one.
+  const restoreMap = async (nodeId: string) => {
+    const doc = restoreChallengeMap(galaxy, nodeId);
+    if (doc === galaxy) return;
+    await conquestSave({ id: doc.id, json: JSON.stringify(doc) });
+    await refreshGalaxies();
+  };
 
   // Fog of war: the systems the player can see. Undefined = no fog (show all),
   // which is also how a finished run reveals the whole map. During setup (no
@@ -394,6 +410,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
           voidBody={voidBodies.get(selected.id)}
           dataDir={target?.dataDir}
           onBattle={setBattleNodeId}
+          onRestoreMap={restoreMap}
           onClose={() => setSelectedId(null)}
         />
       )}
@@ -405,6 +422,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
           node={battleNode}
           state={state}
           mode={battleMode}
+          onRestoreMap={restoreMap}
           onClose={() => setBattleNodeId(null)}
         />
       )}
@@ -613,6 +631,7 @@ function SelectionPanel({
   voidBody,
   dataDir,
   onBattle,
+  onRestoreMap,
   onClose,
 }: {
   galaxy: GalaxyDoc;
@@ -622,6 +641,8 @@ function SelectionPanel({
   voidBody: VoidBody | undefined;
   dataDir: string | undefined;
   onBattle: (nodeId: string) => void;
+  /** Put this system back on the map the challenge named for it (issue #1834). */
+  onRestoreMap: (nodeId: string) => Promise<void>;
   onClose: () => void;
 }) {
   const owner = state.owners[node.id] ?? NEUTRAL;
@@ -677,7 +698,10 @@ function SelectionPanel({
           </dt>
           <dd className="min-w-0 text-right">
             <span className="block truncate">{node.battle.mapName}</span>
-            <SubstitutedMapNote original={node.battle.mapSubstitutedFrom} />
+            <SubstitutedMapNote
+              original={node.battle.mapSubstitutedFrom}
+              onRestore={() => onRestoreMap(node.id)}
+            />
           </dd>
         </div>
       </dl>

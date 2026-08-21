@@ -42,12 +42,15 @@ export function BattleOverlay({
   node,
   state,
   mode,
+  onRestoreMap,
   onClose,
 }: {
   galaxy: GalaxyDoc;
   node: GalaxyNode;
   state: ConquestState;
   mode: "attack" | "defend";
+  /** Put this system back on the map the challenge named for it (issue #1834). */
+  onRestoreMap: (nodeId: string) => Promise<void>;
   onClose: () => void;
 }) {
   const run = useConquestBattleRun(galaxy, state, node, mode);
@@ -221,6 +224,7 @@ export function BattleOverlay({
             enemyCount={enemyCount}
             handicap={handicap}
             run={run}
+            onRestoreMap={onRestoreMap}
           />
         )}
         {run.phase === "checking" && (
@@ -278,6 +282,7 @@ function Briefing({
   enemyCount,
   handicap,
   run,
+  onRestoreMap,
 }: {
   galaxy: GalaxyDoc;
   node: GalaxyNode;
@@ -291,6 +296,7 @@ function Briefing({
   enemyCount: number;
   handicap: number;
   run: ReturnType<typeof useConquestBattleRun>;
+  onRestoreMap: (nodeId: string) => Promise<void>;
 }) {
   const playerFaction = galaxy.factions.find(
     (f) => f.id === state.playerFactionId,
@@ -304,7 +310,10 @@ function Briefing({
           </dt>
           <dd className="min-w-0 text-right">
             <span className="block truncate">{node.battle.mapName}</span>
-            <SubstitutedMapNote original={node.battle.mapSubstitutedFrom} />
+            <SubstitutedMapNote
+              original={node.battle.mapSubstitutedFrom}
+              onRestore={() => onRestoreMap(node.id)}
+            />
           </dd>
         </div>
         <div className="flex justify-between gap-2">

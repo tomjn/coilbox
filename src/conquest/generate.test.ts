@@ -4,6 +4,7 @@ import {
   type GenerateOptions,
   generateGalaxy,
   regenerateGalaxy,
+  restoreChallengeMap,
   substituteExcludedMaps,
 } from "./generate";
 import { parseGalaxyJson } from "./model";
@@ -469,5 +470,52 @@ describe("applyChallengeMaps", () => {
   it("ignores names for systems the galaxy does not have", () => {
     const next = applyChallengeMaps(doc, { "node-999": "Map 1" }, maps);
     expect(next).toBe(doc);
+  });
+});
+
+describe("restoreChallengeMap", () => {
+  const doc = generateGalaxy(base, "t0");
+  const named = Object.fromEntries(doc.nodes.map((n) => [n.id, "Map 3"]));
+  const without = maps.filter((m) => m.name !== "Map 3");
+  const substituted = applyChallengeMaps(doc, named, without);
+  const first = substituted.nodes[0];
+
+  it("puts the system back on the map the challenge named", () => {
+    expect(first.battle.mapSubstitutedFrom).toBe("Map 3");
+    const next = restoreChallengeMap(substituted, first.id);
+    const node = next.nodes.find((n) => n.id === first.id);
+    expect(node?.battle.mapName).toBe("Map 3");
+    expect(node?.battle.mapSubstitutedFrom).toBeUndefined();
+  });
+
+  it("touches only the system asked for", () => {
+    const next = restoreChallengeMap(substituted, first.id);
+    for (const node of next.nodes) {
+      if (node.id === first.id) continue;
+      expect(node.battle.mapSubstitutedFrom).toBe("Map 3");
+      expect(node.battle.mapName).not.toBe("Map 3");
+    }
+  });
+
+  it("drops the stand-in's download hint with the stand-in", () => {
+    const withHint = {
+      ...substituted,
+      nodes: substituted.nodes.map((n) => ({
+        ...n,
+        battle: { ...n.battle, mapDownload: { springName: n.battle.mapName } },
+      })),
+    };
+    const next = restoreChallengeMap(withHint, first.id);
+    expect(
+      next.nodes.find((n) => n.id === first.id)?.battle.mapDownload,
+    ).toBeUndefined();
+  });
+
+  it("leaves the galaxy alone for a system that is not standing in", () => {
+    expect(restoreChallengeMap(doc, doc.nodes[0].id)).toBe(doc);
+  });
+
+  it("leaves the galaxy alone for a system it does not have", () => {
+    expect(restoreChallengeMap(substituted, "node-999")).toBe(substituted);
   });
 });

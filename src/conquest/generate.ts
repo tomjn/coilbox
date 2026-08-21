@@ -709,6 +709,45 @@ export function applyChallengeMaps(
   return changed ? { ...galaxy, nodes } : galaxy;
 }
 
+/**
+ * Put one system back on the map its challenge named, now that this install can
+ * offer it (issue #1834).
+ *
+ * The reverse of the stand-in {@link applyChallengeMaps} leaves behind. A
+ * substitution is a local gap, not part of the challenge, so it should end when
+ * the gap does. One system at a time, because the offer to end it is made on one
+ * system's panel: a map arriving is not a reason to redraw every battlefield in
+ * a conquest somebody is part way through.
+ *
+ * Caller's job to know the map is usable here, meaning installed and not hidden
+ * from conquest. Returns the galaxy unchanged when the system is not standing in
+ * for anything, so callers can memo on identity.
+ */
+export function restoreChallengeMap(
+  galaxy: GalaxyDoc,
+  nodeId: string,
+): GalaxyDoc {
+  const node = galaxy.nodes.find((n) => n.id === nodeId);
+  const wanted = node?.battle.mapSubstitutedFrom;
+  if (!node || !wanted) return galaxy;
+  const nodes = galaxy.nodes.map((n) =>
+    n.id === nodeId
+      ? {
+          ...n,
+          battle: {
+            ...n.battle,
+            mapName: wanted,
+            // The stand-in's download hint goes with the stand-in, and the map
+            // taking its place is already here.
+            mapDownload: undefined,
+            mapSubstitutedFrom: undefined,
+          },
+        }
+      : n,
+  );
+  return { ...galaxy, nodes };
+}
+
 /** The content environment a reroll resolves at call time (never persisted). */
 export interface RegenerateEnv {
   maps: GenMap[];

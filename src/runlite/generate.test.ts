@@ -5,6 +5,7 @@ import {
   type GenerateRunOpts,
   type GenRunMap,
   generateRun,
+  restoreChallengeMap,
   substituteExcludedMaps,
 } from "./generate";
 import { isBattleNode, parseRunJson, type RogueliteRun } from "./model";
@@ -300,5 +301,61 @@ describe("applyChallengeMaps", () => {
     expect(a.nodes.map((n) => n.battle?.mapName)).toEqual(
       b.nodes.map((n) => n.battle?.mapName),
     );
+  });
+});
+
+describe("restoreChallengeMap", () => {
+  const run = generateRun(opts());
+  const named = Object.fromEntries(
+    run.nodes.filter((n) => n.battle).map((n) => [n.id, "Huge"]),
+  );
+  const without = MAPS.filter((m) => m.name !== "Huge");
+  const substituted = applyChallengeMaps(run, named, without);
+  const first = substituted.nodes.find((n) => n.battle?.mapSubstitutedFrom);
+
+  it("puts the encounter back on the map the challenge named", () => {
+    expect(first).toBeDefined();
+    const next = restoreChallengeMap(substituted, first?.id ?? "");
+    const node = next.nodes.find((n) => n.id === first?.id);
+    expect(node?.battle?.mapName).toBe("Huge");
+    expect(node?.battle?.mapSubstitutedFrom).toBeUndefined();
+  });
+
+  it("touches only the encounter asked for", () => {
+    const next = restoreChallengeMap(substituted, first?.id ?? "");
+    for (const node of next.nodes) {
+      if (node.id === first?.id || !node.battle) continue;
+      expect(node.battle.mapSubstitutedFrom).toBe("Huge");
+      expect(node.battle.mapName).not.toBe("Huge");
+    }
+  });
+
+  it("drops the stand-in's download hint with the stand-in", () => {
+    const withHint = {
+      ...substituted,
+      nodes: substituted.nodes.map((n) =>
+        n.battle
+          ? {
+              ...n,
+              battle: {
+                ...n.battle,
+                mapDownload: { springName: n.battle.mapName },
+              },
+            }
+          : n,
+      ),
+    };
+    const next = restoreChallengeMap(withHint, first?.id ?? "");
+    expect(
+      next.nodes.find((n) => n.id === first?.id)?.battle?.mapDownload,
+    ).toBeUndefined();
+  });
+
+  it("leaves the run alone for an encounter that is not standing in", () => {
+    expect(restoreChallengeMap(run, first?.id ?? "")).toBe(run);
+  });
+
+  it("leaves the run alone for a node it does not have", () => {
+    expect(restoreChallengeMap(substituted, "nope")).toBe(substituted);
   });
 });

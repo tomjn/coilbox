@@ -28,6 +28,7 @@ export function EncounterOverlay({
   runId,
   node,
   onResolved,
+  onRestoreMap,
   onClose,
   onCelebrate,
 }: {
@@ -36,6 +37,8 @@ export function EncounterOverlay({
   runId?: string;
   node: RunNode;
   onResolved: (next: RogueliteRun) => Promise<void>;
+  /** Put this encounter back on the map the challenge named (issue #1834). */
+  onRestoreMap: (nodeId: string) => Promise<void>;
   onClose: () => void;
   /** Called when leaving the map after a victory, to fire the win burst. */
   onCelebrate?: () => void;
@@ -92,6 +95,7 @@ export function EncounterOverlay({
                 label="Battlefield"
                 value={spec.mapName}
                 note={spec.mapSubstitutedFrom}
+                onRestoreNote={() => onRestoreMap(node.id)}
               />
               <Row
                 label="Opposition"
@@ -200,11 +204,15 @@ function Row({
   label,
   value,
   note,
+  onRestoreNote,
 }: {
   label: string;
   value: string;
   /** The map this encounter should have used, when it is on a stand-in. */
   note?: string;
+  /** Move the encounter onto `note`, once this install can offer it. Only the
+   * battlefield row has one, so only that row can carry a note. */
+  onRestoreNote?: () => Promise<void>;
 }) {
   return (
     <div className="flex justify-between gap-2">
@@ -213,7 +221,9 @@ function Row({
       </dt>
       <dd className="min-w-0 text-right">
         <span className="block truncate">{value}</span>
-        <SubstitutedMapNote original={note} />
+        {onRestoreNote && (
+          <SubstitutedMapNote original={note} onRestore={onRestoreNote} />
+        )}
       </dd>
     </div>
   );

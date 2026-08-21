@@ -1,5 +1,6 @@
 import { Button, cn } from "@picoframe/frame";
-import { Download } from "lucide-react";
+import { Download, Undo2 } from "lucide-react";
+import { useState } from "react";
 import { useUnitsyncScan } from "@/content/config";
 import { useMapEligibility } from "@/content/mapEligibility";
 import { useWriteRootPath } from "@/downloads/config";
@@ -23,26 +24,46 @@ import { usePreferredTarget } from "@/play/config";
  * player, which a download does not: fetching it again lands the same file
  * behind the same exclusion. So the offer appears only once the scan has said
  * which of the two it is, and the sentence stays cause-neutral until then.
+ *
+ * Once the map is usable the stand-in has outlived its reason, and `onRestore`
+ * is how it ends (issue #1834). Never on its own: a map turning up is not a
+ * reason to move a battle somebody has already fought around, so the swap
+ * happens when it is asked for. Pressing Download here is that asking, so the
+ * swap follows the download it started. A map that arrived some other way, from
+ * a download elsewhere or from being un-hidden in Content, gets a button.
  */
 export function SubstitutedMapNote({
   original,
   className,
+  onRestore,
 }: {
   /** The map the challenge names. Nothing renders without one. */
   original: string | undefined;
   className?: string;
+  /** Move this node onto `original`. Required: every surface this note appears
+   * on can write the change back, and one that could not would be reporting a
+   * problem it offers no way out of. */
+  onRestore: () => void | Promise<void>;
 }) {
   if (!original) return null;
-  return <SubstitutedMap original={original} className={className} />;
+  return (
+    <SubstitutedMap
+      original={original}
+      className={className}
+      onRestore={onRestore}
+    />
+  );
 }
 
 /** The note proper, split out so the hooks below run only for a real stand-in. */
 function SubstitutedMap({
   original,
   className,
+  onRestore,
 }: {
   original: string;
   className?: string;
+  onRestore: () => void | Promise<void>;
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -64,8 +85,18 @@ function SubstitutedMap({
     : undefined;
   const hidden = installed === true && isExcluded(original);
   // Installed, allowed, and still not used: the map arrived after this node
-  // resolved. Restoring it is issue #1834's decision, not this note's.
+  // resolved, so the stand-in can end wherever the surface can end it.
   const arrived = installed === true && !hidden;
+  const [restoring, setRestoring] = useState(false);
+
+  const restore = async () => {
+    setRestoring(true);
+    try {
+      await onRestore();
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const download = async () => {
     const settled = await mapDl.start();
@@ -73,15 +104,35 @@ function SubstitutedMap({
     // The queue drops the cached scan on a finished map, but this component
     // holds its own copy of the result and has to ask for a fresh one.
     await scan.run(true);
+    // The download was a request for this map on this node, so take it. Unless
+    // the map was hidden from the modes before it was ever installed, in which
+    // case fetching it has not made it usable and the swap would put the node
+    // on a map the player has switched off.
+    if (!isExcluded(original)) await restore();
   };
 
   return (
     <div className={cn("text-[10px] text-muted-foreground", className)}>
       <span className="block">
         {arrived
-          ? `Stands in for ${original}. You have that map now, but this battle keeps the stand-in.`
+          ? `Stands in for ${original}, which you now have.`
           : `Stands in for ${original}, which is not available here.`}
       </span>
+      {arrived && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="mt-1 h-7 gap-1.5 px-2 text-xs"
+          disabled={restoring}
+          // The sentence above names the map, so the button label stays short
+          // enough to fit the narrowest panel it appears on.
+          aria-label={`Use ${original}`}
+          onClick={restore}
+        >
+          <Undo2 className="size-3.5" aria-hidden />
+          {restoring ? "Switching…" : "Use it"}
+        </Button>
+      )}
       {hidden && (
         <span className="block">
           You have this map, but it is hidden from warpath and galactic

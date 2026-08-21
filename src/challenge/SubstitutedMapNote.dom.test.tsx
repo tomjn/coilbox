@@ -10,6 +10,11 @@
  * again changes nothing. These tests are here to keep those two apart, because
  * the note says the same cause-neutral sentence for both.
  *
+ * The second half covers going back to the named map once it is usable (issue
+ * #1834), which is the same distinction one step on: the swap follows a download
+ * started from this note, because that download was the request for it, and a
+ * map that turned up on its own waits to be asked for.
+ *
  * A DOM environment is opened for this file alone, by the docblock at the top.
  */
 
@@ -84,8 +89,10 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   <DownloadQueueProvider>{children}</DownloadQueueProvider>
 );
 
-const renderNote = (original: string | undefined) =>
-  render(<SubstitutedMapNote original={original} />, { wrapper });
+const renderNote = (original: string | undefined, onRestore = () => {}) =>
+  render(<SubstitutedMapNote original={original} onRestore={onRestore} />, {
+    wrapper,
+  });
 
 /** The note interpolates the map name, so its sentences span several text
  * nodes and only the whole element's text is worth asserting on. */
@@ -140,24 +147,67 @@ describe("the substituted map note", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("does not offer a download for a map that has since been installed", () => {
-    scan.data = { maps: [{ name: "Nowhere Atoll" }] };
-    renderNote("Nowhere Atoll");
-
-    // "Not available here" has stopped being true, so it stops being said.
-    expect(noteText()).toContain(
-      "You have that map now, but this battle keeps the stand-in.",
-    );
-    expect(noteText()).not.toContain("not available here");
-    expect(screen.queryByRole("button")).toBeNull();
-  });
-
   it("offers nothing until the scan says what is installed", () => {
     scan.data = null;
     renderNote("Nowhere Atoll");
 
     expect(noteText()).toContain(
       "Stands in for Nowhere Atoll, which is not available here.",
+    );
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
+describe("going back to the map the challenge named", () => {
+  it("offers the swap for a map that turned up on its own", async () => {
+    scan.data = { maps: [{ name: "Nowhere Atoll" }] };
+    const onRestore = vi.fn();
+    renderNote("Nowhere Atoll", onRestore);
+
+    expect(noteText()).toContain(
+      "Stands in for Nowhere Atoll, which you now have.",
+    );
+    const button = await screen.findByRole("button", {
+      name: /Use Nowhere Atoll/,
+    });
+    button.click();
+
+    await waitFor(() => expect(onRestore).toHaveBeenCalledTimes(1));
+  });
+
+  it("takes the swap as asked for when the download started here", async () => {
+    scan.data = { maps: [{ name: "Comet Catcher" }] };
+    const onRestore = vi.fn();
+    renderNote("Nowhere Atoll", onRestore);
+
+    (
+      await screen.findByRole("button", { name: /Download Nowhere Atoll/ })
+    ).click();
+
+    await waitFor(() => expect(onRestore).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not swap to a map the download landed behind an exclusion", async () => {
+    scan.data = { maps: [{ name: "Comet Catcher" }] };
+    excluded.names = ["Nowhere Atoll"];
+    const onRestore = vi.fn();
+    renderNote("Nowhere Atoll", onRestore);
+
+    (
+      await screen.findByRole("button", { name: /Download Nowhere Atoll/ })
+    ).click();
+
+    await waitFor(() => expect(downloadMapAnySource).toHaveBeenCalled());
+    expect(onRestore).not.toHaveBeenCalled();
+  });
+
+  it("does not offer the swap for a map that is hidden from the modes", () => {
+    scan.data = { maps: [{ name: "Nowhere Atoll" }] };
+    excluded.names = ["Nowhere Atoll"];
+    renderNote("Nowhere Atoll", vi.fn());
+
+    expect(noteText()).toContain(
+      "You have this map, but it is hidden from warpath and galactic conquest.",
     );
     expect(screen.queryByRole("button")).toBeNull();
   });
