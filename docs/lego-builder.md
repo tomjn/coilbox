@@ -139,13 +139,18 @@ Two shapes cannot be stretched, and the engine says so rather than the panel: a 
 
 The box button in the viewport's camera group draws the volume as an orange wireframe, over the model, so you can keep an eye on it while building rather than only while setting it.
 
-### Shoot at each piece instead
+### Use each piece instead
 
-A unit can be hit piece by piece rather than as one shape. Turn on **Shoot at each piece instead** and the export adds `usepiececollisionvolumes = true`, so a shot is tested against a box around every piece and can pass between a walker's legs or under a gantry rather than stopping at the shape above.
+A unit can be treated piece by piece rather than as one shape, and there are two switches for it because the engine asks the question twice:
 
-There is nothing to set per piece, and that is the engine's doing rather than a gap here. No `.s3o` piece carries a collision volume and no unit definition can name one. The engine measures a box around each piece's own vertices as it loads the model, and the only choice a unit definition has is whether to hit them. A game can change one while a unit is alive, with `Spring.SetUnitPieceCollisionVolumeData`, but that is a unit script's job rather than the builder's. So the boxes are a reading: turn this on and the viewport draws the ones the engine will build, in fainter orange over the model, whenever the volume is being shown.
+- **Shoot at each piece** writes `usepiececollisionvolumes = true`. A shot is then tested against a box around every piece, so it can pass between a walker's legs or under a gantry rather than stopping at the shape above.
+- **Click on each piece** writes `usepieceselectionvolumes = true`. The click target is then the pieces rather than the shape above. That is what a gantry or a spindly walker wants, because otherwise it is selectable from the empty air it encloses.
 
-The volume above still matters with this on, and in two ways. It is the shape you click to select the unit, because selecting by piece is a second switch that coilbox does not write. And it is the sphere an explosion measures to decide whether the unit was caught at all.
+Neither switch turns the other on. The engine reads them in two functions, `ParseCollisionVolume` and `ParseSelectionVolume`, over the same boxes, and a unit shot at piece by piece while staying an easy click is a real combination rather than a mistake. Turning on the shooting one alone is what most units want, which is why the shape above stays the click target unless you say otherwise.
+
+There is nothing to set per piece either way, and that is the engine's doing rather than a gap here. No `.s3o` piece carries a collision volume and no unit definition can name one. The engine measures a box around each piece's own vertices as it loads the model, and the only choice a unit definition has is whether to use them. A game can change one while a unit is alive, with `Spring.SetUnitPieceCollisionVolumeData`, but that is a unit script's job rather than the builder's. So the boxes are a reading: turn either switch on and the viewport draws the ones the engine will build, in fainter orange over the model, whenever the volume is being shown.
+
+The volume above still matters with either switch on. It is the sphere an explosion measures to decide whether the unit was caught at all. And with only the shooting switch on it is still the shape you click, because `ParseSelectionVolume` reads no shape of its own and falls back to the `collisionvolume` keys.
 
 ## Test in game
 
