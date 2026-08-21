@@ -29,7 +29,11 @@ export interface QueuedDownload {
   rate: DownloadRate;
   /** When it started downloading, for elapsed time. Null until it does. */
   startedAt: number | null;
-  /** Why the last attempt failed, if it did. */
+  /**
+   * Why the last attempt failed, if it did. Outlives the queue row, so the
+   * message is still there to read minutes later (issue #1860), and goes when
+   * the download is started again.
+   */
   error: string | null;
   /** Waiting for a slot, or downloading right now. */
   busy: boolean;
@@ -50,8 +54,11 @@ export interface QueuedDownload {
  * started anywhere in the app, shows here as busy too.
  */
 export function useQueuedDownload(input?: EnqueueInput | null): QueuedDownload {
-  const { enqueue, waitFor, items } = useDownloadQueue();
-  const [startedId, setStartedId] = useState<string | null>(null);
+  const { enqueue, waitFor, items, failureFor } = useDownloadQueue();
+  const [started, setStarted] = useState<{
+    id: string;
+    identity: string;
+  } | null>(null);
 
   const inputRef = useRef(input);
   inputRef.current = input;
@@ -61,15 +68,18 @@ export function useQueuedDownload(input?: EnqueueInput | null): QueuedDownload {
       const request = override ?? inputRef.current;
       if (!request) return null;
       const id = enqueue(request);
-      setStartedId(id);
+      setStarted({ id, identity: identityOf(request) });
       return waitFor(id);
     },
     [enqueue, waitFor],
   );
 
-  const identity = input ? identityOf(input) : null;
+  // The screen's own request when it has one, and otherwise whatever it last
+  // asked for at click time, which is the only identity a caller passing its
+  // request to `start` has.
+  const identity = input ? identityOf(input) : (started?.identity ?? null);
   const item =
-    items.find((i) => i.id === startedId) ??
+    items.find((i) => i.id === started?.id) ??
     (identity ? items.find((i) => i.identity === identity) : undefined);
 
   return {
@@ -78,7 +88,9 @@ export function useQueuedDownload(input?: EnqueueInput | null): QueuedDownload {
     progress: item?.progress ?? null,
     rate: item?.rate ?? IDLE_RATE,
     startedAt: item?.startedAt ?? null,
-    error: item?.error ?? null,
+    // The row wins while it is still there, then the queue's longer-lived
+    // record of the failure takes over once it has been pruned.
+    error: item?.error ?? (identity ? failureFor(identity) : null),
     busy: item?.status === "queued" || item?.status === "active",
   };
 }

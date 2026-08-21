@@ -13,7 +13,14 @@
  * A DOM environment is opened for this file alone, by the docblock at the top.
  */
 
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DownloadProgress } from "./bindings";
@@ -325,6 +332,141 @@ describe("a screen's download", () => {
     const { result } = renderHook(() => useQueuedDownload(null), { wrapper });
     await expect(result.current.start()).resolves.toBeNull();
     expect(pending).toHaveLength(0);
+  });
+});
+
+/**
+ * A screen keeps its own failure message after the queue has thrown the row
+ * away (issue #1860).
+ *
+ * Settled rows are pruned a few seconds after they settle, so the topbar
+ * indicator does not fill up with downloads that are over. That pruning used to
+ * take the failure message with it: four seconds after a download failed, the
+ * screen that asked for it went quiet and its button offered the download again
+ * as though nothing had been tried. The queue now remembers the last failure per
+ * request identity, outside the rows it prunes, so the screen can still say what
+ * happened.
+ *
+ * The clock is faked here so the four second wait does not have to be sat
+ * through. `shouldAdvanceTime` keeps real time moving underneath, which is what
+ * `waitFor` needs to poll.
+ */
+describe("a download that failed", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Run the fake download at `index` and fail it with `message`. */
+  async function failed(index: number, message: string) {
+    const run = await nextPending(index);
+    await act(async () => {
+      run.fail(message);
+    });
+  }
+
+  /** Let the prune timer fire. Comfortably past `PRUNE_MS`. */
+  async function prunePasses() {
+    await act(async () => {
+      vi.advanceTimersByTime(10_000);
+    });
+  }
+
+  it("still says why once the queue has dropped the row", async () => {
+    const { result } = renderHook(
+      () => ({
+        screen: useQueuedDownload(mapRequest("Isis")),
+        queue: useDownloadQueue(),
+      }),
+      { wrapper },
+    );
+
+    act(() => {
+      void result.current.screen.start();
+    });
+    await failed(0, "no mirror had it");
+    await waitFor(() =>
+      expect(result.current.screen.error).toBe("no mirror had it"),
+    );
+
+    await prunePasses();
+
+    expect(result.current.queue.items).toHaveLength(0);
+    expect(result.current.screen.error).toBe("no mirror had it");
+  });
+
+  it("says why to a screen opened after the row was dropped", async () => {
+    // Stands in for navigating away from the panel that started the download
+    // and coming back to it: the same provider, a fresh mount of the screen.
+    function Panel() {
+      const dl = useQueuedDownload(mapRequest("Isis"));
+      return (
+        <div>
+          <button type="button" onClick={() => void dl.start()}>
+            Download
+          </button>
+          <span data-testid="why">{dl.error ?? ""}</span>
+        </div>
+      );
+    }
+    const panel = (open: boolean) => (
+      <DownloadQueueProvider>{open ? <Panel /> : null}</DownloadQueueProvider>
+    );
+
+    const { rerender } = render(panel(true));
+    act(() => {
+      screen.getByRole("button", { name: "Download" }).click();
+    });
+    await failed(0, "no mirror had it");
+    await waitFor(() =>
+      expect(screen.getByTestId("why").textContent).toBe("no mirror had it"),
+    );
+    await prunePasses();
+
+    rerender(panel(false));
+    rerender(panel(true));
+
+    expect(screen.getByTestId("why").textContent).toBe("no mirror had it");
+  });
+
+  it("drops the message the moment the download is tried again", async () => {
+    const { result } = renderHook(() => useQueuedDownload(mapRequest("Isis")), {
+      wrapper,
+    });
+
+    act(() => {
+      void result.current.start();
+    });
+    await failed(0, "no mirror had it");
+    await prunePasses();
+    expect(result.current.error).toBe("no mirror had it");
+
+    act(() => {
+      void result.current.start();
+    });
+    await waitFor(() => expect(result.current.error).toBeNull());
+    expect(result.current.busy).toBe(true);
+  });
+
+  it("keeps a cancelled download from leaving a message behind", async () => {
+    const { result } = renderHook(
+      () => ({
+        screen: useQueuedDownload(mapRequest("Isis")),
+        queue: useDownloadQueue(),
+      }),
+      { wrapper },
+    );
+
+    act(() => {
+      void result.current.screen.start();
+    });
+    await failed(0, "download canceled");
+    await prunePasses();
+
+    expect(result.current.screen.error).toBeNull();
   });
 });
 
