@@ -175,6 +175,20 @@ describe("the parent picker", () => {
     expect(hangsOff()?.textContent).toBe("Several");
   });
 
+  it("reads a piece with no parent at all as hanging off the root", () => {
+    // A second parentless piece is a broken document. Every other reader of
+    // one takes it as hanging off the root, so this one has to agree, or a
+    // set holding it reads as having no shared parent when it plainly has.
+    const broken = walker();
+    show(["hull", "arm"], {
+      ...broken,
+      pieces: broken.pieces.map((piece) =>
+        piece.id === "arm" ? { ...piece, parentId: null } : piece,
+      ),
+    });
+    expect(hangsOff()?.textContent).toBe("base");
+  });
+
   it("ignores the parent of a piece another in the set already carries", () => {
     // thigh hangs off hull, which is selected, so thigh is not separately
     // moved and its parent is not part of the question. What is left is hull

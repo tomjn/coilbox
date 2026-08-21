@@ -323,6 +323,9 @@ describe("letting a pair go", () => {
     );
     // The twin is an ordinary piece now: it stayed where the pairing left it.
     expect(origin(bench.project(), twinId)).toEqual([-3, 0, 0]);
+    // And letting the pair go is not the same as putting the piece back in the
+    // queue. A piece that has had its twin does not get a second one.
+    expect(bench.extras()).toHaveLength(1);
   });
 
   it("stops following when the piece joins a wider selection", () => {
@@ -332,6 +335,7 @@ describe("letting a pair go", () => {
       bench.session().place(["leg"], (p) => moveTo(p, "leg", [9, 0, 0])),
     );
     expect(origin(bench.project(), twinId)).toEqual([-3, 0, 0]);
+    expect(bench.extras()).toHaveLength(1);
   });
 
   it("holds on while the same selection is handed back", () => {
