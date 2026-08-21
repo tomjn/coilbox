@@ -62,12 +62,17 @@ export function ViewControls({ children }: { children: ReactNode }) {
  */
 export function ViewToggle({
   icon: Icon,
+  onIcon,
   on,
   onChange,
   hideTitle,
   showTitle,
 }: {
   icon: LucideIcon;
+  /** A different face while it is on, for a control whose two states are not
+   *  the same act: filling the window and coming back out of it. Defaults to
+   *  `icon`, which is what a plain show-or-hide wants. */
+  onIcon?: LucideIcon;
   on: boolean;
   onChange: (on: boolean) => void;
   /** What the button does while the thing is shown. */
@@ -76,6 +81,7 @@ export function ViewToggle({
   showTitle: string;
 }) {
   const title = on ? hideTitle : showTitle;
+  const Face = on ? (onIcon ?? Icon) : Icon;
   return (
     <Button
       size="icon"
@@ -85,7 +91,7 @@ export function ViewToggle({
       title={title}
       aria-label={title}
     >
-      <Icon className="size-4" />
+      <Face className="size-4" />
     </Button>
   );
 }
