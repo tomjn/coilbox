@@ -37,7 +37,7 @@ import { type RenderFrame, renderFrame } from "./vocabulary";
  *
  * Fixing something that does not change the picture is not a bump.
  */
-export const RENDER_VERSION = 2;
+export const RENDER_VERSION = 3;
 
 /** How far above and below the model the camera's clip range reaches, in elmos,
  *  so a model sitting exactly on a clip plane is not shaved. */
