@@ -44,15 +44,10 @@ export interface GameModelRow {
 
 export interface GameModels {
   rows: GameModelRow[];
-  /** Units drawn with a `.3do`, the older format the builder cannot read.
-   *  Counted rather than listed: Balanced Annihilation is 720 `.3do` models
-   *  against 7 `.s3o`, so listing them greyed out would bury the openable ones.
-   *  Counted per unit rather than per file because a unit is what somebody came
-   *  looking for, and most of the files are wrecks and features nobody named. */
-  threeDoUnits: number;
   /** Units naming a model this archive does not hold at all, which is normally
-   *  a game whose models live in an archive it depends on. Kept apart from the
-   *  `.3do` count so neither footnote claims the other's reason. */
+   *  a game whose models live in an archive it depends on. Counted per unit
+   *  rather than per file, because a unit is what somebody came looking for and
+   *  most of the files are wrecks and features nobody named. */
   unresolvedUnits: number;
 }
 
@@ -73,7 +68,7 @@ export function modelKey(name: string): string {
 
 /** A model's own name, for a row no unitdef speaks for. */
 function fileLabel(member: string): string {
-  return (member.split("/").at(-1) ?? member).replace(/\.s3o$/i, "");
+  return (member.split("/").at(-1) ?? member).replace(/\.(s3o|3do)$/i, "");
 }
 
 /**
@@ -95,22 +90,20 @@ export function gameModelRows(input: {
   const { archive, archivePath } = input;
 
   const models = new Map<string, string>();
-  const threeDo = new Set<string>();
   for (const file of input.files) {
     const path = file.path.replace(/\\/g, "/");
     if (!path.toLowerCase().startsWith(MODELS_DIR)) continue;
-    if (/\.3do$/i.test(path)) {
-      threeDo.add(modelKey(path));
-      continue;
-    }
-    if (!/\.s3o$/i.test(path)) continue;
-    models.set(modelKey(path), path);
+    if (!/\.(s3o|3do)$/i.test(path)) continue;
+    const key = modelKey(path);
+    // An `.s3o` and a `.3do` of the same name is a game that replaced its
+    // model and left the old one behind, and the engine takes the `.s3o`.
+    if (/\.3do$/i.test(path) && models.has(key)) continue;
+    models.set(key, path);
   }
 
   const opened = openedProjects(input.projects, archive, archivePath);
   const rows: GameModelRow[] = [];
   const named = new Set<string>();
-  let threeDoUnits = 0;
   let unresolvedUnits = 0;
 
   for (const unit of input.units) {
@@ -118,8 +111,7 @@ export function gameModelRows(input: {
     const key = modelKey(unit.objectName);
     const member = models.get(key);
     if (!member) {
-      if (threeDo.has(key)) threeDoUnits += 1;
-      else unresolvedUnits += 1;
+      unresolvedUnits += 1;
       continue;
     }
     named.add(key);
@@ -145,7 +137,7 @@ export function gameModelRows(input: {
       a.label.localeCompare(b.label, undefined, { sensitivity: "base" }) ||
       a.member.localeCompare(b.member),
   );
-  return { rows, threeDoUnits, unresolvedUnits };
+  return { rows, unresolvedUnits };
 }
 
 /**

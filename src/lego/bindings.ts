@@ -296,6 +296,49 @@ export const legoImportS3o = defineCommand<
   S3oImport
 >("coilbox-lego", "lego_import_s3o");
 
+/** What one import of a `.3do` produced, on top of what any import produces. */
+export interface ThreeDoImport extends S3oImport {
+  /** Faces the format gives a flat palette colour rather than a texture. The
+   *  palette is embedded in the engine rather than shipped in the archive, so
+   *  they are drawn plain and counted. */
+  paletteFaces: number;
+  /** Tiles the model asked for that nothing on disk matched. Their faces are
+   *  drawn plain, and naming them is how anybody works out what is missing. */
+  missingTextures: string[];
+  /** How many distinct tiles the model names, so the panel can say how many of
+   *  them were found. */
+  tiles: number;
+}
+
+/**
+ * Name the tiles a `.3do` asks for, before anything imports it.
+ *
+ * The pair to {@link legoReadS3o}, for the same reason: a model unpacked out of
+ * a packed archive needs its textures put beside it first, and only the model
+ * says which ones. Both spellings of each name come back, because the engine
+ * appends `00` to a `.3do` texture name unless the game lists it in
+ * `teamtex.txt`.
+ */
+export const legoRead3do = defineCommand<
+  { path: string },
+  { textures: string[] }
+>("coilbox-lego", "lego_read_3do");
+
+/**
+ * Import a `.3do`, the older model format, as raw geometry.
+ *
+ * A conversion rather than a read, which is why it is its own command. An
+ * `.s3o` names one texture and stores coordinates into it. A `.3do` names a
+ * tile per face and stores no coordinates at all: a face is stretched over the
+ * whole of its tile. So the tiles are packed into one sheet and every face is
+ * given real coordinates onto it, and what comes out is an ordinary unit that
+ * exports as an ordinary `.s3o`.
+ */
+export const legoImport3do = defineCommand<
+  { path: string; id: string },
+  ThreeDoImport
+>("coilbox-lego", "lego_import_3do");
+
 /**
  * Put a texture in the shared store, for changing which one a unit draws with
  * or for picking up an edit made outside coilbox. The store is keyed by

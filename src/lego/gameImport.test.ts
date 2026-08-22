@@ -49,6 +49,18 @@ describe("textureMember", () => {
     );
   });
 
+  /** A `.3do` names its tiles out of `unittextures/tatex/`, which is a folder
+   *  no `.s3o` ever asks for and which the walk has to reach. */
+  it("finds a 3do tile in the tatex folder", () => {
+    expect(
+      textureMember(
+        [{ path: "unittextures/tatex/ARM200.bmp", size: 1 }],
+        "arm200",
+        "objects3d/peewee.3do",
+      ),
+    ).toBe("unittextures/tatex/ARM200.bmp");
+  });
+
   it("looks in no folder the loose walk would not reach", () => {
     // `bitmaps/armcom.dds` is neither a unittextures folder above the model nor
     // the model's own folder, so it may not be unpacked in its place.
