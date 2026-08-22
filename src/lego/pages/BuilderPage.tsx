@@ -160,6 +160,13 @@ function Builder({ id }: { id: string | undefined }) {
   const [scriptTimeline, setScriptTimeline] = useState<ScriptTimeline | null>(
     null,
   );
+  /**
+   * Whether a script run's clock is frozen on `scriptFrame` rather than
+   * advancing, and the frame it is either frozen on or, while running,
+   * reported to be showing.
+   */
+  const [scriptPaused, setScriptPaused] = useState(false);
+  const [scriptFrame, setScriptFrame] = useState(0);
   /** A preference, not part of the unit, so it lives with the session. */
   const [uniformScale, setUniformScale] = useState(true);
   /** Shared between the viewport and the tree, so hovering a piece in either
@@ -810,6 +817,9 @@ function Builder({ id }: { id: string | undefined }) {
                 onHover={setHoveredId}
                 playing={playing}
                 scriptTimeline={scriptTimeline}
+                scriptPaused={scriptPaused}
+                scriptFrame={scriptFrame}
+                onScriptFrame={setScriptFrame}
                 uniformScale={uniformScale}
                 onGround={() =>
                   edit((project) => sitOnGround(project, pack, raw))
@@ -1073,12 +1083,18 @@ function Builder({ id }: { id: string | undefined }) {
                     edit((project) => ({ ...project, animations }))
                   }
                   onScriptTimeline={setScriptTimeline}
+                  scriptPaused={scriptPaused}
+                  onScriptPausedChange={setScriptPaused}
+                  scriptFrame={scriptFrame}
+                  onScriptFrameChange={setScriptFrame}
                   onScriptChange={(script) => {
                     // What is playing describes the unit before the change: the
                     // presets it just stopped using, or the script it just
                     // edited.
                     setPlaying(false);
                     setScriptTimeline(null);
+                    setScriptPaused(false);
+                    setScriptFrame(0);
                     edit((project) => ({ ...project, script }));
                   }}
                 />

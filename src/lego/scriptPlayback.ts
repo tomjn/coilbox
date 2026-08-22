@@ -153,6 +153,17 @@ export function poseAt(
   ];
 }
 
+/**
+ * Keep a frame index inside the bounds of a timeline, for scrubbing and
+ * stepping: a slider dragged past either end, or a step off the last frame,
+ * lands on the frame nearest to it rather than wrapping or going nowhere.
+ */
+export function clampFrame(timeline: ScriptTimeline, frame: number): number {
+  const count = timeline.frames.length;
+  if (count === 0) return 0;
+  return Math.min(Math.max(frame, 0), count - 1);
+}
+
 /** Whether a piece is hidden on a frame. Nothing is hidden when nothing was. */
 export function hiddenAt(
   timeline: ScriptTimeline,

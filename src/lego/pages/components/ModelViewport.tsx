@@ -120,6 +120,7 @@ import {
   unitBounds,
 } from "../../s3oBuild";
 import {
+  clampFrame,
   frameAt,
   hiddenAt,
   poseAt,
@@ -279,6 +280,22 @@ interface Props {
    * The presets are gone for such a unit, so this is what playing means for it.
    */
   scriptTimeline?: ScriptTimeline | null;
+  /**
+   * True while a script run's clock is frozen on `scriptFrame` rather than
+   * advancing on its own. The bake and detached gizmo stay exactly as they
+   * are while paused, so scrubbing and stepping only ever change the pose.
+   */
+  scriptPaused?: boolean;
+  /**
+   * The frame a paused run is held on, and where the clock in a resumed run
+   * picks back up from. Ignored for the preset codepath.
+   */
+  scriptFrame?: number;
+  /**
+   * Told which frame a script run is showing, every tick it is not paused, so
+   * a scrubber can track playback and know where a pause should hold.
+   */
+  onScriptFrame?: (frame: number) => void;
   /** Scale handles keep the piece's proportions. */
   uniformScale?: boolean;
   /** Drop the unit onto y = 0. Absent hides the button. */
@@ -342,6 +359,9 @@ export function ModelViewport({
   onReady,
   playing = false,
   scriptTimeline = null,
+  scriptPaused = false,
+  scriptFrame = 0,
+  onScriptFrame,
   uniformScale = false,
   onGround,
   onDuplicate,
@@ -442,6 +462,14 @@ export function ModelViewport({
   // is playing without tearing the loop down and building the bake again.
   const scriptTimelineRef = useRef(scriptTimeline);
   scriptTimelineRef.current = scriptTimeline;
+  // Same reason: read inside the tick rather than depended on, so pausing,
+  // scrubbing and stepping never tear down the bake or reattach the gizmo.
+  const scriptPausedRef = useRef(scriptPaused);
+  scriptPausedRef.current = scriptPaused;
+  const scriptFrameRef = useRef(scriptFrame);
+  scriptFrameRef.current = scriptFrame;
+  const onScriptFrameRef = useRef(onScriptFrame);
+  onScriptFrameRef.current = onScriptFrame;
   const placingAnchorRef = useRef(placingAnchor);
   placingAnchorRef.current = placingAnchor;
   const onPlaceAnchorRef = useRef(onPlaceAnchor);
@@ -1153,30 +1181,52 @@ export function ModelViewport({
   // Playback. The gizmo comes off first: it would be dragging a transform that
   // is overwritten on the next frame. Stopping puts the scene back from the
   // document, which is the rest pose by definition.
+  //
+  // Pausing a script run does not stop this effect: it keeps ticking so it can
+  // notice a resume, it just skips posing and rendering while paused, holding
+  // whatever the last unpaused tick drew. Read through refs rather than a
+  // dependency, so pausing, scrubbing and stepping never tear the bake down.
   useEffect(() => {
     const state = sceneRef.current;
     if (!state || !playing || reduceMotion) return;
 
     state.gizmo.detach();
     showBaked(state, packRef.current, rawRef.current, projectRef.current);
-    const started = performance.now();
-    let frame = 0;
+    let raf = 0;
+    let elapsed = 0;
+    let last = performance.now();
+    let wasPaused = false;
 
     const tick = (now: number) => {
-      const timeline = scriptTimelineRef.current;
-      const seconds = (now - started) / 1000;
-      if (timeline) {
-        applyTimeline(state, projectRef.current, timeline, seconds);
+      const dt = (now - last) / 1000;
+      last = now;
+      if (scriptPausedRef.current) {
+        wasPaused = true;
       } else {
-        applyAnimation(state, projectRef.current, seconds);
+        const timeline = scriptTimelineRef.current;
+        if (timeline) {
+          // Resuming picks the clock back up from wherever a pause or a scrub
+          // while paused left the frame, rather than from where it froze.
+          if (wasPaused) {
+            elapsed =
+              clampFrame(timeline, scriptFrameRef.current) / timeline.fps;
+            wasPaused = false;
+          }
+          elapsed += dt;
+          applyTimeline(state, projectRef.current, timeline, elapsed);
+          onScriptFrameRef.current?.(frameAt(timeline, elapsed));
+        } else {
+          elapsed += dt;
+          applyAnimation(state, projectRef.current, elapsed);
+        }
+        state.render();
       }
-      state.render();
-      frame = requestAnimationFrame(tick);
+      raf = requestAnimationFrame(tick);
     };
-    frame = requestAnimationFrame(tick);
+    raf = requestAnimationFrame(tick);
 
     return () => {
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(raf);
       const current = sceneRef.current;
       if (!current) return;
       restoreFromPlayback(current);
@@ -1191,6 +1241,21 @@ export function ModelViewport({
       current.render();
     };
   }, [playing, reduceMotion, selectedIds]);
+
+  // Scrubbing or stepping a paused script run. The tick above paints every
+  // frame while it is not paused, and leaves the frozen frame alone otherwise,
+  // so this is what paints the frame it froze on.
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state || !playing || !scriptPaused || !scriptTimeline) return;
+    applyTimelineFrame(
+      state,
+      projectRef.current,
+      scriptTimeline,
+      clampFrame(scriptTimeline, scriptFrame),
+    );
+    state.render();
+  }, [playing, scriptPaused, scriptTimeline, scriptFrame]);
 
   useEffect(() => {
     const state = sceneRef.current;
@@ -3056,7 +3121,20 @@ function applyTimeline(
 ) {
   const frame = frameAt(timeline, seconds);
   if (frame < 0) return;
+  applyTimelineFrame(state, project, timeline, frame);
+}
 
+/**
+ * Pose every piece at one exact frame, for a paused run being scrubbed or
+ * stepped rather than played. `applyTimeline` is the running clock's own way
+ * of reaching this: it turns elapsed seconds into a frame and calls through.
+ */
+function applyTimelineFrame(
+  state: SceneState,
+  project: LegoProject,
+  timeline: ScriptTimeline,
+  frame: number,
+) {
   for (let index = 0; index < timeline.pieces.length; index++) {
     const piece = project.pieces.find(
       (candidate) => candidate.name === timeline.pieces[index],
