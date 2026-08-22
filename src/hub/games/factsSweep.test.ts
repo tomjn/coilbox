@@ -95,18 +95,21 @@ describe("gamesToSend", () => {
   /// The rule the whole issue rests on: a public catalog gets released games and
   /// nothing somebody is in the middle of editing.
   it("sends the packaged release and neither a working folder nor coilbox's own games", () => {
-    const { sendable, skipped } = gamesToSend([
-      game("Balanced Annihilation 12.24", "ba1224.sdz"),
-      game("SplinterFaction 0.1.78", "SplinterFaction.sdd", {
-        shortname: "SF",
-      }),
-      game("Coilbox unit test scratch", SCRATCH_FOLDER, {
-        shortname: "coilbox-lego",
-      }),
-      game("Coilbox mission test", MUTATOR_FOLDER, {
-        shortname: "coilbox-mission",
-      }),
-    ], new Set<string>());
+    const { sendable, skipped } = gamesToSend(
+      [
+        game("Balanced Annihilation 12.24", "ba1224.sdz"),
+        game("SplinterFaction 0.1.78", "SplinterFaction.sdd", {
+          shortname: "SF",
+        }),
+        game("Coilbox unit test scratch", SCRATCH_FOLDER, {
+          shortname: "coilbox-lego",
+        }),
+        game("Coilbox mission test", MUTATOR_FOLDER, {
+          shortname: "coilbox-mission",
+        }),
+      ],
+      new Set<string>(),
+    );
 
     expect(sendable.map((s) => s.game.name)).toEqual([
       "Balanced Annihilation 12.24",
@@ -121,10 +124,13 @@ describe("gamesToSend", () => {
   /// `release` is required, so a game with no version is a 400 for the whole
   /// submission. Skipping it with a reason beats sending it to be refused.
   it("skips a game whose modinfo declares no version", () => {
-    const { sendable, skipped } = gamesToSend([
-      game("Nameless Mod", "nameless.sdz", { version: "  " }),
-      game("Balanced Annihilation 12.24", "ba1224.sdz"),
-    ], new Set<string>());
+    const { sendable, skipped } = gamesToSend(
+      [
+        game("Nameless Mod", "nameless.sdz", { version: "  " }),
+        game("Balanced Annihilation 12.24", "ba1224.sdz"),
+      ],
+      new Set<string>(),
+    );
 
     expect(sendable.map((s) => s.game.name)).toEqual([
       "Balanced Annihilation 12.24",
@@ -133,9 +139,10 @@ describe("gamesToSend", () => {
   });
 
   it("skips a game with no modinfo shortname, since the hub files games under one", () => {
-    const { sendable, skipped } = gamesToSend([
-      game("Odd Mod", "odd.sdz", { shortname: "" }),
-    ], new Set<string>());
+    const { sendable, skipped } = gamesToSend(
+      [game("Odd Mod", "odd.sdz", { shortname: "" })],
+      new Set<string>(),
+    );
 
     expect(sendable).toEqual([]);
     expect(skipped).toEqual([{ game: "Odd Mod", reason: "no-shortname" }]);
