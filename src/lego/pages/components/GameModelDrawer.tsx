@@ -211,7 +211,14 @@ export function GameModelDrawer({
         )
       : project;
     const script = takeScript ? adopted?.script : null;
-    onOpened(script ? { ...withRoles, script } : withRoles);
+    // Both can be set at once: a conversion taken on leaves the compiled file
+    // it came from still worth carrying, and the unit plays the text it owns.
+    const compiled = adopted?.compiled;
+    onOpened({
+      ...withRoles,
+      ...(script ? { script } : {}),
+      ...(compiled ? { compiledScript: compiled } : {}),
+    });
   }
 
   const loading = Boolean(archive) && (treeLoading || status === "loading");

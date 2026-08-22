@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { animCobRun } from "../../../animation/bindings";
 import { useReduceMotion } from "../../../general/display";
 import {
   type AppliedPreset,
@@ -164,6 +165,12 @@ export function AnimationPanel({
   const applied = project.animations ?? [];
   const counts = countRoles(project.pieces);
   const owned = project.script !== undefined;
+  // The compiled file the unit's game shipped, when that is what animates it.
+  // Text somebody owns beats the file they came in with, so a unit that has
+  // taken a script over is past this even if it still carries the bytecode.
+  const compiled = owned ? undefined : project.compiledScript;
+  /** Whether this unit animates from a script of its own rather than presets. */
+  const playsOwnScript = owned || compiled !== undefined;
 
   const stop = useCallback(() => {
     onPlayingChange(false);
@@ -182,17 +189,28 @@ export function AnimationPanel({
   const start = useCallback(
     async (scenario: string) => {
       const script = project.script;
-      if (script === undefined) return;
+      if (script === undefined && !compiled) return;
       setRunning(true);
       setFailure(null);
       try {
-        const result = await legoRunScript({
-          script,
-          unitName: project.unitName,
-          pieces: project.pieces.map((piece) => piece.name),
-          events: scenarioById(scenario)?.events ?? [],
-          frames: PREVIEW_FRAMES,
-        });
+        const pieces = project.pieces.map((piece) => piece.name);
+        const events = scenarioById(scenario)?.events ?? [];
+        // Two runtimes, one timeline. The compiled one runs the bytecode the
+        // game shipped and reports the same poses the Lua one does.
+        const result = compiled
+          ? await animCobRun({
+              bytes: compiled.bytes,
+              pieces,
+              events,
+              frames: PREVIEW_FRAMES,
+            })
+          : await legoRunScript({
+              script: script ?? "",
+              unitName: project.unitName,
+              pieces,
+              events,
+              frames: PREVIEW_FRAMES,
+            });
         setTimeline(result);
         // A run that produced nothing has only its reason to show. One that
         // failed part way through is still worth watching up to that point.
@@ -213,6 +231,7 @@ export function AnimationPanel({
       project.script,
       project.unitName,
       project.pieces,
+      compiled,
       onPlayingChange,
       onScriptTimeline,
       onScriptPausedChange,
@@ -270,7 +289,7 @@ export function AnimationPanel({
     />
   );
 
-  if (owned) {
+  if (playsOwnScript) {
     const scenario = scenarioById(scenarioId);
     const stopped = timeline?.error ?? null;
 
@@ -315,13 +334,15 @@ export function AnimationPanel({
               ? "Playback is off while your system asks for reduced motion."
               : `${PREVIEW_SECONDS} seconds, looped`}
           </span>
-          <Button
-            size="sm"
-            className="ml-auto"
-            onClick={() => setShowScript(true)}
-          >
-            <FileCode size={14} /> Edit
-          </Button>
+          {owned ? (
+            <Button
+              size="sm"
+              className="ml-auto"
+              onClick={() => setShowScript(true)}
+            >
+              <FileCode size={14} /> Edit
+            </Button>
+          ) : null}
         </div>
 
         {playable(timeline) ? (
@@ -362,7 +383,7 @@ export function AnimationPanel({
           </div>
         ) : null}
 
-        {scriptDrawer}
+        {owned ? scriptDrawer : null}
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
           <div className="flex flex-col gap-1.5">
@@ -418,10 +439,21 @@ export function AnimationPanel({
             </p>
           ))}
 
-          <p className="text-xs text-muted-foreground">
-            The presets wrote this unit's script once and are done with it. This
-            plays the script itself, so what you see is what the file says.
-          </p>
+          {compiled ? (
+            <p className="text-xs text-muted-foreground">
+              This unit's game animates it with{" "}
+              <code className="break-all">{compiled.member}</code>, which is
+              compiled rather than Lua. Coilbox runs it, so what you see is what
+              the game plays. It cannot be edited here and an export does not
+              write it.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              The presets wrote this unit's script once and are done with it.
+              This plays the script itself, so what you see is what the file
+              says.
+            </p>
+          )}
         </div>
       </div>
     );
