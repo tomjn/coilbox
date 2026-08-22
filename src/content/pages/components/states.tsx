@@ -110,6 +110,19 @@ export function SkeletonList() {
   );
 }
 
+/**
+ * A muted sentence centred in whatever space it is given, for a pane that has
+ * nothing to show. The archive browser's preview pane says every one of its
+ * empty states this way, so a model that will not draw reads like the rest.
+ */
+export function Centered({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
+      {children}
+    </div>
+  );
+}
+
 /** Empty result state. */
 export function EmptyState({ label }: { label: ReactNode }) {
   return (

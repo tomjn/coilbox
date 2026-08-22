@@ -2,8 +2,11 @@ import { Button } from "@picoframe/frame";
 import { Check, Copy, Download, FileQuestion } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { modelFormatFor } from "../../archiveModel";
 import type { ArchiveFileResult } from "../../bindings";
 import { formatBytes } from "../../format";
+import { ArchiveModelPreview } from "./ArchiveModelPreview";
+import { Centered } from "./states";
 
 /** Extension -> shiki language id; anything unmapped renders as plain text. */
 const LANG: Record<string, string> = {
@@ -31,14 +34,6 @@ const LANG: Record<string, string> = {
 function langFor(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   return LANG[ext] ?? "text";
-}
-
-function Centered({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
-      {children}
-    </div>
-  );
 }
 
 /** Syntax-highlight `code` with shiki (lazy-loaded); plain `<pre>` until ready. */
@@ -80,17 +75,42 @@ function TextPreview({ code, lang }: { code: string; lang: string }) {
   );
 }
 
-/** The selected member's contents: highlighted text, an inline image, or a
- * metadata-only notice for binary / too-large files. */
+/** The selected member's contents: a drawn model, highlighted text, an inline
+ * image, or a metadata-only notice for binary / too-large files. */
 function PreviewBody({
   path,
   result,
   loading,
+  archive,
+  enginePath,
+  dataDir,
+  size,
 }: {
   path: string;
   result: ArchiveFileResult | null;
   loading: boolean;
+  archive: string;
+  enginePath?: string;
+  dataDir?: string;
+  size?: number;
 }) {
+  // Models are classified here rather than by the preview command, which
+  // decodes bytes and has nothing to make of a `.3do`. The read they need is a
+  // different one anyway: it mounts the archive set to resolve the model's
+  // textures, which no other preview pays for.
+  const model = modelFormatFor(path);
+  if (model) {
+    return (
+      <ArchiveModelPreview
+        enginePath={enginePath}
+        dataDir={dataDir}
+        archive={archive}
+        path={path}
+        format={model}
+        size={size}
+      />
+    );
+  }
   if (loading) {
     return (
       <Skeleton className="h-full min-h-40 rounded-lg border border-border/50 bg-card" />
@@ -211,11 +231,22 @@ export function FilePreview({
   result,
   loading,
   onDownload,
+  archive,
+  enginePath,
+  dataDir,
+  size,
 }: {
   path: string | null;
   result: ArchiveFileResult | null;
   loading: boolean;
   onDownload: () => Promise<boolean>;
+  /** The archive the member is in, which a model is read back out of. */
+  archive: string;
+  enginePath?: string;
+  dataDir?: string;
+  /** The member's size from the archive listing. A model preview is skipped
+   *  above a cap, and the listing already knows how big every member is. */
+  size?: number;
 }) {
   if (!path) {
     return (
@@ -229,7 +260,15 @@ export function FilePreview({
     <div className="flex h-full min-h-0 flex-col gap-2">
       <PreviewToolbar path={path} result={result} onDownload={onDownload} />
       <div className="min-h-0 flex-1">
-        <PreviewBody path={path} result={result} loading={loading} />
+        <PreviewBody
+          path={path}
+          result={result}
+          loading={loading}
+          archive={archive}
+          enginePath={enginePath}
+          dataDir={dataDir}
+          size={size}
+        />
       </div>
     </div>
   );
