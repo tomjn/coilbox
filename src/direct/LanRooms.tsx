@@ -1,5 +1,6 @@
 import { Button, useDrawer } from "@picoframe/frame";
-import { Lock, Users } from "lucide-react";
+import { ChevronRight, Lock, Users } from "lucide-react";
+import { useState } from "react";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { THUMB_MINIMAP_MIP, useUnitsyncMinimap } from "../content/config";
 import { MapThumb } from "../content/pages/components/MapThumb";
@@ -13,8 +14,13 @@ import {
 export type { JoinRoomArgs } from "./JoinRoomForm";
 
 /**
- * "Rooms on your network": the rooms other people are announcing, and the way in
- * for a host who was never heard at all.
+ * "Local Network": the rooms other people are announcing, and the way in for a
+ * host who was never heard at all.
+ *
+ * Collapsed to its heading until somebody opens it, and counted there like the
+ * battle list's own groups, because most people are on a server and the rooms on
+ * their own network are nearly always none. A section that is nearly always
+ * empty should not be the first thing above the battles.
  *
  * Other people's, because a host is already in their own room and it is in the
  * battle list below with the way back into it, so listing it here as well was
@@ -56,12 +62,29 @@ export function LanRooms({
   dataDir?: string;
   onJoin: (args: JoinRoomArgs) => Promise<void>;
 }) {
+  const [collapsed, setCollapsed] = useState(true);
   return (
     <section className="flex w-full flex-col gap-2" aria-labelledby="lan-rooms">
       <div className="flex items-center justify-between gap-2">
-        <h2 id="lan-rooms" className="text-sm font-semibold">
-          Rooms on your network
-        </h2>
+        <button
+          type="button"
+          id="lan-rooms"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          className="flex items-center gap-1.5 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ChevronRight
+            aria-hidden
+            className={`size-3.5 transition-transform ${
+              collapsed ? "" : "rotate-90"
+            }`}
+          />
+          Local Network
+          <span>{rooms.length}</span>
+        </button>
+        {/* Outside the collapse on purpose. A room heard on nobody's network is
+            exactly when somebody needs to type an address, so the way in cannot
+            be behind the heading that says there is nothing here. */}
         <JoinRoomDrawerButton
           defaultName={defaultName}
           blocked={blocked}
@@ -69,34 +92,41 @@ export function LanRooms({
         />
       </div>
 
-      {error ? (
+      {/* Also outside, because a client that cannot listen at all has a reason
+          worth reading and a count of 0 that does not explain itself. */}
+      {error && (
         <p role="alert" className="text-xs text-destructive">
           {error} Rooms on this network will not be listed, but you can still
           join one by address.
         </p>
-      ) : rooms.length === 0 ? (
-        <p className="text-left text-xs text-muted-foreground">
-          No rooms found. Some networks stop devices seeing each other, so a
-          room that is up may still not be listed here. Ask the host for their
-          address and join by address.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {rooms.map((room) => (
-            <LanRoomRow
-              key={room.id}
-              room={room}
-              blocked={blocked}
-              defaultName={defaultName}
-              enginePath={enginePath}
-              dataDir={dataDir}
-              onJoin={onJoin}
-            />
-          ))}
-        </ul>
       )}
 
-      {blocked && rooms.length > 0 && (
+      {!collapsed &&
+        (rooms.length === 0 ? (
+          !error && (
+            <p className="text-left text-xs text-muted-foreground">
+              No rooms found. Some networks stop devices seeing each other, so a
+              room that is up may still not be listed here. Ask the host for
+              their address and join by address.
+            </p>
+          )
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {rooms.map((room) => (
+              <LanRoomRow
+                key={room.id}
+                room={room}
+                blocked={blocked}
+                defaultName={defaultName}
+                enginePath={enginePath}
+                dataDir={dataDir}
+                onJoin={onJoin}
+              />
+            ))}
+          </ul>
+        ))}
+
+      {!collapsed && blocked && rooms.length > 0 && (
         <p className="text-xs text-muted-foreground">{blocked}</p>
       )}
     </section>
