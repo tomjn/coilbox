@@ -34,6 +34,10 @@ image = { version = "0.25", default-features = false, features = [
   "bmp",
   "tga",
 ] }
+# Blender reads neither a `.dds` nor a compressed texture inside a `.glb`, so the
+# two Blender exports decode whatever the store holds and write a PNG. The same
+# decode the unitsync worker's build pics go through (issue #715).
+coilbox-texture = { path = "../coilbox-texture" }
 
 [dev-dependencies]
 tempfile = "3"

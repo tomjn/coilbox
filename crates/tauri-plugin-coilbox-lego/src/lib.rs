@@ -725,6 +725,36 @@ async fn lego_texture_import<R: Runtime>(app: AppHandle<R>, path: String) -> Cli
     }
 }
 
+/// `lego_texture_png` hands a stored texture back as a PNG the webview can
+/// decode.
+///
+/// Only the `.glb` export asks for this. It embeds the image inside the
+/// container, which means three.js has to have decoded it first, and the store
+/// holds the game's own file: usually a compressed `.dds`, which no webview
+/// reads. A `data:` URL rather than a file, because the alternative is another
+/// asset-protocol root and another thing to prune, for bytes that are wanted
+/// once and thrown away.
+#[tauri::command]
+async fn lego_texture_png<R: Runtime>(app: AppHandle<R>, key: String) -> CliResult {
+    let dir = match lego_dir(&app) {
+        Ok(dir) => dir.join("textures"),
+        Err(e) => return CliResult::err(e),
+    };
+    let source = match stored_texture_source(&dir, &key) {
+        Ok(path) => path,
+        Err(e) => return CliResult::err(e),
+    };
+    match texture::blender_png(&source) {
+        Ok(png) => CliResult::ok(json!({
+            "dataUrl": coilbox_texture::png_data_url(&png.bytes),
+            "width": png.width,
+            "height": png.height,
+            "scaled": png.scaled,
+        })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `lego_texture_prune` deletes every stored texture that `keep` does not name.
 ///
 /// The store is content addressed, so refreshing an edited texture leaves the
@@ -999,13 +1029,61 @@ async fn lego_export<R: Runtime>(
     }))
 }
 
+/// Decode stored textures and write them into a Blender export's folder.
+///
+/// A PNG rather than the file the store holds, because that file is usually a
+/// compressed `.dds` and neither Blender's glTF importer nor any `.mtl` reader
+/// will open one. `write_as` already carries the `.png` name, derived by the
+/// frontend, which needs the same name in the `.mtl` it wrote.
+///
+/// Overwritten every export, unlike the game's own folders: `blender/` holds
+/// coilbox's files and nobody else's.
+fn place_blender_textures<R: Runtime>(
+    app: &AppHandle<R>,
+    dir: &Path,
+    textures: &[StoredTextureRef],
+) -> Result<Vec<serde_json::Value>, String> {
+    if textures.is_empty() {
+        return Ok(Vec::new());
+    }
+    let store = lego_dir(app)?.join("textures");
+    let mut written = Vec::new();
+    for stored in textures {
+        let source = stored_texture_source(&store, &stored.key)?;
+        let target = stored_texture_target(dir, &stored.write_as)?;
+        let png = texture::blender_png(&source).map_err(|e| format!("{}: {e}", stored.write_as))?;
+        std::fs::write(&target, &png.bytes)
+            .map_err(|e| format!("could not write {}: {e}", target.display()))?;
+        written.push(json!({
+            "path": target.to_string_lossy(),
+            "width": png.width,
+            "height": png.height,
+            "scaled": png.scaled,
+        }));
+    }
+    Ok(written)
+}
+
 /// `lego_export_glb` writes a unit's `.glb` into a game folder.
 ///
 /// Kept out of `objects3d`, in its own `blender/` folder: a `.glb` is not
 /// something the engine reads, only something to open in Blender to check
 /// the unit or finish it by hand.
+///
+/// `textures` is for a unit imported from somebody else's model. The `.glb`
+/// embeds the texture the unit is painted with, but an `.s3o` names a second
+/// one, the mask marking the regions the engine paints in the player's colour.
+/// glTF has no such thing to embed it as, and inventing one would put a picture
+/// of measurements into a colour slot, so it goes beside the `.glb` as its own
+/// PNG instead.
 #[tauri::command]
-async fn lego_export_glb(dir: String, unit_name: String, bytes: Vec<u8>) -> CliResult {
+async fn lego_export_glb<R: Runtime>(
+    app: AppHandle<R>,
+    dir: String,
+    unit_name: String,
+    bytes: Vec<u8>,
+    textures: Option<Vec<StoredTextureRef>>,
+) -> CliResult {
     if !valid_unit_name(&unit_name) {
         return CliResult::err(format!(
             "invalid unit name: {unit_name}. Lower case letters, digits and underscores only."
@@ -1021,19 +1099,31 @@ async fn lego_export_glb(dir: String, unit_name: String, bytes: Vec<u8>) -> CliR
         return CliResult::err(format!("could not create {}: {e}", blender.display()));
     }
     let target = blender.join(format!("{unit_name}.glb"));
-    match std::fs::write(&target, &bytes) {
-        Ok(()) => CliResult::ok(json!({ "path": target.to_string_lossy() })),
-        Err(e) => CliResult::err(format!("could not write {}: {e}", target.display())),
+    if let Err(e) = std::fs::write(&target, &bytes) {
+        return CliResult::err(format!("could not write {}: {e}", target.display()));
+    }
+    match place_blender_textures(&app, &blender, &textures.unwrap_or_default()) {
+        Ok(written) => CliResult::ok(json!({
+            "path": target.to_string_lossy(),
+            "textures": written,
+        })),
+        Err(e) => CliResult::err(e),
     }
 }
 
 /// `lego_export_obj` writes a unit's `.obj` and `.mtl` into a game folder,
-/// alongside a copy of the atlas the `.mtl` names.
+/// alongside the texture the `.mtl` names.
 ///
 /// The copy is what makes the reference resolve: the caller's `.mtl` points
-/// `map_Kd` at `atlas` by file name alone, so that file has to actually sit
-/// next to it rather than only in `unittextures/` elsewhere in the game
-/// folder.
+/// `map_Kd` at a file name alone, so that file has to actually sit next to it
+/// rather than only in `unittextures/` elsewhere in the game folder.
+///
+/// One or the other, the same split as [`lego_export`]. A unit built out of
+/// parts names `atlas`, which is copied across as it is. A unit imported from
+/// somebody else's model names `textures` instead, which are decoded to PNG on
+/// the way: the second of them is the team-colour mask, which nothing in an
+/// `.mtl` can point at, so it lands beside the `.obj` for whoever opens it to
+/// use rather than being dropped.
 #[tauri::command]
 async fn lego_export_obj<R: Runtime>(
     app: AppHandle<R>,
@@ -1041,14 +1131,15 @@ async fn lego_export_obj<R: Runtime>(
     unit_name: String,
     obj: String,
     mtl: String,
-    atlas: AtlasRef,
+    atlas: Option<AtlasRef>,
+    textures: Option<Vec<StoredTextureRef>>,
 ) -> CliResult {
     if !valid_unit_name(&unit_name) {
         return CliResult::err(format!(
             "invalid unit name: {unit_name}. Lower case letters, digits and underscores only."
         ));
     }
-    let source = match atlas_source(&app, &atlas) {
+    let source = match atlas.as_ref().map(|a| atlas_source(&app, a)).transpose() {
         Ok(path) => path,
         Err(e) => return CliResult::err(e),
     };
@@ -1063,7 +1154,11 @@ async fn lego_export_obj<R: Runtime>(
     }
     // Resolved before anything is written, so a texture name that will not do
     // does not leave an `.mtl` pointing at a file that never arrives.
-    let texture_path = match atlas_target(&blender, &atlas) {
+    let texture_path = match atlas
+        .as_ref()
+        .map(|a| atlas_target(&blender, a))
+        .transpose()
+    {
         Ok(path) => path,
         Err(e) => return CliResult::err(e),
     };
@@ -1077,14 +1172,22 @@ async fn lego_export_obj<R: Runtime>(
         return CliResult::err(format!("could not write {}: {e}", mtl_path.display()));
     }
 
-    if let Err(e) = std::fs::copy(&source, &texture_path) {
-        return CliResult::err(format!("could not copy the texture: {e}"));
+    if let (Some(source), Some(target)) = (&source, &texture_path) {
+        if let Err(e) = std::fs::copy(source, target) {
+            return CliResult::err(format!("could not copy the texture: {e}"));
+        }
     }
+
+    let written = match place_blender_textures(&app, &blender, &textures.unwrap_or_default()) {
+        Ok(written) => written,
+        Err(e) => return CliResult::err(e),
+    };
 
     CliResult::ok(json!({
         "obj": obj_path.to_string_lossy(),
         "mtl": mtl_path.to_string_lossy(),
-        "texture": texture_path.to_string_lossy(),
+        "texture": texture_path.map(|p| p.to_string_lossy().to_string()),
+        "textures": written,
     }))
 }
 
@@ -1209,6 +1312,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_read_s3o,
             lego_import_s3o,
             lego_texture_import,
+            lego_texture_png,
             lego_texture_prune,
             lego_export,
             lego_export_glb,

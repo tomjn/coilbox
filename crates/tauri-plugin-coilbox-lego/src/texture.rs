@@ -192,6 +192,83 @@ fn to_webview_format(ext: &str, bytes: &[u8]) -> Option<Vec<u8>> {
     Some(png.into_inner())
 }
 
+/// The longest side a texture is written at for the two Blender exports.
+///
+/// Measured rather than guessed: the store on this machine holds two 8192
+/// square DDS files, 64 MiB each, because a game's units share one texture and
+/// importing any of them stores it. That is 256 MiB as RGBA, and it does not
+/// stop there. The `.glb`'s image crosses the IPC bridge as base64, goes through
+/// a canvas in `GLTFExporter`, and comes back as a `.glb` the frontend hands
+/// over one byte per array element. At 8192 that is gigabytes of webview heap
+/// for a file nothing but Blender opens. At 2048 the whole chain is a few
+/// megabytes, and the unit's real texture is still placed in `unittextures/` by
+/// the `.s3o` export at full size.
+const BLENDER_MAX: u32 = 2048;
+
+/// A stored texture, decoded and re-encoded for a Blender export.
+pub struct BlenderPng {
+    pub bytes: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+    /// Whether it was scaled down to fit [`BLENDER_MAX`], which the export says
+    /// out loud rather than quietly handing over a smaller image than the game
+    /// has.
+    pub scaled: bool,
+}
+
+/// Read a texture out of the store as a PNG Blender can open.
+///
+/// A `.dds` is decoded here because nothing downstream will: Blender's glTF
+/// importer refuses one, and so does every `.mtl` reader. A stored PNG small
+/// enough already is passed through untouched, since re-encoding it would only
+/// spend time to produce the same picture.
+///
+/// The reason comes back as words rather than an empty result. Which texture it
+/// was is the caller's to add: the store names files by content hash, so the
+/// path in here means nothing to anybody.
+pub fn blender_png(source: &Path) -> Result<BlenderPng, String> {
+    let bytes = std::fs::read(source)
+        .map_err(|e| format!("could not read it from coilbox's texture store: {e}"))?;
+    let ext = extension(source);
+    let img = coilbox_texture::decode(&ext, &bytes).ok_or_else(|| {
+        format!("coilbox cannot decode this .{ext}. A .dds has to be uncompressed or DXT1/3/5: BC4 upwards and anything behind a DX10 header are not read.")
+    })?;
+
+    let (width, height) = (img.width(), img.height());
+    if width.max(height) <= BLENDER_MAX {
+        // Already a PNG at a size that needs nothing doing to it.
+        if ext == "png" {
+            return Ok(BlenderPng {
+                bytes,
+                width,
+                height,
+                scaled: false,
+            });
+        }
+        let bytes = coilbox_texture::encode_png(&img)
+            .ok_or_else(|| "could not re-encode it as a PNG".to_string())?;
+        return Ok(BlenderPng {
+            bytes,
+            width,
+            height,
+            scaled: false,
+        });
+    }
+
+    let small = image::DynamicImage::ImageRgba8(img)
+        .thumbnail(BLENDER_MAX, BLENDER_MAX)
+        .to_rgba8();
+    let (width, height) = (small.width(), small.height());
+    let bytes = coilbox_texture::encode_png(&small)
+        .ok_or_else(|| "could not re-encode it as a PNG".to_string())?;
+    Ok(BlenderPng {
+        bytes,
+        width,
+        height,
+        scaled: true,
+    })
+}
+
 /// Delete every texture in the store that no saved unit names.
 ///
 /// The store is content addressed, so editing a texture and refreshing leaves
@@ -352,6 +429,102 @@ mod tests {
             find_beside_model(&root.path().join("unit.s3o"), "skin.png"),
             Some(root.path().join("skin.png"))
         );
+    }
+
+    /// A one-pixel uncompressed A8R8G8B8 `.dds`: the 128-byte legacy header,
+    /// then the pixel, BGRA in memory order.
+    fn one_pixel_dds(b: u8, g: u8, r: u8, a: u8) -> Vec<u8> {
+        let mut out = b"DDS ".to_vec();
+        let mut put = |v: u32| out.extend_from_slice(&v.to_le_bytes());
+        put(124); // header size
+        put(0x1007); // caps | height | width | pixelformat
+        put(1); // height
+        put(1); // width
+        put(4); // pitch
+        put(0); // depth
+        put(1); // mip count
+        for _ in 0..11 {
+            put(0); // reserved
+        }
+        put(32); // pixel format size
+        put(0x41); // rgb | alpha pixels
+        put(0); // no fourcc: the masks below describe the pixels
+        put(32); // bits a pixel
+        put(0x00ff0000); // r
+        put(0x0000ff00); // g
+        put(0x000000ff); // b
+        put(0xff000000); // a
+        put(0x1000); // caps: texture
+        for _ in 0..4 {
+            put(0); // caps2..4, reserved2
+        }
+        out.extend_from_slice(&[b, g, r, a]);
+        out
+    }
+
+    #[test]
+    fn a_dds_comes_back_as_a_png_because_blender_reads_no_dds() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("Beacon_1.dds");
+        std::fs::write(&source, one_pixel_dds(0x30, 0x20, 0x10, 0xff)).expect("write");
+
+        let png = blender_png(&source).expect("should decode");
+
+        assert_eq!(&png.bytes[1..4], b"PNG");
+        assert_eq!((png.width, png.height), (1, 1));
+        assert!(!png.scaled);
+        let back = image::load_from_memory(&png.bytes)
+            .expect("decode")
+            .to_rgba8();
+        assert_eq!(back.get_pixel(0, 0).0, [0x10, 0x20, 0x30, 0xff]);
+    }
+
+    #[test]
+    fn a_stored_png_small_enough_is_passed_through_untouched() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("skin.png");
+        let bytes = png_bytes(4, 4);
+        std::fs::write(&source, &bytes).expect("write");
+
+        let png = blender_png(&source).expect("should read");
+
+        assert_eq!(png.bytes, bytes);
+        assert_eq!((png.width, png.height), (4, 4));
+        assert!(!png.scaled);
+    }
+
+    #[test]
+    fn a_texture_over_the_cap_is_scaled_and_says_so() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("atlas.png");
+        std::fs::write(&source, png_bytes(BLENDER_MAX * 2, BLENDER_MAX)).expect("write");
+
+        let png = blender_png(&source).expect("should read");
+
+        assert_eq!((png.width, png.height), (BLENDER_MAX, BLENDER_MAX / 2));
+        assert!(png.scaled);
+    }
+
+    #[test]
+    fn a_dds_the_decoder_cannot_read_gives_a_reason_rather_than_nothing() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("atlas.dds");
+        std::fs::write(&source, b"DDS not really").expect("write");
+
+        let reason = blender_png(&source).err().expect("should refuse");
+
+        assert!(reason.contains(".dds"), "got: {reason}");
+    }
+
+    #[test]
+    fn a_texture_missing_from_the_store_says_so() {
+        let dir = tempfile::tempdir().expect("tempdir");
+
+        let reason = blender_png(&dir.path().join("gone.dds"))
+            .err()
+            .expect("should refuse");
+
+        assert!(reason.contains("store"), "got: {reason}");
     }
 
     #[test]
