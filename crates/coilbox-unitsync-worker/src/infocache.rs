@@ -33,8 +33,10 @@ use std::path::Path;
 /// `maxWaterDepth` and `waterline`, which is the other half of the same
 /// question. v12: the unit dataset gained each unit's declared stats, so a
 /// cached blob from before them would leave a game's whole encyclopedia blank
-/// with nothing to say why.
-const INFO_CACHE_VERSION: u32 = 12;
+/// with nothing to say why. v13: a game that names its units in a localisation
+/// file rather than in its unitdefs is now read (#1925), and a blob cached
+/// before that holds def keys where Beyond All Reason's unit names should be.
+const INFO_CACHE_VERSION: u32 = 13;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.

@@ -18,6 +18,7 @@ use crate::ffi::Unitsync;
 use crate::infocache;
 use crate::model::{UnitDatasetEntry, UnitDatasetOutput};
 use serde_json::{Map, Value};
+use std::collections::HashMap;
 use std::path::Path;
 
 /// VFS modes for the parser: raw + map + mod + base — the same set `game.rs`, the
@@ -366,6 +367,17 @@ pub(crate) fn resolve(
     let _ = us.drain_errors();
     units.sort_by(|a, b| a.name.cmp(&b.name));
 
+    // A game that names its units in a localisation file rather than in its
+    // unitdefs (issue #1925). Only worth opening the archive when something is
+    // actually missing a name, which for every game but BAR is nothing.
+    if units.iter().any(|u| u.full_name.is_none()) {
+        let named = language_names(us, game_archive);
+        if !named.is_empty() {
+            fill_missing_names(&mut units, &named);
+        }
+        let _ = us.drain_errors();
+    }
+
     // Prefer the full primary-mod sync checksum (archive + all dependencies) —
     // the value joiners verify against — over the single-archive
     // `GetArchiveChecksum`, which many engine builds leave 0 for a game's primary
@@ -528,6 +540,168 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
             })
         })
         .collect()
+}
+
+/// The unit names a game keeps in a localisation file rather than in its
+/// unitdefs (issue #1925), keyed by lowercased def key.
+///
+/// Beyond All Reason leaves every unitdef's `name` empty and names its units in
+/// `language/en/units.json`, so without this every BAR unit reaches the hub as
+/// its def key: `corcom` rather than Cortex Commander.
+///
+/// Only `units.names` is read. The same file holds `dead` and `scavenger`,
+/// which are templates like `"%{name} Wreckage"` describing how to build a name
+/// out of another one, and `factions`, which names sides rather than units.
+///
+/// Answers nothing rather than failing on a file that will not parse. A game
+/// whose translations are broken still has units, and they are better read as
+/// def keys than not at all.
+fn names_from_language_json(text: &str) -> HashMap<String, String> {
+    let Ok(Value::Object(root)) = serde_json::from_str::<Value>(text) else {
+        return HashMap::new();
+    };
+    let Some(Value::Object(names)) = root
+        .get("units")
+        .and_then(Value::as_object)
+        .and_then(|units: &Map<String, Value>| units.get("names"))
+        .cloned()
+    else {
+        return HashMap::new();
+    };
+
+    names
+        .into_iter()
+        .filter_map(|(key, value)| {
+            let name = value.as_str()?.trim();
+            (!name.is_empty()).then(|| (key.to_lowercase(), name.to_string()))
+        })
+        .collect()
+}
+
+/// Give a name to every unit whose unitdef did not carry one.
+///
+/// A fallback and never an override: the unitdef is the game's own answer, and
+/// a game that answered is left alone. A unit the file does not mention keeps
+/// its def key, which reads badly and is at least true.
+fn fill_missing_names(units: &mut [UnitDatasetEntry], named: &HashMap<String, String>) {
+    for unit in units.iter_mut().filter(|u| u.full_name.is_none()) {
+        if let Some(name) = named.get(&unit.name) {
+            unit.full_name = Some(name.clone());
+        }
+    }
+}
+
+/// The game's own `language/en/units.json`, when it ships one.
+///
+/// English because the hub holds one name per unit and its pages are written in
+/// English, not because English is the truest name. BAR ships eight locales,
+/// and a catalog with one column cannot hold eight.
+fn language_names(us: &Unitsync, game_archive: &str) -> HashMap<String, String> {
+    const LANGUAGE_FILE: &str = "language/en/units.json";
+    // Generous next to an 80 KB file, and still a bound on a game that ships
+    // something enormous under that name.
+    const CAP: usize = 4 * 1024 * 1024;
+
+    let Some(open_path) = crate::archive::resolve_open_path(us, game_archive) else {
+        return HashMap::new();
+    };
+    let Some(handle) = us.open_archive(&open_path) else {
+        return HashMap::new();
+    };
+    let found = us
+        .list_archive_files(handle)
+        .into_iter()
+        .find(|(path, _)| path.replace('\\', "/").to_lowercase() == LANGUAGE_FILE)
+        .and_then(|(path, _)| us.read_archive_member(handle, &path, CAP))
+        .map(|(_, bytes)| String::from_utf8_lossy(&bytes).into_owned());
+    us.close_archive(handle);
+
+    found
+        .as_deref()
+        .map(names_from_language_json)
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod language_name_tests {
+    use super::*;
+
+    const BAR_SHAPED: &str = r#"{
+      "units": {
+        "factions": { "arm": "Armada", "cor": "Cortex" },
+        "dead": "%{name} Wreckage",
+        "scavenger": "Scavenger %{name}",
+        "names": {
+          "corcom": "Cortex Commander",
+          "CorAP": "Aircraft Plant"
+        }
+      }
+    }"#;
+
+    fn unit(name: &str, full: Option<&str>) -> UnitDatasetEntry {
+        UnitDatasetEntry {
+            name: name.to_string(),
+            full_name: full.map(str::to_string),
+            ..Default::default()
+        }
+    }
+
+    /// Only `units.names` is a list of unit names. The keys beside it are
+    /// templates describing how to build a name, not names themselves.
+    #[test]
+    fn reads_the_names_and_none_of_the_templates() {
+        let named = names_from_language_json(BAR_SHAPED);
+
+        assert_eq!(
+            named.get("corcom").map(String::as_str),
+            Some("Cortex Commander")
+        );
+        assert!(!named.contains_key("dead"));
+        assert!(!named.contains_key("scavenger"));
+        assert!(!named.contains_key("arm"));
+    }
+
+    /// Def keys arrive lowercased from the shim, and a game is free to spell
+    /// them however it likes in its own file.
+    #[test]
+    fn keys_are_matched_however_the_file_spells_them() {
+        let named = names_from_language_json(BAR_SHAPED);
+
+        assert_eq!(
+            named.get("corap").map(String::as_str),
+            Some("Aircraft Plant")
+        );
+    }
+
+    #[test]
+    fn a_file_that_is_not_json_names_nothing() {
+        assert!(names_from_language_json("<html>404</html>").is_empty());
+        assert!(names_from_language_json(r#"{"units":{}}"#).is_empty());
+    }
+
+    /// The unitdef is the game's own answer. This is only ever a fallback for
+    /// a game that left the question blank.
+    #[test]
+    fn a_unit_that_names_itself_keeps_its_name() {
+        let named = names_from_language_json(BAR_SHAPED);
+        let mut units = vec![unit("corcom", Some("Commander"))];
+
+        fill_missing_names(&mut units, &named);
+
+        assert_eq!(units[0].full_name.as_deref(), Some("Commander"));
+    }
+
+    #[test]
+    fn a_unit_with_no_name_takes_the_one_the_file_holds() {
+        let named = names_from_language_json(BAR_SHAPED);
+        let mut units = vec![unit("corcom", None), unit("armsolar", None)];
+
+        fill_missing_names(&mut units, &named);
+
+        assert_eq!(units[0].full_name.as_deref(), Some("Cortex Commander"));
+        // Absent from the file, so it stays a def key rather than an invention.
+        assert_eq!(units[1].full_name, None);
+    }
 }
 
 #[cfg(test)]
