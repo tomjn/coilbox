@@ -11,6 +11,13 @@
  * are read through the disassembler and shown as a listing instead, which makes
  * a compiled unit legible without pretending it can be edited here.
  *
+ * Most games that compiled a script shipped the `.bos` source they compiled it
+ * from, and that source is text coilbox already converts. So a compiled unit
+ * still gets an animation, out of the source rather than the bytecode. The
+ * converter is a textual transform whose output needs hand-fixing, so what
+ * comes back is marked as a conversion and offered rather than taken on: a unit
+ * animating subtly wrongly with nobody warned is worse than one standing still.
+ *
  * Nothing is ever written to a game. The `.cob` is read out of the archive as
  * bytes and disassembled in memory, so the file itself is never opened for
  * writing, copied, or touched in any way.
@@ -22,6 +29,7 @@
  */
 
 import { animCobDisasmBytes } from "../animation/bindings";
+import { bos2lua } from "../animation/bos2lua";
 import { unitsyncUnitScript } from "../content/bindings";
 import { inferRoles, type RoleFindings } from "./inferRoles";
 import type { LegoProject } from "./model";
@@ -45,6 +53,15 @@ export interface AdoptedScript {
    * being an opaque file coilbox merely names.
    */
   listing: string | null;
+  /**
+   * Set when `script` is a conversion of the `.bos` source beside a `.cob`
+   * rather than the game's own Lua.
+   *
+   * Its own field rather than a flag on `kind`, because the compiled file is
+   * still what the game runs and `member` still names it. This says where the
+   * Lua on offer actually came from.
+   */
+  converted: { member: string } | null;
   /** What the reader wants to say: a unit with no script, a `.cob` that cannot
    *  be adopted, an archive that would not open. */
   notes: string[];
@@ -58,6 +75,7 @@ const NOTHING: AdoptedScript = {
   declared: null,
   findings: null,
   listing: null,
+  converted: null,
   notes: [],
 };
 
@@ -140,16 +158,24 @@ export async function adoptGameScript(
   }
 
   if (result.kind === "cob" || result.text === null) {
+    const source = result.bosText?.trim() ? result.bosMember : null;
     notes.push(
-      `${result.member} is compiled bytecode rather than Lua. Coilbox writes Lua, so this one is read and left where it is.`,
+      source
+        ? `${result.member} is compiled bytecode rather than Lua, so what is on offer is ${source} converted. The converter is a set of text substitutions rather than a compiler, so read the result before trusting it.`
+        : `${result.member} is compiled bytecode rather than Lua. Coilbox writes Lua, so this one is read and left where it is.`,
     );
     return {
-      script: null,
+      // Roles are deliberately not inferred from a conversion. Inferring them
+      // means running the script and reading what moved, and calling that "the
+      // script named these" would present a reading of a best-effort transform
+      // as the game's own answer.
+      script: source ? bos2lua(result.bosText ?? "") : null,
       member: result.member,
       kind: "cob",
       declared: result.declared,
       findings: null,
       listing: await disassemble(result.bytes, notes),
+      converted: source ? { member: source } : null,
       notes,
     };
   }
@@ -164,6 +190,7 @@ export async function adoptGameScript(
     declared: result.declared,
     findings,
     listing: null,
+    converted: null,
     notes: [...new Set([...notes, ...findings.notes])],
   };
 }

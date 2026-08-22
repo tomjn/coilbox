@@ -15,7 +15,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AdoptedScript } from "../../adoptGameScript";
 import type { RoleProposal } from "../../inferRoles";
-import { defaultTakenRoles, GameScriptPanel } from "./GameScriptPanel";
+import {
+  defaultTakenRoles,
+  defaultTakeScript,
+  GameScriptPanel,
+} from "./GameScriptPanel";
 
 const onTakeScript = vi.fn();
 const onToggleRole = vi.fn();
@@ -28,6 +32,7 @@ function adopted(over: Partial<AdoptedScript> = {}): AdoptedScript {
     declared: "armcom.cob",
     findings: { proposals: [], notes: [], error: null },
     listing: null,
+    converted: null,
     notes: [],
     ...over,
   };
@@ -43,11 +48,15 @@ function proposal(over: Partial<RoleProposal> = {}): RoleProposal {
   };
 }
 
-function show(value: AdoptedScript, taken = defaultTakenRoles(value)) {
+function show(
+  value: AdoptedScript,
+  taken = defaultTakenRoles(value),
+  takeScript = true,
+) {
   return render(
     <GameScriptPanel
       adopted={value}
-      takeScript
+      takeScript={takeScript}
       onTakeScript={onTakeScript}
       taken={taken}
       onToggleRole={onToggleRole}
@@ -109,6 +118,80 @@ describe("a unit whose game ships compiled bytecode", () => {
 
     expect(screen.getByText(/; COB v4/)).toBeTruthy();
     expect(screen.getByText(/the file itself is untouched/)).toBeTruthy();
+  });
+});
+
+/**
+ * The case the compiled-script note used to end at. What matters is that the
+ * offer never reads as the game's own file: the converter is a set of text
+ * substitutions, and a unit animating subtly wrongly with nobody warned is
+ * worse than one standing still.
+ */
+describe("a unit whose game ships the source beside the bytecode", () => {
+  const converted = adopted({
+    script: "local base = piece 'base' \n",
+    kind: "cob",
+    member: "scripts/armcom.cob",
+    listing: "; COB v4\n",
+    findings: null,
+    converted: { member: "scripts/armcom.bos" },
+    notes: [],
+  });
+
+  it("names the source it converted, not only the compiled file", () => {
+    show(converted);
+
+    expect(screen.getByText("scripts/armcom.bos")).toBeTruthy();
+    expect(screen.getByText("scripts/armcom.cob")).toBeTruthy();
+  });
+
+  it("says outright that this is a conversion rather than the game's file", () => {
+    show(converted);
+
+    expect(screen.getByText(/not the game's own file/)).toBeTruthy();
+    expect(screen.getByText(/needs checking/)).toBeTruthy();
+  });
+
+  it("offers it, and asks before taking it", () => {
+    show(converted, undefined, false);
+    fireEvent.click(screen.getByLabelText("Use the converted script"));
+
+    expect(onTakeScript).toHaveBeenCalledWith(true);
+  });
+
+  /** The compiled file is still what the game runs, so the faithful reading of
+   *  it stays available beside the conversion. */
+  it("still lets the compiled file be read", () => {
+    show(converted);
+    fireEvent.click(screen.getByRole("button", { name: "Read it anyway" }));
+
+    expect(screen.getByText(/; COB v4/)).toBeTruthy();
+  });
+});
+
+describe("what the panel starts with the script switch set to", () => {
+  it("keeps a game's own Lua, which is exactly what it ships", () => {
+    expect(defaultTakeScript(adopted())).toBe(true);
+  });
+
+  /** Off, because a conversion needs reading before it is trusted and an
+   *  accept is one click away. */
+  it("leaves a conversion off until somebody asks for it", () => {
+    expect(
+      defaultTakeScript(
+        adopted({
+          kind: "cob",
+          script: "local base = piece 'base' \n",
+          converted: { member: "scripts/armcom.bos" },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("is off for a unit with no script to take at all", () => {
+    expect(
+      defaultTakeScript(adopted({ script: null, member: null, kind: null })),
+    ).toBe(false);
   });
 });
 

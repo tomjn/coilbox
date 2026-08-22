@@ -11,6 +11,10 @@
 //! the unit's own, edit and export. A `.cob` is compiled bytecode: readable
 //! through the disassembler in `tauri-plugin-coilbox-anim`, but not Lua and not
 //! something an export can write, so it comes back as bytes and is labelled.
+//!
+//! A `.cob` also brings back the `.bos` source beside it where the game ships
+//! one, which most do. That source is text, and coilbox has a BOS to Lua
+//! converter, so it is the way a compiled unit still opens with an animation.
 
 use std::path::Path;
 
@@ -40,6 +44,11 @@ pub struct UnitScriptOutput {
     pub text: Option<String>,
     /// The bytes, for a `.cob`. Absent for Lua, which is in `text`.
     pub bytes: Option<Vec<u8>>,
+    /// The `.bos` source beside a `.cob`, where the game ships it. Absent for
+    /// Lua, which needs no conversion, and for a `.cob` shipped on its own.
+    pub bos_member: Option<String>,
+    /// That source. Text, because BOS is source rather than bytecode.
+    pub bos_text: Option<String>,
     /// What the unit definition asked for, whether or not it was found. Worth
     /// reporting either way: a name that resolved to nothing is the useful
     /// half of "this unit has no script here".
@@ -109,13 +118,24 @@ pub fn render(lib: &str, game_archive: &str, unit_name: &str) -> UnitScriptOutpu
         .map(|(path, _)| (path.to_lowercase(), path))
         .collect();
 
-    let out = match find_script(&list, &want) {
+    let mut out = match find_script(&list, &want) {
         Some(member) => read_script(&us, handle, &member, declared.clone()),
         None => UnitScriptOutput {
             declared,
             ..Default::default()
         },
     };
+
+    // Only for a `.cob`. A game shipping Lua has nothing to convert, and the
+    // `.bos` beside that Lua is the older source of a script already superseded.
+    if out.kind.as_deref() == Some("cob") {
+        if let Some(member) = find_bos(&list, &want) {
+            if let Some((_, bytes)) = us.read_archive_member(handle, &member, SCRIPT_CAP) {
+                out.bos_text = Some(String::from_utf8_lossy(&bytes).into_owned());
+                out.bos_member = Some(member);
+            }
+        }
+    }
 
     us.close_archive(handle);
     us.remove_all_archives();
@@ -163,12 +183,42 @@ pub(crate) fn find_script(list: &[(String, String)], declared: &str) -> Option<S
     // tried before the exact `.cob` the definition still names.
     let candidates: Vec<String> = swapped.into_iter().chain([want]).collect();
 
-    for candidate in &candidates {
+    resolve(list, &candidates)
+}
+
+/// The `.bos` source sitting beside the script a definition names.
+///
+/// Many games ship the source they compiled the `.cob` from: SplinterFaction
+/// has 83 `.bos` files beside its 84 `.cob` files. The engine never loads one,
+/// so this is not part of [`find_script`]'s walk. It is a separate lookup, run
+/// only once a `.cob` has already won, that finds source coilbox can convert.
+///
+/// The walk itself is the framework's, because the source sits where the script
+/// does and a game filing one in a subfolder files the other there too.
+pub(crate) fn find_bos(list: &[(String, String)], declared: &str) -> Option<String> {
+    let want = declared.trim().replace('\\', "/").to_lowercase();
+    let stem = want
+        .strip_suffix(".cob")
+        .or_else(|| want.strip_suffix(".lua"))
+        .unwrap_or(&want);
+    if stem.is_empty() {
+        return None;
+    }
+    resolve(list, &[format!("{stem}.bos")])
+}
+
+/// Exact match on every candidate, then basename match on every candidate.
+///
+/// Both passes run over the whole list before the next candidate is tried,
+/// which is the framework's order: a `.lua` two folders down still beats a
+/// `.cob` sitting exactly where the definition said.
+fn resolve(list: &[(String, String)], candidates: &[String]) -> Option<String> {
+    for candidate in candidates {
         if let Some(hit) = exact(list, &format!("{SCRIPT_DIR}/{candidate}")) {
             return Some(hit);
         }
     }
-    for candidate in &candidates {
+    for candidate in candidates {
         let base = candidate.rsplit('/').next().unwrap_or(candidate);
         if let Some(hit) = list.iter().find(|(lower, _)| {
             lower.starts_with(SCRIPT_DIR) && lower.ends_with(&format!("/{base}"))
@@ -305,5 +355,53 @@ mod tests {
     fn finds_nothing_for_a_unit_that_names_nothing() {
         let list = listing(&["scripts/armcom.lua"]);
         assert_eq!(find_script(&list, "   "), None);
+    }
+
+    /// The whole point: a compiled script with its source sitting beside it.
+    #[test]
+    fn finds_the_bos_source_beside_a_cob() {
+        let list = listing(&["scripts/armcom.cob", "scripts/armcom.bos"]);
+        assert_eq!(
+            find_bos(&list, "armcom.cob"),
+            Some("scripts/armcom.bos".into())
+        );
+    }
+
+    /// SplinterFaction ships one more `.cob` than `.bos`, so a compiled script
+    /// with no source is the ordinary case rather than a fault.
+    #[test]
+    fn finds_no_source_for_a_cob_shipped_without_one() {
+        let list = listing(&["scripts/armcom.cob"]);
+        assert_eq!(find_bos(&list, "armcom.cob"), None);
+    }
+
+    /// The same fold the framework's own walk does, because a definition
+    /// written on Windows names the script that way.
+    #[test]
+    fn finds_the_source_ignoring_case_and_separators_and_subfolders() {
+        let list = listing(&["scripts/arm/ARMCOM.BOS"]);
+        assert_eq!(
+            find_bos(&list, "units\\ARMCOM.COB"),
+            Some("scripts/arm/ARMCOM.BOS".into())
+        );
+    }
+
+    /// A game that moved to Lua names its script `.lua`, and the source beside
+    /// it is still `.bos`.
+    #[test]
+    fn finds_the_source_for_a_script_named_as_lua() {
+        let list = listing(&["scripts/armcom.bos"]);
+        assert_eq!(
+            find_bos(&list, "armcom.lua"),
+            Some("scripts/armcom.bos".into())
+        );
+    }
+
+    /// A script is only ever loaded out of `scripts/`, and its source is only
+    /// ever found there for the same reason.
+    #[test]
+    fn does_not_take_source_from_outside_the_scripts_folder() {
+        let list = listing(&["examples/armcom.bos"]);
+        assert_eq!(find_bos(&list, "armcom.cob"), None);
     }
 }
