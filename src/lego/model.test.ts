@@ -657,6 +657,31 @@ describe("parseLegoProjectJson", () => {
     );
   });
 
+  /**
+   * A unit whose game compiled its animation carries the bytecode, because it
+   * is the only copy of that animation coilbox has: the game archive it came
+   * out of may not be installed the next time the project is opened.
+   */
+  it("carries a compiled script through a save and a load", () => {
+    const compiled = { member: "scripts/armcom.cob", bytes: [4, 0, 0, 0] };
+    const doc = { ...project([piece("root", null)]), compiledScript: compiled };
+
+    expect(parseLegoProjectJson(JSON.stringify(doc))?.compiledScript).toEqual(
+      compiled,
+    );
+  });
+
+  it("drops a compiled script with nothing in it", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      compiledScript: { member: "scripts/armcom.cob", bytes: [] },
+    };
+
+    expect(parseLegoProjectJson(JSON.stringify(doc))).not.toHaveProperty(
+      "compiledScript",
+    );
+  });
+
   it("loads a project that has problems, rather than refusing to open it", () => {
     // `a` hangs off a parent that no longer exists. Refusing to open the
     // project would leave no way to fix it.

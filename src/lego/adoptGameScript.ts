@@ -7,9 +7,10 @@
  * and which unit it came from, so it can go and read that file.
  *
  * Only Lua is adopted. A `.cob` is compiled bytecode, and an export writes Lua,
- * so adopting one would give a unit a script that cannot be written back. Those
- * are read through the disassembler and shown as a listing instead, which makes
- * a compiled unit legible without pretending it can be edited here.
+ * so adopting one would give a unit a script that cannot be written back. It
+ * still animates: the bytecode travels with the unit and the builder runs it,
+ * which is exactly what the game plays. It is also disassembled and shown as a
+ * listing, so a compiled unit is legible as well as watchable.
  *
  * Most games that compiled a script shipped the `.bos` source they compiled it
  * from, and that source is text coilbox already converts. So a compiled unit
@@ -62,6 +63,15 @@ export interface AdoptedScript {
    * Lua on offer actually came from.
    */
   converted: { member: string } | null;
+  /**
+   * The compiled bytecode itself, when the game ships one.
+   *
+   * Here so the unit can be played. Coilbox cannot write a `.cob`, but it can
+   * run one, and running it is how a unit whose game compiled its animation
+   * animates at all. The bytes travel with the project because the game they
+   * came out of may not be installed the next time it is opened.
+   */
+  compiled: { member: string; bytes: number[] } | null;
   /** What the reader wants to say: a unit with no script, a `.cob` that cannot
    *  be adopted, an archive that would not open. */
   notes: string[];
@@ -76,6 +86,7 @@ const NOTHING: AdoptedScript = {
   findings: null,
   listing: null,
   converted: null,
+  compiled: null,
   notes: [],
 };
 
@@ -161,8 +172,8 @@ export async function adoptGameScript(
     const source = result.bosText?.trim() ? result.bosMember : null;
     notes.push(
       source
-        ? `${result.member} is compiled bytecode rather than Lua, so what is on offer is ${source} converted. The converter is a set of text substitutions rather than a compiler, so read the result before trusting it.`
-        : `${result.member} is compiled bytecode rather than Lua. Coilbox writes Lua, so this one is read and left where it is.`,
+        ? `${result.member} is compiled bytecode rather than Lua. Coilbox runs it, so the unit animates either way. What is on offer here is ${source} converted, which is a script you can edit at the cost of accuracy: the converter is a set of text substitutions rather than a compiler, so read the result before trusting it.`
+        : `${result.member} is compiled bytecode rather than Lua. Coilbox runs it, so the unit animates, but an export writes Lua and does not write this.`,
     );
     return {
       // Roles are deliberately not inferred from a conversion. Inferring them
@@ -176,6 +187,9 @@ export async function adoptGameScript(
       findings: null,
       listing: await disassemble(result.bytes, notes),
       converted: source ? { member: source } : null,
+      compiled: result.bytes?.length
+        ? { member: result.member, bytes: result.bytes }
+        : null,
       notes,
     };
   }
@@ -191,6 +205,7 @@ export async function adoptGameScript(
     findings,
     listing: null,
     converted: null,
+    compiled: null,
     notes: [...new Set([...notes, ...findings.notes])],
   };
 }

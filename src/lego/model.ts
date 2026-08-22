@@ -344,6 +344,18 @@ export interface LegoProject {
    * shows and what an export writes, exactly as it stands.
    */
   script?: string;
+  /**
+   * The compiled animation script the unit's game ships, when it ships one.
+   *
+   * A `.cob` is bytecode rather than Lua, so it can be played but not edited
+   * and not written back by an export. It is kept here, bytes and all, because
+   * it is the only copy coilbox has: the game it came out of may not be
+   * installed the next time this project is opened.
+   *
+   * A unit that also has `script` is past this. Taking a script over is a
+   * decision, and the text somebody owns beats the file they came in with.
+   */
+  compiledScript?: { member: string; bytes: number[] };
   /** Where this unit was last exported, so exporting again does not ask. */
   exportDir?: string;
   /** Whether that export also placed the shared atlas. Defaults to true. */
@@ -651,6 +663,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       ? { animations: d.animations.map(parseApplied).filter((a) => a !== null) }
       : {}),
     ...(typeof d.script === "string" ? { script: d.script } : {}),
+    ...(parseCompiledScript(d.compiledScript) ?? {}),
     ...(typeof d.exportDir === "string" ? { exportDir: d.exportDir } : {}),
     ...(typeof d.exportTexture === "boolean"
       ? { exportTexture: d.exportTexture }
@@ -788,6 +801,28 @@ function parseTexture(value: unknown, packed: boolean): LegoTexture | null {
     name: v.name,
     ...(!packed && typeof v.source === "string" ? { source: v.source } : {}),
   };
+}
+
+/**
+ * A compiled script off a saved project, or nothing when there is not one.
+ *
+ * An empty byte array is nothing rather than an empty script: it would play as
+ * a unit that stands still, which is exactly what having no script looks like,
+ * and keeping it would mean the panel claiming an animation that is not there.
+ */
+function parseCompiledScript(
+  raw: unknown,
+): { compiledScript: LegoProject["compiledScript"] } | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const value = raw as Record<string, unknown>;
+  if (typeof value.member !== "string" || !Array.isArray(value.bytes)) {
+    return null;
+  }
+  const bytes = value.bytes.filter((byte): byte is number =>
+    Number.isInteger(byte),
+  );
+  if (bytes.length === 0) return null;
+  return { compiledScript: { member: value.member, bytes } };
 }
 
 /**
