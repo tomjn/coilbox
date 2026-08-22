@@ -95,6 +95,22 @@ describe("readyToCapture", () => {
     expect(readyToCapture(unit)).toBe(true);
   });
 
+  /**
+   * The cut-out mask decides which pixels are drawn at all, so before it arrives
+   * the picture is empty rather than dark (issue #1911).
+   */
+  it("waits for the cut-out mask as well as the texture", () => {
+    const unit = textured(true);
+    const mesh = unit.children[0] as THREE.Mesh;
+    const material = mesh.material as THREE.MeshStandardMaterial;
+    material.alphaMap = new THREE.Texture();
+
+    expect(readyToCapture(unit)).toBe(false);
+
+    material.alphaMap.image = { width: 64, height: 64 };
+    expect(readyToCapture(unit)).toBe(true);
+  });
+
   it("has nothing to photograph in a unit with no pieces", () => {
     const empty = new THREE.Group();
     // The pivot dot the builder puts in the unit's own group, which is not the
