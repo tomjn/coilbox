@@ -75,6 +75,8 @@ function found(over: Record<string, unknown> = {}) {
     kind: "lua",
     text: "-- the game's own\n",
     bytes: null,
+    bosMember: null,
+    bosText: null,
     declared: "armcom.cob",
     errors: [],
     ...over,
@@ -251,6 +253,98 @@ describe("a compiled script", () => {
 
     expect(adopted.listing).toBeNull();
     expect(disasm).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Most games that compiled a script shipped the source they compiled it from,
+ * and coilbox can already turn that source into Lua. The converter is textual
+ * and its output needs hand-fixing, so what matters here is that the result is
+ * marked as a conversion rather than passed off as the game's own file.
+ */
+describe("a compiled script whose game ships its source", () => {
+  const withSource = () =>
+    found({
+      kind: "cob",
+      text: null,
+      member: "scripts/armcom.cob",
+      bytes: [1, 2, 3],
+      bosMember: "scripts/armcom.bos",
+      bosText: "piece base, turret;\n",
+    });
+
+  it("offers the source converted to Lua", async () => {
+    readScript.mockResolvedValue(withSource());
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.script).toContain("local base = piece 'base'");
+    expect(adopted.script).toContain("local turret = piece 'turret'");
+  });
+
+  it("names the file the conversion came from", async () => {
+    readScript.mockResolvedValue(withSource());
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.converted?.member).toBe("scripts/armcom.bos");
+  });
+
+  /** The compiled file is still what the game runs, and the disassembly is
+   *  still the only faithful reading of it. */
+  it("still reports the compiled file it sits beside", async () => {
+    readScript.mockResolvedValue(withSource());
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.kind).toBe("cob");
+    expect(adopted.member).toBe("scripts/armcom.cob");
+    expect(adopted.listing).toBe("; COB v4\n");
+  });
+
+  /**
+   * A converted script is a best-effort textual transform. Watching it move
+   * pieces and calling that "the script named these" would dress a guess about
+   * a guess as the game's own answer.
+   */
+  it("is not asked about roles", async () => {
+    readScript.mockResolvedValue(withSource());
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(infer).not.toHaveBeenCalled();
+    expect(adopted.findings).toBeNull();
+  });
+
+  it("says the conversion needs checking rather than leaving it implied", async () => {
+    readScript.mockResolvedValue(withSource());
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.notes.join(" ")).toContain("scripts/armcom.bos");
+    expect(adopted.notes.join(" ")).toContain("converted");
+  });
+
+  it("offers nothing to convert when the game shipped only the compiled file", async () => {
+    readScript.mockResolvedValue(
+      found({ kind: "cob", text: null, bytes: [1, 2, 3] }),
+    );
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.converted).toBeNull();
+    expect(adopted.script).toBeNull();
+  });
+
+  /** A game that ships Lua has nothing to convert, and a conversion beside it
+   *  would be an older source of a script already superseded. */
+  it("offers nothing to convert for a game that ships Lua", async () => {
+    readScript.mockResolvedValue(found({ bosText: "piece base;\n" }));
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.converted).toBeNull();
+    expect(adopted.script).toBe("-- the game's own\n");
   });
 });
 
