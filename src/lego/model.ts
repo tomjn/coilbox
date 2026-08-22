@@ -175,9 +175,11 @@ export interface LegoImported {
   /** What the unit is painted with. Absent when it could not be found. */
   texture?: LegoTexture;
   /**
-   * The second texture an `.s3o` names, whose red channel marks the regions the
-   * engine paints in the player's colour. Not decoration: those regions are
-   * black in the first texture, so a unit that loses this shows black patches.
+   * The second texture an `.s3o` names: glow in red, reflectivity in green, and
+   * in alpha the one-bit mask that says whether a pixel is drawn at all. Not
+   * decoration. A unit that loses it draws the faces the game cuts away, which
+   * is a solid rectangle where a radar dish or a fence should be. The field name
+   * is a leftover: the team-colour mask is the first texture's alpha (#1910).
    */
   teamMask?: LegoTexture;
   /** The texture name the header gave when the file could not be found. */

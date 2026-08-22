@@ -16,6 +16,7 @@ import * as THREE from "three";
 
 import { legoTextureUrl } from "../lib/assetUrl";
 import {
+  cutOutHiddenPixels,
   paintTeamColour,
   releaseSpringTexture,
   springTexture,
@@ -99,8 +100,6 @@ export function importedMaterial(imported: LegoImported): {
     return springTexture(url);
   };
 
-  // Only the texture the unit is painted with. The second one an `.s3o` names
-  // is a glow and reflectivity map, and nothing here draws either.
   const key = imported.texture?.key;
   const map = load(key);
   const material = new THREE.MeshStandardMaterial({
@@ -112,6 +111,12 @@ export function importedMaterial(imported: LegoImported): {
     // one has holes in it. Same call the game model viewer makes.
     side: THREE.DoubleSide,
   });
+
+  // The second texture is a glow and reflectivity map, and nothing here draws
+  // either. Its alpha is the one thing an `.s3o` viewer cannot leave out: the
+  // engine throws away every pixel it masks off.
+  const mask = load(imported.teamMask?.key);
+  if (mask) cutOutHiddenPixels(material, mask);
 
   let live = true;
   if (map && key) {
