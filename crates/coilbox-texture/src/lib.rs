@@ -27,8 +27,26 @@ pub fn decode(ext: &str, bytes: &[u8]) -> Option<image::RgbaImage> {
         "tga" => load_rgba(bytes, image::ImageFormat::Tga),
         "bmp" => load_rgba(bytes, image::ImageFormat::Bmp),
         "gif" => load_rgba(bytes, image::ImageFormat::Gif),
+        "tif" | "tiff" => decode_tiff(bytes),
         _ => None,
     }
+}
+
+/// Whether a webview can be relied on to decode this format, given that [`decode`]
+/// can. A caller writing a file for the webview to fetch re-encodes these as PNG
+/// and passes everything else through.
+///
+/// `.bmp` and `.tga` are most of what the legacy games ship, 358 and 192 files
+/// respectively in Balanced Annihilation. `.tif` is rarer, four files in Basically
+/// OTA, and the reason this is a list rather than a pair: macOS's webview decodes a
+/// TIFF and Windows's and Linux's do not, so a unit painted with one drew
+/// differently depending on the platform (issue #1915).
+///
+/// `.dds` is deliberately not here. No webview decodes one either, but three's
+/// `DDSLoader` does, and decoding a shared 8192 square atlas would cost 256 MiB
+/// for one texture where the webview can upload it still compressed.
+pub fn needs_webview_transcode(ext: &str) -> bool {
+    matches!(ext.to_lowercase().as_str(), "bmp" | "tga" | "tif" | "tiff")
 }
 
 fn load_rgba(bytes: &[u8], format: image::ImageFormat) -> Option<image::RgbaImage> {
@@ -37,6 +55,82 @@ fn load_rgba(bytes: &[u8], format: image::ImageFormat) -> Option<image::RgbaImag
             .ok()?
             .to_rgba8(),
     )
+}
+
+/// Decode a TIFF, reading a fourth sample the file declines to name as alpha.
+///
+/// Photoshop wrote Basically OTA's four unit textures with an `ExtraSamples` tag
+/// of "unspecified" rather than "alpha", and the `tiff` crate takes that at its
+/// word: four samples, three of them RGB, the fourth thrown away. The engine does
+/// not. DevIL hands Spring all four, and an `.s3o` needs that channel: the
+/// team-colour mask on the first texture, the one-bit cut-out on the second. A
+/// unit painted with one of these came out with neither (issue #1915).
+fn decode_tiff(bytes: &[u8]) -> Option<image::RgbaImage> {
+    match name_the_extra_sample_alpha(bytes) {
+        Some(named) => load_rgba(&named, image::ImageFormat::Tiff),
+        None => load_rgba(bytes, image::ImageFormat::Tiff),
+    }
+}
+
+/// Rewrite an `ExtraSamples` tag of "unspecified" to "unassociated alpha", or
+/// `None` when the file has nothing to rewrite and can be decoded as it is.
+///
+/// Unassociated rather than associated, because these pixels are not
+/// premultiplied. A file that names its extra sample already, or has none at all,
+/// is left alone: four samples with no tag decode as RGBA without any help.
+///
+/// Only the first IFD, and only a tag holding a single value inline, which is how
+/// every file of this shape is written. A TIFF stores a one-value SHORT in the
+/// first two bytes of the entry's four-byte value field, in both byte orders.
+fn name_the_extra_sample_alpha(bytes: &[u8]) -> Option<Vec<u8>> {
+    const EXTRA_SAMPLES: u16 = 338;
+    const UNSPECIFIED: u16 = 0;
+    const UNASSOCIATED_ALPHA: u16 = 2;
+
+    let little = match bytes.get(..2)? {
+        b"II" => true,
+        b"MM" => false,
+        _ => return None,
+    };
+    let short = |at: usize| -> Option<u16> {
+        let raw = bytes.get(at..at + 2)?.try_into().ok()?;
+        Some(if little {
+            u16::from_le_bytes(raw)
+        } else {
+            u16::from_be_bytes(raw)
+        })
+    };
+    let long = |at: usize| -> Option<u32> {
+        let raw = bytes.get(at..at + 4)?.try_into().ok()?;
+        Some(if little {
+            u32::from_le_bytes(raw)
+        } else {
+            u32::from_be_bytes(raw)
+        })
+    };
+
+    if short(2)? != 42 {
+        return None;
+    }
+    let ifd = usize::try_from(long(4)?).ok()?;
+    for i in 0..usize::from(short(ifd)?) {
+        let entry = ifd + 2 + i * 12;
+        if short(entry)? != EXTRA_SAMPLES || long(entry + 4)? != 1 {
+            continue;
+        }
+        if short(entry + 8)? != UNSPECIFIED {
+            return None;
+        }
+        let mut out = bytes.to_vec();
+        let named = if little {
+            UNASSOCIATED_ALPHA.to_le_bytes()
+        } else {
+            UNASSOCIATED_ALPHA.to_be_bytes()
+        };
+        out.get_mut(entry + 8..entry + 10)?.copy_from_slice(&named);
+        return Some(out);
+    }
+    None
 }
 
 /// Encode an image as PNG bytes at its own size, alpha kept.
@@ -309,6 +403,149 @@ mod tests {
     fn an_uncompressed_dds_short_of_pixels_is_none() {
         let dds = uncompressed_dds(4, 4, 32, (0x00ff0000, 0x0000ff00, 0x000000ff, 0), &[0; 16]);
         assert!(decode("dds", &dds).is_none());
+    }
+
+    /// Build an uncompressed four-sample RGB TIFF the way Basically OTA's are:
+    /// one strip, 8 bits a sample, no compression. `extra` is the `ExtraSamples`
+    /// tag, and `None` leaves it out altogether.
+    ///
+    /// Written out by hand rather than through an encoder, because the point of
+    /// these tests is the tag a 2010 Photoshop wrote rather than whatever `image`
+    /// writes this year.
+    fn rgba_tiff(w: u32, h: u32, pixels: &[u8], extra: Option<u16>, little: bool) -> Vec<u8> {
+        let entries = if extra.is_some() { 10u16 } else { 9 };
+        // Header, then the IFD, then the one value too big to sit in an entry
+        // (BitsPerSample's four shorts), then the strip.
+        let ifd_at = 8u32;
+        let bits_at = ifd_at + 2 + u32::from(entries) * 12 + 4;
+        let strip_at = bits_at + 8;
+
+        let short = |v: u16| {
+            if little {
+                v.to_le_bytes()
+            } else {
+                v.to_be_bytes()
+            }
+        };
+        let long = |v: u32| {
+            if little {
+                v.to_le_bytes()
+            } else {
+                v.to_be_bytes()
+            }
+        };
+
+        let mut out = if little {
+            b"II".to_vec()
+        } else {
+            b"MM".to_vec()
+        };
+        out.extend_from_slice(&short(42));
+        out.extend_from_slice(&long(ifd_at));
+        out.extend_from_slice(&short(entries));
+
+        // tag, type (3 = SHORT, 4 = LONG), count, then the value or where it is.
+        // A single SHORT is left-justified in the four-byte field.
+        let mut entry = |tag: u16, kind: u16, count: u32, value: u32| {
+            out.extend_from_slice(&short(tag));
+            out.extend_from_slice(&short(kind));
+            out.extend_from_slice(&long(count));
+            if kind == 3 && count == 1 {
+                out.extend_from_slice(&short(value as u16));
+                out.extend_from_slice(&[0, 0]);
+            } else {
+                out.extend_from_slice(&long(value));
+            }
+        };
+        entry(256, 3, 1, w); // ImageWidth
+        entry(257, 3, 1, h); // ImageLength
+        entry(258, 3, 4, bits_at); // BitsPerSample
+        entry(259, 3, 1, 1); // Compression: none
+        entry(262, 3, 1, 2); // PhotometricInterpretation: RGB
+        entry(273, 4, 1, strip_at); // StripOffsets
+        entry(277, 3, 1, 4); // SamplesPerPixel
+        entry(278, 3, 1, h); // RowsPerStrip: the whole image
+        entry(279, 4, 1, w * h * 4); // StripByteCounts
+        if let Some(extra) = extra {
+            entry(338, 3, 1, u32::from(extra));
+        }
+
+        out.extend_from_slice(&long(0)); // no second IFD
+        for _ in 0..4 {
+            out.extend_from_slice(&short(8)); // bits a sample
+        }
+        out.extend_from_slice(pixels);
+        out
+    }
+
+    /// Two pixels, one opaque and one masked out, which is what the second
+    /// texture's one-bit cut-out looks like.
+    const TIFF_PIXELS: [u8; 8] = [10, 20, 30, 255, 40, 50, 60, 0];
+
+    /// The exact shape Basically OTA paints `CORE_T1_BOT_Crasher` with: four
+    /// samples, `ExtraSamples` "unspecified". Both its textures are one of these,
+    /// and the alpha the tag declines to name is the team-colour mask on the
+    /// first and the cut-out mask on the second, so it has to survive.
+    #[test]
+    fn a_tiff_that_will_not_name_its_fourth_sample_keeps_it_as_alpha() {
+        let tiff = rgba_tiff(2, 1, &TIFF_PIXELS, Some(0), true);
+
+        let img = decode("tif", &tiff).expect("tif should decode");
+
+        assert_eq!((img.width(), img.height()), (2, 1));
+        assert_eq!(img.get_pixel(0, 0).0, [10, 20, 30, 255]);
+        assert_eq!(img.get_pixel(1, 0).0, [40, 50, 60, 0]);
+        // Games write both spellings, and the engine's loader takes either.
+        assert!(decode("tiff", &tiff).is_some());
+        assert!(decode("tif", b"II not really a tiff").is_none());
+    }
+
+    /// The same file big endian, because a TIFF may be either way round and the
+    /// tag is rewritten in place.
+    #[test]
+    fn a_big_endian_tiff_keeps_its_alpha_too() {
+        let tiff = rgba_tiff(2, 1, &TIFF_PIXELS, Some(0), false);
+
+        let img = decode("tif", &tiff).expect("big endian tif should decode");
+
+        assert_eq!(img.get_pixel(1, 0).0, [40, 50, 60, 0]);
+    }
+
+    /// A file that names its alpha, and one that carries no `ExtraSamples` at
+    /// all, both decode without being touched.
+    #[test]
+    fn a_tiff_that_needs_no_help_is_decoded_as_it_arrived() {
+        for extra in [None, Some(1), Some(2)] {
+            let tiff = rgba_tiff(2, 1, &TIFF_PIXELS, extra, true);
+            assert!(
+                name_the_extra_sample_alpha(&tiff).is_none(),
+                "{extra:?} should be left alone"
+            );
+            let img = decode("tif", &tiff).expect("should decode");
+            assert_eq!(img.get_pixel(1, 0).0[3], 0, "alpha lost for {extra:?}");
+        }
+    }
+
+    /// Nothing that is not a TIFF is rewritten, however short or odd it is.
+    #[test]
+    fn only_a_tiff_header_is_rewritten() {
+        assert!(name_the_extra_sample_alpha(b"").is_none());
+        assert!(name_the_extra_sample_alpha(b"II").is_none());
+        assert!(name_the_extra_sample_alpha(b"\x89PNG\r\n\x1a\n").is_none());
+        // A TIFF header pointing its IFD past the end of the file.
+        assert!(name_the_extra_sample_alpha(b"II\x2a\x00\xff\xff\x00\x00").is_none());
+    }
+
+    /// The formats the webview cannot be trusted with, and the one that looks
+    /// like it belongs on the list and does not.
+    #[test]
+    fn the_transcode_list_is_the_formats_a_webview_cannot_open() {
+        for ext in ["bmp", "tga", "tif", "tiff", "TIF"] {
+            assert!(needs_webview_transcode(ext), "{ext} should be re-encoded");
+        }
+        for ext in ["png", "jpg", "jpeg", "gif", "dds", ""] {
+            assert!(!needs_webview_transcode(ext), "{ext} should pass through");
+        }
     }
 
     /// Encoding yields real PNG bytes, and the data URL wraps them.
