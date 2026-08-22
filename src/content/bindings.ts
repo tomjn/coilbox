@@ -1289,9 +1289,10 @@ export interface UnitModelResult {
   mid: [number, number, number];
   root?: UnitModelPiece;
   textures: UnitModelTexture[];
-  /** An `.s3o`'s second texture, whose red channel marks the regions the engine
-   *  paints in the owning player's colour. Those regions are black in the first
-   *  texture, so ignoring this draws a unit with black holes in its markings. */
+  /** An `.s3o`'s second texture: glow in red, reflectivity in green, and whether
+   *  a pixel is drawn in alpha. Named but not drawn, because the viewer does
+   *  none of those. The team-colour mask is the alpha of the first texture, so
+   *  the field name is a leftover (issue #1910). */
   teamMask?: UnitModelTexture;
   /** Faces a `.3do` draws in a flat palette colour, which is engine-embedded and
    *  not in the archive. Drawn plain grey, so the count is worth showing. */

@@ -20,6 +20,7 @@ import {
   releaseSpringTexture,
   springTexture,
 } from "../lib/springTexture";
+import { textureHasAlpha } from "../lib/textureAlpha";
 import { textureArrived } from "../lib/textureArrival";
 import { atlasUrl, type LegoAtlas } from "./atlas";
 import type { LegoImported } from "./model";
@@ -77,21 +78,31 @@ export function partMaterial(atlas: LegoAtlas): THREE.MeshStandardMaterial {
  * An untextured unit is not a failure to report here. The texture could not be
  * found, which the builder says in words, and a plain grey model is more use
  * than none.
+ *
+ * The team colour goes on a frame late, and only once the stored file is known
+ * to carry an alpha channel. The mask lives in that alpha, and a texture without
+ * one samples as 1 everywhere, which paints the whole unit rather than none of
+ * it. A unit imported before issue #1909 has exactly that: the store dropped the
+ * alpha when it re-encoded a `.bmp` or a `.tga`, and only a refresh puts it
+ * back. Waiting a frame is the same deal the textures themselves already make,
+ * so `textureArrived` is what asks for the redraw.
  */
 export function importedMaterial(imported: LegoImported): {
   material: THREE.MeshStandardMaterial;
   dispose: () => void;
 } {
   const urls: string[] = [];
-  const load = (key: string | undefined, data: boolean) => {
+  const load = (key: string | undefined) => {
     if (!key) return null;
     const url = legoTextureUrl(key);
     urls.push(url);
-    return springTexture(url, data);
+    return springTexture(url);
   };
 
-  const map = load(imported.texture?.key, false);
-  const mask = load(imported.teamMask?.key, true);
+  // Only the texture the unit is painted with. The second one an `.s3o` names
+  // is a glow and reflectivity map, and nothing here draws either.
+  const key = imported.texture?.key;
+  const map = load(key);
   const material = new THREE.MeshStandardMaterial({
     map,
     color: map ? 0xffffff : UNTEXTURED,
@@ -101,11 +112,23 @@ export function importedMaterial(imported: LegoImported): {
     // one has holes in it. Same call the game model viewer makes.
     side: THREE.DoubleSide,
   });
-  if (map && mask) paintTeamColour(material, mask);
+
+  let live = true;
+  if (map && key) {
+    void textureHasAlpha(legoTextureUrl(key)).then((alpha) => {
+      // Not a format this reads is a reason to trust the file, not to distrust
+      // it: the engine paints from that alpha whatever the file is.
+      if (!live || alpha === false) return;
+      paintTeamColour(material);
+      material.needsUpdate = true;
+      textureArrived();
+    });
+  }
 
   return {
     material,
     dispose: () => {
+      live = false;
       material.dispose();
       for (const url of urls) releaseSpringTexture(url);
     },
