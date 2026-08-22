@@ -86,10 +86,15 @@ pub fn render(lib: &str, game_archive: &str, unit_name: &str) -> UnitScriptOutpu
         .clone()
         .unwrap_or_else(|| format!("{unit_name}.cob"));
 
-    let handle = us
-        .archive_path(game_archive)
-        .and_then(|dir| us.open_archive(&Path::new(&dir).join(game_archive).to_string_lossy()));
+    // Through the shared resolver rather than joining the name onto the
+    // archive directory. A game is named several ways (display name, file name,
+    // full path) and only that one knows which is which, so a hand-rolled join
+    // opens nothing for most of them.
+    let handle = crate::archive::resolve_open_path(&us, game_archive)
+        .as_deref()
+        .and_then(|p| us.open_archive(p));
     let Some(handle) = handle else {
+        us.remove_all_archives();
         us.uninit();
         return UnitScriptOutput {
             declared,
@@ -113,6 +118,7 @@ pub fn render(lib: &str, game_archive: &str, unit_name: &str) -> UnitScriptOutpu
     };
 
     us.close_archive(handle);
+    us.remove_all_archives();
     us.uninit();
     out
 }
