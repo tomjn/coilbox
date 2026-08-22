@@ -690,7 +690,7 @@ async fn lego_import_s3o<R: Runtime>(app: AppHandle<R>, path: String, id: String
         "mid": model.mid,
         "root": imported.root,
         "texture": import_texture(&store, &file, &model.texture1),
-        "teamMask": import_texture(&store, &file, &model.texture2),
+        "texture2": import_texture(&store, &file, &model.texture2),
         "meshes": imported.meshes,
         "vertices": imported.vertices,
         "triangles": imported.triangles,

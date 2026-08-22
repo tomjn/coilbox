@@ -2873,7 +2873,7 @@ function unitMaterial(
   if (!imported) {
     return partMaterial(unitAtlas(project, pack.library.atlases).drawWith);
   }
-  const key = `${imported.texture?.key ?? ""}|${imported.teamMask?.key ?? ""}`;
+  const key = `${imported.texture?.key ?? ""}|${imported.texture2?.key ?? ""}`;
   if (state.imported?.key === key) return state.imported.material;
   state.imported?.dispose();
   state.imported = { key, ...importedMaterial(imported) };

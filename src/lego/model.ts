@@ -178,13 +178,17 @@ export interface LegoImported {
    * The second texture an `.s3o` names: glow in red, reflectivity in green, and
    * in alpha the one-bit mask that says whether a pixel is drawn at all. Not
    * decoration. A unit that loses it draws the faces the game cuts away, which
-   * is a solid rectangle where a radar dish or a fence should be. The field name
-   * is a leftover: the team-colour mask is the first texture's alpha (#1910).
+   * is a solid rectangle where a radar dish or a fence should be.
+   *
+   * Named after the `.s3o` header's own field rather than after what the
+   * channels mean, because the last name that made a claim about the meaning was
+   * wrong for a year: it was `teamMask`, and the team-colour mask is the first
+   * texture's alpha (#1910). A document written before the rename is read below.
    */
-  teamMask?: LegoTexture;
+  texture2?: LegoTexture;
   /** The texture name the header gave when the file could not be found. */
   missingTexture?: string;
-  missingTeamMask?: string;
+  missingTexture2?: string;
 }
 
 export interface LegoPiece {
@@ -669,6 +673,12 @@ function parsePiece(raw: unknown): LegoPiece | null {
  * The unit then draws untextured and says which file it wanted, which is the
  * same call the import itself makes when a texture cannot be found: losing the
  * project over a missing image would be worse than drawing it plain.
+ *
+ * The second texture is read under `teamMask` as well as under `texture2`,
+ * because that is what every document written before #1910 calls it. The old
+ * name is only ever read: a save writes the new one, so a unit migrates the next
+ * time it is touched and one nobody touches goes on working untouched. Same deal
+ * `parseGameIdentity` makes with the spellings that predate #1335.
  */
 function parseImported(value: unknown): LegoImported | null {
   if (typeof value !== "object" || value === null) return null;
@@ -683,18 +693,17 @@ function parseImported(value: unknown): LegoImported | null {
   // fail.
   const packed = game !== null && !isLooseArchive(game.archive);
   const texture = parseTexture(v.texture, packed);
-  const teamMask = parseTexture(v.teamMask, packed);
+  const texture2 = parseTexture(v.texture2 ?? v.teamMask, packed);
+  const missingTexture2 = v.missingTexture2 ?? v.missingTeamMask;
   return {
     source: v.source,
     ...(game ? { game } : {}),
     ...(texture ? { texture } : {}),
-    ...(teamMask ? { teamMask } : {}),
+    ...(texture2 ? { texture2 } : {}),
     ...(typeof v.missingTexture === "string"
       ? { missingTexture: v.missingTexture }
       : {}),
-    ...(typeof v.missingTeamMask === "string"
-      ? { missingTeamMask: v.missingTeamMask }
-      : {}),
+    ...(typeof missingTexture2 === "string" ? { missingTexture2 } : {}),
   };
 }
 

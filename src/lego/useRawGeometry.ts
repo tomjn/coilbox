@@ -54,8 +54,8 @@ export function useRawGeometry(
   // and what to call them.
   const textureKey = project?.imported?.texture?.key;
   const textureName = project?.imported?.texture?.name;
-  const maskKey = project?.imported?.teamMask?.key;
-  const maskName = project?.imported?.teamMask?.name;
+  const maskKey = project?.imported?.texture2?.key;
+  const maskName = project?.imported?.texture2?.name;
 
   useEffect(() => {
     if (!projectId) {

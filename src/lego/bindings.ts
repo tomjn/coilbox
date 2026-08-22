@@ -267,7 +267,9 @@ export interface S3oImport {
   mid: [number, number, number];
   root: ImportedPiece;
   texture: ImportedTexture;
-  teamMask: ImportedTexture;
+  /** The second texture the header names, under the header's own name for it:
+   *  glow in red, reflectivity in green, and a one-bit cut-out in alpha. */
+  texture2: ImportedTexture;
   meshes: number;
   vertices: number;
   triangles: number;

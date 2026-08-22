@@ -37,7 +37,7 @@ function result(overrides: Partial<S3oImport> = {}): S3oImport {
       "Beacon_1.dds",
       "/game/unittextures/Beacon_1.dds",
     ),
-    teamMask: texture(
+    texture2: texture(
       "bb22.dds",
       "Beacon_2.dds",
       "/game/unittextures/Beacon_2.dds",
@@ -122,7 +122,7 @@ describe("projectFromImport", () => {
       name: "Beacon_1.dds",
       source: "/game/unittextures/Beacon_1.dds",
     });
-    expect(project.imported?.teamMask?.key).toBe("bb22.dds");
+    expect(project.imported?.texture2?.key).toBe("bb22.dds");
   });
 
   it("records no source for a model unpacked out of a packed archive", () => {
@@ -143,21 +143,21 @@ describe("projectFromImport", () => {
       key: "aa11.dds",
       name: "Beacon_1.dds",
     });
-    expect(project.imported?.teamMask?.source).toBeUndefined();
+    expect(project.imported?.texture2?.source).toBeUndefined();
     // What the unit is drawn with is unaffected: coilbox has its own copy.
-    expect(project.imported?.teamMask?.key).toBe("bb22.dds");
+    expect(project.imported?.texture2?.key).toBe("bb22.dds");
   });
 
   it("remembers the name of a texture that could not be found", () => {
     const { project } = build({
       texture: texture(null, "Beacon_1.dds"),
-      teamMask: texture(null, ""),
+      texture2: texture(null, ""),
     });
 
     expect(project.imported?.texture).toBeUndefined();
     expect(project.imported?.missingTexture).toBe("Beacon_1.dds");
     // A model that names no second texture is not missing one.
-    expect(project.imported?.missingTeamMask).toBeUndefined();
+    expect(project.imported?.missingTexture2).toBeUndefined();
   });
 
   it("carries the counts the drawer reports", () => {
@@ -186,7 +186,7 @@ describe("importedTextures", () => {
   it("still names a texture it has no copy of, and places nothing", () => {
     const { project } = build({
       texture: texture(null, "Beacon_1.dds"),
-      teamMask: texture(null, ""),
+      texture2: texture(null, ""),
     });
 
     const out = importedTextures(project.imported as never);
@@ -233,7 +233,7 @@ describe("blenderTextures", () => {
   it("has nothing for a texture the import could not find", () => {
     const { project } = build({
       texture: texture(null, "Beacon_1.dds"),
-      teamMask: texture(null, ""),
+      texture2: texture(null, ""),
     });
 
     const out = blenderTextures(project.imported as never);
@@ -243,7 +243,7 @@ describe("blenderTextures", () => {
   });
 
   it("has a colour and no mask for a model carrying one texture", () => {
-    const { project } = build({ teamMask: texture(null, "") });
+    const { project } = build({ texture2: texture(null, "") });
 
     const out = blenderTextures(project.imported as never);
 

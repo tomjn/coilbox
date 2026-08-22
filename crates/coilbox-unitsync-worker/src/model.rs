@@ -685,12 +685,15 @@ pub struct UnitModelOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub root: Option<ModelPiece>,
     pub textures: Vec<ModelTexture>,
-    /// An `.s3o`'s second texture, whose red channel marks the regions the
-    /// engine paints in the owning player's colour. Those regions are black in
-    /// the first texture, so a viewer that ignores this draws a unit with black
-    /// holes where its markings should be.
+    /// An `.s3o`'s second texture: glow in red, reflectivity in green, and in
+    /// alpha the one-bit mask that says whether a pixel is drawn at all. Only
+    /// that last channel is drawn, as the cut-out the engine discards on.
+    ///
+    /// Named after the header's own field. The name before it was `team_mask`,
+    /// which was wrong: the team-colour mask is the first texture's alpha
+    /// (issue #1910).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub team_mask: Option<ModelTexture>,
+    pub texture2: Option<ModelTexture>,
     /// Faces a `.3do` draws in a flat colour from the Total Annihilation
     /// palette, which is engine-embedded and not in the archive. They are drawn
     /// plain grey, so the count is reported rather than hidden.

@@ -91,7 +91,7 @@ describe("importedMaterial", () => {
    */
   it("cuts out what the second texture masks off", () => {
     const { material, dispose } = importedMaterial(
-      imported({ teamMask: { key: "bb22.dds", name: "probe_2.dds" } }),
+      imported({ texture2: { key: "bb22.dds", name: "probe_2.dds" } }),
     );
     expect(material.alphaMap).not.toBeNull();
     expect(material.alphaTest).toBe(0.5);

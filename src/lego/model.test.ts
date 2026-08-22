@@ -353,16 +353,57 @@ describe("parseLegoProjectJson", () => {
           name: "Beacon_1.dds",
           source: "/game/unittextures/Beacon_1.dds",
         },
-        teamMask: { key: "bb22.dds", name: "Beacon_2.dds" },
-        missingTeamMask: undefined,
+        texture2: { key: "bb22.dds", name: "Beacon_2.dds" },
+        missingTexture2: undefined,
       },
     };
 
     const parsed = parseLegoProjectJson(JSON.stringify(doc));
 
     expect(parsed?.imported?.texture?.key).toBe("aa11.dds");
-    expect(parsed?.imported?.teamMask?.name).toBe("Beacon_2.dds");
+    expect(parsed?.imported?.texture2?.name).toBe("Beacon_2.dds");
     expect(parsed?.pieces[1].meshId).toBe("m1");
+  });
+
+  it("reads a second texture written under the old teamMask name", () => {
+    // Every unit saved before #1910 spells it that way. Reading it here is the
+    // whole migration: the parse writes the new name out, so a unit moves over
+    // the next time it is saved without anybody re-importing it.
+    const doc = {
+      ...project([piece("root", null)]),
+      imported: {
+        source: "/game/objects3d/Beacon.s3o",
+        texture: { key: "aa11.dds", name: "Beacon_1.dds" },
+        teamMask: { key: "bb22.dds", name: "Beacon_2.dds" },
+        missingTeamMask: "Beacon_3.dds",
+      },
+    };
+
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+
+    expect(parsed?.imported?.texture2).toEqual({
+      key: "bb22.dds",
+      name: "Beacon_2.dds",
+    });
+    expect(parsed?.imported?.missingTexture2).toBe("Beacon_3.dds");
+    // The old spellings do not survive the trip, so a saved document carries
+    // one name for the field rather than two free to disagree.
+    expect(JSON.stringify(parsed)).not.toContain("teamMask");
+  });
+
+  it("prefers the new name when a document somehow carries both", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      imported: {
+        source: "/game/objects3d/Beacon.s3o",
+        texture2: { key: "new.dds", name: "New_2.dds" },
+        teamMask: { key: "old.dds", name: "Old_2.dds" },
+      },
+    };
+
+    expect(
+      parseLegoProjectJson(JSON.stringify(doc))?.imported?.texture2?.key,
+    ).toBe("new.dds");
   });
 
   it("round-trips the game an imported unit was opened out of", () => {
@@ -441,7 +482,7 @@ describe("parseLegoProjectJson", () => {
           name: "Beacon_1.dds",
           source: "/tmp/coilbox-lego-model-1/unittextures/Beacon_1.dds",
         },
-        teamMask: {
+        texture2: {
           key: "bb22.dds",
           name: "Beacon_2.dds",
           source: "/tmp/coilbox-lego-model-1/unittextures/Beacon_2.dds",
@@ -455,7 +496,7 @@ describe("parseLegoProjectJson", () => {
       key: "aa11.dds",
       name: "Beacon_1.dds",
     });
-    expect(parsed?.imported?.teamMask?.source).toBeUndefined();
+    expect(parsed?.imported?.texture2?.source).toBeUndefined();
   });
 
   it("keeps the texture source of a unit out of a loose game folder", () => {
