@@ -868,29 +868,33 @@ fn read_tiles(model_file: &Path, model: &coilbox_3do::Model) -> (Vec<atlas3do::T
             let found = texture::find_tile_beside_model(model_file, &name)?;
             let bytes = std::fs::read(&found.path).ok()?;
             let mut image = coilbox_texture::decode(&extension_of(&found.path), &bytes)?;
-            if found.team_colour {
-                team_colour_tile(&mut image);
-            }
+            set_team_mask(&mut image, found.team_colour);
             Some(atlas3do::Tile { name, image })
         })
         .collect();
     (tiles, wanted)
 }
 
-/// Turn a team-colour placeholder into what an `.s3o` means by one.
+/// Put the team-colour mask an `.s3o` expects into a tile's alpha.
 ///
-/// The file a game ships for one of these is flat magenta, which is a marker
-/// rather than a colour: the engine never draws it. An `.s3o` says the same
-/// thing in the alpha of the texture the unit is painted with, so the pixels
-/// become transparent and the engine paints the player's colour over them.
+/// This is the one thing about the conversion with a direction that is easy to
+/// get backwards, so it is worth writing down. Both engine model shaders read
+/// `texColor1.rgb = mix(texColor1.rgb, teamCol.rgb, texColor1.a)`. Alpha of one
+/// is entirely the player's colour, alpha of zero is entirely the texture. A
+/// `.3do` tile is opaque, so copying its own alpha through paints the whole
+/// unit flat in the player's colour with no texture left.
 ///
-/// The colour underneath goes mid grey rather than staying magenta, because the
-/// builder draws the texture as it is and shows no team colour at all. Left
-/// magenta, a converted commander would have magenta patches on it in the one
-/// place somebody is looking at it.
-fn team_colour_tile(image: &mut image::RgbaImage) {
+/// So the alpha is written rather than copied. An ordinary tile gets zero and
+/// keeps its own colours. A team-colour region gets one, and its colours stop
+/// mattering: the file a game ships for one is flat magenta, a marker the
+/// engine never draws.
+fn set_team_mask(image: &mut image::RgbaImage, team_colour: bool) {
     for pixel in image.pixels_mut() {
-        *pixel = image::Rgba([128, 128, 128, 0]);
+        if team_colour {
+            *pixel = image::Rgba([128, 128, 128, 255]);
+        } else {
+            pixel.0[3] = 0;
+        }
     }
 }
 
@@ -1591,6 +1595,39 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_probe_script
         ])
         .build()
+}
+
+#[cfg(test)]
+mod team_mask_tests {
+    use super::set_team_mask;
+
+    fn tile(alpha: u8) -> image::RgbaImage {
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([10, 20, 30, alpha]))
+    }
+
+    /// The direction that is easy to get backwards, and was: both engine model
+    /// shaders read `mix(texColor1.rgb, teamCol.rgb, texColor1.a)`, so alpha is
+    /// how much of the player's colour to use. A `.3do` tile is opaque, and
+    /// copying its own alpha through paints the whole unit flat in the player's
+    /// colour with no texture left at all.
+    #[test]
+    fn leaves_an_ordinary_tile_out_of_the_team_colour() {
+        let mut image = tile(255);
+
+        set_team_mask(&mut image, false);
+
+        assert_eq!(image.get_pixel(0, 0).0, [10, 20, 30, 0]);
+    }
+
+    /// A region the engine paints in the player's colour asks for all of it.
+    #[test]
+    fn asks_for_the_players_colour_over_a_team_region() {
+        let mut image = tile(255);
+
+        set_team_mask(&mut image, true);
+
+        assert_eq!(image.get_pixel(0, 0).0[3], 255);
+    }
 }
 
 #[cfg(test)]

@@ -45,7 +45,11 @@ const MAX_SIDE: u32 = 2048;
 /// Mid grey rather than a guess at the palette. A face drawn in a colour
 /// coilbox does not have is better plainly wrong than confidently wrong, and
 /// the count says how many took it.
-const PALETTE_GREY: [u8; 4] = [128, 128, 128, 255];
+///
+/// Alpha zero, because on an `.s3o` the first texture's alpha is the
+/// team-colour mask rather than transparency. A palette face is not a region
+/// the player's colour belongs on.
+const PALETTE_GREY: [u8; 4] = [128, 128, 128, 0];
 
 /// The name the flat-colour tile is filed under, which no `.3do` texture name
 /// can collide with: the format stores names without a path separator.
