@@ -59,6 +59,15 @@ export const dlVersions = defineCommand<
   { versions: Version[] }
 >("coilbox-downloads", "dl_versions");
 
+/**
+ * The md5s of rapid packages a named tag points at, read off this machine's
+ * pool. An installed `<md5>.sdp` missing from this is a commit snapshot.
+ */
+export const dlRapidReleaseArchives = defineCommand<
+  { dataDir: string },
+  { md5s: string[] }
+>("coilbox-downloads", "dl_rapid_release_archives");
+
 /** Raw start command WITHOUT the completion notification — for internal callers
  * that compose several attempts into one logical download (fallback chains),
  * which notify once themselves. Prefer the wrapped `dlDownload` elsewhere. */

@@ -22,6 +22,7 @@ const COMMANDS: &[&str] = &[
     "dl_set_engine_dirs",
     "dl_path_writable",
     "dl_fetch_text",
+    "dl_rapid_release_archives",
 ];
 
 fn main() {

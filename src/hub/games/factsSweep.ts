@@ -4,8 +4,9 @@ import {
   unitsyncScan,
   unitsyncUnitDataset,
 } from "@/content/bindings";
-import { isSddName } from "@/content/format";
+import { isSddName, isSdpName } from "@/content/format";
 import { buildTechForest } from "@/content/techForest";
+import { dlRapidReleaseArchives } from "@/downloads/bindings";
 import {
   type GameFaction,
   type GameFacts,
@@ -25,8 +26,17 @@ import {
  * scratch game, the scenario test mutator - and none of it belongs in a public
  * catalog (issue #1890). The test is `isSddName` on the primary archive, which
  * is the one the picture backfill and the seed corpus already use, and coilbox's
- * own generated folders are `.sdd` so the same test takes them out. A rapid pool
- * install is a `.sdp` and is untouched by it.
+ * own generated folders are `.sdd` so the same test takes them out.
+ *
+ * A rapid pool install is a `.sdp` and needs its own test, because rapid carries
+ * both. Rapid publishes a tag per commit as `<repo>:git:<sha>` alongside named
+ * ones like `ba:stable`, and a package only a commit tag reaches is somebody's
+ * snapshot rather than what the game is (issue #1923). The pool names an archive
+ * after its md5 and `versions.gz` records the md5 each tag points at, so
+ * `dlRapidReleaseArchives` answers with the released ones and anything else is
+ * skipped. Reading the tag is the whole point: `ba:test` names the released
+ * V15.9.8 while the build called `test-7183-001edc3` is the snapshot, so a rule
+ * that matched on the word would get both backwards.
  *
  * Two other things stop a game. A game with no modinfo shortname has nothing for
  * the hub to file it under, which is the reason the picture seed skips one too.
@@ -40,10 +50,14 @@ import {
  * which install they came from. Four installed BAR releases posted in one run
  * would leave the current facts pointing at whichever went last, and the next
  * run would move them again, so nothing would ever settle. One install per
- * shortname is sent instead, chosen by archive name so that the same library
+ * shortname is sent instead, the greatest game name, so that the same library
  * chooses the same install every time. That is a stable pick rather than a claim
  * about which release is newer: a version is whatever the game's author typed,
  * and an ordering invented for it would be a guess dressed up as a rule.
+ *
+ * That only holds because it is choosing between releases. It used to choose
+ * between a release and a snapshot, and it always chose the snapshot, since a
+ * name holding `test-` beats a tagged version under a string comparison.
  *
  * ## Why it is a button and not something that happens
  *
@@ -57,6 +71,8 @@ import {
 export type GameSkipReason =
   /** A loose `.sdd` working folder, or one coilbox generated for itself. */
   | "development-folder"
+  /** A rapid commit snapshot, which is a private build rather than a release. */
+  | "snapshot-build"
   /** No modinfo shortname, so the hub has nothing to file it under. */
   | "no-shortname"
   /** No modinfo version, and the hub requires one. */
@@ -111,6 +127,7 @@ export interface GameSweepTools {
   info: typeof unitsyncGameInfo;
   dataset: typeof unitsyncUnitDataset;
   send: typeof publishGameFacts;
+  releases: typeof dlRapidReleaseArchives;
 }
 
 export const liveGameSweepTools: GameSweepTools = {
@@ -118,6 +135,7 @@ export const liveGameSweepTools: GameSweepTools = {
   info: unitsyncGameInfo,
   dataset: unitsyncUnitDataset,
   send: publishGameFacts,
+  releases: dlRapidReleaseArchives,
 };
 
 export interface GameSweepTarget {
@@ -140,7 +158,10 @@ interface Sendable {
  * else's working folder out of a public catalog, and they are worth asserting
  * without a hub.
  */
-export function gamesToSend(games: readonly GameItem[]): {
+export function gamesToSend(
+  games: readonly GameItem[],
+  releaseMd5s: ReadonlySet<string>,
+): {
   sendable: Sendable[];
   skipped: SkippedGame[];
 } {
@@ -160,6 +181,20 @@ export function gamesToSend(games: readonly GameItem[]): {
     const release = game.info?.version?.trim();
     if (!release) {
       skipped.push({ game: game.name, reason: "no-release" });
+      continue;
+    }
+
+    // A rapid package is a release only when a named tag points at it. Rapid
+    // publishes one tag per commit, and a package only a commit tag reaches is
+    // somebody's snapshot rather than what the game is. Reading the tag is the
+    // point: `ba:test` names the released V15.9.8 while the build called
+    // `test-7183-001edc3` is the snapshot.
+    const archive = game.primaryArchive?.name ?? "";
+    if (
+      isSdpName(archive) &&
+      !releaseMd5s.has(archive.slice(0, -4).toLowerCase())
+    ) {
+      skipped.push({ game: game.name, reason: "snapshot-build" });
       continue;
     }
 
@@ -326,8 +361,12 @@ export async function sweepGameFacts(
   const { hubUrl, enginePath, dataDir } = target;
 
   onProgress({ phase: "scanning", done: 0, total: 0 });
+  const { md5s } = await tools.releases({ dataDir });
   const scanned = await tools.scan({ enginePath, dataDir });
-  const { sendable, skipped } = gamesToSend(scanned.games);
+  const { sendable, skipped } = gamesToSend(
+    scanned.games,
+    new Set(md5s.map((m) => m.toLowerCase())),
+  );
   const report: GameSweepReport = {
     ...nothing,
     found: scanned.games.length,
