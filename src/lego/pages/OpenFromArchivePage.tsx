@@ -58,9 +58,18 @@ export default function OpenFromArchivePage() {
   );
   const [stage, setStage] = useState<ImportStage>({ state: "idle" });
   const [problem, setProblem] = useState<string | null>(null);
+  /** What was asked for, as a string. There is no route that reaches this page
+   *  a second time without a fresh archive or member, so this doubles as the
+   *  identity of "the request currently owning `stage`". */
+  const requestKey = request
+    ? JSON.stringify([request.archive, request.member])
+    : null;
   /** So a re-render, or the tree arriving twice out of its cache, cannot start
-   *  a second import of the same model. */
-  const started = useRef(false);
+   *  a second import of the same model. Keyed to the request rather than a
+   *  plain flag, so a new archive or member in the URL reads as unstarted even
+   *  though the page never unmounted, and a read still in flight for the old
+   *  request cannot land under the new one's name (#1906). */
+  const startedFor = useRef<string | null>(null);
   /** Dropped on unmount, so an import somebody navigated away from stops
    *  reporting into a page that is no longer on screen. Raised on mount rather
    *  than only at birth, because Strict Mode mounts, unmounts and mounts again,
@@ -73,12 +82,25 @@ export default function OpenFromArchivePage() {
     };
   }, []);
 
+  // Clears whatever the last request reported the moment a new one arrives,
+  // rather than leaving it on screen under the new request's name until the
+  // fetch below gets around to overwriting it. Done during render, React's
+  // documented way to reset state when a derived value changes, so the reset
+  // lands in the same commit as the new header and description instead of a
+  // frame after them.
+  const seenRequestKey = useRef<string | null>(null);
+  if (seenRequestKey.current !== requestKey) {
+    seenRequestKey.current = requestKey;
+    setStage({ state: "idle" });
+    setProblem(null);
+  }
+
   useEffect(() => {
-    if (!request || started.current) return;
+    if (!request || !requestKey || startedFor.current === requestKey) return;
     if (!openableInBuilder(request.member)) return;
     if (projectsLoading || treeLoading || targetLoading) return;
     if (!selected?.enginePath || !selected?.rootPath || !tree) return;
-    started.current = true;
+    startedFor.current = requestKey;
 
     // A model already open is offered as the unit it is, rather than imported a
     // second time into a second copy with its own geometry beside it.
@@ -122,9 +144,12 @@ export default function OpenFromArchivePage() {
           beforeImport: (textures) =>
             stageTextures(target, picked, staged, tree.files, textures),
         });
-        if (live.current) setStage(result);
+        // A later request may have started and moved the guard on while this
+        // one was still reading, in which case its result belongs to nobody
+        // on screen and must not be reported under the newer request's name.
+        if (live.current && startedFor.current === requestKey) setStage(result);
       } catch (error) {
-        if (!live.current) return;
+        if (!live.current || startedFor.current !== requestKey) return;
         setStage({
           state: "failed",
           message: error instanceof Error ? error.message : String(error),
@@ -133,6 +158,7 @@ export default function OpenFromArchivePage() {
     })();
   }, [
     request,
+    requestKey,
     projects,
     projectsLoading,
     selected,
