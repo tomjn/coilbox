@@ -33,6 +33,11 @@ export function isSddName(name?: string): boolean {
   return !!name && name.toLowerCase().endsWith(".sdd");
 }
 
+/** Whether an archive name is a rapid pool package, which is named after its md5. */
+export function isSdpName(name?: string): boolean {
+  return !!name && name.toLowerCase().endsWith(".sdp");
+}
+
 const DELETABLE_EXTS = ["sd7", "sdz", "sdd", "sdp"];
 const CONTENT_DIRS = ["games", "maps", "packages"];
 

@@ -83,6 +83,9 @@ function tools(
       sent.push(facts);
       return outcomes;
     }) as unknown as GameSweepTools["send"],
+    releases: vi.fn(async () => ({
+      md5s: [],
+    })) as unknown as GameSweepTools["releases"],
     sent: () => sent,
     mounted: () => mounted,
   };
@@ -103,7 +106,7 @@ describe("gamesToSend", () => {
       game("Coilbox mission test", MUTATOR_FOLDER, {
         shortname: "coilbox-mission",
       }),
-    ]);
+    ], new Set<string>());
 
     expect(sendable.map((s) => s.game.name)).toEqual([
       "Balanced Annihilation 12.24",
@@ -121,7 +124,7 @@ describe("gamesToSend", () => {
     const { sendable, skipped } = gamesToSend([
       game("Nameless Mod", "nameless.sdz", { version: "  " }),
       game("Balanced Annihilation 12.24", "ba1224.sdz"),
-    ]);
+    ], new Set<string>());
 
     expect(sendable.map((s) => s.game.name)).toEqual([
       "Balanced Annihilation 12.24",
@@ -132,7 +135,7 @@ describe("gamesToSend", () => {
   it("skips a game with no modinfo shortname, since the hub files games under one", () => {
     const { sendable, skipped } = gamesToSend([
       game("Odd Mod", "odd.sdz", { shortname: "" }),
-    ]);
+    ], new Set<string>());
 
     expect(sendable).toEqual([]);
     expect(skipped).toEqual([{ game: "Odd Mod", reason: "no-shortname" }]);
@@ -147,8 +150,8 @@ describe("gamesToSend", () => {
       game("SplinterFaction 0.1.78", "sf0178.sdz", { shortname: "SF" }),
     ];
 
-    const forwards = gamesToSend(installs);
-    const backwards = gamesToSend([...installs].reverse());
+    const forwards = gamesToSend(installs, new Set<string>());
+    const backwards = gamesToSend([...installs].reverse(), new Set<string>());
 
     expect(forwards.sendable.map((s) => s.game.name)).toEqual([
       "SplinterFaction 0.1.78",
@@ -158,6 +161,67 @@ describe("gamesToSend", () => {
     ]);
     expect(forwards.skipped).toEqual([
       { game: "SplinterFaction 0.1.77", reason: "another-install" },
+    ]);
+  });
+
+  /// A commit snapshot is a private build. It never speaks for a game, even
+  /// when it is the only install, because the catalog describes a game as its
+  /// players know it.
+  it("skips a rapid install no named tag points at, and sends nothing in its place", () => {
+    const { sendable, skipped } = gamesToSend(
+      [
+        game("Beyond All Reason test-30922", "ded9b29714a05164.sdp", {
+          shortname: "BYAR",
+        }),
+      ],
+      new Set<string>(),
+    );
+
+    expect(sendable).toEqual([]);
+    expect(skipped).toEqual([
+      { game: "Beyond All Reason test-30922", reason: "snapshot-build" },
+    ]);
+  });
+
+  /// Rapid is how most people install Beyond All Reason, so a rule that refused
+  /// every pool install would keep the largest game out of the catalog.
+  it("sends a rapid install a named tag points at", () => {
+    const { sendable } = gamesToSend(
+      [
+        game("Beyond All Reason 1.2.3", "ded9b29714a05164.sdp", {
+          shortname: "BYAR",
+        }),
+      ],
+      new Set(["ded9b29714a05164"]),
+    );
+
+    expect(sendable.map((s) => s.game.name)).toEqual([
+      "Beyond All Reason 1.2.3",
+    ]);
+  });
+
+  /// The bug this rule exists for: a name holding `test-` beats a tagged
+  /// version under a plain string comparison, because `t` sorts above `V`.
+  it("prefers the packaged release over a snapshot whatever the two names sort like", () => {
+    const { sendable, skipped } = gamesToSend(
+      [
+        game("Balanced Annihilation test-7183-001edc3", "cc956b0843d10d36.sdp"),
+        game(
+          "Balanced Annihilation V15.9.8",
+          "balanced_annihilation-v15.9.8.sdz",
+        ),
+      ],
+      new Set<string>(),
+    );
+
+    expect(sendable.map((s) => s.game.name)).toEqual([
+      "Balanced Annihilation V15.9.8",
+    ]);
+    expect(skipped).toEqual([
+      {
+        game: "Balanced Annihilation test-7183-001edc3",
+        reason: "snapshot-build",
+      },
     ]);
   });
 });
