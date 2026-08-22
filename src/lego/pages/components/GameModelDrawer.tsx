@@ -40,7 +40,11 @@ import { modelSource, stageModel, stageTextures } from "../../gameImport";
 import { type GameModelRow, gameModelRows } from "../../gameModels";
 import type { LegoProject } from "../../model";
 import { useLegoProjects } from "../../projects";
-import { defaultTakenRoles, GameScriptPanel } from "./GameScriptPanel";
+import {
+  defaultTakenRoles,
+  defaultTakeScript,
+  GameScriptPanel,
+} from "./GameScriptPanel";
 import {
   ImportResult,
   type ImportStage,
@@ -183,6 +187,7 @@ export function GameModelDrawer({
         const found = await adoptGameScript(project, target);
         setAdopted(found);
         setTakenRoles(defaultTakenRoles(found));
+        setTakeScript(defaultTakeScript(found));
       }
     } catch (error) {
       setStage({

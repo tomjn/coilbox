@@ -104,12 +104,44 @@ export function GameScriptPanel({
 
       {adopted.kind === "cob" && adopted.member ? (
         <>
-          <p className="text-xs text-muted-foreground">
-            The game animates this unit with{" "}
-            <code className="break-all">{adopted.member}</code>, which is
-            compiled rather than Lua. Coilbox writes Lua, so this one is read
-            and left alone, and the unit opens on the presets instead.
-          </p>
+          {adopted.converted ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                The game animates this unit with{" "}
+                <code className="break-all">{adopted.member}</code>, which is
+                compiled rather than Lua. It ships the source that was compiled,{" "}
+                <code className="break-all">{adopted.converted.member}</code>,
+                and what is on offer here is that source converted to Lua.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                The converter is a set of text substitutions rather than a
+                compiler, so this is not the game's own file and it needs
+                checking. Read it in the script drawer and expect to fix parts
+                of it by hand.
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <Label
+                  htmlFor="take-game-script"
+                  className="text-xs font-medium"
+                >
+                  Use the converted script
+                </Label>
+                <Switch
+                  id="take-game-script"
+                  checked={takeScript}
+                  onCheckedChange={onTakeScript}
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              The game animates this unit with{" "}
+              <code className="break-all">{adopted.member}</code>, which is
+              compiled rather than Lua, and it does not ship the source that was
+              compiled. Coilbox writes Lua, so this one is read and left alone,
+              and the unit opens on the presets instead.
+            </p>
+          )}
           {adopted.listing ? (
             <Collapsible>
               <CollapsibleTrigger asChild>
@@ -180,4 +212,16 @@ export function defaultTakenRoles(adopted: AdoptedScript): Set<string> {
   return new Set(
     (adopted.findings?.proposals ?? []).map((proposal) => proposal.pieceName),
   );
+}
+
+/**
+ * Whether the script switch starts on.
+ *
+ * On for a game's own Lua, which is exactly the file the game runs. Off for a
+ * conversion, because that one is a set of text substitutions over BOS source
+ * and accepting the unit is one click away. Somebody who reads the panel and
+ * wants it turns it on, which is the offer the conversion is meant to be.
+ */
+export function defaultTakeScript(adopted: AdoptedScript): boolean {
+  return adopted.kind === "lua" && adopted.script !== null;
 }
