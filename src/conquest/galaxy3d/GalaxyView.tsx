@@ -8,6 +8,7 @@ import {
 } from "three/addons/renderers/CSS2DRenderer.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { assetUrl } from "../../lib/assetUrl";
+import { drawingPixelRatio } from "../../lib/uiZoom";
 import type { GalaxyDoc, GalaxyNode, Incursion, NodeStar } from "../model";
 import { NEUTRAL } from "../model";
 import { mulberry32 } from "../rng";
@@ -3048,9 +3049,6 @@ export function GalaxyView({
       alpha: true,
     });
     renderer.setClearColor(0x000000, 0); // page background shows through
-    renderer.setPixelRatio(
-      performanceMode ? 1 : Math.min(window.devicePixelRatio, 2),
-    );
     container.appendChild(renderer.domElement);
     renderer.domElement.style.cssText =
       "display:block;width:100%;height:100%;position:absolute;inset:0;";
@@ -3822,6 +3820,10 @@ export function GalaxyView({
       if (!renderer || !labelRenderer) return;
       const w = container.clientWidth || 1;
       const h = container.clientHeight || 1;
+      // Every resize, not once at build: UI zoom moves the pixel ratio and the
+      // container's CSS size together, so the observer that reports the size
+      // change is also when the ratio needs re-reading (see `lib/uiZoom`).
+      renderer.setPixelRatio(drawingPixelRatio(performanceMode ? 1 : 2));
       renderer.setSize(w, h, false);
       labelRenderer.setSize(w, h);
       camera.aspect = w / h;

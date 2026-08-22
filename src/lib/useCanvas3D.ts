@@ -2,8 +2,9 @@
  * One three.js canvas, from renderer to disposal.
  *
  * Every 3D view wants the same four things: a renderer sized to the element it
- * sits in, a redraw when that element resizes, a frame drawn only when
- * something changed, and everything freed on the way out. The trap is held here
+ * sits in, a redraw when that element resizes or the UI zoom moves, a frame
+ * drawn only when something changed, and everything freed on the way out. The
+ * trap is held here
  * rather than found again by each view that comes along: `setSize(w, h, false)`
  * leaves the canvas element itself unsized, so it falls back to its intrinsic
  * size, which is the drawing buffer including the pixel ratio. That is larger
@@ -18,6 +19,7 @@ import { type DependencyList, type RefObject, useLayoutEffect } from "react";
 import * as THREE from "three";
 
 import { onTextureArrived } from "./textureArrival";
+import { drawingPixelRatio } from "./uiZoom";
 
 /** The canvas the build is handed, and what it can ask of it afterwards. */
 export interface Canvas3D {
@@ -64,17 +66,23 @@ export function useCanvas3D(
     if (!host) return;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     host.appendChild(renderer.domElement);
     renderer.domElement.style.display = "block";
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
 
     let scene: Canvas3DScene | undefined;
+    // The pixel ratio the buffer was last sized at, so a window resize that did
+    // not move it costs nothing.
+    let ratio = 0;
     const render = () => scene?.render();
     const resize = () => {
       const { clientWidth, clientHeight } = host;
       if (clientWidth === 0 || clientHeight === 0) return;
+      // Read the ratio every time rather than once at build: UI zoom changes it
+      // (see `./uiZoom`), and a buffer left at the old one is the blurry model.
+      ratio = drawingPixelRatio();
+      renderer.setPixelRatio(ratio);
       renderer.setSize(clientWidth, clientHeight, false);
       scene?.resize(clientWidth, clientHeight);
       render();
@@ -90,6 +98,17 @@ export function useCanvas3D(
 
     const observer = new ResizeObserver(resize);
     observer.observe(host);
+    // A zoom change moves the pixel ratio, and only sometimes the host's size:
+    // a host sized by layout shrinks in CSS pixels and the observer reports it,
+    // but one with a fixed CSS size keeps every number the observer watches and
+    // is left drawing at the wrong ratio. The window resize event fires on a
+    // zoom change either way (measured in the app's own webview), so it is the
+    // signal, and the ratio check keeps a plain window resize from doing the
+    // work twice.
+    const onWindowResize = () => {
+      if (drawingPixelRatio() !== ratio) resize();
+    };
+    window.addEventListener("resize", onWindowResize);
     // A texture the view is already drawing with is a change like any other,
     // and the only one three does not report to whoever is drawing.
     const stopWatchingTextures = onTextureArrived(render);
@@ -104,6 +123,7 @@ export function useCanvas3D(
       // texture that already has it (issue #1740).
       renderer.render = () => {};
       stopWatchingTextures();
+      window.removeEventListener("resize", onWindowResize);
       observer.disconnect();
       scene?.dispose();
       renderer.dispose();
