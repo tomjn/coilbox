@@ -7,6 +7,7 @@ import {
   paintTeamColour,
   TEAM_COLOUR,
 } from "./springTexture";
+import { textureArrived } from "./textureArrival";
 
 /**
  * The markers three's own fragment shader carries, in the order it carries
@@ -178,6 +179,54 @@ describe("cutOutHiddenPixels", () => {
     expect(fragmentShader.indexOf("mix(diffuseColor.rgb")).toBeLessThan(
       fragmentShader.indexOf("texture2D( alphaMap"),
     );
+  });
+
+  /**
+   * A mask that never arrives is not a mask of nothing: an empty texture samples
+   * as zero, so leaving it in place masks off the whole model. Measured on a
+   * plain white quad in the running app: 0 painted pixels of 4096.
+   *
+   * The `.tif` Basically OTA paints `CORE_T1_BOT_Crasher` with is the real case.
+   * macOS's webview decodes it and the other two platforms do not.
+   */
+  it("draws the model whole when the loader gives up on the mask", () => {
+    const material = new THREE.MeshStandardMaterial();
+    const mask = new THREE.Texture();
+    cutOutHiddenPixels(material, mask);
+    expect(material.alphaMap).toBe(mask);
+
+    mask.userData.springTextureFailed = true;
+    textureArrived();
+
+    expect(material.alphaMap).toBeNull();
+    expect(material.alphaTest).toBe(0);
+    expect(compile(material).fragmentShader).toContain(
+      "#include <alphamap_fragment>",
+    );
+  });
+
+  /** Already given up on by the time the material is built, which is what a
+   *  second unit sharing one failed texture sees. */
+  it("never puts a mask on when the loader has already given up", () => {
+    const material = new THREE.MeshStandardMaterial();
+    const mask = new THREE.Texture();
+    mask.userData.springTextureFailed = true;
+    cutOutHiddenPixels(material, mask);
+    expect(material.alphaMap).toBeNull();
+    expect(material.alphaTest).toBe(0);
+  });
+
+  /** A mask that arrives is a mask that stays. */
+  it("keeps the mask once the texture has its pixels", () => {
+    const material = new THREE.MeshStandardMaterial();
+    const mask = new THREE.Texture();
+    cutOutHiddenPixels(material, mask);
+
+    mask.image = { width: 64, height: 64 };
+    textureArrived();
+
+    expect(material.alphaMap).toBe(mask);
+    expect(material.alphaTest).toBe(CUT_OUT_ALPHA);
   });
 
   /** Two different patches are two different programs. */
