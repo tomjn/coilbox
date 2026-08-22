@@ -59,6 +59,13 @@ const legoPlugin: FramePlugin = {
       crumb: "Lego Parts",
     },
     {
+      // Before the unit route so the two are read in the order they are
+      // written, though a static segment outranks a dynamic one either way.
+      path: "lego/open",
+      lazy: gateAdvanced(() => import("./pages/OpenFromArchivePage")),
+      crumb: "Open a model",
+    },
+    {
       path: "lego/:id",
       lazy: gateAdvanced(() => import("./pages/BuilderPage")),
       crumb: "Unit",

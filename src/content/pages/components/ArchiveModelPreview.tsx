@@ -9,6 +9,11 @@
  * copied out of the archive into the cache the asset protocol serves.
  */
 
+import { Button } from "@picoframe/frame";
+import { Blocks } from "lucide-react";
+import { useNavigate } from "react-router";
+
+import { builderOpenUrl } from "@/lego/archiveOpen";
 import {
   MODEL_PREVIEW_CAP,
   type ModelFormat,
@@ -24,6 +29,7 @@ export function ArchiveModelPreview({
   enginePath,
   dataDir,
   archive,
+  archiveLabel,
   path,
   format,
   size,
@@ -31,12 +37,16 @@ export function ArchiveModelPreview({
   enginePath?: string;
   dataDir?: string;
   archive: string;
+  /** The game or map behind the archive's file name, for the builder to file an
+   *  opened unit under. */
+  archiveLabel?: string;
   /** The member's path inside `archive`, which is what gets read. */
   path: string;
   format: ModelFormat;
   /** The member's size, when the preview read reported one. */
   size?: number;
 }) {
+  const navigate = useNavigate();
   // A model past the cap is never asked for: the read comes back as one JSON
   // message of floats, so a file that big would stall the window rather than
   // draw late.
@@ -104,6 +114,37 @@ export function ArchiveModelPreview({
             .join(", ") || "none"}
         </dd>
       </dl>
+      <div className="flex shrink-0 items-center gap-3 border-t border-border/50 px-3 py-2">
+        {format === "s3o" ? (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() =>
+                navigate(
+                  builderOpenUrl({
+                    archive,
+                    member: path,
+                    ...(archiveLabel ? { name: archiveLabel } : {}),
+                  }),
+                )
+              }
+            >
+              <Blocks className="size-3.5" /> Open in the builder
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Takes its own copy of the geometry and texture, so updating{" "}
+              {archive} later cannot change the unit.
+            </span>
+          </>
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            The builder reads <code>.s3o</code> alone, so this one can be looked
+            at here but not opened.
+          </span>
+        )}
+      </div>
       <ModelNotes model={model} archive={archive} />
     </div>
   );

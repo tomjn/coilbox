@@ -70,37 +70,75 @@ export function modelSource(picked: PickedModel): string {
  * The archive member holding the texture a model's header names, if it holds
  * one.
  *
- * The same rules `find_beside_model` applies to a folder: the header's name is
- * reduced to its file name, matched against `unittextures/` without regard to
- * case, and failing that matched by stem against the other image extensions,
- * because a model asking for a `.dds` is routinely shipped a `.png`.
+ * The same rules `find_beside_model` applies to a folder, in the same order:
+ * walk up from the model looking for a `unittextures/`, then fall back to the
+ * model's own folder. The header's name is reduced to its file name, matched
+ * without regard to case, and failing that matched by stem against the other
+ * image extensions, because a model asking for a `.dds` is routinely shipped a
+ * `.png`.
+ *
+ * The walk and the fallback are what a map needs. A game keeps its textures in
+ * one `unittextures/` at the top, but a map's feature models routinely carry
+ * their texture beside them in `objects3d/`, and looking only at the top would
+ * unpack a feature untextured.
  */
 export function textureMember(
   files: ArchiveFileEntry[],
   name: string,
+  /** The model's own member path, which the search starts from. */
+  member: string,
 ): string | null {
   const want = name.trim().replace(/\\/g, "/").split("/").at(-1)?.toLowerCase();
   if (!want) return null;
 
-  const beside = new Map<string, string>();
+  /** Every member by folder, lower cased, so a folder can be searched at all. */
+  const byFolder = new Map<string, Map<string, string>>();
   for (const file of files) {
     const path = file.path.replace(/\\/g, "/");
-    const lower = path.toLowerCase();
-    if (!lower.startsWith("unittextures/")) continue;
-    const rest = lower.slice("unittextures/".length);
-    // Only a direct child, which is all the loose walk looks at.
-    if (rest.includes("/")) continue;
-    if (!beside.has(rest)) beside.set(rest, path);
+    const cut = path.lastIndexOf("/");
+    const folder = cut === -1 ? "" : path.slice(0, cut + 1).toLowerCase();
+    const base = path.slice(cut + 1).toLowerCase();
+    let here = byFolder.get(folder);
+    if (!here) {
+      here = new Map();
+      byFolder.set(folder, here);
+    }
+    if (!here.has(base)) here.set(base, path);
   }
 
-  const exact = beside.get(want);
-  if (exact) return exact;
   const stem = want.includes(".") ? want.slice(0, want.lastIndexOf(".")) : want;
-  for (const ext of TEXTURE_EXTS) {
-    const hit = beside.get(`${stem}.${ext}`);
-    if (hit) return hit;
+  for (const folder of searchFolders(member)) {
+    const here = byFolder.get(folder);
+    if (!here) continue;
+    const exact = here.get(want);
+    if (exact) return exact;
+    for (const ext of TEXTURE_EXTS) {
+      const hit = here.get(`${stem}.${ext}`);
+      if (hit) return hit;
+    }
   }
   return null;
+}
+
+/**
+ * The folders a model's texture is looked for in, nearest first.
+ *
+ * Every `unittextures/` from the model's own folder up to the archive's root,
+ * then the model's folder itself. Lower cased, with a trailing slash, so it can
+ * be compared against a member's folder directly.
+ */
+function searchFolders(member: string): string[] {
+  const parts = member
+    .replace(/\\/g, "/")
+    .toLowerCase()
+    .split("/")
+    .slice(0, -1);
+  const folders: string[] = [];
+  for (let depth = parts.length; depth >= 0; depth -= 1) {
+    folders.push([...parts.slice(0, depth), "unittextures", ""].join("/"));
+  }
+  folders.push(parts.length === 0 ? "" : `${parts.join("/")}/`);
+  return folders;
 }
 
 /**
@@ -155,7 +193,7 @@ export async function stageTextures(
   if (!staged.staged) return;
   const done = new Set<string>();
   for (const name of names) {
-    const member = textureMember(files, name);
+    const member = textureMember(files, name, picked.member);
     if (!member || done.has(member)) continue;
     done.add(member);
     const dest = await join(

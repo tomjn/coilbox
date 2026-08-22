@@ -149,6 +149,24 @@ export function gameModelRows(input: {
 }
 
 /**
+ * The project one model is already open as, if it is open as one.
+ *
+ * The same test the picker's rows are marked with, asked about a single member,
+ * so a second route into the builder offers the unit that exists rather than
+ * quietly making a copy of it.
+ */
+export function openedProjectFor(input: {
+  projects: LegoProject[];
+  archive: string;
+  archivePath?: string;
+  member: string;
+}): string | undefined {
+  return openedProjects(input.projects, input.archive, input.archivePath).get(
+    modelKey(input.member),
+  );
+}
+
+/**
  * Which of this game's models are already open as a project, by model key.
  *
  * A unit opened through the picker says which archive and member it came from,
