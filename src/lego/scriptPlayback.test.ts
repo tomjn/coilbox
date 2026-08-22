@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  clampFrame,
   frameAt,
   hiddenAt,
   PREVIEW_FRAMES,
@@ -90,6 +91,24 @@ describe("hiddenAt", () => {
     });
     expect(hiddenAt(played, 0, 1)).toBe(true);
     expect(hiddenAt(played, 1, 1)).toBe(false);
+  });
+});
+
+describe("clampFrame", () => {
+  it("leaves a frame that is already in range alone", () => {
+    expect(clampFrame(timeline(), 1)).toBe(1);
+  });
+
+  it("pulls a frame before the start up to the first frame", () => {
+    expect(clampFrame(timeline(), -4)).toBe(0);
+  });
+
+  it("pulls a frame past the end back to the last frame", () => {
+    expect(clampFrame(timeline(), 99)).toBe(2);
+  });
+
+  it("has nowhere to land in a timeline with no frames", () => {
+    expect(clampFrame(timeline({ frames: [] }), 5)).toBe(0);
   });
 });
 
