@@ -25,20 +25,30 @@
  *
  * A watcher would notice the edit on its own and is more machinery than this
  * needs. A button is honest and cheap, and can grow into a watcher later.
+ *
+ * Refresh is also the fix for a unit imported before issue #1909, whose stored
+ * texture had its team-colour mask cut out of it on the way in. Nothing here
+ * refreshes such a unit on its own: rewriting somebody's document the moment
+ * they open it is a bigger promise than a button, and it is a promise this
+ * cannot keep for the units that came out of a packed archive anyway. So it says
+ * what happened and leaves the click to the user (#1912). See `textureMask.ts`.
  */
 
 import { Button } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Image, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { Image, RefreshCw, TriangleAlert } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { legoTextureUrl } from "@/lib/assetUrl";
+import { textureHasAlpha } from "@/lib/textureAlpha";
 import { legoTextureImport } from "../../bindings";
 import type { LegoImported, LegoTexture } from "../../model";
+import { maskLoss, maskLossNote } from "../../textureMask";
 
 /** Which of the two textures a control is about. */
 type Slot = "texture" | "texture2";
@@ -55,6 +65,7 @@ export function TexturePicker({ imported, onChange }: Props) {
 
   const label =
     imported.texture?.name ?? imported.missingTexture ?? "no texture";
+  const note = maskLossNote(maskLoss(imported.texture, useAlpha(imported)));
 
   /** Put a file in the store and point the unit at it. */
   async function take(slot: Slot, path: string) {
@@ -115,9 +126,25 @@ export function TexturePicker({ imported, onChange }: Props) {
             variant="ghost"
             size="sm"
             className="h-5 max-w-40 justify-start gap-1 px-1 text-xs font-normal"
+            // The unit is visibly missing its markings and nothing else on this
+            // screen says why, so the warning rides on the control that opens
+            // the sentence explaining it.
+            {...(note ? { title: note } : {})}
           >
             <Image size={12} className="shrink-0" />
             <span className="truncate">{label}</span>
+            {note ? (
+              <>
+                <TriangleAlert
+                  size={12}
+                  aria-hidden
+                  className="shrink-0 text-amber-500"
+                />
+                <span className="sr-only">
+                  This unit's team-colour mask is missing
+                </span>
+              </>
+            ) : null}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80">
@@ -127,6 +154,7 @@ export function TexturePicker({ imported, onChange }: Props) {
               hint="What this unit is painted with. Its UV map points onto this image, so a different one is a different look rather than a remap."
               texture={imported.texture}
               missing={imported.missingTexture}
+              note={note}
               busy={busy === "texture"}
               onChoose={() => void choose("texture")}
               onRefresh={() => void refresh("texture")}
@@ -161,12 +189,41 @@ export function TexturePicker({ imported, onChange }: Props) {
   );
 }
 
+/**
+ * Whether the stored file this unit is painted with carries an alpha channel.
+ *
+ * Keyed on the store key, so refreshing a texture asks again about the new bytes
+ * and nothing asks twice about the same ones. 128 bytes over a range request,
+ * which is what makes it cheap enough to do on every open: see `textureAlpha.ts`.
+ */
+function useAlpha(imported: LegoImported): boolean | undefined {
+  const key = imported.texture?.key;
+  const [alpha, setAlpha] = useState<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    if (!key) {
+      setAlpha(undefined);
+      return;
+    }
+    let live = true;
+    void textureHasAlpha(legoTextureUrl(key)).then((has) => {
+      if (live) setAlpha(has);
+    });
+    return () => {
+      live = false;
+    };
+  }, [key]);
+
+  return alpha;
+}
+
 /** One of the two textures: what it is, where it came from, and what to do. */
 function TextureSlot({
   title,
   hint,
   texture,
   missing,
+  note,
   busy,
   onChoose,
   onRefresh,
@@ -175,6 +232,8 @@ function TextureSlot({
   hint: string;
   texture: LegoTexture | undefined;
   missing: string | undefined;
+  /** Something wrong with the stored file itself, as against with finding it. */
+  note?: string | null;
   busy: boolean;
   onChoose: () => void;
   onRefresh: () => void;
@@ -205,6 +264,12 @@ function TextureSlot({
             : "The model names none."}
         </p>
       )}
+      {note ? (
+        <p className="flex gap-1.5 text-xs text-amber-600 dark:text-amber-500">
+          <TriangleAlert size={14} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{note}</span>
+        </p>
+      ) : null}
       <div className="flex items-center gap-2">
         <Button variant="outline" size="sm" disabled={busy} onClick={onChoose}>
           {texture ? "Change" : "Choose"}
