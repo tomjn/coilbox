@@ -100,6 +100,13 @@ export interface LegoPieceCollision {
  * called where it came from, which is what the model header names and what an
  * export writes it back out as. `source` is where it was read from, which is
  * what refreshing it re-reads.
+ *
+ * `source` is absent whenever there is no file to go back to. A model unpacked
+ * out of a packed archive is read out of a temp folder the operating system
+ * reclaims, so a path recorded against one points at nothing an hour later
+ * (#1903). Refresh is off in that case and says to choose a file, which is the
+ * honest answer: coilbox already has its own copy, and the archive never held a
+ * path to hand back.
  */
 export interface LegoTexture {
   key: string;
@@ -127,6 +134,18 @@ export interface LegoTexture {
  * game's name back out of a path is guesswork, so this is the field anything
  * grouping units by game reads first (#1819).
  */
+/**
+ * Whether a game archive is a loose folder, so what it names are real files.
+ *
+ * A `.sdd` is a directory: its models and textures are on disk under their own
+ * paths, and an import reads them where they lie. Every other kind holds its
+ * members with no path to them, so an import has to unpack what it wants into a
+ * temp folder first, and nothing it read is still there afterwards.
+ */
+export function isLooseArchive(archive: string): boolean {
+  return archive.toLowerCase().endsWith(".sdd");
+}
+
 export interface LegoImportedGame {
   /** The game's name as unitsync reports it, which is what a list shows. */
   name: string;
@@ -654,9 +673,15 @@ function parseImported(value: unknown): LegoImported | null {
   const v = value as Record<string, unknown>;
   if (typeof v.source !== "string") return null;
 
-  const texture = parseTexture(v.texture);
-  const teamMask = parseTexture(v.teamMask);
   const game = parseImportedGame(v.game);
+  // A model out of a packed archive was read from a temp folder that is long
+  // gone, so a source recorded against one is a path to nothing (#1903). The
+  // import stopped writing them, and this is for the documents that already
+  // have one: without it those units go on offering a Refresh that can only
+  // fail.
+  const packed = game !== null && !isLooseArchive(game.archive);
+  const texture = parseTexture(v.texture, packed);
+  const teamMask = parseTexture(v.teamMask, packed);
   return {
     source: v.source,
     ...(game ? { game } : {}),
@@ -700,7 +725,8 @@ function parseImportedGame(value: unknown): LegoImportedGame | null {
   };
 }
 
-function parseTexture(value: unknown): LegoTexture | null {
+/** One stored texture. `packed` drops the source, for the reason above. */
+function parseTexture(value: unknown, packed: boolean): LegoTexture | null {
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
   if (typeof v.key !== "string" || v.key === "") return null;
@@ -708,7 +734,7 @@ function parseTexture(value: unknown): LegoTexture | null {
   return {
     key: v.key,
     name: v.name,
-    ...(typeof v.source === "string" ? { source: v.source } : {}),
+    ...(!packed && typeof v.source === "string" ? { source: v.source } : {}),
   };
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isLoose, modelSource, textureMember } from "./gameImport";
+import { modelSource, textureMember } from "./gameImport";
 
 const files = [
   { path: "unittextures/ARMCOM.png", size: 1 },
@@ -9,14 +9,6 @@ const files = [
   { path: "objects3d/armcom.s3o", size: 1 },
   { path: "bitmaps/armcom.dds", size: 1 },
 ];
-
-describe("isLoose", () => {
-  it("is only a .sdd, whatever case it is written in", () => {
-    expect(isLoose("SplinterFaction.SDD")).toBe(true);
-    expect(isLoose("balanced_annihilation-v15.9.8.sdz")).toBe(false);
-    expect(isLoose("abc123.sdp")).toBe(false);
-  });
-});
 
 describe("modelSource", () => {
   it("is the archive's own path with the member on the end", () => {

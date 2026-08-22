@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   descendantIds,
   isEffectivelyHidden,
+  isLooseArchive,
   LEGO_SCHEMA_VERSION,
   type LegoPiece,
   type LegoProject,
@@ -42,6 +43,17 @@ function project(pieces: LegoPiece[], rootPieceId = "root"): LegoProject {
     pieces,
   };
 }
+
+describe("isLooseArchive", () => {
+  it("is only a .sdd, whatever case it is written in", () => {
+    expect(isLooseArchive("SplinterFaction.SDD")).toBe(true);
+    expect(isLooseArchive("balanced_annihilation-v15.9.8.sdz")).toBe(false);
+    expect(isLooseArchive("abc123.sdp")).toBe(false);
+    // A map's archive is named rather than spelled as a file, which is not a
+    // folder either.
+    expect(isLooseArchive("Ancient Vault v1.4")).toBe(false);
+  });
+});
 
 describe("normalisePieceName", () => {
   it("produces something a unit script can use as a local", () => {
@@ -410,6 +422,85 @@ describe("parseLegoProjectJson", () => {
     expect(
       parseLegoProjectJson(JSON.stringify(doc))?.imported?.game?.archive,
     ).toBe("Game.sdd");
+  });
+
+  it("drops the texture source of a unit that came out of a packed archive", () => {
+    // Saved before the import stopped recording one. The path is a temp folder
+    // that has long since gone, so a Refresh against it can only fail (#1903).
+    const doc = {
+      ...project([piece("root", null)]),
+      imported: {
+        source: "/games/game.sdz/objects3d/armcom.s3o",
+        game: {
+          name: "Some Game",
+          archive: "game.sdz",
+          member: "objects3d/armcom.s3o",
+        },
+        texture: {
+          key: "aa11.dds",
+          name: "Beacon_1.dds",
+          source: "/tmp/coilbox-lego-model-1/unittextures/Beacon_1.dds",
+        },
+        teamMask: {
+          key: "bb22.dds",
+          name: "Beacon_2.dds",
+          source: "/tmp/coilbox-lego-model-1/unittextures/Beacon_2.dds",
+        },
+      },
+    };
+
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+
+    expect(parsed?.imported?.texture).toEqual({
+      key: "aa11.dds",
+      name: "Beacon_1.dds",
+    });
+    expect(parsed?.imported?.teamMask?.source).toBeUndefined();
+  });
+
+  it("keeps the texture source of a unit out of a loose game folder", () => {
+    // A `.sdd` is a folder, so the file it named is still that file.
+    const doc = {
+      ...project([piece("root", null)]),
+      imported: {
+        source: "/games/Game.sdd/objects3d/armcom.s3o",
+        game: {
+          name: "Some Game",
+          archive: "Game.sdd",
+          member: "objects3d/armcom.s3o",
+        },
+        texture: {
+          key: "aa11.dds",
+          name: "Beacon_1.dds",
+          source: "/games/Game.sdd/unittextures/Beacon_1.dds",
+        },
+      },
+    };
+
+    const parsed = parseLegoProjectJson(JSON.stringify(doc));
+
+    expect(parsed?.imported?.texture?.source).toBe(
+      "/games/Game.sdd/unittextures/Beacon_1.dds",
+    );
+  });
+
+  it("keeps the texture source of a model chosen with the file dialog", () => {
+    // No game recorded at all, so the path is one somebody pointed at.
+    const doc = {
+      ...project([piece("root", null)]),
+      imported: {
+        source: "/home/me/Beacon.s3o",
+        texture: {
+          key: "aa11.dds",
+          name: "Beacon_1.dds",
+          source: "/home/me/unittextures/Beacon_1.dds",
+        },
+      },
+    };
+
+    expect(
+      parseLegoProjectJson(JSON.stringify(doc))?.imported?.texture?.source,
+    ).toBe("/home/me/unittextures/Beacon_1.dds");
   });
 
   it("keeps an imported unit when one of its textures will not parse", () => {

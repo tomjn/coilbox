@@ -18,6 +18,11 @@
  * the webview has nothing stale behind the old URL. Nothing else moves: the
  * geometry, the camera and the selection are all left where they were.
  *
+ * A unit out of a packed game or map has no such file. The import unpacked its
+ * texture out of the archive to read it, and an archive holds no path to hand
+ * back, so there is nothing to re-read and Refresh is off until a file is
+ * chosen (#1903).
+ *
  * A watcher would notice the edit on its own and is more machinery than this
  * needs. A button is honest and cheap, and can grow into a watcher later.
  */
@@ -185,7 +190,13 @@ function TextureSlot({
             <p className="break-all text-xs text-muted-foreground">
               from {texture.source}
             </p>
-          ) : null}
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Coilbox has its own copy and there is no file behind it to
+              re-read, which is what a model out of a packed game or map leaves
+              you with. Choose one, and refresh picks up edits to it after that.
+            </p>
+          )}
         </>
       ) : (
         <p className="text-xs text-muted-foreground">

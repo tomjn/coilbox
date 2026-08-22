@@ -67,6 +67,11 @@ export function projectFromImport(
      *  game rather than off disk. Recorded here because this is the only moment
      *  anything knows it (#1819). */
     game?: LegoImportedGame;
+    /** Whether the model was unpacked out of a packed archive into a temp
+     *  folder, which is where its textures were read from too. Their paths go
+     *  with the folder when the operating system reclaims it, so none is
+     *  recorded: see {@link LegoTexture} (#1903). */
+    unpacked?: boolean;
     name: string;
     unitName: string;
     packId: string;
@@ -101,11 +106,17 @@ export function projectFromImport(
   };
   const rootPieceId = visit(result.root, null);
 
+  const keepSource = !options.unpacked;
   const imported: LegoImported = {
     source: options.source,
     ...(options.game ? { game: options.game } : {}),
-    ...textureFields("texture", "missingTexture", result.texture),
-    ...textureFields("teamMask", "missingTeamMask", result.teamMask),
+    ...textureFields("texture", "missingTexture", result.texture, keepSource),
+    ...textureFields(
+      "teamMask",
+      "missingTeamMask",
+      result.teamMask,
+      keepSource,
+    ),
   };
 
   return {
@@ -144,9 +155,16 @@ function textureFields(
   found: "texture" | "teamMask",
   missing: "missingTexture" | "missingTeamMask",
   texture: ImportedTexture,
+  /** Whether the path it was read from is a real file somebody can go on
+   *  editing, rather than a temp copy of one. */
+  keepSource: boolean,
 ): Partial<LegoImported> {
   if (texture.key) {
-    return { [found]: storedTexture(texture) } as Partial<LegoImported>;
+    return {
+      [found]: storedTexture(
+        keepSource ? texture : { ...texture, source: null },
+      ),
+    } as Partial<LegoImported>;
   }
   if (texture.name.trim() === "") return {};
   return { [missing]: texture.name } as Partial<LegoImported>;
