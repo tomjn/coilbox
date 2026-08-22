@@ -25,7 +25,7 @@ use std::rc::Rc;
 
 /// Salts the texture cache file names. Bump when the naming scheme changes so
 /// stale files are never picked up under a new meaning.
-const CACHE_VERSION: u32 = 1;
+const CACHE_VERSION: u32 = 2;
 
 /// Models are a few megabytes at most: the largest in the games checked is a
 /// 3.2 MiB `.s3o`. Bound the read anyway.
@@ -388,9 +388,10 @@ fn build(path: &str, bytes: &[u8]) -> UnitModelOutput {
 // ---------------------------------------------------------------- s3o
 
 /// Flatten an `.s3o`. One texture for the whole model, so every piece with
-/// geometry gets a single batch naming it. `texture2` is not drawn: its red
-/// channel is the team-colour mask, which the viewer needs because the regions
-/// it marks are black in `texture1`.
+/// geometry gets a single batch naming it. `texture2` is named but not drawn:
+/// the engine reads its red as self-illumination, its green as reflectivity and
+/// its alpha as whether a pixel is drawn, none of which the viewer does. The
+/// team-colour mask is the alpha of `texture1`.
 fn from_s3o(path: &str, model: &coilbox_s3o::Model) -> UnitModelOutput {
     let texture = (!model.texture1.is_empty()).then(|| model.texture1.clone());
     let mask = (!model.texture2.is_empty()).then(|| ModelTexture {
@@ -652,7 +653,7 @@ fn resolve_texture(
         return;
     };
     let _ = std::fs::create_dir_all(dir);
-    let payload = to_webview_format(ext, &bytes);
+    let payload = to_webview_format(ext, &bytes, format == "s3o");
     if std::fs::write(&dest, payload.as_deref().unwrap_or(&bytes)).is_ok() {
         tex.file = file;
     }
@@ -665,25 +666,29 @@ fn resolve_texture(
 /// respectively in Balanced Annihilation, and a webview will render neither.
 /// `.pcx` joins them as the third format of that era, rarer on a model than on a
 /// build pic but read by the same engine loader. The archive preview already
-/// transcodes `.tga` and `.pcx` to PNG for the same reason. Alpha is dropped
-/// along with it, on the same grounds preview states for `.tga`: Spring's unit
-/// textures use it as a team-colour or specular mask rather than as
-/// transparency, so honouring it renders half a unit invisible. Preview keeps a
-/// `.pcx`'s alpha because it is showing a picture, not a texture.
+/// transcodes `.tga` and `.pcx` to PNG for the same reason.
+///
+/// `keep_alpha` is whether the model is an `.s3o`, and it decides whether the
+/// alpha channel survives. An `.s3o`'s first texture keeps the team-colour mask
+/// there, so dropping it paints the whole unit in the player's colour. A `.3do`
+/// keeps reflectivity there, which the engine moves into the second texture's
+/// green and coilbox does not draw at all, so it goes.
 ///
 /// Everything else passes through. `.dds` above all, because decoding a shared
 /// 8192 square atlas would cost 256 MiB for one texture and the webview can
 /// upload it compressed.
-fn to_webview_format(ext: &str, bytes: &[u8]) -> Option<Vec<u8>> {
+fn to_webview_format(ext: &str, bytes: &[u8], keep_alpha: bool) -> Option<Vec<u8>> {
     if !matches!(ext, "bmp" | "tga" | "pcx") {
         return None;
     }
     let img = crate::texture::decode_texture(ext, bytes)?;
-    let rgb = image::DynamicImage::ImageRgba8(img).to_rgb8();
+    let img = if keep_alpha {
+        image::DynamicImage::ImageRgba8(img)
+    } else {
+        image::DynamicImage::ImageRgb8(image::DynamicImage::ImageRgba8(img).to_rgb8())
+    };
     let mut png = std::io::Cursor::new(Vec::new());
-    image::DynamicImage::ImageRgb8(rgb)
-        .write_to(&mut png, image::ImageFormat::Png)
-        .ok()?;
+    img.write_to(&mut png, image::ImageFormat::Png).ok()?;
     Some(png.into_inner())
 }
 
@@ -1005,13 +1010,49 @@ mod tests {
     /// all must reach the GPU still compressed.
     #[test]
     fn only_the_legacy_formats_are_transcoded() {
-        assert!(to_webview_format("dds", b"not really a dds").is_none());
-        assert!(to_webview_format("png", b"not really a png").is_none());
-        assert!(to_webview_format("jpg", b"not really a jpeg").is_none());
+        assert!(to_webview_format("dds", b"not really a dds", true).is_none());
+        assert!(to_webview_format("png", b"not really a png", true).is_none());
+        assert!(to_webview_format("jpg", b"not really a jpeg", true).is_none());
         // Undecodable bytes fall through to being written as they are, rather
         // than the texture going missing.
-        assert!(to_webview_format("bmp", b"not really a bmp").is_none());
-        assert!(to_webview_format("pcx", b"not really a pcx").is_none());
+        assert!(to_webview_format("bmp", b"not really a bmp", true).is_none());
+        assert!(to_webview_format("pcx", b"not really a pcx", true).is_none());
+    }
+
+    /// One 2 by 1 uncompressed 32-bit TGA: an opaque red pixel and a
+    /// transparent green one. Written bottom-up, which is what the games ship.
+    fn tga_rgba() -> Vec<u8> {
+        let mut raw = vec![0u8; 18];
+        raw[2] = 2; // uncompressed true colour
+        raw[12] = 2; // width
+        raw[14] = 1; // height
+        raw[16] = 32; // bits a pixel
+        raw[17] = 8; // eight alpha bits
+        raw.extend_from_slice(&[0, 0, 0xff, 0xff]); // BGRA: opaque red
+        raw.extend_from_slice(&[0, 0xff, 0, 0x00]); // BGRA: transparent green
+        raw
+    }
+
+    /// The team-colour mask an `.s3o` keeps in its first texture's alpha, which
+    /// is the whole reason a unit has markings rather than being painted in the
+    /// player's colour from end to end.
+    #[test]
+    fn an_s3o_texture_keeps_its_alpha_through_the_transcode() {
+        let png = to_webview_format("tga", &tga_rgba(), true).expect("a tga is transcoded");
+        let img = image::load_from_memory(&png).expect("the output is a png");
+        assert_eq!(img.color(), image::ColorType::Rgba8);
+        let rgba = img.to_rgba8();
+        assert_eq!(rgba.get_pixel(0, 0).0, [0xff, 0, 0, 0xff]);
+        assert_eq!(rgba.get_pixel(1, 0).0, [0, 0xff, 0, 0x00]);
+    }
+
+    /// A `.3do` keeps reflectivity in the same channel, and coilbox draws no
+    /// reflections, so the alpha is dead weight on every legacy game's atlas.
+    #[test]
+    fn a_3do_texture_drops_its_alpha() {
+        let png = to_webview_format("tga", &tga_rgba(), false).expect("a tga is transcoded");
+        let img = image::load_from_memory(&png).expect("the output is a png");
+        assert_eq!(img.color(), image::ColorType::Rgb8);
     }
 
     /// A `.pcx` model texture is the third format of the legacy era, and a
@@ -1029,7 +1070,7 @@ mod tests {
         raw[66] = 1;
         raw.extend_from_slice(&[0xc1, 0xff, 0x00, 0x00]);
 
-        let png = to_webview_format("pcx", &raw).expect("a pcx is transcoded");
+        let png = to_webview_format("pcx", &raw, false).expect("a pcx is transcoded");
         let img = image::load_from_memory(&png).expect("the output is a png");
         assert_eq!(img.to_rgba8().get_pixel(0, 0).0, [0xff, 0, 0, 255]);
     }

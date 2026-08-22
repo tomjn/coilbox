@@ -175,9 +175,10 @@ fn extension(path: &Path) -> String {
 ///
 /// The same rule the unit-model viewer applies (`to_webview_format` in
 /// `crates/coilbox-unitsync-worker/src/unitmodel.rs`), for the same reason and
-/// with the same limits. Alpha goes with the conversion: Spring's unit textures
-/// use it as a team-colour or specular mask rather than as transparency, so
-/// honouring it renders half a unit invisible.
+/// with the same limits. Alpha survives it, because everything in this store
+/// belongs to an `.s3o` and an `.s3o`'s first texture keeps the team-colour mask
+/// there. It is not transparency and is never drawn as any: three's own
+/// `opaque_fragment` sets it back to 1 on the way out.
 fn to_webview_format(ext: &str, bytes: &[u8]) -> Option<Vec<u8>> {
     let format = match ext {
         "bmp" => image::ImageFormat::Bmp,
@@ -186,7 +187,7 @@ fn to_webview_format(ext: &str, bytes: &[u8]) -> Option<Vec<u8>> {
     };
     let img = image::load_from_memory_with_format(bytes, format).ok()?;
     let mut png = std::io::Cursor::new(Vec::new());
-    image::DynamicImage::ImageRgb8(img.to_rgb8())
+    image::DynamicImage::ImageRgba8(img.to_rgba8())
         .write_to(&mut png, image::ImageFormat::Png)
         .ok()?;
     Some(png.into_inner())
@@ -350,6 +351,31 @@ mod tests {
 
         assert!(stored.key.ends_with(".png"), "got: {}", stored.key);
         assert_eq!(stored.name, "skin.bmp");
+    }
+
+    /// The team-colour mask lives in this texture's alpha, so a transcode that
+    /// dropped it would paint the whole unit in the player's colour.
+    #[test]
+    fn a_tga_keeps_its_alpha_because_that_is_the_team_colour_mask() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("skin.tga");
+        let mut img = image::RgbaImage::from_pixel(2, 1, image::Rgba([9, 9, 9, 0]));
+        img.put_pixel(1, 0, image::Rgba([8, 8, 8, 255]));
+        let mut tga = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut tga, image::ImageFormat::Tga)
+            .expect("encode");
+        std::fs::write(&source, tga.into_inner()).expect("write");
+
+        let store_dir = dir.path().join("textures");
+        let stored = store(&store_dir, &source).expect("store");
+
+        let back =
+            image::load_from_memory(&std::fs::read(store_dir.join(&stored.key)).expect("read"))
+                .expect("decode")
+                .to_rgba8();
+        assert_eq!(back.get_pixel(0, 0).0[3], 0);
+        assert_eq!(back.get_pixel(1, 0).0[3], 255);
     }
 
     #[test]
