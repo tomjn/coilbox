@@ -191,6 +191,21 @@ pub fn build_unit_model_args(
     args
 }
 
+/// Build args for `--unit-script` mode: the game and one unit definition's key.
+///
+/// The unit's own key rather than its `objectname`, because a script is named by
+/// the definition and a model by a field inside it, and games regularly use
+/// different words for the two.
+pub fn build_unit_script_args(lib: &str, datadir: &str, game: &str, unit: &str) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.push("--unit-script".into());
+    args.push("--game".into());
+    args.push(game.into());
+    args.push("--unit".into());
+    args.push(unit.into());
+    args
+}
+
 /// Build args for `--unit-models` mode: the game, a file of `objectname`s, and
 /// the directory each flattened model and its textures are written into.
 ///

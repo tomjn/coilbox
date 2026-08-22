@@ -1316,6 +1316,44 @@ export const unitsyncUnitModel = defineCommand<
   UnitModelResult
 >("coilbox-unitsync", "unitsync_unit_model");
 
+/** One unit's animation script, as found in the game it came from. */
+export interface UnitScriptResult {
+  /** The archive member it was found at, or null when the game has none for
+   *  this unit. */
+  member: string | null;
+  /** `lua` or `cob`, or null when nothing was found. */
+  kind: "lua" | "cob" | null;
+  /** The source, for a Lua script. Null for a `.cob`, which is not text. */
+  text: string | null;
+  /** The bytes, for a `.cob`. Null for Lua. */
+  bytes: number[] | null;
+  /** What the unit definition asked for, found or not. A name that resolved to
+   *  nothing is the useful half of "this unit has no script here". */
+  declared: string | null;
+  errors: string[];
+}
+
+/**
+ * Find and read one unit's animation script inside a game's archive.
+ *
+ * `unit` is the unit definition's own key, not its `objectname`: a script is
+ * named by the definition and a model by a field inside it, and games regularly
+ * use different words for the two.
+ *
+ * The name a definition gives is resolved the way the unit script framework
+ * resolves it rather than as a path, so a game that moved to Lua while keeping
+ * the old `.cob` names in its definitions still resolves.
+ */
+export const unitsyncUnitScript = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    gameArchive: string;
+    unit: string;
+  },
+  UnitScriptResult
+>("coilbox-unitsync", "unitsync_unit_script");
+
 /**
  * One model of a batch: where the flattened model was written, rather than the
  * model itself (issue #1684).

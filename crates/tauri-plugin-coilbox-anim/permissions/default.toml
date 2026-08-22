@@ -2,4 +2,8 @@
 
 [default]
 description = "Allows the animation plugin's commands (COB disassembly and BOS->COB compilation)."
-permissions = ["allow-anim-cob-disasm", "allow-anim-bos2cob"]
+permissions = [
+  "allow-anim-cob-disasm",
+  "allow-anim-cob-disasm-bytes",
+  "allow-anim-bos2cob",
+]

@@ -33,6 +33,26 @@ export interface ScriptTimeline {
   warnings: string[];
 }
 
+/** What one call-in that answers with a piece said. */
+export interface ScriptProbe {
+  /** Key in the script's `script` table, such as `QueryNanoPiece`. */
+  callin: string;
+  /** The pieces it named, in call order and with repeats kept, because the
+   *  order is the cycle a multi-nozzle builder walks. */
+  pieces: string[];
+  /** Why it named nothing: no such call-in, a throw, or an answer that is not
+   *  a piece of this unit. */
+  note: string | null;
+}
+
+/** Every probe of one script, plus whatever stopped it loading at all. */
+export interface ScriptProbes {
+  pieces: string[];
+  probes: ScriptProbe[];
+  /** Set when nothing could be asked, in which case `probes` is empty. */
+  error: string | null;
+}
+
 /**
  * How long a preview runs before it loops.
  *

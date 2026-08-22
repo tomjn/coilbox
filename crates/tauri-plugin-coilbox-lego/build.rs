@@ -19,6 +19,7 @@ const COMMANDS: &[&str] = &[
     "lego_export_obj",
     "lego_scratch_game",
     "lego_run_script",
+    "lego_probe_script",
 ];
 
 fn main() {

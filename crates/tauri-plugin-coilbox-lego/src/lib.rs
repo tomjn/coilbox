@@ -1305,6 +1305,29 @@ fn lego_run_script(
     }
 }
 
+/// `lego_probe_script` asks a script which of its pieces do which job, by
+/// calling the call-ins that answer with a piece and reading what comes back.
+///
+/// Not a run and not a preview. The engine calls these for an answer rather
+/// than for an effect, so this calls them the same way: directly, with no
+/// frames passing and nothing animated.
+///
+/// A script that will not load, or that answers badly, is not an error here
+/// either. It comes back saying so, for the same reason `lego_run_script` does.
+#[tauri::command]
+fn lego_probe_script(
+    script: String,
+    unit_name: String,
+    pieces: Vec<String>,
+    callins: Vec<String>,
+) -> CliResult {
+    let probes = unitscript::probe(&script, &format!("{unit_name}.lua"), &pieces, &callins);
+    match serde_json::to_value(probes) {
+        Ok(value) => CliResult::ok(value),
+        Err(e) => CliResult::err(format!("could not report what the script named: {e}")),
+    }
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-lego")
         // An import writes its geometry before anyone says they want the unit,
@@ -1333,7 +1356,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_export_glb,
             lego_export_obj,
             lego_scratch_game,
-            lego_run_script
+            lego_run_script,
+            lego_probe_script
         ])
         .build()
 }

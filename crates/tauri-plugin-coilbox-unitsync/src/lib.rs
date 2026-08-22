@@ -21,8 +21,8 @@ use sidecar::{
     build_lua_repl_args, build_map_info_args, build_map_meta_args, build_map_skybox_args,
     build_metalmap_args, build_minimap_args, build_skirmish_ai_args, build_thumbnails_args,
     build_unit_buildpics_args, build_unit_dataset_args, build_unit_model_args,
-    build_unit_models_args, build_unit_render_args, build_unit_render_keys_args, find_unitsync,
-    resolve_sidecar, RenderSourceArgs,
+    build_unit_models_args, build_unit_render_args, build_unit_render_keys_args,
+    build_unit_script_args, find_unitsync, resolve_sidecar, RenderSourceArgs,
 };
 use std::collections::HashMap;
 use std::io::Read;
@@ -705,6 +705,32 @@ async fn unitsync_unit_model<R: Runtime>(
     Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit model", None).await)
 }
 
+/// `unitsync_unit_script`: find and read one unit's animation script inside a
+/// game's archive.
+///
+/// `unit` is the unit definition's own key. The script it names is resolved the
+/// way the unit script framework resolves it, which is not a plain path lookup:
+/// see `unitscriptfile` in the worker.
+///
+/// A Lua script comes back as text the builder can adopt. A `.cob` comes back
+/// as bytes, because it is compiled bytecode rather than something an export
+/// could write.
+#[tauri::command]
+async fn unitsync_unit_script(
+    engine_path: String,
+    data_dir: String,
+    game_archive: String,
+    unit: String,
+) -> Result<CliResult, ()> {
+    let (bin, libpath, engine_dir) = match prepare(&engine_path) {
+        Ok(v) => v,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let args = build_unit_script_args(&libpath.to_string_lossy(), &data_dir, &game_archive, &unit);
+    let envs = loader_envs(&engine_dir, &data_dir);
+    Ok(run_worker(bin, args, envs, SCAN_TIMEOUT, "unit script", None).await)
+}
+
 /// `unitsync_unit_models` reads a batch of units' models in one archive mount
 /// (issue #1684).
 ///
@@ -1367,6 +1393,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             unitsync_unit_dataset,
             unitsync_unit_model,
             unitsync_unit_models,
+            unitsync_unit_script,
             unitsync_unit_render,
             unitsync_unit_render_keys,
             unitsync_remember_render,

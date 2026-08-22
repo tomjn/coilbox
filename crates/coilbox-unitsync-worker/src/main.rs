@@ -41,6 +41,7 @@ mod typemap;
 mod unitmodel;
 mod unitmodels;
 mod unitrender;
+mod unitscriptfile;
 
 use ffi::Unitsync;
 use model::{Archive, ConfigOption, GameItem, MapItem, OptionListItem, ScanOutput};
@@ -117,6 +118,9 @@ struct Args {
     /// mount, named by the `objectname`s in `--units-file`, and write each into
     /// `--cache-dir`.
     unit_models: bool,
+    /// `--unit-script`: find and read `--unit`'s animation script inside
+    /// `--game`, following the unit script framework's own resolution order.
+    unit_script: bool,
     /// `--unit-render`: encode a top down render the webview drew as the hub's
     /// `render:<angle>` asset. Takes the pixels in `--pixels`, the frame in
     /// `--width`/`--height`/`--footprint-x`/`--footprint-z`, and the unit in
@@ -152,6 +156,10 @@ struct Args {
     /// Which renderer drew the pixels, for the render's `source_hash`.
     renderer_version: u32,
     object: Option<String>,
+    /// `--unit`: one unit definition's own key, for `--unit-script`. Not the
+    /// `objectname` the model reads: a script is named by the definition and a
+    /// model by the field inside it, and the two are often different words.
+    unit: Option<String>,
     units: Vec<String>,
     /// `--faction-logos`: resolve `Sidepics/<side>` emblems for `--game`, for the
     /// side names listed in `--sides` (comma-separated).
@@ -418,6 +426,27 @@ fn run() -> i32 {
             }
             Err(_) => {
                 unitmodel::emit_error("worker panicked while reading a unit model".into());
+                1
+            }
+        };
+    }
+
+    // Unit script: find and read one unit's animation script inside a game.
+    // Keys off --game like the model read above, and names the unit by its
+    // definition key rather than by a path, because the script name is a
+    // definition field the game may compute.
+    if args.unit_script {
+        let game_archive = args.game.clone().unwrap_or_default();
+        let unit = args.unit.clone().unwrap_or_default();
+        return match std::panic::catch_unwind(|| {
+            unitscriptfile::render(&args.lib, &game_archive, &unit)
+        }) {
+            Ok(out) => {
+                println!("{}", serde_json::to_string(&out).unwrap_or_default());
+                0
+            }
+            Err(_) => {
+                unitscriptfile::emit_error("worker panicked while reading a unit script".into());
                 1
             }
         };
@@ -947,6 +976,7 @@ fn parse_args() -> Result<Args, String> {
     let mut unit_buildpics = false;
     let mut unit_dataset = false;
     let mut unit_model = false;
+    let mut unit_script = false;
     let mut unit_models = false;
     let mut unit_render = false;
     let mut model_digest = None;
@@ -962,6 +992,7 @@ fn parse_args() -> Result<Args, String> {
     let mut footprint_z = 0u32;
     let mut renderer_version = 0u32;
     let mut object = None;
+    let mut unit = None;
     let mut units: Vec<String> = Vec::new();
     let mut faction_logos = false;
     let mut sides: Vec<String> = Vec::new();
@@ -1014,6 +1045,7 @@ fn parse_args() -> Result<Args, String> {
             "--unit-buildpics" => unit_buildpics = true,
             "--unit-dataset" => unit_dataset = true,
             "--unit-model" => unit_model = true,
+            "--unit-script" => unit_script = true,
             "--unit-models" => unit_models = true,
             "--unit-render" => unit_render = true,
             "--model-digest" => model_digest = it.next(),
@@ -1054,6 +1086,7 @@ fn parse_args() -> Result<Args, String> {
                     .ok_or("--renderer-version needs an integer")?
             }
             "--object" => object = it.next(),
+            "--unit" => unit = it.next(),
             "--units" => {
                 units = it
                     .next()
@@ -1119,6 +1152,7 @@ fn parse_args() -> Result<Args, String> {
         unit_buildpics,
         unit_dataset,
         unit_model,
+        unit_script,
         unit_models,
         unit_render,
         model_digest,
@@ -1134,6 +1168,7 @@ fn parse_args() -> Result<Args, String> {
         footprint_z,
         renderer_version,
         object,
+        unit,
         units,
         faction_logos,
         sides,
@@ -1560,6 +1595,8 @@ mod tests {
             footprint_z: 0,
             renderer_version: 0,
             object: None,
+            unit: None,
+            unit_script: false,
             units: Vec::new(),
             faction_logos: false,
             sides: Vec::new(),

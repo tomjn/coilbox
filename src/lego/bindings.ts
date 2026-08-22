@@ -2,7 +2,11 @@ import { defineCommand } from "@picoframe/plugin-sdk";
 
 import type { S3oModel } from "./importS3o";
 import type { S3oBuild } from "./s3oBuild";
-import type { ScriptEvent, ScriptTimeline } from "./scriptPlayback";
+import type {
+  ScriptEvent,
+  ScriptProbes,
+  ScriptTimeline,
+} from "./scriptPlayback";
 
 /**
  * Which atlas to place, where to read it from, and what to call it. The three
@@ -343,6 +347,28 @@ export const legoRunScript = defineCommand<
   },
   ScriptTimeline
 >("coilbox-lego", "lego_run_script");
+
+/**
+ * Ask a script which of its pieces do which job.
+ *
+ * Calls the call-ins that answer with a piece and reads what comes back, which
+ * is the script's own answer rather than something inferred from motion. Each
+ * is called several times, because a builder with more than one nozzle cycles
+ * them and a single call sees one of them.
+ *
+ * Not a run: nothing is animated and no frames pass. A script that will not
+ * load, or that answers badly, comes back saying so rather than throwing.
+ */
+export const legoProbeScript = defineCommand<
+  {
+    script: string;
+    unitName: string;
+    pieces: string[];
+    /** Call-in names, such as `QueryNanoPiece`. */
+    callins: string[];
+  },
+  ScriptProbes
+>("coilbox-lego", "lego_probe_script");
 
 /** Reveal an exported unit in the file manager. */
 export const legoOpenPath = defineCommand<
