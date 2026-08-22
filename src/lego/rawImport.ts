@@ -237,10 +237,17 @@ export function pngName(name: string): string {
   return dot > 0 ? `${file.slice(0, dot)}.png` : `${file}.png`;
 }
 
-/** A texture an export takes out of the store, under the name it writes it as. */
-export interface PlacedTexture {
+/**
+ * A texture a Blender export decodes out of the store.
+ *
+ * `role` is which of the `.s3o`'s two it is, which the Rust side needs because
+ * the two mean different things by their alpha channel and only one of them can
+ * go through a canvas unharmed.
+ */
+export interface BlenderTextureRef {
   key: string;
   writeAs: string;
+  role: "colour" | "mask";
 }
 
 /**
@@ -249,25 +256,30 @@ export interface PlacedTexture {
  * `colour` is the picture the unit is painted with, which is what a material
  * samples: embedded in the `.glb`, and named by the `.mtl`'s `map_Kd`.
  *
- * `mask` is not a colour map. It marks the regions the engine paints in the
- * player's colour, and neither glTF nor an `.mtl` has anywhere to put a picture
- * of measurements without claiming it is something it is not. So it goes into
- * the `blender` folder as a PNG of its own, next to whichever file was written,
- * for whoever opens it to wire up as they see fit.
+ * `mask` is not a colour map. Its channels are measurements the engine reads,
+ * the regions to paint in the player's colour among them, and neither glTF nor
+ * an `.mtl` has anywhere to put that without claiming it is a picture. So it
+ * goes into the `blender` folder as a PNG of its own, next to whichever file
+ * was written, for whoever opens it to wire up as they see fit.
  *
  * Either can be missing. A model naming a texture coilbox could not find has no
  * key to read, and a model with one texture and no mask is a perfectly ordinary
  * model.
  */
 export function blenderTextures(imported: LegoImported): {
-  colour: PlacedTexture | null;
-  mask: PlacedTexture | null;
+  colour: BlenderTextureRef | null;
+  mask: BlenderTextureRef | null;
 } {
-  const placed = (texture: LegoTexture | undefined): PlacedTexture | null =>
-    texture?.key ? { key: texture.key, writeAs: pngName(texture.name) } : null;
+  const placed = (
+    texture: LegoTexture | undefined,
+    role: "colour" | "mask",
+  ): BlenderTextureRef | null =>
+    texture?.key
+      ? { key: texture.key, writeAs: pngName(texture.name), role }
+      : null;
   return {
-    colour: placed(imported.texture),
-    mask: placed(imported.teamMask),
+    colour: placed(imported.texture, "colour"),
+    mask: placed(imported.teamMask, "mask"),
   };
 }
 

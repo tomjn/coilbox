@@ -216,8 +216,18 @@ describe("blenderTextures", () => {
 
     const out = blenderTextures(project.imported as never);
 
-    expect(out.colour).toEqual({ key: "aa11.dds", writeAs: "Beacon_1.png" });
-    expect(out.mask).toEqual({ key: "bb22.dds", writeAs: "Beacon_2.png" });
+    // The role travels with each: Rust reads it to decide what happens to the
+    // alpha channel, which the two textures mean different things by.
+    expect(out.colour).toEqual({
+      key: "aa11.dds",
+      writeAs: "Beacon_1.png",
+      role: "colour",
+    });
+    expect(out.mask).toEqual({
+      key: "bb22.dds",
+      writeAs: "Beacon_2.png",
+      role: "mask",
+    });
   });
 
   it("has nothing for a texture the import could not find", () => {

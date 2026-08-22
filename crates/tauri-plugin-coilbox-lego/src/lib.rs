@@ -744,7 +744,9 @@ async fn lego_texture_png<R: Runtime>(app: AppHandle<R>, key: String) -> CliResu
         Ok(path) => path,
         Err(e) => return CliResult::err(e),
     };
-    match texture::blender_png(&source) {
+    // Always the texture the unit is painted with: the `.glb` embeds that one
+    // and nothing else, because a glTF material has nowhere to put the other.
+    match texture::blender_png(&source, texture::TextureRole::Colour) {
         Ok(png) => CliResult::ok(json!({
             "dataUrl": coilbox_texture::png_data_url(&png.bytes),
             "width": png.width,
@@ -1029,6 +1031,19 @@ async fn lego_export<R: Runtime>(
     }))
 }
 
+/// A texture to decode into a Blender export's folder.
+///
+/// The role is what says whether the alpha channel survives, which is not a
+/// choice: an `.s3o`'s two textures mean different things by it. See
+/// [`texture::TextureRole`].
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BlenderTextureRef {
+    key: String,
+    write_as: String,
+    role: texture::TextureRole,
+}
+
 /// Decode stored textures and write them into a Blender export's folder.
 ///
 /// A PNG rather than the file the store holds, because that file is usually a
@@ -1041,7 +1056,7 @@ async fn lego_export<R: Runtime>(
 fn place_blender_textures<R: Runtime>(
     app: &AppHandle<R>,
     dir: &Path,
-    textures: &[StoredTextureRef],
+    textures: &[BlenderTextureRef],
 ) -> Result<Vec<serde_json::Value>, String> {
     if textures.is_empty() {
         return Ok(Vec::new());
@@ -1051,7 +1066,8 @@ fn place_blender_textures<R: Runtime>(
     for stored in textures {
         let source = stored_texture_source(&store, &stored.key)?;
         let target = stored_texture_target(dir, &stored.write_as)?;
-        let png = texture::blender_png(&source).map_err(|e| format!("{}: {e}", stored.write_as))?;
+        let png = texture::blender_png(&source, stored.role)
+            .map_err(|e| format!("{}: {e}", stored.write_as))?;
         std::fs::write(&target, &png.bytes)
             .map_err(|e| format!("could not write {}: {e}", target.display()))?;
         written.push(json!({
@@ -1082,7 +1098,7 @@ async fn lego_export_glb<R: Runtime>(
     dir: String,
     unit_name: String,
     bytes: Vec<u8>,
-    textures: Option<Vec<StoredTextureRef>>,
+    textures: Option<Vec<BlenderTextureRef>>,
 ) -> CliResult {
     if !valid_unit_name(&unit_name) {
         return CliResult::err(format!(
@@ -1132,7 +1148,7 @@ async fn lego_export_obj<R: Runtime>(
     obj: String,
     mtl: String,
     atlas: Option<AtlasRef>,
-    textures: Option<Vec<StoredTextureRef>>,
+    textures: Option<Vec<BlenderTextureRef>>,
 ) -> CliResult {
     if !valid_unit_name(&unit_name) {
         return CliResult::err(format!(

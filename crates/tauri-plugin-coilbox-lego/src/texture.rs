@@ -205,6 +205,25 @@ fn to_webview_format(ext: &str, bytes: &[u8]) -> Option<Vec<u8>> {
 /// the `.s3o` export at full size.
 const BLENDER_MAX: u32 = 2048;
 
+/// Which of an `.s3o`'s two textures this is, which is what decides whether its
+/// alpha channel survives the trip to Blender.
+#[derive(serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum TextureRole {
+    /// The picture the unit is painted with. Its alpha is not transparency: the
+    /// engine reads it as the team-colour mask, `mix(texColor1.rgb, teamCol.rgb,
+    /// texColor1.a)` in `ModelFragProgGL4.glsl`. So it is dropped, and for a
+    /// stronger reason than tidiness. `GLTFExporter` puts the image through a
+    /// canvas, which is premultiplied, and on this machine's own Adder texture
+    /// that halved the mean colour of what came out the other side. The mask
+    /// beside it says which regions those were.
+    Colour,
+    /// The second texture, which is measurements end to end and has nothing in
+    /// it a reader could mistake for a picture. Kept exactly as it decodes,
+    /// alpha included: that channel is the engine's visibility cutout.
+    Mask,
+}
+
 /// A stored texture, decoded and re-encoded for a Blender export.
 pub struct BlenderPng {
     pub bytes: Vec<u8>,
@@ -219,14 +238,12 @@ pub struct BlenderPng {
 /// Read a texture out of the store as a PNG Blender can open.
 ///
 /// A `.dds` is decoded here because nothing downstream will: Blender's glTF
-/// importer refuses one, and so does every `.mtl` reader. A stored PNG small
-/// enough already is passed through untouched, since re-encoding it would only
-/// spend time to produce the same picture.
+/// importer refuses one, and so does every `.mtl` reader.
 ///
 /// The reason comes back as words rather than an empty result. Which texture it
 /// was is the caller's to add: the store names files by content hash, so the
 /// path in here means nothing to anybody.
-pub fn blender_png(source: &Path) -> Result<BlenderPng, String> {
+pub fn blender_png(source: &Path, role: TextureRole) -> Result<BlenderPng, String> {
     let bytes = std::fs::read(source)
         .map_err(|e| format!("could not read it from coilbox's texture store: {e}"))?;
     let ext = extension(source);
@@ -234,38 +251,23 @@ pub fn blender_png(source: &Path) -> Result<BlenderPng, String> {
         format!("coilbox cannot decode this .{ext}. A .dds has to be uncompressed or DXT1/3/5: BC4 upwards and anything behind a DX10 header are not read.")
     })?;
 
+    let scaled = img.width().max(img.height()) > BLENDER_MAX;
+    let img = if scaled {
+        image::DynamicImage::ImageRgba8(img).thumbnail(BLENDER_MAX, BLENDER_MAX)
+    } else {
+        image::DynamicImage::ImageRgba8(img)
+    };
     let (width, height) = (img.width(), img.height());
-    if width.max(height) <= BLENDER_MAX {
-        // Already a PNG at a size that needs nothing doing to it.
-        if ext == "png" {
-            return Ok(BlenderPng {
-                bytes,
-                width,
-                height,
-                scaled: false,
-            });
-        }
-        let bytes = coilbox_texture::encode_png(&img)
-            .ok_or_else(|| "could not re-encode it as a PNG".to_string())?;
-        return Ok(BlenderPng {
-            bytes,
-            width,
-            height,
-            scaled: false,
-        });
+    let bytes = match role {
+        TextureRole::Colour => coilbox_texture::encode_rgb_png(&img.to_rgb8()),
+        TextureRole::Mask => coilbox_texture::encode_png(&img.to_rgba8()),
     }
-
-    let small = image::DynamicImage::ImageRgba8(img)
-        .thumbnail(BLENDER_MAX, BLENDER_MAX)
-        .to_rgba8();
-    let (width, height) = (small.width(), small.height());
-    let bytes = coilbox_texture::encode_png(&small)
-        .ok_or_else(|| "could not re-encode it as a PNG".to_string())?;
+    .ok_or_else(|| "could not re-encode it as a PNG".to_string())?;
     Ok(BlenderPng {
         bytes,
         width,
         height,
-        scaled: true,
+        scaled,
     })
 }
 
@@ -465,10 +467,10 @@ mod tests {
     #[test]
     fn a_dds_comes_back_as_a_png_because_blender_reads_no_dds() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let source = dir.path().join("Beacon_1.dds");
+        let source = dir.path().join("Beacon_2.dds");
         std::fs::write(&source, one_pixel_dds(0x30, 0x20, 0x10, 0xff)).expect("write");
 
-        let png = blender_png(&source).expect("should decode");
+        let png = blender_png(&source, TextureRole::Mask).expect("should decode");
 
         assert_eq!(&png.bytes[1..4], b"PNG");
         assert_eq!((png.width, png.height), (1, 1));
@@ -479,18 +481,44 @@ mod tests {
         assert_eq!(back.get_pixel(0, 0).0, [0x10, 0x20, 0x30, 0xff]);
     }
 
+    /// The alpha of the texture a unit is painted with is the team-colour mask
+    /// rather than transparency, so it does not go to Blender at all: a reader
+    /// that finds one samples it, and `GLTFExporter`'s canvas premultiplies by
+    /// it on the way into the `.glb`.
     #[test]
-    fn a_stored_png_small_enough_is_passed_through_untouched() {
+    fn the_colour_texture_arrives_with_no_alpha_channel() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let source = dir.path().join("skin.png");
-        let bytes = png_bytes(4, 4);
-        std::fs::write(&source, &bytes).expect("write");
+        let source = dir.path().join("Beacon_1.dds");
+        // A pixel the engine would paint almost entirely in the team's colour,
+        // which is what a canvas would read as almost entirely transparent.
+        std::fs::write(&source, one_pixel_dds(0x30, 0x20, 0x10, 0x08)).expect("write");
 
-        let png = blender_png(&source).expect("should read");
+        let png = blender_png(&source, TextureRole::Colour).expect("should decode");
 
-        assert_eq!(png.bytes, bytes);
-        assert_eq!((png.width, png.height), (4, 4));
-        assert!(!png.scaled);
+        assert_eq!(png.bytes[25], 2, "should be truecolour with no alpha");
+        let back = image::load_from_memory(&png.bytes)
+            .expect("decode")
+            .to_rgba8();
+        // The colour is the file's own, not the file's own multiplied by an
+        // alpha that never meant transparency.
+        assert_eq!(back.get_pixel(0, 0).0, [0x10, 0x20, 0x30, 0xff]);
+    }
+
+    /// The mask keeps every channel, alpha included: the engine reads that one
+    /// as the unit's visibility cutout.
+    #[test]
+    fn the_mask_keeps_its_alpha() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("Beacon_2.dds");
+        std::fs::write(&source, one_pixel_dds(0x00, 0x00, 0xff, 0x40)).expect("write");
+
+        let png = blender_png(&source, TextureRole::Mask).expect("should decode");
+
+        assert_eq!(png.bytes[25], 6, "should be truecolour with alpha");
+        let back = image::load_from_memory(&png.bytes)
+            .expect("decode")
+            .to_rgba8();
+        assert_eq!(back.get_pixel(0, 0).0, [0xff, 0x00, 0x00, 0x40]);
     }
 
     #[test]
@@ -499,10 +527,22 @@ mod tests {
         let source = dir.path().join("atlas.png");
         std::fs::write(&source, png_bytes(BLENDER_MAX * 2, BLENDER_MAX)).expect("write");
 
-        let png = blender_png(&source).expect("should read");
+        let png = blender_png(&source, TextureRole::Colour).expect("should read");
 
         assert_eq!((png.width, png.height), (BLENDER_MAX, BLENDER_MAX / 2));
         assert!(png.scaled);
+    }
+
+    #[test]
+    fn a_texture_inside_the_cap_is_left_at_its_own_size() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("skin.png");
+        std::fs::write(&source, png_bytes(64, 32)).expect("write");
+
+        let png = blender_png(&source, TextureRole::Colour).expect("should read");
+
+        assert_eq!((png.width, png.height), (64, 32));
+        assert!(!png.scaled);
     }
 
     #[test]
@@ -511,7 +551,9 @@ mod tests {
         let source = dir.path().join("atlas.dds");
         std::fs::write(&source, b"DDS not really").expect("write");
 
-        let reason = blender_png(&source).err().expect("should refuse");
+        let reason = blender_png(&source, TextureRole::Colour)
+            .err()
+            .expect("should refuse");
 
         assert!(reason.contains(".dds"), "got: {reason}");
     }
@@ -520,7 +562,7 @@ mod tests {
     fn a_texture_missing_from_the_store_says_so() {
         let dir = tempfile::tempdir().expect("tempdir");
 
-        let reason = blender_png(&dir.path().join("gone.dds"))
+        let reason = blender_png(&dir.path().join("gone.dds"), TextureRole::Colour)
             .err()
             .expect("should refuse");
 

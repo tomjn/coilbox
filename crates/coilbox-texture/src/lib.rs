@@ -53,6 +53,24 @@ pub fn encode_png(img: &image::RgbaImage) -> Option<Vec<u8>> {
     Some(png)
 }
 
+/// Encode an image as PNG bytes with no alpha channel at all.
+///
+/// Not the same as an opaque alpha channel. A reader that finds one samples it,
+/// and a Spring unit texture's alpha is a mask rather than transparency, so a
+/// reader honouring it draws most of the unit away.
+pub fn encode_rgb_png(img: &image::RgbImage) -> Option<Vec<u8>> {
+    let mut png = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut png)
+        .write_image(
+            img.as_raw(),
+            img.width(),
+            img.height(),
+            image::ExtendedColorType::Rgb8,
+        )
+        .ok()?;
+    Some(png)
+}
+
 /// Wrap PNG bytes in a base64 `data:` URL, for a caller with nowhere to put a
 /// file.
 pub fn png_data_url(png: &[u8]) -> String {
@@ -300,5 +318,18 @@ mod tests {
         let png = encode_png(&img).expect("should encode");
         assert_eq!(&png[1..4], b"PNG");
         assert!(png_data_url(&png).starts_with("data:image/png;base64,"));
+    }
+
+    /// The RGB encoder writes a file with no alpha channel, and the colour it
+    /// carries survives the round trip untouched by whatever alpha was dropped.
+    #[test]
+    fn the_rgb_encoder_leaves_no_alpha_channel_behind() {
+        let img = image::RgbImage::from_pixel(4, 4, image::Rgb([200, 100, 50]));
+        let png = encode_rgb_png(&img).expect("should encode");
+
+        // Colour type 2 is truecolour without alpha: byte 25 of the IHDR.
+        assert_eq!(png[25], 2);
+        let back = decode("png", &png).expect("should decode");
+        assert_eq!(back.get_pixel(0, 0).0, [200, 100, 50, 255]);
     }
 }

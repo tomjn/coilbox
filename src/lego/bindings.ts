@@ -130,6 +130,20 @@ export const legoExport = defineCommand<
   }
 >("coilbox-lego", "lego_export");
 
+/**
+ * A texture for a Blender export to decode out of the store.
+ *
+ * `role` says which of the `.s3o`'s two it is, and Rust reads that to decide
+ * what happens to the alpha channel: the picture the unit is painted with keeps
+ * none, since the engine reads its alpha as the team-colour mask and a canvas
+ * would premultiply the colour away by it.
+ */
+export interface BlenderTextureRef {
+  key: string;
+  writeAs: string;
+  role: "colour" | "mask";
+}
+
 /** A texture a Blender export decoded and wrote out. */
 export interface BlenderTextureWritten {
   path: string;
@@ -154,7 +168,7 @@ export const legoExportGlb = defineCommand<
     dir: string;
     unitName: string;
     bytes: number[];
-    textures: StoredTextureRef[];
+    textures: BlenderTextureRef[];
   },
   { path: string; textures: BlenderTextureWritten[] }
 >("coilbox-lego", "lego_export_glb");
@@ -179,7 +193,7 @@ export const legoExportObj = defineCommand<
     /** The atlas to copy in beside the .obj and .mtl, for a built unit. */
     atlas: AtlasRef | null;
     /** An imported unit's own textures, decoded on the way in. */
-    textures: StoredTextureRef[];
+    textures: BlenderTextureRef[];
   },
   {
     obj: string;

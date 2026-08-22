@@ -34,6 +34,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { atlasUrl, exportTextureName, unitAtlas } from "../../atlas";
 import {
+  type BlenderTextureRef,
   type BlenderTextureWritten,
   legoExport,
   legoExportGlb,
@@ -95,6 +96,23 @@ type Result =
       blenderProblem: string | null;
     }
   | { state: "failed"; message: string };
+
+/**
+ * A stored texture as a PNG, with the file's own name on any reason it could
+ * not be read.
+ *
+ * The store names files by their content hash, so a bare failure from it says
+ * nothing a person could act on. `lego_export_obj` puts the name on its own
+ * failures for the same reason.
+ */
+async function decodedTexture(texture: BlenderTextureRef) {
+  try {
+    return await legoTexturePng({ key: texture.key });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`${texture.writeAs}: ${reason}`);
+  }
+}
 
 export function ExportDrawer({
   open: isOpen,
@@ -204,7 +222,7 @@ export function ExportDrawer({
           // here, since this is the one file that carries the image itself.
           const colourUrl = blender
             ? blender.colour
-              ? (await legoTexturePng({ key: blender.colour.key })).dataUrl
+              ? (await decodedTexture(blender.colour)).dataUrl
               : null
             : installed
               ? atlasUrl(installed)
