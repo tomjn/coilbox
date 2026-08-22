@@ -4,6 +4,7 @@ import { ArrowLeft, FolderOpen, Terminal } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
+import { modelFormatFor } from "../archiveModel";
 import {
   type Archive,
   contentOpenPath,
@@ -47,12 +48,17 @@ export default function ArchiveDetailPage() {
     archive?.name,
   );
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  // A model is read by the model command instead, which draws it. Asking the
+  // preview command as well would spend a second unitsync session on a byte
+  // count the listing already has.
+  const isModel = selectedFile ? modelFormatFor(selectedFile) : undefined;
   const { data: file, loading: fileLoading } = useUnitsyncArchiveFile(
     selected?.enginePath,
     selected?.rootPath,
     archive?.name,
-    selectedFile ?? undefined,
+    isModel ? undefined : (selectedFile ?? undefined),
   );
+  const selectedSize = tree?.files.find((f) => f.path === selectedFile)?.size;
 
   if (!data || loading) return <DetailLoading backTo="/content/archives" />;
   if (!archive) return <NotFound backTo="/content/archives" label="archive" />;
@@ -244,6 +250,10 @@ export default function ArchiveDetailPage() {
               result={file}
               loading={fileLoading}
               onDownload={downloadSelected}
+              archive={archive.name}
+              enginePath={selected?.enginePath}
+              dataDir={selected?.rootPath}
+              size={selectedSize}
             />
           </div>
         </div>

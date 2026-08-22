@@ -10,15 +10,11 @@
 
 import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
-import { useRef, useState } from "react";
-import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { useState } from "react";
 
 import { RENDER_VERSION, renderTopDown } from "@/hub/assets/renderTop";
 import { RENDER_ANGLES, renderFrame } from "@/hub/assets/vocabulary";
 import { toBase64 } from "@/lib/base64";
-import { useCanvas3D } from "@/lib/useCanvas3D";
-import { useReduceMotion } from "../../../general/display";
 import type {
   RenderSkip,
   UnitDatasetEntry,
@@ -27,7 +23,8 @@ import type {
 } from "../../bindings";
 import { unitsyncUnitRender } from "../../bindings";
 import { useUnitsyncUnitModel } from "../../config";
-import { buildModel, countPieces, countTriangles } from "../../unitModel";
+import { countPieces, countTriangles } from "../../unitModel";
+import { ModelNotes, ModelViewport, Note } from "./ModelViewport";
 
 interface Props {
   enginePath: string;
@@ -149,12 +146,12 @@ function Body({
     );
   }
 
-  const missing = model.textures.filter((t) => !t.file && !t.teamColour);
-  const teamColour = model.textures.filter((t) => t.teamColour);
-
   return (
     <>
-      <ModelViewport model={model} />
+      <ModelViewport
+        model={model}
+        className="aspect-square w-full border-b border-border/50"
+      />
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 px-3 py-2 text-xs">
         <dt className="text-muted-foreground">Model</dt>
         <dd className="break-all font-mono">{model.path}</dd>
@@ -179,32 +176,7 @@ function Body({
         </dd>
       </dl>
 
-      {teamColour.length > 0 && (
-        <Note>
-          {teamColour.length} of this model's textures are team-colour regions,
-          which the engine paints in the owning player's colour. There is no
-          player here, so they are drawn in one blue.
-        </Note>
-      )}
-
-      {missing.length > 0 && (
-        <Note>
-          {missing.length} of this model's textures are not in {gameArchive}, so
-          those faces are drawn plain:{" "}
-          <span className="font-mono">
-            {missing.map((t) => t.name).join(", ")}
-          </span>
-          .
-        </Note>
-      )}
-      {model.paletteFaces > 0 && (
-        <Note>
-          {model.paletteFaces.toLocaleString()} faces are a flat colour from the
-          Total Annihilation palette, which the engine holds rather than the
-          archive. They are drawn plain grey.
-        </Note>
-      )}
-      {model.errors.length > 0 && <Note>{model.errors.join(". ")}</Note>}
+      <ModelNotes model={model} archive={gameArchive} />
     </>
   );
 }
@@ -351,105 +323,4 @@ function renderSkipReason(skip: RenderSkip): string {
     case "not-written":
       return "it encoded, and the file could not be written.";
   }
-}
-
-function Note({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="m-3 rounded border border-border/50 px-3 py-2 text-xs text-muted-foreground">
-      {children}
-    </p>
-  );
-}
-
-/** The model itself, framed on its own extent and orbitable. */
-function ModelViewport({ model }: { model: UnitModelResult }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const reduceMotion = useReduceMotion();
-
-  useCanvas3D(
-    containerRef,
-    ({ renderer }) => {
-      const built = buildModel(model);
-
-      const scene = new THREE.Scene();
-      const key = new THREE.DirectionalLight(0xffffff, 2.2);
-      key.position.set(4, 8, 6);
-      const fill = new THREE.DirectionalLight(0xbfd4ff, 0.7);
-      fill.position.set(-5, 2, -4);
-      scene.add(key, fill, new THREE.AmbientLight(0xffffff, 0.55));
-      scene.add(built.object);
-
-      // Framed on the model's own bounding box rather than the header's radius,
-      // which both formats let the engine work out and so is often absent.
-      //
-      // Still not `frameBox` from the unit builder, now that nothing caps its
-      // distance. `frameBox` fits the bounding sphere and pads it, which is
-      // 4.3 radii at this lens; sitting at 2.8 fills the panel with the model
-      // rather than the space around it, and this is a preview nobody orbits
-      // out of. Its floor of 1.5 world units would work against a small model
-      // here too, where the near plane scales with the model instead of being
-      // fixed, so there is no absolute distance to be too close from.
-      const centre = built.box.getCenter(new THREE.Vector3());
-      const radius = Math.max(
-        built.box.getBoundingSphere(new THREE.Sphere()).radius,
-        0.001,
-      );
-      const camera = new THREE.PerspectiveCamera(
-        35,
-        1,
-        radius / 100,
-        radius * 100,
-      );
-      camera.position.set(
-        centre.x + radius * 1.6,
-        centre.y + radius * 1.2,
-        centre.z + radius * 1.9,
-      );
-
-      const controls = new OrbitControls(camera, renderer.domElement);
-      controls.target.copy(centre);
-      controls.enableDamping = !reduceMotion;
-      controls.enablePan = false;
-      controls.minDistance = radius * 0.4;
-      controls.maxDistance = radius * 8;
-      controls.update();
-
-      const render = () => renderer.render(scene, camera);
-      controls.addEventListener("change", render);
-
-      // Damping needs a frame loop to settle. Without it the view still moves,
-      // it just stops the moment the pointer does.
-      let frame = 0;
-      if (!reduceMotion) {
-        const tick = () => {
-          controls.update();
-          render();
-          frame = requestAnimationFrame(tick);
-        };
-        frame = requestAnimationFrame(tick);
-      }
-
-      return {
-        render,
-        resize: (width, height) => {
-          camera.aspect = width / height;
-          camera.updateProjectionMatrix();
-        },
-        dispose: () => {
-          cancelAnimationFrame(frame);
-          controls.removeEventListener("change", render);
-          controls.dispose();
-          built.dispose();
-        },
-      };
-    },
-    [model, reduceMotion],
-  );
-
-  return (
-    <div
-      ref={containerRef}
-      className="aspect-square w-full border-b border-border/50"
-    />
-  );
 }
