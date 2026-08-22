@@ -1327,6 +1327,11 @@ export interface UnitScriptResult {
   text: string | null;
   /** The bytes, for a `.cob`. Null for Lua. */
   bytes: number[] | null;
+  /** The `.bos` source beside a `.cob`, where the game ships one. Null for Lua,
+   *  which needs no conversion, and for a `.cob` shipped without its source. */
+  bosMember: string | null;
+  /** That source, as text. */
+  bosText: string | null;
   /** What the unit definition asked for, found or not. A name that resolved to
    *  nothing is the useful half of "this unit has no script here". */
   declared: string | null;
