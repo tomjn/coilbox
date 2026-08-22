@@ -84,6 +84,66 @@ export function releaseSpringTexture(url: string): void {
 }
 
 /**
+ * What one material has had patched into it, so a second patch keeps the first.
+ *
+ * three gives a material one `onBeforeCompile`, and an `.s3o` wants two things
+ * from it. The unit builder asks for them a frame apart, once each texture has
+ * answered for itself, so the last one to arrive cannot simply overwrite what is
+ * already there.
+ */
+interface SpringShading {
+  teamColour?: THREE.Color;
+  cutOut?: boolean;
+}
+
+const shading = new WeakMap<THREE.Material, SpringShading>();
+
+/**
+ * Rewrite the material's shader patch with `change` folded into whatever is
+ * already there.
+ *
+ * A patch on the standard material rather than a material of our own:
+ * everything else about it, the lighting and the colour space, is what the rest
+ * of the app already uses.
+ */
+function shade(
+  material: THREE.MeshStandardMaterial,
+  change: SpringShading,
+): void {
+  const shaded: SpringShading = { ...shading.get(material), ...change };
+  shading.set(material, shaded);
+  const { teamColour, cutOut } = shaded;
+
+  material.onBeforeCompile = (shader) => {
+    if (teamColour) {
+      shader.uniforms.teamColour = { value: teamColour };
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <common>",
+          "#include <common>\nuniform vec3 teamColour;",
+        )
+        .replace(
+          "#include <map_fragment>",
+          "#include <map_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, teamColour, diffuseColor.a);",
+        );
+    }
+    if (cutOut) {
+      // three's own chunk reads green and multiplies. The engine reads alpha,
+      // and multiplying would fold in the team-colour mask the line above has
+      // already used, cutting the team-colour regions out of the model.
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <alphamap_fragment>",
+        "diffuseColor.a = texture2D( alphaMap, vAlphaMapUv ).a;",
+      );
+    }
+  };
+  // Without a key of its own three reuses the unpatched program it compiled for
+  // another material with the same parameters.
+  material.customProgramCacheKey = () =>
+    `coilbox-spring:${teamColour ? "team" : ""}:${cutOut ? "cutout" : ""}`;
+}
+
+/**
  * Paint the team-colour regions the material's own map marks in its alpha.
  *
  * The engine's two model shaders both mix straight from the first texture's
@@ -97,29 +157,48 @@ export function releaseSpringTexture(url: string): void {
  * Only for an `.s3o`. A `.3do`'s texture alpha is reflectivity, which the engine
  * moves into the second texture's green rather than reading as a mask.
  *
- * A patch on the standard material rather than a material of our own:
- * everything else about it, the lighting and the colour space, is what the rest
- * of the app already uses. The alpha itself never leaves the shader, because
- * three's own `opaque_fragment` sets it back to 1 for a material that is not
- * transparent.
+ * The alpha itself never leaves the shader, because three's own
+ * `opaque_fragment` sets it back to 1 for a material that is not transparent.
  */
 export function paintTeamColour(
   material: THREE.MeshStandardMaterial,
   colour: THREE.ColorRepresentation = TEAM_COLOUR,
 ): void {
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.teamColour = { value: new THREE.Color(colour) };
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        "#include <common>",
-        "#include <common>\nuniform vec3 teamColour;",
-      )
-      .replace(
-        "#include <map_fragment>",
-        "#include <map_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, teamColour, diffuseColor.a);",
-      );
-  };
-  // Without this three reuses the unpatched program it compiled for another
-  // material with the same parameters.
-  material.customProgramCacheKey = () => "coilbox-team-colour";
+  shade(material, { teamColour: new THREE.Color(colour) });
+}
+
+/** Below this the engine draws nothing. One bit, not a gradient. */
+export const CUT_OUT_ALPHA = 0.5;
+
+/**
+ * Throw away the pixels the `.s3o`'s second texture masks out, the way the
+ * engine does.
+ *
+ * `ModelFragProgGL4.glsl` line 97 reads
+ * `float alpha = teamCol.a * float(texColor2.a >= 0.5)` and discards on it, and
+ * the opaque model pass sets the test to "greater than 0.5" in
+ * `ModelDrawerState.cpp` line 330. So a fragment survives exactly when the
+ * second texture's alpha is at least a half. `ModelFragProg.glsl` line 95 is the
+ * same rule through the fixed-function alpha test, and calls it a one-bit mask
+ * in so many words. Modellers cut shapes out of flat quads with it: a radar
+ * dish's mesh, a camo net, a chain link fence.
+ *
+ * An alpha test rather than transparency, which in three are separate things. A
+ * transparent material stops writing depth and is sorted per object, and one
+ * unit can have dozens of cut-out surfaces inside a single mesh, which no
+ * per-object sort can order. The engine does not blend either: it keeps or drops
+ * the whole fragment.
+ *
+ * A second texture with no alpha channel is not a reason to stop drawing. GL
+ * samples the missing channel as 1, so nothing is cut, which is also what the
+ * engine does with a second texture it cannot find: it stands in a single opaque
+ * pixel, in `S3OTextureHandler.cpp` line 160.
+ */
+export function cutOutHiddenPixels(
+  material: THREE.MeshStandardMaterial,
+  mask: THREE.Texture,
+): void {
+  material.alphaMap = mask;
+  material.alphaTest = CUT_OUT_ALPHA;
+  shade(material, { cutOut: true });
 }
