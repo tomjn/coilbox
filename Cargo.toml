@@ -9,6 +9,7 @@ members = [
   "crates/coilbox-lobby-protocol",
   "crates/coilbox-tachyon-protocol",
   "crates/coilbox-springlua",
+  "crates/coilbox-unitpose",
   "crates/coilbox-assets",
   "crates/coilbox-map-catalog",
   "crates/coilbox-thumb-cache",
