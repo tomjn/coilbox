@@ -18,13 +18,16 @@ serde_json = "1"
 # Minimap mode encodes the RGB565 buffer to PNG; archive preview also decodes
 # TGA (which browsers can't render) and re-encodes it to PNG. Game-header art is
 # decoded from any loadpicture format and re-encoded as a downscaled JPEG, so the
-# jpeg/bmp/gif decoders (and jpeg encoder) are enabled too.
+# jpeg/bmp/gif decoders (and jpeg encoder) are enabled too. `tiff` is decoded
+# through `coilbox-texture` (issue #1915) and named here so the tests can write
+# one, which costs nothing: the same feature is already on in the graph.
 image = { version = "0.25", default-features = false, features = [
     "png",
     "tga",
     "jpeg",
     "bmp",
     "gif",
+    "tiff",
 ] }
 # DDS (DirectDraw Surface) decode for unit build pics, which are frequently
 # DXT/BCn-compressed, and the PNG encode every cache here writes. Shared with the
