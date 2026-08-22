@@ -112,9 +112,9 @@ export function projectFromImport(
     ...(options.game ? { game: options.game } : {}),
     ...textureFields("texture", "missingTexture", result.texture, keepSource),
     ...textureFields(
-      "teamMask",
-      "missingTeamMask",
-      result.teamMask,
+      "texture2",
+      "missingTexture2",
+      result.texture2,
       keepSource,
     ),
   };
@@ -152,8 +152,8 @@ export function projectFromImport(
  * use than an untextured model with no explanation.
  */
 function textureFields(
-  found: "texture" | "teamMask",
-  missing: "missingTexture" | "missingTeamMask",
+  found: "texture" | "texture2",
+  missing: "missingTexture" | "missingTexture2",
   texture: ImportedTexture,
   /** Whether the path it was read from is a real file somebody can go on
    *  editing, rather than a temp copy of one. */
@@ -218,7 +218,7 @@ export function importedTextures(imported: LegoImported): {
   };
   return {
     texture1: name(imported.texture, imported.missingTexture),
-    texture2: name(imported.teamMask, imported.missingTeamMask),
+    texture2: name(imported.texture2, imported.missingTexture2),
     place,
   };
 }
@@ -279,7 +279,7 @@ export function blenderTextures(imported: LegoImported): {
       : null;
   return {
     colour: placed(imported.texture, "colour"),
-    mask: placed(imported.teamMask, "mask"),
+    mask: placed(imported.texture2, "mask"),
   };
 }
 
@@ -295,7 +295,7 @@ export function texturesInUse(projects: LegoProject[]): string[] {
   for (const project of projects) {
     for (const texture of [
       project.imported?.texture,
-      project.imported?.teamMask,
+      project.imported?.texture2,
     ]) {
       if (texture?.key) keys.add(texture.key);
     }

@@ -414,7 +414,7 @@ function Builder({ id }: { id: string | undefined }) {
     void legoTexturePrune({
       keep: [
         ...texturesInUse(projects),
-        ...[next.texture, next.teamMask].flatMap((texture) =>
+        ...[next.texture, next.texture2].flatMap((texture) =>
           texture?.key ? [texture.key] : [],
         ),
       ],

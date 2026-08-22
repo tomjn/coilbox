@@ -313,15 +313,15 @@ function Imported({
               : "The model names no texture, so the unit opens untextured."}
           </p>
         )}
-        {imported?.teamMask ? (
+        {imported?.texture2 ? (
           <p className="text-xs text-muted-foreground">
-            <code>{imported.teamMask.name}</code> is the shading map, which the
+            <code>{imported.texture2.name}</code> is the shading map, which the
             engine reads as glow in red and shine in green. Kept with the unit
             and written back out by the export, though nothing here draws it.
           </p>
-        ) : imported?.missingTeamMask ? (
+        ) : imported?.missingTexture2 ? (
           <p className="text-xs text-muted-foreground">
-            The shading map, <code>{imported.missingTeamMask}</code>, was not
+            The shading map, <code>{imported.missingTexture2}</code>, was not
             found. Nothing here draws it, so the unit looks the same either way,
             but the export will have no glow or shine to write out.
           </p>

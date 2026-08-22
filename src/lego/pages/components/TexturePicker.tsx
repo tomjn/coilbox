@@ -41,7 +41,7 @@ import { legoTextureImport } from "../../bindings";
 import type { LegoImported, LegoTexture } from "../../model";
 
 /** Which of the two textures a control is about. */
-type Slot = "texture" | "teamMask";
+type Slot = "texture" | "texture2";
 
 interface Props {
   imported: LegoImported;
@@ -70,7 +70,7 @@ export function TexturePicker({ imported, onChange }: Props) {
       onChange(
         slot === "texture"
           ? { texture, missingTexture: undefined }
-          : { teamMask: texture, missingTeamMask: undefined },
+          : { texture2: texture, missingTexture2: undefined },
       );
     } catch (error) {
       setProblem(error instanceof Error ? error.message : String(error));
@@ -82,7 +82,7 @@ export function TexturePicker({ imported, onChange }: Props) {
   async function choose(slot: Slot) {
     const picked = await open({
       multiple: false,
-      title: slot === "texture" ? "Choose a texture" : "Choose a team mask",
+      title: slot === "texture" ? "Choose a texture" : "Choose a shading map",
       filters: [
         {
           name: "Texture",
@@ -95,7 +95,7 @@ export function TexturePicker({ imported, onChange }: Props) {
 
   /** Re-read the file this texture came from, in case it has been edited. */
   async function refresh(slot: Slot) {
-    const source = (slot === "texture" ? imported.texture : imported.teamMask)
+    const source = (slot === "texture" ? imported.texture : imported.texture2)
       ?.source;
     if (!source) {
       setProblem(
@@ -134,11 +134,11 @@ export function TexturePicker({ imported, onChange }: Props) {
             <TextureSlot
               title="Shading map"
               hint="The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it."
-              texture={imported.teamMask}
-              missing={imported.missingTeamMask}
-              busy={busy === "teamMask"}
-              onChoose={() => void choose("teamMask")}
-              onRefresh={() => void refresh("teamMask")}
+              texture={imported.texture2}
+              missing={imported.missingTexture2}
+              busy={busy === "texture2"}
+              onChoose={() => void choose("texture2")}
+              onRefresh={() => void refresh("texture2")}
             />
             {problem ? (
               <p className="text-xs text-destructive">{problem}</p>

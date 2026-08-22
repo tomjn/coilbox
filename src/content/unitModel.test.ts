@@ -61,7 +61,7 @@ function model(over: Partial<UnitModelResult> = {}): UnitModelResult {
       children: [],
     },
     textures: [texture("skin.dds", "abc_skin_dds.dds")],
-    teamMask: texture("skin_glow.dds", "abc_skin_glow_dds.dds"),
+    texture2: texture("skin_glow.dds", "abc_skin_glow_dds.dds"),
     paletteFaces: 0,
     errors: [],
     ...over,
@@ -87,7 +87,7 @@ describe("buildModel", () => {
   });
 
   it("paints it with no second texture named at all", () => {
-    const built = buildModel(model({ teamMask: undefined }));
+    const built = buildModel(model({ texture2: undefined }));
     expect(painted).toHaveLength(1);
     built.dispose();
   });
@@ -110,14 +110,14 @@ describe("buildModel", () => {
   /** No second texture is no reason to stop drawing: the engine stands a
    *  missing one in as a single opaque pixel. */
   it("draws the model whole when there is no second texture", () => {
-    const built = buildModel(model({ teamMask: undefined }));
+    const built = buildModel(model({ texture2: undefined }));
     expect(masked).toHaveLength(0);
     built.dispose();
   });
 
   /** Named but not in the archive is the same case. */
   it("draws the model whole when the second texture was not found", () => {
-    const built = buildModel(model({ teamMask: texture("skin_glow.dds") }));
+    const built = buildModel(model({ texture2: texture("skin_glow.dds") }));
     expect(masked).toHaveLength(0);
     expect(loaded).toEqual(["coilbox://localhost/unitmodel/abc_skin_dds.dds"]);
     built.dispose();
@@ -131,7 +131,7 @@ describe("buildModel", () => {
    */
   it("leaves a 3do's materials alone", () => {
     const built = buildModel(
-      model({ format: "3do", path: "objects3d/test.3do", teamMask: undefined }),
+      model({ format: "3do", path: "objects3d/test.3do", texture2: undefined }),
     );
     expect(painted).toHaveLength(0);
     expect(masked).toHaveLength(0);

@@ -99,7 +99,7 @@ export function buildModel(
       // every material of one model shares it: an `.s3o` names one pair for the
       // whole model. A model that names no second texture, or whose second
       // texture is not in the archive, draws whole.
-      const mask = model.teamMask?.file;
+      const mask = model.texture2?.file;
       if (mask) cutOutHiddenPixels(material, modelTexture(mask));
     }
     materials.set(key, material);

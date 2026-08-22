@@ -182,7 +182,7 @@ pub(crate) fn read_model(
     };
 
     let format = out.format.clone();
-    for tex in out.textures.iter_mut().chain(out.team_mask.iter_mut()) {
+    for tex in out.textures.iter_mut().chain(out.texture2.iter_mut()) {
         resolve_texture(us, handle, list, &format, teamtex, cache, tex);
     }
     out
@@ -338,7 +338,7 @@ fn source_digest_with(
     let mut members: Vec<String> = flattened
         .textures
         .iter()
-        .chain(flattened.team_mask.iter())
+        .chain(flattened.texture2.iter())
         // A `.3do` team-colour region is a name the engine paints rather than a
         // file, so there is nothing in the archive to hash for it.
         .filter(|tex| !(format == "3do" && teamtex.contains(&tex.name.trim().to_lowercase())))
@@ -413,7 +413,7 @@ fn from_s3o(path: &str, model: &coilbox_s3o::Model) -> UnitModelOutput {
                 }]
             })
             .unwrap_or_default(),
-        team_mask: mask,
+        texture2: mask,
         palette_faces: 0,
         errors: Vec::new(),
     }
@@ -477,7 +477,7 @@ fn from_3do(path: &str, model: &coilbox_3do::Model) -> UnitModelOutput {
             .collect(),
         // A `.3do` has no second texture: its team-colour regions are named
         // face by face, and `resolve_texture` flags them instead.
-        team_mask: None,
+        texture2: None,
         palette_faces,
         errors: Vec::new(),
     }

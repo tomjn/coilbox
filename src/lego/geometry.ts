@@ -115,7 +115,7 @@ export function importedMaterial(imported: LegoImported): {
   // The second texture is a glow and reflectivity map, and nothing here draws
   // either. Its alpha is the one thing an `.s3o` viewer cannot leave out: the
   // engine throws away every pixel it masks off.
-  const mask = load(imported.teamMask?.key);
+  const mask = load(imported.texture2?.key);
   if (mask) cutOutHiddenPixels(material, mask);
 
   let live = true;
