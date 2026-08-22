@@ -25,7 +25,12 @@ use std::rc::Rc;
 
 /// Salts the texture cache file names. Bump when the naming scheme changes so
 /// stale files are never picked up under a new meaning.
-const CACHE_VERSION: u32 = 2;
+///
+/// 3: `.tif` is re-encoded to PNG rather than written through raw, and so is an
+/// extension spelled in upper case (issue #1915). A cache filled before that
+/// holds 276 files on this machine that were written through when they should
+/// have been re-encoded, and their names are what a new build asks for.
+const CACHE_VERSION: u32 = 3;
 
 /// Models are a few megabytes at most: the largest in the games checked is a
 /// 3.2 MiB `.s3o`. Bound the read anyway.
@@ -663,10 +668,15 @@ fn resolve_texture(
 /// through untouched.
 ///
 /// `.bmp` and `.tga` are most of what the legacy games ship, 358 and 192 files
-/// respectively in Balanced Annihilation, and a webview will render neither.
-/// `.pcx` joins them as the third format of that era, rarer on a model than on a
-/// build pic but read by the same engine loader. The archive preview already
-/// transcodes `.tga` and `.pcx` to PNG for the same reason.
+/// respectively in Balanced Annihilation. `.tif` is rarer and matters more:
+/// macOS's webview decodes one and Windows's and Linux's do not, so before this
+/// covered them Basically OTA's `CORE_T1_BOT_Crasher` drew painted on one
+/// platform and bare on the other two (issue #1915).
+///
+/// Which formats those are is [`coilbox_texture::needs_webview_transcode`], so the
+/// unit builder's texture store answers the question the same way. `.pcx` is the
+/// worker's own addition: no game ships a model texture in one, but the archive
+/// preview reads build pics through here and every legacy game's are `.pcx`.
 ///
 /// `keep_alpha` is whether the model is an `.s3o`, and it decides whether the
 /// alpha channel survives. An `.s3o`'s first texture keeps the team-colour mask
@@ -678,18 +688,15 @@ fn resolve_texture(
 /// 8192 square atlas would cost 256 MiB for one texture and the webview can
 /// upload it compressed.
 fn to_webview_format(ext: &str, bytes: &[u8], keep_alpha: bool) -> Option<Vec<u8>> {
-    if !matches!(ext, "bmp" | "tga" | "pcx") {
+    if !coilbox_texture::needs_webview_transcode(ext) && !ext.eq_ignore_ascii_case("pcx") {
         return None;
     }
     let img = crate::texture::decode_texture(ext, bytes)?;
-    let img = if keep_alpha {
-        image::DynamicImage::ImageRgba8(img)
+    if keep_alpha {
+        coilbox_texture::encode_png(&img)
     } else {
-        image::DynamicImage::ImageRgb8(image::DynamicImage::ImageRgba8(img).to_rgb8())
-    };
-    let mut png = std::io::Cursor::new(Vec::new());
-    img.write_to(&mut png, image::ImageFormat::Png).ok()?;
-    Some(png.into_inner())
+        coilbox_texture::encode_rgb_png(&image::DynamicImage::ImageRgba8(img).to_rgb8())
+    }
 }
 
 /// The archive member a model's texture name means.
@@ -768,13 +775,23 @@ pub(crate) fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String
 /// The cache file for one archive member: `<gamekey>_<sanitised path>.<ext>`.
 /// One flat segment, because the asset protocol's root for these serves a single
 /// folder. The extension is the one the file is written in, which is not the
-/// source's when it was transcoded, so the webview can pick a loader from it.
+/// source's when it was transcoded, so the webview can pick a loader from it and
+/// the asset protocol can put a content type on it.
+///
+/// Every extension [`to_webview_format`] re-encodes is listed here. A file
+/// written as PNG under its source's name is served as an octet stream, and a
+/// webview that sniffs it anyway is doing us a favour rather than being asked.
+///
+/// The extension the archive gives is the artist's own case, and 1086 of the
+/// installed games' 1680 `.bmp` textures are spelled `.BMP`. Every one of those
+/// was written through raw while its lower-case neighbour was re-encoded, so the
+/// name is settled in lower case before anything is decided from it.
 pub(crate) fn cache_file_name(base: &str, member: &str, source_ext: &str) -> String {
     let lower = member.to_lowercase();
-    let ext = match source_ext {
-        "bmp" | "tga" => "png",
-        "" => "bin",
-        other => other,
+    let ext = match source_ext.to_lowercase().as_str() {
+        "bmp" | "tga" | "tif" | "tiff" | "pcx" => "png".to_string(),
+        "" => "bin".to_string(),
+        other => other.to_string(),
     };
     let safe: String = lower
         .chars()
@@ -916,12 +933,13 @@ mod tests {
     #[test]
     fn cache_file_name_is_one_flat_segment_keeping_the_extension() {
         let name = cache_file_name("abcd", "UnitTextures/Lego Skin.DDS", "DDS");
-        assert_eq!(name, "abcd_unittextures_lego_skin_dds.DDS");
+        assert_eq!(name, "abcd_unittextures_lego_skin_dds.dds");
         assert!(!name.contains('/'));
     }
 
     /// A transcoded texture is named for what it was written as, not what it
-    /// came from, so the webview picks a loader that can read it.
+    /// came from, so the webview picks a loader that can read it and the asset
+    /// protocol puts an image content type on it.
     #[test]
     fn a_transcoded_texture_is_named_png() {
         assert_eq!(
@@ -932,6 +950,12 @@ mod tests {
             cache_file_name("abcd", "unittextures/tatex/arm01a00.tga", "tga"),
             "abcd_unittextures_tatex_arm01a00_tga.png"
         );
+        // Every extension `to_webview_format` re-encodes belongs on the list, in
+        // whichever case the artist happened to save it in.
+        for ext in ["tif", "tiff", "pcx", "BMP", "TGA", "TIF"] {
+            let name = cache_file_name("abcd", &format!("unittextures/skin.{ext}"), ext);
+            assert!(name.ends_with(".png"), "got: {name}");
+        }
     }
 
     /// The whole point of the cache (issue #1676): the second model to draw
@@ -1019,6 +1043,20 @@ mod tests {
         assert!(to_webview_format("pcx", b"not really a pcx", true).is_none());
     }
 
+    /// The archive spells an extension however the artist saved it, and 1086 of
+    /// the installed games' 1680 `.bmp` textures are `.BMP`. Every one of those
+    /// used to be written through raw (issue #1915).
+    #[test]
+    fn an_upper_case_extension_is_transcoded_like_any_other() {
+        let png = to_webview_format("TGA", &tga_rgba(), true).expect("a .TGA is transcoded");
+        assert_eq!(
+            image::load_from_memory(&png)
+                .expect("the output is a png")
+                .color(),
+            image::ColorType::Rgba8
+        );
+    }
+
     /// One 2 by 1 uncompressed 32-bit TGA: an opaque red pixel and a
     /// transparent green one. Written bottom-up, which is what the games ship.
     fn tga_rgba() -> Vec<u8> {
@@ -1073,5 +1111,33 @@ mod tests {
         let png = to_webview_format("pcx", &raw, false).expect("a pcx is transcoded");
         let img = image::load_from_memory(&png).expect("the output is a png");
         assert_eq!(img.to_rgba8().get_pixel(0, 0).0, [0xff, 0, 0, 255]);
+    }
+
+    /// A `.tif` is the format that made this a platform bug rather than a bug:
+    /// macOS's webview decodes one and the other two do not, so Basically OTA's
+    /// `CORE_T1_BOT_Crasher` drew painted here and bare there (issue #1915).
+    /// Alpha survives, because both its textures are `.tif` and the engine reads
+    /// the second one's alpha as the unit's cut-out mask.
+    #[test]
+    fn a_tif_texture_is_re_encoded_as_png_with_its_alpha() {
+        let mut src = image::RgbaImage::from_pixel(2, 1, image::Rgba([0xff, 0, 0, 0xff]));
+        src.put_pixel(1, 0, image::Rgba([0, 0xff, 0, 0x00]));
+        let mut tiff = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(src)
+            .write_to(&mut tiff, image::ImageFormat::Tiff)
+            .expect("encode a tiff");
+        let tiff = tiff.into_inner();
+
+        let png = to_webview_format("tif", &tiff, true).expect("a tif is transcoded");
+
+        let img = image::load_from_memory(&png).expect("the output is a png");
+        assert_eq!(img.color(), image::ColorType::Rgba8);
+        let rgba = img.to_rgba8();
+        assert_eq!(rgba.get_pixel(0, 0).0, [0xff, 0, 0, 0xff]);
+        assert_eq!(rgba.get_pixel(1, 0).0[3], 0x00);
+        // Both spellings, and undecodable bytes still fall through to being
+        // written as they arrived rather than the texture going missing.
+        assert!(to_webview_format("tiff", &tiff, true).is_some());
+        assert!(to_webview_format("tif", b"II not really a tiff", true).is_none());
     }
 }
