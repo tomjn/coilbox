@@ -31,10 +31,16 @@ import { isSdd } from "@/content/format";
 import { SddBadge } from "@/content/pages/components/SddBadge";
 import { unitIconSrc } from "@/content/unitIcon";
 import { usePreferredTarget } from "@/play/config";
+import {
+  type AdoptedScript,
+  adoptGameScript,
+  applyRoles,
+} from "../../adoptGameScript";
 import { modelSource, stageModel, stageTextures } from "../../gameImport";
 import { type GameModelRow, gameModelRows } from "../../gameModels";
 import type { LegoProject } from "../../model";
 import { useLegoProjects } from "../../projects";
+import { defaultTakenRoles, GameScriptPanel } from "./GameScriptPanel";
 import {
   ImportResult,
   type ImportStage,
@@ -65,6 +71,15 @@ export function GameModelDrawer({
   const [game, setGame] = useState<GameItem | null>(null);
   const [query, setQuery] = useState("");
   const [stage, setStage] = useState<ImportStage>({ state: "idle" });
+  /**
+   * What the game's own script said about this unit, once its model has been
+   * read. Null while there is nothing read yet, and for a model no unit
+   * definition points at.
+   */
+  const [adopted, setAdopted] = useState<AdoptedScript | null>(null);
+  const [takeScript, setTakeScript] = useState(true);
+  /** Piece names whose proposed role is taken when the unit is accepted. */
+  const [takenRoles, setTakenRoles] = useState<Set<string>>(new Set());
 
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -120,6 +135,9 @@ export function GameModelDrawer({
     setGame(null);
     setQuery("");
     setStage({ state: "idle" });
+    setAdopted(null);
+    setTakenRoles(new Set());
+    setTakeScript(true);
   }
 
   async function pick(row: GameModelRow) {
@@ -135,25 +153,37 @@ export function GameModelDrawer({
       member: row.member,
     };
     setStage({ state: "reading" });
+    setAdopted(null);
+    setTakenRoles(new Set());
+    setTakeScript(true);
     try {
       const staged = await stageModel(target, picked);
-      setStage(
-        await readModel({
-          path: staged.path,
-          name: row.label,
-          unitName: row.unit ?? row.label,
-          source: modelSource(picked),
-          unpacked: staged.staged !== null,
-          game: {
-            name: game.name,
-            archive,
-            member: row.member,
-            ...(row.unit ? { unit: row.unit } : {}),
-          },
-          beforeImport: (textures) =>
-            stageTextures(target, picked, staged, tree.files, textures),
-        }),
-      );
+      const read = await readModel({
+        path: staged.path,
+        name: row.label,
+        unitName: row.unit ?? row.label,
+        source: modelSource(picked),
+        unpacked: staged.staged !== null,
+        game: {
+          name: game.name,
+          archive,
+          member: row.member,
+          ...(row.unit ? { unit: row.unit } : {}),
+        },
+        beforeImport: (textures) =>
+          stageTextures(target, picked, staged, tree.files, textures),
+      });
+      setStage(read);
+
+      // After the model rather than alongside it. Reading the script means
+      // running it, and running it needs the piece names the model just
+      // produced. A unit whose model did not import has nothing to run against.
+      const project = stageProject(read);
+      if (project) {
+        const found = await adoptGameScript(project, target);
+        setAdopted(found);
+        setTakenRoles(defaultTakenRoles(found));
+      }
     } catch (error) {
       setStage({
         state: "failed",
@@ -164,7 +194,19 @@ export function GameModelDrawer({
 
   function accept() {
     const project = stageProject(stage);
-    if (project) onOpened(project);
+    if (!project) return;
+    // The roles first, so a piece the script named opens with its job already
+    // set rather than needing it typed in again.
+    const withRoles = adopted
+      ? applyRoles(
+          project,
+          (adopted.findings?.proposals ?? []).filter((proposal) =>
+            takenRoles.has(proposal.pieceName),
+          ),
+        )
+      : project;
+    const script = takeScript ? adopted?.script : null;
+    onOpened(script ? { ...withRoles, script } : withRoles);
   }
 
   const loading = Boolean(archive) && (treeLoading || status === "loading");
@@ -220,6 +262,21 @@ export function GameModelDrawer({
                 }
                 onAccept={accept}
               />
+              {adopted ? (
+                <GameScriptPanel
+                  adopted={adopted}
+                  takeScript={takeScript}
+                  onTakeScript={setTakeScript}
+                  taken={takenRoles}
+                  onToggleRole={(pieceName) =>
+                    setTakenRoles((current) => {
+                      const next = new Set(current);
+                      if (!next.delete(pieceName)) next.add(pieceName);
+                      return next;
+                    })
+                  }
+                />
+              ) : null}
               {stage.state === "failed" ? (
                 <Button
                   variant="outline"

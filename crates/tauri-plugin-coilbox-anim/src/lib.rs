@@ -88,6 +88,26 @@ async fn anim_cob_disasm(path: String) -> CliResult {
     }
 }
 
+/// `anim_cob_disasm_bytes`: the same disassembly for a `.cob` that is not a
+/// file on disk.
+///
+/// A unit script read out of a game archive is bytes in memory, and the archive
+/// is somebody else's game. Writing them to a temporary file to hand back a
+/// path would mean making a copy of a file coilbox has no business copying, so
+/// this takes the bytes straight.
+///
+/// Read only in the strongest sense. Nothing is opened, nothing is written, and
+/// the `.cob` inside the archive is never touched.
+#[tauri::command]
+async fn anim_cob_disasm_bytes(bytes: Vec<u8>) -> CliResult {
+    let result = tauri::async_runtime::spawn_blocking(move || disasm::disassemble(&bytes)).await;
+    match result {
+        Ok(Ok(listing)) => CliResult::ok(json!({ "listing": listing })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("disasm task failed: {e}")),
+    }
+}
+
 /// `anim_bos2cob` — compile a `.bos` file to `.cob`, written next to the source
 /// (`<basename>.cob`) unless `output` is given. If the output already exists and
 /// `overwrite` is not set, it compiles but does NOT write, returning
@@ -131,6 +151,10 @@ async fn anim_bos2cob(path: String, output: Option<String>, overwrite: Option<bo
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-anim")
-        .invoke_handler(tauri::generate_handler![anim_cob_disasm, anim_bos2cob])
+        .invoke_handler(tauri::generate_handler![
+            anim_cob_disasm,
+            anim_cob_disasm_bytes,
+            anim_bos2cob
+        ])
         .build()
 }

@@ -16,6 +16,7 @@ permissions = [
   "allow-unitsync-unit-dataset",
   "allow-unitsync-unit-model",
   "allow-unitsync-unit-models",
+  "allow-unitsync-unit-script",
   "allow-unitsync-unit-render",
   "allow-unitsync-unit-render-keys",
   "allow-unitsync-remember-render",

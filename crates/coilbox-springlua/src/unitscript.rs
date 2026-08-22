@@ -113,6 +113,41 @@ pub struct Timeline {
     pub warnings: Vec<String>,
 }
 
+/// What one call-in that returns a piece answered.
+///
+/// Separate from [`Timeline`] because it is a different question. A timeline
+/// says what a script did to the model. This says what a script told us about
+/// it, which is a stronger thing: `QueryNanoPiece` returning `nano2` is the
+/// script naming that piece's job rather than us inferring it from motion.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Probe {
+    /// Key in the script's `script` table, such as `QueryNanoPiece`.
+    pub callin: String,
+    /// The pieces it named, in call order and with repeats kept.
+    ///
+    /// Called more than once because a builder with several nozzles cycles
+    /// them, so one call sees one of them. Order is kept because it is the
+    /// cycle: the caller decides whether to care.
+    pub pieces: Vec<String>,
+    /// Why it named nothing. A script with no such call-in, one that threw, or
+    /// one that answered with something that is not a piece of this unit.
+    pub note: Option<String>,
+}
+
+/// Every probe of one script, plus whatever went wrong before any ran.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Probes {
+    /// The unit's piece names, so a caller can check they are what it expected.
+    pub pieces: Vec<String>,
+    pub probes: Vec<Probe>,
+    /// Set when the script could not be loaded at all, in which case `probes`
+    /// is empty. A script that loaded and then answered badly reports that on
+    /// the probe itself instead.
+    pub error: Option<String>,
+}
+
 impl Timeline {
     /// A run that produced nothing, because it could not start.
     fn failed(pieces: &[String], error: String) -> Self {
@@ -263,6 +298,45 @@ pub fn run(
     }
 }
 
+/// How many times each probe calls its call-in.
+///
+/// Enough to walk a cycle of nozzles round and back. A builder with more emit
+/// points than this reports the first sixteen rather than all of them, which is
+/// a worse answer than the whole cycle and a much better one than one piece.
+const PROBE_CALLS: usize = 16;
+
+/// Ask a script which pieces it names, by calling the call-ins that return one.
+///
+/// This is not a run. Nothing is animated and no frames pass: each call-in is
+/// called directly and its return value read, because these are the call-ins
+/// the engine itself calls for an answer rather than for an effect.
+///
+/// That is also why they are safe to call this way. `QueryNanoPiece` is
+/// commented out of `thread_wrap` in the unit script framework, so it may not
+/// wait for anything and has to answer immediately, and the same holds for
+/// `QueryWeapon` and `AimFromWeapon`. A call-in that blocks would hang here,
+/// which is what the instruction budget is for.
+///
+/// Never returns an error. A script that will not load comes back with `error`
+/// set, and one that loads but answers badly says so on the probe itself.
+pub fn probe(script: &str, name: &str, pieces: &[String], callins: &[String]) -> Probes {
+    let mut run = match Run::start(script, name, pieces) {
+        Ok(run) => run,
+        Err(error) => {
+            return Probes {
+                pieces: pieces.to_vec(),
+                probes: Vec::new(),
+                error: Some(error),
+            }
+        }
+    };
+    Probes {
+        pieces: pieces.to_vec(),
+        probes: callins.iter().map(|callin| run.probe(callin)).collect(),
+        error: None,
+    }
+}
+
 struct Run {
     lua: Lua,
     sim: Rc<RefCell<Sim>>,
@@ -303,6 +377,57 @@ impl Run {
             runners: Vec::new(),
             frame: 0,
         })
+    }
+
+    /// Call one call-in repeatedly and collect the pieces it named.
+    ///
+    /// Each call gets a fresh instruction budget, so a script doing real work
+    /// per call is not cut off part way by whatever the call before it spent.
+    ///
+    /// A call that throws stops the probe rather than being retried: the first
+    /// failure says why, and fifteen more copies of it say nothing.
+    fn probe(&mut self, callin: &str) -> Probe {
+        let Ok(Some(function)) = self.script.get::<Option<Function>>(callin) else {
+            return Probe {
+                callin: callin.to_string(),
+                pieces: Vec::new(),
+                note: Some(format!("This script has no {callin} call-in.")),
+            };
+        };
+
+        let mut pieces = Vec::new();
+        let mut note = None;
+        for _ in 0..PROBE_CALLS {
+            self.budget.set(FRAME_INSTRUCTIONS);
+            match function.call::<Option<i64>>(()) {
+                Ok(Some(index)) => {
+                    match piece_index(&self.sim.borrow(), index) {
+                        Ok(at) => pieces.push(self.sim.borrow().pieces[at].name.clone()),
+                        // A number that is not a piece of this unit. Worth
+                        // saying rather than dropping: it is usually a script
+                        // written against a model this one is not.
+                        Err(error) => {
+                            note = Some(error.to_string());
+                            break;
+                        }
+                    }
+                }
+                Ok(None) => {
+                    note = Some(format!("{callin} answered with nothing."));
+                    break;
+                }
+                Err(error) => {
+                    note = Some(describe(&error));
+                    break;
+                }
+            }
+        }
+
+        Probe {
+            callin: callin.to_string(),
+            pieces,
+            note,
+        }
     }
 
     fn play(&mut self, events: &[ScriptEvent], frames: u32) -> Timeline {

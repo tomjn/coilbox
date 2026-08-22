@@ -631,3 +631,154 @@ fn a_script_cannot_reach_outside_the_sandbox() {
         assert!(error.contains(hatch), "{error}");
     }
 }
+
+/// Asking a script which pieces it names, rather than watching what it moves.
+/// This is the script's own answer about a piece's job, which is a stronger
+/// thing than an inference drawn from motion.
+mod probing {
+    use super::*;
+
+    fn ask(script: &str, callins: &[&str]) -> Probes {
+        let names: Vec<String> = callins.iter().map(|c| (*c).to_string()).collect();
+        probe(script, "test.lua", &pieces(), &names)
+    }
+
+    fn answers<'a>(probes: &'a Probes, callin: &str) -> &'a Probe {
+        probes
+            .probes
+            .iter()
+            .find(|p| p.callin == callin)
+            .expect("the probe was asked for")
+    }
+
+    #[test]
+    fn reads_the_piece_a_call_in_returns() {
+        let probes = ask(
+            "local flare = piece('flare')\n\
+             function script.QueryWeapon1() return flare end",
+            &["QueryWeapon1"],
+        );
+
+        let probe = answers(&probes, "QueryWeapon1");
+        assert_eq!(probe.pieces.first().map(String::as_str), Some("flare"));
+        assert_eq!(probe.note, None);
+    }
+
+    /// A builder with several nozzles cycles them, so one call sees one of
+    /// them. The whole cycle is what the caller is after.
+    #[test]
+    fn walks_a_cycle_round_by_calling_more_than_once() {
+        let probes = ask(
+            "local a, b = piece('turret'), piece('barrel')\n\
+             local n = 0\n\
+             function script.QueryNanoPiece()\n\
+               n = n % 2 + 1\n\
+               return ({a, b})[n]\n\
+             end",
+            &["QueryNanoPiece"],
+        );
+
+        let probe = answers(&probes, "QueryNanoPiece");
+        let seen: std::collections::BTreeSet<&str> =
+            probe.pieces.iter().map(String::as_str).collect();
+        assert_eq!(
+            seen,
+            ["barrel", "turret"].into_iter().collect(),
+            "{:?}",
+            probe.pieces
+        );
+    }
+
+    #[test]
+    fn says_so_when_the_script_has_no_such_call_in() {
+        let probes = ask("function script.Create() end", &["QueryNanoPiece"]);
+
+        let probe = answers(&probes, "QueryNanoPiece");
+        assert!(probe.pieces.is_empty());
+        assert!(
+            probe
+                .note
+                .as_deref()
+                .unwrap_or("")
+                .contains("QueryNanoPiece"),
+            "{:?}",
+            probe.note
+        );
+    }
+
+    /// Usually a script written against a model this one is not, which is worth
+    /// saying rather than quietly reporting no pieces.
+    #[test]
+    fn says_so_when_the_answer_is_not_a_piece_of_this_unit() {
+        let probes = ask(
+            "function script.QueryNanoPiece() return 99 end",
+            &["QueryNanoPiece"],
+        );
+
+        let probe = answers(&probes, "QueryNanoPiece");
+        assert!(probe.pieces.is_empty());
+        assert!(probe.note.is_some(), "{probe:?}");
+    }
+
+    #[test]
+    fn a_call_in_that_throws_stops_that_probe_and_says_why() {
+        let probes = ask(
+            "function script.QueryNanoPiece() error('nope') end",
+            &["QueryNanoPiece"],
+        );
+
+        let probe = answers(&probes, "QueryNanoPiece");
+        assert!(probe.pieces.is_empty());
+        assert!(
+            probe.note.as_deref().unwrap_or("").contains("nope"),
+            "{:?}",
+            probe.note
+        );
+    }
+
+    /// One bad answer must not cost the others. A game script is asked several
+    /// questions at once and usually answers some of them.
+    #[test]
+    fn one_failing_probe_does_not_stop_the_rest() {
+        let probes = ask(
+            "local flare = piece('flare')\n\
+             function script.QueryNanoPiece() error('nope') end\n\
+             function script.QueryWeapon1() return flare end",
+            &["QueryNanoPiece", "QueryWeapon1"],
+        );
+
+        assert!(answers(&probes, "QueryNanoPiece").pieces.is_empty());
+        assert_eq!(
+            answers(&probes, "QueryWeapon1")
+                .pieces
+                .first()
+                .map(String::as_str),
+            Some("flare")
+        );
+    }
+
+    #[test]
+    fn a_script_that_will_not_load_reports_that_and_probes_nothing() {
+        let probes = ask("this is not lua", &["QueryNanoPiece"]);
+
+        assert!(probes.probes.is_empty());
+        assert!(probes.error.is_some());
+    }
+
+    /// The probe calls a call-in directly rather than as a thread, so a script
+    /// that tries to wait must come back as a failed probe rather than hanging.
+    #[test]
+    fn a_call_in_that_tries_to_wait_fails_rather_than_hanging() {
+        let probes = ask(
+            "local turret = piece('turret')\n\
+             function script.QueryNanoPiece()\n\
+               Sleep(100)\n\
+               return turret\n\
+             end",
+            &["QueryNanoPiece"],
+        );
+
+        let probe = answers(&probes, "QueryNanoPiece");
+        assert!(probe.note.is_some(), "{probe:?}");
+    }
+}
