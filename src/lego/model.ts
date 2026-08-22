@@ -160,6 +160,33 @@ export interface LegoImportedGame {
   unit?: string;
 }
 
+/**
+ * What a unit that builds is worth, as three unit definition keys.
+ *
+ * All three go in together, and that is not tidiness. `UnitDef::IsBuilderUnit`
+ * is `builder && buildSpeed > 0 && buildDistance > 0`, and `builder` is then
+ * `&=`'d against it, so `builder = true` with the engine's own `workerTime`
+ * default of zero clears itself and the unit is silently not a builder.
+ */
+export interface LegoBuilder {
+  /** Written as `workerTime`. Build, repair, reclaim and capture speed all
+   *  default to this one number. */
+  workerTime?: number;
+  /** How far it reaches, in elmos. The engine clamps this up to 38. */
+  buildDistance?: number;
+  /** Whether it can help another unit's build. The engine defaults this to
+   *  whatever `builder` is, so absent means true for a builder. */
+  canAssist?: boolean;
+}
+
+/** What a unit with no `builder` block of its own is worth. `workerTime` has to
+ *  be above zero or the engine discards the whole thing: see `LegoBuilder`. */
+export const DEFAULT_BUILDER: Required<LegoBuilder> = {
+  workerTime: 100,
+  buildDistance: 128,
+  canAssist: true,
+};
+
 export interface LegoImported {
   /**
    * The `.s3o` this came from, for saying where the unit came from.
@@ -292,6 +319,18 @@ export interface LegoProject {
    * piece by piece and still be clicked as one easy shape.
    */
   pieceSelection?: boolean;
+  /**
+   * How fast and how far this unit builds, when it builds at all.
+   *
+   * Absent means the defaults, which is where a unit with a build arm starts:
+   * the panel opens on them and touching a field takes them over, the same rule
+   * the collision volume and the aim point follow.
+   *
+   * Whether the keys are written at all is not stored here. It follows from the
+   * unit having a piece in a `buildarm.*` role, because a unit with a build arm
+   * modelled and nothing driving it is not a thing anybody wants.
+   */
+  builder?: LegoBuilder;
   unitDef?: Record<string, string | number | boolean>;
   notes?: string;
   /** Canned animations applied to this unit, from `animPresets.ts`. */
@@ -577,6 +616,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
 
   const mid = parseVec3(d.mid);
   const collisionVolume = parseCollisionVolume(d.collisionVolume);
+  const builder = parseBuilder(d.builder);
   const project: LegoProject = {
     schemaVersion: LEGO_SCHEMA_VERSION,
     id: d.id,
@@ -602,6 +642,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(collisionVolume ? { collisionVolume } : {}),
     ...(d.pieceCollision === true ? { pieceCollision: true } : {}),
     ...(d.pieceSelection === true ? { pieceSelection: true } : {}),
+    ...(builder ? { builder } : {}),
     ...(typeof d.unitDef === "object" && d.unitDef !== null
       ? { unitDef: d.unitDef as Record<string, string | number | boolean> }
       : {}),
@@ -786,6 +827,32 @@ function parseCollisionVolume(value: unknown): LegoCollisionVolume | null {
   const offsets = parseVec3(v.offsets);
   if (!type || !scales || !offsets) return null;
   return { type, scales, offsets };
+}
+
+/**
+ * A unit's build tuning, keeping only the fields it actually carries.
+ *
+ * An empty block is dropped rather than stored, so a unit that was opened,
+ * looked at and left alone does not gain a key saying nothing. The defaults
+ * fill in whatever is absent at write time: see `DEFAULT_BUILDER`.
+ */
+function parseBuilder(value: unknown): LegoBuilder | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const builder: LegoBuilder = {
+    // Zero is a real number here and a broken one: the engine reads a builder
+    // with no work rate as not a builder. It is kept rather than swapped for a
+    // default, because silently rewriting a number somebody typed is worse
+    // than showing them the number that does nothing.
+    ...(typeof v.workerTime === "number" && Number.isFinite(v.workerTime)
+      ? { workerTime: v.workerTime }
+      : {}),
+    ...(typeof v.buildDistance === "number" && Number.isFinite(v.buildDistance)
+      ? { buildDistance: v.buildDistance }
+      : {}),
+    ...(typeof v.canAssist === "boolean" ? { canAssist: v.canAssist } : {}),
+  };
+  return Object.keys(builder).length > 0 ? builder : null;
 }
 
 /**

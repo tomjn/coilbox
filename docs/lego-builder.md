@@ -91,12 +91,39 @@ Then open the **Animation** tab. Each preset says what it does and what it needs
 | Recoil on firing | A barrel |
 | Idle sway | A body |
 | Wreck pose | A body |
+| Aim while building | A build arm |
+| Factory build cycle | A door |
+| Nano from the nozzle | A nano emit point |
 
 Applying one gives you sliders for its own parameters: stride time, thigh swing, sweep angle, kick distance and so on. **Play** runs everything applied, in the viewport, over the unit's built pose. Nothing about playback is written to the unit, so stopping restores exactly what you built. Playback stays off if your system asks for reduced motion.
 
-The file button at the top of the panel shows the unit script the presets generate, ready to copy. It is Lua, it declares a local only for the pieces it actually uses, and it is sampled from the same maths the viewport plays, so the two cannot drift apart.
-
 Presets are demonstrations of motion, not the motion itself in every case. A turret in a game points where the target is, and the sweep you see in the viewport is what that motion looks like.
+
+### Units that build
+
+The engine asks a builder and a factory different questions, so they get different presets.
+
+A builder is handed a heading and a pitch worked out from whatever it is building, recomputed every time. **Aim while building** turns the arm base to that heading and the arm to that pitch, waits for both, and swings them home when the job stops. A factory is handed nothing at all, because it builds inside itself and there is nothing to point at, so **Factory build cycle** opens its doors while it works and shuts them after.
+
+**Nano from the nozzle** is not motion. It answers the engine's question about where the build spray comes out, taking each piece marked **Nano emit point** in turn. Those are usually empty pieces called `nano1`, `nano2` and so on, carrying no geometry: add them with the empty piece button. Without this the spray comes from the model's origin, which on a tall builder is somewhere around its feet.
+
+**Build arm** used to sweep whenever the unit was switched on, which for a builder is nearly always. It now runs while the unit is actually building. If you applied it before this change, that is what altered.
+
+Two things happen automatically for a unit with any build role on it.
+
+Its definition is written as a builder, with `builder`, `workerTime`, `builddistance` and `canassist`. The three numbers go together because the engine reads a builder with no work rate as not a builder, so `builder = true` on its own clears itself. **What it builds with** at the top of the Animation panel sets the work rate and the reach.
+
+Its script sets build stance. That one is written for every unit, builder or not. `CBuilder::StartBuild` refuses to begin until the unit says it is in stance, and a script is the only thing in the engine that can say so, so a builder whose script leaves it out queues a build and waits forever with nothing in the infolog to explain it.
+
+### The script behind the presets
+
+**Script** at the top of the Animation panel shows the Lua the presets generate, ready to copy. It declares a local only for the pieces it actually uses, and it is sampled from the same maths the viewport plays, so the two cannot drift apart.
+
+The engine calls this the unit script, and it is written on export to `scripts/<unit>.lua`. Animation is most of what it does, which is why the builder puts it behind the Animation panel, but the same file is where a game's own `Create`, `Killed` and `AimWeapon` hooks would go. It is loaded by the unit script framework that games ship in `LuaGadgets/Gadgets/unit_script.lua`, which reads the file named by the unit definition's `script` key.
+
+**Take ownership of this script** hands it to you. From then on the drawer is an editor, the text is stored on the unit, and an export writes exactly what you wrote. The presets stop applying at that point, so the Animation panel becomes a player for your script rather than a list of presets.
+
+**Discard this script and use the presets** gives it back. The stored text goes and the unit is generated from its presets again. Undo brings the text back if that was a mistake, so copy it first if you want to keep it past this session. The case worth knowing about: a unit whose script was taken over and then emptied animates nothing and no preset can reach it, and this is the only way out short of editing files on disk.
 
 ## What export writes
 
@@ -133,7 +160,7 @@ The **Collision** tab beside Pieces and Animation shows what will be written, an
 
 Changing anything takes the volume over, and it is then saved with the unit. **Use the bounding box** hands it back, and the derived volume follows the geometry again as you build.
 
-You do not have to type any of it. While the Collision tab is open the viewport's move and scale handles are on the volume rather than on a piece, so you can drag it to size and watch the numbers follow. There is no rotate handle, because a volume has no rotation: the engine measures it along the model's own axes.
+You do not have to type any of it. While the Collision tab is open the viewport's move and scale handles are on the volume rather than on a piece, so you can drag it to size and watch the numbers follow. There is no rotate handle, because a volume has no rotation: the engine measures it along the model's own axes. The per-piece fields further down the panel can borrow those handles for one piece's own box.
 
 Two shapes cannot be stretched, and the engine says so rather than the panel: a sphere takes the largest of the three sizes for every axis, and a cylinder takes the larger of the two across it for both. The viewport draws what the engine will end up with rather than what was typed, so a sphere dragged out on one axis comes back round.
 
@@ -148,7 +175,15 @@ A unit can be treated piece by piece rather than as one shape, and there are two
 
 Neither switch turns the other on. The engine reads them in two functions, `ParseCollisionVolume` and `ParseSelectionVolume`, over the same boxes, and a unit shot at piece by piece while staying an easy click is a real combination rather than a mistake. Turning on the shooting one alone is what most units want, which is why the shape above stays the click target unless you say otherwise.
 
-There is nothing to set per piece either way, and that is the engine's doing rather than a gap here. No `.s3o` piece carries a collision volume and no unit definition can name one. The engine measures a box around each piece's own vertices as it loads the model, and the only choice a unit definition has is whether to use them. A game can change one while a unit is alive, with `Spring.SetUnitPieceCollisionVolumeData`, but that is a unit script's job rather than the builder's. So the boxes are a reading: turn either switch on and the viewport draws the ones the engine will build, in fainter orange over the model, whenever the volume is being shown.
+Turn either switch on and the viewport draws the boxes the engine will build, in yellow over the model. They are yellow rather than orange so they read apart from the unit's own volume, which is drawn at the same time and usually has them all inside it.
+
+Those boxes start as a reading, because nothing declares them. No `.s3o` piece carries a collision volume and no unit definition can name one: the engine measures a box around each piece's own vertices as it loads the model. The only way to change one is `Spring.SetUnitPieceCollisionVolumeData` on a unit that is already alive, which makes it a unit script's job.
+
+**Change one piece's box** at the bottom of the panel does it anyway. Pick a piece, and it opens on the box the engine measured for it. Change a number and that piece is yours: a different shape, a different size, a different place, or out of the hit test entirely so nothing stops there.
+
+Selecting a piece while this panel is open moves the viewport's move and size handles onto that piece's box and draws it wide so it can be picked out of the crowd. There is one set of handles, so the unit's volume gives them up and dims while a piece has them. Deselect to put them back. A piece nothing hits draws no box, so the handles stay on the volume.
+
+Anything set here is written on export, as Lua, to `scripts/coilbox/<unit>_collision.lua` inside the game you export to. That file is coilbox's own and is rewritten every time, which is the whole reason it is a file of its own: `scripts/<unit>.lua` beside it, the animation script from [The script behind the presets](#the-script-behind-the-presets), is written once and then never overwritten, so collision code inside it would be frozen at whatever the first export happened to write. The generated animation script pulls the collision file in with one `include` line. A script you took over before setting any of this has no such line and an export will never add one, so the panel says which line to add. **Show the file this writes** prints the Lua the next export would produce, so it can be read without going and finding it in the game folder.
 
 The volume above still matters with either switch on. It is the sphere an explosion measures to decide whether the unit was caught at all. And with only the shooting switch on it is still the shape you click, because `ParseSelectionVolume` reads no shape of its own and falls back to the `collisionvolume` keys.
 
@@ -159,6 +194,8 @@ The aim point is the one point on the unit that another unit shoots at. A weapon
 Left alone it is the middle of the model's bounding box. That is the wrong point whenever a long outlying piece drags the box off the body: a crane arm, an aircraft tail, a raised dish. The point ends up in the air beside the unit, or down in its legs, so shots aimed at it miss what a player is looking at.
 
 The **Aim** tab beside Collision sets it. It opens on the measured middle, and typing anything takes it over. **Use the bounding box centre** hands it back, and it follows the geometry again as you build. The crosshair button in the viewport's camera group draws the point as a red dot, and opening the tab draws it whether or not that button is on.
+
+You do not have to type it either. While the tab is open the viewport's move handles are on the point, so it can be dragged onto the body and the numbers follow. Move is all it gets: a point has no size to scale and nothing to rotate, so the other two tools stand down.
 
 Two other numbers are measured from this point rather than from the model's origin, so both move with it, and the builder keeps both right:
 

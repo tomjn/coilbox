@@ -161,11 +161,30 @@ describe("presets", () => {
     }
   });
 
-  it("animates every role it requires", () => {
+  /**
+   * A preset that asks for a role and then never moves it is asking for
+   * nothing, which is a bug in a preset that animates.
+   *
+   * Not every preset animates. `build.nano` answers `QueryNanoPiece` with the
+   * pieces carrying its role and moves none of them, so it claims an empty
+   * `animates` honestly rather than naming roles it never touches. Playback
+   * reads `animates` to know what to reset, and a role listed there that
+   * nothing moves would have it reset a piece for no reason.
+   */
+  it("animates every role it requires, unless it animates nothing at all", () => {
     for (const preset of PRESETS) {
+      if (preset.animates.length === 0) continue;
       for (const need of preset.requires) {
         expect(preset.animates).toContain(need.role);
       }
+    }
+  });
+
+  it("gives a preset that animates nothing no parameters to animate with", () => {
+    for (const preset of PRESETS) {
+      if (preset.animates.length > 0) continue;
+      expect(preset.params).toEqual([]);
+      expect(preset.track(0, {}, preset.requires[0].role)).toBeNull();
     }
   });
 

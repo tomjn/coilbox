@@ -78,11 +78,46 @@ const HOOKS: { hook: LuaHook; signature: string }[] = [
   { hook: "AimFromWeapon1", signature: "script.AimFromWeapon1()" },
   { hook: "QueryWeapon1", signature: "script.QueryWeapon1()" },
   { hook: "Shot1", signature: "script.Shot1()" },
+  // One name, two shapes. A builder is handed a heading and a pitch worked out
+  // from its build target, a factory is handed nothing at all, and the engine
+  // calls the same function either way (`LuaScriptNames.h`, `Builder.cpp` and
+  // `Factory.cpp`). Anything reading the arguments has to check it got them.
+  { hook: "StartBuilding", signature: "script.StartBuilding(heading, pitch)" },
+  { hook: "StopBuilding", signature: "script.StopBuilding()" },
+  { hook: "QueryNanoPiece", signature: "script.QueryNanoPiece()" },
 ];
 
 /** What a callin returns when no preset has anything to say. */
 const HOOK_FALLBACK: Partial<Record<LuaHook, string[]>> = {
   AimWeapon1: ["  return true"],
+};
+
+/**
+ * The line that lets a builder build at all, and where it goes.
+ *
+ * `CBuilder::StartBuild` refuses to start until the unit is in build stance,
+ * and the only thing in the whole engine that ever sets that is a script
+ * calling this: `UnitScript.cpp` writes `unit->inBuildStance` from
+ * `SetUnitValue(INBUILDSTANCE, ...)` and nothing else does, while `Unit.h`
+ * starts it false. A builder whose script never says this queues a build and
+ * waits forever, with no error and nothing in the infolog.
+ *
+ * So it is not a preset. It is written for every unit the way `Killed`'s
+ * explode line is, because a unit can be a builder in its definition without
+ * having a build arm modelled, and gating it on a role would leave that unit
+ * broken in exactly the way this exists to prevent.
+ *
+ * Position matters. Setting stance runs after whatever a preset put in
+ * `StartBuilding`, so an aim preset's `WaitForTurn` has finished and the unit
+ * only claims to be in stance once its arm is actually pointing. Clearing it
+ * runs before anything in `StopBuilding`, so the unit stops building at once
+ * rather than after its arm has finished swinging home.
+ */
+const BUILD_STANCE: Partial<
+  Record<LuaHook, { before?: string; after?: string }>
+> = {
+  StartBuilding: { after: "  SetUnitValue(COB.INBUILDSTANCE, 1)" },
+  StopBuilding: { before: "  SetUnitValue(COB.INBUILDSTANCE, 0)" },
 };
 
 /**
@@ -182,8 +217,22 @@ export function buildLuaScript(project: LegoProject): string {
     ...functions,
   ];
 
+  // `QueryNanoPiece` has to hand back a piece whichever way it is asked, and
+  // the honest answer with none marked is the root: that is where the engine
+  // puts the spray with no script at all. Not in `HOOK_FALLBACK` because the
+  // root's local name is only known once the document has been read.
+  const nanoFallback = root ? [`  return ${localName(root)}`] : [];
+
   for (const { hook, signature } of HOOKS) {
-    const lines = hooks.get(hook) ?? HOOK_FALLBACK[hook] ?? [];
+    const fallback =
+      hook === "QueryNanoPiece" ? nanoFallback : (HOOK_FALLBACK[hook] ?? []);
+    const preset = hooks.get(hook) ?? fallback;
+    const stance = BUILD_STANCE[hook];
+    const lines = [
+      ...(stance?.before ? [stance.before] : []),
+      ...preset,
+      ...(stance?.after ? [stance.after] : []),
+    ];
     out.push(`function ${signature}`, ...lines, "end", "");
   }
 

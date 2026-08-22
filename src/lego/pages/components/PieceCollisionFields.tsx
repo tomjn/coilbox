@@ -22,6 +22,11 @@
 import { Button } from "@picoframe/frame";
 import { useMemo } from "react";
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { OptionSelect } from "../../../uberstress/pages/components/OptionSelect";
@@ -45,6 +50,22 @@ import type { RawGeometry } from "../../rawGeometry";
 import { bakedPieces } from "../../s3oBuild";
 import { Vec3Row } from "./TransformFields";
 
+/**
+ * The piece these fields are on, given the builder's selection.
+ *
+ * Exported because the viewport has to put its handles on the same box these
+ * fields change, and nothing selected still shows a piece here: the fields open
+ * on the first one rather than on nothing at all.
+ */
+export function pickedCollisionPiece(
+  project: LegoProject,
+  selectedId: string | null,
+): string | null {
+  const pieces = orderedPieces(project);
+  const picked = pieces.find((piece) => piece.id === selectedId) ?? pieces[0];
+  return picked?.id ?? null;
+}
+
 interface Props {
   project: LegoProject;
   pack: LoadedPack;
@@ -54,6 +75,9 @@ interface Props {
   onSelect: (pieceId: string) => void;
   /** Null puts the piece back on the box the engine derives for it. */
   onChange: (pieceId: string, collision: LegoPieceCollision | null) => void;
+  /** The Lua the export would write for this unit right now, so the file can be
+   *  read without going and finding it in the game folder. */
+  script: string;
 }
 
 export function PieceCollisionFields({
@@ -63,6 +87,7 @@ export function PieceCollisionFields({
   selectedId,
   onSelect,
   onChange,
+  script,
 }: Props) {
   // Every vertex in the unit, so not on every keystroke elsewhere in the page.
   const volumes = useMemo(
@@ -80,7 +105,8 @@ export function PieceCollisionFields({
   // offered. A piece the model does not carry vertices for is offered as well:
   // an empty piece is exactly the case this panel exists for, since the engine
   // gives it a one elmo box nobody asked for.
-  const picked = pieces.find((piece) => piece.id === selectedId) ?? pieces[0];
+  const pickedId = pickedCollisionPiece(project, selectedId);
+  const picked = pieces.find((piece) => piece.id === pickedId);
   const entry = picked ? byId.get(picked.id) : undefined;
   const overridden = project.pieces.filter(
     (piece) => piece.collision !== undefined,
@@ -126,13 +152,11 @@ export function PieceCollisionFields({
       <p className="text-xs font-medium">Change one piece's box</p>
       <p className="text-xs text-muted-foreground">
         Nothing in a model or a unit definition can set these, so coilbox writes
-        them as Lua instead:{" "}
-        <code className="break-all">
-          scripts/{pieceCollisionScriptPath(project.unitName)}
-        </code>
-        , which the unit script pulls in with one line. That file is its own and
-        is rewritten on every export, so it keeps up with what you set here even
-        after you have taken the script over.
+        them as Lua instead. Exporting the unit puts them in a file of coilbox's
+        own next to the game's scripts, and the unit script pulls that file in
+        with one line. Nothing is written until you export, and the file is
+        rewritten every time, so it keeps up with what you set here even after
+        you have taken the script over.
       </p>
 
       <div>
@@ -148,6 +172,14 @@ export function PieceCollisionFields({
           }))}
         />
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        {!selectedId
+          ? `Nothing is selected, so the viewport's handles are on the unit's volume. Select ${picked.name} to move them onto its box.`
+          : hit
+            ? `${picked.name} is selected, so the viewport's handles are on its box and it is drawn wide to stand out from the rest. Size needs the scale tool: those handles are plates on the box's six faces. Deselect to put them back on the unit's volume.`
+            : `Nothing hits ${picked.name}, so it has no box on screen and the viewport's handles stay on the unit's volume.`}
+      </p>
 
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor="piece-hit" className="text-xs font-medium">
@@ -241,6 +273,31 @@ export function PieceCollisionFields({
           Changed on {overridden.map((piece) => piece.name).join(", ")}.
         </p>
       ) : null}
+
+      {/* The file is coilbox's and lands in somebody else's game folder, which
+          made it easy to take on trust or to miss entirely. Reading it is the
+          only way to check what a piece will actually be given. */}
+      <Collapsible>
+        <CollapsibleTrigger asChild>
+          <Button size="sm" variant="outline" className="w-full">
+            Show the file this writes
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Written on export to{" "}
+            <code className="break-all">
+              scripts/{pieceCollisionScriptPath(project.unitName)}
+            </code>{" "}
+            inside the game you export to, and nowhere else. Saving the project
+            does not write it. Change these numbers rather than the file: an
+            export overwrites it.
+          </p>
+          <pre className="mt-2 max-h-64 overflow-auto rounded border border-border/60 bg-muted/40 p-2 text-[11px] leading-relaxed">
+            {script}
+          </pre>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

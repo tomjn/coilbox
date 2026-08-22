@@ -44,6 +44,12 @@ export const ROLES: LegoRole[] = [
   { id: "buildarm.base", label: "Build arm base", group: "Build arm" },
   { id: "buildarm.arm", label: "Build arm", group: "Build arm" },
   { id: "buildarm.nozzle", label: "Build nozzle", group: "Build arm" },
+  // Set on as many pieces as the unit has. A game model usually carries these
+  // as empty pieces called nano1, nano2 and so on: they have no geometry and
+  // exist only as the coordinate the build spray comes out of, which is why
+  // they are their own role rather than the nozzle. A nozzle swings and gets
+  // counter-rotated by `BUILDARM`. A nano point never moves.
+  { id: "buildarm.nano", label: "Nano emit point", group: "Build arm" },
   { id: "door", label: "Door", group: "Structure" },
 ];
 
@@ -56,8 +62,17 @@ export function isRole(value: string): boolean {
 export interface PresetParam {
   id: string;
   label: string;
-  /** Degrees, seconds, turns per second or metres. Converted inside `track`. */
-  unit: "deg" | "s" | "hz" | "m";
+  /**
+   * Degrees, seconds, turns per second, metres, or degrees per second.
+   * Converted inside `track`.
+   *
+   * `deg/s` is a rate rather than an angle. A preset using it hands the angle
+   * itself straight to the engine, which works it out from the build target,
+   * and only decides how fast the piece gets there. `track` reads it to time
+   * the preview's swing, so the slider changes what you watch as well as what
+   * is exported.
+   */
+  unit: "deg" | "s" | "hz" | "m" | "deg/s";
   min: number;
   max: number;
   step: number;
@@ -96,6 +111,11 @@ export type LuaHook =
   | "AimFromWeapon1"
   | "QueryWeapon1"
   | "Shot1"
+  // A builder is handed a heading and a pitch to point at, a factory is handed
+  // nothing at all, and both arrive through this one name. See `BUILD_AIM`.
+  | "StartBuilding"
+  | "StopBuilding"
+  | "QueryNanoPiece"
   | "Killed";
 
 export interface EmitContext {
@@ -630,9 +650,270 @@ export const BUILDARM: AnimPreset = {
     return {
       functions: thread.functions,
       hooks: {
-        // A builder animates while it is working, which is what Activate means.
-        Activate: [`  Signal(${ctx.signal})`, "  StartThread(buildArm)"],
-        Deactivate: [`  Signal(${ctx.signal})`, "  buildArmStop()"],
+        // Working, not merely switched on. This used to hang off Activate,
+        // which is the engine's "on" and for a builder is nearly always true,
+        // so the arm swept the whole time and stopped for nothing. A build is
+        // what StartBuilding and StopBuilding bracket.
+        StartBuilding: [`  Signal(${ctx.signal})`, "  StartThread(buildArm)"],
+        StopBuilding: [`  Signal(${ctx.signal})`, "  buildArmStop()"],
+      },
+    };
+  },
+};
+
+/**
+ * How long one leg of the build preview runs, in seconds.
+ *
+ * A builder in a game aims once and then holds for as long as the job takes, so
+ * a preview that only showed the swing would be over before it was noticed and
+ * one that only showed the hold would look like nothing. Each leg is a swing
+ * followed by a hold, and the two legs aim opposite ways.
+ */
+const BUILD_PREVIEW_LEG = 3;
+/** The most of a leg the swing may take, so there is always a hold to see. */
+const BUILD_PREVIEW_SWING = 2 / 3;
+
+/** Where the preview aims on each leg, in degrees of heading and pitch. */
+const BUILD_PREVIEW_AIM: [number, number][] = [
+  [40, -12],
+  [-35, 8],
+];
+
+/**
+ * Eased 0 to 1 over the swing, then held at 1, given a position within one leg.
+ *
+ * How long the swing takes is the angle divided by the speed, which is what
+ * `Turn` does in a game, so the sliders change the preview and not only the
+ * exported script. Capped at part of a leg, because a preview whose swing fills
+ * the whole leg never shows the hold, and a hold is most of what a builder does.
+ *
+ * Cosine rather than linear, because a piece starts and stops against the rest
+ * of the model, and a linear ramp in a six second loop reads as a machine part
+ * sliding rather than an arm swinging.
+ */
+function buildSwing(phase: number, angle: number, speed: number): number {
+  const swing = Math.min(
+    BUILD_PREVIEW_LEG * BUILD_PREVIEW_SWING,
+    Math.abs(angle) / Math.max(speed, 1),
+  );
+  if (phase >= swing) return 1;
+  return (1 - Math.cos((phase / swing) * Math.PI)) * 0.5;
+}
+
+export const BUILD_AIM: AnimPreset = {
+  id: "build.aim",
+  label: "Aim while building",
+  description:
+    "Points the build arm at whatever the unit is building and holds it there until the job stops. A builder only.",
+  requires: [{ role: "buildarm.arm", count: 1 }],
+  animates: ["buildarm.base", "buildarm.arm"],
+  params: [
+    {
+      id: "turnSpeed",
+      label: "Turn speed",
+      unit: "deg/s",
+      min: 15,
+      max: 720,
+      step: 15,
+      fallback: 120,
+    },
+    {
+      id: "liftSpeed",
+      label: "Lift speed",
+      unit: "deg/s",
+      min: 15,
+      max: 720,
+      step: 15,
+      fallback: 90,
+    },
+  ],
+  /**
+   * Two aims, swung to and held, over and over.
+   *
+   * In a game the heading and pitch come from the build target and the hold
+   * lasts as long as the job, so this is a demonstration in the same way
+   * `turret.track`'s sweep is. What it shows honestly is which piece takes the
+   * heading, which takes the pitch, and how long each takes to get there: the
+   * swing runs at the speed that piece's slider sets, so a slow arm is slow to
+   * watch rather than only slow in the exported script.
+   */
+  track(t, params, role) {
+    const cycle = BUILD_PREVIEW_LEG * BUILD_PREVIEW_AIM.length;
+    const at = t - Math.floor(t / cycle) * cycle;
+    const leg = Math.floor(at / BUILD_PREVIEW_LEG);
+    const [heading, pitch] = BUILD_PREVIEW_AIM[leg];
+    const phase = at - leg * BUILD_PREVIEW_LEG;
+
+    if (role === "buildarm.base") {
+      const towards = buildSwing(
+        phase,
+        heading,
+        value(this, params, "turnSpeed"),
+      );
+      return { rotation: [0, deg(heading) * towards, 0] };
+    }
+    // The same sign the emitted script uses, so the viewport and a game agree
+    // about which way an arm lifts. See `emit`.
+    if (role === "buildarm.arm") {
+      const towards = buildSwing(
+        phase,
+        pitch,
+        value(this, params, "liftSpeed"),
+      );
+      return { rotation: [deg(-pitch) * towards, 0, 0] };
+    }
+    return null;
+  },
+  /**
+   * Hangs off `StartBuilding` directly, with no thread of its own, because the
+   * unit script framework already wraps that call-in in one: it is listed in
+   * `thread_wrap` in `LuaGadgets/Gadgets/unit_script.lua`, which is what makes
+   * `WaitForTurn` legal here.
+   *
+   * The `if heading` guard is not defensive noise. A factory's `StartBuilding`
+   * is called with no arguments at all (`CFactory::StartBuild`), and both
+   * shapes arrive through this one function name, so a unit carrying this and
+   * the factory preset would otherwise turn to a nil heading on every build.
+   *
+   * Waiting for both turns before returning is what lets the build stance line
+   * the generator appends mean something: the unit says it is in stance once
+   * the arm is actually pointing, rather than while it is still swinging.
+   */
+  emit(ctx) {
+    const arm = ctx.pieces("buildarm.arm")[0];
+    if (!arm) return null;
+    const base = ctx.pieces("buildarm.base")[0];
+    const turn = lua(deg(value(this, ctx.params, "turnSpeed")));
+    const lift = lua(deg(value(this, ctx.params, "liftSpeed")));
+
+    const aim: string[] = [];
+    const rest: string[] = [];
+    if (base) {
+      aim.push(`    Turn(${base}, y_axis, heading, ${turn})`);
+      rest.push(`  Turn(${base}, y_axis, 0, ${turn})`);
+    }
+    aim.push(`    Turn(${arm}, x_axis, -pitch, ${lift})`);
+    rest.push(`  Turn(${arm}, x_axis, 0, ${lift})`);
+    if (base) aim.push(`    WaitForTurn(${base}, y_axis)`);
+    aim.push(`    WaitForTurn(${arm}, x_axis)`);
+
+    return {
+      functions: [],
+      hooks: {
+        StartBuilding: ["  if heading then", ...aim, "  end"],
+        StopBuilding: rest,
+      },
+    };
+  },
+};
+
+export const BUILD_FACTORY: AnimPreset = {
+  id: "build.factory",
+  label: "Factory build cycle",
+  description:
+    "Opens the doors while a factory is building and shuts them when it stops. No aiming: the engine hands a factory nothing to point at.",
+  requires: [{ role: "door", count: 1 }],
+  animates: ["door"],
+  params: [
+    {
+      id: "open",
+      label: "Opening",
+      unit: "deg",
+      min: 10,
+      max: 180,
+      step: 5,
+      fallback: 100,
+    },
+    {
+      id: "openTime",
+      label: "Opening time",
+      unit: "s",
+      min: 0.2,
+      max: 8,
+      step: 0.2,
+      fallback: 1.2,
+    },
+  ],
+  /** Open for the first build, shut for the gap, on the same legs the aim
+   *  preview uses so a unit carrying both reads as one motion. */
+  track(t, params, role) {
+    if (role !== "door") return null;
+    const cycle = BUILD_PREVIEW_LEG * 2;
+    const at = t - Math.floor(t / cycle) * cycle;
+    const building = at < BUILD_PREVIEW_LEG;
+    const phase = at - (building ? 0 : BUILD_PREVIEW_LEG);
+    const open = value(this, params, "open");
+    // The doors travel their whole opening in the time the slider asks for,
+    // whichever way they are going, so the preview matches the emitted speed.
+    const speed = open / Math.max(value(this, params, "openTime"), 0.05);
+    const towards = building
+      ? buildSwing(phase, open, speed)
+      : 1 - buildSwing(phase, open, speed);
+    return { rotation: [0, deg(open) * towards, 0] };
+  },
+  emit(ctx) {
+    const doors = ctx.pieces("door");
+    if (doors.length === 0) return null;
+    const open = value(this, ctx.params, "open");
+    const speed = lua(
+      deg(open) / Math.max(value(this, ctx.params, "openTime"), 0.05),
+    );
+    const angle = lua(deg(open));
+
+    return {
+      functions: [],
+      hooks: {
+        // No wait: a factory's build starts whether or not the doors have
+        // finished, and holding the call-in open would only delay the unit
+        // appearing behind them.
+        StartBuilding: doors.map(
+          (door) => `  Turn(${door}, y_axis, ${angle}, ${speed})`,
+        ),
+        // Shutting is not optional: a door left open is a hole in the model.
+        StopBuilding: doors.map(
+          (door) => `  Turn(${door}, y_axis, 0, ${speed})`,
+        ),
+      },
+    };
+  },
+};
+
+export const BUILD_NANO: AnimPreset = {
+  id: "build.nano",
+  label: "Nano from the nozzle",
+  description:
+    "Sends the build spray out of the pieces marked as nano emit points, taking each in turn, rather than out of the model's origin.",
+  requires: [{ role: "buildarm.nano", count: 1 }],
+  // Moves nothing. It answers a question the engine asks rather than posing
+  // the model, which is why there is no track below either.
+  animates: [],
+  params: [],
+  track() {
+    return null;
+  },
+  /**
+   * `QueryNanoPiece` is the one call-in here that is not thread-wrapped: it is
+   * commented out of `thread_wrap` in `unit_script.lua`, so it has to return
+   * straight away and may not wait for anything.
+   *
+   * Cycling rather than answering with one piece is what a builder with more
+   * than one nozzle does, and it is why the role takes many pieces. The counter
+   * is a file-scope local, which is per unit rather than shared: the framework
+   * compiles the chunk once and re-runs it in each unit's own environment.
+   */
+  emit(ctx) {
+    const nano = ctx.pieces("buildarm.nano");
+    if (nano.length === 0) return null;
+    return {
+      functions: [
+        `local nanoPieces = { ${nano.join(", ")} }`,
+        "local nanoIndex = 0",
+      ],
+      hooks: {
+        QueryNanoPiece: [
+          "  nanoIndex = nanoIndex % #nanoPieces + 1",
+          "  return nanoPieces[nanoIndex]",
+        ],
       },
     };
   },
@@ -1061,6 +1342,9 @@ export const PRESETS: AnimPreset[] = [
   TURRET_TRACK,
   WHEELS_ROLL,
   BUILDARM,
+  BUILD_AIM,
+  BUILD_FACTORY,
+  BUILD_NANO,
   OPEN_CLOSE,
   HOVER_BOB,
   AIM_TRACK,

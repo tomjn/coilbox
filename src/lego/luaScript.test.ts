@@ -67,6 +67,34 @@ const LEGS: Partial<LegoPiece>[] = [
   { id: "rs", name: "rightshin", role: "leg.r1.shin" },
 ];
 
+const ARM: Partial<LegoPiece>[] = [
+  { id: "ab", name: "armbase", role: "buildarm.base" },
+  { id: "ar", name: "arm", role: "buildarm.arm" },
+];
+
+/** Three emit points, which is what a game builder usually carries and what
+ *  makes the cycling in `QueryNanoPiece` worth writing. */
+const NANO: Partial<LegoPiece>[] = [
+  { id: "n1", name: "nano1", role: "buildarm.nano" },
+  { id: "n2", name: "nano2", role: "buildarm.nano" },
+  { id: "n3", name: "nano3", role: "buildarm.nano" },
+];
+
+/**
+ * The body of one generated function, without its `function` and `end` lines.
+ *
+ * Asserting on position inside a call-in needs the lines in order rather than a
+ * substring of the whole file, since build stance is about what runs first and
+ * what runs last.
+ */
+function between(lua: string, signature: string): string[] {
+  const lines = lua.split("\n");
+  const start = lines.findIndex((line) => line.startsWith(signature));
+  if (start === -1) throw new Error(`no ${signature} in the script`);
+  const end = lines.indexOf("end", start);
+  return lines.slice(start + 1, end);
+}
+
 describe("buildLuaScript", () => {
   it("writes every callin even with nothing applied, so it loads as it is", () => {
     const lua = buildLuaScript(project([]));
@@ -412,6 +440,164 @@ describe("buildLuaScript", () => {
     expect(lua.endsWith("\n")).toBe(true);
     expect(lua.endsWith("\n\n")).toBe(false);
     expect(lua).not.toMatch(/\n{3}/);
+  });
+
+  /**
+   * Build stance is what lets a builder build at all. `CBuilder::StartBuild`
+   * refuses to start until it is set, and a script is the only thing in the
+   * engine that can set it, so a unit whose script omits it queues a build and
+   * waits forever with nothing in the infolog to say why.
+   */
+  describe("build stance", () => {
+    it("is set for a unit with no build arm and no presets at all", () => {
+      const lua = buildLuaScript(project([{ id: "hull", name: "hull" }]));
+
+      expect(lua).toContain("SetUnitValue(COB.INBUILDSTANCE, 1)");
+      expect(lua).toContain("SetUnitValue(COB.INBUILDSTANCE, 0)");
+    });
+
+    /** After the aim, so the unit only claims to be in stance once its arm has
+     *  actually finished pointing at the target. */
+    it("is set last in StartBuilding, after whatever a preset added", () => {
+      const lua = buildLuaScript(
+        project(ARM, [{ presetId: "build.aim", params: {} }]),
+      );
+      const body = between(lua, "function script.StartBuilding");
+
+      expect(body.at(-1)).toBe("  SetUnitValue(COB.INBUILDSTANCE, 1)");
+      expect(body.indexOf("  end")).toBeLessThan(body.length - 1);
+    });
+
+    /** Before the swing home, so the unit stops building at once rather than
+     *  after its arm has finished travelling. */
+    it("is cleared first in StopBuilding, before whatever a preset added", () => {
+      const lua = buildLuaScript(
+        project(ARM, [{ presetId: "build.aim", params: {} }]),
+      );
+      const body = between(lua, "function script.StopBuilding");
+
+      expect(body[0]).toBe("  SetUnitValue(COB.INBUILDSTANCE, 0)");
+      expect(body.length).toBeGreaterThan(1);
+    });
+  });
+
+  describe("aiming while building", () => {
+    /**
+     * A factory's `StartBuilding` is called with no arguments at all, and both
+     * shapes arrive through the one function name, so the body has to check it
+     * was handed a heading before it turns anything to it.
+     */
+    it("guards the aim, since a factory calls the same function with nothing", () => {
+      const lua = buildLuaScript(
+        project(ARM, [{ presetId: "build.aim", params: {} }]),
+      );
+
+      expect(lua).toContain("  if heading then");
+      expect(lua).toMatch(/if heading then[\s\S]*Turn\(arm, x_axis, -pitch/);
+    });
+
+    it("waits for both turns before the stance line runs", () => {
+      const lua = buildLuaScript(
+        project(ARM, [{ presetId: "build.aim", params: {} }]),
+      );
+      const body = between(lua, "function script.StartBuilding").join("\n");
+
+      expect(body).toMatch(
+        /WaitForTurn\(armbase, y_axis\)[\s\S]*WaitForTurn\(arm, x_axis\)[\s\S]*INBUILDSTANCE, 1/,
+      );
+    });
+
+    it("turns both pieces home when the job stops", () => {
+      const lua = buildLuaScript(
+        project(ARM, [{ presetId: "build.aim", params: {} }]),
+      );
+
+      expect(lua).toContain("Turn(armbase, y_axis, 0,");
+      expect(lua).toContain("Turn(arm, x_axis, 0,");
+    });
+
+    /** The base is optional: a one piece arm still aims, it just cannot swing
+     *  round, so nothing should be emitted naming a piece that is not there. */
+    it("emits no base turn for an arm with no base under it", () => {
+      const lua = buildLuaScript(
+        project(
+          [{ id: "ar", name: "arm", role: "buildarm.arm" }],
+          [{ presetId: "build.aim", params: {} }],
+        ),
+      );
+
+      expect(lua).toContain("Turn(arm, x_axis, -pitch,");
+      expect(lua).not.toContain("y_axis, heading");
+    });
+  });
+
+  describe("the nano piece", () => {
+    it("cycles every piece marked as an emit point", () => {
+      const lua = buildLuaScript(
+        project(NANO, [{ presetId: "build.nano", params: {} }]),
+      );
+
+      expect(lua).toContain("local nanoPieces = { nano1, nano2, nano3 }");
+      expect(lua).toContain("nanoIndex = nanoIndex % #nanoPieces + 1");
+      expect(lua).toContain("return nanoPieces[nanoIndex]");
+    });
+
+    it("still cycles with only one emit point, rather than special-casing it", () => {
+      const lua = buildLuaScript(
+        project(
+          [{ id: "n", name: "nano1", role: "buildarm.nano" }],
+          [{ presetId: "build.nano", params: {} }],
+        ),
+      );
+
+      expect(lua).toContain("local nanoPieces = { nano1 }");
+    });
+
+    /**
+     * The call-in has to hand back a piece however it is asked, and the honest
+     * answer with none marked is the root: that is where the engine puts the
+     * spray for a unit with no script at all.
+     */
+    it("falls back to the root piece when nothing is marked", () => {
+      const lua = buildLuaScript(project([{ id: "hull", name: "hull" }]));
+
+      // `base` is the root piece's name here. Its id is `root`, which is not
+      // what the script says: a script names pieces, never ids.
+      expect(between(lua, "function script.QueryNanoPiece")).toEqual([
+        "  return base",
+      ]);
+    });
+  });
+
+  /**
+   * The build arm used to sweep on Activate, which is the engine's "switched
+   * on" and for a builder is nearly always true, so it never stopped.
+   */
+  it("sweeps the build arm while building rather than while merely active", () => {
+    const lua = buildLuaScript(
+      project(ARM, [{ presetId: "buildarm", params: {} }]),
+    );
+
+    expect(between(lua, "function script.StartBuilding")).toContain(
+      "  StartThread(buildArm)",
+    );
+    expect(between(lua, "function script.Activate")).toEqual([]);
+  });
+
+  it("compiles with every build preset applied at once", () => {
+    const lua = buildLuaScript(
+      project(
+        [...ARM, ...NANO, { id: "d", name: "door1", role: "door" }],
+        [
+          { presetId: "build.aim", params: {} },
+          { presetId: "build.factory", params: {} },
+          { presetId: "build.nano", params: {} },
+          { presetId: "buildarm", params: {} },
+        ],
+      ),
+    );
+
+    expect(luaCompiles(lua)).toBe(true);
   });
 });
 

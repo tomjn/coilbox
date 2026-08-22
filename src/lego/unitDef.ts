@@ -20,8 +20,35 @@
  */
 
 import { effectiveCollisionVolume } from "./collisionVolume";
-import type { LegoProject } from "./model";
+import { DEFAULT_BUILDER, type LegoProject } from "./model";
 import type { UnitBounds } from "./s3oBuild";
+
+/**
+ * Whether this unit builds, which is decided by the model rather than a flag.
+ *
+ * A piece in any `buildarm.*` role means somebody modelled an arm, a nozzle or
+ * a set of nano points, and none of those are decoration. The alternative was a
+ * switch somewhere saying "this is a builder", which would be a second thing to
+ * remember that says what the piece roles already say.
+ */
+export function isBuilder(project: LegoProject): boolean {
+  return project.pieces.some((piece) => piece.role?.startsWith("buildarm."));
+}
+
+/** The builder keys, or nothing for a unit with no build arm on it. */
+function builderFields(project: LegoProject): [string, string][] {
+  if (!isBuilder(project)) return [];
+  const { workerTime, buildDistance, canAssist } = {
+    ...DEFAULT_BUILDER,
+    ...project.builder,
+  };
+  return [
+    ["builder", "true"],
+    ["workertime", String(workerTime)],
+    ["builddistance", String(buildDistance)],
+    ["canassist", canAssist ? "true" : "false"],
+  ];
+}
 
 /**
  * World units (elmos) per footprint step. The blocking map's square is two of
@@ -143,6 +170,14 @@ export function buildUnitDef(project: LegoProject, bounds: UnitBounds): string {
       : []),
     ["maxdamage", String(DEFAULT_MAX_DAMAGE)],
     ["canmove", "false"],
+    // Written together or not at all. `UnitDef::IsBuilderUnit` is `builder &&
+    // buildSpeed > 0 && buildDistance > 0`, and `builder` is `&=`'d against
+    // that a line later, so `builder = true` on its own clears itself against
+    // the engine's `workerTime` default of zero and the unit quietly is not a
+    // builder. The generated script's build stance line is the other half:
+    // without it a builder with these keys still never starts. See
+    // `luaScript.ts`.
+    ...builderFields(project),
   ];
 
   const lines = [

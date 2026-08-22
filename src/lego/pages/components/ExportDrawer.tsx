@@ -48,7 +48,10 @@ import { buildObj } from "../../exportObj";
 import { unitScript } from "../../luaScript";
 import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
-import { buildPieceCollisionScript } from "../../pieceCollisionScript";
+import {
+  buildPieceCollisionScript,
+  pieceCollisionScriptPath,
+} from "../../pieceCollisionScript";
 import type { RawGeometry } from "../../rawGeometry";
 import { blenderTextures, importedTextures } from "../../rawImport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
@@ -369,6 +372,25 @@ export function ExportDrawer({
                   survive a re-export.
                 </p>
               </div>
+            </div>
+
+            {/* Named before the export rather than only in the list of what was
+                written, because it is a file nobody asked for by name and it
+                lands in somebody else's game folder. */}
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium">Piece collision</span>
+              <p className="text-xs text-muted-foreground">
+                Export always writes{" "}
+                <code className="break-all">
+                  scripts/{pieceCollisionScriptPath(project.unitName)}
+                </code>
+                , the Lua that gives this unit's pieces the collision boxes set
+                in the collision panel. No checkbox and no keeping an older
+                copy: this one is coilbox's own and is rewritten every time, so
+                it stays in step with the unit even once the script beside it
+                belongs to you. A unit that changes nothing gets an empty file,
+                since the script's <code>include</code> has to find something.
+              </p>
             </div>
 
             <div className="flex items-start gap-2">

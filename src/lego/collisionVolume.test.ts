@@ -6,6 +6,7 @@ import {
   engineScales,
   isIgnoredByEngine,
   MIN_COLLISION_SIZE,
+  MIN_PIECE_COLLISION_SIZE,
   pieceCollisionVolume,
   pieceCollisionVolumes,
   reanchorCollisionVolume,
@@ -186,6 +187,21 @@ describe("resizeCollisionFace", () => {
     const crushed = resizeCollisionFace(box, 1, 1, -30);
     expect(crushed.scales).toEqual([10, MIN_COLLISION_SIZE, 10]);
     // Still hanging off the same fixed face.
+    expect(crushed.offsets[1] - crushed.scales[1] / 2).toBe(-5);
+  });
+
+  it("holds a piece's larger minimum when it is given one", () => {
+    // A piece box is clamped to an elmo by the engine rather than to a tenth
+    // of one, so a drag that crushes it has to stop at the number a game will
+    // actually build. See `MIN_PIECE_COLLISION_SIZE`.
+    const crushed = resizeCollisionFace(
+      box,
+      1,
+      1,
+      -30,
+      MIN_PIECE_COLLISION_SIZE,
+    );
+    expect(crushed.scales).toEqual([10, MIN_PIECE_COLLISION_SIZE, 10]);
     expect(crushed.offsets[1] - crushed.scales[1] / 2).toBe(-5);
   });
 

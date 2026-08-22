@@ -96,6 +96,7 @@ function panel(project: LegoProject, selectedId: string | null = "hull") {
       selectedId={selectedId}
       onSelectPiece={onSelectPiece}
       onPieceVolumeChange={onPieceVolumeChange}
+      pieceScript="-- nothing set"
     />
   );
 }
@@ -491,5 +492,85 @@ describe("changing one piece's box", () => {
     });
 
     expect(screen.queryByText(/does not pull the file in/)).toBeNull();
+  });
+});
+
+/**
+ * Selecting the piece is the whole gesture. There is no switch on top of it,
+ * so the panel's job is to say where the handles currently are and how to move
+ * them, for all three cases.
+ */
+describe("where the panel says the viewport's handles are", () => {
+  it("on the selected piece's box", () => {
+    show(unit({ pieceCollision: true }));
+    expect(screen.getByText(/hull is selected, so the viewport/)).toBeTruthy();
+  });
+
+  /** The fields still open on a piece with nothing selected, the first in the
+   *  tree, so the way back onto a box is to select that one. */
+  it("on the unit's volume while nothing is selected, and how to move them", () => {
+    render(panel(unit({ pieceCollision: true }), null));
+    expect(
+      screen.getByText(/Nothing is selected.*Select base to move them/),
+    ).toBeTruthy();
+  });
+
+  /** A piece nothing hits draws no box, so there is nothing for the handles to
+   *  land on and they stay where they were. */
+  it("on the unit's volume for a piece switched out of the hit test", () => {
+    const project = unit({ pieceCollision: true });
+    show({
+      ...project,
+      pieces: project.pieces.map((piece) =>
+        piece.id === "hull" ? { ...piece, collision: { hit: false } } : piece,
+      ),
+    });
+
+    expect(screen.getByText(/no box on screen/)).toBeTruthy();
+  });
+});
+
+/**
+ * The generated Lua is written into somebody else's game folder on export and
+ * cannot be opened from anywhere else in coilbox, so the panel is the only
+ * place it can be read before it lands.
+ */
+describe("reading the file this writes", () => {
+  it("shows the Lua it was handed, and where that file goes", () => {
+    render(
+      <CollisionPanel
+        project={unit({ pieceCollision: true })}
+        pack={loaded}
+        raw={null}
+        onChange={onChange}
+        onPieceCollisionChange={onPieceCollisionChange}
+        onPieceSelectionChange={onPieceSelectionChange}
+        selectedId="hull"
+        onSelectPiece={onSelectPiece}
+        onPieceVolumeChange={onPieceVolumeChange}
+        pieceScript="Spring.SetUnitPieceCollisionVolumeData(unitID, hull)"
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Show the file this writes" }),
+    );
+
+    expect(
+      screen.getByText("Spring.SetUnitPieceCollisionVolumeData(unitID, hull)"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("scripts/coilbox/walker_collision.lua"),
+    ).toBeTruthy();
+  });
+
+  it("says an export writes it and a save does not", () => {
+    show(unit({ pieceCollision: true }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Show the file this writes" }),
+    );
+
+    expect(
+      screen.getByText(/Saving the project\s+does not write it/),
+    ).toBeTruthy();
   });
 });
