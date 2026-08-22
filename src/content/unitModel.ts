@@ -49,8 +49,8 @@ export interface BuiltModel {
  * that. A `.3do` face can also name a Total Annihilation palette entry rather
  * than a texture, which is why `UNTEXTURED` exists above.
  */
-function modelTexture(file: string, data = false): THREE.Texture {
-  return springTexture(unitModelTextureUrl(file), data);
+function modelTexture(file: string): THREE.Texture {
+  return springTexture(unitModelTextureUrl(file));
 }
 
 /**
@@ -89,13 +89,10 @@ export function buildModel(
       metalness: 0.05,
       side: THREE.DoubleSide,
     });
-    if (file && model.teamMask?.file) {
-      paintTeamColour(
-        material,
-        modelTexture(model.teamMask.file, true),
-        teamColour,
-      );
-    }
+    // Only an `.s3o` keeps a team-colour mask in its texture's alpha. A `.3do`
+    // keeps reflectivity there and names its team-colour regions face by face,
+    // which is the `texture?.teamColour` branch above.
+    if (file && model.format === "s3o") paintTeamColour(material, teamColour);
     materials.set(key, material);
     return material;
   };

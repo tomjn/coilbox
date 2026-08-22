@@ -1,6 +1,6 @@
 /**
  * Loading a Spring unit texture into three.js, and painting the team-colour
- * regions an `.s3o` marks in its second one.
+ * regions an `.s3o` marks in the alpha of the one it is painted with.
  *
  * Shared by the game model viewer, which reads textures out of a game archive,
  * and by the unit builder's imported units, which read them out of coilbox's
@@ -18,11 +18,11 @@ import { textureArrived } from "./textureArrival";
  * What a team-colour region is drawn in when the caller has no colour of its
  * own.
  *
- * The regions are black in the texture a unit is painted with and marked in the
- * red channel of a second one, because the engine paints them in the player's
- * colour. A viewer of a lone model has no player to take a colour from, so it
- * picks one. A view that does know whose the unit is, such as the scenario
- * editor, passes that colour instead.
+ * The regions are black in the texture a unit is painted with and marked in its
+ * alpha channel, because the engine paints them in the player's colour. A viewer
+ * of a lone model has no player to take a colour from, so it picks one. A view
+ * that does know whose the unit is, such as the scenario editor, passes that
+ * colour instead.
  */
 export const TEAM_COLOUR = 0x1028cc;
 
@@ -38,10 +38,11 @@ const textures = new Map<string, THREE.Texture>();
  * compressed rather than being decoded anywhere: a shared 8192 square atlas is
  * 64 MiB packed and 256 MiB as RGBA.
  *
- * `data` is for a mask, which is measurements rather than colour and must not
- * be gamma-decoded on the way to the shader that reads it.
+ * Always sRGB, because the only Spring texture coilbox draws with is the one a
+ * unit is painted with. The team-colour mask rides in that texture's alpha,
+ * which no colour space touches.
  */
-export function springTexture(url: string, data = false): THREE.Texture {
+export function springTexture(url: string): THREE.Texture {
   const cached = textures.get(url);
   if (cached) return cached;
 
@@ -52,7 +53,7 @@ export function springTexture(url: string, data = false): THREE.Texture {
     ext === "dds"
       ? new DDSLoader().load(url, textureArrived)
       : new THREE.TextureLoader().load(url, textureArrived);
-  texture.colorSpace = data ? THREE.NoColorSpace : THREE.SRGBColorSpace;
+  texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   // The engine flips every texture to OpenGL's bottom-up order on load,
   // including a DDS. three does that for anything it decodes itself, but a
@@ -83,28 +84,39 @@ export function releaseSpringTexture(url: string): void {
 }
 
 /**
- * Paint the team-colour regions the mask marks in its red channel.
+ * Paint the team-colour regions the material's own map marks in its alpha.
  *
- * Mixing two samplers needs a patch on the standard material rather than a
- * material of our own: everything else about it, the lighting and the colour
- * space, is what the rest of the app already uses.
+ * The engine's two model shaders both mix straight from the first texture's
+ * alpha and never read the second one for this:
+ * `texColor1.rgb = mix(texColor1.rgb, teamCol.rgb, texColor1.a)` in
+ * `ModelFragProgGL4.glsl`, and the same line over `gl_FragColor` in
+ * `ModelFragProg.glsl`. `S3OTextureHandler.cpp` says it in words: the first
+ * texture is "diffuse color (RGB) and teamcolor (A)", the second is "glow (R),
+ * reflectivity (G) and 1-bit Alpha (A)".
+ *
+ * Only for an `.s3o`. A `.3do`'s texture alpha is reflectivity, which the engine
+ * moves into the second texture's green rather than reading as a mask.
+ *
+ * A patch on the standard material rather than a material of our own:
+ * everything else about it, the lighting and the colour space, is what the rest
+ * of the app already uses. The alpha itself never leaves the shader, because
+ * three's own `opaque_fragment` sets it back to 1 for a material that is not
+ * transparent.
  */
 export function paintTeamColour(
   material: THREE.MeshStandardMaterial,
-  mask: THREE.Texture,
   colour: THREE.ColorRepresentation = TEAM_COLOUR,
 ): void {
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.teamMask = { value: mask };
     shader.uniforms.teamColour = { value: new THREE.Color(colour) };
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
-        "#include <common>\nuniform sampler2D teamMask;\nuniform vec3 teamColour;",
+        "#include <common>\nuniform vec3 teamColour;",
       )
       .replace(
         "#include <map_fragment>",
-        "#include <map_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, teamColour, texture2D(teamMask, vMapUv).r);",
+        "#include <map_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, teamColour, diffuseColor.a);",
       );
   };
   // Without this three reuses the unpatched program it compiled for another
