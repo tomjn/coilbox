@@ -27,6 +27,8 @@ pub struct Repo {
 pub struct Version {
     /// Rapid tag passed to `pr-downloader --download-game`, e.g. `bar:test`.
     pub tag: String,
+    /// The package's md5, which is also what the pool names its `.sdp` after.
+    pub md5: String,
     /// Human-readable long name, e.g. `Beyond all Reason test-11407-03b45b8`.
     pub name: String,
 }
@@ -70,7 +72,7 @@ pub fn parse_versions(body: &str) -> Vec<Version> {
             if tag.is_empty() {
                 return None;
             }
-            let _md5 = parts.next();
+            let md5 = parts.next().map(str::trim).unwrap_or_default();
             let _depends = parts.next();
             let name = parts
                 .next()
@@ -79,9 +81,28 @@ pub fn parse_versions(body: &str) -> Vec<Version> {
                 .unwrap_or(tag);
             Some(Version {
                 tag: tag.to_string(),
+                md5: md5.to_string(),
                 name: name.to_string(),
             })
         })
+        .collect()
+}
+
+/// The md5s a *named* tag points at, which is what tells a public release from a
+/// private build.
+///
+/// Rapid publishes a tag per commit as `<repo>:git:<sha>` alongside the named
+/// ones like `ba:stable`. A package only a commit tag reaches is a snapshot
+/// somebody happened to download, and it is not what a game is.
+///
+/// Deliberately reads the tag rather than the name: `ba:test` currently points
+/// at the released V15.9.8 while the build named `test-7183-001edc3` is a
+/// snapshot, so matching on the word would get both backwards.
+pub fn release_md5s(body: &str) -> Vec<String> {
+    parse_versions(body)
+        .into_iter()
+        .filter(|v| !v.tag.contains(":git:") && !v.md5.is_empty())
+        .map(|v| v.md5)
         .collect()
 }
 
@@ -134,5 +155,43 @@ mod tests {
     fn version_name_keeps_embedded_commas() {
         let vs = parse_versions("t:1,md5,,Some Game, Special Edition\n");
         assert_eq!(vs[0].name, "Some Game, Special Edition");
+    }
+
+    /// The md5 is the join back to an installed `<md5>.sdp`, so a parser that
+    /// drops it cannot tell a release from a commit snapshot.
+    #[test]
+    fn versions_keep_the_md5_the_pool_names_its_archives_after() {
+        let vs = parse_versions(
+            "ba:stable,1df3ea4654d1f1f381e3534bfb1cbdb3,,Balanced Annihilation V15.9.8\n",
+        );
+        assert_eq!(vs[0].md5, "1df3ea4654d1f1f381e3534bfb1cbdb3");
+    }
+
+    /// `ba:test` points at the released V15.9.8 while the build *named*
+    /// test-7183 is a commit snapshot, which is why this reads the tag and
+    /// never the name.
+    #[test]
+    fn only_named_tags_name_a_release() {
+        let body = "ba:git:001edc3f,cc956b0843d10d3689e2558281587c83,,Balanced Annihilation test-7183-001edc3\n\
+                    ba:stable,1df3ea4654d1f1f381e3534bfb1cbdb3,,Balanced Annihilation V15.9.8\n\
+                    ba:test,dd57d8bc4e04ce8edee09a9cf84bbc04,,Balanced Annihilation V15.9.8\n";
+        assert_eq!(
+            release_md5s(body),
+            vec![
+                "1df3ea4654d1f1f381e3534bfb1cbdb3".to_string(),
+                "dd57d8bc4e04ce8edee09a9cf84bbc04".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_repo_of_nothing_but_commits_names_no_release() {
+        let body = "ba:git:aaa,1111,,One\nba:git:bbb,2222,,Two\n";
+        assert!(release_md5s(body).is_empty());
+    }
+
+    #[test]
+    fn a_line_with_no_md5_names_no_release() {
+        assert!(release_md5s("ba:stable,,,Balanced Annihilation\n").is_empty());
     }
 }
