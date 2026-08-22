@@ -22,4 +22,5 @@ permissions = [
   "allow-dl-set-engine-dirs",
   "allow-dl-path-writable",
   "allow-dl-fetch-text",
+  "allow-dl-rapid-release-archives",
 ]

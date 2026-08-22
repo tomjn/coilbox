@@ -410,6 +410,62 @@ async fn dl_versions(repo_url: String) -> CliResult {
     }
 }
 
+/// Every md5 a named rapid tag points at, across the pool this data directory
+/// holds.
+///
+/// Walks `<dataDir>/rapid` two levels deep, because a repository's tags live at
+/// `rapid/<host>/<repo>/versions.gz` and a master package index at
+/// `rapid/<host>/versions.gz`. A file that will not open or will not inflate is
+/// passed over rather than failing the read: one unreadable repository should
+/// not decide that every other game is a snapshot.
+fn local_release_md5s(data_dir: &std::path::Path) -> Vec<String> {
+    fn read_one(path: &std::path::Path, into: &mut Vec<String>) {
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
+        let mut body = String::new();
+        let mut decoder = flate2::read::GzDecoder::new(&bytes[..]);
+        if decoder.read_to_string(&mut body).is_err() {
+            return;
+        }
+        into.extend(rapid::release_md5s(&body));
+    }
+
+    let mut found = Vec::new();
+    let Ok(hosts) = std::fs::read_dir(data_dir.join("rapid")) else {
+        return found;
+    };
+    for host in hosts.flatten() {
+        let host = host.path();
+        if !host.is_dir() {
+            continue;
+        }
+        read_one(&host.join("versions.gz"), &mut found);
+        let Ok(repos) = std::fs::read_dir(&host) else {
+            continue;
+        };
+        for repo in repos.flatten() {
+            let repo = repo.path();
+            if repo.is_dir() {
+                read_one(&repo.join("versions.gz"), &mut found);
+            }
+        }
+    }
+    found
+}
+
+/// `dl_rapid_release_archives` - the md5s of rapid packages a named tag points
+/// at, for deciding whether an installed `<md5>.sdp` is a public release or a
+/// commit snapshot. See `src/hub/games/factsSweep.ts`.
+#[tauri::command]
+async fn dl_rapid_release_archives(data_dir: String) -> CliResult {
+    if data_dir.trim().is_empty() {
+        return CliResult::err("data_dir is required");
+    }
+    let md5s = local_release_md5s(std::path::Path::new(&data_dir));
+    CliResult::ok(json!({ "md5s": md5s }))
+}
+
 /// `dl_download` — download a rapid tag via the sidecar, parsing its log output
 /// into a success/error envelope. `master_url` (optional) points pr-downloader at
 /// a specific rapid master, e.g. Beyond All Reason; absent, the sidecar's default
@@ -1336,7 +1392,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_installed_content,
             dl_set_engine_dirs,
             dl_path_writable,
-            dl_fetch_text
+            dl_fetch_text,
+            dl_rapid_release_archives
         ])
         .build()
 }
@@ -1846,5 +1903,62 @@ mod engine_sweep_tests {
             "not mine"
         );
         assert!(!engine_root.join("spring_105.7z").exists());
+    }
+}
+
+#[cfg(test)]
+mod local_rapid_tests {
+    use super::local_release_md5s;
+    use flate2::write::GzEncoder;
+    use flate2::Compression;
+    use std::io::Write;
+    use std::path::Path;
+
+    /// Rapid writes `<dataDir>/rapid/<host>/<repo>/versions.gz`, and the master
+    /// package index sits one level shallower at
+    /// `<dataDir>/rapid/<host>/versions.gz`, so both depths have to be found.
+    fn write_versions(dir: &Path, body: &str) {
+        std::fs::create_dir_all(dir).unwrap();
+        let f = std::fs::File::create(dir.join("versions.gz")).unwrap();
+        let mut gz = GzEncoder::new(f, Compression::default());
+        gz.write_all(body.as_bytes()).unwrap();
+        gz.finish().unwrap();
+    }
+
+    #[test]
+    fn reads_named_tags_from_every_repo_at_either_depth() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        write_versions(
+            &root.join("rapid/repos.springrts.com/ba"),
+            "ba:git:001edc3f,cc956b08,,Balanced Annihilation test-7183-001edc3\n\
+             ba:stable,1df3ea46,,Balanced Annihilation V15.9.8\n",
+        );
+        write_versions(
+            &root.join("rapid/packages.springrts.com"),
+            "pkg:stable,9999abcd,,Some Package\n",
+        );
+
+        let mut found = local_release_md5s(root);
+        found.sort();
+        assert_eq!(found, vec!["1df3ea46".to_string(), "9999abcd".to_string()]);
+    }
+
+    #[test]
+    fn a_repo_of_nothing_but_commits_contributes_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_versions(
+            &tmp.path().join("rapid/repos.springrts.com/ba"),
+            "ba:git:aaa,1111,,One\nba:git:bbb,2222,,Two\n",
+        );
+        assert!(local_release_md5s(tmp.path()).is_empty());
+    }
+
+    /// A machine with no pool is not a failure. It just has no rapid installs
+    /// for the rule to judge.
+    #[test]
+    fn a_data_dir_with_no_rapid_folder_answers_with_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(local_release_md5s(tmp.path()).is_empty());
     }
 }
