@@ -82,6 +82,7 @@ function PreviewBody({
   result,
   loading,
   archive,
+  archiveLabel,
   enginePath,
   dataDir,
   size,
@@ -90,6 +91,7 @@ function PreviewBody({
   result: ArchiveFileResult | null;
   loading: boolean;
   archive: string;
+  archiveLabel?: string;
   enginePath?: string;
   dataDir?: string;
   size?: number;
@@ -105,6 +107,7 @@ function PreviewBody({
         enginePath={enginePath}
         dataDir={dataDir}
         archive={archive}
+        archiveLabel={archiveLabel}
         path={path}
         format={model}
         size={size}
@@ -232,6 +235,7 @@ export function FilePreview({
   loading,
   onDownload,
   archive,
+  archiveLabel,
   enginePath,
   dataDir,
   size,
@@ -242,6 +246,9 @@ export function FilePreview({
   onDownload: () => Promise<boolean>;
   /** The archive the member is in, which a model is read back out of. */
   archive: string;
+  /** The game or map behind that file name, when the archive is one. Only for
+   *  naming: a model opened into the builder is filed under it. */
+  archiveLabel?: string;
   enginePath?: string;
   dataDir?: string;
   /** The member's size from the archive listing. A model preview is skipped
@@ -265,6 +272,7 @@ export function FilePreview({
           result={result}
           loading={loading}
           archive={archive}
+          archiveLabel={archiveLabel}
           enginePath={enginePath}
           dataDir={dataDir}
           size={size}

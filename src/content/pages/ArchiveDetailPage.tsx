@@ -266,6 +266,7 @@ export default function ArchiveDetailPage() {
               loading={fileLoading}
               onDownload={downloadSelected}
               archive={archive.name}
+              archiveLabel={archive.gameName ?? archive.mapName}
               enginePath={selected?.enginePath}
               dataDir={selected?.rootPath}
               size={selectedSize}
