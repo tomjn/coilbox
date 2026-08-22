@@ -20,6 +20,7 @@
 //! Registered as `"coilbox-lego"`, so the frontend invokes
 //! `plugin:coilbox-lego|<cmd>`.
 
+mod atlas3do;
 mod geometry;
 mod import;
 mod texture;
@@ -703,6 +704,234 @@ async fn lego_import_s3o<R: Runtime>(app: AppHandle<R>, path: String, id: String
     }
 }
 
+/// `lego_read_3do` names the tiles a `.3do` asks for, before anything imports it.
+///
+/// The pair to `lego_read_s3o`, and it exists for the same reason: a model
+/// unpacked out of a packed archive needs its textures put beside it before the
+/// import goes looking for them, and only the model itself says which ones.
+///
+/// Both spellings of each name come back. The engine appends `00` to a `.3do`
+/// texture name unless it is listed in the game's `teamtex.txt`, so a face
+/// naming `arm2` is drawn with `arm200`, and whichever the archive holds is the
+/// one worth unpacking.
+#[tauri::command]
+async fn lego_read_3do(path: String) -> CliResult {
+    let bytes = match std::fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let model = match coilbox_3do::read(&bytes) {
+        Ok(model) => model,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let mut names: Vec<String> = Vec::new();
+    for piece in model.root.walk() {
+        for prim in &piece.primitives {
+            let coilbox_3do::Texture::Name(name) = &prim.texture else {
+                continue;
+            };
+            if name.is_empty() {
+                continue;
+            }
+            for candidate in [format!("{name}00"), name.clone()] {
+                if !names.contains(&candidate) {
+                    names.push(candidate);
+                }
+            }
+        }
+    }
+    CliResult::ok(json!({ "textures": names }))
+}
+
+/// `lego_import_3do` imports a `.3do`, the older model format, as raw geometry.
+///
+/// Opening one is a conversion rather than a read, which is what makes this a
+/// different command from `lego_import_s3o` rather than a branch inside it. An
+/// `.s3o` names one texture and stores coordinates into it. A `.3do` names a
+/// tile per face, in `unittextures/tatex/`, and stores no coordinates at all: a
+/// face is stretched over the whole of its tile. So the tiles are packed into
+/// one sheet and every face is given real coordinates onto it, and what comes
+/// out is an ordinary unit that exports as an ordinary `.s3o`.
+///
+/// The sheet is written into the shared texture store like any other imported
+/// texture, so nothing downstream knows this unit was converted.
+///
+/// A tile nothing on disk matched, and a face the format gives a flat palette
+/// colour rather than a texture, are both drawn plain and counted. The Total
+/// Annihilation palette is embedded in the engine rather than shipped in the
+/// archive, so there is no colour to look up for the second kind.
+#[tauri::command]
+async fn lego_import_3do<R: Runtime>(app: AppHandle<R>, path: String, id: String) -> CliResult {
+    if !valid_id(&id) {
+        return CliResult::err(format!("invalid id: {id}"));
+    }
+    let file = PathBuf::from(&path);
+    let size = match std::fs::metadata(&file) {
+        Ok(meta) => meta.len(),
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    if size > MAX_MODEL_BYTES {
+        return CliResult::err(format!(
+            "{path} is {size} bytes, which is far larger than any unit model"
+        ));
+    }
+    let bytes = match std::fs::read(&file) {
+        Ok(bytes) => bytes,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+    let model = match coilbox_3do::read(&bytes) {
+        Ok(model) => model,
+        Err(e) => return CliResult::err(format!("could not read {path}: {e}")),
+    };
+
+    let (tiles, wanted) = read_tiles(&file, &model);
+    let packed = match atlas3do::pack(tiles, true) {
+        Ok(packed) => packed,
+        Err(e) => return CliResult::err(format!("could not build a texture for {path}: {e}")),
+    };
+    let imported = match import::import_3do(&model, &packed.rects) {
+        Ok(imported) => imported,
+        Err(e) => return CliResult::err(e),
+    };
+    if imported.meshes == 0 {
+        return CliResult::err(format!(
+            "{path} has no geometry in it, so there is nothing to import."
+        ));
+    }
+
+    let base = match lego_dir(&app) {
+        Ok(dir) => dir,
+        Err(e) => return CliResult::err(e),
+    };
+    let geometry = base.join("geometry");
+    if let Err(e) = std::fs::create_dir_all(&geometry) {
+        return CliResult::err(format!("could not create the geometry folder: {e}"));
+    }
+    if let Err(e) = std::fs::write(geometry.join(format!("{id}.bin.gz")), &imported.blob) {
+        return CliResult::err(format!("could not store the geometry: {e}"));
+    }
+
+    // Named after the unit rather than after anything in the file, because the
+    // sheet did not exist until now and nothing else is going to want it.
+    let sheet_name = format!(
+        "{}.png",
+        file.file_stem()
+            .map_or("model", |s| s.to_str().unwrap_or("model"))
+    );
+    let texture = match store_sheet(&base.join("textures"), &packed.image, &sheet_name) {
+        Ok(value) => value,
+        Err(e) => return CliResult::err(e),
+    };
+
+    let out = json!({
+        "radius": model.radius,
+        "height": model.height,
+        "mid": model.mid,
+        "root": imported.root,
+        "texture": texture,
+        "texture2": json!({ "key": null, "name": "", "source": null }),
+        "meshes": imported.meshes,
+        "vertices": imported.vertices,
+        "triangles": imported.triangles,
+        "converted": imported.converted,
+        "bytes": imported.blob.len(),
+        "paletteFaces": imported.palette_faces,
+        "missingTextures": imported.missing_textures,
+        "tiles": wanted,
+    });
+    match serde_json::to_value(out) {
+        Ok(value) => CliResult::ok(value),
+        Err(e) => CliResult::err(format!("could not describe {path}: {e}")),
+    }
+}
+
+/// Read every tile a `.3do` names off the disk beside it.
+///
+/// Answers the tiles it found and how many the model asked for, so the import
+/// can say "22 of 25" rather than leaving a silently patchy unit.
+fn read_tiles(model_file: &Path, model: &coilbox_3do::Model) -> (Vec<atlas3do::Tile>, usize) {
+    let mut names: Vec<String> = Vec::new();
+    for piece in model.root.walk() {
+        for prim in &piece.primitives {
+            if let coilbox_3do::Texture::Name(name) = &prim.texture {
+                if !name.is_empty() && !names.iter().any(|held| held == name) {
+                    names.push(name.clone());
+                }
+            }
+        }
+    }
+
+    let wanted = names.len();
+    let tiles = names
+        .into_iter()
+        .filter_map(|name| {
+            let found = texture::find_tile_beside_model(model_file, &name)?;
+            let bytes = std::fs::read(&found.path).ok()?;
+            let mut image = coilbox_texture::decode(&extension_of(&found.path), &bytes)?;
+            if found.team_colour {
+                team_colour_tile(&mut image);
+            }
+            Some(atlas3do::Tile { name, image })
+        })
+        .collect();
+    (tiles, wanted)
+}
+
+/// Turn a team-colour placeholder into what an `.s3o` means by one.
+///
+/// The file a game ships for one of these is flat magenta, which is a marker
+/// rather than a colour: the engine never draws it. An `.s3o` says the same
+/// thing in the alpha of the texture the unit is painted with, so the pixels
+/// become transparent and the engine paints the player's colour over them.
+///
+/// The colour underneath goes mid grey rather than staying magenta, because the
+/// builder draws the texture as it is and shows no team colour at all. Left
+/// magenta, a converted commander would have magenta patches on it in the one
+/// place somebody is looking at it.
+fn team_colour_tile(image: &mut image::RgbaImage) {
+    for pixel in image.pixels_mut() {
+        *pixel = image::Rgba([128, 128, 128, 0]);
+    }
+}
+
+fn extension_of(path: &Path) -> String {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or_default()
+        .to_lowercase()
+}
+
+/// Put a sheet this import drew into the texture store.
+///
+/// Through the same content-addressed store every other texture goes through,
+/// written as a PNG because that is what the sheet is: pixels coilbox composed
+/// rather than a file it copied.
+fn store_sheet(
+    dir: &Path,
+    image: &image::RgbaImage,
+    name: &str,
+) -> Result<serde_json::Value, String> {
+    let png = coilbox_texture::encode_png(image).ok_or("could not encode the packed texture")?;
+    let key = format!("{}.png", hex_digest(&png));
+    let target = dir.join(&key);
+    if !target.is_file() {
+        std::fs::create_dir_all(dir)
+            .map_err(|e| format!("could not create the texture folder: {e}"))?;
+        std::fs::write(&target, &png).map_err(|e| format!("could not store the texture: {e}"))?;
+    }
+    // No source. The sheet is pixels coilbox composed rather than a file it
+    // copied, so there is nothing on disk to refresh it from.
+    Ok(json!({ "key": key, "name": name, "source": serde_json::Value::Null }))
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
 /// `lego_texture_import` puts a texture the user pointed at into the store.
 ///
 /// Both changing a unit's texture and refreshing one edited outside coilbox go
@@ -1349,6 +1578,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             lego_packs,
             lego_read_s3o,
             lego_import_s3o,
+            lego_read_3do,
+            lego_import_3do,
             lego_texture_import,
             lego_texture_png,
             lego_texture_prune,
