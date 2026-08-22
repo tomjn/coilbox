@@ -1,6 +1,7 @@
 import { Maximize2, Sparkles, Wrench } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { clampUiZoom, UI_ZOOM_LEVELS } from "../../lib/uiZoom";
 import { OptionSelect } from "../../uberstress/pages/components/OptionSelect";
 import { useAdvancedModeSetting } from "../advanced";
 import {
@@ -11,6 +12,7 @@ import {
 } from "../display";
 import { isFullscreenLocked, useFullscreenSetting } from "../fullscreen";
 import { hasProfileSplash, useSplashSetting } from "../splash";
+import { useUiZoomSetting } from "../uiZoom";
 import { AboutCoilbox } from "./AboutCoilbox";
 
 /**
@@ -26,6 +28,7 @@ export default function GeneralSettings() {
   const [reduceMotion, setReduceMotion] = useReduceMotionSetting();
   const [effects, setEffects] = useEffectsSetting();
   const [performance, setPerformance] = usePerformanceModeSetting();
+  const [zoom, setZoom] = useUiZoomSetting();
   // A kiosk-locked build forces fullscreen and hides the toggle entirely.
   const fullscreenLocked = isFullscreenLocked();
   // The splash toggle only makes sense when the profile actually ships one.
@@ -58,55 +61,73 @@ export default function GeneralSettings() {
         </Label>
       </section>
 
-      {(!fullscreenLocked || showSplashToggle) && (
-        <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            <Maximize2 size={15} /> Display
-          </h2>
-          {!fullscreenLocked && (
-            <Label
-              htmlFor="fullscreen-mode"
-              className="flex cursor-pointer items-start gap-3 font-normal"
-            >
-              <Switch
-                id="fullscreen-mode"
-                checked={fullscreen}
-                onCheckedChange={(v) => setFullscreen(v === true)}
-                className="mt-0.5"
-              />
-              <span className="space-y-1">
-                <span className="block text-sm font-medium">Fullscreen</span>
-                <span className="block text-xs text-muted-foreground">
-                  Run Coilbox in fullscreen. Also toggleable with F11 or the
-                  top-bar button; the choice is remembered across restarts.
-                </span>
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <Maximize2 size={15} /> Display
+        </h2>
+        <div className="flex items-start gap-3">
+          <div className="w-40">
+            <OptionSelect
+              value={String(clampUiZoom(zoom))}
+              onValueChange={(v) => setZoom(Number(v))}
+              size="sm"
+              options={UI_ZOOM_LEVELS.map((level) => ({
+                value: String(level),
+                label: `${Math.round(level * 100)}%`,
+              }))}
+            />
+          </div>
+          <span className="space-y-1">
+            <span className="block text-sm font-medium">Interface size</span>
+            <span className="block text-xs text-muted-foreground">
+              Scales the whole of Coilbox: text, spacing and the 3D views. Fit
+              more on a small screen, or make everything easier to read on a
+              large one. Cmd or Ctrl with plus and minus does the same, and with
+              zero puts it back to 100%.
+            </span>
+          </span>
+        </div>
+        {!fullscreenLocked && (
+          <Label
+            htmlFor="fullscreen-mode"
+            className="flex cursor-pointer items-start gap-3 font-normal"
+          >
+            <Switch
+              id="fullscreen-mode"
+              checked={fullscreen}
+              onCheckedChange={(v) => setFullscreen(v === true)}
+              className="mt-0.5"
+            />
+            <span className="space-y-1">
+              <span className="block text-sm font-medium">Fullscreen</span>
+              <span className="block text-xs text-muted-foreground">
+                Run Coilbox in fullscreen. Also toggleable with F11 or the
+                top-bar button; the choice is remembered across restarts.
               </span>
-            </Label>
-          )}
-          {showSplashToggle && (
-            <Label
-              htmlFor="startup-splash"
-              className="flex cursor-pointer items-start gap-3 font-normal"
-            >
-              <Switch
-                id="startup-splash"
-                checked={splash}
-                onCheckedChange={(v) => setSplash(v === true)}
-                className="mt-0.5"
-              />
-              <span className="space-y-1">
-                <span className="block text-sm font-medium">
-                  Startup splash
-                </span>
-                <span className="block text-xs text-muted-foreground">
-                  Show the brand splash when Coilbox launches. Click it or press
-                  Escape to dismiss it early.
-                </span>
+            </span>
+          </Label>
+        )}
+        {showSplashToggle && (
+          <Label
+            htmlFor="startup-splash"
+            className="flex cursor-pointer items-start gap-3 font-normal"
+          >
+            <Switch
+              id="startup-splash"
+              checked={splash}
+              onCheckedChange={(v) => setSplash(v === true)}
+              className="mt-0.5"
+            />
+            <span className="space-y-1">
+              <span className="block text-sm font-medium">Startup splash</span>
+              <span className="block text-xs text-muted-foreground">
+                Show the brand splash when Coilbox launches. Click it or press
+                Escape to dismiss it early.
               </span>
-            </Label>
-          )}
-        </section>
-      )}
+            </span>
+          </Label>
+        )}
+      </section>
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">

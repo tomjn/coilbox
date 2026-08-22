@@ -9,6 +9,7 @@ import { loadHomeBackground } from "./home/background";
 import { loadContentArt } from "./home/contentArt";
 import HomeRoute from "./home/HomeRoute";
 import { loadHomeMarkup } from "./home/markup";
+import { applyUiZoom, DEFAULT_UI_ZOOM, UI_ZOOM_KEY } from "./lib/uiZoom";
 import { applyProfilePages } from "./profile/CustomPage";
 import { applyProfileSettingsHiding } from "./profile/hidden";
 import { applyProfileSlots, buildLayoutConfig } from "./profile/layout";
@@ -128,6 +129,14 @@ if (fullscreenOn) {
     .setFullscreen(true)
     .catch((e) => console.warn("fullscreen: boot apply failed", e));
 }
+
+// And the UI zoom, for the same reason: a session set to 150% should not draw
+// one frame at 100% and then jump. `GeneralProvider` keeps it in step after
+// this, and `applyUiZoom` snaps anything out of range back into it.
+applyUiZoom(
+  Number(settingsStorage.get(UI_ZOOM_KEY) ?? DEFAULT_UI_ZOOM) ||
+    DEFAULT_UI_ZOOM,
+);
 
 // Theme overrides re-point picoframe's CSS variables app-wide (every colour token
 // is a CSS var), so a branded build recolours the whole shell, not just the welcome.
