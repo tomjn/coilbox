@@ -208,6 +208,30 @@ describe("a compiled script", () => {
     expect(infer).not.toHaveBeenCalled();
   });
 
+  /**
+   * The bytecode itself, so the unit can be played. It rides along on the
+   * project because the game it came out of may not be installed the next time
+   * the project is opened.
+   */
+  it("hands back the bytecode, so the unit can animate", async () => {
+    readScript.mockResolvedValue(
+      found({ kind: "cob", text: null, bytes: [4, 0, 0, 0] }),
+    );
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.compiled).toEqual({
+      member: "scripts/armcom.lua",
+      bytes: [4, 0, 0, 0],
+    });
+  });
+
+  it("hands back no bytecode for a game that ships Lua", async () => {
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.compiled).toBeNull();
+  });
+
   /** Legible rather than an opaque file coilbox merely names. */
   it("is read back as a disassembly listing", async () => {
     readScript.mockResolvedValue(

@@ -8,6 +8,7 @@
 //! mode). See PORTING.md for the porting spec and golden-test harness.
 
 mod cob;
+mod cobrun;
 mod compiler;
 mod disasm;
 mod fold;
@@ -113,6 +114,38 @@ async fn anim_cob_disasm_bytes(bytes: Vec<u8>) -> CliResult {
 /// `overwrite` is not set, it compiles but does NOT write, returning
 /// `needsOverwrite: true` so the UI can ask before clobbering. Otherwise returns
 /// the output path and byte count with `needsOverwrite: false`.
+/// `anim_cob_run`: play a `.cob` and report where its pieces are on each frame.
+///
+/// The disassembly above makes a compiled script legible. This makes it move,
+/// which is the thing somebody opening a unit out of an older game actually
+/// wanted. `pieces` is the model's own piece names, and the timeline that comes
+/// back is the same one the Lua unit script runtime produces, so the viewport
+/// plays both the same way.
+///
+/// Read only, like the disassembly and for the same reason: bytes in, poses
+/// out, and the `.cob` inside somebody's game archive is never touched.
+///
+/// A script that will not decode or that loops without sleeping is not an
+/// error. It comes back as a timeline carrying the reason.
+#[tauri::command]
+async fn anim_cob_run(
+    bytes: Vec<u8>,
+    pieces: Vec<String>,
+    events: Vec<coilbox_unitpose::ScriptEvent>,
+    frames: u32,
+) -> CliResult {
+    let result =
+        tauri::async_runtime::spawn_blocking(move || cobrun::run(&bytes, &pieces, &events, frames))
+            .await;
+    match result {
+        Ok(timeline) => match serde_json::to_value(&timeline) {
+            Ok(value) => CliResult::ok(value),
+            Err(e) => CliResult::err(format!("could not report the run: {e}")),
+        },
+        Err(e) => CliResult::err(format!("the run failed to start: {e}")),
+    }
+}
+
 #[tauri::command]
 async fn anim_bos2cob(path: String, output: Option<String>, overwrite: Option<bool>) -> CliResult {
     let overwrite = overwrite.unwrap_or(false);
@@ -154,6 +187,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             anim_cob_disasm,
             anim_cob_disasm_bytes,
+            anim_cob_run,
             anim_bos2cob
         ])
         .build()

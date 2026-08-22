@@ -1,0 +1,9 @@
+[package]
+name = "coilbox-unitpose"
+version = "0.0.0"
+description = "The pose a unit's pieces are in on each frame, and the motion model that gets them there. Shared by the Lua and the compiled unit script runtimes."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

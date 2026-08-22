@@ -33,6 +33,7 @@ function adopted(over: Partial<AdoptedScript> = {}): AdoptedScript {
     findings: { proposals: [], notes: [], error: null },
     listing: null,
     converted: null,
+    compiled: null,
     notes: [],
     ...over,
   };
@@ -110,6 +111,14 @@ describe("a unit whose game ships compiled bytecode", () => {
 
     expect(screen.queryByLabelText("Keep the game's script")).toBeNull();
     expect(screen.getByText(/compiled rather than Lua/)).toBeTruthy();
+  });
+
+  /** Coilbox cannot write a `.cob` and can run one, and those are different
+   *  things. The panel used to say only the first. */
+  it("says the unit still animates, because the file is run", () => {
+    show(compiled);
+
+    expect(screen.getByText(/Coilbox runs it/)).toBeTruthy();
   });
 
   it("still lets it be read, and says the file is untouched", () => {

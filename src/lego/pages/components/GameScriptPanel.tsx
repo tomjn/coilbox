@@ -109,15 +109,18 @@ export function GameScriptPanel({
               <p className="text-xs text-muted-foreground">
                 The game animates this unit with{" "}
                 <code className="break-all">{adopted.member}</code>, which is
-                compiled rather than Lua. It ships the source that was compiled,{" "}
-                <code className="break-all">{adopted.converted.member}</code>,
-                and what is on offer here is that source converted to Lua.
+                compiled rather than Lua. It also ships the source that was
+                compiled,{" "}
+                <code className="break-all">{adopted.converted.member}</code>.
               </p>
               <p className="text-xs text-muted-foreground">
-                The converter is a set of text substitutions rather than a
-                compiler, so this is not the game's own file and it needs
-                checking. Read it in the script drawer and expect to fix parts
-                of it by hand.
+                The unit animates either way. Coilbox runs the compiled file,
+                which is exactly what the game plays. Taking the converted
+                source instead gives you a script you can edit and export, at
+                the cost of accuracy: the converter is a set of text
+                substitutions rather than a compiler, so what it produces is not
+                the game's own file and needs checking. Read it in the script
+                drawer and expect to fix parts of it by hand.
               </p>
               <div className="flex items-center justify-between gap-3">
                 <Label
@@ -138,8 +141,9 @@ export function GameScriptPanel({
               The game animates this unit with{" "}
               <code className="break-all">{adopted.member}</code>, which is
               compiled rather than Lua, and it does not ship the source that was
-              compiled. Coilbox writes Lua, so this one is read and left alone,
-              and the unit opens on the presets instead.
+              compiled. Coilbox runs it, so the unit opens animating the way its
+              game animates it. It cannot be edited here, and an export writes
+              Lua so it does not write this.
             </p>
           )}
           {adopted.listing ? (

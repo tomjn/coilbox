@@ -13,6 +13,10 @@
 //! and one place to keep the Lua version honest is worth more than the tidier
 //! boundary.
 //!
+//! Where the pieces are and how they move is not here. That lives in
+//! [`coilbox_unitpose`], because a compiled `.cob` animates the same model the
+//! same way and the two runtimes agreeing is the whole point of a preview.
+//!
 //! What it is for: previewing a unit's own script in the builder's viewport.
 //! It is not the engine and does not try to be. It moves pieces, hides them and
 //! runs threads. Weapons, world state, terrain, damage and sound are absent, and
@@ -24,19 +28,10 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use mlua::{Function, Lua, LuaOptions, MultiValue, StdLib, Table, Thread, ThreadStatus, Value};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-/// Sim frames per second. The engine's `GAME_SPEED`, which every `Sleep` and
-/// every per-second speed is measured against.
-pub const FPS: u32 = 30;
-
-/// Seconds of sim per frame, which every per-second speed is divided by.
-const DT: f64 = 1.0 / FPS as f64;
-
-/// Milliseconds a frame lasts as far as a script is concerned. 33, not 33.33:
-/// the engine passes `1000 / GAME_SPEED` as an integer, so a script's clock runs
-/// 990ms to the second and a `Sleep` is measured in these.
-const TICK_MS: f64 = 33.0;
+use coilbox_unitpose::{axis_index, Model, Wait, TICK_MS};
+pub use coilbox_unitpose::{ScriptEvent, Timeline, FPS, MAX_FRAMES};
 
 /// Instructions one frame may execute before the run is abandoned.
 ///
@@ -52,10 +47,6 @@ const FRAME_INSTRUCTIONS: i64 = 2_000_000;
 /// matters is kept on this side and this is only how often it is looked at.
 const HOOK_EVERY: u32 = 100_000;
 
-/// Most frames one run may simulate: 30 seconds. A preview loops, so more than
-/// this buys nothing and costs memory in the timeline.
-pub const MAX_FRAMES: u32 = FPS * 30;
-
 /// Most threads that may exist at once. A script that starts a thread per frame
 /// is a bug, and without a ceiling it is a hang.
 const MAX_THREADS: usize = 256;
@@ -70,48 +61,6 @@ const EXEC_HATCHES: &[&str] = &[
     "getfenv",
     "setfenv",
 ];
-
-/// A call-in to fire at a given frame, which is how a scenario is expressed.
-///
-/// A script animates in response to events, so a preview has to choose what
-/// happens to the unit. The choosing is the caller's: it knows the wording the
-/// user picked from and can expand "fires every two seconds" into the events it
-/// means. This side only runs them.
-#[derive(Debug, Clone, Deserialize)]
-pub struct ScriptEvent {
-    /// Frame to fire on, counted from 0.
-    pub frame: u32,
-    /// Key in the script's `script` table, such as `Create` or `AimWeapon1`.
-    pub callin: String,
-    /// Numeric arguments, for the call-ins that take them.
-    #[serde(default)]
-    pub args: Vec<f64>,
-}
-
-/// Every piece's pose on every frame, which is what the viewport plays.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Timeline {
-    pub fps: u32,
-    /// Piece names, in the order every frame's numbers are laid out.
-    pub pieces: Vec<String>,
-    /// One entry per frame simulated: `pieces.len() * 6` numbers, six per piece,
-    /// being x, y, z offset from the rest pose then x, y, z rotation in radians.
-    ///
-    /// The rotations compose in the order the engine composes them, which is y,
-    /// then x, then z. Whatever draws these has to say so.
-    pub frames: Vec<Vec<f64>>,
-    /// One flag per piece per frame, or empty when the script never hid
-    /// anything. Empty is the common case and worth not paying for.
-    pub hidden: Vec<Vec<bool>>,
-    /// What stopped the run, or none if it ran to the end. The frames before it
-    /// are still here and still worth playing: where a script gets to before it
-    /// fails is most of what says why.
-    pub error: Option<String>,
-    /// Things the run wants to say that did not stop it: a call-in the script
-    /// does not define, a call the preview cannot honour.
-    pub warnings: Vec<String>,
-}
 
 /// What one call-in that returns a piece answered.
 ///
@@ -148,102 +97,22 @@ pub struct Probes {
     pub error: Option<String>,
 }
 
-impl Timeline {
-    /// A run that produced nothing, because it could not start.
-    fn failed(pieces: &[String], error: String) -> Self {
-        Self {
-            fps: FPS,
-            pieces: pieces.to_vec(),
-            frames: Vec::new(),
-            hidden: Vec::new(),
-            error: Some(error),
-            warnings: Vec::new(),
-        }
-    }
-}
-
-/// A rotation in progress on one axis of one piece.
-///
-/// One or the other, never both: the engine keeps a single turn and a single
-/// spin per piece and axis, and starting either removes the other
-/// (`CUnitScript::AddAnim`).
-#[derive(Debug, Clone, Copy)]
-enum Rotate {
-    /// Toward `dest` at `speed` radians per second, then stop.
-    Turn { dest: f64, speed: f64 },
-    /// Continuously, at `speed` radians per second, changing that speed by
-    /// `accel` radians per second on every frame until it reaches `target`. An
-    /// `accel` of zero means `speed` is already `target`.
-    Spin { speed: f64, target: f64, accel: f64 },
-}
-
-/// A translation in progress on one axis of one piece.
-#[derive(Debug, Clone, Copy)]
-struct Translate {
-    dest: f64,
-    speed: f64,
-}
-
-#[derive(Debug, Clone)]
-struct Piece {
-    name: String,
-    /// Offset from the rest pose, in elmos, per axis.
-    pos: [f64; 3],
-    /// Rotation about the piece's own origin, in radians, per axis.
-    rot: [f64; 3],
-    hidden: bool,
-    rotate: [Option<Rotate>; 3],
-    translate: [Option<Translate>; 3],
-}
-
-impl Piece {
-    fn new(name: String) -> Self {
-        Self {
-            name,
-            pos: [0.0; 3],
-            rot: [0.0; 3],
-            hidden: false,
-            rotate: [None; 3],
-            translate: [None; 3],
-        }
-    }
-}
-
-/// Which kind of animation a thread is waiting on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Wait {
-    Turn,
-    Move,
-}
-
 /// Everything the Lua-facing functions read or write. Shared with them through
 /// an `Rc<RefCell<_>>`, so every borrow is short and none is held across a call
 /// back into Lua.
+///
+/// The model is the shared one. What is here beside it is the part only a Lua
+/// script has: coroutines it asked to start, and the signals it raised, both of
+/// which the scheduler takes up after the call that made them returns.
 #[derive(Debug, Default)]
 struct Sim {
-    pieces: Vec<Piece>,
-    /// True once anything has been hidden, shown or exploded, which is what
-    /// decides whether the timeline carries visibility at all.
-    visibility_used: bool,
+    model: Model,
     /// Threads a running thread asked for. Started before the frame ends.
     spawned: Vec<(Thread, Vec<Value>)>,
     /// Signal masks the running thread raised while it was running.
     signalled: Vec<u32>,
     /// The mask the running thread set for itself, if it did.
     mask: Option<u32>,
-    warnings: Vec<String>,
-}
-
-impl Sim {
-    fn piece(&mut self, piece: i64) -> mlua::Result<&mut Piece> {
-        piece_index(self, piece).map(move |index| &mut self.pieces[index])
-    }
-
-    fn note(&mut self, note: String) {
-        if !self.warnings.contains(&note) {
-            self.warnings.push(note);
-        }
-    }
 }
 
 /// One of the script's threads: a call-in the preview fired, or something a
@@ -353,7 +222,7 @@ impl Run {
     /// happen.
     fn start(script: &str, name: &str, pieces: &[String]) -> Result<Self, String> {
         let sim = Rc::new(RefCell::new(Sim {
-            pieces: pieces.iter().cloned().map(Piece::new).collect(),
+            model: Model::new(pieces),
             ..Sim::default()
         }));
         let budget = Rc::new(Cell::new(FRAME_INSTRUCTIONS));
@@ -402,7 +271,7 @@ impl Run {
             match function.call::<Option<i64>>(()) {
                 Ok(Some(index)) => {
                     match piece_index(&self.sim.borrow(), index) {
-                        Ok(at) => pieces.push(self.sim.borrow().pieces[at].name.clone()),
+                        Ok(at) => pieces.push(self.sim.borrow().model.pieces[at].name.clone()),
                         // A number that is not a piece of this unit. Worth
                         // saying rather than dropping: it is usually a script
                         // written against a model this one is not.
@@ -431,20 +300,15 @@ impl Run {
     }
 
     fn play(&mut self, events: &[ScriptEvent], frames: u32) -> Timeline {
-        let mut timeline = Timeline {
-            fps: FPS,
-            pieces: self
-                .sim
-                .borrow()
-                .pieces
-                .iter()
-                .map(|piece| piece.name.clone())
-                .collect(),
-            frames: Vec::with_capacity(frames as usize),
-            hidden: Vec::new(),
-            error: None,
-            warnings: Vec::new(),
-        };
+        let names = self
+            .sim
+            .borrow()
+            .model
+            .pieces
+            .iter()
+            .map(|piece| piece.name.clone())
+            .collect();
+        let mut timeline = Timeline::new(names, frames as usize);
 
         for frame in 0..frames {
             self.frame = frame;
@@ -452,14 +316,10 @@ impl Run {
                 timeline.error = Some(error);
                 break;
             }
-            self.sample(&mut timeline);
+            self.sim.borrow().model.sample(&mut timeline);
         }
 
-        let sim = self.sim.borrow();
-        timeline.warnings.extend(sim.warnings.iter().cloned());
-        if !sim.visibility_used {
-            timeline.hidden.clear();
-        }
+        self.sim.borrow().model.finish(&mut timeline);
         timeline
     }
 
@@ -471,24 +331,10 @@ impl Run {
     /// a `Sleep` cost time rather than nothing.
     fn step(&mut self, events: &[ScriptEvent]) -> Result<(), String> {
         self.budget.set(FRAME_INSTRUCTIONS);
-        self.tick_animations();
+        self.sim.borrow_mut().model.tick();
         self.wake_finished();
         self.fire_due(events)?;
         self.run_threads()
-    }
-
-    fn tick_animations(&mut self) {
-        let mut sim = self.sim.borrow_mut();
-        for piece in &mut sim.pieces {
-            for axis in 0..3 {
-                if let Some(rotate) = piece.rotate[axis] {
-                    piece.rotate[axis] = tick_rotate(&mut piece.rot[axis], rotate);
-                }
-                if let Some(translate) = piece.translate[axis] {
-                    piece.translate[axis] = tick_translate(&mut piece.pos[axis], translate);
-                }
-            }
-        }
     }
 
     /// Anything waiting on an animation that is no longer running is ready.
@@ -504,11 +350,7 @@ impl Run {
             };
             // A spin started on the axis a thread was waiting to finish turning
             // wakes it, because the spin removed the turn it was waiting on.
-            let still_going = sim.pieces.get(piece).is_some_and(|piece| match kind {
-                Wait::Turn => matches!(piece.rotate[axis], Some(Rotate::Turn { .. })),
-                Wait::Move => piece.translate[axis].is_some(),
-            });
-            if !still_going {
+            if !sim.model.animating(piece, axis, kind) {
                 runner.state = State::Ready;
             }
         }
@@ -521,6 +363,7 @@ impl Run {
             let Some(function) = function else {
                 self.sim
                     .borrow_mut()
+                    .model
                     .note(format!("This script has no {} call-in.", event.callin));
                 continue;
             };
@@ -660,7 +503,7 @@ impl Run {
                 let named = piece;
                 let piece = usize::try_from(piece - 1)
                     .ok()
-                    .filter(|piece| *piece < self.sim.borrow().pieces.len())
+                    .filter(|piece| *piece < self.sim.borrow().model.pieces.len())
                     .ok_or_else(|| format!("{origin}: waited on {named}, which is not a piece"))?;
                 let axis = axis_index(axis).ok_or_else(|| {
                     format!("{origin}: waited on axis {axis}, which is not an axis")
@@ -678,96 +521,12 @@ impl Run {
             _ => Ok(State::Sleeping(self.frame + 1)),
         }
     }
-
-    fn sample(&self, timeline: &mut Timeline) {
-        let sim = self.sim.borrow();
-        let mut frame = Vec::with_capacity(sim.pieces.len() * 6);
-        let mut hidden = Vec::with_capacity(sim.pieces.len());
-        for piece in &sim.pieces {
-            frame.extend_from_slice(&piece.pos);
-            frame.extend_from_slice(&piece.rot);
-            hidden.push(piece.hidden);
-        }
-        timeline.frames.push(frame);
-        timeline.hidden.push(hidden);
-    }
 }
 
 impl Runner {
     fn is_dead(&self) -> bool {
         matches!(self.state, State::Dead)
     }
-}
-
-/// Move one axis one frame toward its target, and report the animation that is
-/// left, which is none once it arrives.
-///
-/// A turn takes the shortest way round, as `CUnitScript::TurnToward` does, so a
-/// piece at 0.1 told to turn to 6.2 goes backwards past zero rather than nearly
-/// all the way round.
-fn tick_rotate(value: &mut f64, animation: Rotate) -> Option<Rotate> {
-    match animation {
-        Rotate::Turn { dest, speed } => {
-            let step = speed.abs() * DT;
-            let delta = shortest(dest - clamp_rad(*value));
-            if delta.abs() <= step {
-                *value = dest;
-                return None;
-            }
-            *value = clamp_rad(clamp_rad(*value) + delta.signum() * step);
-            Some(animation)
-        }
-        Rotate::Spin {
-            speed,
-            target,
-            accel,
-        } => {
-            // Acceleration is per frame rather than per second: the engine
-            // scales it by `GAME_SPEED / tickRate`, and those are the same
-            // number, so a spin gains `accel` radians per second every frame.
-            let reached = (target - speed).abs() <= accel;
-            let speed = if reached {
-                target
-            } else {
-                speed + (target - speed).signum() * accel
-            };
-            *value = clamp_rad(*value + speed * DT);
-            // Only a spin that has arrived at a target of nothing is over. One
-            // passing through zero on its way to a speed the other way is not.
-            if reached && speed == 0.0 {
-                return None;
-            }
-            Some(Rotate::Spin {
-                speed,
-                target,
-                accel,
-            })
-        }
-    }
-}
-
-fn tick_translate(value: &mut f64, animation: Translate) -> Option<Translate> {
-    let step = animation.speed.abs() * DT;
-    if (animation.dest - *value).abs() <= step {
-        *value = animation.dest;
-        return None;
-    }
-    *value += (animation.dest - *value).signum() * step;
-    Some(animation)
-}
-
-/// An angle in `[0, TAU)`, which is the range the engine keeps piece rotations
-/// in and what stops a long spin drifting out of a float's precision.
-fn clamp_rad(angle: f64) -> f64 {
-    let tau = std::f64::consts::TAU;
-    angle - tau * (angle / tau).floor()
-}
-
-/// The way round from one angle to another that is not the long way: the result
-/// is in `(-PI, PI]`.
-fn shortest(delta: f64) -> f64 {
-    let tau = std::f64::consts::TAU;
-    (delta + 3.0 * std::f64::consts::PI).rem_euclid(tau) - std::f64::consts::PI
 }
 
 /// A number a yield carried, whichever of Lua's two number shapes it arrived in.
@@ -777,14 +536,6 @@ fn number(value: Option<Value>) -> f64 {
         Some(Value::Number(number)) => number,
         _ => 0.0,
     }
-}
-
-/// The axis a script named, as an index into a piece's three.
-///
-/// Lua's `x_axis`, `y_axis` and `z_axis` are 1, 2 and 3. The engine's own
-/// arrays are 0, 1 and 2, and it subtracts one on the way in.
-fn axis_index(axis: i64) -> Option<usize> {
-    (1..=3).contains(&axis).then_some(axis as usize - 1)
 }
 
 /// Turn an mlua error into something worth putting in front of a user: the
@@ -882,7 +633,7 @@ fn install_pieces(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
                 ));
             };
             let name = name.to_string_lossy();
-            let index = sim.pieces.iter().position(|piece| piece.name == name);
+            let index = sim.model.pieces.iter().position(|piece| piece.name == name);
             let Some(index) = index else {
                 return Err(mlua::Error::RuntimeError(format!(
                     "this unit has no piece called \"{name}\""
@@ -902,7 +653,7 @@ fn install_pieces(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
 fn piece_index(sim: &Sim, piece: i64) -> mlua::Result<usize> {
     usize::try_from(piece - 1)
         .ok()
-        .filter(|index| *index < sim.pieces.len())
+        .filter(|index| *index < sim.model.pieces.len())
         .ok_or_else(|| mlua::Error::RuntimeError(format!("{piece} is not a piece of this unit")))
 }
 
@@ -930,12 +681,7 @@ fn install_motion(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
             move |_, (piece, axis, dest, speed): (i64, i64, f64, Option<f64>)| {
                 let mut sim = state.borrow_mut();
                 let (index, axis) = target(&sim, piece, axis)?;
-                let piece = &mut sim.pieces[index];
-                let dest = clamp_rad(dest);
-                match speed.filter(|speed| *speed != 0.0) {
-                    Some(speed) => piece.rotate[axis] = Some(Rotate::Turn { dest, speed }),
-                    None => piece.rot[axis] = dest,
-                }
+                sim.model.turn(index, axis, dest, speed.unwrap_or(0.0));
                 Ok(())
             },
         )?,
@@ -951,11 +697,7 @@ fn install_motion(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
             move |_, (piece, axis, dest, speed): (i64, i64, f64, Option<f64>)| {
                 let mut sim = state.borrow_mut();
                 let (index, axis) = target(&sim, piece, axis)?;
-                let piece = &mut sim.pieces[index];
-                match speed.filter(|speed| *speed != 0.0) {
-                    Some(speed) => piece.translate[axis] = Some(Translate { dest, speed }),
-                    None => piece.pos[axis] = dest,
-                }
+                sim.model.r#move(index, axis, dest, speed.unwrap_or(0.0));
                 Ok(())
             },
         )?,
@@ -970,16 +712,7 @@ fn install_motion(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
             move |_, (piece, axis, speed, accel): (i64, i64, f64, Option<f64>)| {
                 let mut sim = state.borrow_mut();
                 let (index, axis) = target(&sim, piece, axis)?;
-                let accel = accel.unwrap_or(0.0).abs();
-                let current = match sim.pieces[index].rotate[axis] {
-                    Some(Rotate::Spin { speed, .. }) => speed,
-                    _ => 0.0,
-                };
-                sim.pieces[index].rotate[axis] = Some(Rotate::Spin {
-                    speed: if accel > 0.0 { current } else { speed },
-                    target: speed,
-                    accel,
-                });
+                sim.model.spin(index, axis, speed, accel.unwrap_or(0.0));
                 Ok(())
             },
         )?,
@@ -992,16 +725,7 @@ fn install_motion(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         lua.create_function(move |_, (piece, axis, decel): (i64, i64, Option<f64>)| {
             let mut sim = state.borrow_mut();
             let (index, axis) = target(&sim, piece, axis)?;
-            let decel = decel.unwrap_or(0.0).abs();
-            let current = match sim.pieces[index].rotate[axis] {
-                Some(Rotate::Spin { speed, .. }) => speed,
-                _ => 0.0,
-            };
-            sim.pieces[index].rotate[axis] = (decel > 0.0).then_some(Rotate::Spin {
-                speed: current,
-                target: 0.0,
-                accel: decel,
-            });
+            sim.model.stop_spin(index, axis, decel.unwrap_or(0.0));
             Ok(())
         })?,
     )?;
@@ -1012,8 +736,8 @@ fn install_motion(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
             name,
             lua.create_function(move |_, piece: i64| {
                 let mut sim = state.borrow_mut();
-                sim.visibility_used = true;
-                sim.piece(piece)?.hidden = hide;
+                let index = piece_index(&sim, piece)?;
+                sim.model.set_hidden(index, hide);
                 Ok(())
             })?,
         )?;
@@ -1028,7 +752,8 @@ fn install_motion(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         lua.create_function(move |_, (piece, _sfx): (i64, Option<i64>)| {
             let mut sim = state.borrow_mut();
             piece_index(&sim, piece)?;
-            sim.note("Explode throws no debris in the preview.".to_string());
+            sim.model
+                .note("Explode throws no debris in the preview.".to_string());
             Ok(())
         })?,
     )?;
@@ -1062,11 +787,12 @@ fn install_threading(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         lua.create_function(move |_, (piece, axis, kind): (i64, i64, String)| {
             let sim = state.borrow();
             let (index, axis) = target(&sim, piece, axis)?;
-            let piece = &sim.pieces[index];
-            Ok(match kind.as_str() {
-                "turn" => matches!(piece.rotate[axis], Some(Rotate::Turn { .. })),
-                _ => piece.translate[axis].is_some(),
-            })
+            let kind = if kind == "turn" {
+                Wait::Turn
+            } else {
+                Wait::Move
+            };
+            Ok(sim.model.animating(index, axis, kind))
         })?,
     )?;
 
@@ -1111,6 +837,7 @@ fn install_stubs(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
             lua.create_function(move |_, _: MultiValue| {
                 state
                     .borrow_mut()
+                    .model
                     .note(format!("{label} does nothing in the preview."));
                 Ok(())
             })?,
@@ -1133,6 +860,7 @@ fn install_stubs(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         lua.create_function(move |_, _: MultiValue| {
             state
                 .borrow_mut()
+                .model
                 .note("include reads nothing in the preview.".to_string());
             Ok(())
         })?,
