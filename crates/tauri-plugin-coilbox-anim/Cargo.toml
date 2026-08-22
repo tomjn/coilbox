@@ -16,3 +16,6 @@ tauri = { version = "2" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 picoframe-core = "0.0.4"
+# Where the pieces are and how they move, shared with the Lua unit script
+# runtime so a preview means the same thing for a `.cob` as for a `.lua`.
+coilbox-unitpose = { path = "../coilbox-unitpose" }

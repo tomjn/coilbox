@@ -63,11 +63,24 @@ impl CobHeader {
 
 /// A COB decoded into its scripts (name + code words) and piece names — enough
 /// for the disassembler.
+// `code`/`offsets` are read by the interpreter. The disassembly integration
+// test compiles this module on its own, without it, where they look dead.
+#[allow(dead_code)]
 pub struct DecodedCob {
     pub header: CobHeader,
     pub pieces: Vec<String>,
     /// `(script_name, code_words)` per script.
     pub scripts: Vec<(String, Vec<u32>)>,
+    /// Every script's code, end to end, as the file stores it.
+    ///
+    /// Here as well as sliced up per script because a `JUMP` sets the program
+    /// counter to an offset into this, not into the script it is jumping
+    /// inside. Anything running the code needs the whole stream. The
+    /// disassembler, which lists one script at a time, wants the slices.
+    pub code: Vec<u32>,
+    /// Where each script starts in `code`, in the same order as `scripts`. A
+    /// `CALL` names a script by index and jumps to its start.
+    pub offsets: Vec<usize>,
 }
 
 pub fn decode(buf: &[u8]) -> Result<DecodedCob, String> {
@@ -111,6 +124,8 @@ pub fn decode(buf: &[u8]) -> Result<DecodedCob, String> {
         header,
         pieces,
         scripts,
+        code,
+        offsets: starts,
     })
 }
 
