@@ -123,7 +123,28 @@ The engine calls this the unit script, and it is written on export to `scripts/<
 
 **Take ownership of this script** hands it to you. From then on the drawer is an editor, the text is stored on the unit, and an export writes exactly what you wrote. The presets stop applying at that point, so the Animation panel becomes a player for your script rather than a list of presets.
 
+A unit opened out of a game brings its own script with it. See [Opening a unit from a game](#opening-a-unit-from-a-game).
+
 **Discard this script and use the presets** gives it back. The stored text goes and the unit is generated from its presets again. Undo brings the text back if that was a mistake, so copy it first if you want to keep it past this session. The case worth knowing about: a unit whose script was taken over and then emptied animates nothing and no preset can reach it, and this is the only way out short of editing files on disk.
+
+## Opening a unit from a game
+
+A model opened out of an installed game arrives as geometry with a modeller's names on it. Nothing in a model says which piece is the turret, so coilbox goes and asks the unit's own script, which is the thing that turns the turret.
+
+Where that script is comes from the unit definition's `script` key, resolved the way the engine's unit script framework resolves it rather than as a path. A game that moved to Lua while keeping the old `.cob` names in its definitions still resolves.
+
+Lua is offered as the unit's own script. Keep it and the unit animates the way it does in its game, and an export writes it back. The presets stop applying while it does, and the script drawer hands it back whenever you want them.
+
+A `.cob` is compiled, and coilbox writes Lua, so one of those is never taken on. It is disassembled and shown for reading instead, straight from the bytes, so nothing is copied out of the game and the file itself is untouched. The unit opens on the presets.
+
+Alongside the script come proposals for what its pieces are for, in two groups, because they are different kinds of claim:
+
+- **The script named these.** It hands the piece back when the engine asks. `QueryNanoPiece` answering `nano2` is the script saying what `nano2` is for.
+- **These moved when the unit was asked to work.** Worked out from what turned and which way. A piece that turns horizontally when the unit is told to aim is a turret on nearly every unit ever shipped, and it is still a reading rather than a declaration.
+
+Legs are never proposed. Which of six moving pieces is the front left shin is not something motion reveals, and the walk presets animate a unit inside out if it is guessed wrong.
+
+Nothing is applied until you accept the unit, every proposal is on screen before that, and a role already set by hand is never overwritten.
 
 ## What export writes
 
