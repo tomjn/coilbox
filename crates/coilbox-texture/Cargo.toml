@@ -1,0 +1,23 @@
+[package]
+name = "coilbox-texture"
+version = "0.0.0"
+description = "Decode a Spring texture (including DXT/BCn .dds) to RGBA and encode PNG. Shared by the unitsync worker's build pics and the unit builder's Blender exports."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# The container and the block decompress for `.dds`. ddsfile parses the header
+# and picks the format, texpresso does the pure-Rust BC1/2/3 decode, so there is
+# no C toolchain in the way of any target.
+ddsfile = "0.6"
+texpresso = "2"
+# Everything that is not a `.dds`. Extension-driven rather than sniffed, because
+# TGA has no magic bytes.
+image = { version = "0.25", default-features = false, features = [
+    "png",
+    "tga",
+    "jpeg",
+    "bmp",
+    "gif",
+] }
+base64 = "0.22"

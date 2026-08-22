@@ -716,6 +716,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-texture"
+version = "0.0.0"
+dependencies = [
+ "base64 0.22.1",
+ "ddsfile",
+ "image 0.25.10",
+ "texpresso",
+]
+
+[[package]]
 name = "coilbox-thumb-cache"
 version = "0.0.0"
 
@@ -728,8 +738,8 @@ dependencies = [
  "coilbox-assets",
  "coilbox-map-catalog",
  "coilbox-s3o",
+ "coilbox-texture",
  "coilbox-thumb-cache",
- "ddsfile",
  "image 0.25.10",
  "libloading 0.8.9",
  "mlua",
@@ -737,7 +747,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.0",
- "texpresso",
  "webp",
 ]
 
@@ -5346,6 +5355,7 @@ dependencies = [
  "coilbox-portable",
  "coilbox-s3o",
  "coilbox-springlua",
+ "coilbox-texture",
  "flate2",
  "image 0.25.10",
  "picoframe-core",

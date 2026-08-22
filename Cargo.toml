@@ -12,6 +12,7 @@ members = [
   "crates/coilbox-assets",
   "crates/coilbox-map-catalog",
   "crates/coilbox-thumb-cache",
+  "crates/coilbox-texture",
   "crates/coilbox-unitsync-worker",
   "crates/coilbox-oauth",
   "crates/tauri-plugin-coilbox-downloads",

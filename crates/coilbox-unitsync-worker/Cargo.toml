@@ -27,10 +27,9 @@ image = { version = "0.25", default-features = false, features = [
     "gif",
 ] }
 # DDS (DirectDraw Surface) decode for unit build pics, which are frequently
-# DXT/BCn-compressed. ddsfile parses the container + format; texpresso does the
-# pure-Rust BC1/2/3 block decompress. Decode-only — no C toolchain.
-ddsfile = "0.6"
-texpresso = "2"
+# DXT/BCn-compressed, and the PNG encode every cache here writes. Shared with the
+# unit builder's Blender exports, which decode the same files (issue #715).
+coilbox-texture = { path = "../coilbox-texture" }
 base64 = "0.22"
 # The one WebP encoder, lossy and lossless (issue #1623). It wraps libwebp-sys,
 # which vendors libwebp's C and builds it with `cc`, so there is no system
