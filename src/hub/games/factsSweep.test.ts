@@ -34,8 +34,14 @@ function unit(
   name: string,
   buildOptions: string[] = [],
   fullName?: string,
+  stats?: Record<string, unknown>,
 ): UnitDatasetEntry {
-  return { name, buildOptions, ...(fullName ? { fullName } : {}) };
+  return {
+    name,
+    buildOptions,
+    ...(fullName ? { fullName } : {}),
+    ...(stats ? { stats } : {}),
+  };
 }
 
 /**
@@ -327,16 +333,64 @@ describe("sweepGameFacts", () => {
             fullName: "Commander",
             factionKey: "armada",
             buildOptions: ["armlab"],
+            stats: {},
           },
           {
             name: "armlab",
             fullName: "Vehicle Lab",
             factionKey: "armada",
             buildOptions: [],
+            stats: {},
           },
         ],
       },
     ]);
+  });
+
+  /// The stats the worker read travel to the hub untouched (issue #1876). The
+  /// hub stores them as schemaless JSON and renders what arrives, so anything
+  /// this reshaped would be a stat nobody could trace back to a unitdef.
+  it("sends the stats the worker read, as it read them", async () => {
+    const kit = tools([game("Balanced Annihilation 12.24", "ba1224.sdz")], {
+      "ba1224.sdz": [
+        unit("armcom", [], "Commander", {
+          health: 3000,
+          metalCost: 2600,
+          maxVelocity: 27,
+          range: 250,
+          weapons: [{ damage: 450, reload: 1.5, projectile: "DGun" }],
+        }),
+      ],
+    });
+
+    await sweepGameFacts(target, () => {}, kit);
+
+    expect(kit.sent()[0].units[0].stats).toEqual({
+      health: 3000,
+      metalCost: 2600,
+      maxVelocity: 27,
+      range: 250,
+      weapons: [{ damage: 450, reload: 1.5, projectile: "DGun" }],
+    });
+  });
+
+  /// The rule the extraction rests on, held at this end too: a unitdef that
+  /// declares nothing sends nothing, not a table of zeroes. A worker too old to
+  /// report stats at all lands in the same place.
+  it("sends no stats for a unit the worker had none for", async () => {
+    const kit = tools([game("Balanced Annihilation 12.24", "ba1224.sdz")], {
+      "ba1224.sdz": [
+        unit("armsolar", [], "Solar Collector", { health: 355 }),
+        unit("armnothing"),
+      ],
+    });
+
+    await sweepGameFacts(target, () => {}, kit);
+    const [solar, nothing] = kit.sent()[0].units;
+
+    expect(solar.stats).toEqual({ health: 355 });
+    expect(nothing.stats).toEqual({});
+    expect(nothing.stats).not.toHaveProperty("health");
   });
 
   /// The whole point of the skip rules, end to end: a working folder's archives

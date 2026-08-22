@@ -1209,6 +1209,18 @@ export interface UnitDatasetEntry {
    *  engine levels a floater to `-waterline` rather than to the ground, so
    *  without it a floater cannot be judged at all. */
   waterline?: number;
+  /**
+   * Everything else the unitdef declares that is worth reading next to the
+   * unit: `health`, `metalCost`, `energyCost`, `buildTime`, `sightDistance`,
+   * `maxVelocity`, `range`, and a `weapons` array of one object per weapon.
+   * `shared/unitdef-stats.json` writes the list down.
+   *
+   * Untyped on purpose. The hub stores these as schemaless JSON and renders
+   * what arrives, so a stat added to the worker's Lua shim reaches a unit page
+   * without a type change here. A key a def does not declare is simply not
+   * present, which is not the same as zero: zero is a claim about the game.
+   */
+  stats?: Record<string, unknown>;
 }
 
 export interface UnitDatasetResult {

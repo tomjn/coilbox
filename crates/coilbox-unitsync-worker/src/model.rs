@@ -586,6 +586,18 @@ pub struct UnitDatasetEntry {
     /// ground, so without it a floater cannot be judged at all.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub waterline: Option<f32>,
+    /// Everything else the unitdef declares that is worth reading next to the
+    /// unit: `health`, `metalCost`, `energyCost`, `buildTime`, `sightDistance`,
+    /// `maxVelocity`, `range`, and a `weapons` array of one object per weapon.
+    /// `shared/unitdef-stats.json` writes the list down.
+    ///
+    /// Deliberately untyped. The hub stores these as schemaless JSON and renders
+    /// what arrives, so a stat added to the Lua shim reaches a unit page without
+    /// a struct field, and a key a def does not declare is simply not here. An
+    /// absent key and a zero are different answers: zero is a claim about the
+    /// game, absent is a fact about what could be read.
+    #[serde(skip_serializing_if = "serde_json::Map::is_empty")]
+    pub stats: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Output of the lazy `--unit-dataset` mode: the whole game's unit graph (units +

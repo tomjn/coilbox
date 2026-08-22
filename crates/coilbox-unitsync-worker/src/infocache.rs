@@ -31,8 +31,10 @@ use std::path::Path;
 /// whether it floats, which is what decides if a building will stand on a piece
 /// of ground. v11: the unit dataset gained each unit's `minWaterDepth`,
 /// `maxWaterDepth` and `waterline`, which is the other half of the same
-/// question.
-const INFO_CACHE_VERSION: u32 = 11;
+/// question. v12: the unit dataset gained each unit's declared stats, so a
+/// cached blob from before them would leave a game's whole encyclopedia blank
+/// with nothing to say why.
+const INFO_CACHE_VERSION: u32 = 12;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.

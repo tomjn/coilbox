@@ -290,6 +290,11 @@ function factsFor(
         ...(unit.fullName ? { fullName: unit.fullName } : {}),
         ...(key ? { factionKey: key } : {}),
         buildOptions: unit.buildOptions ?? [],
+        // Passed through as the worker read them (issue #1876). Nothing here
+        // decides which stats a unit has: the shim that reads the unitdef does,
+        // and the hub renders whatever arrives. A worker too old to report any
+        // sends `{}`, which is a unit page with no table rather than a refusal.
+        stats: unit.stats ?? {},
       };
     }),
   };
