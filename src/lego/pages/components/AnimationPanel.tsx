@@ -11,7 +11,14 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { FileCode, Pause, Play } from "lucide-react";
+import {
+  FileCode,
+  Pause,
+  Play,
+  Square,
+  StepBack,
+  StepForward,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -34,8 +41,10 @@ import {
 import { legoRunScript } from "../../bindings";
 import type { LegoProject } from "../../model";
 import {
+  clampFrame,
   PREVIEW_FRAMES,
   PREVIEW_SECONDS,
+  playable,
   SCENARIOS,
   type ScriptTimeline,
   scenarioById,
@@ -54,6 +63,17 @@ interface Props {
    * play. Null whenever the presets are what is playing, or nothing is.
    */
   onScriptTimeline: (timeline: ScriptTimeline | null) => void;
+  /**
+   * Whether the run's clock is frozen on `scriptFrame`. Pausing holds the
+   * viewport on one frame without losing the run. Stepping and scrubbing both
+   * pause it first, since either only makes sense as a still frame.
+   */
+  scriptPaused: boolean;
+  onScriptPausedChange: (paused: boolean) => void;
+  /** The frame a paused run is held on, and the frame a running one is
+   *  currently showing. */
+  scriptFrame: number;
+  onScriptFrameChange: (frame: number) => void;
 }
 
 export function AnimationPanel({
@@ -63,6 +83,10 @@ export function AnimationPanel({
   onChange,
   onScriptChange,
   onScriptTimeline,
+  scriptPaused,
+  onScriptPausedChange,
+  scriptFrame,
+  onScriptFrameChange,
 }: Props) {
   const reduceMotion = useReduceMotion();
   const [showScript, setShowScript] = useState(false);
@@ -80,7 +104,14 @@ export function AnimationPanel({
     onScriptTimeline(null);
     setTimeline(null);
     setFailure(null);
-  }, [onPlayingChange, onScriptTimeline]);
+    onScriptPausedChange(false);
+    onScriptFrameChange(0);
+  }, [
+    onPlayingChange,
+    onScriptTimeline,
+    onScriptPausedChange,
+    onScriptFrameChange,
+  ]);
 
   const start = useCallback(
     async (scenario: string) => {
@@ -101,6 +132,8 @@ export function AnimationPanel({
         // failed part way through is still worth watching up to that point.
         onScriptTimeline(result.frames.length > 0 ? result : null);
         onPlayingChange(result.frames.length > 0);
+        onScriptPausedChange(false);
+        onScriptFrameChange(0);
       } catch (error) {
         setTimeline(null);
         onScriptTimeline(null);
@@ -116,7 +149,19 @@ export function AnimationPanel({
       project.pieces,
       onPlayingChange,
       onScriptTimeline,
+      onScriptPausedChange,
+      onScriptFrameChange,
     ],
+  );
+
+  /** Stepping only makes sense on a held frame, so it pauses first. */
+  const step = useCallback(
+    (delta: number) => {
+      if (!timeline) return;
+      onScriptPausedChange(true);
+      onScriptFrameChange(clampFrame(timeline, scriptFrame + delta));
+    },
+    [timeline, scriptFrame, onScriptPausedChange, onScriptFrameChange],
   );
 
   // A script edited while it is playing leaves the poses on screen describing
@@ -167,13 +212,37 @@ export function AnimationPanel({
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
           <Button
             size="sm"
-            variant={playing ? "default" : "outline"}
+            variant={playing && !scriptPaused ? "default" : "outline"}
             disabled={reduceMotion || running}
-            onClick={() => (playing ? stop() : void start(scenarioId))}
+            onClick={() =>
+              playing
+                ? onScriptPausedChange(!scriptPaused)
+                : void start(scenarioId)
+            }
           >
-            {playing ? <Pause size={14} /> : <Play size={14} />}
-            {playing ? "Stop" : running ? "Running" : "Play"}
+            {playing && !scriptPaused ? (
+              <Pause size={14} />
+            ) : (
+              <Play size={14} />
+            )}
+            {!playing
+              ? running
+                ? "Running"
+                : "Play"
+              : scriptPaused
+                ? "Resume"
+                : "Pause"}
           </Button>
+          {playing ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={stop}
+              title="Stop and return to the built pose"
+            >
+              <Square size={14} />
+            </Button>
+          ) : null}
           <span className="text-xs text-muted-foreground">
             {reduceMotion
               ? "Playback is off while your system asks for reduced motion."
@@ -187,6 +256,44 @@ export function AnimationPanel({
             <FileCode size={14} /> Edit
           </Button>
         </div>
+
+        {playable(timeline) ? (
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={scriptFrame <= 0}
+              onClick={() => step(-1)}
+              title="Step back one frame"
+            >
+              <StepBack size={14} />
+            </Button>
+            <Slider
+              className="flex-1"
+              min={0}
+              max={Math.max((timeline?.frames.length ?? 1) - 1, 0)}
+              step={1}
+              value={[scriptFrame]}
+              onValueChange={([next]) => {
+                onScriptPausedChange(true);
+                onScriptFrameChange(next);
+              }}
+              aria-label="Scrub the script preview"
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={scriptFrame >= (timeline?.frames.length ?? 1) - 1}
+              onClick={() => step(1)}
+              title="Step forward one frame"
+            >
+              <StepForward size={14} />
+            </Button>
+            <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+              {scriptFrame + 1}/{timeline?.frames.length}
+            </span>
+          </div>
+        ) : null}
 
         {scriptDrawer}
 
