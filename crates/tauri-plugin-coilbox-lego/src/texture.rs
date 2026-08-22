@@ -215,12 +215,12 @@ pub enum TextureRole {
     /// texColor1.a)` in `ModelFragProgGL4.glsl`. So it is dropped, and for a
     /// stronger reason than tidiness. `GLTFExporter` puts the image through a
     /// canvas, which is premultiplied, and on this machine's own Adder texture
-    /// that halved the mean colour of what came out the other side. The mask
-    /// beside it says which regions those were.
+    /// that halved the mean colour of what came out the other side.
     Colour,
-    /// The second texture, which is measurements end to end and has nothing in
-    /// it a reader could mistake for a picture. Kept exactly as it decodes,
-    /// alpha included: that channel is the engine's visibility cutout.
+    /// The second texture, which carries no colour at all: the engine reads red
+    /// as self-illumination, green as reflectivity and alpha as the unit's
+    /// visibility (`ModelFragProg.glsl` lines 95 to 104). Nothing in it a reader
+    /// could mistake for a picture, so it is kept exactly as it decodes.
     Mask,
 }
 

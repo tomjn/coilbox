@@ -21,7 +21,8 @@
  * because those are the game's own file names rather than a pack's generic
  * one. The Blender files take the same two textures a different way: Blender
  * reads no `.dds`, so both are decoded to PNG on the way into the `blender`
- * folder. See https://github.com/tomjn/coilbox/issues/715.
+ * folder, and only the first of them is a picture anything samples. See
+ * https://github.com/tomjn/coilbox/issues/715.
  */
 
 import { Button } from "@picoframe/frame";
@@ -433,7 +434,8 @@ export function ExportDrawer({
                     <>
                       {" "}
                       <code>{blender.mask.writeAs}</code> goes in beside them:
-                      it is the team-colour mask rather than a picture, so
+                      it is the model's second texture, which the engine reads
+                      as glow, shine and visibility rather than as colour, so
                       neither file samples it.
                     </>
                   ) : null}

@@ -167,7 +167,7 @@ describe("buildObj", () => {
     expect(rightFace).toBe("f 4/4/4 6/6/6 5/5/5");
   });
 
-  it("names the team-colour mask in a comment, since mtl has no slot for it", () => {
+  it("names the second texture in a comment, since mtl has no slot for it", () => {
     const built = buildObj(project([]), pack(), null, {
       ...OPTIONS,
       textureName: "Beacon_1.png",
@@ -178,7 +178,7 @@ describe("buildObj", () => {
     // Named so whoever opens it knows the file is there and what it is, and
     // commented so no reader samples measurements as if they were colour.
     expect(built?.mtl).toContain("# Beacon_2.png sits beside this file");
-    expect(built?.mtl).toContain("team-colour");
+    expect(built?.mtl).toContain("glow in red");
     expect(built?.mtl).not.toContain("map_Kd Beacon_2.png");
   });
 

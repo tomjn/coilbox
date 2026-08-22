@@ -159,9 +159,9 @@ export interface BlenderTextureWritten {
  * for taking the unit into Blender, either to check it against the `.s3o` or
  * to finish it by hand.
  *
- * `textures` is for an imported unit's team-colour mask, which is not a colour
- * map and so has no slot in a glTF material. It is decoded and written beside
- * the `.glb` rather than dropped.
+ * `textures` is for an imported unit's second texture, which carries no colour
+ * and so has no slot in a glTF material. It is decoded and written beside the
+ * `.glb` rather than dropped.
  */
 export const legoExportGlb = defineCommand<
   {

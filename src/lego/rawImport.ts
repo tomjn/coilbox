@@ -256,11 +256,11 @@ export interface BlenderTextureRef {
  * `colour` is the picture the unit is painted with, which is what a material
  * samples: embedded in the `.glb`, and named by the `.mtl`'s `map_Kd`.
  *
- * `mask` is not a colour map. Its channels are measurements the engine reads,
- * the regions to paint in the player's colour among them, and neither glTF nor
- * an `.mtl` has anywhere to put that without claiming it is a picture. So it
- * goes into the `blender` folder as a PNG of its own, next to whichever file
- * was written, for whoever opens it to wire up as they see fit.
+ * `mask` is the model's second texture, which carries no colour at all: the
+ * engine reads it as glow in red, shine in green and visibility in alpha.
+ * Neither glTF nor an `.mtl` has anywhere to put that without claiming it is a
+ * picture, so it goes into the `blender` folder as a PNG of its own, next to
+ * whichever file was written, for whoever opens it to wire up as they see fit.
  *
  * Either can be missing. A model naming a texture coilbox could not find has no
  * key to read, and a model with one texture and no mask is a perfectly ordinary

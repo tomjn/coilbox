@@ -1088,10 +1088,9 @@ fn place_blender_textures<R: Runtime>(
 ///
 /// `textures` is for a unit imported from somebody else's model. The `.glb`
 /// embeds the texture the unit is painted with, but an `.s3o` names a second
-/// one, the mask marking the regions the engine paints in the player's colour.
-/// glTF has no such thing to embed it as, and inventing one would put a picture
-/// of measurements into a colour slot, so it goes beside the `.glb` as its own
-/// PNG instead.
+/// one, which carries the unit's glow, shine and visibility rather than any
+/// colour. glTF has no slot for that, and the ones it does have would claim it
+/// is a picture, so it goes beside the `.glb` as its own PNG instead.
 #[tauri::command]
 async fn lego_export_glb<R: Runtime>(
     app: AppHandle<R>,
@@ -1137,9 +1136,9 @@ async fn lego_export_glb<R: Runtime>(
 /// One or the other, the same split as [`lego_export`]. A unit built out of
 /// parts names `atlas`, which is copied across as it is. A unit imported from
 /// somebody else's model names `textures` instead, which are decoded to PNG on
-/// the way: the second of them is the team-colour mask, which nothing in an
-/// `.mtl` can point at, so it lands beside the `.obj` for whoever opens it to
-/// use rather than being dropped.
+/// the way: the second of them carries no colour, so nothing in an `.mtl` can
+/// point at it, and it lands beside the `.obj` for whoever opens it to use
+/// rather than being dropped.
 #[tauri::command]
 async fn lego_export_obj<R: Runtime>(
     app: AppHandle<R>,
