@@ -1,7 +1,7 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { ArrowLeft, FolderOpen, Terminal } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { modelFormatFor } from "../archiveModel";
@@ -48,6 +48,14 @@ export default function ArchiveDetailPage() {
     archive?.name,
   );
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  // Archive detail pages all match the same route, so React Router keeps this
+  // component (and its state) mounted across a dependency-link jump from one
+  // archive straight to another. Without this, the preview pane goes on
+  // showing a member from the archive you just left (#1900).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: decoded is the trigger, not a value the effect reads - it's what changes on an archive switch, exactly when the old selection should be dropped.
+  useEffect(() => {
+    setSelectedFile(null);
+  }, [decoded]);
   // A model is read by the model command instead, which draws it. Asking the
   // preview command as well would spend a second unitsync session on a byte
   // count the listing already has.
@@ -229,7 +237,14 @@ export default function ArchiveDetailPage() {
           Contents{tree ? ` (${tree.files.length} files)` : ""}
         </h2>
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(14rem,20rem)_1fr] gap-3">
-          <div className="min-h-0 overflow-auto rounded-lg border border-border/50 bg-card">
+          <div
+            // Keyed on the archive so the whole pane - the tree's expanded
+            // folders and this container's scroll offset alike - remounts
+            // fresh on every archive change, rather than carrying over from
+            // the one you just left (#1900).
+            key={decoded}
+            className="min-h-0 overflow-auto rounded-lg border border-border/50 bg-card"
+          >
             {treeLoading ? (
               <Skeleton className="h-40 rounded-none bg-transparent" />
             ) : tree ? (
