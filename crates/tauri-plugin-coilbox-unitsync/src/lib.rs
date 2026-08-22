@@ -8,6 +8,7 @@
 //! set *after* launch is ignored), runs it under a timeout, and passes its JSON
 //! straight through inside the [`CliResult`] envelope.
 
+mod modelcache;
 mod renderindex;
 mod sidecar;
 
@@ -1342,6 +1343,16 @@ async fn unitsync_cancel(op_id: String) -> Result<CliResult, ()> {
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-unitsync|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-unitsync")
+        // The model-texture cache only ever grows (issue #1919): nothing deleted
+        // an entry a bumped `CACHE_VERSION` or an uninstalled game orphaned.
+        // Swept here, at the one moment nothing can be mid-render and every file
+        // still under the current version is provably live: see `modelcache`.
+        .setup(|app, _api| {
+            if let Some(dir) = model_texture_dir(app) {
+                modelcache::sweep(&dir);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             unitsync_scan,
             unitsync_minimap,
