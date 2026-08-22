@@ -1290,9 +1290,9 @@ export interface UnitModelResult {
   root?: UnitModelPiece;
   textures: UnitModelTexture[];
   /** An `.s3o`'s second texture: glow in red, reflectivity in green, and whether
-   *  a pixel is drawn in alpha. Named but not drawn, because the viewer does
-   *  none of those. The team-colour mask is the alpha of the first texture, so
-   *  the field name is a leftover (issue #1910). */
+   *  a pixel is drawn in alpha. Only that last one is drawn, as the cut-out the
+   *  engine discards on. The team-colour mask is the alpha of the first texture,
+   *  so the field name is a leftover (issue #1910). */
   teamMask?: UnitModelTexture;
   /** Faces a `.3do` draws in a flat palette colour, which is engine-embedded and
    *  not in the archive. Drawn plain grey, so the count is worth showing. */

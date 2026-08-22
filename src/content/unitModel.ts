@@ -14,6 +14,7 @@ import * as THREE from "three";
 
 import { unitModelTextureUrl } from "@/lib/assetUrl";
 import {
+  cutOutHiddenPixels,
   paintTeamColour,
   springTexture,
   TEAM_COLOUR,
@@ -92,7 +93,15 @@ export function buildModel(
     // Only an `.s3o` keeps a team-colour mask in its texture's alpha. A `.3do`
     // keeps reflectivity there and names its team-colour regions face by face,
     // which is the `texture?.teamColour` branch above.
-    if (file && model.format === "s3o") paintTeamColour(material, teamColour);
+    if (file && model.format === "s3o") {
+      paintTeamColour(material, teamColour);
+      // The second texture masks out the pixels the engine never draws, and
+      // every material of one model shares it: an `.s3o` names one pair for the
+      // whole model. A model that names no second texture, or whose second
+      // texture is not in the archive, draws whole.
+      const mask = model.teamMask?.file;
+      if (mask) cutOutHiddenPixels(material, modelTexture(mask));
+    }
     materials.set(key, material);
     return material;
   };

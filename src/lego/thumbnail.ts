@@ -83,6 +83,10 @@ export function captureThumbnail(
  * loaders do not report back to whoever holds the texture, so what a texture has
  * is read off the texture itself: an image with a width is one that arrived,
  * whether it was decoded by the browser or uploaded still compressed.
+ *
+ * Both of an `.s3o`'s textures, because the second one decides which pixels are
+ * drawn at all. That one samples as zero rather than as black before it arrives,
+ * so a capture taken too early is an empty picture rather than a dark one.
  */
 export function readyToCapture(unit: THREE.Object3D): boolean {
   let meshes = 0;
@@ -95,12 +99,14 @@ export function readyToCapture(unit: THREE.Object3D): boolean {
       ? mesh.material
       : [mesh.material];
     for (const material of materials) {
-      const map = (material as THREE.MeshStandardMaterial).map;
-      // `image` is whatever the loader put there: an `HTMLImageElement`, an
-      // `ImageBitmap`, or a compressed texture's dimensions. All three carry a
-      // width once they hold anything.
-      const image = map?.image as { width?: number } | undefined;
-      if (map && !image?.width) waiting += 1;
+      const standard = material as THREE.MeshStandardMaterial;
+      for (const texture of [standard.map, standard.alphaMap]) {
+        // `image` is whatever the loader put there: an `HTMLImageElement`, an
+        // `ImageBitmap`, or a compressed texture's dimensions. All three carry a
+        // width once they hold anything.
+        const image = texture?.image as { width?: number } | undefined;
+        if (texture && !image?.width) waiting += 1;
+      }
     }
   });
   return meshes > 0 && waiting === 0;
