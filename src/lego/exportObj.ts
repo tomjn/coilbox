@@ -29,13 +29,23 @@ const MATERIAL_NAME = "atlas";
  * `textureName` is the file name the `.mtl` should point `map_Kd` at, which
  * the caller is responsible for actually writing next to the `.obj`: a
  * texture reference to a file that is not there defeats the point of a
- * faithful export.
+ * faithful export. `null` for a unit whose texture could not be found, which
+ * gets a material with no map rather than one pointing at nothing.
+ *
+ * `maskName` is a model's second texture, which an imported unit has and a
+ * built one does not. `.mtl` has no slot for it, so it is named in a comment:
+ * the file is there beside the `.obj`, and saying so is the difference between
+ * leaving it for the reader and quietly dropping it.
  */
 export function buildObj(
   project: LegoProject,
   pack: LoadedPack,
   raw: RawGeometry | null,
-  options: { unitName: string; textureName: string },
+  options: {
+    unitName: string;
+    textureName: string | null;
+    maskName?: string | null;
+  },
 ): ObjBuild | null {
   if (!pieceById(project, project.rootPieceId)) return null;
   const { pieces } = bakedPieces(project, pack, raw);
@@ -99,7 +109,15 @@ export function buildObj(
     "Ks 0.000000 0.000000 0.000000",
     "d 1.000000",
     "illum 1",
-    `map_Kd ${options.textureName}`,
+    ...(options.textureName ? [`map_Kd ${options.textureName}`] : []),
+    ...(options.maskName
+      ? [
+          `# ${options.maskName} sits beside this file. It is the model's second`,
+          "# texture, which the engine reads as glow in red, shine in green and",
+          "# visibility in alpha. None of that is colour, so nothing here samples",
+          "# it.",
+        ]
+      : []),
     "",
   ].join("\n");
 

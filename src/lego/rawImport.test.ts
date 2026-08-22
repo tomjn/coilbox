@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { ImportedPiece, ImportedTexture, S3oImport } from "./bindings";
 import type { LegoProject } from "./model";
 import {
+  blenderTextures,
   importedTextures,
+  pngName,
   projectFromImport,
   texturesInUse,
 } from "./rawImport";
@@ -194,6 +196,59 @@ describe("importedTextures", () => {
     expect(out.texture1).toBe("Beacon_1.dds");
     expect(out.texture2).toBe("");
     expect(out.place).toEqual([]);
+  });
+});
+
+describe("pngName", () => {
+  it("renames whatever the model calls a texture to the PNG it becomes", () => {
+    expect(pngName("Beacon_1.dds")).toBe("Beacon_1.png");
+    expect(pngName("Beacon_1.PNG")).toBe("Beacon_1.png");
+    // A header naming a path, which s3o files out of some games do.
+    expect(pngName("unittextures\\Beacon_1.dds")).toBe("Beacon_1.png");
+    // A dotless name gains an extension rather than losing its name.
+    expect(pngName("Beacon")).toBe("Beacon.png");
+  });
+});
+
+describe("blenderTextures", () => {
+  it("names both as PNGs, since Blender reads no dds", () => {
+    const { project } = build();
+
+    const out = blenderTextures(project.imported as never);
+
+    // The role travels with each: Rust reads it to decide what happens to the
+    // alpha channel, which the two textures mean different things by.
+    expect(out.colour).toEqual({
+      key: "aa11.dds",
+      writeAs: "Beacon_1.png",
+      role: "colour",
+    });
+    expect(out.mask).toEqual({
+      key: "bb22.dds",
+      writeAs: "Beacon_2.png",
+      role: "mask",
+    });
+  });
+
+  it("has nothing for a texture the import could not find", () => {
+    const { project } = build({
+      texture: texture(null, "Beacon_1.dds"),
+      teamMask: texture(null, ""),
+    });
+
+    const out = blenderTextures(project.imported as never);
+
+    expect(out.colour).toBeNull();
+    expect(out.mask).toBeNull();
+  });
+
+  it("has a colour and no mask for a model carrying one texture", () => {
+    const { project } = build({ teamMask: texture(null, "") });
+
+    const out = blenderTextures(project.imported as never);
+
+    expect(out.colour?.writeAs).toBe("Beacon_1.png");
+    expect(out.mask).toBeNull();
   });
 });
 

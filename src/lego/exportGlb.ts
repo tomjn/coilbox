@@ -19,7 +19,6 @@
 
 import * as THREE from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
-import { atlasUrl, type LegoAtlas } from "./atlas";
 import { childrenOf, type LegoProject, pieceById } from "./model";
 import type { LoadedPack } from "./pack";
 import type { RawGeometry } from "./rawGeometry";
@@ -82,10 +81,18 @@ function bakedGeometry(baked: BakedPiece): THREE.BufferGeometry {
 }
 
 /**
- * The unit as a `.glb`'s bytes, with the unit's own atlas embedded.
+ * The unit as a `.glb`'s bytes, with the texture it draws with embedded.
  *
- * The atlas is passed in rather than read off the pack, because which one a
- * unit samples is the unit's own choice and this has to embed that one.
+ * `textureUrl` is passed in rather than worked out here, because where the
+ * bytes come from depends on what kind of unit this is. A unit built out of
+ * parts samples an atlas out of a parts pack, which the webview can fetch as it
+ * stands. A unit imported from somebody else's model draws with the game's own
+ * file, usually a compressed `.dds` no browser decodes, so Rust decodes it and
+ * hands it over as a `data:` URL. Either way what arrives here is an image
+ * three.js can load, which is all `GLTFExporter` can embed.
+ *
+ * `null` for a unit whose texture could not be found. The geometry is still
+ * worth having in Blender, and a grey model says more than a failed export.
  *
  * Not unit tested: `GLTFExporter` needs a DOM to rasterise the texture, which
  * this reaches for the moment it runs and vitest cannot provide.
@@ -94,17 +101,21 @@ export async function exportGlb(
   project: LegoProject,
   pack: LoadedPack,
   raw: RawGeometry | null,
-  atlas: LegoAtlas,
+  textureUrl: string | null,
 ): Promise<ArrayBuffer | null> {
   const scene = buildGlbScene(project, pack, raw);
   if (!scene) return null;
 
-  const texture = await new THREE.TextureLoader().loadAsync(atlasUrl(atlas));
-  texture.colorSpace = THREE.SRGBColorSpace;
-  // Some parts reach a neighbouring atlas column through negative u, same
-  // reason partMaterial in geometry.ts repeats rather than clamps.
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
+  const texture = textureUrl
+    ? await new THREE.TextureLoader().loadAsync(textureUrl)
+    : null;
+  if (texture) {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    // Some parts reach a neighbouring atlas column through negative u, same
+    // reason partMaterial in geometry.ts repeats rather than clamps.
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+  }
   const material = new THREE.MeshStandardMaterial({ map: texture });
 
   scene.traverse((object) => {
@@ -112,7 +123,7 @@ export async function exportGlb(
   });
 
   const result = await new GLTFExporter().parseAsync(scene, { binary: true });
-  texture.dispose();
+  texture?.dispose();
   material.dispose();
 
   if (!(result instanceof ArrayBuffer)) {

@@ -12,6 +12,7 @@ permissions = [
   "allow-lego-read-s3o",
   "allow-lego-import-s3o",
   "allow-lego-texture-import",
+  "allow-lego-texture-png",
   "allow-lego-texture-prune",
   "allow-lego-export",
   "allow-lego-export-glb",

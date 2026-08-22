@@ -12,6 +12,7 @@ const COMMANDS: &[&str] = &[
     "lego_read_s3o",
     "lego_import_s3o",
     "lego_texture_import",
+    "lego_texture_png",
     "lego_texture_prune",
     "lego_export",
     "lego_export_glb",
