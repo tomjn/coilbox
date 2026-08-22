@@ -81,10 +81,14 @@ Frontend, on `gamesToSend`:
 
 On the machine this was found on, with 16 games installed:
 
-- Balanced Annihilation is sent as `V15.9.8` rather than `test-7183-001edc3`
-- XTA is sent as `9.728` rather than `test-1274-006fa06`
-- Beyond All Reason drops out, because `test-30922-8064a43` is its only install and it is a `git:` snapshot
-- sendable falls from 9 games to 8
+- Balanced Annihilation is sent as `V15.9.8` rather than `test-7183-001edc3`, and both its snapshots are skipped
+- XTA is sent as `9.728 patch 1` rather than `test-1274-006fa06`
+- Beyond All Reason stays, and is sent as `test-30922-8064a43`
+- sendable stays at 9 games
+
+Beyond All Reason is worth explaining, because it looks like the rule failing and is the rule working. Its installed package is reachable from `byar:test` as well as from a commit tag, and `byar:test` is a named channel BAR publishes rather than a private build. The alternative on this machine is `byar:stable`, which points at "Beyond All Reason 0.01", a stale placeholder that would be far worse to publish.
+
+So its page reads `test-30922-8064a43` as the release. That is BAR's own version string for the build people actually run, not something coilbox invented.
 
 ## Out of scope
 
