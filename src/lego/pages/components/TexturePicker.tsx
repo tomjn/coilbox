@@ -132,8 +132,8 @@ export function TexturePicker({ imported, onChange }: Props) {
               onRefresh={() => void refresh("texture")}
             />
             <TextureSlot
-              title="Team colour mask"
-              hint="The red channel marks the regions the engine paints in the player's colour. Those regions are black in the texture above, so a unit without this shows black patches."
+              title="Shading map"
+              hint="The model's second texture, which the engine reads as glow in red and shine in green rather than as a picture. Kept with the unit and written back out by the export, but nothing here draws it."
               texture={imported.teamMask}
               missing={imported.missingTeamMask}
               busy={busy === "teamMask"}

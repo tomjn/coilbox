@@ -315,14 +315,15 @@ function Imported({
         )}
         {imported?.teamMask ? (
           <p className="text-xs text-muted-foreground">
-            <code>{imported.teamMask.name}</code> is the team-colour mask, which
-            marks the regions the engine paints in the player's colour.
+            <code>{imported.teamMask.name}</code> is the shading map, which the
+            engine reads as glow in red and shine in green. Kept with the unit
+            and written back out by the export, though nothing here draws it.
           </p>
         ) : imported?.missingTeamMask ? (
           <p className="text-xs text-muted-foreground">
-            The team-colour mask, <code>{imported.missingTeamMask}</code>, was
-            not found. Without it the regions it marks show black, since that is
-            what they are in the texture above.
+            The shading map, <code>{imported.missingTeamMask}</code>, was not
+            found. Nothing here draws it, so the unit looks the same either way,
+            but the export will have no glow or shine to write out.
           </p>
         ) : null}
       </div>
