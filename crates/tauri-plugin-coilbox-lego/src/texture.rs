@@ -11,11 +11,11 @@
 //! the same name would go on drawing the old bytes. Changed bytes hash to a
 //! different key, so the URL changes and there is nothing stale to serve.
 //!
-//! A `.bmp` or a `.tga` is re-encoded to PNG on the way in, because a webview
-//! renders neither and they are most of what the legacy games ship. Everything
-//! else is stored as it arrived, `.dds` above all: a shared 8192 square atlas
-//! is 64 MiB packed and 256 MiB as RGBA, and the webview uploads it still
-//! compressed.
+//! A `.bmp`, a `.tga` or a `.tif` is re-encoded to PNG on the way in, because a
+//! webview renders none of them and they are most of what the legacy games ship.
+//! Everything else is stored as it arrived, `.dds` above all: a shared 8192
+//! square atlas is 64 MiB packed and 256 MiB as RGBA, and the webview uploads it
+//! still compressed.
 
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
@@ -173,24 +173,21 @@ fn extension(path: &Path) -> String {
 /// Re-encode a texture the webview cannot decode, or `None` to store the bytes
 /// as they arrived.
 ///
-/// The same rule the unit-model viewer applies (`to_webview_format` in
-/// `crates/coilbox-unitsync-worker/src/unitmodel.rs`), for the same reason and
-/// with the same limits. Alpha survives it, because everything in this store
-/// belongs to an `.s3o` and an `.s3o`'s first texture keeps the team-colour mask
-/// there. It is not transparency and is never drawn as any: three's own
-/// `opaque_fragment` sets it back to 1 on the way out.
+/// Which formats those are is `coilbox_texture::needs_webview_transcode`, so the
+/// unit-model viewer's own cache answers the question the same way rather than
+/// keeping a second list that can drift. `.tif` is on it because Basically OTA
+/// paints four of its core units with one, and only macOS's webview reads one
+/// (issue #1915).
+///
+/// Alpha survives, because everything in this store belongs to an `.s3o` and an
+/// `.s3o`'s first texture keeps the team-colour mask there. It is not
+/// transparency and is never drawn as any: three's own `opaque_fragment` sets it
+/// back to 1 on the way out.
 fn to_webview_format(ext: &str, bytes: &[u8]) -> Option<Vec<u8>> {
-    let format = match ext {
-        "bmp" => image::ImageFormat::Bmp,
-        "tga" => image::ImageFormat::Tga,
-        _ => return None,
-    };
-    let img = image::load_from_memory_with_format(bytes, format).ok()?;
-    let mut png = std::io::Cursor::new(Vec::new());
-    image::DynamicImage::ImageRgba8(img.to_rgba8())
-        .write_to(&mut png, image::ImageFormat::Png)
-        .ok()?;
-    Some(png.into_inner())
+    if !coilbox_texture::needs_webview_transcode(ext) {
+        return None;
+    }
+    coilbox_texture::encode_png(&coilbox_texture::decode(ext, bytes)?)
 }
 
 /// The longest side a texture is written at for the two Blender exports.
@@ -376,6 +373,35 @@ mod tests {
                 .to_rgba8();
         assert_eq!(back.get_pixel(0, 0).0[3], 0);
         assert_eq!(back.get_pixel(1, 0).0[3], 255);
+    }
+
+    /// A `.tif` is stored as a PNG for the same reason a `.tga` is, and with the
+    /// same alpha. It is the one that made this a per-platform difference:
+    /// Basically OTA paints four of its core units with a `.tif`, and only macOS's
+    /// webview reads one (issue #1915).
+    #[test]
+    fn a_tif_is_stored_as_a_png_keeping_its_alpha() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let source = dir.path().join("bcore_def_2.tif");
+        let mut img = image::RgbaImage::from_pixel(2, 1, image::Rgba([9, 9, 9, 255]));
+        img.put_pixel(1, 0, image::Rgba([8, 8, 8, 0]));
+        let mut tiff = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut tiff, image::ImageFormat::Tiff)
+            .expect("encode");
+        std::fs::write(&source, tiff.into_inner()).expect("write");
+
+        let store_dir = dir.path().join("textures");
+        let stored = store(&store_dir, &source).expect("store");
+
+        assert!(stored.key.ends_with(".png"), "got: {}", stored.key);
+        assert_eq!(stored.name, "bcore_def_2.tif");
+        let back =
+            image::load_from_memory(&std::fs::read(store_dir.join(&stored.key)).expect("read"))
+                .expect("decode")
+                .to_rgba8();
+        assert_eq!(back.get_pixel(0, 0).0[3], 255);
+        assert_eq!(back.get_pixel(1, 0).0[3], 0);
     }
 
     #[test]

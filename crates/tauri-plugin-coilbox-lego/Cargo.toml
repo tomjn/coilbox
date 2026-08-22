@@ -27,12 +27,15 @@ flate2 = "1"
 # The texture store is keyed by content, so a file edited outside coilbox hashes
 # to a new key and cannot be served from a stale cache.
 sha2 = { workspace = true }
-# A webview renders neither `.bmp` nor `.tga`, and they are most of what the
-# legacy games ship, so both are re-encoded to PNG on the way into the store.
+# A webview renders none of `.bmp`, `.tga` or `.tif`, and they are most of what
+# the legacy games ship, so all three are re-encoded to PNG on the way into the
+# store. `coilbox-texture` does the decoding. These are the encoders the tests
+# write their fixtures with.
 image = { version = "0.25", default-features = false, features = [
   "png",
   "bmp",
   "tga",
+  "tiff",
 ] }
 # Blender reads neither a `.dds` nor a compressed texture inside a `.glb`, so the
 # two Blender exports decode whatever the store holds and write a PNG. The same
