@@ -330,7 +330,6 @@ export function GameModelDrawer({
                   <Footnotes
                     shown={Math.min(matched.length, ROW_CAP)}
                     matched={matched.length}
-                    threeDoUnits={models.threeDoUnits}
                     unresolved={models.unresolvedUnits}
                   />
                 </>
@@ -494,23 +493,16 @@ function BuildPic({
 function Footnotes({
   shown,
   matched,
-  threeDoUnits,
   unresolved,
 }: {
   shown: number;
   matched: number;
-  threeDoUnits: number;
   unresolved: number;
 }) {
   const notes: string[] = [];
   if (matched > shown) {
     notes.push(
       `Showing the first ${shown} of ${matched}. Search to narrow it down.`,
-    );
-  }
-  if (threeDoUnits > 0) {
-    notes.push(
-      `${threeDoUnits} of this game's units are drawn with a .3do, an older model format the builder cannot read.`,
     );
   }
   if (unresolved > 0) {

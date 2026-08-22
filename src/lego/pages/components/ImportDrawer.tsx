@@ -1,5 +1,5 @@
 /**
- * Open somebody else's `.s3o` by pointing at the file.
+ * Open somebody else's model by pointing at the file.
  *
  * The oldest way in and still the only one that reaches a model outside a game
  * coilbox can see: a loose export, a file somebody sent you, a model half way
@@ -39,7 +39,7 @@ export function ImportDrawer({ open: isOpen, onOpenChange, onOpened }: Props) {
     const picked = await open({
       multiple: false,
       title: "Choose a model",
-      filters: [{ name: "Spring model", extensions: ["s3o"] }],
+      filters: [{ name: "Spring model", extensions: ["s3o", "3do"] }],
     });
     if (typeof picked !== "string") return;
 
@@ -82,6 +82,12 @@ export function ImportDrawer({ open: isOpen, onOpenChange, onOpened }: Props) {
                 the project it was exported from, with its parts and its atlas.
                 Any other model keeps its meshes as they are and opens as a unit
                 with no parts, drawn with its own texture.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                A <code>.3do</code> works too, which is the older format most of
+                an older game's units are drawn with. That one is converted
+                rather than read: its texture tiles are packed into one sheet so
+                it exports as an ordinary <code>.s3o</code>.
               </p>
               <Button variant="outline" size="sm" onClick={() => void choose()}>
                 <FileUp className="size-4" /> Choose a model
