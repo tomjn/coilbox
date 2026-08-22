@@ -231,7 +231,13 @@ mod tests {
         let mut written = BTreeSet::new();
         let out = write_model(&dir, "abcd", model("Objects3D/armcom.s3o"), &mut written).unwrap();
 
-        assert_eq!(out.file, "abcd_objects3d_armcom_s3o.json");
+        assert_eq!(
+            out.file,
+            format!(
+                "v{}-abcd_objects3d_armcom_s3o.json",
+                crate::unitmodel::CACHE_VERSION
+            )
+        );
         assert_eq!(out.path, "Objects3D/armcom.s3o");
         assert_eq!(out.format, "s3o");
         let raw = std::fs::read_to_string(dir.join(&out.file)).expect("the model file was written");

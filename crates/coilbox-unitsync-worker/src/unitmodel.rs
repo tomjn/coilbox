@@ -30,7 +30,15 @@ use std::rc::Rc;
 /// extension spelled in upper case (issue #1915). A cache filled before that
 /// holds 276 files on this machine that were written through when they should
 /// have been re-encoded, and their names are what a new build asks for.
-const CACHE_VERSION: u32 = 3;
+///
+/// Also the literal prefix [`cache_file_name`] gives every file, which is what
+/// lets `tauri-plugin-coilbox-unitsync`'s startup sweep (`modelcache.rs`, issue
+/// #1919) tell a live file from an orphan without opening an archive: bump this
+/// and the sweep deletes everything written under the old number on its next
+/// launch. That module keeps its own copy of this number, since there is no
+/// library dependency between this sidecar and the plugin crate, so bump both
+/// together.
+pub(crate) const CACHE_VERSION: u32 = 3;
 
 /// Models are a few megabytes at most: the largest in the games checked is a
 /// 3.2 MiB `.s3o`. Bound the read anyway.
@@ -772,11 +780,12 @@ pub(crate) fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String
     Some(format!("{:016x}", h.finish()))
 }
 
-/// The cache file for one archive member: `<gamekey>_<sanitised path>.<ext>`.
-/// One flat segment, because the asset protocol's root for these serves a single
-/// folder. The extension is the one the file is written in, which is not the
-/// source's when it was transcoded, so the webview can pick a loader from it and
-/// the asset protocol can put a content type on it.
+/// The cache file for one archive member:
+/// `v<CACHE_VERSION>-<gamekey>_<sanitised path>.<ext>`. One flat segment,
+/// because the asset protocol's root for these serves a single folder. The
+/// extension is the one the file is written in, which is not the source's when
+/// it was transcoded, so the webview can pick a loader from it and the asset
+/// protocol can put a content type on it.
 ///
 /// Every extension [`to_webview_format`] re-encodes is listed here. A file
 /// written as PNG under its source's name is served as an octet stream, and a
@@ -786,6 +795,11 @@ pub(crate) fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String
 /// installed games' 1680 `.bmp` textures are spelled `.BMP`. Every one of those
 /// was written through raw while its lower-case neighbour was re-encoded, so the
 /// name is settled in lower case before anything is decided from it.
+///
+/// The `v<CACHE_VERSION>-` prefix is spelled out in the clear rather than left
+/// folded into `base`'s hash, so the startup sweep (issue #1919) can tell a
+/// current file from an orphan by string comparison alone, with no archive to
+/// open and no hash to recompute.
 pub(crate) fn cache_file_name(base: &str, member: &str, source_ext: &str) -> String {
     let lower = member.to_lowercase();
     let ext = match source_ext.to_lowercase().as_str() {
@@ -797,7 +811,7 @@ pub(crate) fn cache_file_name(base: &str, member: &str, source_ext: &str) -> Str
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect();
-    format!("{base}_{safe}.{ext}")
+    format!("v{CACHE_VERSION}-{base}_{safe}.{ext}")
 }
 
 #[cfg(test)]
@@ -933,8 +947,23 @@ mod tests {
     #[test]
     fn cache_file_name_is_one_flat_segment_keeping_the_extension() {
         let name = cache_file_name("abcd", "UnitTextures/Lego Skin.DDS", "DDS");
-        assert_eq!(name, "abcd_unittextures_lego_skin_dds.dds");
+        assert_eq!(
+            name,
+            format!("v{CACHE_VERSION}-abcd_unittextures_lego_skin_dds.dds")
+        );
         assert!(!name.contains('/'));
+    }
+
+    /// The sweep in `tauri-plugin-coilbox-unitsync/src/modelcache.rs` tells a
+    /// current file from an orphan by this exact prefix, so it has to be at the
+    /// front of the name and it has to spell the real constant.
+    #[test]
+    fn cache_file_name_starts_with_the_literal_cache_version() {
+        let name = cache_file_name("abcd", "unittextures/skin.dds", "dds");
+        assert!(
+            name.starts_with(&format!("v{CACHE_VERSION}-")),
+            "got: {name}"
+        );
     }
 
     /// A transcoded texture is named for what it was written as, not what it
@@ -944,11 +973,11 @@ mod tests {
     fn a_transcoded_texture_is_named_png() {
         assert_eq!(
             cache_file_name("abcd", "unittextures/tatex/glow00.bmp", "bmp"),
-            "abcd_unittextures_tatex_glow00_bmp.png"
+            format!("v{CACHE_VERSION}-abcd_unittextures_tatex_glow00_bmp.png")
         );
         assert_eq!(
             cache_file_name("abcd", "unittextures/tatex/arm01a00.tga", "tga"),
-            "abcd_unittextures_tatex_arm01a00_tga.png"
+            format!("v{CACHE_VERSION}-abcd_unittextures_tatex_arm01a00_tga.png")
         );
         // Every extension `to_webview_format` re-encodes belongs on the list, in
         // whichever case the artist happened to save it in.
