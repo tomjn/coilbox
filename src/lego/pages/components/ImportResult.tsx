@@ -90,6 +90,10 @@ export async function readModel(options: {
   source?: string;
   /** Recorded on the project when the model was picked out of a game. */
   game?: LegoImportedGame;
+  /** Whether {@link path} is a copy unpacked into a temp folder rather than a
+   *  file where it lives. The textures were unpacked beside it, so none of them
+   *  is somewhere to refresh from either (#1903). */
+  unpacked?: boolean;
   beforeImport?: (textures: string[]) => Promise<void>;
 }): Promise<ImportStage> {
   const { path } = options;
@@ -130,6 +134,7 @@ export async function readModel(options: {
       id,
       source: options.source ?? path,
       ...(options.game ? { game: options.game } : {}),
+      ...(options.unpacked ? { unpacked: true } : {}),
       name,
       unitName,
       packId: pack.manifest.id,
@@ -296,8 +301,10 @@ function Imported({
           <p className="text-xs text-muted-foreground">
             Drawn with <code>{imported.texture.name}</code>, copied into
             coilbox's own store so the unit keeps working if the game folder
-            goes away. You can point it at a different file later, or refresh it
-            after editing it elsewhere.
+            goes away. You can point it at a different file later
+            {imported.texture.source
+              ? ", or refresh it after editing it elsewhere."
+              : ". There is no file behind this one to refresh from, because a packed archive holds no path to hand back."}
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">

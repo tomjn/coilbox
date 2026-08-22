@@ -49,7 +49,7 @@ function result(overrides: Partial<S3oImport> = {}): S3oImport {
   };
 }
 
-function build(overrides: Partial<S3oImport> = {}) {
+function build(overrides: Partial<S3oImport> = {}, unpacked = false) {
   let n = 0;
   return projectFromImport(result(overrides), {
     id: "unit-1",
@@ -60,6 +60,7 @@ function build(overrides: Partial<S3oImport> = {}) {
     packVersion: "1",
     now: "2026-07-31T00:00:00.000Z",
     newId: () => `p${n++}`,
+    ...(unpacked ? { unpacked: true } : {}),
   });
 }
 
@@ -119,6 +120,29 @@ describe("projectFromImport", () => {
       name: "Beacon_1.dds",
       source: "/game/unittextures/Beacon_1.dds",
     });
+    expect(project.imported?.teamMask?.key).toBe("bb22.dds");
+  });
+
+  it("records no source for a model unpacked out of a packed archive", () => {
+    const { project } = build(
+      {
+        texture: texture(
+          "aa11.dds",
+          "Beacon_1.dds",
+          "/tmp/coilbox-lego-model-1/unittextures/Beacon_1.dds",
+        ),
+      },
+      true,
+    );
+
+    // The temp folder goes when the operating system decides it does, so a path
+    // into it is a promise the unit cannot keep.
+    expect(project.imported?.texture).toEqual({
+      key: "aa11.dds",
+      name: "Beacon_1.dds",
+    });
+    expect(project.imported?.teamMask?.source).toBeUndefined();
+    // What the unit is drawn with is unaffected: coilbox has its own copy.
     expect(project.imported?.teamMask?.key).toBe("bb22.dds");
   });
 

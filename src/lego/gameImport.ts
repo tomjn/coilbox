@@ -19,6 +19,7 @@ import { join, tempDir } from "@tauri-apps/api/path";
 
 import type { ArchiveFileEntry } from "../content/bindings";
 import { unitsyncArchiveExtract } from "../content/bindings";
+import { isLooseArchive } from "./model";
 
 /** The extensions `find_beside_model` will accept in place of the one a model's
  *  header names, kept in step with `texture.rs`. */
@@ -47,11 +48,6 @@ export interface StagedModel {
   /** The temp folder it was unpacked into, or null for a loose game read in
    *  place. */
   staged: string | null;
-}
-
-/** Whether a game is a loose folder, so its members are files already. */
-export function isLoose(archive: string): boolean {
-  return archive.toLowerCase().endsWith(".sdd");
 }
 
 /**
@@ -157,7 +153,7 @@ export async function stageModel(
   target: UnitsyncTarget,
   picked: PickedModel,
 ): Promise<StagedModel> {
-  if (isLoose(picked.archive) && picked.archivePath) {
+  if (isLooseArchive(picked.archive) && picked.archivePath) {
     return {
       path: await join(picked.archivePath, picked.member),
       staged: null,

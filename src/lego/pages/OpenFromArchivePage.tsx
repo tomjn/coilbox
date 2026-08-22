@@ -113,6 +113,7 @@ export default function OpenFromArchivePage() {
           name,
           unitName: name,
           source: modelSource(picked),
+          unpacked: staged.staged !== null,
           game: {
             name: request.name ?? request.archive,
             archive: request.archive,

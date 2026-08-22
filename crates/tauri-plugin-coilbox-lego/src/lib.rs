@@ -10,7 +10,7 @@
 //!     `coilbox://` scheme
 //!   - `geometry/<id>.bin.gz` the meshes of a unit imported from somebody
 //!     else's `.s3o`, served by the `legogeom` root. Too big for the document:
-//!     see [`import`]
+//!     see [`import`], and [`geometry`] for the ones nobody kept
 //!   - `textures/<sha256>.<ext>` the textures those units draw with, served by
 //!     the `legotex` root. Keyed by content because a texture is shared: see
 //!     [`texture`]
@@ -20,6 +20,7 @@
 //! Registered as `"coilbox-lego"`, so the frontend invokes
 //! `plugin:coilbox-lego|<cmd>`.
 
+mod geometry;
 mod import;
 mod texture;
 
@@ -1188,6 +1189,16 @@ fn lego_run_script(
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-lego")
+        // An import writes its geometry before anyone says they want the unit,
+        // so a read somebody walked away from leaves a sidecar nothing names.
+        // Cleared here because startup is the one moment nothing can be part way
+        // through an import: see [`geometry`].
+        .setup(|app, _api| {
+            if let Ok(base) = lego_dir(app) {
+                geometry::sweep(&base);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             lego_list,
             lego_save,

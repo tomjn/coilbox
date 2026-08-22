@@ -143,6 +143,7 @@ export function GameModelDrawer({
           name: row.label,
           unitName: row.unit ?? row.label,
           source: modelSource(picked),
+          unpacked: staged.staged !== null,
           game: {
             name: game.name,
             archive,
