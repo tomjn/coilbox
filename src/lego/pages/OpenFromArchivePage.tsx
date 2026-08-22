@@ -62,14 +62,16 @@ export default function OpenFromArchivePage() {
    *  a second import of the same model. */
   const started = useRef(false);
   /** Dropped on unmount, so an import somebody navigated away from stops
-   *  reporting into a page that is no longer on screen. */
+   *  reporting into a page that is no longer on screen. Raised on mount rather
+   *  than only at birth, because Strict Mode mounts, unmounts and mounts again,
+   *  and a flag only ever lowered would leave a live page counted as gone. */
   const live = useRef(true);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    live.current = true;
+    return () => {
       live.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
 
   useEffect(() => {
     if (!request || started.current) return;
