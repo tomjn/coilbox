@@ -556,10 +556,21 @@ fn do3_piece(
 /// `"arm_commander.s3o"`, or a path with a subfolder and Windows separators. A
 /// name with no extension means the engine tries `.s3o` first and `.3do` after,
 /// which is the order tried here.
+///
+/// A caller that already holds a member path, the archive browser previewing the
+/// file somebody clicked (issue #698), gets that member and not a namesake: a
+/// whole-path match is taken first, and only for a name that is already a model
+/// file. The suffix matching below would otherwise hand back whichever model
+/// under `objects3d/` shares its file name.
 fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
     let want = object_name.trim().replace('\\', "/").to_lowercase();
     if want.is_empty() {
         return None;
+    }
+    if want.ends_with(".s3o") || want.ends_with(".3do") {
+        if let Some((_, real)) = list.iter().find(|(lower, _)| *lower == want) {
+            return Some(real.clone());
+        }
     }
     let candidates: Vec<String> = if want.ends_with(".s3o") || want.ends_with(".3do") {
         vec![want]
@@ -818,6 +829,48 @@ mod tests {
     fn a_model_outside_objects3d_is_not_a_model() {
         let list = listing(&["scripts/armcom.s3o"]);
         assert_eq!(find_model(&list, "armcom"), None);
+    }
+
+    /// What the archive browser asks with: the member it is showing. The one it
+    /// clicked, not the one of that name the suffix search would find first.
+    #[test]
+    fn a_whole_member_path_resolves_to_that_member() {
+        let list = listing(&[
+            "Objects3D/units/tree.s3o",
+            "Objects3D/features/tree.s3o",
+            "Objects3D/armcom.3do",
+        ]);
+        assert_eq!(
+            find_model(&list, "Objects3D/features/tree.s3o").as_deref(),
+            Some("Objects3D/features/tree.s3o")
+        );
+        assert_eq!(
+            find_model(&list, "objects3d/armcom.3do").as_deref(),
+            Some("Objects3D/armcom.3do")
+        );
+    }
+
+    /// A model an archive keeps outside `objects3d/` is still a file somebody
+    /// can click, so previewing it works even though no unitdef could name it.
+    #[test]
+    fn a_whole_member_path_resolves_outside_objects3d() {
+        let list = listing(&["scripts/armcom.s3o"]);
+        assert_eq!(
+            find_model(&list, "scripts/armcom.s3o").as_deref(),
+            Some("scripts/armcom.s3o")
+        );
+    }
+
+    /// The whole-path match only ever fires for a name that is already a model
+    /// file, so an `objectname` cannot reach a member of some other kind that
+    /// happens to be spelled the same.
+    #[test]
+    fn a_whole_path_match_needs_a_model_extension() {
+        let list = listing(&["Objects3D/armcom.s3o", "scripts/armcom"]);
+        assert_eq!(
+            find_model(&list, "scripts/armcom").as_deref(),
+            Some("Objects3D/armcom.s3o")
+        );
     }
 
     /// A `.3do` face's name gets `00` appended. A name `teamtex.txt` claims is
