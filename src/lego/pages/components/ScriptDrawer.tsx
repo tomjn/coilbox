@@ -3,8 +3,14 @@
  *
  * A unit starts with a generated script, shown here to read and copy. Taking
  * ownership hands it over: from then on this is an editor, the text is stored
- * on the unit, and an export writes exactly what is in it. That is a one way
- * door, so the panel says so next to the button rather than in a warning.
+ * on the unit, and an export writes exactly what is in it.
+ *
+ * Giving it back is here too. It used to be a one way door, on the reasoning
+ * that nobody would want the presets after writing their own script. That was
+ * wrong in the case it mattered: a unit whose script was taken over and then
+ * emptied has no animation, no presets and no way to ask for either, and the
+ * animation panel is a script player for a script that does nothing. The stored
+ * text is what goes, so the button says that and undo brings it straight back.
  *
  * Editing is a textarea, not a code editor. Every piece name the script uses is
  * checked against the unit, because a name the model does not have fails at
@@ -27,6 +33,9 @@ interface Props {
   project: LegoProject;
   /** Stores the unit's own Lua. The first call is the unit taking it over. */
   onScriptChange: (script: string) => void;
+  /** Drops the stored Lua, so the unit goes back to a script generated from
+   *  its animation presets. */
+  onScriptRelease: () => void;
 }
 
 export function ScriptDrawer({
@@ -34,6 +43,7 @@ export function ScriptDrawer({
   onOpenChange,
   project,
   onScriptChange,
+  onScriptRelease,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const owned = project.script !== undefined;
@@ -49,6 +59,10 @@ export function ScriptDrawer({
     project.pieces.map((piece) => piece.name),
   );
   const unsaved = owned && draft !== project.script;
+  // The case that made handing it back necessary: an owned script with nothing
+  // in it animates nothing and cannot be reached by a preset, so the unit is
+  // stuck until somebody edits files by hand.
+  const empty = owned && shown.trim() === "";
 
   function commit() {
     if (draft !== project.script) onScriptChange(draft);
@@ -140,17 +154,44 @@ export function ScriptDrawer({
           ) : null}
 
           {owned ? (
-            <p className="border-t border-border/60 px-5 py-2 text-xs text-muted-foreground">
-              {unsaved ? "Not saved yet" : "Saved to the unit"}
-            </p>
+            <>
+              <p className="border-t border-border/60 px-5 py-2 text-xs text-muted-foreground">
+                {unsaved ? "Not saved yet" : "Saved to the unit"}
+              </p>
+              <div className="flex flex-col gap-2 border-t border-border/60 px-5 py-4">
+                <span className="text-sm font-medium">
+                  Go back to the animations
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  {empty
+                    ? "This script is empty, so the unit has no animation at all and the presets cannot reach it. Hand it back and the Animation panel works again."
+                    : "Hand the script back and the unit is generated from the animation presets again, as it was before you took it over."}{" "}
+                  The text above is discarded. Undo brings it back if that was a
+                  mistake, so copy it first if you want to keep it beyond this
+                  session.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="self-start"
+                  onClick={() => {
+                    onScriptRelease();
+                    onOpenChange(false);
+                  }}
+                >
+                  Discard this script and use the presets
+                </Button>
+              </div>
+            </>
           ) : (
             <div className="flex flex-col gap-2 border-t border-border/60 px-5 py-4">
               <span className="text-sm font-medium">Write it yourself</span>
               <p className="text-xs text-muted-foreground">
                 Take this script over and the unit keeps your version of it: you
                 edit it here, and an export writes what you wrote. The animation
-                presets stop applying to this unit at that point, and there is
-                no way back to them.
+                presets stop applying to this unit at that point. You can hand
+                the script back later, which discards what you wrote and puts
+                the presets back in charge.
               </p>
               <Button
                 variant="outline"

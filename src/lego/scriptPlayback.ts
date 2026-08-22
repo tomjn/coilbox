@@ -102,6 +102,23 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    id: "building",
+    label: "Building",
+    description:
+      "Builds one thing, stops, then builds another the other way round.",
+    events: [
+      { frame: 0, callin: "Create" },
+      // Heading and pitch in radians, relative to the unit's own facing, which
+      // is what the engine works out from the build target and hands over. A
+      // factory is called with no arguments at all, so a factory script that
+      // reads them has to check it got them: see `BUILD_AIM`.
+      { frame: at(0.5), callin: "StartBuilding", args: [0.7, -0.2] },
+      { frame: at(2.5), callin: "StopBuilding" },
+      { frame: at(3.5), callin: "StartBuilding", args: [-0.6, 0.15] },
+      { frame: at(5.5), callin: "StopBuilding" },
+    ],
+  },
+  {
     id: "firing",
     label: "Aiming and firing",
     description: "Aims one way, fires, aims the other, fires again.",

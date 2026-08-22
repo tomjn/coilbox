@@ -63,6 +63,12 @@ export function AimPointPanel({ project, pack, raw, onChange }: Props) {
       </p>
 
       <p className="text-xs text-muted-foreground">
+        While this panel is open the viewport's handles are on the point itself,
+        so it can be dragged onto the body rather than typed. Move only: a point
+        has no size and nothing to turn.
+      </p>
+
+      <p className="text-xs text-muted-foreground">
         Worth moving whenever a long piece drags the bounding box off the body:
         a crane arm, an aircraft tail, a raised dish. The middle of the box is
         then out in the air beside the unit, and shots aimed at it miss what a

@@ -54,6 +54,8 @@ interface Props {
     pieceId: string,
     collision: LegoPieceCollision | null,
   ) => void;
+  /** The collision Lua an export would write for this unit as it stands. */
+  pieceScript: string;
 }
 
 export function CollisionPanel({
@@ -66,6 +68,7 @@ export function CollisionPanel({
   selectedId,
   onSelectPiece,
   onPieceVolumeChange,
+  pieceScript,
 }: Props) {
   // Every vertex in the unit, so not on every keystroke elsewhere in the page.
   const bounds = useMemo(
@@ -130,7 +133,8 @@ export function CollisionPanel({
       <p className="text-xs text-muted-foreground">
         While this panel is open the viewport's handles are on the volume rather
         than on a piece, so you can drag it to size instead of typing. Move and
-        scale only: a volume has no rotation.
+        scale only: a volume has no rotation. Select a piece and they move onto
+        that piece's own box instead, which is the fields at the bottom.
       </p>
 
       {volume.type === "sphere" ? (
@@ -231,6 +235,7 @@ export function CollisionPanel({
         selectedId={selectedId}
         onSelect={onSelectPiece}
         onChange={onPieceVolumeChange}
+        script={pieceScript}
       />
     </div>
   );

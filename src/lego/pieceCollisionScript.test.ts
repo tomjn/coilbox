@@ -232,4 +232,17 @@ describe("buildPieceCollisionScript", () => {
     expect(lua).toContain("Rewritten on every export");
     expect(lua.endsWith("\n")).toBe(true);
   });
+
+  /**
+   * "The unit script" has no referent inside a generated file, and the file it
+   * means is the one most people call the animation script. So the header names
+   * the path, which somebody reading this can go and open.
+   */
+  it("names the file that includes it rather than calling it the unit script", () => {
+    const project = unit([piece({ id: "dish", collision: { hit: false } })]);
+    const lua = buildPieceCollisionScript(project, baked(project));
+    expect(lua).toContain("scripts/radar.lua");
+    expect(lua).toContain("animation");
+    expect(lua).not.toContain("Pulled in by the unit script");
+  });
 });

@@ -170,3 +170,13 @@ describe("what the panel says moves with the point", () => {
     expect(screen.getByText(/stays on the geometry/)).toBeTruthy();
   });
 });
+
+describe("what the panel says about dragging the point", () => {
+  /** The handles are the viewport's, and it only puts them on the point while
+   *  this panel is open, so this panel is where that has to be said. */
+  it("says the handles are on the point and that they only move it", () => {
+    show(unit());
+    expect(screen.getByText(/handles are on the point itself/)).toBeTruthy();
+    expect(screen.getByText(/Move only/)).toBeTruthy();
+  });
+});

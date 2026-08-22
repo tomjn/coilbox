@@ -157,6 +157,11 @@ export const MIN_COLLISION_SIZE = 0.1;
  * middle, which is what `offsets` are measured from. `axis` is which of x, y
  * and z the face is on and `sign` is which end of it.
  *
+ * `min` is the floor a drag stops at, so a face pushed through its opposite
+ * leaves a thin volume rather than an inside-out one. It is a parameter because
+ * the engine clamps a unit's volume and a piece's differently: see
+ * `MIN_COLLISION_SIZE` and `MIN_PIECE_COLLISION_SIZE`.
+ *
  * The size that moves is the one the engine will build, not the one typed in,
  * so a shape that cannot be stretched stays the shape it is: a sphere takes the
  * new size on all three axes and a cylinder takes it on both of its
@@ -168,10 +173,11 @@ export function resizeCollisionFace(
   axis: 0 | 1 | 2,
   sign: 1 | -1,
   face: number,
+  min: number = MIN_COLLISION_SIZE,
 ): LegoCollisionVolume {
   const built = engineScales(volume);
   const fixed = volume.offsets[axis] - (sign * built[axis]) / 2;
-  const size = Math.max(MIN_COLLISION_SIZE, sign * (face - fixed));
+  const size = Math.max(min, sign * (face - fixed));
   const offsets: [number, number, number] = [...volume.offsets];
   offsets[axis] = fixed + (sign * size) / 2;
   return { ...volume, scales: resizedScales(volume, axis, size), offsets };

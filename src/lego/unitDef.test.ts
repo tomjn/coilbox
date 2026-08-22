@@ -326,4 +326,91 @@ describe("buildUnitDef", () => {
     expect(lua.endsWith("\n")).toBe(true);
     expect(lua.endsWith("\n\n")).toBe(false);
   });
+
+  /**
+   * `UnitDef::IsBuilderUnit` is `builder && buildSpeed > 0 && buildDistance >
+   * 0`, and `builder` is `&=`'d against it immediately after being read. So a
+   * definition claiming `builder` without a work rate clears its own claim and
+   * the unit is not a builder, with nothing said anywhere.
+   */
+  describe("builder keys", () => {
+    /** A build arm is what says the unit builds. There is no separate switch,
+     *  because the roles already carry the answer. */
+    function withArm(role = "buildarm.arm"): LegoProject {
+      const base = project("Con Bot", "conbot");
+      return {
+        ...base,
+        pieces: [
+          ...base.pieces,
+          {
+            id: "arm",
+            name: "arm",
+            parentId: base.rootPieceId,
+            partId: null,
+            position: [0, 0, 0],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+            role,
+          },
+        ],
+      };
+    }
+
+    it("writes nothing for a unit with no build arm on it", () => {
+      const lua = buildUnitDef(project("Cake Bot"), bounds({ x: 32, z: 32 }));
+
+      // The key, not the word: the file's own header says "unit builder".
+      expect(lua).not.toContain("builder = ");
+      expect(lua).not.toContain("workertime");
+    });
+
+    it("writes all three together, since one without the others is discarded", () => {
+      const lua = buildUnitDef(withArm(), bounds({ x: 32, z: 32 }));
+
+      expect(lua).toContain("builder = true");
+      expect(lua).toContain("workertime = 100");
+      expect(lua).toContain("builddistance = 128");
+      expect(lua).toContain("canassist = true");
+    });
+
+    /** Any of the build roles, not just the arm: a unit can be nano points and
+     *  a nozzle with no arm modelled between them. */
+    it("counts a nano point or a nozzle as a build arm", () => {
+      for (const role of [
+        "buildarm.nano",
+        "buildarm.nozzle",
+        "buildarm.base",
+      ]) {
+        expect(buildUnitDef(withArm(role), bounds({ x: 8, z: 8 }))).toContain(
+          "builder = true",
+        );
+      }
+    });
+
+    it("takes the numbers the unit carries over the defaults", () => {
+      const lua = buildUnitDef(
+        {
+          ...withArm(),
+          builder: { workerTime: 350, buildDistance: 420, canAssist: false },
+        },
+        bounds({ x: 32, z: 32 }),
+      );
+
+      expect(lua).toContain("workertime = 350");
+      expect(lua).toContain("builddistance = 420");
+      expect(lua).toContain("canassist = false");
+    });
+
+    /** A partial block is what a unit gets after one slider is touched, so the
+     *  rest still has to come from the defaults rather than from nothing. */
+    it("fills the rest from the defaults when only one is set", () => {
+      const lua = buildUnitDef(
+        { ...withArm(), builder: { workerTime: 250 } },
+        bounds({ x: 32, z: 32 }),
+      );
+
+      expect(lua).toContain("workertime = 250");
+      expect(lua).toContain("builddistance = 128");
+    });
+  });
 });

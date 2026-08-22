@@ -68,6 +68,7 @@ import {
   projectPackProblems,
 } from "../pack";
 import { usePanelOpen } from "../panels";
+import { buildPieceCollisionScript } from "../pieceCollisionScript";
 import { currentPivot, pivotChoices, setPivot } from "../pivot";
 import {
   deleteCompound,
@@ -78,7 +79,7 @@ import {
 import { rawGeometryProblems } from "../rawGeometry";
 import { texturesInUse } from "../rawImport";
 import { parentOptions, reparentPiece } from "../reparent";
-import { sitOnGround, unitBounds } from "../s3oBuild";
+import { bakedPieces, sitOnGround, unitBounds } from "../s3oBuild";
 import type { ScriptTimeline } from "../scriptPlayback";
 import { shortcutLabel } from "../shortcuts";
 import { useEditShortcuts } from "../useEditShortcuts";
@@ -96,6 +97,7 @@ import { ModelViewport } from "./components/ModelViewport";
 import { NameInput } from "./components/NameInput";
 import { NoMatches, PartFilters } from "./components/PartFilters";
 import { PartPicker } from "./components/PartPicker";
+import { pickedCollisionPiece } from "./components/PieceCollisionFields";
 import { PieceTree } from "./components/PieceTree";
 import { SetPanel } from "./components/SetPanel";
 import { TestDrawer } from "./components/TestDrawer";
@@ -570,12 +572,81 @@ function Builder({ id }: { id: string | undefined }) {
     }));
   }
 
+  // The collision panel's two readings, both of which walk every vertex in the
+  // unit. Only worked out while that panel is open, so a keystroke anywhere
+  // else in the builder does not pay for them.
+  const collisionOpen = asideOpen && aside === "collision";
+  const pieceCollisionLua = useMemo(
+    () =>
+      draft && pack && collisionOpen
+        ? buildPieceCollisionScript(draft, bakedPieces(draft, pack, raw).pieces)
+        : "",
+    [draft, pack, raw, collisionOpen],
+  );
+  // The piece the viewport puts its collision handles on: whichever is
+  // selected while the collision panel is open. Selecting a piece is the whole
+  // gesture, rather than a switch on top of it, because picking the thing you
+  // want to change is already how everything else in the builder works.
+  //
+  // Nothing selected leaves them on the unit's own volume, which is also the
+  // way back from a piece.
+  const collisionPieceId =
+    draft && collisionOpen && selectedId
+      ? pickedCollisionPiece(draft, selectedId)
+      : null;
+
+  /** Stop the preview. Whatever is on screen describes the unit before a script
+   *  change: the presets it just stopped using, or the script it just left. */
+  function stopPlayback() {
+    setPlaying(false);
+    setScriptTimeline(null);
+    setScriptPaused(false);
+    setScriptFrame(0);
+  }
+
   if (doc.loading || !draft || !pack) {
     return (
       <p className="px-6 py-10 text-center text-sm text-muted-foreground">
         {doc.loading ? "Opening the unit." : "This unit could not be opened."}
       </p>
     );
+  }
+
+  // Declared past the guard above, since it measures the unit and there is no
+  // pack to measure it against until then.
+  const loaded = pack;
+
+  /**
+   * Put the unit's aim point somewhere, or hand it back to the bounding box.
+   *
+   * Shared by the aim panel's fields and by the viewport's drag handles: moving
+   * the point drags two other things with it, and neither caller should be the
+   * one that has to remember that.
+   */
+  function setAimPoint(mid: [number, number, number] | null) {
+    edit((project) => {
+      const bounds = unitBounds(project, loaded, raw);
+      const from = aimPoint(project, bounds);
+      const to = mid ?? bounds.mid;
+      // A volume somebody fitted to the geometry is measured from the aim
+      // point, so moving the point would drag it off. Its offsets absorb the
+      // move instead.
+      const held = project.collisionVolume
+        ? {
+            ...project,
+            collisionVolume: reanchorCollisionVolume(
+              project.collisionVolume,
+              from,
+              to,
+            ),
+          }
+        : project;
+      // A pinned radius came out of an imported header and was measured from
+      // that header's own mid, so deciding the aim point here makes it stale.
+      // Dropping it has the export measure a sphere round the point instead.
+      const { radius: _stale, mid: _replaced, ...rest } = held;
+      return mid ? { ...rest, mid } : rest;
+    });
   }
 
   // What the drawers below draw parts and compounds with, so picking one is
@@ -845,13 +916,37 @@ function Builder({ id }: { id: string | undefined }) {
                 // switched on, and closing it gives them back to the pieces.
                 // Putting the whole side panel away closes it too, so the handles
                 // never outlive the thing that explains them.
-                editCollision={asideOpen && aside === "collision"}
+                editCollision={collisionOpen}
                 onCollisionChange={(collisionVolume) =>
                   edit((project) => ({ ...project, collisionVolume }))
+                }
+                // The selected piece while this panel is open, and null the
+                // rest of the time, which leaves the handles on the unit's own
+                // volume. See `collisionPieceId`.
+                editPieceCollisionId={collisionPieceId}
+                onPieceCollisionVolumeChange={(pieceId, volume) =>
+                  edit((project) => ({
+                    ...project,
+                    pieces: project.pieces.map((piece) =>
+                      piece.id === pieceId
+                        ? {
+                            ...piece,
+                            // A dragged box keeps whether anything hits the
+                            // piece, which is the switch above it in the panel
+                            // and not something a drag has an opinion about.
+                            collision: {
+                              hit: piece.collision?.hit !== false,
+                              volume,
+                            },
+                          }
+                        : piece,
+                    ),
+                  }))
                 }
                 // The same reasoning, for the marker the aim point panel is
                 // about: opening the panel draws the point it is describing.
                 showAimPoint={asideOpen && aside === "aim"}
+                onAimChange={setAimPoint}
               />
             </div>
 
@@ -1000,32 +1095,7 @@ function Builder({ id }: { id: string | undefined }) {
                   project={draft}
                   pack={pack}
                   raw={raw}
-                  onChange={(mid) =>
-                    edit((project) => {
-                      const bounds = unitBounds(project, pack, raw);
-                      const from = aimPoint(project, bounds);
-                      const to = mid ?? bounds.mid;
-                      // A volume somebody fitted to the geometry is measured
-                      // from the aim point, so moving the point would drag it
-                      // off. Its offsets absorb the move instead.
-                      const held = project.collisionVolume
-                        ? {
-                            ...project,
-                            collisionVolume: reanchorCollisionVolume(
-                              project.collisionVolume,
-                              from,
-                              to,
-                            ),
-                          }
-                        : project;
-                      // A pinned radius came out of an imported header and was
-                      // measured from that header's own mid, so deciding the
-                      // aim point here makes it stale. Dropping it has the
-                      // export measure a sphere round the point instead.
-                      const { radius: _stale, mid: _replaced, ...rest } = held;
-                      return mid ? { ...rest, mid } : rest;
-                    })
-                  }
+                  onChange={setAimPoint}
                 />
               ) : aside === "collision" ? (
                 <CollisionPanel
@@ -1073,6 +1143,7 @@ function Builder({ id }: { id: string | undefined }) {
                       }),
                     }))
                   }
+                  pieceScript={pieceCollisionLua}
                 />
               ) : aside === "animation" ? (
                 <AnimationPanel
@@ -1088,14 +1159,20 @@ function Builder({ id }: { id: string | undefined }) {
                   scriptFrame={scriptFrame}
                   onScriptFrameChange={setScriptFrame}
                   onScriptChange={(script) => {
-                    // What is playing describes the unit before the change: the
-                    // presets it just stopped using, or the script it just
-                    // edited.
-                    setPlaying(false);
-                    setScriptTimeline(null);
-                    setScriptPaused(false);
-                    setScriptFrame(0);
+                    stopPlayback();
                     edit((project) => ({ ...project, script }));
+                  }}
+                  onBuilderChange={(builder) =>
+                    edit((project) => ({ ...project, builder }))
+                  }
+                  onScriptRelease={() => {
+                    stopPlayback();
+                    edit((project) => {
+                      // Back on a generated script, which is the absence of the
+                      // key rather than a stored copy of what was generated.
+                      const { script: _dropped, ...rest } = project;
+                      return rest;
+                    });
                   }}
                 />
               ) : (

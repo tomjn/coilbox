@@ -35,6 +35,9 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
@@ -70,6 +73,8 @@ import {
 import {
   effectiveCollisionVolume,
   engineScales,
+  MIN_COLLISION_SIZE,
+  MIN_PIECE_COLLISION_SIZE,
   pieceCollisionVolumes,
   resizeCollisionFace,
 } from "../../collisionVolume";
@@ -180,6 +185,15 @@ const HOVER_COLOUR = FACE_COLOUR;
 const HOVER_OVERLAY_OPACITY = 0.12;
 const SELECT_OVERLAY_OPACITY = 0.22;
 /**
+ * The same wash while a collision panel is open, where it is in the way.
+ *
+ * The boxes are wireframes drawn over the model, so a selected piece's violet
+ * wash sits between the eye and the very lines being read, and a box passing
+ * across a washed face is harder to follow than one crossing the texture. The
+ * selection outline still marks the piece, so the wash can give way.
+ */
+const COLLISION_OVERLAY_OPACITY = 0.1;
+/**
  * Dot sizes in CSS pixels, constant however far the camera is.
  *
  * Small: a part can carry fifteen of these and they have to sit on the model
@@ -200,6 +214,38 @@ const TARGET_COLD = 0x64748b;
  * glance.
  */
 const COLLISION_COLOUR = 0xf97316;
+/** How strongly that wireframe draws when it is the shape being read. */
+const COLLISION_OPACITY = 0.9;
+/**
+ * The same wireframe while a piece's own box is being edited.
+ *
+ * It stays on screen, because a piece box is only reached at all when the unit
+ * volume lets the engine walk the piece tree, so the two are read together. But
+ * it is no longer the answer being changed, and at full strength a large orange
+ * box drawn over everything wins the eye against the small yellow one inside it.
+ */
+const COLLISION_DIM_OPACITY = 0.3;
+
+/**
+ * The per-piece boxes. Yellow rather than the unit volume's orange, because the
+ * two are drawn at once and one sits inside the other: the same orange at a
+ * lower opacity read as a dimmer copy of the volume rather than as a different
+ * reading, so a piece's box was easy to miss entirely.
+ *
+ * Warm, so it still groups with the volume as "what stops a shot", but far
+ * enough round the wheel to be told apart at a glance in a wireframe.
+ */
+const PIECE_COLLISION_COLOUR = 0xfacc15;
+
+/**
+ * How wide the box on the piece being edited is drawn, in pixels.
+ *
+ * `LineBasicMaterial.linewidth` is ignored by every WebGL driver, so the one
+ * box that has to stand out is drawn with the `Line2` shader instead, which
+ * builds each segment as screen-space geometry. Only the edited piece gets it:
+ * the shader costs a draw call per box and the crowd is meant to recede.
+ */
+const PIECE_EDIT_LINE_WIDTH = 3;
 
 /**
  * The aim point. Red and larger than the origin dot, because it is the one
@@ -341,9 +387,32 @@ interface Props {
   editCollision?: boolean;
   /** Where a dragged volume goes. Committed on release, like a piece's. */
   onCollisionChange?: (volume: LegoCollisionVolume) => void;
+  /**
+   * The piece whose own box takes the handles instead, drawn wide so it stands
+   * out from the rest. Null leaves them on the unit's volume.
+   *
+   * A separate prop from `editCollision` rather than a mode inside it, because
+   * the two boxes are set in the same panel and only one of them can have the
+   * handles at a time: whichever the panel says.
+   */
+  editPieceCollisionId?: string | null;
+  /** Where a dragged piece box goes. The piece keeps whether anything hits it,
+   *  which the panel owns, so only the volume comes back here. */
+  onPieceCollisionVolumeChange?: (
+    pieceId: string,
+    volume: LegoCollisionVolume,
+  ) => void;
   /** Draws the aim point whether or not its own toggle is on, so the panel
    *  that sets it has the point it is about on screen. */
   showAimPoint?: boolean;
+  /**
+   * Where a dragged aim point goes, which also puts the move handles on it.
+   * Committed on release like everything else here.
+   *
+   * A point has no size and no rotation, so this is the move gizmo only: there
+   * are no faces to grab the way a volume has.
+   */
+  onAimChange?: (mid: [number, number, number]) => void;
 }
 
 export function ModelViewport({
@@ -378,12 +447,18 @@ export function ModelViewport({
   onCancelAnchor,
   editCollision = false,
   onCollisionChange,
+  editPieceCollisionId = null,
+  onPieceCollisionVolumeChange,
   showAimPoint = false,
+  onAimChange,
 }: Props) {
   // The one selected piece, when there is exactly one. Anchors, the key at the
   // bottom of the view and the pivot dot are all about a single piece: a set
   // is dragged about its midpoint and seats against nothing.
   const soleSelectedId = selectedIds.length === 1 ? selectedIds[0] : null;
+  /** Either box being edited: they behave the same way under the handles, and
+   *  differ only in which one the plates land on. */
+  const editingVolume = editCollision || editPieceCollisionId !== null;
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
   const compassRef = useRef<SVGSVGElement>(null);
@@ -478,6 +553,10 @@ export function ModelViewport({
   onCancelAnchorRef.current = onCancelAnchor;
   const onCollisionChangeRef = useRef(onCollisionChange);
   onCollisionChangeRef.current = onCollisionChange;
+  const onPieceVolumeChangeRef = useRef(onPieceCollisionVolumeChange);
+  onPieceVolumeChangeRef.current = onPieceCollisionVolumeChange;
+  const onAimChangeRef = useRef(onAimChange);
+  onAimChangeRef.current = onAimChange;
 
   // Built once. Everything after this mutates the scene rather than remaking it.
   useCanvas3D(
@@ -520,7 +599,7 @@ export function ModelViewport({
       const collisionMaterial = new THREE.LineBasicMaterial({
         color: COLLISION_COLOUR,
         transparent: true,
-        opacity: 0.9,
+        opacity: COLLISION_OPACITY,
         depthTest: false,
       });
 
@@ -544,15 +623,45 @@ export function ModelViewport({
       const collisionHandles = buildCollisionHandles(collisionHandleMaterial);
       scene.add(collisionHandles);
 
-      // The per-piece boxes, when the unit is hit piece by piece. Fainter than
-      // the unit's own volume because both are drawn at once and one of them
-      // is a thing you can change.
-      const pieceCollisionMaterial = new THREE.LineBasicMaterial({
-        color: COLLISION_COLOUR,
+      // The same plates go on a piece's box, in that box's own colour, so the
+      // handles say which of the two shapes they are about to size.
+      const pieceHandleMaterial = new THREE.MeshBasicMaterial({
+        color: PIECE_COLLISION_COLOUR,
         transparent: true,
-        opacity: 0.4,
+        opacity: 0.35,
+        depthTest: false,
+        side: THREE.DoubleSide,
+      });
+      const pieceHandleHotMaterial = new THREE.MeshBasicMaterial({
+        color: PIECE_COLLISION_COLOUR,
+        transparent: true,
+        opacity: 0.8,
+        depthTest: false,
+        side: THREE.DoubleSide,
+      });
+
+      // The per-piece boxes, when the unit is hit piece by piece. Fainter than
+      // the box of whichever piece is being edited, so a unit with thirty
+      // pieces still reads as one box you are working on and a crowd behind it.
+      const pieceCollisionMaterial = new THREE.LineBasicMaterial({
+        color: PIECE_COLLISION_COLOUR,
+        transparent: true,
+        opacity: 0.55,
         depthTest: false,
       });
+
+      // The box on the piece being edited. Wide enough to find without hunting,
+      // which needs the `Line2` shader: see `PIECE_EDIT_LINE_WIDTH`.
+      const pieceEditMaterial = new LineMaterial({
+        color: PIECE_COLLISION_COLOUR,
+        linewidth: PIECE_EDIT_LINE_WIDTH,
+        transparent: true,
+        opacity: 0.95,
+        depthTest: false,
+      });
+      // Screen-space widths need the viewport size. `useCanvas3D` calls `resize`
+      // once straight after this, which is what keeps it right from then on.
+      renderer.getSize(pieceEditMaterial.resolution);
 
       // The aim point: one dot, moved rather than rebuilt, drawn over the
       // collision wireframe so it is still findable inside a volume.
@@ -674,10 +783,18 @@ export function ModelViewport({
         collisionHandles,
         collisionHandleMaterial,
         collisionHandleHotMaterial,
+        pieceHandleMaterial,
+        pieceHandleHotMaterial,
         collisionDrag: null,
         onCollisionChangeRef,
         pieceCollision: null,
         pieceCollisionMaterial,
+        pieceEditMaterial,
+        pieceCollisionBoxes: new Map(),
+        editPieceId: null,
+        onPieceVolumeChangeRef,
+        editAim: false,
+        onAimChangeRef,
         aimMark,
         sky: null,
         terrain: null,
@@ -740,8 +857,12 @@ export function ModelViewport({
         dragging = false;
         showTargetAnchors(state, packRef.current, projectRef.current, null);
         showSeat(state, null);
-        if (gizmo.object === state.collision) commitCollision(state);
-        else if (gizmo.object === groupPivot) commitGroup(state);
+        const dragged = gizmo.object;
+        if (dragged === state.collision) commitCollision(state);
+        else if (dragged === state.aimMark) commitAim(state);
+        else if (dragged === groupPivot) commitGroup(state);
+        else if (dragged && dragged === handleBox(state))
+          commitPieceCollision(state);
         else commitGizmo(state);
         render();
       });
@@ -923,6 +1044,9 @@ export function ModelViewport({
         resize: (width, height) => {
           camera.aspect = width / height;
           camera.updateProjectionMatrix();
+          // The wide line shader works in screen space, so it has to be told
+          // how big the screen is or the box comes out the wrong width.
+          pieceEditMaterial.resolution.set(width, height);
         },
         dispose: () => {
           cancelAnimationFrame(frame);
@@ -970,8 +1094,11 @@ export function ModelViewport({
           (collisionHandles.children[0] as THREE.Mesh).geometry.dispose();
           collisionHandleMaterial.dispose();
           collisionHandleHotMaterial.dispose();
+          pieceHandleMaterial.dispose();
+          pieceHandleHotMaterial.dispose();
           disposePieceCollision(state);
           pieceCollisionMaterial.dispose();
+          pieceEditMaterial.dispose();
           state.aimMark.geometry.dispose();
           aimMaterial.dispose();
           sceneRef.current = null;
@@ -1014,19 +1141,41 @@ export function ModelViewport({
     const state = sceneRef.current;
     if (!state) return;
     state.editCollision = editCollision;
+    state.editPieceId = editPieceCollisionId;
     const shown = showCollision || editCollision;
+    // Both boxes are wireframes read through the model, so the model's own
+    // washes step back while either panel is open.
+    state.selectOverlayMaterial.opacity =
+      editingVolume || showAimPoint
+        ? COLLISION_OVERLAY_OPACITY
+        : SELECT_OVERLAY_OPACITY;
     showCollisionVolume(state, shown ? project : null, pack, raw);
     // One set of boxes for both switches: the engine builds them once and
     // hit-tests and click-tests against the same tree, so either switch alone
     // is reason to draw them.
+    //
+    // Picking a piece to edit draws them whichever way the switches are set,
+    // the same way opening the collision panel draws the unit's own volume. A
+    // piece can be given a box before the unit is told to use them, and handles
+    // for a shape nobody can see would be handles on nothing.
     showPieceCollisionVolumes(
       state,
-      shown && (project.pieceCollision || project.pieceSelection)
+      (shown && (project.pieceCollision || project.pieceSelection)) ||
+        editPieceCollisionId !== null
         ? project
         : null,
       pack,
       raw,
     );
+    // The unit's volume steps back once a piece's box is the shape being
+    // changed, so the large orange box drawn over everything stops winning the
+    // eye against the small yellow one inside it. After the boxes, since a
+    // piece nothing hits draws none and keeps the volume the shape being read.
+    state.collisionMaterial.opacity =
+      editPieceCollisionId !== null &&
+      state.pieceCollisionBoxes.has(editPieceCollisionId)
+        ? COLLISION_DIM_OPACITY
+        : COLLISION_OPACITY;
     // The handles move between the volume and the selected piece with this, so
     // they are re-pointed here rather than left until the selection changes.
     attachGizmo(
@@ -1037,7 +1186,16 @@ export function ModelViewport({
     );
     showCollisionHandles(state);
     state.render();
-  }, [showCollision, editCollision, project, pack, raw]);
+  }, [
+    showCollision,
+    editCollision,
+    editingVolume,
+    editPieceCollisionId,
+    showAimPoint,
+    project,
+    pack,
+    raw,
+  ]);
 
   // Follows the document as well as the toggle, for the same reason the volume
   // does: a unit that has not been given an aim point is aimed at the middle of
@@ -1047,11 +1205,23 @@ export function ModelViewport({
     if (!state) return;
     const shown = showAim || showAimPoint;
     state.aimMark.visible = shown;
+    // Handles only while the panel that explains them is open, which is the
+    // same rule the collision volume follows. The viewport's own toggle draws
+    // the point without offering to move it.
+    state.editAim = showAimPoint;
     if (shown) {
       state.aimMark.position.set(
         ...aimPoint(project, unitBounds(project, pack, raw)),
       );
     }
+    // After the position, so the gizmo attaches to a marker already sitting
+    // where the point is rather than snapping to it on the next frame.
+    attachGizmo(
+      state,
+      project,
+      selectedIdsRef.current,
+      placingAnchorRef.current,
+    );
     state.render();
   }, [showAim, showAimPoint, project, pack, raw]);
 
@@ -1094,10 +1264,7 @@ export function ModelViewport({
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    // Rotate falls back to move on a volume, which has no rotation to drag.
-    state.gizmo.setMode(
-      editCollision && mode === "rotate" ? "translate" : mode,
-    );
+    state.gizmo.setMode(gizmoMode(mode, editingVolume, showAimPoint));
     // Scale on a volume is the face plates rather than the gizmo, so the mode
     // decides which of the two is on screen.
     attachGizmo(
@@ -1108,7 +1275,7 @@ export function ModelViewport({
     );
     showCollisionHandles(state);
     state.render();
-  }, [mode, editCollision]);
+  }, [mode, editingVolume, showAimPoint]);
 
   useEffect(() => {
     const state = sceneRef.current;
@@ -1327,7 +1494,10 @@ export function ModelViewport({
               {MODES.map(({ id, label, key, Icon }) => {
                 // A collision volume is measured along the model's own axes and
                 // has nothing to turn, so the handles for it are move and scale.
-                const off = editCollision && id === "rotate";
+                // The aim point is a point: move is all it has.
+                const off = showAimPoint
+                  ? id !== "translate"
+                  : editingVolume && id === "rotate";
                 return (
                   <Tooltip key={id}>
                     <TooltipTrigger asChild>
@@ -1343,9 +1513,11 @@ export function ModelViewport({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                      {off
-                        ? "A collision volume has no rotation"
-                        : `${label} (${key})`}
+                      {!off
+                        ? `${label} (${key})`
+                        : showAimPoint
+                          ? "An aim point is one point, so it only moves"
+                          : "A collision volume has no rotation"}
                     </TooltipContent>
                   </Tooltip>
                 );
@@ -1525,6 +1697,19 @@ export function ModelViewport({
             )}
           </div>
         ) : null}
+        {/* Named only while the boxes are drawn, and the piece swatch only
+            while there are piece boxes to name. Two oranges with no key was
+            the thing that made a piece's box hard to place at all. */}
+        {showCollision || editingVolume ? (
+          <div className="flex gap-3">
+            <Dot colour="#f97316" label="Unit volume" />
+            {project.pieceCollision ||
+            project.pieceSelection ||
+            editPieceCollisionId ? (
+              <Dot colour="#facc15" label="Piece boxes" />
+            ) : null}
+          </div>
+        ) : null}
         {showAim || showAimPoint ? (
           <div className="flex gap-3">
             <Dot colour="#ef4444" label="Aim point" />
@@ -1670,14 +1855,99 @@ interface CollisionFaceDrag extends CollisionFace {
   /** The pointer is followed on this plane. It holds the axis and faces the
    *  camera, so the face tracks the pointer from any angle. */
   plane: THREE.Plane;
-  /** The model's middle, which the volume's offsets are measured from. Fixed
-   *  for the length of the drag: the unit cannot change while it runs. */
+  /** The point the volume's offsets are measured from: the unit's aim point,
+   *  or the piece's own place in the model. Fixed for the length of the drag,
+   *  since the unit cannot change while it runs. */
   mid: [number, number, number];
   /** The volume when the face was grabbed. Every frame sizes this rather than
    *  the last frame's answer, so the opposite face cannot creep. */
   from: LegoCollisionVolume;
   /** What the wireframe is showing now, and what release writes. */
   volume: LegoCollisionVolume;
+  /** The box being sized, so a drag keeps hold of the one it grabbed. */
+  lines: THREE.Object3D;
+  /** How thin the drag may make it, which differs between the unit's volume
+   *  and a piece's: the engine clamps the two differently. */
+  min: number;
+  /** Where release writes the result. */
+  commit: (volume: LegoCollisionVolume) => void;
+}
+
+/**
+ * The box the handles are on, or null when nothing is being edited.
+ *
+ * A piece wins when the panel has named one. Two sets of plates on screen at
+ * once would be two answers to "what does dragging this size".
+ *
+ * Split from `handleSubject` below because this one runs on every frame of a
+ * drag and on every mode change, and the volumes behind it cost a walk over
+ * every vertex in the unit to work out.
+ */
+function handleBox(state: SceneState): THREE.Object3D | null {
+  if (state.editPieceId) {
+    const box = state.pieceCollisionBoxes.get(state.editPieceId);
+    // A piece switched out of the hit test draws no box, because nothing is
+    // what it will stop. The handles go back to the unit's volume rather than
+    // to the piece's own transform, which is not what this panel is about.
+    if (box) return box;
+  }
+  return state.editCollision ? state.collision : null;
+}
+
+/**
+ * The box the handles are on, with everything needed to size and write it.
+ *
+ * One shape for the unit's own volume and for a piece's, because the plates and
+ * the drag behave identically on both. What differs is only where the offsets
+ * are measured from, how thin the engine lets it get, and where the answer
+ * goes, so those three are what this returns alongside the object on screen.
+ *
+ * Read once when a drag starts, never during one: it re-measures the unit.
+ */
+function handleSubject(state: SceneState): {
+  lines: THREE.Object3D;
+  volume: LegoCollisionVolume;
+  mid: [number, number, number];
+  min: number;
+  commit: (volume: LegoCollisionVolume) => void;
+} | null {
+  const project = state.projectRef.current;
+
+  // A piece with no box on screen falls through to the unit's volume below,
+  // the same way `handleBox` does.
+  if (state.editPieceId && state.pieceCollisionBoxes.has(state.editPieceId)) {
+    const pieceId = state.editPieceId;
+    const lines = state.pieceCollisionBoxes.get(pieceId);
+    if (!lines) return null;
+    const entry = pieceCollisionVolumes(
+      project,
+      bakedPieces(project, state.packRef.current, state.rawRef.current).pieces,
+    ).find((candidate) => candidate.pieceId === pieceId);
+    if (!entry) return null;
+    return {
+      lines,
+      volume: entry.volume,
+      mid: entry.origin,
+      min: MIN_PIECE_COLLISION_SIZE,
+      commit: (volume) =>
+        state.onPieceVolumeChangeRef.current?.(pieceId, volume),
+    };
+  }
+
+  if (!state.editCollision || !state.collision) return null;
+  const bounds = unitBounds(
+    project,
+    state.packRef.current,
+    state.rawRef.current,
+  );
+  const change = state.onCollisionChangeRef.current;
+  return {
+    lines: state.collision,
+    volume: effectiveCollisionVolume(project, bounds),
+    mid: aimPoint(project, bounds),
+    min: MIN_COLLISION_SIZE,
+    commit: (volume) => change?.(volume),
+  };
 }
 
 interface SceneState {
@@ -1735,12 +2005,17 @@ interface SceneState {
   collisionMaterial: THREE.LineBasicMaterial;
   /** Whether the gizmo is on the volume rather than on the selected piece. */
   editCollision: boolean;
-  /** A grab plate on each of the volume's six faces, which is how the volume
-   *  is sized. Built with the scene and moved onto the volume from there. */
+  /** A grab plate on each of the six faces, which is how a volume is sized.
+   *  Built with the scene and moved onto whichever box is being edited, the
+   *  unit's own or one piece's. */
   collisionHandles: THREE.Group;
   collisionHandleMaterial: THREE.MeshBasicMaterial;
   /** The same plate under the pointer, or being dragged. */
   collisionHandleHotMaterial: THREE.MeshBasicMaterial;
+  /** The same pair again in the piece boxes' colour, so the plates say which
+   *  of the two shapes they are about to size. */
+  pieceHandleMaterial: THREE.MeshBasicMaterial;
+  pieceHandleHotMaterial: THREE.MeshBasicMaterial;
   /** The face drag in progress, or null while nothing is being sized. */
   collisionDrag: CollisionFaceDrag | null;
   onCollisionChangeRef: {
@@ -1751,6 +2026,25 @@ interface SceneState {
    *  piece collision off. */
   pieceCollision: THREE.Group | null;
   pieceCollisionMaterial: THREE.LineBasicMaterial;
+  /** The wide-line material the edited piece's box draws with. */
+  pieceEditMaterial: LineMaterial;
+  /** Each drawn piece box by piece id, so the handles and the gizmo can find
+   *  the one being edited without walking the group. A piece switched out of
+   *  the hit test draws nothing and is absent here. */
+  pieceCollisionBoxes: Map<string, THREE.Object3D>;
+  /** The piece whose box has the handles, or null when the unit's own volume
+   *  has them. Set by the panel, so it never outlives the fields explaining it. */
+  editPieceId: string | null;
+  onPieceVolumeChangeRef: {
+    current:
+      | ((pieceId: string, volume: LegoCollisionVolume) => void)
+      | undefined;
+  };
+  /** Whether the gizmo is on the aim point, which the aim panel decides. */
+  editAim: boolean;
+  onAimChangeRef: {
+    current: ((mid: [number, number, number]) => void) | undefined;
+  };
   /** The dot on the unit's aim point. Built with the scene and moved, since it
    *  is one point wherever it is and there is nothing to rebuild. */
   aimMark: THREE.Points;
@@ -1908,6 +2202,11 @@ function showCollisionVolume(
  *
  * A null project means "not showing", which covers both the toggle being off
  * and the unit not asking for piece collision.
+ *
+ * The piece being edited is drawn wide and the rest thin. Every box used to be
+ * one faint colour, which left the one you had picked indistinguishable from
+ * the thirty behind it, so a unit with any real number of pieces read as a mesh
+ * of lines rather than as a box you were changing.
  */
 function showPieceCollisionVolumes(
   state: SceneState,
@@ -1920,15 +2219,27 @@ function showPieceCollisionVolumes(
 
   const { pieces } = bakedPieces(project, pack, raw);
   const group = new THREE.Group();
-  for (const { origin, volume, hit } of pieceCollisionVolumes(
+  for (const { pieceId, origin, volume, hit } of pieceCollisionVolumes(
     project,
     pieces,
   )) {
     if (!hit) continue;
-    const lines = new THREE.LineSegments(
-      collisionWireframe(volume),
-      state.pieceCollisionMaterial,
-    );
+    const edited = pieceId === state.editPieceId;
+    const wire = collisionWireframe(volume);
+    let lines: THREE.Object3D;
+    if (edited) {
+      // `LineSegments2` keeps its own copy of the points as instance
+      // attributes, so the wireframe it was built from is finished with here.
+      // Fed by position rather than by `fromEdgesGeometry`, which is typed for
+      // an `EdgesGeometry` and a round volume's wireframe is not one.
+      const fat = new LineSegmentsGeometry().setPositions(
+        wire.attributes.position.array as Float32Array,
+      );
+      wire.dispose();
+      lines = new LineSegments2(fat, state.pieceEditMaterial);
+    } else {
+      lines = new THREE.LineSegments(wire, state.pieceCollisionMaterial);
+    }
     lines.position.set(
       origin[0] + volume.offsets[0],
       origin[1] + volume.offsets[1],
@@ -1938,20 +2249,25 @@ function showPieceCollisionVolumes(
     // unit volume is drawn: `FixTypeAndScale` makes a sphere uniform and a
     // cylinder round whatever the numbers say.
     lines.scale.set(...engineScales(volume));
-    lines.renderOrder = 4;
+    // Above the crowd of thin boxes, so the edited one is not cut into by a
+    // box drawn after it.
+    lines.renderOrder = edited ? 5 : 4;
     lines.raycast = () => {};
     group.add(lines);
+    state.pieceCollisionBoxes.set(pieceId, lines);
   }
   state.pieceCollision = group;
   state.scene.add(group);
 }
 
 /** Free the per-piece boxes. Each carries its own geometry, and they share the
- *  one material, which outlives them. */
+ *  two materials, which outlive them. */
 function disposePieceCollision(state: SceneState) {
+  state.pieceCollisionBoxes.clear();
   if (!state.pieceCollision) return;
   for (const lines of state.pieceCollision.children) {
-    (lines as THREE.LineSegments).geometry.dispose();
+    if (state.gizmo.object === lines) state.gizmo.detach();
+    (lines as THREE.LineSegments | LineSegments2).geometry.dispose();
   }
   state.pieceCollision.removeFromParent();
   state.pieceCollision = null;
@@ -1972,11 +2288,16 @@ function disposePieceCollision(state: SceneState) {
  * turns the size negative.
  */
 function showCollisionHandles(state: SceneState) {
-  const lines = state.collision;
-  const shown =
-    lines !== null && state.editCollision && state.gizmo.getMode() === "scale";
+  const lines = handleBox(state);
+  const shown = lines !== null && state.gizmo.getMode() === "scale";
   state.collisionHandles.visible = shown;
   if (!lines || !shown) return;
+
+  // Whichever box they are on, in that box's colour, so a piece's plates are
+  // never mistaken for the unit volume's. Not mid-drag: this runs on every
+  // frame of one, and clearing the highlight would put the grabbed plate back
+  // to cold the moment the pointer moved.
+  if (!state.collisionDrag) highlightHandle(state, null);
 
   const size = [lines.scale.x, lines.scale.y, lines.scale.z];
   state.collisionHandles.position.copy(lines.position);
@@ -1987,6 +2308,22 @@ function showCollisionHandles(state: SceneState) {
     const side = plateSize(size[across[0]], size[across[1]]);
     plate.scale.set(side, side, 1);
   }
+}
+
+/**
+ * Which handles the gizmo shows, given what is being edited.
+ *
+ * A volume is measured along the model's own axes, so it has no rotation to
+ * drag and rotate falls back to move. The aim point is one point, so it has no
+ * size either and every mode falls back to move.
+ */
+function gizmoMode(
+  mode: GizmoMode,
+  editingVolume: boolean,
+  editingAim: boolean,
+): GizmoMode {
+  if (editingAim) return "translate";
+  return editingVolume && mode === "rotate" ? "translate" : mode;
 }
 
 /** How big a grab plate is, given the face it sits on. A quarter of the face's
@@ -2039,13 +2376,8 @@ function beginFaceDrag(state: SceneState, raycaster: THREE.Raycaster): boolean {
   const normal = eye.sub(along.clone().multiplyScalar(eye.dot(along)));
   if (normal.lengthSq() < 1e-6) return false;
 
-  const project = state.projectRef.current;
-  const bounds = unitBounds(
-    project,
-    state.packRef.current,
-    state.rawRef.current,
-  );
-  const volume = effectiveCollisionVolume(project, bounds);
+  const subject = handleSubject(state);
+  if (!subject) return false;
   state.collisionDrag = {
     axis,
     sign,
@@ -2053,9 +2385,12 @@ function beginFaceDrag(state: SceneState, raycaster: THREE.Raycaster): boolean {
       normal.normalize(),
       hit.point,
     ),
-    mid: aimPoint(project, bounds),
-    from: volume,
-    volume,
+    mid: subject.mid,
+    from: subject.volume,
+    volume: subject.volume,
+    lines: subject.lines,
+    min: subject.min,
+    commit: subject.commit,
   };
   highlightHandle(state, hit.object);
   state.controls.enabled = false;
@@ -2066,8 +2401,7 @@ function beginFaceDrag(state: SceneState, raycaster: THREE.Raycaster): boolean {
  *  so the size being set is the size on screen the whole way through. */
 function moveFaceDrag(state: SceneState, raycaster: THREE.Raycaster) {
   const drag = state.collisionDrag;
-  const lines = state.collision;
-  if (!drag || !lines) return;
+  if (!drag) return;
 
   const at = raycaster.ray.intersectPlane(drag.plane, new THREE.Vector3());
   if (!at) return;
@@ -2077,9 +2411,10 @@ function moveFaceDrag(state: SceneState, raycaster: THREE.Raycaster) {
     drag.axis,
     drag.sign,
     at.getComponent(drag.axis) - drag.mid[drag.axis],
+    drag.min,
   );
-  lines.scale.set(...engineScales(drag.volume));
-  lines.position.set(
+  drag.lines.scale.set(...engineScales(drag.volume));
+  drag.lines.position.set(
     drag.mid[0] + drag.volume.offsets[0],
     drag.mid[1] + drag.volume.offsets[1],
     drag.mid[2] + drag.volume.offsets[2],
@@ -2096,23 +2431,32 @@ function endFaceDrag(state: SceneState) {
   state.controls.enabled = true;
   highlightHandle(state, null);
   if (!drag) return;
-  const change = state.onCollisionChangeRef.current;
   const moved =
     drag.volume.scales.some((size, i) => size !== drag.from.scales[i]) ||
     drag.volume.offsets.some((offset, i) => offset !== drag.from.offsets[i]);
-  if (moved && change) change(drag.volume);
+  if (moved) drag.commit(drag.volume);
   else state.render();
 }
 
-/** Light up the plate under the pointer, so it reads as something to grab. */
+/** Light up the plate under the pointer, so it reads as something to grab. The
+ *  pair is the colour of whichever box the plates are currently on. */
 function highlightHandle(state: SceneState, plate: THREE.Object3D | null) {
+  // Whether they really landed on a piece, not just whether one is selected: a
+  // piece with no box hands them back to the unit's volume, and they have to
+  // take that volume's colour with them.
+  const onPiece =
+    state.editPieceId !== null &&
+    state.pieceCollisionBoxes.has(state.editPieceId);
+  const cold = onPiece
+    ? state.pieceHandleMaterial
+    : state.collisionHandleMaterial;
+  const hot = onPiece
+    ? state.pieceHandleHotMaterial
+    : state.collisionHandleHotMaterial;
   let changed = false;
   for (const other of state.collisionHandles.children) {
     if (!(other instanceof THREE.Mesh)) continue;
-    const material =
-      other === plate
-        ? state.collisionHandleHotMaterial
-        : state.collisionHandleMaterial;
+    const material = other === plate ? hot : cold;
     if (other.material === material) continue;
     other.material = material;
     changed = true;
@@ -2552,16 +2896,26 @@ function attachGizmo(
   selectedIds: string[],
   placingAnchor: boolean,
 ) {
-  // Editing the volume takes the handles off the pieces entirely. One set of
-  // handles cannot mean two things, and the volume is a property of the whole
-  // unit rather than of whichever piece happens to be selected behind it.
-  if (state.editCollision && state.collision) {
+  // Editing a volume takes the handles off the pieces entirely. One set of
+  // handles cannot mean two things, and a volume is a property of the unit or
+  // of one named piece rather than of whichever piece is selected behind it.
+  const box = handleBox(state);
+  if (box) {
     state.groupIds = [];
     state.groupChanges = new Map();
     // The face plates are the volume's size control, so the gizmo stands down
     // in scale mode rather than offering a second, worse one.
     if (state.gizmo.getMode() === "scale") state.gizmo.detach();
-    else state.gizmo.attach(state.collision);
+    else state.gizmo.attach(box);
+    return;
+  }
+
+  // The aim point is one point, so it only ever moves. There is no size to
+  // grab and nothing to turn, which is why it gets the gizmo and no plates.
+  if (state.editAim && state.aimMark.visible && state.onAimChangeRef.current) {
+    state.groupIds = [];
+    state.groupChanges = new Map();
+    state.gizmo.attach(state.aimMark);
     return;
   }
 
@@ -3382,6 +3736,45 @@ function commitCollision(state: SceneState) {
       lines.position.z - aim[2],
     ],
   });
+}
+
+/**
+ * Write a moved piece box back to the document.
+ *
+ * The same rule as the unit volume above and for the same reasons: only the
+ * offsets, and read off the wireframe's position rather than its scale.
+ *
+ * A piece's offsets are measured from the piece's own place in the model rather
+ * than from the unit's aim point, so the point they are taken against is the
+ * one `pieceCollisionVolumes` reports for it. The engine translates by them on
+ * top of the piece's model-space matrix, which is what makes them move and turn
+ * with the piece in a game.
+ */
+function commitPieceCollision(state: SceneState) {
+  const subject = handleSubject(state);
+  if (!subject) return;
+  const { lines, volume, mid, commit } = subject;
+  commit({
+    ...volume,
+    offsets: [
+      lines.position.x - mid[0],
+      lines.position.y - mid[1],
+      lines.position.z - mid[2],
+    ],
+  });
+}
+
+/**
+ * Write a moved aim point back to the document.
+ *
+ * Straight off the marker's position, because the aim point is measured from
+ * the unit's own origin and the marker is drawn at exactly that point. What has
+ * to move with it, the collision volume's offsets and a stale imported radius,
+ * is the caller's business: the same handler the aim panel's fields use.
+ */
+function commitAim(state: SceneState) {
+  const { position } = state.aimMark;
+  state.onAimChangeRef.current?.([position.x, position.y, position.z]);
 }
 
 /** Write the dragged transform back to the document, once the drag is over. */

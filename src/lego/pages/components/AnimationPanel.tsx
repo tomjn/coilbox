@@ -20,7 +20,7 @@ import {
   StepForward,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -29,17 +29,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { useReduceMotion } from "../../../general/display";
 import {
   type AppliedPreset,
   countRoles,
   PRESETS,
+  type PresetParam,
   presetById,
   roleLabel,
   unmetRequirements,
 } from "../../animPresets";
 import { legoRunScript } from "../../bindings";
-import type { LegoProject } from "../../model";
+import {
+  DEFAULT_BUILDER,
+  type LegoBuilder,
+  type LegoProject,
+} from "../../model";
 import {
   clampFrame,
   PREVIEW_FRAMES,
@@ -49,7 +55,60 @@ import {
   type ScriptTimeline,
   scenarioById,
 } from "../../scriptPlayback";
+import { isBuilder } from "../../unitDef";
 import { ScriptDrawer } from "./ScriptDrawer";
+
+/**
+ * What each parameter's number is measured in, beside the slider.
+ *
+ * A map rather than a chain of ternaries, because the chain ended in a bare
+ * `/s` that stood for turns per second and quietly claimed every unit added
+ * after it. `deg/s` came out as `/s` with the degrees lost.
+ */
+const PARAM_SUFFIX: Record<PresetParam["unit"], string> = {
+  deg: "°",
+  s: " s",
+  m: " m",
+  hz: "/s",
+  "deg/s": "°/s",
+};
+
+/**
+ * The two numbers a builder is worth, as sliders.
+ *
+ * `canAssist` is not here because it is a switch rather than a number, and the
+ * two ranges are the engine's own: `buildDistance` defaults to 128 and is
+ * clamped up to 38, `workerTime` defaults to zero, which is the number that
+ * makes a builder silently not one.
+ */
+const BUILDER_FIELDS: {
+  id: "workerTime" | "buildDistance";
+  label: string;
+  suffix: string;
+  min: number;
+  max: number;
+  step: number;
+  note: string;
+}[] = [
+  {
+    id: "workerTime",
+    label: "Work rate",
+    suffix: "",
+    min: 10,
+    max: 2000,
+    step: 10,
+    note: "Writes workerTime, which is also the repair, reclaim and capture speed unless a definition sets those separately.",
+  },
+  {
+    id: "buildDistance",
+    label: "Build distance",
+    suffix: " elmos",
+    min: 38,
+    max: 1000,
+    step: 8,
+    note: "How far it reaches. The engine clamps anything under 38, which is the least that keeps a one by one builder clear of a one by one building.",
+  },
+];
 
 interface Props {
   project: LegoProject;
@@ -58,6 +117,11 @@ interface Props {
   onChange: (applied: AppliedPreset[]) => void;
   /** Stores the unit's own Lua. The first call is the unit taking it over. */
   onScriptChange: (script: string) => void;
+  /** Drops the stored Lua, putting the unit back on the presets below. */
+  onScriptRelease: () => void;
+  /** What the unit builds with, written into its definition. Only asked for
+   *  when the unit has a build arm on it. */
+  onBuilderChange: (builder: LegoBuilder) => void;
   /**
    * The poses a run of the unit's own script produced, for the viewport to
    * play. Null whenever the presets are what is playing, or nothing is.
@@ -82,6 +146,8 @@ export function AnimationPanel({
   onPlayingChange,
   onChange,
   onScriptChange,
+  onScriptRelease,
+  onBuilderChange,
   onScriptTimeline,
   scriptPaused,
   onScriptPausedChange,
@@ -200,6 +266,7 @@ export function AnimationPanel({
       onOpenChange={setShowScript}
       project={project}
       onScriptChange={onScriptChange}
+      onScriptRelease={onScriptRelease}
     />
   );
 
@@ -379,20 +446,81 @@ export function AnimationPanel({
               ? "Apply one below."
               : `${applied.length} applied`}
         </span>
+        {/* Labelled rather than an icon on its own. This is the only way to
+            read the generated script, and as a bare glyph in the corner it was
+            missed by people who went looking for exactly that. */}
         <Button
           size="sm"
-          variant="ghost"
+          variant="outline"
           className="ml-auto"
           onClick={() => setShowScript(true)}
-          title="The unit script these animations generate"
+          title="The animation script these presets generate"
         >
-          <FileCode size={14} />
+          <FileCode size={14} /> Script
         </Button>
       </div>
 
       {scriptDrawer}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* Above the presets, because it is what makes them mean anything: a
+            unit with a build arm and no builder keys animates a job it can
+            never be given. Only for a unit that has one, since the roles are
+            what say this unit builds. */}
+        {isBuilder(project) ? (
+          <div className="border-b border-border/60 px-3 py-2">
+            <p className="text-sm font-medium">What it builds with</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              This unit has a build arm, so its definition is written as a
+              builder. All three go together: the engine reads a builder with no
+              work rate as not a builder at all.
+            </p>
+
+            {BUILDER_FIELDS.map((field) => (
+              <div key={field.id} className="mt-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span>{field.label}</span>
+                  <span className="text-muted-foreground">
+                    {project.builder?.[field.id] ?? DEFAULT_BUILDER[field.id]}
+                    {field.suffix}
+                  </span>
+                </div>
+                <Slider
+                  className="mt-1"
+                  min={field.min}
+                  max={field.max}
+                  step={field.step}
+                  value={[
+                    project.builder?.[field.id] ?? DEFAULT_BUILDER[field.id],
+                  ]}
+                  onValueChange={([next]) =>
+                    onBuilderChange({ ...project.builder, [field.id]: next })
+                  }
+                  aria-label={field.label}
+                />
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {field.note}
+                </p>
+              </div>
+            ))}
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <Label htmlFor="builder-assist" className="text-xs font-medium">
+                Can help another unit's build
+              </Label>
+              <Switch
+                id="builder-assist"
+                checked={
+                  project.builder?.canAssist ?? DEFAULT_BUILDER.canAssist
+                }
+                onCheckedChange={(on) =>
+                  onBuilderChange({ ...project.builder, canAssist: on })
+                }
+              />
+            </div>
+          </div>
+        ) : null}
+
         {PRESETS.map((preset) => {
           const entry = applied.find((a) => a.presetId === preset.id);
           const missing = unmetRequirements(preset, counts);
@@ -433,13 +561,7 @@ export function AnimationPanel({
                         <span>{param.label}</span>
                         <span className="text-muted-foreground">
                           {entry.params[param.id] ?? param.fallback}
-                          {param.unit === "deg"
-                            ? "°"
-                            : param.unit === "s"
-                              ? " s"
-                              : param.unit === "m"
-                                ? " m"
-                                : "/s"}
+                          {PARAM_SUFFIX[param.unit]}
                         </span>
                       </div>
                       <Slider
