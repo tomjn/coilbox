@@ -167,6 +167,33 @@ describe("buildObj", () => {
     expect(rightFace).toBe("f 4/4/4 6/6/6 5/5/5");
   });
 
+  it("names the team-colour mask in a comment, since mtl has no slot for it", () => {
+    const built = buildObj(project([]), pack(), null, {
+      ...OPTIONS,
+      textureName: "Beacon_1.png",
+      maskName: "Beacon_2.png",
+    });
+
+    expect(built?.mtl).toContain("map_Kd Beacon_1.png");
+    // Named so whoever opens it knows the file is there and what it is, and
+    // commented so no reader samples measurements as if they were colour.
+    expect(built?.mtl).toContain("# Beacon_2.png sits beside this file");
+    expect(built?.mtl).toContain("team-colour");
+    expect(built?.mtl).not.toContain("map_Kd Beacon_2.png");
+  });
+
+  it("writes a material with no map when there is no texture to name", () => {
+    const built = buildObj(project([]), pack(), null, {
+      ...OPTIONS,
+      textureName: null,
+    });
+
+    expect(built?.mtl).toContain("newmtl atlas");
+    expect(built?.mtl).not.toContain("map_Kd");
+    // The obj still names the material, so the geometry is grouped as before.
+    expect(built?.obj).toContain("mtllib probe.mtl");
+  });
+
   it("returns null when the project has no root piece", () => {
     const doc = project([]);
     const broken = { ...doc, rootPieceId: "missing" };

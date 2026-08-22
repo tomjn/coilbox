@@ -130,23 +130,45 @@ export const legoExport = defineCommand<
   }
 >("coilbox-lego", "lego_export");
 
+/** A texture a Blender export decoded and wrote out. */
+export interface BlenderTextureWritten {
+  path: string;
+  width: number;
+  height: number;
+  /** Whether it was written smaller than the game's own copy of it. */
+  scaled: boolean;
+}
+
 /**
  * Write a unit's `.glb` into a game folder, at `blender/<unit>.glb`. Separate
  * from `objects3d`, since a `.glb` is not something the engine reads: it is
  * for taking the unit into Blender, either to check it against the `.s3o` or
  * to finish it by hand.
+ *
+ * `textures` is for an imported unit's team-colour mask, which is not a colour
+ * map and so has no slot in a glTF material. It is decoded and written beside
+ * the `.glb` rather than dropped.
  */
 export const legoExportGlb = defineCommand<
-  { dir: string; unitName: string; bytes: number[] },
-  { path: string }
+  {
+    dir: string;
+    unitName: string;
+    bytes: number[];
+    textures: StoredTextureRef[];
+  },
+  { path: string; textures: BlenderTextureWritten[] }
 >("coilbox-lego", "lego_export_glb");
 
 /**
  * Write a unit's `.obj` and `.mtl` into a game folder, at
- * `blender/<unit>.obj` and `.mtl`, alongside a copy of the atlas the `.mtl`
- * points its `map_Kd` at. The copy is what makes the reference resolve: an
- * `.mtl` naming a texture that lives only in `unittextures/` elsewhere in the
- * game folder would not open correctly relocated on its own.
+ * `blender/<unit>.obj` and `.mtl`, alongside the texture the `.mtl` points its
+ * `map_Kd` at. The copy is what makes the reference resolve: an `.mtl` naming a
+ * texture that lives only in `unittextures/` elsewhere in the game folder would
+ * not open correctly relocated on its own.
+ *
+ * One or the other. A unit built out of parts names `atlas`, copied across as
+ * it stands. An imported unit names `textures`, which are decoded to PNG on the
+ * way because Blender reads no `.dds`.
  */
 export const legoExportObj = defineCommand<
   {
@@ -154,10 +176,17 @@ export const legoExportObj = defineCommand<
     unitName: string;
     obj: string;
     mtl: string;
-    /** The atlas to copy in beside the .obj and .mtl. */
-    atlas: AtlasRef;
+    /** The atlas to copy in beside the .obj and .mtl, for a built unit. */
+    atlas: AtlasRef | null;
+    /** An imported unit's own textures, decoded on the way in. */
+    textures: StoredTextureRef[];
   },
-  { obj: string; mtl: string; texture: string }
+  {
+    obj: string;
+    mtl: string;
+    texture: string | null;
+    textures: BlenderTextureWritten[];
+  }
 >("coilbox-lego", "lego_export_obj");
 
 /**
@@ -256,6 +285,19 @@ export const legoTextureImport = defineCommand<
   { path: string },
   { key: string; name: string; bytes: number }
 >("coilbox-lego", "lego_texture_import");
+
+/**
+ * A stored texture as a PNG `data:` URL, decoded and scaled to fit inside 2048
+ * if the game's own copy is larger.
+ *
+ * Only the `.glb` export asks. It embeds the picture inside the container, so
+ * three.js has to have decoded it first, and the store holds the game's file
+ * as it shipped: usually a compressed `.dds` no webview reads.
+ */
+export const legoTexturePng = defineCommand<
+  { key: string },
+  { dataUrl: string; width: number; height: number; scaled: boolean }
+>("coilbox-lego", "lego_texture_png");
 
 /**
  * Delete every stored texture `keep` does not name. Called after a texture

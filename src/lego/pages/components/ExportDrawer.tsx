@@ -19,9 +19,9 @@
  * A unit imported from somebody else's model has no atlas. It draws with its
  * own two textures, which go in under the names the model already gives them,
  * because those are the game's own file names rather than a pack's generic
- * one. The Blender files are not offered for such a unit: they embed a texture
- * a browser has to rasterise, and an imported one is usually a compressed DDS.
- * See https://github.com/tomjn/coilbox/issues/712.
+ * one. The Blender files take the same two textures a different way: Blender
+ * reads no `.dds`, so both are decoded to PNG on the way into the `blender`
+ * folder. See https://github.com/tomjn/coilbox/issues/715.
  */
 
 import { Button } from "@picoframe/frame";
@@ -32,12 +32,14 @@ import { useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { exportTextureName, unitAtlas } from "../../atlas";
+import { atlasUrl, exportTextureName, unitAtlas } from "../../atlas";
 import {
+  type BlenderTextureWritten,
   legoExport,
   legoExportGlb,
   legoExportObj,
   legoOpenPath,
+  legoTexturePng,
 } from "../../bindings";
 import { exportGlb } from "../../exportGlb";
 import { buildObj } from "../../exportObj";
@@ -46,7 +48,7 @@ import type { LegoProject } from "../../model";
 import type { LoadedPack } from "../../pack";
 import { buildPieceCollisionScript } from "../../pieceCollisionScript";
 import type { RawGeometry } from "../../rawGeometry";
-import { importedTextures } from "../../rawImport";
+import { blenderTextures, importedTextures } from "../../rawImport";
 import { bakedPieces, buildS3o, unitBounds } from "../../s3oBuild";
 import { buildUnitDef } from "../../unitDef";
 
@@ -85,6 +87,12 @@ type Result =
       glb: string | null;
       obj: string | null;
       mtl: string | null;
+      /** The decoded textures the Blender files were written with. */
+      blenderTextures: BlenderTextureWritten[];
+      /** Why a Blender file could not be written, when the rest of the export
+       *  went through. Reported rather than thrown: the `.s3o` is already on
+       *  disk by then and is the half the engine reads. */
+      blenderProblem: string | null;
     }
   | { state: "failed"; message: string };
 
@@ -111,6 +119,8 @@ export function ExportDrawer({
   // A unit imported from somebody else's model draws with its own textures out
   // of the store, and none of the atlas below applies to it.
   const imported = project.imported ? importedTextures(project.imported) : null;
+  // The same two textures again, named as the PNGs a Blender file can carry.
+  const blender = project.imported ? blenderTextures(project.imported) : null;
   const unit = unitAtlas(project, pack.library.atlases);
   const atlas = unit.texture;
   // What the atlas is called once written, which is what the s3o names and
@@ -145,7 +155,7 @@ export function ExportDrawer({
     }
     setResult({ state: "working" });
     try {
-      const written = await legoExport({
+      const exported = await legoExport({
         dir,
         unitName: project.unitName,
         textures: withTexture
@@ -175,37 +185,75 @@ export function ExportDrawer({
         model,
       });
 
+      // The Blender half, which the engine reads none of. A texture the decoder
+      // cannot read stops these two and nothing else: the model, the script and
+      // the definition are already written and are what the game runs on.
       let glbPath: string | null = null;
-      if (withGlb && installed && !imported) {
-        const bytes = await exportGlb(project, pack, raw, installed);
-        if (bytes) {
-          const glbWritten = await legoExportGlb({
-            dir,
-            unitName: project.unitName,
-            bytes: Array.from(new Uint8Array(bytes)),
-          });
-          glbPath = glbWritten.path;
-        }
-      }
-
       let objPath: string | null = null;
       let mtlPath: string | null = null;
-      if (withObj && installed && !imported) {
-        const objBuild = buildObj(project, pack, raw, {
-          unitName: project.unitName,
-          textureName: atlasFile,
-        });
-        if (objBuild) {
-          const objWritten = await legoExportObj({
-            dir,
-            unitName: project.unitName,
-            obj: objBuild.obj,
-            mtl: objBuild.mtl,
-            atlas: { name: atlas, pack: installed.folder, writeAs: atlasFile },
-          });
-          objPath = objWritten.obj;
-          mtlPath = objWritten.mtl;
+      let written: BlenderTextureWritten[] = [];
+      let blenderProblem: string | null = null;
+      try {
+        // The mask is not a colour map, so it goes beside whichever file is
+        // written rather than into a material slot that would misdescribe it.
+        const place = blender?.mask ? [blender.mask] : [];
+
+        if (withGlb && (blender || installed)) {
+          // What the material samples: an imported unit's own picture, decoded
+          // out of the store, or the atlas a built one shares. Asked for only
+          // here, since this is the one file that carries the image itself.
+          const colourUrl = blender
+            ? blender.colour
+              ? (await legoTexturePng({ key: blender.colour.key })).dataUrl
+              : null
+            : installed
+              ? atlasUrl(installed)
+              : null;
+          const bytes = await exportGlb(project, pack, raw, colourUrl);
+          if (bytes) {
+            const glbWritten = await legoExportGlb({
+              dir,
+              unitName: project.unitName,
+              bytes: Array.from(new Uint8Array(bytes)),
+              textures: place,
+            });
+            glbPath = glbWritten.path;
+            written = [...written, ...glbWritten.textures];
+          }
         }
+
+        if (withObj && (blender || installed)) {
+          const objBuild = buildObj(project, pack, raw, {
+            unitName: project.unitName,
+            textureName: blender
+              ? (blender.colour?.writeAs ?? null)
+              : atlasFile,
+            maskName: blender?.mask?.writeAs,
+          });
+          if (objBuild) {
+            const objWritten = await legoExportObj({
+              dir,
+              unitName: project.unitName,
+              obj: objBuild.obj,
+              mtl: objBuild.mtl,
+              atlas:
+                !blender && installed
+                  ? { name: atlas, pack: installed.folder, writeAs: atlasFile }
+                  : null,
+              // The colour texture as well this time: an `.mtl` names a file
+              // beside it rather than carrying the picture the way a `.glb`
+              // does.
+              textures: blender
+                ? [blender.colour, ...place].filter((t) => t !== null)
+                : [],
+            });
+            objPath = objWritten.obj;
+            mtlPath = objWritten.mtl;
+            written = [...written, ...objWritten.textures];
+          }
+        }
+      } catch (error) {
+        blenderProblem = error instanceof Error ? error.message : String(error);
       }
 
       onRemember({
@@ -217,10 +265,16 @@ export function ExportDrawer({
       });
       setResult({
         state: "done",
-        ...written,
+        ...exported,
         glb: glbPath,
         obj: objPath,
         mtl: mtlPath,
+        // Both Blender files write the mask, into the same folder under the
+        // same name, so a run that wrote both reports it once.
+        blenderTextures: written.filter(
+          (t, i) => written.findIndex((other) => other.path === t.path) === i,
+        ),
+        blenderProblem,
       });
     } catch (error) {
       setResult({
@@ -351,56 +405,81 @@ export function ExportDrawer({
                 by hand, and both go into a <code>blender</code> folder
                 alongside the game's own.
               </p>
-              {imported ? (
+              {blender ? (
                 <p className="text-xs text-muted-foreground">
-                  Not offered for an imported unit. Both embed the texture as an
-                  image a browser has to decode, and an imported unit's is
-                  usually a compressed <code>.dds</code>.
+                  Blender reads no <code>.dds</code>, so this unit's textures
+                  are decoded to PNG on the way in, and one over 2048 across is
+                  written smaller. The full size copy still goes to{" "}
+                  <code>unittextures</code> for the engine.
+                  {blender.mask ? (
+                    <>
+                      {" "}
+                      <code>{blender.mask.writeAs}</code> goes in beside them:
+                      it is the team-colour mask rather than a picture, so
+                      neither file samples it.
+                    </>
+                  ) : null}
                 </p>
               ) : null}
             </div>
 
-            {imported ? null : (
-              <>
-                <div className="flex items-start gap-2">
-                  <Checkbox
-                    id="lego-export-glb"
-                    checked={withGlb && !!installed}
-                    disabled={!installed}
-                    onCheckedChange={(checked) => setWithGlb(checked === true)}
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <Label htmlFor="lego-export-glb">Also write a .glb</Label>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      <code>{project.unitName}.glb</code>, with the texture
-                      embedded.
-                    </p>
-                  </div>
-                </div>
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="lego-export-glb"
+                checked={withGlb && (blender ? true : !!installed)}
+                disabled={!blender && !installed}
+                onCheckedChange={(checked) => setWithGlb(checked === true)}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="lego-export-glb">Also write a .glb</Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  <code>{project.unitName}.glb</code>, with{" "}
+                  {blender ? (
+                    blender.colour ? (
+                      <>
+                        <code>{blender.colour.writeAs}</code> embedded
+                      </>
+                    ) : (
+                      "no texture, since this unit's could not be found"
+                    )
+                  ) : (
+                    "the texture embedded"
+                  )}
+                  .
+                </p>
+              </div>
+            </div>
 
-                <div className="flex items-start gap-2">
-                  <Checkbox
-                    id="lego-export-obj"
-                    checked={withObj && !!installed}
-                    disabled={!installed}
-                    onCheckedChange={(checked) => setWithObj(checked === true)}
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <Label htmlFor="lego-export-obj">
-                      Also write an .obj and .mtl
-                    </Label>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      <code>{project.unitName}.obj</code> and{" "}
-                      <code>{project.unitName}.mtl</code>, with a copy of{" "}
-                      <code>{atlasFile}</code> next to them so the material
-                      resolves.
-                    </p>
-                  </div>
-                </div>
-              </>
-            )}
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="lego-export-obj"
+                checked={withObj && (blender ? true : !!installed)}
+                disabled={!blender && !installed}
+                onCheckedChange={(checked) => setWithObj(checked === true)}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="lego-export-obj">
+                  Also write an .obj and .mtl
+                </Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  <code>{project.unitName}.obj</code> and{" "}
+                  <code>{project.unitName}.mtl</code>
+                  {blender && !blender.colour ? (
+                    ", with no material texture, since this unit's could not be found."
+                  ) : (
+                    <>
+                      , with a copy of{" "}
+                      <code>
+                        {blender ? blender.colour?.writeAs : atlasFile}
+                      </code>{" "}
+                      next to them so the material resolves.
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
 
             <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
               <Button
@@ -465,6 +544,29 @@ export function ExportDrawer({
                 ) : null}
                 {result.mtl ? (
                   <code className="break-all">{result.mtl}</code>
+                ) : null}
+                {result.blenderTextures.map((written) => (
+                  <code key={written.path} className="break-all">
+                    {written.path}
+                  </code>
+                ))}
+                {result.blenderTextures.some((written) => written.scaled) ? (
+                  <p className="text-muted-foreground">
+                    A texture larger than 2048 was written smaller for Blender,
+                    at{" "}
+                    {result.blenderTextures
+                      .filter((written) => written.scaled)
+                      .map((written) => `${written.width}x${written.height}`)
+                      .join(", ")}
+                    . The game's own copy in <code>unittextures</code> is
+                    untouched.
+                  </p>
+                ) : null}
+                {result.blenderProblem ? (
+                  <p className="text-destructive">
+                    The unit is exported, but the Blender files are not:{" "}
+                    {result.blenderProblem}
+                  </p>
                 ) : null}
                 <Button
                   variant="outline"

@@ -224,6 +224,54 @@ export function importedTextures(imported: LegoImported): {
 }
 
 /**
+ * The same name under a `.png` extension, or with one added when it has none.
+ *
+ * What a Blender export calls a texture it decoded. The store holds the game's
+ * own file, usually a `.dds`, and neither Blender file can carry one: the
+ * picture that comes out is a PNG, so it is named as one rather than keeping an
+ * extension that now lies about the bytes.
+ */
+export function pngName(name: string): string {
+  const file = name.trim().replace(/\\/g, "/").split("/").pop() ?? "";
+  const dot = file.lastIndexOf(".");
+  return dot > 0 ? `${file.slice(0, dot)}.png` : `${file}.png`;
+}
+
+/** A texture an export takes out of the store, under the name it writes it as. */
+export interface PlacedTexture {
+  key: string;
+  writeAs: string;
+}
+
+/**
+ * What an imported unit's two Blender exports do with its two textures.
+ *
+ * `colour` is the picture the unit is painted with, which is what a material
+ * samples: embedded in the `.glb`, and named by the `.mtl`'s `map_Kd`.
+ *
+ * `mask` is not a colour map. It marks the regions the engine paints in the
+ * player's colour, and neither glTF nor an `.mtl` has anywhere to put a picture
+ * of measurements without claiming it is something it is not. So it goes into
+ * the `blender` folder as a PNG of its own, next to whichever file was written,
+ * for whoever opens it to wire up as they see fit.
+ *
+ * Either can be missing. A model naming a texture coilbox could not find has no
+ * key to read, and a model with one texture and no mask is a perfectly ordinary
+ * model.
+ */
+export function blenderTextures(imported: LegoImported): {
+  colour: PlacedTexture | null;
+  mask: PlacedTexture | null;
+} {
+  const placed = (texture: LegoTexture | undefined): PlacedTexture | null =>
+    texture?.key ? { key: texture.key, writeAs: pngName(texture.name) } : null;
+  return {
+    colour: placed(imported.texture),
+    mask: placed(imported.teamMask),
+  };
+}
+
+/**
  * Every stored texture key a set of units names, for pruning the store.
  *
  * The store is shared and content addressed, so nothing can decide whether a
