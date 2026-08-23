@@ -49,6 +49,10 @@ pub struct UnitScriptOutput {
     pub bos_member: Option<String>,
     /// That source. Text, because BOS is source rather than bytecode.
     pub bos_text: Option<String>,
+    /// The unit's whole definition, as JSON. A script is allowed to read its
+    /// own definition and BAR's do, so a preview that cannot answer is a script
+    /// that throws at load rather than one that loses a branch.
+    pub unit_def: Option<String>,
     /// What the unit definition asked for, whether or not it was found. Worth
     /// reporting either way: a name that resolved to nothing is the useful
     /// half of "this unit has no script here".
@@ -91,6 +95,7 @@ pub fn render(lib: &str, game_archive: &str, unit_name: &str) -> UnitScriptOutpu
     }
 
     let declared = declared_script(&us, unit_name);
+    let unit_def = unit_def_json(&us, unit_name);
     let want = declared
         .clone()
         .unwrap_or_else(|| format!("{unit_name}.cob"));
@@ -137,6 +142,8 @@ pub fn render(lib: &str, game_archive: &str, unit_name: &str) -> UnitScriptOutpu
         }
     }
 
+    out.unit_def = unit_def;
+
     us.close_archive(handle);
     us.remove_all_archives();
     us.uninit();
@@ -164,6 +171,89 @@ fn declared_script(us: &Unitsync, unit_name: &str) -> Option<String> {
     let raw = us.run_lua_source(&lua, "rmMbe").ok()?;
     let trimmed = raw.trim();
     (!trimmed.is_empty()).then(|| trimmed.to_string())
+}
+
+/// How deep the definition reader follows nested tables.
+///
+/// A unit definition is mostly flat. `customParams` is one level down and is
+/// what a script reads most often, weapons are two. Past that is armour tables
+/// and lists nothing reads at load, and a depth limit is also what stops a
+/// definition that refers to itself running forever.
+const DEF_DEPTH: u32 = 4;
+
+/// Read one unit's whole definition, as JSON.
+///
+/// A unit script is allowed to read its own definition, and BAR's scripts do:
+/// `coralab.lua` decides which of two animations it has from
+/// `UnitDefs[unitDefID].customParams.litelab`. Without the definition the
+/// script does not merely lose a branch, it throws at load and the unit does
+/// not animate at all.
+///
+/// Through the game's own definitions for the same reason [`declared_script`]
+/// is: a game builds its definitions in Lua, and a file read would get the
+/// template rather than the unit.
+///
+/// The table is `unitdefs` rather than `unitDefs`, because the def scripts
+/// lowercase their keys on the way out, which is also what the unit dataset
+/// reader looks for. The unit's own key is matched without regard to case for
+/// the same reason.
+///
+/// The encoder is here rather than borrowed because unitsync's Lua parser hands
+/// back one string, so the table has to be a string before it leaves. Values
+/// that are neither a scalar nor a table are dropped: a definition holding a
+/// function is holding something no script reads for its value.
+fn unit_def_json(us: &Unitsync, unit_name: &str) -> Option<String> {
+    let lua = format!(
+        "{}{}\
+         local function esc(s)\n\
+         \x20 s = string.gsub(s, '\\\\', '\\\\\\\\')\n\
+         \x20 s = string.gsub(s, '\"', '\\\\\"')\n\
+         \x20 s = string.gsub(s, '\\n', '\\\\n')\n\
+         \x20 s = string.gsub(s, '\\r', '\\\\r')\n\
+         \x20 s = string.gsub(s, '\\t', '\\\\t')\n\
+         \x20 return '\"' .. s .. '\"'\n\
+         end\n\
+         local function enc(v, depth)\n\
+         \x20 local t = type(v)\n\
+         \x20 if t == 'string' then return esc(v) end\n\
+         \x20 if t == 'number' then\n\
+         \x20   if v ~= v or v == 1/0 or v == -1/0 then return 'null' end\n\
+         \x20   return tostring(v)\n\
+         \x20 end\n\
+         \x20 if t == 'boolean' then return v and 'true' or 'false' end\n\
+         \x20 if t ~= 'table' or depth <= 0 then return nil end\n\
+         \x20 local parts = {{}}\n\
+         \x20 for k, val in pairs(v) do\n\
+         \x20   if type(k) == 'string' or type(k) == 'number' then\n\
+         \x20     local e = enc(val, depth - 1)\n\
+         \x20     if e then parts[#parts + 1] = esc(tostring(k)) .. ':' .. e end\n\
+         \x20   end\n\
+         \x20 end\n\
+         \x20 return '{{' .. table.concat(parts, ',') .. '}}'\n\
+         end\n\
+         local ok, defs = pcall(VFS.Include, 'gamedata/defs.lua')\n\
+         if not ok or type(defs) ~= 'table' then return __cb_chunk('') end\n\
+         local ud = defs.unitdefs or defs.unitDefs\n\
+         if type(ud) ~= 'table' then return __cb_chunk('') end\n\
+         local want = '{unit_name}'\n\
+         local d = ud[want]\n\
+         if type(d) ~= 'table' then\n\
+         \x20 for k, v in pairs(ud) do\n\
+         \x20   if type(k) == 'string' and string.lower(k) == string.lower(want) then d = v break end\n\
+         \x20 end\n\
+         end\n\
+         if type(d) ~= 'table' then return __cb_chunk('') end\n\
+         return __cb_chunk(enc(d, {DEF_DEPTH}) or '')\n",
+        crate::lua::CHUNKED_RESULT,
+        crate::lua::DEFS_ENV_SHIM
+    );
+    let raw = us.run_lua_source(&lua, "rmMbe").ok()?;
+    let trimmed = raw.trim();
+    // Only something that parses. A definition that came back half written is
+    // worse than none: the script would read a field that is there and miss one
+    // that should be, and nothing downstream could tell.
+    (!trimmed.is_empty() && serde_json::from_str::<serde_json::Value>(trimmed).is_ok())
+        .then(|| trimmed.to_string())
 }
 
 /// The member a declared script name resolves to, following the framework's own

@@ -1332,6 +1332,11 @@ export interface UnitScriptResult {
   bosMember: string | null;
   /** That source, as text. */
   bosText: string | null;
+  /** The unit's whole definition, as JSON, or null when the game's definitions
+   *  could not be read. A script is allowed to read its own definition and
+   *  BAR's do, so without it those scripts throw at load rather than losing a
+   *  branch. */
+  unitDef: string | null;
   /** What the unit definition asked for, found or not. A name that resolved to
    *  nothing is the useful half of "this unit has no script here". */
   declared: string | null;

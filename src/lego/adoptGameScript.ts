@@ -72,6 +72,14 @@ export interface AdoptedScript {
    * came out of may not be installed the next time it is opened.
    */
   compiled: { member: string; bytes: number[] } | null;
+  /**
+   * The definition the unit's game gives it, for a script that reads one.
+   *
+   * Read here because this is the one call that already has the game and the
+   * unit in hand, and because the game may not be installed the next time the
+   * project is opened.
+   */
+  unitDef: Record<string, unknown> | null;
   /** What the reader wants to say: a unit with no script, a `.cob` that cannot
    *  be adopted, an archive that would not open. */
   notes: string[];
@@ -87,8 +95,29 @@ const NOTHING: AdoptedScript = {
   listing: null,
   converted: null,
   compiled: null,
+  unitDef: null,
   notes: [],
 };
+
+/**
+ * The unit's definition, as an object, or nothing when there is not one.
+ *
+ * It crosses as JSON because the reader builds it inside the game's own Lua and
+ * hands back one string. Something that will not parse is nothing rather than a
+ * failure: the unit still imported and its model is fine, and a script that
+ * wanted its definition says so on its own when it runs.
+ */
+function parseUnitDef(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null;
+  try {
+    const value: unknown = JSON.parse(raw);
+    return typeof value === "object" && value !== null
+      ? (value as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Read a `.cob` back as a listing, or say why it could not be.
@@ -155,6 +184,7 @@ export async function adoptGameScript(
   }
 
   const notes = [...result.errors];
+  const unitDef = parseUnitDef(result.unitDef);
 
   if (!result.member || !result.kind) {
     // Worth naming what was asked for. A definition that names a script the
@@ -190,6 +220,7 @@ export async function adoptGameScript(
       compiled: result.bytes?.length
         ? { member: result.member, bytes: result.bytes }
         : null,
+      unitDef,
       notes,
     };
   }
@@ -206,6 +237,7 @@ export async function adoptGameScript(
     listing: null,
     converted: null,
     compiled: null,
+    unitDef,
     notes: [...new Set([...notes, ...findings.notes])],
   };
 }
