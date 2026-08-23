@@ -16,10 +16,11 @@
  *
  * Renders are the class to be careful with. A build pic is read out of the
  * archive and a whole game's worth is about 20 MB, but a render is drawn from the
- * model and they scale with units times angles. So the have check comes first for
- * them, which is possible at all because `unitsync_unit_render_keys` names a
- * render's identity without drawing it (issue #1672). Only the units it comes
- * back wanting are ever drawn.
+ * model and they scale with units times angles, which is four of them now
+ * (issue #1951). So the have check comes first for them, which is possible at all
+ * because `unitsync_unit_render_keys` names a render's identity without drawing
+ * it (issue #1672). Only the pictures it comes back wanting are ever drawn, and
+ * a unit the hub holds three angles of costs one render rather than four.
  *
  * Build pics cannot be asked about first, because their `source_hash` is over the
  * archive member and reading it out is most of the work of extracting it. They
@@ -110,7 +111,7 @@ import { toBase64 } from "@/lib/base64";
 import { reportAssetUploadStopped } from "../uploadOutcomes";
 import { type AssetKey, assetsTheHubWants, type HaveResult } from "./have";
 import { localRenders, rememberLocalRender } from "./localRenders";
-import { RENDER_VERSION, renderTopDown, type TopDownRender } from "./renderTop";
+import { RENDER_VERSION, renderUnit, type UnitRender } from "./renderTop";
 import {
   hideUploadRun,
   showUploadRun,
@@ -118,14 +119,23 @@ import {
   uploadRunStopping,
 } from "./runningUploads";
 import { type AssetUpload, uploadAssetsToHub } from "./upload";
-import { renderVariant } from "./vocabulary";
+import { RENDER_ANGLES, renderVariant } from "./vocabulary";
 
 /**
- * The one angle that ships (issue #1631). A second angle would double the render
- * corpus, which is already a third of the hub's durable tier at two, so this is a
- * constant rather than an argument: nothing gets to ask for more of them.
+ * Every angle the vocabulary lists, which is four (issue #1951).
+ *
+ * The list is the vocabulary's rather than one written here, because the worker
+ * refuses an angle the vocabulary does not name and a second list would be a
+ * second thing to keep in step. It is still not an argument: which angles a unit
+ * is worth drawing at is a fact about the corpus the whole community shares, not
+ * something a caller gets to decide.
+ *
+ * It used to be one, on the grounds that a second angle would double a class
+ * already a third of the durable tier. What overturned that is arithmetic rather
+ * than appetite: section 5.1 of the asset pipeline design budgets renders at
+ * units times angles, which puts four at about 220 MB inside a 1 GB ceiling.
  */
-export const BACKFILL_ANGLE = "top";
+export const BACKFILL_ANGLES = RENDER_ANGLES;
 
 /** Why a run did less than the layout when somebody pressed the button. Not a
  *  sentence anybody is shown: what they are told is in `../uploadOutcomes`. */
@@ -229,10 +239,11 @@ export interface BackfillTools {
   readModel: typeof readCachedModel;
   encodeRender: typeof unitsyncUnitRender;
   draw: (
+    angle: string,
     model: UnitModelResult,
     footprintX: number,
     footprintZ: number,
-  ) => Promise<TopDownRender>;
+  ) => Promise<UnitRender>;
   ask: typeof assetsTheHubWants;
   upload: typeof uploadAssetsToHub;
   /** What this machine has already drawn, from `./localRenders.ts`. */
@@ -247,7 +258,7 @@ export const liveBackfillTools: BackfillTools = {
   models: unitsyncUnitModels,
   readModel: readCachedModel,
   encodeRender: unitsyncUnitRender,
-  draw: renderTopDown,
+  draw: renderUnit,
   ask: assetsTheHubWants,
   upload: uploadAssetsToHub,
   held: localRenders,
@@ -315,11 +326,11 @@ export async function backfillBlueprintUnits(
   // nothing, extracts no build pics and uploads nothing.
   const loose = isSddName(target.archive);
 
-  // One mount, and the answer is what a render will be called rather than a
-  // render. Nothing has been drawn at this point and nothing needs to be.
+  // One mount, and the answer is what every angle's render will be called rather
+  // than a render. Nothing has been drawn at this point and nothing needs to be.
   const keyed = await tools.renderKeys({
     ...archive,
-    angle: BACKFILL_ANGLE,
+    angles: [...BACKFILL_ANGLES],
     rendererVersion: RENDER_VERSION,
     units: working.map((unit) => ({
       unit: unit.name,
@@ -332,13 +343,13 @@ export async function backfillBlueprintUnits(
   const keys = renderKeysToAsk(target.game, working, keyed);
   // Nothing to ask about a picture that is not going anywhere, and a have check
   // is itself a request carrying this machine's archive hashes. So a loose
-  // folder wants every unit it minted a key for: what the hub holds has no
+  // folder wants every picture it minted a key for: what the hub holds has no
   // bearing on what this machine still has to draw for itself.
   const asked = loose ? 0 : keys.length;
   const wanted = new Set(
     loose
-      ? keys.map((key) => (key.keyed_on === "unit" ? key.unit_name : ""))
-      : unitsWanted(keys, await tools.ask(target.hubUrl, keys)),
+      ? keys.map(pictureId)
+      : picturesWanted(keys, await tools.ask(target.hubUrl, keys)),
   );
 
   // Extracted rather than drawn, so this costs a mount and an encode and nothing
@@ -369,33 +380,63 @@ export async function backfillBlueprintUnits(
   // Only a render of the same identity counts: the key was worked out against
   // the archive a moment ago, so a game update is a different `sourceHash` and
   // the old picture is not offered under the new one.
-  const held = await tools.held(
-    target.game,
-    renderVariant(BACKFILL_ANGLE),
-    RENDER_VERSION,
-    working.filter((unit) => wanted.has(unit.name)).map((unit) => unit.name),
-    keyed.sourceArchive,
+  //
+  // One read per angle, because the index answers for one variant at a time.
+  // They go together rather than in turn: each is a file read on this machine
+  // and none of them waits on the others.
+  const held = new Map(
+    await Promise.all(
+      BACKFILL_ANGLES.map(async (angle) => {
+        const variant = renderVariant(angle);
+        const renders = await tools.held(
+          target.game,
+          variant,
+          RENDER_VERSION,
+          working
+            .filter((unit) => wanted.has(`${unit.name}\n${variant}`))
+            .map((unit) => unit.name),
+          keyed.sourceArchive,
+        );
+        return [variant, renders] as const;
+      }),
+    ),
   );
   const already = new Map<string, AssetUpload>();
   for (const unit of working) {
-    const render = held.get(unit.name.toLowerCase());
-    const key = keyed.keys[unit.name];
-    if (!render || !key?.sourceHash || render.sourceHash !== key.sourceHash) {
-      continue;
+    for (const angle of BACKFILL_ANGLES) {
+      const variant = renderVariant(angle);
+      const render = held.get(variant)?.get(unit.name.toLowerCase());
+      const key = keyed.keys[unit.name]?.[variant];
+      if (!render || !key?.sourceHash || render.sourceHash !== key.sourceHash) {
+        continue;
+      }
+      already.set(
+        `${unit.name}\n${variant}`,
+        heldRenderUpload(target.game, unit.name, render),
+      );
     }
-    already.set(unit.name, heldRenderUpload(target.game, unit.name, render));
   }
-  // Still read for a loose folder, because what it answers is which units this
-  // machine has already drawn, and redrawing those would be the run doing its
-  // slowest work twice. Only the offering of them stops.
+  // Still read for a loose folder, because what it answers is which pictures
+  // this machine has already drawn, and redrawing those would be the run doing
+  // its slowest work twice. Only the offering of them stops.
   if (!loose) assets.push(...already.values());
 
   // The models of what is left to draw, in one mount rather than one each
   // (issue #1684). Asked for after the have check, so a layout the hub already
   // holds every render of does not mount for models at all.
-  const drawing = working.filter(
-    (unit) => wanted.has(unit.name) && !already.has(unit.name),
-  );
+  //
+  // A picture is a unit at an angle, so a unit the hub holds three angles of is
+  // one picture of work rather than none and rather than four.
+  const drawing: Picture[] = [];
+  for (const unit of working) {
+    for (const angle of BACKFILL_ANGLES) {
+      const variant = renderVariant(angle);
+      const id = `${unit.name}\n${variant}`;
+      if (wanted.has(id) && !already.has(id)) {
+        drawing.push({ unit, angle, variant });
+      }
+    }
+  }
 
   // Half the threshold (issue #1686). A run with a picture to draw is about to
   // hold the app for seconds each, so it says so. The other half is the upload's
@@ -412,13 +453,15 @@ export async function backfillBlueprintUnits(
     const models = drawing.length
       ? await tools.models({
           ...archive,
-          objects: [...new Set(drawing.map((unit) => unit.objectName))],
+          // One entry per model however many angles of it are being drawn, since
+          // a model read four times is the same model.
+          objects: [...new Set(drawing.map((one) => one.unit.objectName))],
         })
       : null;
 
     let rendered = 0;
     let halted = false;
-    for (const [at, unit] of drawing.entries()) {
+    for (const [at, { unit, angle, variant }] of drawing.entries()) {
       // Between pictures rather than inside one. A render is seconds, so this
       // lands well inside anybody's patience.
       if (uploadRunStopping(opId)) {
@@ -439,8 +482,9 @@ export async function backfillBlueprintUnits(
           target,
           archive,
           unit,
+          angle,
           model.file,
-          keyed.keys[unit.name],
+          keyed.keys[unit.name]?.[variant],
           keyed.sourceArchive,
           tools,
         );
@@ -537,11 +581,31 @@ export async function backfillBlueprintUnits(
 }
 
 /**
- * The keys to ask the hub about, one per unit that got one.
+ * What names one picture in this run: a unit and the variant it is drawn at.
  *
- * A unit the worker skipped gets none. There is nothing to ask about a model
- * coilbox could not read, and a key with no `source_hash` is refused by the have
- * check rather than answered.
+ * A unit is no longer enough on its own now there are four angles of one
+ * (issue #1951), and the two are joined by a newline because neither half can
+ * hold one: a unit name comes out of a unitdef and a variant is `render:` and a
+ * word from the vocabulary.
+ */
+function pictureId(key: AssetKey): string {
+  return key.keyed_on === "unit" ? `${key.unit_name}\n${key.variant}` : "";
+}
+
+/** One picture a run may draw: a unit seen from one angle. */
+interface Picture {
+  unit: BackfillUnit;
+  angle: string;
+  /** `render:<angle>`, carried alongside so it is worked out once. */
+  variant: string;
+}
+
+/**
+ * The keys to ask the hub about, one per angle of every unit that got one.
+ *
+ * A unit the worker skipped gets none at any angle. There is nothing to ask about
+ * a model coilbox could not read, and a key with no `source_hash` is refused by
+ * the have check rather than answered.
  */
 export function renderKeysToAsk(
   game: string,
@@ -551,31 +615,35 @@ export function renderKeysToAsk(
   const keys: AssetKey[] = [];
   const seen = new Set<string>();
   for (const unit of units) {
-    const key = keyed.keys[unit.name];
-    if (!key?.sourceHash) continue;
-    // Two units sharing one model are two pictures, but the same unit twice is
-    // one, and the have check refuses a batch that asks about one picture twice.
-    if (seen.has(unit.name)) continue;
-    seen.add(unit.name);
-    keys.push({
-      keyed_on: "unit",
-      game,
-      unit_name: unit.name,
-      variant: key.variant,
-      source_hash: key.sourceHash,
-    });
+    for (const angle of BACKFILL_ANGLES) {
+      const key = keyed.keys[unit.name]?.[renderVariant(angle)];
+      if (!key?.sourceHash) continue;
+      // Two units sharing one model are two pictures, and so are two angles of
+      // one unit, but the same unit at the same angle twice is one: the have
+      // check refuses a batch that asks about one picture twice.
+      const id = `${unit.name}\n${key.variant}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      keys.push({
+        keyed_on: "unit",
+        game,
+        unit_name: unit.name,
+        variant: key.variant,
+        source_hash: key.sourceHash,
+      });
+    }
   }
   return keys;
 }
 
 /**
- * The units whose renders are worth drawing, from the answers.
+ * The pictures worth drawing, from the answers, each named by {@link pictureId}.
  *
  * Zipped by index, which is what the have check promises: answers come back in
  * the order the keys were given. A short answer means the two cannot be lined up,
  * and lining them up wrongly would draw the wrong pictures, so it draws none.
  */
-export function unitsWanted(
+export function picturesWanted(
   keys: readonly AssetKey[],
   answers: readonly HaveResult[],
 ): string[] {
@@ -583,7 +651,7 @@ export function unitsWanted(
   const wanted: string[] = [];
   keys.forEach((key, at) => {
     if (key.keyed_on !== "unit") return;
-    if (answers[at].status !== "have") wanted.push(key.unit_name);
+    if (answers[at].status !== "have") wanted.push(pictureId(key));
   });
   return wanted;
 }
@@ -674,6 +742,7 @@ async function renderOne(
   target: BackfillTarget,
   archive: { enginePath: string; dataDir: string; gameArchive: string },
   unit: BackfillUnit,
+  angle: string,
   modelFile: string,
   key: UnitRenderKey | undefined,
   sourceArchive: string | undefined,
@@ -681,7 +750,12 @@ async function renderOne(
 ): Promise<AssetUpload | null> {
   try {
     const model = await tools.readModel(modelFile);
-    const drawn = await tools.draw(model, unit.footprintX, unit.footprintZ);
+    const drawn = await tools.draw(
+      angle,
+      model,
+      unit.footprintX,
+      unit.footprintZ,
+    );
     const known =
       key?.modelDigest && key.sourceMember && sourceArchive
         ? {
@@ -693,7 +767,7 @@ async function renderOne(
     const encoded: UnitRenderResult = await tools.encodeRender({
       ...archive,
       object: unit.objectName,
-      angle: BACKFILL_ANGLE,
+      angle,
       footprintX: unit.footprintX,
       footprintZ: unit.footprintZ,
       rendererVersion: RENDER_VERSION,

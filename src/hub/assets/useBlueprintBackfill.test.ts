@@ -53,7 +53,11 @@ import {
   memorySettingsStorage,
 } from "@/lib/storedSetting";
 import { ASSET_UPLOAD_SETTING_KEY } from "../assetUploads";
-import { readLedger, WRITES_PER_GAME_PER_HOUR } from "./budget";
+import {
+  readLedger,
+  VARIANTS_PER_UNIT,
+  WRITES_PER_GAME_PER_HOUR,
+} from "./budget";
 import {
   forgetBlueprintBackfills,
   runBlueprintBackfill,
@@ -129,7 +133,7 @@ describe("what has to be true before a blueprint is backfilled", () => {
       {
         game: "bar",
         units: ["unit0", "unit1", "unit2"],
-        affordable: WRITES_PER_GAME_PER_HOUR / 2,
+        affordable: Math.floor(WRITES_PER_GAME_PER_HOUR / VARIANTS_PER_UNIT),
       },
     ]);
   });
@@ -247,7 +251,7 @@ describe("charging the rate limit", () => {
     forgetBlueprintBackfills();
     await runBlueprintBackfill(inputs());
     expect(runs[1].affordable).toBe(
-      Math.floor((WRITES_PER_GAME_PER_HOUR - 6) / 2),
+      Math.floor((WRITES_PER_GAME_PER_HOUR - 6) / VARIANTS_PER_UNIT),
     );
   });
 
