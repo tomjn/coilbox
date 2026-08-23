@@ -198,22 +198,42 @@ pub fn render(lib: &str, game_archive: &str, unit_name: &str) -> UnitScriptOutpu
 /// Through the game's own definitions rather than off a file, because the key
 /// is often built in Lua: a game with one shared script for a family of units
 /// writes it that way, and a path lookup would miss every one of them.
+///
+/// The table is `unitdefs` and the answer goes back through `__cb_chunk`, both
+/// for the reasons [`unit_def_json`] gives. The unit's own key is matched
+/// without regard to case for a third: this and the definition read have to
+/// land on the same unit, and a game that files a key with capitals in it would
+/// otherwise give a definition here and nothing there.
 fn declared_script(us: &Unitsync, unit_name: &str) -> Option<String> {
-    let lua = format!(
-        "{}{}\
-         local ok, defs = pcall(function() return VFS.Include('gamedata/defs.lua') end)\n\
-         local ud = (type(defs) == 'table') and defs.unitDefs or nil\n\
-         if type(ud) ~= 'table' then return '' end\n\
-         local d = ud['{unit_name}']\n\
-         if type(d) ~= 'table' then return '' end\n\
-         local s = d.script or d.Script\n\
-         return (type(s) == 'string') and s or ''\n",
-        crate::lua::CHUNKED_RESULT,
-        crate::lua::DEFS_ENV_SHIM
-    );
-    let raw = us.run_lua_source(&lua, "rmMbe").ok()?;
+    let raw = us
+        .run_lua_source(&declared_script_lua(unit_name), "rmMbe")
+        .ok()?;
     let trimmed = raw.trim();
     (!trimmed.is_empty()).then(|| trimmed.to_string())
+}
+
+/// The Lua [`declared_script`] runs. Built apart from it so a test can run the
+/// same source under a stock interpreter, which is the only way to check the
+/// result comes back at all without a live libunitsync.
+fn declared_script_lua(unit_name: &str) -> String {
+    format!(
+        "{}{}\
+         local ok, defs = pcall(function() return VFS.Include('gamedata/defs.lua') end)\n\
+         local ud = (type(defs) == 'table') and (defs.unitdefs or defs.unitDefs) or nil\n\
+         if type(ud) ~= 'table' then return __cb_chunk('') end\n\
+         local want = '{unit_name}'\n\
+         local d = ud[want]\n\
+         if type(d) ~= 'table' then\n\
+         \x20 for k, v in pairs(ud) do\n\
+         \x20   if type(k) == 'string' and string.lower(k) == string.lower(want) then d = v break end\n\
+         \x20 end\n\
+         end\n\
+         if type(d) ~= 'table' then return __cb_chunk('') end\n\
+         local s = d.script or d.Script\n\
+         return __cb_chunk((type(s) == 'string') and s or '')\n",
+        crate::lua::CHUNKED_RESULT,
+        crate::lua::DEFS_ENV_SHIM
+    )
 }
 
 /// How deep the definition reader follows nested tables.
@@ -658,5 +678,66 @@ mod tests {
     #[test]
     fn does_not_match_a_word_that_merely_ends_in_include() {
         assert_eq!(include_names(r#"reinclude("a.lua")"#), Vec::<String>::new());
+    }
+
+    /// Run [`declared_script_lua`] against a stand-in for a game's definitions
+    /// and read the answer back the way the FFI reader does: out of numbered
+    /// `result` pieces, with `resultChunks` saying how many there are.
+    ///
+    /// Stock Lua 5.1 rather than unitsync's parser, for the reason the injected
+    /// serializer is tested that way: the real parser needs a live libunitsync
+    /// and an installed game. What it does check is the half that was broken,
+    /// which is whether the answer is written down at all.
+    fn declared(defs_lua: &str, unit_name: &str) -> Option<String> {
+        let lua = mlua::Lua::new();
+        let table: mlua::Table = lua
+            .load(format!(
+                "VFS = {{ Include = function() return {defs_lua} end }}\n{}",
+                declared_script_lua(unit_name)
+            ))
+            .eval()
+            .expect("the reader should run");
+        let count: usize = table
+            .get::<String>("resultChunks")
+            .expect("the reader must say how many result pieces it wrote")
+            .parse()
+            .unwrap();
+        (count > 0).then(|| {
+            (1..=count)
+                .map(|i| table.get::<String>(format!("result{i}")).unwrap())
+                .collect()
+        })
+    }
+
+    /// The whole bug: the name a definition declares, written down where the
+    /// parser reads it from. Before this it was returned bare, which wrote no
+    /// pieces at all, and read out of `unitDefs`, which a game's def scripts
+    /// lowercase on the way out.
+    #[test]
+    fn reads_the_script_a_definition_declares() {
+        let defs = "{ unitdefs = { armcom = { script = 'armcom_lus.lua' } } }";
+        assert_eq!(declared(defs, "armcom"), Some("armcom_lus.lua".into()));
+    }
+
+    /// Most games declare nothing and let the engine default to `<unit>.cob`,
+    /// so an empty answer has to be an answer rather than a failure.
+    #[test]
+    fn reads_nothing_for_a_unit_that_declares_no_script() {
+        let defs = "{ unitdefs = { armcom = { name = 'Armada Commander' } } }";
+        assert_eq!(declared(defs, "armcom"), None);
+    }
+
+    #[test]
+    fn reads_nothing_for_a_unit_the_game_does_not_have() {
+        let defs = "{ unitdefs = { armcom = { script = 'armcom_lus.lua' } } }";
+        assert_eq!(declared(defs, "corcom"), None);
+    }
+
+    /// A game that files its key with capitals in it still gets the same unit
+    /// the definition read got, which is the point of matching loosely.
+    #[test]
+    fn finds_the_unit_whatever_case_its_key_is_filed_under() {
+        let defs = "{ unitdefs = { ArmCom = { script = 'armcom_lus.lua' } } }";
+        assert_eq!(declared(defs, "armcom"), Some("armcom_lus.lua".into()));
     }
 }
