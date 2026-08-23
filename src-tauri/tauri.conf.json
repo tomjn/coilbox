@@ -36,7 +36,8 @@
       "prdownloader": "prdownloader",
       "legoparts": "legoparts",
       "../catalog.json": "catalog.json",
-      "../lua/mission-runtime": "mission-runtime"
+      "../lua/mission-runtime": "mission-runtime",
+      "../lua/blueprint-widget": "blueprint-widget"
     },
     "active": true,
     "createUpdaterArtifacts": true,

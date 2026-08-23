@@ -922,6 +922,37 @@ export const contentBlueprintDelete = defineCommand<
   { ok: boolean }
 >("coilbox-content", "content_blueprint_delete");
 
+/** What of the in game blueprint widget is installed under a content root,
+ *  against what this coilbox ships (issue #1419). */
+export interface WidgetStatus {
+  /** Any of the widget's files are there. */
+  installed: boolean;
+  /** Every shipped file is there with the same bytes. */
+  current: boolean;
+  /** Shipped files, relative to `LuaUI/`. */
+  files: string[];
+  /** Shipped files that are missing or differ. */
+  stale: string[];
+}
+
+/** Compare the widget under a content root with the one coilbox ships. */
+export const contentWidgetStatus = defineCommand<
+  { rootPath: string },
+  WidgetStatus
+>("coilbox-content", "content_widget_status");
+
+/** Copy the widget into a content root's `LuaUI/`, or update it there. */
+export const contentWidgetInstall = defineCommand<
+  { rootPath: string },
+  { written: string[] }
+>("coilbox-content", "content_widget_install");
+
+/** Take the widget out of a content root. Its data files stay. */
+export const contentWidgetRemove = defineCommand<
+  { rootPath: string },
+  { removed: string[] }
+>("coilbox-content", "content_widget_remove");
+
 /**
  * Write text to a path the caller picked, knowing nothing about what is in it:
  * a serialised keymap, or a game's own `blueprints.json`. Reading runs through
