@@ -12,6 +12,7 @@ import { AccountControl } from "./components/AccountControl";
 import { AssetUploadControl } from "./components/AssetUploadControl";
 import { Field } from "./components/Field";
 import { GameFactsControl } from "./components/GameFactsControl";
+import { GamePicturesControl } from "./components/GamePicturesControl";
 import { MapCatalogControl } from "./components/MapCatalogControl";
 
 /**
@@ -120,6 +121,7 @@ export default function HubSettings() {
         <>
           <MapCatalogControl hubUrl={effective} agreed={uploadsAgreed} />
           <GameFactsControl hubUrl={effective} agreed={uploadsAgreed} />
+          <GamePicturesControl hubUrl={effective} agreed={uploadsAgreed} />
         </>
       )}
     </div>
