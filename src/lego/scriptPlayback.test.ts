@@ -48,6 +48,50 @@ describe("scenarios", () => {
     expect(scenarioById("moving")?.label).toBe("Moving");
     expect(scenarioById("nope")).toBeUndefined();
   });
+
+  /**
+   * A unit is told what it is standing on by the engine rather than working it
+   * out. A script that branches on it gets nothing, matches no branch, and
+   * stands still: Expand and Exterminate's construction mech does exactly that.
+   */
+  it("all tell the unit it is standing on land", () => {
+    for (const scenario of SCENARIOS) {
+      const told = scenario.events.find((e) => e.callin === "setSFXoccupy");
+      expect(told, scenario.id).toBeDefined();
+      expect(told?.args, scenario.id).toEqual([4]);
+      // After Create, not alongside it: a script routinely starts its own
+      // `setSFXoccupy` with no argument from Create, and a started thread runs
+      // after the call that started it, so the same frame is too early.
+      expect(told?.frame, scenario.id).toBe(1);
+    }
+  });
+
+  /**
+   * A factory and a mobile builder are driven differently. A factory is opened
+   * with `Activate` first and then told to build with no arguments at all, and
+   * most factory scripts will not animate until the yard is open.
+   */
+  it("offer a factory its own way of building", () => {
+    const factory = scenarioById("building-factory");
+
+    expect(factory).toBeDefined();
+    const callins = factory?.events.map((e) => e.callin) ?? [];
+    expect(callins).toContain("Activate");
+    const build = factory?.events.find((e) => e.callin === "StartBuilding");
+    expect(build?.args).toBeUndefined();
+    expect(callins.indexOf("Activate")).toBeLessThan(
+      callins.indexOf("StartBuilding"),
+    );
+  });
+
+  /** The mobile builder's form keeps its two angles, which aim the nanolathe. */
+  it("keep the mobile builder aiming where it was told to", () => {
+    const build = scenarioById("building")?.events.find(
+      (e) => e.callin === "StartBuilding",
+    );
+
+    expect(build?.args).toHaveLength(2);
+  });
 });
 
 describe("frameAt", () => {

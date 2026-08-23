@@ -24,7 +24,7 @@
 
 import { legoProbeScript, legoRunScript } from "./bindings";
 import type { LegoProject } from "./model";
-import { PREVIEW_FRAMES, type ScriptEvent } from "./scriptPlayback";
+import { CREATED, PREVIEW_FRAMES, type ScriptEvent } from "./scriptPlayback";
 
 /** Where a proposal came from, which is also how far to trust it. */
 export type RoleEvidence = "stated" | "observed";
@@ -152,8 +152,11 @@ export async function inferRoles(
   }
 
   for (const driver of OBSERVED) {
+    // The same opening every scenario uses, because a unit that has not been
+    // told what it is standing on animates nothing and there is nothing to
+    // read off it (#1940).
     const events: ScriptEvent[] = [
-      { frame: 0, callin: "Create" },
+      ...CREATED,
       { frame: 1, callin: driver.callin, args: driver.args },
     ];
     const timeline = await legoRunScript({

@@ -375,8 +375,10 @@ impl Run {
         let frame = self.frame;
         for event in events.iter().filter(|event| event.frame == frame) {
             let Some(function) = self.program.script(&event.callin) else {
-                self.model
-                    .note(format!("This script has no {} call-in.", event.callin));
+                if !event.ambient {
+                    self.model
+                        .note(format!("This script has no {} call-in.", event.callin));
+                }
                 continue;
             };
             let mut thread = Thread::new(

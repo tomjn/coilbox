@@ -58,6 +58,7 @@ fn created() -> Vec<ScriptEvent> {
         frame: 0,
         callin: "Create".to_string(),
         args: Vec::new(),
+        ambient: false,
     }]
 }
 
@@ -296,11 +297,13 @@ mod stack_and_arithmetic {
                 frame: 0,
                 callin: "Create".to_string(),
                 args: Vec::new(),
+                ambient: false,
             },
             ScriptEvent {
                 frame: 1,
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
+                ambient: false,
             },
         ];
 
@@ -472,6 +475,26 @@ mod what_it_says_about_itself {
         assert!(timeline.frames.is_empty());
     }
 
+    /// The preview tells a unit things it cannot work out for itself, such as
+    /// what it is standing on. Almost no unit defines those call-ins, so
+    /// reporting a missing one would report it about nearly every unit.
+    #[test]
+    fn stays_quiet_about_a_call_in_it_only_fired_to_describe_the_world() {
+        let timeline = run(
+            &create_only(vec![op("RETURN")]),
+            &model_pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "setSFXoccupy".to_string(),
+                args: vec![4.0],
+                ambient: true,
+            }],
+            3,
+        );
+
+        assert_eq!(timeline.warnings, Vec::<String>::new());
+    }
+
     #[test]
     fn says_when_the_script_has_no_such_call_in() {
         let timeline = run(
@@ -481,6 +504,7 @@ mod what_it_says_about_itself {
                 frame: 0,
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
+                ambient: false,
             }],
             3,
         );
@@ -506,6 +530,7 @@ mod what_it_says_about_itself {
                 frame: 0,
                 callin: "AimWeapon1".to_string(),
                 args: Vec::new(),
+                ambient: false,
             }],
             3,
         );
@@ -532,6 +557,7 @@ mod what_it_says_about_itself {
                 frame: 0,
                 callin: "AimWeapon1".to_string(),
                 args: vec![0.8, 0.15],
+                ambient: false,
             }],
             3,
         );
