@@ -387,6 +387,9 @@ export const legoRunScript = defineCommand<
     pieces: string[];
     events: ScriptEvent[];
     frames: number;
+    /** The unit's own definition, for a script that reads one. Absent for a
+     *  unit built out of parts, which has none. */
+    unitDef?: Record<string, unknown> | null;
   },
   ScriptTimeline
 >("coilbox-lego", "lego_run_script");
@@ -409,6 +412,8 @@ export const legoProbeScript = defineCommand<
     pieces: string[];
     /** Call-in names, such as `QueryNanoPiece`. */
     callins: string[];
+    /** The unit's own definition, for a script that reads one. */
+    unitDef?: Record<string, unknown> | null;
   },
   ScriptProbes
 >("coilbox-lego", "lego_probe_script");

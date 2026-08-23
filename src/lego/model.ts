@@ -356,6 +356,19 @@ export interface LegoProject {
    * decision, and the text somebody owns beats the file they came in with.
    */
   compiledScript?: { member: string; bytes: number[] };
+  /**
+   * The definition the unit's game gives it, for a script that reads one.
+   *
+   * A unit script may read its own definition, and Beyond All Reason's do:
+   * `coralab.lua` picks which of two animations it has out of
+   * `customParams.litelab`. Without it the script throws at load and the unit
+   * does not animate at all.
+   *
+   * Stored rather than re-read, for the same reason the compiled script is: the
+   * game it came out of may not be installed the next time this is opened.
+   * Absent for a unit built out of parts, which has no definition to have.
+   */
+  gameUnitDef?: Record<string, unknown>;
   /** Where this unit was last exported, so exporting again does not ask. */
   exportDir?: string;
   /** Whether that export also placed the shared atlas. Defaults to true. */
@@ -664,6 +677,9 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
       : {}),
     ...(typeof d.script === "string" ? { script: d.script } : {}),
     ...(parseCompiledScript(d.compiledScript) ?? {}),
+    ...(typeof d.gameUnitDef === "object" && d.gameUnitDef !== null
+      ? { gameUnitDef: d.gameUnitDef as Record<string, unknown> }
+      : {}),
     ...(typeof d.exportDir === "string" ? { exportDir: d.exportDir } : {}),
     ...(typeof d.exportTexture === "boolean"
       ? { exportTexture: d.exportTexture }

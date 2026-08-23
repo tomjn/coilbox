@@ -671,6 +671,15 @@ describe("parseLegoProjectJson", () => {
     );
   });
 
+  /** A script may read its own definition, and the game it came out of may not
+   *  be installed the next time the project is opened. */
+  it("carries the game's definition of the unit through a save and a load", () => {
+    const def = { customparams: { litelab: "1" }, health: 1000 };
+    const doc = { ...project([piece("root", null)]), gameUnitDef: def };
+
+    expect(parseLegoProjectJson(JSON.stringify(doc))?.gameUnitDef).toEqual(def);
+  });
+
   it("drops a compiled script with nothing in it", () => {
     const doc = {
       ...project([piece("root", null)]),

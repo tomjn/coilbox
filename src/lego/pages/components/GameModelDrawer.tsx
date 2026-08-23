@@ -218,6 +218,7 @@ export function GameModelDrawer({
       ...withRoles,
       ...(script ? { script } : {}),
       ...(compiled ? { compiledScript: compiled } : {}),
+      ...(adopted?.unitDef ? { gameUnitDef: adopted.unitDef } : {}),
     });
   }
 

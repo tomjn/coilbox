@@ -34,6 +34,7 @@ function adopted(over: Partial<AdoptedScript> = {}): AdoptedScript {
     listing: null,
     converted: null,
     compiled: null,
+    unitDef: null,
     notes: [],
     ...over,
   };

@@ -210,6 +210,9 @@ export function AnimationPanel({
               pieces,
               events,
               frames: PREVIEW_FRAMES,
+              // A script may read its own definition, and without it those
+              // scripts throw at load rather than losing a branch (#1936).
+              unitDef: project.gameUnitDef ?? null,
             });
         setTimeline(result);
         // A run that produced nothing has only its reason to show. One that
@@ -231,6 +234,7 @@ export function AnimationPanel({
       project.script,
       project.unitName,
       project.pieces,
+      project.gameUnitDef,
       compiled,
       onPlayingChange,
       onScriptTimeline,

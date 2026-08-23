@@ -77,6 +77,7 @@ function found(over: Record<string, unknown> = {}) {
     bytes: null,
     bosMember: null,
     bosText: null,
+    unitDef: null,
     declared: "armcom.cob",
     errors: [],
     ...over,
@@ -368,6 +369,42 @@ describe("a compiled script whose game ships its source", () => {
     const adopted = await adoptGameScript(project(), ENGINE);
 
     expect(adopted.converted).toBeNull();
+    expect(adopted.script).toBe("-- the game's own\n");
+  });
+});
+
+/**
+ * A unit script may read its own definition, and Beyond All Reason's do. Read
+ * here because this is the one call that already has the game and the unit in
+ * hand.
+ */
+describe("the unit's own definition", () => {
+  it("comes back as an object the runtime can hand to a script", async () => {
+    readScript.mockResolvedValue(
+      found({ unitDef: '{"customparams":{"litelab":"1"}}' }),
+    );
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.unitDef).toEqual({ customparams: { litelab: "1" } });
+  });
+
+  /** The unit still imported and its model is fine, and a script that wanted
+   *  its definition says so on its own when it runs. */
+  it("is nothing when the game's definitions could not be read", async () => {
+    readScript.mockResolvedValue(found({ unitDef: null }));
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.unitDef).toBeNull();
+  });
+
+  it("is nothing rather than a failure when it will not parse", async () => {
+    readScript.mockResolvedValue(found({ unitDef: "{ not json" }));
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.unitDef).toBeNull();
     expect(adopted.script).toBe("-- the game's own\n");
   });
 });

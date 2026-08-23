@@ -137,6 +137,7 @@ export async function inferRoles(
     unitName: project.unitName,
     pieces,
     callins: STATED.map((entry) => entry.callin),
+    unitDef: project.gameUnitDef ?? null,
   });
   if (probes.error) return { proposals: [], notes: [], error: probes.error };
 
@@ -165,6 +166,7 @@ export async function inferRoles(
       pieces,
       events,
       frames: Math.min(OBSERVE_FRAMES, PREVIEW_FRAMES),
+      unitDef: project.gameUnitDef ?? null,
     });
     notes.push(...timeline.warnings);
     // A run that broke still says something with the frames it managed, so its

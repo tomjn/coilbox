@@ -1524,6 +1524,7 @@ fn lego_run_script(
     pieces: Vec<String>,
     events: Vec<unitscript::ScriptEvent>,
     frames: u32,
+    unit_def: Option<serde_json::Value>,
 ) -> CliResult {
     let timeline = unitscript::run(
         &script,
@@ -1531,6 +1532,7 @@ fn lego_run_script(
         &pieces,
         &events,
         frames,
+        unit_def.as_ref(),
     );
     match serde_json::to_value(timeline) {
         Ok(value) => CliResult::ok(value),
@@ -1553,8 +1555,15 @@ fn lego_probe_script(
     unit_name: String,
     pieces: Vec<String>,
     callins: Vec<String>,
+    unit_def: Option<serde_json::Value>,
 ) -> CliResult {
-    let probes = unitscript::probe(&script, &format!("{unit_name}.lua"), &pieces, &callins);
+    let probes = unitscript::probe(
+        &script,
+        &format!("{unit_name}.lua"),
+        &pieces,
+        &callins,
+        unit_def.as_ref(),
+    );
     match serde_json::to_value(probes) {
         Ok(value) => CliResult::ok(value),
         Err(e) => CliResult::err(format!("could not report what the script named: {e}")),
