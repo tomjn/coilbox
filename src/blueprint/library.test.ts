@@ -19,6 +19,7 @@ import {
   sourceLabel,
   sourceSummary,
   uniqueLayoutName,
+  widgetSource,
 } from "./library";
 import type { BaseBlueprint } from "./model";
 
@@ -300,6 +301,34 @@ describe("the other ways a layout arrives (issue #1473)", () => {
     );
     expect(read?.id).toBe("b1");
     expect(read?.source).toBeUndefined();
+  });
+});
+
+describe("a layout saved in game by the widget (issue #1419)", () => {
+  const at = new Date("2026-08-23T12:00:00.000Z");
+
+  it("names the engine whose spool it came out of", () => {
+    expect(widgetSource("2025.04.08", at)).toEqual({
+      kind: "widget",
+      engine: "2025.04.08",
+      at: "2026-08-23T12:00:00.000Z",
+    });
+    expect(widgetSource(undefined, at)).toEqual({
+      kind: "widget",
+      at: "2026-08-23T12:00:00.000Z",
+    });
+  });
+
+  it("says it was saved in game", () => {
+    expect(sourceLabel(widgetSource("2025.04.08"))).toBe("Saved in game");
+    expect(sourceSummary(widgetSource("2025.04.08"))).toContain("2025.04.08");
+    expect(sourceSummary(widgetSource())).toContain("Saved in game");
+  });
+
+  it("survives a trip through the stored document", () => {
+    const source = widgetSource("2025.04.08", at);
+    const read = parseStoredBlueprintJson(JSON.stringify(record({ source })));
+    expect(read?.source).toEqual(source);
   });
 });
 
