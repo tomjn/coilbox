@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { StoredBlueprint } from "./library";
 import {
-  WIDGET_LIBRARY_FILE,
-  WIDGET_SPOOL_FILE,
   emptySpoolText,
   readSpool,
   spoolRecords,
+  WIDGET_LIBRARY_FILE,
+  WIDGET_SPOOL_FILE,
   widgetLibraryText,
 } from "./widget";
 
@@ -115,9 +115,9 @@ describe("the spool the widget writes", () => {
 
   it("refuses a file it cannot read rather than calling it empty", () => {
     expect(() => readSpool("{ nope")).toThrow(/not JSON|could not/i);
-    expect(() => readSpool(JSON.stringify({ version: 2, blueprints: [] }))).toThrow(
-      /version 2/,
-    );
+    expect(() =>
+      readSpool(JSON.stringify({ version: 2, blueprints: [] })),
+    ).toThrow(/version 2/);
     expect(() => readSpool("[]")).toThrow();
   });
 

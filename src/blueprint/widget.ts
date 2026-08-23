@@ -32,9 +32,7 @@ export const WIDGET_SPOOL_FILE = "LuaUI/Config/coilbox_blueprints_spool.json";
 const VERSION = 1;
 
 /** The library as the widget reads it. */
-export function widgetLibraryText(
-  records: readonly StoredBlueprint[],
-): string {
+export function widgetLibraryText(records: readonly StoredBlueprint[]): string {
   return JSON.stringify({
     version: VERSION,
     blueprints: records.map((record) => ({ id: record.id, ...record.layout })),

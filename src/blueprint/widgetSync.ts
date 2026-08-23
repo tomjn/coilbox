@@ -15,11 +15,11 @@ import { underConfigDir } from "@/content/enginePaths";
 import type { BlueprintFileIO } from "./gameFile";
 import type { StoredBlueprint } from "./library";
 import {
-  WIDGET_LIBRARY_FILE,
-  WIDGET_SPOOL_FILE,
   emptySpoolText,
   readSpool,
   spoolRecords,
+  WIDGET_LIBRARY_FILE,
+  WIDGET_SPOOL_FILE,
   widgetLibraryText,
 } from "./widget";
 

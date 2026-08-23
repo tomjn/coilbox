@@ -63,7 +63,8 @@ describe("collecting what the widget saved", () => {
       { name: "bad" },
     ],
   });
-  const spoolPath = "/engines/2025.04.08/LuaUI/Config/coilbox_blueprints_spool.json";
+  const spoolPath =
+    "/engines/2025.04.08/LuaUI/Config/coilbox_blueprints_spool.json";
 
   it("imports every readable entry, then empties the spool", async () => {
     const { io, files } = fakeFiles({ [spoolPath]: spool });
@@ -148,7 +149,10 @@ describe("collecting what the widget saved", () => {
 
   it("empties a spool holding only unreadable entries, since nothing in it can be kept", async () => {
     const { io, files } = fakeFiles({
-      [spoolPath]: JSON.stringify({ version: 1, blueprints: [{ name: "bad" }] }),
+      [spoolPath]: JSON.stringify({
+        version: 1,
+        blueprints: [{ name: "bad" }],
+      }),
     });
     const result = await collectSpool({
       io,
