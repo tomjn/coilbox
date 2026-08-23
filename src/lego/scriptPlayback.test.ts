@@ -84,6 +84,27 @@ describe("scenarios", () => {
     );
   });
 
+  /**
+   * A death is the biggest animation most units have, and nearly every script
+   * has one: 829 of the 848 compiled scripts Beyond All Reason ships define
+   * `Killed`. A script reads the severity as the ratio of the two numbers it is
+   * handed, so they only matter against each other.
+   */
+  it("offer a death, hit first", () => {
+    const events = scenarioById("destroyed")?.events ?? [];
+    const callins = events.map((e) => e.callin);
+
+    expect(callins).toContain("HitByWeapon");
+    expect(callins.indexOf("HitByWeapon")).toBeLessThan(
+      callins.indexOf("Killed"),
+    );
+    const killed = events.find((e) => e.callin === "Killed");
+    expect(killed?.args).toHaveLength(2);
+    // Half of the health it had, which is the middle band of the three or four
+    // every script written from the same template picks between.
+    expect(killed?.args?.[0]).toBe((killed?.args?.[1] ?? 0) / 2);
+  });
+
   /** The mobile builder's form keeps its two angles, which aim the nanolathe. */
   it("keep the mobile builder aiming where it was told to", () => {
     const build = scenarioById("building")?.events.find(

@@ -193,6 +193,25 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    id: "destroyed",
+    label: "Hit and destroyed",
+    description:
+      "Takes a hit, then dies. A unit's death is usually its biggest animation: pieces are thrown off and the rest is hidden.",
+    events: [
+      ...CREATED,
+      // `HitByWeapon(dirX, dirZ, weaponDefID, damage)`, the direction the hit
+      // came from and what it did. Straight on from the front, because a
+      // flinch is easier to read when it is not also turning away.
+      { frame: at(1), callin: "HitByWeapon", args: [0, 1, 0, 100] },
+      // `Killed(recentDamage, maxHealth)`. A script works the severity out as
+      // the ratio of the two and picks how thoroughly to come apart, so the
+      // numbers matter only against each other. Half, which is the middle of
+      // the three or four bands every script written from the same template
+      // has, and the one that neither leaves the unit whole nor removes it.
+      { frame: at(2), callin: "Killed", args: [50, 100] },
+    ],
+  },
+  {
     id: "firing",
     label: "Aiming and firing",
     description: "Aims one way, fires, aims the other, fires again.",
