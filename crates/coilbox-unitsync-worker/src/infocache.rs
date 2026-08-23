@@ -4,8 +4,8 @@
 //! needs only `Init`, and a cache hit skips the expensive `AddAllArchives` +
 //! whole-archive checksum hash that dominates these calls.
 //!
-//! Only fully-resolved results (a checksum actually computed) are written, so a
-//! failed hash isn't cached and a retry genuinely re-runs it.
+//! Only a read that answered is written, so a failure is not remembered and a
+//! retry genuinely re-runs it. `dataset::worth_caching` decides what counts.
 //!
 //! Keying on the item's own archive shares the header/minimap caches' limitation:
 //! a changed *dependency* archive won't invalidate the entry (its own file
@@ -36,7 +36,11 @@ use std::path::Path;
 /// with nothing to say why. v13: a game that names its units in a localisation
 /// file rather than in its unitdefs is now read (#1925), and a blob cached
 /// before that holds def keys where Beyond All Reason's unit names should be.
-const INFO_CACHE_VERSION: u32 = 13;
+/// v14: a read that failed outright used to be cached as though it were the
+/// answer (#1927), and an install that hit one has a blob saying the game is
+/// empty. Nothing but this bump gets rid of it, because the key is otherwise
+/// the archive's own identity and that has not changed.
+const INFO_CACHE_VERSION: u32 = 14;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.

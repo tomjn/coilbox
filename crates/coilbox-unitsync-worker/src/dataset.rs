@@ -401,13 +401,32 @@ pub(crate) fn resolve(
         checksum,
         errors,
     };
-    // Only cache a syncable result; leave a failed hash uncached so a retry re-runs.
     if let Some((dir, key)) = cache {
-        if out.checksum.is_some() {
+        if worth_caching(&out) {
             infocache::write(dir, key, &out);
         }
     }
     out
+}
+
+/// Whether a read is an answer, and so worth remembering.
+///
+/// The cache is keyed on file identity plus a version, so a wrong entry
+/// survives every retry, restart and rescan. The only ways out are a version
+/// bump and deleting the file by hand, and a player finds neither. A read that
+/// failed has to stay out of it.
+///
+/// A checksum alone is not enough to say a read worked, which is what let a
+/// failure in first: unitsync still answers `GetArchiveChecksum` for an archive
+/// it could not mount, so a read whose `Init` failed outright comes back
+/// checksummed with nothing in it.
+///
+/// So the test is nothing found and something complained about. Games report
+/// harmless diagnostics through the same list, `GetModOptionCount` warnings
+/// among them, and refusing those would make every read of those games slow for
+/// ever. A game that genuinely ships no units reports none of them.
+fn worth_caching(out: &UnitDatasetOutput) -> bool {
+    out.checksum.is_some() && !(out.units.is_empty() && !out.errors.is_empty())
 }
 
 /// Print a unit-dataset error envelope to stdout (used on the panic path in main).
@@ -707,6 +726,62 @@ mod language_name_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn dataset(units: usize, checksum: Option<&str>, errors: &[&str]) -> UnitDatasetOutput {
+        UnitDatasetOutput {
+            units: (0..units)
+                .map(|i| UnitDatasetEntry {
+                    name: format!("u{i}"),
+                    ..Default::default()
+                })
+                .collect(),
+            checksum: checksum.map(str::to_string),
+            errors: errors.iter().map(|e| (*e).to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn caches_a_read_that_answered() {
+        assert!(worth_caching(&dataset(40, Some("124c667d"), &[])));
+    }
+
+    /// The one that made a game look empty for good. Unitsync still answers
+    /// `GetArchiveChecksum` for an archive it could not mount, so a read whose
+    /// `Init` failed outright carries a checksum and used to be cached.
+    #[test]
+    fn refuses_a_read_that_failed_outright() {
+        assert!(!worth_caching(&dataset(
+            0,
+            Some("124c667d"),
+            &["unitsync Init returned 0 (failure)"]
+        )));
+    }
+
+    /// Games report harmless diagnostics through the same list, and refusing
+    /// those would make every read of those games slow for ever. A read that
+    /// came back with units came back with units.
+    #[test]
+    fn caches_a_read_that_worked_and_grumbled() {
+        assert!(worth_caching(&dataset(
+            40,
+            Some("124c667d"),
+            &["GetModOptionCount returned nothing"]
+        )));
+    }
+
+    /// A game that genuinely ships none says so without complaining, and the
+    /// sweep already treats it as a skip rather than as facts.
+    #[test]
+    fn caches_a_game_that_really_has_no_units() {
+        assert!(worth_caching(&dataset(0, Some("124c667d"), &[])));
+    }
+
+    /// The guard that was already there, for a game whose checksum could not be
+    /// worked out at all.
+    #[test]
+    fn refuses_a_read_with_no_checksum() {
+        assert!(!worth_caching(&dataset(40, None, &[])));
+    }
 
     #[test]
     fn parses_tab_separated_dataset_units() {
