@@ -67,7 +67,7 @@ import {
   unitsyncUnitModel,
 } from "./bindings";
 import { liveCacheHit } from "./cachedFile";
-import { newestEngineId } from "./engineVersion";
+import { engineLabel, newestEngineId } from "./engineVersion";
 import { useRecordMapAppearance } from "./mapAppearanceCache";
 import { deriveSetup } from "./setup";
 import { unitIconDataUrl } from "./unitIcon";
@@ -154,7 +154,6 @@ export function useSetupStatus() {
 /** A (content root, engine) pair the unitsync worker can be pointed at. */
 export interface ScanTarget {
   rootPath: string;
-  rootLabel?: string;
   engineId: string;
   /** The engine dir holding `libunitsync.*`. */
   enginePath: string;
@@ -167,6 +166,19 @@ export function targetKey(t: ScanTarget): string {
   return `${t.rootPath}::${t.engineId}`;
 }
 
+/**
+ * How to name a target where somebody has to choose one: by its engine.
+ *
+ * Not by its content folder, which the picker used to show alongside. The
+ * engine's own `SPRING_DATADIR` handling is additive rather than exclusive (it
+ * adds `~/.spring` and its own folder whatever coilbox passes), so the folder
+ * half of a target never narrowed what a scan came back with. Naming it there
+ * promised a filter that does not exist.
+ */
+export function targetLabel(t: ScanTarget): string {
+  return engineLabel({ version: t.engineVersion, path: t.enginePath });
+}
+
 /** Flatten the content state into every (root, engine) scan target. */
 export function targetsFromState(state: ContentState | null): ScanTarget[] {
   return (state?.roots ?? [])
@@ -174,7 +186,6 @@ export function targetsFromState(state: ContentState | null): ScanTarget[] {
     .flatMap((r) =>
       r.engines.map((e) => ({
         rootPath: r.path,
-        rootLabel: r.label,
         engineId: e.id,
         enginePath: e.path,
         engineVersion: e.syncVersion ?? e.version,

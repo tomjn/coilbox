@@ -1,5 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { isRealEngineVersion } from "./engineVersion";
+import { engineLabel, isRealEngineVersion } from "./engineVersion";
+
+describe("engineLabel", () => {
+  it("names an engine by its version", () => {
+    expect(
+      engineLabel({ version: "105.1.1", path: "/data/engine/105.1.1" }),
+    ).toBe("105.1.1");
+  });
+
+  it("prefers the version unitsync reported over the folder name", () => {
+    expect(
+      engineLabel({
+        version: "105.1.1",
+        syncVersion: "105.1.1-2554-gabcdef BAR105",
+        path: "/data/engine/105.1.1",
+      }),
+    ).toBe("105.1.1-2554-gabcdef BAR105");
+  });
+
+  // A hand-assembled install sitting directly in a data root has no version to
+  // read, and every engine in the picker still has to be tellable apart.
+  it("falls back to the folder for an engine with no version", () => {
+    expect(engineLabel({ version: "", path: "/Users/tomjn/.spring" })).toBe(
+      "/Users/tomjn/.spring",
+    );
+  });
+
+  it("falls back to the folder for a leaked path fragment", () => {
+    expect(
+      engineLabel({ version: ".spring", path: "/Users/tomjn/.spring" }),
+    ).toBe("/Users/tomjn/.spring");
+  });
+});
 
 describe("isRealEngineVersion", () => {
   it("accepts a real version string", () => {

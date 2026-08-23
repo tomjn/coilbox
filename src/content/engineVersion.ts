@@ -54,6 +54,24 @@ export function isRealEngineVersion(version: string | undefined): boolean {
   return trimmed !== "" && !trimmed.startsWith(".");
 }
 
+/**
+ * How to name one engine in a list of them.
+ *
+ * The version when there is one, and the folder when there is not. An engine
+ * assembled by hand in a data root has no version to read (see
+ * [`isRealEngineVersion`]), and a picker that labelled it with an empty string
+ * would offer two blank rows to choose between.
+ */
+export function engineLabel(engine: {
+  version: string;
+  syncVersion?: string;
+  /** The engine's own directory, which is unique per engine. */
+  path: string;
+}): string {
+  const version = engine.syncVersion ?? engine.version;
+  return isRealEngineVersion(version) ? version.trim() : engine.path;
+}
+
 /** The `id` of the highest-versioned engine, with input order as a stable tiebreak. */
 export function newestEngineId(
   engines: { id: string; version: string; syncVersion?: string }[],
