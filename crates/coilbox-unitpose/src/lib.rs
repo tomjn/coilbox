@@ -15,6 +15,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod unitvalue;
+
 /// Sim frames per second. The engine's `GAME_SPEED`, which every `Sleep` and
 /// every per-second speed is measured against.
 pub const FPS: u32 = 30;

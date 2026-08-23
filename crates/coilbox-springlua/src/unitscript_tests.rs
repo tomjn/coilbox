@@ -1123,3 +1123,289 @@ mod includes {
         assert!(error.contains("this library is unhappy"), "{error}");
     }
 }
+
+/// What a script is told when it asks the engine about its own unit. Absent
+/// calls are not a lost branch, they are a script that stops on the line.
+mod world {
+    use super::*;
+
+    fn with_def(script: &str, def: serde_json::Value) -> Timeline {
+        run(
+            script,
+            "test.lua",
+            &pieces(),
+            &create(),
+            6,
+            Some(&def),
+            &no_includes(),
+        )
+    }
+
+    fn note_about(timeline: &Timeline, want: &str) -> bool {
+        timeline.warnings.iter().any(|note| note.contains(want))
+    }
+
+    /// The first line of Beyond All Reason's shared library. Answering nothing
+    /// is a script that waits to be finished for as long as the preview runs.
+    #[test]
+    fn a_unit_in_the_preview_is_finished_being_built() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                while Spring.GetUnitIsBeingBuilt(unitID) do Sleep(400) end
+                Turn(turret, y_axis, 1.0)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+    }
+
+    /// A factory asks for its yard to open and then waits for the yard to be
+    /// open. Answering zero to the second is a wait that never ends, which is
+    /// how a factory with a working script animates nothing.
+    #[test]
+    fn a_script_reads_back_a_value_it_set() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                SetUnitValue(COB.YARD_OPEN, 1)
+                while GetUnitValue(COB.YARD_OPEN) == 0 do Sleep(1500) end
+                Turn(turret, y_axis, 1.0)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+    }
+
+    /// The engine takes either, and BAR's commander writes the boolean form.
+    #[test]
+    fn a_value_set_as_a_boolean_reads_back_as_a_number() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                UnitScript.SetUnitValue(COB.INBUILDSTANCE, true)
+                Turn(turret, y_axis, UnitScript.GetUnitValue(COB.INBUILDSTANCE))
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+    }
+
+    /// The same answer the compiled runtime gives, because the two are being
+    /// asked the same question by the same number.
+    #[test]
+    fn health_answers_what_a_finished_unit_would() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                Turn(turret, y_axis, GetUnitValue(COB.HEALTH) / 100)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+        assert!(timeline.warnings.is_empty(), "{:?}", timeline.warnings);
+    }
+
+    /// A question about the world is zero and says so, because a script handed
+    /// zero for the ground under it quietly concludes it is at sea level.
+    #[test]
+    fn a_question_about_the_world_says_there_is_none() {
+        let timeline = play(
+            "function script.Create() GetUnitValue(COB.GROUND_HEIGHT) end",
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(
+            note_about(&timeline, "no world to ask"),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// The fourth value is the speed, and BAR's commander divides its walk
+    /// cycle by it, so a unit answering nothing there never takes a step.
+    #[test]
+    fn velocity_is_the_speed_the_unit_was_built_for() {
+        let timeline = with_def(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                local vx, vy, vz, speed = Spring.GetUnitVelocity(unitID)
+                Turn(turret, y_axis, speed)
+            end
+            "#,
+            serde_json::json!({ "speed": 30.0 }),
+        );
+
+        assert_eq!(timeline.error, None);
+        // Thirty elmos a second is one a frame, which is what the engine's own
+        // velocity counts in.
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+    }
+
+    /// A unit built out of parts has no definition to read a speed off, and the
+    /// compiled runtime answers one elmo a frame when it is asked without one.
+    #[test]
+    fn a_unit_with_no_definition_still_moves_at_a_speed() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                local _, _, _, speed = Spring.GetUnitVelocity(unitID)
+                Turn(turret, y_axis, speed)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+    }
+
+    /// `UnitDefs[Spring.GetUnitDefID(unitID)]` is how a script reaches its own
+    /// definition, and it is what stops BAR's commander before anything else.
+    #[test]
+    fn the_definition_id_finds_the_units_own_definition() {
+        let timeline = with_def(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                Turn(turret, y_axis, UnitDefs[Spring.GetUnitDefID(unitID)].speed / 30)
+            end
+            "#,
+            serde_json::json!({ "speed": 30.0 }),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+    }
+
+    #[test]
+    fn the_game_frame_is_the_frame_the_run_is_on() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                Sleep(100)
+                Turn(turret, y_axis, Spring.GetGameFrame())
+            end
+            "#,
+            8,
+        );
+
+        assert_eq!(timeline.error, None);
+        // Three frames of sleep, so it turns to 3 on the frame it wakes.
+        assert_close(rot_y(&timeline, 3, "turret"), 3.0);
+    }
+
+    /// BAR calls `Spring.UnitScript.EmitSfx` and SplinterFaction calls
+    /// `Spring.UnitScript.Spin`, both meaning what they already have in scope.
+    #[test]
+    fn the_api_is_also_under_the_spring_table() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create() Spring.UnitScript.Turn(turret, y_axis, 1.0) end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+    }
+
+    /// An emit id is a number a script does arithmetic on, so a missing name is
+    /// not a lost effect, it is adding three to nothing. BAR's commander asks
+    /// for exactly this.
+    #[test]
+    fn the_emit_effects_are_named_as_well_as_the_explode_flags() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create() EmitSfx(turret, SFX.CEG + 3) end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+    }
+
+    /// A script telling you what it is doing is worth showing, and it is the
+    /// most used call in BAR's scripts by a distance.
+    #[test]
+    fn what_a_script_prints_is_reported() {
+        let timeline = play(
+            r#"function script.Create() Spring.Echo("opening the yard") end"#,
+            3,
+        );
+
+        assert!(
+            note_about(&timeline, "opening the yard"),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// A script printing every frame would leave no room for anything else the
+    /// run has to say.
+    #[test]
+    fn a_script_that_prints_without_stopping_is_cut_off() {
+        let timeline = play(
+            r#"
+            function script.Create()
+                for i = 1, 50 do Spring.Echo("line " .. i) end
+            end
+            "#,
+            3,
+        );
+
+        assert!(timeline.warnings.len() < 20, "{:?}", timeline.warnings);
+        assert!(
+            note_about(&timeline, "the rest was dropped"),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// The preview has no world to place the unit in, so a script deciding
+    /// something from where it is decides it as though it were at the origin.
+    /// It still runs, and the note says why the branch went the way it did.
+    #[test]
+    fn a_position_answers_the_origin_and_says_so() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                local _, y, _ = Spring.GetUnitPosition(unitID)
+                Turn(turret, y_axis, y + 1)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+        assert!(
+            note_about(&timeline, "no world to place"),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+}
