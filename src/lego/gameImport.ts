@@ -131,7 +131,12 @@ function searchFolders(member: string): string[] {
     .slice(0, -1);
   const folders: string[] = [];
   for (let depth = parts.length; depth >= 0; depth -= 1) {
-    folders.push([...parts.slice(0, depth), "unittextures", ""].join("/"));
+    const here = parts.slice(0, depth);
+    // A `.3do` names its tiles out of `unittextures/tatex/`, which no `.s3o`
+    // ever asks for. Searched first, because a game holding a name in both
+    // folders means the tile in `tatex` and the unit texture in the other.
+    folders.push([...here, "unittextures", "tatex", ""].join("/"));
+    folders.push([...here, "unittextures", ""].join("/"));
   }
   folders.push(parts.length === 0 ? "" : `${parts.join("/")}/`);
   return folders;

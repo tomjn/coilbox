@@ -71,23 +71,46 @@ describe("gameModelRows", () => {
     expect(wreck?.unit).toBeUndefined();
   });
 
-  it("counts a 3do unit out rather than listing one that cannot be opened", () => {
-    const { rows, threeDoUnits, unresolvedUnits } = gameModelRows({
+  /**
+   * For an older game this is most of the roster: Balanced Annihilation is 720
+   * `.3do` models against 7 `.s3o`, so a list that left them out offered
+   * nothing at all.
+   */
+  it("lists a 3do unit, because the builder can open one now", () => {
+    const { rows, unresolvedUnits } = gameModelRows({
       files,
       units: [unit("peewee", "PEEWEE")],
       projects: [],
       archive: "Game.sdd",
     });
 
-    expect(rows.some((r) => r.member.endsWith(".3do"))).toBe(false);
-    expect(threeDoUnits).toBe(1);
-    // Not both: a 3do is a format this cannot read, not a missing file, and a
-    // footnote claiming the wrong reason is worse than no footnote.
+    const row = rows.find((r) => r.member.endsWith(".3do"));
+    expect(row?.unit).toBe("peewee");
+    // Not counted as missing either: the file is right there.
     expect(unresolvedUnits).toBe(0);
   });
 
-  it("counts a unit whose model this archive does not hold apart from a 3do one", () => {
-    const { threeDoUnits, unresolvedUnits } = gameModelRows({
+  /** An `.s3o` and a `.3do` of the same name is a game that replaced its model
+   *  and left the old one behind, and the engine takes the `.s3o`. */
+  it("prefers the s3o when a game holds both for one unit", () => {
+    const both = [
+      ...files,
+      { path: "objects3d/peewee.s3o", size: 1 },
+      { path: "objects3d/PEEWEE.3do", size: 1 },
+    ];
+    const { rows } = gameModelRows({
+      files: both,
+      units: [unit("peewee", "PEEWEE")],
+      projects: [],
+      archive: "Game.sdd",
+    });
+
+    const row = rows.find((r) => r.unit === "peewee");
+    expect(row?.member).toBe("objects3d/peewee.s3o");
+  });
+
+  it("counts a unit whose model this archive does not hold at all", () => {
+    const { unresolvedUnits } = gameModelRows({
       files,
       units: [unit("ghost", "nothing/here")],
       projects: [],
@@ -95,7 +118,6 @@ describe("gameModelRows", () => {
     });
 
     expect(unresolvedUnits).toBe(1);
-    expect(threeDoUnits).toBe(0);
   });
 
   it("says which project a model is already open as, so it is not opened twice", () => {

@@ -24,7 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { LegoAtlas } from "../../atlas";
-import { legoImportS3o, legoReadS3o } from "../../bindings";
+import {
+  legoImport3do,
+  legoImportS3o,
+  legoRead3do,
+  legoReadS3o,
+  type ThreeDoImport,
+} from "../../bindings";
 import {
   NOT_IN_AN_EXPORT,
   recoveredAtlas,
@@ -62,6 +68,9 @@ export type ImportStage =
       /** Why the file could not be taken apart into parts, which is the
        *  ordinary case and worth saying plainly. */
       refused: string;
+      /** What a conversion had to do or could not do, for a `.3do`. Empty for
+       *  an `.s3o`, which is read rather than converted. */
+      notes?: string[];
     };
 
 /** The file's own name, which is what an opened unit is called by default. */
@@ -97,6 +106,8 @@ export async function readModel(options: {
   beforeImport?: (textures: string[]) => Promise<void>;
 }): Promise<ImportStage> {
   const { path } = options;
+  if (/\.3do$/i.test(path)) return readThreeDo(options);
+
   const [model, pack] = await Promise.all([legoReadS3o({ path }), loadPack()]);
   const name = options.name ?? baseName(path);
   const unitName = normalisePieceName(options.unitName ?? name);
@@ -143,6 +154,82 @@ export async function readModel(options: {
       newId: () => crypto.randomUUID(),
     }),
   };
+}
+
+/**
+ * The same, for a `.3do`.
+ *
+ * Its own path because opening a `.3do` is a conversion rather than a read.
+ * There is no recovery step: a `.3do` is the older format and coilbox has never
+ * written one, so it can never be a coilbox export coming home. And the tiles
+ * it names have to be looked up out of the model before they can be put beside
+ * it, which is a different question from the one an `.s3o` header answers.
+ */
+async function readThreeDo(options: {
+  path: string;
+  name?: string;
+  unitName?: string;
+  source?: string;
+  game?: LegoImportedGame;
+  unpacked?: boolean;
+  beforeImport?: (textures: string[]) => Promise<void>;
+}): Promise<ImportStage> {
+  const { path } = options;
+  const [{ textures }, pack] = await Promise.all([
+    legoRead3do({ path }),
+    loadPack(),
+  ]);
+  await options.beforeImport?.(textures);
+
+  const name = options.name ?? baseName(path);
+  const unitName = normalisePieceName(options.unitName ?? name);
+  const id = crypto.randomUUID();
+  const result = await legoImport3do({ path, id });
+
+  return {
+    state: "imported",
+    refused:
+      "This is a .3do, the older model format. Coilbox has never written one, so it cannot be a unit coming home, and it has been converted instead.",
+    notes: conversionNotes(result),
+    imported: projectFromImport(result, {
+      id,
+      source: options.source ?? path,
+      ...(options.game ? { game: options.game } : {}),
+      ...(options.unpacked ? { unpacked: true } : {}),
+      name,
+      unitName,
+      packId: pack.manifest.id,
+      packVersion: pack.manifest.version,
+      now: new Date().toISOString(),
+      newId: () => crypto.randomUUID(),
+    }),
+  };
+}
+
+/**
+ * What the conversion did, in the cases worth knowing about.
+ *
+ * A unit that converted cleanly says nothing, because there is nothing to
+ * decide. The two that are worth saying are both about faces that came out
+ * plain, and both would otherwise look like a bug in the model.
+ */
+export function conversionNotes(result: ThreeDoImport): string[] {
+  const notes: string[] = [];
+  const found = result.tiles - result.missingTextures.length;
+  notes.push(
+    `Its ${result.tiles} texture tiles have been packed into one sheet and every face given coordinates onto it, which is what makes it an ordinary unit that exports as an .s3o.`,
+  );
+  if (result.missingTextures.length > 0) {
+    notes.push(
+      `${found} of ${result.tiles} were found. Nothing in the game matched ${result.missingTextures.join(", ")}, so the faces using them are drawn plain.`,
+    );
+  }
+  if (result.paletteFaces > 0) {
+    notes.push(
+      `${result.paletteFaces} ${result.paletteFaces === 1 ? "face is" : "faces are"} drawn in a flat colour from the Total Annihilation palette rather than a texture. The palette lives in the engine rather than in the game, so those are drawn plain grey.`,
+    );
+  }
+  return notes;
 }
 
 /** The project a finished stage produces, or null while there is not one yet. */
@@ -285,6 +372,11 @@ function Imported({
           triangles, stored beside the unit as{" "}
           {Math.max(1, Math.round(bytes / 1024)).toLocaleString()} KiB.
         </p>
+        {(stage.notes ?? []).map((note) => (
+          <p key={note} className="text-xs text-muted-foreground">
+            {note}
+          </p>
+        ))}
         {converted > 0 ? (
           <p className="text-xs text-muted-foreground">
             {converted} {converted === 1 ? "piece was" : "pieces were"} drawn as

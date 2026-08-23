@@ -28,6 +28,9 @@ const MAX_TEXTURE_BYTES: u64 = 128 * 1024 * 1024;
 /// Where a `.s3o` names its textures, relative to the folder the game is in.
 const TEXTURE_DIR: &str = "unittextures";
 
+/// Where a `.3do`'s tiles live, inside [`TEXTURE_DIR`].
+const TATEX_DIR: &str = "tatex";
+
 /// The extensions a texture name is tried with when the one it names is not
 /// there, which happens when a game reskins a model from `.tga` to `.dds`
 /// without rewriting its headers.
@@ -125,6 +128,67 @@ pub fn find_beside_model(model: &Path, name: &str) -> Option<PathBuf> {
         dir = here.parent();
     }
     find_in(model.parent()?, want)
+}
+
+/// One of a `.3do`'s tiles, as a path on disk, if it can be found.
+///
+/// A different search from the one above, because a `.3do` names its textures
+/// differently. They live in `unittextures/tatex/` rather than `unittextures/`,
+/// and the engine appends `00` to the name before looking: a face naming
+/// `arm2` is drawn with `arm200`. The exception is a name listed in the game's
+/// `unittextures/tatex/teamtex.txt`, which is a region the engine paints in the
+/// player's colour and which is stored under the bare name.
+///
+/// Rather than read that list, both spellings are tried, and which one matched
+/// is the answer to whether this is a team-colour region. That is the same
+/// question `teamtex.txt` answers, because being in that list is exactly what
+/// makes a name skip the suffix.
+///
+/// Not finding it is not fatal. Those faces are drawn plain and the import says
+/// which tiles it wanted.
+pub fn find_tile_beside_model(model: &Path, name: &str) -> Option<Tile> {
+    let want = name.trim().replace('\\', "/");
+    let want = want.rsplit('/').next()?.to_lowercase();
+    if want.is_empty() {
+        return None;
+    }
+    let suffixed = format!("{want}00");
+    let tile = |path: PathBuf, team_colour: bool| Tile { path, team_colour };
+
+    let mut dir = model.parent();
+    while let Some(here) = dir {
+        if let Some(textures) = child_dir(here, TEXTURE_DIR) {
+            for folder in [child_dir(&textures, TATEX_DIR), Some(textures.clone())]
+                .into_iter()
+                .flatten()
+            {
+                for (candidate, team_colour) in [(&suffixed, false), (&want, true)] {
+                    if let Some(hit) = find_in(&folder, candidate) {
+                        return Some(tile(hit, team_colour));
+                    }
+                }
+            }
+        }
+        dir = here.parent();
+    }
+    // Beside the model, which is where a staged copy puts everything it
+    // unpacked and where a map's own feature textures live.
+    let beside = model.parent()?;
+    find_in(beside, &suffixed)
+        .map(|hit| tile(hit, false))
+        .or_else(|| find_in(beside, &want).map(|hit| tile(hit, true)))
+}
+
+/// One of a `.3do`'s tiles, found on disk.
+pub struct Tile {
+    pub path: PathBuf,
+    /// A region the engine paints in the player's colour rather than a texture.
+    ///
+    /// The file behind one is a flat magenta placeholder nobody has ever seen in
+    /// a game, so it is not what the tile should be drawn as. An `.s3o` keeps
+    /// team colour in the alpha of the texture it is painted with, which is
+    /// where this ends up instead.
+    pub team_colour: bool,
 }
 
 /// A subdirectory by name, matched case-insensitively because a game folder's
@@ -308,6 +372,39 @@ mod tests {
             .write_to(&mut out, image::ImageFormat::Png)
             .expect("encode");
         out.into_inner()
+    }
+
+    /// The engine appends `00` to a `.3do` texture name, so a face naming
+    /// `arm2` is drawn with `arm200`.
+    #[test]
+    fn finds_a_tile_under_the_name_the_engine_looks_for() {
+        let dir = tempfile::tempdir().expect("temp");
+        let tatex = dir.path().join("unittextures/tatex");
+        std::fs::create_dir_all(&tatex).expect("dirs");
+        std::fs::create_dir_all(dir.path().join("objects3d")).expect("dirs");
+        std::fs::write(tatex.join("arm200.png"), png_bytes(4, 4)).expect("write");
+
+        let model = dir.path().join("objects3d/peewee.3do");
+        let found = find_tile_beside_model(&model, "arm2").expect("found");
+
+        assert!(found.path.ends_with("arm200.png"));
+        assert!(!found.team_colour);
+    }
+
+    /// A name the game lists in `teamtex.txt` skips the suffix, and that is
+    /// exactly what makes it a region the engine paints in the player's colour.
+    #[test]
+    fn reads_a_tile_stored_without_the_suffix_as_a_team_colour_region() {
+        let dir = tempfile::tempdir().expect("temp");
+        let tatex = dir.path().join("unittextures/tatex");
+        std::fs::create_dir_all(&tatex).expect("dirs");
+        std::fs::create_dir_all(dir.path().join("objects3d")).expect("dirs");
+        std::fs::write(tatex.join("arm2.png"), png_bytes(4, 4)).expect("write");
+
+        let model = dir.path().join("objects3d/peewee.3do");
+        let found = find_tile_beside_model(&model, "arm2").expect("found");
+
+        assert!(found.team_colour);
     }
 
     #[test]

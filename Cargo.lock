@@ -695,6 +695,7 @@ version = "0.0.0"
 name = "coilbox-springlua"
 version = "0.0.0"
 dependencies = [
+ "coilbox-unitpose",
  "mlua",
  "serde",
  "serde_json",
@@ -728,6 +729,13 @@ dependencies = [
 [[package]]
 name = "coilbox-thumb-cache"
 version = "0.0.0"
+
+[[package]]
+name = "coilbox-unitpose"
+version = "0.0.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "coilbox-unitsync-worker"
@@ -5239,6 +5247,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-anim"
 version = "0.0.0"
 dependencies = [
+ "coilbox-unitpose",
  "picoframe-core",
  "serde",
  "serde_json",
@@ -5352,6 +5361,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-lego"
 version = "0.0.0"
 dependencies = [
+ "coilbox-3do",
  "coilbox-portable",
  "coilbox-s3o",
  "coilbox-springlua",
