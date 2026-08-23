@@ -12,6 +12,7 @@ const COMMANDS: &[&str] = &[
     "play_launch_save",
     "play_cancel",
     "play_focus",
+    "play_infolog",
 ];
 
 fn main() {

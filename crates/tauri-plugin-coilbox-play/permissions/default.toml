@@ -12,4 +12,5 @@ permissions = [
   "allow-play-launch-save",
   "allow-play-cancel",
   "allow-play-focus",
+  "allow-play-infolog",
 ]
