@@ -22,7 +22,8 @@ local E = support.engine({ SOLAR, LLT, WIN, CON }, {
 		-- a unit that is gone by the time it is read
 		[204] = nil,
 	},
-	gameName = "Test Game 1.0",
+	gameName = "Test Game",
+	modName = "Test Game 1.0",
 	gameShortName = "TEST",
 	mapName = "Test Map v2",
 })
@@ -34,7 +35,7 @@ check("record keeps only buildings, in selection order", #entry.buildings == 3 a
 check("record anchors at the lowest x and z, floored to the grid", same(entry.buildings[2], { def = "armsolar", offset = { x = 32, z = 0 }, facing = 0 }), show(entry.buildings[2]))
 check("record keeps each building's facing", entry.buildings[1].facing == 1 and entry.buildings[3].facing == 3)
 check("record names the base after the map and the spool count", entry.name == "Base on Test Map v2 3", entry.name)
-check("record binds the game", same(entry.game, { name = "Test Game 1.0", shortname = "TEST" }), show(entry.game))
+check("record binds the game by its archive name, not modinfo's unversioned one", same(entry.game, { name = "Test Game 1.0", shortname = "TEST" }), show(entry.game))
 check("record says which map it was drawn on, and when", entry.designedFor == "Test Map v2" and entry.recordedAt == 5000)
 check("record is not ordered", entry.ordered == false)
 check(

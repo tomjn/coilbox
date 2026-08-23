@@ -54,7 +54,11 @@ function M.selection(opts)
 	end
 	return {
 		name = "Base on " .. Game.mapName .. " " .. (opts.spoolCount + 1),
-		game = { name = Game.gameName, shortname = Game.gameShortName },
+		-- modName, not gameName: coilbox calls a game by its archive name, the
+		-- versioned one unitsync reports, and gameName is modinfo's name with no
+		-- version on it. Recording gameName gives an entry naming a game no
+		-- installed archive is called, so nothing can be drawn with its models.
+		game = { name = Game.modName, shortname = Game.gameShortName },
 		designedFor = Game.mapName,
 		recordedAt = opts.now,
 		ordered = false,
