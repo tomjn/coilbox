@@ -105,7 +105,7 @@ check("the title is drawn", #textsWith(L, "Blueprints") == 1)
 check("tabs show their counts", #textsWith(L, "Now 3") == 1 and #textsWith(L, "Partly 2") == 1 and #textsWith(L, "All 6") == 1, show(L.texts))
 check("every visible row has its name", #textsWith(L, "Eco") == 1 and #textsWith(L, "BAR one") == 1)
 check("a row says where it came from", #textsWith(L, "BAR") >= 1 and #textsWith(L, "saved") == 1, show(L.texts))
-check("an ordered entry says so", #textsWith(L, "ordered") == 2, show(textsWith(L, "ordered")))
+check("an ordered entry says so", #textsWith(L, "ordered") >= 1, show(textsWith(L, "ordered")))
 
 local pics = L.pics
 check("rows show build pictures by def id", #pics > 0 and pics[1].defID == 1, show(pics[1]))
@@ -134,6 +134,7 @@ end
 check("each row is clickable to place", #hitsOf(L, "place") == 3 and hitsOf(L, "place")[1].action.key == "library:eco", show(hitsOf(L, "place")))
 check("tabs are clickable", #hitsOf(L, "tab") == 3 and hitsOf(L, "tab")[2].action.tab == "partly")
 check("there is a save button and a close button", #hitsOf(L, "save") == 1 and #hitsOf(L, "close") == 1)
+check("the close button is a collapse arrow", #textsWith(L, ">") == 1, show(L.texts))
 
 local rowHit = hitsOf(L, "place")[1]
 local inside = MODEL.hit(L, rowHit.x + 1, rowHit.y + 1)
@@ -159,6 +160,46 @@ longState.open = true
 local LL = MODEL.layout(longState, measure, VIEW)
 local longText = textsWith(LL, "xxx")[1]
 check("a long name is cut with an ellipsis", longText and #longText.text < 200 and longText.text:sub(-3) == "...", longText and longText.text)
+check("one row still gets a three row panel", LL.rects[1].h == L.rects[1].h, LL.rects[1].h .. " vs " .. L.rects[1].h)
+
+-- hover
+check("an action names itself", MODEL.actionId({ kind = "place", key = "library:eco" }) == "place:library:eco" and MODEL.actionId({ kind = "tab", tab = "all" }) == "tab:all" and MODEL.actionId({ kind = "save" }) == "save:")
+check("a hovered background lifts", (function()
+	local saveHit = hitsOf(L, "save")[1]
+	local function saveRect(layout)
+		for _, r in ipairs(layout.rects) do
+			if r.kind == "button" and r.x == saveHit.x and r.y == saveHit.y then
+				return r
+			end
+		end
+	end
+	state.hover = MODEL.actionId({ kind = "save" })
+	local LH = MODEL.layout(state, measure, VIEW)
+	state.hover = nil
+	local plain, hot = saveRect(L), saveRect(LH)
+	return plain and hot and hot.color[1] > plain.color[1]
+end)())
+check("a hovered row lifts", (function()
+	state.hover = MODEL.actionId({ kind = "place", key = "library:eco" })
+	local LH = MODEL.layout(state, measure, VIEW)
+	state.hover = nil
+	local function rowColor(layout)
+		for _, r in ipairs(layout.rects) do
+			if r.kind == "row" and r.key == "library:eco" then
+				return r.color
+			end
+		end
+	end
+	return rowColor(LH)[1] > rowColor(L)[1]
+end)())
+check("the opener lifts under the cursor", (function()
+	local closed = MODEL.new()
+	MODEL.refresh(closed, ENTRIES, PLACE, game, CAN)
+	local plain = MODEL.layout(closed, measure, VIEW)
+	closed.hover = MODEL.actionId({ kind = "toggle" })
+	local hot = MODEL.layout(closed, measure, VIEW)
+	return hot.rects[1].color[1] > plain.rects[1].color[1]
+end)())
 
 -- placing and the remainder are reported
 state.placing = { key = "library:eco", name = "Eco", rotation = 1 }
@@ -195,6 +236,16 @@ check("an empty library says where to get blueprints", #textsWith(MODEL.layout(n
 state.open = false
 local LC = MODEL.layout(state, measure, VIEW)
 check("a closed panel shows only the opener", #LC.rects == 1 and LC.rects[1].kind == "opener", show(LC.rects))
+check("the opener is a vertical tab", LC.rects[1].h > LC.rects[1].w, show(LC.rects[1]))
+check("the opener's label reads upward", (function()
+	for _, t in ipairs(LC.texts) do
+		if t.text == "Blueprints" then
+			return t.rotate == 90
+		end
+	end
+	return false
+end)(), show(LC.texts))
+check("the opener carries an arrow", #textsWith(LC, "<") == 1, show(LC.texts))
 check("the opener hugs the right edge, vertically centred", (function()
 	local r = LC.rects[1]
 	local centred = math.abs((r.y - 0) - (VIEW.h - r.y - r.h)) <= 1

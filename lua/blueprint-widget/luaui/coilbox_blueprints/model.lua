@@ -9,7 +9,7 @@
 
 local M = {}
 
-M.WIDTH = 360
+M.WIDTH = 320
 M.PAD = 8
 M.ROW = 44
 M.HEADER = 30
@@ -17,6 +17,9 @@ M.TABS = 26
 M.LINE = 26
 M.FOOTER = 36
 M.MAX_ROWS = 10
+--- The panel never shrinks below this many rows, so one entry does not make
+-- a sliver and an empty tab has room to explain itself.
+M.MIN_ROWS = 3
 M.PIC = 28
 M.FONT = 13
 M.SMALL = 11
@@ -60,8 +63,14 @@ function M.new()
 		placing = nil,
 		remainder = nil,
 		message = nil,
+		hover = nil,
 		version = 0,
 	}
+end
+
+--- One name per clickable thing, for remembering what the cursor is over.
+function M.actionId(action)
+	return action.kind .. ":" .. (action.key or action.tab or "")
 end
 
 --- Bump the version so the widget knows to lay out again.
@@ -215,6 +224,13 @@ function M.layout(state, measure, view)
 	local ROW, HEADER, TABS, LINE, FOOTER = M.ROW * S, M.HEADER * S, M.TABS * S, M.LINE * S, M.FOOTER * S
 	local PIC, FONT, SMALL = M.PIC * S, M.FONT * S, M.SMALL * S
 
+	local function hovered(action)
+		return state.hover ~= nil and state.hover == M.actionId(action)
+	end
+	local function lift(color)
+		return { math.min(1, color[1] + 0.1), math.min(1, color[2] + 0.1), math.min(1, color[3] + 0.1), color[4] }
+	end
+
 	local function rect(x, y, w, h, color, kind, extra)
 		local r = { x = x, y = y, w = w, h = h, color = color, kind = kind }
 		if extra then
@@ -232,22 +248,26 @@ function M.layout(state, measure, view)
 		hits[#hits + 1] = { x = x, y = y, w = w, h = h, action = action }
 	end
 	local function button(x, y, w, h, label, action, color)
-		rect(x, y, w, h, color or C.button, "button")
+		local base = color or C.button
+		rect(x, y, w, h, hovered(action) and lift(base) or base, "button")
 		local tw = measure(label, SMALL)
 		text(x + (w - tw) / 2, y + (h - SMALL) / 2, SMALL, label)
 		hit(x, y, w, h, action)
 	end
 
-	-- Closed, the panel is a tab on the edge saying where it went.
+	-- Closed, the panel is a vertical tab on the edge: an arrow, then the
+	-- name reading upward. The widget turns a text with a rotate field.
 	if not state.open then
 		local label = "Blueprints"
-		local w = measure(label, SMALL) + 2 * PAD
-		local h = LINE
+		local action = { kind = "toggle" }
+		local w = LINE + PAD
+		local h = measure(label, SMALL) + 3 * PAD + SMALL
 		local x = view.w - w
 		local y = math.floor((view.h - h) / 2)
-		rect(x, y, w, h, C.header, "opener")
-		text(x + PAD, y + (h - SMALL) / 2, SMALL, label)
-		hit(x, y, w, h, { kind = "toggle" })
+		rect(x, y, w, h, hovered(action) and lift(C.header) or C.header, "opener")
+		text(x + (w - measure("<", SMALL)) / 2, y + h - PAD - SMALL, SMALL, "<", C.dim)
+		texts[#texts + 1] = { x = x + w / 2 + SMALL * 0.4, y = y + PAD, size = SMALL, text = label, color = C.text, rotate = 90 }
+		hit(x, y, w, h, action)
 		return L
 	end
 
@@ -272,7 +292,10 @@ function M.layout(state, measure, view)
 	local first = state.scroll + 1
 	local last = math.min(#visible, state.scroll + maxRows)
 	local rowsShown = math.max(0, last - first + 1)
-	local height = chrome + (rowsShown > 0 and rowsShown * ROW or ROW)
+	-- The body is at least MIN_ROWS tall whatever it holds, so the panel
+	-- keeps its shape as entries come and go.
+	local bodyRows = math.min(fit, math.max(M.MIN_ROWS, rowsShown))
+	local height = chrome + bodyRows * ROW
 
 	local px = view.w - W
 	local py = math.max(PAD, math.floor((view.h - height) / 2))
@@ -283,7 +306,7 @@ function M.layout(state, measure, view)
 	local y = top - HEADER
 	rect(px, y, W, HEADER, C.header, "header")
 	text(px + PAD, y + (HEADER - FONT) / 2, FONT, "Blueprints")
-	button(px + W - HEADER + 2 * S, y + 2 * S, HEADER - 4 * S, HEADER - 4 * S, "x", { kind = "close" })
+	button(px + W - HEADER + 2 * S, y + 2 * S, HEADER - 4 * S, HEADER - 4 * S, ">", { kind = "close" })
 
 	-- tabs
 	y = y - TABS
@@ -291,10 +314,12 @@ function M.layout(state, measure, view)
 	for i, tab in ipairs(TABS_LIST) do
 		local tx = px + (i - 1) * tabW
 		local active = tab == state.tab
-		rect(tx, y, tabW, TABS, active and C.tabActive or C.tab, "tab", { tab = tab, active = active })
+		local base = active and C.tabActive or C.tab
+		local tabAction = { kind = "tab", tab = tab }
+		rect(tx, y, tabW, TABS, hovered(tabAction) and lift(base) or base, "tab", { tab = tab, active = active })
 		local label = TAB_LABELS[tab] .. " " .. state.counts[tab]
 		text(tx + (tabW - measure(label, SMALL)) / 2, y + (TABS - SMALL) / 2, SMALL, label)
-		hit(tx, y, tabW, TABS, { kind = "tab", tab = tab })
+		hit(tx, y, tabW, TABS, tabAction)
 	end
 
 	-- placing
@@ -324,6 +349,7 @@ function M.layout(state, measure, view)
 		local item = visible[i]
 		y = y - ROW
 		local active = state.placing ~= nil and state.placing.key == item.entry.key
+		local rowAction = { kind = "place", key = item.entry.key }
 		local color = C.row
 		if active then
 			color = C.rowActive
@@ -332,7 +358,7 @@ function M.layout(state, measure, view)
 		elseif i % 2 == 0 then
 			color = C.rowAlt
 		end
-		rect(px, y, W, ROW, color, "row", { key = item.entry.key, active = active })
+		rect(px, y, W, ROW, hovered(rowAction) and lift(color) or color, "row", { key = item.entry.key, active = active })
 		local nameColor = item.tab == "never" and C.faint or C.text
 		local nameW = W - 2 * PAD - picsW - PAD
 		text(px + PAD, y + ROW - PAD - FONT, FONT, M.truncate(item.entry.name, nameW, measure, FONT), nameColor)
@@ -348,7 +374,7 @@ function M.layout(state, measure, view)
 				row = i,
 			}
 		end
-		hit(px, y, W, ROW, { kind = "place", key = item.entry.key })
+		hit(px, y, W, ROW, rowAction)
 	end
 
 	-- scrollbar

@@ -588,6 +588,16 @@ function widget:Update(dt)
 		panel.message = nil
 		MODEL.touch(panel)
 	end
+	-- Hover follows the cursor over anything clickable, the opener included.
+	if layout then
+		local mx, my = Spring.GetMouseState()
+		local action = MODEL.hit(layout, mx, my)
+		local id = action and action.kind ~= "panel" and MODEL.actionId(action) or nil
+		if id ~= panel.hover then
+			panel.hover = id
+			MODEL.touch(panel)
+		end
+	end
 	if not panel.open and not placing then
 		return
 	end
@@ -709,7 +719,15 @@ function widget:DrawScreen()
 	end
 	gl.UseShader(0)
 	for _, t in ipairs(layout.texts) do
-		gl.Text(colourCode(t.color) .. t.text, t.x, t.y, t.size, "")
+		if t.rotate then
+			gl.PushMatrix()
+			gl.Translate(t.x, t.y, 0)
+			gl.Rotate(t.rotate, 0, 0, 1)
+			gl.Text(colourCode(t.color) .. t.text, 0, 0, t.size, "")
+			gl.PopMatrix()
+		else
+			gl.Text(colourCode(t.color) .. t.text, t.x, t.y, t.size, "")
+		end
 	end
 end
 
@@ -722,6 +740,9 @@ local LEFT = { 0.95, 0.7, 0.2, 0.3 }
 -- square on the ground under it is what says blocked, open or left over.
 local function ghost(p, teamID)
 	gl.PushMatrix()
+	-- The stack holds the camera here, and UnitShape wants a pure model
+	-- matrix, so without this the ghost lands nowhere visible.
+	gl.LoadIdentity()
 	gl.Translate(p.x, p.y, p.z)
 	gl.Rotate(90 * p.facing, 0, 1, 0)
 	gl.UnitShape(p.defID, teamID, false, false, false)
