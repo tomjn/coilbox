@@ -255,19 +255,31 @@ function M.layout(state, measure, view)
 		hit(x, y, w, h, action)
 	end
 
-	-- Closed, the panel is a vertical tab on the edge: an arrow, then the
-	-- name reading upward. The widget turns a text with a rotate field.
-	if not state.open then
+	-- The vertical tab that opens and closes the panel: an arrow, then the
+	-- name reading downward. On the screen edge when closed, on the panel's
+	-- outer left edge when open. The widget turns a text with a rotate field.
+	local function edgeTab(rightX, arrow)
 		local label = "Blueprints"
 		local action = { kind = "toggle" }
 		local w = LINE + PAD
 		local h = measure(label, SMALL) + 3 * PAD + SMALL
-		local x = view.w - w
+		local x = rightX - w
 		local y = math.floor((view.h - h) / 2)
 		rect(x, y, w, h, hovered(action) and lift(C.header) or C.header, "opener")
-		text(x + (w - measure("<", SMALL)) / 2, y + h - PAD - SMALL, SMALL, "<", C.dim)
-		texts[#texts + 1] = { x = x + w / 2 + SMALL * 0.4, y = y + PAD, size = SMALL, text = label, color = C.text, rotate = 90 }
+		text(x + (w - measure(arrow, SMALL)) / 2, y + h - PAD - SMALL, SMALL, arrow, C.dim)
+		texts[#texts + 1] = {
+			x = x + w / 2 - SMALL * 0.35,
+			y = y + h - 2 * PAD - SMALL,
+			size = SMALL,
+			text = label,
+			color = C.text,
+			rotate = -90,
+		}
 		hit(x, y, w, h, action)
+	end
+
+	if not state.open then
+		edgeTab(view.w, "<")
 		return L
 	end
 
@@ -301,12 +313,12 @@ function M.layout(state, measure, view)
 	local py = math.max(PAD, math.floor((view.h - height) / 2))
 	local top = py + height
 	local panel = rect(px, py, W, height, C.panel, "panel")
+	edgeTab(px, ">")
 
 	-- header
 	local y = top - HEADER
 	rect(px, y, W, HEADER, C.header, "header")
 	text(px + PAD, y + (HEADER - FONT) / 2, FONT, "Blueprints")
-	button(px + W - HEADER + 2 * S, y + 2 * S, HEADER - 4 * S, HEADER - 4 * S, ">", { kind = "close" })
 
 	-- tabs
 	y = y - TABS

@@ -101,7 +101,7 @@ local function textsWith(layout, needle)
 	end
 	return found
 end
-check("the title is drawn", #textsWith(L, "Blueprints") == 1)
+check("the title is drawn on the panel and on its tab", #textsWith(L, "Blueprints") == 2)
 check("tabs show their counts", #textsWith(L, "Now 3") == 1 and #textsWith(L, "Partly 2") == 1 and #textsWith(L, "All 6") == 1, show(L.texts))
 check("every visible row has its name", #textsWith(L, "Eco") == 1 and #textsWith(L, "BAR one") == 1)
 check("a row says where it came from", #textsWith(L, "BAR") >= 1 and #textsWith(L, "saved") == 1, show(L.texts))
@@ -133,8 +133,12 @@ local function hitsOf(layout, kind)
 end
 check("each row is clickable to place", #hitsOf(L, "place") == 3 and hitsOf(L, "place")[1].action.key == "library:eco", show(hitsOf(L, "place")))
 check("tabs are clickable", #hitsOf(L, "tab") == 3 and hitsOf(L, "tab")[2].action.tab == "partly")
-check("there is a save button and a close button", #hitsOf(L, "save") == 1 and #hitsOf(L, "close") == 1)
-check("the close button is a collapse arrow", #textsWith(L, ">") == 1, show(L.texts))
+check("there is a save button and no separate close button", #hitsOf(L, "save") == 1 and #hitsOf(L, "close") == 0)
+check("the open panel keeps the tab on its outer left edge", (function()
+	local t = hitsOf(L, "toggle")[1]
+	return t ~= nil and t.x + t.w == L.rects[1].x
+end)(), show(hitsOf(L, "toggle")))
+check("the open tab's arrow points at the edge", #textsWith(L, ">") == 1, show(L.texts))
 
 local rowHit = hitsOf(L, "place")[1]
 local inside = MODEL.hit(L, rowHit.x + 1, rowHit.y + 1)
@@ -143,10 +147,11 @@ check("hit outside the panel is nil", MODEL.hit(L, 1, 1) == nil)
 check("a point inside the panel but on nothing is the panel itself", MODEL.hit(L, L.rects[1].x + 2, L.rects[1].y + 2) ~= nil and MODEL.hit(L, L.rects[1].x + 2, L.rects[1].y + 2).kind == "panel")
 
 check("rows stack downward from the top", hitsOf(L, "place")[1].y > hitsOf(L, "place")[2].y)
-check("every text lands inside the panel", (function()
+check("every text lands inside the panel or its tab", (function()
 	local p = L.rects[1]
 	for _, t in ipairs(L.texts) do
-		if t.x < p.x or t.x > p.x + p.w or t.y < p.y or t.y > p.y + p.h then
+		local inPanel = t.x >= p.x and t.x <= p.x + p.w and t.y >= p.y and t.y <= p.y + p.h
+		if not inPanel and t.x >= p.x then
 			return false
 		end
 	end
@@ -237,10 +242,10 @@ state.open = false
 local LC = MODEL.layout(state, measure, VIEW)
 check("a closed panel shows only the opener", #LC.rects == 1 and LC.rects[1].kind == "opener", show(LC.rects))
 check("the opener is a vertical tab", LC.rects[1].h > LC.rects[1].w, show(LC.rects[1]))
-check("the opener's label reads upward", (function()
+check("the opener's label reads downward", (function()
 	for _, t in ipairs(LC.texts) do
 		if t.text == "Blueprints" then
-			return t.rotate == 90
+			return t.rotate == -90
 		end
 	end
 	return false
