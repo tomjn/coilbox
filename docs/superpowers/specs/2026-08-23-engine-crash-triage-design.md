@@ -140,7 +140,7 @@ When the newest log predates the launch, the drawer says the engine wrote no log
 
 ## Part 5: the settings entry
 
-A settings page under Engine Settings, `parent: "engine-settings"`, order 70, between Keybinds and Saved configs. It is declared from `src/play/index.ts` into the group the content plugin owns, which is how other plugins already contribute there (`content/index.ts:42-44`).
+A settings page under Engine Settings, `parent: "engine-settings"`, order 70, so it sits last, after Saved configs. It is the diagnostic rather than a setting, which is why it goes at the end. It is declared from `src/play/index.ts` into the group the content plugin owns, which is how other plugins already contribute there (`content/index.ts:42-44`).
 
 Same viewer, no run context: the newest log, its path and timestamp, the highlighted tail, copy, and open. This is the "it worked yesterday" case the issue names. The log survives the session, so it is still readable the next morning.
 
