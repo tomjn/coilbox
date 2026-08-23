@@ -20,20 +20,18 @@ M.MAX_ROWS = 10
 M.PIC = 28
 M.FONT = 13
 M.SMALL = 11
-M.MARGIN = 16
-
 --- How many times the base sizes the panel is drawn at. The engine hands
--- physical pixels, so 1 is small on any modern screen.
-M.SCALE = 3
+-- physical pixels, so 1 is small on any modern screen and 3 crowds it.
+M.SCALE = 2
 
 local C = {
 	panel = { 0.06, 0.07, 0.09, 0.9 },
 	header = { 0.12, 0.14, 0.18, 1 },
 	tab = { 0.16, 0.18, 0.22, 1 },
-	tabActive = { 0.22, 0.42, 0.72, 1 },
+	tabActive = { 0.32, 0.34, 0.38, 1 },
 	row = { 0.10, 0.12, 0.15, 0.95 },
 	rowAlt = { 0.13, 0.15, 0.19, 0.95 },
-	rowActive = { 0.20, 0.36, 0.58, 1 },
+	rowActive = { 0.30, 0.32, 0.38, 1 },
 	rowNever = { 0.09, 0.09, 0.10, 0.95 },
 	button = { 0.24, 0.28, 0.34, 1 },
 	buttonWarm = { 0.55, 0.30, 0.14, 1 },
@@ -215,7 +213,7 @@ function M.layout(state, measure, view)
 	local S = state.scale or M.SCALE
 	local PAD, W = M.PAD * S, M.WIDTH * S
 	local ROW, HEADER, TABS, LINE, FOOTER = M.ROW * S, M.HEADER * S, M.TABS * S, M.LINE * S, M.FOOTER * S
-	local PIC, FONT, SMALL, MARGIN = M.PIC * S, M.FONT * S, M.SMALL * S, M.MARGIN * S
+	local PIC, FONT, SMALL = M.PIC * S, M.FONT * S, M.SMALL * S
 
 	local function rect(x, y, w, h, color, kind, extra)
 		local r = { x = x, y = y, w = w, h = h, color = color, kind = kind }
@@ -276,7 +274,7 @@ function M.layout(state, measure, view)
 	local rowsShown = math.max(0, last - first + 1)
 	local height = chrome + (rowsShown > 0 and rowsShown * ROW or ROW)
 
-	local px = view.w - W - MARGIN
+	local px = view.w - W
 	local py = math.max(PAD, math.floor((view.h - height) / 2))
 	local top = py + height
 	local panel = rect(px, py, W, height, C.panel, "panel")

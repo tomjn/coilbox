@@ -90,7 +90,7 @@ state.tab = "now"
 local L = MODEL.layout(state, measure, VIEW)
 
 check("layout has a background rect first", L.rects[1].kind == "panel", show(L.rects[1]))
-check("the panel sits inside the view on the right", L.rects[1].x + L.rects[1].w <= VIEW.w and L.rects[1].y >= 0 and L.rects[1].y + L.rects[1].h <= VIEW.h, show(L.rects[1]))
+check("the panel is flush with the right edge, inside the view", L.rects[1].x + L.rects[1].w == VIEW.w and L.rects[1].y >= 0 and L.rects[1].y + L.rects[1].h <= VIEW.h, show(L.rects[1]))
 
 local function textsWith(layout, needle)
 	local found = {}
@@ -206,7 +206,7 @@ check("hit finds the opener", MODEL.hit(LC, LC.rects[1].x + 2, LC.rects[1].y + 2
 state.open = true
 
 -- scale and placement
-check("the default scale is three", state.scale == 3)
+check("the default scale is two", state.scale == 2)
 check("the panel is vertically centred", (function()
 	local p = L.rects[1]
 	return math.abs(p.y - (VIEW.h - p.y - p.h)) <= 2
@@ -218,11 +218,11 @@ check("scale multiplies the panel's sizes", (function()
 	small.scale = 1
 	local LS = MODEL.layout(small, measure, VIEW)
 	local p1, p3 = LS.rects[1], L.rects[1]
-	return p3.w == p1.w * 3 and math.abs(p3.h - p1.h * 3) <= 3
+	return p3.w == p1.w * 2 and math.abs(p3.h - p1.h * 2) <= 2
 end)())
 check("text sizes scale with the panel", (function()
 	for _, t in ipairs(L.texts) do
-		if t.size >= MODEL.FONT * 3 then
+		if t.size >= MODEL.FONT * 2 then
 			return true
 		end
 	end
