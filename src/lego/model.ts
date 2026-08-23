@@ -369,6 +369,19 @@ export interface LegoProject {
    * Absent for a unit built out of parts, which has no definition to have.
    */
   gameUnitDef?: Record<string, unknown>;
+  /**
+   * The library files the unit's script pulls in with `include`, keyed by the
+   * name it asks for.
+   *
+   * A game may keep half its animation in a shared library and have every unit
+   * pull it in, which is Beyond All Reason's house style. Without the file the
+   * script stops on the first line that calls into it.
+   *
+   * Stored rather than re-read, for the same reason the definition is. Absent
+   * for a unit built out of parts, whose script pulls in nothing but coilbox's
+   * own collision file.
+   */
+  gameScriptIncludes?: Record<string, string>;
   /** Where this unit was last exported, so exporting again does not ask. */
   exportDir?: string;
   /** Whether that export also placed the shared atlas. Defaults to true. */
@@ -680,6 +693,7 @@ export function parseLegoProjectData(data: unknown): LegoProject | null {
     ...(typeof d.gameUnitDef === "object" && d.gameUnitDef !== null
       ? { gameUnitDef: d.gameUnitDef as Record<string, unknown> }
       : {}),
+    ...(parseScriptIncludes(d.gameScriptIncludes) ?? {}),
     ...(typeof d.exportDir === "string" ? { exportDir: d.exportDir } : {}),
     ...(typeof d.exportTexture === "boolean"
       ? { exportTexture: d.exportTexture }
@@ -817,6 +831,24 @@ function parseTexture(value: unknown, packed: boolean): LegoTexture | null {
     name: v.name,
     ...(!packed && typeof v.source === "string" ? { source: v.source } : {}),
   };
+}
+
+/**
+ * The script's library files off a saved project.
+ *
+ * Only the entries that are text, because anything else is not a file a script
+ * could have been given. A file dropped here is one `include` reads nothing
+ * for, which the preview says when the script asks.
+ */
+function parseScriptIncludes(
+  raw: unknown,
+): { gameScriptIncludes: Record<string, string> } | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const files = Object.entries(raw as Record<string, unknown>).filter(
+    (entry): entry is [string, string] => typeof entry[1] === "string",
+  );
+  if (files.length === 0) return null;
+  return { gameScriptIncludes: Object.fromEntries(files) };
 }
 
 /**

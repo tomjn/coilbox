@@ -79,6 +79,7 @@ function found(over: Record<string, unknown> = {}) {
     bosText: null,
     unitDef: null,
     declared: "armcom.cob",
+    includes: [],
     errors: [],
     ...over,
   };
@@ -406,6 +407,53 @@ describe("the unit's own definition", () => {
 
     expect(adopted.unitDef).toBeNull();
     expect(adopted.script).toBe("-- the game's own\n");
+  });
+});
+
+/**
+ * A game may keep half its animation in a shared library and have every unit
+ * pull it in, which is Beyond All Reason's house style. Read here for the same
+ * reason the definition is: this call has the game open.
+ */
+describe("the libraries the script pulls in", () => {
+  const library = {
+    name: "include/util.lua",
+    member: "scripts/include/util.lua",
+    text: "function smoke_unit() end\n",
+  };
+
+  it("come back keyed by the name the script asks for", async () => {
+    readScript.mockResolvedValue(found({ includes: [library] }));
+
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.includes).toEqual({
+      "include/util.lua": "function smoke_unit() end\n",
+    });
+  });
+
+  it("are nothing for a unit whose script pulls in nothing", async () => {
+    const adopted = await adoptGameScript(project(), ENGINE);
+
+    expect(adopted.includes).toEqual({});
+  });
+
+  /** Inference runs the script the way the preview does, so a script that
+   *  stops without its library names no pieces either. */
+  it("are handed to the role inference along with the definition", async () => {
+    readScript.mockResolvedValue(
+      found({ includes: [library], unitDef: '{"health":1000}' }),
+    );
+
+    await adoptGameScript(project(), ENGINE);
+
+    expect(infer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gameScriptIncludes: { "include/util.lua": library.text },
+        gameUnitDef: { health: 1000 },
+      }),
+      "-- the game's own\n",
+    );
   });
 });
 

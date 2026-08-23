@@ -680,6 +680,32 @@ describe("parseLegoProjectJson", () => {
     expect(parseLegoProjectJson(JSON.stringify(doc))?.gameUnitDef).toEqual(def);
   });
 
+  /** A script that pulls in its game's library stops without it, and the game
+   *  may not be installed the next time the project is opened. */
+  it("carries the script's libraries through a save and a load", () => {
+    const files = { "include/util.lua": "function smoke_unit() end\n" };
+    const doc = {
+      ...project([piece("root", null)]),
+      gameScriptIncludes: files,
+    };
+
+    expect(
+      parseLegoProjectJson(JSON.stringify(doc))?.gameScriptIncludes,
+    ).toEqual(files);
+  });
+
+  /** A file that is not text is not a file a script could have been given. */
+  it("drops a library whose source is not text", () => {
+    const doc = {
+      ...project([piece("root", null)]),
+      gameScriptIncludes: { "include/util.lua": 12 },
+    };
+
+    expect(parseLegoProjectJson(JSON.stringify(doc))).not.toHaveProperty(
+      "gameScriptIncludes",
+    );
+  });
+
   it("drops a compiled script with nothing in it", () => {
     const doc = {
       ...project([piece("root", null)]),

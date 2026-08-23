@@ -30,6 +30,7 @@ use coilbox_springlua::unitscript;
 use picoframe_core::CliResult;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::{
@@ -1525,6 +1526,7 @@ fn lego_run_script(
     events: Vec<unitscript::ScriptEvent>,
     frames: u32,
     unit_def: Option<serde_json::Value>,
+    includes: Option<HashMap<String, String>>,
 ) -> CliResult {
     let timeline = unitscript::run(
         &script,
@@ -1533,6 +1535,7 @@ fn lego_run_script(
         &events,
         frames,
         unit_def.as_ref(),
+        &includes.unwrap_or_default(),
     );
     match serde_json::to_value(timeline) {
         Ok(value) => CliResult::ok(value),
@@ -1556,6 +1559,7 @@ fn lego_probe_script(
     pieces: Vec<String>,
     callins: Vec<String>,
     unit_def: Option<serde_json::Value>,
+    includes: Option<HashMap<String, String>>,
 ) -> CliResult {
     let probes = unitscript::probe(
         &script,
@@ -1563,6 +1567,7 @@ fn lego_probe_script(
         &pieces,
         &callins,
         unit_def.as_ref(),
+        &includes.unwrap_or_default(),
     );
     match serde_json::to_value(probes) {
         Ok(value) => CliResult::ok(value),

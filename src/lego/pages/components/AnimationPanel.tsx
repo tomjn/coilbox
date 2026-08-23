@@ -213,6 +213,10 @@ export function AnimationPanel({
               // A script may read its own definition, and without it those
               // scripts throw at load rather than losing a branch (#1936).
               unitDef: project.gameUnitDef ?? null,
+              // A game may keep half its animation in a shared library, and
+              // without it the script stops on the line that calls into it
+              // (#1944).
+              includes: project.gameScriptIncludes ?? null,
             });
         setTimeline(result);
         // A run that produced nothing has only its reason to show. One that
@@ -235,6 +239,7 @@ export function AnimationPanel({
       project.unitName,
       project.pieces,
       project.gameUnitDef,
+      project.gameScriptIncludes,
       compiled,
       onPlayingChange,
       onScriptTimeline,
