@@ -30,6 +30,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 import type { LocalRender, UnitDatasetEntry } from "@/content/bindings";
 import {
   BACKFILL_ANGLES,
+  type BackfillTarget,
   type BackfillTools,
   type BackfillUnit,
   backfillBlueprintUnits,
@@ -422,12 +423,13 @@ function progress(
   };
 }
 
-const TARGET = {
+const TARGET: BackfillTarget = {
   hubUrl: "https://hub.example",
   game: "bar",
   archive: "Beyond All Reason test-1",
   enginePath: "/engines/105",
   dataDir: "/data",
+  startedBy: "coilbox",
 };
 
 function unitsOf(count: number): BackfillUnit[] {
@@ -546,6 +548,24 @@ describe("a run over one layout", () => {
     await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
 
     expect(watch.startedBy).toEqual(["coilbox"]);
+  });
+
+  /**
+   * And the other way round for a run somebody pressed a button for
+   * (issue #1952). They are watching it, so a refusal has to reach them rather
+   * than going quietly into the bell: a run that was refused and said nothing
+   * looks exactly like a run that worked.
+   */
+  it("tells the upload when a person started it instead", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(
+      { ...TARGET, startedBy: "user" },
+      unitsOf(3),
+      100,
+      watch.tools,
+    );
+
+    expect(watch.startedBy).toEqual(["user"]);
   });
 
   /**
