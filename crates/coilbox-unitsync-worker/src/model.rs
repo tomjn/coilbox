@@ -873,8 +873,14 @@ pub struct UnitRenderKey {
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct UnitRenderKeysOutput {
-    /// Keyed by the unit's internal name, as asked for.
-    pub keys: BTreeMap<String, UnitRenderKey>,
+    /// Keyed by the unit's internal name, as asked for, then by the variant.
+    ///
+    /// Two maps rather than one because a unit has a key per angle now
+    /// (issue #1951), and all of them come out of one mount: the archive read is
+    /// the model digest, which every angle of a unit shares. Asking per angle
+    /// would be one `AddAllArchives` each, which is the cost #1684 and #1720
+    /// exist to have removed.
+    pub keys: BTreeMap<String, BTreeMap<String, UnitRenderKey>>,
     /// The name the game archive declares for itself, which is what a hub row's
     /// `source_archive` holds. One per batch rather than one per key, because a
     /// batch is one game.
