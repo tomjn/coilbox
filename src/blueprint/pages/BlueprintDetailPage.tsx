@@ -63,6 +63,7 @@ import {
   saveBlueprint,
   useBlueprintLibrary,
 } from "../store";
+import { useWidgetFiles } from "../useWidgetFiles";
 
 /** How long after the last change the layout is written. Long enough that a
  *  drag is one write rather than several, short enough that nobody has to think
@@ -75,6 +76,8 @@ export default function BlueprintDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const { records, loading, error } = useBlueprintLibrary();
+  // An edit here is a change the in game widget should see next match.
+  useWidgetFiles();
 
   const stored = records.find((record) => record.id === id) ?? null;
   // What is on screen, which is ahead of what is on disk between an edit and
