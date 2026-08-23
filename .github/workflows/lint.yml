@@ -33,9 +33,9 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-  # The mission runtime is Lua a game vendors, so neither the frontend nor the
-  # Rust job compiles it and a break in it would otherwise reach a game. The
-  # suites need luajit and nothing else. The engine harness
+  # The mission runtime and the blueprint widget are Lua the engine runs, so
+  # neither the frontend nor the Rust job compiles them and a break would
+  # otherwise reach a game. The suites need luajit and nothing else. The engine harness
   # (scripts/mission-headless.sh) is not here: it needs a spring-headless build,
   # a game and a map, none of which a runner has.
   lua:
@@ -47,7 +47,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y luajit
-      - name: Mission runtime tests
+      - name: Lua tests
         run: scripts/mission-tests.sh
 
   # 30 minutes rather than the other two jobs' limits: on a cache miss this job

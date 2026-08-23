@@ -30,6 +30,7 @@ mod stats;
 mod stats_watcher;
 mod steam;
 mod storage;
+mod widget;
 
 use model::{
     load_store, save_store, ContentRoot, ContentState, RootCounts, RootKind, RootSource, StoreFile,
@@ -1537,6 +1538,74 @@ async fn content_blueprint_delete<R: Runtime>(
     }
 }
 
+/// Where the bundled blueprint widget lives, or a message when this build has
+/// none to offer.
+fn widget_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    let bundled = app
+        .path()
+        .resource_dir()
+        .ok()
+        .and_then(|dir| widget::bundled_widget_dir(&dir, |path| path.is_dir()));
+    bundled
+        .or_else(widget::source_tree_widget_dir)
+        .ok_or_else(|| "this build of coilbox does not carry the blueprint widget".to_string())
+}
+
+/// `content_widget_status`, what is installed under a content root against
+/// what coilbox ships. `rootPath` is a `ContentRoot.path`.
+#[tauri::command]
+async fn content_widget_status<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+) -> Result<CliResult, ()> {
+    let src = match widget_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let res =
+        tauri::async_runtime::spawn_blocking(move || widget::status(&src, Path::new(&root_path)))
+            .await;
+    match res {
+        Ok(status) => Ok(CliResult::ok(json!(status))),
+        Err(e) => Ok(CliResult::err(format!("widget status task failed: {e}"))),
+    }
+}
+
+/// `content_widget_install`, copy the blueprint widget into a content root's
+/// `LuaUI/`. The same command updates one already there. Only ever run from the
+/// button: coilbox never installs a widget on its own.
+#[tauri::command]
+async fn content_widget_install<R: Runtime>(
+    app: AppHandle<R>,
+    root_path: String,
+) -> Result<CliResult, ()> {
+    let src = match widget_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let res =
+        tauri::async_runtime::spawn_blocking(move || widget::install(&src, Path::new(&root_path)))
+            .await;
+    match res {
+        Ok(Ok(written)) => Ok(CliResult::ok(json!({ "written": written }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("widget install task failed: {e}"))),
+    }
+}
+
+/// `content_widget_remove`, take the blueprint widget out of a content root.
+/// The library file and the spool are data rather than the widget, and stay.
+#[tauri::command]
+async fn content_widget_remove(root_path: String) -> Result<CliResult, ()> {
+    let res =
+        tauri::async_runtime::spawn_blocking(move || widget::remove(Path::new(&root_path))).await;
+    match res {
+        Ok(Ok(removed)) => Ok(CliResult::ok(json!({ "removed": removed }))),
+        Ok(Err(e)) => Ok(CliResult::err(e)),
+        Err(e) => Ok(CliResult::err(format!("widget remove task failed: {e}"))),
+    }
+}
+
 /// `content_warm_rapid_pool` — background-read every `packages/*.sdp` manifest
 /// across the given roots into the OS page cache so the engine's first rapid-tag
 /// resolution is warm. Manifests only; returns a cache-warm summary.
@@ -1655,6 +1724,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             content_blueprints,
             content_blueprint_save,
             content_blueprint_delete,
+            content_widget_status,
+            content_widget_install,
+            content_widget_remove,
             content_warm_rapid_pool,
             content_prune_rapid_pool,
             content_reclaim_caches,

@@ -42,6 +42,9 @@ vi.mock("@/content/config", () => ({
   useUnitsyncScan: () => ({ data: { games: [] }, loading: false }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
+// The widget file sync reaches the play state and the engine config, which
+// neither page test stands up. What it does is tested on its own.
+vi.mock("../useWidgetFiles", () => ({ useWidgetFiles: () => {} }));
 vi.mock("@/deeplink/useImportParam", () => ({ useImportParam: () => ({}) }));
 vi.mock("@/hub/imports", () => ({ useRecordHubImport: () => () => {} }));
 vi.mock("../store", () => ({

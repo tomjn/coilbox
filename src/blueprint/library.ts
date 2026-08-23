@@ -52,7 +52,8 @@ export type BlueprintSource =
   | FileSource
   | CodeSource
   | HubSource
-  | ScenarioSource;
+  | ScenarioSource
+  | WidgetSource;
 
 /** What every way in knows. */
 interface ArrivedHere {
@@ -101,6 +102,15 @@ export interface ScenarioSource extends ArrivedHere {
   /** What that scenario is called, for a line a person can read. Absent when
    *  the scenario had no name. */
   scenarioName?: string;
+}
+
+/** Saved in game by coilbox's own widget, and collected out of the spool file
+ *  it writes beside the engine (issue #1419). */
+export interface WidgetSource extends ArrivedHere {
+  kind: "widget";
+  /** The engine folder the spool was under, which is the engine it was played
+   *  on. Absent when the collector did not know. */
+  engine?: string;
 }
 
 /** What the library keeps for one layout. */
@@ -178,6 +188,18 @@ export function scenarioSource(
   };
 }
 
+/** For one saved in game by the widget and collected out of its spool. */
+export function widgetSource(
+  engine?: string,
+  at: Date = new Date(),
+): WidgetSource {
+  return {
+    kind: "widget",
+    ...(engine ? { engine } : {}),
+    ...arrived(undefined, at),
+  };
+}
+
 /** A file's own name, without the directories it sat in. Splits on both
  *  separators, because the path came from whichever platform's file dialog. */
 export function sourceFileName(path: string): string {
@@ -197,6 +219,8 @@ export function sourceLabel(source: BlueprintSource): string {
       return source.author
         ? `From ${source.author} on the hub`
         : "From the hub";
+    case "widget":
+      return "Saved in game";
     default:
       return source.scenarioName
         ? `From ${source.scenarioName}`
@@ -227,6 +251,10 @@ function summaryOf(source: BlueprintSource): string {
       return source.author
         ? `Imported from the community hub, published by ${source.author}.`
         : "Imported from the community hub.";
+    case "widget":
+      return source.engine
+        ? `Saved in game with the coilbox widget, on engine ${source.engine}.`
+        : "Saved in game with the coilbox widget.";
     default:
       return source.scenarioName
         ? `Saved out of the scenario "${source.scenarioName}".`
@@ -263,6 +291,10 @@ function parseBlueprintSource(value: unknown): BlueprintSource | undefined {
       return item
         ? { kind: "hub", item, ...(author ? { author } : {}), ...rest }
         : undefined;
+    }
+    case "widget": {
+      const engine = text("engine");
+      return { kind: "widget", ...(engine ? { engine } : {}), ...rest };
     }
     case "scenario": {
       const scenario = text("scenario");

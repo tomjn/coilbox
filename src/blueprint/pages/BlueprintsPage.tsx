@@ -20,6 +20,7 @@ import {
   Blocks,
   FileDown,
   Flag,
+  Gamepad2,
   Globe,
   Layers,
   Link2,
@@ -57,10 +58,12 @@ import {
   uniqueLayoutName,
 } from "../library";
 import { blueprintRoute, saveBlueprint, useBlueprintLibrary } from "../store";
+import { useWidgetFiles } from "../useWidgetFiles";
 import { BlueprintCardMenu } from "./components/BlueprintCardMenu";
 import { BlueprintImportButton } from "./components/BlueprintImportButton";
 import { BlueprintPackButton } from "./components/BlueprintPackButton";
 import { BlueprintPackWriteButton } from "./components/BlueprintPackWriteButton";
+import { BlueprintWidgetButton } from "./components/BlueprintWidgetButton";
 import { LayoutThumb } from "./components/LayoutThumb";
 
 /** Every game, rather than one of them. A game's name is its archive name, so
@@ -79,6 +82,9 @@ export default function BlueprintsPage() {
   // hub item it came from when the hub browse screen started it (issue #1368).
   const { code: importCode, hubItemId } = useImportParam();
   const recordHubImport = useRecordHubImport();
+  // The in game widget reads this library out of a file, and what it saves
+  // comes back through another. Both kept in step while the page is up.
+  useWidgetFiles();
 
   const games = useMemo(() => libraryGames(records), [records]);
   /** Every name in the library, which is what a new layout's name and a copy's
@@ -116,6 +122,7 @@ export default function BlueprintsPage() {
                 onWritten={(said) => toast.success(said)}
               />
             )}
+            <BlueprintWidgetButton onChanged={(said) => toast.success(said)} />
             <BlueprintImportButton
               initialCode={importCode}
               hubItemId={hubItemId}
@@ -271,6 +278,7 @@ const SOURCE_ICONS = {
   code: Link2,
   hub: Globe,
   scenario: Flag,
+  widget: Gamepad2,
 } as const;
 
 /** Where one copy came from, in a line. The title is the fuller fact, which is

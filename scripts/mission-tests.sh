@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Run every mission runtime test suite.
+# Run every Lua test suite: the mission runtime's and the blueprint widget's.
 #
-# The suites are whatever lua/mission-runtime/tests/ holds, so adding one is
-# adding a file. Each runs on its own in luajit and prints "all passed", the way
-# a single suite does when run by hand.
+# The suites are whatever lua/*/tests/ holds, so adding one is adding a file.
+# Each runs on its own in luajit and prints "all passed", the way a single suite
+# does when run by hand.
 #
 # This does not run the engine. scripts/mission-headless.sh does that, and needs
 # a spring-headless binary and a game installed.
@@ -12,7 +12,6 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TESTS="$ROOT/lua/mission-runtime/tests"
 
 if ! command -v luajit >/dev/null; then
   echo "luajit is not on PATH" >&2
@@ -20,8 +19,8 @@ if ! command -v luajit >/dev/null; then
 fi
 
 failures=0
-for suite in "$TESTS"/*_test.lua; do
-  name="$(basename "$suite" .lua)"
+for suite in "$ROOT"/lua/*/tests/*_test.lua; do
+  name="$(basename "$(dirname "$(dirname "$suite")")")/$(basename "$suite" .lua)"
   if output="$(luajit "$suite" 2>&1)"; then
     echo "ok   $name"
   else

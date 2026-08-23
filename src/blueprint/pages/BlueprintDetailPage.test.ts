@@ -59,6 +59,9 @@ vi.mock("@/content/useGameUnits", () => ({
 vi.mock("@/hub/assets/useBlueprintBackfill", () => ({
   useBlueprintBackfill: () => {},
 }));
+// The widget file sync reaches the play state and the engine config, which
+// this test does not stand up. What it does is tested on its own.
+vi.mock("../useWidgetFiles", () => ({ useWidgetFiles: () => {} }));
 vi.mock("../store", () => ({
   blueprintRoute: (id: string) => `/content/blueprints/${id}`,
   deleteBlueprint: async () => {},
