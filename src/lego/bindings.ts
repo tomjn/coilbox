@@ -390,6 +390,9 @@ export const legoRunScript = defineCommand<
     /** The unit's own definition, for a script that reads one. Absent for a
      *  unit built out of parts, which has none. */
     unitDef?: Record<string, unknown> | null;
+    /** The library files the script pulls in, keyed by the name it asks for.
+     *  A name with no file behind it is noted rather than failed. */
+    includes?: Record<string, string> | null;
   },
   ScriptTimeline
 >("coilbox-lego", "lego_run_script");
@@ -414,6 +417,8 @@ export const legoProbeScript = defineCommand<
     callins: string[];
     /** The unit's own definition, for a script that reads one. */
     unitDef?: Record<string, unknown> | null;
+    /** The library files the script pulls in, keyed by the name it asks for. */
+    includes?: Record<string, string> | null;
   },
   ScriptProbes
 >("coilbox-lego", "lego_probe_script");

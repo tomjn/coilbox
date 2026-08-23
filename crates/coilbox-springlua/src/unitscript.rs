@@ -25,6 +25,7 @@
 //! [`SpringLua`]: crate::SpringLua
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use mlua::{
@@ -163,8 +164,9 @@ pub fn run(
     events: &[ScriptEvent],
     frames: u32,
     unit_def: Option<&serde_json::Value>,
+    includes: &HashMap<String, String>,
 ) -> Timeline {
-    match Run::start(script, name, pieces, unit_def) {
+    match Run::start(script, name, pieces, unit_def, includes) {
         Ok(mut run) => run.play(events, frames.min(MAX_FRAMES)),
         Err(error) => Timeline::failed(pieces, error),
     }
@@ -197,8 +199,9 @@ pub fn probe(
     pieces: &[String],
     callins: &[String],
     unit_def: Option<&serde_json::Value>,
+    includes: &HashMap<String, String>,
 ) -> Probes {
-    let mut run = match Run::start(script, name, pieces, unit_def) {
+    let mut run = match Run::start(script, name, pieces, unit_def, includes) {
         Ok(run) => run,
         Err(error) => {
             return Probes {
@@ -234,13 +237,14 @@ impl Run {
         name: &str,
         pieces: &[String],
         unit_def: Option<&serde_json::Value>,
+        includes: &HashMap<String, String>,
     ) -> Result<Self, String> {
         let sim = Rc::new(RefCell::new(Sim {
             model: Model::new(pieces),
             ..Sim::default()
         }));
         let budget = Rc::new(Cell::new(FRAME_INSTRUCTIONS));
-        let lua = sandbox(&sim, &budget, unit_def)
+        let lua = sandbox(&sim, &budget, unit_def, includes)
             .map_err(|e| format!("could not build the Lua sandbox: {e}"))?;
         let table: Table = lua
             .globals()
@@ -576,6 +580,7 @@ fn sandbox(
     sim: &Rc<RefCell<Sim>>,
     budget: &Rc<Cell<i64>>,
     unit_def: Option<&serde_json::Value>,
+    includes: &HashMap<String, String>,
 ) -> mlua::Result<Lua> {
     let lua = Lua::new_with(
         StdLib::TABLE | StdLib::STRING | StdLib::MATH,
@@ -616,6 +621,7 @@ fn sandbox(
     install_motion(&lua, sim)?;
     install_threading(&lua, sim)?;
     install_stubs(&lua, sim)?;
+    install_include(&lua, sim, includes)?;
     bootstrap(&lua)?;
     install_unit_script_table(&lua)?;
     install_unit_def(&lua, sim, unit_def)?;
@@ -1006,24 +1012,74 @@ fn install_stubs(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         lua.create_function(|_, _: MultiValue| Ok(0))?,
     )?;
 
-    // `include` pulls in another file out of the game archive, which a preview
-    // running off one script in memory has nothing to read. Coilbox's own unit
-    // scripts carry one, for the per-piece collision volumes, and none of what
-    // is behind it moves a piece, so a preview that skipped it silently would
-    // still be right about the animation. Left as a note rather than a failure
-    // for the same reason the sound calls are.
-    let state = Rc::clone(sim);
-    globals.set(
-        "include",
-        lua.create_function(move |_, _: MultiValue| {
-            state
-                .borrow_mut()
-                .model
-                .note("include reads nothing in the preview.".to_string());
-            Ok(())
-        })?,
-    )?;
     Ok(())
+}
+
+/// `include`, over the library files the caller read out of the unit's game.
+///
+/// A game may keep half its animation in a shared library and have every unit
+/// pull it in, which is Beyond All Reason's house style: `coralab.lua` opens
+/// with `include("include/util.lua")` and then starts a thread on a function
+/// that lives in it. Without the file the function is nil and the script stops
+/// on the line that calls it.
+///
+/// The preview has no archive to read, so the files come in with the script,
+/// read at import by whoever had the game open. `sources` is keyed by the name
+/// the script asks for, folded the way the engine's VFS folds a path, because
+/// that name is all a script ever says about a file.
+///
+/// What the framework does, from `MemoizedInclude` in
+/// `LuaGadgets/Gadgets/unit_script.lua`, and what this does with it:
+///
+/// - the chunk runs in the unit's own environment, which here is the sandbox's
+///   globals, so a library defining a global defines it for the script.
+/// - what the chunk returns is what `include` returns, because a game
+///   assigning `common = include("...")` needs the value rather than the
+///   globals.
+/// - a file that will not load is logged and answers nothing. That is a note
+///   here, for the same reason the sound calls are notes: a preview that
+///   stopped would say less than one that carries on and says what it skipped.
+/// - a file that loads and then throws takes the caller down with it, which is
+///   plain Lua and is what the framework does too.
+fn install_include(
+    lua: &Lua,
+    sim: &Rc<RefCell<Sim>>,
+    includes: &HashMap<String, String>,
+) -> mlua::Result<()> {
+    let sources: HashMap<String, String> = includes
+        .iter()
+        .map(|(name, text)| (fold_include(name), text.clone()))
+        .collect();
+    let state = Rc::clone(sim);
+    lua.globals().set(
+        "include",
+        lua.create_function(move |lua, name: String| {
+            let Some(source) = sources.get(&fold_include(&name)) else {
+                state.borrow_mut().model.note(format!(
+                    "include(\"{name}\") read nothing: the preview does not have that file, so whatever it defines is missing."
+                ));
+                return Ok(MultiValue::new());
+            };
+            match lua.load(source.as_str()).set_name(&name).into_function() {
+                Ok(chunk) => chunk.call::<MultiValue>(()),
+                Err(error) => {
+                    state.borrow_mut().model.note(format!(
+                        "include(\"{name}\") could not be loaded: {}",
+                        describe(&error)
+                    ));
+                    Ok(MultiValue::new())
+                }
+            }
+        })?,
+    )
+}
+
+/// One name for a file, whatever the script spelled it as.
+///
+/// Case and separators both, because an archive's paths are folded that way and
+/// a script written on Windows names a file with backslashes.
+fn fold_include(name: &str) -> String {
+    name.trim().replace('\\', "/").to_lowercase()
 }
 
 /// The Lua half of the API: the calls that suspend a thread.

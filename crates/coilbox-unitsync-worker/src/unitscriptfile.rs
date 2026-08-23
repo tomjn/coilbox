@@ -15,7 +15,13 @@
 //! A `.cob` also brings back the `.bos` source beside it where the game ships
 //! one, which most do. That source is text, and coilbox has a BOS to Lua
 //! converter, so it is the way a compiled unit still opens with an animation.
+//!
+//! A Lua script also brings back the library files it `include`s, because a
+//! game that keeps half its animation in a shared library has a script that
+//! does nothing without it. They are read here, where the archive is already
+//! open, so that nothing downstream needs to reach back into the game.
 
+use std::collections::{HashSet, VecDeque};
 use std::path::Path;
 
 use serde::Serialize;
@@ -24,6 +30,21 @@ use crate::ffi::Unitsync;
 
 /// Where the framework looks for a unit's script.
 const SCRIPT_DIR: &str = "scripts";
+
+/// How many levels of `include` are followed.
+///
+/// A library including a library is ordinary and a third level is rare, so this
+/// is past anything the games to hand do. It is also what stops a pair of files
+/// that include each other from never ending, along with the seen-set.
+const INCLUDE_DEPTH: u32 = 4;
+
+/// Most library files read for one script.
+///
+/// A ceiling rather than a size anybody has met: the most any installed game
+/// asks for is two. It is here so a script naming files in a loop, or a scan
+/// that read something it should not have, cannot pull an archive's worth of
+/// Lua into a project.
+const MAX_INCLUDES: usize = 32;
 
 /// The biggest script worth reading, in bytes.
 ///
@@ -57,7 +78,23 @@ pub struct UnitScriptOutput {
     /// reporting either way: a name that resolved to nothing is the useful
     /// half of "this unit has no script here".
     pub declared: Option<String>,
+    /// The library files the script `include`s, and the libraries those
+    /// include. Empty for a `.cob`, which has no such thing.
+    pub includes: Vec<ScriptInclude>,
     pub errors: Vec<String>,
+}
+
+/// One library file a script pulls in.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptInclude {
+    /// The name the script asked for, exactly as written. That is the key the
+    /// preview matches on, because it is all the script ever says.
+    pub name: String,
+    /// The archive member it resolved to, so the caller can say where from.
+    pub member: String,
+    /// The source. Lua, always: `include` reads nothing else.
+    pub text: String,
 }
 
 impl UnitScriptOutput {
@@ -130,6 +167,12 @@ pub fn render(lib: &str, game_archive: &str, unit_name: &str) -> UnitScriptOutpu
             ..Default::default()
         },
     };
+
+    // Only for Lua, because `include` is a Lua call. A `.cob` was compiled with
+    // whatever it needed already inside it.
+    if let Some(text) = out.text.clone() {
+        out.includes = read_includes(&us, handle, &list, &text);
+    }
 
     // Only for a `.cob`. A game shipping Lua has nothing to convert, and the
     // `.bos` beside that Lua is the older source of a script already superseded.
@@ -382,6 +425,87 @@ fn read_script(
     }
 }
 
+/// Every file `text` pulls in with `include`, and everything those pull in.
+///
+/// Read here, at import, because the preview runs one script in memory and has
+/// no archive to reach into later. The same shape the unit definition uses, and
+/// for the same second reason: the game may not be installed the next time the
+/// project is opened.
+///
+/// Breadth first, so the files a script names itself are read before the ones a
+/// library names, and the cap falls on the far end rather than the near one.
+///
+/// A name that resolves to nothing is left out rather than reported. The
+/// preview says so instead, at the point the script asks for it, which is where
+/// it means something: a library that was never there and one that was not read
+/// leave the script equally short of a function, and only the preview knows
+/// whether it was ever asked for.
+fn read_includes(
+    us: &Unitsync,
+    handle: i32,
+    list: &[(String, String)],
+    text: &str,
+) -> Vec<ScriptInclude> {
+    let mut found = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut queue: VecDeque<(String, u32)> = include_names(text)
+        .into_iter()
+        .map(|name| (name, 1))
+        .collect();
+
+    while let Some((name, depth)) = queue.pop_front() {
+        if found.len() >= MAX_INCLUDES {
+            break;
+        }
+        let want = name.trim().replace('\\', "/").to_lowercase();
+        if want.is_empty() || !seen.insert(want.clone()) {
+            continue;
+        }
+        // Exactly where the framework looks and nowhere else: `include` is
+        // `VFS.LoadFile(UNITSCRIPT_DIR .. filename)`, a plain path join with
+        // none of the basename walking a script name gets.
+        let Some(member) = exact(list, &format!("{SCRIPT_DIR}/{want}")) else {
+            continue;
+        };
+        let Some((_, bytes)) = us.read_archive_member(handle, &member, SCRIPT_CAP) else {
+            continue;
+        };
+        let source = String::from_utf8_lossy(&bytes).into_owned();
+        if depth < INCLUDE_DEPTH {
+            queue.extend(include_names(&source).into_iter().map(|n| (n, depth + 1)));
+        }
+        found.push(ScriptInclude {
+            name,
+            member,
+            text: source,
+        });
+    }
+    found
+}
+
+/// The names one file asks for, in the order it asks.
+///
+/// A literal string is all this looks for, because it is all a preview can
+/// follow: a name a script builds at run time is not a name until the script
+/// runs. Every `include` in the games to hand is a literal.
+///
+/// A commented-out `include` is matched too, which costs one file read and
+/// nothing else. Telling the difference means lexing Lua, and reading a file
+/// the script turns out not to want is a much smaller fault than missing one it
+/// does.
+fn include_names(text: &str) -> Vec<String> {
+    // Both quote styles, since Lua has no preference and games use each.
+    let Ok(pattern) = regex::Regex::new(r#"\binclude\s*\(\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)')"#)
+    else {
+        return Vec::new();
+    };
+    pattern
+        .captures_iter(text)
+        .filter_map(|hit| hit.get(1).or_else(|| hit.get(2)))
+        .map(|name| name.as_str().to_string())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -513,6 +637,47 @@ mod tests {
     fn does_not_take_source_from_outside_the_scripts_folder() {
         let list = listing(&["examples/armcom.bos"]);
         assert_eq!(find_bos(&list, "armcom.cob"), None);
+    }
+
+    /// Beyond All Reason's house style, and SplinterFaction's: one line at the
+    /// top of the script naming the game's shared library.
+    #[test]
+    fn finds_the_library_a_script_asks_for() {
+        assert_eq!(
+            include_names(r#"include("include/util.lua")"#),
+            vec!["include/util.lua"]
+        );
+    }
+
+    #[test]
+    fn finds_a_library_named_with_single_quotes_and_spacing() {
+        assert_eq!(
+            include_names("common = include ( 'headers/common_lus.lua' )"),
+            vec!["headers/common_lus.lua"]
+        );
+    }
+
+    #[test]
+    fn finds_every_library_in_the_order_asked_for() {
+        let script = "include(\"a.lua\")\nlocal x = 1\ninclude(\"b.lua\")\n";
+        assert_eq!(include_names(script), vec!["a.lua", "b.lua"]);
+    }
+
+    /// A name built at run time is not a name yet, so there is nothing to read.
+    /// The preview says so when the script asks.
+    #[test]
+    fn finds_nothing_for_a_name_the_script_builds() {
+        assert_eq!(
+            include_names("include(prefix .. '.lua')"),
+            Vec::<String>::new()
+        );
+    }
+
+    /// `include` is the whole word. A game with its own `reinclude` helper is
+    /// not naming a file the framework would load.
+    #[test]
+    fn does_not_match_a_word_that_merely_ends_in_include() {
+        assert_eq!(include_names(r#"reinclude("a.lua")"#), Vec::<String>::new());
     }
 
     /// Run [`declared_script_lua`] against a stand-in for a game's definitions

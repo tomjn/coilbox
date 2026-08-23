@@ -219,6 +219,9 @@ export function GameModelDrawer({
       ...(script ? { script } : {}),
       ...(compiled ? { compiledScript: compiled } : {}),
       ...(adopted?.unitDef ? { gameUnitDef: adopted.unitDef } : {}),
+      ...(adopted && Object.keys(adopted.includes).length > 0
+        ? { gameScriptIncludes: adopted.includes }
+        : {}),
     });
   }
 

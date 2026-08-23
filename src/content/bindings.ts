@@ -1340,7 +1340,21 @@ export interface UnitScriptResult {
   /** What the unit definition asked for, found or not. A name that resolved to
    *  nothing is the useful half of "this unit has no script here". */
   declared: string | null;
+  /** The library files the script pulls in with `include`, and the ones those
+   *  pull in. Empty for a `.cob`, which has no such thing. */
+  includes: UnitScriptInclude[];
   errors: string[];
+}
+
+/** One library file a unit script pulls in. */
+export interface UnitScriptInclude {
+  /** The name the script asked for, as written. That is what the preview
+   *  matches on, because it is all the script ever says about the file. */
+  name: string;
+  /** The archive member it resolved to. */
+  member: string;
+  /** The source. */
+  text: string;
 }
 
 /**

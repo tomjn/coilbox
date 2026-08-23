@@ -80,6 +80,18 @@ export interface AdoptedScript {
    * project is opened.
    */
   unitDef: Record<string, unknown> | null;
+  /**
+   * The library files the script pulls in, keyed by the name it asks for.
+   *
+   * A game may keep half its animation in a shared library, which is Beyond
+   * All Reason's house style. Without the file the script does not lose a
+   * function, it stops on the first line that calls one.
+   *
+   * Read here for the same two reasons the definition is, and keyed by the
+   * name rather than the archive member because the name is all the script
+   * ever says about the file.
+   */
+  includes: Record<string, string>;
   /** What the reader wants to say: a unit with no script, a `.cob` that cannot
    *  be adopted, an archive that would not open. */
   notes: string[];
@@ -96,6 +108,7 @@ const NOTHING: AdoptedScript = {
   converted: null,
   compiled: null,
   unitDef: null,
+  includes: {},
   notes: [],
 };
 
@@ -185,6 +198,12 @@ export async function adoptGameScript(
 
   const notes = [...result.errors];
   const unitDef = parseUnitDef(result.unitDef);
+  // Keyed by the name the script asks for. A later file under a name an
+  // earlier one already used is the same file read twice, because the reader
+  // resolves both against `scripts/`.
+  const includes = Object.fromEntries(
+    result.includes.map((file) => [file.name, file.text]),
+  );
 
   if (!result.member || !result.kind) {
     // Worth naming what was asked for. A definition that names a script the
@@ -221,11 +240,22 @@ export async function adoptGameScript(
         ? { member: result.member, bytes: result.bytes }
         : null,
       unitDef,
+      includes,
       notes,
     };
   }
 
-  const findings = await inferRoles(project, result.text);
+  // With what has just been read put on it. Inference runs the script the same
+  // way the preview does, so it needs the same definition and the same
+  // libraries, and the project it was handed predates both.
+  const findings = await inferRoles(
+    {
+      ...project,
+      gameScriptIncludes: includes,
+      ...(unitDef ? { gameUnitDef: unitDef } : {}),
+    },
+    result.text,
+  );
   if (findings.error) notes.push(findings.error);
 
   return {
@@ -238,6 +268,7 @@ export async function adoptGameScript(
     converted: null,
     compiled: null,
     unitDef,
+    includes,
     notes: [...new Set([...notes, ...findings.notes])],
   };
 }
