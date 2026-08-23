@@ -85,6 +85,9 @@ local placing = nil
 -- Ghosts left after a partial placement, already in world space.
 local remainder = nil
 local messageUntil = 0
+-- What the widget handler stored for us last time. The handler hands it over
+-- when the widget loads, before Initialize runs.
+local saved = nil
 
 --------------------------------------------------------------------------------
 -- GL objects
@@ -477,6 +480,14 @@ end
 -- Callins
 --------------------------------------------------------------------------------
 
+function widget:SetConfigData(data)
+	saved = data
+end
+
+function widget:GetConfigData()
+	return { seen = true }
+end
+
 function widget:Initialize()
 	local err
 	JSON, err = include("json.lua")
@@ -545,6 +556,14 @@ function widget:Initialize()
 		save = saveSelection,
 		rotate = rotate,
 	}
+
+	-- A widget that loads and then draws nothing looks like one that did not
+	-- load. Say how to reach it, and the very first time it ever runs, open
+	-- the panel so there is something to see.
+	Spring.Echo("Coilbox blueprints: /coilbox_blueprints toggles the panel, [ and ] turn a layout while placing.")
+	if not (saved and saved.seen) then
+		open()
+	end
 end
 
 function widget:Shutdown()

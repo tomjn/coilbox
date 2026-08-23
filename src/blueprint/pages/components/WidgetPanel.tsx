@@ -129,7 +129,7 @@ export function WidgetPanel({
           onClick={() =>
             void act(
               () => contentWidgetInstall({ rootPath }),
-              `${verb === "Update" ? "Updated" : "Installed"} the blueprint widget. Press F11 in game to check it is enabled.`,
+              `${verb === "Update" ? "Updated" : "Installed"} the blueprint widget. Its panel opens on its own the first time a match starts.`,
             )
           }
         >
@@ -153,9 +153,10 @@ export function WidgetPanel({
 
       <div className="flex flex-col gap-2 text-xs text-muted-foreground">
         <p>
-          After installing, press F11 in game and check "Coilbox blueprints" is
-          enabled. Which widgets start enabled is the game's choice, kept in a
-          file of its own that coilbox does not edit.
+          The first time it runs, the panel opens on its own so you can see it
+          is there. If it never appears, press F11 in game and check "Coilbox
+          blueprints" is enabled: which widgets start enabled is the game's
+          choice, kept in a file of its own that coilbox does not edit.
         </p>
         <p>
           Open the panel with the <code>coilbox_blueprints</code> action: bind a

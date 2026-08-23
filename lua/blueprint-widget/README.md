@@ -62,6 +62,6 @@ luajit lua/blueprint-widget/tests/place_test.lua
 
 The script runs every suite under `lua/*/tests/`, and CI runs the same script. There is no engine harness: the widget needs a window, and `spring-headless` has no `gl`.
 
-## Not yet checked
+## Handler coverage
 
-Whether a game's own widget handler scans every raw data dir or only the write dir. The engine's stock handler scans every one (`cont/LuaUI/widgets.lua`, `VFS.DirList(WIDGET_DIRNAME, "*.lua", VFS.RAW_ONLY)`). If a game's does not, the widget has to be installed into each engine folder instead.
+The engine's stock widget handler scans every raw data dir (`cont/LuaUI/widgets.lua`, `VFS.DirList(WIDGET_DIRNAME, "*.lua", VFS.RAW_ONLY)`), and a content root install was confirmed live on 2026-08-23: Splinter Faction and Metal Factions, both on the stock handler, found and enabled the widget from `<content root>/LuaUI/Widgets/`. BAR's own handler has still not been checked. If a game's handler does not scan the raw dirs, the widget has to be installed into each engine folder instead.
