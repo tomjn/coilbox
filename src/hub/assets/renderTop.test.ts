@@ -4,11 +4,13 @@ import { describe, expect, it } from "vitest";
 import { toBase64 } from "@/lib/base64";
 import {
   flipRows,
+  PICTURE_VIEWS,
+  pictureCamera,
   RENDER_VERSION,
   topDownCamera,
   unpremultiply,
 } from "./renderTop";
-import { renderFrame } from "./vocabulary";
+import { PICTURE_ANGLES, renderFrame } from "./vocabulary";
 
 /**
  * The render itself needs a GL context, which this runner does not have. What it
@@ -115,6 +117,84 @@ describe("where the camera puts the model", () => {
       expect(Math.abs(at.x)).toBeLessThan(1);
       expect(Math.abs(at.y)).toBeLessThan(1);
     }
+  });
+});
+
+/**
+ * The three angles that are pictures of a unit rather than plans of one
+ * (issue #1951).
+ *
+ * Orientation is worth the most here for the reason the file's header gives: a
+ * front view drawn from behind is a plausible picture of the wrong side, and
+ * nobody reviewing a corpus of them would catch it.
+ */
+describe("where the camera puts the model for a picture", () => {
+  /**
+   * Standing in front of a unit and looking at it, its left hand is on your
+   * right. The model's `+x` is the unit's left, so `+x` has to come out on the
+   * right of the image.
+   */
+  it("puts the unit's left on the right of a front view", () => {
+    const camera = pictureCamera("front", anyBox());
+    expect(ndc(camera, 30, 0, 0).x).toBeGreaterThan(0);
+    expect(ndc(camera, -30, 0, 0).x).toBeLessThan(0);
+  });
+
+  /**
+   * `side` looks from off the unit's left, which is `+x`. Standing there, the
+   * unit's nose points away to your left, so the front comes out on the left.
+   */
+  it("shows the unit facing left from its own left side", () => {
+    const camera = pictureCamera("side", anyBox());
+    expect(ndc(camera, 0, 0, 30).x).toBeLessThan(0);
+    expect(ndc(camera, 0, 0, -30).x).toBeGreaterThan(0);
+  });
+
+  /** The three quarter view is above the unit, so the top of it is nearer the
+   *  camera than the bottom. Being level with it would be a second front view. */
+  it("looks down on the unit from an angle", () => {
+    const camera = pictureCamera("angled", anyBox());
+    expect(camera.position.y).toBeGreaterThan(0);
+    expect(ndc(camera, 0, 30, 0).y).toBeGreaterThan(ndc(camera, 0, 0, 0).y);
+  });
+
+  /**
+   * Framed on the model rather than on the origin, which is the opposite of the
+   * plan's rule. A model that sits entirely off to one side of its own origin
+   * still fills the picture, where a plan of it leans off its squares on purpose.
+   */
+  it("centres the model rather than the unit's origin", () => {
+    const leaning = new THREE.Box3(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(64, 30, 64),
+    );
+    for (const angle of PICTURE_ANGLES) {
+      const camera = pictureCamera(angle, leaning);
+      const middle = ndc(camera, 32, 15, 32);
+      expect(middle.x).toBeCloseTo(0);
+      expect(middle.y).toBeCloseTo(0);
+    }
+  });
+
+  /** A model with nothing in it has no bounds to frame, and a camera at the
+   *  model's own centre would divide by nothing. */
+  it("still points at something for a model with no bounds", () => {
+    for (const angle of PICTURE_ANGLES) {
+      const camera = pictureCamera(angle, new THREE.Box3());
+      expect(camera.position.length()).toBeGreaterThan(0);
+      expect(Number.isFinite(camera.position.x)).toBe(true);
+    }
+  });
+
+  /**
+   * An angle the vocabulary lists and this file has no direction for would be
+   * drawn from wherever the fallback points, which is a picture named after an
+   * angle it was not taken at.
+   */
+  it("has a camera direction for every angle that is a picture", () => {
+    expect(Object.keys(PICTURE_VIEWS).sort()).toEqual(
+      [...PICTURE_ANGLES].sort(),
+    );
   });
 });
 

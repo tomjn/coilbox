@@ -1562,8 +1562,14 @@ export interface UnitRenderKey {
 }
 
 export interface UnitRenderKeysResult {
-  /** Keyed by the unit's internal name, as asked for. */
-  keys: Record<string, UnitRenderKey>;
+  /**
+   * Keyed by the unit's internal name, as asked for, then by the variant.
+   *
+   * Two maps rather than one because a unit has a key per angle (issue #1951),
+   * and every one of them comes out of a single mount: what the archive is read
+   * for is the model digest, which all of a unit's angles share.
+   */
+  keys: Record<string, Record<string, UnitRenderKey>>;
   /** The name the game archive declares for itself, which is what a hub row's
    *  `source_archive` holds. One per batch, because a batch is one game. Here so
    *  the encode can be handed the whole of what it would otherwise mount to work
@@ -1584,16 +1590,19 @@ export interface UnitRenderKeysResult {
  * and until this existed the only route to one was to draw the picture and encode
  * it, which is the cost asking first exists to avoid.
  *
- * One call is one archive mount however many units it names. Ask for the whole
- * batch at once rather than looping: twenty units one at a time is twenty mounts,
- * a second or more each on a game like Beyond All Reason.
+ * One call is one archive mount however many units it names, and however many
+ * angles it asks for. Ask for the whole batch at once rather than looping:
+ * twenty units one at a time is twenty mounts, a second or more each on a game
+ * like Beyond All Reason.
  */
 export const unitsyncUnitRenderKeys = defineCommand<
   {
     enginePath: string;
     dataDir: string;
     gameArchive: string;
-    angle: string;
+    /** The angles to key, without the `render:` prefix. Every angle the
+     *  vocabulary lists when it is left off, since they share the mount. */
+    angles?: string[];
     rendererVersion: number;
     units: UnitRenderKeyRequest[];
   },

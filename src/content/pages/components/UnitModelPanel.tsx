@@ -12,7 +12,7 @@ import { Button } from "@picoframe/frame";
 import { X } from "lucide-react";
 import { useState } from "react";
 
-import { RENDER_VERSION, renderTopDown } from "@/hub/assets/renderTop";
+import { RENDER_VERSION, renderUnit } from "@/hub/assets/renderTop";
 import { RENDER_ANGLES, renderFrame } from "@/hub/assets/vocabulary";
 import { toBase64 } from "@/lib/base64";
 import type {
@@ -218,7 +218,12 @@ function HubRender({
     setBusy(true);
     setResult(null);
     try {
-      const drawn = await renderTopDown(model, footprintX, footprintZ);
+      const drawn = await renderUnit(
+        RENDER_ANGLES[0],
+        model,
+        footprintX,
+        footprintZ,
+      );
       setResult(
         await unitsyncUnitRender({
           enginePath,
