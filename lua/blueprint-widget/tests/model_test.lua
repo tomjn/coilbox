@@ -191,11 +191,43 @@ nothing.open = true
 nothing.tab = "all"
 check("an empty library says where to get blueprints", #textsWith(MODEL.layout(nothing, measure, VIEW), "coilbox") >= 1)
 
--- a closed panel draws nothing
+-- a closed panel leaves an opener on the edge
 state.open = false
 local LC = MODEL.layout(state, measure, VIEW)
-check("a closed panel has no rects, texts or hits", #LC.rects == 0 and #LC.texts == 0 and #LC.hits == 0)
+check("a closed panel shows only the opener", #LC.rects == 1 and LC.rects[1].kind == "opener", show(LC.rects))
+check("the opener hugs the right edge, vertically centred", (function()
+	local r = LC.rects[1]
+	local centred = math.abs((r.y - 0) - (VIEW.h - r.y - r.h)) <= 1
+	return r.x + r.w == VIEW.w and centred
+end)(), show(LC.rects[1]))
+check("the opener names the panel", #textsWith(LC, "Blueprints") == 1)
+check("clicking the opener toggles", #LC.hits == 1 and LC.hits[1].action.kind == "toggle")
+check("hit finds the opener", MODEL.hit(LC, LC.rects[1].x + 2, LC.rects[1].y + 2) ~= nil and MODEL.hit(LC, LC.rects[1].x + 2, LC.rects[1].y + 2).kind == "toggle")
 state.open = true
+
+-- scale and placement
+check("the default scale is three", state.scale == 3)
+check("the panel is vertically centred", (function()
+	local p = L.rects[1]
+	return math.abs(p.y - (VIEW.h - p.y - p.h)) <= 2
+end)(), show(L.rects[1]))
+check("scale multiplies the panel's sizes", (function()
+	local small = MODEL.new()
+	MODEL.refresh(small, ENTRIES, PLACE, game, CAN)
+	small.open = true
+	small.scale = 1
+	local LS = MODEL.layout(small, measure, VIEW)
+	local p1, p3 = LS.rects[1], L.rects[1]
+	return p3.w == p1.w * 3 and math.abs(p3.h - p1.h * 3) <= 3
+end)())
+check("text sizes scale with the panel", (function()
+	for _, t in ipairs(L.texts) do
+		if t.size >= MODEL.FONT * 3 then
+			return true
+		end
+	end
+	return false
+end)(), show(L.texts[1]))
 
 --------------------------------------------------------------------------------
 -- scrolling
@@ -210,10 +242,15 @@ MODEL.refresh(tall, many, PLACE, game, CAN)
 tall.open = true
 local LT = MODEL.layout(tall, measure, VIEW)
 local shown = #hitsOf(LT, "place")
-check("rows past the panel's height are not drawn", shown < 30 and shown >= 8, shown)
+check("rows past the panel's height are not drawn", shown < 30 and shown >= 3, shown)
+check("the shown rows fit the view", (function()
+	local p = LT.rects[1]
+	return p.y >= 0 and p.y + p.h <= VIEW.h
+end)(), show(LT.rects[1]))
 check("the first row is Entry 1 before scrolling", hitsOf(LT, "place")[1].action.key == "library:1")
 MODEL.scroll(tall, 3)
 check("scroll moves the window down", hitsOf(MODEL.layout(tall, measure, VIEW), "place")[1].action.key == "library:4")
+MODEL.scroll(tall, -3)
 MODEL.scroll(tall, -100)
 check("scroll clamps at the top", tall.scroll == 0)
 MODEL.scroll(tall, 1000)

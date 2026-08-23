@@ -21,7 +21,10 @@ M.PIC = 28
 M.FONT = 13
 M.SMALL = 11
 M.MARGIN = 16
-M.TOP_GAP = 120
+
+--- How many times the base sizes the panel is drawn at. The engine hands
+-- physical pixels, so 1 is small on any modern screen.
+M.SCALE = 3
 
 local C = {
 	panel = { 0.06, 0.07, 0.09, 0.9 },
@@ -42,7 +45,7 @@ local C = {
 }
 M.COLORS = C
 
-local TABS = { "now", "partly", "all" }
+local TABS_LIST = { "now", "partly", "all" }
 local TAB_LABELS = { now = "Now", partly = "Partly", all = "All" }
 local SOURCE_TAGS = { library = "coilbox", spool = "saved", bar = "BAR" }
 
@@ -51,6 +54,7 @@ function M.new()
 	return {
 		open = false,
 		tab = "now",
+		scale = M.SCALE,
 		scroll = 0,
 		items = {},
 		counts = { now = 0, partly = 0, all = 0 },
@@ -121,10 +125,11 @@ function M.visible(state)
 	return out
 end
 
---- Move the row window, clamped so the last row stays reachable.
+--- Move the row window, clamped so the last row stays reachable. The window
+-- is however many rows the last layout could fit, which the layout records.
 function M.scroll(state, delta)
 	local total = #M.visible(state)
-	local most = math.max(0, total - M.MAX_ROWS)
+	local most = math.max(0, total - (state.rowsShown or M.MAX_ROWS))
 	local next = math.max(0, math.min(most, state.scroll + delta))
 	if next ~= state.scroll then
 		state.scroll = next
@@ -206,11 +211,11 @@ end
 --   { x, y, w, h, defID, row }, each hit { x, y, w, h, action }.
 function M.layout(state, measure, view)
 	local L = { rects = {}, texts = {}, pics = {}, hits = {} }
-	if not state.open then
-		return L
-	end
 	local rects, texts, pics, hits = L.rects, L.texts, L.pics, L.hits
-	local PAD, W = M.PAD, M.WIDTH
+	local S = state.scale or M.SCALE
+	local PAD, W = M.PAD * S, M.WIDTH * S
+	local ROW, HEADER, TABS, LINE, FOOTER = M.ROW * S, M.HEADER * S, M.TABS * S, M.LINE * S, M.FOOTER * S
+	local PIC, FONT, SMALL, MARGIN = M.PIC * S, M.FONT * S, M.SMALL * S, M.MARGIN * S
 
 	local function rect(x, y, w, h, color, kind, extra)
 		local r = { x = x, y = y, w = w, h = h, color = color, kind = kind }
@@ -230,78 +235,96 @@ function M.layout(state, measure, view)
 	end
 	local function button(x, y, w, h, label, action, color)
 		rect(x, y, w, h, color or C.button, "button")
-		local tw = measure(label, M.SMALL)
-		text(x + (w - tw) / 2, y + (h - M.SMALL) / 2, M.SMALL, label)
+		local tw = measure(label, SMALL)
+		text(x + (w - tw) / 2, y + (h - SMALL) / 2, SMALL, label)
 		hit(x, y, w, h, action)
 	end
 
-	local visible = M.visible(state)
-	local first = state.scroll + 1
-	local last = math.min(#visible, state.scroll + M.MAX_ROWS)
-	local rowsShown = math.max(0, last - first + 1)
+	-- Closed, the panel is a tab on the edge saying where it went.
+	if not state.open then
+		local label = "Blueprints"
+		local w = measure(label, SMALL) + 2 * PAD
+		local h = LINE
+		local x = view.w - w
+		local y = math.floor((view.h - h) / 2)
+		rect(x, y, w, h, C.header, "opener")
+		text(x + PAD, y + (h - SMALL) / 2, SMALL, label)
+		hit(x, y, w, h, { kind = "toggle" })
+		return L
+	end
 
-	local height = M.HEADER + M.TABS + M.FOOTER + PAD
+	local visible = M.visible(state)
+
+	-- The panel's fixed parts, and however many rows fit under them in the
+	-- view. Without the clamp a tall library would push the panel off screen.
+	local chrome = HEADER + TABS + FOOTER + PAD
 	if state.placing then
-		height = height + M.LINE
+		chrome = chrome + LINE
 	end
 	if state.remainder then
-		height = height + M.LINE
+		chrome = chrome + LINE
 	end
-	height = height + (rowsShown > 0 and rowsShown * M.ROW or M.ROW)
 	if state.message then
-		height = height + M.LINE
+		chrome = chrome + LINE
 	end
+	local fit = math.max(1, math.floor((view.h - 2 * PAD - chrome) / ROW))
+	local maxRows = math.min(M.MAX_ROWS, fit)
+	state.rowsShown = maxRows
 
-	local px = view.w - W - M.MARGIN
-	local top = view.h - M.TOP_GAP
-	local py = math.max(PAD, top - height)
-	top = py + height
+	local first = state.scroll + 1
+	local last = math.min(#visible, state.scroll + maxRows)
+	local rowsShown = math.max(0, last - first + 1)
+	local height = chrome + (rowsShown > 0 and rowsShown * ROW or ROW)
+
+	local px = view.w - W - MARGIN
+	local py = math.max(PAD, math.floor((view.h - height) / 2))
+	local top = py + height
 	local panel = rect(px, py, W, height, C.panel, "panel")
 
 	-- header
-	local y = top - M.HEADER
-	rect(px, y, W, M.HEADER, C.header, "header")
-	text(px + PAD, y + (M.HEADER - M.FONT) / 2, M.FONT, "Blueprints")
-	button(px + W - M.HEADER + 2, y + 2, M.HEADER - 4, M.HEADER - 4, "x", { kind = "close" })
+	local y = top - HEADER
+	rect(px, y, W, HEADER, C.header, "header")
+	text(px + PAD, y + (HEADER - FONT) / 2, FONT, "Blueprints")
+	button(px + W - HEADER + 2 * S, y + 2 * S, HEADER - 4 * S, HEADER - 4 * S, "x", { kind = "close" })
 
 	-- tabs
-	y = y - M.TABS
-	local tabW = W / #TABS
-	for i, tab in ipairs(TABS) do
+	y = y - TABS
+	local tabW = W / #TABS_LIST
+	for i, tab in ipairs(TABS_LIST) do
 		local tx = px + (i - 1) * tabW
 		local active = tab == state.tab
-		rect(tx, y, tabW, M.TABS, active and C.tabActive or C.tab, "tab", { tab = tab, active = active })
+		rect(tx, y, tabW, TABS, active and C.tabActive or C.tab, "tab", { tab = tab, active = active })
 		local label = TAB_LABELS[tab] .. " " .. state.counts[tab]
-		text(tx + (tabW - measure(label, M.SMALL)) / 2, y + (M.TABS - M.SMALL) / 2, M.SMALL, label)
-		hit(tx, y, tabW, M.TABS, { kind = "tab", tab = tab })
+		text(tx + (tabW - measure(label, SMALL)) / 2, y + (TABS - SMALL) / 2, SMALL, label)
+		hit(tx, y, tabW, TABS, { kind = "tab", tab = tab })
 	end
 
 	-- placing
 	if state.placing then
-		y = y - M.LINE
+		y = y - LINE
 		local label = "Placing " .. state.placing.name .. ", turned " .. (state.placing.rotation * 90)
-		text(px + PAD, y + (M.LINE - M.SMALL) / 2, M.SMALL, M.truncate(label, W - 2 * PAD - 70, measure, M.SMALL), C.warn)
-		button(px + W - PAD - 60, y + 3, 60, M.LINE - 6, "Cancel", { kind = "cancel" })
+		text(px + PAD, y + (LINE - SMALL) / 2, SMALL, M.truncate(label, W - 2 * PAD - 70 * S, measure, SMALL), C.warn)
+		button(px + W - PAD - 60 * S, y + 3 * S, 60 * S, LINE - 6 * S, "Cancel", { kind = "cancel" })
 	end
 
 	-- remainder
 	if state.remainder then
-		y = y - M.LINE
+		y = y - LINE
 		local n = state.remainder.count
-		text(px + PAD, y + (M.LINE - M.SMALL) / 2, M.SMALL, n .. " left to build", C.warn)
-		button(px + W - PAD - 130, y + 3, 60, M.LINE - 6, "Place", { kind = "remainder" })
-		button(px + W - PAD - 64, y + 3, 64, M.LINE - 6, "Dismiss", { kind = "dismiss" })
+		text(px + PAD, y + (LINE - SMALL) / 2, SMALL, n .. " left to build", C.warn)
+		button(px + W - PAD - 130 * S, y + 3 * S, 60 * S, LINE - 6 * S, "Place", { kind = "remainder" })
+		button(px + W - PAD - 64 * S, y + 3 * S, 64 * S, LINE - 6 * S, "Dismiss", { kind = "dismiss" })
 	end
 
 	-- rows
 	if rowsShown == 0 then
-		y = y - M.ROW
-		text(px + PAD, y + (M.ROW - M.SMALL) / 2, M.SMALL, M.truncate(emptyText(state), W - 2 * PAD, measure, M.SMALL), C.dim)
+		y = y - ROW
+		text(px + PAD, y + (ROW - SMALL) / 2, SMALL, M.truncate(emptyText(state), W - 2 * PAD, measure, SMALL), C.dim)
 	end
-	local picsW = 5 * (M.PIC + 2)
+	local picsW = 5 * (PIC + 2 * S)
 	for i = first, last do
 		local item = visible[i]
-		y = y - M.ROW
+		y = y - ROW
 		local active = state.placing ~= nil and state.placing.key == item.entry.key
 		local color = C.row
 		if active then
@@ -311,44 +334,44 @@ function M.layout(state, measure, view)
 		elseif i % 2 == 0 then
 			color = C.rowAlt
 		end
-		rect(px, y, W, M.ROW, color, "row", { key = item.entry.key, active = active })
+		rect(px, y, W, ROW, color, "row", { key = item.entry.key, active = active })
 		local nameColor = item.tab == "never" and C.faint or C.text
 		local nameW = W - 2 * PAD - picsW - PAD
-		text(px + PAD, y + M.ROW - PAD - M.FONT, M.FONT, M.truncate(item.entry.name, nameW, measure, M.FONT), nameColor)
-		text(px + PAD, y + PAD - 2, M.SMALL, M.truncate(rowDetail(item), nameW, measure, M.SMALL), C.dim)
+		text(px + PAD, y + ROW - PAD - FONT, FONT, M.truncate(item.entry.name, nameW, measure, FONT), nameColor)
+		text(px + PAD, y + PAD - 2 * S, SMALL, M.truncate(rowDetail(item), nameW, measure, SMALL), C.dim)
 		local defIDs = rowPics(item)
 		for p, defID in ipairs(defIDs) do
 			pics[#pics + 1] = {
-				x = px + W - PAD - (#defIDs - p + 1) * (M.PIC + 2),
-				y = y + (M.ROW - M.PIC) / 2,
-				w = M.PIC,
-				h = M.PIC,
+				x = px + W - PAD - (#defIDs - p + 1) * (PIC + 2 * S),
+				y = y + (ROW - PIC) / 2,
+				w = PIC,
+				h = PIC,
 				defID = defID,
 				row = i,
 			}
 		end
-		hit(px, y, W, M.ROW, { kind = "place", key = item.entry.key })
+		hit(px, y, W, ROW, { kind = "place", key = item.entry.key })
 	end
 
 	-- scrollbar
 	if #visible > rowsShown and rowsShown > 0 then
-		local trackH = rowsShown * M.ROW
-		local thumbH = math.max(12, trackH * rowsShown / #visible)
+		local trackH = rowsShown * ROW
+		local thumbH = math.max(12 * S, trackH * rowsShown / #visible)
 		local thumbY = y + trackH - thumbH - (trackH - thumbH) * (state.scroll / (#visible - rowsShown))
-		rect(px + W - 4, thumbY, 3, thumbH, C.scroll, "scroll")
+		rect(px + W - 4 * S, thumbY, 3 * S, thumbH, C.scroll, "scroll")
 	end
 
 	-- message
 	if state.message then
-		y = y - M.LINE
-		text(px + PAD, y + (M.LINE - M.SMALL) / 2, M.SMALL, M.truncate(state.message, W - 2 * PAD, measure, M.SMALL), C.warn)
+		y = y - LINE
+		text(px + PAD, y + (LINE - SMALL) / 2, SMALL, M.truncate(state.message, W - 2 * PAD, measure, SMALL), C.warn)
 	end
 
 	-- footer
 	y = py
-	button(px + PAD, y + PAD, 120, M.FOOTER - PAD, "Save selection", { kind = "save" })
+	button(px + PAD, y + PAD, 120 * S, FOOTER - PAD, "Save selection", { kind = "save" })
 	local hint = "[ ] turn, right click cancels"
-	text(px + W - PAD - measure(hint, M.SMALL), y + (M.FOOTER - M.SMALL) / 2 + PAD / 2, M.SMALL, hint, C.faint)
+	text(px + W - PAD - measure(hint, SMALL), y + (FOOTER - SMALL) / 2 + PAD / 2, SMALL, hint, C.faint)
 
 	panel.h = top - py
 	return L
@@ -364,7 +387,7 @@ function M.hit(L, x, y)
 		end
 	end
 	local p = L.rects[1]
-	if p and x >= p.x and x < p.x + p.w and y >= p.y and y < p.y + p.h then
+	if p and p.kind == "panel" and x >= p.x and x < p.x + p.w and y >= p.y and y < p.y + p.h then
 		return { kind = "panel" }
 	end
 	return nil

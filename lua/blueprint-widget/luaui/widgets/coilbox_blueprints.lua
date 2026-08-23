@@ -455,7 +455,9 @@ end
 
 local function act(action)
 	local kind = action.kind
-	if kind == "close" then
+	if kind == "toggle" then
+		toggle()
+	elseif kind == "close" then
 		close()
 	elseif kind == "tab" then
 		MODEL.setTab(panel, action.tab)
@@ -609,7 +611,7 @@ function widget:IsAbove(x, y)
 end
 
 function widget:MousePress(x, y, button)
-	if layout and panel.open then
+	if layout then
 		local action = MODEL.hit(layout, x, y)
 		if action then
 			if button == 1 then
@@ -683,7 +685,7 @@ end
 
 function widget:DrawScreen()
 	relayout()
-	if not panel.open or not layout then
+	if not layout or #layout.rects == 0 then
 		return
 	end
 	gl.Blending(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)
