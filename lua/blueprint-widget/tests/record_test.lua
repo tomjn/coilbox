@@ -35,7 +35,7 @@ check("record anchors at the lowest x and z, floored to the grid", same(entry.bu
 check("record keeps each building's facing", entry.buildings[1].facing == 1 and entry.buildings[3].facing == 3)
 check("record names the base after the map and the spool count", entry.name == "Base on Test Map v2 3", entry.name)
 check("record binds the game", same(entry.game, { name = "Test Game 1.0", shortname = "TEST" }), show(entry.game))
-check("record stamps the map and the time", entry.map == "Test Map v2" and entry.recordedAt == 5000)
+check("record says which map it was drawn on, and when", entry.designedFor == "Test Map v2" and entry.recordedAt == 5000)
 check("record is not ordered", entry.ordered == false)
 check(
 	"record writes footprints in build squares, keyed by lowercased def",

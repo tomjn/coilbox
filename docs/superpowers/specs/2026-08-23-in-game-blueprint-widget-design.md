@@ -54,7 +54,7 @@ A `version` other than 1 makes the widget log once and show nothing from that fi
     {
       "name": "Base on Supreme Isthmus 2",
       "game": { "name": "...", "shortname": "..." },
-      "map": "Supreme Isthmus v1.9",
+      "designedFor": "Supreme Isthmus v1.9",
       "recordedAt": 1787000000,
       "ordered": false,
       "buildings": [ ... ],
@@ -64,7 +64,7 @@ A `version` other than 1 makes the widget log once and show nothing from that fi
 }
 ```
 
-No `id`. Coilbox assigns one when it collects, and then empties the file. `recordedAt` is `os.time()` and only there so a player can tell two saves apart if coilbox has not run yet. `footprints` are filled from `UnitDefs` (`xsize / 2`, `zsize / 2`) so coilbox's importer has them without running unitsync.
+No `id`. Coilbox assigns one when it collects, and then empties the file. `recordedAt` is `os.time()` and only there so a player can tell two saves apart if coilbox has not run yet. `designedFor` is `Game.mapName`, the payload's own field for the map a layout was drawn on, so the entry is a `BlueprintPayload` plus `recordedAt` and needs no translation. `footprints` are filled from `UnitDefs` (`xsize / 2`, `zsize / 2`) so coilbox's importer has them without running unitsync.
 
 The widget reads the spool back on load and lists its entries alongside the library, so a saved base is placeable in the same match and survives a restart until coilbox collects it.
 

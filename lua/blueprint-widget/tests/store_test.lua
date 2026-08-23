@@ -67,8 +67,8 @@ check("building without an offset is dropped, facing is wrapped", #badBuilding =
 local SPOOL = json.encode({
 	version = 1,
 	blueprints = {
-		{ name = "Base on Map 1", recordedAt = 100, map = "Map", buildings = { { def = "armsolar", offset = { x = 0, z = 0 }, facing = 0 } } },
-		{ name = "Base on Map 2", recordedAt = 200, map = "Map", buildings = {} },
+		{ name = "Base on Map 1", recordedAt = 100, designedFor = "Map", buildings = { { def = "armsolar", offset = { x = 0, z = 0 }, facing = 0 } } },
+		{ name = "Base on Map 2", recordedAt = 200, designedFor = "Map", buildings = {} },
 	},
 })
 local spooled = STORE.parseSpool(SPOOL)
@@ -195,7 +195,7 @@ check("store:find of an unknown key is nil", store:find("library:one") == nil)
 local entry = {
 	name = "Base on Map 3",
 	game = { name = "Test Game 1.0", shortname = "TEST" },
-	map = "Map",
+	designedFor = "Map",
 	recordedAt = 1000,
 	ordered = false,
 	buildings = { { def = "armsolar", offset = { x = 0, z = 0 }, facing = 2 } },

@@ -20,7 +20,8 @@ end
 
 --- The selected buildings as a spool entry.
 -- @param opts table spoolCount (how many entries the spool already holds, for
---   the name), now (seconds, for recordedAt)
+--   the name), now (seconds, for recordedAt). designedFor is the map, the
+--   same field the library uses for the map a layout was drawn on.
 -- @return table? entry, or nil and a message when there is nothing to record
 function M.selection(opts)
 	local selected = Spring.GetSelectedUnits()
@@ -54,7 +55,7 @@ function M.selection(opts)
 	return {
 		name = "Base on " .. Game.mapName .. " " .. (opts.spoolCount + 1),
 		game = { name = Game.gameName, shortname = Game.gameShortName },
-		map = Game.mapName,
+		designedFor = Game.mapName,
 		recordedAt = opts.now,
 		ordered = false,
 		buildings = buildings,

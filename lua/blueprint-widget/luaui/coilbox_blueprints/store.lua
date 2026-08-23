@@ -322,7 +322,7 @@ function Store:readSpoolText()
 end
 
 --- Append a recorded entry to the spool.
--- @param entry table name, game, map, recordedAt, ordered, buildings, footprints
+-- @param entry table name, game, designedFor, recordedAt, ordered, buildings, footprints
 -- @return boolean ok, string? message
 function Store:append(entry)
 	if self.io == nil then
