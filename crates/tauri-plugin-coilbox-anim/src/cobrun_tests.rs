@@ -609,13 +609,25 @@ mod what_it_says_about_itself {
         assert!(timeline.error.is_some());
     }
 
+    /// A word that is not an opcode means this thread has walked into data, so
+    /// the thread stops. The rest of the unit is unaffected and carries on, the
+    /// way the Lua runtime treats a thread that throws.
     #[test]
-    fn stops_on_an_instruction_word_that_is_not_an_opcode() {
+    fn stops_the_thread_that_meets_a_word_that_is_not_an_opcode() {
         let code = vec![0xDEAD_BEEF, op("RETURN")];
 
         let timeline = play(&create_only(code), 3);
 
-        assert!(timeline.error.as_deref().unwrap_or("").contains("deadbeef"));
+        assert_eq!(timeline.error, None);
+        assert_eq!(timeline.frames.len(), 3);
+        assert!(
+            timeline
+                .warnings
+                .iter()
+                .any(|note| note.contains("deadbeef")),
+            "{:?}",
+            timeline.warnings
+        );
     }
 
     /// The preview has no world, so a script asking it about one is told that

@@ -239,6 +239,11 @@ struct Run {
     sim: Rc<RefCell<Sim>>,
     /// Instructions left in this frame, counted down by the VM's hook.
     budget: Rc<Cell<i64>>,
+    /// Set when something has gone wrong with the run itself rather than with
+    /// one of its threads, which is the difference between stopping and
+    /// carrying on. Shared with the VM's hook, which sets it when a frame's
+    /// instructions run out.
+    fatal: Rc<Cell<bool>>,
     script: Table,
     runners: Vec<Runner>,
     frame: u32,
@@ -260,7 +265,8 @@ impl Run {
             ..Sim::default()
         }));
         let budget = Rc::new(Cell::new(FRAME_INSTRUCTIONS));
-        let lua = sandbox(&sim, &budget, unit_def, includes)
+        let fatal = Rc::new(Cell::new(false));
+        let lua = sandbox(&sim, &budget, &fatal, unit_def, includes)
             .map_err(|e| format!("could not build the Lua sandbox: {e}"))?;
         let table: Table = lua
             .globals()
@@ -276,6 +282,7 @@ impl Run {
             lua,
             sim,
             budget,
+            fatal,
             script: table,
             runners: Vec::new(),
             frame: 0,
@@ -365,6 +372,7 @@ impl Run {
     /// a `Sleep` cost time rather than nothing.
     fn step(&mut self, events: &[ScriptEvent]) -> Result<(), String> {
         self.budget.set(FRAME_INSTRUCTIONS);
+        self.fatal.set(false);
         {
             let mut sim = self.sim.borrow_mut();
             sim.frame = self.frame;
@@ -427,6 +435,9 @@ impl Run {
         origin: String,
     ) -> Result<(), String> {
         if self.runners.iter().filter(|r| !r.is_dead()).count() >= MAX_THREADS {
+            // The ceiling is what stops a script that starts a thread per frame
+            // from hanging, so carrying on past it is the hang it prevents.
+            self.fatal.set(true);
             return Err(format!(
                 "this script has more than {MAX_THREADS} threads running at once"
             ));
@@ -465,7 +476,35 @@ impl Run {
         })
     }
 
+    /// Resume one thread, and decide what its failing means.
+    ///
+    /// A thread that throws takes itself down and nothing else. That is what
+    /// the engine does: `CLuaUnitScript` logs the error and the unit carries
+    /// on, because a unit is several threads and one of them being wrong is not
+    /// the others being wrong. Beyond All Reason's commander runs a smoke
+    /// thread, an idle thread and a walk thread at once, so a preview that
+    /// stopped at the first bad line would show none of the unit for the sake
+    /// of one part of it.
+    ///
+    /// The exception is running out of instructions, which is not this thread
+    /// being wrong but the run being unable to continue: the budget is spent
+    /// for the whole frame, so every thread after it would fail too and the
+    /// preview would fill with notes about threads that were fine.
     fn resume(&mut self, index: usize) -> Result<(), String> {
+        match self.step_thread(index) {
+            Ok(()) => Ok(()),
+            Err(error) if self.fatal.get() => Err(error),
+            Err(error) => {
+                self.runners[index].state = State::Dead;
+                self.sim.borrow_mut().model.note(format!(
+                    "{error}. That thread stopped and the rest of the unit carried on."
+                ));
+                Ok(())
+            }
+        }
+    }
+
+    fn step_thread(&mut self, index: usize) -> Result<(), String> {
         let args = std::mem::take(&mut self.runners[index].args);
         // Dead before the resume, so a thread that finishes without yielding is
         // not left looking runnable.
@@ -599,6 +638,7 @@ fn describe(error: &mlua::Error) -> String {
 fn sandbox(
     sim: &Rc<RefCell<Sim>>,
     budget: &Rc<Cell<i64>>,
+    fatal: &Rc<Cell<bool>>,
     unit_def: Option<&serde_json::Value>,
     includes: &HashMap<String, String>,
 ) -> mlua::Result<Lua> {
@@ -611,12 +651,14 @@ fn sandbox(
     // thread and every call-in is a thread. Set before any of them exist, since
     // only threads made afterwards pick it up.
     let left = Rc::clone(budget);
+    let spent = Rc::clone(fatal);
     lua.set_global_hook(
         mlua::HookTriggers::new().every_nth_instruction(HOOK_EVERY),
         move |_lua, _debug| {
             let remaining = left.get() - i64::from(HOOK_EVERY);
             left.set(remaining);
             if remaining < 0 {
+                spent.set(true);
                 return Err(mlua::Error::RuntimeError(
                     "this frame ran too long: a thread is looping without a Sleep".into(),
                 ));

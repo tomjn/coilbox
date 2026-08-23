@@ -259,6 +259,10 @@ struct Run {
     /// The clock a `SLEEP` is measured against, in milliseconds.
     time: i64,
     budget: i64,
+    /// Set when something has gone wrong with the run itself rather than with
+    /// one of its threads, which is the difference between stopping and
+    /// carrying on.
+    fatal: bool,
     /// State for the deterministic `RAND`. A preview that shuffled itself every
     /// time it was asked would be impossible to look at.
     rng: u64,
@@ -288,6 +292,7 @@ impl Run {
             frame: 0,
             time: 0,
             budget: FRAME_INSTRUCTIONS,
+            fatal: false,
             rng: 0x2545_F491_4F6C_DD1D,
             set_values: HashMap::new(),
         })
@@ -379,6 +384,9 @@ impl Run {
 
     fn add(&mut self, thread: Thread) -> Result<(), String> {
         if self.alive() >= MAX_THREADS {
+            // The ceiling is what stops a script that starts a thread per frame
+            // from hanging, so carrying on past it is the hang it prevents.
+            self.fatal = true;
             return Err(format!(
                 "this script has more than {MAX_THREADS} threads running at once"
             ));
@@ -404,7 +412,7 @@ impl Run {
                 self.threads.retain(|t| !matches!(t.state, State::Dead));
                 return Ok(());
             };
-            self.tick_thread(index)?;
+            self.step_thread(index)?;
             for thread in std::mem::take(&mut self.queued) {
                 self.add(thread)?;
             }
@@ -453,12 +461,36 @@ impl Run {
         )
     }
 
+    /// Run one thread, and decide what its failing means.
+    ///
+    /// A thread that walks into something it cannot execute takes itself down
+    /// and nothing else, the way the Lua runtime treats a thread that throws
+    /// and the way the engine treats both. A unit is several threads and one
+    /// of them being wrong is not the others being wrong.
+    ///
+    /// Running out of instructions is the exception, because the budget is
+    /// spent for the whole frame rather than by this thread alone.
+    fn step_thread(&mut self, index: usize) -> Result<(), String> {
+        match self.tick_thread(index) {
+            Ok(()) => Ok(()),
+            Err(error) if self.fatal => Err(error),
+            Err(error) => {
+                self.threads[index].state = State::Dead;
+                self.model.note(format!(
+                    "{error}. That thread stopped and the rest of the unit carried on."
+                ));
+                Ok(())
+            }
+        }
+    }
+
     /// Run one thread until it sleeps, waits or dies.
     fn tick_thread(&mut self, index: usize) -> Result<(), String> {
         self.threads[index].state = State::Ready;
         while matches!(self.threads[index].state, State::Ready) {
             self.budget -= 1;
             if self.budget < 0 {
+                self.fatal = true;
                 return Err(format!(
                     "{}: this frame ran too long, so a thread is looping without a sleep",
                     self.threads[index].origin

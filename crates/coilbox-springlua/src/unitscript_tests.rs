@@ -512,8 +512,12 @@ fn a_syntax_error_says_where() {
     assert!(error.contains("test.lua"), "{error}");
 }
 
+/// The engine logs a thread that throws and the unit carries on, because a
+/// unit is several threads and one of them being wrong is not the others being
+/// wrong. BAR's commander runs a smoke thread, an idle thread and a walk thread
+/// at once.
 #[test]
-fn a_throwing_call_in_names_it_and_keeps_the_frames_before_it() {
+fn a_throwing_call_in_stops_that_thread_and_nothing_else() {
     let timeline = run(
         r#"
         local turret = piece("turret")
@@ -540,9 +544,28 @@ fn a_throwing_call_in_names_it_and_keeps_the_frames_before_it() {
         None,
         &no_includes(),
     );
-    let error = timeline.error.expect("a throwing call-in fails");
-    assert!(error.contains("StartMoving"), "{error}");
-    assert_eq!(timeline.frames.len(), 5);
+    assert_eq!(timeline.error, None);
+    assert_eq!(timeline.frames.len(), 30);
+    // The turn the working call-in started is still there afterwards.
+    assert_close(rot_y(&timeline, 29, "turret"), 1.0);
+    assert!(
+        timeline
+            .warnings
+            .iter()
+            .any(|note| note.contains("StartMoving")),
+        "{:?}",
+        timeline.warnings
+    );
+}
+
+/// The two that are about the run rather than about one thread. Carrying on
+/// past either is the hang each of them is there to prevent.
+#[test]
+fn a_frame_that_runs_out_of_instructions_still_stops_the_run() {
+    let timeline = play("function script.Create() while true do end end", 30);
+
+    let error = timeline.error.expect("an endless loop stops the run");
+    assert!(error.contains("looping without a Sleep"), "{error}");
 }
 
 #[test]
@@ -659,7 +682,9 @@ fn the_frame_count_is_capped() {
 #[test]
 fn a_script_cannot_reach_outside_the_sandbox() {
     for hatch in ["loadstring", "dofile", "os", "io"] {
-        let timeline = play(&format!("function script.Create() {hatch}() end"), 3);
+        // At the top level, where a failure is the script failing to load
+        // rather than one of its threads failing.
+        let timeline = play(&format!("{hatch}()"), 3);
         let error = timeline.error.expect("the sandbox holds");
         assert!(error.contains(hatch), "{error}");
     }
