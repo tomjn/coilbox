@@ -16,6 +16,11 @@ export interface ScriptEvent {
   frame: number;
   callin: string;
   args?: number[];
+  /** Whether this is the preview describing the world rather than putting the
+   *  unit through something. Almost no unit defines those call-ins, so a
+   *  runtime saying it does not have one would say it about nearly every
+   *  unit. */
+  ambient?: boolean;
 }
 
 /** What one run of a script produced. Mirrors the runtime's own report. */
@@ -79,6 +84,43 @@ function at(seconds: number): number {
 }
 
 /**
+ * What the engine tells a unit standing on solid ground.
+ *
+ * `SFX_TERRAINTYPE_LAND` in `rts/Sim/Units/Unit.cpp`, where the others are
+ * nothing (0) and two kinds of water (1 and 2).
+ */
+export const ON_LAND = 4;
+
+/**
+ * How every scenario starts: the unit exists, and it is standing on land.
+ *
+ * `Create` because the engine does it and because a script's rest pose is often
+ * set there. `setSFXoccupy` because a unit does not work out what it is
+ * standing on, the engine tells it, and a script that branches on the answer
+ * gets nothing until something does. Expand and Exterminate's construction mech
+ * only walks on land or shallow water and stands still on anything else, so
+ * without this it never walks at all (#1940).
+ *
+ * Land rather than water because the viewport draws a unit on a ground plane,
+ * and a preview should agree with what it is showing.
+ *
+ * Exported because anything that drives a script itself needs the same two
+ * events for the same reason, not only the scenarios below.
+ *
+ * A frame after `Create` rather than alongside it, which is not a detail. A
+ * script routinely starts its own `setSFXoccupy` from `Create` with no argument
+ * at all, which sets the surface to nothing, and a started thread runs after
+ * the call that started it. Told on the same frame, the unit is told and then
+ * immediately un-told. The engine has the same order for the same reason: it
+ * works the terrain out in the unit's update, which is a later frame than the
+ * one the unit was made on.
+ */
+export const CREATED: ScriptEvent[] = [
+  { frame: 0, callin: "Create" },
+  { frame: 1, callin: "setSFXoccupy", args: [ON_LAND], ambient: true },
+];
+
+/**
  * What a preview can put a unit through.
  *
  * Every one of them starts with `Create`, because the engine does and because a
@@ -91,17 +133,14 @@ export const SCENARIOS: Scenario[] = [
     id: "moving",
     label: "Moving",
     description: "Created, then told to move and left moving.",
-    events: [
-      { frame: 0, callin: "Create" },
-      { frame: 0, callin: "StartMoving" },
-    ],
+    events: [...CREATED, { frame: 0, callin: "StartMoving" }],
   },
   {
     id: "starting-stopping",
     label: "Starting and stopping",
     description: "Moves for half the preview, then stops, so both are visible.",
     events: [
-      { frame: 0, callin: "Create" },
+      ...CREATED,
       { frame: 0, callin: "StartMoving" },
       { frame: at(PREVIEW_SECONDS / 2), callin: "StopMoving" },
     ],
@@ -110,28 +149,23 @@ export const SCENARIOS: Scenario[] = [
     id: "idle",
     label: "Standing still",
     description: "Created and nothing else. Shows what a script does unasked.",
-    events: [{ frame: 0, callin: "Create" }],
+    events: CREATED,
   },
   {
     id: "active",
     label: "Switched on",
     description: "Activated, for a unit that opens or spins up when it is on.",
-    events: [
-      { frame: 0, callin: "Create" },
-      { frame: 0, callin: "Activate" },
-    ],
+    events: [...CREATED, { frame: 0, callin: "Activate" }],
   },
   {
     id: "building",
-    label: "Building",
+    label: "Building (mobile)",
     description:
-      "Builds one thing, stops, then builds another the other way round.",
+      "A construction unit reaching one way, stopping, then reaching the other. Its nanolathe is aimed, so this is the one with angles in it.",
     events: [
-      { frame: 0, callin: "Create" },
+      ...CREATED,
       // Heading and pitch in radians, relative to the unit's own facing, which
-      // is what the engine works out from the build target and hands over. A
-      // factory is called with no arguments at all, so a factory script that
-      // reads them has to check it got them: see `BUILD_AIM`.
+      // is what the engine works out from the build target and hands over.
       { frame: at(0.5), callin: "StartBuilding", args: [0.7, -0.2] },
       { frame: at(2.5), callin: "StopBuilding" },
       { frame: at(3.5), callin: "StartBuilding", args: [-0.6, 0.15] },
@@ -139,11 +173,31 @@ export const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    id: "building-factory",
+    label: "Building (factory)",
+    description:
+      "A factory opening its yard and then building, which is a different pair of call-ins from a construction unit's.",
+    events: [
+      ...CREATED,
+      // A factory is opened first. `CFactory::Update` calls `Activate` when the
+      // yard opens and that is what sets the build stance, so a factory script
+      // that animates its doors does it from here and most of them will not
+      // animate a build at all until it has happened.
+      { frame: at(0.5), callin: "Activate" },
+      // No arguments. `CFactory::StartBuild` calls the no-argument form, unlike
+      // a construction unit, which is handed a heading and a pitch to aim its
+      // nanolathe with (`CBuilder`).
+      { frame: at(1.5), callin: "StartBuilding" },
+      { frame: at(4.5), callin: "StopBuilding" },
+      { frame: at(5.5), callin: "Deactivate" },
+    ],
+  },
+  {
     id: "firing",
     label: "Aiming and firing",
     description: "Aims one way, fires, aims the other, fires again.",
     events: [
-      { frame: 0, callin: "Create" },
+      ...CREATED,
       // Heading and pitch in radians, which is what the call-in is handed.
       { frame: at(0.5), callin: "AimWeapon1", args: [0.8, 0.15] },
       { frame: at(2), callin: "Shot1" },
