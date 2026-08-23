@@ -84,6 +84,34 @@ export interface BattleConfig {
 export interface LaunchEvent {
   kind: "started" | "exited";
   code?: number;
+  signal?: number;
+}
+
+/**
+ * How the engine process ended.
+ *
+ * `signal` is what makes a crash visible. A segfault kills the engine outright,
+ * so there is no exit code to report and `exitCode` is null while `signal` names
+ * the signal. Windows has no signals, so it is always null there. Both null means
+ * the run was cancelled: `playCancel` removed the child before it was reaped.
+ */
+export interface LaunchOutcome {
+  exitCode: number | null;
+  signal: number | null;
+}
+
+/** The tail of an engine `infolog.txt`, with enough about the file to tell
+ * whether it belongs to a given run. */
+export interface InfologTail {
+  path: string;
+  /** Last modified, milliseconds since the unix epoch. */
+  modifiedMs: number;
+  /** Lines in the whole file, not just the tail. */
+  totalLines: number;
+  /** The last `maxLines` lines. */
+  lines: string[];
+  /** Whether anything was left off the front. */
+  truncated: boolean;
 }
 
 /** Render a `BattleConfig` to start-script text (no launch). */
@@ -130,7 +158,7 @@ export const playLaunch = defineCommand<
     runId: string;
     onEvent: Channel<LaunchEvent>;
   },
-  { exitCode: number | null }
+  LaunchOutcome
 >("coilbox-play", "play_launch");
 
 /**
@@ -146,7 +174,7 @@ export const playLaunchReplay = defineCommand<
     runId: string;
     onEvent: Channel<LaunchEvent>;
   },
-  { exitCode: number | null }
+  LaunchOutcome
 >("coilbox-play", "play_launch_replay");
 
 /**
@@ -162,7 +190,7 @@ export const playLaunchSave = defineCommand<
     runId: string;
     onEvent: Channel<LaunchEvent>;
   },
-  { exitCode: number | null }
+  LaunchOutcome
 >("coilbox-play", "play_launch_save");
 
 /** Kill an in-flight game by run id. */
@@ -180,3 +208,20 @@ export const playFocus = defineCommand<{ runId: string }, { focused: boolean }>(
   "coilbox-play",
   "play_focus",
 );
+
+/**
+ * Read the tail of the engine's most recent `infolog.txt`.
+ *
+ * It is not in `dataDir`, whatever the content root says. The engine writes the
+ * log to its own write dir, which on unix is `~/.config/spring` rather than
+ * anything coilbox named, so the Rust side searches every dir the engine could
+ * have picked and returns the newest log it finds.
+ *
+ * The result says when the log was written and nothing about which run wrote it.
+ * The caller knows when its launch started, so the caller decides. Rejects when
+ * no engine log exists anywhere.
+ */
+export const playInfolog = defineCommand<
+  { dataDir: string; maxLines: number },
+  { log: InfologTail }
+>("coilbox-play", "play_infolog");
