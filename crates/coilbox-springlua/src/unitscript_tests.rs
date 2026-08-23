@@ -1222,6 +1222,45 @@ mod world {
         assert!(timeline.warnings.is_empty(), "{:?}", timeline.warnings);
     }
 
+    /// A `.cob` has no square root of its own and asks for one through the same
+    /// call it asks questions with. The Lua runtime answers it identically, so
+    /// that one id cannot mean two things across the two runtimes.
+    #[test]
+    fn the_maths_call_outs_are_answered_exactly() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                Turn(turret, y_axis, GetUnitValue(133, -1) + GetUnitValue(131, 2, 5))
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        // The absolute value of minus one, plus the smaller of two and five.
+        assert_close(rot_y(&timeline, 0, "turret"), 3.0);
+        assert!(timeline.warnings.is_empty(), "{:?}", timeline.warnings);
+    }
+
+    /// Every script passes it to everything it asks, and a script building a
+    /// message out of it fails on the concatenation without it.
+    #[test]
+    fn the_unit_has_an_id_of_its_own() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                Turn(turret, y_axis, unitID)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+    }
+
     /// A question about the world is zero and says so, because a script handed
     /// zero for the ground under it quietly concludes it is at sea level.
     #[test]

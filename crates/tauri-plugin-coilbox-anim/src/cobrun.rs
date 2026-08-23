@@ -63,10 +63,8 @@ const MAX_THREADS: usize = 256;
 const LUA0: i32 = 110;
 const LUA9: i32 = 119;
 
-/// Two-argument `atan`, answering in COB angular units.
-const ATAN: i32 = 14;
-/// Two-argument `hypot`, answering in the same units it was given.
-const HYPOT: i32 = 15;
+/// The frame the run is on, which the preview counts itself.
+const GAME_FRAME: i32 = 134;
 
 /// Run the compiled script in `bytes` for `frames` frames, firing `events` as
 /// they come due.
@@ -958,17 +956,22 @@ impl Run {
 
     /// What a script gets when it asks about its unit.
     ///
-    /// The two trigonometry call-outs are answered exactly, because they are
-    /// arithmetic and a script aiming a barrel needs them. Everything else is
-    /// about a world the preview has none of, so it is zero and a note.
+    /// The arithmetic call-outs are answered exactly, because they are
+    /// arithmetic: a `.cob` has no sine, no square root and no absolute value
+    /// of its own, so a script wanting one asks for it here. Those come first,
+    /// because none of them is about the unit and none can be set.
+    ///
+    /// Everything after that is about the unit, and then about a world the
+    /// preview has none of, which is zero and a note.
     fn unit_value(&mut self, i: usize, id: i32, p1: i32, p2: i32) -> i32 {
         if (LUA0..=LUA9).contains(&id) {
             return self.threads[i].lua[(id - LUA0) as usize];
         }
-        match id {
-            ATAN => return (RAD2TAANG * f64::from(p1).atan2(f64::from(p2))) as i32,
-            HYPOT => return f64::from(p1).hypot(f64::from(p2)) as i32,
-            _ => {}
+        if let Some(value) = unitvalue::arithmetic(id, p1, p2) {
+            return value;
+        }
+        if id == GAME_FRAME {
+            return self.frame as i32;
         }
         if let Some(value) = self.set_values.get(&id) {
             return *value;

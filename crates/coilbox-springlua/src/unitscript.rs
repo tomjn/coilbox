@@ -54,6 +54,9 @@ const HOOK_EVERY: u32 = 100_000;
 /// is a bug, and without a ceiling it is a hang.
 const MAX_THREADS: usize = 256;
 
+/// The frame the run is on, which the preview counts itself.
+const GAME_FRAME: i32 = 134;
+
 /// Base-library functions that can execute arbitrary strings or escape the
 /// environment. Removed for the same reason [`crate::SpringLua`] removes them.
 const EXEC_HATCHES: &[&str] = &[
@@ -782,7 +785,13 @@ fn install_unit_def(
         "#,
     )
     .set_name("unitscript:unitdef")
-    .exec()
+    .exec()?;
+
+    // The unit's own id, which every script passes to everything it asks. The
+    // framework puts it in the environment and without it a script concatenating
+    // it into a message fails on the concatenation rather than on the message.
+    // The same number the compiled runtime answers `MY_ID` with.
+    globals.set("unitID", unitvalue::UNIT_ID)
 }
 
 /// The `SFX` constants a script names when it explodes or emits. Only the names
@@ -1315,9 +1324,20 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     let state = Rc::clone(sim);
     globals.set(
         "GetUnitValue",
-        lua.create_function(move |_, (id, _rest): (i64, MultiValue)| {
+        lua.create_function(move |_, (id, p1, p2): (i64, Option<i64>, Option<i64>)| {
             let id = id as i32;
+            let (p1, p2) = (p1.unwrap_or(0) as i32, p2.unwrap_or(0) as i32);
+            // First, because none of the maths is about the unit and none of it
+            // can be set. A `.cob` asks for its arithmetic this way and a Lua
+            // script has `math`, so this is mostly here so that the two
+            // runtimes cannot answer the same id differently.
+            if let Some(value) = unitvalue::arithmetic(id, p1, p2) {
+                return Ok(value);
+            }
             let mut sim = state.borrow_mut();
+            if id == GAME_FRAME {
+                return Ok(sim.frame as i32);
+            }
             if let Some(value) = sim.values.get(&id) {
                 return Ok(*value);
             }
