@@ -34,8 +34,12 @@ export function SubstituteBlueprintForm({
   record: StoredBlueprint;
   onApply: (layout: BaseBlueprint) => void;
 }) {
-  const gameName = recordGameName(record);
-  const { units, loading, archive } = useGameUnits(gameName);
+  // The shortname so a layout whose build has gone is still substituted
+  // against the newest build of its game, rather than against nothing.
+  const { units, loading, archive } = useGameUnits(
+    recordGameName(record),
+    record.layout.game?.shortname,
+  );
   const sides = useGameSides(archive);
   const { table, remember } = useEquivalents(archive);
   const shipped = useShippedEquivalents(archive, sides);

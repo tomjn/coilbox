@@ -51,8 +51,11 @@ vi.mock("@/placement/BlueprintEditor", () => ({
 vi.mock("@/placement/BlueprintOnMap", () => ({
   BlueprintOnMap: () => createElement("p", null, "the map check"),
 }));
+// The build the layout's game resolved to, which is the record's own name
+// until a test says the archive has gone and another build answered for it.
+let resolved: string | undefined = RECORD.layout.game?.name;
 vi.mock("@/content/useGameUnits", () => ({
-  useGameUnits: () => ({ units: [], loading: false }),
+  useGameUnits: () => ({ units: [], loading: false, resolved }),
 }));
 // The hub backfill reads the hub address off the frame's settings store, which
 // is not mounted here, and it has its own tests (issue #1636).
@@ -107,6 +110,31 @@ describe("BlueprintDetailPage", () => {
     const html = markup();
     expect(html).toContain("Opening solars");
     expect(html).toContain("2 buildings");
+  });
+
+  /**
+   * A game that releases often leaves every layout naming a build nobody has
+   * any more. The shortname recognises the newest one as the same game, so the
+   * layout still opens, and the page says which build it opened with rather
+   * than quietly showing another version's models under the old name.
+   */
+  describe("a layout whose build has gone", () => {
+    it("names the build it was drawn on, and the one it opened with", () => {
+      resolved = "Beyond All Reason test-9";
+      try {
+        const html = markup();
+        expect(html).toContain("Beyond All Reason test-1");
+        expect(html).toContain(
+          "You have Beyond All Reason test-9, which is the same game at another version",
+        );
+      } finally {
+        resolved = RECORD.layout.game?.name;
+      }
+    });
+
+    it("says nothing when the build it names is the one that is here", () => {
+      expect(markup()).not.toContain("same game at another version");
+    });
   });
 
   it("offers no name field of its own, so a rename is an editor edit", () => {

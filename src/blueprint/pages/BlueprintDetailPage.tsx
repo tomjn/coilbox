@@ -86,8 +86,15 @@ export default function BlueprintDetailPage() {
   const [draft, setDraft] = useState<StoredBlueprint | null>(null);
   const record = draft?.id === id ? draft : stored;
 
-  const gameName = record ? recordGameName(record) : "";
-  const { units, archive } = useGameUnits(gameName);
+  // What the layout says it is for, and what is here to open it with. They
+  // differ once a game has moved on: a layout drawn on SplinterFaction 0.1.80
+  // outlives that archive, and the shortname is what recognises 0.1.84 as the
+  // same game. Everything below the header works against the build that is
+  // here, because that is where the units and models come from.
+  const claimedGame = record ? recordGameName(record) : "";
+  const shortname = record?.layout.game?.shortname;
+  const { units, archive, resolved } = useGameUnits(claimedGame, shortname);
+  const gameName = resolved ?? claimedGame;
   const footprints = useMemo(() => footprintsFromUnits(units), [units]);
 
   // Offer the hub pictures of the units this layout names, once, and only when
@@ -191,10 +198,19 @@ export default function BlueprintDetailPage() {
             {record.layout.name}
           </h1>
           <p className="truncate text-xs text-muted-foreground">
-            {gameName || "No game named"} · {buildings} building
+            {claimedGame || "No game named"} · {buildings} building
             {buildings === 1 ? "" : "s"}
             {record.layout.ordered ? " · build order" : ""}
           </p>
+          {/* Said rather than done quietly, because the units below came out of
+              a build this layout was not drawn on and one of them may have
+              moved since. The editor names any that have. */}
+          {resolved && resolved !== claimedGame && (
+            <p className="text-xs text-muted-foreground">
+              You have {resolved}, which is the same game at another version, so
+              it is opened with that.
+            </p>
+          )}
           {/* Where this copy came from, for a layout that did not start here
               (issue #1313). The whole path, because the point of recording it
               is being able to go back to the file. */}

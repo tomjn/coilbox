@@ -12,6 +12,7 @@
  * read rather than one each.
  */
 
+import { compareGameVersions } from "@/conquest/model";
 import { usePreferredTarget } from "@/play/config";
 import type { UnitDatasetEntry } from "./bindings";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "./config";
@@ -27,12 +28,64 @@ export interface GameUnits {
   /** The archive the units came out of, which is also what a model read of one
    *  of them has to be made against. Undefined until the game is found. */
   archive?: string;
+  /** The installed game the name resolved to. The name asked for when that
+   *  build is here, and another build of the same game when it is not, so a
+   *  caller can say which one it is really looking at. */
+  resolved?: string;
 }
 
-export function useGameUnits(gameName: string): GameUnits {
+/** The minimal shape of an installed game this needs, a structural subset of
+ *  `GameItem` from the content bindings. */
+interface Installed {
+  name: string;
+  info: Record<string, string>;
+}
+
+/**
+ * The installed game a document's game belongs to: the build it names, and
+ * failing that the newest build of the same game by modinfo shortname.
+ *
+ * The fallback is what keeps a document usable as its game moves on. A game
+ * that releases weekly leaves every document naming a build nobody has any
+ * more, and treating that as "you have not got this game" would eventually be
+ * wrong about all of them. The shortname is the part modinfo keeps stable
+ * across releases, so it is what recognises them as the same game.
+ *
+ * A document with no shortname gets no fallback rather than a loose one: an
+ * empty shortname would otherwise match every game whose modinfo has none.
+ */
+export function gameForIdentity<T extends Installed>(
+  games: readonly T[],
+  name: string,
+  shortname?: string,
+): T | undefined {
+  const exact = games.find((g) => g.name === name);
+  if (exact) return exact;
+  const want = shortname?.trim().toLowerCase();
+  if (!want) return undefined;
+  let newest: T | undefined;
+  for (const game of games) {
+    if ((game.info.shortname ?? "").trim().toLowerCase() !== want) continue;
+    if (
+      !newest ||
+      compareGameVersions(game.info.version ?? "", newest.info.version ?? "") >
+        0
+    ) {
+      newest = game;
+    }
+  }
+  return newest;
+}
+
+/**
+ * `shortname` is the layout's modinfo shortname, and passing it is what turns
+ * on the fallback above. A caller that has none, or that means one exact build
+ * and nothing else, leaves it out and gets the exact match it always got.
+ */
+export function useGameUnits(gameName: string, shortname?: string): GameUnits {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const game = scan.data?.games.find((g) => g.name === gameName);
+  const game = gameForIdentity(scan.data?.games ?? [], gameName, shortname);
   const { dataset, status } = useUnitsyncUnitDataset(
     target?.enginePath,
     target?.dataDir,
@@ -44,5 +97,6 @@ export function useGameUnits(gameName: string): GameUnits {
     loading: scan.loading || status === "loading",
     gameMissing: !!gameName && !!scan.data && !game,
     archive: game?.primaryArchive.name,
+    resolved: game?.name,
   };
 }

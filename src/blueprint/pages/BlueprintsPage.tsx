@@ -43,6 +43,7 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "@/content/pages/components/states";
+import { gameForIdentity } from "@/content/useGameUnits";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { useRecordHubImport } from "@/hub/imports";
 import { usePreferredTarget } from "@/play/config";
@@ -189,7 +190,11 @@ export default function BlueprintsPage() {
                 taken={names}
                 installed={
                   !recordGameName(record) ||
-                  installed.some((g) => g.name === recordGameName(record))
+                  !!gameForIdentity(
+                    installed,
+                    recordGameName(record),
+                    record.layout.game?.shortname,
+                  )
                 }
               />
             </li>
