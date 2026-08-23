@@ -33,7 +33,7 @@ use mlua::{
 };
 use serde::Serialize;
 
-use coilbox_unitpose::{axis_index, Model, Wait, TICK_MS};
+use coilbox_unitpose::{axis_index, unitvalue, Model, Wait, TICK_MS};
 pub use coilbox_unitpose::{ScriptEvent, Timeline, FPS, MAX_FRAMES};
 
 /// Instructions one frame may execute before the run is abandoned.
@@ -116,6 +116,19 @@ struct Sim {
     signalled: Vec<u32>,
     /// The mask the running thread set for itself, if it did.
     mask: Option<u32>,
+    /// The frame being run, for a script that asks what time it is.
+    frame: u32,
+    /// What the script has told the engine about its unit, by the numbered id
+    /// it told it under.
+    ///
+    /// A script sets a value and reads it back a moment later, and a preview
+    /// that always answered zero would tell it nothing it said had happened.
+    /// A factory does exactly that: it asks for its yard to open and then waits
+    /// for the yard to be open, which never comes and never ends.
+    values: HashMap<i32, i32>,
+    /// How many lines the script has printed, so a script printing every frame
+    /// does not bury everything else the run has to say.
+    printed: usize,
 }
 
 /// One of the script's threads: a call-in the preview fired, or something a
@@ -349,7 +362,11 @@ impl Run {
     /// a `Sleep` cost time rather than nothing.
     fn step(&mut self, events: &[ScriptEvent]) -> Result<(), String> {
         self.budget.set(FRAME_INSTRUCTIONS);
-        self.sim.borrow_mut().model.tick();
+        {
+            let mut sim = self.sim.borrow_mut();
+            sim.frame = self.frame;
+            sim.model.tick();
+        }
         self.wake_finished();
         self.fire_due(events)?;
         self.run_threads()
@@ -621,10 +638,14 @@ fn sandbox(
     install_motion(&lua, sim)?;
     install_threading(&lua, sim)?;
     install_stubs(&lua, sim)?;
+    install_unit_value(&lua, sim)?;
     install_include(&lua, sim, includes)?;
     bootstrap(&lua)?;
     install_unit_script_table(&lua)?;
     install_unit_def(&lua, sim, unit_def)?;
+    // Last, because it hands a script the `UnitScript` table the line above
+    // builds and the `unitDefID` the one before it sets.
+    install_spring(&lua, sim, unit_def)?;
     Ok(lua)
 }
 
@@ -767,11 +788,18 @@ fn install_unit_def(
 /// The `SFX` constants a script names when it explodes or emits. Only the names
 /// matter here: the preview neither explodes nor emits, so the values are the
 /// engine's and are never read back.
+///
+/// All of them, from `LuaConstSFX::PushEntries`, rather than the explode flags
+/// alone. The emit ids are numbers a script does arithmetic on: Beyond All
+/// Reason's commander asks for `SFX.CEG + 3`, and a missing name there is not a
+/// lost effect, it is adding three to nothing.
 fn sfx_table(lua: &Lua) -> mlua::Result<Table> {
     let sfx = lua.create_table()?;
     for (name, value) in [
+        // Piece flags for Explode.
         ("SHATTER", 1),
         ("EXPLODE", 2),
+        ("EXPLODE_ON_HIT", 2),
         ("FALL", 4),
         ("SMOKE", 8),
         ("FIRE", 16),
@@ -779,10 +807,247 @@ fn sfx_table(lua: &Lua) -> mlua::Result<Table> {
         ("NO_CEG_TRAIL", 64),
         ("NO_HEATCLOUD", 128),
         ("RECURSIVE", 65536),
+        // Effect ids for EmitSfx.
+        ("VTOL", 0),
+        ("WAKE", 2),
+        ("REVERSE_WAKE", 4),
+        ("WHITE_SMOKE", 257),
+        ("BLACK_SMOKE", 258),
+        ("BUBBLE", 259),
+        ("CEG", 1024),
+        ("FIRE_WEAPON", 2048),
+        ("DETONATE_WEAPON", 4096),
+        ("GLOBAL", 16384),
     ] {
         sfx.set(name, value)?;
     }
     Ok(sfx)
+}
+
+/// What a script gets when it asks the engine about its unit.
+///
+/// A unit script is allowed to ask, and Beyond All Reason's do: its shared
+/// library opens with `while Spring.GetUnitIsBeingBuilt(unitID) do Sleep(400)`,
+/// and its commander divides its walk cycle by `Spring.GetUnitVelocity`. Absent
+/// calls are not a lost branch, they are a script that stops on the line.
+///
+/// Three kinds of answer, and which kind each one is matters more than the
+/// number:
+///
+///  - what the run genuinely knows. The frame it is on, and which definition
+///    the unit has. These are answers.
+///  - what a finished unit doing what the scenario says would say. Full health,
+///    not being built, not cloaked, moving at the speed it was built for. These
+///    are answers too, and they agree with the compiled runtime, which is
+///    already asked the same things by number.
+///  - what needs a world. Where the unit is, where its pieces are, what is
+///    nearest to it. These answer nothing useful and say so, because a script
+///    handed zero for its position quietly concludes it is at sea level.
+///
+/// The calls that only do something, with nothing to answer, are noted the way
+/// the sound calls are: the effect is missing from the preview either way, and
+/// what matters is that the script keeps running and somebody is told.
+fn install_spring(
+    lua: &Lua,
+    sim: &Rc<RefCell<Sim>>,
+    unit_def: Option<&serde_json::Value>,
+) -> mlua::Result<()> {
+    let spring: Table = lua.globals().get("Spring")?;
+
+    // The same table again, under the name a script may reach it through.
+    // Beyond All Reason writes `Spring.UnitScript.EmitSfx` and SplinterFaction
+    // writes `Spring.UnitScript.Spin`, both meaning the call-outs they already
+    // have in scope.
+    spring.set("UnitScript", lua.globals().get::<Table>("UnitScript")?)?;
+
+    // Full health, in whatever the definition counts health in, so a script
+    // reading the pair back gets a unit that has taken no damage.
+    let health = def_number(unit_def, "health").unwrap_or(100.0);
+    // Elmos per frame, which is what the engine's velocity is in, from a
+    // definition that counts its speed per second. A unit with no definition
+    // behind it gets one elmo a frame, the same as the compiled runtime
+    // answers when it is asked for `CURRENT_SPEED` without one.
+    let speed = def_number(unit_def, "speed").map_or(1.0, |per_second| per_second / f64::from(FPS));
+
+    spring.set(
+        "GetUnitHealth",
+        lua.create_function(move |_, _: MultiValue| {
+            // health, maxHealth, paralyzeDamage, captureProgress, buildProgress
+            Ok((health, health, 0.0, 0.0, 1.0))
+        })?,
+    )?;
+    spring.set(
+        "GetUnitIsBeingBuilt",
+        // beingBuilt, buildProgress. A preview shows a finished unit, and a
+        // script waiting to be finished is a script waiting forever otherwise.
+        lua.create_function(|_, _: MultiValue| Ok((false, 1.0)))?,
+    )?;
+    spring.set(
+        "GetUnitVelocity",
+        // The fourth is the speed itself, which is the one that matters: a
+        // walking script divides its cycle by it, so nothing there is a unit
+        // that never takes a step.
+        lua.create_function(move |_, _: MultiValue| Ok((0.0, 0.0, speed, speed)))?,
+    )?;
+    spring.set(
+        "GetUnitIsCloaked",
+        lua.create_function(|_, _: MultiValue| Ok(false))?,
+    )?;
+    spring.set(
+        "GetUnitDefID",
+        // The one the sandbox filed the definition under, so that
+        // `UnitDefs[Spring.GetUnitDefID(unitID)]` is this unit's own.
+        lua.create_function(|lua, _: MultiValue| lua.globals().get::<i64>("unitDefID"))?,
+    )?;
+
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetGameFrame",
+        lua.create_function(move |_, _: MultiValue| Ok(state.borrow().frame))?,
+    )?;
+
+    // A unit sitting there with nothing asked of it. The keys are the engine's
+    // own, so a script reading one it does not set finds nothing rather than
+    // finding a table that is not the shape it expected.
+    spring.set(
+        "GetUnitStates",
+        lua.create_function(|lua, _: MultiValue| {
+            let states = lua.create_table()?;
+            states.set("firestate", 2)?;
+            states.set("movestate", 1)?;
+            states.set("autorepairlevel", -1)?;
+            states.set("repeat", false)?;
+            states.set("cloak", false)?;
+            states.set("active", true)?;
+            states.set("trajectory", false)?;
+            Ok(states)
+        })?,
+    )?;
+
+    for name in ["GetUnitPosition", "GetUnitPiecePosition"] {
+        let state = Rc::clone(sim);
+        let label = name.to_string();
+        spring.set(
+            name,
+            lua.create_function(move |_, _: MultiValue| {
+                state.borrow_mut().model.note(format!(
+                    "{label} answers nothing in the preview, which has no world to place the unit in, so a script deciding something from where it is decides it as though it were at the origin."
+                ));
+                Ok((0.0, 0.0, 0.0))
+            })?,
+        )?;
+    }
+
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitPiecePosDir",
+        lua.create_function(move |_, _: MultiValue| {
+            state.borrow_mut().model.note(
+                "GetUnitPiecePosDir answers nothing in the preview, which knows how far a piece has moved but not where the model puts it.".to_string(),
+            );
+            // Position, then a direction, which is forward because a piece
+            // facing nowhere is not a direction any script could use.
+            Ok((0.0, 0.0, 0.0, 0.0, 0.0, 1.0))
+        })?,
+    )?;
+
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitNearestEnemy",
+        lua.create_function(move |_, _: MultiValue| {
+            state.borrow_mut().model.note(
+                "GetUnitNearestEnemy answers nothing in the preview, where the unit is on its own."
+                    .to_string(),
+            );
+            Ok(Value::Nil)
+        })?,
+    )?;
+
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitWeaponState",
+        lua.create_function(move |_, _: MultiValue| {
+            state.borrow_mut().model.note(
+                "GetUnitWeaponState answers zero in the preview, which has no weapons to keep the state of.".to_string(),
+            );
+            Ok(0)
+        })?,
+    )?;
+
+    for name in [
+        "SpawnCEG",
+        "SetUnitNanoPieces",
+        "SetUnitCloak",
+        "SetUnitArmored",
+        "DestroyUnit",
+    ] {
+        let state = Rc::clone(sim);
+        let label = name.to_string();
+        spring.set(
+            name,
+            lua.create_function(move |_, _: MultiValue| {
+                state
+                    .borrow_mut()
+                    .model
+                    .note(format!("Spring.{label} does nothing in the preview."));
+                Ok(())
+            })?,
+        )?;
+    }
+
+    install_echo(lua, sim, &spring)
+}
+
+/// `Spring.Echo`, into the run's own notes.
+///
+/// It is the most used call in Beyond All Reason's scripts by a distance, and
+/// it is a script saying what it thinks it is doing. Worth showing rather than
+/// swallowing, since a preview that could not otherwise be stepped through is
+/// exactly where that is useful.
+///
+/// Capped, because a script printing every frame would leave no room for
+/// anything else the run has to say.
+fn install_echo(lua: &Lua, sim: &Rc<RefCell<Sim>>, spring: &Table) -> mlua::Result<()> {
+    /// Lines from the script kept before the rest are dropped.
+    const MAX_PRINTS: usize = 12;
+
+    let state = Rc::clone(sim);
+    let echo = lua.create_function(move |_, args: MultiValue| {
+        let line: Vec<String> = args
+            .iter()
+            .map(|value| match value {
+                Value::String(text) => text.to_string_lossy(),
+                other => format!("{other:?}"),
+            })
+            .collect();
+        let mut sim = state.borrow_mut();
+        sim.printed += 1;
+        match sim.printed.cmp(&MAX_PRINTS) {
+            std::cmp::Ordering::Greater => {}
+            std::cmp::Ordering::Equal => sim
+                .model
+                .note("The script printed more than this and the rest was dropped.".to_string()),
+            std::cmp::Ordering::Less => {
+                let text = line.join(" ");
+                sim.model.note(format!("The script said: {text}"));
+            }
+        }
+        Ok(())
+    })?;
+    spring.set("Echo", echo)
+}
+
+/// One number off the unit's definition, whatever case the game filed it under.
+///
+/// The definitions come back through a game's own def scripts, which lowercase
+/// every key on the way out, so a lookup that cared about case would find
+/// nothing in most games and everything in the rest.
+fn def_number(unit_def: Option<&serde_json::Value>, key: &str) -> Option<f64> {
+    unit_def?
+        .as_object()?
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case(key))
+        .and_then(|(_, value)| value.as_f64())
 }
 
 fn install_pieces(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
@@ -991,7 +1256,6 @@ fn install_stubs(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
         "PlaySoundFile",
         "AttachUnit",
         "DropUnit",
-        "SetUnitValue",
         "ChangeHeading",
     ] {
         let state = Rc::clone(sim);
@@ -1007,12 +1271,73 @@ fn install_stubs(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
             })?,
         )?;
     }
-    globals.set(
-        "GetUnitValue",
-        lua.create_function(|_, _: MultiValue| Ok(0))?,
-    )?;
 
     Ok(())
+}
+
+/// What a script tells the engine about its unit, and what it is told back.
+///
+/// A script sets a value and reads it back, and both go by the numbered ids in
+/// [`unitvalue`]. Three things can happen to a read, in this order:
+///
+///  1. the script set it itself, so it gets what it set. A factory asks for its
+///     yard to open and then waits for the yard to be open, and answering zero
+///     there is a wait that never ends.
+///  2. it is one of the questions a finished unit has an answer to, in which
+///     case the answer is the one the compiled runtime gives, because the two
+///     are being asked the same question by the same number.
+///  3. it is about a world the preview has none of, so it is zero and a note.
+///     Zero is not a neutral answer and pretending otherwise is how a script
+///     ends up believing it is at sea level, so it is worth saying out loud.
+fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
+    let globals = lua.globals();
+
+    let state = Rc::clone(sim);
+    globals.set(
+        "SetUnitValue",
+        // A boolean or a number, because the engine takes either and Beyond All
+        // Reason's commander writes `SetUnitValue(COB.INBUILDSTANCE, true)`.
+        // Anything after it is the packed pair of coordinates the engine takes
+        // for the handful of ids that are about where the unit is, which the
+        // preview has nothing to say about anyway.
+        lua.create_function(move |_, (id, value, _rest): (i64, Value, MultiValue)| {
+            let value = match value {
+                Value::Boolean(set) => i32::from(set),
+                Value::Integer(number) => number as i32,
+                Value::Number(number) => number as i32,
+                _ => 0,
+            };
+            state.borrow_mut().values.insert(id as i32, value);
+            Ok(())
+        })?,
+    )?;
+
+    let state = Rc::clone(sim);
+    globals.set(
+        "GetUnitValue",
+        lua.create_function(move |_, (id, _rest): (i64, MultiValue)| {
+            let id = id as i32;
+            let mut sim = state.borrow_mut();
+            if let Some(value) = sim.values.get(&id) {
+                return Ok(*value);
+            }
+            if let Some(value) = unitvalue::known(id) {
+                return Ok(value);
+            }
+            sim.model.note(format!(
+                "This script asks the world for value {id}, and the preview has no world to ask."
+            ));
+            Ok(0)
+        })?,
+    )?;
+
+    // The names the engine puts in every unit script's environment, so a script
+    // can ask for `COB.YARD_OPEN` rather than for 18.
+    let cob = lua.create_table()?;
+    for (name, id) in unitvalue::NAMES {
+        cob.set(*name, *id)?;
+    }
+    globals.set("COB", cob)
 }
 
 /// `include`, over the library files the caller read out of the unit's game.
