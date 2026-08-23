@@ -31,7 +31,7 @@
 
 use std::collections::HashMap;
 
-use coilbox_unitpose::{Model, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS};
+use coilbox_unitpose::{unitvalue, Model, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS};
 
 use crate::cob;
 use crate::opcodes::{mnemonic, opcode};
@@ -67,28 +67,6 @@ const LUA9: i32 = 119;
 const ATAN: i32 = 14;
 /// Two-argument `hypot`, answering in the same units it was given.
 const HYPOT: i32 = 15;
-
-/// What the preview's unit is, for the handful of questions that have an answer
-/// even without a world.
-///
-/// Every one of these describes a whole unit doing what the scenario says, and
-/// the numbers are the engine's own scaling. They are answers rather than
-/// stand-ins, which is why they carry no note.
-///
-/// `MAX_SPEED` is the one that has to be here. A walking unit works its leg
-/// speed out as its current speed over its top speed, so leaving that zero
-/// divides by zero and the unit stands still with its legs mid-stride. Both are
-/// one elmo per frame, so a unit told to move walks at the pace it was animated
-/// for.
-const KNOWN: &[(i32, i32)] = &[
-    // HEALTH: whole, on a 0 to 100 scale.
-    (4, 100),
-    // BUILD_PERCENT_LEFT: nothing left, so the unit is finished and working.
-    (17, 0),
-    // CURRENT_SPEED and MAX_SPEED, in 65536ths of an elmo per frame.
-    (29, 65536),
-    (75, 65536),
-];
 
 /// Run the compiled script in `bytes` for `frames` frames, firing `events` as
 /// they come due.
@@ -995,8 +973,10 @@ impl Run {
         if let Some(value) = self.set_values.get(&id) {
             return *value;
         }
-        if let Some((_, value)) = KNOWN.iter().find(|(known, _)| *known == id) {
-            return *value;
+        // Shared with the Lua runtime, which is asked the same questions by the
+        // same numbers and has to give the same answers.
+        if let Some(value) = unitvalue::known(id) {
+            return value;
         }
         self.model.note(format!(
             "This script asks the world for value {id}, and the preview has no world to ask."
