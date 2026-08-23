@@ -178,7 +178,11 @@ function M.engine(defs, opts)
 		end,
 	}
 	E.Game = {
-		gameName = opts.gameName or "Test Game 1.0",
+		-- Two names, as the engine has them: gameName is modinfo's name with no
+		-- version on it, modName is the archive, which is what unitsync and so
+		-- coilbox calls a game.
+		gameName = opts.gameName or "Test Game",
+		modName = opts.modName or "Test Game 1.0",
 		gameShortName = opts.gameShortName or "TEST",
 		mapName = opts.mapName or "Test Map",
 	}

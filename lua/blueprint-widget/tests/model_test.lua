@@ -16,7 +16,8 @@ local CON = support.def(10, "armck", { buildOptions = { 1, 2 } })
 local E = support.engine({ SOLAR, LLT, LAB, CON }, {
 	selected = { 100 },
 	units = { [100] = { def = 10 } },
-	gameName = "Test Game 1.0",
+	gameName = "Test Game",
+	modName = "Test Game 1.0",
 	gameShortName = "TEST",
 })
 PLACE.use(E)
@@ -31,8 +32,9 @@ local game = E.Game
 check("no game binding is for every game", MODEL.forGame({ buildings = {} }, game))
 check("matching shortname is for this game", MODEL.forGame({ game = { shortname = "TEST" } }, game))
 check("another shortname is not", not MODEL.forGame({ game = { shortname = "BYAR" } }, game))
-check("a name only binding matches the full name", MODEL.forGame({ game = { name = "Test Game 1.0" } }, game))
+check("a name only binding matches the archive name", MODEL.forGame({ game = { name = "Test Game 1.0" } }, game))
 check("a name only binding to another build is not", not MODEL.forGame({ game = { name = "Test Game 2.0" } }, game))
+check("modinfo's unversioned name is not the archive name", not MODEL.forGame({ game = { name = "Test Game" } }, game))
 check("shortname wins over name when both are there", not MODEL.forGame({ game = { name = "Test Game 1.0", shortname = "BYAR" } }, game))
 
 --------------------------------------------------------------------------------
