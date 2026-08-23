@@ -225,6 +225,15 @@ export interface BackfillTarget {
    * that it is a decision about the run rather than a property of the work.
    */
   startedBy: UploadInitiator;
+  /**
+   * Whether to extract and offer build pics, which defaults to yes.
+   *
+   * `false` is for a caller that has already sent this game's build pics itself
+   * and is here for the renders (issue #1953). Extracting them again would be a
+   * second mount and a few hundred encodes to produce bytes the hub was handed a
+   * moment ago and would answer `have` to.
+   */
+  buildpics?: boolean;
 }
 
 /**
@@ -381,17 +390,18 @@ export async function backfillBlueprintUnits(
   // build pic a page shows comes from `useBuildpics` in `@/content/config`,
   // which reads the same archive without asking for an encoded asset, so this
   // call exists only to produce something to upload.
-  const assets: AssetUpload[] = loose
-    ? []
-    : buildpicUploads(
-        target.game,
-        working,
-        await tools.buildpics({
-          ...archive,
-          units: working.map((unit) => unit.name),
-          assets: true,
-        }),
-      );
+  const assets: AssetUpload[] =
+    loose || target.buildpics === false
+      ? []
+      : buildpicUploads(
+          target.game,
+          working,
+          await tools.buildpics({
+            ...archive,
+            units: working.map((unit) => unit.name),
+            assets: true,
+          }),
+        );
 
   // What this machine already drew and the hub still has not got (issue #1724).
   // A run that drew a render and then failed to send it used to draw the whole

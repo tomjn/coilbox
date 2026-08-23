@@ -113,13 +113,20 @@ export function remaining(
  * full {@link VARIANTS_PER_UNIT}, which over-reserves for a unit whose pictures
  * the hub turns out to already hold, and over-reserving is the direction that
  * cannot end in a refusal.
+ *
+ * `perUnit` is what a unit costs in this particular run, and the default is a
+ * whole unit's worth. A run doing one class rather than all of them says so
+ * (issue #1953): reserving five writes a unit for a pass that sends one build
+ * pic each would ration eighty writes down to sixteen units of work when eighty
+ * of them would fit.
  */
 export function unitsAffordable(
   ledger: BackfillLedger,
   game: string,
   now: number,
+  perUnit: number = VARIANTS_PER_UNIT,
 ): number {
-  return Math.floor(remaining(ledger, game, now) / VARIANTS_PER_UNIT);
+  return Math.floor(remaining(ledger, game, now) / Math.max(1, perUnit));
 }
 
 /**
@@ -188,8 +195,18 @@ export function readLedger(): BackfillLedger {
 }
 
 /** How many units a run for this game may work on right now. */
-export function unitsAffordableNow(game: string, now = Date.now()): number {
-  return unitsAffordable(readLedger(), game, now);
+export function unitsAffordableNow(
+  game: string,
+  now = Date.now(),
+  perUnit: number = VARIANTS_PER_UNIT,
+): number {
+  return unitsAffordable(readLedger(), game, now, perUnit);
+}
+
+/** How many writes this game has left in the hour, which is what a run sending
+ *  one picture a unit counts in. */
+export function writesLeftNow(game: string, now = Date.now()): number {
+  return remaining(readLedger(), game, now);
 }
 
 /** Charge a finished run's writes against this game and store the result. */

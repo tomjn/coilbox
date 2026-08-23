@@ -1,6 +1,7 @@
 import type { GameItem, UnitDatasetEntry } from "@/content/bindings";
 import {
   unitsyncScan,
+  unitsyncUnitBuildpics,
   unitsyncUnitDataset,
   unitsyncUnitRenderKeys,
 } from "@/content/bindings";
@@ -14,17 +15,23 @@ import {
   type BackfillTools,
   type BackfillUnit,
   backfillBlueprintUnits,
+  buildpicUploads,
   liveBackfillTools,
   picturesWanted,
   renderKeysToAsk,
 } from "./blueprintBackfill";
-import { recordBackfillWrites, unitsAffordableNow } from "./budget";
-import { assetsTheHubWants } from "./have";
+import {
+  recordBackfillWrites,
+  unitsAffordableNow,
+  writesLeftNow,
+} from "./budget";
+import { type AssetKey, assetsTheHubWants } from "./have";
 import { RENDER_VERSION } from "./renderTop";
+import { type AssetUpload, uploadAssetsToHub } from "./upload";
 
 /**
  * Filling in the pictures the hub has none of, for the games on this computer
- * (issue #1952).
+ * (issues #1952 and #1953).
  *
  * ## Why this exists next to the lazy path
  *
@@ -65,6 +72,33 @@ import { RENDER_VERSION } from "./renderTop";
  * of digesting. It costs no upload allowance, though, which is the allowance that
  * is shared, and it is what makes the answer to "what is missing" real rather
  * than a guess.
+ *
+ * ## Build pics before renders (issue #1953)
+ *
+ * Both classes are rationed the same way, at eighty writes a game an hour, and
+ * that is what decides the order rather than which is cheaper to make.
+ *
+ * Eighty writes spent on build pics is eighty units that now have a picture on
+ * the hub. The same eighty spent on renders is sixteen units with five pictures
+ * each and three hundred and sixty three units still blank. For anybody reading a
+ * game's unit list the first is most of a catalog and the second is a rounding
+ * error, so the build pics go first and the renders get whatever is left.
+ *
+ * ## Whether a roster walk belongs in the client at all
+ *
+ * It was worth asking, because the map corpus answers the same question the
+ * other way: map pictures reach the hub only through the seed export, run offline
+ * by somebody who has the archives, on the grounds that the map set is bounded
+ * and has no long tail.
+ *
+ * A game's roster is bounded in exactly that way, so a maintainer seed would
+ * work. What decides it against is coverage rather than cost. A seed only ever
+ * holds the games that maintainer has installed, at the versions they had, and a
+ * unit's picture is keyed on the model's digest so a balance patch that changes a
+ * model needs the picture made again. The client is the only thing that is
+ * already sitting next to every installed game, including the ones nobody
+ * maintaining a seed has heard of. So: both, eventually, and the client is the
+ * one that does not need anybody to remember to run it.
  *
  * ## Which games
  *
@@ -112,8 +146,15 @@ export interface GamePictures {
   units: number;
   /** Units the hub was missing at least one picture of, before this run. */
   wanted: number;
-  /** Units this run actually covered, which is what the hour's allowance left
-   *  room for. */
+  /**
+   * Units this run sent at least one picture of, which is what the hour's
+   * allowance left room for.
+   *
+   * A union of the two passes rather than either of them. They overlap and
+   * neither contains the other: a unit whose build pic the hub already held is
+   * only in the render pass, and a unit the game ships no model for is only in
+   * the other.
+   */
   covered: number;
   /** Pictures the hub took. */
   written: number;
@@ -142,8 +183,16 @@ export interface PictureSweepTools {
   renderKeys: typeof unitsyncUnitRenderKeys;
   ask: typeof assetsTheHubWants;
   releases: typeof dlRapidReleaseArchives;
+  /** Every build pic in a game, extracted and encoded ready to offer. */
+  buildpics: typeof unitsyncUnitBuildpics;
+  /** Send a set of pictures. Used directly for the build pic pass, which is a
+   *  batch of ready bytes rather than anything that needs drawing. */
+  upload: typeof uploadAssetsToHub;
   /** How much of the hour is left for one game, so a test can hand out its own. */
   affordable: typeof unitsAffordableNow;
+  /** The same allowance in pictures rather than in units, which is what a pass
+   *  sending one picture a unit counts in. */
+  writesLeft: typeof writesLeftNow;
   /** What the fill itself uses. Handed down whole rather than reimplemented,
    *  because the drawing, the local render index and the upload are the lazy
    *  path's and this is the same work over a different unit list. */
@@ -158,7 +207,10 @@ export const livePictureSweepTools: PictureSweepTools = {
   renderKeys: unitsyncUnitRenderKeys,
   ask: assetsTheHubWants,
   releases: dlRapidReleaseArchives,
+  buildpics: unitsyncUnitBuildpics,
+  upload: uploadAssetsToHub,
   affordable: unitsAffordableNow,
+  writesLeft: writesLeftNow,
   fill: backfillBlueprintUnits,
   backfill: liveBackfillTools,
   record: recordBackfillWrites,
@@ -321,8 +373,14 @@ async function sweepOneGame(
   const units = rosterUnits(dataset.units);
   if (units.length === 0) return blank;
 
-  // The survey: what every picture of every unit would be called, and which of
-  // them the hub has not got. One mount for the keys however long the roster is.
+  // The build pics first, and the whole roster's worth (issue #1953). They are
+  // read out of the archive rather than drawn, so eighty of them is eighty units
+  // that have a picture where the same eighty writes spent on renders would be
+  // sixteen units with five each.
+  const pics = await sendBuildpics(target, game, shortname, units, tools);
+
+  // Then the renders. What every picture of every unit would be called, and
+  // which of them the hub has not got, in one mount however long the roster is.
   const keyed = await tools.renderKeys({
     ...mount,
     rendererVersion: RENDER_VERSION,
@@ -335,12 +393,21 @@ async function sweepOneGame(
   });
   const keys = renderKeysToAsk(shortname, units, keyed);
   const missing = picturesWanted(keys, await tools.ask(hubUrl, keys));
-  const wanting = unitsWithGaps(units, missing);
-  const surveyed = { ...blank, units: units.length, wanted: wanting.length };
-  if (wanting.length === 0) return surveyed;
+  // A unit is wanted if any of its pictures is, which is what makes the count
+  // the one somebody is really asking about: how much of this game is uncovered.
+  const wanting = unitsWithGaps(units, [...missing, ...pics.stillWanted]);
+  const surveyed = {
+    ...blank,
+    units: units.length,
+    wanted: wanting.length,
+    written: pics.written,
+    covered: pics.covered.length,
+  };
+  const rendering = unitsWithGaps(units, missing);
+  if (rendering.length === 0) return surveyed;
 
-  // And the fill, over what came back missing rather than over the roster's
-  // first however many. This is the half that spends the shared allowance.
+  // And the render fill, over what came back missing rather than over the
+  // roster's first however many. Whatever the build pics left of the hour.
   const affordable = tools.affordable(shortname);
   if (affordable <= 0) {
     return {
@@ -358,19 +425,151 @@ async function sweepOneGame(
       enginePath,
       dataDir,
       startedBy: "user",
+      // Already done, a moment ago, over the whole roster rather than over this
+      // narrowed list. Doing them again would be a mount and a few hundred
+      // encodes to produce bytes the hub would answer `have` to.
+      buildpics: false,
     },
-    wanting,
+    rendering,
     affordable,
     tools.backfill,
   );
   tools.record(shortname, filled.written);
 
+  // A unit is covered if this run sent any picture of it, so the two passes are
+  // a union rather than the larger of two counts: they overlap but neither
+  // contains the other. A unit whose build pic the hub already had is only in
+  // the render pass, and a unit the game ships no model for is only in the
+  // other.
+  //
+  // The fill works through its list in order and reports how many it reached,
+  // so its first `filled.units` are the ones it covered.
+  const covered = new Set(pics.covered);
+  for (const unit of rendering.slice(0, filled.units)) covered.add(unit.name);
+
   return {
     ...surveyed,
-    covered: filled.units,
-    written: filled.written,
+    covered: covered.size,
+    written: surveyed.written + filled.written,
     ...(filled.stopped ? { stopped: filled.stopped } : {}),
   };
+}
+
+/** What the build pic pass came to. */
+interface BuildpicPass {
+  /** Pictures the hub took. */
+  written: number;
+  /** The units it sent one for, by name, so the run's coverage can be a union of
+   *  the two passes rather than the larger of two counts. */
+  covered: string[];
+  /** The ones the hub is still missing, in {@link picturesWanted}'s spelling, so
+   *  they can be folded into the count of how much of the game is uncovered. */
+  stillWanted: string[];
+}
+
+/**
+ * Send the build pics for a whole roster, before anything is drawn
+ * (issue #1953).
+ *
+ * ## Why these go first
+ *
+ * A build pic is the icon the game already ships. Reading one out of the archive
+ * is a mount and an encode, no GPU and no model, and it is 5 to 10 KB. A render
+ * is seconds of drawing each and there are four of them a unit.
+ *
+ * Both are rationed the same way, at eighty writes a game an hour, and that is
+ * what decides the order. Eighty writes spent on build pics is eighty units that
+ * now have a picture on the hub. The same eighty spent on renders is sixteen
+ * units with five pictures each and three hundred and sixty three units still
+ * blank. For somebody looking at a game's unit list, the first is most of a
+ * catalog and the second is a rounding error.
+ *
+ * ## Why they are extracted before they are asked about
+ *
+ * A build pic's `source_hash` is over the archive member, and reading that out
+ * is most of the work of extracting it, so unlike a render there is no way to
+ * ask the hub about one without making it first. That is affordable here for the
+ * same reason it is affordable in the lazy path: extracting costs this machine a
+ * mount and some encodes and costs the shared allowance nothing.
+ *
+ * Asking before uploading is what makes a second run reach units the first one
+ * did not, which is the same rule the roster survey follows and for the same
+ * reason. Offering the first eighty every time would find the hub already had
+ * them and write nothing for ever.
+ */
+async function sendBuildpics(
+  target: PictureSweepTarget,
+  game: GameItem,
+  shortname: string,
+  units: readonly BackfillUnit[],
+  tools: PictureSweepTools,
+): Promise<BuildpicPass> {
+  const nothing: BuildpicPass = { written: 0, covered: [], stillWanted: [] };
+
+  const extracted = buildpicUploads(
+    shortname,
+    units,
+    await tools.buildpics({
+      enginePath: target.enginePath,
+      dataDir: target.dataDir,
+      gameArchive: game.primaryArchive.name,
+      units: units.map((unit) => unit.name),
+      assets: true,
+    }),
+  );
+  if (extracted.length === 0) return nothing;
+
+  const answers = await tools.ask(target.hubUrl, extracted.map(keyOf));
+  const wanted = picturesWanted(extracted.map(keyOf), answers);
+  if (wanted.length === 0) return nothing;
+
+  // One write a picture here rather than a whole unit's worth, because that is
+  // what this pass actually spends.
+  const room = tools.writesLeft(shortname);
+  if (room <= 0) return { ...nothing, stillWanted: wanted };
+
+  const missing = new Set(wanted);
+  const sending = extracted
+    .filter((asset) => missing.has(pictureId(asset)))
+    .slice(0, room);
+  const run = await tools.upload(target.hubUrl, sending, {
+    startedBy: "user",
+    opId: crypto.randomUUID(),
+  });
+  tools.record(shortname, run.written);
+
+  return {
+    written: run.written,
+    covered: sending.map((asset) =>
+      asset.keyed_on === "unit" ? asset.unit_name : "",
+    ),
+    stillWanted: wanted,
+  };
+}
+
+/** The have check's question for one ready upload. */
+function keyOf(asset: AssetUpload): AssetKey {
+  return asset.keyed_on === "unit"
+    ? {
+        keyed_on: "unit",
+        game: asset.game,
+        unit_name: asset.unit_name,
+        variant: asset.variant,
+        source_hash: asset.source_hash,
+      }
+    : {
+        keyed_on: "map",
+        map_name: asset.map_name,
+        variant: asset.variant,
+        source_hash: asset.source_hash,
+      };
+}
+
+/** The same name `picturesWanted` answers in, so the two sets can be compared. */
+function pictureId(asset: AssetUpload): string {
+  return asset.keyed_on === "unit"
+    ? `${asset.unit_name}\n${asset.variant}`
+    : "";
 }
 
 /** Where the last sweep's finishing time is kept. */
