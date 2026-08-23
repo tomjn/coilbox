@@ -4,7 +4,7 @@
  */
 
 import { Button, useDrawer } from "@picoframe/frame";
-import { Gamepad2 } from "lucide-react";
+import { Puzzle } from "lucide-react";
 
 import { nextDrawerKey } from "@/general/drawerKey";
 
@@ -30,7 +30,7 @@ export function BlueprintWidgetButton({
       className="shrink-0 gap-1.5"
       onClick={() => void openPanel()}
     >
-      <Gamepad2 className="size-4" /> In game
+      <Puzzle className="size-4" /> Widget
     </Button>
   );
 }
