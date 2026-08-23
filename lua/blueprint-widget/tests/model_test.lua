@@ -231,15 +231,26 @@ local verts, idx = MODEL.pack({
 	{ x = 10, y = 20, w = 100, h = 50, color = { 1, 0, 0, 1 } },
 	{ x = 0, y = 0, w = 1, h = 1, color = { 0, 0, 1, 0.5 } },
 })
-check("pack emits eight floats per vertex, four vertices per rect", #verts == 2 * 4 * 8, #verts)
+check("pack emits nine floats per vertex, four vertices per rect", #verts == 2 * 4 * 9, #verts)
 check("pack emits six indices per rect", #idx == 12, #idx)
-check("the first vertex is the bottom left corner with its colour", same({ verts[1], verts[2], verts[5], verts[6], verts[7], verts[8] }, { 10, 20, 1, 0, 0, 1 }), show(verts))
-check("the third vertex is the top right corner", verts[17] == 110 and verts[18] == 70, verts[17] .. "," .. verts[18])
+check("the first vertex is the bottom left corner at depth zero with its colour", same({ verts[1], verts[2], verts[3], verts[6], verts[7], verts[8], verts[9] }, { 10, 20, 0, 1, 0, 0, 1 }), show(verts))
+check("the third vertex is the top right corner", verts[19] == 110 and verts[20] == 70, verts[19] .. "," .. verts[20])
 check("indices are zero based and the second rect starts at four", same(idx, { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 }), show(idx))
-check("uvs span the unit square", verts[3] == 0 and verts[4] == 0 and verts[19] == 1 and verts[20] == 1)
+check("uvs span the unit square", verts[4] == 0 and verts[5] == 0 and verts[22] == 1 and verts[23] == 1)
 
 local none, noneIdx = MODEL.pack({})
 check("packing nothing is empty", #none == 0 and #noneIdx == 0)
+
+-- ground marks: a footprint square on the x, z plane at the building's height
+local gv, gi = MODEL.packGround({
+	{ x = 320, y = 10, z = 320, defID = 1, facing = 0, blocked = true, def = { xsize = 8, zsize = 4 } },
+	{ x = 0, y = 0, z = 0, defID = 1, facing = 1, blocked = false, def = { xsize = 8, zsize = 4 } },
+}, { 1, 0, 0, 0.4 }, { 0, 1, 0, 0.4 })
+check("ground marks pack one quad per position", #gv == 2 * 4 * 9 and #gi == 12)
+check("a mark spans the footprint about the centre, half the size in elmos each way", gv[1] == 320 - 32 and gv[3] == 320 - 16 and gv[19] == 320 + 32 and gv[21] == 320 + 16, show({ gv[1], gv[3], gv[19], gv[21] }))
+check("a mark floats just above the ground", gv[2] == 10 + 2)
+check("an odd facing swaps the span", gv[37] == -16 and gv[39] == -32, show({ gv[37], gv[39] }))
+check("a blocked mark takes the first colour and an open one the second", gv[6] == 1 and gv[43] == 1, show({ gv[6], gv[43] }))
 
 --------------------------------------------------------------------------------
 -- the orthographic matrix for the shader

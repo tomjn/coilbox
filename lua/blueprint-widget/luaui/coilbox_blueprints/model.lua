@@ -370,31 +370,67 @@ function M.hit(L, x, y)
 	return nil
 end
 
+local function quad(verts, idx, v, n, corners, c, i)
+	for _, p in ipairs(corners) do
+		verts[v + 1], verts[v + 2], verts[v + 3] = p[1], p[2], p[3]
+		verts[v + 4], verts[v + 5] = p[4], p[5]
+		verts[v + 6], verts[v + 7], verts[v + 8], verts[v + 9] = c[1], c[2], c[3], c[4]
+		v = v + 9
+	end
+	local base = (i - 1) * 4
+	idx[n + 1], idx[n + 2], idx[n + 3] = base, base + 1, base + 2
+	idx[n + 4], idx[n + 5], idx[n + 6] = base, base + 2, base + 3
+	return v, n + 6
+end
+
 --- Flatten rectangles for the vertex buffer.
 -- @param rects table[] x, y, w, h, color
--- @return number[] vertices, eight floats each (x, y, u, v, r, g, b, a), four
---   per rect, bottom left first, anticlockwise
+-- @return number[] vertices, nine floats each (x, y, z, u, v, r, g, b, a),
+--   four per rect, bottom left first, anticlockwise, z always 0
 -- @return number[] indices, zero based, six per rect
 function M.pack(rects)
 	local verts, idx = {}, {}
 	local v, n = 0, 0
 	for i, r in ipairs(rects) do
-		local c = r.color
-		local corners = {
-			{ r.x, r.y, 0, 0 },
-			{ r.x + r.w, r.y, 1, 0 },
-			{ r.x + r.w, r.y + r.h, 1, 1 },
-			{ r.x, r.y + r.h, 0, 1 },
-		}
-		for _, p in ipairs(corners) do
-			verts[v + 1], verts[v + 2], verts[v + 3], verts[v + 4] = p[1], p[2], p[3], p[4]
-			verts[v + 5], verts[v + 6], verts[v + 7], verts[v + 8] = c[1], c[2], c[3], c[4]
-			v = v + 8
-		end
-		local base = (i - 1) * 4
-		idx[n + 1], idx[n + 2], idx[n + 3] = base, base + 1, base + 2
-		idx[n + 4], idx[n + 5], idx[n + 6] = base, base + 2, base + 3
-		n = n + 6
+		v, n = quad(verts, idx, v, n, {
+			{ r.x, r.y, 0, 0, 0 },
+			{ r.x + r.w, r.y, 0, 1, 0 },
+			{ r.x + r.w, r.y + r.h, 0, 1, 1 },
+			{ r.x, r.y + r.h, 0, 0, 1 },
+		}, r.color, i)
+	end
+	return verts, idx
+end
+
+--- Elmos from a footprint's centre to its edge along x and z, for a facing.
+-- xsize and zsize are in half build squares, so a footprint of xsize 8 is
+-- four squares, 64 elmos, and reaches 32 either way.
+function M.halfSpan(def, facing)
+	local xs, zs = def.xsize, def.zsize
+	if facing % 2 == 1 then
+		xs, zs = zs, xs
+	end
+	return xs * 4, zs * 4
+end
+
+--- Flatten footprint squares on the ground for the vertex buffer, in world
+-- space: x and z span the footprint, y sits two elmos above the ground.
+-- @param positions table[] from place.footprint
+-- @param blockedColor number[] rgba for a blocked position
+-- @param openColor number[] rgba for the rest
+-- @return number[] vertices, number[] indices, as M.pack
+function M.packGround(positions, blockedColor, openColor)
+	local verts, idx = {}, {}
+	local v, n = 0, 0
+	for i, p in ipairs(positions) do
+		local hw, hd = M.halfSpan(p.def, p.facing)
+		local y = p.y + 2
+		v, n = quad(verts, idx, v, n, {
+			{ p.x - hw, y, p.z - hd, 0, 0 },
+			{ p.x + hw, y, p.z - hd, 1, 0 },
+			{ p.x + hw, y, p.z + hd, 1, 1 },
+			{ p.x - hw, y, p.z + hd, 0, 1 },
+		}, p.blocked and blockedColor or openColor, i)
 	end
 	return verts, idx
 end
