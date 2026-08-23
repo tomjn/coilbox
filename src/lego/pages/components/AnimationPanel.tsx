@@ -47,6 +47,7 @@ import {
   type LegoBuilder,
   type LegoProject,
 } from "../../model";
+import { pieceRest } from "../../pieceRest";
 import {
   clampFrame,
   PREVIEW_FRAMES,
@@ -203,6 +204,7 @@ export function AnimationPanel({
               pieces,
               events,
               frames: PREVIEW_FRAMES,
+              rest: pieceRest(project),
             })
           : await legoRunScript({
               script: script ?? "",
@@ -217,6 +219,9 @@ export function AnimationPanel({
               // without it the script stops on the line that calls into it
               // (#1944).
               includes: project.gameScriptIncludes ?? null,
+              // A script may ask where one of its pieces is, and neither
+              // runtime reads models, so the shape travels with the run (#1948).
+              rest: pieceRest(project),
             });
         setTimeline(result);
         // A run that produced nothing has only its reason to show. One that
@@ -235,11 +240,8 @@ export function AnimationPanel({
       }
     },
     [
-      project.script,
-      project.unitName,
-      project.pieces,
-      project.gameUnitDef,
-      project.gameScriptIncludes,
+      // The whole project, because where its pieces sit is read off it too.
+      project,
       compiled,
       onPlayingChange,
       onScriptTimeline,

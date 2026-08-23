@@ -1,6 +1,7 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 
 import type { S3oModel } from "./importS3o";
+import type { PieceRest } from "./pieceRest";
 import type { S3oBuild } from "./s3oBuild";
 import type {
   ScriptEvent,
@@ -393,6 +394,9 @@ export const legoRunScript = defineCommand<
     /** The library files the script pulls in, keyed by the name it asks for.
      *  A name with no file behind it is noted rather than failed. */
     includes?: Record<string, string> | null;
+    /** Where each piece sits, in the same order as `pieces`, for a script that
+     *  asks where one of them is. */
+    rest?: PieceRest[] | null;
   },
   ScriptTimeline
 >("coilbox-lego", "lego_run_script");
@@ -419,6 +423,8 @@ export const legoProbeScript = defineCommand<
     unitDef?: Record<string, unknown> | null;
     /** The library files the script pulls in, keyed by the name it asks for. */
     includes?: Record<string, string> | null;
+    /** Where each piece sits, in the same order as `pieces`. */
+    rest?: PieceRest[] | null;
   },
   ScriptProbes
 >("coilbox-lego", "lego_probe_script");

@@ -31,7 +31,7 @@
 
 use std::collections::HashMap;
 
-use coilbox_unitpose::{unitvalue, Model, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS};
+use coilbox_unitpose::{unitvalue, Model, Rest, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS};
 
 use crate::cob;
 use crate::opcodes::{mnemonic, opcode};
@@ -63,10 +63,19 @@ const MAX_THREADS: usize = 256;
 const LUA0: i32 = 110;
 const LUA9: i32 = 119;
 
-/// Two-argument `atan`, answering in COB angular units.
-const ATAN: i32 = 14;
-/// Two-argument `hypot`, answering in the same units it was given.
-const HYPOT: i32 = 15;
+/// The frame the run is on, which the preview counts itself.
+const GAME_FRAME: i32 = 134;
+
+/// Where a piece is: the pair of map coordinates packed into one number, and
+/// the height on its own.
+const PIECE_XZ: i32 = 7;
+const PIECE_Y: i32 = 8;
+
+/// Two coordinates in one number, sixteen bits each, which is how the engine
+/// hands a script a place on the map (`PACKXZ` in `CobInstance.h`).
+fn pack_xz(x: f64, z: f64) -> i32 {
+    ((x as i32) << 16) + ((z as i32) & 0xffff)
+}
 
 /// Run the compiled script in `bytes` for `frames` frames, firing `events` as
 /// they come due.
@@ -80,8 +89,14 @@ const HYPOT: i32 = 15;
 /// Never returns an error. A file that will not decode, a thread that loops
 /// without sleeping and a word that is not an opcode all come back as a
 /// [`Timeline`] with `error` set and whatever frames it managed first.
-pub fn run(bytes: &[u8], pieces: &[String], events: &[ScriptEvent], frames: u32) -> Timeline {
-    match Run::start(bytes, pieces) {
+pub fn run(
+    bytes: &[u8],
+    pieces: &[String],
+    events: &[ScriptEvent],
+    frames: u32,
+    rest: &[Rest],
+) -> Timeline {
+    match Run::start(bytes, pieces, rest) {
         Ok(mut run) => run.play(events, frames.min(MAX_FRAMES)),
         Err(error) => Timeline::failed(pieces, error),
     }
@@ -261,6 +276,10 @@ struct Run {
     /// The clock a `SLEEP` is measured against, in milliseconds.
     time: i64,
     budget: i64,
+    /// Set when something has gone wrong with the run itself rather than with
+    /// one of its threads, which is the difference between stopping and
+    /// carrying on.
+    fatal: bool,
     /// State for the deterministic `RAND`. A preview that shuffled itself every
     /// time it was asked would be impossible to look at.
     rng: u64,
@@ -271,9 +290,10 @@ struct Run {
 }
 
 impl Run {
-    fn start(bytes: &[u8], pieces: &[String]) -> Result<Self, String> {
+    fn start(bytes: &[u8], pieces: &[String], rest: &[Rest]) -> Result<Self, String> {
         let program = Program::read(bytes, pieces)?;
         let mut model = Model::new(pieces);
+        model.place(rest);
         for (index, name) in program.piece_names.iter().enumerate() {
             if program.pieces[index].is_none() {
                 model.note(format!(
@@ -290,6 +310,7 @@ impl Run {
             frame: 0,
             time: 0,
             budget: FRAME_INSTRUCTIONS,
+            fatal: false,
             rng: 0x2545_F491_4F6C_DD1D,
             set_values: HashMap::new(),
         })
@@ -381,6 +402,9 @@ impl Run {
 
     fn add(&mut self, thread: Thread) -> Result<(), String> {
         if self.alive() >= MAX_THREADS {
+            // The ceiling is what stops a script that starts a thread per frame
+            // from hanging, so carrying on past it is the hang it prevents.
+            self.fatal = true;
             return Err(format!(
                 "this script has more than {MAX_THREADS} threads running at once"
             ));
@@ -406,7 +430,7 @@ impl Run {
                 self.threads.retain(|t| !matches!(t.state, State::Dead));
                 return Ok(());
             };
-            self.tick_thread(index)?;
+            self.step_thread(index)?;
             for thread in std::mem::take(&mut self.queued) {
                 self.add(thread)?;
             }
@@ -455,12 +479,36 @@ impl Run {
         )
     }
 
+    /// Run one thread, and decide what its failing means.
+    ///
+    /// A thread that walks into something it cannot execute takes itself down
+    /// and nothing else, the way the Lua runtime treats a thread that throws
+    /// and the way the engine treats both. A unit is several threads and one
+    /// of them being wrong is not the others being wrong.
+    ///
+    /// Running out of instructions is the exception, because the budget is
+    /// spent for the whole frame rather than by this thread alone.
+    fn step_thread(&mut self, index: usize) -> Result<(), String> {
+        match self.tick_thread(index) {
+            Ok(()) => Ok(()),
+            Err(error) if self.fatal => Err(error),
+            Err(error) => {
+                self.threads[index].state = State::Dead;
+                self.model.note(format!(
+                    "{error}. That thread stopped and the rest of the unit carried on."
+                ));
+                Ok(())
+            }
+        }
+    }
+
     /// Run one thread until it sleeps, waits or dies.
     fn tick_thread(&mut self, index: usize) -> Result<(), String> {
         self.threads[index].state = State::Ready;
         while matches!(self.threads[index].state, State::Ready) {
             self.budget -= 1;
             if self.budget < 0 {
+                self.fatal = true;
                 return Err(format!(
                     "{}: this frame ran too long, so a thread is looping without a sleep",
                     self.threads[index].origin
@@ -958,17 +1006,41 @@ impl Run {
 
     /// What a script gets when it asks about its unit.
     ///
-    /// The two trigonometry call-outs are answered exactly, because they are
-    /// arithmetic and a script aiming a barrel needs them. Everything else is
-    /// about a world the preview has none of, so it is zero and a note.
+    /// The arithmetic call-outs are answered exactly, because they are
+    /// arithmetic: a `.cob` has no sine, no square root and no absolute value
+    /// of its own, so a script wanting one asks for it here. Those come first,
+    /// because none of them is about the unit and none can be set.
+    ///
+    /// Everything after that is about the unit, and then about a world the
+    /// preview has none of, which is zero and a note.
     fn unit_value(&mut self, i: usize, id: i32, p1: i32, p2: i32) -> i32 {
         if (LUA0..=LUA9).contains(&id) {
             return self.threads[i].lua[(id - LUA0) as usize];
         }
-        match id {
-            ATAN => return (RAD2TAANG * f64::from(p1).atan2(f64::from(p2))) as i32,
-            HYPOT => return f64::from(p1).hypot(f64::from(p2)) as i32,
-            _ => {}
+        if let Some(value) = unitvalue::arithmetic(id, p1, p2) {
+            return value;
+        }
+        if id == GAME_FRAME {
+            return self.frame as i32;
+        }
+        // Where a piece is, which the model knows once somebody has said where
+        // its pieces sit. The unit stands at the origin facing forwards, so a
+        // piece's place in the unit is also its place in the world, which is
+        // what the engine answers with.
+        if id == PIECE_XZ || id == PIECE_Y {
+            let index = self.program.pieces.get((p1 - 1).max(0) as usize).copied();
+            let at = index.flatten().and_then(|at| self.model.piece_position(at));
+            let Some(at) = at else {
+                self.model.note(
+                    "This script asks where one of its pieces is, and the preview was not told where this unit's pieces sit.".to_string(),
+                );
+                return 0;
+            };
+            return if id == PIECE_Y {
+                (at[1] * COBSCALE) as i32
+            } else {
+                pack_xz(at[0], at[2])
+            };
         }
         if let Some(value) = self.set_values.get(&id) {
             return *value;

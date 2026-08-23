@@ -24,6 +24,7 @@
 
 import { legoProbeScript, legoRunScript } from "./bindings";
 import type { LegoProject } from "./model";
+import { pieceRest } from "./pieceRest";
 import { CREATED, PREVIEW_FRAMES, type ScriptEvent } from "./scriptPlayback";
 
 /** Where a proposal came from, which is also how far to trust it. */
@@ -139,6 +140,7 @@ export async function inferRoles(
     callins: STATED.map((entry) => entry.callin),
     unitDef: project.gameUnitDef ?? null,
     includes: project.gameScriptIncludes ?? null,
+    rest: pieceRest(project),
   });
   if (probes.error) return { proposals: [], notes: [], error: probes.error };
 
@@ -169,6 +171,7 @@ export async function inferRoles(
       frames: Math.min(OBSERVE_FRAMES, PREVIEW_FRAMES),
       unitDef: project.gameUnitDef ?? null,
       includes: project.gameScriptIncludes ?? null,
+      rest: pieceRest(project),
     });
     notes.push(...timeline.warnings);
     // A run that broke still says something with the frames it managed, so its

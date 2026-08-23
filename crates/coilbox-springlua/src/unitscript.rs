@@ -34,7 +34,7 @@ use mlua::{
 use serde::Serialize;
 
 use coilbox_unitpose::{axis_index, unitvalue, Model, Wait, TICK_MS};
-pub use coilbox_unitpose::{ScriptEvent, Timeline, FPS, MAX_FRAMES};
+pub use coilbox_unitpose::{Rest, ScriptEvent, Timeline, FPS, MAX_FRAMES};
 
 /// Instructions one frame may execute before the run is abandoned.
 ///
@@ -53,6 +53,9 @@ const HOOK_EVERY: u32 = 100_000;
 /// Most threads that may exist at once. A script that starts a thread per frame
 /// is a bug, and without a ceiling it is a hang.
 const MAX_THREADS: usize = 256;
+
+/// The frame the run is on, which the preview counts itself.
+const GAME_FRAME: i32 = 134;
 
 /// Base-library functions that can execute arbitrary strings or escape the
 /// environment. Removed for the same reason [`crate::SpringLua`] removes them.
@@ -170,18 +173,42 @@ enum State {
 /// piece, throws, or loops without sleeping comes back as a [`Timeline`] with
 /// `error` set and whatever frames it managed. Failing is an outcome of running
 /// a script, not a failure to run one.
-pub fn run(
-    script: &str,
-    name: &str,
-    pieces: &[String],
-    events: &[ScriptEvent],
-    frames: u32,
-    unit_def: Option<&serde_json::Value>,
-    includes: &HashMap<String, String>,
-) -> Timeline {
-    match Run::start(script, name, pieces, unit_def, includes) {
+pub fn run(script: &str, name: &str, unit: &Unit, events: &[ScriptEvent], frames: u32) -> Timeline {
+    match Run::start(script, name, unit) {
         Ok(mut run) => run.play(events, frames.min(MAX_FRAMES)),
-        Err(error) => Timeline::failed(pieces, error),
+        Err(error) => Timeline::failed(unit.pieces, error),
+    }
+}
+
+/// Everything the preview knows about the unit a script is running on.
+///
+/// One thing rather than four arguments because they are one thing: what the
+/// game said this unit is. Each was added when a script that read it stopped
+/// without it, and the next one will be too.
+pub struct Unit<'a> {
+    /// The piece names, which is what `piece("name")` resolves against and the
+    /// order the timeline's numbers are laid out in.
+    pub pieces: &'a [String],
+    /// The unit's own definition, for a script that reads one.
+    pub def: Option<&'a serde_json::Value>,
+    /// The library files the script pulls in, by the name it asks for.
+    pub includes: &'a HashMap<String, String>,
+    /// Where the pieces sit, for a script that asks where one of them is.
+    pub rest: &'a [Rest],
+}
+
+impl<'a> Unit<'a> {
+    /// A unit that is only its pieces, which is what a preview of a script on
+    /// its own knows.
+    pub fn new(pieces: &'a [String]) -> Self {
+        // A borrow of an empty map, so the common case allocates nothing.
+        static NONE: std::sync::OnceLock<HashMap<String, String>> = std::sync::OnceLock::new();
+        Self {
+            pieces,
+            def: None,
+            includes: NONE.get_or_init(HashMap::new),
+            rest: &[],
+        }
     }
 }
 
@@ -206,26 +233,19 @@ const PROBE_CALLS: usize = 16;
 ///
 /// Never returns an error. A script that will not load comes back with `error`
 /// set, and one that loads but answers badly says so on the probe itself.
-pub fn probe(
-    script: &str,
-    name: &str,
-    pieces: &[String],
-    callins: &[String],
-    unit_def: Option<&serde_json::Value>,
-    includes: &HashMap<String, String>,
-) -> Probes {
-    let mut run = match Run::start(script, name, pieces, unit_def, includes) {
+pub fn probe(script: &str, name: &str, unit: &Unit, callins: &[String]) -> Probes {
+    let mut run = match Run::start(script, name, unit) {
         Ok(run) => run,
         Err(error) => {
             return Probes {
-                pieces: pieces.to_vec(),
+                pieces: unit.pieces.to_vec(),
                 probes: Vec::new(),
                 error: Some(error),
             }
         }
     };
     Probes {
-        pieces: pieces.to_vec(),
+        pieces: unit.pieces.to_vec(),
         probes: callins.iter().map(|callin| run.probe(callin)).collect(),
         error: None,
     }
@@ -236,6 +256,11 @@ struct Run {
     sim: Rc<RefCell<Sim>>,
     /// Instructions left in this frame, counted down by the VM's hook.
     budget: Rc<Cell<i64>>,
+    /// Set when something has gone wrong with the run itself rather than with
+    /// one of its threads, which is the difference between stopping and
+    /// carrying on. Shared with the VM's hook, which sets it when a frame's
+    /// instructions run out.
+    fatal: Rc<Cell<bool>>,
     script: Table,
     runners: Vec<Runner>,
     frame: u32,
@@ -245,19 +270,16 @@ impl Run {
     /// Build the VM, install the unit script API and execute the chunk's top
     /// level, which is where its `piece(...)` calls and `script.X` definitions
     /// happen.
-    fn start(
-        script: &str,
-        name: &str,
-        pieces: &[String],
-        unit_def: Option<&serde_json::Value>,
-        includes: &HashMap<String, String>,
-    ) -> Result<Self, String> {
+    fn start(script: &str, name: &str, unit: &Unit) -> Result<Self, String> {
+        let mut model = Model::new(unit.pieces);
+        model.place(unit.rest);
         let sim = Rc::new(RefCell::new(Sim {
-            model: Model::new(pieces),
+            model,
             ..Sim::default()
         }));
         let budget = Rc::new(Cell::new(FRAME_INSTRUCTIONS));
-        let lua = sandbox(&sim, &budget, unit_def, includes)
+        let fatal = Rc::new(Cell::new(false));
+        let lua = sandbox(&sim, &budget, &fatal, unit.def, unit.includes)
             .map_err(|e| format!("could not build the Lua sandbox: {e}"))?;
         let table: Table = lua
             .globals()
@@ -273,6 +295,7 @@ impl Run {
             lua,
             sim,
             budget,
+            fatal,
             script: table,
             runners: Vec::new(),
             frame: 0,
@@ -362,6 +385,7 @@ impl Run {
     /// a `Sleep` cost time rather than nothing.
     fn step(&mut self, events: &[ScriptEvent]) -> Result<(), String> {
         self.budget.set(FRAME_INSTRUCTIONS);
+        self.fatal.set(false);
         {
             let mut sim = self.sim.borrow_mut();
             sim.frame = self.frame;
@@ -424,6 +448,9 @@ impl Run {
         origin: String,
     ) -> Result<(), String> {
         if self.runners.iter().filter(|r| !r.is_dead()).count() >= MAX_THREADS {
+            // The ceiling is what stops a script that starts a thread per frame
+            // from hanging, so carrying on past it is the hang it prevents.
+            self.fatal.set(true);
             return Err(format!(
                 "this script has more than {MAX_THREADS} threads running at once"
             ));
@@ -462,7 +489,35 @@ impl Run {
         })
     }
 
+    /// Resume one thread, and decide what its failing means.
+    ///
+    /// A thread that throws takes itself down and nothing else. That is what
+    /// the engine does: `CLuaUnitScript` logs the error and the unit carries
+    /// on, because a unit is several threads and one of them being wrong is not
+    /// the others being wrong. Beyond All Reason's commander runs a smoke
+    /// thread, an idle thread and a walk thread at once, so a preview that
+    /// stopped at the first bad line would show none of the unit for the sake
+    /// of one part of it.
+    ///
+    /// The exception is running out of instructions, which is not this thread
+    /// being wrong but the run being unable to continue: the budget is spent
+    /// for the whole frame, so every thread after it would fail too and the
+    /// preview would fill with notes about threads that were fine.
     fn resume(&mut self, index: usize) -> Result<(), String> {
+        match self.step_thread(index) {
+            Ok(()) => Ok(()),
+            Err(error) if self.fatal.get() => Err(error),
+            Err(error) => {
+                self.runners[index].state = State::Dead;
+                self.sim.borrow_mut().model.note(format!(
+                    "{error}. That thread stopped and the rest of the unit carried on."
+                ));
+                Ok(())
+            }
+        }
+    }
+
+    fn step_thread(&mut self, index: usize) -> Result<(), String> {
         let args = std::mem::take(&mut self.runners[index].args);
         // Dead before the resume, so a thread that finishes without yielding is
         // not left looking runnable.
@@ -596,6 +651,7 @@ fn describe(error: &mlua::Error) -> String {
 fn sandbox(
     sim: &Rc<RefCell<Sim>>,
     budget: &Rc<Cell<i64>>,
+    fatal: &Rc<Cell<bool>>,
     unit_def: Option<&serde_json::Value>,
     includes: &HashMap<String, String>,
 ) -> mlua::Result<Lua> {
@@ -608,12 +664,14 @@ fn sandbox(
     // thread and every call-in is a thread. Set before any of them exist, since
     // only threads made afterwards pick it up.
     let left = Rc::clone(budget);
+    let spent = Rc::clone(fatal);
     lua.set_global_hook(
         mlua::HookTriggers::new().every_nth_instruction(HOOK_EVERY),
         move |_lua, _debug| {
             let remaining = left.get() - i64::from(HOOK_EVERY);
             left.set(remaining);
             if remaining < 0 {
+                spent.set(true);
                 return Err(mlua::Error::RuntimeError(
                     "this frame ran too long: a thread is looping without a Sleep".into(),
                 ));
@@ -782,7 +840,13 @@ fn install_unit_def(
         "#,
     )
     .set_name("unitscript:unitdef")
-    .exec()
+    .exec()?;
+
+    // The unit's own id, which every script passes to everything it asks. The
+    // framework puts it in the environment and without it a script concatenating
+    // it into a message fails on the concatenation rather than on the message.
+    // The same number the compiled runtime answers `MY_ID` with.
+    globals.set("unitID", unitvalue::UNIT_ID)
 }
 
 /// The `SFX` constants a script names when it explodes or emits. Only the names
@@ -924,30 +988,38 @@ fn install_spring(
         })?,
     )?;
 
-    for name in ["GetUnitPosition", "GetUnitPiecePosition"] {
-        let state = Rc::clone(sim);
-        let label = name.to_string();
-        spring.set(
-            name,
-            lua.create_function(move |_, _: MultiValue| {
-                state.borrow_mut().model.note(format!(
-                    "{label} answers nothing in the preview, which has no world to place the unit in, so a script deciding something from where it is decides it as though it were at the origin."
-                ));
-                Ok((0.0, 0.0, 0.0))
-            })?,
-        )?;
-    }
+    // The unit itself stands at the origin, which is where the viewport draws
+    // it, so a piece's place in the unit is also its place in the world.
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitPosition",
+        lua.create_function(move |_, _: MultiValue| {
+            state.borrow_mut().model.note(
+                "GetUnitPosition answers the origin in the preview, which is where the unit stands because there is nowhere else to stand.".to_string(),
+            );
+            Ok((0.0, 0.0, 0.0))
+        })?,
+    )?;
+
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitPiecePosition",
+        lua.create_function(move |_, (_unit, piece): (Value, Option<i64>)| {
+            let mut sim = state.borrow_mut();
+            let at = piece_position(&mut sim, piece);
+            Ok((at[0], at[1], at[2]))
+        })?,
+    )?;
 
     let state = Rc::clone(sim);
     spring.set(
         "GetUnitPiecePosDir",
-        lua.create_function(move |_, _: MultiValue| {
-            state.borrow_mut().model.note(
-                "GetUnitPiecePosDir answers nothing in the preview, which knows how far a piece has moved but not where the model puts it.".to_string(),
-            );
-            // Position, then a direction, which is forward because a piece
-            // facing nowhere is not a direction any script could use.
-            Ok((0.0, 0.0, 0.0, 0.0, 0.0, 1.0))
+        lua.create_function(move |_, (_unit, piece): (Value, Option<i64>)| {
+            let mut sim = state.borrow_mut();
+            let at = piece_position(&mut sim, piece);
+            // Then a direction, which is forward: the preview does not compose
+            // the rotations that would turn it.
+            Ok((at[0], at[1], at[2], 0.0, 0.0, 1.0))
         })?,
     )?;
 
@@ -1035,6 +1107,30 @@ fn install_echo(lua: &Lua, sim: &Rc<RefCell<Sim>>, spring: &Table) -> mlua::Resu
         Ok(())
     })?;
     spring.set("Echo", echo)
+}
+
+/// Where one piece is, for a script that asks.
+///
+/// The piece is numbered the way `piece()` hands them back, which is from one.
+/// A number that is not a piece of this unit, or a unit nobody said the shape
+/// of, comes back as the origin with a note: a script deciding something from a
+/// position it was quietly handed zero for decides it wrongly and silently.
+fn piece_position(sim: &mut Sim, piece: Option<i64>) -> [f64; 3] {
+    let index = piece.and_then(|number| usize::try_from(number - 1).ok());
+    match index.and_then(|index| sim.model.piece_position(index)) {
+        Some(at) => {
+            sim.model.note(
+                "Where a piece is comes from the model as it stands, so a piece on an arm that has turned is reported where it would be if the arm had not.".to_string(),
+            );
+            at
+        }
+        None => {
+            sim.model.note(
+                "This script asks where one of its pieces is, and the preview was not told where this unit's pieces sit, so it answered the origin.".to_string(),
+            );
+            [0.0; 3]
+        }
+    }
 }
 
 /// One number off the unit's definition, whatever case the game filed it under.
@@ -1315,9 +1411,20 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
     let state = Rc::clone(sim);
     globals.set(
         "GetUnitValue",
-        lua.create_function(move |_, (id, _rest): (i64, MultiValue)| {
+        lua.create_function(move |_, (id, p1, p2): (i64, Option<i64>, Option<i64>)| {
             let id = id as i32;
+            let (p1, p2) = (p1.unwrap_or(0) as i32, p2.unwrap_or(0) as i32);
+            // First, because none of the maths is about the unit and none of it
+            // can be set. A `.cob` asks for its arithmetic this way and a Lua
+            // script has `math`, so this is mostly here so that the two
+            // runtimes cannot answer the same id differently.
+            if let Some(value) = unitvalue::arithmetic(id, p1, p2) {
+                return Ok(value);
+            }
             let mut sim = state.borrow_mut();
+            if id == GAME_FRAME {
+                return Ok(sim.frame as i32);
+            }
             if let Some(value) = sim.values.get(&id) {
                 return Ok(*value);
             }
