@@ -30,26 +30,35 @@ use std::path::Path;
 use crate::ffi::Unitsync;
 use crate::model::{RenderSkip, UnitRenderKey, UnitRenderKeyRequest, UnitRenderKeysOutput};
 
-/// Work out the render key for each of `requests` against `game_archive`.
+/// Work out every angle's render key for each of `requests` against
+/// `game_archive`.
 ///
-/// `angle` is the render angle without the `render:` prefix, checked against the
-/// vocabulary rather than accepted, so a typo cannot mint keys the hub has no
+/// `angles` are render angles without the `render:` prefix, each checked against
+/// the vocabulary rather than accepted, so a typo cannot mint keys the hub has no
 /// reader for. `renderer_version` is the webview's `RENDER_VERSION`, since the
 /// side that draws is the side that knows what drew it.
+///
+/// All the angles are answered from one mount (issue #1951). What the archive is
+/// read for is the model digest, and every angle of one unit shares it, so the
+/// angles cost arithmetic rather than another `AddAllArchives`.
 pub fn render(
     lib: &str,
     game_archive: &str,
     requests: &[UnitRenderKeyRequest],
-    angle: &str,
+    angles: &[String],
     renderer_version: u32,
 ) -> UnitRenderKeysOutput {
-    let Some(variant) = variant_for(angle) else {
-        return UnitRenderKeysOutput {
-            errors: vec![format!(
-                "{angle:?} is not a render angle the hub keeps, so there is no key to give for it"
-            )],
-            ..Default::default()
-        };
+    let variants = match variants_for(angles) {
+        Ok(v) => v,
+        Err(unknown) => {
+            return UnitRenderKeysOutput {
+                errors: vec![format!(
+                    "{unknown:?} is not a render angle the hub keeps, so there is no key to give \
+                     for it"
+                )],
+                ..Default::default()
+            }
+        }
     };
 
     let us = match unsafe { Unitsync::load(Path::new(lib)) } {
@@ -62,21 +71,30 @@ pub fn render(
         }
     };
     us.init(false, 0);
-    let out = resolve(&us, game_archive, requests, &variant, renderer_version);
+    let out = resolve(&us, game_archive, requests, &variants, renderer_version);
     us.uninit();
     out
 }
 
-/// The full variant for `angle`, or `None` when the vocabulary does not list it.
-/// The same check `unitrender` makes, so a key and a render agree about what an
-/// angle is.
-fn variant_for(angle: &str) -> Option<String> {
-    coilbox_assets::vocabulary()
-        .unit
-        .render_angles
+/// Each angle paired with its full variant, or the first one the vocabulary does
+/// not list. The same check `unitrender` makes, so a key and a render agree about
+/// what an angle is.
+///
+/// One unknown angle refuses the whole batch rather than dropping itself. A
+/// caller asking for four angles and silently getting three would offer the hub
+/// three quarters of a unit and read as though it had offered all of it.
+fn variants_for(angles: &[String]) -> Result<Vec<(String, String)>, String> {
+    let known = &coilbox_assets::vocabulary().unit.render_angles;
+    angles
         .iter()
-        .any(|a| a == angle)
-        .then(|| coilbox_assets::render_variant(angle))
+        .map(|angle| {
+            known
+                .iter()
+                .any(|a| a == angle)
+                .then(|| (angle.clone(), coilbox_assets::render_variant(angle)))
+                .ok_or_else(|| angle.clone())
+        })
+        .collect()
 }
 
 /// Read the digests in a session the caller has already initialised, mounting the
@@ -88,7 +106,7 @@ pub(crate) fn resolve(
     us: &Unitsync,
     game_archive: &str,
     requests: &[UnitRenderKeyRequest],
-    variant: &str,
+    variants: &[(String, String)],
     renderer_version: u32,
 ) -> UnitRenderKeysOutput {
     let mut errors = us.drain_errors();
@@ -131,7 +149,7 @@ pub(crate) fn resolve(
     // batch because a batch is one game, and it is here so `--unit-render` can be
     // handed the whole of what it would otherwise mount for (issue #1720).
     let source_archive = crate::archive::archive_name_for_game(us, game_archive);
-    let batch = build_keys(requests, variant, renderer_version, digest, source_archive);
+    let batch = build_keys(requests, variants, renderer_version, digest, source_archive);
 
     us.close_archive(handle);
     errors.extend(us.drain_errors());
@@ -155,12 +173,12 @@ pub(crate) fn resolve(
 /// them, rather than in `resolve`, where nothing but a live engine can.
 fn build_keys(
     requests: &[UnitRenderKeyRequest],
-    variant: &str,
+    variants: &[(String, String)],
     renderer_version: u32,
     digest: impl Fn(&str) -> Result<(String, String), String>,
     source_archive: String,
 ) -> UnitRenderKeysOutput {
-    let mut keys = BTreeMap::new();
+    let mut keys: BTreeMap<String, BTreeMap<String, UnitRenderKey>> = BTreeMap::new();
     let mut skipped = BTreeMap::new();
     let mut seen: BTreeMap<String, Option<(String, String)>> = BTreeMap::new();
 
@@ -173,16 +191,25 @@ fn build_keys(
             skipped.insert(request.unit.clone(), RenderSkip::NoModel);
             continue;
         };
-        keys.insert(
-            request.unit.clone(),
-            key_for(
-                request,
-                variant,
-                renderer_version,
-                model_digest,
-                source_member,
-            ),
-        );
+        // Every angle off the one digest. A unit with no model is skipped whole
+        // rather than per angle, because what it is missing is the model.
+        let angles = variants
+            .iter()
+            .map(|(angle, variant)| {
+                (
+                    variant.clone(),
+                    key_for(
+                        request,
+                        angle,
+                        variant,
+                        renderer_version,
+                        model_digest.clone(),
+                        source_member.clone(),
+                    ),
+                )
+            })
+            .collect();
+        keys.insert(request.unit.clone(), angles);
     }
     UnitRenderKeysOutput {
         keys,
@@ -192,26 +219,28 @@ fn build_keys(
     }
 }
 
-/// One key, framed the way `--unit-render` frames the pixels.
+/// One key, framed the way `--unit-render` frames the pixels for that angle.
 ///
-/// The frame is recomputed from the footprint here rather than taken from the
-/// caller for the same reason `unitrender` recomputes it: the pixel size is part
-/// of the identity, and two footprints can frame to one size.
+/// The frame is recomputed from the angle and the footprint here rather than
+/// taken from the caller for the same reason `unitrender` recomputes it: the
+/// pixel size is part of the identity, and two footprints can frame to one size.
 fn key_for(
     request: &UnitRenderKeyRequest,
+    angle: &str,
     variant: &str,
     renderer_version: u32,
     model_digest: String,
     source_member: String,
 ) -> UnitRenderKey {
-    let frame = coilbox_assets::render_frame(request.footprint_x, request.footprint_z);
+    let (width_px, height_px) =
+        coilbox_assets::render_pixels(angle, request.footprint_x, request.footprint_z);
     let source_hash = crate::assetencode::render_source_hash(
         variant,
         renderer_version,
         request.footprint_x,
         request.footprint_z,
-        frame.width_px,
-        frame.height_px,
+        width_px,
+        height_px,
         &model_digest,
     );
     UnitRenderKey {
@@ -222,8 +251,8 @@ fn key_for(
         renderer_version,
         footprint_x: request.footprint_x,
         footprint_z: request.footprint_z,
-        width_px: frame.width_px,
-        height_px: frame.height_px,
+        width_px,
+        height_px,
         source_hash,
     }
 }
@@ -256,6 +285,17 @@ mod tests {
         }
     }
 
+    /// The angles to key, as `build_keys` takes them.
+    fn angles(named: &[&str]) -> Vec<(String, String)> {
+        variants_for(&named.iter().map(|a| (*a).to_string()).collect::<Vec<_>>())
+            .expect("every angle here is one the vocabulary lists")
+    }
+
+    /// Just the plan, which is what most of these assert about.
+    fn plan() -> Vec<(String, String)> {
+        angles(&["top"])
+    }
+
     /// The identity the whole design rests on: the key a caller can compute
     /// without drawing is the one `--unit-render` will produce for those pixels.
     /// Both go through `render_source_hash` over the same frame, and this asserts
@@ -265,6 +305,7 @@ mod tests {
         let frame = coilbox_assets::render_frame(3, 2);
         let key = key_for(
             &request("armsolar", "armsolar", 3, 2),
+            "top",
             "render:top",
             1,
             "a-model-digest".into(),
@@ -286,6 +327,86 @@ mod tests {
         assert_eq!(key.variant, "render:top");
     }
 
+    /// The framing rule, at the one place a key records it: the plan takes the
+    /// footprint's aspect and the three pictures are square (issue #1951). A key
+    /// that named the wrong size would have the encode refuse the pixels as
+    /// mis-framed, which is the failure this is the early half of.
+    #[test]
+    fn a_picture_angle_is_keyed_square_and_only_the_plan_is_not() {
+        let keyed = |angle: &str| {
+            let key = key_for(
+                &request("armsolar", "armsolar", 3, 2),
+                angle,
+                &coilbox_assets::render_variant(angle),
+                1,
+                "digest".into(),
+                "objects3d/armsolar.s3o".into(),
+            );
+            (key.width_px, key.height_px)
+        };
+        assert_eq!(keyed("top"), (255, 204));
+        for angle in ["front", "side", "angled"] {
+            assert_eq!(keyed(angle), (256, 256), "{angle}");
+        }
+    }
+
+    /// Four angles of one unit are four pictures, so they are four identities.
+    /// Sharing one would have the have check answer for a picture nobody drew.
+    #[test]
+    fn every_angle_of_one_unit_is_its_own_identity() {
+        let out = build_keys(
+            &[request("armsolar", "armsolar", 3, 2)],
+            &angles(&["top", "front", "side", "angled"]),
+            1,
+            |_| Ok(("digest".into(), "objects3d/armsolar.s3o".into())),
+            "Balanced Annihilation V15.9.8".into(),
+        );
+        let keyed = &out.keys["armsolar"];
+        assert_eq!(keyed.len(), 4);
+
+        let hashes: std::collections::BTreeSet<&str> =
+            keyed.values().map(|k| k.source_hash.as_str()).collect();
+        assert_eq!(hashes.len(), 4, "{keyed:?}");
+        // Named by the variant they are of, since that is what the upload and
+        // the have check address a picture by.
+        for angle in ["top", "front", "side", "angled"] {
+            let variant = coilbox_assets::render_variant(angle);
+            assert_eq!(keyed[&variant].variant, variant);
+        }
+        // And the model was read once for all four.
+        for key in keyed.values() {
+            assert_eq!(key.model_digest, "digest");
+        }
+    }
+
+    /// The mount is the cost and the angles are arithmetic, so asking for four
+    /// reads no more models than asking for one (issues #1684, #1720 and #1951).
+    #[test]
+    fn four_angles_read_the_model_no_more_often_than_one_does() {
+        let count = |wanted: &[&str]| {
+            let asked = RefCell::new(0usize);
+            build_keys(
+                &[
+                    request("armsolar", "armsolar", 3, 2),
+                    request("armllt", "armllt", 2, 2),
+                ],
+                &angles(wanted),
+                1,
+                |object| {
+                    *asked.borrow_mut() += 1;
+                    Ok((
+                        format!("digest-of-{object}"),
+                        format!("objects3d/{object}.s3o"),
+                    ))
+                },
+                "Balanced Annihilation V15.9.8".into(),
+            );
+            asked.into_inner()
+        };
+        assert_eq!(count(&["top"]), 2);
+        assert_eq!(count(&["top", "front", "side", "angled"]), 2);
+    }
+
     /// Two units with the same model and different footprints are two pictures,
     /// which is why the footprint is in the key and not only in the frame.
     #[test]
@@ -293,6 +414,7 @@ mod tests {
         let key = |fx, fz| {
             key_for(
                 &request("u", "shared", fx, fz),
+                "top",
                 "render:top",
                 1,
                 "digest".into(),
@@ -316,7 +438,7 @@ mod tests {
         ];
         let out = build_keys(
             &requests,
-            "render:top",
+            &plan(),
             1,
             |object| {
                 asked.borrow_mut().push(object.to_string());
@@ -328,19 +450,17 @@ mod tests {
             "Beyond All Reason test-30922-8064a43".into(),
         );
         let (keys, skipped) = (out.keys, out.skipped);
+        let top = |unit: &str| keys[unit]["render:top"].clone();
 
         assert_eq!(asked.borrow().len(), 2, "{:?}", asked.borrow());
         assert_eq!(keys.len(), 4);
         assert!(skipped.is_empty());
         // Same model, so the same digest, and the one asked for in a different
         // case is the same model too.
-        assert_eq!(keys["armwreck_a"].model_digest, "digest-of-wreck");
-        assert_eq!(keys["armwreck_c"].model_digest, "digest-of-wreck");
+        assert_eq!(top("armwreck_a").model_digest, "digest-of-wreck");
+        assert_eq!(top("armwreck_c").model_digest, "digest-of-wreck");
         // And a different footprint is still a different picture.
-        assert_ne!(
-            keys["armwreck_a"].source_hash,
-            keys["armwreck_c"].source_hash
-        );
+        assert_ne!(top("armwreck_a").source_hash, top("armwreck_c").source_hash);
     }
 
     /// A unit whose model the archive does not hold gets no key rather than a key
@@ -353,7 +473,7 @@ mod tests {
         ];
         let out = build_keys(
             &requests,
-            "render:top",
+            &plan(),
             1,
             |object| {
                 if object.contains("missing") {
@@ -384,7 +504,7 @@ mod tests {
         let keyed = |requests: &[UnitRenderKeyRequest]| {
             build_keys(
                 requests,
-                "render:top",
+                &plan(),
                 1,
                 |object| {
                     if object.contains("missing") {
@@ -430,20 +550,32 @@ mod tests {
             );
             // And each key carries the other two, so every unit the batch keyed
             // is one the encode can take without mounting for it.
-            for (unit, key) in &out.keys {
-                assert!(!key.model_digest.is_empty(), "{unit}");
-                assert!(!key.source_member.is_empty(), "{unit}");
+            for (unit, keyed) in &out.keys {
+                for key in keyed.values() {
+                    assert!(!key.model_digest.is_empty(), "{unit}");
+                    assert!(!key.source_member.is_empty(), "{unit}");
+                }
             }
         }
     }
 
     /// An angle nobody agreed on would key a row the hub has no reader for, so
     /// nothing is mounted and nothing is answered.
+    ///
+    /// One bad angle refuses the batch rather than dropping itself. A caller that
+    /// asked for four and quietly got three would send three quarters of a unit
+    /// and have no way to tell that from the whole of it.
     #[test]
     fn an_angle_the_vocabulary_does_not_list_is_refused() {
-        assert_eq!(variant_for("top").as_deref(), Some("render:top"));
-        assert_eq!(variant_for("isometric"), None);
-        let out = render("nolib", "Nothing.sdd", &[], "isometric", 1);
+        assert_eq!(
+            variants_for(&["top".into()]),
+            Ok(vec![("top".into(), "render:top".into())])
+        );
+        assert_eq!(
+            variants_for(&["top".into(), "isometric".into()]),
+            Err("isometric".into())
+        );
+        let out = render("nolib", "Nothing.sdd", &[], &["isometric".into()], 1);
         assert!(out.keys.is_empty());
         assert!(out.errors[0].contains("isometric"), "{:?}", out.errors);
     }
@@ -531,7 +663,18 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let pixel_file = dir.join("pixels.bin");
         let mut checked = 0;
-        for (unit, key) in batch.keys.iter().take(3) {
+        // Every angle of the first few units, since the framing rule differs by
+        // angle and a plan agreeing says nothing about a picture (issue #1951).
+        let sampled = batch
+            .keys
+            .iter()
+            .take(3)
+            .flat_map(|(unit, keyed)| keyed.values().map(move |key| (unit, key)));
+        for (unit, key) in sampled {
+            let angle = key
+                .variant
+                .strip_prefix("render:")
+                .expect("a render variant names its angle");
             std::fs::write(
                 &pixel_file,
                 vec![0u8; (key.width_px * key.height_px * 4) as usize],
@@ -545,7 +688,7 @@ mod tests {
                     "--object".into(),
                     key.object_name.clone(),
                     "--angle".into(),
-                    "top".into(),
+                    angle.to_string(),
                     "--footprint-x".into(),
                     key.footprint_x.to_string(),
                     "--footprint-z".into(),
@@ -576,6 +719,7 @@ mod tests {
             ]);
 
             for (how, drawn) in [("mounted", &mounted), ("handed the key", &handed)] {
+                let how = &format!("{angle} {how}");
                 let asset = drawn
                     .get("asset")
                     .unwrap_or_else(|| panic!("{unit} {how} was not encoded: {drawn}"));
@@ -588,11 +732,15 @@ mod tests {
             }
             // And whole, so a field neither the key nor the loop names cannot
             // move under the fast path either.
-            assert_eq!(mounted["asset"], handed["asset"], "{unit}");
-            println!("{unit}: {} matches both render paths", key.source_hash);
+            assert_eq!(mounted["asset"], handed["asset"], "{unit} {angle}");
+            println!(
+                "{unit} {angle}: {} matches both render paths",
+                key.source_hash
+            );
             checked += 1;
         }
-        assert_eq!(checked, batch.keys.len().min(3));
+        let per_unit = batch.keys.values().next().map_or(0, BTreeMap::len);
+        assert_eq!(checked, batch.keys.len().min(3) * per_unit);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -601,7 +749,7 @@ mod tests {
     fn the_output_names_its_fields_the_way_the_caller_reads_them() {
         let out = build_keys(
             &[request("armsolar", "armsolar", 4, 4)],
-            "render:top",
+            &plan(),
             1,
             |_| Ok(("digest".into(), "objects3d/armsolar.s3o".into())),
             "Beyond All Reason test-30922-8064a43".into(),

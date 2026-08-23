@@ -6,10 +6,11 @@
 //! pixels arrive here as a raw RGBA buffer in a file. What this side owns is
 //! everything the picture has to be checked and named against:
 //!
-//! - **The framing.** A render's aspect has to be its footprint's, and the hub
-//!   cannot check that because it does not hold footprints. So the frame is
-//!   recomputed here from the footprint and the pixels are refused if they are
-//!   not that shape. A mis-framed render is caught here or nowhere.
+//! - **The framing.** A plan's aspect has to be its footprint's and a picture of
+//!   a unit has to be square, and the hub can check neither because it does not
+//!   hold footprints. So the shape is recomputed here from the angle and the
+//!   footprint through `coilbox_assets::render_pixels`, and the pixels are
+//!   refused if they are not it. A mis-framed render is caught here or nowhere.
 //! - **The encoding.** `assetencode::encode_variant` is the corpus's one
 //!   encoder. A canvas can write WebP itself, and the easy path would be to let
 //!   it. Measured on one real render, the Armada Vehicle Plant at 250x200:
@@ -98,16 +99,18 @@ pub fn render(lib: &str, req: &RenderRequest<'_>) -> UnitRenderOutput {
         Some(v) => v,
         None => return skipped(RenderSkip::UnknownAngle, Vec::new()),
     };
-    let frame = coilbox_assets::render_frame(req.footprint_x, req.footprint_z);
-    if (req.width, req.height) != (frame.width_px, frame.height_px) {
+    let (width_px, height_px) =
+        coilbox_assets::render_pixels(req.angle, req.footprint_x, req.footprint_z);
+    if (req.width, req.height) != (width_px, height_px) {
         return skipped(
             RenderSkip::MisFramed,
             vec![format!(
-                "a {}x{} footprint frames to {}x{} pixels, and the render is {}x{}",
+                "a {}x{} footprint frames a {:?} render to {}x{} pixels, and the render is {}x{}",
                 req.footprint_x,
                 req.footprint_z,
-                frame.width_px,
-                frame.height_px,
+                req.angle,
+                width_px,
+                height_px,
                 req.width,
                 req.height
             )],
@@ -157,8 +160,8 @@ pub fn render(lib: &str, req: &RenderRequest<'_>) -> UnitRenderOutput {
         req.renderer_version,
         req.footprint_x,
         req.footprint_z,
-        frame.width_px,
-        frame.height_px,
+        width_px,
+        height_px,
         &model_digest,
     );
 

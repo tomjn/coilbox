@@ -2,7 +2,7 @@
   "unit": {
     "buildpicVariant": "buildpic",
     "renderVariantPrefix": "render:",
-    "renderAngles": ["top"]
+    "renderAngles": ["top", "front", "side", "angled"]
   },
   "mapVariants": ["minimap", "overlay:metal", "overlay:type", "overlay:height"],
   "origins": ["extracted", "rendered", "uploaded"],

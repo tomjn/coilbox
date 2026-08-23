@@ -94,11 +94,12 @@ export const BUILDPIC_VARIANT = vocabulary.unit.buildpicVariant;
 export const RENDER_VARIANT_PREFIX = vocabulary.unit.renderVariantPrefix;
 
 /**
- * The angles worth rendering, which is one.
+ * The angles worth rendering, which is four (issue #1951).
  *
- * `render:top` exists for the hub's blueprint preview and nothing else asks for
- * another. Renders are the only class in the corpus that scales without a natural
- * bound, so an angle added on spec is a real cost rather than a spare column.
+ * One of them is a plan and three are pictures of the unit. Renders are the only
+ * class in the corpus that scales without a natural bound, so the list is short
+ * on purpose: section 5.1 of the asset pipeline design budgets the class at units
+ * times angles, and four is what fits under the durable tier's ceiling.
  */
 export const RENDER_ANGLES = vocabulary.unit.renderAngles;
 
@@ -107,6 +108,16 @@ export const RENDER_ANGLES = vocabulary.unit.renderAngles;
  *  and `vocabulary.test.ts` holds it inside {@link RENDER_ANGLES} so it cannot
  *  become an angle the hub has no pictures for. */
 export const TOP_RENDER_ANGLE = "top";
+
+/** What {@link renderPixels} calls the one angle framed on a footprint. The same
+ *  string as {@link TOP_RENDER_ANGLE}, under the name the framing rule uses. */
+export const PLAN_ANGLE = TOP_RENDER_ANGLE;
+
+/** The angles that are pictures of a unit rather than a plan of one: framed on
+ *  the model's own bounds, square, and drawn to be looked at. */
+export const PICTURE_ANGLES = RENDER_ANGLES.filter(
+  (angle) => angle !== PLAN_ANGLE,
+);
 
 /**
  * The map side of the vocabulary, and a closed list, unlike the unit side. None
@@ -262,4 +273,28 @@ export function renderFrame(
     heightPx: squaresZ * pixelsPerSquare,
     pixelsPerSquare,
   };
+}
+
+/**
+ * The pixel size a render of `angle` has to be, and the whole of what the two
+ * sides have to agree on about framing (issue #1951).
+ *
+ * The twin of `render_pixels` in `crates/coilbox-assets`, which is what refuses a
+ * render that is not this shape. The reasoning is written out there, since that
+ * is the side the check runs on. In short: a plan keeps the footprint's aspect
+ * because it tiles into a layout, and the other three are square because a front
+ * or a side view has a footprint for its width and nothing at all for its
+ * height, so they frame on the model instead.
+ */
+export function renderPixels(
+  angle: string,
+  footprintX: number,
+  footprintZ: number,
+): { widthPx: number; heightPx: number } {
+  if (angle === PLAN_ANGLE) {
+    const { widthPx, heightPx } = renderFrame(footprintX, footprintZ);
+    return { widthPx, heightPx };
+  }
+  const cap = ASSET_CLASSES[RENDER_CLASS].maxEdgePx ?? 0;
+  return { widthPx: cap, heightPx: cap };
 }

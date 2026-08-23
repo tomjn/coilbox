@@ -29,11 +29,12 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 import type { LocalRender, UnitDatasetEntry } from "@/content/bindings";
 import {
+  BACKFILL_ANGLES,
   type BackfillTools,
   type BackfillUnit,
   backfillBlueprintUnits,
   blueprintBackfillUnits,
-  unitsWanted,
+  picturesWanted,
 } from "./blueprintBackfill";
 import type { AssetKey, HaveResult, HaveStatus } from "./have";
 import {
@@ -44,6 +45,7 @@ import {
   uploadRunStopping,
 } from "./runningUploads";
 import type { AssetUpload, AssetUploadProgress } from "./upload";
+import { renderVariant } from "./vocabulary";
 
 /**
  * Beyond All Reason's roster after #1663, which is the number this file exists
@@ -51,6 +53,18 @@ import type { AssetUpload, AssetUploadProgress } from "./upload";
  * roster.
  */
 const BAR_UNITS = 564;
+
+/**
+ * How many renders one unit is worth (issue #1951).
+ *
+ * Read off the vocabulary rather than written down, so these tests keep asserting
+ * "every angle" rather than "four" if the list ever changes again. The counts
+ * below are arithmetic on it for the same reason.
+ */
+const ANGLES = BACKFILL_ANGLES.length;
+
+/** What one unit costs in pictures: a build pic and a render at each angle. */
+const PICTURES_PER_UNIT = 1 + ANGLES;
 
 /** A game's whole dataset, of which a layout names a handful. */
 function roster(count = BAR_UNITS): UnitDatasetEntry[] {
@@ -94,15 +108,22 @@ interface Spy {
   /** What the topbar held at each moment a picture was drawn, so a test can see
    *  the run while it is going rather than only after it. */
   shownWhileDrawing: RunningUpload[][];
-  /** The units each lookup of this machine\'s own renders asked about, and what
-   *  archive it named, so a test can see the local check happen (issue #1724). */
-  heldAsks: { units: string[]; sourceArchive?: string }[];
+  /** The angles each render key call asked for, so a test can see that one call
+   *  covers the lot rather than one call per angle (issue #1951). */
+  angleAsks: string[][];
+  /** The angle of each picture drawn, in order. */
+  drawnAngles: string[];
+  /** The units each lookup of this machine\'s own renders asked about, which
+   *  variant it was for, and what archive it named, so a test can see the local
+   *  check happen (issue #1724). */
+  heldAsks: { variant: string; units: string[]; sourceArchive?: string }[];
   /** Every render written down after it was drawn, in order. */
   remembered: { unit: string; sourceHash: string }[];
   /** What each encode was handed, so a test can see whether the key it was named
    *  by came with it (issue #1720). */
   encodes: {
     object: string;
+    angle: string;
     modelDigest?: string;
     sourceMember?: string;
     sourceArchive?: string;
@@ -127,9 +148,10 @@ function spy(
     /** How many of the set the fake hub took, when the run was stopped partway.
      *  Defaults to all of them. */
     takes?: (assets: AssetUpload[]) => number;
-    /** What this machine already drew, by unit name. Defaults to nothing, which is
-     *  a machine that has never rendered anything (issue #1724). */
-    alreadyDrawn?: (unit: string) => LocalRender | undefined;
+    /** What this machine already drew, by unit name and variant. Defaults to
+     *  nothing, which is a machine that has never rendered anything
+     *  (issue #1724). */
+    alreadyDrawn?: (unit: string, variant: string) => LocalRender | undefined;
   } = {},
 ): Spy {
   const hubHas = options.hubHas ?? (() => false);
@@ -144,6 +166,8 @@ function spy(
     asked: [] as AssetKey[][],
     modelBatches: [] as string[][],
     draws: 0,
+    angleAsks: [] as string[][],
+    drawnAngles: [] as string[],
     uploads: [] as AssetUpload[][],
     startedBy: [] as string[],
     uploadOpIds: [] as (string | undefined)[],
@@ -155,23 +179,30 @@ function spy(
   };
 
   const tools: BackfillTools = {
-    renderKeys: async ({ units }) => {
+    renderKeys: async ({ units, angles }) => {
       state.renderKeyCalls += 1;
+      state.angleAsks.push([...(angles ?? [])]);
       const keys: Record<string, never> | Record<string, unknown> = {};
       for (const unit of units) {
         if (modelless(unit.unit)) continue;
-        keys[unit.unit] = {
-          objectName: unit.object,
-          sourceMember: `objects3d/${unit.object}`,
-          modelDigest: `model-${unit.unit}`,
-          variant: "render:top",
-          rendererVersion: 1,
-          footprintX: unit.footprintX,
-          footprintZ: unit.footprintZ,
-          widthPx: 128,
-          heightPx: 192,
-          sourceHash: `render-src-${unit.unit}`,
-        };
+        // One key per angle, off the one model read, the way the worker answers.
+        keys[unit.unit] = Object.fromEntries(
+          (angles ?? []).map((angle) => [
+            renderVariant(angle),
+            {
+              objectName: unit.object,
+              sourceMember: `objects3d/${unit.object}`,
+              modelDigest: `model-${unit.unit}`,
+              variant: renderVariant(angle),
+              rendererVersion: 1,
+              footprintX: unit.footprintX,
+              footprintZ: unit.footprintZ,
+              widthPx: 128,
+              heightPx: 192,
+              sourceHash: `render-src-${unit.unit}-${angle}`,
+            },
+          ]),
+        );
       }
       return {
         keys,
@@ -235,9 +266,10 @@ function spy(
       paletteFaces: 0,
       errors: [],
     }),
-    draw: async () => {
+    draw: async (angle) => {
       await options.beforeDraw?.(state.draws);
       state.draws += 1;
+      state.drawnAngles.push(angle);
       state.shownWhileDrawing.push(
         readRunningUploads().map((run) => ({ ...run })),
       );
@@ -258,19 +290,26 @@ function spy(
     },
     encodeRender: async ({
       object,
+      angle,
       modelDigest,
       sourceMember,
       sourceArchive,
     }) => {
-      state.encodes.push({ object, modelDigest, sourceMember, sourceArchive });
+      state.encodes.push({
+        object,
+        angle,
+        modelDigest,
+        sourceMember,
+        sourceArchive,
+      });
       return {
         asset: {
-          variant: "render:top",
+          variant: renderVariant(angle),
           origin: "rendered",
           sourceArchive: "Beyond All Reason test-1",
-          path: `/cache/${object}.render.webp`,
-          hash: `render-hash-${object}`,
-          sourceHash: `render-src-${object}`,
+          path: `/cache/${object}.${angle}.webp`,
+          hash: `render-hash-${object}-${angle}`,
+          sourceHash: `render-src-${object}-${angle}`,
           sourceMember: `objects3d/${object}`,
           modelDigest: `model-${object}`,
           rendererVersion: 1,
@@ -285,11 +324,11 @@ function spy(
         errors: [],
       };
     },
-    held: async (_game, _variant, _version, units, sourceArchive) => {
-      state.heldAsks.push({ units: [...units], sourceArchive });
+    held: async (_game, variant, _version, units, sourceArchive) => {
+      state.heldAsks.push({ variant, units: [...units], sourceArchive });
       const found = new Map<string, LocalRender>();
       for (const unit of units) {
-        const render = alreadyDrawn(unit);
+        const render = alreadyDrawn(unit, variant);
         if (render) found.set(unit.toLowerCase(), render);
       }
       return found;
@@ -326,6 +365,12 @@ function spy(
     },
     get draws() {
       return state.draws;
+    },
+    get angleAsks() {
+      return state.angleAsks;
+    },
+    get drawnAngles() {
+      return state.drawnAngles;
     },
     get uploads() {
       return state.uploads;
@@ -440,7 +485,8 @@ describe("which units a layout names", () => {
 describe("a run over one layout", () => {
   /**
    * The count that says this is not a roster walk. Twelve units named out of
-   * five hundred and sixty four, and twelve of everything the run does.
+   * five hundred and sixty four, and twelve units' worth of everything the run
+   * does: the angles multiply the pictures and cannot multiply the units.
    */
   it("does twelve units' work for a twelve unit layout in a 564 unit game", async () => {
     const watch = spy();
@@ -452,17 +498,42 @@ describe("a run over one layout", () => {
     );
 
     expect(report.units).toBe(12);
-    expect(report.asked).toBe(12);
-    expect(report.rendered).toBe(12);
-    expect(report.offered).toBe(24);
-    expect(report.written).toBe(24);
+    expect(report.asked).toBe(12 * ANGLES);
+    expect(report.rendered).toBe(12 * ANGLES);
+    expect(report.offered).toBe(12 * PICTURES_PER_UNIT);
+    expect(report.written).toBe(12 * PICTURES_PER_UNIT);
 
-    // And in requests rather than in the report's own words.
+    // And in requests rather than in the report's own words. One question and
+    // one model per unit however many angles come out of them.
     expect(watch.asked).toHaveLength(1);
-    expect(watch.asked[0]).toHaveLength(12);
+    expect(watch.asked[0]).toHaveLength(12 * ANGLES);
     expect(watch.models).toHaveLength(12);
     expect(watch.uploads).toHaveLength(1);
-    expect(watch.uploads[0]).toHaveLength(24);
+    expect(watch.uploads[0]).toHaveLength(12 * PICTURES_PER_UNIT);
+  });
+
+  /**
+   * Every angle of every unit, out of the one call (issue #1951). Asking per
+   * angle would be four `AddAllArchives` where there was one, which is the cost
+   * #1684 and #1720 exist to have removed.
+   */
+  it("asks for every angle in the one key call", async () => {
+    const watch = spy();
+    await backfillBlueprintUnits(TARGET, unitsOf(5), 100, watch.tools);
+
+    expect(watch.renderKeyCalls).toBe(1);
+    expect(watch.angleAsks).toEqual([[...BACKFILL_ANGLES]]);
+    // And a picture really was drawn at each of them, in the order the
+    // vocabulary lists, rather than four of the same one.
+    expect(watch.drawnAngles.slice(0, ANGLES)).toEqual([...BACKFILL_ANGLES]);
+    expect(new Set(watch.drawnAngles).size).toBe(ANGLES);
+
+    const variants = watch.uploads[0]
+      .filter((asset) => asset.origin === "rendered")
+      .map((asset) => asset.variant);
+    expect(new Set(variants)).toEqual(
+      new Set(BACKFILL_ANGLES.map(renderVariant)),
+    );
   });
 
   /**
@@ -505,14 +576,16 @@ describe("a run over one layout", () => {
     const watch = spy();
     await backfillBlueprintUnits(TARGET, unitsOf(20), 100, watch.tools);
 
-    expect(watch.encodes).toHaveLength(20);
+    expect(watch.encodes).toHaveLength(20 * ANGLES);
     for (const encode of watch.encodes) {
       const unit = encode.object.replace(/\.s3o$/, "");
       expect(encode.modelDigest).toBe(`model-${unit}`);
       expect(encode.sourceMember).toBe(`objects3d/${unit}.s3o`);
       expect(encode.sourceArchive).toBe("Beyond All Reason test-1");
     }
-    // Every unit once, so no unit's key was handed to another unit's picture.
+    // Every unit, so no unit's key was handed to another unit's picture. The
+    // digest is the unit's rather than the picture's, which is why four angles
+    // of twenty units is still twenty of them.
     expect(new Set(watch.encodes.map((e) => e.modelDigest)).size).toBe(20);
   });
 
@@ -530,7 +603,7 @@ describe("a run over one layout", () => {
     };
     await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
 
-    expect(watch.encodes).toHaveLength(3);
+    expect(watch.encodes).toHaveLength(3 * ANGLES);
     for (const encode of watch.encodes) {
       expect(encode.modelDigest).toBeUndefined();
       expect(encode.sourceMember).toBeUndefined();
@@ -553,7 +626,7 @@ describe("a run over one layout", () => {
     await backfillBlueprintUnits(TARGET, units, 100, watch.tools);
 
     expect(watch.modelBatches).toEqual([["shared.s3o"]]);
-    expect(watch.draws).toBe(2);
+    expect(watch.draws).toBe(2 * ANGLES);
   });
 
   /**
@@ -569,7 +642,7 @@ describe("a run over one layout", () => {
       watch.tools,
     );
 
-    expect(report.asked).toBe(12);
+    expect(report.asked).toBe(12 * ANGLES);
     expect(report.rendered).toBe(0);
     expect(watch.draws).toBe(0);
     // And no mount for models either, which is what asking after the have check
@@ -606,7 +679,7 @@ describe("a run over one layout", () => {
       watch.tools,
     );
 
-    expect(report.rendered).toBe(1);
+    expect(report.rendered).toBe(ANGLES);
     expect(watch.models).toEqual(["unit5.s3o"]);
   });
 
@@ -619,10 +692,10 @@ describe("a run over one layout", () => {
       watch.tools,
     );
 
-    expect(report.asked).toBe(11);
-    expect(report.rendered).toBe(11);
+    expect(report.asked).toBe(11 * ANGLES);
+    expect(report.rendered).toBe(11 * ANGLES);
     // The build pic still goes, because it does not need the model.
-    expect(report.offered).toBe(23);
+    expect(report.offered).toBe(11 * ANGLES + 12);
   });
 
   it("sends a unit key with the game's shortname and the source hash it asked with", async () => {
@@ -633,16 +706,20 @@ describe("a run over one layout", () => {
       keyed_on: "unit",
       game: "bar",
       unit_name: "unit0",
-      variant: "render:top",
-      source_hash: "render-src-unit0",
+      variant: renderVariant(BACKFILL_ANGLES[0]),
+      source_hash: `render-src-unit0-${BACKFILL_ANGLES[0]}`,
     });
     const sent = watch.uploads[0];
-    expect(sent.map((asset) => asset.variant).sort()).toEqual([
-      "buildpic",
-      "buildpic",
-      "render:top",
-      "render:top",
-    ]);
+    expect(sent.map((asset) => asset.variant).sort()).toEqual(
+      [
+        "buildpic",
+        "buildpic",
+        ...BACKFILL_ANGLES.flatMap((angle) => [
+          renderVariant(angle),
+          renderVariant(angle),
+        ]),
+      ].sort(),
+    );
     expect(
       sent.every((asset) => asset.keyed_on === "unit" && asset.game === "bar"),
     ).toBe(true);
@@ -653,16 +730,17 @@ describe("a render this machine already drew (issue #1724)", () => {
   /** One record in the shape the index answers with, for `unit`. */
   const drawn = (
     unit: string,
+    variant: string,
     patch: Partial<LocalRender> = {},
   ): LocalRender => ({
     game: "bar",
     unit,
-    variant: "render:top",
+    variant,
     file: `render-hash-${unit}.s3o.webp`,
     path: `/cache/hub/render-hash-${unit}.webp`,
     mime: "image/webp",
     encodeProfile: "webp-q80-512",
-    sourceHash: `render-src-${unit}`,
+    sourceHash: `render-src-${unit}-${variant.replace("render:", "")}`,
     modelDigest: `model-${unit}`,
     sourceArchive: "Beyond All Reason test-1",
     rendererVersion: 1,
@@ -677,7 +755,9 @@ describe("a render this machine already drew (issue #1724)", () => {
    * its own bytes and nothing said which unit it was of.
    */
   it("is offered to the hub without being drawn again", async () => {
-    const watch = spy({ alreadyDrawn: (unit) => drawn(unit) });
+    const watch = spy({
+      alreadyDrawn: (unit, variant) => drawn(unit, variant),
+    });
     const report = await backfillBlueprintUnits(
       TARGET,
       unitsOf(4),
@@ -687,13 +767,15 @@ describe("a render this machine already drew (issue #1724)", () => {
 
     expect(watch.draws).toBe(0);
     expect(report.rendered).toBe(0);
-    // Still four renders and four build pics offered, so nothing was lost by not
+    // Still every angle and four build pics offered, so nothing was lost by not
     // drawing them.
-    expect(report.offered).toBe(8);
+    expect(report.offered).toBe(4 * PICTURES_PER_UNIT);
     const renders = watch.uploads[0].filter((a) => a.origin === "rendered");
-    expect(renders).toHaveLength(4);
+    expect(renders).toHaveLength(4 * ANGLES);
     expect(renders[0].path).toBe("/cache/hub/render-hash-unit0.webp");
-    expect(renders[0].source_hash).toBe("render-src-unit0");
+    expect(renders[0].source_hash).toBe(
+      `render-src-unit0-${BACKFILL_ANGLES[0]}`,
+    );
     // And no models were mounted for, because nothing needed drawing.
     expect(watch.models).toHaveLength(0);
   });
@@ -705,18 +787,18 @@ describe("a render this machine already drew (issue #1724)", () => {
    */
   it("is drawn again when the game has moved under it", async () => {
     const watch = spy({
-      alreadyDrawn: (unit) => drawn(unit, { sourceHash: "render-src-old" }),
+      alreadyDrawn: (unit, variant) =>
+        drawn(unit, variant, { sourceHash: "render-src-old" }),
     });
     await backfillBlueprintUnits(TARGET, unitsOf(4), 100, watch.tools);
 
-    expect(watch.draws).toBe(4);
+    expect(watch.draws).toBe(4 * ANGLES);
     const renders = watch.uploads[0].filter((a) => a.origin === "rendered");
-    expect(renders.map((a) => a.source_hash)).toEqual([
-      "render-src-unit0.s3o",
-      "render-src-unit1.s3o",
-      "render-src-unit2.s3o",
-      "render-src-unit3.s3o",
-    ]);
+    expect(renders.map((a) => a.source_hash)).toEqual(
+      ["unit0", "unit1", "unit2", "unit3"].flatMap((unit) =>
+        BACKFILL_ANGLES.map((angle) => `render-src-${unit}.s3o-${angle}`),
+      ),
+    );
   });
 
   /** Asked for the archive the keys call reported, so the lookup can refuse a
@@ -725,9 +807,15 @@ describe("a render this machine already drew (issue #1724)", () => {
     const watch = spy();
     await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
 
-    expect(watch.heldAsks).toHaveLength(1);
-    expect(watch.heldAsks[0].sourceArchive).toBe("Beyond All Reason test-1");
-    expect(watch.heldAsks[0].units).toEqual(["unit0", "unit1", "unit2"]);
+    // One lookup per angle, since the index answers for one variant at a time.
+    expect(watch.heldAsks).toHaveLength(ANGLES);
+    expect(watch.heldAsks.map((ask) => ask.variant)).toEqual(
+      BACKFILL_ANGLES.map(renderVariant),
+    );
+    for (const ask of watch.heldAsks) {
+      expect(ask.sourceArchive).toBe("Beyond All Reason test-1");
+      expect(ask.units).toEqual(["unit0", "unit1", "unit2"]);
+    }
   });
 
   /** Only the units something is going to be done about. A layout the hub already
@@ -736,7 +824,7 @@ describe("a render this machine already drew (issue #1724)", () => {
     const watch = spy({ hubHas: () => true });
     await backfillBlueprintUnits(TARGET, unitsOf(5), 100, watch.tools);
 
-    expect(watch.heldAsks[0].units).toEqual([]);
+    for (const ask of watch.heldAsks) expect(ask.units).toEqual([]);
     expect(watch.draws).toBe(0);
   });
 
@@ -747,11 +835,16 @@ describe("a render this machine already drew (issue #1724)", () => {
     const watch = spy();
     await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
 
-    expect(watch.remembered).toEqual([
-      { unit: "unit0", sourceHash: "render-src-unit0.s3o" },
-      { unit: "unit1", sourceHash: "render-src-unit1.s3o" },
-      { unit: "unit2", sourceHash: "render-src-unit2.s3o" },
-    ]);
+    // Every angle of every unit, since each is its own picture with its own
+    // identity and a run that kept one of four would redraw three next time.
+    expect(watch.remembered).toEqual(
+      ["unit0", "unit1", "unit2"].flatMap((unit) =>
+        BACKFILL_ANGLES.map((angle) => ({
+          unit,
+          sourceHash: `render-src-${unit}.s3o-${angle}`,
+        })),
+      ),
+    );
   });
 
   /**
@@ -778,11 +871,12 @@ describe("a render this machine already drew (issue #1724)", () => {
     );
 
     expect(report.written).toBe(0);
-    expect(watch.remembered.map((r) => r.unit)).toEqual([
-      "unit0",
-      "unit1",
-      "unit2",
-    ]);
+    // Three pictures rather than three units: the stop is read between pictures,
+    // so it lands partway through the first unit's angles.
+    expect(watch.remembered).toHaveLength(3);
+    expect(watch.remembered.map((r) => r.unit)).toEqual(
+      Array.from({ length: 3 }, (_, at) => `unit${Math.floor(at / ANGLES)}`),
+    );
   });
 });
 
@@ -829,33 +923,33 @@ describe("a game in a loose working folder (issue #1890)", () => {
       watch.tools,
     );
 
-    expect(watch.draws).toBe(4);
-    expect(report.rendered).toBe(4);
+    expect(watch.draws).toBe(4 * ANGLES);
+    expect(report.rendered).toBe(4 * ANGLES);
     // Written down under the unit they are of, which is what `localRenders`
     // reads back so a plan draws its buildings rather than squares.
-    expect(watch.remembered.map((r) => r.unit)).toEqual([
-      "unit0",
-      "unit1",
-      "unit2",
-      "unit3",
-    ]);
+    expect(watch.remembered.map((r) => r.unit)).toEqual(
+      ["unit0", "unit1", "unit2", "unit3"].flatMap((unit) =>
+        BACKFILL_ANGLES.map(() => unit),
+      ),
+    );
   });
 
   /** Drawing is the slow half, so a picture this machine already has is not
    *  drawn again just because nothing is going anywhere. */
   it("does not redraw a render this machine already holds", async () => {
+    // One unit, at one angle, so the other three of it are still drawn.
     const watch = spy({
-      alreadyDrawn: (unit) =>
-        unit === "unit0"
+      alreadyDrawn: (unit, variant) =>
+        unit === "unit0" && variant === renderVariant(BACKFILL_ANGLES[0])
           ? {
               game: "bar",
               unit,
-              variant: "render:top",
+              variant,
               file: `render-hash-${unit}.s3o.webp`,
               path: `/cache/hub/render-hash-${unit}.webp`,
               mime: "image/webp",
               encodeProfile: "webp-q80-512",
-              sourceHash: `render-src-${unit}`,
+              sourceHash: `render-src-${unit}-${BACKFILL_ANGLES[0]}`,
               modelDigest: `model-${unit}`,
               sourceArchive: "Beyond All Reason test-1",
               rendererVersion: 1,
@@ -871,8 +965,8 @@ describe("a game in a loose working folder (issue #1890)", () => {
       watch.tools,
     );
 
-    expect(watch.draws).toBe(3);
-    expect(report.rendered).toBe(3);
+    expect(watch.draws).toBe(4 * ANGLES - 1);
+    expect(report.rendered).toBe(4 * ANGLES - 1);
     // The one it held was not offered either, which is the point.
     expect(watch.uploads).toEqual([]);
   });
@@ -890,7 +984,7 @@ describe("a game in a loose working folder (issue #1890)", () => {
 
     expect(watch.asked).toHaveLength(1);
     expect(watch.uploads).toHaveLength(1);
-    expect(report.offered).toBe(8);
+    expect(report.offered).toBe(4 * PICTURES_PER_UNIT);
   });
 
   /** A rapid pool install is a `.sdp` package somebody plays, and Beyond All
@@ -937,11 +1031,13 @@ describe("the rate limit's say", () => {
       watch.tools,
     );
 
+    // The limit is in units, and it is the units it cuts. The pictures follow
+    // from them, which is what `VARIANTS_PER_UNIT` reserves for.
     expect(report.units).toBe(4);
-    expect(report.asked).toBe(4);
-    expect(report.rendered).toBe(4);
-    expect(report.offered).toBe(8);
-    expect(watch.asked[0]).toHaveLength(4);
+    expect(report.asked).toBe(4 * ANGLES);
+    expect(report.rendered).toBe(4 * ANGLES);
+    expect(report.offered).toBe(4 * PICTURES_PER_UNIT);
+    expect(watch.asked[0]).toHaveLength(4 * ANGLES);
     expect(watch.models).toHaveLength(4);
     expect(report.stopped).toContain("4 of this layout's 30");
   });
@@ -967,17 +1063,42 @@ describe("lining the answers up", () => {
 
   it("wants what is not already held", () => {
     expect(
-      unitsWanted(keys, [
+      picturesWanted(keys, [
         { ...keys[0], status: "have" },
         { ...keys[1], status: "changed" },
       ]),
-    ).toEqual(["b"]);
+    ).toEqual(["b\nrender:top"]);
+  });
+
+  /**
+   * A unit is not the unit of work any more (issue #1951). The hub holding a
+   * unit's plan says nothing about whether it holds the picture of it, and an
+   * answer read as being about the unit would skip three angles it never
+   * answered for.
+   */
+  it("wants one angle of a unit while the hub keeps another", () => {
+    const angled: AssetKey = {
+      ...keys[0],
+      variant: "render:angled",
+      source_hash: "z",
+    };
+    expect(
+      picturesWanted(
+        [keys[0], angled],
+        [
+          { ...keys[0], status: "have" },
+          { ...angled, status: "missing" },
+        ],
+      ),
+    ).toEqual(["a\nrender:angled"]);
   });
 
   /** Guessing which answer belongs to which key would draw the wrong pictures,
    *  so an answer that does not cover the batch draws none. */
   it("draws nothing when the answers do not cover the keys", () => {
-    expect(unitsWanted(keys, [{ ...keys[0], status: "missing" }])).toEqual([]);
+    expect(picturesWanted(keys, [{ ...keys[0], status: "missing" }])).toEqual(
+      [],
+    );
   });
 });
 
@@ -1005,8 +1126,14 @@ describe("what a run says about itself while it is going (issue #1686)", () => {
     expect(watch.uploads[0]).toHaveLength(12);
   });
 
-  /** The case the issue is about: twelve model reads and twelve renders, which
-   *  can be a minute with nothing on screen saying why. */
+  /**
+   * The case the issue is about: twelve model reads and forty eight renders,
+   * which can be minutes with nothing on screen saying why.
+   *
+   * The total counts pictures rather than units, which is what somebody watching
+   * it is waiting for. Four angles a unit is four times the wait, and a bar that
+   * counted units would sit on one number for four renders at a time.
+   */
   it("puts a run with pictures to draw on screen, named by its game", async () => {
     const watch = spy();
     await backfillBlueprintUnits(TARGET, unitsOf(12), 100, watch.tools);
@@ -1015,16 +1142,16 @@ describe("what a run says about itself while it is going (issue #1686)", () => {
     expect(first).toHaveLength(1);
     expect(first[0].game).toBe("bar");
     expect(first[0].phase).toBe("drawing");
-    expect(first[0].total).toBe(12);
+    expect(first[0].total).toBe(12 * ANGLES);
   });
 
   it("counts the pictures off as they are drawn", async () => {
     const watch = spy();
     await backfillBlueprintUnits(TARGET, unitsOf(4), 100, watch.tools);
 
-    expect(watch.shownWhileDrawing.map((shown) => shown[0].done)).toEqual([
-      0, 1, 2, 3,
-    ]);
+    expect(watch.shownWhileDrawing.map((shown) => shown[0].done)).toEqual(
+      Array.from({ length: 4 * ANGLES }, (_, at) => at),
+    );
   });
 
   it("leaves the topbar when the run ends", async () => {
@@ -1077,8 +1204,8 @@ describe("what a run says about itself while it is going (issue #1686)", () => {
     await backfillBlueprintUnits(TARGET, unitsOf(3), 100, watch.tools);
 
     expect(sending?.phase).toBe("sending");
-    // Six pictures rather than three: a build pic and a render each.
-    expect(sending?.total).toBe(6);
+    // Fifteen pictures rather than three: a build pic and every angle, each.
+    expect(sending?.total).toBe(3 * PICTURES_PER_UNIT);
   });
 
   it("moves the sending half on from what the plugin reports", async () => {

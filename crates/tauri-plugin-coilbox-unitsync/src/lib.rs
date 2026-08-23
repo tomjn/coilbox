@@ -906,13 +906,16 @@ struct UnitRenderKeyRequest {
 /// One call is one archive mount however many units it names, which is the other
 /// half of the same change: a blueprint naming twenty buildings used to be twenty
 /// mounts, a second or more each on a game like Beyond All Reason.
+///
+/// `angles` left off means every angle the vocabulary lists, which is the
+/// ordinary call: they all come out of that one mount (issue #1951).
 #[tauri::command]
 async fn unitsync_unit_render_keys<R: Runtime>(
     _app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
     game_archive: String,
-    angle: String,
+    angles: Option<Vec<String>>,
     renderer_version: u32,
     units: Vec<UnitRenderKeyRequest>,
 ) -> Result<CliResult, ()> {
@@ -934,7 +937,7 @@ async fn unitsync_unit_render_keys<R: Runtime>(
         &data_dir,
         &game_archive,
         &units_file.to_string_lossy(),
-        &angle,
+        &angles.unwrap_or_default(),
         renderer_version,
     );
     let envs = loader_envs(&engine_dir, &data_dir);

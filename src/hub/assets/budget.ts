@@ -40,6 +40,8 @@
  * and the arithmetic is a filter.
  */
 
+import { RENDER_ANGLES } from "./vocabulary";
+
 /**
  * How many pictures coilbox will write for one game in a rolling hour.
  *
@@ -56,10 +58,20 @@
  */
 export const WRITES_PER_GAME_PER_HOUR = 80;
 
-/** How many pictures one unit can produce, which is a build pic and a render.
- *  A run reserves this much budget per unit before it starts, so it can never
- *  finish over the limit. */
-export const VARIANTS_PER_UNIT = 2;
+/**
+ * How many pictures one unit can produce: a build pic, and a render at every
+ * angle the vocabulary lists.
+ *
+ * A run reserves this much budget per unit before it starts, so it can never
+ * finish over the limit. Taken off the vocabulary rather than written down,
+ * because an angle added there is a picture a run really will make and a number
+ * that had to be remembered separately would be the one that was not
+ * (issue #1951).
+ *
+ * It costs coverage rather than correctness: at five, the eighty an hour is
+ * sixteen units rather than forty.
+ */
+export const VARIANTS_PER_UNIT = 1 + RENDER_ANGLES.length;
 
 /** The window the limit is over. */
 export const WINDOW_MS = 60 * 60 * 1000;

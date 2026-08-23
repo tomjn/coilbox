@@ -10,10 +10,13 @@ import {
   MINIMAP_VARIANT,
   mapExtentElmos,
   maxObjectBytes,
+  PICTURE_ANGLES,
+  PLAN_ANGLE,
   RENDER_ANGLES,
   RENDER_BLEED_SQUARES,
   RENDER_VARIANT_PREFIX,
   renderFrame,
+  renderPixels,
   renderVariant,
   TOP_RENDER_ANGLE,
 } from "./vocabulary";
@@ -50,14 +53,49 @@ describe("the variant names", () => {
     expect(MAP_VARIANTS).toContain(MINIMAP_VARIANT);
   });
 
-  it("renders one angle, because one has a use case", () => {
-    expect([...RENDER_ANGLES]).toEqual(["top"]);
+  it("renders four angles, one of which is a plan", () => {
+    expect([...RENDER_ANGLES]).toEqual(["top", "front", "side", "angled"]);
   });
 
   it("names the angle a plan is drawn from as one of them", () => {
     // The blueprint plan asks the hub for this one by name, and an angle outside
     // the list names a picture nothing ever uploaded.
     expect(RENDER_ANGLES).toContain(TOP_RENDER_ANGLE);
+  });
+
+  /** The plan and the pictures between them are the whole list, so an angle
+   *  added upstream is one or the other rather than neither (issue #1951). */
+  it("splits the angles into the plan and the pictures", () => {
+    expect([PLAN_ANGLE, ...PICTURE_ANGLES].sort()).toEqual(
+      [...RENDER_ANGLES].sort(),
+    );
+    expect(PICTURE_ANGLES).not.toContain(PLAN_ANGLE);
+  });
+
+  /**
+   * The framing rule, from the side that draws. Its twin in `coilbox-assets` is
+   * what refuses a render that is not this shape, and the two disagreeing would
+   * be every picture refused as mis-framed on somebody's machine.
+   */
+  it("frames only the plan on the footprint, and the rest square", () => {
+    const frame = renderFrame(3, 2);
+    expect(renderPixels(PLAN_ANGLE, 3, 2)).toEqual({
+      widthPx: frame.widthPx,
+      heightPx: frame.heightPx,
+    });
+    expect(frame.widthPx).not.toBe(frame.heightPx);
+
+    for (const angle of PICTURE_ANGLES) {
+      expect(renderPixels(angle, 3, 2)).toEqual({
+        widthPx: 256,
+        heightPx: 256,
+      });
+      // The footprint cannot move it, since these frame on the model instead.
+      expect(renderPixels(angle, 12, 1)).toEqual({
+        widthPx: 256,
+        heightPx: 256,
+      });
+    }
   });
 
   it("names how the bytes were produced", () => {

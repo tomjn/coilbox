@@ -21,8 +21,14 @@
 import * as THREE from "three";
 import type { UnitModelResult } from "@/content/bindings";
 import { buildModel } from "@/content/unitModel";
+import { frameBox } from "@/lego/framing";
 import { readyToCapture } from "@/lego/thumbnail";
-import { type RenderFrame, renderFrame } from "./vocabulary";
+import {
+  PLAN_ANGLE,
+  type RenderFrame,
+  renderFrame,
+  renderPixels,
+} from "./vocabulary";
 
 /**
  * Which renderer drew a picture, and part of what its `source_hash` is over.
@@ -35,7 +41,11 @@ import { type RenderFrame, renderFrame } from "./vocabulary";
  * the opposite case: the picture really is different and the hub should be told,
  * so it moves `source_hash`, and this constant is how.
  *
- * Fixing something that does not change the picture is not a bump.
+ * Fixing something that does not change the picture is not a bump. **Adding an
+ * angle is not a bump either** (issue #1951): the angle is already part of a
+ * render's identity through its variant, so a new one is a picture the hub has
+ * never held rather than a change to one it has. Bumping for it would report
+ * every top down render in the corpus as changed and redraw the lot.
  */
 export const RENDER_VERSION = 3;
 
@@ -43,8 +53,8 @@ export const RENDER_VERSION = 3;
  *  so a model sitting exactly on a clip plane is not shaved. */
 const DEPTH_MARGIN = 16;
 
-/** One unit's render, ready for the encoder. */
-export interface TopDownRender {
+/** One unit's render at one angle, ready for the encoder. */
+export interface UnitRender {
   width: number;
   height: number;
   /**
@@ -53,8 +63,14 @@ export interface TopDownRender {
    * that is what an image is: GL hands the framebuffer back the other way up.
    */
   rgba: Uint8Array;
-  /** The frame it was taken in, so the caller can tell the worker the same
-   *  numbers it was drawn to. */
+  /**
+   * The footprint's frame, so the caller can tell the worker the same numbers it
+   * was drawn to.
+   *
+   * The footprint's rather than this render's: only the plan is framed on it, and
+   * the three picture angles frame on the model's bounds instead. `width` and
+   * `height` above are what this render actually is, for every angle.
+   */
   frame: RenderFrame;
 }
 
@@ -100,6 +116,82 @@ export function topDownCamera(
   camera.up.set(0, 0, 1);
   camera.position.set(0, top, 0);
   camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld(true);
+  return camera;
+}
+
+/**
+ * Where the camera sits for each picture angle, as a direction from the unit
+ * (issue #1951).
+ *
+ * The orientation is the same one `topDownCamera` writes out and is easier to
+ * rediscover wrongly than to look up: the model's `+z` is the front and its `+x`
+ * is the unit's left. So `front` looks at the unit from in front of it, `side`
+ * from off its left, and `angled` from above, in front and to one side at once.
+ *
+ * `angled` is `src/lego/thumbnail.ts`'s `THUMBNAIL_VIEW`, deliberately the same
+ * numbers: it is the three quarter view the builder opens on, which is the view
+ * of a unit people already recognise, and two of them that happened to agree
+ * today would drift apart the first time either changed.
+ */
+export const PICTURE_VIEWS: Record<string, [number, number, number]> = {
+  front: [0, 0, 1],
+  side: [1, 0, 0],
+  angled: [9, 7, 11],
+};
+
+/** The same lens the builder's viewport and its thumbnails use, so a unit is the
+ *  shape on a hub page that it is in the editor. */
+const PICTURE_FOV = 40;
+
+/**
+ * The camera a picture of a unit is taken with: perspective, and framed on the
+ * model's own bounds.
+ *
+ * **Framed on the bounds rather than on the origin**, which is the opposite of
+ * what {@link topDownCamera} does, and the reason is the same reason stated from
+ * the other side. A plan is centred on the origin so it lines up with the squares
+ * a consumer draws it on. A picture lines up with nothing, so what matters is
+ * that the unit fills the frame, and a unit whose model sits off its own origin
+ * would otherwise be a picture of some empty space beside it.
+ *
+ * A unit with no bounds to frame keeps the view's own direction and looks at the
+ * origin, which is where a model with nothing in it is.
+ */
+export function pictureCamera(
+  angle: string,
+  box: THREE.Box3,
+): THREE.PerspectiveCamera {
+  const view = PICTURE_VIEWS[angle] ?? PICTURE_VIEWS.angled;
+  // Square, so one field of view covers both axes and `frameBox` fitting the
+  // bounding sphere on the vertical really does fit the whole model.
+  const camera = new THREE.PerspectiveCamera(PICTURE_FOV, 1, 0.05, 500);
+  if (box.isEmpty()) {
+    camera.position.set(...view);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld(true);
+    return camera;
+  }
+
+  const { target, position } = frameBox(
+    {
+      min: [box.min.x, box.min.y, box.min.z],
+      max: [box.max.x, box.max.y, box.max.z],
+    },
+    view,
+    THREE.MathUtils.degToRad(PICTURE_FOV),
+  );
+  camera.position.set(...position);
+  camera.lookAt(...target);
+  // Far enough to still draw the back of the unit from wherever framing put the
+  // camera, the way the builder's thumbnails do it. A unit big enough to want a
+  // camera past the fixed 500 would otherwise be cut off whole.
+  camera.far = Math.max(
+    500,
+    camera.position.distanceTo(new THREE.Vector3(...target)) +
+      box.getBoundingSphere(new THREE.Sphere()).radius,
+  );
+  camera.updateProjectionMatrix();
   camera.updateMatrixWorld(true);
   return camera;
 }
@@ -174,7 +266,14 @@ export function unpremultiply(rgba: Uint8Array): Uint8Array {
 }
 
 /**
- * Draw `model` from above, framed on a `footprintX` by `footprintZ` footprint.
+ * Draw `model` at one `angle`, at the size {@link renderPixels} says that angle
+ * has to be.
+ *
+ * The plan is framed on the `footprintX` by `footprintZ` footprint and every
+ * other angle is framed on the model's own bounds, which is the whole of what
+ * the angle changes here. The lights do not change with it: all four are lit the
+ * same way, so a unit is the same colour whichever picture of it you are looking
+ * at.
  *
  * Waits for the model's textures first: three's loaders do not report back to
  * whoever holds a texture, and one that has not arrived samples as a single black
@@ -185,13 +284,15 @@ export function unpremultiply(rgba: Uint8Array): Uint8Array {
  * blank after that, which is the one thing about this that is easy to get wrong
  * and the reason `captureThumbnail` says so too.
  */
-export async function renderTopDown(
+export async function renderUnit(
+  angle: string,
   model: UnitModelResult,
   footprintX: number,
   footprintZ: number,
   { timeoutMs = 10_000 }: { timeoutMs?: number } = {},
-): Promise<TopDownRender> {
+): Promise<UnitRender> {
   const frame = renderFrame(footprintX, footprintZ);
+  const { widthPx, heightPx } = renderPixels(angle, footprintX, footprintZ);
   const built = buildModel(model);
 
   const scene = new THREE.Scene();
@@ -214,26 +315,23 @@ export async function renderTopDown(
     // One device pixel per image pixel: the frame is in pixels already and a
     // retina scale factor would silently render it at twice the size.
     renderer.setPixelRatio(1);
-    renderer.setSize(frame.widthPx, frame.heightPx, false);
+    renderer.setSize(widthPx, heightPx, false);
     renderer.setClearColor(0x000000, 0);
-    renderer.render(scene, topDownCamera(frame, built.box));
-
-    const rgba = new Uint8Array(frame.widthPx * frame.heightPx * 4);
-    const gl = renderer.getContext();
-    gl.readPixels(
-      0,
-      0,
-      frame.widthPx,
-      frame.heightPx,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      rgba,
+    renderer.render(
+      scene,
+      angle === PLAN_ANGLE
+        ? topDownCamera(frame, built.box)
+        : pictureCamera(angle, built.box),
     );
 
+    const rgba = new Uint8Array(widthPx * heightPx * 4);
+    const gl = renderer.getContext();
+    gl.readPixels(0, 0, widthPx, heightPx, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+
     return {
-      width: frame.widthPx,
-      height: frame.heightPx,
-      rgba: unpremultiply(flipRows(rgba, frame.widthPx, frame.heightPx)),
+      width: widthPx,
+      height: heightPx,
+      rgba: unpremultiply(flipRows(rgba, widthPx, heightPx)),
       frame,
     };
   } finally {

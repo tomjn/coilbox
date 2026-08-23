@@ -86,10 +86,16 @@ pub struct UnitVariants {
     /// A unit's other variants are `render:<angle>`. The angle is part of the
     /// key, so two renders of one unit from different angles are two assets.
     pub render_variant_prefix: String,
-    /// The angles worth rendering, which is one. `render:top` exists for the
-    /// hub's blueprint preview and nothing else asks for another. Renders are the
-    /// only class in the corpus that scales without a natural bound, so an angle
-    /// added on spec is a real cost rather than a spare column.
+    /// The angles worth rendering (issue #1951).
+    ///
+    /// `top` is a plan: orthographic, framed on the footprint, and the one a
+    /// blueprint preview lays on build squares. The other three are pictures of
+    /// the unit, framed on the model's own bounds, and `angled` is the three
+    /// quarter view a person recognises a unit by.
+    ///
+    /// Renders are the only class in the corpus that scales without a natural
+    /// bound, so the list is short on purpose. Section 5.1 of the asset pipeline
+    /// design budgets the class at units times angles, and four is what fits.
     pub render_angles: Vec<String>,
 }
 
@@ -257,6 +263,40 @@ pub fn render_frame(footprint_x: u32, footprint_z: u32) -> RenderFraming {
     }
 }
 
+/// The angle a plan is drawn from, and the only one framed on a footprint.
+pub const PLAN_ANGLE: &str = "top";
+
+/// The pixel size a render of `angle` has to be, which is the whole of what the
+/// two sides have to agree on about framing (issue #1951).
+///
+/// **`top` is a plan and keeps the footprint's aspect**, through
+/// [`render_frame`]. A 3 by 2 building renders 3 by 2, because that picture
+/// exists to tile into a base layout.
+///
+/// **Every other angle is a picture and is square at the class cap.** A front or
+/// a side view has a footprint for its width and nothing at all for its height:
+/// no unitdef declares how tall a model is. So those three frame on the model's
+/// own bounds in the webview, each unit filling its frame the way the builder's
+/// overview thumbnails do, and the size they come out at cannot depend on
+/// anything this side would have to read a model to know.
+///
+/// That is what keeps the encoder's framing check worth having. It refuses
+/// pixels that are not the shape the angle says, and the hub cannot make that
+/// check for itself because it holds no footprints, so a frame this side could
+/// not recompute would be a frame nobody ever checks.
+pub fn render_pixels(angle: &str, footprint_x: u32, footprint_z: u32) -> (u32, u32) {
+    if angle == PLAN_ANGLE {
+        let frame = render_frame(footprint_x, footprint_z);
+        return (frame.width_px, frame.height_px);
+    }
+    let cap = vocabulary()
+        .classes
+        .get(RENDER_CLASS)
+        .and_then(|c| c.max_edge_px)
+        .unwrap_or(0);
+    (cap, cap)
+}
+
 /// A map's size in elmos, from the metal infomap's sample counts (issue #1629).
 ///
 /// This is the number the hub's `map_width` and `map_height` hold, and the one
@@ -296,8 +336,50 @@ mod tests {
     }
 
     #[test]
-    fn renders_one_angle_because_one_has_a_use_case() {
-        assert_eq!(vocabulary().unit.render_angles, ["top"]);
+    fn renders_four_angles_one_of_which_is_a_plan() {
+        assert_eq!(
+            vocabulary().unit.render_angles,
+            ["top", "front", "side", "angled"]
+        );
+        assert_eq!(vocabulary().unit.render_angles[0], PLAN_ANGLE);
+    }
+
+    /// The plan keeps its footprint's aspect and the three pictures are square,
+    /// which is the whole framing rule and the one thing the encoder checks.
+    #[test]
+    fn only_the_plan_angle_is_framed_on_the_footprint() {
+        let frame = render_frame(3, 2);
+        assert_eq!(
+            render_pixels("top", 3, 2),
+            (frame.width_px, frame.height_px)
+        );
+        assert_ne!(frame.width_px, frame.height_px);
+
+        for angle in ["front", "side", "angled"] {
+            assert_eq!(render_pixels(angle, 3, 2), (256, 256), "{angle}");
+            // And the footprint cannot move it, since these three frame on the
+            // model's bounds rather than on the squares under it.
+            assert_eq!(render_pixels(angle, 12, 1), (256, 256), "{angle}");
+        }
+    }
+
+    /// No angle frames a picture the class cap would refuse, which is checked
+    /// over every angle rather than only over the plan.
+    #[test]
+    fn no_angle_frames_a_picture_over_the_class_cap() {
+        let cap = class_for_variant("render:top")
+            .unwrap()
+            .max_edge_px
+            .unwrap();
+        for angle in &vocabulary().unit.render_angles {
+            for fx in 1..=32u32 {
+                for fz in 1..=32u32 {
+                    let (width, height) = render_pixels(angle, fx, fz);
+                    assert!(width <= cap && height <= cap, "{angle} {fx}x{fz}");
+                    assert!(width >= 1 && height >= 1, "{angle} {fx}x{fz}");
+                }
+            }
+        }
     }
 
     #[test]
@@ -458,7 +540,7 @@ mod tests {
     fn digests_the_shared_document_as_an_outside_tool_does() {
         assert_eq!(
             vocabulary_digest(),
-            "sha256:66f986361a51d8486b619b2f5a541f4e207ad4309e0a8a0ae2597b859daf84bd"
+            "sha256:4879f85b17a5cee05e71b04fbe44607ba2cfb957bef0b2ac7c3dd658519d8b4e"
         );
     }
 

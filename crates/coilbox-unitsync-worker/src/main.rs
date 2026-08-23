@@ -134,17 +134,21 @@ struct Args {
     source_member: Option<String>,
     source_archive: Option<String>,
     /// `--unit-render-keys`: what a batch of units' renders would be called,
-    /// without drawing any of them. Takes the units in `--units-file`, the angle
-    /// in `--angle` and the renderer in `--renderer-version`.
+    /// without drawing any of them. Takes the units in `--units-file`, the angles
+    /// in `--angles` and the renderer in `--renderer-version`.
     unit_render_keys: bool,
     /// A JSON file of `{ unit, object, footprintX, footprintZ }` for
     /// `--unit-render-keys`, or of `objectname` strings for `--unit-models`. A
     /// file rather than an argument because a whole game's roster is past what
     /// Windows takes on a command line.
     units_file: Option<String>,
-    /// The render angle, without the `render:` prefix. Defaults to the one angle
-    /// the vocabulary lists.
+    /// The render angle for `--unit-render`, without the `render:` prefix.
+    /// Defaults to the plan, which is the vocabulary's first.
     angle: Option<String>,
+    /// The render angles for `--unit-render-keys`, comma separated and without
+    /// the `render:` prefix. Defaults to every angle the vocabulary lists, since
+    /// the mount they share is the cost.
+    angles: Option<Vec<String>>,
     /// A file of raw RGBA pixels for `--unit-render`, top row first.
     pixels: Option<String>,
     /// The render's pixel dimensions, which have to be what the footprint frames
@@ -564,17 +568,20 @@ fn run() -> i32 {
             }
         };
         let game_archive = args.game.clone().unwrap_or_default();
-        let angle = args
-            .angle
-            .clone()
-            .unwrap_or_else(|| coilbox_assets::vocabulary().unit.render_angles[0].clone());
+        // Every angle the vocabulary lists unless the caller narrows it, since a
+        // batch costs one mount whether it answers for one angle or four
+        // (issue #1951).
+        let angles = match args.angles.clone() {
+            Some(named) => named,
+            None => coilbox_assets::vocabulary().unit.render_angles.clone(),
+        };
         let renderer_version = args.renderer_version;
         return match std::panic::catch_unwind(|| {
             renderkey::render(
                 &args.lib,
                 &game_archive,
                 &requests,
-                &angle,
+                &angles,
                 renderer_version,
             )
         }) {
@@ -985,6 +992,7 @@ fn parse_args() -> Result<Args, String> {
     let mut unit_render_keys = false;
     let mut units_file = None;
     let mut angle = None;
+    let mut angles = None;
     let mut pixels = None;
     let mut width = 0u32;
     let mut height = 0u32;
@@ -1054,6 +1062,15 @@ fn parse_args() -> Result<Args, String> {
             "--unit-render-keys" => unit_render_keys = true,
             "--units-file" => units_file = it.next(),
             "--angle" => angle = it.next(),
+            "--angles" => {
+                angles = it.next().map(|list| {
+                    list.split(',')
+                        .map(str::trim)
+                        .filter(|a| !a.is_empty())
+                        .map(str::to_owned)
+                        .collect()
+                })
+            }
             "--pixels" => pixels = it.next(),
             "--width" => {
                 width = it
@@ -1161,6 +1178,7 @@ fn parse_args() -> Result<Args, String> {
         unit_render_keys,
         units_file,
         angle,
+        angles,
         pixels,
         width,
         height,
@@ -1588,6 +1606,7 @@ mod tests {
             unit_render_keys: false,
             units_file: None,
             angle: None,
+            angles: None,
             pixels: None,
             width: 0,
             height: 0,

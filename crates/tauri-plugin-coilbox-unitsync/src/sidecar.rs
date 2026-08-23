@@ -296,17 +296,20 @@ pub fn build_unit_render_args(
 }
 
 /// Build args for `--unit-render-keys` mode: the game the models come out of,
-/// the file naming the units, and the angle and renderer the keys are for.
+/// the file naming the units, and the angles and renderer the keys are for.
 ///
 /// The units travel by path for the same reason the pixels do: a whole game's
 /// roster is tens of kilobytes, which is past what Windows takes on a command
-/// line.
+/// line. The angles do not: there are four of them and they are short words.
+///
+/// An empty list leaves `--angles` off, which is how the worker is told to key
+/// every angle the vocabulary lists (issue #1951).
 pub fn build_unit_render_keys_args(
     lib: &str,
     datadir: &str,
     game: &str,
     units_file: &str,
-    angle: &str,
+    angles: &[String],
     renderer_version: u32,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
@@ -315,8 +318,10 @@ pub fn build_unit_render_keys_args(
     args.push(game.into());
     args.push("--units-file".into());
     args.push(units_file.into());
-    args.push("--angle".into());
-    args.push(angle.into());
+    if !angles.is_empty() {
+        args.push("--angles".into());
+        args.push(angles.join(","));
+    }
     args.push("--renderer-version".into());
     args.push(renderer_version.to_string());
     args
@@ -940,18 +945,21 @@ mod tests {
     }
 
     /// The key mode's whole point is one call for many units, so the units go by
-    /// file and the angle and renderer travel with them: a key made for the wrong
-    /// renderer would report the hub's corpus as changed.
+    /// file and the angles and renderer travel with them: a key made for the
+    /// wrong renderer would report the hub's corpus as changed.
     #[test]
     fn build_unit_render_keys_args_carry_the_game_the_units_and_the_renderer() {
-        let a = build_unit_render_keys_args(
-            "/eng/libunitsync.so",
-            "/data",
-            "BAR.sdd",
-            "/tmp/units.json",
-            "top",
-            1,
-        );
+        let keys = |angles: &[&str]| {
+            build_unit_render_keys_args(
+                "/eng/libunitsync.so",
+                "/data",
+                "BAR.sdd",
+                "/tmp/units.json",
+                &angles.iter().map(|a| (*a).to_string()).collect::<Vec<_>>(),
+                1,
+            )
+        };
+        let a = keys(&["top", "angled"]);
         let after = |flag: &str| {
             let at = a.iter().position(|x| x == flag).expect(flag);
             a[at + 1].clone()
@@ -959,11 +967,16 @@ mod tests {
         assert!(a.contains(&"--unit-render-keys".to_string()));
         assert_eq!(after("--game"), "BAR.sdd");
         assert_eq!(after("--units-file"), "/tmp/units.json");
-        assert_eq!(after("--angle"), "top");
+        assert_eq!(after("--angles"), "top,angled");
         assert_eq!(after("--renderer-version"), "1");
         // Nothing is drawn or written, so neither belongs on this call.
         assert!(!a.contains(&"--pixels".to_string()));
         assert!(!a.contains(&"--asset-dir".to_string()));
+
+        // No angles named is how a caller says every angle, so the flag has to be
+        // absent rather than empty: an empty `--angles` would key nothing at all
+        // and read to the caller as the hub already holding every picture.
+        assert!(!keys(&[]).contains(&"--angles".to_string()));
     }
 
     #[test]
