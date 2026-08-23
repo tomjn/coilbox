@@ -20,8 +20,21 @@ fn create() -> Vec<ScriptEvent> {
     }]
 }
 
+/// A unit whose script pulls in nothing, which is most of them.
+fn no_includes() -> HashMap<String, String> {
+    HashMap::new()
+}
+
 fn play(script: &str, frames: u32) -> Timeline {
-    run(script, "test.lua", &pieces(), &create(), frames, None)
+    run(
+        script,
+        "test.lua",
+        &pieces(),
+        &create(),
+        frames,
+        None,
+        &no_includes(),
+    )
 }
 
 /// One piece's numbers on one frame: x, y, z offset then x, y, z rotation.
@@ -328,6 +341,7 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
         ],
         60,
         None,
+        &no_includes(),
     );
     assert_eq!(timeline.error, None);
     // Killed and turned back to rest, and nothing moved it again afterwards.
@@ -381,6 +395,7 @@ fn a_call_in_with_arguments_gets_them() {
         }],
         3,
         None,
+        &no_includes(),
     );
     assert_eq!(timeline.error, None);
     assert_close(rot_y(&timeline, 0, "turret"), 0.75);
@@ -457,6 +472,7 @@ fn the_generated_script_shape_runs() {
         ],
         120,
         None,
+        &no_includes(),
     );
     assert_eq!(timeline.error, None);
     assert_eq!(timeline.frames.len(), 120);
@@ -522,6 +538,7 @@ fn a_throwing_call_in_names_it_and_keeps_the_frames_before_it() {
         ],
         30,
         None,
+        &no_includes(),
     );
     let error = timeline.error.expect("a throwing call-in fails");
     assert!(error.contains("StartMoving"), "{error}");
@@ -574,6 +591,7 @@ fn a_call_in_the_script_does_not_have_is_a_warning_not_a_failure() {
         }],
         5,
         None,
+        &no_includes(),
     );
     assert_eq!(timeline.error, None);
     assert_eq!(timeline.frames.len(), 5);
@@ -655,7 +673,7 @@ mod probing {
 
     fn ask(script: &str, callins: &[&str]) -> Probes {
         let names: Vec<String> = callins.iter().map(|c| (*c).to_string()).collect();
-        probe(script, "test.lua", &pieces(), &names, None)
+        probe(script, "test.lua", &pieces(), &names, None, &no_includes())
     }
 
     fn answers<'a>(probes: &'a Probes, callin: &str) -> &'a Probe {
@@ -721,6 +739,7 @@ mod probing {
             }],
             3,
             None,
+            &no_includes(),
         );
 
         assert_eq!(timeline.warnings, Vec::<String>::new());
@@ -826,7 +845,15 @@ mod unit_definition {
     use super::*;
 
     fn with_def(script: &str, def: serde_json::Value) -> Timeline {
-        run(script, "test.lua", &pieces(), &create(), 3, Some(&def))
+        run(
+            script,
+            "test.lua",
+            &pieces(),
+            &create(),
+            3,
+            Some(&def),
+            &no_includes(),
+        )
     }
 
     /// The exact line out of Beyond All Reason's `coralab.lua` that started
@@ -903,6 +930,7 @@ mod unit_definition {
             &create(),
             3,
             None,
+            &no_includes(),
         );
 
         assert_eq!(timeline.error, None);
@@ -954,5 +982,144 @@ mod unit_definition {
 
         assert_eq!(timeline.error, None);
         assert!((rot_y(&timeline, 0, "turret") - 0.5).abs() < 1e-6);
+    }
+}
+
+/// A game may keep half its animation in a shared library and have every unit
+/// pull it in, which is Beyond All Reason's house style. Without the library
+/// the script stops on the first line that calls into it.
+mod includes {
+    use super::*;
+
+    fn with_library(script: &str, name: &str, library: &str) -> Timeline {
+        let mut sources = HashMap::new();
+        sources.insert(name.to_string(), library.to_string());
+        run(script, "test.lua", &pieces(), &create(), 3, None, &sources)
+    }
+
+    /// The shape of `coralab.lua`: a library defines the function, the script
+    /// starts a thread on it, and without the file the thread starts on nil.
+    #[test]
+    fn runs_a_function_the_library_defines() {
+        let timeline = with_library(
+            r#"
+            include("include/util.lua")
+            local turret = piece("turret")
+            function script.Create() StartThread(smoke_unit, turret) end
+            "#,
+            "include/util.lua",
+            "function smoke_unit(piece) Turn(piece, y_axis, 1.0) end",
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((rot_y(&timeline, 0, "turret") - 1.0).abs() < 1e-6);
+    }
+
+    /// SplinterFaction's shape: the library returns a table and the script
+    /// keeps it, so what the chunk returns has to come back out of `include`.
+    #[test]
+    fn hands_back_what_the_library_returns() {
+        let timeline = with_library(
+            r#"
+            local common = include("headers/common.lua")
+            local turret = piece("turret")
+            function script.Create() common.spin(turret) end
+            "#,
+            "headers/common.lua",
+            "return { spin = function(p) Turn(p, y_axis, 1.0) end }",
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((rot_y(&timeline, 0, "turret") - 1.0).abs() < 1e-6);
+    }
+
+    /// The name is matched the way the engine's VFS matches a path, because a
+    /// script written on Windows names its library with backslashes.
+    #[test]
+    fn matches_a_name_whatever_its_case_and_separators() {
+        let timeline = with_library(
+            r#"
+            include("Include\\Util.LUA")
+            local turret = piece("turret")
+            function script.Create() smoke_unit(turret) end
+            "#,
+            "include/util.lua",
+            "function smoke_unit(piece) Turn(piece, y_axis, 1.0) end",
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((rot_y(&timeline, 0, "turret") - 1.0).abs() < 1e-6);
+    }
+
+    /// A library the preview does not have is said rather than skipped in
+    /// silence, because what follows is a script failing on a line that looks
+    /// fine. Coilbox's own generated scripts pull in a collision file this way
+    /// and get the same note, which is the honest answer: it is not applied.
+    #[test]
+    fn says_when_a_library_is_missing() {
+        let timeline = run(
+            r#"
+            include("coilbox/armcom_collision.lua")
+            function script.Create() end
+            "#,
+            "test.lua",
+            &pieces(),
+            &create(),
+            3,
+            None,
+            &no_includes(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(
+            timeline
+                .warnings
+                .iter()
+                .any(|note| note.contains("coilbox/armcom_collision.lua")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// The framework logs a library it cannot compile and carries on with
+    /// nothing, so the script gets as far as the line that needed it.
+    #[test]
+    fn says_when_a_library_will_not_compile() {
+        let timeline = with_library(
+            r#"
+            include("include/util.lua")
+            function script.Create() end
+            "#,
+            "include/util.lua",
+            "function broken( end",
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(
+            timeline
+                .warnings
+                .iter()
+                .any(|note| note.contains("include/util.lua")
+                    && note.contains("could not be loaded")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// A library that loads and then throws takes its caller with it, which is
+    /// plain Lua and is what the framework does. The run says which file.
+    #[test]
+    fn a_library_that_throws_fails_the_run() {
+        let timeline = with_library(
+            r#"
+            include("include/util.lua")
+            function script.Create() end
+            "#,
+            "include/util.lua",
+            "error('this library is unhappy')",
+        );
+
+        let error = timeline.error.expect("the run should have failed");
+        assert!(error.contains("this library is unhappy"), "{error}");
     }
 }
