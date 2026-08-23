@@ -12,7 +12,7 @@ import { useFactionLogo } from "@/factions/logos";
 import { mostRecentOpen } from "@/lib/recency";
 import { resolveGameByShortname } from "../../conquest/model";
 import { useUnitsyncScan } from "../../content/config";
-import { EmptyState } from "../../content/pages/components/states";
+import { Diagnostics, EmptyState } from "../../content/pages/components/states";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
@@ -36,13 +36,11 @@ import { RunSetupForm } from "./components/RunSetupForm";
 export default function RunListPage() {
   const navigate = useNavigate();
   const drawer = useDrawer();
-  const { target } = usePreferredTarget();
-  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { runs, deleteRun } = useRuns();
 
   // Shared with the sidebar nav badge (issue #419) via `usePlayReadiness`, so
   // the two never disagree on whether a game is installed.
-  const { hasGames } = usePlayReadiness();
+  const { hasGames, state, scanErrors } = usePlayReadiness();
   const runEntries = Object.entries(runs);
 
   // The single most recently updated run still in progress (issue #374's
@@ -138,28 +136,51 @@ export default function RunListPage() {
         }
       />
 
-      {!scan.data ? (
-        target ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-            Scanning installed games…
-          </div>
-        ) : (
+      {state === "scanning" ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+          Scanning installed games…
+        </div>
+      ) : state === "no-engine" ? (
+        <EmptyState
+          label={
+            <>
+              Install an engine first (
+              <Link
+                className="underline underline-offset-4"
+                to="/settings/engines"
+              >
+                Settings → Engines
+              </Link>
+              ).
+            </>
+          }
+        />
+      ) : state === "unreadable" ? (
+        <div className="flex flex-col gap-3">
           <EmptyState
             label={
               <>
-                Install an engine first (
+                This engine could not read your games. Try another from{" "}
                 <Link
                   className="underline underline-offset-4"
                   to="/settings/engines"
                 >
                   Settings → Engines
                 </Link>
-                ).
+                , or see what it found in{" "}
+                <Link
+                  className="underline underline-offset-4"
+                  to="/content/games"
+                >
+                  Content → Games
+                </Link>
+                .
               </>
             }
           />
-        )
+          <Diagnostics errors={scanErrors} />
+        </div>
       ) : !hasGames ? (
         <EmptyState
           label={

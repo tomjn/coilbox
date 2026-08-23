@@ -1,7 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Link } from "react-router";
-import { type ScanTarget, targetKey } from "../../config";
+import { type ScanTarget, targetKey, targetLabel } from "../../config";
 import { TargetPicker } from "./TargetPicker";
 
 /**
@@ -64,9 +64,9 @@ export function BrowserToolbar({
       ) : (
         <span
           className="min-w-0 truncate text-xs text-muted-foreground"
-          title={current.rootPath}
+          title={current.enginePath}
         >
-          via {current.engineVersion} · {current.rootLabel ?? current.rootPath}
+          via {targetLabel(current)}
         </span>
       )}
       {scanning && onCancel ? (

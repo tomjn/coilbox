@@ -5,12 +5,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { type ScanTarget, targetKey } from "../../config";
+import { type ScanTarget, targetKey, targetLabel } from "../../config";
 
 /**
- * Picks which (content root, engine) pair the scan runs against. A root can hold
- * several engines and a user can have several roots, so this is a real choice —
- * the selection persists via the frame settings store.
+ * Picks which engine the scan runs with. The selection persists via the frame
+ * settings store.
+ *
+ * Engine, not content folder. Every engine belongs to exactly one folder, so
+ * the list is one row per engine either way, and the folder never decided what
+ * a scan found (see [`targetLabel`]).
  */
 export function TargetPicker({
   targets,
@@ -31,7 +34,7 @@ export function TargetPicker({
       <SelectContent>
         {targets.map((t) => (
           <SelectItem key={targetKey(t)} value={targetKey(t)}>
-            {t.engineVersion} · {t.rootLabel ?? t.rootPath}
+            {targetLabel(t)}
           </SelectItem>
         ))}
       </SelectContent>

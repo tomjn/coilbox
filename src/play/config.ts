@@ -15,6 +15,7 @@ import {
 } from "../content/config";
 import { compareEngineVersions } from "../content/engineVersion";
 import { withoutGeneratedGames } from "../lib/generatedGames";
+import { type GameListState, gameListState } from "./gameListState";
 
 export type { Participant, Rgb } from "./participants";
 // The pure participant model lives in ./participants (no hooks, no frame
@@ -166,6 +167,10 @@ export function usePlayReadiness(): {
   loading: boolean;
   target: PlayTarget | null;
   hasGames: boolean;
+  /** What an empty list means, for the screens that draw the empty state. */
+  state: GameListState;
+  /** Diagnostics unitsync reported during the scan, for the same screens. */
+  scanErrors: string[];
 } {
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -174,9 +179,16 @@ export function usePlayReadiness(): {
   // one the unit builder wrote has nothing to play, and every empty state that
   // reads this says so.
   const hasGames = withoutGeneratedGames(scan.data?.games ?? []).length > 0;
+  const scanErrors = scan.data?.errors ?? [];
+  const state = gameListState({
+    hasTarget: !!target,
+    scanned: scanResolved,
+    hasGames,
+    scanErrors,
+  });
   const needsGame = !target || (scanResolved && !hasGames);
   const loading = targetLoading || (!!target && !scanResolved);
-  return { ready: !needsGame, loading, target, hasGames };
+  return { ready: !needsGame, loading, target, hasGames, state, scanErrors };
 }
 
 /** A resolved replay launch target plus whether its engine exactly matches the
