@@ -16,6 +16,7 @@ fn create() -> Vec<ScriptEvent> {
         frame: 0,
         callin: "Create".to_string(),
         args: Vec::new(),
+        ambient: false,
     }]
 }
 
@@ -316,11 +317,13 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
                 frame: 0,
                 callin: "Create".to_string(),
                 args: Vec::new(),
+                ambient: false,
             },
             ScriptEvent {
                 frame: 10,
                 callin: "StopMoving".to_string(),
                 args: Vec::new(),
+                ambient: false,
             },
         ],
         60,
@@ -373,6 +376,7 @@ fn a_call_in_with_arguments_gets_them() {
             frame: 0,
             callin: "AimWeapon1".to_string(),
             args: vec![0.75, 0.1],
+            ambient: false,
         }],
         3,
     );
@@ -434,16 +438,19 @@ fn the_generated_script_shape_runs() {
                 frame: 0,
                 callin: "Create".to_string(),
                 args: Vec::new(),
+                ambient: false,
             },
             ScriptEvent {
                 frame: 0,
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
+                ambient: false,
             },
             ScriptEvent {
                 frame: 60,
                 callin: "StopMoving".to_string(),
                 args: Vec::new(),
+                ambient: false,
             },
         ],
         120,
@@ -501,11 +508,13 @@ fn a_throwing_call_in_names_it_and_keeps_the_frames_before_it() {
                 frame: 0,
                 callin: "Create".to_string(),
                 args: Vec::new(),
+                ambient: false,
             },
             ScriptEvent {
                 frame: 5,
                 callin: "StartMoving".to_string(),
                 args: Vec::new(),
+                ambient: false,
             },
         ],
         30,
@@ -557,6 +566,7 @@ fn a_call_in_the_script_does_not_have_is_a_warning_not_a_failure() {
             frame: 0,
             callin: "StartMoving".to_string(),
             args: Vec::new(),
+            ambient: false,
         }],
         5,
     );
@@ -687,6 +697,27 @@ mod probing {
             "{:?}",
             probe.pieces
         );
+    }
+
+    /// The preview tells a unit things it cannot work out for itself, such as
+    /// what it is standing on. Almost no unit defines those call-ins, so
+    /// reporting a missing one would report it about nearly every unit.
+    #[test]
+    fn stays_quiet_about_a_call_in_it_only_fired_to_describe_the_world() {
+        let timeline = run(
+            "function script.Create() end",
+            "test.lua",
+            &pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "setSFXoccupy".to_string(),
+                args: vec![4.0],
+                ambient: true,
+            }],
+            3,
+        );
+
+        assert_eq!(timeline.warnings, Vec::<String>::new());
     }
 
     #[test]

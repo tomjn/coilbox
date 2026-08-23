@@ -361,10 +361,12 @@ impl Run {
         for event in events.iter().filter(|event| event.frame == frame) {
             let function: Option<Function> = self.script.get(event.callin.as_str()).ok().flatten();
             let Some(function) = function else {
-                self.sim
-                    .borrow_mut()
-                    .model
-                    .note(format!("This script has no {} call-in.", event.callin));
+                if !event.ambient {
+                    self.sim
+                        .borrow_mut()
+                        .model
+                        .note(format!("This script has no {} call-in.", event.callin));
+                }
                 continue;
             };
             let thread = self

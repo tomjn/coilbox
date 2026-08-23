@@ -46,6 +46,16 @@ pub struct ScriptEvent {
     /// Numeric arguments, for the call-ins that take them.
     #[serde(default)]
     pub args: Vec<f64>,
+    /// Whether this is the preview describing the world rather than putting the
+    /// unit through something.
+    ///
+    /// The engine tells a unit things it cannot work out for itself, such as
+    /// what it is standing on, and a script that branches on one of those stops
+    /// dead without it. Almost no unit defines those call-ins, so a runtime that
+    /// said "this script has no setSFXoccupy call-in" would say it about nearly
+    /// every unit, which is noise rather than news.
+    #[serde(default)]
+    pub ambient: bool,
 }
 
 /// Every piece's pose on every frame, which is what the viewport plays.
