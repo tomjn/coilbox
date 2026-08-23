@@ -85,6 +85,9 @@ describe("settings declarations", () => {
       "engine-game",
       "engine-keybinds",
       "engine-profiles",
+      // Declared by the play plugin rather than by content, which owns the
+      // group. Last, because it is the diagnostic rather than a setting.
+      "engine-log",
     ]);
     expect(childrenOf("multiplayer")).toEqual([
       "lobby-servers",

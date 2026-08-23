@@ -8,6 +8,7 @@
 //! signal — the `play_launch` command simply resolves when the process exits.
 
 mod focus;
+mod infolog;
 mod launch;
 mod script;
 
@@ -18,7 +19,7 @@ use serde::Serialize;
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::process::{Child, Stdio};
+use std::process::{Child, ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{
@@ -32,6 +33,35 @@ use tauri::{
 /// its own entry when the engine exits.
 type RunRegistry = Arc<Mutex<HashMap<String, Child>>>;
 
+/// How the engine process ended.
+///
+/// Both halves matter, and neither alone is enough. A crash kills the engine with
+/// a signal, so `ExitStatus::code()` answers `None` and flattening it to 0 reports
+/// a segfault as a clean exit (issue #379). Windows has no signals, so `signal` is
+/// always `None` there and a failure shows up in `code`.
+#[derive(Clone, Copy, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExitOutcome {
+    code: Option<i32>,
+    signal: Option<i32>,
+}
+
+impl ExitOutcome {
+    fn from_status(status: &ExitStatus) -> Self {
+        #[cfg(unix)]
+        let signal = {
+            use std::os::unix::process::ExitStatusExt;
+            status.signal()
+        };
+        #[cfg(not(unix))]
+        let signal = None;
+        Self {
+            code: status.code(),
+            signal,
+        }
+    }
+}
+
 /// Lifecycle event streamed to the frontend over a [`Channel`]. The authoritative
 /// unfreeze signal is `play_launch` resolving; this just lets the UI show a
 /// "running" state before then.
@@ -39,7 +69,10 @@ type RunRegistry = Arc<Mutex<HashMap<String, Child>>>;
 #[serde(rename_all = "camelCase", tag = "kind")]
 enum LaunchEvent {
     Started,
-    Exited { code: Option<i32> },
+    Exited {
+        code: Option<i32>,
+        signal: Option<i32>,
+    },
 }
 
 /// Poll interval while waiting for the engine to exit. Coarse: the engine runs for
@@ -104,7 +137,7 @@ fn launch_blocking(
     run_id: String,
     reg: RunRegistry,
     on_event: Channel<LaunchEvent>,
-) -> Result<Option<i32>, String> {
+) -> Result<Option<ExitOutcome>, String> {
     let mut cmd = coilbox_proc::command(&bin);
     cmd.args(&args)
         .env("SPRING_DATADIR", &data_dir)
@@ -128,7 +161,7 @@ fn launch_blocking(
                 Some(child) => match child.try_wait().map_err(|e| e.to_string())? {
                     Some(status) => {
                         map.remove(&run_id);
-                        Some(status.code())
+                        Some(ExitOutcome::from_status(&status))
                     }
                     None => None,
                 },
@@ -136,11 +169,31 @@ fn launch_blocking(
                 None => return Ok(None),
             }
         };
-        if let Some(code) = exited {
-            let _ = on_event.send(LaunchEvent::Exited { code });
-            return Ok(Some(code.unwrap_or(0)));
+        if let Some(outcome) = exited {
+            let _ = on_event.send(LaunchEvent::Exited {
+                code: outcome.code,
+                signal: outcome.signal,
+            });
+            return Ok(Some(outcome));
         }
         std::thread::sleep(POLL_INTERVAL);
+    }
+}
+
+/// Turn a finished launch task into the command's reply, shared by the three
+/// launch commands.
+///
+/// A cancelled run reports no exit status at all, which is how the frontend tells
+/// a cancel from a crash: `play_cancel` takes the child out of the registry, so
+/// the poll loop never sees it exit.
+fn launch_result<E: std::fmt::Display>(
+    result: Result<Result<Option<ExitOutcome>, String>, E>,
+) -> CliResult {
+    match result {
+        Ok(Ok(Some(o))) => CliResult::ok(json!({ "exitCode": o.code, "signal": o.signal })),
+        Ok(Ok(None)) => CliResult::ok(json!({ "exitCode": null, "signal": null })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("launch task failed: {e}")),
     }
 }
 
@@ -188,12 +241,7 @@ async fn play_launch<R: Runtime>(
     })
     .await;
 
-    Ok(match result {
-        Ok(Ok(Some(code))) => CliResult::ok(json!({ "exitCode": code })),
-        Ok(Ok(None)) => CliResult::ok(json!({ "exitCode": serde_json::Value::Null })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("launch task failed: {e}")),
-    })
+    Ok(launch_result(result))
 }
 
 /// `play_launch_replay` — launch the engine to play back a demo (`.sdfz`). Unlike
@@ -231,12 +279,7 @@ async fn play_launch_replay<R: Runtime>(
     })
     .await;
 
-    Ok(match result {
-        Ok(Ok(Some(code))) => CliResult::ok(json!({ "exitCode": code })),
-        Ok(Ok(None)) => CliResult::ok(json!({ "exitCode": serde_json::Value::Null })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("launch task failed: {e}")),
-    })
+    Ok(launch_result(result))
 }
 
 /// `play_launch_save` — resume a savegame (`.ssf`/`.slsf`). Like `play_launch_replay`
@@ -274,12 +317,7 @@ async fn play_launch_save<R: Runtime>(
     })
     .await;
 
-    Ok(match result {
-        Ok(Ok(Some(code))) => CliResult::ok(json!({ "exitCode": code })),
-        Ok(Ok(None)) => CliResult::ok(json!({ "exitCode": serde_json::Value::Null })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("launch task failed: {e}")),
-    })
+    Ok(launch_result(result))
 }
 
 /// `play_cancel` — kill an in-flight game by run id (its launch resolves shortly
@@ -310,6 +348,35 @@ async fn play_focus(reg: State<'_, RunRegistry>, run_id: String) -> Result<CliRe
     })
 }
 
+/// `play_infolog` — read the tail of the engine's most recent `infolog.txt`, for
+/// crash triage and for the engine log page in settings (issue #379).
+///
+/// The log is not in `data_dir`, whatever the content root says: the engine writes
+/// it to its own write dir, which on unix is `~/.config/spring` long before it is
+/// anything coilbox named. See `infolog::candidate_dirs` for the search, and the
+/// module docs for why.
+///
+/// This reports the newest log it can find and when it was written, and says
+/// nothing about which run it belongs to. The caller knows when its launch
+/// started, so the caller decides whether this log is that run's.
+#[tauri::command]
+async fn play_infolog<R: Runtime>(
+    app: AppHandle<R>,
+    data_dir: String,
+    max_lines: usize,
+) -> Result<CliResult, ()> {
+    let documents = app.path().document_dir().ok();
+    let base = infolog::LogBaseDirs::from_env(documents);
+    let dirs = infolog::candidate_dirs(infolog::current_os(), &base, &data_dir);
+    let Some(path) = infolog::newest_log(&dirs) else {
+        return Ok(CliResult::err("no engine log was found"));
+    };
+    Ok(match infolog::read_tail(&path, max_lines) {
+        Ok(tail) => CliResult::ok(json!({ "log": tail })),
+        Err(e) => CliResult::err(e),
+    })
+}
+
 /// Build the plugin. Registered as `"coilbox-play"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-play|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -327,7 +394,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             play_launch_replay,
             play_launch_save,
             play_cancel,
-            play_focus
+            play_focus,
+            play_infolog
         ])
         .build()
 }

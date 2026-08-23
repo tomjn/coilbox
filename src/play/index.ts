@@ -1,7 +1,8 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
-import { Clapperboard, Save, Swords } from "lucide-react";
+import { Clapperboard, FileText, Save, Swords } from "lucide-react";
 import InGameBadge from "./InGameBadge";
 import { PlayProvider } from "./PlayProvider";
+import EngineLogSection from "./pages/EngineLogSection";
 
 /**
  * The Play plugin's frontend half — a **Play** sidebar section whose first screen
@@ -69,6 +70,21 @@ const playPlugin: FramePlugin = {
       path: "play/savegames",
       lazy: () => import("./pages/SavegamesPage"),
       crumb: "Save Games",
+    },
+  ],
+  // Declared into Engine Settings, which the content plugin owns, because that
+  // is where somebody goes looking for what the engine did. The code stays here
+  // because the crash drawer it shares a viewer with is a play concern.
+  settings: [
+    {
+      id: "engine-log",
+      title: "Engine log",
+      description: "What the engine last wrote down, and where it wrote it.",
+      parent: "engine-settings",
+      order: 70,
+      icon: FileText,
+      width: "lg",
+      Component: EngineLogSection,
     },
   ],
   Provider: PlayProvider,

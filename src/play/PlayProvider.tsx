@@ -10,12 +10,15 @@ import {
 import {
   type BattleConfig,
   type LaunchEvent,
+  type LaunchOutcome,
   playCancel,
   playFocus,
   playLaunch,
   playLaunchReplay,
   playLaunchSave,
 } from "./bindings";
+import { CrashDrawer } from "./pages/components/CrashDrawer";
+import { type CrashContext, useCrashTriage } from "./useCrashTriage";
 
 /** Which kind of run is live, for labelling. A campaign mission launches through
  * the same skirmish path — the label only distinguishes it for the UI. */
@@ -27,6 +30,19 @@ export type RunKind =
   | "campaign"
   | "conquest"
   | "runlite";
+
+/** What each run kind is called when the crash drawer says what died. Warpath
+ * keeps its internal name `runlite` everywhere else, so it is spelled out here
+ * rather than shown raw. */
+const RUN_LABELS: Record<RunKind, string> = {
+  skirmish: "Skirmish",
+  battle: "Multiplayer battle",
+  replay: "Replay",
+  save: "Savegame",
+  campaign: "Campaign mission",
+  conquest: "Conquest battle",
+  runlite: "Warpath battle",
+};
 
 interface LaunchOpts {
   config: BattleConfig;
@@ -56,11 +72,11 @@ interface PlayContextValue {
   launch: (
     kind: "skirmish" | "battle" | "campaign" | "conquest" | "runlite",
     opts: LaunchOpts,
-  ) => Promise<{ exitCode: number | null }>;
+  ) => Promise<LaunchOutcome>;
   /** Launch a replay; resolves when the engine exits. */
-  launchReplay: (opts: ReplayOpts) => Promise<{ exitCode: number | null }>;
+  launchReplay: (opts: ReplayOpts) => Promise<LaunchOutcome>;
   /** Resume a savegame; resolves when the engine exits. */
-  launchSave: (opts: SaveOpts) => Promise<{ exitCode: number | null }>;
+  launchSave: (opts: SaveOpts) => Promise<LaunchOutcome>;
   /** Bring the running game's window to the foreground (best-effort). */
   focusGame: () => void;
   /**
@@ -91,6 +107,14 @@ export function PlayProvider({ children }: { children: ReactNode }) {
   // `cancel` already cleared state, or after a second run started) doesn't
   // clobber a run it no longer belongs to.
   const activeRunIdRef = useRef<string | null>(null);
+  // Crash triage (#379). It lives here because every launch in the app goes
+  // through `start`, so one drawer covers all of them.
+  const {
+    triage,
+    open: crashOpen,
+    setOpen: setCrashOpen,
+    inspect,
+  } = useCrashTriage();
 
   const clearRun = useCallback(() => {
     runningRef.current = false;
@@ -103,10 +127,11 @@ export function PlayProvider({ children }: { children: ReactNode }) {
   const start = useCallback(
     async (
       runKind: RunKind,
+      ctx: { dataDir: string } & Omit<CrashContext, "outcome" | "runKind">,
       run: (
         runId: string,
         onEvent: Channel<LaunchEvent>,
-      ) => Promise<{ exitCode: number | null }>,
+      ) => Promise<LaunchOutcome>,
     ) => {
       if (runningRef.current) throw new Error("a game is already running");
       runningRef.current = true;
@@ -116,11 +141,25 @@ export function PlayProvider({ children }: { children: ReactNode }) {
       // The authoritative unfreeze is the launch promise resolving. The channel
       // is required by the command signature but unused here.
       onEvent.onmessage = () => {};
+      // Recorded before the engine starts, so crash triage can tell this run's
+      // log from the one an earlier session left behind (#379).
+      const startedAtMs = Date.now();
       setRunning(true);
       setActiveRunId(runId);
       setKind(runKind);
       try {
-        return await run(runId, onEvent);
+        const outcome = await run(runId, onEvent);
+        // Only triage the run that is still current. A run the user cancelled
+        // is not a crash, and its promise settles after `cancel` cleared the id.
+        if (activeRunIdRef.current === runId) {
+          void inspect({
+            ...ctx,
+            runKind: RUN_LABELS[runKind],
+            outcome,
+            startedAtMs,
+          });
+        }
+        return outcome;
       } finally {
         // Only clear if this run is still the active one. `cancel` may already
         // have cleared it (and a new run may since have started) before this
@@ -128,7 +167,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
         if (activeRunIdRef.current === runId) clearRun();
       }
     },
-    [clearRun],
+    [clearRun, inspect],
   );
 
   const launch = useCallback(
@@ -136,24 +175,45 @@ export function PlayProvider({ children }: { children: ReactNode }) {
       runKind: "skirmish" | "battle" | "campaign" | "conquest" | "runlite",
       opts: LaunchOpts,
     ) =>
-      start(runKind, (runId, onEvent) =>
-        playLaunch({ ...opts, runId, onEvent }),
+      start(
+        runKind,
+        {
+          dataDir: opts.dataDir,
+          game: opts.config.gameType,
+          map: opts.config.mapName,
+          engine: opts.executable,
+        },
+        (runId, onEvent) => playLaunch({ ...opts, runId, onEvent }),
       ),
     [start],
   );
 
   const launchReplay = useCallback(
     (opts: ReplayOpts) =>
-      start("replay", (runId, onEvent) =>
-        playLaunchReplay({ ...opts, runId, onEvent }),
+      start(
+        "replay",
+        {
+          dataDir: opts.dataDir,
+          engine: opts.executable,
+          // The engine reads the game and map out of the demo, so coilbox knows
+          // neither. Naming the file is the useful thing it does know.
+          file: opts.demoPath,
+        },
+        (runId, onEvent) => playLaunchReplay({ ...opts, runId, onEvent }),
       ),
     [start],
   );
 
   const launchSave = useCallback(
     (opts: SaveOpts) =>
-      start("save", (runId, onEvent) =>
-        playLaunchSave({ ...opts, runId, onEvent }),
+      start(
+        "save",
+        {
+          dataDir: opts.dataDir,
+          engine: opts.executable,
+          file: opts.savePath,
+        },
+        (runId, onEvent) => playLaunchSave({ ...opts, runId, onEvent }),
       ),
     [start],
   );
@@ -188,6 +248,11 @@ export function PlayProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <CrashDrawer
+        open={crashOpen}
+        onOpenChange={setCrashOpen}
+        triage={triage}
+      />
     </PlayContext.Provider>
   );
 }
