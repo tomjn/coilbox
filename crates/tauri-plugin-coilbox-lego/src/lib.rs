@@ -1518,6 +1518,9 @@ async fn lego_scratch_game(
 /// A script that throws, loops or names a piece the unit does not have is not
 /// an error here. It comes back as a timeline carrying the reason, because what
 /// the script managed before it broke is worth seeing.
+// Each argument is one field of the IPC payload, so grouping them would only
+// move the width into a struct the frontend then has to nest.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 fn lego_run_script(
     script: String,
@@ -1527,15 +1530,19 @@ fn lego_run_script(
     frames: u32,
     unit_def: Option<serde_json::Value>,
     includes: Option<HashMap<String, String>>,
+    rest: Option<Vec<unitscript::Rest>>,
 ) -> CliResult {
     let timeline = unitscript::run(
         &script,
         &format!("{unit_name}.lua"),
-        &pieces,
+        &unitscript::Unit {
+            def: unit_def.as_ref(),
+            includes: &includes.unwrap_or_default(),
+            rest: &rest.unwrap_or_default(),
+            ..unitscript::Unit::new(&pieces)
+        },
         &events,
         frames,
-        unit_def.as_ref(),
-        &includes.unwrap_or_default(),
     );
     match serde_json::to_value(timeline) {
         Ok(value) => CliResult::ok(value),
@@ -1560,14 +1567,18 @@ fn lego_probe_script(
     callins: Vec<String>,
     unit_def: Option<serde_json::Value>,
     includes: Option<HashMap<String, String>>,
+    rest: Option<Vec<unitscript::Rest>>,
 ) -> CliResult {
     let probes = unitscript::probe(
         &script,
         &format!("{unit_name}.lua"),
-        &pieces,
+        &unitscript::Unit {
+            def: unit_def.as_ref(),
+            includes: &includes.unwrap_or_default(),
+            rest: &rest.unwrap_or_default(),
+            ..unitscript::Unit::new(&pieces)
+        },
         &callins,
-        unit_def.as_ref(),
-        &includes.unwrap_or_default(),
     );
     match serde_json::to_value(probes) {
         Ok(value) => CliResult::ok(value),

@@ -179,7 +179,9 @@ const MY_ID: i32 = 71;
 const HEADING: i32 = 82;
 const IN_WATER: i32 = 28;
 const MAX_SPEED: i32 = 75;
-/// The packed pair of map coordinates, which is not arithmetic however it looks.
+/// The packed pair of map coordinates, which is not arithmetic however it
+/// looks. Named only so the test that keeps it out can say what it is.
+#[cfg(test)]
 const XZ_ATAN: i32 = 12;
 
 /// What a preview answers, for the questions that have an answer.

@@ -136,9 +136,25 @@ pub enum Wait {
     Move,
 }
 
+/// Where a piece sits in the unit before anything moves it.
+///
+/// The model's own geometry, which a runtime is given rather than working out:
+/// a script asking where one of its pieces is is asking about the model, and
+/// neither runtime reads models.
+#[derive(Debug, Clone, Copy, Default, Deserialize)]
+pub struct Rest {
+    /// The piece this one hangs off, or none for the root. An index into the
+    /// same list of pieces the names came in.
+    pub parent: Option<usize>,
+    /// Its offset from that parent, in elmos.
+    pub position: [f64; 3],
+}
+
 #[derive(Debug, Clone)]
 pub struct Piece {
     pub name: String,
+    /// Where it sits, and what it hangs off, before anything moves it.
+    pub rest: Rest,
     /// Offset from the rest pose, in elmos, per axis.
     pub pos: [f64; 3],
     /// Rotation about the piece's own origin, in radians, per axis.
@@ -152,6 +168,7 @@ impl Piece {
     pub fn new(name: String) -> Self {
         Self {
             name,
+            rest: Rest::default(),
             pos: [0.0; 3],
             rot: [0.0; 3],
             hidden: false,
@@ -168,6 +185,10 @@ pub struct Model {
     /// True once anything has been hidden, shown or exploded, which is what
     /// decides whether the timeline carries visibility at all.
     pub visibility_used: bool,
+    /// Whether the caller said where the pieces sit. Without it a script asking
+    /// where one of them is has to be told nobody knows, rather than handed the
+    /// origin as though every piece were stacked at the unit's feet.
+    pub placed: bool,
     pub warnings: Vec<String>,
 }
 
@@ -177,6 +198,53 @@ impl Model {
             pieces: names.iter().cloned().map(Piece::new).collect(),
             ..Self::default()
         }
+    }
+
+    /// Say where the pieces sit, in the order their names came in.
+    ///
+    /// Ignored unless there is one entry per piece, because a list that does
+    /// not line up with the names would put every piece somewhere that is not
+    /// where it is.
+    pub fn place(&mut self, rest: &[Rest]) {
+        if rest.len() != self.pieces.len() {
+            return;
+        }
+        for (piece, rest) in self.pieces.iter_mut().zip(rest) {
+            piece.rest = *rest;
+        }
+        self.placed = true;
+    }
+
+    /// Where a piece is in the unit, or nothing if nobody said where it sits.
+    ///
+    /// Its offset from its parent plus whatever has moved it, added up the
+    /// chain to the root. That is the position in the unit's own space, which
+    /// is the same as the position in the world because a preview puts the unit
+    /// at the origin facing forwards.
+    ///
+    /// Rotations are not composed, so a piece hanging off an arm that has
+    /// turned is reported where it would be if the arm had not. Composing them
+    /// needs each piece's rest rotation as well, which is model data no runtime
+    /// carries, and the callers of this are scripts asking how high a piece is
+    /// on a unit that is standing up. The answer is labelled where it is given
+    /// rather than quietly being treated as exact.
+    pub fn piece_position(&self, index: usize) -> Option<[f64; 3]> {
+        if !self.placed {
+            return None;
+        }
+        let mut at = Some(index);
+        let mut out = [0.0; 3];
+        // Bounded by the number of pieces, so a parent chain that loops back on
+        // itself stops rather than running forever.
+        for _ in 0..=self.pieces.len() {
+            let Some(index) = at else { return Some(out) };
+            let piece = self.pieces.get(index)?;
+            for (axis, sum) in out.iter_mut().enumerate() {
+                *sum += piece.rest.position[axis] + piece.pos[axis];
+            }
+            at = piece.rest.parent;
+        }
+        Some(out)
     }
 
     /// Say something once. A warning repeated per frame is noise, and the same
@@ -381,4 +449,89 @@ fn shortest(delta: f64) -> f64 {
 /// arrays are 0, 1 and 2, and it subtracts one on the way in.
 pub fn axis_index(axis: i64) -> Option<usize> {
     (1..=3).contains(&axis).then_some(axis as usize - 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn names() -> Vec<String> {
+        ["base", "torso", "arm"]
+            .iter()
+            .map(|n| (*n).to_string())
+            .collect()
+    }
+
+    /// A base on the ground, a torso above it, an arm out to one side of that.
+    fn placed() -> Model {
+        let mut model = Model::new(&names());
+        model.place(&[
+            Rest {
+                parent: None,
+                position: [0.0, 0.0, 0.0],
+            },
+            Rest {
+                parent: Some(0),
+                position: [0.0, 10.0, 0.0],
+            },
+            Rest {
+                parent: Some(1),
+                position: [4.0, 2.0, 0.0],
+            },
+        ]);
+        model
+    }
+
+    #[test]
+    fn a_piece_sits_where_its_parents_put_it() {
+        assert_eq!(placed().piece_position(2), Some([4.0, 12.0, 0.0]));
+    }
+
+    /// Moving a piece moves everything hanging off it, which is what makes a
+    /// raised arm's hand raised as well.
+    #[test]
+    fn moving_a_parent_carries_its_children() {
+        let mut model = placed();
+        model.pieces[1].pos[1] = 5.0;
+
+        assert_eq!(model.piece_position(2), Some([4.0, 17.0, 0.0]));
+    }
+
+    /// Without geometry there is no answer, and saying so is the point: a
+    /// script handed the origin for every piece decides they are all at the
+    /// unit's feet.
+    #[test]
+    fn a_model_nobody_placed_has_no_positions() {
+        assert_eq!(Model::new(&names()).piece_position(0), None);
+    }
+
+    /// A list that does not line up with the pieces would put every one of them
+    /// somewhere that is not where it is.
+    #[test]
+    fn a_placement_of_the_wrong_length_is_ignored() {
+        let mut model = Model::new(&names());
+        model.place(&[Rest::default()]);
+
+        assert_eq!(model.piece_position(0), None);
+    }
+
+    /// A parent chain that loops is a broken model, and stopping is what makes
+    /// it a wrong answer rather than a hang.
+    #[test]
+    fn a_parent_chain_that_loops_still_answers() {
+        let mut model = Model::new(&names());
+        model.place(&[
+            Rest {
+                parent: Some(1),
+                position: [1.0, 0.0, 0.0],
+            },
+            Rest {
+                parent: Some(0),
+                position: [1.0, 0.0, 0.0],
+            },
+            Rest::default(),
+        ]);
+
+        assert!(model.piece_position(0).is_some());
+    }
 }

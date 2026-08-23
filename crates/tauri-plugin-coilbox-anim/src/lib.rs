@@ -133,10 +133,13 @@ async fn anim_cob_run(
     pieces: Vec<String>,
     events: Vec<coilbox_unitpose::ScriptEvent>,
     frames: u32,
+    rest: Option<Vec<coilbox_unitpose::Rest>>,
 ) -> CliResult {
-    let result =
-        tauri::async_runtime::spawn_blocking(move || cobrun::run(&bytes, &pieces, &events, frames))
-            .await;
+    let rest = rest.unwrap_or_default();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        cobrun::run(&bytes, &pieces, &events, frames, &rest)
+    })
+    .await;
     match result {
         Ok(timeline) => match serde_json::to_value(&timeline) {
             Ok(value) => CliResult::ok(value),

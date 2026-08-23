@@ -34,7 +34,7 @@ use mlua::{
 use serde::Serialize;
 
 use coilbox_unitpose::{axis_index, unitvalue, Model, Wait, TICK_MS};
-pub use coilbox_unitpose::{ScriptEvent, Timeline, FPS, MAX_FRAMES};
+pub use coilbox_unitpose::{Rest, ScriptEvent, Timeline, FPS, MAX_FRAMES};
 
 /// Instructions one frame may execute before the run is abandoned.
 ///
@@ -173,18 +173,42 @@ enum State {
 /// piece, throws, or loops without sleeping comes back as a [`Timeline`] with
 /// `error` set and whatever frames it managed. Failing is an outcome of running
 /// a script, not a failure to run one.
-pub fn run(
-    script: &str,
-    name: &str,
-    pieces: &[String],
-    events: &[ScriptEvent],
-    frames: u32,
-    unit_def: Option<&serde_json::Value>,
-    includes: &HashMap<String, String>,
-) -> Timeline {
-    match Run::start(script, name, pieces, unit_def, includes) {
+pub fn run(script: &str, name: &str, unit: &Unit, events: &[ScriptEvent], frames: u32) -> Timeline {
+    match Run::start(script, name, unit) {
         Ok(mut run) => run.play(events, frames.min(MAX_FRAMES)),
-        Err(error) => Timeline::failed(pieces, error),
+        Err(error) => Timeline::failed(unit.pieces, error),
+    }
+}
+
+/// Everything the preview knows about the unit a script is running on.
+///
+/// One thing rather than four arguments because they are one thing: what the
+/// game said this unit is. Each was added when a script that read it stopped
+/// without it, and the next one will be too.
+pub struct Unit<'a> {
+    /// The piece names, which is what `piece("name")` resolves against and the
+    /// order the timeline's numbers are laid out in.
+    pub pieces: &'a [String],
+    /// The unit's own definition, for a script that reads one.
+    pub def: Option<&'a serde_json::Value>,
+    /// The library files the script pulls in, by the name it asks for.
+    pub includes: &'a HashMap<String, String>,
+    /// Where the pieces sit, for a script that asks where one of them is.
+    pub rest: &'a [Rest],
+}
+
+impl<'a> Unit<'a> {
+    /// A unit that is only its pieces, which is what a preview of a script on
+    /// its own knows.
+    pub fn new(pieces: &'a [String]) -> Self {
+        // A borrow of an empty map, so the common case allocates nothing.
+        static NONE: std::sync::OnceLock<HashMap<String, String>> = std::sync::OnceLock::new();
+        Self {
+            pieces,
+            def: None,
+            includes: NONE.get_or_init(HashMap::new),
+            rest: &[],
+        }
     }
 }
 
@@ -209,26 +233,19 @@ const PROBE_CALLS: usize = 16;
 ///
 /// Never returns an error. A script that will not load comes back with `error`
 /// set, and one that loads but answers badly says so on the probe itself.
-pub fn probe(
-    script: &str,
-    name: &str,
-    pieces: &[String],
-    callins: &[String],
-    unit_def: Option<&serde_json::Value>,
-    includes: &HashMap<String, String>,
-) -> Probes {
-    let mut run = match Run::start(script, name, pieces, unit_def, includes) {
+pub fn probe(script: &str, name: &str, unit: &Unit, callins: &[String]) -> Probes {
+    let mut run = match Run::start(script, name, unit) {
         Ok(run) => run,
         Err(error) => {
             return Probes {
-                pieces: pieces.to_vec(),
+                pieces: unit.pieces.to_vec(),
                 probes: Vec::new(),
                 error: Some(error),
             }
         }
     };
     Probes {
-        pieces: pieces.to_vec(),
+        pieces: unit.pieces.to_vec(),
         probes: callins.iter().map(|callin| run.probe(callin)).collect(),
         error: None,
     }
@@ -253,20 +270,16 @@ impl Run {
     /// Build the VM, install the unit script API and execute the chunk's top
     /// level, which is where its `piece(...)` calls and `script.X` definitions
     /// happen.
-    fn start(
-        script: &str,
-        name: &str,
-        pieces: &[String],
-        unit_def: Option<&serde_json::Value>,
-        includes: &HashMap<String, String>,
-    ) -> Result<Self, String> {
+    fn start(script: &str, name: &str, unit: &Unit) -> Result<Self, String> {
+        let mut model = Model::new(unit.pieces);
+        model.place(unit.rest);
         let sim = Rc::new(RefCell::new(Sim {
-            model: Model::new(pieces),
+            model,
             ..Sim::default()
         }));
         let budget = Rc::new(Cell::new(FRAME_INSTRUCTIONS));
         let fatal = Rc::new(Cell::new(false));
-        let lua = sandbox(&sim, &budget, &fatal, unit_def, includes)
+        let lua = sandbox(&sim, &budget, &fatal, unit.def, unit.includes)
             .map_err(|e| format!("could not build the Lua sandbox: {e}"))?;
         let table: Table = lua
             .globals()
@@ -975,30 +988,38 @@ fn install_spring(
         })?,
     )?;
 
-    for name in ["GetUnitPosition", "GetUnitPiecePosition"] {
-        let state = Rc::clone(sim);
-        let label = name.to_string();
-        spring.set(
-            name,
-            lua.create_function(move |_, _: MultiValue| {
-                state.borrow_mut().model.note(format!(
-                    "{label} answers nothing in the preview, which has no world to place the unit in, so a script deciding something from where it is decides it as though it were at the origin."
-                ));
-                Ok((0.0, 0.0, 0.0))
-            })?,
-        )?;
-    }
+    // The unit itself stands at the origin, which is where the viewport draws
+    // it, so a piece's place in the unit is also its place in the world.
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitPosition",
+        lua.create_function(move |_, _: MultiValue| {
+            state.borrow_mut().model.note(
+                "GetUnitPosition answers the origin in the preview, which is where the unit stands because there is nowhere else to stand.".to_string(),
+            );
+            Ok((0.0, 0.0, 0.0))
+        })?,
+    )?;
+
+    let state = Rc::clone(sim);
+    spring.set(
+        "GetUnitPiecePosition",
+        lua.create_function(move |_, (_unit, piece): (Value, Option<i64>)| {
+            let mut sim = state.borrow_mut();
+            let at = piece_position(&mut sim, piece);
+            Ok((at[0], at[1], at[2]))
+        })?,
+    )?;
 
     let state = Rc::clone(sim);
     spring.set(
         "GetUnitPiecePosDir",
-        lua.create_function(move |_, _: MultiValue| {
-            state.borrow_mut().model.note(
-                "GetUnitPiecePosDir answers nothing in the preview, which knows how far a piece has moved but not where the model puts it.".to_string(),
-            );
-            // Position, then a direction, which is forward because a piece
-            // facing nowhere is not a direction any script could use.
-            Ok((0.0, 0.0, 0.0, 0.0, 0.0, 1.0))
+        lua.create_function(move |_, (_unit, piece): (Value, Option<i64>)| {
+            let mut sim = state.borrow_mut();
+            let at = piece_position(&mut sim, piece);
+            // Then a direction, which is forward: the preview does not compose
+            // the rotations that would turn it.
+            Ok((at[0], at[1], at[2], 0.0, 0.0, 1.0))
         })?,
     )?;
 
@@ -1086,6 +1107,30 @@ fn install_echo(lua: &Lua, sim: &Rc<RefCell<Sim>>, spring: &Table) -> mlua::Resu
         Ok(())
     })?;
     spring.set("Echo", echo)
+}
+
+/// Where one piece is, for a script that asks.
+///
+/// The piece is numbered the way `piece()` hands them back, which is from one.
+/// A number that is not a piece of this unit, or a unit nobody said the shape
+/// of, comes back as the origin with a note: a script deciding something from a
+/// position it was quietly handed zero for decides it wrongly and silently.
+fn piece_position(sim: &mut Sim, piece: Option<i64>) -> [f64; 3] {
+    let index = piece.and_then(|number| usize::try_from(number - 1).ok());
+    match index.and_then(|index| sim.model.piece_position(index)) {
+        Some(at) => {
+            sim.model.note(
+                "Where a piece is comes from the model as it stands, so a piece on an arm that has turned is reported where it would be if the arm had not.".to_string(),
+            );
+            at
+        }
+        None => {
+            sim.model.note(
+                "This script asks where one of its pieces is, and the preview was not told where this unit's pieces sit, so it answered the origin.".to_string(),
+            );
+            [0.0; 3]
+        }
+    }
 }
 
 /// One number off the unit's definition, whatever case the game filed it under.

@@ -31,7 +31,7 @@
 
 use std::collections::HashMap;
 
-use coilbox_unitpose::{unitvalue, Model, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS};
+use coilbox_unitpose::{unitvalue, Model, Rest, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS};
 
 use crate::cob;
 use crate::opcodes::{mnemonic, opcode};
@@ -66,6 +66,17 @@ const LUA9: i32 = 119;
 /// The frame the run is on, which the preview counts itself.
 const GAME_FRAME: i32 = 134;
 
+/// Where a piece is: the pair of map coordinates packed into one number, and
+/// the height on its own.
+const PIECE_XZ: i32 = 7;
+const PIECE_Y: i32 = 8;
+
+/// Two coordinates in one number, sixteen bits each, which is how the engine
+/// hands a script a place on the map (`PACKXZ` in `CobInstance.h`).
+fn pack_xz(x: f64, z: f64) -> i32 {
+    ((x as i32) << 16) + ((z as i32) & 0xffff)
+}
+
 /// Run the compiled script in `bytes` for `frames` frames, firing `events` as
 /// they come due.
 ///
@@ -78,8 +89,14 @@ const GAME_FRAME: i32 = 134;
 /// Never returns an error. A file that will not decode, a thread that loops
 /// without sleeping and a word that is not an opcode all come back as a
 /// [`Timeline`] with `error` set and whatever frames it managed first.
-pub fn run(bytes: &[u8], pieces: &[String], events: &[ScriptEvent], frames: u32) -> Timeline {
-    match Run::start(bytes, pieces) {
+pub fn run(
+    bytes: &[u8],
+    pieces: &[String],
+    events: &[ScriptEvent],
+    frames: u32,
+    rest: &[Rest],
+) -> Timeline {
+    match Run::start(bytes, pieces, rest) {
         Ok(mut run) => run.play(events, frames.min(MAX_FRAMES)),
         Err(error) => Timeline::failed(pieces, error),
     }
@@ -273,9 +290,10 @@ struct Run {
 }
 
 impl Run {
-    fn start(bytes: &[u8], pieces: &[String]) -> Result<Self, String> {
+    fn start(bytes: &[u8], pieces: &[String], rest: &[Rest]) -> Result<Self, String> {
         let program = Program::read(bytes, pieces)?;
         let mut model = Model::new(pieces);
+        model.place(rest);
         for (index, name) in program.piece_names.iter().enumerate() {
             if program.pieces[index].is_none() {
                 model.note(format!(
@@ -1004,6 +1022,25 @@ impl Run {
         }
         if id == GAME_FRAME {
             return self.frame as i32;
+        }
+        // Where a piece is, which the model knows once somebody has said where
+        // its pieces sit. The unit stands at the origin facing forwards, so a
+        // piece's place in the unit is also its place in the world, which is
+        // what the engine answers with.
+        if id == PIECE_XZ || id == PIECE_Y {
+            let index = self.program.pieces.get((p1 - 1).max(0) as usize).copied();
+            let at = index.flatten().and_then(|at| self.model.piece_position(at));
+            let Some(at) = at else {
+                self.model.note(
+                    "This script asks where one of its pieces is, and the preview was not told where this unit's pieces sit.".to_string(),
+                );
+                return 0;
+            };
+            return if id == PIECE_Y {
+                (at[1] * COBSCALE) as i32
+            } else {
+                pack_xz(at[0], at[2])
+            };
         }
         if let Some(value) = self.set_values.get(&id) {
             return *value;

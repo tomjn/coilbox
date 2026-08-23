@@ -20,21 +20,8 @@ fn create() -> Vec<ScriptEvent> {
     }]
 }
 
-/// A unit whose script pulls in nothing, which is most of them.
-fn no_includes() -> HashMap<String, String> {
-    HashMap::new()
-}
-
 fn play(script: &str, frames: u32) -> Timeline {
-    run(
-        script,
-        "test.lua",
-        &pieces(),
-        &create(),
-        frames,
-        None,
-        &no_includes(),
-    )
+    run(script, "test.lua", &Unit::new(&pieces()), &create(), frames)
 }
 
 /// One piece's numbers on one frame: x, y, z offset then x, y, z rotation.
@@ -324,7 +311,7 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
         end
         "#,
         "test.lua",
-        &pieces(),
+        &Unit::new(&pieces()),
         &[
             ScriptEvent {
                 frame: 0,
@@ -340,8 +327,6 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
             },
         ],
         60,
-        None,
-        &no_includes(),
     );
     assert_eq!(timeline.error, None);
     // Killed and turned back to rest, and nothing moved it again afterwards.
@@ -386,7 +371,7 @@ fn a_call_in_with_arguments_gets_them() {
         end
         "#,
         "test.lua",
-        &pieces(),
+        &Unit::new(&pieces()),
         &[ScriptEvent {
             frame: 0,
             callin: "AimWeapon1".to_string(),
@@ -394,8 +379,6 @@ fn a_call_in_with_arguments_gets_them() {
             ambient: false,
         }],
         3,
-        None,
-        &no_includes(),
     );
     assert_eq!(timeline.error, None);
     assert_close(rot_y(&timeline, 0, "turret"), 0.75);
@@ -449,7 +432,7 @@ fn the_generated_script_shape_runs() {
         end
         "#,
         "walker.lua",
-        &pieces(),
+        &Unit::new(&pieces()),
         &[
             ScriptEvent {
                 frame: 0,
@@ -471,8 +454,6 @@ fn the_generated_script_shape_runs() {
             },
         ],
         120,
-        None,
-        &no_includes(),
     );
     assert_eq!(timeline.error, None);
     assert_eq!(timeline.frames.len(), 120);
@@ -525,7 +506,7 @@ fn a_throwing_call_in_stops_that_thread_and_nothing_else() {
         function script.StartMoving() error("no") end
         "#,
         "test.lua",
-        &pieces(),
+        &Unit::new(&pieces()),
         &[
             ScriptEvent {
                 frame: 0,
@@ -541,8 +522,6 @@ fn a_throwing_call_in_stops_that_thread_and_nothing_else() {
             },
         ],
         30,
-        None,
-        &no_includes(),
     );
     assert_eq!(timeline.error, None);
     assert_eq!(timeline.frames.len(), 30);
@@ -605,7 +584,7 @@ fn a_call_in_the_script_does_not_have_is_a_warning_not_a_failure() {
     let timeline = run(
         "function script.Create() end",
         "test.lua",
-        &pieces(),
+        &Unit::new(&pieces()),
         &[ScriptEvent {
             frame: 0,
             callin: "StartMoving".to_string(),
@@ -613,8 +592,6 @@ fn a_call_in_the_script_does_not_have_is_a_warning_not_a_failure() {
             ambient: false,
         }],
         5,
-        None,
-        &no_includes(),
     );
     assert_eq!(timeline.error, None);
     assert_eq!(timeline.frames.len(), 5);
@@ -698,7 +675,7 @@ mod probing {
 
     fn ask(script: &str, callins: &[&str]) -> Probes {
         let names: Vec<String> = callins.iter().map(|c| (*c).to_string()).collect();
-        probe(script, "test.lua", &pieces(), &names, None, &no_includes())
+        probe(script, "test.lua", &Unit::new(&pieces()), &names)
     }
 
     fn answers<'a>(probes: &'a Probes, callin: &str) -> &'a Probe {
@@ -755,7 +732,7 @@ mod probing {
         let timeline = run(
             "function script.Create() end",
             "test.lua",
-            &pieces(),
+            &Unit::new(&pieces()),
             &[ScriptEvent {
                 frame: 0,
                 callin: "setSFXoccupy".to_string(),
@@ -763,8 +740,6 @@ mod probing {
                 ambient: true,
             }],
             3,
-            None,
-            &no_includes(),
         );
 
         assert_eq!(timeline.warnings, Vec::<String>::new());
@@ -870,15 +845,12 @@ mod unit_definition {
     use super::*;
 
     fn with_def(script: &str, def: serde_json::Value) -> Timeline {
-        run(
-            script,
-            "test.lua",
-            &pieces(),
-            &create(),
-            3,
-            Some(&def),
-            &no_includes(),
-        )
+        let pieces = pieces();
+        let unit = Unit {
+            def: Some(&def),
+            ..Unit::new(&pieces)
+        };
+        run(script, "test.lua", &unit, &create(), 3)
     }
 
     /// The exact line out of Beyond All Reason's `coralab.lua` that started
@@ -951,11 +923,9 @@ mod unit_definition {
             function script.Create() end
             "#,
             "test.lua",
-            &pieces(),
+            &Unit::new(&pieces()),
             &create(),
             3,
-            None,
-            &no_includes(),
         );
 
         assert_eq!(timeline.error, None);
@@ -1019,7 +989,12 @@ mod includes {
     fn with_library(script: &str, name: &str, library: &str) -> Timeline {
         let mut sources = HashMap::new();
         sources.insert(name.to_string(), library.to_string());
-        run(script, "test.lua", &pieces(), &create(), 3, None, &sources)
+        let pieces = pieces();
+        let unit = Unit {
+            includes: &sources,
+            ..Unit::new(&pieces)
+        };
+        run(script, "test.lua", &unit, &create(), 3)
     }
 
     /// The shape of `coralab.lua`: a library defines the function, the script
@@ -1088,11 +1063,9 @@ mod includes {
             function script.Create() end
             "#,
             "test.lua",
-            &pieces(),
+            &Unit::new(&pieces()),
             &create(),
             3,
-            None,
-            &no_includes(),
         );
 
         assert_eq!(timeline.error, None);
@@ -1155,15 +1128,12 @@ mod world {
     use super::*;
 
     fn with_def(script: &str, def: serde_json::Value) -> Timeline {
-        run(
-            script,
-            "test.lua",
-            &pieces(),
-            &create(),
-            6,
-            Some(&def),
-            &no_includes(),
-        )
+        let pieces = pieces();
+        let unit = Unit {
+            def: Some(&def),
+            ..Unit::new(&pieces)
+        };
+        run(script, "test.lua", &unit, &create(), 6)
     }
 
     fn note_about(timeline: &Timeline, want: &str) -> bool {
@@ -1467,7 +1437,77 @@ mod world {
         assert_eq!(timeline.error, None);
         assert_close(rot_y(&timeline, 0, "turret"), 1.0);
         assert!(
-            note_about(&timeline, "no world to place"),
+            note_about(&timeline, "answers the origin"),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// A commander checks whether a foot is under water by adding the piece's
+    /// height to the unit's, so the height has to come from the model. Every
+    /// piece at zero is a unit at sea level with all of itself submerged.
+    #[test]
+    fn a_piece_is_where_the_model_puts_it() {
+        // The turret ten above the base, the barrel two above that.
+        let rest = [
+            Rest {
+                parent: None,
+                position: [0.0, 0.0, 0.0],
+            },
+            Rest {
+                parent: Some(0),
+                position: [0.0, 10.0, 0.0],
+            },
+            Rest {
+                parent: Some(1),
+                position: [0.0, 2.0, 0.0],
+            },
+            Rest::default(),
+        ];
+        let pieces = pieces();
+        let timeline = run(
+            r#"
+            local turret = piece("turret")
+            local barrel = piece("barrel")
+            function script.Create()
+                local _, y, _ = Spring.GetUnitPiecePosition(unitID, barrel)
+                -- Moved rather than turned, because a rotation is reported
+                -- inside one turn and twelve radians is nearly two.
+                Move(turret, z_axis, y)
+            end
+            "#,
+            "test.lua",
+            &Unit {
+                rest: &rest,
+                ..Unit::new(&pieces)
+            },
+            &create(),
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(pose(&timeline, 0, "turret")[2], 12.0);
+    }
+
+    /// A unit nobody said the shape of. Answering the origin in silence would
+    /// have a script decide its pieces are all at the unit's feet.
+    #[test]
+    fn a_piece_on_a_unit_with_no_geometry_says_so() {
+        let timeline = play(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                local _, y, _ = Spring.GetUnitPiecePosition(unitID, turret)
+                Turn(turret, y_axis, y + 1)
+            end
+            "#,
+            3,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_close(rot_y(&timeline, 0, "turret"), 1.0);
+        assert!(
+            note_about(&timeline, "where this unit's pieces sit"),
             "{:?}",
             timeline.warnings
         );

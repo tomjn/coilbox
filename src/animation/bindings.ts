@@ -43,6 +43,9 @@ export const animCobRun = defineCommand<
     pieces: string[];
     events: { frame: number; callin: string; args?: number[] }[];
     frames: number;
+    /** Where each piece sits, in the same order as `pieces`, for a script that
+     *  asks where one of them is. Absent when nobody said. */
+    rest?: import("../lego/pieceRest").PieceRest[];
   },
   import("../lego/scriptPlayback").ScriptTimeline
 >("coilbox-anim", "anim_cob_run");
