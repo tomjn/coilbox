@@ -172,10 +172,11 @@ check("first refresh reports a change", store:refresh(0) == true)
 check("store merges library, spool and bar in that order", #store:entries() == 6, show(store:entries()))
 check("store order is library first", store:entries()[1].key == "library:one" and store:entries()[3].key == "spool:1" and store:entries()[5].key == "bar:1")
 check("refresh within the interval does nothing", store:refresh(2) == false)
+check("a forced refresh reads within the interval", store:refresh(1, true) == false and store.lastPoll == 1)
 check("refresh after the interval with no change reports none", store:refresh(6) == false)
 
 files[STORE.LIBRARY_PATH] = json.encode({ version = 1, blueprints = {} })
-check("a changed file is not seen before the interval", store:refresh(7) == false and #store:entries() == 6)
+check("a changed file is not seen before the interval", store:refresh(9) == false and #store:entries() == 6)
 check("a changed file is seen after the interval", store:refresh(12) == true and #store:entries() == 4)
 
 files[STORE.LIBRARY_PATH] = "broken"

@@ -286,9 +286,10 @@ end
 
 --- Re-read the files if POLL_SECONDS have passed since the last read.
 -- @param now number seconds, any monotonic clock
+-- @param force boolean? read now whatever the clock says
 -- @return boolean true when the list changed
-function Store:refresh(now)
-	if self.lastPoll ~= nil and now - self.lastPoll < M.POLL_SECONDS then
+function Store:refresh(now, force)
+	if not force and self.lastPoll ~= nil and now - self.lastPoll < M.POLL_SECONDS then
 		return false
 	end
 	self.lastPoll = now
