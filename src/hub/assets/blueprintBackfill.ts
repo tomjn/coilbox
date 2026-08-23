@@ -3,14 +3,20 @@
  *
  * Backfill is lazy and this is what that means: opening a layout of twelve
  * buildings offers the hub twelve units' pictures, not the five hundred and
- * sixty four Beyond All Reason ships. Nothing here can be pointed at a roster.
- * The unit list is the layout's own `buildings`, deduplicated, and there is no
- * argument that widens it.
+ * sixty four Beyond All Reason ships. `blueprintBackfillUnits` takes the
+ * layout's own `buildings`, deduplicated, and there is no argument that widens
+ * it.
  *
  * That matters more than the write volume suggests. Every accepted upload spends
  * a storage operation out of an allowance the whole community shares, and running
  * out is thirty days with no uploads at all and no way to pay through it. A
- * client that walked a roster would spend it for everybody.
+ * client that walked a roster on its own would spend it for everybody.
+ *
+ * Something does walk a roster now, and the distinction is who asked. Pressing
+ * the button in Settings runs `./pictureSweep.ts`, which hands
+ * `backfillBlueprintUnits` below a whole game's worth (issue #1952). What stays
+ * true is that nothing does it unasked: reached without a button, this file only
+ * ever sees a layout somebody opened, and only the units on it.
  *
  * ## Ask before making anything
  *
@@ -108,7 +114,10 @@ import {
 import { isSddName } from "@/content/format";
 import { unitModelTextureUrl } from "@/lib/assetUrl";
 import { toBase64 } from "@/lib/base64";
-import { reportAssetUploadStopped } from "../uploadOutcomes";
+import {
+  reportAssetUploadStopped,
+  type UploadInitiator,
+} from "../uploadOutcomes";
 import { type AssetKey, assetsTheHubWants, type HaveResult } from "./have";
 import { localRenders, rememberLocalRender } from "./localRenders";
 import { RENDER_VERSION, renderUnit, type UnitRender } from "./renderTop";
@@ -204,6 +213,18 @@ export interface BackfillTarget {
   archive: string;
   enginePath: string;
   dataDir: string;
+  /**
+   * Who to tell when the hub refuses something (issues #1690 and #1952).
+   *
+   * `coilbox` is a run nobody asked for, and a refusal goes quietly into the
+   * bell rather than in front of somebody who was reading a layout. `user` is a
+   * run somebody pressed a button for, and they are watching: a refusal they are
+   * never shown is a run that looks like it worked.
+   *
+   * No default, so a caller has to answer. The whole point of the distinction is
+   * that it is a decision about the run rather than a property of the work.
+   */
+  startedBy: UploadInitiator;
 }
 
 /**
@@ -517,10 +538,10 @@ export async function backfillBlueprintUnits(
     // loose folder: nothing was put in `assets` for one, so a run against a
     // checkout arrives here empty however many pictures it drew.
     //
-    // Started by coilbox, always. A backfill is the app filling gaps it noticed
-    // on its own, so a rejection goes to the console rather than in front of
-    // somebody who was reading a layout (issue #1690). If a button ever starts
-    // one of these, this is what has to become an argument.
+    // Reported to whoever started it. A backfill coilbox began on its own puts
+    // a rejection in the bell rather than in front of somebody who was reading a
+    // layout (issue #1690), and a run somebody pressed a button for is shown to
+    // them, because they are waiting on it (issue #1952).
     let written = 0;
     let stoppedSending = false;
     if (assets.length) {
@@ -530,7 +551,7 @@ export async function backfillBlueprintUnits(
         total: assets.length,
       });
       const run = await tools.upload(target.hubUrl, assets, {
-        startedBy: "coilbox",
+        startedBy: target.startedBy,
         opId,
         onProgress: (sample) => {
           // The first moment anybody knows how many pictures are really going

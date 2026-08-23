@@ -174,6 +174,9 @@ export async function runBlueprintBackfill(
       archive,
       enginePath: target.enginePath,
       dataDir: target.dataDir,
+      // Nobody asked for this one, so a refusal goes in the bell rather than in
+      // front of somebody who opened a layout to look at it (issue #1690).
+      startedBy: "coilbox",
     },
     units,
     unitsAffordableNow(game),
