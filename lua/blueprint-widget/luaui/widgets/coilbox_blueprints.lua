@@ -153,6 +153,11 @@ local function makeBuffers(rects)
 	vbo:Define(rects * 4, VERTEX_LAYOUT)
 	ibo:Define(rects * 6, GL.UNSIGNED_INT)
 	local vao = gl.GetVAO()
+	if not vao then
+		vbo:Delete()
+		ibo:Delete()
+		return nil
+	end
 	vao:AttachVertexBuffer(vbo)
 	vao:AttachIndexBuffer(ibo)
 	return vbo, ibo, vao
@@ -514,14 +519,16 @@ function widget:Initialize()
 
 	vsx, vsy = Spring.GetViewGeometry()
 
-	widgetHandler:AddAction(ACTION_TOGGLE, toggle, nil, "t")
-	widgetHandler:AddAction(ACTION_SAVE, saveSelection, nil, "t")
+	-- "t" reaches the console and "p" a key bound in uikeys.txt. Without the
+	-- second, bind x coilbox_blueprints would do nothing.
+	widgetHandler:AddAction(ACTION_TOGGLE, toggle, nil, "tp")
+	widgetHandler:AddAction(ACTION_SAVE, saveSelection, nil, "tp")
 	widgetHandler:AddAction(ACTION_LEFT, function()
 		rotate(-1)
-	end, nil, "t")
+	end, nil, "tp")
 	widgetHandler:AddAction(ACTION_RIGHT, function()
 		rotate(1)
-	end, nil, "t")
+	end, nil, "tp")
 
 	WG.CoilboxBlueprints = {
 		open = open,
@@ -689,11 +696,13 @@ local BLOCKED = { 0.9, 0.2, 0.15, 0.45 }
 local OPEN = { 0.3, 0.9, 0.4, 0.3 }
 local LEFT = { 0.95, 0.7, 0.2, 0.3 }
 
-local function ghost(p, teamID, color)
+--- One translucent model. It comes out in the team's colour whatever gl.Color
+-- says, because the model shader takes its tint from the team handler, so the
+-- square on the ground under it is what says blocked, open or left over.
+local function ghost(p, teamID)
 	gl.PushMatrix()
 	gl.Translate(p.x, p.y, p.z)
 	gl.Rotate(90 * p.facing, 0, 1, 0)
-	gl.Color(color[1], color[2], color[3], 0.55)
 	gl.UnitShape(p.defID, teamID, false, false, false)
 	gl.PopMatrix()
 end
@@ -739,14 +748,13 @@ function widget:DrawWorld()
 
 	if foot then
 		for _, p in ipairs(foot) do
-			ghost(p, teamID, p.blocked and BLOCKED or OPEN)
+			ghost(p, teamID)
 		end
 	end
 	if remainder then
 		for _, p in ipairs(remainder) do
-			ghost(p, teamID, LEFT)
+			ghost(p, teamID)
 		end
 	end
-	gl.Color(1, 1, 1, 1)
 	gl.DepthTest(false)
 end

@@ -91,9 +91,9 @@ Choosing an entry enters placing mode. Each frame while placing:
 1. `Spring.TraceScreenRay(mx, my, true)` gives the ground point under the cursor. Off map or over the sky, nothing is drawn.
 2. The anchor is that point snapped to the 16 elmo grid.
 3. Each building's offset is rotated by the layout rotation (0 to 3 quarter turns, `(x, z) -> (z, -x)` per turn, matching `turned()` in `src/blueprint/bar.ts`), added to the anchor, and snapped with `Spring.Pos2BuildPos(defID, x, y, z, facing)` where `facing = (building.facing + rotation) % 4`.
-4. `Spring.TestBuildOrder(defID, x, y, z, facing)` marks each position. 0 is blocked and drawn red. Anything else is drawn in the team colour.
+4. `Spring.TestBuildOrder(defID, x, y, z, facing)` marks each position. 0 is blocked.
 
-Ghosts are `gl.UnitShape` inside push, translate, rotate. Blocked squares are a flat quad per building on the ground, drawn from a VBO rebuilt when the snapped anchor or rotation changes.
+Ghosts are `gl.UnitShape` inside push, translate, rotate, and they always come out in the team's colour: the model shader takes its tint from the team handler and ignores `gl.Color`. So the state is shown by a flat square on the ground under each ghost, red for blocked, green for open, orange for a remainder, drawn from a VBO rebuilt when the snapped anchor or rotation changes.
 
 Left click issues orders. For every selected unit, the widget collects the buildings its `buildOptions` allow, in layout order, as `{ -defID, { x, y, z, facing }, opts }` and sends them with one `Spring.GiveOrderArrayToUnitArray({ unitID }, cmds)`. The first command carries no options so it replaces the unit's queue, and the rest carry `shift`, which is what keeps an ordered layout in sequence. If the player holds shift, all of them carry `shift`. Buildings nobody selected can build are not ordered.
 
@@ -113,7 +113,7 @@ The entry is appended to the spool. If the spool is unreadable the save is refus
 
 No immediate mode. `gl.Rect`, `gl.TexRect` and `gl.Vertex` are not used.
 
-One shader program with attributes `pos` (vec2), `uv` (vec2) and `color` (vec4), uniforms `proj` (mat4, an orthographic matrix built in Lua from `Spring.GetViewGeometry`), `rect` (vec4, a position and size a unit quad is mapped into) and `useTex` (int). Two VAOs:
+One shader program with attributes `pos` (vec3), `uv` (vec2) and `color` (vec4), uniforms `proj` and `view` (mat4, an orthographic matrix and the identity in `DrawScreen`, the camera's named matrices in `DrawWorld`), `rect` (vec4, a position and size a unit quad is mapped into) and `useTex` (int). Three VAOs, the third holding the ground squares:
 
 - the panel VAO holds every rectangle of the panel as two triangles, re-uploaded only when the layout changes, drawn with one `DrawElements`
 - the quad VAO holds one unit square and is drawn once per build picture with `gl.Texture(0, "#" .. defID)` and `rect` set per picture
