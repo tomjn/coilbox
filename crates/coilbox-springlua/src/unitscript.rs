@@ -27,7 +27,9 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use mlua::{Function, Lua, LuaOptions, MultiValue, StdLib, Table, Thread, ThreadStatus, Value};
+use mlua::{
+    Function, Lua, LuaOptions, LuaSerdeExt, MultiValue, StdLib, Table, Thread, ThreadStatus, Value,
+};
 use serde::Serialize;
 
 use coilbox_unitpose::{axis_index, Model, Wait, TICK_MS};
@@ -160,8 +162,9 @@ pub fn run(
     pieces: &[String],
     events: &[ScriptEvent],
     frames: u32,
+    unit_def: Option<&serde_json::Value>,
 ) -> Timeline {
-    match Run::start(script, name, pieces) {
+    match Run::start(script, name, pieces, unit_def) {
         Ok(mut run) => run.play(events, frames.min(MAX_FRAMES)),
         Err(error) => Timeline::failed(pieces, error),
     }
@@ -188,8 +191,14 @@ const PROBE_CALLS: usize = 16;
 ///
 /// Never returns an error. A script that will not load comes back with `error`
 /// set, and one that loads but answers badly says so on the probe itself.
-pub fn probe(script: &str, name: &str, pieces: &[String], callins: &[String]) -> Probes {
-    let mut run = match Run::start(script, name, pieces) {
+pub fn probe(
+    script: &str,
+    name: &str,
+    pieces: &[String],
+    callins: &[String],
+    unit_def: Option<&serde_json::Value>,
+) -> Probes {
+    let mut run = match Run::start(script, name, pieces, unit_def) {
         Ok(run) => run,
         Err(error) => {
             return Probes {
@@ -220,14 +229,19 @@ impl Run {
     /// Build the VM, install the unit script API and execute the chunk's top
     /// level, which is where its `piece(...)` calls and `script.X` definitions
     /// happen.
-    fn start(script: &str, name: &str, pieces: &[String]) -> Result<Self, String> {
+    fn start(
+        script: &str,
+        name: &str,
+        pieces: &[String],
+        unit_def: Option<&serde_json::Value>,
+    ) -> Result<Self, String> {
         let sim = Rc::new(RefCell::new(Sim {
             model: Model::new(pieces),
             ..Sim::default()
         }));
         let budget = Rc::new(Cell::new(FRAME_INSTRUCTIONS));
-        let lua =
-            sandbox(&sim, &budget).map_err(|e| format!("could not build the Lua sandbox: {e}"))?;
+        let lua = sandbox(&sim, &budget, unit_def)
+            .map_err(|e| format!("could not build the Lua sandbox: {e}"))?;
         let table: Table = lua
             .globals()
             .get("script")
@@ -558,7 +572,11 @@ fn describe(error: &mlua::Error) -> String {
 }
 
 /// Build the VM and install everything a unit script expects to find.
-fn sandbox(sim: &Rc<RefCell<Sim>>, budget: &Rc<Cell<i64>>) -> mlua::Result<Lua> {
+fn sandbox(
+    sim: &Rc<RefCell<Sim>>,
+    budget: &Rc<Cell<i64>>,
+    unit_def: Option<&serde_json::Value>,
+) -> mlua::Result<Lua> {
     let lua = Lua::new_with(
         StdLib::TABLE | StdLib::STRING | StdLib::MATH,
         LuaOptions::default(),
@@ -599,7 +617,145 @@ fn sandbox(sim: &Rc<RefCell<Sim>>, budget: &Rc<Cell<i64>>) -> mlua::Result<Lua> 
     install_threading(&lua, sim)?;
     install_stubs(&lua, sim)?;
     bootstrap(&lua)?;
+    install_unit_script_table(&lua)?;
+    install_unit_def(&lua, sim, unit_def)?;
     Ok(lua)
+}
+
+/// The same API again, under the table a script may reach it through.
+///
+/// The unit script framework puts every call-out in the script's own
+/// environment and also in a `UnitScript` table, and a game picks whichever it
+/// prefers. Beyond All Reason's scripts use both in the same file:
+/// `coralab.lua` calls `Turn` bare and `UnitScript.Turn` a few lines later.
+/// Without the table those scripts fail on the first line that uses it.
+///
+/// Built from the globals rather than beside them, so the two can never come to
+/// mean different things.
+fn install_unit_script_table(lua: &Lua) -> mlua::Result<()> {
+    let globals = lua.globals();
+    let table = lua.create_table()?;
+    for name in [
+        "Turn",
+        "Move",
+        "Spin",
+        "StopSpin",
+        "Show",
+        "Hide",
+        "Explode",
+        "EmitSfx",
+        "Sleep",
+        "WaitForTurn",
+        "WaitForMove",
+        "StartThread",
+        "Signal",
+        "SetSignalMask",
+        "SetUnitValue",
+        "GetUnitValue",
+        "PlaySoundFile",
+        "AttachUnit",
+        "DropUnit",
+    ] {
+        let held: Value = globals.get(name)?;
+        table.set(name, held)?;
+    }
+    globals.set("UnitScript", table)
+}
+
+/// The unit's own definition, under the two names a script reads it by.
+///
+/// A unit script is allowed to read its own definition, and BAR's do:
+/// `coralab.lua` decides which of two animations it has from
+/// `UnitDefs[unitDefID].customParams.litelab`. Without them the script does not
+/// lose a branch, it throws on the line and the unit does not animate at all,
+/// which is why an empty `UnitDefs` would not do either: indexing the missing
+/// entry throws on the same line.
+///
+/// Keys resolve without regard to case. The definition coilbox reads comes back
+/// through a game's own def scripts, which lowercase every key on the way out,
+/// while the engine builds its `UnitDefs` from its own structures and keeps the
+/// case. So a script asking for `customParams` is asking for the thing stored
+/// as `customparams`, and matching loosely is the closest true answer available
+/// rather than a guess.
+///
+/// A field the definition does not declare reads as nothing, which is what the
+/// engine answers. Standing in an empty table instead would make every absent
+/// field read as present and flip the branch it was being asked about, which is
+/// the whole thing this is meant to avoid. The one exception is `customParams`,
+/// because every definition the engine builds carries one whether the game
+/// declared it or not.
+///
+/// A unit with no definition behind it, one built out of parts or opened from a
+/// file, gets an empty one and a note the first time the script reads anything
+/// off it. That is the honest shape: the script runs, and whoever is watching
+/// is told that a branch may have gone the way it did for want of an answer.
+fn install_unit_def(
+    lua: &Lua,
+    sim: &Rc<RefCell<Sim>>,
+    unit_def: Option<&serde_json::Value>,
+) -> mlua::Result<()> {
+    let globals = lua.globals();
+    let def: Value = match unit_def {
+        Some(json) => lua.to_value(json)?,
+        None => Value::Table(lua.create_table()?),
+    };
+
+    // Said once, from Lua, so it fires when the script actually reads the
+    // definition rather than on every unit that has none.
+    let state = Rc::clone(sim);
+    globals.set(
+        "__nodef",
+        lua.create_function(move |_, key: String| {
+            state.borrow_mut().model.note(format!(
+                "This script reads {key} off its own unit definition, which the preview does not have for this unit, so it read an empty one."
+            ));
+            Ok(())
+        })?,
+    )?;
+    globals.set("__rawdef", def)?;
+    globals.set("__hasdef", unit_def.is_some())?;
+
+    lua.load(
+        r#"
+        local function insensitive(value, missing)
+          if type(value) ~= 'table' then return value end
+          local out, lower = {}, {}
+          for key, held in pairs(value) do
+            local wrapped = insensitive(held, missing)
+            out[key] = wrapped
+            if type(key) == 'string' then lower[string.lower(key)] = wrapped end
+          end
+          return setmetatable(out, {
+            __index = function(_, key)
+              if type(key) ~= 'string' then return nil end
+              local hit = lower[string.lower(key)]
+              -- Nothing, the way the engine answers for a field a definition
+              -- does not declare. Standing in an empty table instead would make
+              -- every absent key read as present, which is the branch-flipping
+              -- this is meant to avoid.
+              if hit == nil and missing then missing(key) end
+              return hit
+            end,
+          })
+        end
+        local missing = (not __hasdef) and __nodef or nil
+        -- Every UnitDef the engine builds carries a customParams table, empty
+        -- or not, so a script reading one on a unit that declares none is
+        -- reading an empty table rather than failing.
+        if type(__rawdef) == 'table' then
+          local has = false
+          for key in pairs(__rawdef) do
+            if type(key) == 'string' and string.lower(key) == 'customparams' then has = true end
+          end
+          if not has then __rawdef.customParams = {} end
+        end
+        unitDefID = 1
+        UnitDefs = { insensitive(__rawdef, missing) }
+        __rawdef, __hasdef, __nodef = nil, nil, nil
+        "#,
+    )
+    .set_name("unitscript:unitdef")
+    .exec()
 }
 
 /// The `SFX` constants a script names when it explodes or emits. Only the names

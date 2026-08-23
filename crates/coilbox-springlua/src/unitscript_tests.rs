@@ -21,7 +21,7 @@ fn create() -> Vec<ScriptEvent> {
 }
 
 fn play(script: &str, frames: u32) -> Timeline {
-    run(script, "test.lua", &pieces(), &create(), frames)
+    run(script, "test.lua", &pieces(), &create(), frames, None)
 }
 
 /// One piece's numbers on one frame: x, y, z offset then x, y, z rotation.
@@ -327,6 +327,7 @@ fn a_signal_kills_the_thread_carrying_its_mask() {
             },
         ],
         60,
+        None,
     );
     assert_eq!(timeline.error, None);
     // Killed and turned back to rest, and nothing moved it again afterwards.
@@ -379,6 +380,7 @@ fn a_call_in_with_arguments_gets_them() {
             ambient: false,
         }],
         3,
+        None,
     );
     assert_eq!(timeline.error, None);
     assert_close(rot_y(&timeline, 0, "turret"), 0.75);
@@ -454,6 +456,7 @@ fn the_generated_script_shape_runs() {
             },
         ],
         120,
+        None,
     );
     assert_eq!(timeline.error, None);
     assert_eq!(timeline.frames.len(), 120);
@@ -518,6 +521,7 @@ fn a_throwing_call_in_names_it_and_keeps_the_frames_before_it() {
             },
         ],
         30,
+        None,
     );
     let error = timeline.error.expect("a throwing call-in fails");
     assert!(error.contains("StartMoving"), "{error}");
@@ -569,6 +573,7 @@ fn a_call_in_the_script_does_not_have_is_a_warning_not_a_failure() {
             ambient: false,
         }],
         5,
+        None,
     );
     assert_eq!(timeline.error, None);
     assert_eq!(timeline.frames.len(), 5);
@@ -650,7 +655,7 @@ mod probing {
 
     fn ask(script: &str, callins: &[&str]) -> Probes {
         let names: Vec<String> = callins.iter().map(|c| (*c).to_string()).collect();
-        probe(script, "test.lua", &pieces(), &names)
+        probe(script, "test.lua", &pieces(), &names, None)
     }
 
     fn answers<'a>(probes: &'a Probes, callin: &str) -> &'a Probe {
@@ -715,6 +720,7 @@ mod probing {
                 ambient: true,
             }],
             3,
+            None,
         );
 
         assert_eq!(timeline.warnings, Vec::<String>::new());
@@ -811,5 +817,142 @@ mod probing {
 
         let probe = answers(&probes, "QueryNanoPiece");
         assert!(probe.note.is_some(), "{probe:?}");
+    }
+}
+
+/// A unit script may read its own definition, and BAR's do. Without one the
+/// script does not lose a branch, it throws on the line.
+mod unit_definition {
+    use super::*;
+
+    fn with_def(script: &str, def: serde_json::Value) -> Timeline {
+        run(script, "test.lua", &pieces(), &create(), 3, Some(&def))
+    }
+
+    /// The exact line out of Beyond All Reason's `coralab.lua` that started
+    /// this: `attempt to index global 'UnitDefs' (a nil value)`.
+    #[test]
+    fn lets_a_script_read_its_own_definition() {
+        let timeline = with_def(
+            r#"
+            local lite = UnitDefs[unitDefID].customParams.litelab ~= nil
+            local turret = piece("turret")
+            function script.Create()
+                Turn(turret, y_axis, lite and 1.0 or 0.5)
+            end
+            "#,
+            serde_json::json!({ "customParams": { "litelab": "1" } }),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((rot_y(&timeline, 0, "turret") - 1.0).abs() < 1e-6);
+    }
+
+    /// A definition read out of a game comes back through its own def scripts,
+    /// which lowercase every key, while the engine keeps the case. A script
+    /// asking for `customParams` is asking for what is stored as
+    /// `customparams`.
+    #[test]
+    fn finds_a_key_whatever_case_the_script_asks_in() {
+        let timeline = with_def(
+            r#"
+            local lite = UnitDefs[unitDefID].customParams.liteLab ~= nil
+            local turret = piece("turret")
+            function script.Create()
+                Turn(turret, y_axis, lite and 1.0 or 0.5)
+            end
+            "#,
+            serde_json::json!({ "customparams": { "litelab": "1" } }),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((rot_y(&timeline, 0, "turret") - 1.0).abs() < 1e-6);
+    }
+
+    /// A key the definition does not carry is nothing, which is the answer, and
+    /// the script takes the other branch rather than failing.
+    #[test]
+    fn answers_nothing_for_a_key_the_definition_does_not_have() {
+        let timeline = with_def(
+            r#"
+            local lite = UnitDefs[unitDefID].customParams.litelab ~= nil
+            local turret = piece("turret")
+            function script.Create()
+                Turn(turret, y_axis, lite and 1.0 or 0.5)
+            end
+            "#,
+            serde_json::json!({ "customparams": { "techlevel": 2 } }),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((rot_y(&timeline, 0, "turret") - 0.5).abs() < 1e-6);
+    }
+
+    /// A unit built out of parts has no definition behind it. The script still
+    /// runs, because throwing helps nobody, and the run says what was read so
+    /// that a branch taken for want of an answer is not taken silently.
+    #[test]
+    fn says_when_a_unit_has_no_definition_to_read() {
+        let timeline = run(
+            r#"
+            local lite = UnitDefs[unitDefID].customParams.litelab ~= nil
+            function script.Create() end
+            "#,
+            "test.lua",
+            &pieces(),
+            &create(),
+            3,
+            None,
+        );
+
+        assert_eq!(timeline.error, None);
+        // The key the script actually wanted, which is the useful half: it
+        // says which branch may have gone the way it did for want of an answer.
+        assert!(
+            timeline
+                .warnings
+                .iter()
+                .any(|note| note.contains("litelab")),
+            "{:?}",
+            timeline.warnings
+        );
+    }
+
+    /// A game reaches the same API through a `UnitScript` table as well as
+    /// bare, and Beyond All Reason's scripts use both in one file.
+    #[test]
+    fn offers_the_api_under_the_table_a_script_may_reach_it_through() {
+        let timeline = with_def(
+            r#"
+            local turret = piece("turret")
+            function script.Create()
+                UnitScript.Turn(turret, y_axis, 1.0)
+            end
+            "#,
+            serde_json::json!({ "health": 1000 }),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((rot_y(&timeline, 0, "turret") - 1.0).abs() < 1e-6);
+    }
+
+    /// Every definition the engine builds carries a `customParams` table
+    /// whether the game declared one or not, so the commonest thing a script
+    /// reads is always there to read.
+    #[test]
+    fn always_has_a_custom_params_table_to_read() {
+        let timeline = with_def(
+            r#"
+            local lite = UnitDefs[unitDefID].customParams.litelab ~= nil
+            local turret = piece("turret")
+            function script.Create()
+                Turn(turret, y_axis, lite and 1.0 or 0.5)
+            end
+            "#,
+            serde_json::json!({ "health": 1000 }),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!((rot_y(&timeline, 0, "turret") - 0.5).abs() < 1e-6);
     }
 }
