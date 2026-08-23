@@ -32,6 +32,7 @@ import { BrandingLinks } from "../../content/pages/components/BrandingLinks";
 import { BrandingScreenshots } from "../../content/pages/components/BrandingScreenshots";
 import { ResolveContentGate } from "../../content/pages/components/ResolveContentDrawer";
 import {
+  Diagnostics,
   EmptyState,
   ErrorBanner,
   SkeletonList,
@@ -111,8 +112,11 @@ export default function ConquestListPage() {
   // rapid installs (BAR et al.) live in packages/pool, not games/*.sd7. Shared
   // with the sidebar nav badge (issue #419) via `usePlayReadiness`, so the two
   // never disagree.
-  const { target, ready } = usePlayReadiness();
-  const needsGame = !ready;
+  const { target, state, scanErrors } = usePlayReadiness();
+  // "scanning" is deliberately absent: a scan that has not answered yet leaves
+  // the list up rather than flashing an empty state that is about to be wrong.
+  const needsGame =
+    state === "no-engine" || state === "empty" || state === "unreadable";
 
   const runs = galaxies.filter((g) => file.conquests[g.galaxy.id]);
   const unstarted = galaxies.filter((g) => !file.conquests[g.galaxy.id]);
@@ -211,36 +215,54 @@ export default function ConquestListPage() {
       {error && <ErrorBanner message={error} />}
 
       {needsGame ? (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-10 text-center">
-          <Orbit className="size-6 text-muted-foreground" aria-hidden />
-          <div className="space-y-1">
-            <p className="text-sm font-medium">
-              {target
-                ? "Conquest needs a game installed"
-                : "Conquest needs an engine and a game"}
-            </p>
-            <p className="max-w-md text-sm text-muted-foreground">
-              {target
-                ? "Conquest generates a galaxy for any installed game with skirmish AIs. Download a game to get started — it will appear here automatically."
-                : "Install an engine and at least one game, then return here to generate a galaxy for it."}
-            </p>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-10 text-center">
+            <Orbit className="size-6 text-muted-foreground" aria-hidden />
+            <div className="space-y-1">
+              <p className="text-sm font-medium">
+                {state === "unreadable"
+                  ? "This engine could not read your games"
+                  : target
+                    ? "Conquest needs a game installed"
+                    : "Conquest needs an engine and a game"}
+              </p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                {state === "unreadable"
+                  ? "The scan finished but the engine reported problems and listed no games, so this is not a sign that you own none. Try another engine, or open Content > Games to see what it did find."
+                  : target
+                    ? "Conquest generates a galaxy for any installed game with skirmish AIs. Download a game to get started, and it will appear here automatically."
+                    : "Install an engine and at least one game, then return here to generate a galaxy for it."}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {(!target || state === "unreadable") && (
+                <Link
+                  to="/settings/engines"
+                  className={cn(buttonVariants({ variant: "outline" }))}
+                >
+                  {state === "unreadable"
+                    ? "Pick another engine"
+                    : "Install an engine"}
+                </Link>
+              )}
+              {state === "unreadable" ? (
+                <Link
+                  to="/content/games"
+                  className={cn(buttonVariants({ variant: "outline" }))}
+                >
+                  Open Content &gt; Games
+                </Link>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/downloads/games")}
+                >
+                  Browse games to download
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="flex gap-2">
-            {!target && (
-              <Link
-                to="/settings/engines"
-                className={cn(buttonVariants({ variant: "outline" }))}
-              >
-                Install an engine
-              </Link>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => navigate("/downloads/games")}
-            >
-              Browse games to download
-            </Button>
-          </div>
+          {state === "unreadable" && <Diagnostics errors={scanErrors} />}
         </div>
       ) : loading ? (
         <SkeletonList />
