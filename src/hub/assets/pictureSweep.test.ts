@@ -55,6 +55,13 @@ interface Watch {
   tools: PictureSweepTools;
   /** The unit list each fill was handed, and what it was allowed to spend. */
   fills: { game: string; units: string[]; affordable: number }[];
+  /** Every set of build pics sent, by the units they were of, so the ordering
+   *  can be seen rather than inferred (issue #1953). */
+  picsSent: string[][];
+  /** The units each build pic extraction was asked for. */
+  picsRead: string[][];
+  /** What each caller was told about build pics, so a second extraction shows. */
+  fillWantedPics: (boolean | undefined)[];
   /** What each fill reported as written, so the ledger side can be seen. */
   recorded: { game: string; written: number }[];
   asked: AssetKey[][];
@@ -68,7 +75,14 @@ function watcher(
     dataset?: (archive: string) => UnitDatasetEntry[];
     /** Which units the hub already holds every picture of. */
     hubHas?: (unit: string) => boolean;
+    /** Which units the hub already holds the build pic of. Separate from
+     *  `hubHas`, which is about renders. */
+    hubHasPic?: (unit: string) => boolean;
+    /** Which units the game ships a build pic for at all. */
+    shipsPic?: (unit: string) => boolean;
     affordable?: number;
+    /** Writes left in the hour, which is what the build pic pass counts in. */
+    writesLeft?: number;
     /** Units the fill claims to have covered. Defaults to all it was given. */
     covered?: (units: readonly BackfillUnit[]) => number;
   } = {},
@@ -76,11 +90,17 @@ function watcher(
   const games = options.games ?? [game("Balanced Annihilation", "ba")];
   const dataset = options.dataset ?? (() => roster(10));
   const hubHas = options.hubHas ?? (() => false);
+  const hubHasPic = options.hubHasPic ?? (() => false);
+  const shipsPic = options.shipsPic ?? (() => true);
   const affordable = options.affordable ?? 100;
+  const writesLeft = options.writesLeft ?? 500;
   const covered = options.covered ?? ((units) => units.length);
 
   const watch: Watch = {
     fills: [],
+    picsSent: [],
+    picsRead: [],
+    fillWantedPics: [],
     recorded: [],
     asked: [],
     startedBy: [],
@@ -123,17 +143,49 @@ function watcher(
     },
     ask: async (_hubUrl, keys) => {
       watch.asked.push(keys);
-      return keys.map(
-        (key): HaveResult =>
-          ({
-            ...key,
-            status:
-              key.keyed_on === "unit" && hubHas(key.unit_name)
-                ? "have"
-                : "missing",
-          }) as HaveResult,
-      );
+      return keys.map((key): HaveResult => {
+        const held =
+          key.keyed_on === "unit" &&
+          (key.variant === "buildpic"
+            ? hubHasPic(key.unit_name)
+            : hubHas(key.unit_name));
+        return { ...key, status: held ? "have" : "missing" } as HaveResult;
+      });
     },
+    buildpics: async ({ units }) => {
+      watch.picsRead.push([...units]);
+      const out: Record<string, unknown> = {};
+      for (const unit of units) {
+        out[unit] = shipsPic(unit)
+          ? {
+              asset: {
+                variant: "buildpic",
+                origin: "extracted",
+                sourceArchive: "BA V15",
+                path: `/cache/${unit}.webp`,
+                hash: `hash-${unit}`,
+                sourceHash: `pic-src-${unit}`,
+                sourceMember: `unitpics/${unit}.dds`,
+                encodeProfile: "webp-lossless-256",
+                mime: "image/webp",
+                width: 128,
+                height: 128,
+                bytes: 900,
+              },
+            }
+          : { assetSkipped: "no-source" };
+      }
+      return { units: out, errors: [] } as never;
+    },
+    upload: async (_hubUrl, assets) => {
+      watch.picsSent.push(
+        assets.map((asset) =>
+          asset.keyed_on === "unit" ? asset.unit_name : "",
+        ),
+      );
+      return { outcomes: [], written: assets.length, error: null };
+    },
+    writesLeft: () => writesLeft,
     affordable: () => affordable,
     fill: async (target, units, allowed): Promise<BackfillReport> => {
       watch.fills.push({
@@ -142,6 +194,7 @@ function watcher(
         affordable: allowed,
       });
       watch.startedBy.push(target.startedBy);
+      watch.fillWantedPics.push(target.buildpics);
       const did = Math.min(covered(units), allowed);
       return {
         units: did,
@@ -211,8 +264,9 @@ describe("a sweep over the installed games", () => {
   it("spends the allowance on units the hub is missing, not on the first few", async () => {
     const watch = watcher({
       dataset: () => roster(50),
-      // The hub has everything except the last five.
+      // The hub has every render except the last five, and every build pic.
       hubHas: (unit) => Number(unit.replace("unit", "")) < 45,
+      hubHasPic: () => true,
       affordable: 3,
     });
     const report = await run(watch);
@@ -236,25 +290,111 @@ describe("a sweep over the installed games", () => {
     });
   });
 
+  /**
+   * The whole of issue #1953. Eighty writes spent on build pics is eighty units
+   * that have a picture. The same eighty spent on renders is sixteen units with
+   * five each, and three hundred and sixty three still blank.
+   */
+  it("sends a whole roster's build pics before it draws anything", async () => {
+    const watch = watcher({ dataset: () => roster(400), writesLeft: 80 });
+    await run(watch);
+
+    expect(watch.picsSent).toHaveLength(1);
+    // Eighty units with a picture, rather than sixteen with five each.
+    expect(watch.picsSent[0]).toHaveLength(80);
+    expect(watch.picsSent[0][0]).toBe("unit0");
+    // And the extraction covered the roster rather than the eighty, since which
+    // eighty is not knowable until the hub has answered.
+    expect(watch.picsRead[0]).toHaveLength(400);
+  });
+
+  /** The render pass must not extract them a second time: the hub was handed
+   *  them a moment ago and would answer `have` to every one. */
+  it("does not read the build pics again for the render pass", async () => {
+    const watch = watcher({ dataset: () => roster(5) });
+    await run(watch);
+
+    expect(watch.picsRead).toHaveLength(1);
+    expect(watch.fillWantedPics).toEqual([false]);
+  });
+
+  /**
+   * The same progressive rule the render survey follows. Offering the first
+   * eighty every run would find the hub already had them and write nothing for
+   * ever, which is exactly the bug this ordering could have reintroduced.
+   */
+  it("sends build pics the hub is missing, not the first few of the roster", async () => {
+    const watch = watcher({
+      dataset: () => roster(50),
+      hubHasPic: (unit) => Number(unit.replace("unit", "")) < 40,
+      writesLeft: 5,
+    });
+    await run(watch);
+
+    expect(watch.picsSent[0]).toEqual([
+      "unit40",
+      "unit41",
+      "unit42",
+      "unit43",
+      "unit44",
+    ]);
+  });
+
+  /** A game whose hour is gone sends none, and the units it could not reach are
+   *  still counted as waiting rather than quietly dropped. */
+  it("sends no build pics when the hour is spent, and still counts them", async () => {
+    const watch = watcher({
+      dataset: () => roster(6),
+      writesLeft: 0,
+      // Renders are all held, so the build pics are the only gap left.
+      hubHas: () => true,
+    });
+    const report = await run(watch);
+
+    expect(watch.picsSent).toEqual([]);
+    expect(report.games[0]).toMatchObject({ units: 6, wanted: 6, covered: 0 });
+  });
+
+  /** A unit the game ships no build pic for is not a gap, so it must not be
+   *  counted as one and must not stop the renders. */
+  it("passes over a unit the game ships no build pic for", async () => {
+    const watch = watcher({
+      dataset: () => roster(4),
+      shipsPic: (unit) => unit !== "unit2",
+      hubHas: () => true,
+    });
+    const report = await run(watch);
+
+    expect(watch.picsSent[0]).toEqual(["unit0", "unit1", "unit3"]);
+    expect(report.games[0]).toMatchObject({ wanted: 3, covered: 3 });
+  });
+
   /** Asked about before anything is drawn, which is what makes the count real
    *  rather than a guess at what the hub might be missing. */
   it("asks the hub about every picture of every unit", async () => {
     const watch = watcher({ dataset: () => roster(6) });
     await run(watch);
 
-    expect(watch.asked).toHaveLength(1);
-    expect(watch.asked[0]).toHaveLength(6 * ANGLES);
-    const first = watch.asked[0][0];
+    // Two questions, in the order the two passes run: the build pics, then
+    // every angle of every unit.
+    expect(watch.asked).toHaveLength(2);
+    expect(watch.asked[0]).toHaveLength(6);
+    expect(watch.asked[0].every((key) => key.variant === "buildpic")).toBe(
+      true,
+    );
+    expect(watch.asked[1]).toHaveLength(6 * ANGLES);
+    const first = watch.asked[1][0];
     expect(first.keyed_on === "unit" && first.game).toBe("ba");
   });
 
   /** The ordinary second run: nothing to do, no allowance spent, and it says so
    *  rather than looking like a failure. */
   it("does no work at all on a game the hub has covered", async () => {
-    const watch = watcher({ hubHas: () => true });
+    const watch = watcher({ hubHas: () => true, hubHasPic: () => true });
     const report = await run(watch);
 
     expect(watch.fills).toEqual([]);
+    expect(watch.picsSent).toEqual([]);
     expect(watch.recorded).toEqual([]);
     expect(report.games[0]).toMatchObject({ units: 10, wanted: 0, covered: 0 });
     expect(pictureSweepSummary(report)).toContain("already has a picture");
@@ -275,7 +415,12 @@ describe("a sweep over the installed games", () => {
     const watch = watcher({ dataset: () => roster(4) });
     await run(watch);
 
-    expect(watch.recorded).toEqual([{ game: "ba", written: 4 * (ANGLES + 1) }]);
+    // Once for the build pics and once for the renders, because they are two
+    // uploads and the second one's allowance has to see the first one's spend.
+    expect(watch.recorded).toEqual([
+      { game: "ba", written: 4 },
+      { game: "ba", written: 4 * (ANGLES + 1) },
+    ]);
   });
 
   /** A game with none of its hour left is not read, drawn or sent, and the
