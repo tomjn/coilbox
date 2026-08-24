@@ -81,7 +81,7 @@ end
 --- Whether an entry is for the game being played. No binding is for every
 -- game. A shortname decides when there is one, otherwise the full name.
 -- @param entry table a store entry
--- @param game table Game, or anything with gameName and gameShortName
+-- @param game table Game, or anything with modName and gameShortName
 function M.forGame(entry, game)
 	local bound = entry.game
 	if bound == nil then
@@ -90,7 +90,9 @@ function M.forGame(entry, game)
 	if bound.shortname ~= nil then
 		return bound.shortname == game.gameShortName
 	end
-	return bound.name == game.gameName
+	-- modName, the archive, because that is the name an entry carries. See
+	-- record.lua.
+	return bound.name == game.modName
 end
 
 --- Take a new list of entries and classify them against what the selection
