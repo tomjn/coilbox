@@ -31,9 +31,14 @@
 --
 -- Each raises a scenario's requiredRuntimeVersion only when the scenario uses
 -- it, so nothing already authored asks for 3.
+--
+-- 4 added no types and no format features, so nothing asks for it. It rewrote
+-- how the mission widget draws, and the version is also what tells coilbox an
+-- installed runtime is older than the one it ships, which is how a game that
+-- vendored 3 is offered the new widget.
 
 return {
-	version = 3,
+	version = 4,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,
