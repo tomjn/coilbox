@@ -277,4 +277,133 @@ check("the debrief lists the objectives the way the panel does",
 	ids(debrief.objectives) == "keep,bridge,scout", ids(debrief.objectives))
 check("with how each one ended", debrief.objectives[1].state == "complete")
 
+--------------------------------------------------------------------------------
+-- Layout: the rectangles and texts the widget uploads and draws.
+--------------------------------------------------------------------------------
+
+-- Half an em per character, the shape of what gl.GetTextWidth answers.
+local function measure(text)
+	return #text * 0.5
+end
+
+local VIEW = { w = 1000, h = 1000 }
+
+local function textsWith(L, needle)
+	local found = {}
+	for _, t in ipairs(L.texts) do
+		if t.text:find(needle, 1, true) then
+			found[#found + 1] = t
+		end
+	end
+	return found
+end
+
+local L = MODEL.layout({ objectives = {} }, measure, VIEW)
+check("a scene with nothing to say lays out nothing",
+	#L.rects == 0 and #L.texts == 0 and L.portrait == nil and L.debriefBox == nil)
+
+-- The objectives panel.
+
+L = MODEL.layout({ objectives = MODEL.objectives(MISSION, read) }, measure, VIEW)
+
+check("objectives lay a backdrop first", L.rects[1] ~= nil and L.rects[1].kind == "objectives")
+check("in the backdrop colour", L.rects[1].color == MODEL.BACKDROP)
+check("sized for the title and a row per line, with the secondary heading its own row",
+	L.rects[1].h == 2 * MODEL.PAD + MODEL.LINE_HEIGHT + 4 * MODEL.LINE_HEIGHT, L.rects[1].h)
+check("the panel is titled", #textsWith(L, "Objectives") == 1)
+check("the secondaries sit under their heading", #textsWith(L, "Secondary") == 1)
+check("a completed objective carries its marker", textsWith(L, "+")[1] ~= nil)
+check("and a failed one its own", textsWith(L, "x")[1] ~= nil)
+check("in the state's colour", textsWith(L, "Take the keep.")[1].color == MODEL.COLOUR.complete)
+check("an objective's text clears its marker",
+	textsWith(L, "Take the keep.")[1].x == MODEL.OBJECTIVES_LEFT + MODEL.PAD + MODEL.MARKER_WIDTH)
+
+local long = { objectives = { {
+	id = "keep",
+	kind = "primary",
+	text = string.rep("word ", 12) .. "end",
+	state = "active",
+} } }
+L = MODEL.layout(long, measure, VIEW)
+check("a long objective wraps into more rows",
+	L.rects[1].h > 2 * MODEL.PAD + 2 * MODEL.LINE_HEIGHT, L.rects[1].h)
+check("with the marker on the first row only", #textsWith(L, "-") == 1)
+
+-- The dialogue panel.
+
+local LINE = { speaker = "HQ", text = "Contact!", portrait = "hq.png" }
+L = MODEL.layout({ objectives = {}, line = LINE }, measure, VIEW)
+
+check("dialogue lays a backdrop", L.rects[1] ~= nil and L.rects[1].kind == "dialogue")
+check("tall enough for its portrait",
+	L.rects[1].h == MODEL.PORTRAIT_SIZE + 2 * MODEL.PAD, L.rects[1].h)
+check("the portrait is handed over for the widget to texture",
+	L.portrait ~= nil and L.portrait.file == "hq.png" and L.portrait.w == MODEL.PORTRAIT_SIZE)
+check("and the speaker starts past it",
+	textsWith(L, "HQ")[1].x == L.rects[1].x + MODEL.PAD + MODEL.PORTRAIT_SIZE + MODEL.PAD)
+check("with the line under the speaker", #textsWith(L, "Contact!") == 1)
+
+L = MODEL.layout({ objectives = {}, line = LINE, portraitBad = true }, measure, VIEW)
+check("a portrait that would not load is left out", L.portrait == nil)
+check("and the text takes its room", textsWith(L, "HQ")[1].x == L.rects[1].x + MODEL.PAD)
+
+-- The debrief.
+
+local DEBRIEF = { outcome = "victory", objectives = MODEL.objectives(MISSION, read) }
+L = MODEL.layout({ objectives = {}, debrief = DEBRIEF }, measure, VIEW)
+
+check("the debrief lays a backdrop", L.rects[1] ~= nil and L.rects[1].kind == "debrief")
+check("centred on the screen", L.debriefBox ~= nil
+	and L.debriefBox[1] == (VIEW.w - math.min(MODEL.DEBRIEF_WIDTH, VIEW.w * 0.6)) / 2,
+	L.debriefBox and L.debriefBox[1])
+check("the box is the backdrop, which is what a dismissing click is tested against",
+	L.debriefBox[1] == L.rects[1].x and L.debriefBox[3] == L.rects[1].x + L.rects[1].w)
+local headline = textsWith(L, "Mission accomplished")[1]
+check("the headline says how it went", headline ~= nil)
+check("across the middle, at twice the title size",
+	headline ~= nil and headline.options == "co" and headline.size == MODEL.TITLE_SIZE * 2)
+check("in the outcome's colour", headline ~= nil and headline.color == MODEL.COLOUR.victory)
+check("with the objectives listed under it", #textsWith(L, "Take the keep.") == 1)
+
+-- The scene key, which is what decides a re-upload.
+
+local function key(scene)
+	return MODEL.sceneKey(scene)
+end
+
+local BASE = { objectives = MODEL.objectives(MISSION, read) }
+check("the same scene keys the same", key(BASE) == key({ objectives = MODEL.objectives(MISSION, read) }))
+check("an objective changing state changes the key",
+	key(BASE) ~= key({ objectives = MODEL.objectives(MISSION, reader(objectiveParams({ keep = 1 }))) }))
+check("a line taking the panel changes the key", key(BASE) ~= key({ objectives = BASE.objectives, line = LINE }))
+check("a portrait going bad changes the key",
+	key({ objectives = BASE.objectives, line = LINE })
+		~= key({ objectives = BASE.objectives, line = LINE, portraitBad = true }))
+check("the debrief appearing changes the key",
+	key(BASE) ~= key({ objectives = BASE.objectives, debrief = DEBRIEF }))
+
+--------------------------------------------------------------------------------
+-- Packing, and the matrix that maps it to the screen.
+--------------------------------------------------------------------------------
+
+local verts, idx = MODEL.pack({
+	{ x = 0, y = 0, w = 10, h = 10, color = { 1, 0, 0, 1 } },
+	{ x = 20, y = 0, w = 10, h = 10, color = { 0, 1, 0, 1 } },
+})
+check("pack emits nine floats per vertex, four vertices per rect", #verts == 2 * 4 * 9, #verts)
+check("pack emits six indices per rect", #idx == 12, #idx)
+check("a vertex is position, uv, then colour",
+	verts[1] == 0 and verts[2] == 0 and verts[3] == 0
+		and verts[4] == 0 and verts[5] == 0
+		and verts[6] == 1 and verts[7] == 0 and verts[8] == 0 and verts[9] == 1)
+check("the second rect's indices carry on from the first", idx[7] == 4, idx[7])
+
+local none, noneIdx = MODEL.pack({})
+check("packing nothing is empty", #none == 0 and #noneIdx == 0)
+
+local m = MODEL.ortho(1920, 1080)
+check("ortho is sixteen numbers", #m == 16)
+check("ortho maps the view to clip space",
+	m[1] == 2 / 1920 and m[6] == 2 / 1080 and m[13] == -1 and m[14] == -1 and m[16] == 1)
+
 support.report()
