@@ -20,8 +20,10 @@
 #
 # Usage: scripts/mission-clients.sh
 #
-#   COILBOX_SPRING_HEADLESS  the binary. Default is spring-headless in
-#                            COILBOX_SPRING_DATA, then one on PATH.
+#   COILBOX_SPRING_HEADLESS  the binary. Default is the first spring-headless
+#                            with base content beside it or in the data
+#                            directory: loose in COILBOX_SPRING_DATA, then the
+#                            installed engines under its engine/, then PATH.
 #   COILBOX_SPRING_DATA      where games/ and maps/ are. Default ~/.spring.
 #   COILBOX_HARNESS_GAME     the base game archive's filename under games/.
 #                            Default the first balanced_annihilation-* there.
@@ -47,18 +49,8 @@ CLIENT_TIMEOUT=180
 
 DATA_DIR="${COILBOX_SPRING_DATA:-$HOME/.spring}"
 
-ENGINE="${COILBOX_SPRING_HEADLESS:-}"
-if [ -z "$ENGINE" ]; then
-  if [ -x "$DATA_DIR/spring-headless" ]; then
-    ENGINE="$DATA_DIR/spring-headless"
-  else
-    ENGINE="$(command -v spring-headless || true)"
-  fi
-fi
-if [ -z "$ENGINE" ] || [ ! -x "$ENGINE" ]; then
-  echo "no headless engine. Set COILBOX_SPRING_HEADLESS to a spring-headless binary" >&2
-  exit 2
-fi
+# The engine and the base content to run it on, shared with every harness.
+. "$ROOT/scripts/mission-engine.sh"
 command -v timeout >/dev/null || {
   echo "this needs timeout on PATH, so a client that never connects is a failure" >&2
   exit 2
@@ -89,7 +81,7 @@ GAME="$WORK/data/games/coilbox-mission-clients.sdd"
 # cache, a log and a demo of its own.
 mkdir -p "$WORK/data/games" "$WORK/data/maps" \
   "$WORK/write-aimed" "$WORK/write-other" "$WORK/write-watcher"
-ln -s "$DATA_DIR/base" "$WORK/data/base"
+ln -s "$BASE_CONTENT" "$WORK/data/base"
 ln -s "$DATA_DIR/games/$GAME_ARCHIVE" "$WORK/data/games/$GAME_ARCHIVE"
 ln -s "$DATA_DIR/maps/$MAP_ARCHIVE" "$WORK/data/maps/$MAP_ARCHIVE"
 

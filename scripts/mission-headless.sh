@@ -50,32 +50,8 @@ FIXTURES="$ROOT/src/scenario/fixtures/missions"
 
 DATA_DIR="${COILBOX_SPRING_DATA:-$HOME/.spring}"
 
-# Whether an engine binary in this directory has base content to run on:
-# its own base/ beside it, the way an installed engine under engine/ ships,
-# or the data directory's. A binary with neither cannot even parse a start
-# script, because TdfParser runs gamedata/parse_tdf.lua out of springcontent,
-# so the hunt below passes one over rather than dying on it later.
-usable_base() { # directory holding a spring-headless
-  [ -d "$1/base" ] || [ -d "$DATA_DIR/base" ]
-}
-
-ENGINE="${COILBOX_SPRING_HEADLESS:-}"
-if [ -z "$ENGINE" ]; then
-  candidates=("$DATA_DIR/spring-headless")
-  for bin in "$DATA_DIR"/engine/*/*/spring-headless; do
-    candidates+=("$bin")
-  done
-  candidates+=("$(command -v spring-headless || true)")
-  for bin in "${candidates[@]}"; do
-    { [ -n "$bin" ] && [ -x "$bin" ] && usable_base "$(dirname "$bin")"; } || continue
-    ENGINE="$bin"
-    break
-  done
-fi
-if [ -z "$ENGINE" ] || [ ! -x "$ENGINE" ]; then
-  echo "no headless engine with base content. Set COILBOX_SPRING_HEADLESS to a spring-headless binary" >&2
-  exit 2
-fi
+# The engine and the base content to run it on, shared with every harness.
+. "$ROOT/scripts/mission-engine.sh"
 
 # The first archive matching a pattern, by name, or a refusal naming what is missing.
 pick() { # directory, pattern, what it is
@@ -98,19 +74,6 @@ MISSIONS=("$@")
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/coilbox-mission-headless.XXXXXX")"
 GAME="$WORK/data/games/coilbox-mission-harness.sdd"
-
-# Base content (springcontent.sdz and friends), from beside the engine binary
-# first because that copy always matches it, then the data directory's. Without
-# it the engine cannot even parse the start script, because TdfParser runs
-# gamedata/parse_tdf.lua out of springcontent, and the error it dies with says
-# "GAME-section missing" rather than naming the archive. So a missing base is
-# refused here, by name, rather than linked dangling.
-BASE_CONTENT="$(dirname "$ENGINE")/base"
-[ -d "$BASE_CONTENT" ] || BASE_CONTENT="$DATA_DIR/base"
-if [ ! -d "$BASE_CONTENT" ]; then
-  echo "no base content: neither $(dirname "$ENGINE")/base nor $DATA_DIR/base exists" >&2
-  exit 2
-fi
 
 mkdir -p "$WORK/data/games" "$WORK/data/maps" "$WORK/write"
 ln -s "$BASE_CONTENT" "$WORK/data/base"

@@ -26,8 +26,10 @@
 #
 # Usage: scripts/mission-sf-extension.sh [--keep]
 #
-#   COILBOX_SPRING_HEADLESS  the binary. Default is spring-headless in
-#                            COILBOX_SPRING_DATA, then one on PATH.
+#   COILBOX_SPRING_HEADLESS  the binary. Default is the first spring-headless
+#                            with base content beside it or in the data
+#                            directory: loose in COILBOX_SPRING_DATA, then the
+#                            installed engines under its engine/, then PATH.
 #   COILBOX_SPRING_DATA      where games/ and maps/ are. Default ~/.spring.
 #   COILBOX_SF_GAME          the game folder under games/. It must be a loose
 #                            .sdd, and the runtime is installed into it. Default
@@ -57,18 +59,8 @@ DATA_DIR="${COILBOX_SPRING_DATA:-$HOME/.spring}"
 SF_GAME="${COILBOX_SF_GAME:-SplinterFaction.sdd}"
 SF_DIR="$DATA_DIR/games/$SF_GAME"
 
-ENGINE="${COILBOX_SPRING_HEADLESS:-}"
-if [ -z "$ENGINE" ]; then
-  if [ -x "$DATA_DIR/spring-headless" ]; then
-    ENGINE="$DATA_DIR/spring-headless"
-  else
-    ENGINE="$(command -v spring-headless || true)"
-  fi
-fi
-if [ -z "$ENGINE" ] || [ ! -x "$ENGINE" ]; then
-  echo "no headless engine. Set COILBOX_SPRING_HEADLESS to a spring-headless binary" >&2
-  exit 2
-fi
+# The engine and the base content to run it on, shared with every harness.
+. "$ROOT/scripts/mission-engine.sh"
 
 [ -d "$SF_DIR" ] || { echo "no loose game at $SF_DIR" >&2; exit 2; }
 # The game's own file, if it ever has one. Overwriting it would be writing over
@@ -95,7 +87,7 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/coilbox-sf-extension.XXXXXX")"
 PROBE_GAME="$WORK/data/games/coilbox-sf-extension.sdd"
 
 mkdir -p "$WORK/data/games" "$WORK/data/maps" "$WORK/write"
-ln -s "$DATA_DIR/base" "$WORK/data/base"
+ln -s "$BASE_CONTENT" "$WORK/data/base"
 ln -s "$SF_DIR" "$WORK/data/games/$SF_GAME"
 ln -s "$DATA_DIR/maps/$MAP_ARCHIVE" "$WORK/data/maps/$MAP_ARCHIVE"
 
