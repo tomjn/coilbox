@@ -14,9 +14,17 @@
 -- Plus the name over a named actor, because nothing in the engine renames a unit
 -- and a character the author called "Warlord" has to say so somewhere.
 --
--- What to draw is decided in luaui/mission_ui/coilbox_panel_model.lua, which is
--- pure and tested outside the engine. This file is the engine half: reading the
--- world, and putting pixels on the screen.
+-- What to draw, and where every pixel of it goes, is decided in
+-- luaui/mission_ui/coilbox_panel_model.lua, which is pure and tested outside
+-- the engine. This file is the engine half: reading the world, uploading
+-- geometry and drawing.
+--
+-- No immediate mode: the panels are one vertex buffer drawn with one call,
+-- re-uploaded only when the scene changes, with the portrait a textured quad
+-- through the same shader. Text goes through the engine's own batched path.
+-- An engine without those buffers, which spring-headless is, keeps the widget
+-- with the backdrops disabled rather than losing it: the dialogue, its audio
+-- and the debrief still run, and the text still draws.
 --
 -- The widget reads the mission's state out of game rules params, which every Lua
 -- handle can read, and hears about a line of dialogue through a global the
@@ -47,57 +55,7 @@ local function log(level, message)
 end
 
 --------------------------------------------------------------------------------
--- Look. Every number the panels are drawn with, in one place.
---------------------------------------------------------------------------------
-
-local PAD = 10
-local BACKDROP = { 0, 0, 0, 0.55 }
-
-local TITLE_SIZE = 14
-local TEXT_SIZE = 13
-local LINE_HEIGHT = 17
--- How far the text of an objective sits from its marker.
-local MARKER_WIDTH = 12
-
-local OBJECTIVES_WIDTH = 300
-local OBJECTIVES_TOP = 0.72
-local OBJECTIVES_LEFT = 16
-
-local DIALOGUE_WIDTH = 760
-local DIALOGUE_BOTTOM = 0.14
-local PORTRAIT_SIZE = 84
-
-local DEBRIEF_WIDTH = 640
-
-local LABEL_SIZE = 14
--- How far above a unit its name floats, in elmos.
-local LABEL_HEIGHT = 30
-
-local COLOUR = {
-	active = { 0.88, 0.88, 0.88 },
-	complete = { 0.45, 0.9, 0.5 },
-	failed = { 0.95, 0.45, 0.45 },
-	title = { 1, 0.85, 0.4 },
-	label = { 1, 0.9, 0.6 },
-	victory = { 0.5, 0.95, 0.55 },
-	defeat = { 0.95, 0.45, 0.45 },
-	undecided = { 0.85, 0.85, 0.85 },
-}
-
-local MARKER = {
-	active = "-",
-	complete = "+",
-	failed = "x",
-}
-
-local HEADLINE = {
-	victory = "Mission accomplished",
-	defeat = "Mission failed",
-	undecided = "Mission ended",
-}
-
---------------------------------------------------------------------------------
--- State.
+-- State. The look itself lives in the model, beside the layout it drives.
 --------------------------------------------------------------------------------
 
 -- Nothing is drawn and no callin does any work until Initialize has the mission
@@ -118,6 +76,13 @@ local vsx, vsy = 1024, 768
 -- Portraits that would not load, so a missing file is one warning rather than
 -- one per frame.
 local badTexture = {}
+
+-- What the panels are showing, and the version that says it changed. The scene
+-- is rebuilt on game frames because the mirrors it reads only change on them,
+-- and the layout is rebuilt, packed and uploaded only when the version moves.
+local scene = { objectives = {} }
+local sceneVersion = 0
+local sceneKey = nil
 
 local function read(name)
 	return Spring.GetGameRulesParam(name)
@@ -151,91 +116,183 @@ local function includeTable(path, env)
 end
 
 --------------------------------------------------------------------------------
--- Drawing helpers.
+-- GL objects.
 --------------------------------------------------------------------------------
 
-local function colour(rgb, alpha)
-	gl.Color(rgb[1], rgb[2], rgb[3], alpha or 1)
+-- Whether the engine gave us buffers and a shader. When it did not, which is
+-- what spring-headless answers, the widget carries on with text alone.
+local canDraw = false
+
+local shader
+local locProj, locView, locRect, locUseTex
+-- One quad, for the portrait: the rect uniform moves it where the layout says.
+local quadVAO, quadVBO, quadIBO
+-- The panels' buffer, grown as needed by upload().
+local panelSet = { capacity = 0 }
+local panelIndices = 0
+
+local layout = nil
+local layoutVersion = -1
+local layoutW, layoutH = 0, 0
+
+local IDENTITY = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 }
+local UNIT_RECT = { 0, 0, 1, 1 }
+
+local VERTEX_LAYOUT = {
+	{ id = 0, name = "pos", size = 3 },
+	{ id = 1, name = "uv", size = 2 },
+	{ id = 2, name = "color", size = 4 },
+}
+
+local VERTEX_SHADER = [[
+#version 130
+#extension GL_ARB_explicit_attrib_location : require
+layout(location = 0) in vec3 pos;
+layout(location = 1) in vec2 uv;
+layout(location = 2) in vec4 color;
+uniform mat4 proj;
+uniform mat4 view;
+uniform vec4 rect;
+out vec2 vUv;
+out vec4 vColor;
+void main() {
+	vec3 p = vec3(pos.xy * rect.zw + rect.xy, pos.z);
+	gl_Position = proj * view * vec4(p, 1.0);
+	vUv = uv;
+	vColor = color;
+}
+]]
+
+local FRAGMENT_SHADER = [[
+#version 130
+uniform sampler2D tex;
+uniform int useTex;
+in vec2 vUv;
+in vec4 vColor;
+out vec4 fragColor;
+void main() {
+	vec4 c = vColor;
+	if (useTex == 1) {
+		c *= texture(tex, vUv);
+	}
+	fragColor = c;
+}
+]]
+
+--- A vertex buffer, index buffer and array able to hold `rects` quads.
+local function makeBuffers(rects)
+	local vbo = gl.GetVBO(GL.ARRAY_BUFFER, true)
+	local ibo = gl.GetVBO(GL.ELEMENT_ARRAY_BUFFER, true)
+	if not vbo or not ibo then
+		return nil
+	end
+	vbo:Define(rects * 4, VERTEX_LAYOUT)
+	ibo:Define(rects * 6, GL.UNSIGNED_INT)
+	local vao = gl.GetVAO()
+	if not vao then
+		vbo:Delete()
+		ibo:Delete()
+		return nil
+	end
+	vao:AttachVertexBuffer(vbo)
+	vao:AttachIndexBuffer(ibo)
+	return vbo, ibo, vao
 end
 
-local function backdrop(x0, y0, x1, y1)
-	gl.Color(BACKDROP[1], BACKDROP[2], BACKDROP[3], BACKDROP[4])
-	gl.Rect(x0, y0, x1, y1)
+local function dropBuffers(vbo, ibo, vao)
+	if vao then
+		vao:Delete()
+	end
+	if ibo then
+		ibo:Delete()
+	end
+	if vbo then
+		vbo:Delete()
+	end
 end
 
---- One line of text, with the black outline that keeps it readable over whatever
--- the map happens to be underneath.
-local function text(value, x, y, size, options)
-	gl.Text(value, x, y, size or TEXT_SIZE, options or "o")
+local function makeGL()
+	if not gl.CreateShader or not gl.GetVBO or not gl.GetVAO then
+		return false
+	end
+	shader = gl.CreateShader({
+		vertex = VERTEX_SHADER,
+		fragment = FRAGMENT_SHADER,
+		uniformInt = { tex = 0, useTex = 0 },
+	})
+	if not shader then
+		log("warning", "shader failed: " .. tostring(gl.GetShaderLog()))
+		return false
+	end
+	locProj = gl.GetUniformLocation(shader, "proj")
+	locView = gl.GetUniformLocation(shader, "view")
+	locRect = gl.GetUniformLocation(shader, "rect")
+	locUseTex = gl.GetUniformLocation(shader, "useTex")
+
+	quadVBO, quadIBO, quadVAO = makeBuffers(1)
+	if not quadVAO then
+		return false
+	end
+	local verts, idx = MODEL.pack({ { x = 0, y = 0, w = 1, h = 1, color = { 1, 1, 1, 1 } } })
+	quadVBO:Upload(verts)
+	quadIBO:Upload(idx)
+	return true
 end
 
---- Lay a list of objectives out as drawable rows: a heading before the
--- secondaries, and one row per wrapped line with the marker on the first.
---
--- Laid out before anything is drawn, because a panel's backdrop has to know how
--- tall the panel turned out once every objective was wrapped.
-local function objectiveRows(entries, wrapWidth)
-	local rows = {}
-	local secondaries = false
-	for _, entry in ipairs(entries) do
-		if entry.kind == "secondary" and not secondaries then
-			secondaries = true
-			rows[#rows + 1] = { heading = "Secondary" }
-		end
-		for index, line in ipairs(MODEL.wrap(entry.text, wrapWidth / TEXT_SIZE, measure)) do
-			rows[#rows + 1] = {
-				state = entry.state,
-				marker = index == 1 and MARKER[entry.state] or "",
-				text = line,
-			}
+local function dropGL()
+	dropBuffers(panelSet.vbo, panelSet.ibo, panelSet.vao)
+	panelSet.vbo, panelSet.ibo, panelSet.vao, panelSet.capacity = nil, nil, nil, 0
+	dropBuffers(quadVBO, quadIBO, quadVAO)
+	quadVBO, quadIBO, quadVAO = nil, nil, nil
+	if shader then
+		gl.DeleteShader(shader)
+		shader = nil
+	end
+end
+
+--- Upload quads into a buffer set, growing it when it is too small.
+local function upload(set, verts, idx)
+	local quads = #idx / 6
+	if quads == 0 then
+		return 0
+	end
+	if set.capacity < quads then
+		dropBuffers(set.vbo, set.ibo, set.vao)
+		local capacity = math.max(quads, set.capacity * 2, 8)
+		set.vbo, set.ibo, set.vao = makeBuffers(capacity)
+		set.capacity = set.vao and capacity or 0
+		if not set.vao then
+			return 0
 		end
 	end
-	return rows
+	set.vbo:Upload(verts)
+	set.ibo:Upload(idx)
+	return #idx
 end
 
---- Draw laid-out rows downwards from a baseline.
-local function drawRows(rows, x, y)
-	for _, row in ipairs(rows) do
-		y = y - LINE_HEIGHT
-		if row.heading then
-			colour(COLOUR.title, 0.75)
-			text(row.heading, x, y)
-		else
-			colour(COLOUR[row.state])
-			text(row.marker, x, y)
-			text(row.text, x + MARKER_WIDTH, y)
-		end
+--- The inline code that colours a run of text, so a pass of gl.Text calls
+-- needs no gl.Color between them.
+local function colourCode(c)
+	return string.char(255, math.floor(c[1] * 254) + 1, math.floor(c[2] * 254) + 1, math.floor(c[3] * 254) + 1)
+end
+
+--------------------------------------------------------------------------------
+-- The scene, and its layout.
+--------------------------------------------------------------------------------
+
+--- Read what the panels should be showing, and move the version on when it is
+-- not what they were showing before.
+local function rebuildScene()
+	scene.objectives = MODEL.objectives(MISSION, read)
+	scene.line = queue.current()
+	scene.portraitBad = (scene.line and scene.line.portrait and badTexture[scene.line.portrait]) == true
+	scene.debrief = debrief
+	local key = MODEL.sceneKey(scene)
+	if key ~= sceneKey then
+		sceneKey = key
+		sceneVersion = sceneVersion + 1
 	end
 end
-
---------------------------------------------------------------------------------
--- The objectives panel.
---------------------------------------------------------------------------------
-
-local function drawObjectives()
-	local entries = MODEL.objectives(MISSION, read)
-	if #entries == 0 then
-		return
-	end
-
-	local width = math.min(OBJECTIVES_WIDTH, vsx * 0.25)
-	local rows = objectiveRows(entries, width - (PAD * 2) - MARKER_WIDTH)
-
-	local x0 = OBJECTIVES_LEFT
-	local top = vsy * OBJECTIVES_TOP
-	local height = (PAD * 2) + LINE_HEIGHT + (#rows * LINE_HEIGHT)
-
-	backdrop(x0, top - height, x0 + width, top)
-
-	local y = top - PAD - TITLE_SIZE
-	colour(COLOUR.title)
-	text("Objectives", x0 + PAD, y, TITLE_SIZE)
-	drawRows(rows, x0 + PAD, y)
-end
-
---------------------------------------------------------------------------------
--- The dialogue panel.
---------------------------------------------------------------------------------
 
 --- Where a dialogue clip or portrait lives. The launch path copies a scenario's
 -- media in beside the compiled mission, so the bare file name the scenario
@@ -244,47 +301,32 @@ local function mediaPath(file)
 	return MISSION_DIR .. file
 end
 
-local function drawDialogue()
-	local line = queue.current()
-	if not line then
+--- Lay the scene out and re-upload its geometry, when either has changed.
+local function relayout()
+	if layoutVersion == sceneVersion and layoutW == vsx and layoutH == vsy then
 		return
 	end
+	layout = MODEL.layout(scene, measure, { w = vsx, h = vsy })
+	layoutVersion, layoutW, layoutH = sceneVersion, vsx, vsy
+	local verts, idx = MODEL.pack(layout.rects)
+	panelIndices = upload(panelSet, verts, idx)
+end
 
-	local width = math.min(DIALOGUE_WIDTH, vsx * 0.62)
-	local x0 = (vsx - width) * 0.5
-	local y0 = vsy * DIALOGUE_BOTTOM
-
-	local portrait = line.portrait and not badTexture[line.portrait]
-	local textLeft = x0 + PAD + (portrait and (PORTRAIT_SIZE + PAD) or 0)
-	local wrapWidth = (x0 + width - PAD) - textLeft
-
-	local rows = MODEL.wrap(line.text, wrapWidth / TEXT_SIZE, measure)
-	local body = (PAD * 2) + LINE_HEIGHT + (#rows * LINE_HEIGHT)
-	local height = math.max(body, PORTRAIT_SIZE + (PAD * 2))
-
-	backdrop(x0, y0, x0 + width, y0 + height)
-
-	if portrait then
-		local py = y0 + ((height - PORTRAIT_SIZE) * 0.5)
-		gl.Color(1, 1, 1, 1)
-		if gl.Texture(mediaPath(line.portrait)) then
-			gl.TexRect(x0 + PAD, py, x0 + PAD + PORTRAIT_SIZE, py + PORTRAIT_SIZE)
-			gl.Texture(false)
-		else
-			badTexture[line.portrait] = true
-			log("warning", "could not load dialogue portrait " .. mediaPath(line.portrait))
-		end
+--- The portrait, as a textured quad through the same shader. A file that will
+-- not load is remembered and the scene rebuilt without it, so a missing
+-- portrait is one warning rather than one per frame.
+local function drawPortrait(portrait)
+	if not gl.Texture(0, mediaPath(portrait.file)) then
+		badTexture[portrait.file] = true
+		log("warning", "could not load dialogue portrait " .. mediaPath(portrait.file))
+		rebuildScene()
+		return
 	end
-
-	local y = y0 + height - PAD - TITLE_SIZE
-	colour(COLOUR.title)
-	text(tostring(line.speaker or ""), textLeft, y, TITLE_SIZE)
-
-	colour(COLOUR.active)
-	for _, row in ipairs(rows) do
-		y = y - LINE_HEIGHT
-		text(row, textLeft, y)
-	end
+	gl.UniformInt(locUseTex, 1)
+	gl.Uniform(locRect, portrait.x, portrait.y, portrait.w, portrait.h)
+	quadVAO:DrawElements(GL.TRIANGLES, 6, 0)
+	gl.Texture(0, false)
+	gl.UniformInt(locUseTex, 0)
 end
 
 --------------------------------------------------------------------------------
@@ -292,7 +334,8 @@ end
 --------------------------------------------------------------------------------
 
 --- Build the debrief from the mirrored outcome, once, whichever of the GameOver
--- callin and the mirror notices first.
+-- callin and the mirror notices first. Where it goes and how it wraps is the
+-- layout's business, so a resize after the mission ends re-wraps it too.
 local function buildDebrief()
 	if debrief then
 		return
@@ -303,29 +346,9 @@ local function buildDebrief()
 		return
 	end
 
-	built.rows = objectiveRows(
-		built.objectives,
-		math.min(DEBRIEF_WIDTH, vsx * 0.6) - (PAD * 2) - MARKER_WIDTH)
 	debrief = built
 	queue.clear()
-end
-
-local function debriefBox()
-	local width = math.min(DEBRIEF_WIDTH, vsx * 0.6)
-	local height = (PAD * 3) + (TITLE_SIZE * 2) + (#debrief.rows * LINE_HEIGHT)
-	local x0 = (vsx - width) * 0.5
-	local y0 = (vsy - height) * 0.5
-	return x0, y0, x0 + width, y0 + height
-end
-
-local function drawDebrief()
-	local x0, y0, x1, y1 = debriefBox()
-	backdrop(x0, y0, x1, y1)
-
-	local y = y1 - PAD - (TITLE_SIZE * 2)
-	colour(COLOUR[debrief.outcome])
-	text(HEADLINE[debrief.outcome], (x0 + x1) * 0.5, y, TITLE_SIZE * 2, "co")
-	drawRows(debrief.rows, x0 + PAD, y - PAD)
+	rebuildScene()
 end
 
 --------------------------------------------------------------------------------
@@ -337,15 +360,15 @@ end
 -- GetUnitViewPosition answers nothing for a unit this player cannot see, so a
 -- name never gives away where a hidden character is standing.
 local function drawLabels()
-	colour(COLOUR.label)
+	local code = colourCode(MODEL.COLOUR.label)
 	for _, label in ipairs(MODEL.labels(MISSION, read)) do
 		local x, y, z = Spring.GetUnitViewPosition(label.unitID)
 		if x then
-			local sx, sy, sz = Spring.WorldToScreenCoords(x, y + LABEL_HEIGHT, z)
+			local sx, sy, sz = Spring.WorldToScreenCoords(x, y + MODEL.LABEL_HEIGHT, z)
 			-- Past the far plane is behind the camera, where the projection puts the
 			-- point back on screen mirrored through the middle.
 			if sz and sz <= 1 then
-				text(label.name, sx, sy, LABEL_SIZE, "co")
+				gl.Text(code .. label.name, sx, sy, MODEL.LABEL_SIZE, "co")
 			end
 		end
 	end
@@ -397,6 +420,13 @@ function widget:Initialize()
 		log("error", DIALOGUE_GLOBAL .. " is already taken, so this mission will say nothing")
 	end
 
+	canDraw = makeGL()
+	if not canDraw then
+		dropGL()
+		log("warning", "vertex buffers are not available, so the panels are text alone")
+	end
+
+	rebuildScene()
 	ready = true
 end
 
@@ -406,6 +436,7 @@ function widget:Shutdown()
 		registered = false
 	end
 	ready = false
+	dropGL()
 end
 
 function widget:ViewResize(x, y)
@@ -425,6 +456,7 @@ function widget:GameFrame(frame)
 	if not debrief and read(MODEL.OVER_PARAM) == 1 then
 		buildDebrief()
 	end
+	rebuildScene()
 end
 
 --- The engine hands the winning ally teams to this callin and the stock widget
@@ -442,11 +474,12 @@ function widget:MousePress(x, y)
 	if not ready or not debrief then
 		return false
 	end
-	local x0, y0, x1, y1 = debriefBox()
-	if x < x0 or x > x1 or y < y0 or y > y1 then
+	local box = layout and layout.debriefBox
+	if not box or x < box[1] or x > box[3] or y < box[2] or y > box[4] then
 		return false
 	end
 	debrief = nil
+	rebuildScene()
 	return true
 end
 
@@ -454,11 +487,24 @@ function widget:DrawScreen()
 	if not ready then
 		return
 	end
-	drawObjectives()
-	drawDialogue()
-	drawLabels()
-	if debrief then
-		drawDebrief()
+	relayout()
+	if canDraw and (panelIndices > 0 or layout.portrait) then
+		gl.Blending(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)
+		gl.UseShader(shader)
+		gl.UniformMatrix(locProj, unpack(MODEL.ortho(vsx, vsy)))
+		gl.UniformMatrix(locView, unpack(IDENTITY))
+		gl.Uniform(locRect, unpack(UNIT_RECT))
+		gl.UniformInt(locUseTex, 0)
+		if panelIndices > 0 and panelSet.vao then
+			panelSet.vao:DrawElements(GL.TRIANGLES, panelIndices, 0)
+		end
+		if layout.portrait then
+			drawPortrait(layout.portrait)
+		end
+		gl.UseShader(0)
 	end
-	gl.Color(1, 1, 1, 1)
+	for _, t in ipairs(layout.texts) do
+		gl.Text(colourCode(t.color) .. t.text, t.x, t.y, t.size, t.options)
+	end
+	drawLabels()
 end
