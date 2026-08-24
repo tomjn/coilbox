@@ -32,8 +32,10 @@
 # links the data directory's own LuaUI/ in beside base/ when there is one, and
 # says so and proves nothing about the widget when there is not.
 #
-#   COILBOX_SPRING_HEADLESS  the binary. Default is spring-headless in
-#                            COILBOX_SPRING_DATA, then one on PATH.
+#   COILBOX_SPRING_HEADLESS  the binary. Default is the first spring-headless
+#                            with base content beside it or in the data
+#                            directory: loose in COILBOX_SPRING_DATA, then the
+#                            installed engines under its engine/, then PATH.
 #   COILBOX_SPRING_DATA      where games/ and maps/ are. Default ~/.spring.
 #   COILBOX_HARNESS_GAME     the base game archive's filename under games/.
 #                            Default the first balanced_annihilation-* there.
@@ -48,16 +50,30 @@ FIXTURES="$ROOT/src/scenario/fixtures/missions"
 
 DATA_DIR="${COILBOX_SPRING_DATA:-$HOME/.spring}"
 
+# Whether an engine binary in this directory has base content to run on:
+# its own base/ beside it, the way an installed engine under engine/ ships,
+# or the data directory's. A binary with neither cannot even parse a start
+# script, because TdfParser runs gamedata/parse_tdf.lua out of springcontent,
+# so the hunt below passes one over rather than dying on it later.
+usable_base() { # directory holding a spring-headless
+  [ -d "$1/base" ] || [ -d "$DATA_DIR/base" ]
+}
+
 ENGINE="${COILBOX_SPRING_HEADLESS:-}"
 if [ -z "$ENGINE" ]; then
-  if [ -x "$DATA_DIR/spring-headless" ]; then
-    ENGINE="$DATA_DIR/spring-headless"
-  else
-    ENGINE="$(command -v spring-headless || true)"
-  fi
+  candidates=("$DATA_DIR/spring-headless")
+  for bin in "$DATA_DIR"/engine/*/*/spring-headless; do
+    candidates+=("$bin")
+  done
+  candidates+=("$(command -v spring-headless || true)")
+  for bin in "${candidates[@]}"; do
+    { [ -n "$bin" ] && [ -x "$bin" ] && usable_base "$(dirname "$bin")"; } || continue
+    ENGINE="$bin"
+    break
+  done
 fi
 if [ -z "$ENGINE" ] || [ ! -x "$ENGINE" ]; then
-  echo "no headless engine. Set COILBOX_SPRING_HEADLESS to a spring-headless binary" >&2
+  echo "no headless engine with base content. Set COILBOX_SPRING_HEADLESS to a spring-headless binary" >&2
   exit 2
 fi
 
@@ -83,8 +99,21 @@ MISSIONS=("$@")
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/coilbox-mission-headless.XXXXXX")"
 GAME="$WORK/data/games/coilbox-mission-harness.sdd"
 
+# Base content (springcontent.sdz and friends), from beside the engine binary
+# first because that copy always matches it, then the data directory's. Without
+# it the engine cannot even parse the start script, because TdfParser runs
+# gamedata/parse_tdf.lua out of springcontent, and the error it dies with says
+# "GAME-section missing" rather than naming the archive. So a missing base is
+# refused here, by name, rather than linked dangling.
+BASE_CONTENT="$(dirname "$ENGINE")/base"
+[ -d "$BASE_CONTENT" ] || BASE_CONTENT="$DATA_DIR/base"
+if [ ! -d "$BASE_CONTENT" ]; then
+  echo "no base content: neither $(dirname "$ENGINE")/base nor $DATA_DIR/base exists" >&2
+  exit 2
+fi
+
 mkdir -p "$WORK/data/games" "$WORK/data/maps" "$WORK/write"
-ln -s "$DATA_DIR/base" "$WORK/data/base"
+ln -s "$BASE_CONTENT" "$WORK/data/base"
 ln -s "$DATA_DIR/games/$GAME_ARCHIVE" "$WORK/data/games/$GAME_ARCHIVE"
 ln -s "$DATA_DIR/maps/$MAP_ARCHIVE" "$WORK/data/maps/$MAP_ARCHIVE"
 
