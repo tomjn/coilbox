@@ -348,6 +348,9 @@ impl Plan {
         out.push_str(&format!("pub enum {name} {{\n"));
         for value in &enumeration.values {
             out.push_str(&docs(&value.docs, "    "));
+            if let Some(text) = &value.description {
+                out.push_str(&format!("    /// Upstream labels this \"{text}\".\n"));
+            }
             out.push_str(&format!("    {},\n", value.name));
         }
         out.push_str("    /// A number the pinned commit does not name, kept so it survives a\n");
@@ -383,6 +386,26 @@ impl Plan {
             "impl Default for {name} {{\n    fn default() -> Self {{\n        Self::from(0)\n    \
              }}\n}}\n"
         ));
+
+        // Upstream's `[Description]` is the wording it shows a person, and for a
+        // refusal code it is the only wording there is. Generated rather than
+        // transcribed, so a reworded reason arrives with the next refresh.
+        if enumeration.values.iter().any(|v| v.description.is_some()) {
+            out.push_str(&format!(
+                "\nimpl {name} {{\n    /// The label upstream gives this value, from its \
+                 `[Description]`.\n    /// `None` for a value it does not label, and for a number \
+                 it does not name.\n    pub fn description(self) -> Option<&'static str> {{\n     \
+                    match self {{\n"
+            ));
+            for value in &enumeration.values {
+                let answer = value.description.as_ref().map_or_else(
+                    || "None".to_string(),
+                    |text| format!("Some({:?})", text.as_str()),
+                );
+                out.push_str(&format!("            Self::{} => {answer},\n", value.name));
+            }
+            out.push_str("            Self::Other(_) => None,\n        }\n    }\n}\n");
+        }
         out
     }
 
