@@ -31,7 +31,10 @@ export function RegisterForm({
   // Registering is a TASServer exchange. A Tachyon server has no account for
   // Coilbox to create, because signing in there happens on the server's own page
   // in the browser, so those servers are not offered here.
-  const registrable = servers.filter((s) => serverProtocol(s) !== "tachyon");
+  // A positive test rather than "not Tachyon". Registering is a TASServer
+  // `REGISTER` line, which is meaningless to any other protocol, and a third one
+  // arriving here would otherwise have been offered a form that cannot work.
+  const registrable = servers.filter((s) => serverProtocol(s) === "tasserver");
   const [serverId, setServerId] = useState(
     defaultServerId ?? registrable[0]?.id ?? "",
   );

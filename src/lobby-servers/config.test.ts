@@ -105,9 +105,20 @@ describe("serverProtocol", () => {
     expect(serverProtocol(stored)).toBe("tasserver");
   });
 
-  it("reads every TASServer built-in as tasserver", () => {
-    const tas = BUILTIN_SERVERS.filter((s) => s.id !== "bar-tachyon");
+  it("reads every built-in that names no protocol as tasserver", () => {
+    // By the absent field rather than by a list of ids, so a built-in added for
+    // a third protocol does not have to be remembered here as well.
+    const tas = BUILTIN_SERVERS.filter((s) => s.protocol === undefined);
+    expect(tas.length).toBeGreaterThan(0);
     expect(tas.map(serverProtocol)).toEqual(tas.map(() => "tasserver"));
+  });
+
+  it("reads a built-in that names one back as what it says", () => {
+    const named = BUILTIN_SERVERS.filter((s) => s.protocol !== undefined);
+    expect(named.map((s) => [s.id, serverProtocol(s)])).toEqual([
+      ["bar-tachyon", "tachyon"],
+      ["zero-k", "zerok"],
+    ]);
   });
 
   it("reads an explicit tachyon value back", () => {

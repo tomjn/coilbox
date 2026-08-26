@@ -48,6 +48,7 @@ import {
   mpConfirmAgreement,
   mpConnect,
   mpConnectTachyon,
+  mpConnectZerok,
   mpDisconnect,
   mpFriendList,
   mpFriendRequestList,
@@ -78,7 +79,12 @@ import {
   matchesHighlight,
 } from "./chat/highlight";
 import { triggerMentionCue } from "./chat/mentionCue";
-import { CLIENT_ID_KEY, newClientId } from "./clientId";
+import {
+  CLIENT_ID_KEY,
+  newClientId,
+  newZerokInstallId,
+  ZEROK_INSTALL_ID_KEY,
+} from "./clientId";
 import { favouritesFor, useFavourites } from "./friends";
 import { addIgnore, ignoredFor, useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
@@ -849,6 +855,24 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     setClientId(fresh);
   }, [clientId, setClientId]);
 
+  // Zero-K's `InstallID`, generated on first use and kept from then on. Its own
+  // value rather than a second use of the one above: they are for two different
+  // servers, and Zero-K reads a changed one as a different machine.
+  const [zerokInstallId, setZerokInstallId] = useSetting<string>(
+    ZEROK_INSTALL_ID_KEY,
+    "",
+  );
+  const zerokInstallIdRef = useRef(zerokInstallId);
+  useEffect(() => {
+    if (zerokInstallId) {
+      zerokInstallIdRef.current = zerokInstallId;
+      return;
+    }
+    const fresh = newZerokInstallId();
+    zerokInstallIdRef.current = fresh;
+    setZerokInstallId(fresh);
+  }, [zerokInstallId, setZerokInstallId]);
+
   // The key of the connection that is a room rather than a server, which is what
   // tells the two apart: both are dialled as a TASServer at a `host:port`, and
   // only a room's link is an address to dial (see `inviteLink`).
@@ -917,6 +941,13 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // `true` once a session reached `ready`; only then is a drop worth reconnecting
   // (excludes login-denied / initial-connect failures, which never logged in).
   const loggedInRef = useRef(false);
+  // `true` once the server has refused this attempt's credentials. The drop path
+  // already declines to reconnect a session that never reached `ready`, but a
+  // denial can also surface as a `doConnect` throw, when the connection is torn
+  // down before the snapshot that follows it lands. This closes that race, which
+  // matters most on Zero-K: it counts failed attempts per IP address, so a retry
+  // loop bans the address rather than the account. Reset on every attempt.
+  const deniedRef = useRef(false);
   // Enough to call `connect()` again; captured on each connect attempt.
   const reconnectCtxRef = useRef<{
     server: LobbyServer;
@@ -1008,6 +1039,12 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "event", ev });
       if (ev.kind === "delta") {
         const d = ev.delta;
+        // The server has refused these credentials. Recorded so the reconnect
+        // loop stops rather than spending attempts on a password that will be
+        // refused again, which on Zero-K is counted against the IP address.
+        if (d.kind === "loginDenied" || d.kind === "registrationDenied") {
+          deniedRef.current = true;
+        }
         // An autohost `!ring` is a transient event, not state - react to it directly
         // (gong + reverberation + taskbar flash) rather than through the snapshot.
         if (d.kind === "ring") triggerRing(d.from);
@@ -1142,12 +1179,38 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       setBusy(true);
       intentionalRef.current = false;
       loggedInRef.current = false;
+      deniedRef.current = false;
       reconnectCtxRef.current = { server, username, direct };
       const serverKey = serverKeyFor(server, username);
       connectingKeyRef.current = serverKey;
       try {
         const onEvent = openChannel(serverKey);
-        if (serverProtocol(server) === "tachyon") {
+        const protocol = serverProtocol(server);
+        if (protocol === "zerok") {
+          // Same credentials as a TASServer login, from the same keychain entry,
+          // because Zero-K hashes a password the same way. What differs is the
+          // handshake, which the Rust side runs off the server's unprompted
+          // greeting, and that there is no TLS to choose.
+          const cred = await lsGetCredential({
+            serverId: server.id,
+            username,
+          });
+          if (!cred.secret) {
+            throw new Error(
+              "No stored password for this login (set one in Settings).",
+            );
+          }
+          dispatch({ type: "connecting" });
+          await mpConnectZerok({
+            serverKey,
+            host: server.host,
+            port: server.port,
+            username,
+            password: cred.secret,
+            installId: zerokInstallIdRef.current,
+            onEvent,
+          });
+        } else if (protocol === "tachyon") {
           // No password to read and no handshake to run. The Rust side refreshes
           // the token the browser sign-in stored, so this never opens a browser,
           // which is what makes an auto-reconnect safe on a Tachyon server.
@@ -1292,6 +1355,18 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         void notify({ title: "Reconnected to multiplayer", level: "success" });
       } catch {
         if (reconnectGenRef.current !== gen) return;
+        // A password the server has already refused will be refused again, so a
+        // retry costs a failed attempt and buys nothing. On Zero-K it costs more
+        // than that: it logs failed attempts per IP address, so a loop bans the
+        // address rather than the account. Stop and let the person fix it.
+        if (deniedRef.current) {
+          void notify({
+            title: "Multiplayer login refused",
+            body: "Check the password in Settings, then log in again from the topbar.",
+            level: "error",
+          });
+          return;
+        }
         // A Tachyon sign-in the server has refused will be refused again, so
         // retrying it only delays the one thing that can fix it: another trip
         // through the browser, which a reconnect must never open by itself.
