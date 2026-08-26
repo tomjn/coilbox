@@ -1,0 +1,20 @@
+# The files from ZeroK-RTS/Zero-K-Infrastructure that define the lobby protocol,
+# one repo-relative path per line. Each is vendored here under the same path, so
+# a refresh is a straight fetch and compare. See README.md.
+#
+# The first three declare the commands. The rest only contribute types those
+# three reference, and every one of them is load-bearing:
+#
+#   UserBattleStatus.cs  the sync flag that tells a room you have the map
+#   AutohostMode.cs      the battle mode
+#   Relation.cs          the friend and ignore values
+#   IContentService.cs   the news, ladder and forum lists sent on connect
+#   GlobalConst.cs       the Planet Wars phase, via PwStatus
+Shared/LobbyClient/Protocol/Messages.cs
+Shared/LobbyClient/Protocol/MatchMakerMessages.cs
+Shared/LobbyClient/Protocol/PartyMessages.cs
+Shared/LobbyClient/UserBattleStatus.cs
+Shared/PlasmaShared/ISpringieService/AutohostMode.cs
+Shared/PlasmaShared/Relation.cs
+Shared/PlasmaShared/IContentService/IContentService.cs
+Shared/PlasmaShared/GlobalConst.cs

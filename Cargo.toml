@@ -8,6 +8,7 @@ members = [
   "crates/coilbox-3do",
   "crates/coilbox-lobby-protocol",
   "crates/coilbox-tachyon-protocol",
+  "crates/coilbox-zerok-protocol",
   "crates/coilbox-springlua",
   "crates/coilbox-unitpose",
   "crates/coilbox-assets",
