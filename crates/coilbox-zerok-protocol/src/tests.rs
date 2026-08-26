@@ -215,3 +215,75 @@ fn a_body_that_does_not_fit_names_the_command_it_came_under() {
     }
     assert_eq!(decoded.name(), "Welcome");
 }
+
+// -------------------------------------------------------------------------
+// The wire line.
+// -------------------------------------------------------------------------
+
+#[test]
+fn a_line_splits_on_the_first_space_only() {
+    let line = r#"Say {"Text":"hello there","Place":0}"#;
+    let (name, body) = line::split_line(line).expect("it is a line");
+    assert_eq!(name, "Say");
+    // The whole point: the body keeps the spaces inside it.
+    assert_eq!(body, r#"{"Text":"hello there","Place":0}"#);
+}
+
+#[test]
+fn a_line_with_no_space_is_not_a_line() {
+    assert_eq!(line::split_line("Welcome"), None);
+    assert_eq!(line::split_line(""), None);
+    assert_eq!(line::parse_line("Welcome"), None);
+}
+
+#[test]
+fn leading_spaces_are_skipped_the_way_dot_net_skips_them() {
+    let (name, body) = line::split_line("   Welcome {}").expect("it is a line");
+    assert_eq!(name, "Welcome");
+    assert_eq!(body, "{}");
+}
+
+#[test]
+fn an_empty_body_still_names_its_command() {
+    // A command with no members serialises to `{}`, which PwCancel does.
+    let (name, body) = line::split_line("PwCancel {}").expect("it is a line");
+    assert_eq!(name, "PwCancel");
+    assert_eq!(body, "{}");
+    assert!(matches!(
+        line::parse_line("PwCancel {}"),
+        Some(ZerokMessage::PwCancel(_))
+    ));
+}
+
+#[test]
+fn a_command_goes_out_as_its_name_then_its_json() {
+    let line = line::to_line(&LeaveChannel {
+        channel_name: Some("main".into()),
+    })
+    .expect("LeaveChannel serialises");
+    assert_eq!(line, r#"LeaveChannel {"ChannelName":"main"}"#);
+
+    // And straight back, which is what makes a round trip through the socket
+    // worth trusting.
+    let (name, body) = line::split_line(&line).expect("it is a line");
+    assert_eq!(name, LeaveChannel::NAME);
+    assert_eq!(
+        ZerokMessage::decode(name, body),
+        ZerokMessage::LeaveChannel(LeaveChannel {
+            channel_name: Some("main".into()),
+        })
+    );
+}
+
+#[test]
+fn a_built_line_never_carries_a_break() {
+    // A name or a body with a newline in it would read as two messages.
+    let line = line::to_line(&Say {
+        text: Some("first\nsecond".into()),
+        ..Say::default()
+    })
+    .expect("Say serialises");
+    assert!(line::is_wire_safe(&line), "serde_json escapes the break");
+    assert!(!line::is_wire_safe("Say {}\nSay {}"));
+    assert!(!line::is_wire_safe("Say {}\r\n"));
+}

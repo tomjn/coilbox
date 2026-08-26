@@ -141,6 +141,7 @@ pub fn spawn_connection(
     lock_or_recover(&registry).insert(
         server_key,
         ServerConn {
+            protocol: crate::conn::ConnProtocol::Tachyon,
             tx,
             state,
             sink,
