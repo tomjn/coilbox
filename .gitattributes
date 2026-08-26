@@ -13,3 +13,10 @@ shared/map-catalog.json text eol=lf
 # endings, which `core.autocrlf` would quietly flatten on the way in, so the
 # tests would be reading something pr-downloader never wrote.
 crates/tauri-plugin-coilbox-downloads/tests/fixtures/*.txt -text
+
+# Zero-K's protocol definitions, copied from upstream at a pinned commit.
+# `scripts/zerok-refresh.sh` proves that what is vendored is what upstream has by
+# comparing the two byte for byte, and two of these files are written with CRLF.
+# Normalising them on the way in would leave that check reporting a difference
+# nobody can resolve.
+crates/coilbox-zerok-protocol/upstream/**/*.cs -text
