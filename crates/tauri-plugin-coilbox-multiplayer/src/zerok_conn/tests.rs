@@ -179,3 +179,275 @@ async fn a_connect_to_nothing_says_so_rather_than_hanging() {
         Ok(_) => panic!("nothing is listening there"),
     }
 }
+
+// -------------------------------------------------------------------------
+// The login exchange, through the whole connection task.
+// -------------------------------------------------------------------------
+
+/// How long a test waits for something that should happen in milliseconds.
+const PATIENCE: Duration = Duration::from_secs(5);
+
+/// A stand-in server that greets the way Zero-K's does, keeps whatever the
+/// client answers with, and replies with `answer`.
+///
+/// The greeting goes out unprompted, because that is the behaviour under test:
+/// a client that waits to be asked never logs in.
+async fn greet_and_answer(answer: Option<String>) -> (u16, Arc<Mutex<Vec<String>>>) {
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind a loopback port");
+    let port = listener.local_addr().expect("it has an address").port();
+    let heard: Arc<Mutex<Vec<String>>> = Arc::default();
+    let keep = Arc::clone(&heard);
+
+    tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.expect("a client connects");
+        let (read, mut write) = socket.into_split();
+        let greeting = "Welcome {\"Engine\":\"105.1.1\",\"UserCount\":3}\n";
+        if write.write_all(greeting.as_bytes()).await.is_err() {
+            return;
+        }
+        let mut reader = BufReader::new(read).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            let first = {
+                let mut kept = keep.lock().unwrap_or_else(|e| e.into_inner());
+                kept.push(line);
+                kept.len() == 1
+            };
+            if first {
+                if let Some(answer) = &answer {
+                    let framed = format!("{answer}\n");
+                    if write.write_all(framed.as_bytes()).await.is_err() {
+                        return;
+                    }
+                }
+            }
+        }
+    });
+    (port, heard)
+}
+
+/// One connected client, with everything a test needs to watch it.
+struct Client {
+    key: String,
+    registry: Registry,
+    /// Every event the connection streamed, as the JSON the frontend receives.
+    events: Arc<Mutex<Vec<String>>>,
+}
+
+impl Client {
+    async fn connect(port: u16, username: &str) -> Client {
+        let stream = connect_to(port).await;
+        let events: Arc<Mutex<Vec<String>>> = Arc::default();
+        let sink = Arc::clone(&events);
+        let channel = Channel::new(move |body: tauri::ipc::InvokeResponseBody| {
+            if let tauri::ipc::InvokeResponseBody::Json(json) = body {
+                sink.lock().unwrap_or_else(|e| e.into_inner()).push(json);
+            }
+            Ok(())
+        });
+        let registry = Registry::default();
+        let key = format!("{username}@127.0.0.1:{port}");
+        spawn_connection(
+            registry.clone(),
+            key.clone(),
+            stream,
+            ZerokLogin {
+                username: username.to_string(),
+                password_hash: "X03MO1qnZdYdgyfeuILPmQ==".to_string(),
+                lobby_version: "Coilbox 9.9.9".to_string(),
+                install_id: "test-install".to_string(),
+            },
+            channel,
+        );
+        Client {
+            key,
+            registry,
+            events,
+        }
+    }
+
+    /// The phase this connection has reached, or `None` once it has been torn
+    /// down and evicted from the registry.
+    fn phase(&self) -> Option<LoginPhase> {
+        let registry = self.registry.lock().unwrap_or_else(|e| e.into_inner());
+        registry.get(&self.key).map(|c| *c.phase.borrow())
+    }
+
+    /// The name this connection believes it is logged in as.
+    fn username(&self) -> Option<String> {
+        let registry = self.registry.lock().unwrap_or_else(|e| e.into_inner());
+        let name = registry
+            .get(&self.key)?
+            .state
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .my_username
+            .clone();
+        name
+    }
+
+    /// Every event streamed so far, parsed.
+    fn events(&self) -> Vec<serde_json::Value> {
+        self.events
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .filter_map(|raw| serde_json::from_str(raw).ok())
+            .collect()
+    }
+
+    /// The first event of a kind, if one has arrived.
+    fn event(&self, kind: &str) -> Option<serde_json::Value> {
+        self.events()
+            .into_iter()
+            .find(|event| event["kind"] == kind || event["delta"]["kind"] == kind)
+    }
+
+    async fn wait_for(&self, kind: &'static str) -> serde_json::Value {
+        let deadline = std::time::Instant::now() + PATIENCE;
+        while std::time::Instant::now() < deadline {
+            if let Some(event) = self.event(kind) {
+                return event;
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+        panic!("timed out waiting for a {kind} event on {}", self.key);
+    }
+}
+
+/// The line the client answered the greeting with, once it has answered.
+async fn first_line(heard: &Arc<Mutex<Vec<String>>>) -> String {
+    let deadline = std::time::Instant::now() + PATIENCE;
+    while std::time::Instant::now() < deadline {
+        if let Some(line) = heard
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .first()
+            .cloned()
+        {
+            return line;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    panic!("the client never answered the greeting");
+}
+
+#[tokio::test]
+async fn the_greeting_is_answered_with_a_login() {
+    let (port, heard) = greet_and_answer(None).await;
+    let client = Client::connect(port, "someone").await;
+
+    let line = first_line(&heard).await;
+    let Some(ZerokMessage::Login(login)) = line::parse_line(&line) else {
+        panic!("the client answered the greeting with {line}");
+    };
+
+    assert_eq!(login.name.as_deref(), Some("someone"));
+    assert_eq!(
+        login.password_hash.as_deref(),
+        Some("X03MO1qnZdYdgyfeuILPmQ==")
+    );
+    assert_eq!(login.install_id.as_deref(), Some("test-install"));
+    // Names coilbox and its version, so a player who sees it knows what they
+    // are talking to.
+    assert_eq!(login.lobby_version.as_deref(), Some("Coilbox 9.9.9"));
+    // 1 is ZeroKLobby. There is no value for a third-party client, and a type
+    // the server does not know is worse than one that is not strictly true.
+    assert_eq!(login.client_type, types::ClientTypes::ZeroKLobby);
+    assert_eq!(login.user_id, 0);
+
+    // The Steam and RSA members the server does not ask for go out unset rather
+    // than as null, which is what upstream's serialiser does.
+    let (_, body) = line::split_line(&line).expect("it is a line");
+    let sent: serde_json::Value = serde_json::from_str(body).expect("the body is JSON");
+    let object = sent.as_object().expect("it is an object");
+    for unset in [
+        "SteamAuthToken",
+        "ClientPubKey",
+        "SignedChallengeToken",
+        "EncryptedPasswordHash",
+    ] {
+        assert!(!object.contains_key(unset), "{unset} should not be sent");
+    }
+
+    assert_eq!(client.phase(), Some(LoginPhase::AwaitAccepted));
+    drop(client);
+}
+
+#[tokio::test]
+async fn a_login_the_server_accepts_reaches_ready() {
+    let (port, _heard) = greet_and_answer(Some(
+        r#"LoginResponse {"ResultCode":0,"Name":"Someone"}"#.into(),
+    ))
+    .await;
+    let client = Client::connect(port, "someone").await;
+
+    let delta = client.wait_for("loggedIn").await;
+    // Zero-K answers with the name it knows the account by, which here differs
+    // from the one that was typed only in case. Taking the server's is what
+    // keeps every later message matching.
+    assert_eq!(delta["delta"]["username"], "Someone");
+    assert_eq!(client.username().as_deref(), Some("Someone"));
+    assert_eq!(client.phase(), Some(LoginPhase::Ready));
+}
+
+#[tokio::test]
+async fn a_refused_login_says_why_in_the_server_s_own_words() {
+    let (port, _heard) = greet_and_answer(Some(r#"LoginResponse {"ResultCode":3}"#.into())).await;
+    let client = Client::connect(port, "someone").await;
+
+    let delta = client.wait_for("loginDenied").await;
+    // Upstream's own [Description] for code 3, generated rather than
+    // transcribed, so a reworded reason arrives with the next refresh.
+    assert_eq!(delta["delta"]["reason"], "invalid password");
+
+    // The denial reaches the login form ahead of the disconnect that follows it.
+    let disconnected = client.wait_for("disconnected").await;
+    assert_eq!(disconnected["reason"], "invalid password");
+}
+
+#[tokio::test]
+async fn a_ban_carries_the_reason_the_server_gave_for_it() {
+    let (port, _heard) = greet_and_answer(Some(
+        r#"LoginResponse {"ResultCode":4,"BanReason":"smurfing"}"#.into(),
+    ))
+    .await;
+    let client = Client::connect(port, "someone").await;
+
+    let delta = client.wait_for("loginDenied").await;
+    assert_eq!(delta["delta"]["reason"], "banned: smurfing");
+}
+
+#[tokio::test]
+async fn a_refusal_code_we_do_not_know_still_says_something() {
+    // A server ahead of the pinned commit. The number is worth more than
+    // nothing, and the message still has to end the connection.
+    let (port, _heard) =
+        greet_and_answer(Some(r#"LoginResponse {"ResultCode":9999}"#.into())).await;
+    let client = Client::connect(port, "someone").await;
+
+    let delta = client.wait_for("loginDenied").await;
+    assert_eq!(
+        delta["delta"]["reason"],
+        "the server refused the login (code 9999)"
+    );
+}
+
+#[tokio::test]
+async fn a_refused_login_leaves_nothing_in_the_registry_to_retry() {
+    // The key has to free up, so a second attempt with a corrected password is
+    // not refused as a duplicate connection.
+    let (port, _heard) = greet_and_answer(Some(r#"LoginResponse {"ResultCode":3}"#.into())).await;
+    let client = Client::connect(port, "someone").await;
+    client.wait_for("disconnected").await;
+
+    let deadline = std::time::Instant::now() + PATIENCE;
+    while std::time::Instant::now() < deadline {
+        if client.phase().is_none() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    panic!("the refused connection is still in the registry");
+}

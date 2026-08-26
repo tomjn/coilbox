@@ -25,8 +25,9 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use coilbox_lobby_protocol::{LobbyState, LoginPhase};
-use coilbox_zerok_protocol::line;
+use coilbox_lobby_protocol::{Delta, LobbyState, LoginPhase};
+use coilbox_zerok_protocol::types::LoginResponseCode;
+use coilbox_zerok_protocol::{line, types, ZerokMessage};
 use futures_util::{SinkExt, StreamExt};
 use tauri::ipc::Channel;
 use tokio::net::TcpStream;
@@ -92,6 +93,27 @@ pub async fn connect(
     Ok(stream)
 }
 
+/// What a Zero-K login needs beyond a socket.
+///
+/// Four of `Login`'s members are for Steam authentication and RSA challenge
+/// signing, which the server does not currently require of a password login, so
+/// they are not here and go out unset.
+pub struct ZerokLogin {
+    pub username: String,
+    /// `base64(md5(password))`, the same scheme TASServer uses.
+    pub password_hash: String,
+    /// Free text naming this client and its version, sent as `LobbyVersion` and
+    /// shown to other players. Built by the caller from the running app's
+    /// version rather than from anything compiled in, because coilbox takes its
+    /// release version from the git tag and the source keeps a placeholder.
+    pub lobby_version: String,
+    /// The per-install identifier, sent as `InstallID`. Zero-K's server uses it
+    /// for multi-account and ban-evasion checks. It is not identity, it does not
+    /// authenticate anything, and it is not meant to follow a person from one
+    /// install to another.
+    pub install_id: String,
+}
+
 /// Spawn the connection task for an already-connected socket, registering its
 /// [`ServerConn`] so other commands can reach it.
 ///
@@ -101,6 +123,7 @@ pub fn spawn_connection(
     registry: Registry,
     server_key: String,
     stream: TcpStream,
+    login: ZerokLogin,
     on_event: Channel<LobbyEvent>,
 ) {
     let (tx, rx) = mpsc::unbounded_channel::<Outbound>();
@@ -114,8 +137,10 @@ pub fn spawn_connection(
         registry.clone(),
         server_key.clone(),
         stream,
+        login,
         sink.clone(),
         phase_tx,
+        state.clone(),
         rx,
     ));
 
@@ -146,23 +171,23 @@ pub fn spawn_connection(
 ///
 /// No keepalive timer, unlike [`crate::conn::run_loop`]. Zero-K's protocol has
 /// no `Ping`, and the socket carries TCP keepalive instead.
+#[allow(clippy::too_many_arguments)]
 async fn run_loop(
     registry: Registry,
     server_key: String,
     stream: TcpStream,
+    login: ZerokLogin,
     sink: EventSink,
     phase_slot: watch::Sender<LoginPhase>,
+    state: Arc<Mutex<LobbyState>>,
     mut rx: mpsc::UnboundedReceiver<Outbound>,
 ) {
     emit(&sink, LobbyEvent::Connected);
-    let _ = phase_slot.send(LoginPhase::AwaitGreeting);
-    emit(
-        &sink,
-        LobbyEvent::Phase {
-            phase: LoginPhase::AwaitGreeting,
-            agreement: None,
-        },
-    );
+    let mut phase = Phase {
+        sink: sink.clone(),
+        slot: phase_slot,
+    };
+    phase.set(LoginPhase::AwaitGreeting);
 
     let mut framed = Framed::new(stream, LinesCodec::new());
 
@@ -183,10 +208,53 @@ async fn run_loop(
                     let Some(message) = line::parse_line(&raw) else {
                         continue;
                     };
-                    // Nothing folds a message into state yet. The battle list,
-                    // the room and chat are their own issues in this milestone,
-                    // and the login exchange is the next one.
-                    let _ = message;
+                    match message {
+                        // Zero-K's server speaks first. The greeting is the
+                        // prompt to log in, rather than the client opening with
+                        // one of its own.
+                        ZerokMessage::Welcome(_) => {
+                            match line::to_line(&login_command(&login)) {
+                                Ok(line) => {
+                                    outbound.push(line);
+                                    phase.set(LoginPhase::AwaitAccepted);
+                                }
+                                // Nothing in a Login can fail to serialise, so
+                                // this says the types have moved rather than
+                                // that the credentials are wrong.
+                                Err(e) => break 'conn Some(format!("could not build the login: {e}")),
+                            }
+                        }
+                        ZerokMessage::LoginResponse(response) => {
+                            if response.result_code == LoginResponseCode::Ok {
+                                // Zero-K answers with the name it knows the
+                                // account by, which is not always the one that
+                                // was typed.
+                                let username = response
+                                    .name
+                                    .clone()
+                                    .unwrap_or_else(|| login.username.clone());
+                                lock_or_recover(&state).my_username = Some(username.clone());
+                                phase.set(LoginPhase::Ready);
+                                emit(&sink, LobbyEvent::Delta {
+                                    delta: Delta::LoggedIn { username },
+                                });
+                            } else {
+                                let reason = refusal(&response);
+                                phase.set(LoginPhase::Denied);
+                                // Emitted before the teardown below, so the
+                                // login form has the reason ahead of the
+                                // disconnect that follows it.
+                                emit(&sink, LobbyEvent::Delta {
+                                    delta: Delta::LoginDenied { reason: reason.clone() },
+                                });
+                                break 'conn Some(reason);
+                            }
+                        }
+                        // Nothing else folds into state yet. The battle list,
+                        // the room and chat are their own issues in this
+                        // milestone.
+                        _ => {}
+                    }
                 }
                 Some(Err(e)) => break 'conn Some(e.to_string()),
                 None => break 'conn None,
@@ -227,6 +295,70 @@ async fn run_loop(
 
     emit(&sink, LobbyEvent::Disconnected { reason });
     lock_or_recover(&registry).remove(&server_key);
+}
+
+/// The login phase, written to both places that have to hear about it: the watch
+/// anything waiting on the connection reads, and the frontend.
+struct Phase {
+    sink: EventSink,
+    slot: watch::Sender<LoginPhase>,
+}
+
+impl Phase {
+    fn set(&mut self, phase: LoginPhase) {
+        let _ = self.slot.send(phase);
+        emit(
+            &self.sink,
+            LobbyEvent::Phase {
+                phase,
+                // Zero-K's terms are agreed on its website, so a connection never
+                // parks on an agreement.
+                agreement: None,
+            },
+        );
+    }
+}
+
+/// Build the `Login` for a set of credentials.
+///
+/// `ClientType` is 1, which upstream names `ZeroKLobby`. There is no value for a
+/// third-party client, and a client type the server does not know is worse than
+/// one that is not strictly true, so coilbox sends 1 like every other client
+/// does. `UserID` is always 0. The four Steam and RSA members go out unset,
+/// because the server does not currently ask a password login for any of them
+/// and `NullValueHandling.Ignore` leaves an unset member out of the JSON.
+fn login_command(login: &ZerokLogin) -> types::Login {
+    types::Login {
+        name: Some(login.username.clone()),
+        password_hash: Some(login.password_hash.clone()),
+        client_type: types::ClientTypes::ZeroKLobby,
+        lobby_version: Some(login.lobby_version.clone()),
+        install_id: Some(login.install_id.clone()),
+        user_id: 0,
+        ..types::Login::default()
+    }
+}
+
+/// What to show somebody whose login was refused.
+///
+/// The wording comes from upstream's own `[Description]` on the code, generated
+/// rather than transcribed, so a reworded reason arrives with the next refresh.
+/// A ban carries its own text as well, which is the part that says why.
+fn refusal(response: &types::LoginResponse) -> String {
+    let code = response.result_code;
+    let mut reason = code.description().map_or_else(
+        || format!("the server refused the login (code {})", i32::from(code)),
+        str::to_string,
+    );
+    if let Some(ban) = response
+        .ban_reason
+        .as_deref()
+        .map(str::trim)
+        .filter(|ban| !ban.is_empty())
+    {
+        reason = format!("{reason}: {ban}");
+    }
+    reason
 }
 
 #[cfg(test)]

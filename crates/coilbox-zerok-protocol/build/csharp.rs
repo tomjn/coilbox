@@ -75,9 +75,12 @@ pub struct ClassDef {
 pub struct EnumValue {
     pub name: String,
     pub number: i32,
-    /// Doc comments, plus the text of any `[Description("...")]`, which is the
-    /// only human wording some values have.
     pub docs: Vec<String>,
+    /// The text of a `[Description("...")]`, which is upstream's own label for
+    /// the value and the only human wording most of them have. Kept apart from
+    /// the docs so it can be generated as something a caller can read at
+    /// runtime, rather than only something a reader of the source can.
+    pub description: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -758,6 +761,7 @@ impl Parser<'_> {
         let mut next = 0i32;
         loop {
             let mut value_docs = Vec::new();
+            let mut value_description = None;
             loop {
                 match self.peek() {
                     Some(Tok::Doc(line)) => {
@@ -766,7 +770,7 @@ impl Parser<'_> {
                     }
                     Some(Tok::Attr(text)) => {
                         if let Some(text) = description(text) {
-                            value_docs.push(text);
+                            value_description = Some(text);
                         }
                         self.at += 1;
                     }
@@ -812,6 +816,7 @@ impl Parser<'_> {
                 name: value_name,
                 number: next,
                 docs: clean_docs(value_docs),
+                description: value_description,
             });
             next += 1;
             if self.is_punct(',') {

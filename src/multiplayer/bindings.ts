@@ -399,6 +399,33 @@ export const mpConnectTachyon = defineCommand<
 >("coilbox-multiplayer", "mp_connect_tachyon");
 
 /**
+ * Open a lobby connection to Zero-K's server. Streams the same `LobbyEvent`s over
+ * `onEvent` as `mpConnect` does, so everything above the connection is unchanged.
+ *
+ * The server speaks first: a `Welcome` arrives unprompted and the Rust side
+ * answers it with `Login`, so there is no handshake to drive from here. Success
+ * is the `ready` phase, a refusal arrives as a `loginDenied` delta followed by
+ * `disconnected`.
+ *
+ * A refusal must not be retried on a loop. Zero-K's server logs failed attempts
+ * per IP address, so a retry walks into a ban on the address rather than on the
+ * account.
+ */
+export const mpConnectZerok = defineCommand<
+  {
+    serverKey: string;
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    /** The per-install `InstallID` (see `clientId.ts`). */
+    installId: string;
+    onEvent: Channel<LobbyEvent>;
+  },
+  { connected: boolean }
+>("coilbox-multiplayer", "mp_connect_zerok");
+
+/**
  * Sign in to a Tachyon server through the system browser, and keep the result.
  * Resolves only once the user has finished there, which can take a minute, and
  * rejects if they never do.

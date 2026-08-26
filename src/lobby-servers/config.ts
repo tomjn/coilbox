@@ -2,8 +2,14 @@ import { useSetting } from "@picoframe/frame";
 import type { ProfileLobby } from "../profile/profile";
 import { getProfile } from "../profile/profile";
 
-/** The wire protocol a lobby server speaks. See `docs/tachyon-protocol.md`. */
-export type LobbyProtocol = "tasserver" | "tachyon";
+/**
+ * The wire protocol a lobby server speaks. See `docs/tachyon-protocol.md`.
+ *
+ * `zerok` is Zero-K's own line protocol, which is neither of the other two: a
+ * command name and a JSON object over plain TCP, defined by C# classes rather
+ * than by a published schema. See `crates/coilbox-zerok-protocol`.
+ */
+export type LobbyProtocol = "tasserver" | "tachyon" | "zerok";
 
 /**
  * How an encrypted TASServer connection starts, which the two server families do
@@ -169,6 +175,21 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     alpha: true,
     notice:
       "Our Tachyon support is incomplete. Use the Beyond All Reason entry instead.",
+  },
+  {
+    id: "zero-k",
+    name: "Zero-K",
+    host: "zero-k.info",
+    // The same number TASServer uses, and a different protocol entirely. Zero-K
+    // offers no TLS on it, so nothing on this connection is private, including
+    // the password hash.
+    port: 8200,
+    tls: false,
+    allowSelfSigned: false,
+    protocol: "zerok",
+    alpha: true,
+    notice:
+      "Our Zero-K support is incomplete. You can log in, and little else yet.",
   },
   // Last on purpose: it is the least likely destination for a Recoil or BAR player,
   // and the one nobody can register a new account on.

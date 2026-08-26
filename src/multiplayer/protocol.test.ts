@@ -100,3 +100,32 @@ describe("messageLimit", () => {
     expect(messageLimit("tasserver")).toBeNull();
   });
 });
+
+describe("Zero-K", () => {
+  const zerok = builtin("zero-k");
+
+  it("reads a Zero-K connection off its server key", () => {
+    const key = `player@${zerok.host}:${zerok.port}`;
+    expect(protocolForKey(key, BUILTIN_SERVERS)).toBe("zerok");
+  });
+
+  it("is not mistaken for TASServer by its port", () => {
+    // Zero-K listens on 8200, the number TASServer conventionally uses, so the
+    // host is what tells them apart.
+    expect(zerok.port).toBe(8200);
+    expect(protocolForKey(`p@lobby.springrts.com:8200`, BUILTIN_SERVERS)).toBe(
+      "tasserver",
+    );
+  });
+
+  it("sends none of the TASServer ready-time commands", () => {
+    // Zero-K has channels and a friend list, but none of them are asked for
+    // with a TASServer line, so the ready-time sync would be four protocol
+    // errors rather than four commands.
+    expect(syncsOnReady("zerok")).toBe(false);
+  });
+
+  it("sets no message limit, because none is published", () => {
+    expect(messageLimit("zerok")).toBeNull();
+  });
+});
