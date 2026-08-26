@@ -192,6 +192,11 @@ const PATIENCE: Duration = Duration::from_secs(5);
 ///
 /// The greeting goes out unprompted, because that is the behaviour under test:
 /// a client that waits to be asked never logs in.
+///
+/// It answers only the command the answer is a response to, which the real
+/// server also does and which matters more than it looks. Answering whatever
+/// arrives lets every test about the response pass while the client sends the
+/// wrong command entirely.
 async fn greet_and_answer(answer: Option<String>) -> (u16, Arc<Mutex<Vec<String>>>) {
     let listener = TcpListener::bind(("127.0.0.1", 0))
         .await
@@ -199,6 +204,7 @@ async fn greet_and_answer(answer: Option<String>) -> (u16, Arc<Mutex<Vec<String>
     let port = listener.local_addr().expect("it has an address").port();
     let heard: Arc<Mutex<Vec<String>>> = Arc::default();
     let keep = Arc::clone(&heard);
+    let asked = answer.as_deref().map(expected_request).map(str::to_string);
 
     tokio::spawn(async move {
         let (socket, _) = listener.accept().await.expect("a client connects");
@@ -209,12 +215,15 @@ async fn greet_and_answer(answer: Option<String>) -> (u16, Arc<Mutex<Vec<String>
         }
         let mut reader = BufReader::new(read).lines();
         while let Ok(Some(line)) = reader.next_line().await {
+            let name = line::split_line(&line)
+                .map(|(name, _)| name.to_string())
+                .unwrap_or_default();
             let first = {
                 let mut kept = keep.lock().unwrap_or_else(|e| e.into_inner());
                 kept.push(line);
                 kept.len() == 1
             };
-            if first {
+            if first && asked.as_deref() == Some(name.as_str()) {
                 if let Some(answer) = &answer {
                     let framed = format!("{answer}\n");
                     if write.write_all(framed.as_bytes()).await.is_err() {
@@ -227,6 +236,16 @@ async fn greet_and_answer(answer: Option<String>) -> (u16, Arc<Mutex<Vec<String>
     (port, heard)
 }
 
+/// The command a response answers, so the stand-in server can hold back an
+/// answer to something the client never asked.
+fn expected_request(answer: &str) -> &'static str {
+    match line::split_line(answer).map(|(name, _)| name) {
+        Some("LoginResponse") => "Login",
+        Some("RegisterResponse") => "Register",
+        other => panic!("no request is known to produce {other:?}"),
+    }
+}
+
 /// One connected client, with everything a test needs to watch it.
 struct Client {
     key: String,
@@ -237,6 +256,18 @@ struct Client {
 
 impl Client {
     async fn connect(port: u16, username: &str) -> Client {
+        Client::open(port, username, LoginMode::Login).await
+    }
+
+    /// The same, answering the greeting with `Register` instead.
+    async fn register(port: u16, username: &str, email: Option<&str>) -> Client {
+        let mode = LoginMode::Register {
+            email: email.map(str::to_string),
+        };
+        Client::open(port, username, mode).await
+    }
+
+    async fn open(port: u16, username: &str, mode: LoginMode) -> Client {
         let stream = connect_to(port).await;
         let events: Arc<Mutex<Vec<String>>> = Arc::default();
         let sink = Arc::clone(&events);
@@ -257,6 +288,7 @@ impl Client {
                 password_hash: "X03MO1qnZdYdgyfeuILPmQ==".to_string(),
                 lobby_version: "Coilbox 9.9.9".to_string(),
                 install_id: "test-install".to_string(),
+                mode,
             },
             channel,
         );
@@ -450,4 +482,110 @@ async fn a_refused_login_leaves_nothing_in_the_registry_to_retry() {
         tokio::time::sleep(Duration::from_millis(2)).await;
     }
     panic!("the refused connection is still in the registry");
+}
+
+// -------------------------------------------------------------------------
+// Registering, which runs on a connection of its own.
+// -------------------------------------------------------------------------
+
+#[tokio::test]
+async fn the_greeting_is_answered_with_a_register_when_that_is_what_was_asked() {
+    let (port, heard) = greet_and_answer(None).await;
+    let client = Client::register(port, "newcomer", Some("  someone@example.com  ")).await;
+
+    let line = first_line(&heard).await;
+    let Some(ZerokMessage::Register(register)) = line::parse_line(&line) else {
+        panic!("the client answered the greeting with {line}");
+    };
+    assert_eq!(register.name.as_deref(), Some("newcomer"));
+    assert_eq!(
+        register.password_hash.as_deref(),
+        Some("X03MO1qnZdYdgyfeuILPmQ==")
+    );
+    // Trimmed, because a stray space in an email box is the caller's typo and
+    // not something to store against the account.
+    assert_eq!(register.email.as_deref(), Some("someone@example.com"));
+    assert_eq!(register.install_id.as_deref(), Some("test-install"));
+    assert_eq!(register.user_id, 0);
+
+    assert_eq!(client.phase(), Some(LoginPhase::AwaitRegistration));
+}
+
+#[tokio::test]
+async fn no_email_means_no_email_member_rather_than_an_empty_one() {
+    let (port, heard) = greet_and_answer(None).await;
+    let _client = Client::register(port, "newcomer", None).await;
+
+    let line = first_line(&heard).await;
+    let (name, body) = line::split_line(&line).expect("it is a line");
+    // Named, because a Login has no Email member either and this would pass
+    // against one without saying anything.
+    assert_eq!(name, "Register");
+    let sent: serde_json::Value = serde_json::from_str(body).expect("the body is JSON");
+    assert!(
+        !sent.as_object().expect("an object").contains_key("Email"),
+        "an unset email is left out, not sent as an empty string"
+    );
+}
+
+#[tokio::test]
+async fn an_accepted_registration_reaches_the_registered_phase() {
+    let (port, _heard) =
+        greet_and_answer(Some(r#"RegisterResponse {"ResultCode":0}"#.into())).await;
+    let client = Client::register(port, "newcomer", None).await;
+
+    let deadline = std::time::Instant::now() + PATIENCE;
+    while std::time::Instant::now() < deadline {
+        if client.phase() == Some(LoginPhase::Registered) {
+            // The connection stays up, and the caller drops it before logging in
+            // on a fresh one. Registering never logs anybody in.
+            assert!(client.event("disconnected").is_none());
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    panic!("the registration never reached the registered phase");
+}
+
+#[tokio::test]
+async fn a_taken_name_says_so_in_the_server_s_own_words() {
+    // Code 2, which on a RegisterResponse is NameAlreadyTaken. On a
+    // LoginResponse the same number is InvalidName, which is why the two
+    // refusals are read through their own enums rather than one shared one.
+    let (port, _heard) =
+        greet_and_answer(Some(r#"RegisterResponse {"ResultCode":2}"#.into())).await;
+    let client = Client::register(port, "taken", None).await;
+
+    let delta = client.wait_for("registrationDenied").await;
+    assert_eq!(delta["delta"]["reason"], "name already exists");
+
+    let disconnected = client.wait_for("disconnected").await;
+    assert_eq!(disconnected["reason"], "name already exists");
+}
+
+#[tokio::test]
+async fn a_registration_the_server_bans_carries_its_reason() {
+    let (port, _heard) = greet_and_answer(Some(
+        r#"RegisterResponse {"ResultCode":4,"BanReason":"ban evasion"}"#.into(),
+    ))
+    .await;
+    let client = Client::register(port, "newcomer", None).await;
+
+    let delta = client.wait_for("registrationDenied").await;
+    assert_eq!(delta["delta"]["reason"], "banned: ban evasion");
+}
+
+#[tokio::test]
+async fn the_two_refusal_codes_are_not_confused_for_one_another() {
+    // The check the shape of this code is built around. Both enums have a 2 and
+    // they mean different things, so reading a registration refusal through the
+    // login enum would tell somebody their name was invalid when it was taken.
+    assert_eq!(
+        coilbox_zerok_protocol::types::LoginResponseCode::from(2).description(),
+        Some("invalid name")
+    );
+    assert_eq!(
+        coilbox_zerok_protocol::types::RegisterResponseCode::from(2).description(),
+        Some("name already exists")
+    );
 }

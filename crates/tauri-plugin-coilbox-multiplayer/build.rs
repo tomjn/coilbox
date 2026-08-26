@@ -6,6 +6,7 @@ const COMMANDS: &[&str] = &[
     "mp_connect",
     "mp_connect_tachyon",
     "mp_connect_zerok",
+    "mp_register_zerok",
     "mp_register",
     "mp_confirm_agreement",
     "mp_disconnect",

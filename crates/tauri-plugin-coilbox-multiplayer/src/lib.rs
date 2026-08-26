@@ -476,32 +476,110 @@ async fn mp_connect_zerok<R: Runtime>(
     install_id: String,
     on_event: Channel<LobbyEvent>,
 ) -> Result<CliResult, ()> {
-    if lock_or_recover(&registry).contains_key(&server_key) {
-        return Ok(CliResult::err(format!("already connected: {server_key}")));
+    Ok(open_zerok(
+        &app,
+        registry.inner(),
+        pending.inner(),
+        server_key,
+        host,
+        port,
+        username,
+        password,
+        install_id,
+        LoginMode::Login,
+        on_event,
+    )
+    .await)
+}
+
+/// `mp_register_zerok`: open a connection and create a Zero-K account on it.
+///
+/// A connection of its own, thrown away afterwards. Registering does not log
+/// anybody in, so the caller drops this one on success and connects normally,
+/// which is what upstream's own client does.
+///
+/// The frontend watches for the `registered` phase, and a refusal arrives as a
+/// `registrationDenied` delta ahead of the `disconnected` that follows it. There
+/// is no verification step: Zero-K stores the email against the account and
+/// never checks it, so the login after this one is ordinary.
+///
+/// A refusal must not be retried on a loop. `LoginChecker.cs` counts attempts
+/// per IP address and answers a run of them with `BannedTooManyAttempts`, so a
+/// retry bans the address rather than telling anyone what was wrong.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn mp_register_zerok<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    registry: State<'_, Registry>,
+    pending: State<'_, PendingConnects>,
+    server_key: String,
+    host: String,
+    port: u16,
+    username: String,
+    password: String,
+    email: Option<String>,
+    install_id: String,
+    on_event: Channel<LobbyEvent>,
+) -> Result<CliResult, ()> {
+    Ok(open_zerok(
+        &app,
+        registry.inner(),
+        pending.inner(),
+        server_key,
+        host,
+        port,
+        username,
+        password,
+        install_id,
+        LoginMode::Register { email },
+        on_event,
+    )
+    .await)
+}
+
+/// Open the socket to a Zero-K server and hand it to the connection task, which
+/// answers the greeting according to `mode`. Shared by the two commands above,
+/// which differ only in that.
+#[allow(clippy::too_many_arguments)]
+async fn open_zerok<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    registry: &Registry,
+    pending: &PendingConnects,
+    server_key: String,
+    host: String,
+    port: u16,
+    username: String,
+    password: String,
+    install_id: String,
+    mode: LoginMode,
+    on_event: Channel<LobbyEvent>,
+) -> CliResult {
+    if lock_or_recover(registry).contains_key(&server_key) {
+        return CliResult::err(format!("already connected: {server_key}"));
     }
 
     // The same cancel token the other two publish, so `mp_cancel_connect`
     // reaches a Zero-K connect that is still opening.
     let token = CancellationToken::new();
     {
-        let mut map = lock_or_recover(&pending);
+        let mut map = lock_or_recover(pending);
         if map.contains_key(&server_key) {
-            return Ok(CliResult::err(format!("already connecting: {server_key}")));
+            return CliResult::err(format!("already connecting: {server_key}"));
         }
         map.insert(server_key.clone(), token.clone());
     }
     let opened = zerok_conn::connect(&host, port, CONNECT_TIMEOUT, &token).await;
-    lock_or_recover(&pending).remove(&server_key);
+    lock_or_recover(pending).remove(&server_key);
     let stream = match opened {
         Ok(stream) => stream,
-        Err(ConnectError::Cancelled) => return Ok(CliResult::err("connection cancelled")),
+        Err(ConnectError::Cancelled) => return CliResult::err("connection cancelled"),
         Err(ConnectError::TimedOut) => {
-            return Ok(CliResult::err(format!(
+            return CliResult::err(format!(
                 "connection timed out after {}s",
                 CONNECT_TIMEOUT.as_secs()
-            )))
+            ))
         }
-        Err(ConnectError::Failed(e)) => return Ok(CliResult::err(e)),
+        Err(ConnectError::Failed(e)) => return CliResult::err(e),
     };
 
     let login = zerok_conn::ZerokLogin {
@@ -509,15 +587,10 @@ async fn mp_connect_zerok<R: Runtime>(
         password_hash: password_hash(&password),
         lobby_version: format!("Coilbox {}", app.package_info().version),
         install_id,
+        mode,
     };
-    zerok_conn::spawn_connection(
-        registry.inner().clone(),
-        server_key,
-        stream,
-        login,
-        on_event,
-    );
-    Ok(CliResult::ok(json!({ "connected": true })))
+    zerok_conn::spawn_connection(registry.clone(), server_key, stream, login, on_event);
+    CliResult::ok(json!({ "connected": true }))
 }
 
 /// `mp_confirm_agreement` — resume a login parked awaiting the emailed verification
@@ -2149,6 +2222,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_connect,
             mp_connect_tachyon,
             mp_connect_zerok,
+            mp_register_zerok,
             mp_register,
             mp_confirm_agreement,
             mp_disconnect,
