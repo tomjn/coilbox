@@ -450,19 +450,30 @@ async fn mp_connect_tachyon(
 /// port carries no TLS at all, so there is no mode to pass and nothing to
 /// upgrade.
 ///
-/// This opens the socket and starts reading. It does not log in. The server
-/// sends `Welcome` unprompted, and answering it is issue #1968, so until then
-/// the connection sits in `awaitGreeting`.
+/// The server speaks first: a `Welcome` arrives unprompted and the connection
+/// task answers it with `Login`, so there is no handshake to drive from here.
+/// The password is hashed here and never logged in plaintext.
+///
+/// `install_id` is the caller's per-install identifier, which Zero-K's server
+/// uses for multi-account and ban-evasion checks. `LobbyVersion` is built from
+/// the running app's version rather than from `CARGO_PKG_VERSION`, which stays a
+/// placeholder in source because coilbox takes its release version from the git
+/// tag.
 ///
 /// Streams the same `LobbyEvent`s as the other two, so everything above the
 /// connection is unchanged.
 #[tauri::command]
-async fn mp_connect_zerok(
+#[allow(clippy::too_many_arguments)]
+async fn mp_connect_zerok<R: Runtime>(
+    app: tauri::AppHandle<R>,
     registry: State<'_, Registry>,
     pending: State<'_, PendingConnects>,
     server_key: String,
     host: String,
     port: u16,
+    username: String,
+    password: String,
+    install_id: String,
     on_event: Channel<LobbyEvent>,
 ) -> Result<CliResult, ()> {
     if lock_or_recover(&registry).contains_key(&server_key) {
@@ -493,7 +504,19 @@ async fn mp_connect_zerok(
         Err(ConnectError::Failed(e)) => return Ok(CliResult::err(e)),
     };
 
-    zerok_conn::spawn_connection(registry.inner().clone(), server_key, stream, on_event);
+    let login = zerok_conn::ZerokLogin {
+        username,
+        password_hash: password_hash(&password),
+        lobby_version: format!("Coilbox {}", app.package_info().version),
+        install_id,
+    };
+    zerok_conn::spawn_connection(
+        registry.inner().clone(),
+        server_key,
+        stream,
+        login,
+        on_event,
+    );
     Ok(CliResult::ok(json!({ "connected": true })))
 }
 
