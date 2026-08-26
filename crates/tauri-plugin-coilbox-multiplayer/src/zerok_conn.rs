@@ -25,8 +25,8 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use coilbox_lobby_protocol::{Delta, LobbyState, LoginPhase};
-use coilbox_zerok_protocol::types::LoginResponseCode;
+use coilbox_lobby_protocol::{Delta, LobbyState, LoginMode, LoginPhase};
+use coilbox_zerok_protocol::types::{LoginResponseCode, RegisterResponseCode};
 use coilbox_zerok_protocol::{line, types, ZerokMessage};
 use futures_util::{SinkExt, StreamExt};
 use tauri::ipc::Channel;
@@ -112,6 +112,10 @@ pub struct ZerokLogin {
     /// authenticate anything, and it is not meant to follow a person from one
     /// install to another.
     pub install_id: String,
+    /// Whether the greeting is answered with `Login` or with `Register`. Sharing
+    /// `LoginMode` with the TASServer path rather than a second enum, because
+    /// the two connections make the same choice for the same reason.
+    pub mode: LoginMode,
 }
 
 /// Spawn the connection task for an already-connected socket, registering its
@@ -210,18 +214,43 @@ async fn run_loop(
                     };
                     match message {
                         // Zero-K's server speaks first. The greeting is the
-                        // prompt to log in, rather than the client opening with
-                        // one of its own.
+                        // prompt to log in or to register, rather than the
+                        // client opening with one of its own.
                         ZerokMessage::Welcome(_) => {
-                            match line::to_line(&login_command(&login)) {
+                            let (built, next) = match &login.mode {
+                                LoginMode::Login => (
+                                    line::to_line(&login_command(&login)),
+                                    LoginPhase::AwaitAccepted,
+                                ),
+                                LoginMode::Register { email } => (
+                                    line::to_line(&register_command(&login, email.as_deref())),
+                                    LoginPhase::AwaitRegistration,
+                                ),
+                            };
+                            match built {
                                 Ok(line) => {
                                     outbound.push(line);
-                                    phase.set(LoginPhase::AwaitAccepted);
+                                    phase.set(next);
                                 }
-                                // Nothing in a Login can fail to serialise, so
+                                // Nothing in either can fail to serialise, so
                                 // this says the types have moved rather than
                                 // that the credentials are wrong.
                                 Err(e) => break 'conn Some(format!("could not build the login: {e}")),
+                            }
+                        }
+                        ZerokMessage::RegisterResponse(response) => {
+                            if response.result_code == RegisterResponseCode::Ok {
+                                // Terminal success. Registering does not log
+                                // anybody in, so the caller drops this
+                                // connection and opens a fresh one to do that.
+                                phase.set(LoginPhase::Registered);
+                            } else {
+                                let reason = register_refusal(&response);
+                                phase.set(LoginPhase::Denied);
+                                emit(&sink, LobbyEvent::Delta {
+                                    delta: Delta::RegistrationDenied { reason: reason.clone() },
+                                });
+                                break 'conn Some(reason);
                             }
                         }
                         ZerokMessage::LoginResponse(response) => {
@@ -339,6 +368,25 @@ fn login_command(login: &ZerokLogin) -> types::Login {
     }
 }
 
+/// Build the `Register` for a set of credentials.
+///
+/// The email is stored against the account and never verified, so unlike every
+/// TASServer this talks to, Zero-K issues no code and the login that follows
+/// registering is an ordinary one. It goes out only when there is one to send.
+fn register_command(login: &ZerokLogin, email: Option<&str>) -> types::Register {
+    types::Register {
+        name: Some(login.username.clone()),
+        password_hash: Some(login.password_hash.clone()),
+        email: email
+            .map(str::trim)
+            .filter(|email| !email.is_empty())
+            .map(str::to_string),
+        install_id: Some(login.install_id.clone()),
+        user_id: 0,
+        ..types::Register::default()
+    }
+}
+
 /// What to show somebody whose login was refused.
 ///
 /// The wording comes from upstream's own `[Description]` on the code, generated
@@ -346,19 +394,39 @@ fn login_command(login: &ZerokLogin) -> types::Login {
 /// A ban carries its own text as well, which is the part that says why.
 fn refusal(response: &types::LoginResponse) -> String {
     let code = response.result_code;
-    let mut reason = code.description().map_or_else(
+    let reason = code.description().map_or_else(
         || format!("the server refused the login (code {})", i32::from(code)),
         str::to_string,
     );
-    if let Some(ban) = response
-        .ban_reason
-        .as_deref()
-        .map(str::trim)
-        .filter(|ban| !ban.is_empty())
-    {
-        reason = format!("{reason}: {ban}");
+    with_ban(reason, response.ban_reason.as_deref())
+}
+
+/// The same, for a registration the server would not take.
+///
+/// A separate function rather than one over both, because the two result codes
+/// are separate C# enums with overlapping numbers that mean different things.
+/// Code 2 is `InvalidName` on a login and `NameAlreadyTaken` on a registration.
+fn register_refusal(response: &types::RegisterResponse) -> String {
+    let code = response.result_code;
+    let reason = code.description().map_or_else(
+        || {
+            format!(
+                "the server refused the registration (code {})",
+                i32::from(code)
+            )
+        },
+        str::to_string,
+    );
+    with_ban(reason, response.ban_reason.as_deref())
+}
+
+/// Add the server's own words for a ban, when it gave any. The code says that
+/// somebody is banned, and this is the part that says why.
+fn with_ban(reason: String, ban: Option<&str>) -> String {
+    match ban.map(str::trim).filter(|ban| !ban.is_empty()) {
+        Some(ban) => format!("{reason}: {ban}"),
+        None => reason,
     }
-    reason
 }
 
 #[cfg(test)]

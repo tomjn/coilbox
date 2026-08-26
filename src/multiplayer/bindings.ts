@@ -426,6 +426,34 @@ export const mpConnectZerok = defineCommand<
 >("coilbox-multiplayer", "mp_connect_zerok");
 
 /**
+ * Create a new Zero-K account, then disconnect. Streams the same `LobbyEvent`s as
+ * `mpRegister`: success is the `registered` phase, a refusal arrives as a
+ * `registrationDenied` delta ahead of the `disconnected` that follows it.
+ *
+ * Runs on a connection of its own and does NOT log in, so the caller drops it and
+ * connects normally afterwards. Unlike the TASServer servers, Zero-K stores the
+ * email against the account without checking it, so there is no verification code
+ * and the login that follows is an ordinary one.
+ *
+ * A refusal must not be retried on a loop, for the same reason a refused login
+ * must not be: attempts are counted per IP address.
+ */
+export const mpRegisterZerok = defineCommand<
+  {
+    serverKey: string;
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    email: string | null;
+    /** The per-install `InstallID` (see `clientId.ts`). */
+    installId: string;
+    onEvent: Channel<LobbyEvent>;
+  },
+  { connected: boolean }
+>("coilbox-multiplayer", "mp_register_zerok");
+
+/**
  * Sign in to a Tachyon server through the system browser, and keep the result.
  * Resolves only once the user has finished there, which can take a minute, and
  * rejects if they never do.

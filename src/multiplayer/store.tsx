@@ -58,6 +58,7 @@ import {
   mpJoinChannel,
   mpReattach,
   mpRegister,
+  mpRegisterZerok,
   mpSetStatus,
   mpSnapshot,
   mpTachyonSignedIn,
@@ -1502,19 +1503,34 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
               reject(new Error(ev.reason ?? "Registration failed"));
             }
           };
-          mpRegister({
-            serverKey,
-            host: server.host,
-            port: server.port,
-            tlsMode: tlsModeFor(server),
-            allowSelfSigned: server.allowSelfSigned,
-            username,
-            password,
-            email: email ?? null,
-            clientId: clientIdRef.current,
-            compatFlags: ["u", "sp"],
-            onEvent,
-          }).catch(reject);
+          // Zero-K creates an account over its own protocol. Everything above
+          // this call is unchanged, because it streams the same events.
+          const opened =
+            serverProtocol(server) === "zerok"
+              ? mpRegisterZerok({
+                  serverKey,
+                  host: server.host,
+                  port: server.port,
+                  username,
+                  password,
+                  email: email ?? null,
+                  installId: zerokInstallIdRef.current,
+                  onEvent,
+                })
+              : mpRegister({
+                  serverKey,
+                  host: server.host,
+                  port: server.port,
+                  tlsMode: tlsModeFor(server),
+                  allowSelfSigned: server.allowSelfSigned,
+                  username,
+                  password,
+                  email: email ?? null,
+                  clientId: clientIdRef.current,
+                  compatFlags: ["u", "sp"],
+                  onEvent,
+                });
+          opened.catch(reject);
         });
       } finally {
         // Free the registry slot (the register connection stays open on success).

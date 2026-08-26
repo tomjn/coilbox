@@ -28,13 +28,11 @@ export function RegisterForm({
 }) {
   const { register, busy } = useMultiplayer();
   const [accountsCfg, setAccountsCfg] = useLobbyAccounts();
-  // Registering is a TASServer exchange. A Tachyon server has no account for
-  // Coilbox to create, because signing in there happens on the server's own page
-  // in the browser, so those servers are not offered here.
-  // A positive test rather than "not Tachyon". Registering is a TASServer
-  // `REGISTER` line, which is meaningless to any other protocol, and a third one
-  // arriving here would otherwise have been offered a form that cannot work.
-  const registrable = servers.filter((s) => serverProtocol(s) === "tasserver");
+  // A Tachyon server has no account for Coilbox to create, because signing in
+  // there happens on the server's own page in the browser, so those servers are
+  // not offered here. TASServer and Zero-K both take a name, a password and an
+  // email, which is why one form covers them.
+  const registrable = servers.filter((s) => serverProtocol(s) !== "tachyon");
   const [serverId, setServerId] = useState(
     defaultServerId ?? registrable[0]?.id ?? "",
   );
@@ -44,6 +42,7 @@ export function RegisterForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const selected = registrable.find((s) => s.id === serverId);
   const trimmedUser = username.trim();
   const canSubmit =
     serverId !== "" &&
@@ -54,7 +53,7 @@ export function RegisterForm({
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const server = registrable.find((s) => s.id === serverId);
+    const server = selected;
     if (!server) {
       setError("Select a server.");
       return;
@@ -123,7 +122,11 @@ export function RegisterForm({
       </Field>
       <Field
         label="Email"
-        hint="Some servers email a verification code to confirm your account."
+        hint={
+          selected && serverProtocol(selected) === "zerok"
+            ? "Optional. Zero-K keeps it against your account and does not send a code."
+            : "Some servers email a verification code to confirm your account."
+        }
       >
         <Input
           type="email"
