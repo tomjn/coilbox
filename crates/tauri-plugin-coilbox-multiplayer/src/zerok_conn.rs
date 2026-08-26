@@ -1,0 +1,233 @@
+//! The Zero-K connection: the socket, the line framing, and the task that owns
+//! both.
+//!
+//! Zero-K's server is at `zero-k.info` on port 8200, which the frontend's server
+//! catalog holds like every other address. That is the port number TASServer
+//! conventionally uses, which is a good way to talk yourself into thinking it is
+//! the same protocol. It is not. The connection is plain TCP with no TLS at all,
+//! and each line is a command name, one space, and a JSON object.
+//!
+//! Three things about it cost time if they are not known up front:
+//!
+//! - The server speaks first. A `Welcome` arrives unprompted on connect and is
+//!   what a client answers, rather than the client opening with a greeting.
+//! - There is no application-level keepalive. Zero-K's protocol has no `Ping`
+//!   command at all, so sending one is a protocol error and spends the
+//!   connection's throttle budget on nothing. The socket is held open with TCP
+//!   keepalive instead, set in [`connect`].
+//! - There is no TLS, so nothing on this connection is private, the password
+//!   hash included.
+//!
+//! The task follows [`crate::conn`]: one tokio task owns the whole duplex, so a
+//! shutdown drops the socket and everything waiting on it at once, with no
+//! cross-task handshake to get wrong.
+
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use coilbox_lobby_protocol::{LobbyState, LoginPhase};
+use coilbox_zerok_protocol::line;
+use futures_util::{SinkExt, StreamExt};
+use tauri::ipc::Channel;
+use tokio::net::TcpStream;
+use tokio::sync::mpsc;
+use tokio::sync::watch;
+use tokio_util::codec::{Framed, LinesCodec};
+use tokio_util::sync::CancellationToken;
+
+use crate::conn::{
+    emit, ConnProtocol, EventSink, LobbyEvent, Outbound, Registry, ServerConn, StartedBattle,
+    TachyonHandle,
+};
+use crate::lock_or_recover;
+use crate::tls::ConnectError;
+
+/// How long the socket may be idle before the kernel starts probing, and how far
+/// apart the probes go.
+///
+/// Zero-K has no application-level keepalive to lean on, so this is the only
+/// thing keeping a NAT or a firewall from dropping the mapping under a
+/// connection that is simply quiet. Two minutes is under the 5 minute mapping
+/// timeout RFC 5382 requires of a NAT for an established TCP connection, so a
+/// conforming one is refreshed before it can forget.
+const KEEPALIVE_IDLE: Duration = Duration::from_secs(120);
+const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
+
+/// Open the socket to a Zero-K server, with TCP keepalive set before anything is
+/// read from it.
+///
+/// No TLS: Zero-K's server offers none on this port, so there is no mode to
+/// choose and nothing to upgrade.
+pub async fn connect(
+    host: &str,
+    port: u16,
+    timeout: Duration,
+    cancel: &CancellationToken,
+) -> Result<TcpStream, ConnectError> {
+    let opened = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return Err(ConnectError::Cancelled),
+        opened = tokio::time::timeout(timeout, TcpStream::connect((host, port))) => opened,
+    };
+    let stream = match opened {
+        Ok(Ok(stream)) => stream,
+        Ok(Err(e)) => {
+            return Err(ConnectError::Failed(format!(
+                "connect {host}:{port} failed: {e}"
+            )))
+        }
+        Err(_elapsed) => return Err(ConnectError::TimedOut),
+    };
+
+    let keepalive = socket2::TcpKeepalive::new()
+        .with_time(KEEPALIVE_IDLE)
+        .with_interval(KEEPALIVE_INTERVAL);
+    // A socket that will not take keepalive still carries the protocol, so this
+    // is reported rather than fatal. What it costs is a quiet connection being
+    // dropped by something in the middle with no warning, which is exactly the
+    // failure the reconnect loop is there for.
+    if let Err(e) = socket2::SockRef::from(&stream).set_tcp_keepalive(&keepalive) {
+        eprintln!("zero-k: could not set TCP keepalive on {host}:{port}: {e}");
+    }
+    Ok(stream)
+}
+
+/// Spawn the connection task for an already-connected socket, registering its
+/// [`ServerConn`] so other commands can reach it.
+///
+/// Returns once the task is spawned and registered. The task runs until the
+/// socket closes or a `Shutdown` ends it.
+pub fn spawn_connection(
+    registry: Registry,
+    server_key: String,
+    stream: TcpStream,
+    on_event: Channel<LobbyEvent>,
+) {
+    let (tx, rx) = mpsc::unbounded_channel::<Outbound>();
+    let state = Arc::new(Mutex::new(LobbyState::new()));
+    let sink: EventSink = Arc::new(Mutex::new(on_event));
+    // The sending half goes to the task and nowhere else, so it is dropped when
+    // the connection ends and everything waiting on the phase is woken.
+    let (phase_tx, phase) = watch::channel(LoginPhase::AwaitGreeting);
+
+    tokio::spawn(run_loop(
+        registry.clone(),
+        server_key.clone(),
+        stream,
+        sink.clone(),
+        phase_tx,
+        rx,
+    ));
+
+    // Registered after spawning. The task's first act is a network read, so it
+    // cannot have removed itself before this insert lands.
+    lock_or_recover(&registry).insert(
+        server_key,
+        ServerConn {
+            protocol: ConnProtocol::Zerok,
+            tx,
+            state,
+            sink,
+            phase,
+            // Zero-K's terms are agreed on its website, so there is no agreement
+            // handshake on the connection to park on.
+            agreement: Arc::new(Mutex::new(None)),
+            // Neither of these belongs to a Zero-K connection. There is no
+            // Tachyon client, and a battle carries the host's address itself.
+            tachyon: TachyonHandle::default(),
+            started: StartedBattle::default(),
+        },
+    );
+}
+
+/// The connection event loop. Interleaves inbound lines with the ones commands
+/// queue, over one socket. On exit it reports the reason and evicts itself from
+/// the registry.
+///
+/// No keepalive timer, unlike [`crate::conn::run_loop`]. Zero-K's protocol has
+/// no `Ping`, and the socket carries TCP keepalive instead.
+async fn run_loop(
+    registry: Registry,
+    server_key: String,
+    stream: TcpStream,
+    sink: EventSink,
+    phase_slot: watch::Sender<LoginPhase>,
+    mut rx: mpsc::UnboundedReceiver<Outbound>,
+) {
+    emit(&sink, LobbyEvent::Connected);
+    let _ = phase_slot.send(LoginPhase::AwaitGreeting);
+    emit(
+        &sink,
+        LobbyEvent::Phase {
+            phase: LoginPhase::AwaitGreeting,
+            agreement: None,
+        },
+    );
+
+    let mut framed = Framed::new(stream, LinesCodec::new());
+
+    let reason: Option<String> = 'conn: loop {
+        let mut outbound: Vec<String> = Vec::new();
+        let mut shutdown = false;
+
+        tokio::select! {
+            item = framed.next() => match item {
+                Some(Ok(raw)) => {
+                    emit(&sink, LobbyEvent::Console {
+                        direction: "in".into(),
+                        line: raw.clone(),
+                    });
+                    // A line with no space in it is not a line. Upstream throws
+                    // on one. It is already in the console above, which is as
+                    // much as can usefully be done with it.
+                    let Some(message) = line::parse_line(&raw) else {
+                        continue;
+                    };
+                    // Nothing folds a message into state yet. The battle list,
+                    // the room and chat are their own issues in this milestone,
+                    // and the login exchange is the next one.
+                    let _ = message;
+                }
+                Some(Err(e)) => break 'conn Some(e.to_string()),
+                None => break 'conn None,
+            },
+            Some(out) = rx.recv() => match out {
+                Outbound::Line(line) => outbound.push(line),
+                Outbound::Shutdown => shutdown = true,
+                // Zero-K has no `EXIT` to write and no agreement to confirm, and
+                // a Tachyon action never reaches a connection without a Tachyon
+                // client. A private message is queued by a command that refuses
+                // this connection before it gets here.
+                Outbound::ConfirmAgreement { .. }
+                | Outbound::Tachyon(_)
+                | Outbound::SayPrivate { .. }
+                | Outbound::SayPrivateEx { .. } => {}
+            },
+        }
+
+        for line in outbound {
+            emit(
+                &sink,
+                LobbyEvent::Console {
+                    direction: "out".into(),
+                    line: line.clone(),
+                },
+            );
+            if let Err(e) = framed.send(line).await {
+                break 'conn Some(e.to_string());
+            }
+        }
+
+        if shutdown {
+            // Zero-K reads a closed socket as the client leaving, so dropping
+            // the connection is the whole of a graceful logout.
+            break 'conn None;
+        }
+    };
+
+    emit(&sink, LobbyEvent::Disconnected { reason });
+    lock_or_recover(&registry).remove(&server_key);
+}
+
+#[cfg(test)]
+mod tests;

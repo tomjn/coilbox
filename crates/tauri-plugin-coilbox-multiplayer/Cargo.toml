@@ -27,6 +27,7 @@ picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 coilbox-lobby-protocol = { path = "../coilbox-lobby-protocol" }
 coilbox-tachyon-protocol = { path = "../coilbox-tachyon-protocol" }
+coilbox-zerok-protocol = { path = "../coilbox-zerok-protocol" }
 coilbox-oauth = { path = "../coilbox-oauth" }
 tauri-plugin-opener = "2"
 # rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
@@ -40,3 +41,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 webpki-roots = "1"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
+# Zero-K's protocol has no application-level keepalive, so the socket needs TCP
+# keepalive and tokio has no way to set it. Already a direct dependency of the
+# direct-hosting plugin, at this version.
+socket2 = { version = "0.6", features = ["all"] }

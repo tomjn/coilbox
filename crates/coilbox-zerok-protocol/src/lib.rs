@@ -39,6 +39,9 @@
 //! in `Z`, a local one carries an offset and an unspecified one carries neither.
 //! A type that insisted on RFC 3339 would refuse the third.
 
+/// The wire line, which is a command name, a space and a JSON object.
+pub mod line;
+
 /// The generated types, one per C# class or enum a command can reach.
 pub mod types {
     #![allow(clippy::doc_markdown, clippy::struct_excessive_bools)]

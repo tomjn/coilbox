@@ -88,6 +88,7 @@ mod tests {
         lock_or_recover(registry).insert(
             server_key.to_owned(),
             ServerConn {
+                protocol: crate::conn::ConnProtocol::TasServer,
                 tx,
                 state: Arc::new(Mutex::new(LobbyState::new())),
                 sink,

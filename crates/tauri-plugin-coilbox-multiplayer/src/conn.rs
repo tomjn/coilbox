@@ -174,11 +174,32 @@ pub(crate) fn emit(sink: &EventSink, ev: LobbyEvent) {
     let _ = lock_or_recover(sink).send(ev);
 }
 
+/// The protocol a live connection speaks.
+///
+/// Coilbox talks to three kinds of server and only one of them reads a TASServer
+/// line, so a command that builds one has to be able to tell them apart. An
+/// empty [`TachyonHandle`] answered that on its own back when the two
+/// possibilities were Tachyon and not-Tachyon. Zero-K is a second line protocol
+/// and leaves the same slot empty, so which one it is gets recorded rather than
+/// inferred.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConnProtocol {
+    /// TASServer, or one of the servers speaking it, including a room we host.
+    TasServer,
+    /// Teiserver's Tachyon, over a WebSocket.
+    Tachyon,
+    /// Zero-K, over its own line protocol.
+    Zerok,
+}
+
 /// One live connection, held in the plugin registry so commands can push lines and
 /// disconnect. `state` is the shared authoritative mirror the read task mutates and
 /// `mp_snapshot` clones; `sink` is the swappable event channel and `phase` the last
 /// login phase, both so a reload can re-adopt the connection via `mp_reattach`.
 pub struct ServerConn {
+    /// What this connection speaks, so a command can refuse rather than send
+    /// syntax the server cannot read.
+    pub protocol: ConnProtocol,
     pub tx: UnboundedSender<Outbound>,
     pub state: Arc<Mutex<LobbyState>>,
     pub sink: EventSink,
@@ -274,6 +295,7 @@ pub fn spawn_connection(
     lock_or_recover(&registry).insert(
         server_key,
         ServerConn {
+            protocol: ConnProtocol::TasServer,
             tx,
             state,
             sink,

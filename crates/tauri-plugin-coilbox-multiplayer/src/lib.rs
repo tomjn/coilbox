@@ -46,6 +46,10 @@ mod tachyon_users;
 /// line protocol above.
 pub mod tachyon_ws;
 mod tls;
+/// Zero-K's line protocol over plain TCP, built alongside the two above.
+/// Private, like the other two connection modules: exporting it would drag the
+/// registry's `pub(crate)` action types out with it.
+mod zerok_conn;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -56,8 +60,8 @@ use coilbox_lobby_protocol::{
     LobbyState, LoginConfig, LoginMode, LoginPhase,
 };
 use conn::{
-    spawn_connection, wait_until_ready, LobbyEvent, Outbound, Registry, TachyonAction,
-    READY_TIMEOUT,
+    spawn_connection, wait_until_ready, ConnProtocol, LobbyEvent, Outbound, Registry,
+    TachyonAction, READY_TIMEOUT,
 };
 use picoframe_core::CliResult;
 use serde_json::{json, Value};
@@ -120,6 +124,14 @@ fn enqueue(registry: &Registry, server_key: &str, line: String) -> CliResult {
     }
     let map = lock_or_recover(registry);
     match map.get(server_key) {
+        // Every line this builds is TASServer syntax. Zero-K's server reads a
+        // command name and a JSON object, so one of these would be a protocol
+        // error rather than a command it happens not to support, and its
+        // throttle counts protocol errors. Refusing here says so once, in the
+        // one place every typed command passes through.
+        Some(conn) if conn.protocol == ConnProtocol::Zerok => {
+            CliResult::err("this server does not speak the TASServer line protocol")
+        }
         Some(conn) => match conn.tx.send(Outbound::Line(line)) {
             Ok(()) => CliResult::ok(json!({ "sent": true })),
             Err(_) => CliResult::err("connection is closed"),
@@ -428,6 +440,60 @@ async fn mp_connect_tachyon(
         on_event,
         markers.inner().clone(),
     );
+    Ok(CliResult::ok(json!({ "connected": true })))
+}
+
+/// `mp_connect_zerok`: open a lobby connection to Zero-K's server.
+///
+/// The third connect command, and deliberately separate again. Zero-K's protocol
+/// shares neither the TASServer handshake nor Tachyon's bearer token, and its
+/// port carries no TLS at all, so there is no mode to pass and nothing to
+/// upgrade.
+///
+/// This opens the socket and starts reading. It does not log in. The server
+/// sends `Welcome` unprompted, and answering it is issue #1968, so until then
+/// the connection sits in `awaitGreeting`.
+///
+/// Streams the same `LobbyEvent`s as the other two, so everything above the
+/// connection is unchanged.
+#[tauri::command]
+async fn mp_connect_zerok(
+    registry: State<'_, Registry>,
+    pending: State<'_, PendingConnects>,
+    server_key: String,
+    host: String,
+    port: u16,
+    on_event: Channel<LobbyEvent>,
+) -> Result<CliResult, ()> {
+    if lock_or_recover(&registry).contains_key(&server_key) {
+        return Ok(CliResult::err(format!("already connected: {server_key}")));
+    }
+
+    // The same cancel token the other two publish, so `mp_cancel_connect`
+    // reaches a Zero-K connect that is still opening.
+    let token = CancellationToken::new();
+    {
+        let mut map = lock_or_recover(&pending);
+        if map.contains_key(&server_key) {
+            return Ok(CliResult::err(format!("already connecting: {server_key}")));
+        }
+        map.insert(server_key.clone(), token.clone());
+    }
+    let opened = zerok_conn::connect(&host, port, CONNECT_TIMEOUT, &token).await;
+    lock_or_recover(&pending).remove(&server_key);
+    let stream = match opened {
+        Ok(stream) => stream,
+        Err(ConnectError::Cancelled) => return Ok(CliResult::err("connection cancelled")),
+        Err(ConnectError::TimedOut) => {
+            return Ok(CliResult::err(format!(
+                "connection timed out after {}s",
+                CONNECT_TIMEOUT.as_secs()
+            )))
+        }
+        Err(ConnectError::Failed(e)) => return Ok(CliResult::err(e)),
+    };
+
+    zerok_conn::spawn_connection(registry.inner().clone(), server_key, stream, on_event);
     Ok(CliResult::ok(json!({ "connected": true })))
 }
 
@@ -2059,6 +2125,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             mp_connect,
             mp_connect_tachyon,
+            mp_connect_zerok,
             mp_register,
             mp_confirm_agreement,
             mp_disconnect,
