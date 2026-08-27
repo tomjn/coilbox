@@ -17,6 +17,7 @@ import {
   messageLimit,
   protocolForKey,
   publishesStatus,
+  seatIsServerAssigned,
   syncsOnReady,
 } from "./protocol";
 
@@ -138,6 +139,17 @@ describe("Zero-K", () => {
 
   it("sets no message limit, because none is published", () => {
     expect(messageLimit("zerok")).toBeNull();
+  });
+});
+
+describe("seatIsServerAssigned", () => {
+  it("is false on TASServer, where the client picks all of it", () => {
+    expect(seatIsServerAssigned("tasserver")).toBe(false);
+  });
+
+  it("is true on Tachyon and Zero-K, which carry no colour or faction", () => {
+    expect(seatIsServerAssigned("tachyon")).toBe(true);
+    expect(seatIsServerAssigned("zerok")).toBe(true);
   });
 });
 

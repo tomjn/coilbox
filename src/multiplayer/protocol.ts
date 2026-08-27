@@ -46,6 +46,22 @@ export function syncsOnReady(protocol: LobbyProtocol): boolean {
 }
 
 /**
+ * Whether the server decides a player's colour, faction, team number and
+ * handicap rather than the client asking for them.
+ *
+ * True on Tachyon, which assigns colours when the match starts and picks a
+ * member's team within their ally team itself. True on Zero-K for the same
+ * reason: `UpdateUserBattleStatus` carries the ally team, the spectator flag and
+ * the sync flag, and there is nothing on the wire for the rest.
+ *
+ * The ally team is the one seat field every protocol lets a player choose, so it
+ * is not covered by this.
+ */
+export function seatIsServerAssigned(protocol: LobbyProtocol): boolean {
+  return protocol !== "tasserver";
+}
+
+/**
  * Whether this connection has a client-wide away/ingame status to publish.
  *
  * Separate from `syncsOnReady` because Zero-K parts company with it here: the

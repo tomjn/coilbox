@@ -53,6 +53,9 @@ mod zerok_battles;
 /// Private, like the other two connection modules: exporting it would drag the
 /// registry's `pub(crate)` action types out with it.
 mod zerok_conn;
+/// The Zero-K battle room we are in, held as that protocol describes it and
+/// projected into the same room the other two fill.
+mod zerok_room;
 /// Who is online on a Zero-K connection, and which battle each of them is in.
 mod zerok_users;
 
@@ -201,6 +204,24 @@ fn zerok_action(
         Ok(()) => CliResult::ok(json!({ "sent": true })),
         Err(_) => CliResult::err("connection is closed"),
     })
+}
+
+/// Whether this connection speaks Zero-K, for the one command that has to
+/// answer differently rather than fall through to its TASServer line.
+fn is_zerok(registry: &Registry, server_key: &str) -> bool {
+    lock_or_recover(registry)
+        .get(server_key)
+        .is_some_and(|conn| conn.protocol == ConnProtocol::Zerok)
+}
+
+/// Queue one battle-room action on a Zero-K connection, for the commands that
+/// have a Zero-K equivalent as well as a TASServer one.
+fn zerok_room_action(
+    registry: &Registry,
+    server_key: &str,
+    action: zerok_room::RoomAction,
+) -> Option<CliResult> {
+    zerok_action(registry, server_key, zerok_conn::ZerokAction::Room(action))
 }
 
 /// Record our intended battle status on the connection's state so the
@@ -1223,6 +1244,20 @@ fn mp_join_battle(
     ) {
         return result;
     }
+    // Zero-K takes the battle's password and no script password: the server
+    // hands one out itself, in the `ConnectSpring` that says where the match is.
+    // Nothing about our seat can go with the join, so the connection sends it
+    // once `JoinBattleSuccess` confirms we are in the room.
+    if let Some(result) = zerok_room_action(
+        registry.inner(),
+        &server_key,
+        zerok_room::RoomAction::Join {
+            battle: id,
+            password: key.clone(),
+        },
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -1234,6 +1269,11 @@ fn mp_join_battle(
 #[tauri::command]
 fn mp_leave_battle(registry: State<'_, Registry>, server_key: String) -> CliResult {
     if let Some(result) = tachyon_action(registry.inner(), &server_key, TachyonAction::LeaveLobby) {
+        return result;
+    }
+    if let Some(result) =
+        zerok_room_action(registry.inner(), &server_key, zerok_room::RoomAction::Leave)
+    {
         return result;
     }
     enqueue(registry.inner(), &server_key, command::leave_battle())
@@ -1303,7 +1343,21 @@ fn mp_set_battle_status(
     ) {
         return result;
     }
+    // The intent is recorded before the send on every protocol, and on Zero-K it
+    // is also what the connection sends when a join lands: the server takes
+    // nothing about a seat until it has confirmed we are in the room.
     set_intended_battle_status(registry.inner(), &server_key, status, color);
+    // Zero-K carries the ally team, the spectator flag and the sync flag, and
+    // has nothing for the colour, the faction, the team number, the handicap or
+    // readiness. The room hides those controls there, so a push that carries
+    // them loses nothing.
+    if let Some(result) = zerok_room_action(
+        registry.inner(),
+        &server_key,
+        zerok_room::RoomAction::OwnStatus(status),
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -1407,6 +1461,17 @@ fn mp_start_battle(registry: State<'_, Registry>, server_key: String) -> CliResu
     ) {
         return result;
     }
+    // Zero-K has no command for it either, and its autohost reads `!start` out
+    // of battle chat the same way SPADS does.
+    if let Some(result) = zerok_room_action(
+        registry.inner(),
+        &server_key,
+        zerok_room::RoomAction::Say {
+            text: "!start".into(),
+        },
+    ) {
+        return result;
+    }
     enqueue(registry.inner(), &server_key, command::say_battle("!start"))
 }
 
@@ -1496,6 +1561,21 @@ fn mp_add_bot(
     ) {
         return result;
     }
+    // `UpdateBotStatus` both seats a bot and moves one, keyed by the name, so
+    // adding and updating are the same command on Zero-K. The name is ours to
+    // pick: the server looks it straight up in the room's bot dictionary and
+    // throws on an absent one rather than generating anything.
+    if let Some(result) = zerok_room_action(
+        registry.inner(),
+        &server_key,
+        zerok_room::RoomAction::Bot {
+            name: name.clone(),
+            ally,
+            ai: ai_dll.clone(),
+        },
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -1534,7 +1614,7 @@ fn mp_update_bot(
     // ally pickers on a Tachyon connection and only an AI change comes through.
     // On a TASServer connection there is no such command, so the caller changes
     // a bot's AI by removing it and adding it back (see `changeBotAi`).
-    if let Some(ai) = ai_dll {
+    if let Some(ai) = ai_dll.clone() {
         if let Some(result) = tachyon_action(
             registry.inner(),
             &server_key,
@@ -1542,6 +1622,29 @@ fn mp_update_bot(
                 name: name.clone(),
                 ai,
             }),
+        ) {
+            return result;
+        }
+    }
+    // Zero-K's `UpdateBotStatus` is a patch keyed by the name, so it moves a bot
+    // and changes its AI in one command rather than needing a remove and a
+    // re-add. The AI it is already running goes back out when the caller is only
+    // moving it, because the message carries both.
+    if let Some(conn_ai) = ai_dll.or_else(|| {
+        let map = lock_or_recover(&registry);
+        let conn = map.get(&server_key)?;
+        let held = lock_or_recover(&conn.state);
+        let battle = held.battles.get(&held.current_battle?)?;
+        Some(battle.bots.get(&name)?.ai_dll.clone())
+    }) {
+        if let Some(result) = zerok_room_action(
+            registry.inner(),
+            &server_key,
+            zerok_room::RoomAction::Bot {
+                name: name.clone(),
+                ally,
+                ai: conn_ai,
+            },
         ) {
             return result;
         }
@@ -1560,6 +1663,13 @@ fn mp_remove_bot(registry: State<'_, Registry>, server_key: String, name: String
         registry.inner(),
         &server_key,
         TachyonAction::Room(RoomAction::RemoveBot { name: name.clone() }),
+    ) {
+        return result;
+    }
+    if let Some(result) = zerok_room_action(
+        registry.inner(),
+        &server_key,
+        zerok_room::RoomAction::RemoveBot { name: name.clone() },
     ) {
         return result;
     }
@@ -1640,6 +1750,15 @@ fn mp_kick(registry: State<'_, Registry>, server_key: String, username: String) 
     ) {
         return result;
     }
+    if let Some(result) = zerok_room_action(
+        registry.inner(),
+        &server_key,
+        zerok_room::RoomAction::Kick {
+            username: username.clone(),
+        },
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -1663,6 +1782,21 @@ fn mp_cast_vote(
         TachyonAction::Room(RoomAction::CastVote { choice }),
     ) {
         return result;
+    }
+    // Zero-K has no vote command either. Its official client puts a vote in
+    // battle chat, which is why its autohost reads one there. There is no third
+    // answer to type, and the room does not offer one because a Zero-K poll
+    // never advertises an abstain.
+    if is_zerok(registry.inner(), &server_key) {
+        return match zerok_room::vote_text(choice) {
+            Some(text) => zerok_room_action(
+                registry.inner(),
+                &server_key,
+                zerok_room::RoomAction::Say { text: text.into() },
+            )
+            .unwrap_or_else(|| CliResult::err("connection is closed")),
+            None => CliResult::err("a Zero-K poll has only two answers"),
+        };
     }
     let letter = match choice {
         VoteChoice::Yes => "y",
@@ -1742,11 +1876,58 @@ fn mp_set_script_tags(
     server_key: String,
     tags: BTreeMap<String, String>,
 ) -> CliResult {
+    // Zero-K splits this in two and takes each whole. `SetModOptions` and
+    // `SetMapOptions` assign the dictionary they are handed, so a key left out
+    // is a key removed, which is why the caller's tags are read as the whole of
+    // each namespace rather than as a patch over it. It has nothing for a start
+    // position type or a unit restriction, so those go nowhere.
+    if is_zerok(registry.inner(), &server_key) {
+        return zerok_option_actions(registry.inner(), &server_key, &tags);
+    }
     enqueue_all(
         registry.inner(),
         &server_key,
         command::set_script_tags(&tags),
     )
+}
+
+/// Send a tag map to a Zero-K connection as its two option commands.
+///
+/// Only the namespaces Zero-K has a command for, and only when the caller named
+/// something in them, so a push that carried nothing but unit restrictions sends
+/// nothing rather than clearing the room's options.
+fn zerok_option_actions(
+    registry: &Registry,
+    server_key: &str,
+    tags: &BTreeMap<String, String>,
+) -> CliResult {
+    let under = |prefix: &str| -> BTreeMap<String, String> {
+        tags.iter()
+            .filter_map(|(key, value)| {
+                let key = key.to_lowercase();
+                let name = key.strip_prefix(prefix)?.to_owned();
+                Some((name, value.clone()))
+            })
+            .collect()
+    };
+
+    let mod_options = under("game/modoptions/");
+    let map_options = under("game/mapoptions/");
+    let mut last = CliResult::ok(json!({ "sent": true }));
+    for action in [
+        (!mod_options.is_empty()).then_some(zerok_room::RoomAction::ModOptions(mod_options)),
+        (!map_options.is_empty()).then_some(zerok_room::RoomAction::MapOptions(map_options)),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        last = zerok_room_action(registry, server_key, action)
+            .unwrap_or_else(|| CliResult::err("connection is closed"));
+        if !last.success {
+            return last;
+        }
+    }
+    last
 }
 
 /// `mp_remove_script_tags` — host: clear game script tags by key.

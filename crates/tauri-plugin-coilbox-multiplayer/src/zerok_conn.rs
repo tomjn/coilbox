@@ -41,7 +41,7 @@ use crate::conn::{
     TachyonHandle,
 };
 use crate::tls::ConnectError;
-use crate::{lock_or_recover, zerok_battles, zerok_users};
+use crate::{lock_or_recover, zerok_battles, zerok_room, zerok_users};
 
 /// How long the socket may be idle before the kernel starts probing, and how far
 /// apart the probes go.
@@ -293,23 +293,34 @@ async fn run_loop(
                                 }
                             }
                         }
-                        // The room and chat are their own issues in this
-                        // milestone. Everything else is folded below.
+                        // Chat is its own issue in this milestone. Everything
+                        // else is folded below.
                         _ => {}
                     }
 
-                    // The battle list and the player directory, folded after the
-                    // login arms so a `LoggedIn` reaches the frontend before
-                    // anything that assumes we are.
-                    let deltas = {
+                    // The battle list, the player directory and the room, folded
+                    // after the login arms so a `LoggedIn` reaches the frontend
+                    // before anything that assumes we are.
+                    let (deltas, replies) = {
                         let mut held = lock_or_recover(&state);
                         let mut deltas = zerok_users::reduce(&mut held, &message);
                         deltas.extend(zerok_battles::reduce(&mut held, &message));
-                        deltas
+                        let (room, replies) = zerok_room::reduce(&mut held, &message);
+                        deltas.extend(room);
+                        // Built here, under the same lock the fold ran under, so
+                        // the answer to a join is the state that join produced
+                        // rather than whatever a later line left behind.
+                        let replies: Vec<String> = replies
+                            .iter()
+                            .filter_map(|action| zerok_room::build(&held, action).ok())
+                            .flatten()
+                            .collect();
+                        (deltas, replies)
                     };
                     for delta in deltas {
                         emit(&sink, LobbyEvent::Delta { delta });
                     }
+                    outbound.extend(replies);
                 }
                 Some(Err(e)) => break 'conn Some(e.to_string()),
                 None => break 'conn None,
@@ -317,15 +328,19 @@ async fn run_loop(
             Some(out) = rx.recv() => match out {
                 Outbound::Line(line) => outbound.push(line),
                 Outbound::Shutdown => shutdown = true,
-                Outbound::Zerok(action) => match build(&action) {
-                    Ok(line) => outbound.push(line),
-                    // Nothing generated can fail to serialise, so this says the
-                    // types have moved rather than that the action was wrong.
-                    Err(e) => emit(&sink, LobbyEvent::Console {
-                        direction: "out".into(),
-                        line: format!("could not build the command: {e}"),
-                    }),
-                },
+                Outbound::Zerok(action) => {
+                    let built = build(&lock_or_recover(&state), &action);
+                    match built {
+                        Ok(lines) => outbound.extend(lines),
+                        // Nothing generated can fail to serialise, so this says
+                        // the types have moved rather than that the action was
+                        // wrong.
+                        Err(e) => emit(&sink, LobbyEvent::Console {
+                            direction: "out".into(),
+                            line: format!("could not build the command: {e}"),
+                        }),
+                    }
+                }
                 // Zero-K has no `EXIT` to write and no agreement to confirm, and
                 // a Tachyon action never reaches a connection without a Tachyon
                 // client. A private message is queued by a command that refuses
@@ -371,15 +386,24 @@ pub enum ZerokAction {
     /// Publish whether we are away or in a game. Zero-K has no status bitfield:
     /// each half is a nullable flag, and one left unset is left alone.
     Status { ingame: bool, away: bool },
+    /// Something a battle room control asks of the room we are in.
+    Room(zerok_room::RoomAction),
 }
 
-/// The wire line for an action.
-fn build(action: &ZerokAction) -> Result<String, serde_json::Error> {
+/// The wire lines for an action, in the order they go out.
+///
+/// Takes the state because Zero-K names the room and the player on messages the
+/// other two protocols leave to the connection, so what a room action turns into
+/// depends on which room we are in and who we are.
+fn build(state: &LobbyState, action: &ZerokAction) -> Result<Vec<String>, serde_json::Error> {
     match action {
-        ZerokAction::Status { ingame, away } => line::to_line(&types::ChangeUserStatus {
-            is_afk: Some(*away),
-            is_in_game: Some(*ingame),
-        }),
+        ZerokAction::Status { ingame, away } => {
+            Ok(vec![line::to_line(&types::ChangeUserStatus {
+                is_afk: Some(*away),
+                is_in_game: Some(*ingame),
+            })?])
+        }
+        ZerokAction::Room(action) => zerok_room::build(state, action),
     }
 }
 

@@ -166,6 +166,13 @@ pub enum Delta {
     /// has found changed. Only ever produced on a Tachyon connection, which is the
     /// only protocol with matchmaking.
     MatchmakingChanged,
+    /// The vote open in the current battle changed, or there is no longer one.
+    ///
+    /// Only ever produced on a Zero-K connection, which is the only protocol
+    /// that announces a poll rather than leaving it to be read out of chat. A
+    /// SPADS vote arrives as a chat line, so the `ChatMessage` for that line is
+    /// already the signal, and Tachyon holds its votes on the lobby.
+    VoteChanged,
 }
 
 /// Apply a server message to the lobby state, returning the deltas produced.
