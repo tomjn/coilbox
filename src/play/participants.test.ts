@@ -15,8 +15,23 @@ import {
   rgbToHex,
   sanitizeColors,
   setParticipantTeam,
+  showsFactionColumn,
   toBattleConfig,
 } from "./participants";
+
+describe("showsFactionColumn", () => {
+  it("shows the column when there is a choice to make", () => {
+    expect(showsFactionColumn([{ name: "Arm" }, { name: "Core" }])).toBe(true);
+  });
+
+  it("hides it for a game with one faction, which Zero-K is", () => {
+    expect(showsFactionColumn([{ name: "Zero-K" }])).toBe(false);
+  });
+
+  it("hides it when the game is not installed and its sides are unknown", () => {
+    expect(showsFactionColumn([])).toBe(false);
+  });
+});
 
 const you = (color: Participant["color"]): Participant => ({
   id: "you",

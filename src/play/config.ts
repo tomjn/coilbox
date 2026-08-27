@@ -37,6 +37,7 @@ export {
   rgbToHex,
   sanitizeColors,
   setParticipantTeam,
+  showsFactionColumn,
   toBattleConfig,
 } from "./participants";
 

@@ -30,6 +30,18 @@ export const aiKey = (a: { kind: string; shortName: string }) =>
  * carries neither field (many native AIs have no metadata), so callers can omit
  * the subline entirely. Author isn't a unitsync AI key, so it's never included.
  */
+/**
+ * Whether a player table has a faction column to draw. Pure.
+ *
+ * A game with one faction gives a picker holding that one faction, and a game
+ * that is not installed gives a picker holding nothing, so both draw a control
+ * with no choice in it. Zero-K is the one-faction case and the reason this
+ * exists. Used by the skirmish table and the battle room's alike.
+ */
+export function showsFactionColumn(sides: { name: string }[]): boolean {
+  return sides.length > 1;
+}
+
 export function aiByline(a: {
   version?: string;
   description?: string;

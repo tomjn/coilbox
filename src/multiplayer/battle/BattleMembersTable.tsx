@@ -12,8 +12,13 @@ import type { Side } from "@/content/bindings";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { cn } from "@/lib/utils";
-import { aiByline } from "@/play/config";
-import { aiPips, type GameAiConfig, orderedAis } from "@/play/gameAi";
+import { aiByline, showsFactionColumn } from "@/play/config";
+import {
+  aiPips,
+  type GameAiConfig,
+  minigamePips,
+  orderedAis,
+} from "@/play/gameAi";
 import { DifficultyPips } from "@/play/pages/components/DifficultyPips";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { useMultiplayer } from "../store";
@@ -138,11 +143,19 @@ export function BattleMembersTable({
   // the team in the picker, and whom later members of the same team visually
   // hang off (branch glyph / Co-player badge). Display-only — wire state (each
   // member's own colour/side/ally) is untouched.
+  //
+  // Left empty where the server assigns the seat, because a team number is one
+  // of the fields those protocols never send. Every member arrives on team 0,
+  // so the first seated player would lead a team the whole room appears to have
+  // joined, and everyone else would be badged as their co-player.
   const leaderByTeamId = new Map<number, Row>();
-  for (const r of rows) {
-    if (!r.spectator && !leaderByTeamId.has(r.teamId))
-      leaderByTeamId.set(r.teamId, r);
+  if (!serverAssignsSeat) {
+    for (const r of rows) {
+      if (!r.spectator && !leaderByTeamId.has(r.teamId))
+        leaderByTeamId.set(r.teamId, r);
+    }
   }
+  const showFaction = showsFactionColumn(sides);
   // Group rows by team so shared teams sit together; spectators sink to the
   // bottom. Stable, so join order is kept within a team (leader stays first).
   const displayOrder = [...rows].sort(
@@ -198,7 +211,10 @@ export function BattleMembersTable({
   // The AI options, shared by the Add AI dropdown and each bot row's in-place AI
   // picker (issue #532), so both offer exactly the game's addable AIs.
   const aiOptions = orderedAis(addableAis, aiConfig).map((a) => {
-    const filled = aiPips(a, addableAis, aiConfig);
+    // A chicken AI is left out of the ranking on purpose, so its level comes
+    // out of its name instead. See `minigamePips`.
+    const filled =
+      aiPips(a, addableAis, aiConfig) ?? minigamePips(a.name ?? a.shortName);
     return {
       value: a.shortName,
       label: a.name ?? a.shortName,
@@ -222,9 +238,11 @@ export function BattleMembersTable({
               <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
                 Player
               </TableHead>
-              <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                Faction
-              </TableHead>
+              {showFaction && (
+                <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                  Faction
+                </TableHead>
+              )}
               <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
                 Team
               </TableHead>
@@ -315,6 +333,7 @@ export function BattleMembersTable({
                   serverAssignsSeat={serverAssignsSeat}
                   flashIngame={justWentIngame.has(row.name)}
                   sideOptions={sideOptions}
+                  showFaction={showFaction}
                   teamOptions={teamOptions}
                   allyOptions={allyOptions}
                   aiOptions={aiOptions}

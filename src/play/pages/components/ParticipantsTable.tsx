@@ -22,7 +22,12 @@ import type { Side, SkirmishAi } from "@/content/bindings";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { cn } from "@/lib/utils";
-import { aiPips, type GameAiConfig, orderedAis } from "@/play/gameAi";
+import {
+  aiPips,
+  type GameAiConfig,
+  minigamePips,
+  orderedAis,
+} from "@/play/gameAi";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   aiByline,
@@ -31,6 +36,7 @@ import {
   type Participant,
   RANDOM_SIDE,
   rgbToHex,
+  showsFactionColumn,
 } from "../../config";
 import { DifficultyPips } from "./DifficultyPips";
 
@@ -153,13 +159,20 @@ export function ParticipantsTable({
       ),
     };
   });
+  // A game with one faction, or one whose sides are not known, has no faction
+  // for anyone to pick, so the column goes rather than showing a picker with
+  // nothing in it.
+  const showFaction = showsFactionColumn(sides);
   // Hardest first within each group, with AIs no ranking places last, so the
   // pips read as an ordered scale rather than scattered through the list.
   const sorted = orderedAis(ais, aiConfig);
   const nativeAis = sorted.filter((a) => a.kind === "native");
   const luaAis = sorted.filter((a) => a.kind === "lua");
   const pipsFor = (a: SkirmishAi) => {
-    const filled = aiPips(a, ais, aiConfig);
+    // A chicken AI is left out of the ranking on purpose, so its level comes
+    // out of its name instead. See `minigamePips`.
+    const filled =
+      aiPips(a, ais, aiConfig) ?? minigamePips(a.name ?? a.shortName);
     return filled === undefined ? undefined : (
       <DifficultyPips filled={filled} />
     );
@@ -184,9 +197,11 @@ export function ParticipantsTable({
             <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
               Player
             </TableHead>
-            <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-              Faction
-            </TableHead>
+            {showFaction && (
+              <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                Faction
+              </TableHead>
+            )}
             <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
               Team
             </TableHead>
@@ -321,31 +336,33 @@ export function ParticipantsTable({
                   </div>
                 </TableCell>
 
-                <TableCell className="px-2 py-2">
-                  {p.kind === "you" && p.spectator ? (
-                    <span className="text-xs text-muted-foreground">–</span>
-                  ) : sharer ? (
-                    <Badge
-                      variant="outline"
-                      title={sharedTitle}
-                      style={{
-                        color: rgbToHex(leader.color),
-                        borderColor: rgbToHex(leader.color),
-                      }}
-                    >
-                      Co-player
-                    </Badge>
-                  ) : (
-                    <OptionSelect
-                      value={p.side}
-                      size="sm"
-                      className="w-auto min-w-20"
-                      disabled={disabled || sides.length === 0}
-                      options={sideOptions}
-                      onValueChange={(v) => onUpdate(p.id, { side: v })}
-                    />
-                  )}
-                </TableCell>
+                {showFaction && (
+                  <TableCell className="px-2 py-2">
+                    {p.kind === "you" && p.spectator ? (
+                      <span className="text-xs text-muted-foreground">–</span>
+                    ) : sharer ? (
+                      <Badge
+                        variant="outline"
+                        title={sharedTitle}
+                        style={{
+                          color: rgbToHex(leader.color),
+                          borderColor: rgbToHex(leader.color),
+                        }}
+                      >
+                        Co-player
+                      </Badge>
+                    ) : (
+                      <OptionSelect
+                        value={p.side}
+                        size="sm"
+                        className="w-auto min-w-20"
+                        disabled={disabled || sides.length === 0}
+                        options={sideOptions}
+                        onValueChange={(v) => onUpdate(p.id, { side: v })}
+                      />
+                    )}
+                  </TableCell>
+                )}
 
                 <TableCell className="px-2 py-2">
                   {teamIdx === undefined ? (
