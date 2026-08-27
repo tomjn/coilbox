@@ -8,6 +8,7 @@ import {
   isMinigameAi,
   isNeverAi,
   mergeGameAi,
+  minigamePips,
   neutralPick,
   orderedAis,
   rankedAis,
@@ -108,6 +109,32 @@ describe("orderedAis", () => {
       "Sandbox",
       "ChickensAI",
     ]);
+  });
+});
+
+describe("minigamePips", () => {
+  // The names are Zero-K's, from its `LuaAI.lua`: the chicken AIs run
+  // "Chicken: Beginner" through "Chicken: Suicidal", plus a "Chicken: Custom"
+  // that is a configuration rather than a level.
+  it("reads the level out of a chicken AI's name", () => {
+    expect(minigamePips("Chicken: Suicidal")).toBe(5);
+    expect(minigamePips("Chicken: Hard")).toBe(4);
+    expect(minigamePips("Chicken: Normal")).toBe(3);
+    expect(minigamePips("Chicken: Easy")).toBe(2);
+    expect(minigamePips("Chicken: Beginner")).toBe(1);
+  });
+
+  it("does not read 'very easy' as 'easy'", () => {
+    expect(minigamePips("Chicken: Very Easy")).toBe(1);
+    expect(minigamePips("Chicken: Very Easy")).not.toBe(
+      minigamePips("Chicken: Easy"),
+    );
+  });
+
+  it("has no reading for a name carrying no level", () => {
+    expect(minigamePips("Chicken: Custom")).toBeUndefined();
+    expect(minigamePips("Chicken")).toBeUndefined();
+    expect(minigamePips("CAI")).toBeUndefined();
   });
 });
 
