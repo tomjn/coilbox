@@ -12,6 +12,7 @@ import {
   membersToRows,
   randomTeamColorHex,
   readableText,
+  roomTakesBots,
   shouldNotifyVoteOpened,
   startPosTypeOf,
   usedColorsFromBattle,
@@ -62,6 +63,7 @@ function mkBattle(p: Partial<Battle> = {}): Battle {
     bosses: [],
     bossesEnabled: false,
     inProgress: false,
+    mode: null,
     ...p,
   };
 }
@@ -464,6 +466,27 @@ describe("aiShortNameFromDll", () => {
 
   it("strips a leading numeric id prefix, keeping the shortName", () => {
     expect(aiShortNameFromDll("11772313 SimpleAI")).toBe("SimpleAI");
+  });
+});
+
+describe("roomTakesBots", () => {
+  // Upstream's `Process(UpdateBotStatus)` refuses a bot outside these two with
+  // "Sorry, this room type does not support bots, please use cooperative or
+  // custom", and the refusal arrives as a message box rather than as an error.
+  it("takes bots in a custom or cooperative Zero-K room", () => {
+    expect(roomTakesBots("custom")).toBe(true);
+    expect(roomTakesBots("coop")).toBe(true);
+  });
+
+  it("refuses them in the room types the server refuses them in", () => {
+    expect(roomTakesBots("teams")).toBe(false);
+    expect(roomTakesBots("1v1")).toBe(false);
+    expect(roomTakesBots("ffa")).toBe(false);
+    expect(roomTakesBots("planetwars")).toBe(false);
+  });
+
+  it("takes bots where the protocol has no room type at all", () => {
+    expect(roomTakesBots(null)).toBe(true);
   });
 });
 

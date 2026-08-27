@@ -15,6 +15,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import { BUILTIN_SERVERS, type LobbyServer } from "../lobby-servers/config";
 import {
   autoJoinsChannels,
+  carriesBotAlly,
   founderRunsTheGame,
   messageLimit,
   protocolForKey,
@@ -162,6 +163,17 @@ describe("seatIsServerAssigned", () => {
   it("is true on Tachyon and Zero-K, which carry no colour or faction", () => {
     expect(seatIsServerAssigned("tachyon")).toBe(true);
     expect(seatIsServerAssigned("zerok")).toBe(true);
+  });
+});
+
+describe("carriesBotAlly", () => {
+  it("is true where a bot's own message carries its ally team", () => {
+    expect(carriesBotAlly("tasserver")).toBe(true);
+    expect(carriesBotAlly("zerok")).toBe(true);
+  });
+
+  it("is false on Tachyon, whose bot update says nothing about a seat", () => {
+    expect(carriesBotAlly("tachyon")).toBe(false);
   });
 });
 

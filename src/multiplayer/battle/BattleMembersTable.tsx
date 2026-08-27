@@ -44,6 +44,8 @@ export function BattleMembersTable({
   canKick,
   canBoss,
   canAddBot,
+  botsRefused,
+  canSetBotAlly,
   hostControls,
   addableAis,
   addableAisReady,
@@ -79,6 +81,11 @@ export function BattleMembersTable({
   canBoss: boolean;
   /** When true, the viewer may add a bot (any seated member — see `useBattleRoom`). */
   canAddBot: boolean;
+  /** Why this room takes no AIs, shown in place of the Add AI control so its
+   * absence reads as a rule rather than as a missing feature. */
+  botsRefused?: string | null;
+  /** Whether a bot's ally team may be set, which Tachyon alone does not carry. */
+  canSetBotAlly: boolean;
   hostControls: {
     forceTeam: (user: string, team: number) => void;
     forceAlly: (user: string, ally: number) => void;
@@ -156,6 +163,12 @@ export function BattleMembersTable({
     }
   }
   const showFaction = showsFactionColumn(sides);
+  // A team number is a field only TASServer has. Where the server assigns the
+  // seat there is nothing on the wire to show, so every row read as team 1
+  // while sitting on different ally teams, which is not a thing a team can do:
+  // a team belongs to exactly one ally team, and it is the ally column that
+  // says who is with whom.
+  const showTeam = !serverAssignsSeat;
   // Group rows by team so shared teams sit together; spectators sink to the
   // bottom. Stable, so join order is kept within a team (leader stays first).
   const displayOrder = [...rows].sort(
@@ -243,9 +256,11 @@ export function BattleMembersTable({
                   Faction
                 </TableHead>
               )}
-              <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                Team
-              </TableHead>
+              {showTeam && (
+                <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                  Team
+                </TableHead>
+              )}
               <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
                 Ally
               </TableHead>
@@ -301,13 +316,15 @@ export function BattleMembersTable({
                 control = {
                   // Tachyon's bot update carries the AI, the name and the bot's
                   // options, and nothing about where it sits, so a bot's seat is
-                  // the server's there.
+                  // the server's there. Zero-K sits between: its update carries
+                  // an ally team but no team number, which nothing on that
+                  // protocol has.
                   onForceTeam: serverAssignsSeat
                     ? undefined
                     : (t) => hostControls.updateBot(row.name, { teamId: t }),
-                  onForceAlly: serverAssignsSeat
-                    ? undefined
-                    : (a) => hostControls.updateBot(row.name, { ally: a }),
+                  onForceAlly: canSetBotAlly
+                    ? (a) => hostControls.updateBot(row.name, { ally: a })
+                    : undefined,
                   onKick: () => hostControls.removeBot(row.name),
                   onChangeAi: (ai) => hostControls.changeBotAi(row.name, ai),
                 };
@@ -334,6 +351,7 @@ export function BattleMembersTable({
                   flashIngame={justWentIngame.has(row.name)}
                   sideOptions={sideOptions}
                   showFaction={showFaction}
+                  showTeam={showTeam}
                   teamOptions={teamOptions}
                   allyOptions={allyOptions}
                   aiOptions={aiOptions}
@@ -373,6 +391,11 @@ export function BattleMembersTable({
         </Table>
       </div>
 
+      {!canAddBot && botsRefused && (
+        <div className="border-t border-border/40 p-2 text-xs text-muted-foreground">
+          {botsRefused}
+        </div>
+      )}
       {canAddBot && (
         <div className="flex items-center gap-2 border-t border-border/40 p-2">
           <span className="text-xs font-medium text-muted-foreground">

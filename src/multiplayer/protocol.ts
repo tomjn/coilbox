@@ -73,6 +73,18 @@ export function seatIsServerAssigned(protocol: LobbyProtocol): boolean {
 }
 
 /**
+ * Whether the message that updates a bot carries the ally team it sits on.
+ *
+ * False on Tachyon alone, whose bot update carries the AI, the name and the
+ * bot's options and nothing about where it sits. Zero-K's `UpdateBotStatus`
+ * carries `AllyNumber`, so a bot's ally is settable there even though its team
+ * number is not: the protocol has no team number for anyone, player or bot.
+ */
+export function carriesBotAlly(protocol: LobbyProtocol): boolean {
+  return protocol !== "tachyon";
+}
+
+/**
  * Whether founding a room on this connection also means running the match on
  * this machine.
  *

@@ -469,6 +469,8 @@ function BattleRoomPage() {
             canKick={room.canKick}
             canBoss={room.canBoss}
             canAddBot={room.canAddBot}
+            botsRefused={room.botsRefused}
+            canSetBotAlly={room.canSetBotAlly}
             hostControls={room.hostControls}
             addableAis={room.addableAis}
             addableAisReady={room.addableAisReady}

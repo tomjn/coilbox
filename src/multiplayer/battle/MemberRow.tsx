@@ -86,6 +86,7 @@ export function MemberRow({
   flashIngame,
   sideOptions,
   showFaction,
+  showTeam,
   teamOptions,
   allyOptions,
   aiOptions,
@@ -123,6 +124,9 @@ export function MemberRow({
    * faction, and for one that is not installed, so the cell is dropped rather
    * than drawn as a picker with nothing to pick. */
   showFaction: boolean;
+  /** Whether this table has a team column at all. False where the server
+   * assigns the seat, because a team number is a field only TASServer has. */
+  showTeam: boolean;
   teamOptions: {
     value: string;
     label: string;
@@ -341,36 +345,38 @@ export function MemberRow({
         </TableCell>
       )}
 
-      <TableCell className="px-2 py-2">
-        {row.spectator ? (
-          <span className="text-xs text-muted-foreground">–</span>
-        ) : canEditTeam ? (
-          <Select
-            value={String(row.teamId)}
-            onValueChange={(v) => setTeam(Number(v))}
-          >
-            <SelectTrigger size="sm" className="w-16">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {teamOptions.map((o) => (
-                <SelectItem
-                  key={o.value}
-                  value={o.value}
-                  description={o.description}
-                  icon={o.icon}
-                >
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <span className="inline-flex h-8 min-w-8 items-center justify-center rounded border border-border/60 bg-muted/40 px-2 text-xs">
-            {row.teamId + 1}
-          </span>
-        )}
-      </TableCell>
+      {showTeam && (
+        <TableCell className="px-2 py-2">
+          {row.spectator ? (
+            <span className="text-xs text-muted-foreground">–</span>
+          ) : canEditTeam ? (
+            <Select
+              value={String(row.teamId)}
+              onValueChange={(v) => setTeam(Number(v))}
+            >
+              <SelectTrigger size="sm" className="w-16">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {teamOptions.map((o) => (
+                  <SelectItem
+                    key={o.value}
+                    value={o.value}
+                    description={o.description}
+                    icon={o.icon}
+                  >
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded border border-border/60 bg-muted/40 px-2 text-xs">
+              {row.teamId + 1}
+            </span>
+          )}
+        </TableCell>
+      )}
 
       <TableCell className="px-2 py-2">
         {row.spectator ? (

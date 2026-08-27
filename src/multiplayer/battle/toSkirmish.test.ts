@@ -59,6 +59,7 @@ function mkBattle(p: Partial<Battle> = {}): Battle {
     bosses: [],
     bossesEnabled: false,
     inProgress: false,
+    mode: null,
     ...p,
   };
 }

@@ -34,6 +34,7 @@ function mk(p: Partial<Battle>): Battle {
     bosses: [],
     bossesEnabled: false,
     inProgress: false,
+    mode: null,
     ...p,
   };
 }

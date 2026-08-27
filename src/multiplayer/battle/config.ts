@@ -218,6 +218,18 @@ export function aiShortNameFromDll(aiDll: string): string {
  * from `useBattleRoom`, #531). An unloaded list must not read as "this game
  * has no AIs".
  */
+/**
+ * Whether a room of this mode will accept a bot at all. Pure.
+ *
+ * Zero-K's server takes bots in a Custom or a Cooperative room and refuses them
+ * everywhere else, answering with a message box rather than an error, so an Add
+ * AI button offered in a Teams room does nothing anyone can see. A room with no
+ * mode is one whose protocol has no such rule.
+ */
+export function roomTakesBots(mode: string | null): boolean {
+  return mode == null || mode === "custom" || mode === "coop";
+}
+
 export function isAiUnavailable(
   aiDll: string | undefined,
   addableAis: { shortName: string }[],
