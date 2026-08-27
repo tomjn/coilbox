@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { contentRescan } from "../content/bindings";
 import { invalidateScans } from "../content/config";
 import { warmAllRoots } from "../content/rapidPoolWarm";
 import {
@@ -31,6 +30,7 @@ import {
   rateFrom,
 } from "./downloadRate";
 import { errMessage } from "./pages/components/states";
+import { installEngine } from "./warmEngineCache";
 
 /**
  * A download request as enqueued by a page. `kind` selects the backend start
@@ -333,20 +333,22 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           invalidateScans();
           return;
         case "engineRecoil":
-          await dlDownloadEngineRecoil({
-            ...item.args,
-            opId: item.id,
-            onProgress,
-          });
-          await contentRescan(undefined).catch(() => {});
+          await installEngine(() =>
+            dlDownloadEngineRecoil({
+              ...item.args,
+              opId: item.id,
+              onProgress,
+            }),
+          );
           return;
         case "engineSpring":
-          await dlDownloadEngineSpring({
-            ...item.args,
-            opId: item.id,
-            onProgress,
-          });
-          await contentRescan(undefined).catch(() => {});
+          await installEngine(() =>
+            dlDownloadEngineSpring({
+              ...item.args,
+              opId: item.id,
+              onProgress,
+            }),
+          );
           return;
       }
     },

@@ -23,7 +23,7 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DownloadProgress } from "./bindings";
+import { type DownloadProgress, dlDownloadEngineRecoil } from "./bindings";
 import {
   DownloadQueueProvider,
   useDownloadQueue,
@@ -61,6 +61,14 @@ vi.mock("./bindings", () => ({
       }),
   ),
 }));
+
+/** Stands in for the real warm so the queue's own wiring is what is under test. */
+const { installEngine } = vi.hoisted(() => ({
+  installEngine: vi.fn(async (download: () => Promise<unknown>) => {
+    await download();
+  }),
+}));
+vi.mock("./warmEngineCache", () => ({ installEngine }));
 
 vi.mock("./downloadGame", () => ({ downloadGameAnySource: vi.fn() }));
 vi.mock("./downloadMap", () => ({ downloadMapAnySource: vi.fn() }));
@@ -624,5 +632,28 @@ describe("a download reported from outside the queue", () => {
       result.current.report("app-update", null);
     });
     expect(result.current.reported).toHaveLength(0);
+  });
+
+  it("runs an engine download through the archive-cache warm", async () => {
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    act(() => {
+      result.current.enqueue({
+        kind: "engineRecoil",
+        label: "Engine 2026.07.04",
+        args: {
+          version: "2026.07.04",
+          assetUrl: "https://example.invalid/engine.7z",
+          writePath: "/data",
+        },
+      });
+    });
+
+    await waitFor(() => expect(installEngine).toHaveBeenCalled());
+    // The warm owns the download rather than running beside it, so a new engine
+    // is on disk before anything tries to read its library.
+    expect(dlDownloadEngineRecoil).toHaveBeenCalledWith(
+      expect.objectContaining({ version: "2026.07.04" }),
+    );
   });
 });
