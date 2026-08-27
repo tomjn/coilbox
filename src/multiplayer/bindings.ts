@@ -335,7 +335,8 @@ export type Delta =
   | { kind: "friendsChanged" }
   | { kind: "friendRequestsChanged" }
   | { kind: "partyChanged" }
-  | { kind: "matchmakingChanged" };
+  | { kind: "matchmakingChanged" }
+  | { kind: "voteChanged" };
 
 /** An event streamed over the connect `Channel` (mirrors `LobbyEvent`). */
 export type LobbyEvent =

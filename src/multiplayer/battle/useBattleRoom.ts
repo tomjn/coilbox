@@ -37,6 +37,7 @@ import {
   mpUpdateBattleInfo,
   mpUpdateBot,
 } from "../bindings";
+import { seatIsServerAssigned } from "../protocol";
 import { useMultiplayer } from "../store";
 import {
   battleOptionTags,
@@ -288,7 +289,12 @@ export function useBattleRoom(): BattleRoomView {
   // handicap controls have nothing to send there. Our assets are the other way
   // round: only the client knows whether the map and game are installed, and
   // Tachyon has a command for saying so, so that push runs on both.
-  const serverAssignsSeat = protocol === "tachyon";
+  //
+  // Zero-K is the same shape for the same reason. `UpdateUserBattleStatus`
+  // carries the ally team, the spectator flag and the sync flag, and nothing
+  // else: there is no colour, no faction, no team number and no handicap on the
+  // wire at all.
+  const serverAssignsSeat = seatIsServerAssigned(protocol);
 
   // The team colour we remember across battles and app restarts. Empty means
   // "never picked" — we assign a random colour the first time we need one.
@@ -334,9 +340,12 @@ export function useBattleRoom(): BattleRoomView {
   const canChangeMap = selfHost || iAmBoss;
   // Kicking is a host power on TASServer and a lobby-scoped one on Tachyon: any
   // member may ask, and the server puts it to a vote. So the room offers it to
-  // anyone seated there rather than to the founder alone.
-  const canKick = selfHost || (serverAssignsSeat && !!myStatus);
-  const canBoss = serverAssignsSeat && !!myStatus && !!battle?.bossesEnabled;
+  // anyone seated there rather than to the founder alone. Zero-K is the first
+  // case again: `KickFromBattle` is the founder's, and every Zero-K room is
+  // founded by an autohost, so a human is never in a position to use it.
+  const canKick = selfHost || (protocol === "tachyon" && !!myStatus);
+  const canBoss =
+    protocol === "tachyon" && !!myStatus && !!battle?.bossesEnabled;
 
   // AIs the host can add as bots. The game-scoped query already applies the game's
   // `validais.lua` whitelist and includes its own Lua AIs (from `LuaAI.lua`) — both
