@@ -488,13 +488,19 @@ export function ChatPane({
                       body = (
                         <div className="px-1 text-sm italic text-muted-foreground [overflow-wrap:anywhere]">
                           {"* "}
+                          {/* Plain inline text, not a flex box: a flex box has
+                              to be aligned as a box, and `align-middle` sits
+                              its centre near the baseline rather than putting
+                              the name on it, so the sender rode above the line
+                              it was part of. The glyph is aligned on its own
+                              instead, which leaves the name where the text is. */}
                           <span
-                            className="inline-flex items-center gap-1 align-middle font-medium not-italic"
+                            className="font-medium not-italic"
                             style={color ? { color } : undefined}
                           >
                             {bot && (
                               <Bot
-                                className="size-4 shrink-0"
+                                className="mr-1 inline size-4 shrink-0 align-text-bottom"
                                 aria-label="Bot"
                               />
                             )}
