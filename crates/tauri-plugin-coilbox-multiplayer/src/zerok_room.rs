@@ -656,6 +656,22 @@ pub(crate) fn autohost_mode(name: &str) -> Option<types::AutohostMode> {
     })
 }
 
+/// The name [`autohost_mode`] parses, for a mode off the wire.
+///
+/// A mode the pinned commit does not name has no name to give, and neither does
+/// Planet Wars, which no client opens a room in.
+pub(crate) fn mode_name(mode: types::AutohostMode) -> Option<&'static str> {
+    Some(match mode {
+        types::AutohostMode::None => "custom",
+        types::AutohostMode::Teams => "teams",
+        types::AutohostMode::Game1v1 => "1v1",
+        types::AutohostMode::GameFFA => "ffa",
+        types::AutohostMode::GameChickens => "coop",
+        types::AutohostMode::Planetwars => "planetwars",
+        types::AutohostMode::Other(_) => return None,
+    })
+}
+
 /// What a vote is typed as. Zero-K has no vote command: the official client puts
 /// it in battle chat and so does its autohost, which is how anything in a room
 /// gets decided.

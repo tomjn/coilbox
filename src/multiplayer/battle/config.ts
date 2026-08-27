@@ -218,14 +218,31 @@ export function aiShortNameFromDll(aiDll: string): string {
  * from `useBattleRoom`, #531). An unloaded list must not read as "this game
  * has no AIs".
  */
+/**
+ * Whether a room of this mode will accept a bot at all. Pure.
+ *
+ * Zero-K's server takes bots in a Custom or a Cooperative room and refuses them
+ * everywhere else, answering with a message box rather than an error, so an Add
+ * AI button offered in a Teams room does nothing anyone can see. A room with no
+ * mode is one whose protocol has no such rule.
+ */
+export function roomTakesBots(mode: string | null): boolean {
+  return mode == null || mode === "custom" || mode === "coop";
+}
+
 export function isAiUnavailable(
   aiDll: string | undefined,
   addableAis: { shortName: string }[],
   ready: boolean,
 ): boolean {
   if (!ready || !aiDll) return false;
-  const shortName = aiShortNameFromDll(aiDll).toLowerCase();
-  return !addableAis.some((a) => a.shortName.toLowerCase() === shortName);
+  const named = (name: string) =>
+    addableAis.some((a) => a.shortName.toLowerCase() === name);
+  // The whole string first. Stripping a prefix off a name that never had one
+  // is how "Chicken: Beginner" became "Beginner", which is nothing's name, so
+  // every Zero-K chicken read as an AI the game does not have.
+  if (named(aiDll.trim().toLowerCase())) return false;
+  return !named(aiShortNameFromDll(aiDll).toLowerCase());
 }
 
 /* -------------------------------------------------------------------------- *

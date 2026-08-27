@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChannelState, ChatMsg, LobbyState } from "../bindings";
-import { backfilledCounts, conversationCounts } from "./conversation";
+import { backfilledCounts, conversationCounts, convId } from "./conversation";
 
 /** A live chat line: no history id. */
 const live = (from: string, text: string): ChatMsg => ({
@@ -36,6 +36,29 @@ const stateWith = (channels: ChannelState[]): LobbyState =>
     channels: Object.fromEntries(channels.map((c) => [c.name, c])),
     dms: {},
   }) as unknown as LobbyState;
+
+describe("convId", () => {
+  it("names a channel and a direct message by what they are", () => {
+    expect(convId({ kind: "channel", name: "main" })).toBe("channel:main");
+    expect(convId({ kind: "dm", peer: "bob" })).toBe("dm:bob");
+  });
+
+  // A battle used to have an id of its own, which nothing else wrote to: the
+  // seen baseline, the backlog discount and the nav badge all key battle chat
+  // by its channel. So a room's chat could never be marked read, and the badge
+  // counted on while you sat there reading it.
+  it("names a battle by the channel its chat actually lives in", () => {
+    expect(convId({ kind: "battle", id: 42, channel: "__battle__42" })).toBe(
+      "channel:__battle__42",
+    );
+  });
+
+  it("agrees with the id the counts are keyed by", () => {
+    const state = stateWith([channel("__battle__42", [live("bob", "hi")])]);
+    const id = convId({ kind: "battle", id: 42, channel: "__battle__42" });
+    expect(conversationCounts(state)[id]).toBe(1);
+  });
+});
 
 describe("backfilledCounts", () => {
   it("counts only messages replayed from history", () => {

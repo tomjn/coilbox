@@ -37,7 +37,11 @@ import {
   mpUpdateBattleInfo,
   mpUpdateBot,
 } from "../bindings";
-import { founderRunsTheGame, seatIsServerAssigned } from "../protocol";
+import {
+  carriesBotAlly,
+  founderRunsTheGame,
+  seatIsServerAssigned,
+} from "../protocol";
 import { useMultiplayer } from "../store";
 import {
   battleOptionTags,
@@ -51,6 +55,7 @@ import {
   hexToColorInt,
   type MemberRow,
   membersToRows,
+  roomTakesBots,
   type SyncState,
   shouldNotifyVoteOpened,
   startPosTypeOf,
@@ -89,6 +94,11 @@ export interface BattleRoomView {
    * the founder. A host that forbids bots rejects it and we surface the error.
    */
   canAddBot: boolean;
+  /** Why this room takes no AIs, or null when it does. Shown where the Add AI
+   * control would otherwise be, so its absence has a reason attached. */
+  botsRefused: string | null;
+  /** Whether a bot's ally team may be set here (everywhere but Tachyon). */
+  canSetBotAlly: boolean;
   target: PlayTarget | null;
   targetLoading: boolean;
   enginePath: string | undefined;
@@ -335,7 +345,19 @@ export function useBattleRoom(): BattleRoomView {
   // Founding a Zero-K room is not that: the server runs the match whoever opened
   // the room, so nothing here forces a seat, builds a host config or binds a port.
   const selfHost = isFounder && !hostIsBot && founderRunsTheGame(protocol);
-  const canAddBot = !!battle && !!myStatus;
+  // A room type that refuses bots is not offered the control. Zero-K answers an
+  // AI added to a Teams or 1v1 room with a message box, which is a button that
+  // does nothing anyone can see.
+  const takesBots = roomTakesBots(battle?.mode ?? null);
+  const canAddBot = !!battle && !!myStatus && takesBots;
+  const botsRefused =
+    battle && !takesBots
+      ? "This room type takes no AIs. Only a custom or cooperative room does."
+      : null;
+  // A bot's ally team is settable wherever the protocol carries one, which is
+  // everywhere but Tachyon. Its team number is a separate matter: Zero-K has no
+  // team number for anyone, so nothing here offers one.
+  const canSetBotAlly = carriesBotAlly(protocol);
   // Who may change a Tachyon lobby. It has no founder, so a boss is what it has
   // instead, and the lobby says whether it allows bosses at all.
   const iAmBoss = !!me && !!battle?.bosses.includes(me);
@@ -1055,6 +1077,8 @@ export function useBattleRoom(): BattleRoomView {
     isFounder,
     selfHost,
     canAddBot,
+    botsRefused,
+    canSetBotAlly,
     serverAssignsSeat,
     canKick,
     canBoss,

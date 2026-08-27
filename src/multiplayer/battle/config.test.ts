@@ -12,6 +12,7 @@ import {
   membersToRows,
   randomTeamColorHex,
   readableText,
+  roomTakesBots,
   shouldNotifyVoteOpened,
   startPosTypeOf,
   usedColorsFromBattle,
@@ -62,6 +63,7 @@ function mkBattle(p: Partial<Battle> = {}): Battle {
     bosses: [],
     bossesEnabled: false,
     inProgress: false,
+    mode: null,
     ...p,
   };
 }
@@ -467,6 +469,27 @@ describe("aiShortNameFromDll", () => {
   });
 });
 
+describe("roomTakesBots", () => {
+  // Upstream's `Process(UpdateBotStatus)` refuses a bot outside these two with
+  // "Sorry, this room type does not support bots, please use cooperative or
+  // custom", and the refusal arrives as a message box rather than as an error.
+  it("takes bots in a custom or cooperative Zero-K room", () => {
+    expect(roomTakesBots("custom")).toBe(true);
+    expect(roomTakesBots("coop")).toBe(true);
+  });
+
+  it("refuses them in the room types the server refuses them in", () => {
+    expect(roomTakesBots("teams")).toBe(false);
+    expect(roomTakesBots("1v1")).toBe(false);
+    expect(roomTakesBots("ffa")).toBe(false);
+    expect(roomTakesBots("planetwars")).toBe(false);
+  });
+
+  it("takes bots where the protocol has no room type at all", () => {
+    expect(roomTakesBots(null)).toBe(true);
+  });
+});
+
 describe("isAiUnavailable", () => {
   const ais = [{ shortName: "SimpleAI" }, { shortName: "BARb" }];
 
@@ -480,6 +503,21 @@ describe("isAiUnavailable", () => {
 
   it("flags a genuinely absent shortName", () => {
     expect(isAiUnavailable("SurvivalAI", ais, true)).toBe(true);
+  });
+
+  // Zero-K's Lua AIs are named "Chicken: Beginner" and the like, and the id
+  // prefix rule above reduced that to "Beginner", which is nothing's name. So
+  // every chicken added to a room was flagged as an AI the game does not have.
+  it("does not flag a shortName that has a space in it", () => {
+    const withSpaces = [
+      { shortName: "Chicken: Beginner" },
+      { shortName: "CAI" },
+    ];
+    expect(isAiUnavailable("Chicken: Beginner", withSpaces, true)).toBe(false);
+  });
+
+  it("still flags an absent AI whose name has a space in it", () => {
+    expect(isAiUnavailable("Chicken: Suicidal", ais, true)).toBe(true);
   });
 
   it("does not flag while the addable list isn't ready yet (#531)", () => {

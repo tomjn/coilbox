@@ -147,6 +147,44 @@ export function aiPips(
 }
 
 /**
+ * The levels a mini-game AI's name can carry, with the pip count each reads as.
+ *
+ * Taken from Zero-K's `LuaAI.lua`, which names its chicken AIs "Chicken:
+ * Beginner", "Chicken: Very Easy", "Chicken: Easy", "Chicken: Normal",
+ * "Chicken: Hard" and "Chicken: Suicidal". Six levels over five pips, so the
+ * two gentlest share the bottom of the scale. A game whose levels are worded
+ * differently reads as unrated rather than guessed at.
+ */
+const MINIGAME_LEVELS: [string, number][] = [
+  ["beginner", 1],
+  ["very easy", 1],
+  ["easy", 2],
+  ["normal", 3],
+  ["hard", 4],
+  ["suicidal", 5],
+];
+
+/**
+ * The difficulty reading for a mini-game AI, out of its own name, or undefined
+ * when the name carries no level. Pure.
+ *
+ * Chickens and scavengers are a game mode rather than an opponent, so
+ * {@link rankedAis} leaves them out and {@link aiPips} can never place one.
+ * Their names carry the level instead, which is the only place it exists: the
+ * lobby protocol has no field for an AI's difficulty. The longest matching
+ * level wins, so "Very Easy" is not read as "Easy".
+ */
+export function minigamePips(name: string): number | undefined {
+  const n = norm(name);
+  let best: [string, number] | undefined;
+  for (const level of MINIGAME_LEVELS) {
+    if (n.includes(level[0]) && (!best || level[0].length > best[0].length))
+      best = level;
+  }
+  return best?.[1];
+}
+
+/**
  * The difficulty reading for a `shortName` against the built-in ranking alone,
  * ignoring what is installed. The one way to carry a difficulty across a game
  * switch: the game a preset was authored in is gone by the time its AI has to be

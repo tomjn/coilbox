@@ -159,6 +159,14 @@ export interface Battle {
    * TASServer connection, where the list reads the host's ingame bit instead.
    */
   inProgress: boolean;
+  /**
+   * The room's mode where the protocol has one: `custom`, `teams`, `1v1`,
+   * `ffa`, `coop` or `planetwars`. Zero-K only, and null everywhere else.
+   *
+   * What it decides is whether the room takes AIs at all: Zero-K's server
+   * refuses a bot outside a custom or cooperative room. See `roomTakesBots`.
+   */
+  mode: string | null;
 }
 
 /**

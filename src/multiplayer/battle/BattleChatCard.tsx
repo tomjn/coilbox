@@ -1,7 +1,7 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import type { Battle } from "../bindings";
 import { ChatPane } from "../chat/ChatPane";
-import type { ConversationDescriptor } from "../chat/conversation";
+import { type ConversationDescriptor, convId } from "../chat/conversation";
 import { useConversation } from "../chat/useConversation";
 import { useMultiplayer } from "../store";
 import { colorIntToHex } from "./config";
@@ -13,13 +13,23 @@ import { colorIntToHex } from "./config";
  * colour. The grid wrapper gives the embedded pane a bounded height to scroll in.
  */
 export function BattleChatCard({ battle }: { battle: Battle }) {
-  const { mirror } = useMultiplayer();
+  const { mirror, markSeen } = useMultiplayer();
   const me = mirror.state?.myUsername ?? null;
   const channel = battle.channel;
   const desc: ConversationDescriptor | null = channel
     ? { kind: "battle", id: battle.id, channel }
     : null;
   const conv = useConversation(desc);
+
+  // Reading the room is reading its chat, so being here marks it seen. Without
+  // this the Battle Room nav badge counted every line while you sat in front of
+  // it. Only the chat hub ever marked anything read, and it cannot mark a room
+  // it was never opened for.
+  const seenId = desc ? convId(desc) : null;
+  const seen = conv.total;
+  useEffect(() => {
+    if (seenId) markSeen(seenId, seen);
+  }, [seenId, seen, markSeen]);
 
   const senderColor = useCallback(
     (from: string): string | undefined => {

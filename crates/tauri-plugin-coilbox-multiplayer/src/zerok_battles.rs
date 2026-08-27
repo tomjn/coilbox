@@ -25,11 +25,9 @@
 //!
 //! # What is parsed and not kept
 //!
-//! `Mode` is the autohost mode: Teams, 1v1, FFA, Cooperative, Custom,
-//! PlanetWars. [`Battle`] has nowhere for it, so it is read off the wire by the
-//! generated types and goes no further, which is what the `lobby-protocol-gap`
-//! label tracks. The same goes for `IsMatchMaker`, `TimeQueueEnabled`,
-//! `MaxEvenPlayers` and `RunningSince`.
+//! `IsMatchMaker`, `TimeQueueEnabled`, `MaxEvenPlayers` and `RunningSince` are
+//! read off the wire by the generated types and go no further, which is what the
+//! `lobby-protocol-gap` label tracks.
 
 use coilbox_lobby_protocol::{Battle, Delta, LobbyState};
 use coilbox_zerok_protocol::types::BattleHeader;
@@ -95,6 +93,9 @@ fn put(state: &mut LobbyState, header: &BattleHeader) -> Vec<Delta> {
         // connection too. `engine` is the TASServer field naming which engine,
         // and Zero-K never says anything but Spring.
         battle.version.clone_from(engine);
+    }
+    if let Some(mode) = header.mode {
+        battle.mode = crate::zerok_room::mode_name(mode).map(str::to_owned);
     }
     if let Some(max_players) = header.max_players {
         battle.max_players = count(max_players);
@@ -185,6 +186,37 @@ mod tests {
         assert!(!battle.passworded);
         assert!(!battle.in_progress);
         assert_eq!(deltas, vec![Delta::BattleOpened { id: 42 }]);
+    }
+
+    /// The mode decides what a room will accept, not just how it reads. Upstream
+    /// takes bots in a Custom or a Cooperative room and refuses them in the
+    /// rest, so a client that does not know the mode offers an Add AI button
+    /// that answers with a message box.
+    #[test]
+    fn a_room_carries_the_mode_it_was_opened_in() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            r#"BattleAdded {"Header":{"BattleID":42,"Mode":6}}"#,
+        );
+        assert_eq!(state.battles[&42].mode.as_deref(), Some("teams"));
+
+        feed(
+            &mut state,
+            r#"BattleUpdate {"Header":{"BattleID":42,"Mode":0}}"#,
+        );
+        assert_eq!(state.battles[&42].mode.as_deref(), Some("custom"));
+    }
+
+    /// A room whose header never named a mode has none, rather than reading as
+    /// the mode whose number happens to be zero. Custom is 0 upstream, so a
+    /// default would make every Tachyon and TASServer battle a Zero-K custom
+    /// room.
+    #[test]
+    fn a_room_that_names_no_mode_has_none() {
+        let mut state = LobbyState::new();
+        feed(&mut state, r#"BattleAdded {"Header":{"BattleID":42}}"#);
+        assert_eq!(state.battles[&42].mode, None);
     }
 
     /// The reason every field is merged. Upstream leaves an unset member out of

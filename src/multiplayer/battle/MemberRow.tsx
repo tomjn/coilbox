@@ -85,6 +85,8 @@ export function MemberRow({
   serverAssignsSeat,
   flashIngame,
   sideOptions,
+  showFaction,
+  showTeam,
   teamOptions,
   allyOptions,
   aiOptions,
@@ -118,6 +120,13 @@ export function MemberRow({
   /** Briefly highlight this row because the player just launched the game. */
   flashIngame?: boolean;
   sideOptions: { value: string; label: string; icon?: ReactNode }[];
+  /** Whether this table has a faction column at all. False for a game with one
+   * faction, and for one that is not installed, so the cell is dropped rather
+   * than drawn as a picker with nothing to pick. */
+  showFaction: boolean;
+  /** Whether this table has a team column at all. False where the server
+   * assigns the seat, because a team number is a field only TASServer has. */
+  showTeam: boolean;
   teamOptions: {
     value: string;
     label: string;
@@ -195,7 +204,12 @@ export function MemberRow({
       <TableCell className="px-3 py-2">
         <div className="flex items-center justify-center gap-1.5">
           <ReadyIcon row={row} />
-          {!row.spectator && row.sync === 2 && (
+          {/* Humans only. Sync is whether a player's client has the map and the
+              game, and a bot has no client: it runs on whichever machine hosts
+              the match, which by definition has both. A bot's status carries
+              the field anyway, and it arrives unset, so a room full of AIs read
+              as a room full of people missing the map. */}
+          {row.kind === "human" && !row.spectator && row.sync === 2 && (
             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
               <AlertTriangle className="size-3.5" />
               Unsynced
@@ -219,15 +233,7 @@ export function MemberRow({
                 style={{ borderColor: sharedWith.colorHex }}
               />
             </span>
-          ) : serverAssignsSeat ? (
-            // Colour 0 is black, and this seat has no colour yet rather than a
-            // black one, so the swatch reads as unset.
-            <span
-              aria-hidden
-              title="Team colours are assigned when the match starts"
-              className="size-6 shrink-0 rounded border border-dashed border-muted-foreground/50"
-            />
-          ) : canEditColor ? (
+          ) : serverAssignsSeat ? null : canEditColor ? (
             <input
               type="color"
               aria-label={`${row.name} colour`}
@@ -243,21 +249,40 @@ export function MemberRow({
             />
           )}
           <div className="min-w-0 leading-tight">
-            <div className="flex items-center gap-1 truncate">
-              {(row.host || row.boss) && (
-                <Crown className="size-3.5 text-amber-500" />
+            {/* The AI picker sits beside the name while the row is wide enough
+                for both, and wraps under it when it is not. A bot's name is a
+                handle rather than a sentence, so the pair reads as one thing. */}
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="flex items-center gap-1 truncate">
+                {(row.host || row.boss) && (
+                  <Crown className="size-3.5 text-amber-500" />
+                )}
+                {row.kind === "bot" && (
+                  <BotIcon className="size-3.5 text-muted-foreground" />
+                )}
+                {row.country && <CountryFlag country={row.country} />}
+                <span
+                  className={cn("truncate", row.self && "font-medium")}
+                  title={note || undefined}
+                >
+                  {row.name}
+                </span>
+                {row.rank != null && <RankBadge rank={row.rank} />}
+              </div>
+              {canChangeAi && (
+                <OptionSelect
+                  value={
+                    aiOptions?.some((o) => o.value === row.aiDll)
+                      ? (row.aiDll ?? "")
+                      : ""
+                  }
+                  onValueChange={(v) => control?.onChangeAi?.(v)}
+                  options={aiOptions ?? []}
+                  size="sm"
+                  className="h-7 w-auto min-w-36"
+                  placeholder={row.aiDll ?? "Select an AI"}
+                />
               )}
-              {row.kind === "bot" && (
-                <BotIcon className="size-3.5 text-muted-foreground" />
-              )}
-              {row.country && <CountryFlag country={row.country} />}
-              <span
-                className={cn("truncate", row.self && "font-medium")}
-                title={note || undefined}
-              >
-                {row.name}
-              </span>
-              {row.rank != null && <RankBadge rank={row.rank} />}
             </div>
             {aiInvalid && (
               <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
@@ -265,25 +290,10 @@ export function MemberRow({
                 {row.aiDll} isn't available in this game
               </span>
             )}
-            {canChangeAi ? (
-              <OptionSelect
-                value={
-                  aiOptions?.some((o) => o.value === row.aiDll)
-                    ? (row.aiDll ?? "")
-                    : ""
-                }
-                onValueChange={(v) => control?.onChangeAi?.(v)}
-                options={aiOptions ?? []}
-                size="sm"
-                className="mt-1 h-7 w-auto min-w-36"
-                placeholder={row.aiDll ?? "Select an AI"}
-              />
-            ) : (
-              !aiInvalid && (
-                <span className="text-[11px] text-muted-foreground">
-                  {subtitle}
-                </span>
-              )
+            {!canChangeAi && !aiInvalid && (
+              <span className="text-[11px] text-muted-foreground">
+                {subtitle}
+              </span>
             )}
           </div>
           {onSetNote && (
@@ -297,72 +307,76 @@ export function MemberRow({
         </div>
       </TableCell>
 
-      <TableCell className="px-2 py-2">
-        {row.spectator ? (
-          <span className="text-xs text-muted-foreground">–</span>
-        ) : sharedWith ? (
-          <Badge
-            variant="outline"
-            title={sharedTitle}
-            style={{
-              color: sharedWith.colorHex,
-              borderColor: sharedWith.colorHex,
-            }}
-          >
-            Co-player
-          </Badge>
-        ) : canEditSide ? (
-          <OptionSelect
-            value={String(row.side)}
-            size="sm"
-            className="w-auto min-w-20"
-            disabled={sideOptions.length === 0}
-            options={sideOptions}
-            onValueChange={(v) => onSide(Number(v))}
-          />
-        ) : (
-          (() => {
-            const opt = sideOptions.find((o) => o.value === String(row.side));
-            return (
-              <span className="flex items-center gap-1.5 text-sm">
-                {opt?.icon}
-                {opt?.label ?? "–"}
-              </span>
-            );
-          })()
-        )}
-      </TableCell>
+      {showFaction && (
+        <TableCell className="px-2 py-2">
+          {row.spectator ? (
+            <span className="text-xs text-muted-foreground">–</span>
+          ) : sharedWith ? (
+            <Badge
+              variant="outline"
+              title={sharedTitle}
+              style={{
+                color: sharedWith.colorHex,
+                borderColor: sharedWith.colorHex,
+              }}
+            >
+              Co-player
+            </Badge>
+          ) : canEditSide ? (
+            <OptionSelect
+              value={String(row.side)}
+              size="sm"
+              className="w-auto min-w-20"
+              disabled={sideOptions.length === 0}
+              options={sideOptions}
+              onValueChange={(v) => onSide(Number(v))}
+            />
+          ) : (
+            (() => {
+              const opt = sideOptions.find((o) => o.value === String(row.side));
+              return (
+                <span className="flex items-center gap-1.5 text-sm">
+                  {opt?.icon}
+                  {opt?.label ?? "–"}
+                </span>
+              );
+            })()
+          )}
+        </TableCell>
+      )}
 
-      <TableCell className="px-2 py-2">
-        {row.spectator ? (
-          <span className="text-xs text-muted-foreground">–</span>
-        ) : canEditTeam ? (
-          <Select
-            value={String(row.teamId)}
-            onValueChange={(v) => setTeam(Number(v))}
-          >
-            <SelectTrigger size="sm" className="w-16">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {teamOptions.map((o) => (
-                <SelectItem
-                  key={o.value}
-                  value={o.value}
-                  description={o.description}
-                  icon={o.icon}
-                >
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <span className="inline-flex h-8 min-w-8 items-center justify-center rounded border border-border/60 bg-muted/40 px-2 text-xs">
-            {row.teamId + 1}
-          </span>
-        )}
-      </TableCell>
+      {showTeam && (
+        <TableCell className="px-2 py-2">
+          {row.spectator ? (
+            <span className="text-xs text-muted-foreground">–</span>
+          ) : canEditTeam ? (
+            <Select
+              value={String(row.teamId)}
+              onValueChange={(v) => setTeam(Number(v))}
+            >
+              <SelectTrigger size="sm" className="w-16">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {teamOptions.map((o) => (
+                  <SelectItem
+                    key={o.value}
+                    value={o.value}
+                    description={o.description}
+                    icon={o.icon}
+                  >
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded border border-border/60 bg-muted/40 px-2 text-xs">
+              {row.teamId + 1}
+            </span>
+          )}
+        </TableCell>
+      )}
 
       <TableCell className="px-2 py-2">
         {row.spectator ? (

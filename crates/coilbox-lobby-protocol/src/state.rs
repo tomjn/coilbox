@@ -158,6 +158,14 @@ pub struct Battle {
     /// TASServer connection, which says nothing about the battle and where the
     /// list reads the host's ingame bit instead.
     pub in_progress: bool,
+    /// The room's mode, where the protocol has one: `custom`, `teams`, `1v1`,
+    /// `ffa`, `coop` or `planetwars`. Zero-K only, and `None` everywhere else,
+    /// including on a Zero-K room whose header never named one.
+    ///
+    /// Not decoration. Zero-K's server takes bots in a Custom or a Cooperative
+    /// room and refuses them in the rest, so a room that cannot say which it is
+    /// offers an Add AI button that answers with a message box.
+    pub mode: Option<String>,
 }
 
 /// A transient SPADS autohost vote in the current battle, surfaced so the UI can
