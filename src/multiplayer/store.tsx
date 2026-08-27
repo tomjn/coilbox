@@ -90,7 +90,12 @@ import { favouritesFor, useFavourites } from "./friends";
 import { addIgnore, ignoredFor, useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
 import { MatchFoundPanel } from "./MatchFoundPanel";
-import { protocolForKey, publishesStatus, syncsOnReady } from "./protocol";
+import {
+  autoJoinsChannels,
+  protocolForKey,
+  publishesStatus,
+  syncsOnReady,
+} from "./protocol";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
 import { newScriptPassword } from "./scriptPassword";
@@ -640,14 +645,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // re-firing when `joinedChannels` changes mid-session (e.g. the user joins one).
   // Each entry may carry a key/password, passed straight through to JOIN.
   //
-  // A Tachyon server has no named channels and no ignore list, so it gets neither
-  // (see `syncsOnReady`). The auto-join list is hidden in settings to match.
+  // A Tachyon server has no named channels, so it gets none of this and the
+  // auto-join list is hidden in settings to match (see `autoJoinsChannels`).
   useEffect(() => {
     if (activeKey == null) {
       rejoinedForRef.current = null;
       return;
     }
-    if (!syncsOnReady(protocol)) return;
+    if (!autoJoinsChannels(protocol)) return;
     if (mirror.phase === "ready" && rejoinedForRef.current !== activeKey) {
       rejoinedForRef.current = activeKey;
       // First-ever connect for this login (no stored list yet) to the profile's

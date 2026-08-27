@@ -180,6 +180,10 @@ fn joined_battle(state: &mut LobbyState, joined: &types::JoinBattleSuccess) -> R
     battle.members.clear();
     battle.bots.clear();
     battle.script_tags.clear();
+    // Where the room's chat is filed. TASServer auto-joins a real channel of
+    // this name and Zero-K has no such thing, so it is named here instead, and
+    // one chat screen reads both.
+    battle.channel = Some(crate::zerok_chat::battle_channel(id));
     for player in joined.players.iter().flatten() {
         if let Some(name) = named(player.name.as_deref()) {
             battle.members.insert(name, member_from(player));
