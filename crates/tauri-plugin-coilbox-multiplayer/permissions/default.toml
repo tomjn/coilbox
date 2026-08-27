@@ -51,6 +51,7 @@ permissions = [
   "allow-mp-set-status",
   "allow-mp-set-battle-status",
   "allow-mp-open-battle",
+  "allow-mp-zerok-open-battle",
   "allow-mp-create-lobby",
   "allow-mp-start-battle",
   "allow-mp-update-battle-info",

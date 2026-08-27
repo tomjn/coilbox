@@ -859,6 +859,31 @@ export const mpOpenBattle = defineCommand<
   { sent: boolean }
 >("coilbox-multiplayer", "mp_open_battle");
 
+/** The battle modes a Zero-K room can be opened in, as `mp_zerok_open_battle`
+ * names them. Planet Wars is not one: the server runs that campaign itself. */
+export type ZerokBattleMode = "custom" | "teams" | "1v1" | "ffa" | "coop";
+
+/**
+ * Zero-K only: ask the server to open a room founded in our name.
+ *
+ * The server runs every Zero-K match on its own machine, so this is not hosting
+ * either, and it carries no port, no NAT mode and no content hash. The map is a
+ * request the server resolves against its own content, and the game is not asked
+ * for at all. Being the founder means the room's commands run for us without
+ * going to a vote.
+ */
+export const mpZerokOpenBattle = defineCommand<
+  {
+    serverKey: string;
+    title: string;
+    map: string | null;
+    mode: ZerokBattleMode;
+    maxPlayers: number;
+    password: string | null;
+  },
+  { sent: boolean }
+>("coilbox-multiplayer", "mp_zerok_open_battle");
+
 /**
  * Tachyon only: create a lobby, which is a room the server owns and puts us in
  * as its first player. It is not hosting. Nothing runs on this machine until a

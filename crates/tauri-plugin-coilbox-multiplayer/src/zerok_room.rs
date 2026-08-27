@@ -70,6 +70,20 @@ pub(crate) enum RoomAction {
         battle: u32,
         password: Option<String>,
     },
+    /// Ask the server for a room of our own, founded in our name.
+    ///
+    /// Founding one is not hosting it. The server runs every Zero-K match on
+    /// its own machine, so there is no port to advertise and no content hash to
+    /// send, and what being the founder buys is the right to run the room's
+    /// commands without a vote. The answer is a `BattleAdded` and the
+    /// `JoinBattleSuccess` that puts us in it, the same pair a join produces.
+    Open {
+        title: String,
+        map: Option<String>,
+        mode: types::AutohostMode,
+        max_players: u32,
+        password: Option<String>,
+    },
     /// Leave the room we are in.
     Leave,
     /// Our own seat, as the room's controls set it.
@@ -563,6 +577,30 @@ pub(crate) fn build(
                 password: password.clone().filter(|key| !key.is_empty()),
             })?]
         }
+        RoomAction::Open {
+            title,
+            map,
+            mode,
+            max_players,
+            password,
+        } => {
+            // Upstream refuses to open a room for somebody who is already in
+            // one, in a message box rather than as a failure, so a client that
+            // did not leave first would wait on a room that never arrives.
+            let leaving = build(state, &RoomAction::Leave)?;
+            let header = types::BattleHeader {
+                title: Some(title.clone()),
+                map: map.clone().filter(|name| !name.is_empty()),
+                mode: Some(*mode),
+                max_players: Some(i32::try_from(*max_players).unwrap_or(i32::MAX)),
+                password: password.clone().filter(|key| !key.is_empty()),
+                ..types::BattleHeader::default()
+            };
+            let open = line(&types::OpenBattle {
+                header: Some(header),
+            })?;
+            leaving.into_iter().chain([open]).collect()
+        }
         RoomAction::Leave => match battle_id {
             Some(battle_id) => vec![line(&types::LeaveBattle {
                 battle_id: Some(battle_id),
@@ -598,6 +636,23 @@ pub(crate) fn build(
             text: Some(text.clone()),
             ..types::Say::default()
         })?],
+    })
+}
+
+/// The battle mode a room opens in, by the name the frontend picks it by.
+///
+/// A mode upstream cannot place is answered with "Incorrect battle type" and
+/// opens nothing, so a name that is not one of these is refused here instead of
+/// going out as a number nobody has. Planet Wars is deliberately not one of
+/// them: the server runs that campaign and hands out its rooms itself.
+pub(crate) fn autohost_mode(name: &str) -> Option<types::AutohostMode> {
+    Some(match name {
+        "custom" => types::AutohostMode::None,
+        "teams" => types::AutohostMode::Teams,
+        "1v1" => types::AutohostMode::Game1v1,
+        "ffa" => types::AutohostMode::GameFFA,
+        "coop" => types::AutohostMode::GameChickens,
+        _ => return None,
     })
 }
 

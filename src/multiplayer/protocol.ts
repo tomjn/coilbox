@@ -73,6 +73,20 @@ export function seatIsServerAssigned(protocol: LobbyProtocol): boolean {
 }
 
 /**
+ * Whether founding a room on this connection also means running the match on
+ * this machine.
+ *
+ * True only on TASServer, where `OPENBATTLE` advertises this machine's port and
+ * the founder's client scripts the game, drives the roster and forces seats.
+ * A Zero-K founder owns the room and none of the match: the server runs every
+ * game itself and tells each player where to connect, so a founder there is a
+ * player with the room's commands to hand, not a host.
+ */
+export function founderRunsTheGame(protocol: LobbyProtocol): boolean {
+  return protocol === "tasserver";
+}
+
+/**
  * Whether this connection has a client-wide away/ingame status to publish.
  *
  * Separate from `syncsOnReady` because Zero-K parts company with it here: the
