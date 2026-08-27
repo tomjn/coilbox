@@ -90,7 +90,7 @@ import { favouritesFor, useFavourites } from "./friends";
 import { addIgnore, ignoredFor, useIgnored } from "./ignore";
 import { triggerIngameCue } from "./ingameCue";
 import { MatchFoundPanel } from "./MatchFoundPanel";
-import { protocolForKey, syncsOnReady } from "./protocol";
+import { protocolForKey, publishesStatus, syncsOnReady } from "./protocol";
 import { triggerRing } from "./ringEffect";
 import { ServerMessageBoxDialog } from "./ServerMessageBoxDialog";
 import { newScriptPassword } from "./scriptPassword";
@@ -818,10 +818,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   }, [activeKey]);
 
   // Tachyon carries readiness per lobby rather than as a client-wide status, so a
-  // Tachyon connection publishes nothing here (see `syncsOnReady`).
+  // Tachyon connection publishes nothing here (see `publishesStatus`).
   useEffect(() => {
     if (activeKey == null || mirror.phase !== "ready") return;
-    if (!syncsOnReady(protocol)) return;
+    if (!publishesStatus(protocol)) return;
     const sent = sentStatusRef.current;
     if (sent && sameStatus(sent, status)) return;
     sentStatusRef.current = status;

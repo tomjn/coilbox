@@ -27,8 +27,8 @@ export function protocolForKey(
 
 /**
  * Whether a connection runs the ready-time sync the store owns: auto-joining the
- * configured channels, pulling the server ignore list, pulling the friend list and
- * pending friend requests, and publishing our status bits.
+ * configured channels, pulling the server ignore list, and pulling the friend
+ * list and pending friend requests.
  *
  * Each of those is a TASServer command with no Tachyon equivalent, bar the friend
  * list: Tachyon has `friend/list`, but `user/self` has already handed the friends
@@ -36,9 +36,25 @@ export function protocolForKey(
  * round trip for what we hold. A Tachyon connection skips them all here rather
  * than queueing them for the connection task to drop, which is what put four "not
  * sent" lines in the console on every connect.
+ *
+ * A Zero-K connection skips them for the opposite reason: the server sends all
+ * three unasked. It force-joins the default channels, and pushes `FriendList` and
+ * `IgnoreList` on connect and again after every change.
  */
 export function syncsOnReady(protocol: LobbyProtocol): boolean {
   return protocol === "tasserver";
+}
+
+/**
+ * Whether this connection has a client-wide away/ingame status to publish.
+ *
+ * Separate from `syncsOnReady` because Zero-K parts company with it here: the
+ * server pushes the channels and the lists, but it is still the client that says
+ * whether somebody is away or in a game, as `ChangeUserStatus`. Tachyon carries
+ * readiness per lobby instead and has nothing client-wide to send.
+ */
+export function publishesStatus(protocol: LobbyProtocol): boolean {
+  return protocol !== "tachyon";
 }
 
 /** How many characters one Tachyon message may carry, from the schema for

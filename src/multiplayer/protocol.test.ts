@@ -13,7 +13,12 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 }));
 
 import { BUILTIN_SERVERS, type LobbyServer } from "../lobby-servers/config";
-import { messageLimit, protocolForKey, syncsOnReady } from "./protocol";
+import {
+  messageLimit,
+  protocolForKey,
+  publishesStatus,
+  syncsOnReady,
+} from "./protocol";
 
 /** A built-in server by id, failing loudly if the catalog entry is renamed. */
 function builtin(id: string): LobbyServer {
@@ -125,7 +130,23 @@ describe("Zero-K", () => {
     expect(syncsOnReady("zerok")).toBe(false);
   });
 
+  it("still publishes an away and ingame status of its own", () => {
+    // The one part of the ready-time sync Zero-K does want. The server pushes
+    // the channels and the lists, but only the client knows it is away.
+    expect(publishesStatus("zerok")).toBe(true);
+  });
+
   it("sets no message limit, because none is published", () => {
     expect(messageLimit("zerok")).toBeNull();
+  });
+});
+
+describe("publishesStatus", () => {
+  it("is true on TASServer, which packs it into MYSTATUS", () => {
+    expect(publishesStatus("tasserver")).toBe(true);
+  });
+
+  it("is false on Tachyon, which carries readiness per lobby instead", () => {
+    expect(publishesStatus("tachyon")).toBe(false);
   });
 });
