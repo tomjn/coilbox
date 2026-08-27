@@ -362,6 +362,72 @@ fn a_kick_aimed_at_us_takes_us_out_of_the_room() {
     );
 }
 
+/// `LeaveBattle` is a client message and the server has no answer for it, so
+/// our own record with the battle gone is the only thing that says we left.
+/// Without this the room stays open on a battle we are no longer in.
+#[test]
+fn our_own_record_with_no_battle_takes_us_out_of_the_room() {
+    let mut state = in_room();
+    let (deltas, _) = feed(&mut state, r#"User {"Name":"someone"}"#);
+
+    assert_eq!(state.current_battle, None);
+    assert_eq!(state.last_battle, Some(42));
+    assert_eq!(
+        deltas,
+        vec![Delta::MemberLeft {
+            battle_id: 42,
+            name: "someone".into()
+        }]
+    );
+}
+
+/// Somebody else leaving is theirs to be taken out of, and [`crate::zerok_users`]
+/// does that. The room we are in is untouched.
+#[test]
+fn somebody_else_leaving_leaves_us_where_we_are() {
+    let mut state = in_room();
+    let (deltas, _) = feed(&mut state, r#"User {"Name":"another"}"#);
+
+    assert_eq!(state.current_battle, Some(42));
+    assert_eq!(deltas, vec![]);
+}
+
+/// The record is re-broadcast on every change, so most of them arrive while we
+/// are sitting in the room it names.
+#[test]
+fn our_own_record_still_naming_our_room_leaves_us_in_it() {
+    let mut state = in_room();
+    let (deltas, _) = feed(&mut state, r#"User {"Name":"someone","BattleID":42}"#);
+
+    assert_eq!(state.current_battle, Some(42));
+    assert_eq!(deltas, vec![]);
+}
+
+/// The connection folds the directory before the room, and both act on the same
+/// record. Only one of them announces the departure.
+#[test]
+fn leaving_is_announced_once_across_the_two_folds() {
+    let mut state = in_room();
+    // The directory already holds everybody by the time a room is joined, so a
+    // record arriving now is an update rather than a first sighting.
+    let seen = line::parse_line(r#"User {"Name":"someone","BattleID":42}"#).expect("it parses");
+    crate::zerok_users::reduce(&mut state, &seen);
+
+    let message = line::parse_line(r#"User {"Name":"someone"}"#).expect("the line parses");
+    let mut deltas = crate::zerok_users::reduce(&mut state, &message);
+    let (room, _) = reduce(&mut state, &message);
+    deltas.extend(room);
+
+    assert_eq!(state.current_battle, None);
+    assert_eq!(
+        deltas,
+        vec![Delta::MemberLeft {
+            battle_id: 42,
+            name: "someone".into()
+        }]
+    );
+}
+
 /// A kick is broadcast to the whole room, so it has to be read as being about
 /// somebody else.
 #[test]

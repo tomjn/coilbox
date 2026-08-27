@@ -28,9 +28,13 @@
 //!
 //! # Leaving has no message of its own
 //!
-//! `LeaveBattle` carries a battle id and is only ever about yourself. Somebody
-//! else leaving arrives as their `User` record with `BattleID` cleared, which
-//! [`crate::zerok_users`] acts on.
+//! `LeaveBattle` carries a battle id and is only ever about yourself. It is a
+//! client message with no server form, so nothing comes back to confirm it.
+//! Leaving arrives as the leaver's `User` record with `BattleID` cleared, and
+//! that is as true of us as of anyone else: the room we are in is only ever
+//! closed by our own record turning up naming a different battle or none.
+//! [`crate::zerok_users`] takes the person off the roster and this takes us out
+//! of the room, off the same record.
 //!
 //! # What is parsed and not kept
 //!
@@ -158,6 +162,10 @@ pub(crate) fn reduce(state: &mut LobbyState, msg: &ZerokMessage) -> Reduced {
                 }],
             )
         }
+        // The whole directory comes through here, so most of these are about
+        // somebody else and produce nothing. See the module header for why our
+        // own is what closes the room.
+        ZerokMessage::User(record) => (own_record(state, record), vec![]),
         _ => (vec![], vec![]),
     }
 }
@@ -416,7 +424,31 @@ fn clear_poll(state: &mut LobbyState) -> Vec<Delta> {
     }
 }
 
+/// Take us out of the room our own record no longer names.
+///
+/// A record naming somebody else is theirs, and [`crate::zerok_users`] takes
+/// them out of whichever battle they left. A record naming the room we are
+/// already in is one of the many the server re-broadcasts on any change, and
+/// says nothing about where we are sitting.
+fn own_record(state: &mut LobbyState, record: &types::User) -> Vec<Delta> {
+    let Some(name) = named(record.name.as_deref()) else {
+        return vec![];
+    };
+    if state.my_username.as_deref() != Some(name.as_str()) {
+        return vec![];
+    }
+    let battle = record.battle_id.and_then(|id| u32::try_from(id).ok());
+    if battle == state.current_battle {
+        return vec![];
+    }
+    leave(state)
+}
+
 /// Take ourselves out of the room we are in.
+///
+/// The departure is announced only when this is what took us off the roster.
+/// [`crate::zerok_users`] folds the same record first and announces the one it
+/// acts on, so saying it again here would ring the room's leave twice.
 fn leave(state: &mut LobbyState) -> Vec<Delta> {
     let Some(id) = state.current_battle.take() else {
         return vec![];
@@ -424,13 +456,18 @@ fn leave(state: &mut LobbyState) -> Vec<Delta> {
     state.last_battle = Some(id);
     state.current_vote = None;
     let name = state.my_username.clone().unwrap_or_default();
-    if let Some(battle) = state.battles.get_mut(&id) {
-        battle.members.remove(&name);
+    let seated = state
+        .battles
+        .get_mut(&id)
+        .is_some_and(|battle| battle.members.remove(&name).is_some());
+    if seated {
+        vec![Delta::MemberLeft {
+            battle_id: id,
+            name,
+        }]
+    } else {
+        vec![]
     }
-    vec![Delta::MemberLeft {
-        battle_id: id,
-        name,
-    }]
 }
 
 /// Whether a message naming somebody is naming us. A message that names nobody
