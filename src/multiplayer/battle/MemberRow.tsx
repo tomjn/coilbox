@@ -245,21 +245,40 @@ export function MemberRow({
             />
           )}
           <div className="min-w-0 leading-tight">
-            <div className="flex items-center gap-1 truncate">
-              {(row.host || row.boss) && (
-                <Crown className="size-3.5 text-amber-500" />
+            {/* The AI picker sits beside the name while the row is wide enough
+                for both, and wraps under it when it is not. A bot's name is a
+                handle rather than a sentence, so the pair reads as one thing. */}
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="flex items-center gap-1 truncate">
+                {(row.host || row.boss) && (
+                  <Crown className="size-3.5 text-amber-500" />
+                )}
+                {row.kind === "bot" && (
+                  <BotIcon className="size-3.5 text-muted-foreground" />
+                )}
+                {row.country && <CountryFlag country={row.country} />}
+                <span
+                  className={cn("truncate", row.self && "font-medium")}
+                  title={note || undefined}
+                >
+                  {row.name}
+                </span>
+                {row.rank != null && <RankBadge rank={row.rank} />}
+              </div>
+              {canChangeAi && (
+                <OptionSelect
+                  value={
+                    aiOptions?.some((o) => o.value === row.aiDll)
+                      ? (row.aiDll ?? "")
+                      : ""
+                  }
+                  onValueChange={(v) => control?.onChangeAi?.(v)}
+                  options={aiOptions ?? []}
+                  size="sm"
+                  className="h-7 w-auto min-w-36"
+                  placeholder={row.aiDll ?? "Select an AI"}
+                />
               )}
-              {row.kind === "bot" && (
-                <BotIcon className="size-3.5 text-muted-foreground" />
-              )}
-              {row.country && <CountryFlag country={row.country} />}
-              <span
-                className={cn("truncate", row.self && "font-medium")}
-                title={note || undefined}
-              >
-                {row.name}
-              </span>
-              {row.rank != null && <RankBadge rank={row.rank} />}
             </div>
             {aiInvalid && (
               <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
@@ -267,25 +286,10 @@ export function MemberRow({
                 {row.aiDll} isn't available in this game
               </span>
             )}
-            {canChangeAi ? (
-              <OptionSelect
-                value={
-                  aiOptions?.some((o) => o.value === row.aiDll)
-                    ? (row.aiDll ?? "")
-                    : ""
-                }
-                onValueChange={(v) => control?.onChangeAi?.(v)}
-                options={aiOptions ?? []}
-                size="sm"
-                className="mt-1 h-7 w-auto min-w-36"
-                placeholder={row.aiDll ?? "Select an AI"}
-              />
-            ) : (
-              !aiInvalid && (
-                <span className="text-[11px] text-muted-foreground">
-                  {subtitle}
-                </span>
-              )
+            {!canChangeAi && !aiInvalid && (
+              <span className="text-[11px] text-muted-foreground">
+                {subtitle}
+              </span>
             )}
           </div>
           {onSetNote && (
