@@ -482,6 +482,21 @@ describe("isAiUnavailable", () => {
     expect(isAiUnavailable("SurvivalAI", ais, true)).toBe(true);
   });
 
+  // Zero-K's Lua AIs are named "Chicken: Beginner" and the like, and the id
+  // prefix rule above reduced that to "Beginner", which is nothing's name. So
+  // every chicken added to a room was flagged as an AI the game does not have.
+  it("does not flag a shortName that has a space in it", () => {
+    const withSpaces = [
+      { shortName: "Chicken: Beginner" },
+      { shortName: "CAI" },
+    ];
+    expect(isAiUnavailable("Chicken: Beginner", withSpaces, true)).toBe(false);
+  });
+
+  it("still flags an absent AI whose name has a space in it", () => {
+    expect(isAiUnavailable("Chicken: Suicidal", ais, true)).toBe(true);
+  });
+
   it("does not flag while the addable list isn't ready yet (#531)", () => {
     expect(isAiUnavailable("SurvivalAI", [], false)).toBe(false);
   });

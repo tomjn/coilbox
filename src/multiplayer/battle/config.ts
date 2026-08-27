@@ -224,8 +224,13 @@ export function isAiUnavailable(
   ready: boolean,
 ): boolean {
   if (!ready || !aiDll) return false;
-  const shortName = aiShortNameFromDll(aiDll).toLowerCase();
-  return !addableAis.some((a) => a.shortName.toLowerCase() === shortName);
+  const named = (name: string) =>
+    addableAis.some((a) => a.shortName.toLowerCase() === name);
+  // The whole string first. Stripping a prefix off a name that never had one
+  // is how "Chicken: Beginner" became "Beginner", which is nothing's name, so
+  // every Zero-K chicken read as an AI the game does not have.
+  if (named(aiDll.trim().toLowerCase())) return false;
+  return !named(aiShortNameFromDll(aiDll).toLowerCase());
 }
 
 /* -------------------------------------------------------------------------- *
