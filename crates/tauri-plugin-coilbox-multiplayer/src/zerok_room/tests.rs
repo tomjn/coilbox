@@ -495,6 +495,95 @@ fn a_join_names_the_battle_and_leaves_an_empty_password_out() {
     );
 }
 
+/// A mode upstream does not know is answered with "Incorrect battle type" and
+/// opens nothing, so a name we cannot place is refused here rather than sent as
+/// a number nobody has. Planet Wars is one of those names: the server runs that
+/// campaign and hands out its rooms itself.
+#[test]
+fn the_battle_modes_are_the_ones_a_person_may_open_a_room_in() {
+    assert_eq!(autohost_mode("custom"), Some(types::AutohostMode::None));
+    assert_eq!(autohost_mode("teams"), Some(types::AutohostMode::Teams));
+    assert_eq!(autohost_mode("1v1"), Some(types::AutohostMode::Game1v1));
+    assert_eq!(autohost_mode("ffa"), Some(types::AutohostMode::GameFFA));
+    assert_eq!(
+        autohost_mode("coop"),
+        Some(types::AutohostMode::GameChickens)
+    );
+    assert_eq!(autohost_mode("planetwars"), None);
+    assert_eq!(autohost_mode(""), None);
+}
+
+/// The server fills in the rest. `ServerBattle.ValidateAndFillDetails` upstream
+/// overwrites the engine with its own for every mode but Custom, and resolves
+/// the game against its own resources, so neither is ours to ask for. What is
+/// not there at all is the port, the NAT mode and the two content hashes
+/// `OPENBATTLE` carries: nothing about this room runs on this machine.
+#[test]
+fn opening_a_room_asks_for_a_title_a_map_a_size_and_a_mode() {
+    let state = ready();
+    assert_eq!(
+        replies(
+            &state,
+            &[RoomAction::Open {
+                title: "someone's game".into(),
+                map: Some("Comet Catcher Remake 1.8".into()),
+                mode: types::AutohostMode::None,
+                max_players: 8,
+                password: Some("hunter2".into()),
+            }]
+        ),
+        vec![
+            r#"OpenBattle {"Header":{"Map":"Comet Catcher Remake 1.8","MaxPlayers":8,"Mode":0,"Password":"hunter2","Title":"someone's game"}}"#
+        ]
+    );
+}
+
+/// An empty password is a room anyone may join, and upstream tests the field
+/// with `IsNullOrEmpty`, so an empty string would read the same as none. It is
+/// left out rather than sent empty, as it is on a join.
+#[test]
+fn opening_a_room_without_a_password_or_a_map_leaves_both_out() {
+    let state = ready();
+    assert_eq!(
+        replies(
+            &state,
+            &[RoomAction::Open {
+                title: "someone's game".into(),
+                map: None,
+                mode: types::AutohostMode::Teams,
+                max_players: 16,
+                password: Some(String::new()),
+            }]
+        ),
+        vec![r#"OpenBattle {"Header":{"MaxPlayers":16,"Mode":6,"Title":"someone's game"}}"#]
+    );
+}
+
+/// Upstream's `Process(OpenBattle)` answers somebody who is already in a room
+/// with "You are already in a battle" and opens nothing, and its own client
+/// leaves first for that reason. The refusal comes back as a message box rather
+/// than as a failure, so a client that did not leave would be left waiting on a
+/// room that is never coming.
+#[test]
+fn opening_a_room_leaves_the_one_we_are_already_in() {
+    assert_eq!(
+        replies(
+            &in_room(),
+            &[RoomAction::Open {
+                title: "someone's game".into(),
+                map: None,
+                mode: types::AutohostMode::None,
+                max_players: 8,
+                password: None,
+            }]
+        ),
+        vec![
+            r#"LeaveBattle {"BattleID":42}"#,
+            r#"OpenBattle {"Header":{"MaxPlayers":8,"Mode":0,"Title":"someone's game"}}"#,
+        ]
+    );
+}
+
 #[test]
 fn leaving_names_the_room_we_are_in_and_says_nothing_when_we_are_in_none() {
     let state = in_room();

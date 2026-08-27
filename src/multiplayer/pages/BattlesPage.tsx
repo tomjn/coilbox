@@ -50,6 +50,10 @@ import {
   HostBattlePopover,
   type OpenBattleArgs,
 } from "../battles/HostBattlePopover";
+import {
+  HostZerokBattlePopover,
+  type ZerokOpenBattleArgs,
+} from "../battles/HostZerokBattlePopover";
 import { useBattleFilters } from "../battles/useBattleFilters";
 import {
   type Battle,
@@ -58,6 +62,7 @@ import {
   mpLeaveBattle,
   mpOpenBattle,
   mpSnapshot,
+  mpZerokOpenBattle,
 } from "../bindings";
 import { newScriptPassword } from "../scriptPassword";
 import { serverAddressFromKey, useMultiplayer } from "../store";
@@ -96,11 +101,6 @@ function BattlesPage() {
   // this page is open and stopped when it is not, so nothing holds the beacon
   // port open behind a page nobody is looking at.
   const lan = useLanRooms();
-  // Under Tachyon the server allocates a dedicated autohost and a client cannot
-  // host a battle at all. What it can do is create a lobby, which is a different
-  // thing with its own popover, so the two swap rather than one being hidden.
-  // See `docs/tachyon-protocol.md`.
-  const canHost = protocol !== "tachyon";
   const [filters, setFilters] = useBattleFilters();
 
   const all = useMemo(
@@ -277,6 +277,32 @@ function BattlesPage() {
     }
   }
 
+  // Open a room on a Zero-K server. The server founds it in our name and puts us
+  // in it, so `currentBattle` is set by the same `JoinBattleSuccess` a join
+  // produces and the effect above takes us to the room. Nothing runs here, so a
+  // draft's bots and options have nowhere to go and the draft is not carried.
+  //
+  // Held stable across renders so the form it belongs to can be, which is what
+  // keeps an open map picker from being rebuilt every time a battle changes in
+  // the list behind it.
+  const onZerokHost = useCallback(
+    async (args: ZerokOpenBattleArgs) => {
+      if (!activeKey) return;
+      clearJoinError();
+      hostingFromDraftRef.current = false;
+      joiningRef.current = true;
+      try {
+        await mpZerokOpenBattle({ serverKey: activeKey, ...args });
+      } catch (e) {
+        joiningRef.current = false;
+        // Thrown on rather than dropped, for the same reason `onHost` throws: a
+        // refusal that never reached the wire has no join error behind it.
+        throw e;
+      }
+    },
+    [activeKey, clearJoinError],
+  );
+
   // Create a lobby on a Tachyon server. The response is the whole lobby and it
   // puts us in it, so it sets `currentBattle` exactly as a join does and the
   // effect above takes us to the room. Nothing here hosts anything.
@@ -441,6 +467,40 @@ function BattlesPage() {
     </>
   );
 
+  // Every protocol opens a room in its own words, so the control swaps rather
+  // than one of them being hidden. On TASServer this machine becomes the host.
+  // Under Tachyon the server allocates a dedicated autohost and a client cannot
+  // host at all, so what it offers instead is a lobby (see
+  // `docs/tachyon-protocol.md`). Zero-K sits between the two: the server runs
+  // the game, but the room is opened in a player's name and founding it carries
+  // the room's commands with it.
+  const openControl =
+    protocol === "tachyon" ? (
+      <CreateLobbyPopover
+        disabled={!canJoin}
+        onCreate={onCreate}
+        initialMap={hostDraft?.mapName ?? hostMap}
+        autoOpen={!!hostMap || !!hostDraft}
+      />
+    ) : protocol === "zerok" ? (
+      <HostZerokBattlePopover
+        disabled={!canJoin}
+        onHost={onZerokHost}
+        initialMap={hostDraft?.mapName ?? hostMap}
+        initialTitle={hostState?.hostTitle}
+        autoOpen={!!hostMap || !!hostDraft}
+      />
+    ) : (
+      <HostBattlePopover
+        disabled={!canJoin}
+        onHost={onHost}
+        initialMap={hostDraft?.mapName ?? hostMap}
+        initialGame={hostDraft?.gameName}
+        initialTitle={hostState?.hostTitle}
+        autoOpen={!!hostMap || !!hostDraft}
+      />
+    );
+
   const hostControl = (
     <HostRoomControl
       room={room}
@@ -501,23 +561,7 @@ function BattlesPage() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {canHost ? (
-            <HostBattlePopover
-              disabled={!canJoin}
-              onHost={onHost}
-              initialMap={hostDraft?.mapName ?? hostMap}
-              initialGame={hostDraft?.gameName}
-              initialTitle={hostState?.hostTitle}
-              autoOpen={!!hostMap || !!hostDraft}
-            />
-          ) : (
-            <CreateLobbyPopover
-              disabled={!canJoin}
-              onCreate={onCreate}
-              initialMap={hostDraft?.mapName ?? hostMap}
-              autoOpen={!!hostMap || !!hostDraft}
-            />
-          )}
+          {openControl}
           {hostControl}
           <BattleFilterPopover filters={filters} setFilters={setFilters} />
         </div>

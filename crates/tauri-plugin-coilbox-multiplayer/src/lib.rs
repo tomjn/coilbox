@@ -1620,6 +1620,46 @@ fn mp_open_battle(
     enqueue(registry.inner(), &server_key, line)
 }
 
+/// `mp_zerok_open_battle`, Zero-K only: ask the server to open a room for us.
+///
+/// The Zero-K counterpart of [`mp_open_battle`], and a different thing under the
+/// same word. Opening a battle on TASServer makes this machine the host, so the
+/// line carries a port, a NAT mode and the hashes joiners check themselves
+/// against. Zero-K's server runs every match itself, so none of those exist and
+/// what is left is what the room is: a title, a map, a size, a mode and an
+/// optional password. Being its founder is the right to run the room's commands
+/// without a vote, not a game running here.
+///
+/// The map is a request rather than a setting. The server resolves it against
+/// its own content and picks a recommended one when it cannot, which is also
+/// why the game is not asked for at all.
+#[tauri::command]
+fn mp_zerok_open_battle(
+    registry: State<'_, Registry>,
+    server_key: String,
+    title: String,
+    map: Option<String>,
+    mode: String,
+    max_players: u32,
+    password: Option<String>,
+) -> CliResult {
+    let Some(mode) = zerok_room::autohost_mode(&mode) else {
+        return CliResult::err(format!("{mode} is not a battle mode"));
+    };
+    zerok_room_action(
+        registry.inner(),
+        &server_key,
+        zerok_room::RoomAction::Open {
+            title,
+            map,
+            mode,
+            max_players,
+            password,
+        },
+    )
+    .unwrap_or_else(|| CliResult::err("this server does not open battles for its players"))
+}
+
 /// `mp_create_lobby`, Tachyon only: make a lobby of our own.
 ///
 /// A lobby is not a battle this machine hosts. It is a room the server owns,
@@ -2688,6 +2728,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_set_status,
             mp_set_battle_status,
             mp_open_battle,
+            mp_zerok_open_battle,
             mp_create_lobby,
             mp_start_battle,
             mp_update_battle_info,
