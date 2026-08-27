@@ -46,13 +46,16 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 /// `ConfirmAgreement` resumes a login parked awaiting the emailed verification
 /// code by driving the login machine (`CONFIRMAGREEMENT` + re-`LOGIN`).
 /// `Tachyon` is an action with no wire line at all, carried out by the Tachyon
-/// task in [`crate::tachyon_conn`].
+/// task in [`crate::tachyon_conn`]. `Zerok` is an action turned into one of
+/// Zero-K's own commands by [`crate::zerok_conn`], which owns the types it is
+/// built from.
 pub enum Outbound {
     Line(String),
     SayPrivate { peer: String, text: String },
     SayPrivateEx { peer: String, text: String },
     ConfirmAgreement { code: Option<String> },
     Tachyon(TachyonAction),
+    Zerok(crate::zerok_conn::ZerokAction),
     Shutdown,
 }
 
@@ -482,9 +485,9 @@ async fn run_loop(
                         );
                     }
                 }
-                // Only queued for a connection that has a Tachyon client, so a
-                // line-protocol one never sees it.
-                Outbound::Tachyon(_) => {}
+                // Only queued for a connection whose protocol it belongs to, so
+                // a TASServer one never sees either.
+                Outbound::Tachyon(_) | Outbound::Zerok(_) => {}
                 Outbound::Shutdown => {
                     outbound.push(command::exit(None));
                     shutdown = true;

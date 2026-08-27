@@ -40,8 +40,8 @@ use crate::conn::{
     emit, ConnProtocol, EventSink, LobbyEvent, Outbound, Registry, ServerConn, StartedBattle,
     TachyonHandle,
 };
-use crate::lock_or_recover;
 use crate::tls::ConnectError;
+use crate::{lock_or_recover, zerok_battles, zerok_users};
 
 /// How long the socket may be idle before the kernel starts probing, and how far
 /// apart the probes go.
@@ -212,7 +212,7 @@ async fn run_loop(
                     let Some(message) = line::parse_line(&raw) else {
                         continue;
                     };
-                    match message {
+                    match &message {
                         // Zero-K's server speaks first. The greeting is the
                         // prompt to log in or to register, rather than the
                         // client opening with one of its own.
@@ -245,7 +245,7 @@ async fn run_loop(
                                 // connection and opens a fresh one to do that.
                                 phase.set(LoginPhase::Registered);
                             } else {
-                                let reason = register_refusal(&response);
+                                let reason = register_refusal(response);
                                 phase.set(LoginPhase::Denied);
                                 emit(&sink, LobbyEvent::Delta {
                                     delta: Delta::RegistrationDenied { reason: reason.clone() },
@@ -268,7 +268,7 @@ async fn run_loop(
                                     delta: Delta::LoggedIn { username },
                                 });
                             } else {
-                                let reason = refusal(&response);
+                                let reason = refusal(response);
                                 phase.set(LoginPhase::Denied);
                                 // Emitted before the teardown below, so the
                                 // login form has the reason ahead of the
@@ -279,10 +279,36 @@ async fn run_loop(
                                 break 'conn Some(reason);
                             }
                         }
-                        // Nothing else folds into state yet. The battle list,
-                        // the room and chat are their own issues in this
-                        // milestone.
+                        // Zero-K pushes its news at every client on connect and
+                        // again whenever the site changes it, so the list is
+                        // always the whole thing rather than a patch. The
+                        // console is where a server's own greeting already
+                        // lands, which is what `Motd` names.
+                        ZerokMessage::NewsList(news) => {
+                            for item in news.news_items.iter().flatten() {
+                                if let Some(line) = news_line(item) {
+                                    emit(&sink, LobbyEvent::Delta {
+                                        delta: Delta::Motd { line },
+                                    });
+                                }
+                            }
+                        }
+                        // The room and chat are their own issues in this
+                        // milestone. Everything else is folded below.
                         _ => {}
+                    }
+
+                    // The battle list and the player directory, folded after the
+                    // login arms so a `LoggedIn` reaches the frontend before
+                    // anything that assumes we are.
+                    let deltas = {
+                        let mut held = lock_or_recover(&state);
+                        let mut deltas = zerok_users::reduce(&mut held, &message);
+                        deltas.extend(zerok_battles::reduce(&mut held, &message));
+                        deltas
+                    };
+                    for delta in deltas {
+                        emit(&sink, LobbyEvent::Delta { delta });
                     }
                 }
                 Some(Err(e)) => break 'conn Some(e.to_string()),
@@ -291,6 +317,15 @@ async fn run_loop(
             Some(out) = rx.recv() => match out {
                 Outbound::Line(line) => outbound.push(line),
                 Outbound::Shutdown => shutdown = true,
+                Outbound::Zerok(action) => match build(&action) {
+                    Ok(line) => outbound.push(line),
+                    // Nothing generated can fail to serialise, so this says the
+                    // types have moved rather than that the action was wrong.
+                    Err(e) => emit(&sink, LobbyEvent::Console {
+                        direction: "out".into(),
+                        line: format!("could not build the command: {e}"),
+                    }),
+                },
                 // Zero-K has no `EXIT` to write and no agreement to confirm, and
                 // a Tachyon action never reaches a connection without a Tachyon
                 // client. A private message is queued by a command that refuses
@@ -324,6 +359,49 @@ async fn run_loop(
 
     emit(&sink, LobbyEvent::Disconnected { reason });
     lock_or_recover(&registry).remove(&server_key);
+}
+
+/// Something a command asks of a Zero-K connection.
+///
+/// Zero-K's own commands are what a client sends here, so unlike
+/// [`crate::conn::TachyonAction`] every one of these becomes a wire line and
+/// nothing has to wait for an answer. It is an enum rather than a built line so
+/// the building stays in this module, beside the types it builds from.
+pub enum ZerokAction {
+    /// Publish whether we are away or in a game. Zero-K has no status bitfield:
+    /// each half is a nullable flag, and one left unset is left alone.
+    Status { ingame: bool, away: bool },
+}
+
+/// The wire line for an action.
+fn build(action: &ZerokAction) -> Result<String, serde_json::Error> {
+    match action {
+        ZerokAction::Status { ingame, away } => line::to_line(&types::ChangeUserStatus {
+            is_afk: Some(*away),
+            is_in_game: Some(*ingame),
+        }),
+    }
+}
+
+/// One news item as a line for the console, or `None` when it carries nothing
+/// worth showing.
+///
+/// The header is the headline and the text is the body, which runs to
+/// paragraphs. A console line is one line, so the headline and the link to the
+/// rest of it are what goes in.
+fn news_line(item: &types::NewsItem) -> Option<String> {
+    let headline = item
+        .header
+        .as_deref()
+        .or(item.text.as_deref())
+        .map(str::trim)
+        .filter(|headline| !headline.is_empty())?;
+    Some(
+        match item.url.as_deref().map(str::trim).filter(|u| !u.is_empty()) {
+            Some(url) => format!("{headline} ({url})"),
+            None => headline.to_owned(),
+        },
+    )
 }
 
 /// The login phase, written to both places that have to hear about it: the watch

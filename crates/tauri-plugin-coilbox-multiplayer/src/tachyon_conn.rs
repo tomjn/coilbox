@@ -573,6 +573,10 @@ async fn run_loop(
                     not_sent(&sink, &format!("SAYPRIVATEEX {peer}"))
                 }
                 Outbound::ConfirmAgreement { .. } => not_sent(&sink, "CONFIRMAGREEMENT"),
+                // Queued only for a Zero-K connection, so this one never sees
+                // it. Reported rather than dropped, for the same reason as the
+                // lines above it.
+                Outbound::Zerok(_) => not_sent(&sink, "a Zero-K command"),
             },
             ended = &mut task => break ended
                 .map(|e| match e {
