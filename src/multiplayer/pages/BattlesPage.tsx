@@ -281,20 +281,27 @@ function BattlesPage() {
   // in it, so `currentBattle` is set by the same `JoinBattleSuccess` a join
   // produces and the effect above takes us to the room. Nothing runs here, so a
   // draft's bots and options have nowhere to go and the draft is not carried.
-  async function onZerokHost(args: ZerokOpenBattleArgs) {
-    if (!activeKey) return;
-    clearJoinError();
-    hostingFromDraftRef.current = false;
-    joiningRef.current = true;
-    try {
-      await mpZerokOpenBattle({ serverKey: activeKey, ...args });
-    } catch (e) {
-      joiningRef.current = false;
-      // Thrown on rather than dropped, for the same reason `onHost` throws: a
-      // refusal that never reached the wire has no join error behind it.
-      throw e;
-    }
-  }
+  //
+  // Held stable across renders so the form it belongs to can be, which is what
+  // keeps an open map picker from being rebuilt every time a battle changes in
+  // the list behind it.
+  const onZerokHost = useCallback(
+    async (args: ZerokOpenBattleArgs) => {
+      if (!activeKey) return;
+      clearJoinError();
+      hostingFromDraftRef.current = false;
+      joiningRef.current = true;
+      try {
+        await mpZerokOpenBattle({ serverKey: activeKey, ...args });
+      } catch (e) {
+        joiningRef.current = false;
+        // Thrown on rather than dropped, for the same reason `onHost` throws: a
+        // refusal that never reached the wire has no join error behind it.
+        throw e;
+      }
+    },
+    [activeKey, clearJoinError],
+  );
 
   // Create a lobby on a Tachyon server. The response is the whole lobby and it
   // puts us in it, so it sets `currentBattle` exactly as a join does and the

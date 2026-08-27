@@ -1,5 +1,5 @@
 import { Button, Input } from "@picoframe/frame";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   Popover,
   PopoverContent,
@@ -44,7 +44,7 @@ const SERVER_PICKS = "\u0000";
  * has and picks a recommended map when it cannot, so naming none is a real
  * choice rather than an empty field.
  */
-export function HostZerokBattlePopover({
+export const HostZerokBattlePopover = memo(function HostZerokBattlePopover({
   disabled,
   onHost,
   initialMap,
@@ -84,6 +84,24 @@ export function HostZerokBattlePopover({
   const [hosting, setHosting] = useState(false);
 
   const named = mapName !== SERVER_PICKS;
+  // Held still across renders. The picker scrolls back to the selected option
+  // whenever its list is rebuilt, and rebuilding it on every render meant a
+  // battle changing in the list behind this form threw away where you had
+  // scrolled to.
+  const mapOptions = useMemo(
+    () => [
+      { value: SERVER_PICKS, label: "Let the server pick" },
+      // A map we were sent to host but do not have is still a map the server
+      // can run. Listed rather than left out, because a value with no option
+      // behind it shows as an empty picker over a form that would go on to ask
+      // for that map anyway.
+      ...(named && !maps.some((m) => m.name === mapName)
+        ? [{ value: mapName, label: `${mapName} (not installed)` }]
+        : []),
+      ...maps.map((m) => ({ value: m.name, label: m.name })),
+    ],
+    [maps, mapName, named],
+  );
   const problem = newZerokBattleProblem({ title, mode, maxPlayers });
   const seated = seatedBy(mode, maxPlayers);
   const blurb = ZEROK_BATTLE_MODES.find((m) => m.value === mode)?.blurb;
@@ -155,17 +173,7 @@ export function HostZerokBattlePopover({
             <OptionSelect
               value={mapName}
               onValueChange={setMapName}
-              options={[
-                { value: SERVER_PICKS, label: "Let the server pick" },
-                // A map we were sent to host but do not have is still a map the
-                // server can run. Listed rather than left out, because a value
-                // with no option behind it shows as an empty picker over a form
-                // that would go on to ask for that map anyway.
-                ...(named && !maps.some((m) => m.name === mapName)
-                  ? [{ value: mapName, label: `${mapName} (not installed)` }]
-                  : []),
-                ...maps.map((m) => ({ value: m.name, label: m.name })),
-              ]}
+              options={mapOptions}
               placeholder={scan.loading ? "Scanning…" : "Let the server pick"}
               size="sm"
             />
@@ -219,4 +227,4 @@ export function HostZerokBattlePopover({
       </PopoverContent>
     </Popover>
   );
-}
+});
