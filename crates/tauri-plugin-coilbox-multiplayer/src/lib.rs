@@ -49,6 +49,9 @@ mod tls;
 /// Zero-K's battle stream, folded into the same battle list the other two
 /// protocols fill.
 mod zerok_battles;
+/// Channels, direct messages, friends and ignores on a Zero-K connection, which
+/// are one subject there because a relation decides what chat reaches you.
+mod zerok_chat;
 /// Zero-K's line protocol over plain TCP, built alongside the two above.
 /// Private, like the other two connection modules: exporting it would drag the
 /// registry's `pub(crate)` action types out with it.
@@ -67,6 +70,7 @@ use coilbox_lobby_protocol::{
     command, default_battle_status, password_hash, team_color_rgb, BattleStatus, ClientStatus,
     LobbyState, LoginConfig, LoginMode, LoginPhase,
 };
+use coilbox_zerok_protocol::types::Relation as ZerokRelation;
 use conn::{
     spawn_connection, wait_until_ready, ConnProtocol, LobbyEvent, Outbound, Registry,
     TachyonAction, READY_TIMEOUT,
@@ -212,6 +216,67 @@ fn is_zerok(registry: &Registry, server_key: &str) -> bool {
     lock_or_recover(registry)
         .get(server_key)
         .is_some_and(|conn| conn.protocol == ConnProtocol::Zerok)
+}
+
+/// Queue one chat action on a Zero-K connection.
+fn zerok_chat_action(
+    registry: &Registry,
+    server_key: &str,
+    action: zerok_chat::ChatAction,
+) -> Option<CliResult> {
+    zerok_action(registry, server_key, zerok_conn::ZerokAction::Chat(action))
+}
+
+/// Queue one line of chat on a Zero-K connection.
+///
+/// The six say commands differ only in where the line goes and whether it is an
+/// action, so the shape is written once.
+fn zerok_say(
+    registry: &Registry,
+    server_key: &str,
+    place: zerok_chat::Place,
+    emote: bool,
+    text: &str,
+) -> Option<CliResult> {
+    zerok_chat_action(
+        registry,
+        server_key,
+        zerok_chat::ChatAction::Say {
+            place,
+            emote,
+            text: text.to_owned(),
+        },
+    )
+}
+
+/// Answer a request for a list Zero-K sends unasked.
+///
+/// `FriendList` and `IgnoreList` arrive on connect and again after every change,
+/// so there is nothing to ask for. Answered as sent rather than refused, because
+/// the caller wanted the list to be current and it already is.
+fn zerok_pushed_list(registry: &Registry, server_key: &str) -> Option<CliResult> {
+    is_zerok(registry, server_key).then(|| CliResult::ok(json!({ "sent": true })))
+}
+
+/// Queue one relation change on a Zero-K connection.
+///
+/// Zero-K has one command for friends and ignores both. It is one-sided and
+/// needs no answer: `SetAccountRelation` says what we have flagged somebody as,
+/// and the server replies with a fresh list.
+fn zerok_relation(
+    registry: &Registry,
+    server_key: &str,
+    username: &str,
+    relation: coilbox_zerok_protocol::types::Relation,
+) -> Option<CliResult> {
+    zerok_chat_action(
+        registry,
+        server_key,
+        zerok_chat::ChatAction::Relation {
+            username: username.to_owned(),
+            relation,
+        },
+    )
 }
 
 /// Queue one battle-room action on a Zero-K connection, for the commands that
@@ -606,6 +671,16 @@ async fn open_zerok<R: Runtime>(
         return CliResult::err(format!("already connected: {server_key}"));
     }
 
+    // The same store the other two connections use, so a direct-message thread
+    // is where it was left whichever server it was on. Only the direct-message
+    // half: see the note in [`zerok_conn::run_loop`] on why a Zero-K channel is
+    // not written down.
+    let dm_dir = match log_dirs(app) {
+        Ok((dm_dir, _)) => dm_dir,
+        Err(e) => return CliResult::err(format!("no app data dir: {e}")),
+    };
+    let dm_log = dmlog::DmLog::new(&dm_dir, &server_key);
+
     // The same cancel token the other two publish, so `mp_cancel_connect`
     // reaches a Zero-K connect that is still opening.
     let token = CancellationToken::new();
@@ -637,7 +712,14 @@ async fn open_zerok<R: Runtime>(
         install_id,
         mode,
     };
-    zerok_conn::spawn_connection(registry.clone(), server_key, stream, login, on_event);
+    zerok_conn::spawn_connection(
+        registry.clone(),
+        server_key,
+        stream,
+        login,
+        on_event,
+        dm_log,
+    );
     CliResult::ok(json!({ "connected": true }))
 }
 
@@ -771,6 +853,15 @@ fn mp_say(
     channel: String,
     message: String,
 ) -> CliResult {
+    if let Some(result) = zerok_say(
+        registry.inner(),
+        &server_key,
+        zerok_chat::Place::Channel(channel.clone()),
+        false,
+        &message,
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -797,6 +888,17 @@ fn mp_say_private(
             conversation: Conversation::Peer(username.clone()),
             text: message.clone(),
         },
+    ) {
+        return result;
+    }
+    // Zero-K echoes our own `Say` back to us, private ones included, so nothing
+    // is recorded here. Doing it as well would double every line we sent.
+    if let Some(result) = zerok_say(
+        registry.inner(),
+        &server_key,
+        zerok_chat::Place::Peer(username.clone()),
+        false,
+        &message,
     ) {
         return result;
     }
@@ -830,6 +932,15 @@ fn mp_say_battle(registry: State<'_, Registry>, server_key: String, message: Str
     ) {
         return result;
     }
+    if let Some(result) = zerok_say(
+        registry.inner(),
+        &server_key,
+        zerok_chat::Place::Battle,
+        false,
+        &message,
+    ) {
+        return result;
+    }
     enqueue(registry.inner(), &server_key, command::say_battle(&message))
 }
 
@@ -842,6 +953,15 @@ fn mp_say_ex(
     channel: String,
     message: String,
 ) -> CliResult {
+    if let Some(result) = zerok_say(
+        registry.inner(),
+        &server_key,
+        zerok_chat::Place::Channel(channel.clone()),
+        true,
+        &message,
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -866,6 +986,15 @@ fn mp_say_battle_ex(
             conversation: Conversation::Lobby,
             text: message.clone(),
         },
+    ) {
+        return result;
+    }
+    if let Some(result) = zerok_say(
+        registry.inner(),
+        &server_key,
+        zerok_chat::Place::Battle,
+        true,
+        &message,
     ) {
         return result;
     }
@@ -897,6 +1026,16 @@ fn mp_say_private_ex(
     ) {
         return result;
     }
+    // Echoed back to us like the plain form above, so it is not recorded here.
+    if let Some(result) = zerok_say(
+        registry.inner(),
+        &server_key,
+        zerok_chat::Place::Peer(username.clone()),
+        true,
+        &message,
+    ) {
+        return result;
+    }
     let map = lock_or_recover(&registry);
     match map.get(&server_key) {
         Some(conn) => match conn.tx.send(Outbound::SayPrivateEx {
@@ -918,6 +1057,16 @@ fn mp_join_channel(
     channel: String,
     key: Option<String>,
 ) -> CliResult {
+    if let Some(result) = zerok_chat_action(
+        registry.inner(),
+        &server_key,
+        zerok_chat::ChatAction::JoinChannel {
+            channel: channel.clone(),
+            password: key.clone(),
+        },
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -932,6 +1081,15 @@ fn mp_leave_channel(
     server_key: String,
     channel: String,
 ) -> CliResult {
+    if let Some(result) = zerok_chat_action(
+        registry.inner(),
+        &server_key,
+        zerok_chat::ChatAction::LeaveChannel {
+            channel: channel.clone(),
+        },
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -959,6 +1117,16 @@ fn mp_ignore(
     username: String,
     reason: Option<String>,
 ) -> CliResult {
+    // Zero-K's relation carries no note, so the reason the line protocol can
+    // send is dropped there.
+    if let Some(result) = zerok_relation(
+        registry.inner(),
+        &server_key,
+        &username,
+        ZerokRelation::Ignore,
+    ) {
+        return result;
+    }
     enqueue(
         registry.inner(),
         &server_key,
@@ -969,6 +1137,14 @@ fn mp_ignore(
 /// `mp_unignore` — ask the server to stop ignoring a user (`UNIGNORE`).
 #[tauri::command]
 fn mp_unignore(registry: State<'_, Registry>, server_key: String, username: String) -> CliResult {
+    if let Some(result) = zerok_relation(
+        registry.inner(),
+        &server_key,
+        &username,
+        ZerokRelation::None,
+    ) {
+        return result;
+    }
     enqueue(registry.inner(), &server_key, command::unignore(&username))
 }
 
@@ -976,6 +1152,9 @@ fn mp_unignore(registry: State<'_, Registry>, server_key: String, username: Stri
 /// reply streams as `IGNORELISTBEGIN...IGNORELISTEND` and rebuilds `server_ignores`.
 #[tauri::command]
 fn mp_ignore_list(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    if let Some(result) = zerok_pushed_list(registry.inner(), &server_key) {
+        return result;
+    }
     enqueue(registry.inner(), &server_key, command::ignore_list())
 }
 
@@ -993,6 +1172,16 @@ fn mp_friend_request(
         registry.inner(),
         &server_key,
         TachyonAction::Friend(FriendAction::Send(username.clone())),
+    ) {
+        return result;
+    }
+    // Zero-K has no friend request. A relation is one-sided and takes effect at
+    // once, so asking is befriending and the note goes nowhere.
+    if let Some(result) = zerok_relation(
+        registry.inner(),
+        &server_key,
+        &username,
+        ZerokRelation::Friend,
     ) {
         return result;
     }
@@ -1058,6 +1247,14 @@ fn mp_unfriend(registry: State<'_, Registry>, server_key: String, username: Stri
     ) {
         return result;
     }
+    if let Some(result) = zerok_relation(
+        registry.inner(),
+        &server_key,
+        &username,
+        ZerokRelation::None,
+    ) {
+        return result;
+    }
     enqueue(registry.inner(), &server_key, command::unfriend(&username))
 }
 
@@ -1070,6 +1267,9 @@ fn mp_friend_list(registry: State<'_, Registry>, server_key: String) -> CliResul
         &server_key,
         TachyonAction::Friend(FriendAction::List),
     ) {
+        return result;
+    }
+    if let Some(result) = zerok_pushed_list(registry.inner(), &server_key) {
         return result;
     }
     enqueue(registry.inner(), &server_key, command::friend_list())
@@ -1086,6 +1286,9 @@ fn mp_friend_request_list(registry: State<'_, Registry>, server_key: String) -> 
         &server_key,
         TachyonAction::Friend(FriendAction::List),
     ) {
+        return result;
+    }
+    if let Some(result) = zerok_pushed_list(registry.inner(), &server_key) {
         return result;
     }
     enqueue(

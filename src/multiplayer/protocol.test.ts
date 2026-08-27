@@ -14,6 +14,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 
 import { BUILTIN_SERVERS, type LobbyServer } from "../lobby-servers/config";
 import {
+  autoJoinsChannels,
   messageLimit,
   protocolForKey,
   publishesStatus,
@@ -124,11 +125,14 @@ describe("Zero-K", () => {
     );
   });
 
-  it("sends none of the TASServer ready-time commands", () => {
-    // Zero-K has channels and a friend list, but none of them are asked for
-    // with a TASServer line, so the ready-time sync would be four protocol
-    // errors rather than four commands.
+  it("asks for neither list, because it is sent both unasked", () => {
     expect(syncsOnReady("zerok")).toBe(false);
+  });
+
+  it("still rejoins the channels the account is configured for", () => {
+    // The server force-joins its own defaults and nothing else, so a channel
+    // somebody added themselves is silent after a reconnect without this.
+    expect(autoJoinsChannels("zerok")).toBe(true);
   });
 
   it("still publishes an away and ingame status of its own", () => {
@@ -139,6 +143,13 @@ describe("Zero-K", () => {
 
   it("sets no message limit, because none is published", () => {
     expect(messageLimit("zerok")).toBeNull();
+  });
+});
+
+describe("autoJoinsChannels", () => {
+  it("is true on TASServer and false on Tachyon, which has no channels", () => {
+    expect(autoJoinsChannels("tasserver")).toBe(true);
+    expect(autoJoinsChannels("tachyon")).toBe(false);
   });
 });
 
