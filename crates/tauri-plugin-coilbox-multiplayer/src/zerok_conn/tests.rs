@@ -720,6 +720,88 @@ async fn the_news_reaches_the_console() {
     );
 }
 
+/// The two-step join, over a real socket.
+///
+/// Nothing about a seat can be sent until the server has confirmed we are in the
+/// room, so the status the room needs goes out when the confirmation lands and
+/// not when the join does.
+#[tokio::test]
+async fn a_join_is_answered_with_a_status_once_the_server_confirms_it() {
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind a loopback port");
+    let port = listener.local_addr().expect("it has an address").port();
+    let heard: Arc<Mutex<Vec<String>>> = Arc::default();
+    let keep = Arc::clone(&heard);
+
+    tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.expect("a client connects");
+        let (read, mut write) = socket.into_split();
+        let send = |line: &str| -> Vec<u8> { format!("{line}\n").into_bytes() };
+        if write
+            .write_all(&send("Welcome {\"UserCount\":3}"))
+            .await
+            .is_err()
+        {
+            return;
+        }
+        let mut reader = BufReader::new(read).lines();
+        while let Ok(Some(raw)) = reader.next_line().await {
+            let name = line::split_line(&raw)
+                .map(|(name, _)| name.to_string())
+                .unwrap_or_default();
+            keep.lock().unwrap_or_else(|e| e.into_inner()).push(raw);
+            let answer = match name.as_str() {
+                "Login" => send(r#"LoginResponse {"ResultCode":0,"Name":"someone"}"#),
+                "JoinBattle" => send(
+                    r#"JoinBattleSuccess {"BattleID":42,"Players":[{"Name":"someone"}],"Options":{"MaxUnits":"2000"}}"#,
+                ),
+                _ => continue,
+            };
+            if write.write_all(&answer).await.is_err() {
+                return;
+            }
+        }
+    });
+
+    let client = Client::connect(port, "someone").await;
+    client.wait_for("loggedIn").await;
+    {
+        let registry = client.registry.lock().unwrap_or_else(|e| e.into_inner());
+        registry[&client.key]
+            .tx
+            .send(Outbound::Zerok(ZerokAction::Room(
+                zerok_room::RoomAction::Join {
+                    battle: 42,
+                    password: None,
+                },
+            )))
+            .expect("the connection takes it");
+    }
+    client.wait_for("enteredBattle").await;
+
+    let deadline = std::time::Instant::now() + PATIENCE;
+    while std::time::Instant::now() < deadline {
+        let sent = heard.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        if sent.len() >= 3 {
+            assert_eq!(sent[1], r#"JoinBattle {"BattleID":42}"#);
+            // The sync flag, which the room needs and which nothing prompts for.
+            assert_eq!(
+                sent[2],
+                r#"UpdateUserBattleStatus {"AllyNumber":0,"IsSpectator":true,"Name":"someone","Sync":2}"#
+            );
+            let battles = client.battles();
+            assert_eq!(battles[&42].script_tags["game/modoptions/maxunits"], "2000");
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    panic!(
+        "the join was not answered: {:?}",
+        heard.lock().unwrap_or_else(|e| e.into_inner())
+    );
+}
+
 /// Zero-K has no status bitfield, so what goes out is the pair of flags on their
 /// own rather than a packed number.
 #[tokio::test]
