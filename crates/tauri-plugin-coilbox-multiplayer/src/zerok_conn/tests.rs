@@ -575,6 +575,186 @@ async fn a_registration_the_server_bans_carries_its_reason() {
     assert_eq!(delta["delta"]["reason"], "banned: ban evasion");
 }
 
+// -------------------------------------------------------------------------
+// The battle list and the player directory, through the whole connection task.
+// -------------------------------------------------------------------------
+
+/// A stand-in server that greets, accepts the login, and then sends `then`.
+///
+/// The directory arrives after the login rather than instead of it, which is
+/// what the real server does and what makes the ordering worth testing: the
+/// frontend has to be told it is logged in before it is handed a battle list.
+async fn greet_accept_and_send(then: Vec<String>) -> u16 {
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind a loopback port");
+    let port = listener.local_addr().expect("it has an address").port();
+
+    tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.expect("a client connects");
+        let (read, mut write) = socket.into_split();
+        if write
+            .write_all(b"Welcome {\"Engine\":\"105.1.1\",\"UserCount\":3}\n")
+            .await
+            .is_err()
+        {
+            return;
+        }
+        let mut reader = BufReader::new(read).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            if line::split_line(&line).map(|(name, _)| name) != Some("Login") {
+                continue;
+            }
+            let mut flood = vec![r#"LoginResponse {"ResultCode":0,"Name":"someone"}"#.to_string()];
+            flood.extend(then.clone());
+            for line in flood {
+                let framed = format!("{line}\n");
+                if write.write_all(framed.as_bytes()).await.is_err() {
+                    return;
+                }
+            }
+        }
+    });
+    port
+}
+
+impl Client {
+    /// The battle list this connection holds.
+    fn battles(&self) -> std::collections::HashMap<u32, coilbox_lobby_protocol::Battle> {
+        let registry = self.registry.lock().unwrap_or_else(|e| e.into_inner());
+        registry
+            .get(&self.key)
+            .map(|c| {
+                c.state
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .battles
+                    .clone()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Who this connection believes is online.
+    fn users(&self) -> Vec<String> {
+        let registry = self.registry.lock().unwrap_or_else(|e| e.into_inner());
+        let mut names: Vec<String> = registry
+            .get(&self.key)
+            .map(|c| {
+                c.state
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .users
+                    .keys()
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
+        names.sort();
+        names
+    }
+}
+
+#[tokio::test]
+async fn the_battle_stream_fills_the_list_the_other_protocols_fill() {
+    let port = greet_accept_and_send(vec![
+        r#"BattleAdded {"Header":{"BattleID":42,"Title":"Teams All Welcome","Map":"Comet Catcher Remake 1.8","Game":"Zero-K v1.12.6.0","Engine":"105.1.1-2590","MaxPlayers":16,"PlayerCount":5}}"#.into(),
+        r#"BattleAdded {"Header":{"BattleID":43,"Title":"1v1 Ranked","PlayerCount":2}}"#.into(),
+        r#"BattleUpdate {"Header":{"BattleID":42,"PlayerCount":6}}"#.into(),
+        r#"BattleRemoved {"BattleID":43}"#.into(),
+    ])
+    .await;
+    let client = Client::connect(port, "someone").await;
+    client.wait_for("battleClosed").await;
+
+    let battles = client.battles();
+    assert_eq!(battles.len(), 1, "the closed one is gone: {battles:?}");
+    let battle = &battles[&42];
+    assert_eq!(battle.title, "Teams All Welcome");
+    assert_eq!(battle.map, "Comet Catcher Remake 1.8");
+    assert_eq!(battle.modname, "Zero-K v1.12.6.0");
+    assert_eq!(battle.version, "105.1.1-2590");
+    assert_eq!(battle.max_players, 16);
+    // The update named the count and nothing else, and the rest above survived.
+    assert_eq!(battle.player_count, Some(6));
+}
+
+#[tokio::test]
+async fn the_directory_says_who_is_online_and_where_they_are() {
+    let port = greet_accept_and_send(vec![
+        r#"BattleAdded {"Header":{"BattleID":42,"Title":"Teams All Welcome"}}"#.into(),
+        r#"User {"Name":"someone","AccountID":4271,"Country":"GB"}"#.into(),
+        r#"User {"Name":"another","AccountID":9001,"BattleID":42}"#.into(),
+    ])
+    .await;
+    let client = Client::connect(port, "someone").await;
+    client.wait_for("memberJoined").await;
+
+    assert_eq!(client.users(), vec!["another", "someone"]);
+    assert!(client.battles()[&42].members.contains_key("another"));
+}
+
+/// The frontend logs the server's own greeting into the lobby console, which is
+/// where Zero-K's news belongs: it is the same thing, pushed at every client on
+/// connect.
+#[tokio::test]
+async fn the_news_reaches_the_console() {
+    let port = greet_accept_and_send(vec![
+        r#"NewsList {"NewsItems":[{"Header":"Tournament this Saturday","Text":"Sign up on the site.","Url":"https://zero-k.info/News"},{"Header":"Patch notes"}]}"#.into(),
+    ])
+    .await;
+    let client = Client::connect(port, "someone").await;
+    client.wait_for("motd").await;
+
+    let lines: Vec<String> = client
+        .events()
+        .into_iter()
+        .filter(|event| event["delta"]["kind"] == "motd")
+        .filter_map(|event| event["delta"]["line"].as_str().map(str::to_string))
+        .collect();
+    assert_eq!(
+        lines,
+        vec![
+            "Tournament this Saturday (https://zero-k.info/News)",
+            "Patch notes",
+        ]
+    );
+}
+
+/// Zero-K has no status bitfield, so what goes out is the pair of flags on their
+/// own rather than a packed number.
+#[tokio::test]
+async fn a_status_change_goes_out_as_the_two_flags() {
+    let (port, heard) = greet_and_answer(None).await;
+    let client = Client::connect(port, "someone").await;
+    first_line(&heard).await;
+
+    {
+        let registry = client.registry.lock().unwrap_or_else(|e| e.into_inner());
+        registry[&client.key]
+            .tx
+            .send(Outbound::Zerok(ZerokAction::Status {
+                ingame: true,
+                away: false,
+            }))
+            .expect("the connection takes it");
+    }
+
+    let deadline = std::time::Instant::now() + PATIENCE;
+    while std::time::Instant::now() < deadline {
+        let sent = heard
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(1)
+            .cloned();
+        if let Some(sent) = sent {
+            assert_eq!(sent, r#"ChangeUserStatus {"IsAfk":false,"IsInGame":true}"#);
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    panic!("the status never went out");
+}
+
 #[tokio::test]
 async fn the_two_refusal_codes_are_not_confused_for_one_another() {
     // The check the shape of this code is built around. Both enums have a 2 and

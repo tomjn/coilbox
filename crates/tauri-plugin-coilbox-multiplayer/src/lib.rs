@@ -46,10 +46,15 @@ mod tachyon_users;
 /// line protocol above.
 pub mod tachyon_ws;
 mod tls;
+/// Zero-K's battle stream, folded into the same battle list the other two
+/// protocols fill.
+mod zerok_battles;
 /// Zero-K's line protocol over plain TCP, built alongside the two above.
 /// Private, like the other two connection modules: exporting it would drag the
 /// registry's `pub(crate)` action types out with it.
 mod zerok_conn;
+/// Who is online on a Zero-K connection, and which battle each of them is in.
+mod zerok_users;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -171,6 +176,28 @@ fn tachyon_action(
     let conn = map.get(server_key)?;
     lock_or_recover(&conn.tachyon).as_ref()?;
     Some(match conn.tx.send(Outbound::Tachyon(action)) {
+        Ok(()) => CliResult::ok(json!({ "sent": true })),
+        Err(_) => CliResult::err("connection is closed"),
+    })
+}
+
+/// Queue an action on a Zero-K connection, or `None` when this connection is not
+/// one and the caller should send its TASServer line instead.
+///
+/// The counterpart of [`tachyon_action`], and it tests the recorded protocol
+/// rather than a handle: a Zero-K connection has no client of its own to check
+/// for, and leaves the same slot empty a TASServer one does.
+fn zerok_action(
+    registry: &Registry,
+    server_key: &str,
+    action: zerok_conn::ZerokAction,
+) -> Option<CliResult> {
+    let map = lock_or_recover(registry);
+    let conn = map.get(server_key)?;
+    if conn.protocol != ConnProtocol::Zerok {
+        return None;
+    }
+    Some(match conn.tx.send(Outbound::Zerok(action)) {
         Ok(()) => CliResult::ok(json!({ "sent": true })),
         Err(_) => CliResult::err("connection is closed"),
     })
@@ -1221,6 +1248,16 @@ fn mp_set_status(
     ingame: bool,
     away: bool,
 ) -> CliResult {
+    // Zero-K has no status bitfield. `ChangeUserStatus` carries the two flags on
+    // their own, and the server owns rank, moderator and bot outright, so there
+    // is nothing to send it about those.
+    if let Some(result) = zerok_action(
+        registry.inner(),
+        &server_key,
+        zerok_conn::ZerokAction::Status { ingame, away },
+    ) {
+        return result;
+    }
     let status = ClientStatus {
         ingame,
         away,
