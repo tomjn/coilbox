@@ -36,12 +36,14 @@ use tokio::sync::watch;
 use tokio_util::codec::{Framed, LinesCodec};
 use tokio_util::sync::CancellationToken;
 
+use crate::conn::now_ms;
 use crate::conn::{
     emit, ConnProtocol, EventSink, LobbyEvent, Outbound, Registry, ServerConn, StartedBattle,
     TachyonHandle,
 };
+use crate::dmlog::DmLog;
 use crate::tls::ConnectError;
-use crate::{lock_or_recover, zerok_battles, zerok_room, zerok_users};
+use crate::{lock_or_recover, zerok_battles, zerok_chat, zerok_room, zerok_users};
 
 /// How long the socket may be idle before the kernel starts probing, and how far
 /// apart the probes go.
@@ -129,9 +131,14 @@ pub fn spawn_connection(
     stream: TcpStream,
     login: ZerokLogin,
     on_event: Channel<LobbyEvent>,
+    dm_log: DmLog,
 ) {
     let (tx, rx) = mpsc::unbounded_channel::<Outbound>();
-    let state = Arc::new(Mutex::new(LobbyState::new()));
+    let mut initial = LobbyState::new();
+    // The same store the other two connections keep their threads in, so a
+    // conversation is where it was left whichever server it was on.
+    initial.dms = dm_log.load();
+    let state = Arc::new(Mutex::new(initial));
     let sink: EventSink = Arc::new(Mutex::new(on_event));
     // The sending half goes to the task and nowhere else, so it is dropped when
     // the connection ends and everything waiting on the phase is woken.
@@ -146,6 +153,7 @@ pub fn spawn_connection(
         phase_tx,
         state.clone(),
         rx,
+        dm_log,
     ));
 
     // Registered after spawning. The task's first act is a network read, so it
@@ -185,6 +193,7 @@ async fn run_loop(
     phase_slot: watch::Sender<LoginPhase>,
     state: Arc<Mutex<LobbyState>>,
     mut rx: mpsc::UnboundedReceiver<Outbound>,
+    dm_log: DmLog,
 ) {
     emit(&sink, LobbyEvent::Connected);
     let mut phase = Phase {
@@ -298,26 +307,49 @@ async fn run_loop(
                         _ => {}
                     }
 
-                    // The battle list, the player directory and the room, folded
-                    // after the login arms so a `LoggedIn` reaches the frontend
-                    // before anything that assumes we are.
+                    // The battle list, the player directory, the room and chat,
+                    // folded after the login arms so a `LoggedIn` reaches the
+                    // frontend before anything that assumes we are.
+                    let now = now_ms();
                     let (deltas, replies) = {
                         let mut held = lock_or_recover(&state);
                         let mut deltas = zerok_users::reduce(&mut held, &message);
                         deltas.extend(zerok_battles::reduce(&mut held, &message));
-                        let (room, replies) = zerok_room::reduce(&mut held, &message);
+                        let (room, room_replies) = zerok_room::reduce(&mut held, &message);
                         deltas.extend(room);
+                        let (chat, chat_replies) = zerok_chat::reduce(&mut held, &message, now);
+                        deltas.extend(chat);
                         // Built here, under the same lock the fold ran under, so
                         // the answer to a join is the state that join produced
                         // rather than whatever a later line left behind.
-                        let replies: Vec<String> = replies
+                        let replies: Vec<String> = room_replies
                             .iter()
                             .filter_map(|action| zerok_room::build(&held, action).ok())
+                            .chain(
+                                chat_replies
+                                    .iter()
+                                    .filter_map(|action| zerok_chat::build(&held, action).ok()),
+                            )
                             .flatten()
                             .collect();
                         (deltas, replies)
                     };
                     for delta in deltas {
+                        // A conversation outlives the connection, so a message
+                        // in one is written down as it arrives. Only direct
+                        // messages: Zero-K replays a channel's backlog as
+                        // ordinary lines with nothing to mark them, so a channel
+                        // log would grow a fresh copy of it on every connect.
+                        if let Delta::PrivateMessage { from } = &delta {
+                            let last = lock_or_recover(&state)
+                                .dms
+                                .get(from)
+                                .and_then(|thread| thread.last())
+                                .cloned();
+                            if let Some(message) = last {
+                                dm_log.append(from, &message);
+                            }
+                        }
                         emit(&sink, LobbyEvent::Delta { delta });
                     }
                     outbound.extend(replies);
@@ -388,6 +420,9 @@ pub enum ZerokAction {
     Status { ingame: bool, away: bool },
     /// Something a battle room control asks of the room we are in.
     Room(zerok_room::RoomAction),
+    /// Something a chat surface asks: a line to say, a channel to join or
+    /// leave, or a relation to set.
+    Chat(zerok_chat::ChatAction),
 }
 
 /// The wire lines for an action, in the order they go out.
@@ -404,6 +439,7 @@ fn build(state: &LobbyState, action: &ZerokAction) -> Result<Vec<String>, serde_
             })?])
         }
         ZerokAction::Room(action) => zerok_room::build(state, action),
+        ZerokAction::Chat(action) => zerok_chat::build(state, action),
     }
 }
 

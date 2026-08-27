@@ -291,6 +291,10 @@ impl Client {
                 mode,
             },
             channel,
+            // A scratch directory rather than the app's, so a test never reads
+            // or writes the real conversation log. The key is unique per test
+            // (it carries the port), so two of these never share a file.
+            DmLog::new(&std::env::temp_dir().join("coilbox-zerok-conn-tests"), &key),
         );
         Client {
             key,
@@ -800,6 +804,33 @@ async fn a_join_is_answered_with_a_status_once_the_server_confirms_it() {
         "the join was not answered: {:?}",
         heard.lock().unwrap_or_else(|e| e.into_inner())
     );
+}
+
+/// Chat through the whole task, and the one place Zero-K parts company with the
+/// TASServer path: it relays our own private message back to us, so nothing is
+/// recorded when it goes out and the thread is built from the echo.
+#[tokio::test]
+async fn a_private_message_we_send_is_filed_from_the_server_s_echo() {
+    let port = greet_accept_and_send(vec![
+        r#"Say {"Place":2,"User":"someone","Target":"another","Text":"hello yourself"}"#.into(),
+        r#"Say {"Place":0,"Target":"zk","User":"another","Text":"good game all"}"#.into(),
+    ])
+    .await;
+    let client = Client::connect(port, "someone").await;
+    client.wait_for("chatMessage").await;
+
+    let registry = client.registry.lock().unwrap_or_else(|e| e.into_inner());
+    let held = registry[&client.key]
+        .state
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    // Filed under the other end even though we are the sender, because the
+    // server echoes a private message to both parties.
+    let thread = &held.dms["another"];
+    assert_eq!(thread.len(), 1);
+    assert_eq!(thread[0].from, "someone");
+    assert_eq!(thread[0].text, "hello yourself");
+    assert_eq!(held.channels["zk"].messages[0].text, "good game all");
 }
 
 /// Zero-K has no status bitfield, so what goes out is the pair of flags on their
