@@ -15,6 +15,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import { BUILTIN_SERVERS, type LobbyServer } from "../lobby-servers/config";
 import {
   autoJoinsChannels,
+  founderRunsTheGame,
   messageLimit,
   protocolForKey,
   publishesStatus,
@@ -161,6 +162,17 @@ describe("seatIsServerAssigned", () => {
   it("is true on Tachyon and Zero-K, which carry no colour or faction", () => {
     expect(seatIsServerAssigned("tachyon")).toBe(true);
     expect(seatIsServerAssigned("zerok")).toBe(true);
+  });
+});
+
+describe("founderRunsTheGame", () => {
+  it("is true on TASServer, where a host advertises their own port", () => {
+    expect(founderRunsTheGame("tasserver")).toBe(true);
+  });
+
+  it("is false on Zero-K, where founding a room runs nothing here", () => {
+    expect(founderRunsTheGame("zerok")).toBe(false);
+    expect(founderRunsTheGame("tachyon")).toBe(false);
   });
 });
 

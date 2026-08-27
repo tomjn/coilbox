@@ -37,7 +37,7 @@ import {
   mpUpdateBattleInfo,
   mpUpdateBot,
 } from "../bindings";
-import { seatIsServerAssigned } from "../protocol";
+import { founderRunsTheGame, seatIsServerAssigned } from "../protocol";
 import { useMultiplayer } from "../store";
 import {
   battleOptionTags,
@@ -332,7 +332,9 @@ export function useBattleRoom(): BattleRoomView {
   const canEditOptions = canEditBattleOptions(isFounder, hostIsBot);
   // We founded the battle and run it ourselves (no autohost bot relaying it), so we
   // drive the roster/options over the protocol and launch the game as founder.
-  const selfHost = isFounder && !hostIsBot;
+  // Founding a Zero-K room is not that: the server runs the match whoever opened
+  // the room, so nothing here forces a seat, builds a host config or binds a port.
+  const selfHost = isFounder && !hostIsBot && founderRunsTheGame(protocol);
   const canAddBot = !!battle && !!myStatus;
   // Who may change a Tachyon lobby. It has no founder, so a boss is what it has
   // instead, and the lobby says whether it allows bosses at all.
@@ -340,10 +342,13 @@ export function useBattleRoom(): BattleRoomView {
   const canChangeMap = selfHost || iAmBoss;
   // Kicking is a host power on TASServer and a lobby-scoped one on Tachyon: any
   // member may ask, and the server puts it to a vote. So the room offers it to
-  // anyone seated there rather than to the founder alone. Zero-K is the first
-  // case again: `KickFromBattle` is the founder's, and every Zero-K room is
-  // founded by an autohost, so a human is never in a position to use it.
-  const canKick = selfHost || (protocol === "tachyon" && !!myStatus);
+  // anyone seated there rather than to the founder alone. On Zero-K it is the
+  // founder's alone, which upstream checks by name before it kicks anyone, and a
+  // room founded by an autohost has no human founder to offer it to.
+  const canKick =
+    selfHost ||
+    (protocol === "tachyon" && !!myStatus) ||
+    (protocol === "zerok" && isFounder);
   const canBoss =
     protocol === "tachyon" && !!myStatus && !!battle?.bossesEnabled;
 
