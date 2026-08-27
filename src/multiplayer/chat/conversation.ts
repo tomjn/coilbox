@@ -14,7 +14,13 @@ export function isBattleChannel(name: string): boolean {
   return name.startsWith("__battle__");
 }
 
-/** Stable string id for unread bookkeeping and selection. */
+/** Stable string id for unread bookkeeping and selection.
+ *
+ * A battle is keyed by its channel rather than by its battle id, because that
+ * is what every counter around it uses: the seen baseline, the backlog discount
+ * and the nav badge all read battle chat out of `state.channels`. An id of its
+ * own read as a conversation nobody had ever seen a message in, so the room's
+ * badge counted on while you sat in the room reading it. */
 export function convId(d: ConversationDescriptor): string {
   switch (d.kind) {
     case "channel":
@@ -22,7 +28,7 @@ export function convId(d: ConversationDescriptor): string {
     case "dm":
       return `dm:${d.peer}`;
     case "battle":
-      return `battle:${d.id}`;
+      return `channel:${d.channel}`;
   }
 }
 

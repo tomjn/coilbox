@@ -22,6 +22,16 @@ export interface ConversationView {
   title: string;
   subtitle?: string;
   messages: ChatMsg[];
+  /**
+   * How many lines this conversation holds in the snapshot, which is the count
+   * unread bookkeeping has to be marked with.
+   *
+   * Not `messages.length`. That list has ignored senders filtered out and
+   * consecutive lines from one sender coalesced into single entries, so it runs
+   * short of what the unread counters measure against, and marking seen with it
+   * leaves a count that never reaches zero.
+   */
+  total: number;
   members: User[];
   /** Send text to this conversation (no-op when not connected/empty). */
   send: (text: string) => Promise<void>;
@@ -53,13 +63,16 @@ export function useConversation(
   // by the time it is tested. It runs after the ignore filter, so a hidden sender
   // can't split someone else's block, and is memoised because it is O(n) over the
   // conversation's whole history on every snapshot.
+  const all = useMemo(
+    () => (state && desc ? conversationMessages(state, desc) : []),
+    [state, desc],
+  );
   const messages = useMemo(() => {
-    const all = state && desc ? conversationMessages(state, desc) : [];
     const visible = activeKey
       ? all.filter((m) => !isIgnored(ignored, activeKey, m.from))
       : all;
     return coalesceMessages(visible);
-  }, [state, desc, ignored, activeKey]);
+  }, [all, ignored, activeKey]);
   const members = useMemo(
     () => (state && desc ? conversationMembers(state, desc) : []),
     [state, desc],
@@ -130,6 +143,7 @@ export function useConversation(
     title,
     subtitle,
     messages,
+    total: all.length,
     members,
     send,
     maxChars: messageLimit(protocol),

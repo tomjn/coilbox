@@ -233,10 +233,12 @@ function ChatPage() {
     );
   }
 
-  // Mark the open conversation read as its message count changes.
+  // Mark the open conversation read as its message count changes. Marked with
+  // the conversation's own total rather than the length of the rendered list,
+  // which is shorter than the unread counters measure against.
   useEffect(() => {
-    if (active) markSeen(convId(active), conv.messages.length);
-  }, [active, conv.messages.length, markSeen]);
+    if (active) markSeen(convId(active), conv.total);
+  }, [active, conv.total, markSeen]);
 
   // Open on the first joined channel when nothing is selected (initial entry, and
   // once autojoined channels arrive after connect). Battle chat is excluded — it's
