@@ -43,7 +43,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use stun::attributes::ATTR_MESSAGE_INTEGRITY;
-use stun::error_code::{ErrorCodeAttribute, CODE_STALE_NONCE};
+use stun::error_code::{ErrorCodeAttribute, CODE_STALE_NONCE, ERROR_REASONS};
 use stun::message::{
     is_message, Getter, Message, MessageType, CLASS_ERROR_RESPONSE, CLASS_REQUEST,
     CLASS_SUCCESS_RESPONSE, METHOD_ALLOCATE, METHOD_REFRESH,
@@ -199,7 +199,7 @@ impl Health {
         }
         self.report(AllocationFailure::Refused {
             code: code.code.0,
-            reason: String::from_utf8_lossy(&code.reason).into_owned(),
+            reason: reason_for(&code),
         });
     }
 
@@ -240,6 +240,24 @@ fn interesting_type(datagram: &[u8]) -> Option<MessageType> {
     let mut typ = MessageType::default();
     typ.read_value(u16::from_be_bytes([datagram[0], datagram[1]]));
     (typ.method == METHOD_ALLOCATE || typ.method == METHOD_REFRESH).then_some(typ)
+}
+
+/// What to tell the host about an error the server sent.
+///
+/// The reason phrase is optional (RFC 5389 section 15.6) and coturn 4.17.2
+/// leaves it out. Its answer to a signed Refresh for an allocation it no longer
+/// has is a four byte ERROR-CODE with nothing after the number, so what reached
+/// the host was "the server refused it (error 437 )": a number, a stray space
+/// and no explanation. The registered phrase for the code says the same thing
+/// the server would have said, and the registry is already in the `stun` crate.
+fn reason_for(code: &ErrorCodeAttribute) -> String {
+    if !code.reason.is_empty() {
+        return String::from_utf8_lossy(&code.reason).into_owned();
+    }
+    ERROR_REASONS.get(&code.code).map_or_else(
+        || "no reason given".to_string(),
+        |registered| String::from_utf8_lossy(registered).into_owned(),
+    )
 }
 
 fn decode(datagram: &[u8]) -> Option<Message> {
@@ -475,7 +493,7 @@ mod tests {
     use super::*;
     use std::net::Ipv4Addr;
     use stun::attributes::{ATTR_NONCE, ATTR_REALM};
-    use stun::error_code::{ErrorCode, CODE_UNAUTHORIZED};
+    use stun::error_code::{ErrorCode, CODE_ALLOC_MISMATCH, CODE_UNAUTHORIZED};
     use stun::integrity::MessageIntegrity;
     use stun::message::{Method, Setter};
     use stun::textattrs::{Nonce, Realm};
@@ -867,5 +885,62 @@ mod tests {
         health.saw_inbound(&challenge(&unsigned).raw);
 
         assert_eq!(health.failure(), None);
+    }
+
+    /// The refusal a real coturn sends, which carries no reason phrase at all.
+    ///
+    /// Taken off the wire in
+    /// `tauri-plugin-coilbox-multiplayer/tests/relayed_battle.rs`: coturn
+    /// 4.17.2 answers a signed Refresh for an allocation it has no record of
+    /// with a four byte ERROR-CODE, `00 00 04 25`, and nothing after it. The
+    /// reason a host is given has to survive that, because this is the most
+    /// likely way a relayed battle loses its allocation.
+    #[tokio::test]
+    async fn a_refusal_with_no_reason_phrase_still_says_what_went_wrong() {
+        let health = Health::new();
+        let mut signed = Message::new();
+        signed
+            .build(&[
+                Box::new(MessageType::new(METHOD_REFRESH, CLASS_REQUEST)),
+                Box::new(MessageIntegrity::new_long_term_integrity(
+                    USER.to_string(),
+                    SERVER_NAME.to_string(),
+                    PASSWORD.to_string(),
+                )),
+            ])
+            .expect("a well formed request");
+        health.saw_outbound(&signed.raw);
+
+        let mut refused = Message::new();
+        refused
+            .build(&[
+                Box::new(MessageType::new(METHOD_REFRESH, CLASS_ERROR_RESPONSE)),
+                Box::new(ErrorCodeAttribute {
+                    code: CODE_ALLOC_MISMATCH,
+                    reason: Vec::new(),
+                }),
+            ])
+            .expect("a well formed reply");
+        health.saw_inbound(&refused.raw);
+
+        assert_eq!(
+            health.failure(),
+            Some(AllocationFailure::Refused {
+                code: 437,
+                reason: "Allocation Mismatch".to_string(),
+            }),
+            "a server that sent no reason still has to leave the host with one"
+        );
+    }
+
+    /// 437 is the code a restarted TURN server gives, so treating it as a
+    /// credential failure would stop a battle that a rebuild would have saved.
+    #[test]
+    fn an_allocation_the_server_has_forgotten_is_worth_opening_again() {
+        assert!(!AllocationFailure::Refused {
+            code: 437,
+            reason: "Allocation Mismatch".to_string(),
+        }
+        .is_credential_failure());
     }
 }
