@@ -882,4 +882,108 @@ mod tests {
             "the console should still show the rest of the OPENBATTLE line:\n{text}"
         );
     }
+
+    /// The acceptance test for issue #2048. A real `JOIN` with a key, built
+    /// by `command::join_channel` and driven through the real connection
+    /// task over the same TCP fixture the tests above use, must not leave
+    /// the channel key anywhere in what the frontend was sent: whoever
+    /// holds it can join a locked channel they were not invited to. A
+    /// second `JOIN` with no key, the bare shape `join_channel` sends for
+    /// an unlocked channel, must show as-is: there was never a key to hide,
+    /// so nothing here should print `<redacted>` for it.
+    #[tokio::test]
+    async fn joining_a_channel_never_reaches_the_frontend_with_its_key() {
+        let addr = lobby_finishing_login_or_registration().await;
+        let stream = tokio::net::TcpStream::connect(addr)
+            .await
+            .expect("the lobby is listening");
+        let registry: Registry = Registry::default();
+        let key = format!("alice@{addr}");
+
+        let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+        let recorder = seen.clone();
+        let events = Channel::new(move |body| {
+            let json = match body {
+                tauri::ipc::InvokeResponseBody::Json(s) => s,
+                tauri::ipc::InvokeResponseBody::Raw(b) => String::from_utf8_lossy(&b).into_owned(),
+            };
+            lock_or_recover(&recorder).push(json);
+            Ok(())
+        });
+
+        let logs = std::env::temp_dir().join("coilbox-join-redaction-tests");
+        spawn_connection(
+            registry.clone(),
+            key.clone(),
+            Box::new(stream),
+            LoginConfig {
+                username: "alice".to_string(),
+                password_hash: password_hash("hunter2"),
+                local_ip: "127.0.0.1".to_string(),
+                agent: "Coilbox test".to_string(),
+                client_id: "1".to_string(),
+                compat_flags: vec!["u".to_string()],
+                use_stls: false,
+                mode: LoginMode::Login,
+            },
+            events,
+            crate::dmlog::DmLog::new(&logs, &key),
+            crate::dmlog::DmLog::new(&logs, &key),
+        );
+
+        let mut phase = lock_or_recover(&registry)
+            .get(&key)
+            .expect("spawn_connection registered it")
+            .phase
+            .clone();
+        tokio::time::timeout(PATIENCE, phase.wait_for(|p| *p == LoginPhase::Ready))
+            .await
+            .expect("the handshake did not finish in time")
+            .expect("the connection task is still running");
+        let tx = lock_or_recover(&registry)
+            .get(&key)
+            .expect("still registered")
+            .tx
+            .clone();
+
+        tx.send(Outbound::Line(command::join_channel(
+            "locked",
+            Some("chankey"),
+        )))
+        .expect("the connection task is still receiving");
+        tx.send(Outbound::Line(command::join_channel("open", None)))
+            .expect("the connection task is still receiving");
+
+        // Neither line gets a reply from the fixture (it only answers
+        // LOGIN/REGISTER/LISTCOMPFLAGS), so wait for the console to have
+        // recorded both rather than for a reply that never comes.
+        let deadline = tokio::time::Instant::now() + PATIENCE;
+        loop {
+            let recorded = lock_or_recover(&seen).clone();
+            if recorded.iter().any(|l| l.contains("JOIN locked"))
+                && recorded.iter().any(|l| l.contains("JOIN open"))
+            {
+                break;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                panic!("timed out waiting for the JOIN console lines");
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+
+        let text = lock_or_recover(&seen).join("\n");
+        assert!(!text.contains("chankey"), "the channel key leaked:\n{text}");
+        // The absence above is redaction, not a line that never arrived: the
+        // channel name is still there.
+        assert!(
+            text.contains("JOIN locked <redacted>"),
+            "the console should still show the rest of the JOIN line:\n{text}"
+        );
+        // A channel with no key was never sent one, so nothing should show
+        // as redacted for it.
+        assert!(
+            text.contains("JOIN open") && !text.contains("JOIN open <redacted>"),
+            "a keyless JOIN should not show a redaction:\n{text}"
+        );
+    }
 }
