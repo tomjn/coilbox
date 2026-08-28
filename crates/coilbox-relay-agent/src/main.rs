@@ -293,11 +293,7 @@ async fn serve(
         };
         match request {
             Request::AllowPeer { id, ip } => {
-                // Remembered before the send, and kept whether or not it works.
-                // coilbox has vouched for this address, and a probe that failed
-                // says something about the relay rather than about the player.
-                allowlist.remember(ip);
-                let done = allowlist::let_through(relay, ip).await;
+                let done = allowlist::allow(relay, allowlist, ip).await;
                 control::answer(reporter, id, done).await;
             }
         }

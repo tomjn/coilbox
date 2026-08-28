@@ -104,9 +104,22 @@ impl Allowlist {
     }
 }
 
+/// Everything one "let this address through" request means: put `ip` on the
+/// list, and let it through the relay that is open now.
+///
+/// Both halves, and in that order, because they answer different questions. The
+/// list is what makes the player survive a rebuilt relay, and the send is what
+/// makes them able to join the one that is up. A failed send does not take the
+/// address off the list, because it is the relay that failed and not the
+/// player: coilbox has vouched for them, and the next relay has to try again.
+pub async fn allow<R: RelayLink>(relay: &R, allowlist: &Allowlist, ip: IpAddr) -> io::Result<()> {
+    allowlist.remember(ip);
+    let_through(relay, ip).await
+}
+
 /// Let `ip` through `relay`, by sending them something their engine will throw
 /// away.
-pub async fn let_through<R: RelayLink>(relay: &R, ip: IpAddr) -> io::Result<()> {
+async fn let_through<R: RelayLink>(relay: &R, ip: IpAddr) -> io::Result<()> {
     relay
         .send_to(&PROBE, SocketAddr::new(ip, PROBE_PORT))
         .await
@@ -204,13 +217,17 @@ mod tests {
 
     /// The point of the module: something goes to the joiner before the joiner
     /// has sent anything, because that send is what installs the permission.
+    /// And they go on the list, because the relay they were let through is not
+    /// the last relay this battle will have.
     #[tokio::test]
     async fn a_joiner_is_sent_something_before_they_have_said_a_word() {
         let relay = Recorded::default();
-        let_through(&relay, joiner(4))
+        let allowlist = Allowlist::new();
+        allow(&relay, &allowlist, joiner(4))
             .await
             .expect("a working relay takes the probe");
         assert_eq!(relay.addressees(), vec![joiner(4)]);
+        assert_eq!(allowlist.everybody(), vec![joiner(4)]);
     }
 
     /// The probe has to be a datagram the joiner's engine throws away, or
@@ -224,7 +241,7 @@ mod tests {
     async fn the_probe_is_small_enough_for_an_engine_to_discard() {
         const ENGINE_PACKET_HEADER: usize = 6;
         let relay = Recorded::default();
-        let_through(&relay, joiner(4))
+        allow(&relay, &Allowlist::new(), joiner(4))
             .await
             .expect("a working relay");
 
@@ -262,13 +279,11 @@ mod tests {
     #[tokio::test]
     async fn a_relay_that_will_not_send_leaves_the_joiner_on_the_list() {
         let allowlist = Allowlist::new();
-        allowlist.remember(joiner(4));
-
         let broken = Recorded {
             broken: Some("the allocation is gone".to_string()),
             ..Recorded::default()
         };
-        let refused = let_through(&broken, joiner(4))
+        let refused = allow(&broken, &allowlist, joiner(4))
             .await
             .expect_err("a relay that is gone cannot let anybody through");
         assert!(refused.to_string().contains("the allocation is gone"));
