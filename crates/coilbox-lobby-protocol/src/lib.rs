@@ -8,6 +8,7 @@
 //!
 //! # Surface
 //! - [`parse_line`] turns a raw server line into a typed [`ServerMessage`].
+//! - [`redact_line`] takes the secrets out of a line before it is shown or kept.
 //! - The [`command`] module builds outgoing wire lines (no trailing newline).
 //! - [`ClientStatus`] / [`BattleStatus`] pack and unpack the status bitfields.
 //! - [`password_hash`] computes the login password hash.
@@ -20,6 +21,7 @@ pub mod command;
 mod hash;
 mod login;
 mod message;
+mod redact;
 mod reduce;
 pub mod server;
 mod state;
@@ -29,6 +31,7 @@ mod vote;
 pub use hash::password_hash;
 pub use login::{LoginConfig, LoginMachine, LoginMode, LoginPhase};
 pub use message::{parse_line, ServerMessage};
+pub use redact::redact_line;
 pub use reduce::{
     begin_channel_list, push_chat, push_dm, record_outgoing_private, reduce, reduce_at, Delta,
 };
