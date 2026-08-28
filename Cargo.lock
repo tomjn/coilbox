@@ -688,6 +688,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-relay-agent"
+version = "0.0.0"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "coilbox-s3o"
 version = "0.0.0"
 

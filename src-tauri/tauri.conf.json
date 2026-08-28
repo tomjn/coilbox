@@ -29,7 +29,8 @@
   "bundle": {
     "externalBin": [
       "binaries/uberstress",
-      "binaries/coilbox-unitsync-worker"
+      "binaries/coilbox-unitsync-worker",
+      "binaries/coilbox-relay-agent"
     ],
     "resources": {
       "mapconv": "mapconv",

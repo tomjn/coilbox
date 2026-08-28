@@ -1,0 +1,27 @@
+[package]
+name = "coilbox-relay-agent"
+version = "0.0.0"
+description = "Sidecar that fans a relayed battle out into one loopback UDP socket per player, so the host engine tells them apart by source port the way it would tell apart N real clients. Runs out of process because the engine outlives coilbox and a relay that dies with the window would strand a game."
+edition = "2021"
+license = "MIT"
+
+[[bin]]
+name = "coilbox-relay-agent"
+path = "src/main.rs"
+
+[dependencies]
+# The whole crate is one socket fanned out into many, so it is tokio and
+# nothing else. `net` for the sockets, `sync` for the one channel that carries
+# engine replies back up to the relay, `rt-multi-thread` + `macros` for the
+# runtime the binary starts.
+tokio = { version = "1", features = [
+    "net",
+    "sync",
+    "rt-multi-thread",
+    "macros",
+] }
+
+[dev-dependencies]
+# The tests are real sockets on loopback, so they need a timeout to fail loudly
+# rather than hang when a datagram never arrives.
+tokio = { version = "1", features = ["time"] }
