@@ -1,11 +1,24 @@
 [package]
 name = "coilbox-proc"
 version = "0.0.0"
-description = "Dependency-free child-process constructor that suppresses the console window Windows pops for console-mode sidecars. Shared by every plugin that shells out."
+description = "Child-process helpers shared by every plugin that shells out: a Command constructor that suppresses the console window Windows pops for console-mode sidecars, and a liveness check for a process we did not spawn."
 edition = "2021"
 license = "MIT"
 
 [dependencies]
+
+# Only for `is_running`, which asks the OS about a process this one did not
+# spawn and so has no `Child` for. Both were already in `Cargo.lock` before
+# this: `libc` arrives under tokio and `windows` is what `src-tauri` builds its
+# job object with, at this same version.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_System_Threading",
+] }
 
 [dev-dependencies]
 tempfile = "3"
