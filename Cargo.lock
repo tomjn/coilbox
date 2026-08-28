@@ -692,10 +692,19 @@ name = "coilbox-relay-agent"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "coilbox-relay-protocol",
  "stun",
  "tokio",
  "turn",
  "webrtc-util",
+]
+
+[[package]]
+name = "coilbox-relay-protocol"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -5509,6 +5518,7 @@ dependencies = [
  "coilbox-lobby-protocol",
  "coilbox-oauth",
  "coilbox-portable",
+ "coilbox-relay-protocol",
  "coilbox-tachyon-protocol",
  "coilbox-zerok-protocol",
  "futures-util",

@@ -29,6 +29,9 @@ coilbox-lobby-protocol = { path = "../coilbox-lobby-protocol" }
 coilbox-tachyon-protocol = { path = "../coilbox-tachyon-protocol" }
 coilbox-zerok-protocol = { path = "../coilbox-zerok-protocol" }
 coilbox-oauth = { path = "../coilbox-oauth" }
+# The relay agent sidecar's control channel, shared with the sidecar itself so
+# a change to a message breaks both builds rather than one of them at runtime.
+coilbox-relay-protocol = { path = "../coilbox-relay-protocol" }
 tauri-plugin-opener = "2"
 # rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
 # picks it.
