@@ -61,6 +61,7 @@ pub fn redact_line(line: &str) -> Cow<'_, str> {
 fn secrets_removed(cmd: &str, rest: &str) -> Option<String> {
     match cmd {
         "TURNCREDENTIALS" => turn_credentials(rest),
+        "LOGIN" | "REGISTER" => password_field(cmd, rest),
         _ => None,
     }
 }
@@ -91,6 +92,35 @@ fn turn_credentials(rest: &str) -> Option<String> {
     Some(match well_formed {
         Some([_, _, _, ttl]) => format!("TURNCREDENTIALS {uri} {REDACTED} {REDACTED} {ttl}"),
         None => format!("TURNCREDENTIALS {uri} {REDACTED}"),
+    })
+}
+
+/// `LOGIN <user> <pass> <cpu> <local_ip> <agent>\t<client_id>\t<flags>` or
+/// `REGISTER <user> <pass> [email]`, without the password. Both send
+/// `BASE64(MD5(password))` (issue #2044) as their second field, and the
+/// server takes that hash as the login itself, so it is the one thing here
+/// worth hiding: the account name, the CPU marker, the local IP, the client
+/// agent and the compatibility flags on a `LOGIN`, and the email on a
+/// `REGISTER`, are all useful to somebody working out why a login or a
+/// signup was refused, and none of them lets anybody log in.
+///
+/// Unlike `TURNCREDENTIALS`, which arrives from the server and so has to be
+/// treated as untrusted, both of these are lines coilbox itself builds
+/// (`command::login`, `command::register`), so there is no shifted field to
+/// defend against. The password is always the second field, bounded by the
+/// space either side of it, whatever does or does not follow it. That also
+/// means this never has to know the shape of what comes after. It finds the
+/// end of the password and keeps everything past it exactly as it was.
+fn password_field(cmd: &str, rest: &str) -> Option<String> {
+    let (user, remainder) = rest.split_once(' ')?;
+    if remainder.is_empty() {
+        // No second field made it into the line, e.g. `LOGIN alice`, cut
+        // short before the password arrived, so there is nothing to redact.
+        return None;
+    }
+    Some(match remainder.split_once(' ') {
+        Some((_password, after)) => format!("{cmd} {user} {REDACTED} {after}"),
+        None => format!("{cmd} {user} {REDACTED}"),
     })
 }
 
@@ -188,11 +218,87 @@ mod tests {
             "SAIDPRIVATE bob TURNCREDENTIALS is a funny word",
             "MOTD  ",
             "",
+            // Neither is `LOGIN` or `REGISTER`, but each shares a prefix with
+            // one of them, so a redactor matching on anything looser than the
+            // whole command would wrongly cut into a line that carries no
+            // password at all.
+            "LOGININFOEND",
+            "REGISTRATIONACCEPTED",
         ] {
             assert!(
                 matches!(redact_line(line), Cow::Borrowed(kept) if kept == line),
                 "{line} was rewritten"
             );
         }
+    }
+
+    /// The line `command::login` (issue #2044) actually builds, with the
+    /// exact values from its own `login_line` test in `command.rs`. The
+    /// username, the CPU marker, the local IP, the client agent, the client
+    /// id and the compatibility flags all survive, because every one of them
+    /// is what somebody working out a refused login needs to see, and the
+    /// password hash lets anyone holding the console log in as `alice`.
+    #[test]
+    fn a_login_line_loses_its_hash_and_keeps_everything_else() {
+        assert_eq!(
+            redact_line("LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp b"),
+            "LOGIN alice <redacted> 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp b"
+        );
+    }
+
+    /// The two lines `command::register` builds, with and without an email,
+    /// from its own `register_with_and_without_email` test in `command.rs`.
+    /// `REGISTER` sends the same hash `LOGIN` does, and the email is worth
+    /// keeping for the same reason the rest of a `LOGIN` line is.
+    #[test]
+    fn a_registration_line_loses_its_hash_and_keeps_the_username_and_email() {
+        assert_eq!(redact_line("REGISTER bob hash"), "REGISTER bob <redacted>");
+        assert_eq!(
+            redact_line("REGISTER bob hash bob@example.com"),
+            "REGISTER bob <redacted> bob@example.com"
+        );
+    }
+
+    /// A line that never reaches the shape `LOGIN`/`REGISTER` are built in
+    /// still has to lose its password, because the leak is in the text and
+    /// not in whether the line parses. `parse_line` only ever sees these two
+    /// commands as coilbox's own outbound lines, so there is no `Unknown`
+    /// case to assert against here the way `TURNCREDENTIALS` has one. This
+    /// asserts directly that the hash is gone regardless of what surrounds
+    /// it.
+    #[test]
+    fn a_login_or_register_line_that_is_short_or_reshaped_still_loses_its_hash() {
+        for (line, redacted) in [
+            // Cut short before the fields a real `LOGIN` always has.
+            ("LOGIN alice hash", "LOGIN alice <redacted>"),
+            // Cut short before the fields a real `REGISTER` always has.
+            ("REGISTER bob hash", "REGISTER bob <redacted>"),
+            // Extra trailing content past where the client ever puts any.
+            (
+                "REGISTER bob hash bob@example.com extra",
+                "REGISTER bob <redacted> bob@example.com extra",
+            ),
+        ] {
+            assert_eq!(redact_line(line), redacted, "for {line}");
+        }
+    }
+
+    /// Nothing after the username at all is nothing to redact: there is no
+    /// password field in the line to begin with.
+    #[test]
+    fn a_login_with_no_password_field_is_left_alone() {
+        assert_eq!(redact_line("LOGIN alice"), "LOGIN alice");
+    }
+
+    /// Commands are upper-cased before they are matched here too, so a
+    /// server shouting or whispering `LOGIN`/`REGISTER` back at us in a log
+    /// still loses the hash.
+    #[test]
+    fn login_and_register_are_matched_the_way_the_parser_matches_them() {
+        assert_eq!(
+            redact_line("login alice hash 0 192.168.0.5 agent\t1\tu"),
+            "LOGIN alice <redacted> 0 192.168.0.5 agent\t1\tu"
+        );
+        assert_eq!(redact_line("register bob hash"), "REGISTER bob <redacted>");
     }
 }
