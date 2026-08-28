@@ -30,7 +30,7 @@
 use std::io;
 
 use coilbox_relay_protocol::{read_request, to_line, Event, Request, Unreadable};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::{mpsc, Mutex};
 
 /// How many requests may be waiting for a relay to open before the agent stops
@@ -49,7 +49,7 @@ const QUEUED_REQUESTS: usize = 64;
 /// relay loop, and half of one line inside another would be unreadable to both
 /// a parser and a person.
 pub struct Reporter {
-    out: Mutex<tokio::io::Stdout>,
+    out: Mutex<Box<dyn AsyncWrite + Send + Unpin>>,
 }
 
 impl Default for Reporter {
@@ -60,8 +60,14 @@ impl Default for Reporter {
 
 impl Reporter {
     pub fn new() -> Reporter {
+        Reporter::writing(tokio::io::stdout())
+    }
+
+    /// The same voice pointed somewhere other than stdout, which is how a test
+    /// reads what the agent said without a process in the way.
+    pub fn writing(out: impl AsyncWrite + Send + Unpin + 'static) -> Reporter {
         Reporter {
-            out: Mutex::new(tokio::io::stdout()),
+            out: Mutex::new(Box::new(out)),
         }
     }
 
@@ -93,9 +99,18 @@ impl Requests {
     /// rather than being lost, and is answered once there is a relay to answer
     /// it with.
     pub fn listen(reporter: std::sync::Arc<Reporter>) -> Requests {
+        Requests::reading(tokio::io::stdin(), reporter)
+    }
+
+    /// The same reader pointed somewhere other than stdin, which is how a test
+    /// feeds the agent requests without a process in the way.
+    pub fn reading(
+        from: impl AsyncRead + Send + Unpin + 'static,
+        reporter: std::sync::Arc<Reporter>,
+    ) -> Requests {
         let (heard, asked) = mpsc::channel(QUEUED_REQUESTS);
         tokio::spawn(async move {
-            let mut lines = BufReader::new(tokio::io::stdin()).lines();
+            let mut lines = BufReader::new(from).lines();
             loop {
                 let line = match lines.next_line().await {
                     Ok(Some(line)) => line,

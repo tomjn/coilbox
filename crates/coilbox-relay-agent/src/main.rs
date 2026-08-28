@@ -36,7 +36,7 @@
 //!
 //! The engine port, the seat count and the TURN credentials are arguments,
 //! because they are settled before the process starts and never change.
-//! everything after that goes over the control channel: one JSON object per
+//! Everything after that goes over the control channel: one JSON object per
 //! line, requests in on stdin and events out on stdout, defined in
 //! `coilbox_relay_protocol` and carried by [`control`]. stderr stays sentences
 //! for a human.
@@ -277,8 +277,8 @@ impl RelayLink for Transport {
 /// player cannot get in when they can, and answering "yes" would be a lie. The
 /// wait is bounded by the rebuild backoff, and the coilbox end has its own
 /// deadline so nothing waits on this forever.
-async fn serve(
-    relay: &Transport,
+async fn serve<R: RelayLink>(
+    relay: &R,
     allowlist: &Allowlist,
     requests: &mut Requests,
     reporter: &Reporter,
@@ -297,6 +297,33 @@ async fn serve(
                 control::answer(reporter, id, done).await;
             }
         }
+    }
+}
+
+/// Everything one relay does, from the moment it opens to the moment it fails.
+///
+/// A function rather than the body of the loop so a test can drive it with a
+/// relay of its own. What is worth testing here is the first line: a relay is
+/// brand new, so it has no permissions on it, and everybody coilbox has already
+/// vouched for has to be let through again before a single datagram moves.
+/// Forget that and a rebuild that was meant to save a game in progress cuts off
+/// every player in it instead.
+async fn carry<R: RelayLink>(
+    relay: &R,
+    agent: &mut Agent,
+    allowlist: &Allowlist,
+    requests: &mut Requests,
+    reporter: &Reporter,
+) -> std::io::Result<()> {
+    allowlist::let_everybody_through(relay, allowlist).await;
+    tokio::select! {
+        stopped = agent.run(relay) => stopped,
+        // Never finishes, so the relay is always what ends this. Serving
+        // requests here rather than in a task of its own is what lets a request
+        // act on the relay that is open right now, and what makes a request
+        // that arrives during a rebuild wait for the next one instead of being
+        // answered with a lie.
+        impossible = serve(relay, allowlist, requests, reporter) => match impossible {},
     }
 }
 
@@ -361,21 +388,8 @@ async fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         }
-        // Before a single datagram is forwarded, because this is a brand new
-        // allocation with an empty permission table and the players it is for
-        // are already mid-game.
-        allowlist::let_everybody_through(&relay, &allowlist).await;
-
         let opened_at = Instant::now();
-        let stopped = tokio::select! {
-            stopped = agent.run(&relay) => stopped,
-            // Never finishes, so the relay is always what ends this. Serving
-            // requests here rather than in a task of its own is what lets a
-            // request act on the relay that is open right now, and what makes a
-            // request that arrives during a rebuild wait for the next one
-            // instead of being answered with a lie.
-            impossible = serve(&relay, &allowlist, &mut requests, &reporter) => match impossible {},
-        };
+        let stopped = carry(&relay, &mut agent, &allowlist, &mut requests, &reporter).await;
         let down = match relay.failure() {
             Some(failure) => {
                 eprintln!("coilbox-relay-agent: allocation lost: {failure}");
@@ -415,5 +429,171 @@ async fn main() -> ExitCode {
         // here would strand it. Issue #2027 is what decides when to stop.
         tokio::time::sleep(backoff).await;
         backoff = (backoff * 2).min(LONGEST_BACKOFF);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! What [`carry`] does with a relay it has just been handed, which is the
+    //! one piece of this loop that is not obvious from reading it and the one
+    //! that costs a game in progress if it slips.
+
+    use super::*;
+    use allowlist::Allowlist;
+    use std::future::Future;
+    use std::io;
+    use std::net::{IpAddr, Ipv4Addr};
+    use std::sync::Mutex;
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
+    /// How long a test waits for a line before deciding it is never coming.
+    const PATIENCE: Duration = Duration::from_secs(5);
+
+    /// A relay that writes down who it was asked to send to and otherwise sits
+    /// there, which is what a healthy relay carrying no traffic looks like.
+    #[derive(Default)]
+    struct Recorded {
+        sent: Mutex<Vec<IpAddr>>,
+    }
+
+    impl RelayLink for Recorded {
+        fn recv_from(
+            &self,
+            _buf: &mut [u8],
+        ) -> impl Future<Output = io::Result<(usize, SocketAddr)>> + Send {
+            async { std::future::pending().await }
+        }
+
+        fn send_to(
+            &self,
+            buf: &[u8],
+            peer: SocketAddr,
+        ) -> impl Future<Output = io::Result<usize>> + Send {
+            self.sent.lock().unwrap().push(peer.ip());
+            let wrote = buf.len();
+            async move { Ok(wrote) }
+        }
+    }
+
+    fn joiner(last: u8) -> IpAddr {
+        IpAddr::V4(Ipv4Addr::new(198, 51, 100, last))
+    }
+
+    /// The agent, wired to a pair of pipes a test can speak into and read back.
+    struct Wired {
+        agent: Agent,
+        allowlist: Allowlist,
+        requests: Requests,
+        reporter: Arc<Reporter>,
+        to_agent: tokio::io::DuplexStream,
+        from_agent: tokio::io::Lines<BufReader<tokio::io::DuplexStream>>,
+    }
+
+    impl Wired {
+        fn new() -> Wired {
+            // Big enough that nothing in a test blocks on a full pipe, and
+            // nothing here writes more than a few short lines.
+            let (to_agent, agent_stdin) = tokio::io::duplex(4096);
+            let (agent_stdout, from_agent) = tokio::io::duplex(4096);
+            let reporter = Arc::new(Reporter::writing(agent_stdout));
+            Wired {
+                // No engine is listening, and nothing in these tests sends game
+                // traffic, so the forwarding half has nothing to do.
+                agent: Agent::new(SocketAddr::from((Ipv4Addr::LOCALHOST, 1)), 4),
+                allowlist: Allowlist::new(),
+                requests: Requests::reading(agent_stdin, Arc::clone(&reporter)),
+                reporter,
+                to_agent,
+                from_agent: BufReader::new(from_agent).lines(),
+            }
+        }
+    }
+
+    /// Free functions rather than methods, because [`carry`] holds the rest of
+    /// the [`Wired`] fields borrowed for as long as a test is talking to it.
+    async fn ask(to_agent: &mut tokio::io::DuplexStream, line: &str) {
+        use tokio::io::AsyncWriteExt;
+        to_agent
+            .write_all(format!("{line}\n").as_bytes())
+            .await
+            .expect("the agent is still reading");
+    }
+
+    async fn hears(
+        from_agent: &mut tokio::io::Lines<BufReader<tokio::io::DuplexStream>>,
+    ) -> String {
+        tokio::time::timeout(PATIENCE, from_agent.next_line())
+            .await
+            .expect("the agent said nothing at all")
+            .expect("a readable pipe")
+            .expect("the agent's output has not ended")
+    }
+
+    /// The one that costs a game: a relay is rebuilt, and every player already
+    /// vouched for is let through it before anything else happens. A new TURN
+    /// allocation has an empty permission table, so skipping this drops every
+    /// player in the battle at the moment the reconnect was supposed to save
+    /// them.
+    #[tokio::test]
+    async fn a_relay_lets_everybody_already_vouched_for_through_before_it_carries_anything() {
+        let Wired {
+            mut agent,
+            allowlist,
+            mut requests,
+            reporter,
+            ..
+        } = Wired::new();
+        allowlist.remember(joiner(4));
+        allowlist.remember(joiner(5));
+        let rebuilt = Recorded::default();
+
+        // `carry` never returns on its own, so it is raced against the check.
+        tokio::select! {
+            _ = carry(&rebuilt, &mut agent, &allowlist, &mut requests, &reporter) => {
+                panic!("carry returned, so the relay it was handed failed")
+            }
+            // One turn of the runtime is enough. The sends all happen before
+            // `carry` awaits anything on the relay.
+            () = tokio::task::yield_now() => {}
+        }
+
+        assert_eq!(
+            *rebuilt.sent.lock().unwrap(),
+            vec![joiner(4), joiner(5)],
+            "a new relay starts with no permissions, so everybody has to be let through it again"
+        );
+    }
+
+    /// The request path end to end inside one process: a line in, an address
+    /// let through, an answer out.
+    #[tokio::test]
+    async fn a_request_over_the_channel_lets_the_address_through_and_is_answered() {
+        let Wired {
+            mut agent,
+            allowlist,
+            mut requests,
+            reporter,
+            mut to_agent,
+            mut from_agent,
+        } = Wired::new();
+        let relay = Recorded::default();
+
+        let answer = tokio::select! {
+            _ = carry(&relay, &mut agent, &allowlist, &mut requests, &reporter) => {
+                panic!("carry returned, so the relay it was handed failed")
+            }
+            answer = async {
+                ask(&mut to_agent, "{\"type\":\"allowPeer\",\"id\":4,\"ip\":\"198.51.100.4\"}").await;
+                hears(&mut from_agent).await
+            } => answer,
+        };
+
+        assert_eq!(answer, "{\"type\":\"done\",\"id\":4}");
+        assert_eq!(*relay.sent.lock().unwrap(), vec![joiner(4)]);
+        assert_eq!(
+            allowlist.everybody(),
+            vec![joiner(4)],
+            "a served address has to survive the next rebuild"
+        );
     }
 }
