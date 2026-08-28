@@ -11,9 +11,14 @@
 //! gets a credential or a sentence explaining why there is not one, and never
 //! has to know whether it came off the wire just now or was already held.
 //!
-//! No server implements the command yet. ScarylePoo/uberserver#27 is the server
-//! half and it is open, so today every ask ends in [`NoCredential::Silent`],
-//! which is deliberately worded for exactly that.
+//! Nothing is asked of a server that has not said it has a relay. It says so in
+//! its compatibility flags, before login, so the answer is already held by the
+//! time anybody wants to host, and asking anyway would cost a round trip that
+//! ends in silence.
+//!
+//! No server implements either half yet. ScarylePoo/uberserver#26 is the flag
+//! and #27 is the command, both open, so today every ask ends in
+//! [`NoCredential::NoRelay`] without a line being sent.
 
 use std::sync::Mutex;
 use std::time::Duration;
@@ -73,8 +78,12 @@ pub enum NoCredential {
     Closed,
     /// The lobby refused, in its own words.
     Refused(String),
-    /// Nothing came back at all. Far and away the likeliest answer today,
-    /// because a server that has never heard of the command says nothing.
+    /// The server has no relay, so there is nothing to ask it for. Far and away
+    /// the likeliest answer today, because the flag that says otherwise is
+    /// ScarylePoo/uberserver#26 and no server names it yet.
+    NoRelay,
+    /// Nothing came back at all: a server that advertised a relay and then said
+    /// nothing when asked for a credential.
     Silent(Duration),
     /// The lobby minted one that was already spent, or so nearly spent that it
     /// would not outlive the first thing that went wrong.
@@ -92,6 +101,10 @@ impl std::fmt::Display for NoCredential {
                 "this server does not speak the TASServer line protocol, so it has no relay to ask about"
             ),
             NoCredential::Closed => write!(f, "the connection closed before the lobby was asked"),
+            NoCredential::NoRelay => write!(
+                f,
+                "this server has no relay, so there is no credential for one to ask it for"
+            ),
             NoCredential::Refused(why) => write!(f, "the lobby would not hand out a relay credential: {why}"),
             NoCredential::Silent(waited) => write!(
                 f,
@@ -135,9 +148,17 @@ pub async fn credentials(
         if conn.protocol != ConnProtocol::TasServer {
             return Err(NoCredential::WrongProtocol);
         }
-        let held = lock_or_recover(&conn.state)
-            .live_turn_credentials(usable_until(now_ms))
-            .cloned();
+        let state = lock_or_recover(&conn.state);
+        // Whether there is a relay at all is settled before login, so it is
+        // known by the time anybody asks. A server without one is not asked:
+        // the command means nothing to it, the answer would be silence, and the
+        // caller would wait out the whole patience budget to learn what its own
+        // state could have told it straight away.
+        if !state.relay_hosting_available() {
+            return Err(NoCredential::NoRelay);
+        }
+        let held = state.live_turn_credentials(usable_until(now_ms)).cloned();
+        drop(state);
         (held, conn.turn.clone(), conn.tx.clone())
     };
 
@@ -267,11 +288,21 @@ mod tests {
         state: Arc<Mutex<LobbyState>>,
     }
 
+    /// A connection to a server with a relay, which is what every test bar the
+    /// one about the gate is about.
     fn wired(protocol: ConnProtocol) -> Wired {
+        wired_with_flags(protocol, "COMPFLAGS u sp r")
+    }
+
+    /// `compflags` is the server's answer to `LISTCOMPFLAGS`, folded through the
+    /// real parser and reducer, because it is what decides whether the lobby is
+    /// asked for a credential at all.
+    fn wired_with_flags(protocol: ConnProtocol, compflags: &str) -> Wired {
         let registry = Registry::default();
         let (tx, sent) = mpsc::unbounded_channel::<Outbound>();
         let (answers, turn) = watch::channel(TurnAnswer::Unasked);
         let state = Arc::new(Mutex::new(LobbyState::new()));
+        reduce_at(&mut lock_or_recover(&state), parse_line(compflags), NOW);
         lock_or_recover(&registry).insert(
             "alice@bar:8200".to_string(),
             ServerConn {
@@ -447,7 +478,24 @@ mod tests {
         );
     }
 
-    /// Every server today, because none of them has the command. Saying nothing
+    /// Issue #2021, and every server today. A server that never advertised a
+    /// relay is not asked for a credential: not asked and told no, not asked and
+    /// waited out, just not asked.
+    #[tokio::test]
+    async fn a_server_without_a_relay_is_not_asked_for_a_credential() {
+        let mut w = wired_with_flags(ConnProtocol::TasServer, "COMPFLAGS u sp b");
+
+        let refused = credentials(&w.registry, "alice@bar:8200", NOW, PATIENCE)
+            .await
+            .expect_err("there is no relay to get a credential for");
+        assert!(matches!(refused, NoCredential::NoRelay), "got: {refused}");
+        assert!(
+            w.sent.try_recv().is_err(),
+            "nothing may go on the wire to a server with no relay"
+        );
+    }
+
+    /// A server that advertised a relay and then said nothing. Saying nothing
     /// must end in a sentence rather than a wait with no end.
     #[tokio::test]
     async fn a_lobby_that_has_never_heard_of_the_command_says_so_rather_than_hanging() {
@@ -520,7 +568,10 @@ mod tests {
             }
             while let Some(Ok(read)) = framed.next().await {
                 let reply = match parse_client_line(&read) {
-                    ClientCommand::ListCompFlags => line::comp_flags(&["u", "sp"]),
+                    // A lobby with a relay, so it names the flag from
+                    // ScarylePoo/uberserver#26 alongside the two every server
+                    // has. Without it nothing here would ever be asked.
+                    ClientCommand::ListCompFlags => line::comp_flags(&["u", "sp", "r"]),
                     ClientCommand::Login { username, .. } => {
                         if framed.send(line::accepted(&username)).await.is_err() {
                             return;

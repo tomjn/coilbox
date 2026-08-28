@@ -3,6 +3,7 @@ import {
   type LobbyServer,
   serverProtocol,
 } from "../lobby-servers/config";
+import type { LobbyState } from "./bindings";
 
 /**
  * The protocol spoken by the connection named by `serverKey`, matched on the
@@ -108,6 +109,28 @@ export function founderRunsTheGame(protocol: LobbyProtocol): boolean {
  */
 export function publishesStatus(protocol: LobbyProtocol): boolean {
   return protocol !== "tachyon";
+}
+
+/**
+ * The compatibility flag a server names when it has a relay to host battles
+ * through (ScarylePoo/uberserver#26, mirrors `command::RELAY_COMPAT_FLAG`).
+ */
+export const RELAY_COMPAT_FLAG = "r";
+
+/**
+ * Whether this connection's server has a relay, so hosting a battle through one
+ * can be offered. Pure.
+ *
+ * Somebody behind a router they cannot forward a port on hosts through the
+ * server's relay, and not every server has one. The server says so in its
+ * compatibility flags, which it hands over before login, so this is settled by
+ * the time there is a state at all.
+ *
+ * False on a server that has never heard of a relay, which is every server
+ * today, and false on Tachyon and Zero-K, which have no compatibility flags.
+ */
+export function relayHostingAvailable(state: LobbyState | null): boolean {
+  return state?.compflags.includes(RELAY_COMPAT_FLAG) ?? false;
 }
 
 /** How many characters one Tachyon message may carry, from the schema for

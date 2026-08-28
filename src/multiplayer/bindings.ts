@@ -250,6 +250,9 @@ export interface Matchmaking {
 
 export interface LobbyState {
   myUsername: string | null;
+  /** The server's answer to `LISTCOMPFLAGS`, which is what it can do rather than
+   * what it is. Read it through a named predicate such as
+   * `relayHostingAvailable` rather than matching a letter at the call site. */
   compflags: string[];
   users: Record<string, User>;
   channels: Record<string, ChannelState>;

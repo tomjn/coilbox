@@ -18,6 +18,10 @@
 //! `REGISTRATIONACCEPTED` -> [`LoginPhase::Registered`] / `REGISTRATIONDENIED`
 //! -> [`LoginPhase::Denied`].
 //!
+//! Compatibility flags: the `COMPFLAGS` answer arrives before the `LOGIN` that
+//! carries our own flags, and that ordering is what makes the relay flag safe to
+//! send. See [`crate::command::RELAY_COMPAT_FLAG`].
+//!
 //! Verification codes: a new account's first `LOGIN` can trigger the agreement
 //! handshake (`AGREEMENT...` / `AGREEMENTEND`). Rather than auto-confirm, the
 //! machine parks in [`LoginPhase::AwaitAgreement`] so the UI can collect the
@@ -53,6 +57,11 @@ pub struct LoginConfig {
     /// the account's lobby hash and refuses a login that leaves it empty or `0`, so
     /// this has to be a real value that stays the same between connections.
     pub client_id: String,
+    /// The compatibility flags every server is expected to know, such as `u` and
+    /// `sp`. The relay flag is not one of these and is not taken from here: it
+    /// is added by the machine, and only on a server that advertised it. One
+    /// listed here is dropped rather than sent, because a relay flag sent to a
+    /// server that never offered one is precisely the thing this avoids.
     pub compat_flags: Vec<String>,
     pub use_stls: bool,
     /// Login vs. register. Defaults to [`LoginMode::Login`] via [`Default`].
@@ -97,6 +106,12 @@ pub struct LoginMachine {
     phase: LoginPhase,
     /// `AGREEMENT` lines collected between the first one and `AGREEMENTEND`.
     agreement: Vec<String>,
+    /// Whether the server's answer to `LISTCOMPFLAGS` named the relay flag.
+    ///
+    /// False until an answer arrives, and false forever on a server that never
+    /// sends one. That default is the safe one: it means no relay flag on the
+    /// `LOGIN`, which is how every server behaves today.
+    server_relays: bool,
 }
 
 impl LoginMachine {
@@ -106,6 +121,7 @@ impl LoginMachine {
             config,
             phase: LoginPhase::AwaitGreeting,
             agreement: Vec::new(),
+            server_relays: false,
         }
     }
 
@@ -135,7 +151,13 @@ impl LoginMachine {
                 // TODO(teiserver): token auth branch here — if `flags` advertises
                 // a token-auth flag, negotiate a token instead of sending the
                 // MD5 password LOGIN below.
-                let _ = flags;
+                //
+                // The relay answer has to be taken here, before the `LOGIN` built
+                // below, because this is the only moment both halves are in hand:
+                // what the server offers, and what we are about to claim. The
+                // handshake makes that ordering rather than assuming it, because
+                // `LOGIN` is unreachable except through this arm.
+                self.server_relays = flags.iter().any(|f| f == command::RELAY_COMPAT_FLAG);
                 match &self.config.mode {
                     LoginMode::Login => {
                         self.phase = LoginPhase::AwaitAccepted;
@@ -188,13 +210,22 @@ impl LoginMachine {
     }
 
     /// The `LOGIN` wire line for this config.
+    ///
+    /// The relay flag is decided here and nowhere else. It is added when the
+    /// server advertised one and dropped from the configured flags when it did
+    /// not, so there is a single rule for it rather than a caller and a server
+    /// each having a say.
     fn login_line(&self) -> String {
-        let flag_refs: Vec<&str> = self
+        let mut flag_refs: Vec<&str> = self
             .config
             .compat_flags
             .iter()
             .map(String::as_str)
+            .filter(|f| *f != command::RELAY_COMPAT_FLAG)
             .collect();
+        if self.server_relays {
+            flag_refs.push(command::RELAY_COMPAT_FLAG);
+        }
         command::login(
             &self.config.username,
             &self.config.password_hash,
@@ -322,6 +353,102 @@ mod tests {
             ]
         );
         assert_eq!(m.phase(), LoginPhase::AwaitAccepted);
+    }
+
+    /// The whole of the relay flag guarantee, in one place: a server that names
+    /// it gets it back, and a server that does not gets exactly what it gets
+    /// today.
+    #[test]
+    fn the_relay_flag_goes_out_only_to_a_server_that_advertised_it() {
+        let mut has_relay = LoginMachine::new(cfg(false));
+        has_relay.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
+        let out = has_relay.on_message(&parse_line("COMPFLAGS u sp b r"));
+        assert_eq!(
+            out,
+            vec!["LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp r"]
+        );
+
+        let mut no_relay = LoginMachine::new(cfg(false));
+        no_relay.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
+        let out = no_relay.on_message(&parse_line("COMPFLAGS u sp b"));
+        assert_eq!(
+            out,
+            vec!["LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp"]
+        );
+    }
+
+    /// A caller cannot force the flag out by configuring it. The machine is the
+    /// only thing that has seen the server's answer, so it is the only thing
+    /// that gets a say.
+    #[test]
+    fn a_configured_relay_flag_is_dropped_on_a_server_without_a_relay() {
+        let mut m = LoginMachine::new(LoginConfig {
+            compat_flags: vec!["u".into(), "sp".into(), "r".into()],
+            ..cfg(false)
+        });
+        m.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
+        let out = m.on_message(&parse_line("COMPFLAGS u sp"));
+        assert_eq!(
+            out,
+            vec!["LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp"]
+        );
+    }
+
+    /// A server that never answers `LISTCOMPFLAGS` never sees a `LOGIN` at all,
+    /// which is the structural half of the guarantee: there is no path to the
+    /// flag that does not go through the answer. The handshake already worked
+    /// this way, and this pins it, because the relay flag now depends on it.
+    #[test]
+    fn a_server_that_never_answers_compflags_is_never_sent_a_login() {
+        let mut m = LoginMachine::new(cfg(false));
+        assert_eq!(
+            m.on_message(&parse_line("TASSERVER 0.38 * 8201 0")),
+            vec!["LISTCOMPFLAGS"]
+        );
+        // Everything else a server might say while the answer does not come.
+        for line in [
+            "MOTD welcome",
+            "ACCEPTED alice",
+            "LOGININFOEND",
+            "PING",
+            "TASSERVER 0.38 * 8201 0",
+        ] {
+            assert!(m.on_message(&parse_line(line)).is_empty(), "{line}");
+        }
+        assert_eq!(m.phase(), LoginPhase::AwaitCompFlags);
+    }
+
+    /// The agreement path re-sends `LOGIN` from a second place, so it carries the
+    /// same answer. A server that offered a relay before the agreement still gets
+    /// the flag, and one that did not still does not, even though the code that
+    /// asked for it arrived much later.
+    #[test]
+    fn the_relogin_after_an_agreement_carries_the_same_relay_answer() {
+        let mut has_relay = LoginMachine::new(cfg(false));
+        has_relay.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
+        has_relay.on_message(&parse_line("COMPFLAGS u sp r"));
+        has_relay.on_message(&parse_line("AGREEMENTEND"));
+        assert_eq!(
+            has_relay.submit_agreement_code(Some("1234")),
+            vec![
+                "CONFIRMAGREEMENT 1234".to_string(),
+                "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp r".to_string(),
+            ]
+        );
+
+        // The awkward one: a server that sends the agreement before it answers
+        // `LISTCOMPFLAGS`, so the only `LOGIN` it ever sees is the one the code
+        // triggers, built without an answer to go on.
+        let mut never_answered = LoginMachine::new(cfg(false));
+        never_answered.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
+        never_answered.on_message(&parse_line("AGREEMENTEND"));
+        assert_eq!(
+            never_answered.submit_agreement_code(Some("1234")),
+            vec![
+                "CONFIRMAGREEMENT 1234".to_string(),
+                "LOGIN alice aGFzaA== 0 192.168.0.5 Coilbox 0.1\t7654321\tu sp".to_string(),
+            ]
+        );
     }
 
     #[test]

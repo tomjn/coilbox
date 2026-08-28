@@ -13,6 +13,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 }));
 
 import { BUILTIN_SERVERS, type LobbyServer } from "../lobby-servers/config";
+import type { LobbyState } from "./bindings";
 import {
   autoJoinsChannels,
   carriesBotAlly,
@@ -20,6 +21,7 @@ import {
   messageLimit,
   protocolForKey,
   publishesStatus,
+  relayHostingAvailable,
   seatIsServerAssigned,
   syncsOnReady,
 } from "./protocol";
@@ -185,6 +187,24 @@ describe("founderRunsTheGame", () => {
   it("is false on Zero-K, where founding a room runs nothing here", () => {
     expect(founderRunsTheGame("zerok")).toBe(false);
     expect(founderRunsTheGame("tachyon")).toBe(false);
+  });
+});
+
+describe("relayHostingAvailable", () => {
+  /** A connection whose server answered `LISTCOMPFLAGS` with `flags`. */
+  const answered = (flags: string[]) => ({ compflags: flags }) as LobbyState;
+
+  it("is true where the server named its relay flag", () => {
+    expect(relayHostingAvailable(answered(["u", "sp", "b", "r"]))).toBe(true);
+  });
+
+  it("is false where it did not, which is every server today", () => {
+    expect(relayHostingAvailable(answered(["u", "sp", "b"]))).toBe(false);
+  });
+
+  it("is false with no connection, and on a protocol with no flags", () => {
+    expect(relayHostingAvailable(null)).toBe(false);
+    expect(relayHostingAvailable(answered([]))).toBe(false);
   });
 });
 

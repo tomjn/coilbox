@@ -609,6 +609,17 @@ mod tests {
     /// prove something about the `LOGIN`/`REGISTER` lines `LoginMachine`
     /// itself builds, and not about a line the test invented.
     async fn lobby_finishing_login_or_registration() -> std::net::SocketAddr {
+        lobby_advertising(&["u", "sp"], Arc::default()).await
+    }
+
+    /// The same lobby, saying what it likes about its own compatibility flags
+    /// and keeping the flags the client's `LOGIN` came back with. Which is the
+    /// pair issue #2021 turns on: what the server offered, and what we claimed.
+    async fn lobby_advertising(
+        compflags: &[&str],
+        login_flags: Arc<Mutex<Vec<String>>>,
+    ) -> std::net::SocketAddr {
+        let compflags = line::comp_flags(compflags);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
             .expect("a free port");
@@ -627,8 +638,11 @@ mod tests {
             }
             while let Some(Ok(read)) = framed.next().await {
                 let reply = match parse_client_line(&read) {
-                    ClientCommand::ListCompFlags => line::comp_flags(&["u", "sp"]),
-                    ClientCommand::Login { username, .. } => {
+                    ClientCommand::ListCompFlags => compflags.clone(),
+                    ClientCommand::Login {
+                        username, flags, ..
+                    } => {
+                        *lock_or_recover(&login_flags) = flags;
                         if framed.send(line::accepted(&username)).await.is_err() {
                             return;
                         }
@@ -653,11 +667,6 @@ mod tests {
     /// already been through `console` and recorded.
     async fn console_lines_seen_during(mode: LoginMode) -> Vec<String> {
         let addr = lobby_finishing_login_or_registration().await;
-        let stream = tokio::net::TcpStream::connect(addr)
-            .await
-            .expect("the lobby is listening");
-        let registry: Registry = Registry::default();
-        let key = format!("alice@{addr}");
 
         let seen: Arc<Mutex<Vec<String>>> = Arc::default();
         let recorder = seen.clone();
@@ -669,6 +678,22 @@ mod tests {
             lock_or_recover(&recorder).push(json);
             Ok(())
         });
+        handshake(addr, mode, events).await;
+
+        let recorded = lock_or_recover(&seen).clone();
+        recorded
+    }
+
+    /// Run `mode`'s handshake against `addr` through the real connection task,
+    /// over a real socket, returning once it has reached its terminal phase. By
+    /// then every line the handshake sent, the `LOGIN` included, has been
+    /// written and has been through `console`.
+    async fn handshake(addr: std::net::SocketAddr, mode: LoginMode, events: Channel<LobbyEvent>) {
+        let stream = tokio::net::TcpStream::connect(addr)
+            .await
+            .expect("the lobby is listening");
+        let registry: Registry = Registry::default();
+        let key = format!("alice@{addr}");
 
         let terminal = match mode {
             LoginMode::Login => LoginPhase::Ready,
@@ -704,9 +729,29 @@ mod tests {
             .await
             .expect("the handshake did not finish in time")
             .expect("the connection task is still running");
+    }
 
-        let recorded = lock_or_recover(&seen).clone();
-        recorded
+    /// The acceptance test for issue #2021, on the wire, where it matters. A
+    /// server that never offered the relay flag must not be sent it: uberserver
+    /// answers a flag it does not know with `MOTD Your client has compatibility
+    /// errors`, shown to the person logging in, so getting this wrong is a
+    /// warning for every coilbox user on every server that has no relay.
+    #[tokio::test]
+    async fn the_relay_flag_is_on_the_login_only_when_the_lobby_offered_it() {
+        for (advertised, claimed) in [
+            (vec!["u", "sp", "r"], vec!["u", "r"]),
+            // Every server today.
+            (vec!["u", "sp"], vec!["u"]),
+        ] {
+            let sent: Arc<Mutex<Vec<String>>> = Arc::default();
+            let addr = lobby_advertising(&advertised, sent.clone()).await;
+            handshake(addr, LoginMode::Login, Channel::new(|_| Ok(()))).await;
+            assert_eq!(
+                *lock_or_recover(&sent),
+                claimed,
+                "the lobby advertised {advertised:?}"
+            );
+        }
     }
 
     /// The acceptance test for issue #2044. A real login, driven through the
