@@ -38,6 +38,15 @@
 //!   the engine like the whole battle leaving. It is the property `demux.rs`
 //!   was shaped around, and this is the first check of it against a relay that
 //!   really was rebuilt.
+//! - A credential that expires under a live allocation costs nothing until the
+//!   relay has to be rebuilt. coturn judges a credential once, when it makes
+//!   the session, so the battle outlives it. The rebuild is where it bites, and
+//!   coturn refuses that with 401, which the agent is right to stop for.
+//! - A coturn draining for maintenance refuses an Allocate with 403 while
+//!   having no complaint about the credential at all. The agent used to treat
+//!   403 as a refused credential and end the battle over it, which is the one
+//!   thing in `allocation.rs` this file has shown to be wrong rather than
+//!   right.
 //!
 //! ## What it does not prove
 //!
@@ -69,9 +78,11 @@
 //! The build comes first because this test spawns the sidecar binary and cargo
 //! does not build another package's binaries for it.
 //!
-//! All three together take about two and a half seconds, nearly all of it the
-//! two loss tests waiting out an allocation's lifetime. See [`SHORT_LIFETIME`]
-//! for why that lifetime is two seconds and not less.
+//! They run in parallel and all five take 3.1 seconds, which is what the
+//! credential expiry test takes on its own. It has to wait out a credential,
+//! and a credential's life is a whole number of seconds. See [`SHORT_LIFETIME`]
+//! and [`CREDENTIAL_LIFE`] for why those two seconds are the shortest that
+//! measure anything.
 //!
 //! It runs coturn as a process rather than in a container, which is what issue
 //! #2025 imagined, because a container only works where the host can send UDP
@@ -131,6 +142,27 @@ const SHORT_LIFETIME: Duration = Duration::from_secs(2);
 const TURN_USER: &str = "battle-host";
 const TURN_PASSWORD: &str = "a-short-lived-secret";
 const TURN_REALM: &str = "coilbox.test";
+
+/// The shared secret behind [`Auth::SharedSecret`], which is the only thing
+/// coturn is told when it mints credentials rather than being handed a user
+/// list. Any string does: coturn never compares it to anything but the HMAC in
+/// the password.
+const TURN_SHARED_SECRET: &str = "the-secret-only-the-lobby-and-the-relay-know";
+
+/// How long the credential in the expiry test is good for, counted from the
+/// moment it is minted.
+///
+/// Two seconds is the shortest that leaves any room. The expiry is a whole unix
+/// second and coturn accepts the credential for all of that second, so the
+/// moment it stops working is between two and three seconds after minting and
+/// the test has to wait for the later of the two. Against that, the agent has
+/// its allocation about 60 ms in and a player has played through it inside
+/// 100 ms, so there is well over a second in hand.
+///
+/// One second would put the expiry as close as 1.0 seconds, which is where the
+/// client's first Refresh lands, and the test would be about whichever arrived
+/// first.
+const CREDENTIAL_LIFE: Duration = Duration::from_secs(2);
 
 /// The ports coturn may hand out an allocation on.
 ///
@@ -338,6 +370,126 @@ fn a_restarted_turn_server_costs_the_allocation_but_not_the_players() {
     );
 }
 
+/// A credential that runs out while the battle is still going, which is what a
+/// time limited credential does to a game that lasts longer than it.
+///
+/// Two answers come out of this, and the first one is not the one it was
+/// written for. coturn does not notice at all. It works the credential out once
+/// (`check_stun_auth` only calls back into the user database while
+/// `!(ss->hmackey_set)`, `src/server/ns_turn_server.c`), so a Refresh on a live
+/// allocation is checked against the key it already has and an expired
+/// credential goes on being refreshed indefinitely. The battle outlives the
+/// credential that opened it, which is issue #2042's question answered from the
+/// other end.
+///
+/// What the credential does cost is the rebuild. Take the server away and bring
+/// it back and it has no session, so it judges the credential afresh, finds the
+/// timestamp has passed and refuses. That is the second answer, and the one
+/// `is_credential_failure` turns on.
+#[test]
+#[ignore = "needs coturn installed and a few seconds: see this file's comment for the command"]
+fn a_credential_that_expires_costs_nothing_until_the_relay_has_to_be_rebuilt() {
+    let mut coturn = Coturn::minting_credentials(SHORT_LIFETIME);
+    let engine = FakeEngine::start();
+    let (user, password, stops_working_at) = coturn.credential_expiring_in(CREDENTIAL_LIFE);
+    let minted = std::time::Instant::now();
+    let sidecar = Sidecar::start_holding(&coturn, engine.addr, &user, &password);
+
+    // While the credential is still good, this is an ordinary battle. Worth
+    // playing through rather than asserting the failure alone, because a
+    // credential coturn never accepted would fail at the door and prove nothing
+    // about what it does to an allocation that is already open.
+    let relayed = sidecar.relay_open();
+    sidecar
+        .agent
+        .allow_joiner(IpAddr::V4(Ipv4Addr::LOCALHOST), PATIENCE)
+        .expect("the agent let the joiner through the allocation");
+    let player = FakePlayer::dialling(relayed);
+    player.round_trip(b"the relay is working while the credential is good");
+    assert!(
+        minted.elapsed() < CREDENTIAL_LIFE,
+        "the battle has to be running before the credential expires, or this test is about an \
+         allocation that was never granted"
+    );
+
+    while std::time::SystemTime::now() < stops_working_at {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    player.round_trip(b"still here after the credential expired");
+    println!(
+        "still relaying {:?} after minting a {}s credential",
+        minted.elapsed(),
+        CREDENTIAL_LIFE.as_secs()
+    );
+
+    // The same restart as the test above, and a different answer because the
+    // credential has expired since. coturn checks the credential before it
+    // looks for the allocation, so where a good credential gets the 437 that
+    // test asserts, this one never gets that far.
+    coturn.stop();
+    coturn.start_again();
+
+    // The observation the test was written for, and the only one anybody has of
+    // a real TURN server refusing a coilbox credential. coturn 4.17.2 answers
+    // the signed Refresh with 401 and no reason phrase: a four byte ERROR-CODE,
+    // `00 00 04 01`, then the two attributes a challenge carries, and no
+    // MESSAGE-INTEGRITY, because it had no key to sign with. The words below
+    // are the ones `allocation.rs` fills in from the STUN registry.
+    //
+    // `waits_for_stopping` is half the assertion. 401 is in the set
+    // `is_credential_failure` treats as final, so the agent says `stopping`
+    // rather than `relayDown`, and it is right to: the credential has expired,
+    // the sidecar has no way to ask for another, and every rebuild it tried
+    // would be refused the same way.
+    let reason = sidecar.waits_for_stopping();
+    assert_eq!(
+        reason, "the TURN credential was refused: the server refused it (error 401 Unauthorized)",
+        "a server that has to judge an expired credential refuses it, and the host has to be told \
+         it was the credential rather than the relay"
+    );
+    println!(
+        "gave up {:?} after minting, because {reason}",
+        minted.elapsed()
+    );
+}
+
+/// A server on its way out for maintenance, which refuses an allocation while
+/// having no complaint at all about the credential.
+///
+/// This is the case that says the merged list was wrong. coturn answers an
+/// Allocate with 403 once it has been put into drain mode
+/// (`src/server/ns_turn_server.c`, "Server is draining, then will shutdown,
+/// please try another server"), and 403 was one of the codes the agent stopped
+/// the battle for. So a host whose relay operator was restarting a server
+/// cleanly got their game ended, and got told "the TURN credential was
+/// refused" about a credential the server had just checked and accepted.
+///
+/// It really had accepted it. The 403 carries MESSAGE-INTEGRITY, which coturn
+/// only adds once the credential has checked out, where the 401 in the test
+/// above carries the two attributes of a challenge instead and no signature.
+#[test]
+#[ignore = "needs coturn installed and a few seconds: see this file's comment for the command"]
+fn a_server_draining_for_maintenance_is_not_a_refused_credential() {
+    let coturn = Coturn::start();
+    let engine = FakeEngine::start();
+
+    // A drained coturn shuts down as soon as it has no allocations left, which
+    // it checks about a second after the signal ("Drain complete (0 allocations
+    // remaining, threshold 0), shutting down now"). So one allocation has to be
+    // held open, or there is no draining server left to ask.
+    let holding_it_open = Sidecar::start(&coturn, engine.addr);
+    holding_it_open.relay_open();
+    coturn.drain();
+
+    let refused = Sidecar::start(&coturn, engine.addr);
+    let reason = refused.waits_for_relay_down();
+    assert_eq!(
+        reason, "the server refused it (error 403 Forbidden)",
+        "a draining server has to be reported as the refusal it is, and the agent has to keep \
+         trying rather than end a battle over somebody else's maintenance window"
+    );
+}
+
 /// A real coturn, running for the length of one test.
 struct Coturn {
     /// Where the agent sends its Allocate. Fixed at construction, so a coturn
@@ -352,10 +504,26 @@ struct Coturn {
     child: Option<Child>,
 }
 
+/// How coturn decides whether to believe the credential it was handed.
+#[derive(Clone, Copy)]
+enum Auth {
+    /// One username and password written into the configuration file, good for
+    /// as long as coturn is running.
+    LongTerm,
+    /// The TURN REST API: no user list at all, one shared secret, and a
+    /// username that carries its own expiry. See
+    /// [`Coturn::credential_expiring_in`] for the shape of it.
+    ///
+    /// This is the mechanism a real deployment uses and the one issue #2016
+    /// asks the lobby for, and it is the only way to get a credential to expire
+    /// underneath an allocation that is still open.
+    SharedSecret,
+}
+
 impl Coturn {
     /// A coturn with the lifetimes it hands out left alone, which is an hour.
     fn start() -> Coturn {
-        Coturn::start_with(None)
+        Coturn::start_with(None, Auth::LongTerm)
     }
 
     /// A coturn that will not grant an allocation for longer than
@@ -365,10 +533,16 @@ impl Coturn {
     /// coturn clamps this from below, so what it actually grants is worth
     /// asserting rather than assuming. See [`SHORT_LIFETIME`].
     fn granting_at_most(max_lifetime: Duration) -> Coturn {
-        Coturn::start_with(Some(max_lifetime))
+        Coturn::start_with(Some(max_lifetime), Auth::LongTerm)
     }
 
-    fn start_with(max_lifetime: Option<Duration>) -> Coturn {
+    /// The same, with credentials it works out from a shared secret rather than
+    /// a user list, so a test can hand the agent one that is about to expire.
+    fn minting_credentials(max_lifetime: Duration) -> Coturn {
+        Coturn::start_with(Some(max_lifetime), Auth::SharedSecret)
+    }
+
+    fn start_with(max_lifetime: Option<Duration>, auth: Auth) -> Coturn {
         let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, free_udp_port()));
         // Named after the port as well as the process, because the tests in
         // this file run in parallel and each one wants its own coturn with its
@@ -393,8 +567,6 @@ impl Coturn {
             "relay-ip=127.0.0.1".to_string(),
             format!("min-port={}", RELAY_PORTS.0),
             format!("max-port={}", RELAY_PORTS.1),
-            "lt-cred-mech".to_string(),
-            format!("user={TURN_USER}:{TURN_PASSWORD}"),
             format!("realm={TURN_REALM}"),
             "allow-loopback-peers".to_string(),
             "fingerprint".to_string(),
@@ -409,6 +581,19 @@ impl Coturn {
             // fight over it.
             format!("pidfile={}", dir.join("turnserver.pid").display()),
         ];
+        match auth {
+            Auth::LongTerm => {
+                settings.push("lt-cred-mech".to_string());
+                settings.push(format!("user={TURN_USER}:{TURN_PASSWORD}"));
+            }
+            // `lt-cred-mech` is not repeated because coturn turns it on itself
+            // here, and `user` cannot be: coturn refuses a configuration that
+            // has both a user list and the REST API.
+            Auth::SharedSecret => {
+                settings.push("use-auth-secret".to_string());
+                settings.push(format!("static-auth-secret={TURN_SHARED_SECRET}"));
+            }
+        }
         if let Some(max_lifetime) = max_lifetime {
             settings.push(format!("max-allocate-lifetime={}", max_lifetime.as_secs()));
         }
@@ -435,6 +620,67 @@ impl Coturn {
             let _ = child.kill();
             let _ = child.wait();
         }
+    }
+
+    /// A credential this coturn will accept until `good_for` has passed, and
+    /// refuse afterwards.
+    ///
+    /// The TURN REST API, which coturn documents in `README.turnserver` and
+    /// which is what [`Auth::SharedSecret`] turns on. The username is the unix
+    /// time the credential stops being good, a colon, and any name at all. The
+    /// password is the base64 of an HMAC-SHA1 over that username, keyed with
+    /// the secret coturn was configured with. coturn works the same HMAC out
+    /// for itself, so there is nothing to store either end and no way to hand
+    /// back a credential once it has been minted.
+    ///
+    /// This is the only mechanism that expires a credential without touching
+    /// the server, which is what makes the case stageable at all: an operator
+    /// deleting a user is a different test and needs a database.
+    fn credential_expiring_in(
+        &self,
+        good_for: Duration,
+    ) -> (String, String, std::time::SystemTime) {
+        let expires_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("a clock set after 1970")
+            + good_for;
+        let username = format!("{}:{TURN_USER}", expires_at.as_secs());
+        let signed = ring::hmac::sign(
+            &ring::hmac::Key::new(
+                ring::hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY,
+                TURN_SHARED_SECRET.as_bytes(),
+            ),
+            username.as_bytes(),
+        );
+        let password =
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, signed.as_ref());
+        // coturn takes the timestamp as a whole second and accepts the
+        // credential for all of it (`ts >= time(NULL)` in
+        // `apps/relay/userdb.c`), so the first moment it is certainly no good
+        // is the start of the second after the one named in the username.
+        let stops_working_at =
+            std::time::UNIX_EPOCH + Duration::from_secs(expires_at.as_secs() + 1);
+        (username, password, stops_working_at)
+    }
+
+    /// Put it into drain mode, which is what an operator does to a relay before
+    /// taking it down for maintenance.
+    ///
+    /// It keeps the allocations it has and refuses to grant any more. SIGUSR1
+    /// is the whole interface (`drain_handler` in `src/apps/relay/mainrelay.c`)
+    /// and `kill` is easier than a libc dependency for one signal.
+    fn drain(&self) {
+        let pid = self
+            .child
+            .as_ref()
+            .expect("a coturn that is running")
+            .id()
+            .to_string();
+        let sent = Command::new("kill")
+            .args(["-USR1", &pid])
+            .status()
+            .expect("kill on PATH");
+        assert!(sent.success(), "coturn did not take the drain signal");
     }
 
     /// Bring it back, at the same address, with no memory of anything it was
@@ -518,6 +764,12 @@ struct Sidecar {
 
 impl Sidecar {
     fn start(coturn: &Coturn, engine: SocketAddr) -> Sidecar {
+        Sidecar::start_holding(coturn, engine, TURN_USER, TURN_PASSWORD)
+    }
+
+    /// The same, with a credential the test minted rather than the one written
+    /// into coturn's configuration.
+    fn start_holding(coturn: &Coturn, engine: SocketAddr, user: &str, password: &str) -> Sidecar {
         let mut child = Command::new(agent_binary())
             .args([
                 "--engine-port",
@@ -527,9 +779,9 @@ impl Sidecar {
                 "--turn-server",
                 &coturn.addr.to_string(),
                 "--turn-user",
-                TURN_USER,
+                user,
             ])
-            .env("COILBOX_TURN_PASSWORD", TURN_PASSWORD)
+            .env("COILBOX_TURN_PASSWORD", password)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             // Inherited, because the agent's stderr is sentences for a human
@@ -576,6 +828,28 @@ impl Sidecar {
                 "the agent never noticed its allocation had gone, so a host would sit in a \
                  battle nobody can reach for the length of the game"
             ),
+            Err(RecvTimeoutError::Disconnected) => panic!("the agent's output ended"),
+        }
+    }
+
+    /// Wait for the agent to say it is giving up rather than rebuilding, and
+    /// hand back the reason it gave.
+    ///
+    /// The counterpart to [`Sidecar::waits_for_relay_down`]. `relayDown` is the
+    /// agent saying it is about to open another allocation, `stopping` is the
+    /// agent saying there is no point, and which of the two a host is sent is
+    /// the whole of `is_credential_failure`.
+    fn waits_for_stopping(&self) -> String {
+        match self.said.recv_timeout(PATIENCE) {
+            Ok(Event::Stopping { reason }) => reason,
+            Ok(Event::RelayDown { reason }) => panic!(
+                "the agent said the relay was down and went off to rebuild it, when it was told \
+                 the credential is no longer good: {reason}"
+            ),
+            Ok(other) => panic!("the agent said {other:?} instead of giving up"),
+            Err(RecvTimeoutError::Timeout) => {
+                panic!("the agent never gave up on a credential it cannot replace")
+            }
             Err(RecvTimeoutError::Disconnected) => panic!("the agent's output ended"),
         }
     }

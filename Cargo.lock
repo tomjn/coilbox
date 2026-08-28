@@ -5519,6 +5519,7 @@ dependencies = [
 name = "tauri-plugin-coilbox-multiplayer"
 version = "0.0.0"
 dependencies = [
+ "base64 0.22.1",
  "coilbox-lobby-protocol",
  "coilbox-oauth",
  "coilbox-portable",
@@ -5529,6 +5530,7 @@ dependencies = [
  "futures-util",
  "picoframe-core",
  "reqwest 0.12.28",
+ "ring",
  "rustls",
  "serde",
  "serde_json",

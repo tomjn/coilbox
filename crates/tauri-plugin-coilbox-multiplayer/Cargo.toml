@@ -21,6 +21,13 @@ tauri-plugin-coilbox-direct = { path = "../tauri-plugin-coilbox-direct" }
 # A directory to write a relay agent's run file into that is not somebody's
 # real one.
 tempfile = "3"
+# Minting the time limited credential that `tests/relayed_battle.rs` hands a
+# real coturn: the TURN REST API password is the base64 of an HMAC-SHA1 over
+# the username, and the username carries the expiry. Both of these are already
+# in `Cargo.lock` at these versions, `ring` under `stun` and `rustls` and
+# `base64` under `stun`, so neither adds a package to the tree.
+ring = "0.17"
+base64 = "0.22"
 
 [dependencies]
 tauri = { version = "2" }
