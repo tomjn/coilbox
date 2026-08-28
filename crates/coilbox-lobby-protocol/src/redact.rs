@@ -64,6 +64,7 @@ fn secrets_removed(cmd: &str, rest: &str) -> Option<String> {
         "LOGIN" | "REGISTER" => password_field(cmd, rest),
         "JOINBATTLE" => join_battle(rest),
         "OPENBATTLE" => open_battle(rest),
+        "JOIN" => join_channel(rest),
         _ => None,
     }
 }
@@ -196,6 +197,27 @@ fn open_battle(rest: &str) -> Option<String> {
         }
         None => format!("OPENBATTLE {battle_type} {nat_type} {REDACTED}"),
     })
+}
+
+/// `JOIN <chan> [key]`, as `command::join_channel` builds it, without the
+/// key (issue #2048). Whoever holds the key can join a locked channel they
+/// were not invited to, the same as the room key `JOINBATTLE` carries on
+/// the battle side. The channel name is not a credential and stays.
+///
+/// Unlike `JOINBATTLE`, `join_channel` never puts a placeholder in the
+/// key's slot: a channel with no key is a bare `JOIN <chan>`, so that is
+/// the only shape with nothing after the channel name, and the only one
+/// with nothing to redact. Anything past the channel name is the key, in
+/// however many words, and is collapsed into a single redaction rather
+/// than reassembled, because there is no field of a known type after it
+/// to check a split against the way `OPENBATTLE` checks its key against.
+fn join_channel(rest: &str) -> Option<String> {
+    let (chan, key) = rest.split_once(' ')?;
+    if key.is_empty() {
+        // A trailing space with nothing after it is not a key either.
+        return None;
+    }
+    Some(format!("JOIN {chan} {REDACTED}"))
 }
 
 #[cfg(test)]
@@ -461,5 +483,35 @@ mod tests {
             redact_line("openbattle 0 0 s3cret 8452 16 -1 0 -1 spring\t105\tMap\tTitle\tBAR"),
             "OPENBATTLE 0 0 <redacted> 8452 16 -1 0 -1 spring\t105\tMap\tTitle\tBAR"
         );
+    }
+
+    /// The two shapes `command::join_channel` actually builds (issue
+    /// #2048): a bare channel with no key has nothing to redact, and a
+    /// channel with a key loses the key while the channel name stays.
+    #[test]
+    fn a_join_line_loses_its_key_and_keeps_the_channel_when_there_is_one() {
+        for (line, redacted) in [
+            ("JOIN main", "JOIN main"),
+            ("JOIN main k3y", "JOIN main <redacted>"),
+        ] {
+            assert_eq!(redact_line(line), redacted, "for {line}");
+        }
+    }
+
+    /// A key with a space in it is not a bad key, it is still the one
+    /// secret `JOIN` can carry, so every word of it is collapsed into a
+    /// single redaction rather than the second word leaking back out
+    /// mislabelled as something else.
+    #[test]
+    fn a_join_key_with_a_space_still_loses_every_word_of_it() {
+        let shown = redact_line("JOIN main let me in");
+        assert_eq!(shown, "JOIN main <redacted>");
+        assert!(!shown.contains("let") && !shown.contains("me") && !shown.contains(" in"));
+    }
+
+    /// Commands are upper-cased before they are matched here too.
+    #[test]
+    fn join_is_matched_the_way_the_parser_matches_it() {
+        assert_eq!(redact_line("join main k3y"), "JOIN main <redacted>");
     }
 }
