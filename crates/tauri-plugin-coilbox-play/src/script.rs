@@ -51,6 +51,22 @@ pub struct BattleConfig {
     /// to `0.0.0.0`); when joining, the host we connect to.
     #[serde(default)]
     pub host_ip: Option<String>,
+    /// Why this host binds an address the engine is about to complain about,
+    /// written into the script as a comment above `HostIP`.
+    ///
+    /// The engine logs `opening socket on loopback address, other users will not
+    /// be able to connect!` whenever it binds one
+    /// (`rts/System/Net/UDPListener.cpp`, `TryBindSocket`). On a battle relayed
+    /// through a TURN server that warning is untrue: the players reach the relay
+    /// and the relay agent carries them to the engine over loopback, which is
+    /// exactly what it is for. The engine cannot be told to stop saying it, so
+    /// the answer is to put the explanation where somebody who has just read the
+    /// infolog will look next, which is the script sitting beside it.
+    ///
+    /// A `//` line comment, which the engine's TDF reader has always skipped
+    /// (`cont/base/springcontent/gamedata/parse_tdf.lua`, `EatWhite`).
+    #[serde(default)]
+    pub host_loopback_reason: Option<String>,
     /// Host port. Present for a networked host (the port the engine listens on) or
     /// a client (the port to connect to). Absent for pure singleplayer.
     #[serde(default)]
@@ -85,6 +101,7 @@ impl Default for BattleConfig {
             restricted_units: BTreeMap::new(),
             is_host: true,
             host_ip: None,
+            host_loopback_reason: None,
             host_port: None,
             my_passwd: None,
         }
@@ -165,6 +182,13 @@ pub fn generate_script(cfg: &BattleConfig) -> String {
     // A networked host advertises where the engine listens; pure singleplayer omits
     // this and the engine picks a local port itself.
     if let Some(port) = cfg.host_port {
+        if let Some(reason) = &cfg.host_loopback_reason {
+            // Above `HostIP` rather than at the top of the file, so it is next
+            // to the line it is about. Line breaks would end the comment and
+            // leave the rest as a key the parser cannot read, so they are
+            // flattened rather than trusted.
+            let _ = writeln!(s, "\t// {}", reason.replace(['\n', '\r'], " "));
+        }
         kv(
             &mut s,
             1,
@@ -493,6 +517,74 @@ mod tests {
         assert!(s.contains("HostPort=8452;"));
         // Full host structure still present.
         assert!(s.contains("[TEAM0]"));
+    }
+
+    /// A relayed host binds loopback and the engine warns that nobody will be
+    /// able to connect, which under a relay is untrue. The note goes into the
+    /// script beside `HostIP` so it is next to the line it is about, and next to
+    /// the infolog somebody has just read the warning in.
+    #[test]
+    fn a_host_that_explains_its_loopback_bind_says_so_above_hostip() {
+        let mut cfg = sample();
+        cfg.host_ip = Some("127.0.0.1".into());
+        cfg.host_port = Some(8452);
+        cfg.host_loopback_reason = Some("This battle is relayed, so loopback is right.".into());
+        let s = generate_script(&cfg);
+
+        let note = s
+            .lines()
+            .position(|l| l.contains("relayed"))
+            .expect("the reason is in the script");
+        let host_ip = s
+            .lines()
+            .position(|l| l.contains("HostIP="))
+            .expect("a networked host names an address");
+        assert_eq!(
+            note + 1,
+            host_ip,
+            "the note belongs above the line it is about"
+        );
+        assert!(
+            s.lines()
+                .nth(note)
+                .expect("the note")
+                .trim_start()
+                .starts_with("//"),
+            "the engine's TDF reader skips `//` lines and nothing else, so anything \
+             else here is a key it cannot parse"
+        );
+    }
+
+    /// A newline in the reason would end the comment and leave the rest of it
+    /// sitting in the script as a key the parser gives up on, taking the whole
+    /// game with it. The value comes from Rust rather than from a person, so
+    /// this is belt and braces, and it is cheap.
+    #[test]
+    fn a_reason_with_a_line_break_in_it_cannot_break_the_script() {
+        let mut cfg = sample();
+        cfg.host_port = Some(8452);
+        cfg.host_loopback_reason = Some("first line\nHostPort=1;".into());
+        let s = generate_script(&cfg);
+        assert!(s.contains("// first line HostPort=1;"));
+        let ports: Vec<&str> = s
+            .lines()
+            .map(str::trim)
+            .filter(|l| l.starts_with("HostPort="))
+            .collect();
+        assert_eq!(
+            ports,
+            vec!["HostPort=8452;"],
+            "the second half of the reason stayed inside the comment"
+        );
+    }
+
+    /// A host that is not relayed says nothing, because for them the engine's
+    /// warning about a loopback socket would be true.
+    #[test]
+    fn a_host_with_nothing_to_explain_adds_no_comment() {
+        let mut cfg = sample();
+        cfg.host_port = Some(8452);
+        assert!(!generate_script(&cfg).contains("//"));
     }
 
     #[test]

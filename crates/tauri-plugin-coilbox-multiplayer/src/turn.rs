@@ -315,6 +315,7 @@ mod tests {
                 tachyon: TachyonHandle::default(),
                 started: StartedBattle::default(),
                 turn,
+                relay: crate::conn::HostedRelay::default(),
             },
         );
         Wired {

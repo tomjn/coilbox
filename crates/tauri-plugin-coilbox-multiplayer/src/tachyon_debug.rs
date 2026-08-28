@@ -99,6 +99,7 @@ mod tests {
                 tachyon: TachyonHandle::default(),
                 started: StartedBattle::default(),
                 turn: watch::channel(crate::turn::TurnAnswer::Unasked).1,
+                relay: crate::conn::HostedRelay::default(),
             },
         );
         rx

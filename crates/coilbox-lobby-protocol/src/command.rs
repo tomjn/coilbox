@@ -236,6 +236,33 @@ pub fn open_battle(
     )
 }
 
+/// `RELAYEDHOST <ip> <port>`, telling the lobby that the battle this client is
+/// about to open is reachable at the relay rather than at this machine.
+///
+/// The lobby works a battle's address out from the host's own connection, which
+/// is right for every host that is reachable and wrong for one that is not. A
+/// relayed battle lives at a TURN allocation on the relay server, and that
+/// address is genuinely public, so a joiner dials it exactly as it dials a
+/// direct host. There is nothing for a joining client to understand and nothing
+/// for another lobby client to implement. What has to change is the one thing
+/// only the host knows: which address to put in `BATTLEOPENED`.
+///
+/// Sent immediately before `OPENBATTLE`, and only ever after the allocation
+/// exists. A lobby that has not seen one of these opens the battle the way it
+/// always has.
+///
+/// The port is here as well as in `OPENBATTLE` because a rebuilt allocation
+/// changes both, and issue #2031 has to be able to say so in one line without
+/// reopening the battle.
+///
+/// ScarylePoo/uberserver#32 is the server half, and no server runs it yet. A
+/// lobby that does not understand this line ignores it and advertises the
+/// battle at the host's own address, which is the broken host relay hosting
+/// exists to fix rather than a new failure.
+pub fn relayed_host(ip: std::net::IpAddr, port: u16) -> String {
+    format!("RELAYEDHOST {ip} {port}")
+}
+
 /// `TURNCREDENTIALS`, asking the lobby to mint a short-lived credential for its
 /// relay, so a host nothing can reach can open an allocation on it.
 ///
@@ -749,6 +776,28 @@ mod tests {
     #[test]
     fn turn_credentials_line() {
         assert_eq!(turn_credentials(), "TURNCREDENTIALS");
+    }
+
+    /// The address and the port are separate slots, the way `CLIENTIPPORT`
+    /// already writes an address and a port, so the server reads them without
+    /// splitting anything.
+    #[test]
+    fn relayed_host_line() {
+        assert_eq!(
+            relayed_host("198.51.100.9".parse().expect("an address"), 30001),
+            "RELAYEDHOST 198.51.100.9 30001"
+        );
+    }
+
+    /// A TURN server on IPv6 hands out an IPv6 allocation, and the line has to
+    /// stay two fields when it does. Written bare rather than in brackets
+    /// because the port has a slot of its own, so there is nothing to
+    /// disambiguate.
+    #[test]
+    fn a_relayed_host_on_ipv6_is_still_two_fields() {
+        let line = relayed_host("2001:db8::1".parse().expect("an address"), 30001);
+        assert_eq!(line, "RELAYEDHOST 2001:db8::1 30001");
+        assert_eq!(line.split(' ').count(), 3);
     }
 
     #[test]

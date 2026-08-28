@@ -21,6 +21,13 @@ mod probe;
 /// Public because the seam it exposes is the one thing relay hosting cannot
 /// work without, and it is waiting on a lobby that can name a joiner's address.
 pub mod relay_agent;
+/// Hosting a battle through the relay: the credential, the sidecar, the wait
+/// for an allocation, and the address the battle is then advertised at. The
+/// join between everything else in this milestone.
+///
+/// Private, like [`turn`] and for the same reason: its entry point takes a
+/// [`Registry`].
+mod relay_host;
 /// Where the relay agent binary is, what to start it with, and how to tell
 /// whether one is already relaying a battle. Public for the same reason
 /// [`relay_agent`] is: it is half of the seam relay hosting is waiting on.
@@ -1588,7 +1595,8 @@ fn mp_set_battle_status(
 /// `mp_open_battle` — host a new battle (mirrors the `OPENBATTLE` field order).
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-fn mp_open_battle(
+async fn mp_open_battle<R: Runtime>(
+    app: tauri::AppHandle<R>,
     registry: State<'_, Registry>,
     server_key: String,
     battle_type: u8,
@@ -1604,37 +1612,209 @@ fn mp_open_battle(
     map: String,
     title: String,
     modname: String,
+    relay: bool,
+) -> Result<CliResult, ()> {
+    // The run file is the only thing here that needs to know where coilbox is
+    // installed, so it is resolved before the work and handed down as a path.
+    let run_file = if relay {
+        match relay_sidecar::run_file_path(&app) {
+            Ok(path) => Some(path),
+            Err(e) => return Ok(CliResult::err(e)),
+        }
+    } else {
+        None
+    };
+    Ok(open_battle(
+        registry.inner(),
+        &server_key,
+        port,
+        BattleToOpen {
+            battle_type,
+            nat_type,
+            key,
+            max_players,
+            modhash,
+            rank,
+            maphash,
+            engine,
+            version,
+            map,
+            title,
+            modname,
+        },
+        run_file.as_deref(),
+    )
+    .await)
+}
+
+/// Everything an `OPENBATTLE` line carries except where the battle is.
+///
+/// Split out so that the address and the port live in exactly one place, which
+/// is [`advertising`]. A battle's content and a battle's whereabouts are decided
+/// by different things, and the only bug that matters here is mixing them up.
+struct BattleToOpen {
+    battle_type: u8,
+    nat_type: u8,
+    key: String,
+    max_players: u32,
+    modhash: i32,
+    rank: u8,
+    maphash: i32,
+    engine: String,
+    version: String,
+    map: String,
+    title: String,
+    modname: String,
+}
+
+/// The lines that open `battle` at `advertised`, in the order they go on the
+/// wire. Pure.
+///
+/// One port, taken from `advertised`, so there is no second one for the
+/// `OPENBATTLE` line to be built from by mistake. On a relayed battle that is
+/// the relay's allocated port and the host's own engine port is nowhere in
+/// scope.
+///
+/// The address line comes first because the lobby has to know where the battle
+/// is before it is told there is one. It works a host's address out from the
+/// connection it is talking to, and for a relayed host that answer is this
+/// machine, which is the address nobody can reach and the reason any of this
+/// exists. `RELAYEDHOST` is the only place coilbox contradicts it, and it is
+/// absent on every other route because on those the lobby is right.
+fn advertising(advertised: relay_host::Advertised, battle: &BattleToOpen) -> Vec<String> {
+    let open = command::open_battle(
+        battle.battle_type,
+        battle.nat_type,
+        &battle.key,
+        advertised.port,
+        battle.max_players,
+        battle.modhash,
+        battle.rank,
+        battle.maphash,
+        &battle.engine,
+        &battle.version,
+        &battle.map,
+        &battle.title,
+        &battle.modname,
+    );
+    match advertised.ip {
+        Some(ip) => vec![command::relayed_host(ip, advertised.port), open],
+        None => vec![open],
+    }
+}
+
+/// The body of [`mp_open_battle`], with the app handle taken out.
+///
+/// `relay` is the sidecar's run file when this battle is to be relayed and
+/// `None` when it is not, so "which route" and "where the run file is" are one
+/// value rather than two that could disagree.
+///
+/// ## Why the ordering cannot go wrong here
+///
+/// A relayed battle is advertised at the relay's allocation, and advertising it
+/// before that allocation exists gives players a battle they cannot enter. The
+/// guarantee is not the order of the statements below, it is that the port every
+/// line is built from comes out of a [`relay_host::Advertised`], and the only way
+/// to build a relayed one is from a [`relay_host::RelayHost`], which only
+/// [`relay_host::allocate`] returns and only once the agent has said its relay is
+/// open. Rearranging this function cannot produce an advertisement that runs
+/// ahead of the allocation, because there is no value to advertise until there is
+/// one.
+///
+/// `port` is the port the host's own engine will bind. On a relayed battle that
+/// is not the port anybody dials, so it stays out of the wire lines and goes to
+/// the relay agent instead, as `--engine-port`.
+async fn open_battle(
+    registry: &Registry,
+    server_key: &str,
+    port: u16,
+    battle: BattleToOpen,
+    relay: Option<&std::path::Path>,
 ) -> CliResult {
     // Refused rather than sent, because a key with whitespace in it moves the
     // port, the player limit and both content hashes into the wrong slots, and
     // the battle that opens is one nobody can join. Neither end can tell
     // afterwards, so it has to stop here.
-    if !command::fits_one_field(&key) {
+    if !command::fits_one_field(&battle.key) {
         return CliResult::err("a battle password cannot contain spaces");
     }
-    let line = command::open_battle(
-        battle_type,
-        nat_type,
-        &key,
-        port,
-        max_players,
-        modhash,
-        rank,
-        maphash,
-        &engine,
-        &version,
-        &map,
-        &title,
-        &modname,
-    );
+
+    // Dropped before the attempt rather than after it, so a host whose relay
+    // fails is not left described as relayed. The frontend clears its own record
+    // of the route in the same place and for the same reason.
+    forget_relay(registry, server_key);
+
+    let (advertised, hosted) = match relay {
+        Some(run_file) => {
+            // The budget the lobby round trip gets is the login handshake's,
+            // because it is the same round trip to the same server. Waiting for
+            // the allocation afterwards has a budget of its own, in
+            // `relay_host::ALLOCATION_PATIENCE`.
+            let opened = relay_host::allocate(
+                registry,
+                server_key,
+                run_file,
+                port,
+                battle.max_players as usize,
+                conn::now_ms(),
+                READY_TIMEOUT,
+            )
+            .await;
+            match opened {
+                Ok(host) => (relay_host::Advertised::relayed(&host), Some(host)),
+                // The one thing that must not happen is a battle at an address
+                // nobody can reach, so nothing is sent and the host is told why
+                // in the form they pressed Host in.
+                Err(e) => return CliResult::err(e.to_string()),
+            }
+        }
+        None => (relay_host::Advertised::direct(port), None),
+    };
+
+    let lines = advertising(advertised, &battle);
+
     // Seat the host as a player by default (protocol default is spectator). The
     // frontend's colour/sync/spectate pushes then refine this via mp_set_battle_status.
     let seat = BattleStatus {
         mode: true,
         ..default_battle_status()
     };
-    set_intended_battle_status(registry.inner(), &server_key, seat, 0);
-    enqueue(registry.inner(), &server_key, line)
+    set_intended_battle_status(registry, server_key, seat, 0);
+
+    let sent = enqueue_all(registry, server_key, lines);
+    match hosted {
+        // Held against the connection so the host's own start script knows to
+        // point the engine at loopback rather than at the relay.
+        Some(host) if sent.success => remember_relay(registry, server_key, host),
+        // The line never left, so there is no battle and the allocation is
+        // holding the relay's bandwidth for nothing. Asking the sidecar to stop
+        // is also what keeps the next attempt from meeting its own run file and
+        // refusing to start.
+        Some(host) => {
+            let _ = host.agent.stop();
+        }
+        None => {}
+    }
+    sent
+}
+
+/// Hold the relay a battle is being hosted through against its connection.
+fn remember_relay(registry: &Registry, server_key: &str, host: relay_host::RelayHost) {
+    if let Some(conn) = lock_or_recover(registry).get(server_key) {
+        *lock_or_recover(&conn.relay) = Some(host);
+    }
+}
+
+/// Forget whatever relay this connection was last hosting through.
+///
+/// Dropping the [`relay_host::RelayHost`] closes coilbox's end of the sidecar's
+/// stdin, which the sidecar reads as coilbox going away rather than as a battle
+/// ending, so a game already running carries on. Ending a relayed battle
+/// deliberately is issue #2018.
+fn forget_relay(registry: &Registry, server_key: &str) {
+    if let Some(conn) = lock_or_recover(registry).get(server_key) {
+        *lock_or_recover(&conn.relay) = None;
+    }
 }
 
 /// `mp_zerok_open_battle`, Zero-K only: ask the server to open a room for us.
@@ -2374,7 +2554,14 @@ fn team_value(ally: u8, color: u32) -> Value {
 /// wire `team_id`/`ally` bitfields into the contiguous 0..N index space the engine's
 /// positional `[TEAMn]`/`[ALLYTEAMn]` blocks require (see `TODO(host)` above), so
 /// `players[].team` indexes the `teams[]` array directly.
-fn battle_to_host_config(state: &LobbyState) -> Result<Value, String> {
+///
+/// `relay` is set when this battle is being hosted through the lobby's relay, and
+/// it changes both halves of where the engine listens. Read the comment at the
+/// bottom of this function before changing either.
+fn battle_to_host_config(
+    state: &LobbyState,
+    relay: Option<&relay_host::RelayHost>,
+) -> Result<Value, String> {
     let bid = state.current_battle.ok_or("not currently in a battle")?;
     let battle = state
         .battles
@@ -2486,7 +2673,45 @@ fn battle_to_host_config(state: &LobbyState) -> Result<Value, String> {
         })
         .collect();
 
-    Ok(json!({
+    // Where the host's engine listens, which is not where the battle is
+    // advertised once a relay is involved.
+    //
+    // Without a relay these are the same thing: the engine binds every interface
+    // on the port the battle was opened at, and joiners arrive on it straight
+    // from the internet.
+    //
+    // With one they are two different machines. The battle is advertised at an
+    // allocation on the relay server, so `battle.port` is the relay's port and
+    // binding the engine to it would put the engine on a number that means
+    // nothing here. The relay agent sends every player's traffic to
+    // `127.0.0.1:<engine port>` (`coilbox-relay-agent`, `main.rs:380`), so that
+    // is the only address the engine can usefully be at, and the port has to be
+    // the one the agent was started with rather than anything the lobby echoed
+    // back.
+    //
+    // The host still plays in their own battle, and does not go through the relay
+    // to do it. `CPreGame` gives a host `InitLocalClient()`
+    // (`rts/Game/PreGame.cpp:92`), an in-process connection, so `HostIP` only
+    // ever decides where the host's own server binds. Narrowing it to loopback
+    // costs the host's client nothing.
+    //
+    // The engine logs `opening socket on loopback address, other users will not
+    // be able to connect!` when it binds one (`rts/System/Net/UDPListener.cpp`,
+    // `TryBindSocket`). It is a warning rather than a refusal, and under a relay
+    // it is untrue: other users connect to the relay, and the relay agent
+    // connects here. Nothing can stop the engine saying it, so
+    // `hostLoopbackReason` puts the explanation into the start script as a
+    // comment, which is the file sitting next to the infolog somebody has just
+    // read the warning in.
+    let (host_ip, host_port) = match relay {
+        Some(relay) => ("127.0.0.1", Some(relay.engine_port)),
+        None => (
+            "0.0.0.0",
+            state.host_port.or_else(|| battle.port.parse::<u16>().ok()),
+        ),
+    };
+
+    let mut config = json!({
         "mapName": battle.map,
         "gameType": battle.modname,
         "myPlayerName": me,
@@ -2499,9 +2724,18 @@ fn battle_to_host_config(state: &LobbyState) -> Result<Value, String> {
         "teams": teams.into_values().collect::<Vec<_>>(),
         "allyTeams": ally_teams,
         "isHost": true,
-        "hostIp": "0.0.0.0",
-        "hostPort": state.host_port.or_else(|| battle.port.parse::<u16>().ok()),
-    }))
+        "hostIp": host_ip,
+        "hostPort": host_port,
+    });
+    if let Some(relay) = relay {
+        config["hostLoopbackReason"] = json!(format!(
+            "This battle is relayed through {}, so the engine listens on loopback and the relay \
+             agent carries every player to it. The engine's warning about a loopback socket does \
+             not apply.",
+            relay.relayed
+        ));
+    }
+    Ok(config)
 }
 
 /// One host-mode `teams[]` entry, with an already-renumbered ally index and the
@@ -2522,8 +2756,9 @@ fn mp_build_host_config(registry: State<'_, Registry>, server_key: String) -> Cl
     let map = lock_or_recover(&registry);
     match map.get(&server_key) {
         Some(conn) => {
+            let relay = lock_or_recover(&conn.relay);
             let state = lock_or_recover(&conn.state);
-            match battle_to_host_config(&state) {
+            match battle_to_host_config(&state, relay.as_ref()) {
                 Ok(config) => CliResult::ok(json!({ "config": config })),
                 Err(e) => CliResult::err(e),
             }
@@ -3045,7 +3280,7 @@ mod tests {
 
     #[test]
     fn host_config_is_host_and_binds_hostport() {
-        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let cfg = battle_to_host_config(&hosted_state(), None).unwrap();
         assert_eq!(cfg["isHost"], true);
         assert_eq!(cfg["hostIp"], "0.0.0.0");
         assert_eq!(cfg["hostPort"], 8452);
@@ -3054,9 +3289,277 @@ mod tests {
         assert!(cfg.get("myPasswd").is_none());
     }
 
+    /// The engine's port on a relayed host, which the lobby knows nothing about.
+    const RELAYED_ENGINE_PORT: u16 = 8452;
+
+    /// A battle the lobby is advertising at the relay, which is what it looks
+    /// like from this end once `mp_open_battle` has opened one.
+    ///
+    /// `battle.port` is the relay's port, because that is the port the lobby was
+    /// sent and the port it echoes back in `BATTLEOPENED`. `host_port` is empty
+    /// because `HOSTPORT` only ever arrives for a client that sent
+    /// `UDPSOURCEPORT`, which coilbox does not.
+    fn relayed_state() -> LobbyState {
+        let mut state = hosted_state();
+        state.host_port = None;
+        if let Some(battle) = state.battles.get_mut(&9) {
+            battle.port = "30001".into();
+        }
+        state
+    }
+
+    /// A relay carrying that battle, with a control channel that goes nowhere.
+    fn a_relay() -> relay_host::RelayHost {
+        struct Nothing;
+        impl std::io::Read for Nothing {
+            fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+                Ok(0)
+            }
+        }
+        relay_host::RelayHost {
+            engine_port: RELAYED_ENGINE_PORT,
+            relayed: "198.51.100.9:30001".parse().expect("an address"),
+            agent: relay_agent::RelayAgent::driving(Nothing, Vec::new(), |_| {}),
+        }
+    }
+
+    /// The third acceptance criterion of issue #2017, and the easiest thing in
+    /// it to get wrong.
+    ///
+    /// A relayed battle is advertised at the relay's port, so that is the port
+    /// the lobby hands back. Binding the host's own engine to it would put the
+    /// engine on a number that means nothing on this machine, while the relay
+    /// agent went on delivering every player to the port it was started with. The
+    /// host would then be relaying a battle their own engine is not in.
+    #[test]
+    fn a_relayed_host_binds_its_own_engine_port_and_not_the_relays() {
+        let cfg = battle_to_host_config(&relayed_state(), Some(&a_relay())).unwrap();
+        assert_eq!(cfg["hostPort"], RELAYED_ENGINE_PORT);
+        assert_ne!(
+            cfg["hostPort"], 30001,
+            "the relay's port is where players send, not where this engine listens"
+        );
+    }
+
+    /// And the other half: the same battle with no relay is read the way it
+    /// always was, off the port the lobby named. This is what says the line above
+    /// is the relay changing the answer rather than the answer having been
+    /// nothing to do with the lobby all along.
+    #[test]
+    fn the_same_battle_without_a_relay_still_binds_the_port_the_lobby_named() {
+        let cfg = battle_to_host_config(&relayed_state(), None).unwrap();
+        assert_eq!(cfg["hostPort"], 30001);
+        assert_eq!(cfg["hostIp"], "0.0.0.0");
+    }
+
+    /// The agent sends every player's traffic to `127.0.0.1:<engine port>`, so
+    /// that is the only address a relayed engine can usefully be listening at.
+    #[test]
+    fn a_relayed_host_listens_where_the_relay_agent_sends() {
+        let cfg = battle_to_host_config(&relayed_state(), Some(&a_relay())).unwrap();
+        assert_eq!(cfg["hostIp"], "127.0.0.1");
+    }
+
+    /// The engine warns about a loopback socket and is wrong to under a relay.
+    /// The start script is the file next to the infolog, so the explanation goes
+    /// in it, naming the relay so the note is about this battle rather than
+    /// relaying in general.
+    #[test]
+    fn a_relayed_host_says_in_its_script_why_loopback_is_deliberate() {
+        let cfg = battle_to_host_config(&relayed_state(), Some(&a_relay())).unwrap();
+        let note = cfg["hostLoopbackReason"]
+            .as_str()
+            .expect("a relayed host explains its loopback bind");
+        assert!(note.contains("198.51.100.9:30001"), "got: {note}");
+
+        // And a host that is not relayed says nothing, because for them the
+        // engine's warning would be true.
+        let direct = battle_to_host_config(&hosted_state(), None).unwrap();
+        assert!(direct.get("hostLoopbackReason").is_none());
+    }
+
+    /// A battle with nothing interesting in it, so the tests below are about the
+    /// address and nothing else.
+    fn a_battle_to_open() -> BattleToOpen {
+        BattleToOpen {
+            battle_type: 0,
+            nat_type: 0,
+            key: "*".into(),
+            max_players: 8,
+            modhash: -1,
+            rank: 0,
+            maphash: -1,
+            engine: "spring".into(),
+            version: "105".into(),
+            map: "Comet Catcher".into(),
+            title: "Title".into(),
+            modname: "BAR".into(),
+        }
+    }
+
+    /// The headline of issue #2017. A relayed battle is advertised at the
+    /// relay's address and the relay's port, and the address is said before the
+    /// battle is.
+    #[test]
+    fn a_relayed_battle_names_the_relay_before_it_opens_the_battle() {
+        let relay = a_relay();
+        let lines = advertising(relay_host::Advertised::relayed(&relay), &a_battle_to_open());
+
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0], "RELAYEDHOST 198.51.100.9 30001");
+        assert!(
+            lines[1].starts_with("OPENBATTLE 0 0 * 30001 8"),
+            "the port a joiner dials is the relay's, got: {}",
+            lines[1]
+        );
+    }
+
+    /// And the host's own engine port never reaches the wire, because a joiner
+    /// dialling it would be dialling a port on the host's machine, which is the
+    /// machine nothing can reach.
+    #[test]
+    fn a_relayed_battle_never_puts_the_hosts_own_port_on_the_wire() {
+        let relay = a_relay();
+        let lines = advertising(relay_host::Advertised::relayed(&relay), &a_battle_to_open());
+        assert!(
+            !lines
+                .iter()
+                .any(|l| l.contains(&RELAYED_ENGINE_PORT.to_string())),
+            "the engine's own port is for the relay agent, not the lobby: {lines:?}"
+        );
+    }
+
+    /// Every other route says nothing about an address, because the lobby works
+    /// it out from the connection and is right to.
+    #[test]
+    fn a_battle_that_is_not_relayed_names_no_address() {
+        let lines = advertising(relay_host::Advertised::direct(8452), &a_battle_to_open());
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].starts_with("OPENBATTLE 0 0 * 8452 8"));
+    }
+
+    /// A registered TASServer connection whose compatibility flags are
+    /// `compflags`, and the receiving end of everything it sends.
+    ///
+    /// Built here rather than shared with `turn.rs` because what these tests care
+    /// about is the wire, and what those care about is the credential.
+    fn a_connection(compflags: &str) -> (Registry, tokio::sync::mpsc::UnboundedReceiver<Outbound>) {
+        use coilbox_lobby_protocol::{parse_line, reduce_at};
+        use tokio::sync::watch;
+
+        let registry = Registry::default();
+        let (tx, sent) = tokio::sync::mpsc::unbounded_channel::<Outbound>();
+        let state = Arc::new(Mutex::new(LobbyState::new()));
+        reduce_at(&mut lock_or_recover(&state), parse_line(compflags), 0);
+        lock_or_recover(&registry).insert(
+            "alice@bar:8200".to_string(),
+            conn::ServerConn {
+                protocol: ConnProtocol::TasServer,
+                tx,
+                state,
+                sink: Arc::new(Mutex::new(Channel::new(|_| Ok(())))) as conn::EventSink,
+                phase: watch::channel(LoginPhase::Ready).1,
+                agreement: Arc::new(Mutex::new(None)),
+                tachyon: conn::TachyonHandle::default(),
+                started: conn::StartedBattle::default(),
+                turn: watch::channel(turn::TurnAnswer::Unasked).1,
+                relay: conn::HostedRelay::default(),
+            },
+        );
+        (registry, sent)
+    }
+
+    /// The second acceptance criterion of issue #2017, and the failure that
+    /// matters most: a relay that cannot be had stops the open with a reason,
+    /// rather than advertising a battle at an address nobody can reach.
+    ///
+    /// The refusal used here is the one every server gives today, which is a
+    /// lobby that never said it has a relay. It is settled before login, so
+    /// nothing goes on the wire at all, and that is what the second assertion is
+    /// about: not "the OPENBATTLE was withheld", but "the wire is untouched".
+    #[tokio::test]
+    async fn a_host_who_cannot_get_a_relay_is_told_why_and_opens_nothing() {
+        let (registry, mut sent) = a_connection("COMPFLAGS u sp");
+
+        let refused = open_battle(
+            &registry,
+            "alice@bar:8200",
+            8452,
+            a_battle_to_open(),
+            Some(std::path::Path::new("/nowhere/agent.json")),
+        )
+        .await;
+
+        assert!(!refused.success);
+        assert!(
+            refused
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("this server has no relay"),
+            "the host has to be told what stopped them, got: {:?}",
+            refused.error
+        );
+        assert!(
+            sent.try_recv().is_err(),
+            "nothing may reach the lobby when there is no relay to host through"
+        );
+    }
+
+    /// And the same connection hosting without a relay is untouched by any of
+    /// this: one line, the port it was given, and no address.
+    #[tokio::test]
+    async fn hosting_without_a_relay_still_sends_one_ordinary_line() {
+        let (registry, mut sent) = a_connection("COMPFLAGS u sp");
+
+        let opened = open_battle(&registry, "alice@bar:8200", 8452, a_battle_to_open(), None).await;
+
+        assert!(opened.success);
+        assert!(matches!(
+            sent.try_recv(),
+            Ok(Outbound::Line(line)) if line.starts_with("OPENBATTLE 0 0 * 8452 8")
+        ));
+        assert!(sent.try_recv().is_err(), "one line and no more");
+    }
+
+    /// A password the line cannot carry is refused before anything else happens,
+    /// including before a relay is asked for. Hosting is the expensive half and
+    /// it must not be spent on a battle that was never going to open.
+    #[tokio::test]
+    async fn a_password_the_line_cannot_carry_is_refused_before_a_relay_is_asked_for() {
+        let (registry, mut sent) = a_connection("COMPFLAGS u sp r");
+
+        let refused = open_battle(
+            &registry,
+            "alice@bar:8200",
+            8452,
+            BattleToOpen {
+                key: "let me in".into(),
+                ..a_battle_to_open()
+            },
+            Some(std::path::Path::new("/nowhere/agent.json")),
+        )
+        .await;
+
+        assert!(!refused.success);
+        assert!(
+            refused
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("cannot contain spaces"),
+            "got: {:?}",
+            refused.error
+        );
+        assert!(
+            sent.try_recv().is_err(),
+            "a server with a relay was not even asked for a credential"
+        );
+    }
+
     #[test]
     fn host_config_renumbers_teams_and_allies_contiguously() {
-        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let cfg = battle_to_host_config(&hosted_state(), None).unwrap();
 
         // Wire teams {2,3,7} -> positions {0,1,2}; wire allies {5,9} -> {0,1}.
         let teams = cfg["teams"].as_array().unwrap();
@@ -3087,7 +3590,7 @@ mod tests {
     /// never get placed. `me` hosts but is player 1 here, which is the whole point.
     #[test]
     fn host_config_points_ai_host_at_the_owning_player() {
-        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let cfg = battle_to_host_config(&hosted_state(), None).unwrap();
         let players = cfg["players"].as_array().unwrap();
         assert_eq!(players[0]["name"], "ally", "the host does not sort first");
         assert_eq!(players[1]["name"], "me");
@@ -3098,7 +3601,7 @@ mod tests {
 
     #[test]
     fn host_config_leads_an_ai_only_team_with_the_ai_host() {
-        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let cfg = battle_to_host_config(&hosted_state(), None).unwrap();
         let teams = cfg["teams"].as_array().unwrap();
         // Team pos 0 holds only BARb, owned by `me` -> player 1.
         assert_eq!(teams[0]["teamLeader"], 1);
@@ -3106,7 +3609,7 @@ mod tests {
 
     #[test]
     fn host_config_leads_human_teams_with_their_own_player() {
-        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let cfg = battle_to_host_config(&hosted_state(), None).unwrap();
         let teams = cfg["teams"].as_array().unwrap();
         // pos 1 is `me` (player 1); pos 2 is `ally` (player 0).
         assert_eq!(teams[1]["teamLeader"], 1);
@@ -3121,7 +3624,7 @@ mod tests {
         let battle = state.battles.get_mut(&9).unwrap();
         battle.bots.get_mut("BARb").unwrap().owner = "departed".into();
 
-        let cfg = battle_to_host_config(&state).unwrap();
+        let cfg = battle_to_host_config(&state, None).unwrap();
         assert_eq!(cfg["ais"][0]["host"], 1, "falls back to us, not player 0");
         assert_eq!(cfg["teams"][0]["teamLeader"], 1);
     }
@@ -3134,7 +3637,7 @@ mod tests {
         let battle = state.battles.get_mut(&9).unwrap();
         battle.bots.get_mut("BARb").unwrap().owner = "ally".into();
 
-        let cfg = battle_to_host_config(&state).unwrap();
+        let cfg = battle_to_host_config(&state, None).unwrap();
         assert_eq!(cfg["ais"][0]["host"], 0);
         assert_eq!(cfg["teams"][0]["teamLeader"], 0);
     }
@@ -3143,7 +3646,7 @@ mod tests {
     /// throws "invalid AI.Host" / "Team N has invalid leader" and the script dies.
     #[test]
     fn host_config_player_references_are_all_in_range() {
-        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let cfg = battle_to_host_config(&hosted_state(), None).unwrap();
         let n = cfg["players"].as_array().unwrap().len();
         for team in cfg["teams"].as_array().unwrap() {
             assert!(team["teamLeader"].as_u64().unwrap() < n as u64);
@@ -3155,7 +3658,7 @@ mod tests {
 
     #[test]
     fn host_config_converts_start_rects_to_unit_grid() {
-        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let cfg = battle_to_host_config(&hosted_state(), None).unwrap();
         // Ally 5 -> index 0: rect (l0,t0,r100,b200) -> [top,left,bottom,right] in 0..1.
         let rect = &cfg["allyTeams"][0]["startRect"];
         assert_eq!(rect[0], 0.0); // top
@@ -3167,12 +3670,12 @@ mod tests {
     #[test]
     fn host_config_errors_when_not_the_host() {
         // The join fixture is founded by "hoster", not us.
-        assert!(battle_to_host_config(&joined_state()).is_err());
+        assert!(battle_to_host_config(&joined_state(), None).is_err());
     }
 
     #[test]
     fn host_config_includes_unit_restrictions() {
-        let cfg = battle_to_host_config(&hosted_state()).unwrap();
+        let cfg = battle_to_host_config(&hosted_state(), None).unwrap();
         // Both restricted units surface as a name -> limit map the play crate
         // renders into the [RESTRICT] block.
         assert_eq!(cfg["restrictedUnits"]["armcom"], 0);
