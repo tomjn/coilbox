@@ -282,6 +282,40 @@ pub struct MatchFound {
     pub readied: bool,
 }
 
+/// A credential the lobby minted so we can open an allocation on its relay.
+///
+/// The lobby builds these out of a secret it shares with the relay, so the relay
+/// can check one without ever talking to the lobby. That is also why they run
+/// out: the expiry is baked into the username the relay reads, and the relay
+/// checks it on every request, including the refresh that keeps a live
+/// allocation open. A credential that runs out mid-game does not merely stop new
+/// allocations, it ends the one carrying the game.
+///
+/// Never serialized. The password is the one secret this state holds, the
+/// frontend has no use for it, and the relay agent is started from Rust. Issue
+/// #2019 covers keeping it out of the console and the logs as well.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TurnCredentials {
+    /// The relay, as the lobby named it: `turn:host:port`.
+    pub uri: String,
+    pub username: String,
+    pub password: String,
+    /// Unix millis at which the relay stops accepting it, worked out from the
+    /// lifetime the lobby gave and when the answer arrived.
+    pub expires_at: u64,
+}
+
+impl TurnCredentials {
+    /// Whether the relay will still accept this at `now_ms`.
+    ///
+    /// Ask about a moment in the future to leave headroom: a caller that needs
+    /// the credential to survive some piece of work asks whether it is live at
+    /// the end of that work, not at the start of it.
+    pub fn live_at(&self, now_ms: u64) -> bool {
+        now_ms < self.expires_at
+    }
+}
+
 /// A public channel as advertised by the server's `CHANNELS` directory.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -308,6 +342,14 @@ pub struct LobbyState {
     /// while we are the founder of `current_battle`. The host-mode start script binds
     /// the engine to this; cleared when we open a fresh battle.
     pub host_port: Option<u16>,
+    /// The last credential the lobby minted for its relay, live or run out.
+    ///
+    /// Kept past its expiry rather than cleared on a timer, because there is no
+    /// clock in here: the reducer is told the time, it does not ask. Read it
+    /// through [`LobbyState::live_turn_credentials`], which is where the expiry
+    /// is applied.
+    #[serde(skip)]
+    pub turn_credentials: Option<TurnCredentials>,
     /// The last-fetched public channel directory (from `CHANNELS`).
     pub channel_directory: Vec<DirChannel>,
     /// Server-confirmed ignores for this account, reconciled from the server's
@@ -347,6 +389,17 @@ impl LobbyState {
     /// A fresh, empty state.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// The relay credential, if we hold one the relay will still accept at
+    /// `now_ms`.
+    ///
+    /// One that has run out is not handed out again. The relay would refuse the
+    /// allocation, and the refusal would arrive as a failed host rather than as
+    /// anything naming the credential, so the only useful thing to do with an
+    /// expired one is ask the lobby for another.
+    pub fn live_turn_credentials(&self, now_ms: u64) -> Option<&TurnCredentials> {
+        self.turn_credentials.as_ref().filter(|c| c.live_at(now_ms))
     }
 
     /// Our current battle status + team colour, for answering `REQUESTBATTLESTATUS`.

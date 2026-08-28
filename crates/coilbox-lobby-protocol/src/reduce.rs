@@ -8,7 +8,7 @@
 use crate::message::ServerMessage;
 use crate::state::{
     Battle, Bot, ChannelState, ChatKind, ChatMsg, DirChannel, LobbyState, MemberStatus, StartRect,
-    User, Vote,
+    TurnCredentials, User, Vote,
 };
 use crate::status::{BattleStatus, ClientStatus};
 use crate::vote::{parse_vote_line, VoteLine};
@@ -96,6 +96,21 @@ pub enum Delta {
     },
     HostPort {
         port: u16,
+    },
+    /// The lobby minted a credential for its relay and we are holding it.
+    ///
+    /// The credential itself is deliberately not here. The password is a secret,
+    /// the relay agent is started from Rust, and nothing above this needs to see
+    /// it. What is worth carrying is when it runs out, in unix millis, because
+    /// that is the moment a relayed game would end.
+    TurnCredentials {
+        expires_at: u64,
+    },
+    /// The lobby would not mint one, in its own words. A person about to host
+    /// behind a router they cannot forward a port on has to be told this,
+    /// because it is the difference between hosting and not.
+    TurnCredentialsRefused {
+        reason: String,
     },
     LoggedIn {
         username: String,
@@ -720,6 +735,34 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             state.host_port = Some(port);
             vec![Delta::HostPort { port }]
         }
+        ServerMessage::TurnCredentials {
+            uri,
+            username,
+            password,
+            ttl_seconds,
+        } => {
+            // The lifetime is counted from now because now is when the answer
+            // arrived, and this is the only place with a clock. The relay counts
+            // from when it minted the credential, a moment earlier, so ours runs
+            // out first: the wrong way round would have us take a dead
+            // credential to the relay.
+            let expires_at = now_ms.saturating_add(ttl_seconds.saturating_mul(1_000));
+            state.turn_credentials = Some(TurnCredentials {
+                uri,
+                username,
+                password,
+                expires_at,
+            });
+            vec![Delta::TurnCredentials { expires_at }]
+        }
+        ServerMessage::TurnCredentialsFailed { reason } => {
+            // The one we were holding is not why this was refused, so it stays:
+            // a refusal to mint a second credential does not stop the first one
+            // carrying the game it is already carrying.
+            vec![Delta::TurnCredentialsRefused {
+                reason: refusal_words(reason),
+            }]
+        }
         ServerMessage::Ring { username } => {
             vec![Delta::Ring { from: username }]
         }
@@ -865,6 +908,21 @@ fn parse_failed(text: &str) -> (String, String) {
         reason = text.to_string();
     }
     (command, reason)
+}
+
+/// What to tell somebody about a refusal the server gave no reason for.
+///
+/// `TURNCREDENTIALSFAILED` carries its reason as the rest of the line, so a
+/// server that names none sends an empty one and the host would be told the
+/// lobby refused, followed by nothing. Saying that no reason was given is worth
+/// more than a sentence that trails off, and it is the same answer the relay
+/// agent gives for an error code with no phrase behind it (`reason_for` in
+/// `coilbox-relay-agent`).
+fn refusal_words(reason: String) -> String {
+    if reason.trim().is_empty() {
+        return "no reason given".to_string();
+    }
+    reason
 }
 
 /// Append a chat message to a channel (creating it if needed) and emit a delta
@@ -1409,6 +1467,98 @@ mod tests {
         reduce(&mut s, parse_line("OPENBATTLE 3"));
         assert_eq!(s.host_port, None);
         assert_eq!(s.current_battle, Some(3));
+    }
+
+    /// The whole exchange, from the lobby's answer to a credential a caller can
+    /// take to the relay agent.
+    #[test]
+    fn a_minted_credential_is_held_with_the_moment_it_runs_out() {
+        let mut s = LobbyState::new();
+        let minted_at = 1_786_000_000_000;
+        let d = reduce_at(
+            &mut s,
+            parse_line("TURNCREDENTIALS turn:relay.example.org:3478 1786086400:alice hmac= 86400"),
+            minted_at,
+        );
+
+        let held = s.turn_credentials.as_ref().expect("a credential is held");
+        assert_eq!(held.uri, "turn:relay.example.org:3478");
+        assert_eq!(held.username, "1786086400:alice");
+        assert_eq!(held.password, "hmac=");
+        // 86400 seconds after the answer arrived, and not a second later: the
+        // relay started counting before we did.
+        assert_eq!(held.expires_at, minted_at + 86_400_000);
+        assert_eq!(
+            d,
+            vec![Delta::TurnCredentials {
+                expires_at: minted_at + 86_400_000
+            }]
+        );
+    }
+
+    /// The load-bearing half of the expiry. The relay checks the credential on
+    /// every request, including the refresh that keeps a live allocation open,
+    /// so handing an expired one back out would open a game that dies.
+    #[test]
+    fn a_credential_that_has_run_out_is_not_handed_out_again() {
+        let mut s = LobbyState::new();
+        let minted_at = 1_786_000_000_000;
+        reduce_at(
+            &mut s,
+            parse_line("TURNCREDENTIALS turn:relay.example.org:3478 alice hmac= 600"),
+            minted_at,
+        );
+
+        assert!(s.live_turn_credentials(minted_at).is_some());
+        // A second before it runs out, and the second it does.
+        assert!(s.live_turn_credentials(minted_at + 599_000).is_some());
+        assert!(s.live_turn_credentials(minted_at + 600_000).is_none());
+        // Still held, so nothing has to be re-read to know there was one.
+        assert!(s.turn_credentials.is_some());
+    }
+
+    /// A refusal is for the person trying to host, so it carries the lobby's own
+    /// words, and says something rather than nothing when the lobby gave none.
+    #[test]
+    fn a_refusal_reaches_the_host_in_words() {
+        let mut s = LobbyState::new();
+        assert_eq!(
+            reduce(&mut s, parse_line("TURNCREDENTIALSFAILED you asked too often")),
+            vec![Delta::TurnCredentialsRefused {
+                reason: "you asked too often".into()
+            }]
+        );
+        assert_eq!(
+            reduce(&mut s, parse_line("TURNCREDENTIALSFAILED")),
+            vec![Delta::TurnCredentialsRefused {
+                reason: "no reason given".into()
+            }]
+        );
+    }
+
+    /// A refusal to mint a second credential must not throw away the first,
+    /// which may be carrying a game right now.
+    #[test]
+    fn a_refusal_leaves_a_credential_we_are_already_using_alone() {
+        let mut s = LobbyState::new();
+        reduce_at(
+            &mut s,
+            parse_line("TURNCREDENTIALS turn:relay.example.org:3478 alice hmac= 600"),
+            1_000,
+        );
+        reduce(&mut s, parse_line("TURNCREDENTIALSFAILED rate limited"));
+        assert!(s.live_turn_credentials(1_000).is_some());
+    }
+
+    /// A lobby that has never heard of the command says nothing at all, which
+    /// has to be as harmless as any other line coilbox does not know.
+    #[test]
+    fn a_server_that_does_not_know_the_command_changes_nothing() {
+        let mut s = LobbyState::new();
+        let before = s.clone();
+        let d = reduce(&mut s, parse_line("TURNCREDENTIALS not a credential"));
+        assert!(d.is_empty(), "an unreadable line produces no delta");
+        assert_eq!(s, before);
     }
 
     #[test]

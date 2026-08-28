@@ -202,6 +202,23 @@ pub enum ServerMessage {
     OpenBattleFailed { reason: String },
     /// `HOSTPORT <port>`
     HostPort { port: u16 },
+    /// `TURNCREDENTIALS <uri> <username> <password> <ttl_seconds>`, the lobby's
+    /// answer to [`crate::command::turn_credentials`].
+    ///
+    /// The username and password are the relay's, not the player's. The lobby
+    /// mints them out of a secret it shares with the relay, and they are good
+    /// for `ttl_seconds` and no longer.
+    TurnCredentials {
+        /// The relay, as a TURN URI: `turn:host:port`.
+        uri: String,
+        username: String,
+        password: String,
+        /// How long the relay will accept them for, from now.
+        ttl_seconds: u64,
+    },
+    /// `TURNCREDENTIALSFAILED <reason>`, the lobby declining to mint one. The
+    /// reason is meant for the person trying to host, so it is carried whole.
+    TurnCredentialsFailed { reason: String },
     /// `PING [token]`
     Ping { token: Option<String> },
     /// `PONG [token]`
@@ -634,6 +651,10 @@ pub fn parse_line(line: &str) -> ServerMessage {
         "HOSTPORT" => ServerMessage::HostPort {
             port: rest.trim().parse().unwrap_or(0),
         },
+        "TURNCREDENTIALS" => parse_turn_credentials(rest, raw),
+        "TURNCREDENTIALSFAILED" => ServerMessage::TurnCredentialsFailed {
+            reason: rest.to_string(),
+        },
         "PING" => ServerMessage::Ping {
             token: (!rest.is_empty()).then(|| rest.to_string()),
         },
@@ -807,6 +828,42 @@ fn parse_ignore_tags(rest: &str) -> (String, Option<String>) {
         }
     }
     (username, reason)
+}
+
+/// Parse `TURNCREDENTIALS <uri> <username> <password> <ttl_seconds>`.
+///
+/// A field that cannot be read is refused rather than guessed at, and that
+/// matters more here than on most lines. A slot ends at the first space
+/// ([`crate::command::fits_one_field`]), so a value carrying one moves every
+/// field after it along by one. The password would arrive as its first half,
+/// the host would take that to the relay, and the relay would refuse the
+/// allocation without saying anything a person could act on.
+///
+/// What catches a shift is the lifetime: it is last, so it is greedy, and it
+/// has to be a plain number. Any value that stole a slot pushes text into it and
+/// it stops parsing. So a shifted line is not read as a credential at all. It
+/// falls through to [`ServerMessage::Unknown`] the way any unreadable line does,
+/// and the host waits out the ask rather than being handed a credential built
+/// from the wrong pieces. The first three fields cannot hold a space at all,
+/// because a space is where this splits them.
+fn parse_turn_credentials(rest: &str, raw: impl Fn() -> String) -> ServerMessage {
+    let Some([uri, username, password, ttl]) = fields::<4>(rest) else {
+        return ServerMessage::Unknown { raw: raw() };
+    };
+    // An empty slot is a field the server left out, which is the other way a
+    // line can be four fields wide and still not be a credential.
+    if uri.is_empty() || username.is_empty() || password.is_empty() {
+        return ServerMessage::Unknown { raw: raw() };
+    }
+    let Ok(ttl_seconds) = ttl.trim().parse::<u64>() else {
+        return ServerMessage::Unknown { raw: raw() };
+    };
+    ServerMessage::TurnCredentials {
+        uri: uri.to_string(),
+        username: username.to_string(),
+        password: password.to_string(),
+        ttl_seconds,
+    }
 }
 
 fn parse_battle_opened(rest: &str, raw: impl Fn() -> String) -> ServerMessage {
@@ -1207,6 +1264,70 @@ mod tests {
         assert_eq!(
             parse_line("FRIENDREQUESTLISTEND"),
             ServerMessage::FriendRequestListEnd
+        );
+    }
+
+    /// A credential in the shape coturn's shared-secret scheme produces: the
+    /// username is an expiry and a user id, the password is base64 of an HMAC.
+    #[test]
+    fn parses_a_minted_turn_credential() {
+        let m = parse_line(
+            "TURNCREDENTIALS turn:relay.example.org:3478 1786000000:alice bnVIYm9hcmRIbWFjc2ln= 86400",
+        );
+        assert_eq!(
+            m,
+            ServerMessage::TurnCredentials {
+                uri: "turn:relay.example.org:3478".into(),
+                username: "1786000000:alice".into(),
+                password: "bnVIYm9hcmRIbWFjc2ln=".into(),
+                ttl_seconds: 86_400,
+            }
+        );
+    }
+
+    /// The hazard [`crate::command::fits_one_field`] names, on the receiving
+    /// side. Base64 has no space in it, but "has none normally" is not a thing
+    /// to rely on when the result is a host taking half a password to the relay.
+    #[test]
+    fn a_credential_field_with_a_space_is_not_read_as_a_credential() {
+        use crate::command::fits_one_field;
+
+        // What a real password looks like, and what it must not look like.
+        assert!(fits_one_field("bnVIYm9hcmRIbWFjc2ln="));
+        assert!(!fits_one_field("half a password"));
+
+        for line in [
+            // A space in the password pushes its tail into the lifetime.
+            "TURNCREDENTIALS turn:relay.example.org:3478 1786000000:alice half a password 86400",
+            // A space in the username does the same one field earlier.
+            "TURNCREDENTIALS turn:relay.example.org:3478 alice smith secret 86400",
+            // A lifetime that is not a number, on its own.
+            "TURNCREDENTIALS turn:relay.example.org:3478 alice secret a-while",
+            // Three fields, so not a credential at all.
+            "TURNCREDENTIALS turn:relay.example.org:3478 alice secret",
+            // A field the server left empty.
+            "TURNCREDENTIALS  alice secret 86400",
+        ] {
+            assert_eq!(
+                parse_line(line),
+                ServerMessage::Unknown { raw: line.into() },
+                "a line this shape must not become a credential: {line}"
+            );
+        }
+    }
+
+    #[test]
+    fn parses_a_refusal_to_mint_a_turn_credential() {
+        assert_eq!(
+            parse_line("TURNCREDENTIALSFAILED you have asked too often"),
+            ServerMessage::TurnCredentialsFailed {
+                reason: "you have asked too often".into(),
+            }
+        );
+        // A server that names no reason still refuses.
+        assert_eq!(
+            parse_line("TURNCREDENTIALSFAILED"),
+            ServerMessage::TurnCredentialsFailed { reason: "".into() }
         );
     }
 

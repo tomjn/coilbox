@@ -220,6 +220,20 @@ pub fn open_battle(
     )
 }
 
+/// `TURNCREDENTIALS`, asking the lobby to mint a short-lived credential for its
+/// relay, so a host nothing can reach can open an allocation on it.
+///
+/// A TURN server that served anybody would be free bandwidth for the whole
+/// internet, so it only serves people the lobby has vouched for. The lobby does
+/// the vouching by minting a username and a password the relay can check on its
+/// own (ScarylePoo/uberserver#27). Nothing here has to understand how: it asks,
+/// it reads the answer, and it passes the answer to the relay agent.
+///
+/// The command takes no arguments. Who is asking is who is logged in.
+pub fn turn_credentials() -> String {
+    "TURNCREDENTIALS".to_string()
+}
+
 /// `UPDATEBATTLEINFO <spectatorCount> <locked> <maphash> <map>`.
 pub fn update_battle_info(spectators: u32, locked: bool, maphash: i32, map: &str) -> String {
     format!(
@@ -714,6 +728,11 @@ mod tests {
         assert!(!is_wire_safe(&say_battle_ex("waves\nx")));
         // Not chat-specific: any argument can carry a break.
         assert!(!is_wire_safe(&join_channel("main", Some("k\ney"))));
+    }
+
+    #[test]
+    fn turn_credentials_line() {
+        assert_eq!(turn_credentials(), "TURNCREDENTIALS");
     }
 
     #[test]
