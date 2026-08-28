@@ -3,15 +3,14 @@
 //! peer.
 //!
 //! That is deliberately the shape of `webrtc_util::Conn`, because a TURN
-//! allocation is what will really be underneath this (issue #2014).
+//! allocation is what is usually underneath this ([`crate::allocation`]).
 //! `Conn::recv_from` already hands back `(usize, SocketAddr)`, so the peer's
 //! address comes free with the data and the demux needs no bookkeeping of its
 //! own to work out who sent what.
 //!
 //! The trait exists so the tests can drive the demux with a plain UDP socket on
-//! loopback rather than standing up a TURN server, and so #2014 can drop the
-//! real allocation in without touching [`crate::demux`]. It is two methods and
-//! it is meant to stay two methods.
+//! loopback rather than standing up a TURN server. It is two methods and it is
+//! meant to stay two methods.
 
 use std::future::Future;
 use std::io;
