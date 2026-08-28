@@ -62,6 +62,8 @@ fn secrets_removed(cmd: &str, rest: &str) -> Option<String> {
     match cmd {
         "TURNCREDENTIALS" => turn_credentials(rest),
         "LOGIN" | "REGISTER" => password_field(cmd, rest),
+        "JOINBATTLE" => join_battle(rest),
+        "OPENBATTLE" => open_battle(rest),
         _ => None,
     }
 }
@@ -121,6 +123,78 @@ fn password_field(cmd: &str, rest: &str) -> Option<String> {
     Some(match remainder.split_once(' ') {
         Some((_password, after)) => format!("{cmd} {user} {REDACTED} {after}"),
         None => format!("{cmd} {user} {REDACTED}"),
+    })
+}
+
+/// `JOINBATTLE <id> [key] [scriptPassword]`, as `command::join_battle` builds
+/// it, without the key or the script password (issue #2046). Anyone holding
+/// the key can join a locked room, and the script password is what lets the
+/// engine itself treat this client as authenticated, so both are worth
+/// hiding. The battle id is not a credential and stays.
+///
+/// `join_battle` places `*` in the key's slot as a placeholder when there is
+/// a script password but no key (its own doc comment says so, and
+/// `join_battle_variants` in `command.rs` asserts it). That `*` is the one
+/// value the slot can hold without being a secret, so it survives rather
+/// than being hidden behind a redaction that would tell a reader a password
+/// was there when the wire itself says there was not.
+///
+/// Nothing in the real protocol ever follows the script password, and
+/// nothing here guards against a key with a space in it the way
+/// `OPENBATTLE` below does, because there is no field of a known type after
+/// it to check the split against. So whatever remains once the key is split
+/// off, one field or several, shifted or not, is collapsed into a single
+/// redaction rather than reassembled and mislabelled.
+fn join_battle(rest: &str) -> Option<String> {
+    let (id, after_id) = rest.split_once(' ')?;
+    match after_id.split_once(' ') {
+        Some((key, _rest)) => {
+            let key_shown = if key == "*" { "*" } else { REDACTED };
+            Some(format!("JOINBATTLE {id} {key_shown} {REDACTED}"))
+        }
+        // A lone key with nothing after it. `*` there is the same
+        // placeholder as above and never itself a secret.
+        None if after_id == "*" => None,
+        None => Some(format!("JOINBATTLE {id} {REDACTED}")),
+    }
+}
+
+/// `OPENBATTLE <type> <natType> <key> <port> <maxplayers> <modhash> <rank>
+/// <maphash> <engine>\t<version>\t<map>\t<title>\t<modname>`, as
+/// `command::open_battle` builds it, without the key (issue #2046). This is
+/// the host's side of the same room password `JOINBATTLE` carries on the
+/// joiner's side. The type, the NAT mode, the port, the content hashes, the
+/// engine, the map and the title are all things somebody working out why a
+/// battle would not open needs to see, and none of them lets anybody into
+/// the room, so all of them stay.
+///
+/// `open_battle`'s own test proves a key with a space in it shifts every
+/// field after it along by one
+/// (`a_room_password_with_a_space_moves_every_field_after_it`), which is
+/// exactly the `TURNCREDENTIALS` problem. A plain split would echo half the
+/// password back out mislabelled as the port. So the five fields after the
+/// key are checked against the types `open_battle` always sends before they
+/// are trusted, and a line that fails the check gives up everything from
+/// the key onward rather than mislabel a fragment of it.
+fn open_battle(rest: &str) -> Option<String> {
+    let (battle_type, after_type) = rest.split_once(' ')?;
+    let (nat_type, after_nat) = after_type.split_once(' ')?;
+    let well_formed =
+        fields::<7>(after_nat).filter(|[_key, port, max_players, modhash, rank, maphash, _tail]| {
+            port.parse::<u16>().is_ok()
+                && max_players.parse::<u32>().is_ok()
+                && modhash.parse::<i32>().is_ok()
+                && rank.parse::<u8>().is_ok()
+                && maphash.parse::<i32>().is_ok()
+        });
+    Some(match well_formed {
+        Some([key, port, max_players, modhash, rank, maphash, tail]) => {
+            let key_shown = if key == "*" { "*" } else { REDACTED };
+            format!(
+                "OPENBATTLE {battle_type} {nat_type} {key_shown} {port} {max_players} {modhash} {rank} {maphash} {tail}"
+            )
+        }
+        None => format!("OPENBATTLE {battle_type} {nat_type} {REDACTED}"),
     })
 }
 
@@ -300,5 +374,92 @@ mod tests {
             "LOGIN alice <redacted> 0 192.168.0.5 agent\t1\tu"
         );
         assert_eq!(redact_line("register bob hash"), "REGISTER bob <redacted>");
+    }
+
+    /// The four shapes `join_battle_variants` in `command.rs` proves
+    /// `command::join_battle` actually builds. A bare id has nothing to
+    /// redact. A key with no script password loses the key. `*` in the
+    /// key's slot is the placeholder for "no key", not a key, so it
+    /// survives. Both a key and a script password lose both.
+    #[test]
+    fn a_join_battle_line_loses_its_key_and_its_script_password() {
+        for (line, redacted) in [
+            ("JOINBATTLE 3", "JOINBATTLE 3"),
+            ("JOINBATTLE 3 pw", "JOINBATTLE 3 <redacted>"),
+            ("JOINBATTLE 3 * sp", "JOINBATTLE 3 * <redacted>"),
+            ("JOINBATTLE 3 pw sp", "JOINBATTLE 3 <redacted> <redacted>"),
+        ] {
+            assert_eq!(redact_line(line), redacted, "for {line}");
+        }
+    }
+
+    /// A key with a space in it is not a bad key, it is the script password
+    /// moved into the key's own slot (`open_battle`'s
+    /// `a_room_password_with_a_space_moves_every_field_after_it` proves the
+    /// same shift for `OPENBATTLE`). There is no field after the script
+    /// password to check the split against, so the fix here is simpler than
+    /// `OPENBATTLE`'s: whatever follows the id, in however many pieces, is
+    /// one secret and is shown as one redaction.
+    #[test]
+    fn a_joinbattle_key_with_a_space_still_loses_every_word_of_it() {
+        let shown = redact_line("JOINBATTLE 3 let me in");
+        assert_eq!(shown, "JOINBATTLE 3 <redacted> <redacted>");
+        assert!(!shown.contains("let") && !shown.contains("me") && !shown.contains(" in"));
+    }
+
+    /// Commands are upper-cased before they are matched here too.
+    #[test]
+    fn joinbattle_is_matched_the_way_the_parser_matches_it() {
+        assert_eq!(
+            redact_line("joinbattle 3 pw sp"),
+            "JOINBATTLE 3 <redacted> <redacted>"
+        );
+    }
+
+    /// The line `open_battle_tab_block` in `command.rs` proves
+    /// `command::open_battle` builds for a room with no password: `*` in
+    /// the key's slot, and every other field, including the tab-separated
+    /// block and the space inside "Title Here", surviving untouched.
+    #[test]
+    fn an_open_battle_line_with_no_password_keeps_everything_including_the_star() {
+        assert_eq!(
+            redact_line("OPENBATTLE 0 0 * 8452 16 -1 0 -1 spring\t105\tMap\tTitle Here\tBAR"),
+            "OPENBATTLE 0 0 * 8452 16 -1 0 -1 spring\t105\tMap\tTitle Here\tBAR"
+        );
+    }
+
+    /// The same line with a real key, which is the room password
+    /// `command::open_battle` is documented to carry. Everything past the
+    /// key, including the space inside the title, survives.
+    #[test]
+    fn an_open_battle_line_loses_its_key_and_keeps_everything_else() {
+        assert_eq!(
+            redact_line("OPENBATTLE 0 0 s3cret 8452 16 -1 0 -1 spring\t105\tMap\tTitle Here\tBAR"),
+            "OPENBATTLE 0 0 <redacted> 8452 16 -1 0 -1 spring\t105\tMap\tTitle Here\tBAR"
+        );
+    }
+
+    /// The line `a_room_password_with_a_space_moves_every_field_after_it` in
+    /// `command.rs` builds: a key of `"let me in"` puts the second half of
+    /// the password where the port belongs and the port where the player
+    /// limit belongs. Trusting the shift would echo "me" and "in" back out
+    /// mislabelled as the port and the player limit, so this gives up
+    /// everything from the key onward instead.
+    #[test]
+    fn an_open_battle_key_with_a_space_loses_everything_past_the_nat_type() {
+        let shown = redact_line(
+            "OPENBATTLE 0 0 let me in 8452 16 -1 0 -1 spring\t105\tMap\tTitle Here\tBAR",
+        );
+        assert_eq!(shown, "OPENBATTLE 0 0 <redacted>");
+        assert!(!shown.contains("let") && !shown.contains("me") && !shown.contains("8452"));
+    }
+
+    /// Commands are upper-cased before they are matched here too.
+    #[test]
+    fn openbattle_is_matched_the_way_the_parser_matches_it() {
+        assert_eq!(
+            redact_line("openbattle 0 0 s3cret 8452 16 -1 0 -1 spring\t105\tMap\tTitle\tBAR"),
+            "OPENBATTLE 0 0 <redacted> 8452 16 -1 0 -1 spring\t105\tMap\tTitle\tBAR"
+        );
     }
 }
