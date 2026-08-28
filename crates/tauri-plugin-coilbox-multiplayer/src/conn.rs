@@ -748,4 +748,138 @@ mod tests {
             "the console should still show the username:\n{seen}"
         );
     }
+
+    /// The acceptance test for issue #2046. A real `JOINBATTLE` and a real
+    /// `OPENBATTLE`, built by `command::join_battle` and
+    /// `command::open_battle` and driven through the real connection task
+    /// over the same TCP fixture the login tests above use, must not leave
+    /// the room key or the script password anywhere in what the frontend
+    /// was sent. Neither secret is the account itself the way the login
+    /// hash is, but both let somebody into a room they were not invited to.
+    #[tokio::test]
+    async fn joining_and_opening_a_battle_never_reach_the_frontend_with_their_secrets() {
+        let addr = lobby_finishing_login_or_registration().await;
+        let stream = tokio::net::TcpStream::connect(addr)
+            .await
+            .expect("the lobby is listening");
+        let registry: Registry = Registry::default();
+        let key = format!("alice@{addr}");
+
+        let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+        let recorder = seen.clone();
+        let events = Channel::new(move |body| {
+            let json = match body {
+                tauri::ipc::InvokeResponseBody::Json(s) => s,
+                tauri::ipc::InvokeResponseBody::Raw(b) => String::from_utf8_lossy(&b).into_owned(),
+            };
+            lock_or_recover(&recorder).push(json);
+            Ok(())
+        });
+
+        let logs = std::env::temp_dir().join("coilbox-battle-redaction-tests");
+        spawn_connection(
+            registry.clone(),
+            key.clone(),
+            Box::new(stream),
+            LoginConfig {
+                username: "alice".to_string(),
+                password_hash: password_hash("hunter2"),
+                local_ip: "127.0.0.1".to_string(),
+                agent: "Coilbox test".to_string(),
+                client_id: "1".to_string(),
+                compat_flags: vec!["u".to_string()],
+                use_stls: false,
+                mode: LoginMode::Login,
+            },
+            events,
+            crate::dmlog::DmLog::new(&logs, &key),
+            crate::dmlog::DmLog::new(&logs, &key),
+        );
+
+        // Wait for the login this fixture drives to finish, the same way
+        // `console_lines_seen_during` does, then read the task's own sender
+        // back out of the registry so this test can queue lines the way a
+        // real command would, rather than reaching into the task directly.
+        let mut phase = lock_or_recover(&registry)
+            .get(&key)
+            .expect("spawn_connection registered it")
+            .phase
+            .clone();
+        tokio::time::timeout(PATIENCE, phase.wait_for(|p| *p == LoginPhase::Ready))
+            .await
+            .expect("the handshake did not finish in time")
+            .expect("the connection task is still running");
+        let tx = lock_or_recover(&registry)
+            .get(&key)
+            .expect("still registered")
+            .tx
+            .clone();
+
+        tx.send(Outbound::Line(command::join_battle(
+            3,
+            Some("roomkey"),
+            Some("scriptpw"),
+        )))
+        .expect("the connection task is still receiving");
+        tx.send(Outbound::Line(command::open_battle(
+            0,
+            0,
+            "hostkey",
+            8452,
+            16,
+            -1,
+            0,
+            -1,
+            "spring",
+            "105",
+            "Map",
+            "Title Here",
+            "BAR",
+        )))
+        .expect("the connection task is still receiving");
+
+        // Both lines are queued rather than replied to (the fixture ignores
+        // anything but LOGIN/REGISTER/LISTCOMPFLAGS), so wait for the
+        // console to have recorded them rather than for a reply that never
+        // comes.
+        let deadline = tokio::time::Instant::now() + PATIENCE;
+        loop {
+            let recorded = lock_or_recover(&seen).clone();
+            if recorded.iter().any(|l| l.contains("JOINBATTLE"))
+                && recorded.iter().any(|l| l.contains("OPENBATTLE"))
+            {
+                break;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                panic!("timed out waiting for the JOINBATTLE/OPENBATTLE console lines");
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+
+        let text = lock_or_recover(&seen).join("\n");
+        assert!(!text.contains("roomkey"), "the room key leaked:\n{text}");
+        assert!(
+            !text.contains("scriptpw"),
+            "the script password leaked:\n{text}"
+        );
+        assert!(
+            !text.contains("hostkey"),
+            "the host's room key leaked:\n{text}"
+        );
+        // The absence above is redaction, not lines that never arrived: the
+        // battle id, the type, the NAT mode, the port and the rest of the
+        // OPENBATTLE tab block are all still there.
+        assert!(
+            text.contains("JOINBATTLE 3 <redacted> <redacted>"),
+            "the console should still show the rest of the JOINBATTLE line:\n{text}"
+        );
+        // Stops short of the tab-separated block: the recorded line is JSON,
+        // which escapes a literal tab as the two characters `\` and `t`
+        // rather than the byte this Rust string literal would produce, so a
+        // real tab here would never match.
+        assert!(
+            text.contains("OPENBATTLE 0 0 <redacted> 8452 16 -1 0 -1 spring"),
+            "the console should still show the rest of the OPENBATTLE line:\n{text}"
+        );
+    }
 }
