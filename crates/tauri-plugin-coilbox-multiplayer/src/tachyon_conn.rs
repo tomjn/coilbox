@@ -48,6 +48,7 @@ use crate::lock_or_recover;
 use crate::tachyon_messaging::Conversation;
 use crate::tachyon_rpc::{spawn as spawn_rpc, Handlers, RequestError, TachyonClient};
 use crate::tachyon_ws::{TachyonSocket, WsError};
+use crate::turn::TurnAnswer;
 use crate::{
     tachyon_friends, tachyon_lobbies, tachyon_matchmaking, tachyon_messaging, tachyon_parties,
     tachyon_room, tachyon_users,
@@ -151,6 +152,9 @@ pub fn spawn_connection(
             // Tachyon has no agreement handshake. The terms are accepted in the
             // browser, before a token exists.
             agreement: Arc::new(Mutex::new(None)),
+            // Nor does it have a relay credential to ask for: a Tachyon server
+            // arranges the match itself and tells us where to be.
+            turn: watch::channel(TurnAnswer::Unasked).1,
         },
     );
 }

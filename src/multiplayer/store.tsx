@@ -290,6 +290,17 @@ export function mirrorReducer(
           if (d.kind === "joinBattleFailed" || d.kind === "openBattleFailed") {
             return { ...m, lastJoinError: d.reason };
           }
+          // Somebody who cannot forward a port hosts through the lobby's relay,
+          // and the lobby is what says whether they may. A refusal is the
+          // difference between hosting and not, so it goes where the other
+          // reasons a battle would not open go rather than into a log nobody
+          // reads.
+          if (d.kind === "turnCredentialsRefused") {
+            return {
+              ...m,
+              lastJoinError: `the lobby would not hand out a relay credential: ${d.reason}`,
+            };
+          }
           if (d.kind === "loginDenied") {
             return { ...m, loginError: d.reason };
           }

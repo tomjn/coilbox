@@ -98,6 +98,7 @@ mod tests {
                 agreement: Arc::new(Mutex::new(None)),
                 tachyon: TachyonHandle::default(),
                 started: StartedBattle::default(),
+                turn: watch::channel(crate::turn::TurnAnswer::Unasked).1,
             },
         );
         rx

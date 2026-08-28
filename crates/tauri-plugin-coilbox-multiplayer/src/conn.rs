@@ -26,6 +26,7 @@ use crate::dmlog::DmLog;
 use crate::lock_or_recover;
 use crate::tachyon_rpc::TachyonClient;
 use crate::tls::AsyncReadWrite;
+use crate::turn::{TurnAnswer, TurnSlot};
 
 /// Unix-millis now, saturating to 0 on the (impossible) pre-epoch case.
 pub(crate) fn now_ms() -> u64 {
@@ -219,6 +220,12 @@ pub struct ServerConn {
     /// The agreement text sent by the server while parked on `AwaitAgreement`, so
     /// `mp_reattach` can replay it alongside the phase after a webview reload.
     pub agreement: Arc<Mutex<Option<String>>>,
+    /// The lobby's last answer about a relay credential, watched rather than
+    /// locked for the same reason [`PhaseSlot`] is: somebody about to host a
+    /// relayed battle has to be able to wait for the next one. Stays at
+    /// [`TurnAnswer::Unasked`] on a connection to a server without the command,
+    /// which today is all of them.
+    pub turn: TurnSlot,
 }
 
 /// The registry of live connections, keyed by a frontend-supplied `serverKey`
@@ -277,6 +284,10 @@ pub fn spawn_connection(
     // the connection ends and everything waiting on the phase is woken.
     let (phase_tx, phase) = watch::channel(LoginPhase::AwaitGreeting);
     let agreement = Arc::new(Mutex::new(None));
+    // Same arrangement as the phase: the task holds the only sender, so a
+    // connection that ends wakes anybody waiting on a relay credential rather
+    // than leaving them to wait out their own deadline.
+    let (turn_tx, turn) = watch::channel(TurnAnswer::Unasked);
 
     tokio::spawn(run_loop(
         registry.clone(),
@@ -286,6 +297,7 @@ pub fn spawn_connection(
         sink.clone(),
         phase_tx,
         agreement.clone(),
+        turn_tx,
         rx,
         state.clone(),
         dm_log,
@@ -310,6 +322,7 @@ pub fn spawn_connection(
             // Nothing tells a line-protocol client where to connect out of band:
             // the battle it joined carries the host's address.
             started: StartedBattle::default(),
+            turn,
         },
     );
 }
@@ -326,6 +339,7 @@ async fn run_loop(
     sink: EventSink,
     phase_slot: watch::Sender<LoginPhase>,
     agreement_slot: Arc<Mutex<Option<String>>>,
+    turn_slot: watch::Sender<TurnAnswer>,
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
     dm_log: DmLog,
@@ -453,6 +467,11 @@ async fn run_loop(
                             if let Some(m) = m.filter(|m| m.id.is_none()) {
                                 chan_log.append(ch, &m);
                             }
+                        }
+                        // Somebody may be waiting on this line to open a relayed
+                        // battle, so wake them with what it said.
+                        if let Some(answer) = crate::turn::answer_in(&delta, &state) {
+                            let _ = turn_slot.send(answer);
                         }
                         emit(&sink, LobbyEvent::Delta { delta });
                     }

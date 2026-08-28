@@ -43,6 +43,7 @@ use crate::conn::{
 };
 use crate::dmlog::DmLog;
 use crate::tls::ConnectError;
+use crate::turn::TurnAnswer;
 use crate::{lock_or_recover, zerok_battles, zerok_chat, zerok_room, zerok_users};
 
 /// How long the socket may be idle before the kernel starts probing, and how far
@@ -173,6 +174,9 @@ pub fn spawn_connection(
             // Tachyon client, and a battle carries the host's address itself.
             tachyon: TachyonHandle::default(),
             started: StartedBattle::default(),
+            // Zero-K hosts its own battles on its own servers, so there is no
+            // relay credential to ask it for and nothing ever fills this.
+            turn: watch::channel(TurnAnswer::Unasked).1,
         },
     );
 }

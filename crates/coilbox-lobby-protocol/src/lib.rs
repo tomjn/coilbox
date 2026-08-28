@@ -34,7 +34,7 @@ pub use reduce::{
 };
 pub use state::{
     Battle, Bot, ChannelState, ChatKind, ChatMsg, DirChannel, LobbyState, MatchFound, MatchQueue,
-    Matchmaking, MemberStatus, Party, StartRect, User, Vote,
+    Matchmaking, MemberStatus, Party, StartRect, TurnCredentials, User, Vote,
 };
 pub use status::{
     default_battle_status, team_color_from_rgb, team_color_rgb, BattleStatus, ClientStatus,
