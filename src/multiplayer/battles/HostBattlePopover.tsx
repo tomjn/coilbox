@@ -135,8 +135,11 @@ export function HostBattlePopover({
         natType: NAT_TYPE_DIRECT,
         key: password.trim() || "*",
         // The port a joiner dials, which is the one the engine binds unless the
-        // router opened a different one and said so.
+        // router opened a different one and said so. On the relay route it is
+        // neither: the backend advertises the relay's allocated port and takes
+        // this one as where the engine listens (issue #2017).
         port: advertisedGamePort(route, reachability, port),
+        relay: route === "relay",
         maxPlayers,
         modhash,
         rank: 0,

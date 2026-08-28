@@ -173,6 +173,20 @@ pub type TachyonHandle = Arc<Mutex<Option<TachyonClient>>>;
 /// host's address itself.
 pub type StartedBattle = Arc<Mutex<Option<serde_json::Value>>>;
 
+/// A slot for the relay a battle on this connection is being hosted through,
+/// filled by `mp_open_battle` once the allocation is open and read by whatever
+/// needs to know that this host is relayed.
+///
+/// Empty on every connection that is not hosting a relayed battle, which today
+/// is all of them, and emptied again at the start of each attempt so a host that
+/// failed leaves nothing behind for the next reader to believe.
+///
+/// It is here rather than in [`coilbox_lobby_protocol::LobbyState`] because it
+/// is not something the lobby said. The engine's own port and the control
+/// channel are facts about this machine, and the state is a mirror of the
+/// server.
+pub type HostedRelay = Arc<Mutex<Option<crate::relay_host::RelayHost>>>;
+
 /// Send one event to the current frontend channel, ignoring a detached/dead one.
 pub(crate) fn emit(sink: &EventSink, ev: LobbyEvent) {
     let _ = lock_or_recover(sink).send(ev);
@@ -242,6 +256,9 @@ pub struct ServerConn {
     /// [`TurnAnswer::Unasked`] on a connection to a server without the command,
     /// which today is all of them.
     pub turn: TurnSlot,
+    /// The relay this connection's battle is being hosted through, if it is
+    /// being hosted through one. See [`HostedRelay`].
+    pub relay: HostedRelay,
 }
 
 /// The registry of live connections, keyed by a frontend-supplied `serverKey`
@@ -339,6 +356,9 @@ pub fn spawn_connection(
             // the battle it joined carries the host's address.
             started: StartedBattle::default(),
             turn,
+            // Filled only by a host that takes the relay route, which is
+            // decided when they press Host and not when they connect.
+            relay: HostedRelay::default(),
         },
     );
 }

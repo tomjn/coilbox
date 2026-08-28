@@ -114,7 +114,9 @@ export function useBattleLaunch(
       beforePaths = null;
     }
     try {
-      // Hosts bind 0.0.0.0 and connect to nobody, so only joiners get vetted.
+      // A host connects to nobody, so only joiners get vetted. That holds on
+      // the relay route too: the host binds loopback and the relay agent dials
+      // in, so there is still no remote address for this machine to reach.
       let config: BattleConfig;
       if (host) {
         config = (await mpBuildHostConfig({ serverKey })).config;

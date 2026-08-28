@@ -858,6 +858,23 @@ export const mpSetBattleStatus = defineCommand<
   { sent: boolean }
 >("coilbox-multiplayer", "mp_set_battle_status");
 
+/**
+ * Host a battle on a TASServer connection.
+ *
+ * `port` is the port this machine's engine will bind. On the relay route that is
+ * not the port anybody dials: the battle is advertised at the relay's allocation
+ * instead, and this port goes to the relay agent so it knows where to deliver
+ * every player's traffic.
+ *
+ * `relay` is the hosting route from {@link hostingRoute} reduced to the one bit
+ * the backend acts on. Setting it turns one line on the wire into the whole of
+ * relay hosting: a credential from the lobby, a relay agent, an allocation, and
+ * only then a battle. It rejects with the reason if any of that fails, and
+ * nothing is advertised when it does.
+ *
+ * That means this call takes as long as opening a TURN allocation when `relay`
+ * is set, rather than returning as soon as a line is queued.
+ */
 export const mpOpenBattle = defineCommand<
   {
     serverKey: string;
@@ -874,6 +891,7 @@ export const mpOpenBattle = defineCommand<
     map: string;
     title: string;
     modname: string;
+    relay: boolean;
   },
   { sent: boolean }
 >("coilbox-multiplayer", "mp_open_battle");

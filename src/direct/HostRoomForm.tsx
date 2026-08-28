@@ -143,6 +143,11 @@ export function HostRoomForm({
           // would break the case the room exists for to fix the case it does
           // not.
           port: DEFAULT_HOST_PORT,
+          // Never true here, and written as the same expression the lobby form
+          // uses rather than a bare false, because the reason it is never true
+          // is that a room has no lobby server to have a relay. Hard-coding it
+          // would hide that behind a constant.
+          relay: route === "relay",
           maxPlayers,
           modhash: content.modhash,
           rank: 0,

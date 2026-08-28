@@ -72,8 +72,20 @@ export interface BattleConfig {
    * minimal script pointing at the host.
    */
   isHost?: boolean;
-  /** Host address: `0.0.0.0` when hosting a networked game, or the host to join. */
+  /**
+   * Host address: `0.0.0.0` when hosting a networked game, `127.0.0.1` when
+   * hosting one through the relay, or the host to join.
+   */
   hostIp?: string;
+  /**
+   * Why this host binds an address the engine will warn about, written into the
+   * start script as a comment above `HostIP`.
+   *
+   * Only set on a relayed host. The engine says a loopback socket means nobody
+   * can connect, which under a relay is untrue, and the script is the file next
+   * to the infolog somebody has just read that in.
+   */
+  hostLoopbackReason?: string;
   /** Host port (networked host or client). Omitted for pure singleplayer. */
   hostPort?: number;
   /** Script password presented to the host (client scripts only). */
