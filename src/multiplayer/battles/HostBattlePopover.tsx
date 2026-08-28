@@ -1,15 +1,24 @@
 import { Button, Input } from "@picoframe/frame";
 import { useState } from "react";
 import { Link } from "react-router";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
+import {
+  advertisedGamePort,
+  hostingRoute,
+  hostingRouteSummary,
+  NAT_TYPE_DIRECT,
+  recordHostingRoute,
+} from "../../direct/hostingRoute";
 import { ReachablePorts } from "../../direct/ReachablePorts";
-import { battlePorts } from "../../direct/reachability";
+import {
+  battlePorts,
+  type DirectReachability,
+} from "../../direct/reachability";
 import type { mpOpenBattle } from "../bindings";
 import { hostBattleFailure } from "./hostBattle";
 import { hashFailureMessage, useHostContent } from "./useHostContent";
@@ -27,17 +36,18 @@ export const DEFAULT_HOST_PORT = 8452;
  * "Host a battle" affordance for the Battles hub: a compact popover collecting the
  * game, map, title, size and (optional) password, then firing OPENBATTLE via the
  * parent's `onHost`. The engine is the preferred one (no picker), and the mod/map
- * hashes come from unitsync so joining clients can sync. The battle opens as a
- * plain natType 0 one that needs `port` reachable, which is the only mode
- * coilbox implements. "Hole punching" opts into advertising natType 1 instead,
- * for a host who knows their joiners bring their own traversal.
+ * hashes come from unitsync so joining clients can sync.
  *
- * Making `port` reachable used to be entirely the host's problem and this said
- * so. {@link ReachablePorts} now offers to ask their router, and says what to do
- * by hand when it refuses, which on most home routers it will.
+ * How the battle is reachable is worked out rather than asked about. There used
+ * to be a "Hole punching for NAT players" checkbox here, which advertised
+ * `natType 1` and bought a battle that looked joinable and was not, because
+ * coilbox has never implemented hole punching. It is gone, and what replaced it
+ * is {@link hostingRoute} reading the answer {@link ReachablePorts} already had
+ * (issue #2020).
  */
 export function HostBattlePopover({
   disabled,
+  relayAvailable,
   onHost,
   initialMap,
   initialGame,
@@ -45,6 +55,10 @@ export function HostBattlePopover({
   autoOpen,
 }: {
   disabled: boolean;
+  /** Whether this lobby server has a relay to host through, from
+   *  `relayHostingAvailable`. False everywhere today, and the bottom rung of the
+   *  ladder does not exist without it. */
+  relayAvailable: boolean;
   /** Rejects when the battle did not open, which is what this form shows. */
   onHost: (args: OpenBattleArgs) => Promise<void>;
   /** Preselect this map (e.g. from a content map detail's "Host a battle here"). */
@@ -83,11 +97,11 @@ export function HostBattlePopover({
   const [maxPlayers, setMaxPlayers] = useState(8);
   const [port, setPort] = useState(DEFAULT_HOST_PORT);
   const [password, setPassword] = useState("");
-  // Default off. natType 1 tells joiners that the lobbies either side will open
-  // a path through the routers between them, and nothing in coilbox does that
-  // work, so all it bought was a battle that looked joinable and was not.
-  // Direct is what we implement, so direct is what we advertise.
-  const [holePunch, setHolePunch] = useState(false);
+  // What the router and the internet said, handed up by ReachablePorts below.
+  // Null until the host asks it to look, which is a route decision of its own.
+  const [reachability, setReachability] = useState<DirectReachability | null>(
+    null,
+  );
   // Why the last press did nothing. A refusal that never reaches the wire leaves
   // no join error and no disconnect, so this is the only account of it there is
   // (issue #1591).
@@ -105,18 +119,24 @@ export function HostBattlePopover({
 
   const noEngine = content.noEngine;
   const canHost = content.ready;
+  const route = hostingRoute(reachability, relayAvailable);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!canHost || !target || hosting) return;
     setError(null);
     setHosting(true);
+    // Dropped before the attempt rather than after it, so a host that fails
+    // leaves no route behind for the next reader to believe.
+    recordHostingRoute(null);
     try {
       await onHost({
         battleType: 0,
-        natType: holePunch ? 1 : 0,
+        natType: NAT_TYPE_DIRECT,
         key: password.trim() || "*",
-        port,
+        // The port a joiner dials, which is the one the engine binds unless the
+        // router opened a different one and said so.
+        port: advertisedGamePort(route, reachability, port),
         maxPlayers,
         modhash,
         rank: 0,
@@ -127,6 +147,10 @@ export function HostBattlePopover({
         title: title.trim() || `${gameName} — hosted`,
         modname: gameName,
       });
+      // Only once the battle is actually open, so nothing downstream describes a
+      // route for a battle that never happened. Read back by the battle room
+      // (issue #2022).
+      recordHostingRoute(route);
       setOpen(false);
     } catch (err) {
       // Left open on purpose: the answer is in here, and the fields that need
@@ -238,26 +262,16 @@ export function HostBattlePopover({
               <ReachablePorts
                 ports={battlePorts(port)}
                 help={`Asks your router to forward UDP ${port}, which is the port the engine hosts the game on. One port, because the lobby is somebody else's server and coilbox listens on nothing.`}
+                onReport={setReachability}
               />
 
-              {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association) */}
-              <label className="flex items-start gap-2 text-sm">
-                <Checkbox
-                  checked={holePunch}
-                  onCheckedChange={(v) => setHolePunch(v === true)}
-                  className="mt-0.5"
-                />
-                <span className="flex flex-col gap-0.5">
-                  <span className="font-medium">
-                    Hole punching for NAT players
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {holePunch
-                      ? `Tells joiners they need help getting through your router. Coilbox does not do that work, so port ${port} being open is still what makes joins succeed.`
-                      : `Players connect straight to port ${port}. It has to be open on your router or others cannot join.`}
-                  </span>
-                </span>
-              </label>
+              {/* What hosting is about to do, in the place where the answer it
+                  is reading appears. Not the same thing as issue #2022, which
+                  tells the people already in a battle why their ping is what it
+                  is. This is the host, before they commit to anything. */}
+              <p className="text-xs text-muted-foreground">
+                {hostingRouteSummary(route, { lanRoom: false })}
+              </p>
 
               {(gameFailed || mapFailed) && (
                 <div className="flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive">

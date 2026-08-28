@@ -64,6 +64,7 @@ import {
   mpSnapshot,
   mpZerokOpenBattle,
 } from "../bindings";
+import { relayHostingAvailable } from "../protocol";
 import { newScriptPassword } from "../scriptPassword";
 import { serverAddressFromKey, useMultiplayer } from "../store";
 
@@ -493,6 +494,7 @@ function BattlesPage() {
     ) : (
       <HostBattlePopover
         disabled={!canJoin}
+        relayAvailable={relayHostingAvailable(mirror.state)}
         onHost={onHost}
         initialMap={hostDraft?.mapName ?? hostMap}
         initialGame={hostDraft?.gameName}
