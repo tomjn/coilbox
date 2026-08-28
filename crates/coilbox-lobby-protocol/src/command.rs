@@ -67,6 +67,22 @@ pub fn list_comp_flags() -> String {
     "LISTCOMPFLAGS".to_string()
 }
 
+/// The compatibility flag a server names when it has a relay to host battles
+/// through, and that a client names to say it understands one.
+///
+/// It appears in both directions, which is why it lives here rather than in the
+/// login machine: the server offers it in its answer to `LISTCOMPFLAGS`, and we
+/// echo it back in the `LOGIN` flags to say we can use it.
+///
+/// The letter is the one proposed in ScarylePoo/uberserver#26, which is open, so
+/// no server names it yet. Until one does this reads as "no relay here", which
+/// is exactly what a server without a relay means. The direction that must never
+/// be got wrong is the other one: uberserver's `_checkCompat` answers a flag it
+/// does not know with `MOTD Your client has compatibility errors`, aimed at the
+/// person logging in, so the flag is only ever sent to a server that offered it
+/// first.
+pub const RELAY_COMPAT_FLAG: &str = "r";
+
 /// `CHANNELS` - request the public channel directory.
 pub fn list_channels() -> String {
     "CHANNELS".to_string()

@@ -402,6 +402,20 @@ impl LobbyState {
         self.turn_credentials.as_ref().filter(|c| c.live_at(now_ms))
     }
 
+    /// Whether this server has a relay to host battles through.
+    ///
+    /// The answer is the server's own compatibility flags, which it hands over
+    /// before login, so it is settled long before anybody has to choose how to
+    /// host. Anything deciding whether to offer relay hosting reads this, rather
+    /// than asking for a credential and dealing with the refusal.
+    ///
+    /// False on a server that has never heard of a relay, because it does not
+    /// name the flag, which is every server today. Also false on a Tachyon or a
+    /// Zero-K connection, which have no compatibility flags at all.
+    pub fn relay_hosting_available(&self) -> bool {
+        self.compflags.contains(crate::command::RELAY_COMPAT_FLAG)
+    }
+
     /// Our current battle status + team colour, for answering `REQUESTBATTLESTATUS`.
     /// Falls back to the protocol default when we are not yet a member (e.g. the
     /// prompt races our own join), so the server always gets a well-formed reply.

@@ -1469,6 +1469,25 @@ mod tests {
         assert_eq!(s.current_battle, Some(3));
     }
 
+    /// Whether there is a relay to host through is read off the server's own
+    /// compatibility flags, folded through the real parser, so nothing has to ask
+    /// for a credential to find out.
+    #[test]
+    fn a_server_says_whether_it_has_a_relay_in_its_compatibility_flags() {
+        let mut with_relay = LobbyState::new();
+        reduce(&mut with_relay, parse_line("COMPFLAGS u sp b r"));
+        assert!(with_relay.relay_hosting_available());
+
+        // What every server answers today, and what a server without a relay
+        // will keep answering once the flag exists.
+        let mut without = LobbyState::new();
+        reduce(&mut without, parse_line("COMPFLAGS u sp b"));
+        assert!(!without.relay_hosting_available());
+
+        // Before any answer at all, and on a protocol that has no flags.
+        assert!(!LobbyState::new().relay_hosting_available());
+    }
+
     /// The whole exchange, from the lobby's answer to a credential a caller can
     /// take to the relay agent.
     #[test]
