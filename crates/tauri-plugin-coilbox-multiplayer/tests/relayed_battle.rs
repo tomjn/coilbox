@@ -24,6 +24,20 @@
 //!   each, and each one's reply comes back to the player it belongs to. That is
 //!   the property the whole sidecar exists for, now measured through a real
 //!   TURN relay rather than a loopback socket pretending to be one.
+//! - A real allocation really is lost when the server stops answering, and the
+//!   agent's watchdog in `allocation.rs` really does notice within the lifetime
+//!   coturn granted rather than waiting out the game.
+//! - A restarted coturn refuses a signed Refresh for an allocation it has
+//!   forgotten with STUN error 437, and with no reason phrase at all. That code
+//!   is the one thing here nobody had observed, and it is what decides whether
+//!   the agent rebuilds or gives up: 437 is not a credential the agent could do
+//!   nothing about, so it rebuilds, which is the right answer.
+//! - Every player keeps the engine endpoint they had across that rebuild. The
+//!   engine identifies a player by the endpoint their traffic arrives from, so
+//!   the peer table living outside the relay is what stops a rebuild looking to
+//!   the engine like the whole battle leaving. It is the property `demux.rs`
+//!   was shaped around, and this is the first check of it against a relay that
+//!   really was rebuilt.
 //!
 //! ## What it does not prove
 //!
@@ -54,6 +68,10 @@
 //!
 //! The build comes first because this test spawns the sidecar binary and cargo
 //! does not build another package's binaries for it.
+//!
+//! All three together take about two and a half seconds, nearly all of it the
+//! two loss tests waiting out an allocation's lifetime. See [`SHORT_LIFETIME`]
+//! for why that lifetime is two seconds and not less.
 //!
 //! It runs coturn as a process rather than in a container, which is what issue
 //! #2025 imagined, because a container only works where the host can send UDP
@@ -96,9 +114,16 @@ const SILENCE: Duration = Duration::from_millis(500);
 /// coturn's default hour would mean a test that waits half an hour for the
 /// first refresh, so `--max-allocate-lifetime` cuts it.
 ///
-/// coturn clamps its own minimum, so what it grants is not necessarily what it
-/// was asked for, which is why the tests below time how long the agent takes to
-/// notice rather than asserting a number this constant made up.
+/// coturn 4.17.2 grants exactly this rather than clamping it upwards, which is
+/// worth knowing because the whole schedule below depends on it: the agent
+/// reports the allocation expiring 2.0 seconds after coturn is taken away.
+///
+/// One second works too and is not used. The restart below takes about 100 ms,
+/// so a Refresh can fall inside the window when the server is not there, and
+/// the client's first retransmit is 200 ms after that (`DEFAULT_RTO_IN_MS` in
+/// `turn`'s `client/mod.rs`, which applies because the agent passes 0). Two
+/// seconds leaves that retry well inside the lifetime where one second leaves
+/// it near the deadline, and the cost is under a second of test time.
 const SHORT_LIFETIME: Duration = Duration::from_secs(2);
 
 /// The credential coturn is configured with and the agent is handed. Issue
@@ -262,7 +287,9 @@ fn a_restarted_turn_server_costs_the_allocation_but_not_the_players() {
         .agent
         .allow_joiner(IpAddr::V4(Ipv4Addr::LOCALHOST), PATIENCE)
         .expect("the agent let the joiner through the allocation");
-    let players: Vec<FakePlayer> = (0..SEATS).map(|_| FakePlayer::dialling(first_relay)).collect();
+    let players: Vec<FakePlayer> = (0..SEATS)
+        .map(|_| FakePlayer::dialling(first_relay))
+        .collect();
     for (seat, player) in players.iter().enumerate() {
         player.round_trip(format!("hello from seat {seat}").as_bytes());
     }
@@ -383,10 +410,7 @@ impl Coturn {
             format!("pidfile={}", dir.join("turnserver.pid").display()),
         ];
         if let Some(max_lifetime) = max_lifetime {
-            settings.push(format!(
-                "max-allocate-lifetime={}",
-                max_lifetime.as_secs()
-            ));
+            settings.push(format!("max-allocate-lifetime={}", max_lifetime.as_secs()));
         }
         std::fs::write(&conf, settings.join("\n") + "\n").expect("a writable temporary directory");
 
