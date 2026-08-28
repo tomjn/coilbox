@@ -76,6 +76,28 @@ pub enum Request {
     /// to think it did.
     #[serde(rename_all = "camelCase")]
     AllowPeer { id: RequestId, ip: IpAddr },
+    /// The engine serving this battle is process `pid` on this machine.
+    ///
+    /// Sent once coilbox has launched it, which is always after the sidecar
+    /// started: the battle advertises the relay's address, so the allocation
+    /// has to be live before anybody can be invited to a game that does not
+    /// exist yet. Until this arrives the sidecar has no engine to watch, and
+    /// that gap is exactly why it cannot simply exit with the engine
+    /// (issue #2027).
+    ///
+    /// A pid rather than a run id because the sidecar is a different process
+    /// and a run id means nothing to it.
+    #[serde(rename_all = "camelCase")]
+    WatchEngine { id: RequestId, pid: u32 },
+    /// Stop relaying and exit.
+    ///
+    /// The one signal that beats every other, because it is coilbox saying the
+    /// battle is over rather than the sidecar guessing. Answered with
+    /// [`Event::Done`] before the sidecar goes, so a caller knows the
+    /// allocation is being given up rather than being left to infer it from a
+    /// closed pipe.
+    #[serde(rename_all = "camelCase")]
+    Stop { id: RequestId },
 }
 
 impl Request {
@@ -83,6 +105,8 @@ impl Request {
     pub fn id(&self) -> RequestId {
         match self {
             Request::AllowPeer { id, .. } => *id,
+            Request::WatchEngine { id, .. } => *id,
+            Request::Stop { id } => *id,
         }
     }
 }
@@ -117,6 +141,46 @@ pub enum Event {
     /// waiting on an answer is not going to get one.
     #[serde(rename_all = "camelCase")]
     Stopping { reason: String },
+}
+
+/// What a running sidecar leaves on disk so it can be found again.
+///
+/// The other half of the contract, and here for the same reason the messages
+/// are: both ends have to agree on it or a coilbox that reopens mid-game
+/// spawns a second sidecar over the top of the first, and the players in that
+/// game are relayed by a process nobody is talking to any more (issue #2027).
+///
+/// The sidecar owns the file. It creates it at startup and removes it on the
+/// way out, so the file existing means a sidecar was running and its `pid` is
+/// how you tell whether one still is. A sidecar killed outright leaves the file
+/// behind, which is why the pid is in it rather than the file's mere existence
+/// being the answer.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunFile {
+    /// The sidecar's process id.
+    pub pid: u32,
+}
+
+impl RunFile {
+    /// The file's contents. Serialising cannot fail for the same reason
+    /// [`to_line`] cannot.
+    pub fn to_json(&self) -> String {
+        match serde_json::to_string(self) {
+            Ok(json) => json,
+            Err(e) => unreachable!("a run file that will not serialise: {e}"),
+        }
+    }
+
+    /// Read one, or say why it is not one.
+    ///
+    /// A file left behind by a different version of coilbox is unreadable
+    /// rather than fatal, and the caller treats that the same as no file: the
+    /// worst it can do is spawn a sidecar when one was already there, which is
+    /// the behaviour before any of this existed.
+    pub fn from_json(text: &str) -> Result<RunFile, String> {
+        serde_json::from_str(text).map_err(|e| format!("not a relay agent run file: {e}"))
+    }
 }
 
 /// One message as a line, `\n` included.
@@ -192,6 +256,14 @@ mod tests {
             "{\"type\":\"allowPeer\",\"id\":7,\"ip\":\"198.51.100.4\"}\n"
         );
         assert_eq!(
+            to_line(&Request::WatchEngine { id: 8, pid: 4021 }),
+            "{\"type\":\"watchEngine\",\"id\":8,\"pid\":4021}\n"
+        );
+        assert_eq!(
+            to_line(&Request::Stop { id: 9 }),
+            "{\"type\":\"stop\",\"id\":9}\n"
+        );
+        assert_eq!(
             to_line(&Event::RelayOpen {
                 addr: SocketAddr::from(([198, 51, 100, 7], 41641)),
             }),
@@ -246,6 +318,23 @@ mod tests {
         let unreadable =
             read_request("{\"type\":\"allowPeer\"}").expect_err("a request with no id is not one");
         assert_eq!(unreadable.id, None);
+    }
+
+    /// The run file both ends read, spelled out for the same reason the
+    /// messages are: coilbox writing one shape and the sidecar reading another
+    /// is a relay that cannot be found, which costs a game rather than a
+    /// message.
+    #[test]
+    fn the_run_file_is_what_both_ends_agreed_on() {
+        assert_eq!(RunFile { pid: 4021 }.to_json(), "{\"pid\":4021}");
+        assert_eq!(
+            RunFile::from_json("{\"pid\":4021}").expect("its own output"),
+            RunFile { pid: 4021 }
+        );
+        assert!(
+            RunFile::from_json("4021").is_err(),
+            "a file from some other version is unreadable rather than misread"
+        );
     }
 
     #[test]
