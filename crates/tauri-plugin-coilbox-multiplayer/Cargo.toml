@@ -18,6 +18,9 @@ tokio = { version = "1", features = ["test-util"] }
 # The room this client can be pointed at when nobody is running a lobby server.
 # A dev dependency only: nothing in this crate's build depends on it.
 tauri-plugin-coilbox-direct = { path = "../tauri-plugin-coilbox-direct" }
+# A directory to write a relay agent's run file into that is not somebody's
+# real one.
+tempfile = "3"
 
 [dependencies]
 tauri = { version = "2" }
@@ -32,6 +35,10 @@ coilbox-oauth = { path = "../coilbox-oauth" }
 # The relay agent sidecar's control channel, shared with the sidecar itself so
 # a change to a message breaks both builds rather than one of them at runtime.
 coilbox-relay-protocol = { path = "../coilbox-relay-protocol" }
+# Spawning the relay agent, which is the one child that has to survive coilbox
+# closing, and asking the OS whether the one named in a run file is still
+# there.
+coilbox-proc = { path = "../coilbox-proc" }
 tauri-plugin-opener = "2"
 # rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
 # picks it.

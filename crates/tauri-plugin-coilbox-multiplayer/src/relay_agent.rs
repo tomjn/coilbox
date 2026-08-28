@@ -37,18 +37,34 @@
 //! nothing above or below it has to change. The tests drive it directly, and
 //! issue #2025 drives it against a real coturn.
 //!
-//! Spawning the sidecar is issue #2017's, along with the TURN credentials and
-//! advertising the relayed address, so this takes pipes rather than a process.
+//! ## Starting one, and finding one that is already there
+//!
+//! [`RelayAgent::spawn`] is the only thing in coilbox that starts the sidecar.
+//! Where the binary is and what to run it with are in
+//! [`crate::relay_sidecar`], which also explains the run file this checks
+//! before it starts anything.
+//!
+//! [`RelayAgent::driving`] stays separate from it, taking pipes rather than a
+//! process, because that is what lets the tests drive the whole channel
+//! without one.
+//!
+//! Fetching the TURN credentials from the lobby is issue #2016's and
+//! advertising the relayed address is #2017's, so the caller is handed both
+//! problems rather than either being solved here.
 
 use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::IpAddr;
+use std::path::Path;
+use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use coilbox_relay_protocol::{read_event, to_line, Event, Request, RequestId};
+
+use crate::relay_sidecar::{self, Battle};
 
 /// Why a joiner could not be let through the relay.
 ///
@@ -84,6 +100,36 @@ impl std::fmt::Display for NotAllowed {
 
 impl std::error::Error for NotAllowed {}
 
+/// Why no sidecar was started.
+#[derive(Debug)]
+pub enum NotStarted {
+    /// One is already relaying, as process `pid`. This is not a failure so
+    /// much as the answer to a question: a coilbox reopened during a relayed
+    /// game gets this, and starting a second sidecar over the top of it is
+    /// exactly what it prevents.
+    AlreadyRelaying(u32),
+    /// The sidecar binary is not where it should be, which means a broken
+    /// install rather than anything the user did. Raised by whoever calls
+    /// [`relay_sidecar::resolve_sidecar`], since that is where the lookup is.
+    NoSidecar,
+    /// It would not start.
+    Failed(io::Error),
+}
+
+impl std::fmt::Display for NotStarted {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NotStarted::AlreadyRelaying(pid) => {
+                write!(f, "a relay agent is already running as process {pid}")
+            }
+            NotStarted::NoSidecar => write!(f, "the relay agent is missing from this install"),
+            NotStarted::Failed(e) => write!(f, "the relay agent would not start: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for NotStarted {}
+
 /// Answers still being waited on, by request id.
 type Waiting = Arc<Mutex<HashMap<RequestId, mpsc::Sender<Result<(), NotAllowed>>>>>;
 
@@ -98,6 +144,97 @@ pub struct RelayAgent {
 }
 
 impl RelayAgent {
+    /// Start the sidecar for `battle` and take its control channel.
+    ///
+    /// Refuses to start a second one over a battle that is already being
+    /// relayed, which is what somebody reopening coilbox mid-game hits. See
+    /// [`crate::relay_sidecar`] for what that check can and cannot promise.
+    ///
+    /// `binary` comes from [`relay_sidecar::resolve_sidecar`] rather than
+    /// being looked up here, so the one part that depends on where coilbox is
+    /// installed stays out of the part that starts a process.
+    ///
+    /// The child is deliberately let go of. `std::process::Child` neither
+    /// kills nor waits on drop, so nothing here holds the sidecar's life: it
+    /// carries on when coilbox closes, which is the entire reason it is a
+    /// separate process. On Windows that takes asking to leave the job object,
+    /// which `command_that_outlives_us` does and issue #2033 explains.
+    pub fn spawn(
+        binary: &Path,
+        battle: &Battle,
+        run_file: &Path,
+        on_event: impl Fn(Event) + Send + 'static,
+    ) -> Result<RelayAgent, NotStarted> {
+        if let Some(pid) = relay_sidecar::already_relaying(run_file) {
+            return Err(NotStarted::AlreadyRelaying(pid));
+        }
+
+        // The sidecar creates the run file itself, but not the directory its
+        // log has to be opened in, and that happens first.
+        if let Some(parent) = run_file.parent() {
+            std::fs::create_dir_all(parent).map_err(NotStarted::Failed)?;
+        }
+        let log = std::fs::File::create(relay_sidecar::log_path(run_file))
+            .map_err(NotStarted::Failed)?;
+
+        let mut command = coilbox_proc::command_that_outlives_us(binary);
+        command.args(relay_sidecar::build_args(battle, run_file));
+        if let Some(turn) = &battle.turn {
+            command.env(relay_sidecar::PASSWORD_VAR, &turn.password);
+        }
+        let mut child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::from(log))
+            .spawn()
+            .map_err(NotStarted::Failed)?;
+
+        let to_agent = child.stdin.take().ok_or_else(no_pipe)?;
+        let from_agent = child.stdout.take().ok_or_else(no_pipe)?;
+        // Reaped on a thread of its own so a sidecar that exits while coilbox
+        // is still running does not sit there as a zombie. If coilbox goes
+        // first this thread goes with it and the OS takes over, which is the
+        // case the sidecar is built for.
+        std::thread::spawn(move || {
+            let _ = child.wait();
+        });
+
+        Ok(RelayAgent::driving(from_agent, to_agent, on_event))
+    }
+
+    /// Tell the sidecar which process the engine is, so it knows the game is
+    /// over once that process has gone.
+    ///
+    /// Sent as soon as coilbox has launched one, which is always after the
+    /// sidecar started. Not waited on: the only failure that matters is not
+    /// being able to write at all, which means the sidecar has gone, and a
+    /// sidecar that never hears this still stops on its traffic backstop
+    /// rather than leaking.
+    pub fn watch_engine(&self, pid: u32) -> io::Result<()> {
+        self.write(&Request::WatchEngine {
+            id: self.next_id.fetch_add(1, Ordering::Relaxed),
+            pid,
+        })
+    }
+
+    /// Tell the sidecar the battle is over.
+    ///
+    /// The signal that beats every other, because coilbox is the only thing
+    /// that knows a battle has ended rather than guessing at it from an idle
+    /// relay. Not waited on for the same reason as
+    /// [`RelayAgent::watch_engine`]: a sidecar that cannot be reached has
+    /// already stopped.
+    ///
+    /// Note what closing coilbox is not. Dropping this handle closes the
+    /// sidecar's stdin, and the sidecar reads that as coilbox going away
+    /// rather than as a battle ending, so it keeps relaying for whoever is
+    /// still playing. Ending a battle has to be said.
+    pub fn stop(&self) -> io::Result<()> {
+        self.write(&Request::Stop {
+            id: self.next_id.fetch_add(1, Ordering::Relaxed),
+        })
+    }
+
     /// Drive an agent over its pipes.
     ///
     /// `from_agent` is its stdout and `to_agent` its stdin. Reading runs on a
@@ -221,6 +358,12 @@ fn read_events<R: Read>(from_agent: R, waiting: &Waiting, on_event: impl Fn(Even
     for (_, answered) in stranded {
         let _ = answered.send(Err(NotAllowed::AgentGone(ending.clone())));
     }
+}
+
+/// A piped stdio handle that was not there, which cannot happen after a spawn
+/// that asked for one and succeeded.
+fn no_pipe() -> NotStarted {
+    NotStarted::Failed(io::Error::other("the relay agent was spawned without pipes"))
 }
 
 fn hand_over(waiting: &Waiting, id: RequestId, outcome: Result<(), NotAllowed>) {

@@ -21,6 +21,10 @@ mod probe;
 /// Public because the seam it exposes is the one thing relay hosting cannot
 /// work without, and it is waiting on a lobby that can name a joiner's address.
 pub mod relay_agent;
+/// Where the relay agent binary is, what to start it with, and how to tell
+/// whether one is already relaying a battle. Public for the same reason
+/// [`relay_agent`] is: it is half of the seam relay hosting is waiting on.
+pub mod relay_sidecar;
 /// The OAuth browser sign-in that produces a Tachyon bearer token.
 pub mod tachyon_auth;
 mod tachyon_conn;
