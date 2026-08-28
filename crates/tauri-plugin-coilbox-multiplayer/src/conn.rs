@@ -591,3 +591,161 @@ async fn run_loop(
     emit(&sink, LobbyEvent::Disconnected { reason });
     lock_or_recover(&registry).remove(&server_key);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use coilbox_lobby_protocol::server::{line, parse_client_line, ClientCommand};
+    use coilbox_lobby_protocol::{password_hash, LoginMode};
+
+    /// How long a test waits for the handshake to finish.
+    const PATIENCE: Duration = Duration::from_secs(5);
+
+    /// A lobby that greets, answers `LISTCOMPFLAGS`, and finishes whichever
+    /// of `LOGIN` or `REGISTER` the client sends: `ACCEPTED` then
+    /// `LOGININFOEND` for a login, `REGISTRATIONACCEPTED` for a
+    /// registration. Driving the handshake this way, rather than pushing a
+    /// hand-built `Outbound::Line` at the task, is what makes the test below
+    /// prove something about the `LOGIN`/`REGISTER` lines `LoginMachine`
+    /// itself builds, and not about a line the test invented.
+    async fn lobby_finishing_login_or_registration() -> std::net::SocketAddr {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("a free port");
+        let addr = listener.local_addr().expect("a bound address");
+        tokio::spawn(async move {
+            let Ok((stream, _)) = listener.accept().await else {
+                return;
+            };
+            let mut framed = Framed::new(stream, LinesCodec::new());
+            if framed
+                .send(line::tas_server("0.38", "*", 8452, 0))
+                .await
+                .is_err()
+            {
+                return;
+            }
+            while let Some(Ok(read)) = framed.next().await {
+                let reply = match parse_client_line(&read) {
+                    ClientCommand::ListCompFlags => line::comp_flags(&["u", "sp"]),
+                    ClientCommand::Login { username, .. } => {
+                        if framed.send(line::accepted(&username)).await.is_err() {
+                            return;
+                        }
+                        line::login_info_end()
+                    }
+                    ClientCommand::Register { .. } => "REGISTRATIONACCEPTED".to_string(),
+                    _ => continue,
+                };
+                if framed.send(reply).await.is_err() {
+                    return;
+                }
+            }
+        });
+        addr
+    }
+
+    /// Connect, drive `mode`'s handshake through the real connection task
+    /// over a real socket, and hand back every console event the frontend
+    /// would have seen, as the JSON it would have seen it as. Waits for the
+    /// handshake's own terminal phase, so by the time it returns, every line
+    /// the handshake sent (including the `LOGIN`/`REGISTER` line itself) has
+    /// already been through `console` and recorded.
+    async fn console_lines_seen_during(mode: LoginMode) -> Vec<String> {
+        let addr = lobby_finishing_login_or_registration().await;
+        let stream = tokio::net::TcpStream::connect(addr)
+            .await
+            .expect("the lobby is listening");
+        let registry: Registry = Registry::default();
+        let key = format!("alice@{addr}");
+
+        let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+        let recorder = seen.clone();
+        let events = Channel::new(move |body| {
+            let json = match body {
+                tauri::ipc::InvokeResponseBody::Json(s) => s,
+                tauri::ipc::InvokeResponseBody::Raw(b) => String::from_utf8_lossy(&b).into_owned(),
+            };
+            lock_or_recover(&recorder).push(json);
+            Ok(())
+        });
+
+        let terminal = match mode {
+            LoginMode::Login => LoginPhase::Ready,
+            LoginMode::Register { .. } => LoginPhase::Registered,
+        };
+
+        let logs = std::env::temp_dir().join("coilbox-login-redaction-tests");
+        spawn_connection(
+            registry.clone(),
+            key.clone(),
+            Box::new(stream),
+            LoginConfig {
+                username: "alice".to_string(),
+                password_hash: password_hash("hunter2"),
+                local_ip: "127.0.0.1".to_string(),
+                agent: "Coilbox test".to_string(),
+                client_id: "1".to_string(),
+                compat_flags: vec!["u".to_string()],
+                use_stls: false,
+                mode,
+            },
+            events,
+            crate::dmlog::DmLog::new(&logs, &key),
+            crate::dmlog::DmLog::new(&logs, &key),
+        );
+
+        let mut phase = lock_or_recover(&registry)
+            .get(&key)
+            .expect("spawn_connection registered it")
+            .phase
+            .clone();
+        tokio::time::timeout(PATIENCE, phase.wait_for(|p| *p == terminal))
+            .await
+            .expect("the handshake did not finish in time")
+            .expect("the connection task is still running");
+
+        let recorded = lock_or_recover(&seen).clone();
+        recorded
+    }
+
+    /// The acceptance test for issue #2044. A real login, driven through the
+    /// real connection task over a real socket, must not leave a usable
+    /// password hash anywhere in what the frontend was sent, because a
+    /// TASServer takes that hash as the login itself: holding it is holding
+    /// the account.
+    #[tokio::test]
+    async fn a_login_never_reaches_the_frontend_with_its_password_hash() {
+        let hash = password_hash("hunter2");
+        let seen = console_lines_seen_during(LoginMode::Login).await.join("\n");
+
+        assert!(
+            !seen.contains(&hash),
+            "the frontend was told the login hash:\n{seen}"
+        );
+        // The absence above is redaction, not a line that never arrived: the
+        // username and the rest of the LOGIN line are still there.
+        assert!(
+            seen.contains("LOGIN alice <redacted> 0 127.0.0.1 Coilbox test"),
+            "the console should still show the rest of the LOGIN line:\n{seen}"
+        );
+    }
+
+    /// The same, for `REGISTER`, which sends the same hash `LOGIN` does.
+    #[tokio::test]
+    async fn a_registration_never_reaches_the_frontend_with_its_password_hash() {
+        let hash = password_hash("hunter2");
+        let seen = console_lines_seen_during(LoginMode::Register { email: None })
+            .await
+            .join("\n");
+
+        assert!(
+            !seen.contains(&hash),
+            "the frontend was told the registration hash:\n{seen}"
+        );
+        assert!(
+            seen.contains("REGISTER alice <redacted>"),
+            "the console should still show the username:\n{seen}"
+        );
+    }
+}
