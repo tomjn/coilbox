@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CopyButton } from "./CopyButton";
 import {
@@ -31,6 +31,7 @@ import { type PortSpec, useReachablePorts } from "./useReachablePorts";
 export function ReachablePorts({
   ports,
   help,
+  onReport,
 }: {
   /** The ports to open, or null to close whatever is open. The caller builds
    *  this from its own port fields, so a host who moves their room takes the
@@ -39,9 +40,20 @@ export function ReachablePorts({
   /** What ticking this does, in the caller's own terms. The two host paths open
    *  a different number of ports for different reasons. */
   help: string;
+  /** Hear what the router and the internet said, so the form above can pick a
+   *  hosting route from it (issue #2020). Null while this is switched off,
+   *  which is a route decision in its own right: nothing was measured.
+   *
+   *  Must keep the same identity between renders, or this notifies on every
+   *  one. A `useState` setter is the intended argument. */
+  onReport?: (report: DirectReachability | null) => void;
 }) {
   const [enabled, setEnabled] = useState(false);
   const net = useReachablePorts(enabled ? ports : null);
+
+  useEffect(() => {
+    onReport?.(net.report);
+  }, [net.report, onReport]);
 
   return (
     <div className="flex flex-col gap-1.5">

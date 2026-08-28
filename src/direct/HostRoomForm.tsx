@@ -26,8 +26,14 @@ import {
   hashFailureMessage,
   useHostContent,
 } from "../multiplayer/battles/useHostContent";
+import {
+  hostingRoute,
+  hostingRouteSummary,
+  NAT_TYPE_DIRECT,
+  recordHostingRoute,
+} from "./hostingRoute";
 import { ReachablePorts } from "./ReachablePorts";
-import { roomPorts } from "./reachability";
+import { type DirectReachability, roomPorts } from "./reachability";
 import {
   DEFAULT_ROOM_PORT,
   playerNameProblem,
@@ -85,6 +91,16 @@ export function HostRoomForm({
   const [approveJoins, setApproveJoins] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What the router and the internet said, handed up by ReachablePorts below.
+  const [reachability, setReachability] = useState<DirectReachability | null>(
+    null,
+  );
+
+  // A room is its own lobby server, so there is no server to have a relay and
+  // the ladder from issue #2020 ends at the port mapping. That is not a
+  // shortcoming: the point of hosting on a LAN is the people on the LAN, so the
+  // sentence below says so rather than reporting it as a failure.
+  const route = hostingRoute(reachability, false);
 
   const trimmedName = name.trim();
   const nameProblem = playerNameProblem(name);
@@ -103,6 +119,9 @@ export function HostRoomForm({
     if (!canStart || !content.target) return;
     setStarting(true);
     setError(null);
+    // Dropped before the attempt rather than after it, so a room that fails to
+    // start leaves no route behind for the next reader to believe.
+    recordHostingRoute(null);
     try {
       await onStart({
         host: trimmedName,
@@ -111,11 +130,18 @@ export function HostRoomForm({
         approveJoins,
         battle: {
           battleType: 0,
-          // Direct is the only mode coilbox implements, here as everywhere.
-          natType: 0,
+          natType: NAT_TYPE_DIRECT,
           key: password.trim() || "*",
           // The engine's game port, not the room's. The two are separate ports
           // and the engine binds its own, exactly as it does on a real server.
+          //
+          // The port the router opened deliberately does not go here, unlike a
+          // battle on a lobby server. This one field is read by everybody in the
+          // room, and a room's joiners are on both sides of the router: the
+          // people on this network reach the engine at the port it binds, and
+          // only somebody outside would want the router's. Naming the router's
+          // would break the case the room exists for to fix the case it does
+          // not.
           port: DEFAULT_HOST_PORT,
           maxPlayers,
           modhash: content.modhash,
@@ -128,6 +154,7 @@ export function HostRoomForm({
           modname: content.gameName,
         },
       });
+      recordHostingRoute(route);
       // Deliberately left open on success too. A room that starts lands the host
       // in its battle room, and that navigation closes every drawer, so there is
       // nothing here to close and nothing to race with.
@@ -275,7 +302,12 @@ export function HostRoomForm({
       <ReachablePorts
         ports={portProblem ? null : roomPorts(Number(port), DEFAULT_HOST_PORT)}
         help={`Asks your router to forward the room's port and the game's port ${DEFAULT_HOST_PORT} so people outside this network can join. Both, because opening only the room's gets everybody in and then fails at launch.`}
+        onReport={setReachability}
       />
+
+      <p className="text-xs text-muted-foreground">
+        {hostingRouteSummary(route, { lanRoom: true })}
+      </p>
 
       {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association) */}
       <label className="flex items-start gap-2 text-sm">
