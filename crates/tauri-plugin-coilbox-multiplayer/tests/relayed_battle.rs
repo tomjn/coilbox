@@ -89,6 +89,18 @@ const PATIENCE: Duration = Duration::from_secs(20);
 /// measures, and short enough not to be noticed.
 const SILENCE: Duration = Duration::from_millis(500);
 
+/// The longest allocation the two loss tests let coturn grant.
+///
+/// An allocation is only lost once its lifetime has run out or a Refresh has
+/// been refused, and the client refreshes at half the lifetime it was granted.
+/// coturn's default hour would mean a test that waits half an hour for the
+/// first refresh, so `--max-allocate-lifetime` cuts it.
+///
+/// coturn clamps its own minimum, so what it grants is not necessarily what it
+/// was asked for, which is why the tests below time how long the agent takes to
+/// notice rather than asserting a number this constant made up.
+const SHORT_LIFETIME: Duration = Duration::from_secs(2);
+
 /// The credential coturn is configured with and the agent is handed. Issue
 /// #2016 is what makes these come from the lobby.
 const TURN_USER: &str = "battle-host";
@@ -179,20 +191,166 @@ fn a_relayed_battle_carries_every_player_to_the_engine_and_back() {
     );
 }
 
+/// A TURN server that goes away and stays away. Nothing answers the refreshes,
+/// the lifetime coturn granted runs out, and the agent has to say so.
+///
+/// This is the loss the `turn` crate is silent about. Its own refresh loop
+/// retries three times, logs at warn level and carries on, so without the
+/// watchdog in `allocation.rs` the host would sit in a battle nobody can reach
+/// until the game ended.
+#[test]
+#[ignore = "needs coturn installed and a few seconds: see this file's comment for the command"]
+fn a_turn_server_that_stops_answering_is_noticed_before_the_game_ends() {
+    let mut coturn = Coturn::granting_at_most(SHORT_LIFETIME);
+    let engine = FakeEngine::start();
+    let sidecar = Sidecar::start(&coturn, engine.addr);
+
+    let relayed = sidecar.relay_open();
+    sidecar
+        .agent
+        .allow_joiner(IpAddr::V4(Ipv4Addr::LOCALHOST), PATIENCE)
+        .expect("the agent let the joiner through the allocation");
+    let player = FakePlayer::dialling(relayed);
+    player.round_trip(b"the relay is working");
+
+    let taken_away = std::time::Instant::now();
+    coturn.stop();
+
+    let reason = sidecar.waits_for_relay_down();
+    let noticed_in = taken_away.elapsed();
+    assert!(
+        reason.contains("lifetime ran out"),
+        "a server that stopped answering has to be reported as the allocation expiring, and the \
+         agent said: {reason}"
+    );
+    // Loose on purpose. The exact number is coturn's to choose and the client
+    // refreshes on its own timer, so what is being asserted is the shape of the
+    // answer: the agent notices within one granted lifetime of the last one it
+    // was answered, rather than within the ten minutes a default allocation
+    // would have taken or not at all.
+    assert!(
+        noticed_in < PATIENCE,
+        "the agent took {noticed_in:?} to notice, which is longer than any battle would wait"
+    );
+    println!("relay down after {noticed_in:?}, because {reason}");
+}
+
+/// A TURN server that comes back with no memory of the allocation, which is
+/// what a restart on somebody else's machine looks like from here.
+///
+/// Two things are being asked. What a real coturn says to a signed Refresh for
+/// an allocation it has never heard of, which decides whether the agent treats
+/// the loss as retryable or gives up, and whether the players survive the
+/// rebuild.
+///
+/// The second one is the property the sidecar is built around. The engine
+/// identifies a player by the UDP endpoint their traffic arrives from, so a
+/// rebuild that gave everybody a new loopback socket would look to the engine
+/// like every player leaving and a set of strangers arriving, mid-game, which
+/// it does not recover from. `demux.rs` keeps the peer table outside the relay
+/// precisely so that cannot happen, and until now nothing has checked it
+/// against a relay that really was rebuilt.
+#[test]
+#[ignore = "needs coturn installed and a few seconds: see this file's comment for the command"]
+fn a_restarted_turn_server_costs_the_allocation_but_not_the_players() {
+    let mut coturn = Coturn::granting_at_most(SHORT_LIFETIME);
+    let engine = FakeEngine::start();
+    let sidecar = Sidecar::start(&coturn, engine.addr);
+
+    let first_relay = sidecar.relay_open();
+    sidecar
+        .agent
+        .allow_joiner(IpAddr::V4(Ipv4Addr::LOCALHOST), PATIENCE)
+        .expect("the agent let the joiner through the allocation");
+    let players: Vec<FakePlayer> = (0..SEATS).map(|_| FakePlayer::dialling(first_relay)).collect();
+    for (seat, player) in players.iter().enumerate() {
+        player.round_trip(format!("hello from seat {seat}").as_bytes());
+    }
+    let before = engine.distinct_ports();
+    assert_eq!(before.len(), SEATS, "every player reached the engine first");
+
+    // Fast, so that the next Refresh lands on a coturn that is running and has
+    // never heard of this allocation. Leave it down for longer than the
+    // lifetime and the allocation simply expires instead, which is the test
+    // above.
+    coturn.stop();
+    coturn.start_again();
+
+    let reason = sidecar.waits_for_relay_down();
+    // The observation the whole test was written for. coturn 4.17.2 answers a
+    // signed Refresh for an allocation it has no record of with 437, and with
+    // no reason phrase, so the words here are the ones `allocation.rs` fills in
+    // from the STUN registry. 437 is not one of the codes it treats as a
+    // credential it cannot recover from, so the agent rebuilds rather than
+    // stopping the battle. Asserted rather than assumed because a server that
+    // answered 401 or 441 to the same loss would end the battle instead, and
+    // this is what would say so.
+    assert_eq!(
+        reason, "the server refused it (error 437 Allocation Mismatch)",
+        "a restarted coturn refuses the Refresh for an allocation it has forgotten, and the host \
+         has to be told which refusal it was"
+    );
+
+    let second_relay = sidecar.relay_open();
+    assert_ne!(
+        second_relay, first_relay,
+        "a rebuilt allocation is a new one, so the battle has to be advertised again (issue \
+         #2031)"
+    );
+
+    for (seat, player) in players.iter().enumerate() {
+        player.redial(second_relay);
+        player.round_trip_once_it_can(format!("still here, seat {seat}").as_bytes());
+    }
+
+    assert_eq!(
+        engine.distinct_ports(),
+        before,
+        "every player has to reach the engine on the port they had before the relay was rebuilt, \
+         or the engine sees the whole battle leave and a set of strangers arrive"
+    );
+}
+
 /// A real coturn, running for the length of one test.
 struct Coturn {
-    /// Where the agent sends its Allocate.
+    /// Where the agent sends its Allocate. Fixed at construction, so a coturn
+    /// that is stopped and started again comes back at the same address and
+    /// the agent's next Allocate goes to the same place its last one did.
     addr: SocketAddr,
     /// The configuration and log, thrown away when the test ends.
     dir: PathBuf,
-    child: Child,
+    conf: PathBuf,
+    /// `None` while it is stopped, which is a state two of these tests put it
+    /// in on purpose.
+    child: Option<Child>,
 }
 
 impl Coturn {
+    /// A coturn with the lifetimes it hands out left alone, which is an hour.
     fn start() -> Coturn {
+        Coturn::start_with(None)
+    }
+
+    /// A coturn that will not grant an allocation for longer than
+    /// `max_lifetime`, so the client refreshes on a timescale a test can wait
+    /// out.
+    ///
+    /// coturn clamps this from below, so what it actually grants is worth
+    /// asserting rather than assuming. See [`SHORT_LIFETIME`].
+    fn granting_at_most(max_lifetime: Duration) -> Coturn {
+        Coturn::start_with(Some(max_lifetime))
+    }
+
+    fn start_with(max_lifetime: Option<Duration>) -> Coturn {
         let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, free_udp_port()));
-        let dir =
-            std::env::temp_dir().join(format!("coilbox-relayed-battle-{}", std::process::id()));
+        // Named after the port as well as the process, because the tests in
+        // this file run in parallel and each one wants its own coturn with its
+        // own configuration.
+        let dir = std::env::temp_dir().join(format!(
+            "coilbox-relayed-battle-{}-{}",
+            std::process::id(),
+            addr.port()
+        ));
         std::fs::create_dir_all(&dir).expect("somewhere to put coturn's configuration");
         let log = dir.join("coturn.log");
         let conf = dir.join("turnserver.conf");
@@ -202,7 +360,7 @@ impl Coturn {
         // pausing on: coturn refuses to relay to 127.0.0.0/8 without it, and
         // every player in this test is on loopback. coturn warns that this is
         // not for production, and it is right.
-        let settings = [
+        let mut settings = vec![
             format!("listening-port={}", addr.port()),
             "listening-ip=127.0.0.1".to_string(),
             "relay-ip=127.0.0.1".to_string(),
@@ -224,23 +382,54 @@ impl Coturn {
             // fight over it.
             format!("pidfile={}", dir.join("turnserver.pid").display()),
         ];
+        if let Some(max_lifetime) = max_lifetime {
+            settings.push(format!(
+                "max-allocate-lifetime={}",
+                max_lifetime.as_secs()
+            ));
+        }
         std::fs::write(&conf, settings.join("\n") + "\n").expect("a writable temporary directory");
 
-        let child = Command::new("turnserver")
-            .arg("-c")
-            .arg(&conf)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect(
-                "turnserver on PATH: install coturn with `brew install coturn` or \
-                 `apt-get install coturn`",
-            );
-
-        let coturn = Coturn { addr, dir, child };
-        coturn.wait_until_listening();
+        let mut coturn = Coturn {
+            addr,
+            dir,
+            conf,
+            child: None,
+        };
+        coturn.start_again();
         coturn
+    }
+
+    /// Take the server away, the way a machine somebody else owns goes away
+    /// mid-game.
+    ///
+    /// Killed rather than asked to shut down, because a TURN server that hands
+    /// its allocations back on the way out is the easy case. What the agent has
+    /// to survive is the one that does not.
+    fn stop(&mut self) {
+        if let Some(mut child) = self.child.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+
+    /// Bring it back, at the same address, with no memory of anything it was
+    /// relaying.
+    fn start_again(&mut self) {
+        self.child = Some(
+            Command::new("turnserver")
+                .arg("-c")
+                .arg(&self.conf)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .expect(
+                    "turnserver on PATH: install coturn with `brew install coturn` or \
+                     `apt-get install coturn`",
+                ),
+        );
+        self.wait_until_listening();
     }
 
     /// Wait for coturn to answer, rather than for it to say it is ready.
@@ -278,8 +467,7 @@ impl Coturn {
 
 impl Drop for Coturn {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        self.stop();
         let _ = std::fs::remove_dir_all(&self.dir);
     }
 }
@@ -347,6 +535,23 @@ impl Sidecar {
             Err(RecvTimeoutError::Timeout) => {
                 panic!("the agent never opened a relay on the TURN server")
             }
+            Err(RecvTimeoutError::Disconnected) => panic!("the agent's output ended"),
+        }
+    }
+
+    /// Wait for the agent to say the relay is gone, and hand back the reason it
+    /// gave.
+    ///
+    /// The reason is the point. It is the agent's rendering of what the TURN
+    /// server actually said, and what the tests below assert against.
+    fn waits_for_relay_down(&self) -> String {
+        match self.said.recv_timeout(PATIENCE) {
+            Ok(Event::RelayDown { reason }) => reason,
+            Ok(other) => panic!("the agent said {other:?} instead of noticing its relay had gone"),
+            Err(RecvTimeoutError::Timeout) => panic!(
+                "the agent never noticed its allocation had gone, so a host would sit in a \
+                 battle nobody can reach for the length of the game"
+            ),
             Err(RecvTimeoutError::Disconnected) => panic!("the agent's output ended"),
         }
     }
@@ -452,6 +657,55 @@ impl FakePlayer {
             &buf[..read],
             what,
             "the reply reached the wrong player, so the agent lost track of whose socket is whose"
+        );
+    }
+
+    /// Send to a different relayed address from now on, keeping the same
+    /// socket.
+    ///
+    /// The same socket is the whole point. A rebuilt allocation is at a new
+    /// address, so a player has to be told where to send, but their own source
+    /// port does not change and so neither should the loopback socket the agent
+    /// speaks to the engine on for them. In a real battle the new address
+    /// reaches the players through the lobby (issue #2031). Here the test plays
+    /// that part.
+    fn redial(&self, relayed: SocketAddr) {
+        self.socket.connect(relayed).expect("a loopback address");
+    }
+
+    /// Send `what` until the echo comes back, for a relay that has only just
+    /// opened.
+    ///
+    /// [`FakePlayer::round_trip`] sends once, which is right when the
+    /// permission is known to be in place because `allow_joiner` has returned.
+    /// After a rebuild there is nothing to wait on: the agent says `relayOpen`
+    /// and only then lets everybody through the new allocation, so a datagram
+    /// sent the instant the address arrives is legitimately dropped by coturn
+    /// for having no permission yet. Resending is what a player's engine does
+    /// anyway, and it is the only honest way to wait for a permission the test
+    /// cannot see being installed.
+    fn round_trip_once_it_can(&self, what: &[u8]) {
+        self.socket
+            .set_read_timeout(Some(SILENCE))
+            .expect("a bound socket");
+        let deadline = std::time::Instant::now() + PATIENCE;
+        let mut buf = vec![0u8; 4096];
+        while std::time::Instant::now() < deadline {
+            self.socket.send(what).expect("the relay takes the packet");
+            if let Ok(read) = self.socket.recv(&mut buf) {
+                assert_eq!(
+                    &buf[..read],
+                    what,
+                    "the reply reached the wrong player, so the rebuilt relay lost track of \
+                     whose socket is whose"
+                );
+                return;
+            }
+        }
+        panic!(
+            "nothing came back through the rebuilt relay within {} seconds, so a player who was \
+             in the battle before it was rebuilt is no longer in it",
+            PATIENCE.as_secs()
         );
     }
 
