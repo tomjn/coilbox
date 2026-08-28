@@ -194,6 +194,51 @@ impl Requests {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stopping::{Reason, IDLE_TIMEOUT};
+
+    /// The handover, and the one piece of wiring nothing else can reach. The
+    /// agent's own tests prove what it decides once coilbox has gone, and the
+    /// integration tests prove what a running one does while coilbox is still
+    /// there. This is the line between them: EOF on stdin is what moves the
+    /// agent from one to the other, and an agent that never notices would sit
+    /// there holding an allocation forever.
+    ///
+    /// On a paused clock, because the backstop it hands over to is four
+    /// minutes out.
+    #[tokio::test(start_paused = true)]
+    async fn coilbox_closing_the_channel_hands_the_decision_to_the_agent() {
+        let (to_agent, agent_stdin) = tokio::io::duplex(64);
+        let reporter = Arc::new(Reporter::writing(tokio::io::sink()));
+        let stopping = Arc::new(Stopping::new());
+        let mut requests =
+            Requests::reading(agent_stdin, Arc::clone(&reporter), Arc::clone(&stopping));
+
+        tokio::time::sleep(IDLE_TIMEOUT).await;
+        assert_eq!(
+            stopping.reason(),
+            None,
+            "an agent with coilbox still on the other end never stops on a timer"
+        );
+
+        // coilbox closing, which is a window shutting rather than a battle
+        // ending.
+        drop(to_agent);
+        assert!(
+            requests.next().await.is_none(),
+            "the channel has to end when coilbox does"
+        );
+
+        assert_eq!(
+            stopping.reason(),
+            Some(Reason::NothingLeftToCarry),
+            "coilbox going away is what starts the agent judging for itself"
+        );
+    }
+}
+
 /// Answer one request that was carried out, or not.
 pub async fn answer(
     reporter: &Reporter,

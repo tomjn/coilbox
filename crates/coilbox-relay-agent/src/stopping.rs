@@ -192,7 +192,7 @@ impl Stopping {
     }
 
     /// The reason to stop right now, if there is one.
-    fn reason(&self) -> Option<Reason> {
+    pub(crate) fn reason(&self) -> Option<Reason> {
         if self.asked.load(Ordering::Relaxed) {
             return Some(Reason::CoilboxAsked);
         }
@@ -321,6 +321,95 @@ mod tests {
         stopping.coilbox_has_gone();
 
         assert_eq!(stopping.wait().await, Reason::NothingLeftToCarry);
+    }
+
+    /// A relay that hands over a datagram whenever it is asked, which is what
+    /// a game in progress looks like from here.
+    struct Busy;
+
+    impl RelayLink for Busy {
+        async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+            buf[0] = 1;
+            Ok((1, SocketAddr::from(([127, 0, 0, 1], 41641))))
+        }
+
+        async fn send_to(&self, buf: &[u8], _peer: SocketAddr) -> io::Result<usize> {
+            Ok(buf.len())
+        }
+    }
+
+    /// A relay that has failed, which must not read as a game still being
+    /// played.
+    struct Broken;
+
+    impl RelayLink for Broken {
+        async fn recv_from(&self, _buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+            Err(io::Error::other("the allocation is gone"))
+        }
+
+        async fn send_to(&self, _buf: &[u8], _peer: SocketAddr) -> io::Result<usize> {
+            Err(io::Error::other("the allocation is gone"))
+        }
+    }
+
+    fn a_peer() -> SocketAddr {
+        SocketAddr::from(([198, 51, 100, 4], 41641))
+    }
+
+    /// [`Counted`] is the only thing that ever tells [`Stopping`] a game is
+    /// still being played, so this is the wiring the whole rule hangs off. Cut
+    /// it and a busy relayed game is dropped four minutes after coilbox
+    /// closes, with nothing to say why.
+    #[tokio::test(start_paused = true)]
+    async fn a_datagram_through_the_relay_is_what_puts_the_backstop_off() {
+        let stopping = Stopping::new();
+        stopping.coilbox_has_gone();
+        let counted = Counted {
+            relay: &Busy,
+            stopping: &stopping,
+        };
+
+        tokio::time::sleep(IDLE_TIMEOUT).await;
+        assert!(
+            stopping.reason().is_some(),
+            "the backstop has to be due, or the rest of this proves nothing"
+        );
+
+        let mut buf = [0u8; 8];
+        counted.recv_from(&mut buf).await.expect("a busy relay");
+        assert_eq!(stopping.reason(), None, "a datagram from a player counts");
+
+        tokio::time::sleep(IDLE_TIMEOUT).await;
+        counted.send_to(b"reply", a_peer()).await.expect("a busy relay");
+        assert_eq!(
+            stopping.reason(),
+            None,
+            "a datagram to a player counts too, or a game nobody is talking in \
+             would be cut off while it is still being played"
+        );
+    }
+
+    /// A relay that is failing is not a game in progress. Counting a failure
+    /// would keep a dead battle alive on the strength of an allocation the
+    /// server deleted.
+    #[tokio::test(start_paused = true)]
+    async fn a_relay_that_is_only_failing_does_not_count_as_traffic() {
+        let stopping = Stopping::new();
+        stopping.coilbox_has_gone();
+        let counted = Counted {
+            relay: &Broken,
+            stopping: &stopping,
+        };
+
+        tokio::time::sleep(IDLE_TIMEOUT).await;
+        let mut buf = [0u8; 8];
+        counted.recv_from(&mut buf).await.expect_err("a broken relay");
+        counted
+            .send_to(b"reply", a_peer())
+            .await
+            .expect_err("a broken relay");
+
+        assert_eq!(stopping.reason(), Some(Reason::NothingLeftToCarry));
     }
 
     /// Traffic is what keeps it alive, so traffic has to be what resets the

@@ -21,9 +21,10 @@
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::UdpSocket;
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::path::Path;
+use std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// How long to wait for a line from the agent before deciding it is never
 /// coming. Generous next to the milliseconds a loopback relay takes to open,
@@ -39,20 +40,28 @@ struct Running {
 
 impl Running {
     fn start() -> Running {
+        Running::start_with(None)
+    }
+
+    fn start_with(run_file: Option<&Path>) -> Running {
         // Somewhere for the agent to point its loopback sockets. Nothing
         // listens, and nothing in this test sends game traffic.
         let engine = UdpSocket::bind("127.0.0.1:0").expect("a free loopback port");
         let engine_port = engine.local_addr().expect("a bound address").port();
 
-        let mut child = Command::new(env!("CARGO_BIN_EXE_coilbox-relay-agent"))
-            .args([
-                "--engine-port",
-                &engine_port.to_string(),
-                "--max-peers",
-                "4",
-                "--relay-bind",
-                "127.0.0.1:0",
-            ])
+        let mut command = Command::new(env!("CARGO_BIN_EXE_coilbox-relay-agent"));
+        command.args([
+            "--engine-port",
+            &engine_port.to_string(),
+            "--max-peers",
+            "4",
+            "--relay-bind",
+            "127.0.0.1:0",
+        ]);
+        if let Some(run_file) = run_file {
+            command.arg("--run-file").arg(run_file);
+        }
+        let mut child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -86,12 +95,26 @@ impl Running {
             Err(RecvTimeoutError::Disconnected) => panic!("the agent's stdout closed"),
         }
     }
+
+    /// Wait for the process to actually end, which is the assertion a pipe
+    /// going quiet cannot make.
+    fn ends(&mut self) -> ExitStatus {
+        let deadline = Instant::now() + PATIENCE;
+        while Instant::now() < deadline {
+            if let Some(status) = self.child.try_wait().expect("a child we spawned") {
+                return status;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("the agent is still running");
+    }
 }
 
 impl Drop for Running {
     fn drop(&mut self) {
-        // The agent never stops on its own, by design: the engine it is feeding
-        // outlives coilbox, and issue #2027 owns when that stops being true.
+        // Killed rather than asked, because a test that has finished with the
+        // agent has usually finished mid-battle, and mid-battle is exactly
+        // when it is designed not to stop.
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
@@ -111,6 +134,96 @@ fn the_agent_reports_its_relay_and_lets_a_named_address_through() {
 
     agent.ask("{\"type\":\"allowPeer\",\"id\":1,\"ip\":\"127.0.0.1\"}");
     assert_eq!(agent.hears(), "{\"type\":\"done\",\"id\":1}");
+}
+
+/// coilbox asking it to stop, which is the ordinary end of a battle and the
+/// only signal that beats every other. The answer has to come out before the
+/// process does, or a coilbox waiting on it learns the battle ended from a
+/// pipe closing rather than from the agent.
+#[test]
+fn an_agent_that_is_asked_to_stop_answers_and_then_exits() {
+    let mut agent = Running::start();
+    assert!(agent.hears().starts_with("{\"type\":\"relayOpen\""));
+
+    agent.ask("{\"type\":\"stop\",\"id\":4}");
+    assert_eq!(agent.hears(), "{\"type\":\"done\",\"id\":4}");
+    let last = agent.hears();
+    assert!(
+        last.starts_with("{\"type\":\"stopping\",\"reason\":\""),
+        "the agent says why it is going before it goes, got: {last}"
+    );
+    assert!(
+        agent.ends().success(),
+        "a battle that ended normally is not a failure"
+    );
+}
+
+/// Naming the engine is a request like any other and has to be answered like
+/// one. Nothing here can prove the agent then outlives it, because that takes
+/// four minutes of relay traffic. `stopping.rs` tests that on a wound-forward
+/// clock.
+#[test]
+fn naming_the_engine_is_answered() {
+    let mut agent = Running::start();
+    assert!(agent.hears().starts_with("{\"type\":\"relayOpen\""));
+
+    agent.ask("{\"type\":\"watchEngine\",\"id\":5,\"pid\":4021}");
+    assert_eq!(agent.hears(), "{\"type\":\"done\",\"id\":5}");
+
+    // And the channel carries on, since watching an engine is not the end of
+    // anything.
+    agent.ask("{\"type\":\"allowPeer\",\"id\":6,\"ip\":\"127.0.0.1\"}");
+    assert_eq!(agent.hears(), "{\"type\":\"done\",\"id\":6}");
+}
+
+/// The failure the run file exists to prevent: a second agent relaying the
+/// same battle to a second address, while the players in it are still going
+/// through the first.
+#[test]
+fn a_second_agent_will_not_start_over_a_running_one() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let run_file = dir.path().join("relay").join("agent.json");
+
+    let mut first = Running::start_with(Some(&run_file));
+    assert!(first.hears().starts_with("{\"type\":\"relayOpen\""));
+    assert!(
+        run_file.exists(),
+        "a running agent has to leave something to be found by"
+    );
+
+    let mut second = Running::start_with(Some(&run_file));
+    let refused = second.hears();
+    assert!(
+        refused.starts_with("{\"type\":\"stopping\",\"reason\":\"relay agent "),
+        "the second agent has to say why it will not start, got: {refused}"
+    );
+    assert!(
+        !second.ends().success(),
+        "a refusal to start is a failure, so a caller watching the process sees it"
+    );
+
+    // And the first is untouched, which is the whole point.
+    first.ask("{\"type\":\"allowPeer\",\"id\":7,\"ip\":\"127.0.0.1\"}");
+    assert_eq!(first.hears(), "{\"type\":\"done\",\"id\":7}");
+}
+
+/// An agent that has stopped leaves nothing behind, so the next battle starts
+/// a relay rather than being told one is already running.
+#[test]
+fn an_agent_that_stops_gives_its_run_file_back() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let run_file = dir.path().join("relay").join("agent.json");
+
+    let mut agent = Running::start_with(Some(&run_file));
+    assert!(agent.hears().starts_with("{\"type\":\"relayOpen\""));
+    assert!(run_file.exists());
+
+    agent.ask("{\"type\":\"stop\",\"id\":8}");
+    assert!(agent.ends().success());
+    assert!(
+        !run_file.exists(),
+        "a run file outliving its agent means no relayed battle can ever start again"
+    );
 }
 
 /// A request the agent cannot act on is answered rather than swallowed, which
