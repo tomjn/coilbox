@@ -40,8 +40,8 @@
 //!   are arguments, the relay address is printed on stdout each time one is
 //!   opened, and a lost allocation goes to stderr with an exit code to match.
 //! - Fetching the credentials from the lobby (issue #2016).
-//! - Rebuilding a relay that fails, and when the agent decides to stop
-//!   (issue #2027).
+//! - When the agent decides to stop (issue #2027). Until then it keeps
+//!   rebuilding the relay, because the engine it is feeding is still running.
 //!
 //! Usage:
 //!
@@ -60,11 +60,13 @@ mod relay;
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::process::ExitCode;
+use std::time::Duration;
 
 use allocation::{AllocationFailure, TurnAllocation, TurnCredentials};
 use demux::Agent;
 use relay::RelayLink;
 use tokio::net::UdpSocket;
+use tokio::time::Instant;
 
 /// What the agent was asked to do.
 struct Args {
@@ -97,6 +99,16 @@ const PASSWORD_VAR: &str = "COILBOX_TURN_PASSWORD";
 /// a control channel to say it properly (issue #2015), the exit code is how
 /// coilbox can tell.
 const EXIT_CREDENTIAL_REFUSED: u8 = 2;
+
+/// How long to wait before rebuilding a relay that failed, doubling each time
+/// up to [`LONGEST_BACKOFF`].
+///
+/// The same schedule the TURN client uses for its own retransmits, 500 ms
+/// doubling until it gives up around 63 s (`turn::client`, the table above
+/// `ClientConfig`), and for the same reason: a server that is briefly
+/// unreachable comes back quickly, and one that is not should not be hammered.
+const FIRST_BACKOFF: Duration = Duration::from_millis(500);
+const LONGEST_BACKOFF: Duration = Duration::from_secs(32);
 
 fn parse_args() -> Result<Args, String> {
     let mut engine_port = None;
@@ -246,49 +258,65 @@ async fn main() -> ExitCode {
     };
 
     let engine = SocketAddr::from((Ipv4Addr::LOCALHOST, args.engine_port));
+    // Outside the loop, and that is the whole point of it being here. Every
+    // player keeps the loopback socket it was given across as many relays as
+    // this process gets through, because the engine reads a changed source port
+    // as a different player and will not have one mid-game.
     let mut agent = Agent::new(engine, args.max_peers);
 
-    let relay = match Transport::open(&args).await {
-        Ok(relay) => relay,
-        Err(failure) => {
-            eprintln!("coilbox-relay-agent: no relay: {failure}");
-            if failure.is_credential_failure() {
+    let mut backoff = FIRST_BACKOFF;
+    loop {
+        let relay = match Transport::open(&args).await {
+            Ok(relay) => relay,
+            Err(failure) if failure.is_credential_failure() => {
+                eprintln!("coilbox-relay-agent: the TURN credential was refused: {failure}");
                 return ExitCode::from(EXIT_CREDENTIAL_REFUSED);
             }
-            return ExitCode::FAILURE;
-        }
-    };
-    match relay.public_addr() {
-        // The line the caller reads. With `--relay-bind` left at port 0 this is
-        // the only way to learn where players should send.
-        Ok(addr) => println!("{addr}"),
-        Err(e) => {
-            eprintln!("coilbox-relay-agent: {e}");
-            return ExitCode::FAILURE;
-        }
-    }
-
-    // One pass. Rebuilding a failed relay is issue #2027's, and the agent is
-    // built so that adding it here costs nothing: the peer table lives out
-    // here, above `run`.
-    let stopped = agent.run(&relay).await;
-    let code = match relay.failure() {
-        Some(failure) => {
-            eprintln!("coilbox-relay-agent: allocation lost: {failure}");
-            if failure.is_credential_failure() {
-                ExitCode::from(EXIT_CREDENTIAL_REFUSED)
-            } else {
-                ExitCode::FAILURE
+            Err(failure) => {
+                eprintln!("coilbox-relay-agent: no relay: {failure}");
+                tokio::time::sleep(backoff).await;
+                backoff = (backoff * 2).min(LONGEST_BACKOFF);
+                continue;
+            }
+        };
+        match relay.public_addr() {
+            // The line the caller reads. With `--relay-bind` left at port 0
+            // this is the only way to learn where players should send, and a
+            // rebuilt relay says it again because the address will have moved.
+            Ok(addr) => println!("{addr}"),
+            Err(e) => {
+                eprintln!("coilbox-relay-agent: {e}");
+                return ExitCode::FAILURE;
             }
         }
-        None => {
-            match stopped {
+
+        let opened_at = Instant::now();
+        let stopped = agent.run(&relay).await;
+        match relay.failure() {
+            Some(failure) => {
+                eprintln!("coilbox-relay-agent: allocation lost: {failure}");
+                if failure.is_credential_failure() {
+                    relay.close().await;
+                    return ExitCode::from(EXIT_CREDENTIAL_REFUSED);
+                }
+            }
+            None => match stopped {
                 Ok(()) => eprintln!("coilbox-relay-agent: relay stopped"),
                 Err(e) => eprintln!("coilbox-relay-agent: relay stopped: {e}"),
-            }
-            ExitCode::FAILURE
+            },
         }
-    };
-    relay.close().await;
-    code
+        relay.close().await;
+        // A relay that stayed up longer than the agent would ever wait to
+        // rebuild one was working, so its failure starts the backoff over
+        // rather than inheriting the last one's. Without this, a relay that
+        // opens and dies straight away every time would be rebuilt twice a
+        // second for the rest of the game.
+        if opened_at.elapsed() > LONGEST_BACKOFF {
+            backoff = FIRST_BACKOFF;
+        }
+        // Keep going. The engine this is feeding is still running, so giving up
+        // here would strand it. Issue #2027 is what decides when to stop.
+        tokio::time::sleep(backoff).await;
+        backoff = (backoff * 2).min(LONGEST_BACKOFF);
+    }
 }
