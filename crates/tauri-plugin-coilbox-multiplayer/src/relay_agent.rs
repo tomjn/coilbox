@@ -174,8 +174,8 @@ impl RelayAgent {
         if let Some(parent) = run_file.parent() {
             std::fs::create_dir_all(parent).map_err(NotStarted::Failed)?;
         }
-        let log = std::fs::File::create(relay_sidecar::log_path(run_file))
-            .map_err(NotStarted::Failed)?;
+        let log =
+            std::fs::File::create(relay_sidecar::log_path(run_file)).map_err(NotStarted::Failed)?;
 
         let mut command = coilbox_proc::command_that_outlives_us(binary);
         command.args(relay_sidecar::build_args(battle, run_file));
@@ -363,7 +363,9 @@ fn read_events<R: Read>(from_agent: R, waiting: &Waiting, on_event: impl Fn(Even
 /// A piped stdio handle that was not there, which cannot happen after a spawn
 /// that asked for one and succeeded.
 fn no_pipe() -> NotStarted {
-    NotStarted::Failed(io::Error::other("the relay agent was spawned without pipes"))
+    NotStarted::Failed(io::Error::other(
+        "the relay agent was spawned without pipes",
+    ))
 }
 
 fn hand_over(waiting: &Waiting, id: RequestId, outcome: Result<(), NotAllowed>) {

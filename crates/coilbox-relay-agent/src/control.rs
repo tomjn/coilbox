@@ -194,6 +194,25 @@ impl Requests {
     }
 }
 
+/// Answer one request that was carried out, or not.
+pub async fn answer(
+    reporter: &Reporter,
+    id: coilbox_relay_protocol::RequestId,
+    done: io::Result<()>,
+) {
+    match done {
+        Ok(()) => reporter.say(Event::Done { id }).await,
+        Err(e) => {
+            reporter
+                .say(Event::Failed {
+                    id,
+                    reason: e.to_string(),
+                })
+                .await
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,24 +255,5 @@ mod tests {
             Some(Reason::NothingLeftToCarry),
             "coilbox going away is what starts the agent judging for itself"
         );
-    }
-}
-
-/// Answer one request that was carried out, or not.
-pub async fn answer(
-    reporter: &Reporter,
-    id: coilbox_relay_protocol::RequestId,
-    done: io::Result<()>,
-) {
-    match done {
-        Ok(()) => reporter.say(Event::Done { id }).await,
-        Err(e) => {
-            reporter
-                .say(Event::Failed {
-                    id,
-                    reason: e.to_string(),
-                })
-                .await
-        }
     }
 }

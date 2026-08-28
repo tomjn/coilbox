@@ -80,9 +80,7 @@ impl Claim {
         }
         match create_new(&path) {
             Ok(()) => return Ok(Claim { path }),
-            Err(e) if e.kind() != io::ErrorKind::AlreadyExists => {
-                return Err(Taken::Unwritable(e))
-            }
+            Err(e) if e.kind() != io::ErrorKind::AlreadyExists => return Err(Taken::Unwritable(e)),
             Err(_) => {}
         }
         if let Some(pid) = holder(&path) {

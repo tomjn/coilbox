@@ -37,7 +37,10 @@ fn agent_binary() -> PathBuf {
     if path.ends_with("deps") {
         path.pop();
     }
-    path.push(format!("coilbox-relay-agent{}", std::env::consts::EXE_SUFFIX));
+    path.push(format!(
+        "coilbox-relay-agent{}",
+        std::env::consts::EXE_SUFFIX
+    ));
     assert!(
         path.exists(),
         "no relay agent at {}. Build it first with `cargo build -p coilbox-relay-agent`",

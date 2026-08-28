@@ -380,7 +380,10 @@ mod tests {
         assert_eq!(stopping.reason(), None, "a datagram from a player counts");
 
         tokio::time::sleep(IDLE_TIMEOUT).await;
-        counted.send_to(b"reply", a_peer()).await.expect("a busy relay");
+        counted
+            .send_to(b"reply", a_peer())
+            .await
+            .expect("a busy relay");
         assert_eq!(
             stopping.reason(),
             None,
@@ -403,7 +406,10 @@ mod tests {
 
         tokio::time::sleep(IDLE_TIMEOUT).await;
         let mut buf = [0u8; 8];
-        counted.recv_from(&mut buf).await.expect_err("a broken relay");
+        counted
+            .recv_from(&mut buf)
+            .await
+            .expect_err("a broken relay");
         counted
             .send_to(b"reply", a_peer())
             .await
