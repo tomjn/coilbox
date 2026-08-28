@@ -369,12 +369,12 @@ impl TurnAllocation {
             vnet: None,
         })
         .await
-        .map_err(|e| AllocationFailure::Unreachable(e.to_string()))?;
+        .map_err(|e| unreachable_server(&credentials.server, &e))?;
 
         client
             .listen()
             .await
-            .map_err(|e| AllocationFailure::Unreachable(e.to_string()))?;
+            .map_err(|e| unreachable_server(&credentials.server, &e))?;
 
         let relayed = match client.allocate().await {
             Ok(relayed) => relayed,
@@ -385,7 +385,7 @@ impl TurnAllocation {
                 // worth deciding on.
                 return Err(health
                     .failure()
-                    .unwrap_or_else(|| AllocationFailure::Unreachable(e.to_string())));
+                    .unwrap_or_else(|| unreachable_server(&credentials.server, &e)));
             }
         };
         let relayed_addr = relayed.local_addr().map_err(|e| {
@@ -451,6 +451,15 @@ async fn wait_for_loss(lost: &mut watch::Receiver<Option<AllocationFailure>>) {
 
 fn as_io(e: webrtc_util::Error) -> io::Error {
     io::Error::other(e.to_string())
+}
+
+/// Name the server that did not work.
+///
+/// The `turn` crate reports a server that never answered by whatever it could
+/// not find in the answer, so on its own "attribute not found" is what somebody
+/// reads when they typed the address wrong.
+fn unreachable_server(server: &str, why: &turn::Error) -> AllocationFailure {
+    AllocationFailure::Unreachable(format!("{server} did not grant an allocation: {why}"))
 }
 
 #[cfg(test)]
