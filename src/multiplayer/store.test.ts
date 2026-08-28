@@ -104,6 +104,33 @@ describe("mirrorReducer join-failure handling", () => {
     expect(m.lastJoinError).toBe("Nope");
   });
 
+  it("puts a refused relay credential in front of whoever was hosting", () => {
+    const m = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: {
+        kind: "delta",
+        delta: {
+          kind: "turnCredentialsRefused",
+          reason: "you asked too often",
+        },
+      },
+    });
+    expect(m.lastJoinError).toBe(
+      "the lobby would not hand out a relay credential: you asked too often",
+    );
+  });
+
+  it("says nothing about a relay credential that was minted", () => {
+    const m = mirrorReducer(initialMirror, {
+      type: "event",
+      ev: {
+        kind: "delta",
+        delta: { kind: "turnCredentials", expiresAt: 1786086400000 },
+      },
+    });
+    expect(m.lastJoinError).toBeNull();
+  });
+
   it("ignores unrelated deltas", () => {
     const m = mirrorReducer(initialMirror, {
       type: "event",

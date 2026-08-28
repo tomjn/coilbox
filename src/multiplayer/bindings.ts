@@ -326,6 +326,14 @@ export type Delta =
   | { kind: "scriptTagsChanged" }
   | { kind: "playerWentIngame"; name: string }
   | { kind: "hostPort"; port: number }
+  /**
+   * The lobby minted a credential for its relay. `expiresAt` is unix millis and
+   * is the moment a relayed game would end, so it is the only part worth
+   * carrying: the credential itself stays in Rust, where the relay agent is
+   * started from.
+   */
+  | { kind: "turnCredentials"; expiresAt: number }
+  | { kind: "turnCredentialsRefused"; reason: string }
   | { kind: "loggedIn"; username: string }
   | { kind: "loginDenied"; reason: string }
   | { kind: "registrationDenied"; reason: string }
