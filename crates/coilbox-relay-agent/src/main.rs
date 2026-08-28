@@ -440,7 +440,6 @@ mod tests {
 
     use super::*;
     use allowlist::Allowlist;
-    use std::future::Future;
     use std::io;
     use std::net::{IpAddr, Ipv4Addr};
     use std::sync::Mutex;
@@ -457,21 +456,13 @@ mod tests {
     }
 
     impl RelayLink for Recorded {
-        fn recv_from(
-            &self,
-            _buf: &mut [u8],
-        ) -> impl Future<Output = io::Result<(usize, SocketAddr)>> + Send {
-            async { std::future::pending().await }
+        async fn recv_from(&self, _buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+            std::future::pending().await
         }
 
-        fn send_to(
-            &self,
-            buf: &[u8],
-            peer: SocketAddr,
-        ) -> impl Future<Output = io::Result<usize>> + Send {
+        async fn send_to(&self, buf: &[u8], peer: SocketAddr) -> io::Result<usize> {
             self.sent.lock().unwrap().push(peer.ip());
-            let wrote = buf.len();
-            async move { Ok(wrote) }
+            Ok(buf.len())
         }
     }
 

@@ -146,7 +146,6 @@ pub async fn let_everybody_through<R: RelayLink>(relay: &R, allowlist: &Allowlis
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::future::Future;
     use std::net::Ipv4Addr;
 
     /// A relay that writes down what it was asked to send.
@@ -186,28 +185,20 @@ mod tests {
     }
 
     impl RelayLink for Recorded {
-        fn recv_from(
-            &self,
-            _buf: &mut [u8],
-        ) -> impl Future<Output = io::Result<(usize, SocketAddr)>> + Send {
+        async fn recv_from(&self, _buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
             // Nothing in this module reads, and a relay with nothing to say
             // waiting forever is a truer double than one that invents traffic.
-            async { std::future::pending().await }
+            std::future::pending().await
         }
 
-        fn send_to(
-            &self,
-            buf: &[u8],
-            peer: SocketAddr,
-        ) -> impl Future<Output = io::Result<usize>> + Send {
-            let outcome = match &self.broken {
+        async fn send_to(&self, buf: &[u8], peer: SocketAddr) -> io::Result<usize> {
+            match &self.broken {
                 Some(why) => Err(io::Error::other(why.clone())),
                 None => {
                     self.sent.lock().unwrap().push((peer, buf.to_vec()));
                     Ok(buf.len())
                 }
-            };
-            async move { outcome }
+            }
         }
     }
 
