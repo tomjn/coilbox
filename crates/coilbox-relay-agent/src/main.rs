@@ -32,13 +32,21 @@
 //! a working transport for a relay that can already reach the host, and it is
 //! what the demux tests drive.
 //!
+//! ## How coilbox talks to it
+//!
+//! The engine port, the seat count and the TURN credentials are arguments,
+//! because they are settled before the process starts and never change.
+//! everything after that goes over the control channel: one JSON object per
+//! line, requests in on stdin and events out on stdout, defined in
+//! `coilbox_relay_protocol` and carried by [`control`]. stderr stays sentences
+//! for a human.
+//!
+//! Today that channel carries one request, "let this address through the
+//! relay", which is the thing a relayed battle cannot work without and the
+//! reason the channel exists (issue #2015). [`allowlist`] is what does it.
+//!
 //! ## What is not here yet
 //!
-//! - Permissions, so joiners the host has not written to first get through,
-//!   and the control channel coilbox tells the agent about them over (issue
-//!   #2015). For now the engine port, the seat count and the TURN credentials
-//!   are arguments, the relay address is printed on stdout each time one is
-//!   opened, and a lost allocation goes to stderr with an exit code to match.
 //! - Fetching the credentials from the lobby (issue #2016).
 //! - When the agent decides to stop (issue #2027). Until then it keeps
 //!   rebuilding the relay, because the engine it is feeding is still running.
@@ -55,14 +63,21 @@
 //! command line and a relay credential is worth stealing.
 
 mod allocation;
+mod allowlist;
+mod control;
 mod demux;
 mod relay;
 
+use std::convert::Infallible;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::process::ExitCode;
+use std::sync::Arc;
 use std::time::Duration;
 
 use allocation::{AllocationFailure, TurnAllocation, TurnCredentials};
+use allowlist::Allowlist;
+use coilbox_relay_protocol::{Event, Request};
+use control::{Reporter, Requests};
 use demux::Agent;
 use relay::RelayLink;
 use tokio::net::UdpSocket;
@@ -95,9 +110,11 @@ const PASSWORD_VAR: &str = "COILBOX_TURN_PASSWORD";
 /// Exit code for a credential the TURN server will not accept.
 ///
 /// Distinct from a plain failure because it is the one the caller must not
-/// answer by starting the agent again with the same credential. Until there is
-/// a control channel to say it properly (issue #2015), the exit code is how
-/// coilbox can tell.
+/// answer by starting the agent again with the same credential. The control
+/// channel says it properly now, as a [`Event::Stopping`] carrying the reason,
+/// and this stays alongside it for a caller that is watching the process rather
+/// than reading its stdout. Which of the two coilbox acts on is issue #2027's
+/// to settle, since that is the issue that owns when the agent stops at all.
 const EXIT_CREDENTIAL_REFUSED: u8 = 2;
 
 /// How long to wait before rebuilding a relay that failed, doubling each time
@@ -247,6 +264,46 @@ impl RelayLink for Transport {
     }
 }
 
+/// Carry out coilbox's requests against the relay that is open right now.
+///
+/// Never returns, which is what makes it safe to race against the forwarding
+/// loop: the relay failing is the only thing that ends a round of the outer
+/// loop, so a request is never half done because the control channel decided to
+/// stop.
+///
+/// The queue is where a request waits when there is no relay, since this is not
+/// running then. That is the right place for it to wait. Answering "no" while
+/// the agent is a second away from rebuilding a relay would tell coilbox the
+/// player cannot get in when they can, and answering "yes" would be a lie. The
+/// wait is bounded by the rebuild backoff, and the coilbox end has its own
+/// deadline so nothing waits on this forever.
+async fn serve(
+    relay: &Transport,
+    allowlist: &Allowlist,
+    requests: &mut Requests,
+    reporter: &Reporter,
+) -> Infallible {
+    loop {
+        let Some(request) = requests.next().await else {
+            // coilbox has closed. The engine has not, so this process carries
+            // on relaying for the players already in the game and simply stops
+            // being asked to do anything.
+            std::future::pending::<()>().await;
+            continue;
+        };
+        match request {
+            Request::AllowPeer { id, ip } => {
+                // Remembered before the send, and kept whether or not it works.
+                // coilbox has vouched for this address, and a probe that failed
+                // says something about the relay rather than about the player.
+                allowlist.remember(ip);
+                let done = allowlist::let_through(relay, ip).await;
+                control::answer(reporter, id, done).await;
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     let args = match parse_args() {
@@ -264,47 +321,91 @@ async fn main() -> ExitCode {
     // as a different player and will not have one mid-game.
     let mut agent = Agent::new(engine, args.max_peers);
 
+    // Outside the loop for the same reason as the peer table. A permission
+    // belongs to one allocation, so everybody coilbox has vouched for has to be
+    // let through again every time a relay is rebuilt, and this is the only
+    // record of who that is.
+    let allowlist = Allowlist::new();
+    let reporter = Arc::new(Reporter::new());
+    let mut requests = Requests::listen(Arc::clone(&reporter));
+
     let mut backoff = FIRST_BACKOFF;
     loop {
         let relay = match Transport::open(&args).await {
             Ok(relay) => relay,
             Err(failure) if failure.is_credential_failure() => {
                 eprintln!("coilbox-relay-agent: the TURN credential was refused: {failure}");
+                reporter
+                    .say(Event::Stopping {
+                        reason: format!("the TURN credential was refused: {failure}"),
+                    })
+                    .await;
                 return ExitCode::from(EXIT_CREDENTIAL_REFUSED);
             }
             Err(failure) => {
                 eprintln!("coilbox-relay-agent: no relay: {failure}");
+                reporter
+                    .say(Event::RelayDown {
+                        reason: failure.to_string(),
+                    })
+                    .await;
                 tokio::time::sleep(backoff).await;
                 backoff = (backoff * 2).min(LONGEST_BACKOFF);
                 continue;
             }
         };
         match relay.public_addr() {
-            // The line the caller reads. With `--relay-bind` left at port 0
-            // this is the only way to learn where players should send, and a
-            // rebuilt relay says it again because the address will have moved.
-            Ok(addr) => println!("{addr}"),
+            // Where players send. With `--relay-bind` left at port 0 this is
+            // the only way to learn it, and a rebuilt relay says it again
+            // because the address will have moved (issue #2031).
+            Ok(addr) => reporter.say(Event::RelayOpen { addr }).await,
             Err(e) => {
                 eprintln!("coilbox-relay-agent: {e}");
+                reporter.say(Event::Stopping { reason: e }).await;
                 return ExitCode::FAILURE;
             }
         }
+        // Before a single datagram is forwarded, because this is a brand new
+        // allocation with an empty permission table and the players it is for
+        // are already mid-game.
+        allowlist::let_everybody_through(&relay, &allowlist).await;
 
         let opened_at = Instant::now();
-        let stopped = agent.run(&relay).await;
-        match relay.failure() {
+        let stopped = tokio::select! {
+            stopped = agent.run(&relay) => stopped,
+            // Never finishes, so the relay is always what ends this. Serving
+            // requests here rather than in a task of its own is what lets a
+            // request act on the relay that is open right now, and what makes a
+            // request that arrives during a rebuild wait for the next one
+            // instead of being answered with a lie.
+            impossible = serve(&relay, &allowlist, &mut requests, &reporter) => match impossible {},
+        };
+        let down = match relay.failure() {
             Some(failure) => {
                 eprintln!("coilbox-relay-agent: allocation lost: {failure}");
                 if failure.is_credential_failure() {
+                    reporter
+                        .say(Event::Stopping {
+                            reason: format!("the TURN credential was refused: {failure}"),
+                        })
+                        .await;
                     relay.close().await;
                     return ExitCode::from(EXIT_CREDENTIAL_REFUSED);
                 }
+                failure.to_string()
             }
             None => match stopped {
-                Ok(()) => eprintln!("coilbox-relay-agent: relay stopped"),
-                Err(e) => eprintln!("coilbox-relay-agent: relay stopped: {e}"),
+                Ok(()) => {
+                    eprintln!("coilbox-relay-agent: relay stopped");
+                    "the relay stopped".to_string()
+                }
+                Err(e) => {
+                    eprintln!("coilbox-relay-agent: relay stopped: {e}");
+                    format!("the relay stopped: {e}")
+                }
             },
-        }
+        };
+        reporter.say(Event::RelayDown { reason: down }).await;
         relay.close().await;
         // A relay that stayed up longer than the agent would ever wait to
         // rebuild one was working, so its failure starts the backoff over

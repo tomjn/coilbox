@@ -10,6 +10,12 @@ name = "coilbox-relay-agent"
 path = "src/main.rs"
 
 [dependencies]
+# The control channel's message shapes, shared with the coilbox end so a change
+# to either breaks both builds rather than one of them at runtime. IO-free and
+# tokio-free on purpose, so the coilbox end can depend on it without inheriting
+# everything below.
+coilbox-relay-protocol = { path = "../coilbox-relay-protocol" }
+
 # What `turn` buys is the long-term credential dance nobody wants to write
 # twice: answer the server's 401 challenge, derive a key from the credential
 # and the challenge, sign every request after that with HMAC-SHA1, then keep
@@ -37,13 +43,16 @@ webrtc-util = { version = "0.17", default-features = false, features = ["conn"] 
 # nothing else. `net` for the sockets, `sync` for the one channel that carries
 # engine replies back up to the relay, `time` for the clock the allocation is
 # judged alive against, `rt-multi-thread` + `macros` for the runtime the binary
-# starts.
+# starts, and `io-std` + `io-util` for the stdin and stdout the control channel
+# runs over.
 tokio = { version = "1", features = [
     "net",
     "sync",
     "time",
     "rt-multi-thread",
     "macros",
+    "io-std",
+    "io-util",
 ] }
 
 [dev-dependencies]
