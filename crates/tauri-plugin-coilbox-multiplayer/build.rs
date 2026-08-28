@@ -73,6 +73,7 @@ const COMMANDS: &[&str] = &[
     "mp_build_battle_config",
     "mp_build_host_config",
     "mp_probe_host",
+    "mp_turn_credentials",
     "mp_chat_logs",
     "mp_chat_log_open",
     "mp_tachyon_sign_in",
