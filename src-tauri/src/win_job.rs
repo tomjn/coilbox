@@ -12,10 +12,22 @@
 //! Best-effort throughout: any failure leaves us running without the guard rather
 //! than refusing to start.
 //!
-//! The guard has to be lifted for one process: the update installer itself. The
-//! updater plugin starts it with `ShellExecuteW` and calls `std::process::exit(0)`
-//! on the next line, so the installer is one of our children and the kernel kills
-//! it the instant we go. See `stop_confining_new_children` below.
+//! The guard has to be lifted for two processes, in two different ways.
+//!
+//! The update installer is the first. The updater plugin starts it with
+//! `ShellExecuteW` and calls `std::process::exit(0)` on the next line, so the
+//! installer is one of our children and the kernel kills it the instant we go. See
+//! `stop_confining_new_children` below.
+//!
+//! The relay agent is the second, and it is the reason for
+//! `JOB_OBJECT_LIMIT_BREAKAWAY_OK`. A relayed battle is carried by that sidecar
+//! rather than by us, so killing it when coilbox closes drops every other player
+//! from a game the host carries on playing (issue #2033). That flag does not let
+//! anything out of the job on its own: it only means a child that asks with
+//! `CREATE_BREAKAWAY_FROM_JOB` is allowed to leave, and the relay agent is the
+//! only one that asks (`coilbox_proc::command_that_outlives_us`). Everything else
+//! we spawn stays in the job and still dies with us, which is the behaviour the
+//! installer depends on.
 
 /// The job we put ourselves in, as a raw handle value. Zero until
 /// `confine_children_to_job` succeeds. Stored raw because `HANDLE` is a pointer
@@ -29,7 +41,7 @@ pub fn confine_children_to_job() {
     use windows::Win32::System::JobObjects::{
         AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
         SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOB_OBJECT_LIMIT_BREAKAWAY_OK, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     };
     use windows::Win32::System::Threading::GetCurrentProcess;
 
@@ -40,8 +52,14 @@ pub fn confine_children_to_job() {
             _ => return,
         };
 
+        // BREAKAWAY_OK has to be here rather than added later, because
+        // CreateProcess reads it at the moment the child is created: a child
+        // passing CREATE_BREAKAWAY_FROM_JOB to a job without it is refused
+        // outright, so the relay agent would fail to spawn at all rather than
+        // quietly joining the job.
         let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        info.BasicLimitInformation.LimitFlags =
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
         if SetInformationJobObject(
             job,
             JobObjectExtendedLimitInformation,
@@ -84,8 +102,8 @@ pub fn stop_confining_new_children() -> Result<(), String> {
     use windows::Win32::Foundation::HANDLE;
     use windows::Win32::System::JobObjects::{
         JobObjectExtendedLimitInformation, SetInformationJobObject,
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-        JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_BREAKAWAY_OK,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK,
     };
 
     let handle = JOB.load(std::sync::atomic::Ordering::Relaxed);
@@ -94,9 +112,16 @@ pub fn stop_confining_new_children() -> Result<(), String> {
         return Ok(());
     }
 
+    // The flags replace the set, they do not add to it, so BREAKAWAY_OK is
+    // named again here. Dropping it would take away the one thing
+    // CreateProcess checks for a child asking with CREATE_BREAKAWAY_FROM_JOB,
+    // and the documentation for that flag names BREAKAWAY_OK specifically
+    // rather than either breakaway limit, so a relay agent started after an
+    // update had begun might be refused.
     let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-    info.BasicLimitInformation.LimitFlags =
-        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK;
+    info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        | JOB_OBJECT_LIMIT_BREAKAWAY_OK
+        | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK;
     unsafe {
         SetInformationJobObject(
             HANDLE(handle as *mut core::ffi::c_void),

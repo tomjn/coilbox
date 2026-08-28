@@ -684,7 +684,9 @@ dependencies = [
 name = "coilbox-proc"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "tempfile",
+ "windows 0.62.2",
 ]
 
 [[package]]
@@ -692,8 +694,10 @@ name = "coilbox-relay-agent"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "coilbox-proc",
  "coilbox-relay-protocol",
  "stun",
+ "tempfile",
  "tokio",
  "turn",
  "webrtc-util",
@@ -5518,6 +5522,7 @@ dependencies = [
  "coilbox-lobby-protocol",
  "coilbox-oauth",
  "coilbox-portable",
+ "coilbox-proc",
  "coilbox-relay-protocol",
  "coilbox-tachyon-protocol",
  "coilbox-zerok-protocol",
@@ -5532,6 +5537,7 @@ dependencies = [
  "tauri-plugin",
  "tauri-plugin-coilbox-direct",
  "tauri-plugin-opener",
+ "tempfile",
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite",

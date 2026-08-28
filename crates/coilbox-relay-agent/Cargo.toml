@@ -16,6 +16,12 @@ path = "src/main.rs"
 # everything below.
 coilbox-relay-protocol = { path = "../coilbox-relay-protocol" }
 
+# For `is_running`, which is how the agent watches the engine coilbox launched
+# once coilbox itself has closed and there is nobody left to tell it the game
+# is over (issue #2027). The engine is not this process's child, so there is no
+# `Child` to ask and it has to be the OS.
+coilbox-proc = { path = "../coilbox-proc" }
+
 # What `turn` buys is the long-term credential dance nobody wants to write
 # twice: answer the server's 401 challenge, derive a key from the credential
 # and the challenge, sign every request after that with HMAC-SHA1, then keep
@@ -56,7 +62,10 @@ tokio = { version = "1", features = [
 ] }
 
 [dev-dependencies]
-# `test-util` so the allocation tests can wind the clock past a lifetime
-# instead of waiting one out, and so the loopback tests fail loudly on a
-# timeout rather than hanging when a datagram never arrives.
+# `test-util` so the allocation and stopping tests can wind the clock past a
+# lifetime instead of waiting one out, and so the loopback tests fail loudly on
+# a timeout rather than hanging when a datagram never arrives.
 tokio = { version = "1", features = ["time", "test-util"] }
+
+# A directory to put a run file in that is not somebody's real one.
+tempfile = "3"

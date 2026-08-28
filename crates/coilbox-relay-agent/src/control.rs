@@ -14,11 +14,27 @@
 //! agent keeps relaying, because every player already in the game depends on
 //! it, and it stops taking requests, because there is nobody left to make them.
 //!
+//! It is however the moment the agent starts deciding for itself when to stop,
+//! so EOF is reported to [`crate::stopping`] rather than only logged. That
+//! module owns the decision and carries the reasoning.
+//!
 //! The cost is real and is worth saying out loud rather than leaving it to be
 //! discovered: a player who joins after coilbox has closed cannot be let
 //! through the relay, so they will not get in. Anybody already playing is
 //! unaffected. [`Requests::listen`] writes that to stderr at the moment it
 //! becomes true, so it lands in a log next to the join that failed.
+//!
+//! ## Two requests never reach the relay loop
+//!
+//! [`Request::Stop`] and [`Request::WatchEngine`] are answered here, in the
+//! reading task, because neither needs a relay to carry out. Everything else
+//! waits for one, and waiting is right for those: an `allowPeer` answered
+//! while there is no relay would be a lie either way round.
+//!
+//! Answering them here is what makes them prompt. A relay being rebuilt can
+//! take 32 seconds (`LONGEST_BACKOFF` in `main`), and a coilbox that has said
+//! "stop" should not spend that holding an allocation for a battle that is
+//! over.
 //!
 //! ## Every request gets exactly one answer
 //!
@@ -28,10 +44,13 @@
 //! is precisely the failure this issue exists to remove.
 
 use std::io;
+use std::sync::Arc;
 
 use coilbox_relay_protocol::{read_request, to_line, Event, Request, Unreadable};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::{mpsc, Mutex};
+
+use crate::stopping::Stopping;
 
 /// How many requests may be waiting for a relay to open before the agent stops
 /// taking them.
@@ -98,8 +117,8 @@ impl Requests {
     /// request that arrives while the relay is being rebuilt waits in the queue
     /// rather than being lost, and is answered once there is a relay to answer
     /// it with.
-    pub fn listen(reporter: std::sync::Arc<Reporter>) -> Requests {
-        Requests::reading(tokio::io::stdin(), reporter)
+    pub fn listen(reporter: std::sync::Arc<Reporter>, stopping: Arc<Stopping>) -> Requests {
+        Requests::reading(tokio::io::stdin(), reporter, stopping)
     }
 
     /// The same reader pointed somewhere other than stdin, which is how a test
@@ -107,6 +126,7 @@ impl Requests {
     pub fn reading(
         from: impl AsyncRead + Send + Unpin + 'static,
         reporter: std::sync::Arc<Reporter>,
+        stopping: Arc<Stopping>,
     ) -> Requests {
         let (heard, asked) = mpsc::channel(QUEUED_REQUESTS);
         tokio::spawn(async move {
@@ -124,6 +144,19 @@ impl Requests {
                     continue;
                 }
                 match read_request(&line) {
+                    // Answered here rather than forwarded, because neither
+                    // needs a relay and both are about the process itself.
+                    Ok(Request::WatchEngine { id, pid }) => {
+                        stopping.engine_is(pid);
+                        reporter.say(Event::Done { id }).await;
+                    }
+                    Ok(Request::Stop { id }) => {
+                        // Answered before the flag is set, so the answer is on
+                        // its way out before anything starts tearing down.
+                        reporter.say(Event::Done { id }).await;
+                        stopping.coilbox_asked();
+                        return;
+                    }
                     Ok(request) => {
                         if heard.send(request).await.is_err() {
                             return;
@@ -142,6 +175,9 @@ impl Requests {
                     }
                 }
             }
+            // Whatever the agent does from here it decides on its own, so this
+            // has to be said before anything else.
+            stopping.coilbox_has_gone();
             eprintln!(
                 "coilbox-relay-agent: coilbox has closed the control channel. \
                  The players already in this game are unaffected and it will carry on \
@@ -174,5 +210,50 @@ pub async fn answer(
                 })
                 .await
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stopping::{Reason, IDLE_TIMEOUT};
+
+    /// The handover, and the one piece of wiring nothing else can reach. The
+    /// agent's own tests prove what it decides once coilbox has gone, and the
+    /// integration tests prove what a running one does while coilbox is still
+    /// there. This is the line between them: EOF on stdin is what moves the
+    /// agent from one to the other, and an agent that never notices would sit
+    /// there holding an allocation forever.
+    ///
+    /// On a paused clock, because the backstop it hands over to is four
+    /// minutes out.
+    #[tokio::test(start_paused = true)]
+    async fn coilbox_closing_the_channel_hands_the_decision_to_the_agent() {
+        let (to_agent, agent_stdin) = tokio::io::duplex(64);
+        let reporter = Arc::new(Reporter::writing(tokio::io::sink()));
+        let stopping = Arc::new(Stopping::new());
+        let mut requests =
+            Requests::reading(agent_stdin, Arc::clone(&reporter), Arc::clone(&stopping));
+
+        tokio::time::sleep(IDLE_TIMEOUT).await;
+        assert_eq!(
+            stopping.reason(),
+            None,
+            "an agent with coilbox still on the other end never stops on a timer"
+        );
+
+        // coilbox closing, which is a window shutting rather than a battle
+        // ending.
+        drop(to_agent);
+        assert!(
+            requests.next().await.is_none(),
+            "the channel has to end when coilbox does"
+        );
+
+        assert_eq!(
+            stopping.reason(),
+            Some(Reason::NothingLeftToCarry),
+            "coilbox going away is what starts the agent judging for itself"
+        );
     }
 }

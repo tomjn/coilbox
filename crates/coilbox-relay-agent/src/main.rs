@@ -45,17 +45,28 @@
 //! relay", which is the thing a relayed battle cannot work without and the
 //! reason the channel exists (issue #2015). [`allowlist`] is what does it.
 //!
+//! ## When it stops
+//!
+//! [`stopping`] owns that, and carries the reasoning. The short version is
+//! that while coilbox is there coilbox decides, and once coilbox has gone the
+//! agent watches the engine and its own traffic and decides for itself.
+//!
+//! [`run_file`] is the other half of the same problem: an agent that is
+//! running has to be findable, or a coilbox that reopens mid-game starts a
+//! second one over the top of it.
+//!
 //! ## What is not here yet
 //!
 //! - Fetching the credentials from the lobby (issue #2016).
-//! - When the agent decides to stop (issue #2027). Until then it keeps
-//!   rebuilding the relay, because the engine it is feeding is still running.
+//! - Handing the allocation back on the way out (issue #2018). Today the
+//!   process simply exits and the server expires it.
 //!
 //! Usage:
 //!
 //! ```text
 //! coilbox-relay-agent --engine-port <port> --max-peers <n> [--relay-bind <addr>]
 //!                     [--turn-server <host:port> --turn-user <name>]
+//!                     [--run-file <path>]
 //! ```
 //!
 //! The TURN password is read from `COILBOX_TURN_PASSWORD` rather than taken as
@@ -67,9 +78,12 @@ mod allowlist;
 mod control;
 mod demux;
 mod relay;
+mod run_file;
+mod stopping;
 
 use std::convert::Infallible;
 use std::net::{Ipv4Addr, SocketAddr};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
@@ -80,6 +94,8 @@ use coilbox_relay_protocol::{Event, Request};
 use control::{Reporter, Requests};
 use demux::Agent;
 use relay::RelayLink;
+use run_file::Claim;
+use stopping::{Counted, Stopping};
 use tokio::net::UdpSocket;
 use tokio::time::Instant;
 
@@ -99,6 +115,12 @@ struct Args {
     relay_bind: SocketAddr,
     /// The TURN server to allocate on, if the battle is going through one.
     turn: Option<TurnCredentials>,
+    /// Where to record that this agent is running, so a coilbox that reopens
+    /// mid-game finds it instead of starting a second one. See [`run_file`].
+    ///
+    /// Optional because the agent is perfectly usable without it, which is how
+    /// the tests drive it. coilbox always passes one.
+    run_file: Option<PathBuf>,
 }
 
 /// The environment variable the TURN password arrives in.
@@ -113,9 +135,16 @@ const PASSWORD_VAR: &str = "COILBOX_TURN_PASSWORD";
 /// answer by starting the agent again with the same credential. The control
 /// channel says it properly now, as a [`Event::Stopping`] carrying the reason,
 /// and this stays alongside it for a caller that is watching the process rather
-/// than reading its stdout. Which of the two coilbox acts on is issue #2027's
-/// to settle, since that is the issue that owns when the agent stops at all.
+/// than reading its stdout.
 const EXIT_CREDENTIAL_REFUSED: u8 = 2;
+
+/// Exit code for an agent that found another one already relaying.
+///
+/// Its own code for the same reason as the one above: it is the one failure a
+/// caller must not answer by trying again, because trying again would be
+/// starting a second agent over a battle the first one is still carrying. See
+/// [`run_file`].
+const EXIT_ALREADY_RUNNING: u8 = 3;
 
 /// How long to wait before rebuilding a relay that failed, doubling each time
 /// up to [`LONGEST_BACKOFF`].
@@ -133,6 +162,7 @@ fn parse_args() -> Result<Args, String> {
     let mut relay_bind = SocketAddr::from(([0, 0, 0, 0], 0));
     let mut turn_server = None;
     let mut turn_user = None;
+    let mut run_file = None;
 
     let mut argv = std::env::args().skip(1);
     while let Some(flag) = argv.next() {
@@ -157,6 +187,7 @@ fn parse_args() -> Result<Args, String> {
             "--relay-bind" => {
                 relay_bind = value()?.parse().map_err(|e| format!("--relay-bind: {e}"))?
             }
+            "--run-file" => run_file = Some(PathBuf::from(value()?)),
             other => return Err(format!("unknown argument {other}")),
         }
     }
@@ -192,6 +223,7 @@ fn parse_args() -> Result<Args, String> {
         max_peers,
         relay_bind,
         turn,
+        run_file,
     })
 }
 
@@ -296,6 +328,12 @@ async fn serve<R: RelayLink>(
                 let done = allowlist::allow(relay, allowlist, ip).await;
                 control::answer(reporter, id, done).await;
             }
+            // Neither of these ever arrives here. `control` answers them in
+            // the reading task, because neither needs a relay and waiting for
+            // one would mean a battle that is over holding its allocation
+            // through a rebuild. Named rather than caught by a wildcard so
+            // that a new request has to be placed on purpose.
+            Request::WatchEngine { .. } | Request::Stop { .. } => {}
         }
     }
 }
@@ -327,16 +365,18 @@ async fn carry<R: RelayLink>(
     }
 }
 
-#[tokio::main]
-async fn main() -> ExitCode {
-    let args = match parse_args() {
-        Ok(args) => args,
-        Err(reason) => {
-            eprintln!("coilbox-relay-agent: {reason}");
-            return ExitCode::FAILURE;
-        }
-    };
-
+/// Open a relay, carry a game over it, rebuild it when it fails, forever.
+///
+/// Only ever ends by giving up, which is what the returned code says. The
+/// ordinary end of a battle is [`Stopping`] cancelling this from the outside,
+/// and cancelling it is safe: everything it holds is a socket or a table, and
+/// the process is on its way out.
+async fn relay_until_it_gives_up(
+    args: &Args,
+    stopping: &Stopping,
+    requests: &mut Requests,
+    reporter: &Reporter,
+) -> ExitCode {
     let engine = SocketAddr::from((Ipv4Addr::LOCALHOST, args.engine_port));
     // Outside the loop, and that is the whole point of it being here. Every
     // player keeps the loopback socket it was given across as many relays as
@@ -349,12 +389,10 @@ async fn main() -> ExitCode {
     // let through again every time a relay is rebuilt, and this is the only
     // record of who that is.
     let allowlist = Allowlist::new();
-    let reporter = Arc::new(Reporter::new());
-    let mut requests = Requests::listen(Arc::clone(&reporter));
 
     let mut backoff = FIRST_BACKOFF;
     loop {
-        let relay = match Transport::open(&args).await {
+        let relay = match Transport::open(args).await {
             Ok(relay) => relay,
             Err(failure) if failure.is_credential_failure() => {
                 eprintln!("coilbox-relay-agent: the TURN credential was refused: {failure}");
@@ -389,7 +427,13 @@ async fn main() -> ExitCode {
             }
         }
         let opened_at = Instant::now();
-        let stopped = carry(&relay, &mut agent, &allowlist, &mut requests, &reporter).await;
+        // Counted, so that carrying a datagram is what keeps this process
+        // alive once there is no coilbox left to say so.
+        let counted = Counted {
+            relay: &relay,
+            stopping,
+        };
+        let stopped = carry(&counted, &mut agent, &allowlist, requests, reporter).await;
         let down = match relay.failure() {
             Some(failure) => {
                 eprintln!("coilbox-relay-agent: allocation lost: {failure}");
@@ -425,10 +469,62 @@ async fn main() -> ExitCode {
         if opened_at.elapsed() > LONGEST_BACKOFF {
             backoff = FIRST_BACKOFF;
         }
-        // Keep going. The engine this is feeding is still running, so giving up
-        // here would strand it. Issue #2027 is what decides when to stop.
+        // Keep going. Giving up here would strand a game that is still being
+        // played, and this loop is not the thing that knows whether one is.
+        // `stopping` is, and it cancels this from the outside.
         tokio::time::sleep(backoff).await;
         backoff = (backoff * 2).min(LONGEST_BACKOFF);
+    }
+}
+
+#[tokio::main]
+async fn main() -> ExitCode {
+    let args = match parse_args() {
+        Ok(args) => args,
+        Err(reason) => {
+            eprintln!("coilbox-relay-agent: {reason}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let reporter = Arc::new(Reporter::new());
+    let stopping = Arc::new(Stopping::new());
+
+    // Before anything is opened, because the whole point of the claim is that
+    // a second agent does not get as far as allocating a relay for a battle
+    // the first one is already carrying.
+    let _claim = match &args.run_file {
+        None => None,
+        Some(path) => match Claim::take(path.clone()) {
+            Ok(claim) => Some(claim),
+            Err(taken) => {
+                eprintln!("coilbox-relay-agent: {taken}");
+                reporter
+                    .say(Event::Stopping {
+                        reason: taken.to_string(),
+                    })
+                    .await;
+                return ExitCode::from(EXIT_ALREADY_RUNNING);
+            }
+        },
+    };
+
+    let mut requests = Requests::listen(Arc::clone(&reporter), Arc::clone(&stopping));
+
+    // The relay loop only ever ends by giving up. Everything else that ends
+    // this process is a judgement about whether anybody still needs it, and
+    // that is `stopping`'s.
+    tokio::select! {
+        gave_up = relay_until_it_gives_up(&args, &stopping, &mut requests, &reporter) => gave_up,
+        reason = stopping.wait() => {
+            eprintln!("coilbox-relay-agent: stopping, because {reason}");
+            // Said before the process goes, so a coilbox that is still there
+            // learns the battle has lost its relay from the agent rather than
+            // from a pipe that went quiet. Handing the allocation back is
+            // issue #2018 and belongs here when it lands.
+            reporter.say(Event::Stopping { reason: reason.to_string() }).await;
+            ExitCode::SUCCESS
+        }
     }
 }
 
@@ -492,7 +588,11 @@ mod tests {
                 // traffic, so the forwarding half has nothing to do.
                 agent: Agent::new(SocketAddr::from((Ipv4Addr::LOCALHOST, 1)), 4),
                 allowlist: Allowlist::new(),
-                requests: Requests::reading(agent_stdin, Arc::clone(&reporter)),
+                requests: Requests::reading(
+                    agent_stdin,
+                    Arc::clone(&reporter),
+                    Arc::new(Stopping::new()),
+                ),
                 reporter,
                 to_agent,
                 from_agent: BufReader::new(from_agent).lines(),
