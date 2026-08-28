@@ -17,6 +17,10 @@ mod conn;
 mod direct_loopback;
 mod dmlog;
 mod probe;
+/// Telling the relay agent sidecar which addresses may reach a relayed battle.
+/// Public because the seam it exposes is the one thing relay hosting cannot
+/// work without, and it is waiting on a lobby that can name a joiner's address.
+pub mod relay_agent;
 /// The OAuth browser sign-in that produces a Tachyon bearer token.
 pub mod tachyon_auth;
 mod tachyon_conn;
