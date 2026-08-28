@@ -29,12 +29,21 @@
 //!
 //! ## The credential is the part that cannot be recovered from
 //!
-//! coturn checks the credential's expiry on every request, Refresh included.
 //! Once coilbox has closed, this process has no way to ask the lobby for
-//! another one (that is issue #2016, and it needs the app running). A refusal
-//! aimed at the credential is therefore final, which is why
+//! another credential (that is issue #2016, and it needs the app running). A
+//! refusal aimed at the credential is therefore final, which is why
 //! [`AllocationFailure::is_credential_failure`] exists: everything else is
 //! worth retrying and that one is not.
+//!
+//! A credential expiring does not on its own cost anybody a battle, which is
+//! not what this module was written believing. coturn works the credential out
+//! once, when the session is created, and every request after that is checked
+//! against the key it kept, so an allocation goes on being refreshed long after
+//! the credential that opened it stopped being good. What the expiry costs is
+//! the next allocation: the moment a relay has to be rebuilt, the credential is
+//! judged again and refused, and there is nowhere to get a better one. Both
+//! halves are measured against a real coturn in
+//! `tauri-plugin-coilbox-multiplayer/tests/relayed_battle.rs`.
 
 use std::io;
 use std::net::SocketAddr;
@@ -88,12 +97,41 @@ pub enum AllocationFailure {
 impl AllocationFailure {
     /// Whether the credential itself is what the server objected to.
     ///
-    /// This is the one failure there is no point retrying. 401 and 441 are the
-    /// server saying the credential does not check out, and 403 is it saying
-    /// the credential is real but not allowed to do this. None of those change
-    /// on their own, and the sidecar cannot go and get a better credential.
+    /// This is the one failure there is no point retrying, and the cost of
+    /// getting it wrong is one-sided: a code wrongly called final ends a game a
+    /// rebuild would have saved, where a code wrongly called retryable costs one
+    /// Allocate. So the list is only what a real server has been seen to send
+    /// when it means the credential.
+    ///
+    /// 401 is that, and only that. coturn sends it when the key it derived from
+    /// the credential does not match the signature, or when the credential
+    /// names a time that has passed, both from `check_stun_auth` in
+    /// `src/server/ns_turn_server.c`. It is unsigned, because at that point
+    /// coturn has no key to sign with. It has been watched arriving on a
+    /// Refresh mid-game as well as on an Allocate, in
+    /// `tauri-plugin-coilbox-multiplayer/tests/relayed_battle.rs`.
+    ///
+    /// 403 and 441 were on this list from RFC 5766 and neither belonged.
+    ///
+    /// The only 403 coturn sends on a message this module reads is for a server
+    /// in drain mode, on its way down for maintenance, and it carries
+    /// MESSAGE-INTEGRITY because the credential passed. Treating it as final
+    /// ended the battle and told the host their credential was refused, which
+    /// was a lie about a credential the server had just accepted. Its other
+    /// 403s are for peer addresses and TCP relays, on CreatePermission,
+    /// ChannelBind, Send and Connect, which `interesting_type` never decodes.
+    ///
+    /// 441 means the request carried a different credential from the one the
+    /// allocation was made with, which coilbox never does, so it has not been
+    /// observed and there is nothing here that could produce it. If it ever
+    /// arrives, opening a fresh allocation with whatever credential this
+    /// process is holding is the answer to it, not giving up.
+    ///
+    /// Nothing is lost by leaving those two out. A dead credential is caught on
+    /// the Allocate that opens the next relay, which is where a server judges
+    /// one, and answers 401.
     pub fn is_credential_failure(&self) -> bool {
-        matches!(self, AllocationFailure::Refused { code, .. } if matches!(code, 401 | 403 | 441))
+        matches!(self, AllocationFailure::Refused { code: 401, .. })
     }
 }
 
@@ -940,6 +978,55 @@ mod tests {
         assert!(!AllocationFailure::Refused {
             code: 437,
             reason: "Allocation Mismatch".to_string(),
+        }
+        .is_credential_failure());
+    }
+
+    /// The refusal an expired credential gets, which is the one this whole
+    /// distinction is for.
+    ///
+    /// Off the wire in `relayed_battle.rs`: coturn 4.17.2 answers a signed
+    /// Refresh carrying a credential whose time has passed with a four byte
+    /// ERROR-CODE, `00 00 04 01`, and nothing after it.
+    #[test]
+    fn a_credential_the_server_will_not_take_is_not_worth_asking_again_with() {
+        assert!(AllocationFailure::Refused {
+            code: 401,
+            reason: "Unauthorized".to_string(),
+        }
+        .is_credential_failure());
+    }
+
+    /// A server draining for maintenance, which is the only 403 coturn sends on
+    /// anything this module reads.
+    ///
+    /// It was on the credential list and it is not a credential problem: coturn
+    /// signs the 403, which it only does once the credential has checked out.
+    /// Ending the battle over it took a game away from a host whose relay
+    /// operator was doing nothing worse than a restart, and told them their
+    /// credential had been refused.
+    #[test]
+    fn a_server_going_down_for_maintenance_is_not_a_refused_credential() {
+        assert!(!AllocationFailure::Refused {
+            code: 403,
+            reason: "Forbidden".to_string(),
+        }
+        .is_credential_failure());
+    }
+
+    /// 441 is a request carrying a different credential from the one the
+    /// allocation was made with, so the allocation is what is stale, not the
+    /// credential, and a fresh one is the answer rather than the end of the
+    /// battle.
+    ///
+    /// Nothing here can produce it. The agent holds one credential for its
+    /// whole life, and coturn only sends 441 when the username, the server name
+    /// or the origin changed mid-session.
+    #[test]
+    fn an_allocation_that_belongs_to_another_credential_is_worth_opening_again() {
+        assert!(!AllocationFailure::Refused {
+            code: 441,
+            reason: "Wrong Credentials".to_string(),
         }
         .is_credential_failure());
     }
