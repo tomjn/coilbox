@@ -79,11 +79,16 @@ jobs:
       # the committed prebuilts, gitignored). Clippy only needs the path to exist.
       - name: Placeholder pr-downloader resource dir
         run: mkdir -p src-tauri/prdownloader
-      # tauri-build also verifies the externalBin sidecars exist. The unitsync
-      # worker is our own crate (gitignored build artifact), so build it for the
-      # runner's triple before clippy compiles the app crate.
+      # tauri-build also verifies the externalBin sidecars exist, and it fails
+      # the build script with "resource path ... doesn't exist" when one is
+      # missing for the host triple. uberstress and pr-downloader are committed
+      # prebuilts, so they are already here. The unitsync worker and the relay
+      # agent are our own crates (gitignored build artifacts) and have to be
+      # built for the runner's triple before clippy compiles the app crate.
       - name: Build unitsync worker sidecar
         run: bash scripts/build-unitsync-worker.sh
+      - name: Build relay agent sidecar
+        run: bash scripts/build-relay-agent.sh
       - name: Rustfmt
         run: cargo fmt --all --check
       - name: Clippy

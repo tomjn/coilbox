@@ -123,6 +123,12 @@ jobs:
         shell: bash
         run: bash scripts/build-unitsync-worker.sh
 
+      # The relay agent is our own crate too, and pure Rust with tokio as its
+      # only dependency, so there is nothing platform-specific to arrange.
+      - name: Build relay agent sidecar
+        shell: bash
+        run: bash scripts/build-relay-agent.sh
+
       # Assemble the pr-downloader resource folder for this runner's platform:
       # the committed prebuilt binary beside its Windows DLLs. Bundled as a
       # resource folder (not externalBin) so the DLLs ship in the same directory.
