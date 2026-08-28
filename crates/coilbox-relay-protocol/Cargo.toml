@@ -1,0 +1,14 @@
+[package]
+name = "coilbox-relay-protocol"
+version = "0.0.0"
+description = "The control channel between coilbox and the relay agent sidecar: one JSON object per line, requests down, events up. IO-free, so both halves derive the same wire shape from the same declarations and a change to either breaks both builds at once."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# The whole crate is two enums and their framing, so serde is the only thing it
+# needs. Deliberately no tokio: how the lines are carried is the caller's
+# business, and keeping it out means the coilbox side can depend on this without
+# dragging in the sidecar's TURN stack.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
