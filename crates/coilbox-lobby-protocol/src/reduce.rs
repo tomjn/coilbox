@@ -1523,7 +1523,10 @@ mod tests {
     fn a_refusal_reaches_the_host_in_words() {
         let mut s = LobbyState::new();
         assert_eq!(
-            reduce(&mut s, parse_line("TURNCREDENTIALSFAILED you asked too often")),
+            reduce(
+                &mut s,
+                parse_line("TURNCREDENTIALSFAILED you asked too often")
+            ),
             vec![Delta::TurnCredentialsRefused {
                 reason: "you asked too often".into()
             }]
