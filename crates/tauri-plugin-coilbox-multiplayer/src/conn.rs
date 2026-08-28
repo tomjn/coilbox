@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use coilbox_lobby_protocol::{
-    command, parse_line, record_outgoing_private, reduce_at, ChatKind, Delta, LobbyState,
-    LoginConfig, LoginMachine, LoginPhase, ServerMessage,
+    command, parse_line, record_outgoing_private, redact_line, reduce_at, ChatKind, Delta,
+    LobbyState, LoginConfig, LoginMachine, LoginPhase, ServerMessage,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
@@ -176,6 +176,22 @@ pub type StartedBattle = Arc<Mutex<Option<serde_json::Value>>>;
 /// Send one event to the current frontend channel, ignoring a detached/dead one.
 pub(crate) fn emit(sink: &EventSink, ev: LobbyEvent) {
     let _ = lock_or_recover(sink).send(ev);
+}
+
+/// Put one wire line in the frontend's protocol console.
+///
+/// The only way a TASServer line is allowed to reach the frontend, because it is
+/// the only place [`redact_line`] is applied to one. The console is what people
+/// copy into a bug report, so a relay credential shown here is a relay
+/// credential pasted into a public issue (issue #2019).
+fn console(sink: &EventSink, direction: &str, line: &str) {
+    emit(
+        sink,
+        LobbyEvent::Console {
+            direction: direction.to_string(),
+            line: redact_line(line).into_owned(),
+        },
+    );
 }
 
 /// The protocol a live connection speaks.
@@ -363,10 +379,7 @@ async fn run_loop(
         tokio::select! {
             item = framed.next() => match item {
                 Some(Ok(line)) => {
-                    emit(&sink, LobbyEvent::Console {
-                        direction: "in".into(),
-                        line: line.clone(),
-                    });
+                    console(&sink, "in", &line);
                     let msg = parse_line(&line);
 
                     let before = login.phase();
@@ -562,13 +575,7 @@ async fn run_loop(
         }
 
         for line in outbound {
-            emit(
-                &sink,
-                LobbyEvent::Console {
-                    direction: "out".into(),
-                    line: line.clone(),
-                },
-            );
+            console(&sink, "out", &line);
             // A write failure means the socket is gone; report it and stop.
             if let Err(e) = framed.send(line).await {
                 break 'conn Some(e.to_string());

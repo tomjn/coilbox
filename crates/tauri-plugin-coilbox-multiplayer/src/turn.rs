@@ -545,6 +545,16 @@ mod tests {
 
     /// Connect and log in the way `mp_connect` does, and hand back the key.
     async fn logged_in(registry: &Registry, addr: std::net::SocketAddr) -> String {
+        logged_in_watching(registry, addr, Channel::new(|_| Ok(()))).await
+    }
+
+    /// The same, with the frontend's end of the event channel handed in, for a
+    /// test that cares what the frontend was told.
+    async fn logged_in_watching(
+        registry: &Registry,
+        addr: std::net::SocketAddr,
+        events: Channel<crate::conn::LobbyEvent>,
+    ) -> String {
         use coilbox_lobby_protocol::{password_hash, LoginConfig, LoginMode};
 
         let stream = tokio::net::TcpStream::connect(addr)
@@ -566,7 +576,7 @@ mod tests {
                 use_stls: false,
                 mode: LoginMode::Login,
             },
-            Channel::new(|_| Ok(())),
+            events,
             crate::dmlog::DmLog::new(&logs, &key),
             crate::dmlog::DmLog::new(&logs, &key),
         );
@@ -593,6 +603,67 @@ mod tests {
         assert_eq!(turn.server, "relay.example.org:3478");
         assert_eq!(turn.user, "1786086400:alice");
         assert_eq!(turn.password, "bWFj=");
+    }
+
+    /// Issue #2019. The credential must not reach the frontend, because the
+    /// protocol console is what somebody copies into a bug report when their
+    /// battle will not open, and anybody holding the copy holds the lobby's
+    /// bandwidth until the credential runs out.
+    ///
+    /// Driven over a real socket through the real connection task, and asserted
+    /// against every event the frontend was sent rather than against the console
+    /// alone. So a second code path that put the raw line somewhere else on the
+    /// event stream fails here too, which is the point: the assertion is "the
+    /// frontend was never told the secret", not "the redactor was called".
+    #[tokio::test]
+    async fn a_credential_off_the_wire_never_reaches_the_frontend() {
+        // Distinct from anything else in the session, so a hit is this
+        // credential and not the login name echoed back by `ACCEPTED`.
+        let username = "1786086400:z9wq4k";
+        let password = "hVsLm3xQ7f=";
+
+        let addr = lobby_answering(Some(format!(
+            "TURNCREDENTIALS turn:relay.example.org:3478 {username} {password} 86400"
+        )))
+        .await;
+
+        // Every event the frontend would have seen, as the JSON it would have
+        // seen it as, so the assertion covers every field of every event kind
+        // and not only the ones this test knows the shape of.
+        let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+        let recorder = seen.clone();
+        let events = Channel::new(move |body| {
+            let json = match body {
+                tauri::ipc::InvokeResponseBody::Json(s) => s,
+                tauri::ipc::InvokeResponseBody::Raw(b) => String::from_utf8_lossy(&b).into_owned(),
+            };
+            lock_or_recover(&recorder).push(json);
+            Ok(())
+        });
+
+        let registry = Registry::default();
+        let key = logged_in_watching(&registry, addr, events).await;
+        let turn = credentials(&registry, &key, NOW, PATIENCE)
+            .await
+            .expect("the lobby minted one");
+
+        // The credential did arrive, so the absence below is redaction rather
+        // than a line that never got read.
+        assert_eq!(turn.user, username);
+        assert_eq!(turn.password, password);
+
+        let sent = lock_or_recover(&seen).join("\n");
+        assert!(
+            !sent.contains(username) && !sent.contains(password),
+            "the frontend was told the credential:\n{sent}"
+        );
+        // And the line is still there, with the half of it worth showing.
+        assert!(
+            sent.contains(
+                "TURNCREDENTIALS turn:relay.example.org:3478 <redacted> <redacted> 86400"
+            ),
+            "the console should still show the relay and the lifetime:\n{sent}"
+        );
     }
 
     /// The same path, refused. The lobby's words have to survive the socket, the
