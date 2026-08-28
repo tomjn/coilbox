@@ -2579,8 +2579,9 @@ fn mp_build_battle_config(registry: State<'_, Registry>, server_key: String) -> 
 /// is started from Rust, so nothing above this needs to see it. What starts a
 /// relayed battle calls [`turn::credentials`] directly (issue #2017).
 ///
-/// No server implements this yet, so today it answers with the sentence
-/// [`turn::NoCredential::Silent`] carries.
+/// A server that has not said it has a relay is not asked at all, so today it
+/// answers with the sentence [`turn::NoCredential::NoRelay`] carries, without a
+/// line going out.
 #[tauri::command]
 async fn mp_turn_credentials(
     registry: State<'_, Registry>,
