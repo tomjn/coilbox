@@ -67,6 +67,27 @@
 //! `AutohostMode::Planetwars` is the exception that proves it. That is a battle
 //! mode a room can be in, which the battle list shows like any other, and
 //! showing it is not taking part.
+//!
+//! **Zero-K's own content distribution.** The engine mirror at
+//! `zero-k.info/engine`, the `ContentService.svc` endpoint and the `Resources`
+//! image host are infrastructure the Zero-K project runs for its own client, not
+//! shared Spring ecosystem services of the kind coilbox already uses. Coilbox
+//! fetches Zero-K content through rapid from `repos.springrts.com` like anything
+//! else, and a battle naming something rapid does not carry stays unjoinable.
+//! See coilbox issues #1976, #1977 and #1980.
+//!
+//! # Which server this is for
+//!
+//! The official one, `zero-k.info`, speaking the protocol these types are
+//! generated from.
+//!
+//! `FIGHTORDER/ZkInfraNeo` is a separate from-scratch rewrite of the Zero-K
+//! backend. Its own planning document says it is "not obligated to preserve
+//! legacy protocols, schemas, class designs, routes, or bugs" and that backward
+//! compatibility is opt-in, so it is not a server these types describe and
+//! coilbox does not target it. If it ever becomes the server Zero-K's players
+//! are on, that is a decision to take then, against whatever protocol it has
+//! settled on by that point.
 
 /// The wire line, which is a command name, a space and a JSON object.
 pub mod line;
