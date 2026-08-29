@@ -180,7 +180,15 @@ export function BattleRoomHeader({
                   variant="outline"
                   className="h-6 shrink-0 text-muted-foreground"
                 >
-                  <button type="button" className="cursor-help">
+                  {/* The word alone is meaningless read out of the bar it
+                      sits in, so the label says what it is a word about. It
+                      still contains the visible word, so somebody speaking to
+                      the screen asks for the thing they can see. */}
+                  <button
+                    type="button"
+                    className="cursor-help"
+                    aria-label={`How this battle is connected: ${routeLabel.word}`}
+                  >
                     {routeLabel.word}
                   </button>
                 </Badge>
