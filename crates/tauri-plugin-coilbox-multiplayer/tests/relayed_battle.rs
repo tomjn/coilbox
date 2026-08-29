@@ -288,6 +288,56 @@ fn a_relayed_battle_carries_every_player_to_the_engine_and_back() {
     );
 }
 
+/// The meter behind the host's in-game pill (issue #2024), against a real
+/// allocation and all the way to the call the pill reads.
+///
+/// The unit tests either side of the channel prove the halves: the agent counts
+/// what goes through [`Counted`](coilbox-relay-agent's `stopping`) and reports
+/// a rate, and coilbox files what it is told. Neither can prove the number on
+/// screen came from datagrams that really crossed a TURN server, which is the
+/// only claim the pill makes.
+///
+/// Kept playing in a loop rather than sent once, because a report covers the
+/// second it just finished and there is no way to know from here where in that
+/// second the first datagram landed. A game that is being played is what the
+/// pill is showing anyway.
+#[test]
+#[ignore = "needs coturn installed and a few seconds: see this file's comment for the command"]
+fn a_relayed_game_says_how_much_it_is_carrying() {
+    let coturn = Coturn::start();
+    let engine = FakeEngine::start();
+    let sidecar = Sidecar::start(&coturn, engine.addr);
+
+    let relayed = sidecar.relay_open();
+    sidecar
+        .agent
+        .allow_joiner(IpAddr::V4(Ipv4Addr::LOCALHOST), PATIENCE)
+        .expect("the agent let the joiner through the allocation");
+    let player = FakePlayer::dialling(relayed);
+    player.round_trip(b"the game has started");
+
+    let deadline = std::time::Instant::now() + PATIENCE;
+    loop {
+        player.round_trip(b"the game is being played");
+        match sidecar.agent.carrying() {
+            Some(carrying) if carrying > 0 => {
+                println!("the relay reported carrying {carrying} bytes a second");
+                return;
+            }
+            // A relay that is up and has been quiet for the interval, or one
+            // that has not reported yet. Both are ordinary a moment after the
+            // allocation opens, and neither is the answer this is waiting for.
+            Some(_) | None => {}
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "players were relayed to the engine and back and the host would have been shown a \
+             relay carrying nothing, which is what a stalled game looks like"
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
 /// A TURN server that goes away and stays away. Nothing answers the refreshes,
 /// the lifetime coturn granted runs out, and the agent has to say so.
 ///

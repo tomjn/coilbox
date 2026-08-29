@@ -130,12 +130,45 @@ impl Running {
         self.stdin.flush().expect("the agent is still reading");
     }
 
-    fn hears(&self) -> String {
+    /// The next line the agent writes, whatever it is.
+    fn next_line(&self) -> String {
         match self.said.recv_timeout(PATIENCE) {
             Ok(line) => line,
             Err(RecvTimeoutError::Timeout) => panic!("the agent said nothing at all"),
             Err(RecvTimeoutError::Disconnected) => panic!("the agent's stdout closed"),
         }
+    }
+
+    /// The next line that is about the battle, stepping over the meter.
+    ///
+    /// The agent says how much it is carrying every second whether anybody
+    /// asked or not (issue #2024), so "the next line" and "the answer to what I
+    /// asked" stopped being the same thing. Every real reader already steps
+    /// over what it did not ask for, which is what `read_events` in
+    /// `tauri-plugin-coilbox-multiplayer` does, and a test that did not would
+    /// pass or fail on how long the run took.
+    fn hears(&self) -> String {
+        loop {
+            let line = self.next_line();
+            if !line.contains("\"type\":\"traffic\"") {
+                return line;
+            }
+        }
+    }
+
+    /// Wait for the agent to report a rate, and hand back the number in it.
+    fn hears_traffic(&self) -> u64 {
+        let deadline = Instant::now() + PATIENCE;
+        while Instant::now() < deadline {
+            let line = self.next_line();
+            if let Some(rest) = line.strip_prefix("{\"type\":\"traffic\",\"bytesPerSecond\":") {
+                return rest
+                    .trim_end_matches('}')
+                    .parse()
+                    .unwrap_or_else(|_| panic!("a number in the agent's meter, got: {line}"));
+            }
+        }
+        panic!("the agent never said how much it was carrying");
     }
 
     /// Wait for the process to actually end, which is the assertion a pipe
@@ -260,6 +293,47 @@ fn a_battle_that_ends_while_a_player_is_relaying_leaves_the_agent_alone() {
             "the agent stopped while a game was still being relayed through it"
         );
         std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+/// The meter the host's in-game pill reads (issue #2024), over the real pipe.
+///
+/// Two halves, and the pill needs both. A relay carrying nothing has to say so
+/// rather than falling silent, because silence is what a sidecar that has died
+/// looks like. And a relay that really is carrying something has to say a
+/// number bigger than zero, or the pill would report every game as stalled.
+///
+/// The datagram is resent each time round rather than sent once, because a
+/// report covers the second it just finished and the first one can close before
+/// the send lands. Resending means the test measures the meter rather than the
+/// timing of one datagram.
+#[test]
+fn the_agent_says_how_much_it_is_carrying() {
+    let agent = Running::start();
+    let relay = agent.relay_addr();
+
+    assert_eq!(
+        agent.hears_traffic(),
+        0,
+        "a relay nobody is playing through has to report nothing rather than say nothing"
+    );
+
+    let player = UdpSocket::bind("127.0.0.1:0").expect("a free loopback port");
+    let deadline = Instant::now() + PATIENCE;
+    loop {
+        player
+            .send_to(b"a datagram from a player", relay)
+            .expect("the relay is bound");
+        agent.engine_hears();
+        let carrying = agent.hears_traffic();
+        if carrying > 0 {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the agent carried datagrams the engine received and reported carrying nothing, so \
+             the pill would show every relayed game as stalled"
+        );
     }
 }
 

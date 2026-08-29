@@ -37,8 +37,8 @@
 //! rather than misreading the message as something else. Three issues are
 //! already queued to add variants, and the shape here is chosen for them:
 //!
-//! - Traffic figures for the in-game badge (issue #2024) are a new [`Event`],
-//!   pushed rather than polled.
+//! - Traffic figures for the in-game badge are [`Event::Traffic`], pushed
+//!   rather than polled (issue #2024).
 //! - "This new address is the player who was at that old one" (issue #2029) is
 //!   a new [`Request`], answered by the same [`Event::Done`] and
 //!   [`Event::Failed`] pair as any other.
@@ -50,8 +50,24 @@
 //! variant, which is what lets a new request type reuse them.
 
 use std::net::{IpAddr, SocketAddr};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+
+/// How often the agent says how much it is carrying.
+///
+/// Here rather than in the agent because both ends need it. The agent sleeps
+/// it, and coilbox multiplies it to decide when a figure it is holding has gone
+/// stale, so a number that lived on one side would be a number the other side
+/// guessed at.
+///
+/// A second because that is the rate a person reads a moving number at, and
+/// because the reader is a pill on screen while a game is running. Faster would
+/// be a number nobody can follow, redrawn more often, on a machine that is busy
+/// running the game. Slower and a relay that stopped carrying anything would sit
+/// there looking healthy for longer than it takes somebody to notice their game
+/// has stopped.
+pub const TRAFFIC_EVERY: Duration = Duration::from_secs(1);
 
 /// A caller's own number for one request, echoed back in the answer.
 ///
@@ -149,6 +165,27 @@ pub enum Event {
     /// about to try again or about to stop, and says which.
     #[serde(rename_all = "camelCase")]
     RelayDown { reason: String },
+    /// How much the relay carried in the last [`TRAFFIC_EVERY`], both
+    /// directions together, so a host can tell a game that is working from one
+    /// that has stopped (issue #2024).
+    ///
+    /// Sent every interval whether or not anything moved, and the zero is the
+    /// half that matters. A relay that has quietly stopped carrying a game says
+    /// nothing at all, so an agent that only spoke up when it had a number to
+    /// report would look identical to one that had died, and the reader would
+    /// be left showing the last figure it heard forever.
+    ///
+    /// A rate rather than a running total because the question is whether the
+    /// game is working now. A total answers "has this relay ever done anything",
+    /// which the host already knows, and it would make the reader do the
+    /// subtraction and hold the previous figure to do it with.
+    ///
+    /// One number rather than one per direction. A relay carrying a game moves
+    /// traffic both ways or neither, since the engine at the far end answers
+    /// what it is sent, so splitting it would offer a distinction that does not
+    /// arise and put a second number in a pill that has room for one.
+    #[serde(rename_all = "camelCase")]
+    Traffic { bytes_per_second: u64 },
     /// The request with this id is done.
     #[serde(rename_all = "camelCase")]
     Done { id: RequestId },
@@ -294,6 +331,12 @@ mod tests {
                 addr: SocketAddr::from(([198, 51, 100, 7], 41641)),
             }),
             "{\"type\":\"relayOpen\",\"addr\":\"198.51.100.7:41641\"}\n"
+        );
+        assert_eq!(
+            to_line(&Event::Traffic {
+                bytes_per_second: 41_984,
+            }),
+            "{\"type\":\"traffic\",\"bytesPerSecond\":41984}\n"
         );
         assert_eq!(
             to_line(&Event::Done { id: 7 }),

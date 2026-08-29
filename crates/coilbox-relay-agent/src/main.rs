@@ -92,6 +92,7 @@ mod demux;
 mod relay;
 mod run_file;
 mod stopping;
+mod traffic;
 
 use std::convert::Infallible;
 use std::net::{Ipv4Addr, SocketAddr};
@@ -110,6 +111,7 @@ use run_file::Claim;
 use stopping::{Counted, Reason, Stopping};
 use tokio::net::UdpSocket;
 use tokio::time::Instant;
+use traffic::Traffic;
 
 /// What the agent was asked to do.
 struct Args {
@@ -483,6 +485,7 @@ async fn carry<R: RelayLink>(
 async fn relay_until_it_gives_up(
     args: &Args,
     stopping: &Stopping,
+    traffic: &Traffic,
     open: &OpenRelay<Transport>,
     requests: &mut Requests,
     reporter: &Reporter,
@@ -543,10 +546,12 @@ async fn relay_until_it_gives_up(
         }
         let opened_at = Instant::now();
         // Counted, so that carrying a datagram is what keeps this process
-        // alive once there is no coilbox left to say so.
+        // alive once there is no coilbox left to say so, and so the host can
+        // be shown how much is going through it.
         let counted = Counted {
             relay: relay.as_ref(),
             stopping,
+            traffic,
         };
         let stopped = carry(&counted, &mut agent, &allowlist, requests, reporter).await;
         let down = match relay.failure() {
@@ -631,6 +636,20 @@ async fn main() -> ExitCode {
     let mut requests = Requests::listen(Arc::clone(&reporter), Arc::clone(&stopping));
     let open: OpenRelay<Transport> = OpenRelay::default();
 
+    // The meter the host's in-game pill reads (issue #2024). Started here
+    // rather than inside the relay loop because a relay that is being rebuilt
+    // is exactly when somebody wants to know what is going through: reports
+    // carry on saying zero across the gap, and a reader that heard nothing at
+    // all could not tell that from a sidecar that had died.
+    let traffic = Arc::new(Traffic::new());
+    tokio::spawn({
+        let traffic = Arc::clone(&traffic);
+        let reporter = Arc::clone(&reporter);
+        async move {
+            traffic::report_forever(&traffic, &reporter).await;
+        }
+    });
+
     // The relay loop only ever ends by giving up. Everything else that ends
     // this process is a judgement about whether anybody still needs it, and
     // that is `stopping`'s.
@@ -641,7 +660,7 @@ async fn main() -> ExitCode {
     // dropping it tells the relay server nothing, which is why it lives in
     // `open` and is given back by hand.
     tokio::select! {
-        gave_up = relay_until_it_gives_up(&args, &stopping, &open, &mut requests, &reporter) => gave_up,
+        gave_up = relay_until_it_gives_up(&args, &stopping, &traffic, &open, &mut requests, &reporter) => gave_up,
         _ = until_nobody_needs_it(&stopping, &open, &reporter) => ExitCode::SUCCESS,
     }
 }
