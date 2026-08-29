@@ -46,9 +46,11 @@
 //!
 //! - Traffic figures for the in-game badge are [`Event::Traffic`], pushed
 //!   rather than polled (issue #2024).
-//! - "This new address is the player who was at that old one" (issue #2029) is
-//!   a new [`Request`], answered by the same [`Event::Done`] and
-//!   [`Event::Failed`] pair as any other.
+//! - "This new address is the player who was at that old one" (issue #2029) was
+//!   going to be a new [`Request`] and turned out not to need one. The engine
+//!   re-identifies a player who moved by name and password, which is evidence
+//!   neither end of this channel holds, so the sidecar stays out of it.
+//!   `demux.rs` in `coilbox-relay-agent` has the reasoning.
 //! - A relayed address that changed because the sidecar rebuilt its allocation
 //!   (issue #2031) is already [`Event::RelayOpen`], which is sent every time a
 //!   relay opens rather than only the first.

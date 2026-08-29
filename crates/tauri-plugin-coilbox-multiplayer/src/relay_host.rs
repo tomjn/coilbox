@@ -337,10 +337,12 @@ fn rebuilt_at(registry: &Registry, server_key: &str, addr: SocketAddr) {
 ///
 /// ## What this does not fix
 ///
-/// The players already in the room. Their engines are unaffected, because the
-/// sidecar keeps each player's loopback socket across a rebuild, but the new
-/// allocation has none of the old one's permissions and the address they were
-/// told to send to has gone. Letting them back through is issue #2029.
+/// Telling the players. Their engines are unaffected, because the sidecar keeps
+/// each player's loopback socket across a rebuild, and the sidecar lets
+/// everybody it has already vouched for through the new allocation before it
+/// carries anything. What is left is the address they were told to send to,
+/// which has gone, and the only way to correct it is the line below reaching
+/// them through the lobby.
 ///
 /// No lobby server implements `RELAYEDHOST` at all yet
 /// (ScarylePoo/uberserver#32), and that issue explicitly leaves out updating a
