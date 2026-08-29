@@ -181,6 +181,7 @@ pub fn spawn_connection(
             // is ever answered on this connection.
             relay: crate::conn::HostedRelay::default(),
             opened: watch::channel(crate::relay_host::OpenAnswer::Unasked).1,
+            relay_refused: crate::relay_host::RefusedRelayAddress::default(),
         },
     );
 }

@@ -101,6 +101,7 @@ mod tests {
                 turn: watch::channel(crate::turn::TurnAnswer::Unasked).1,
                 relay: crate::conn::HostedRelay::default(),
                 opened: watch::channel(crate::relay_host::OpenAnswer::Unasked).1,
+                relay_refused: crate::relay_host::RefusedRelayAddress::default(),
             },
         );
         rx

@@ -266,6 +266,12 @@ pub struct ServerConn {
     /// happened. Stays at [`crate::relay_host::OpenAnswer::Unasked`] on a
     /// connection nobody hosts on.
     pub opened: OpenSlot,
+    /// The lobby's refusal of the address this connection last said its relayed
+    /// battle lives at, if it refused one. Kept apart from [`Self::opened`]
+    /// rather than folded into it because the two lines arrive together and a
+    /// `watch` would keep only the second. See
+    /// [`crate::relay_host::RefusedRelayAddress`].
+    pub relay_refused: crate::relay_host::RefusedRelayAddress,
 }
 
 /// The registry of live connections, keyed by a frontend-supplied `serverKey`
@@ -338,6 +344,10 @@ pub fn spawn_connection(
     // connection that ends while they wait is a battle that did not open, and
     // they have an allocation to take down over it.
     let (opened_tx, opened) = watch::channel(OpenAnswer::Unasked);
+    // And the refusal that says the battle those two are about is not going
+    // through the relay after all. A note rather than a third slot, because it
+    // arrives in the same read as the answer above and a slot would lose it.
+    let relay_refused = crate::relay_host::RefusedRelayAddress::default();
 
     tokio::spawn(run_loop(
         registry.clone(),
@@ -349,6 +359,7 @@ pub fn spawn_connection(
         agreement.clone(),
         turn_tx,
         opened_tx,
+        relay_refused.clone(),
         relay.clone(),
         rx,
         state.clone(),
@@ -377,6 +388,7 @@ pub fn spawn_connection(
             turn,
             relay,
             opened,
+            relay_refused,
         },
     );
 }
@@ -395,6 +407,7 @@ async fn run_loop(
     agreement_slot: Arc<Mutex<Option<String>>>,
     turn_slot: watch::Sender<TurnAnswer>,
     opened_slot: watch::Sender<OpenAnswer>,
+    relay_refused: crate::relay_host::RefusedRelayAddress,
     relay: HostedRelay,
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
@@ -564,6 +577,15 @@ async fn run_loop(
                         // battle and one holding an allocation for nothing.
                         if let Some(answer) = crate::relay_host::open_answer_in(&delta, &state) {
                             let _ = opened_slot.send(answer);
+                        }
+                        // The lobby would not advertise our battle at the
+                        // relay's address. Written down rather than sent,
+                        // because the answer above is usually in the same read
+                        // and a slot holds only the last thing put in it. The
+                        // delta below goes out either way, so a host who has
+                        // stopped waiting is still told.
+                        if let Delta::RelayedHostRefused { reason } = &delta {
+                            crate::relay_host::note_refused_address(&relay_refused, reason);
                         }
                         emit(&sink, LobbyEvent::Delta { delta });
                     }
