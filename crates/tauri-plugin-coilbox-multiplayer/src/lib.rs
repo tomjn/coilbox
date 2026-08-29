@@ -4045,6 +4045,52 @@ mod tests {
             .unwrap_or_default());
     }
 
+    /// Issue #2031, from the sidecar's event to the wire. The relay agent says
+    /// its allocation came back somewhere else and a `RELAYEDHOST` naming the new
+    /// address goes out on the lobby connection, without the battle being
+    /// reopened.
+    ///
+    /// Driven through the listener `allocate` installs, because that is the seam:
+    /// the event arrives on the agent's own thread long after anybody was waiting
+    /// for an address.
+    #[test]
+    fn a_relay_rebuilt_elsewhere_re_advertises_the_battle_it_is_carrying() {
+        let (registry, mut sent, _answers) = a_connection("COMPFLAGS u sp r");
+        remember_relay(&registry, "alice@bar:8200", a_relay());
+
+        let (saw, heard) = std::sync::mpsc::channel();
+        let listener = relay_host::listening(&registry, "alice@bar:8200", saw);
+        listener(coilbox_relay_protocol::Event::RelayOpen {
+            addr: "198.51.100.9:30002".parse().expect("an address"),
+        });
+
+        assert_eq!(queued(&mut sent), vec!["RELAYEDHOST 198.51.100.9 30002"]);
+        // And the event still reaches whoever is waiting for an address, because
+        // the same listener is what tells a host their first allocation is up.
+        assert!(matches!(
+            heard.try_recv(),
+            Ok(coilbox_relay_protocol::Event::RelayOpen { .. })
+        ));
+    }
+
+    /// And the case that must not fire. A host who is not relaying anything gets
+    /// the same events from a sidecar that is still coming up, and a
+    /// `RELAYEDHOST` on the wire before there is a battle would name an address
+    /// against a battle the host has not opened yet.
+    #[test]
+    fn a_relay_that_is_still_opening_advertises_nothing_on_its_own() {
+        let (registry, mut sent, _answers) = a_connection("COMPFLAGS u sp r");
+
+        let (saw, heard) = std::sync::mpsc::channel();
+        let listener = relay_host::listening(&registry, "alice@bar:8200", saw);
+        listener(coilbox_relay_protocol::Event::RelayOpen {
+            addr: "198.51.100.9:30001".parse().expect("an address"),
+        });
+
+        assert_eq!(queued(&mut sent), Vec::<String>::new());
+        drop(heard);
+    }
+
     /// The lines a connection has queued, oldest first.
     fn queued(sent: &mut tokio::sync::mpsc::UnboundedReceiver<Outbound>) -> Vec<String> {
         std::iter::from_fn(|| match sent.try_recv() {

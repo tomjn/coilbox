@@ -53,14 +53,17 @@
 //! held against the connection, where neither of these can see it. Stopping
 //! that one is issue #2018, and its rules are the opposite of these.
 //!
-//! ## What is deliberately somebody else's
+//! ## A relay that comes back somewhere else
 //!
-//! A rebuilt allocation arrives as a second `relayOpen` and re-advertising the
-//! battle at the new address is issue #2031. It plugs into the listener
-//! [`allocate`] installs, which already runs on the agent's own thread and sees
-//! every event: a rebuild happens while a host is doing something else, so it
-//! has to arrive rather than be waited for, which is why the seam is a callback
-//! and not a queue somebody polls.
+//! The sidecar rebuilds an allocation it has lost, and the new one is at a
+//! different address. The battle is still advertised at the old one, so it looks
+//! alive and nobody can reach it (issue #2031).
+//!
+//! That arrives as a second `relayOpen`, on the listener [`listening`] builds and
+//! [`allocate`] installs. It is a callback rather than something anybody waits on
+//! because a rebuild happens while the host is doing something else entirely,
+//! very likely playing the game it is carrying. [`readvertise`] is what it does
+//! about one.
 //!
 //! Releasing the allocation when a game is over is #2018, and the check that a
 //! credential has enough life left in it is #2042.
@@ -71,7 +74,7 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use coilbox_lobby_protocol::{Delta, LobbyState};
+use coilbox_lobby_protocol::{command, Delta, LobbyState};
 use coilbox_relay_protocol::Event;
 use tokio::sync::watch;
 
@@ -126,6 +129,10 @@ pub struct RelayHost {
     /// can play in their own battle.
     pub engine_port: u16,
     /// Where players send, on the relay server.
+    ///
+    /// Moves when the sidecar rebuilds a lost allocation, because the new one is
+    /// somewhere else. [`readvertise`] is the only thing that changes it, and it
+    /// tells the lobby in the same breath.
     pub relayed: SocketAddr,
     /// The control channel, held so joiners can be let through the relay and so
     /// the battle can be stopped or ended.
@@ -252,17 +259,110 @@ pub async fn allocate(
         max_peers,
         turn: Some(turn),
     };
-    // Every event the agent produces goes down this channel until the wait below
-    // ends and drops the reading half. Issue #2031's reader belongs in this
-    // closure alongside the send, because a rebuilt allocation arrives long
-    // after anybody is waiting on one.
     let (saw, heard) = mpsc::channel();
-    let agent = RelayAgent::spawn(&binary, &battle, run_file, move |event| {
-        let _ = saw.send(event);
-    })
+    let agent = RelayAgent::spawn(
+        &binary,
+        &battle,
+        run_file,
+        listening(registry, server_key, saw),
+    )
     .map_err(NoRelay::NotStarted)?;
 
     waiting_on(agent, heard, engine_port, ALLOCATION_PATIENCE)
+}
+
+/// What happens to every event the agent produces, for the life of the sidecar.
+///
+/// Two things, and they belong to different moments. Everything goes down `saw`,
+/// which is what [`waiting_on`] reads while the host is standing in front of the
+/// hosting form. That half stops mattering the moment the wait ends and the
+/// reading end is dropped. A `relayOpen` also goes to [`rebuilt_at`], and that
+/// half only starts mattering once the battle is open, because until then there
+/// is nothing advertised anywhere to correct.
+///
+/// So the two are one listener rather than two, and it outlives the wait
+/// deliberately. It runs on the agent's own reading thread.
+pub(crate) fn listening(
+    registry: &Registry,
+    server_key: &str,
+    saw: mpsc::Sender<Event>,
+) -> impl Fn(Event) + Send + 'static {
+    let registry = Arc::clone(registry);
+    let server_key = server_key.to_string();
+    move |event| {
+        if let Event::RelayOpen { addr } = &event {
+            rebuilt_at(&registry, &server_key, *addr);
+        }
+        let _ = saw.send(event);
+    }
+}
+
+/// The sidecar's relay has opened at `addr`. Correct the battle this connection
+/// is hosting through it, if it is hosting one.
+///
+/// Fires for the first allocation as well as every rebuild, and does nothing for
+/// the first. Nothing is held against the connection until the lobby has said
+/// the battle exists, so there is no battle to move and [`readvertise`] says so.
+/// The opening address goes out with the `OPENBATTLE`, once, from [`allocate`]'s
+/// caller.
+///
+/// The registry lock is dropped before the relay's is taken, and taken again
+/// afterwards to queue the line. Everything else in coilbox that touches both
+/// locks holds the registry's while it takes the relay's, so this must not hold
+/// the relay's while it takes the registry's.
+fn rebuilt_at(registry: &Registry, server_key: &str, addr: SocketAddr) {
+    let relay = lock_or_recover(registry)
+        .get(server_key)
+        .map(|conn| Arc::clone(&conn.relay));
+    let Some(relay) = relay else { return };
+    let Some(line) = readvertise(&relay, addr) else {
+        return;
+    };
+    // Discarded because the only failure is a connection that has gone, and a
+    // lobby coilbox is no longer talking to cannot be told anything about a
+    // battle it is no longer advertising.
+    let _ = crate::enqueue(registry, server_key, line);
+}
+
+/// Move a hosted battle to the address its relay came back at, and give back the
+/// line that tells the lobby. `None` when there is nothing to tell it.
+///
+/// ## Why one line and not a new battle
+///
+/// `RELAYEDHOST` carries the port as well as the address, which is the whole
+/// reason it does (`coilbox_lobby_protocol::command::relayed_host`). So a battle
+/// that has moved is one line, and the room, its players, its chat and its map
+/// choice all stay where they are. Closing the battle and opening another one
+/// would throw everybody in the room out to fix an address they never saw.
+///
+/// ## What this does not fix
+///
+/// The players already in the room. Their engines are unaffected, because the
+/// sidecar keeps each player's loopback socket across a rebuild, but the new
+/// allocation has none of the old one's permissions and the address they were
+/// told to send to has gone. Letting them back through is issue #2029.
+///
+/// No lobby server implements `RELAYEDHOST` at all yet
+/// (ScarylePoo/uberserver#32), and that issue explicitly leaves out updating a
+/// battle that is already open. So today this line is read by nobody and the
+/// battle stays advertised where it was, which is the same silent degradation
+/// #2017 ships with rather than a new failure.
+///
+/// ## Nothing to tell it
+///
+/// Two cases, and they are both ordinary. There is no relayed battle on this
+/// connection, which is every connection almost all of the time and every
+/// connection during the wait for the first allocation. Or the relay came back
+/// exactly where it was, which a TURN server is free to do, and a battle that has
+/// not moved is not news.
+pub fn readvertise(relay: &HostedRelay, addr: SocketAddr) -> Option<String> {
+    let mut held = lock_or_recover(relay);
+    let host = held.as_mut()?;
+    if host.relayed == addr {
+        return None;
+    }
+    host.relayed = addr;
+    Some(command::relayed_host(addr.ip(), addr.port()))
 }
 
 /// Wait for an agent that is already being driven to open an allocation.
@@ -862,6 +962,48 @@ mod tests {
             written.sent()
         );
         assert_eq!(host.relayed, relayed());
+    }
+
+    /// Where the sidecar's second allocation lands. Same relay server, different
+    /// port, which is what a rebuilt allocation looks like.
+    fn rebuilt() -> SocketAddr {
+        SocketAddr::from((Ipv4Addr::new(198, 51, 100, 9), 30002))
+    }
+
+    /// The whole of issue #2031. The relay comes back somewhere else and the
+    /// battle the lobby is advertising moves with it, in one line.
+    #[test]
+    fn a_relay_that_comes_back_elsewhere_moves_the_battle_with_it() {
+        let relay = relay_slot(silent_agent());
+
+        assert_eq!(
+            readvertise(&relay, rebuilt()).as_deref(),
+            Some("RELAYEDHOST 198.51.100.9 30002")
+        );
+        assert_eq!(
+            lock_or_recover(&relay).as_ref().map(|host| host.relayed),
+            Some(rebuilt()),
+            "the battle has to be at the new address afterwards, or the next thing to read it \
+             sends players back to an allocation that has gone"
+        );
+    }
+
+    /// A TURN server is free to hand the same address back, and a battle that
+    /// has not moved is not news. Saying so anyway would put a line on the wire
+    /// every time an allocation is rebuilt, for no change.
+    #[test]
+    fn a_relay_that_comes_back_where_it_was_says_nothing() {
+        let relay = relay_slot(silent_agent());
+        assert_eq!(readvertise(&relay, relayed()), None);
+    }
+
+    /// The first allocation reaches this too, and must not be advertised twice.
+    /// Nothing is held against the connection until the lobby has opened the
+    /// battle, so during the wait there is no battle to move.
+    #[test]
+    fn the_address_a_battle_opens_at_is_not_advertised_a_second_time() {
+        let opening = HostedRelay::default();
+        assert_eq!(readvertise(&opening, relayed()), None);
     }
 
     /// A joiner's address, nothing like the relayed address above so a test that
