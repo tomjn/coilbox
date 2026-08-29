@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   battlePorts,
   type DirectReachability,
+  isOnPublicAddress,
+  isReachabilityProblem,
   isReachable,
   joinAddress,
   portList,
@@ -41,6 +43,20 @@ function opened(over: Partial<DirectReachability> = {}): DirectReachability {
     publicAddress: "209.35.91.246",
     routerAddress: "209.35.91.246",
     confirmedPort: 8452,
+    ...over,
+  });
+}
+
+/** A machine on the internet under its own address: a VPS, or a home line with
+ *  no NAT. Nothing answers the port mapping request because there is no gateway
+ *  to answer it, so this looks like a refusal with a public address in it. */
+function onPublicAddress(
+  over: Partial<DirectReachability> = {},
+): DirectReachability {
+  return report({
+    lanAddress: "209.35.91.246",
+    publicAddress: "209.35.91.246",
+    problem: "no UPnP gateway answered",
     ...over,
   });
 }
@@ -103,6 +119,39 @@ describe("reachabilityState", () => {
   // for.
   it("reports a refusal rather than a missing address when both are true", () => {
     expect(reachabilityState(report({ publicAddress: null }))).toBe("refused");
+  });
+
+  // The issue. A machine already on the internet has no gateway to answer a
+  // port mapping request, so its report is a refusal, and reading that as one
+  // tells a host who is reachable that they are not.
+  it("calls a machine on its own public address direct, not refused", () => {
+    expect(reachabilityState(onPublicAddress())).toBe("direct");
+  });
+
+  // Ordered like the hosting ladder: a machine that is on the internet and also
+  // happens to hold a mapping was reachable without it.
+  it("prefers direct over a mapping the machine did not need", () => {
+    expect(
+      reachabilityState(
+        opened({ lanAddress: "209.35.91.246", publicAddress: "209.35.91.246" }),
+      ),
+    ).toBe("direct");
+  });
+
+  // Two unknowns are not a match. A machine with no local address and no STUN
+  // answer knows nothing about itself.
+  it("does not read two unknown addresses as a public one", () => {
+    expect(reachabilityState(report({ lanAddress: null }))).toBe("refused");
+  });
+});
+
+describe("isOnPublicAddress", () => {
+  it("is true only when the address the internet sees is this machine's own", () => {
+    expect(isOnPublicAddress(onPublicAddress())).toBe(true);
+    expect(isOnPublicAddress(report({ publicAddress: "209.35.91.246" }))).toBe(
+      false,
+    );
+    expect(isOnPublicAddress(report({ lanAddress: null }))).toBe(false);
   });
 });
 
@@ -199,6 +248,16 @@ describe("reachabilityHeadline", () => {
       "Your router would not open the ports.",
     );
   });
+
+  it("tells a machine on its own public address that it is already reachable", () => {
+    expect(reachabilityHeadline(onPublicAddress())).toBe(
+      "Open. This machine is on the internet at 209.35.91.246, so there was nothing to forward.",
+    );
+  });
+
+  it("does not blame the router of a host who has none", () => {
+    expect(reachabilityHeadline(onPublicAddress())).not.toContain("router");
+  });
 });
 
 describe("reachabilityAdvice", () => {
@@ -235,5 +294,24 @@ describe("reachabilityAdvice", () => {
 
   it("has nothing to advise when everything worked", () => {
     expect(reachabilityAdvice(opened())).toBeNull();
+  });
+
+  // The point of the issue: every word of the refusal advice is a router
+  // setting, and this host has no router to set it on.
+  it("asks a machine on its own public address to change nothing", () => {
+    expect(reachabilityAdvice(onPublicAddress())).toBeNull();
+  });
+});
+
+describe("isReachabilityProblem", () => {
+  it("counts the two ways of being reachable as success", () => {
+    expect(isReachabilityProblem(opened())).toBe(false);
+    expect(isReachabilityProblem(onPublicAddress())).toBe(false);
+  });
+
+  it("counts every other outcome as a problem", () => {
+    expect(isReachabilityProblem(report())).toBe(true);
+    expect(isReachabilityProblem(opened({ doubleNat: true }))).toBe(true);
+    expect(isReachabilityProblem(opened({ publicAddress: null }))).toBe(true);
   });
 });

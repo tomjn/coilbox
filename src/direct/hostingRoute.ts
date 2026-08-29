@@ -1,5 +1,9 @@
 import { useSyncExternalStore } from "react";
-import { type DirectReachability, isReachable } from "./reachability";
+import {
+  type DirectReachability,
+  isOnPublicAddress,
+  isReachable,
+} from "./reachability";
 
 /**
  * Which of the ways of being reachable a host is actually going to use.
@@ -107,10 +111,10 @@ export function hostingRoute(
   // report is a refusal with a public address in it, and a rung that needed a
   // mapping would read that as a host who cannot be reached. First because a
   // machine that is on the internet and also happens to hold a mapping is
-  // reachable at its own address, and did not need the mapping to be.
-  if (report.publicAddress && report.publicAddress === report.lanAddress) {
-    return "direct";
-  }
+  // reachable at its own address, and did not need the mapping to be. The test
+  // is shared with the reachability panel, which used to ask a different
+  // question here and tell this host their router had refused (issue #2054).
+  if (isOnPublicAddress(report)) return "direct";
   if (isReachable(report)) return "portMapped";
   return relayAvailable && wantsRelay ? "relay" : "unreachable";
 }
