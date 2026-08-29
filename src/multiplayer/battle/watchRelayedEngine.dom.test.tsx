@@ -29,6 +29,7 @@ import { useBattleLaunch } from "./useBattleLaunch";
 interface Launched {
   runId: string;
   started: () => void;
+  exited: () => void;
   finish: () => void;
 }
 
@@ -49,6 +50,7 @@ vi.mock("@/play/bindings", () => ({
           launched.push({
             runId: args.runId,
             started: () => args.onEvent.onmessage({ kind: "started" }),
+            exited: () => args.onEvent.onmessage({ kind: "exited", code: 0 }),
             finish: () => resolve({ exitCode: 0, signal: null }),
           });
         },
@@ -163,14 +165,19 @@ it("names the run it started to the sidecar when the battle is relayed", async (
   expect(mpWatchEngine).toHaveBeenCalledTimes(1);
 });
 
-it("says nothing until the engine is actually a process", async () => {
+it("waits for the engine to exist rather than firing on any news of it", async () => {
   recordHostingRoute("relay");
 
-  await launchBattle(true);
-
-  // The launch is in flight and the engine has not reported in. There is no pid
-  // to find yet, so asking now would get an error and watch nothing.
+  const run = await launchBattle(true);
   expect(mpWatchEngine).not.toHaveBeenCalled();
+
+  // An engine that has ended is not one to watch, and Rust would have no pid to
+  // answer with anyway. Only `started` says a process is there to be named.
+  run.exited();
+  expect(mpWatchEngine).not.toHaveBeenCalled();
+
+  run.started();
+  await waitFor(() => expect(mpWatchEngine).toHaveBeenCalledTimes(1));
 });
 
 it("says nothing for a battle hosted without the relay", async () => {
