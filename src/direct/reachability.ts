@@ -110,9 +110,24 @@ export function battlePorts(
   return [{ port: gamePort, transport: "udp", description: "Coilbox game" }];
 }
 
-/** Whether somebody outside this network can actually get in. Pure. */
+/**
+ * Whether somebody outside this network can actually get in. Pure.
+ *
+ * Two ways in, and only one of them involved a router. This used to ask the
+ * narrower question of whether a mapping was made, which answered no for a
+ * machine that was already on the internet and so left that host reading "Open."
+ * with no address to send anybody (issue #2085).
+ *
+ * {@link hostingRoute} asks this on the ladder's second rung, below the rung
+ * that catches a public address, so widening it here changes no route: a host
+ * who is on the internet is already off the ladder by then. The order is what
+ * keeps "direct" and "port mapped" apart, and `hostingRoute.test.ts` holds it
+ * there.
+ */
 export function isReachable(report: DirectReachability): boolean {
-  return report.method !== null && !report.doubleNat;
+  return (
+    isOnPublicAddress(report) || (report.method !== null && !report.doubleNat)
+  );
 }
 
 /**
@@ -147,10 +162,18 @@ export function isOnPublicAddress(report: DirectReachability): boolean {
  *
  * Null when STUN could not be reached. The local address is not the answer to
  * "what do I send my friend", and neither is a guess.
+ *
+ * The port comes from the mappings when there are any, because the router's own
+ * port is the one the world reaches and it is not always the one asked for.
+ * With no mappings the ports asked for are the answer instead: that is a machine
+ * already on the internet, which opened nothing because nothing was shut, and
+ * is listening on exactly what it wanted (issue #2085). The mappings are all or
+ * nothing, so this never reads a port out of a half-open room.
  */
 export function joinAddress(report: DirectReachability): string | null {
   if (!report.publicAddress || !isReachable(report)) return null;
-  const lobby = report.ports.find((p) => p.transport === "tcp");
+  const listening = report.ports.length > 0 ? report.ports : report.wanted;
+  const lobby = listening.find((p) => p.transport === "tcp");
   return lobby
     ? `${report.publicAddress}:${lobby.externalPort}`
     : report.publicAddress;
