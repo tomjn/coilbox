@@ -75,6 +75,7 @@ const COMMANDS: &[&str] = &[
     "mp_probe_host",
     "mp_turn_credentials",
     "mp_relay_traffic",
+    "mp_watch_engine",
     "mp_chat_logs",
     "mp_chat_log_open",
     "mp_tachyon_sign_in",
