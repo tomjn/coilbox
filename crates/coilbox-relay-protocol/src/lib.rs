@@ -96,8 +96,29 @@ pub enum Request {
     /// [`Event::Done`] before the sidecar goes, so a caller knows the
     /// allocation is being given up rather than being left to infer it from a
     /// closed pipe.
+    ///
+    /// Only for a relay that is provably carrying nothing. coilbox sends it
+    /// when a battle it was opening never opened, which is the whole of issue
+    /// #2058, and the sidecar obeys it without asking any questions of its own.
+    /// A battle that did open and is now over is [`Request::BattleOver`]
+    /// instead, because by then coilbox cannot tell whether a game is still
+    /// being played through the relay and the sidecar can.
     #[serde(rename_all = "camelCase")]
     Stop { id: RequestId },
+    /// The lobby battle this relay was opened for has ended.
+    ///
+    /// Not an instruction to exit, and the difference is the point. A host who
+    /// leaves their battle in the lobby has not necessarily ended the game: the
+    /// engine keeps running and the other players are still playing through
+    /// this relay. So this hands the decision to the sidecar rather than making
+    /// it, in exactly the way coilbox closing does (issue #2018).
+    ///
+    /// What the sidecar does with it is in `coilbox-relay-agent`'s `stopping`
+    /// module. The short version is that a relay no player has ever been heard
+    /// through was never carrying a game, so it goes at once, and any other
+    /// relay is left to the engine and the traffic backstop.
+    #[serde(rename_all = "camelCase")]
+    BattleOver { id: RequestId },
 }
 
 impl Request {
@@ -107,6 +128,7 @@ impl Request {
             Request::AllowPeer { id, .. } => *id,
             Request::WatchEngine { id, .. } => *id,
             Request::Stop { id } => *id,
+            Request::BattleOver { id } => *id,
         }
     }
 }
@@ -262,6 +284,10 @@ mod tests {
         assert_eq!(
             to_line(&Request::Stop { id: 9 }),
             "{\"type\":\"stop\",\"id\":9}\n"
+        );
+        assert_eq!(
+            to_line(&Request::BattleOver { id: 10 }),
+            "{\"type\":\"battleOver\",\"id\":10}\n"
         );
         assert_eq!(
             to_line(&Event::RelayOpen {

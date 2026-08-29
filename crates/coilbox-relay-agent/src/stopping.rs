@@ -43,12 +43,31 @@
 //! the engine both dying badly, an engine whose pid the agent never got. See
 //! [`IDLE_TIMEOUT`] for why it is set where it is.
 //!
+//! ## The battle ending in the lobby is a fifth case, not a rule of its own
+//!
+//! coilbox sends [`Request::BattleOver`](coilbox_relay_protocol::Request::BattleOver)
+//! when the host leaves the battle it opened. That is not the end of the game
+//! and must not be treated as one: leaving a battle room while the engine is
+//! running cuts off every other player, which is the failure this whole sidecar
+//! exists to prevent (issue #2018).
+//!
+//! So it does the same thing coilbox closing does. It moves the agent into the
+//! "decide for yourself" column and lets the engine and the traffic backstop
+//! answer, with one shortcut that is a fact rather than a guess: if no player
+//! has ever been heard through this relay, no game has ever been played through
+//! it, so there is nothing to protect and it goes at once. That is the common
+//! case by a distance, a host who opens a battle, waits, and gives up, and
+//! without the shortcut they would leave an allocation standing for the four
+//! minutes of the backstop.
+//!
 //! ## What is deliberately not a reason to stop
 //!
 //! - Losing the relay. The agent rebuilds it, because the game it is feeding
 //!   is still being played. `main` owns that loop.
 //! - stdin reaching EOF. That is coilbox closing, which is state 3.
 //! - Having no peers yet. That is state 1, and it is normal for a long time.
+//! - The battle ending in the lobby while a game is still being played through
+//!   the relay. See above.
 
 use std::io;
 use std::net::SocketAddr;
@@ -98,6 +117,9 @@ const LOOK_EVERY: Duration = Duration::from_secs(1);
 pub enum Reason {
     /// coilbox asked. State 2, and the ordinary end of a battle.
     CoilboxAsked,
+    /// The battle ended in the lobby and no player was ever heard through this
+    /// relay, so there was never a game on it to cut off.
+    BattleOver,
     /// coilbox has gone and so has the engine it named. State 4.
     EngineGone { pid: u32 },
     /// coilbox has gone and the relay has carried nothing for
@@ -109,6 +131,10 @@ impl std::fmt::Display for Reason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Reason::CoilboxAsked => write!(f, "coilbox asked it to stop"),
+            Reason::BattleOver => write!(
+                f,
+                "the battle is over and no player was ever heard through this relay"
+            ),
             Reason::EngineGone { pid } => write!(
                 f,
                 "coilbox has closed and the engine it was relaying for (process {pid}) has exited"
@@ -131,6 +157,17 @@ impl std::fmt::Display for Reason {
 pub struct Stopping {
     asked: AtomicBool,
     coilbox_gone: AtomicBool,
+    /// Whether coilbox has said the lobby battle has ended. Weaker than
+    /// `asked`: it starts the agent judging for itself rather than ending it.
+    battle_over: AtomicBool,
+    /// Whether a datagram has ever arrived through the relay.
+    ///
+    /// Inbound only, and that is what makes it mean something. The only
+    /// addresses a TURN allocation will deliver from are the ones coilbox
+    /// vouched for, and their engines say nothing until the game starts, so a
+    /// datagram arriving is a player playing. The agent's own outbound
+    /// permission probes never arrive at anything, so they cannot set this.
+    heard_a_player: AtomicBool,
     /// The engine's pid once coilbox has named one. Zero means it has not,
     /// which is a real pid on no platform coilbox runs on.
     engine: AtomicU32,
@@ -149,6 +186,8 @@ impl Stopping {
         Stopping {
             asked: AtomicBool::new(false),
             coilbox_gone: AtomicBool::new(false),
+            battle_over: AtomicBool::new(false),
+            heard_a_player: AtomicBool::new(false),
             engine: AtomicU32::new(0),
             // Started here rather than left empty, so an agent that is killed
             // off before it ever carries a datagram is still measured from
@@ -160,6 +199,16 @@ impl Stopping {
     /// coilbox has asked the agent to stop.
     pub fn coilbox_asked(&self) {
         self.asked.store(true, Ordering::Relaxed);
+    }
+
+    /// coilbox has said the lobby battle this relay was opened for has ended.
+    ///
+    /// Deliberately not the same as [`Stopping::coilbox_asked`]. coilbox knows
+    /// the battle is gone from the lobby and does not know whether an engine is
+    /// still playing through the relay, so this only starts the agent judging
+    /// for itself.
+    pub fn battle_is_over(&self) {
+        self.battle_over.store(true, Ordering::Relaxed);
     }
 
     /// coilbox has named the engine it launched.
@@ -176,6 +225,14 @@ impl Stopping {
     /// A datagram went through the relay just now.
     pub fn carried_something(&self) {
         *self.last_traffic.lock().unwrap() = Instant::now();
+    }
+
+    /// A datagram arrived through the relay, so somebody is playing on it.
+    ///
+    /// Sticky, because the question it answers is "has a game ever run through
+    /// this relay" and no later silence unmakes that.
+    pub fn heard_from_a_player(&self) {
+        self.heard_a_player.store(true, Ordering::Relaxed);
     }
 
     /// Wait until there is a reason to stop, and say what it was.
@@ -196,7 +253,18 @@ impl Stopping {
         if self.asked.load(Ordering::Relaxed) {
             return Some(Reason::CoilboxAsked);
         }
-        if !self.coilbox_gone.load(Ordering::Relaxed) {
+        let battle_over = self.battle_over.load(Ordering::Relaxed);
+        // A relay nobody has ever been heard through has never carried a game,
+        // so a battle ending is the end of it and there is nothing at risk. The
+        // test for that is a fact the agent has watched rather than a guess at
+        // how long a quiet relay stays quiet.
+        if battle_over && !self.heard_a_player.load(Ordering::Relaxed) {
+            return Some(Reason::BattleOver);
+        }
+        // Both of these mean the same thing to everything below: coilbox is no
+        // longer in a position to say whether anybody is still playing, so the
+        // agent judges on the engine and its own traffic.
+        if !self.coilbox_gone.load(Ordering::Relaxed) && !battle_over {
             return None;
         }
         let engine = self.engine.load(Ordering::Relaxed);
@@ -227,6 +295,11 @@ impl<R: RelayLink + Sync> RelayLink for Counted<'_, R> {
         // which says nothing about whether anybody is still playing.
         if arrived.is_ok() {
             self.stopping.carried_something();
+            // And a datagram that arrived is a player, where one that went out
+            // might have been the agent's own permission probe. That is the
+            // difference between "a game has run through this relay" and "the
+            // agent has spoken to itself", and a battle ending turns on it.
+            self.stopping.heard_from_a_player();
         }
         arrived
     }
@@ -453,6 +526,93 @@ mod tests {
             started.elapsed() < IDLE_TIMEOUT,
             "the engine exiting has to be noticed on its own, not waited out by the backstop"
         );
+    }
+
+    /// A battle nobody ever played in. The host opened it, waited, gave up and
+    /// left, and no player was ever heard through the relay, so there is
+    /// nothing on it to protect and the allocation goes back at once rather
+    /// than four minutes later.
+    #[tokio::test(start_paused = true)]
+    async fn a_battle_that_ends_with_nobody_ever_having_played_gives_the_relay_back_at_once() {
+        let stopping = Stopping::new();
+        stopping.battle_is_over();
+
+        let started = Instant::now();
+        assert_eq!(stopping.wait().await, Reason::BattleOver);
+        assert!(
+            started.elapsed() < IDLE_TIMEOUT,
+            "a relay nothing ever played through should not be waited out by the backstop"
+        );
+    }
+
+    /// The one that costs a game, and the reason the shortcut above is a fact
+    /// rather than a timer. A host who leaves the battle room mid-match has not
+    /// ended the game: every other player is still connected through this
+    /// relay, and their traffic is what says so.
+    #[tokio::test(start_paused = true)]
+    async fn a_battle_that_ends_while_a_game_is_being_played_keeps_its_relay() {
+        let stopping = Stopping::new();
+        let counted = Counted {
+            relay: &Busy,
+            stopping: &stopping,
+        };
+        // A player has been heard, which is what a game in progress looks like
+        // from here.
+        let mut buf = [0u8; 8];
+        counted.recv_from(&mut buf).await.expect("a busy relay");
+
+        stopping.battle_is_over();
+
+        tokio::select! {
+            reason = stopping.wait() => panic!("stopped mid-game: {reason}"),
+            () = async {
+                // Three backstops' worth of a game still being played, so this
+                // is not a matter of the test not having waited long enough.
+                for _ in 0..6 {
+                    tokio::time::sleep(IDLE_TIMEOUT / 2).await;
+                    counted.recv_from(&mut buf).await.expect("a busy relay");
+                }
+            } => {}
+        }
+    }
+
+    /// The same battle once the game really has finished. The relay carried
+    /// players, so it was not eligible for the shortcut, and the backstop is
+    /// what ends it.
+    #[tokio::test(start_paused = true)]
+    async fn a_battle_that_ends_after_a_game_gives_the_relay_back_on_the_backstop() {
+        let stopping = Stopping::new();
+        let counted = Counted {
+            relay: &Busy,
+            stopping: &stopping,
+        };
+        let mut buf = [0u8; 8];
+        counted.recv_from(&mut buf).await.expect("a busy relay");
+
+        stopping.battle_is_over();
+
+        assert_eq!(stopping.wait().await, Reason::NothingLeftToCarry);
+    }
+
+    /// The agent's own permission probes go out through the same relay, and
+    /// they are the agent talking to itself rather than a game. Counting one as
+    /// a player would leave every battle that ever had a joiner holding its
+    /// allocation for four minutes after the host left.
+    #[tokio::test(start_paused = true)]
+    async fn a_probe_the_agent_sent_is_not_a_player() {
+        let stopping = Stopping::new();
+        let counted = Counted {
+            relay: &Busy,
+            stopping: &stopping,
+        };
+        counted
+            .send_to(b"a permission probe", a_peer())
+            .await
+            .expect("a busy relay");
+
+        stopping.battle_is_over();
+
+        assert_eq!(stopping.reason(), Some(Reason::BattleOver));
     }
 
     /// coilbox asking beats everything, including a game that is still being

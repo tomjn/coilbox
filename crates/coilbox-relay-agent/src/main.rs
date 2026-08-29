@@ -55,11 +55,23 @@
 //! running has to be findable, or a coilbox that reopens mid-game starts a
 //! second one over the top of it.
 //!
+//! ## Giving the allocation back
+//!
+//! An allocation costs the relay server a port and its bandwidth for as long as
+//! it exists, so this process hands one back on its way out however it is
+//! leaving: told to stop, judged for itself that nobody is left, or given up on
+//! a credential it cannot replace. [`HandBack`] is that call and
+//! [`until_nobody_needs_it`] is where the ordinary end of a battle reaches it.
+//!
+//! It is best effort and cannot be anything else. A process killed outright
+//! runs none of this, and the server's own idle timeout is the real backstop.
+//! That is a reason to keep the polite version rather than to skip it: the
+//! polite one costs a single datagram and frees the port now, where the timeout
+//! frees it minutes later.
+//!
 //! ## What is not here yet
 //!
 //! - Fetching the credentials from the lobby (issue #2016).
-//! - Handing the allocation back on the way out (issue #2018). Today the
-//!   process simply exits and the server expires it.
 //!
 //! Usage:
 //!
@@ -95,7 +107,7 @@ use control::{Reporter, Requests};
 use demux::Agent;
 use relay::RelayLink;
 use run_file::Claim;
-use stopping::{Counted, Stopping};
+use stopping::{Counted, Reason, Stopping};
 use tokio::net::UdpSocket;
 use tokio::time::Instant;
 
@@ -155,6 +167,18 @@ const EXIT_ALREADY_RUNNING: u8 = 3;
 /// unreachable comes back quickly, and one that is not should not be hammered.
 const FIRST_BACKOFF: Duration = Duration::from_millis(500);
 const LONGEST_BACKOFF: Duration = Duration::from_secs(32);
+
+/// How long the agent will spend giving an allocation back before leaving
+/// anyway.
+///
+/// The same budget `tauri-plugin-coilbox-direct` gives a router to be told its
+/// port mapping is free (`EXIT_RELEASE_BUDGET`), and the job here is strictly
+/// smaller: one Refresh with a lifetime of zero, sent and not waited on, so
+/// nothing in the call is a network round trip. What this guards against is not
+/// a slow server but a lock the `turn` client never lets go of, and an agent
+/// that hangs on the way out is worse than an allocation left to the server's
+/// own timeout.
+const RELEASE_BUDGET: Duration = Duration::from_millis(500);
 
 fn parse_args() -> Result<Args, String> {
     let mut engine_port = None;
@@ -271,13 +295,94 @@ impl Transport {
             Transport::Relayed(allocation) => allocation.failure(),
         }
     }
+}
 
-    async fn close(&self) {
+/// A relay that can be given back to whoever is holding it open for us.
+///
+/// A trait rather than a plain call on [`Transport`] because what is worth
+/// testing is not the call, it is whether the exit path makes it. The case that
+/// costs a game is the one where it must not be made, and a fake that records
+/// being handed back is the only way to assert the absence of something.
+trait HandBack {
+    /// Give it back, and do not wait to be thanked.
+    async fn hand_back(&self);
+}
+
+impl HandBack for Transport {
+    async fn hand_back(&self) {
         match self {
+            // A socket this process bound. The OS takes it when the process
+            // goes and there is nobody else holding anything for us.
             Transport::Direct(_) => {}
+            // A port and a share of the bandwidth on somebody else's machine,
+            // held until it is given back or until the server times it out.
+            // `TurnAllocation::close` is a Refresh with a lifetime of zero,
+            // which is the protocol's own way of saying "I am finished with
+            // this".
             Transport::Relayed(allocation) => allocation.close().await,
         }
     }
+}
+
+/// The relay that is open right now, if there is one.
+///
+/// A slot rather than a local because two places have to reach it. The loop
+/// below rebuilds relays and knows when one has been replaced, and the exit path
+/// runs at a moment when that loop has been cancelled out from under it and its
+/// local is unreachable. Without this, every allocation the agent ever held
+/// would be left to the server's timeout, because the value holding it was
+/// dropped rather than closed.
+type OpenRelay<R> = Arc<tokio::sync::Mutex<Option<Arc<R>>>>;
+
+/// Give back whatever relay is open, and forget it.
+///
+/// Safe to call when there is not one, which is most of the ways out of the
+/// loop below: an agent that never got an allocation has nothing to hand back
+/// and says nothing about it.
+async fn hand_back<R: HandBack>(open: &OpenRelay<R>) {
+    let Some(relay) = open.lock().await.take() else {
+        return;
+    };
+    if tokio::time::timeout(RELEASE_BUDGET, relay.hand_back())
+        .await
+        .is_err()
+    {
+        eprintln!(
+            "coilbox-relay-agent: the relay was not given back within {} ms, so it is left to the \
+             server's own timeout",
+            RELEASE_BUDGET.as_millis()
+        );
+    }
+}
+
+/// Wait until nobody needs this agent, say so, and give the relay back.
+///
+/// The ordinary end of a relayed battle, and the whole of issue #2018's coilbox
+/// facing half. [`Stopping`] owns the decision and carries the reasoning for it.
+/// Everything here happens after that decision has been made.
+///
+/// The one thing to keep in mind while reading it is what it does not do.
+/// coilbox closing does not reach this, because coilbox closing is not the end
+/// of a game: [`Stopping::wait`] goes on waiting while the engine is alive and
+/// the relay is carrying traffic, so a host who quits the app mid-match hands
+/// nothing back and their game plays on.
+async fn until_nobody_needs_it<R: HandBack>(
+    stopping: &Stopping,
+    open: &OpenRelay<R>,
+    reporter: &Reporter,
+) -> Reason {
+    let reason = stopping.wait().await;
+    eprintln!("coilbox-relay-agent: stopping, because {reason}");
+    // Said before the allocation goes, so a coilbox that is still there learns
+    // the battle has lost its relay from the agent rather than from a pipe that
+    // went quiet.
+    reporter
+        .say(Event::Stopping {
+            reason: reason.to_string(),
+        })
+        .await;
+    hand_back(open).await;
+    reason
 }
 
 impl RelayLink for Transport {
@@ -328,12 +433,12 @@ async fn serve<R: RelayLink>(
                 let done = allowlist::allow(relay, allowlist, ip).await;
                 control::answer(reporter, id, done).await;
             }
-            // Neither of these ever arrives here. `control` answers them in
-            // the reading task, because neither needs a relay and waiting for
+            // None of these ever arrives here. `control` answers them in the
+            // reading task, because none of them needs a relay and waiting for
             // one would mean a battle that is over holding its allocation
             // through a rebuild. Named rather than caught by a wildcard so
             // that a new request has to be placed on purpose.
-            Request::WatchEngine { .. } | Request::Stop { .. } => {}
+            Request::WatchEngine { .. } | Request::Stop { .. } | Request::BattleOver { .. } => {}
         }
     }
 }
@@ -371,9 +476,14 @@ async fn carry<R: RelayLink>(
 /// ordinary end of a battle is [`Stopping`] cancelling this from the outside,
 /// and cancelling it is safe: everything it holds is a socket or a table, and
 /// the process is on its way out.
+///
+/// The relay it has open lives in `open` rather than in a local, because the
+/// cancellation above is exactly the moment somebody else needs to reach it. See
+/// [`OpenRelay`].
 async fn relay_until_it_gives_up(
     args: &Args,
     stopping: &Stopping,
+    open: &OpenRelay<Transport>,
     requests: &mut Requests,
     reporter: &Reporter,
 ) -> ExitCode {
@@ -415,6 +525,10 @@ async fn relay_until_it_gives_up(
                 continue;
             }
         };
+        // Published before anything is advertised on it, so that whatever ends
+        // this process from here on can give it back.
+        let relay = Arc::new(relay);
+        *open.lock().await = Some(Arc::clone(&relay));
         match relay.public_addr() {
             // Where players send. With `--relay-bind` left at port 0 this is
             // the only way to learn it, and a rebuilt relay says it again
@@ -423,6 +537,7 @@ async fn relay_until_it_gives_up(
             Err(e) => {
                 eprintln!("coilbox-relay-agent: {e}");
                 reporter.say(Event::Stopping { reason: e }).await;
+                hand_back(open).await;
                 return ExitCode::FAILURE;
             }
         }
@@ -430,7 +545,7 @@ async fn relay_until_it_gives_up(
         // Counted, so that carrying a datagram is what keeps this process
         // alive once there is no coilbox left to say so.
         let counted = Counted {
-            relay: &relay,
+            relay: relay.as_ref(),
             stopping,
         };
         let stopped = carry(&counted, &mut agent, &allowlist, requests, reporter).await;
@@ -443,7 +558,7 @@ async fn relay_until_it_gives_up(
                             reason: format!("the TURN credential was refused: {failure}"),
                         })
                         .await;
-                    relay.close().await;
+                    hand_back(open).await;
                     return ExitCode::from(EXIT_CREDENTIAL_REFUSED);
                 }
                 failure.to_string()
@@ -460,7 +575,11 @@ async fn relay_until_it_gives_up(
             },
         };
         reporter.say(Event::RelayDown { reason: down }).await;
-        relay.close().await;
+        // The relay that failed is finished with either way, and the next turn
+        // of this loop opens another. Giving it back here rather than dropping
+        // it means a server that is still listening stops holding a port for a
+        // relay this agent has already replaced.
+        hand_back(open).await;
         // A relay that stayed up longer than the agent would ever wait to
         // rebuild one was working, so its failure starts the backoff over
         // rather than inheriting the last one's. Without this, a relay that
@@ -510,35 +629,37 @@ async fn main() -> ExitCode {
     };
 
     let mut requests = Requests::listen(Arc::clone(&reporter), Arc::clone(&stopping));
+    let open: OpenRelay<Transport> = OpenRelay::default();
 
     // The relay loop only ever ends by giving up. Everything else that ends
     // this process is a judgement about whether anybody still needs it, and
     // that is `stopping`'s.
+    //
+    // Losing this race is what frees the peer sockets: the loop future owns the
+    // demux and its table of loopback sockets, and it is dropped when this
+    // expression finishes. The allocation cannot go the same way, because
+    // dropping it tells the relay server nothing, which is why it lives in
+    // `open` and is given back by hand.
     tokio::select! {
-        gave_up = relay_until_it_gives_up(&args, &stopping, &mut requests, &reporter) => gave_up,
-        reason = stopping.wait() => {
-            eprintln!("coilbox-relay-agent: stopping, because {reason}");
-            // Said before the process goes, so a coilbox that is still there
-            // learns the battle has lost its relay from the agent rather than
-            // from a pipe that went quiet. Handing the allocation back is
-            // issue #2018 and belongs here when it lands.
-            reporter.say(Event::Stopping { reason: reason.to_string() }).await;
-            ExitCode::SUCCESS
-        }
+        gave_up = relay_until_it_gives_up(&args, &stopping, &open, &mut requests, &reporter) => gave_up,
+        _ = until_nobody_needs_it(&stopping, &open, &reporter) => ExitCode::SUCCESS,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    //! What [`carry`] does with a relay it has just been handed, which is the
-    //! one piece of this loop that is not obvious from reading it and the one
-    //! that costs a game in progress if it slips.
+    //! Two things, and they are the two pieces of this file that are not
+    //! obvious from reading it and that cost a game in progress if they slip.
+    //! What [`carry`] does with a relay it has just been handed, and whether
+    //! the exit path gives an allocation back.
 
     use super::*;
     use allowlist::Allowlist;
     use std::io;
     use std::net::{IpAddr, Ipv4Addr};
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Mutex;
+    use stopping::IDLE_TIMEOUT;
     use tokio::io::{AsyncBufReadExt, BufReader};
 
     /// How long a test waits for a line before deciding it is never coming.
@@ -685,6 +806,129 @@ mod tests {
             allowlist.everybody(),
             vec![joiner(4)],
             "a served address has to survive the next rebuild"
+        );
+    }
+
+    /// A relay that writes down whether it was ever given back, which is the
+    /// only way to assert that it was not.
+    #[derive(Default)]
+    struct Watched(AtomicBool);
+
+    impl Watched {
+        fn was_given_back(&self) -> bool {
+            self.0.load(Ordering::Relaxed)
+        }
+    }
+
+    impl HandBack for Watched {
+        async fn hand_back(&self) {
+            self.0.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// An open relay, in the slot the exit path reads it out of.
+    fn holding(relay: &Arc<Watched>) -> OpenRelay<Watched> {
+        Arc::new(tokio::sync::Mutex::new(Some(Arc::clone(relay))))
+    }
+
+    /// A reporter whose events nobody reads, for the tests that are about the
+    /// allocation rather than the channel.
+    fn unheard() -> Reporter {
+        Reporter::writing(tokio::io::sink())
+    }
+
+    /// The point of issue #2018. A battle that is over gives its allocation
+    /// back, rather than leaving the relay server holding a port and its
+    /// bandwidth until an idle timeout notices.
+    #[tokio::test(start_paused = true)]
+    async fn a_battle_that_is_over_gives_its_allocation_back() {
+        let relay = Arc::new(Watched::default());
+        let open = holding(&relay);
+        let stopping = Stopping::new();
+        stopping.coilbox_asked();
+
+        until_nobody_needs_it(&stopping, &open, &unheard()).await;
+
+        assert!(
+            relay.was_given_back(),
+            "a battle that ended left its allocation standing on the relay server"
+        );
+        assert!(
+            open.lock().await.is_none(),
+            "an allocation that has been given back is not still held"
+        );
+    }
+
+    /// The requirement that is a negative, and the one this whole design exists
+    /// to protect. Closing coilbox mid-game is not the end of the game: the
+    /// engine is still running and every other player is still connected
+    /// through this allocation, so nothing may be given back.
+    ///
+    /// Written as "the exit path never runs" rather than "the relay was not
+    /// closed", because those are the same thing here and the first is what
+    /// would actually be wrong.
+    #[tokio::test(start_paused = true)]
+    async fn closing_coilbox_during_a_game_gives_nothing_back() {
+        let relay = Arc::new(Watched::default());
+        let open = holding(&relay);
+        let stopping = Stopping::new();
+        // This test process stands in for the engine, so it is definitely
+        // running.
+        stopping.engine_is(std::process::id());
+        // The window shutting, which is not a battle ending.
+        stopping.coilbox_has_gone();
+        let reporter = unheard();
+
+        tokio::select! {
+            reason = until_nobody_needs_it(&stopping, &open, &reporter) => {
+                panic!("gave the allocation back mid-game, because {reason}")
+            }
+            () = async {
+                // Three backstops' worth of a game still being played, so this
+                // is not a matter of the test not having waited long enough.
+                for _ in 0..6 {
+                    tokio::time::sleep(IDLE_TIMEOUT / 2).await;
+                    stopping.carried_something();
+                }
+            } => {}
+        }
+
+        assert!(
+            !relay.was_given_back(),
+            "the allocation carrying a live game was given back, so every player in it was cut off"
+        );
+    }
+
+    /// An agent with no allocation is most of the ways out of the relay loop:
+    /// it never opened one, or it has already given the last one back and is
+    /// waiting to build another. Nothing to hand back, and nothing to say.
+    #[tokio::test]
+    async fn an_agent_with_no_relay_has_nothing_to_give_back() {
+        let open: OpenRelay<Watched> = OpenRelay::default();
+        hand_back(&open).await;
+        assert!(open.lock().await.is_none());
+    }
+
+    /// A relay that will not let go inside the budget must not hold the process
+    /// open, because an agent that hangs on the way out is worse than an
+    /// allocation left to the server's timeout.
+    #[tokio::test(start_paused = true)]
+    async fn a_relay_that_will_not_let_go_does_not_hold_the_process_open() {
+        struct Stuck;
+        impl HandBack for Stuck {
+            async fn hand_back(&self) {
+                std::future::pending::<()>().await;
+            }
+        }
+
+        let open = Arc::new(tokio::sync::Mutex::new(Some(Arc::new(Stuck))));
+        let started = Instant::now();
+        hand_back(&open).await;
+
+        assert!(
+            started.elapsed() <= RELEASE_BUDGET,
+            "the release took {:?}, which is longer than the budget it was given",
+            started.elapsed()
         );
     }
 }
