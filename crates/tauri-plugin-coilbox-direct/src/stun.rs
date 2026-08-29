@@ -391,4 +391,27 @@ mod tests {
     fn two_transaction_ids_in_a_row_are_different() {
         assert_ne!(TransactionId::new(), TransactionId::new());
     }
+
+    /// Every server in [`SERVERS`], one at a time, against the real internet.
+    ///
+    /// The rotation means a normal run only ever reaches one of them, so a
+    /// server whose reply this cannot read would hide behind the three that
+    /// work and only surface for whoever the rotation sent there. Ignored
+    /// because CI has no reason to send traffic to four strangers, and printing
+    /// rather than asserting the address because what a machine's own address
+    /// is depends on the machine.
+    ///
+    /// ```text
+    /// cargo test -p tauri-plugin-coilbox-direct --lib -- --ignored --nocapture every_server
+    /// ```
+    #[tokio::test]
+    #[ignore = "needs the internet"]
+    async fn every_server_answers_in_a_form_this_can_read() {
+        let socket = bind(None).await.expect("an ephemeral socket binds");
+        for server in SERVERS {
+            let found = ask(&socket, server).await;
+            println!("{server} -> {found:?}");
+            assert!(found.is_some(), "{server} answered with an address");
+        }
+    }
 }
