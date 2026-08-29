@@ -31,11 +31,28 @@ use std::time::{Duration, Instant};
 /// and spent in full only when a test is about to fail.
 const PATIENCE: Duration = Duration::from_secs(10);
 
+/// How long a test watches an agent it expects to keep running.
+///
+/// It has to clear the agent's own polling interval, which is `LOOK_EVERY` in
+/// `stopping.rs` and is one second. An agent that had decided to stop takes up
+/// to that long to act on it, so a shorter window here would pass whatever the
+/// rule underneath said. Falsification found exactly that: making the agent
+/// treat a battle ending as an outright stop left this test green until the
+/// window was longer than the interval.
+///
+/// Twice the interval, so a run that is a little slow than usual still measures
+/// something.
+const LONG_ENOUGH_TO_HAVE_STOPPED: Duration = Duration::from_secs(2);
+
 /// The agent, running, with its control channel in hand.
 struct Running {
     child: Child,
     stdin: ChildStdin,
     said: Receiver<String>,
+    /// Where the agent points its loopback sockets. Held rather than dropped so
+    /// a test that sends a datagram through the relay can watch it come out the
+    /// far side, which is the only way to know the agent has seen it.
+    engine: UdpSocket,
 }
 
 impl Running {
@@ -44,8 +61,6 @@ impl Running {
     }
 
     fn start_with(run_file: Option<&Path>) -> Running {
-        // Somewhere for the agent to point its loopback sockets. Nothing
-        // listens, and nothing in this test sends game traffic.
         let engine = UdpSocket::bind("127.0.0.1:0").expect("a free loopback port");
         let engine_port = engine.local_addr().expect("a bound address").port();
 
@@ -80,7 +95,34 @@ impl Running {
             }
         });
 
-        Running { child, stdin, said }
+        Running {
+            child,
+            stdin,
+            said,
+            engine,
+        }
+    }
+
+    /// The address players send to, off the agent's first line.
+    fn relay_addr(&self) -> std::net::SocketAddr {
+        let opened = self.hears();
+        let addr = opened
+            .strip_prefix("{\"type\":\"relayOpen\",\"addr\":\"")
+            .and_then(|rest| rest.split('"').next())
+            .unwrap_or_else(|| panic!("the agent has to say where its relay is, got: {opened}"));
+        addr.parse().expect("an address the agent printed")
+    }
+
+    /// Wait for a datagram to reach the engine, which is proof the agent read
+    /// one off the relay and forwarded it.
+    fn engine_hears(&self) {
+        self.engine
+            .set_read_timeout(Some(PATIENCE))
+            .expect("a bound socket");
+        let mut buf = [0u8; 64];
+        self.engine
+            .recv_from(&mut buf)
+            .expect("the agent forwards what arrives on its relay to the engine");
     }
 
     fn ask(&mut self, line: &str) {
@@ -156,6 +198,69 @@ fn an_agent_that_is_asked_to_stop_answers_and_then_exits() {
         agent.ends().success(),
         "a battle that ended normally is not a failure"
     );
+}
+
+/// A battle that ends without anybody ever having played in it, which is the
+/// host who opened a relayed battle, waited, and gave up. Nothing was ever
+/// relayed, so there is nothing to protect and the allocation goes back at once
+/// rather than four minutes later on the traffic backstop.
+#[test]
+fn a_battle_that_ends_with_nobody_having_played_stops_the_agent() {
+    let mut agent = Running::start();
+    assert!(agent.hears().starts_with("{\"type\":\"relayOpen\""));
+
+    agent.ask("{\"type\":\"battleOver\",\"id\":11}");
+    assert_eq!(agent.hears(), "{\"type\":\"done\",\"id\":11}");
+    let last = agent.hears();
+    assert!(
+        last.starts_with("{\"type\":\"stopping\",\"reason\":\""),
+        "the agent says why it is going before it goes, got: {last}"
+    );
+    assert!(
+        agent.ends().success(),
+        "a battle that ended normally is not a failure"
+    );
+}
+
+/// And the case it must not fire on. A host who leaves the battle room while
+/// the match is still being played has not ended the game: everybody else is
+/// still connected through this relay, and stopping here would cut all of them
+/// off. That is the failure the whole sidecar exists to prevent.
+#[test]
+fn a_battle_that_ends_while_a_player_is_relaying_leaves_the_agent_alone() {
+    let mut agent = Running::start();
+    let relay = agent.relay_addr();
+
+    // A player's engine, talking through the relay, which is what a game in
+    // progress looks like from the agent's side. Waited for at the engine end,
+    // so the agent has certainly seen it before the battle is called over.
+    let player = UdpSocket::bind("127.0.0.1:0").expect("a free loopback port");
+    player
+        .send_to(b"a datagram from a player", relay)
+        .expect("the relay is bound");
+    agent.engine_hears();
+
+    agent.ask("{\"type\":\"battleOver\",\"id\":12}");
+    assert_eq!(agent.hears(), "{\"type\":\"done\",\"id\":12}");
+
+    // Still there, still relaying, for longer than it would take the agent to
+    // act on a decision to stop. See `LONG_ENOUGH_TO_HAVE_STOPPED`.
+    let until = Instant::now() + LONG_ENOUGH_TO_HAVE_STOPPED;
+    while Instant::now() < until {
+        player
+            .send_to(b"the game is still going", relay)
+            .expect("the relay is bound");
+        agent.engine_hears();
+        assert!(
+            agent
+                .child
+                .try_wait()
+                .expect("a child we spawned")
+                .is_none(),
+            "the agent stopped while a game was still being relayed through it"
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
 }
 
 /// Naming the engine is a request like any other and has to be answered like

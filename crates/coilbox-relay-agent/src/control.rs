@@ -24,12 +24,13 @@
 //! unaffected. [`Requests::listen`] writes that to stderr at the moment it
 //! becomes true, so it lands in a log next to the join that failed.
 //!
-//! ## Two requests never reach the relay loop
+//! ## Three requests never reach the relay loop
 //!
-//! [`Request::Stop`] and [`Request::WatchEngine`] are answered here, in the
-//! reading task, because neither needs a relay to carry out. Everything else
-//! waits for one, and waiting is right for those: an `allowPeer` answered
-//! while there is no relay would be a lie either way round.
+//! [`Request::Stop`], [`Request::BattleOver`] and [`Request::WatchEngine`] are
+//! answered here, in the reading task, because none of them needs a relay to
+//! carry out. Everything else waits for one, and waiting is right for those: an
+//! `allowPeer` answered while there is no relay would be a lie either way
+//! round.
 //!
 //! Answering them here is what makes them prompt. A relay being rebuilt can
 //! take 32 seconds (`LONGEST_BACKOFF` in `main`), and a coilbox that has said
@@ -155,6 +156,26 @@ impl Requests {
                         // its way out before anything starts tearing down.
                         reporter.say(Event::Done { id }).await;
                         stopping.coilbox_asked();
+                        return;
+                    }
+                    Ok(Request::BattleOver { id }) => {
+                        reporter.say(Event::Done { id }).await;
+                        stopping.battle_is_over();
+                        // Nothing more to read. A battle that has gone from the
+                        // lobby has no joiners left to vouch for, coilbox lets
+                        // go of the channel as it sends this, and an agent
+                        // still sitting on a blocking read of stdin would keep
+                        // the process alive after it had decided to go.
+                        //
+                        // Unlike `stop` this is not a promise that the process
+                        // is going. A game still being played through the relay
+                        // keeps it running, and now decides for itself when to
+                        // stop.
+                        eprintln!(
+                            "coilbox-relay-agent: coilbox says the battle is over. If a game is \
+                             still being played through this relay it carries on until the game \
+                             ends, and nobody new can be let through from now on."
+                        );
                         return;
                     }
                     Ok(request) => {

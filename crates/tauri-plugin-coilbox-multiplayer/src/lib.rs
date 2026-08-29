@@ -1493,8 +1493,16 @@ fn mp_join_battle(
 }
 
 /// `mp_leave_battle` — leave the current battle.
+///
+/// A host leaving their own battle closes it, so a relay opened for that battle
+/// is carrying one that no longer exists and the sidecar has to hear about it
+/// (issue #2018). [`forget_relay`] is what says so, and what explains why this
+/// cannot cut off a game that is still being played. It runs before the
+/// protocol branches below because a relayed host is always a TASServer host,
+/// and it is a no-op on every connection that is not hosting through a relay.
 #[tauri::command]
 fn mp_leave_battle(registry: State<'_, Registry>, server_key: String) -> CliResult {
+    forget_relay(registry.inner(), &server_key);
     if let Some(result) = tachyon_action(registry.inner(), &server_key, TachyonAction::LeaveLobby) {
         return result;
     }
@@ -1881,15 +1889,28 @@ fn remember_relay(registry: &Registry, server_key: &str, host: relay_host::Relay
     }
 }
 
-/// Forget whatever relay this connection was last hosting through.
+/// Forget whatever relay this connection was last hosting through, telling the
+/// sidecar the battle is over on the way.
 ///
-/// Dropping the [`relay_host::RelayHost`] closes coilbox's end of the sidecar's
-/// stdin, which the sidecar reads as coilbox going away rather than as a battle
-/// ending, so a game already running carries on. Ending a relayed battle
-/// deliberately is issue #2018.
+/// The one place coilbox lets go of a relay, so the one place that has to say
+/// so. Both callers are a battle ending as far as the lobby is concerned: the
+/// host leaving it, and the host opening another one over the top of it.
+///
+/// What it deliberately does not do is stop the sidecar. Leaving a battle room
+/// is not the end of a game, and a host who does it mid-match still has an
+/// engine running with every other player connected through this relay.
+/// [`relay_agent::RelayAgent::battle_over`] says what coilbox knows and leaves
+/// the sidecar to decide, which is issue #2018 and the reason this is not a
+/// `stop`.
+///
+/// Sent before the handle is dropped and not waited on. A write that fails is a
+/// sidecar that has already gone, which is the outcome we wanted anyway.
 fn forget_relay(registry: &Registry, server_key: &str) {
-    if let Some(conn) = lock_or_recover(registry).get(server_key) {
-        *lock_or_recover(&conn.relay) = None;
+    let held = lock_or_recover(registry)
+        .get(server_key)
+        .and_then(|conn| lock_or_recover(&conn.relay).take());
+    if let Some(host) = held {
+        let _ = host.agent.battle_over();
     }
 }
 
@@ -3419,6 +3440,10 @@ mod tests {
         fn was_stopped(&self) -> bool {
             self.sent().contains("\"type\":\"stop\"")
         }
+
+        fn was_told_the_battle_is_over(&self) -> bool {
+            self.sent().contains("\"type\":\"battleOver\"")
+        }
     }
 
     impl std::io::Write for Channelled {
@@ -3684,6 +3709,57 @@ mod tests {
             .get("alice@bar:8200")
             .map(|conn| lock_or_recover(&conn.relay).is_some())
             .unwrap_or_default());
+    }
+
+    /// Issue #2018's coilbox half. A battle that ends has to tell the sidecar,
+    /// because otherwise the allocation stands until the relay server's own
+    /// timeout notices, and until then the sidecar's run file refuses the next
+    /// attempt to host.
+    ///
+    /// What it must not say is `stop`. Leaving a battle room is not the end of
+    /// a game, and coilbox cannot tell from here whether an engine is still
+    /// playing through this relay, so it says what it knows and lets the
+    /// sidecar decide.
+    #[test]
+    fn a_relay_this_connection_lets_go_of_is_told_the_battle_is_over() {
+        let (registry, _sent, _answers) = a_connection("COMPFLAGS u sp r");
+        let channel = Channelled::default();
+        remember_relay(
+            &registry,
+            "alice@bar:8200",
+            a_relay_writing_to(channel.clone()),
+        );
+
+        forget_relay(&registry, "alice@bar:8200");
+
+        assert!(
+            channel.was_told_the_battle_is_over(),
+            "a relay nobody is holding any more has to hear the battle ended, got: {:?}",
+            channel.sent()
+        );
+        assert!(
+            !channel.was_stopped(),
+            "stopping a relay coilbox cannot see the engine behind would cut off a game that is \
+             still being played, got: {:?}",
+            channel.sent()
+        );
+        assert!(
+            lock_or_recover(&registry)
+                .get("alice@bar:8200")
+                .map(|conn| lock_or_recover(&conn.relay).is_none())
+                .unwrap_or_default(),
+            "the connection is no longer hosting through a relay"
+        );
+    }
+
+    /// A connection that was never hosting through a relay has nothing to let
+    /// go of, which is every host today and every join ever. Leaving a battle
+    /// must not need one.
+    #[test]
+    fn letting_go_of_a_relay_there_never_was_does_nothing() {
+        let (registry, _sent, _answers) = a_connection("COMPFLAGS u sp");
+        forget_relay(&registry, "alice@bar:8200");
+        forget_relay(&registry, "nobody@nowhere:8200");
     }
 
     /// Hosting twice on one connection, where the first attempt was refused.

@@ -217,20 +217,39 @@ impl RelayAgent {
         })
     }
 
-    /// Tell the sidecar the battle is over.
+    /// Tell the sidecar to stop relaying and exit.
     ///
-    /// The signal that beats every other, because coilbox is the only thing
-    /// that knows a battle has ended rather than guessing at it from an idle
-    /// relay. Not waited on for the same reason as
-    /// [`RelayAgent::watch_engine`]: a sidecar that cannot be reached has
-    /// already stopped.
+    /// Only for a relay that is provably carrying nothing, which in practice
+    /// means a battle that was being opened and never opened. Every caller is
+    /// on a path that runs before `remember_relay`, so the agent it stops was
+    /// started by that same attempt seconds earlier and no engine has been
+    /// launched into it. See [`crate::relay_host`] for the argument in full.
     ///
-    /// Note what closing coilbox is not. Dropping this handle closes the
-    /// sidecar's stdin, and the sidecar reads that as coilbox going away
-    /// rather than as a battle ending, so it keeps relaying for whoever is
-    /// still playing. Ending a battle has to be said.
+    /// Not waited on for the same reason as [`RelayAgent::watch_engine`]: a
+    /// sidecar that cannot be reached has already stopped.
     pub fn stop(&self) -> io::Result<()> {
         self.write(&Request::Stop {
+            id: self.next_id.fetch_add(1, Ordering::Relaxed),
+        })
+    }
+
+    /// Tell the sidecar the battle it was relaying has ended in the lobby.
+    ///
+    /// The counterpart to [`RelayAgent::stop`] for a battle that did open, and
+    /// the difference between them is the whole of issue #2018. coilbox knows
+    /// the battle has gone from the lobby. It does not know whether an engine
+    /// is still playing through the relay, and a host who leaves a battle room
+    /// mid-match has ended neither the game nor anybody else's connection to
+    /// it. So this says what coilbox knows and leaves the decision to the
+    /// sidecar, which is watching the engine and its own traffic.
+    ///
+    /// Sent before this handle is dropped, and worth sending rather than
+    /// relying on the drop, because the sidecar reads a closed stdin as coilbox
+    /// going away and would then hold its allocation for the four minutes of
+    /// its traffic backstop. Told outright, a relay nobody ever played through
+    /// goes at once.
+    pub fn battle_over(&self) -> io::Result<()> {
+        self.write(&Request::BattleOver {
             id: self.next_id.fetch_add(1, Ordering::Relaxed),
         })
     }
@@ -525,6 +544,30 @@ mod tests {
             written.lines(),
             vec!["{\"type\":\"allowPeer\",\"id\":1,\"ip\":\"198.51.100.4\"}"]
         );
+    }
+
+    /// The two ways a battle ends are two different lines, and which one goes
+    /// out decides whether a game in progress survives. `stop` is obeyed
+    /// outright and `battleOver` is a fact the sidecar weighs against what it
+    /// can see for itself, so sending the wrong one is the difference between a
+    /// tidy exit and cutting off every player in a match.
+    #[test]
+    fn ending_a_battle_and_stopping_a_relay_are_different_lines() {
+        let (scripted, reading) = Scripted::new();
+        let written = Written::default();
+        let agent = RelayAgent::driving(reading, written.clone(), |_| {});
+
+        agent.battle_over().expect("the channel takes a request");
+        agent.stop().expect("the channel takes a request");
+
+        assert_eq!(
+            written.lines(),
+            vec![
+                "{\"type\":\"battleOver\",\"id\":1}",
+                "{\"type\":\"stop\",\"id\":2}",
+            ]
+        );
+        drop(scripted);
     }
 
     /// A join that cannot be allowed through has to fail with the agent's own

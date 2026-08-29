@@ -570,7 +570,14 @@ mod tests {
         AllocateSigned,
         /// An Allocate signed with a key that does not.
         AllocateBadlySigned,
+        /// A Refresh asking to keep the allocation, which is what the client's
+        /// own timer sends.
         Refresh,
+        /// A Refresh asking for a lifetime of zero, which is RFC 5766's way of
+        /// saying the allocation is finished with (section 7). Kept apart from
+        /// an ordinary Refresh because they are opposite instructions with the
+        /// same method, and only the number tells them apart.
+        Release,
     }
 
     struct FakeTurn {
@@ -658,7 +665,13 @@ mod tests {
             return Some(granted(request, METHOD_ALLOCATE, Some(relayed), lifetime));
         }
         if request.typ.method == METHOD_REFRESH {
-            let _ = say.send(Asked::Refresh);
+            let mut asked_for = Lifetime::default();
+            let releasing = asked_for.get_from(request).is_ok() && asked_for.0.is_zero();
+            let _ = say.send(if releasing {
+                Asked::Release
+            } else {
+                Asked::Refresh
+            });
             return match on_refresh {
                 OnRefresh::Grant => Some(granted(request, METHOD_REFRESH, None, lifetime)),
                 OnRefresh::Refuse(code) => {
@@ -811,6 +824,31 @@ mod tests {
             "refreshes were being answered, so nothing was lost"
         );
         allocation.close().await;
+    }
+
+    /// Issue #2018 at the wire. Closing an allocation has to be a Refresh
+    /// asking for a lifetime of zero, because that is the only thing a TURN
+    /// server reads as "I am finished with this" (RFC 5766 section 7). Anything
+    /// else, including simply exiting, leaves the server holding the port until
+    /// its own timeout notices.
+    ///
+    /// Asserted as a message the server was sent rather than as a call that was
+    /// made, because a call this test could see happening would say nothing
+    /// about whether a datagram left the machine.
+    #[tokio::test]
+    async fn giving_an_allocation_back_asks_the_server_for_a_lifetime_of_zero() {
+        let mut server = FakeTurn::start(OnRefresh::Grant, Duration::from_secs(600)).await;
+        let allocation = TurnAllocation::open(any_local_port(), &server.credentials())
+            .await
+            .expect("the server granted an allocation");
+        server.waits_to_be_asked(Asked::AllocateUnsigned).await;
+        server.waits_to_be_asked(Asked::AllocateSigned).await;
+
+        allocation.close().await;
+
+        // A 600 second lifetime, so the client's own refresh timer is five
+        // minutes away and the only Refresh that can arrive is this one.
+        server.waits_to_be_asked(Asked::Release).await;
     }
 
     /// A credential that expires under a live allocation takes the battle with
