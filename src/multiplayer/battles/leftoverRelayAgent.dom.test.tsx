@@ -278,4 +278,17 @@ describe("what the host is told the relay agent did", () => {
     }
     expect(stopOutcomeMessage("noAnswer")).toContain("Restarting this machine");
   });
+
+  // The claim this outcome used to make, and cannot. A note that nothing took
+  // says only that nothing read it, and the agent reads notes only once its own
+  // coilbox has closed. coilbox proves a recycled process number by the lock on
+  // the run file instead, and a record that fails that test never reaches this
+  // panel at all, so anything still landing here is a case coilbox cannot call
+  // (issue #2078).
+  it("does not claim the process has stopped being the relay agent", () => {
+    expect(stopOutcomeMessage("noAnswer")).not.toContain(
+      "no longer the relay agent",
+    );
+    expect(stopOutcomeMessage("noAnswer")).toContain("cannot rule out");
+  });
 });

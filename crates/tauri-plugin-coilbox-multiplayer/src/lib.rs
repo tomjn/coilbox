@@ -2041,8 +2041,18 @@ enum StopAnswer {
     /// It took the note and kept running, which it does when a player has been
     /// heard through the relay. Stopping it would have cut off a game.
     Carrying,
-    /// Nothing took the note. Nothing is reading them, so the process id in the
-    /// run file is no longer the sidecar's.
+    /// Nothing took the note, and coilbox cannot show that the process is not
+    /// the sidecar.
+    ///
+    /// The residual case, and it is genuinely two. Either something is holding
+    /// the run file open, which means the sidecar is there and has stopped
+    /// reading notes, or the record is from a build that took no lock and there
+    /// is nothing to read. Neither can be cleared from here and both need the
+    /// same thing said about them (issue #2078).
+    ///
+    /// A record naming a process id the OS has handed on is no longer one of
+    /// these. [`relay_sidecar::already_relaying`] does not report it as a relay
+    /// at all, so it arrives here as [`StopAnswer::Gone`].
     NoAnswer,
 }
 
@@ -4888,20 +4898,34 @@ mod tests {
         }
     }
 
-    /// A run file naming a process that is definitely running, which is what a
-    /// leftover sidecar leaves. This test process stands in for it.
-    fn a_run_file_naming_a_live_sidecar(dir: &std::path::Path) -> std::path::PathBuf {
+    /// A run file naming a process that is definitely running and holding the
+    /// file, which is what a live sidecar leaves. This test process stands in
+    /// for it.
+    ///
+    /// The lock comes back with the path because it lives on the open handle:
+    /// dropping it is the sidecar dying, so a caller that throws it away is
+    /// testing a leftover rather than a sidecar.
+    fn a_run_file_naming_a_live_sidecar(
+        dir: &std::path::Path,
+    ) -> (std::path::PathBuf, std::fs::File) {
         let run_file = dir.join("relay").join("agent.json");
         std::fs::create_dir_all(run_file.parent().expect("a parent")).expect("a writable temp dir");
         std::fs::write(
             &run_file,
             coilbox_relay_protocol::RunFile {
                 pid: std::process::id(),
+                locked: true,
             }
             .to_json(),
         )
         .expect("a writable temp dir");
-        run_file
+        let held = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&run_file)
+            .expect("the file is there");
+        held.try_lock_shared().expect("nothing else has it");
+        (run_file, held)
     }
 
     /// The note coilbox left, if it is still there.
@@ -4933,7 +4957,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_relay_this_coilbox_is_hosting_through_is_never_asked_to_stop() {
         let dir = tempfile::tempdir().expect("a temp dir");
-        let run_file = a_run_file_naming_a_live_sidecar(dir.path());
+        let (run_file, _held) = a_run_file_naming_a_live_sidecar(dir.path());
 
         assert_eq!(
             ask_the_leftover_sidecar_to_stop(&run_file, true).await,
@@ -4951,7 +4975,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_sidecar_that_takes_the_note_and_goes_is_reported_as_stopped() {
         let dir = tempfile::tempdir().expect("a temp dir");
-        let run_file = a_run_file_naming_a_live_sidecar(dir.path());
+        let (run_file, _held) = a_run_file_naming_a_live_sidecar(dir.path());
 
         // A sidecar that reads the note, decides it has nothing to carry, and
         // exits. One interval, which is what the real one takes.
@@ -4975,7 +4999,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_sidecar_that_takes_the_note_and_stays_is_reported_as_carrying_a_game() {
         let dir = tempfile::tempdir().expect("a temp dir");
-        let run_file = a_run_file_naming_a_live_sidecar(dir.path());
+        let (run_file, _held) = a_run_file_naming_a_live_sidecar(dir.path());
 
         // Takes the note, keeps its run file, carries on relaying.
         let carrying = run_file.clone();
@@ -4995,14 +5019,15 @@ mod tests {
         );
     }
 
-    /// Nothing read the note at all, which means nothing is there to read one.
-    /// A process id is unique only while its process lives, so the run file is
-    /// naming a number the OS has since given to something unrelated. Told
-    /// apart from the case above only by the note still sitting there.
+    /// Nothing read the note, and yet something is holding the run file open,
+    /// so the process it names is the sidecar after all and coilbox must leave
+    /// it alone. The residual case: a sidecar whose note reading has stopped
+    /// while the process has not. Told apart from the case above only by the
+    /// note still sitting there.
     #[tokio::test(start_paused = true)]
     async fn a_note_nothing_ever_reads_is_reported_as_no_answer() {
         let dir = tempfile::tempdir().expect("a temp dir");
-        let run_file = a_run_file_naming_a_live_sidecar(dir.path());
+        let (run_file, _held) = a_run_file_naming_a_live_sidecar(dir.path());
 
         assert_eq!(
             ask_the_leftover_sidecar_to_stop(&run_file, false).await,
@@ -5017,6 +5042,28 @@ mod tests {
             "the note has to name the process the run file named, or a sidecar that is there \
              would leave it alone"
         );
+    }
+
+    /// The record issue #2078 is about, reached through the button rather than
+    /// through hosting. The sidecar has gone and its number now belongs to
+    /// something else, so nothing holds the file, and the host is told they can
+    /// host rather than told to restart the machine.
+    ///
+    /// No note is left, because there is nobody to leave one for and the next
+    /// sidecar to start would read it.
+    #[tokio::test(start_paused = true)]
+    async fn a_record_naming_a_process_that_is_not_the_sidecar_is_already_gone() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let (run_file, held) = a_run_file_naming_a_live_sidecar(dir.path());
+        // The sidecar dying, which is the kernel giving the lock back. The pid
+        // in the file is this test process, which is very much still running.
+        drop(held);
+
+        assert_eq!(
+            ask_the_leftover_sidecar_to_stop(&run_file, false).await,
+            Ok(StopAnswer::Gone)
+        );
+        assert!(!note_beside(&run_file).exists());
     }
 
     /// The registry scan behind the guard above, which is the only thing

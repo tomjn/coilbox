@@ -237,6 +237,39 @@ fn asking_a_sidecar_that_is_carrying_a_game_does_not_end_it() {
     );
 }
 
+/// The half of issue #2078 that only a real sidecar can prove: it holds its own
+/// run file open for as long as it runs, and its record says so.
+///
+/// Everything coilbox does about a recycled process number rests on that. Both
+/// sides' unit tests stand in for the sidecar with a lock they take themselves,
+/// so a sidecar that wrote the promise and never took the lock, or took it and
+/// let it go, would leave every one of them green and have coilbox clearing a
+/// record belonging to a relay carrying a game.
+#[test]
+fn a_running_sidecar_holds_its_own_run_file_and_says_it_does() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let run_file = dir.path().join("relay").join("agent.json");
+
+    let (agent, seen) = start(&run_file);
+    assert!(matches!(hears(&seen), Event::RelayOpen { .. }));
+
+    let record = coilbox_relay_protocol::RunFile::from_json(
+        &std::fs::read_to_string(&run_file).expect("a running sidecar left a run file"),
+    )
+    .expect("the sidecar writes a record coilbox can read");
+    assert!(
+        record.locked,
+        "a sidecar that does not promise the lock leaves coilbox back on the process id alone"
+    );
+    assert!(
+        coilbox_relay_protocol::run_file_is_still_held(&run_file),
+        "the promise has to be kept, or coilbox reads a live relay as a leftover and starts a \
+         second one over the game it is carrying"
+    );
+
+    agent.stop().expect("a running sidecar is still reachable");
+}
+
 /// Once the battle has ended there is nothing to find, so the next one starts
 /// a relay instead of being told one is already running.
 #[test]

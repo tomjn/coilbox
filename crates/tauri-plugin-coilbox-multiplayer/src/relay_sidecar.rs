@@ -44,6 +44,19 @@
 //!
 //! [`note_was_taken`] is the answer. The sidecar removes a note addressed to
 //! it, which is the only proof of life a process with no pipe can give.
+//!
+//! ## Telling a recycled process number from a live sidecar
+//!
+//! A note that nothing takes is close to proof and is not proof, because the
+//! sidecar only reads notes once its own coilbox has closed. So a leftover
+//! record naming a number the OS had handed on to something else was a dead end
+//! that only a restart cleared (issue #2078).
+//!
+//! The lock is the proof. The sidecar keeps a shared lock on its run file
+//! for the whole time it runs, and the kernel gives that lock up when the
+//! process ends, however it ends. [`already_relaying`] tries to take it: if it
+//! can, the sidecar that wrote the record is dead and the record is a leftover,
+//! and the next battle starts a sidecar that clears it on the way in.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -134,13 +147,35 @@ pub fn log_path(run_file: &Path) -> PathBuf {
 
 /// The pid of the sidecar already relaying a battle, if one is.
 ///
-/// `None` covers every way of not finding one: no file, an unreadable file, or
-/// one naming a process that has gone. They all mean the same thing to the
+/// `None` covers every way of not finding one: no file, an unreadable file, one
+/// naming a process that has gone, and one naming a process that is running and
+/// is not the sidecar that wrote it. They all mean the same thing to the
 /// caller, which is that starting a sidecar is the right move.
+///
+/// ## The last of those, and why it is not a guess
+///
+/// A pid is unique only while its process lives. Once the sidecar has gone the
+/// OS may hand its number to anything, and a run file naming a number that now
+/// belongs to somebody's browser refused every relayed battle for the rest of
+/// that machine's uptime (issue #2078).
+///
+/// The lock settles it. The sidecar holds a shared lock on the run file for
+/// as long as it runs and the kernel releases it the moment that process ends,
+/// so a free lock means the writer is dead. That is the one thing a live
+/// sidecar always does and a recycled process never would, and it is why
+/// clearing on it cannot clear a record belonging to a sidecar carrying a game.
+///
+/// Only for a record that says its writer took a lock. One from a build before
+/// the lock has a free lock either way, so it is left to its pid and needs the
+/// note in [`leave_a_stop_note`], or a restart.
 pub fn already_relaying(run_file: &Path) -> Option<u32> {
     let text = std::fs::read_to_string(run_file).ok()?;
-    let pid = RunFile::from_json(&text).ok()?.pid;
-    coilbox_proc::is_running(pid).then_some(pid)
+    let record = RunFile::from_json(&text).ok()?;
+    if !coilbox_proc::is_running(record.pid) {
+        return None;
+    }
+    (!record.locked || coilbox_relay_protocol::run_file_is_still_held(run_file))
+        .then_some(record.pid)
 }
 
 /// How long to give a note before deciding nothing is reading them.
@@ -286,8 +321,26 @@ mod tests {
         );
     }
 
+    /// A process that is running and has never heard of a run file, for
+    /// standing in for whatever the OS gave a dead sidecar's number to. The
+    /// caller kills it.
+    fn a_process_that_is_not_the_sidecar() -> std::process::Child {
+        let (program, args): (&str, &[&str]) = if cfg!(windows) {
+            ("cmd", &["/C", "timeout", "/T", "60"])
+        } else {
+            ("sh", &["-c", "sleep 60"])
+        };
+        std::process::Command::new(program)
+            .args(args)
+            .spawn()
+            .expect("a shell to run")
+    }
+
     /// The findability check, in the two states that matter: a live agent is
     /// found, and one that has gone is not.
+    ///
+    /// The lock stands in for the sidecar, because that is what a running
+    /// sidecar is from out here: something holding the file open.
     #[test]
     fn a_run_file_naming_a_live_process_is_a_relay_that_is_already_running() {
         let dir = tempfile::tempdir().expect("a temp dir");
@@ -296,12 +349,64 @@ mod tests {
             &run_file,
             RunFile {
                 pid: std::process::id(),
+                locked: true,
+            }
+            .to_json(),
+        )
+        .expect("a writable temp dir");
+        let held = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&run_file)
+            .expect("the file is there");
+        held.try_lock_shared().expect("nothing else has it");
+
+        assert_eq!(already_relaying(&run_file), Some(std::process::id()));
+    }
+
+    /// The bug in issue #2078. The sidecar has gone and the OS has given its
+    /// number to something else, so the pid reads as running and nothing holds
+    /// the file. Reporting a relay here is what left a host unable to open a
+    /// relayed battle until they restarted the machine.
+    #[test]
+    fn a_run_file_naming_a_process_that_is_not_the_sidecar_is_not_a_relay() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("agent.json");
+        let mut stranger = a_process_that_is_not_the_sidecar();
+        std::fs::write(
+            &run_file,
+            RunFile {
+                pid: stranger.id(),
+                locked: true,
             }
             .to_json(),
         )
         .expect("a writable temp dir");
 
-        assert_eq!(already_relaying(&run_file), Some(std::process::id()));
+        let found = already_relaying(&run_file);
+        let _ = stranger.kill();
+        let _ = stranger.wait();
+
+        assert_eq!(found, None);
+    }
+
+    /// The same record from a build that took no lock. Its lock is free whether
+    /// the sidecar is alive or dead, so the pid is all there is to go on and it
+    /// still counts. Without this, upgrading coilbox during a relayed game
+    /// would start a second sidecar over the first.
+    #[test]
+    fn a_run_file_from_a_build_that_took_no_lock_is_still_a_relay() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("agent.json");
+        let mut older = a_process_that_is_not_the_sidecar();
+        let pid = older.id();
+        std::fs::write(&run_file, format!("{{\"pid\":{pid}}}")).expect("a writable temp dir");
+
+        let found = already_relaying(&run_file);
+        let _ = older.kill();
+        let _ = older.wait();
+
+        assert_eq!(found, Some(pid));
     }
 
     #[test]
@@ -384,7 +489,15 @@ mod tests {
         let gone = child.id();
         child.wait().expect("it exits at once");
 
-        std::fs::write(&run_file, RunFile { pid: gone }.to_json()).expect("a writable temp dir");
+        std::fs::write(
+            &run_file,
+            RunFile {
+                pid: gone,
+                locked: true,
+            }
+            .to_json(),
+        )
+        .expect("a writable temp dir");
         assert_eq!(already_relaying(&run_file), None);
     }
 }
