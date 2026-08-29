@@ -5424,6 +5424,7 @@ dependencies = [
  "serde",
  "serde_json",
  "socket2",
+ "stun",
  "tauri",
  "tauri-plugin",
  "tokio",

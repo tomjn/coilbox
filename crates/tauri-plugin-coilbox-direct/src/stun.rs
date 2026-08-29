@@ -8,12 +8,17 @@
 //! outside instead, by asking a public server what address the packet arrived
 //! from.
 //!
-//! # Hand rolled on purpose
+//! # What is ours and what is the `stun` crate's
 //!
-//! This is a binding request and the one attribute that comes back in it: about
-//! sixty lines of RFC 5389. Every STUN crate on the registry carries the ICE and
-//! TURN machinery that makes STUN worth a library, and none of it is ever used
-//! here.
+//! The wire is the crate's. Building the binding request, parsing the reply and
+//! un-XOR-ing XOR-MAPPED-ADDRESS all go through `stun::message::Message`, which
+//! arrived in the tree with the `turn` crate the relay agent takes.
+//!
+//! What is left here is the part no STUN library has an opinion about: which
+//! servers to ask, in what order, how long to wait, and which socket the
+//! question goes out of. The crate also has a `Client`, and it is not used: it
+//! wants a `webrtc_util::Conn` and gives back one server, one transaction and no
+//! rotation, which is less than the four lines below do.
 //!
 //! # Confirming the mapping rather than only reading the address
 //!
@@ -24,32 +29,14 @@
 //! failure, because some routers hand an outbound flow its own mapping
 //! regardless, so it is reported as a signal and not as a verdict.
 
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::time::Duration;
 
 use serde::Serialize;
+use stun::agent::TransactionId;
+use stun::message::{Getter, Message, BINDING_REQUEST, BINDING_SUCCESS};
+use stun::xoraddr::XorMappedAddress;
 use tokio::net::UdpSocket;
-
-/// Binding request. RFC 5389 section 6, message type 0x0001.
-const BINDING_REQUEST: u16 = 0x0001;
-
-/// Binding success response, which is the only reply worth reading. An error
-/// response is 0x0111 and is rejected along with everything else.
-const BINDING_SUCCESS: u16 = 0x0101;
-
-/// RFC 5389 section 6. Present in every message, and its absence marks a reply
-/// from something that is not a STUN server.
-const MAGIC_COOKIE: u32 = 0x2112_A442;
-
-/// XOR-MAPPED-ADDRESS. RFC 5389 section 15.2.
-const XOR_MAPPED_ADDRESS: u16 = 0x0020;
-
-/// Address family IPv4, inside XOR-MAPPED-ADDRESS.
-const FAMILY_IPV4: u8 = 0x01;
-
-/// A request is a header and nothing else: 2 type, 2 length, 4 cookie, 12
-/// transaction id.
-const HEADER_LEN: usize = 20;
 
 /// The largest reply this will read. A binding response is under a hundred bytes
 /// and anything near this is somebody else's protocol.
@@ -104,95 +91,49 @@ pub struct Reflexive {
     pub port: u16,
 }
 
-/// Build a binding request. Pure.
-pub fn encode_request(transaction: &[u8; 12]) -> [u8; HEADER_LEN] {
-    let mut out = [0u8; HEADER_LEN];
-    out[0..2].copy_from_slice(&BINDING_REQUEST.to_be_bytes());
-    // Length counts the attributes after the header, and a binding request
-    // carries none.
-    out[2..4].copy_from_slice(&0u16.to_be_bytes());
-    out[4..8].copy_from_slice(&MAGIC_COOKIE.to_be_bytes());
-    out[8..20].copy_from_slice(transaction);
-    out
+/// Build a binding request carrying `transaction`, as bytes ready to send.
+///
+/// A request is a header and no attributes, so the only thing being set here is
+/// the transaction id, and the only reason to set it rather than let the crate
+/// pick one is that [`decode_response`] has to be able to recognise the answer.
+fn encode_request(transaction: TransactionId) -> Vec<u8> {
+    let mut message = Message::new();
+    // Neither setter can fail on an empty message, and a request that somehow
+    // did not build would go out as an empty datagram, which is a server that
+    // does not answer, which the rotation already handles.
+    let _ = message.build(&[Box::new(transaction), Box::new(BINDING_REQUEST)]);
+    message.raw
 }
 
 /// Read the reflexive address out of a reply, or `None` if this is not the reply
-/// we asked for. Pure.
+/// we asked for.
 ///
-/// Rejects, in order: a datagram too short to be a STUN message, anything that
-/// is not a binding success, a missing magic cookie, a transaction id that
-/// belongs to a different request, a stated length that runs off the end, an
-/// attribute that runs off the end, and an address family that is not IPv4.
+/// The crate's decoder throws out anything that is not a well formed STUN
+/// message: too short for a header, no magic cookie, a stated length that runs
+/// off the end, or an attribute that does. Left here are the three judgements
+/// that are ours to make, and all three answer `None`. Anything that is not a
+/// binding success, an error response included. A transaction id belonging to a
+/// different request. An address that is not IPv4, which there is nothing here
+/// that could dial.
 ///
 /// The transaction id check is what makes this safe on a socket that is not
 /// exclusively ours: a late reply from the server we gave up on, or a datagram
 /// from anybody who knows the port, is somebody else's message and is dropped.
-pub fn decode_response(bytes: &[u8], transaction: &[u8; 12]) -> Option<Reflexive> {
-    if bytes.len() < HEADER_LEN {
+fn decode_response(bytes: &[u8], transaction: TransactionId) -> Option<Reflexive> {
+    let mut message = Message::new();
+    message.unmarshal_binary(bytes).ok()?;
+    if message.typ != BINDING_SUCCESS || message.transaction_id != transaction {
         return None;
     }
-    let kind = u16::from_be_bytes([bytes[0], bytes[1]]);
-    if kind != BINDING_SUCCESS {
-        return None;
+    let mut address = XorMappedAddress::default();
+    address.get_from(&message).ok()?;
+    match address.ip {
+        IpAddr::V4(ip) => Some(Reflexive {
+            ip,
+            port: address.port,
+        }),
+        IpAddr::V6(_) => None,
     }
-    let stated = u16::from_be_bytes([bytes[2], bytes[3]]) as usize;
-    if u32::from_be_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) != MAGIC_COOKIE {
-        return None;
-    }
-    if &bytes[8..20] != transaction {
-        return None;
-    }
-    let body = bytes.get(HEADER_LEN..HEADER_LEN + stated)?;
-
-    let mut at = 0usize;
-    while at + 4 <= body.len() {
-        let attribute = u16::from_be_bytes([body[at], body[at + 1]]);
-        let len = u16::from_be_bytes([body[at + 2], body[at + 3]]) as usize;
-        let value = body.get(at + 4..at + 4 + len)?;
-        if attribute == XOR_MAPPED_ADDRESS {
-            return decode_xor_mapped(value);
-        }
-        // Attributes are padded to a four byte boundary, and the padding is not
-        // counted in the stated length.
-        at += 4 + len + (4 - len % 4) % 4;
-    }
-    None
-}
-
-/// The XOR-MAPPED-ADDRESS value: 1 reserved, 1 family, 2 port, 4 address, each
-/// of the last two exclusive-ored with the cookie. RFC 5389 section 15.2.
-fn decode_xor_mapped(value: &[u8]) -> Option<Reflexive> {
-    if value.len() < 8 || value[1] != FAMILY_IPV4 {
-        return None;
-    }
-    let port = u16::from_be_bytes([value[2], value[3]]) ^ (MAGIC_COOKIE >> 16) as u16;
-    let ip = u32::from_be_bytes([value[4], value[5], value[6], value[7]]) ^ MAGIC_COOKIE;
-    Some(Reflexive {
-        ip: Ipv4Addr::from(ip),
-        port,
-    })
-}
-
-/// A transaction id for one request.
-///
-/// It has to be different from the last one and hard to guess off the wire, and
-/// it does not have to be cryptographic: all it separates is our reply from a
-/// stale one on the same socket. `RandomState` is seeded per instance by the
-/// operating system, which is enough for that and costs no dependency.
-fn transaction_id() -> [u8; 12] {
-    use std::hash::{BuildHasher, Hasher};
-    let one = std::collections::hash_map::RandomState::new()
-        .build_hasher()
-        .finish()
-        .to_be_bytes();
-    let two = std::collections::hash_map::RandomState::new()
-        .build_hasher()
-        .finish()
-        .to_be_bytes();
-    let mut id = [0u8; 12];
-    id[..8].copy_from_slice(&one);
-    id[8..].copy_from_slice(&two[..4]);
-    id
 }
 
 /// Ask the internet what address it sees, sending from `from_port` when that
@@ -237,14 +178,14 @@ async fn bind(from_port: Option<u16>) -> Option<UdpSocket> {
 /// Datagrams that are not the reply we asked for are read past rather than
 /// treated as a failure, until the timeout covering the whole exchange runs out.
 async fn ask(socket: &UdpSocket, server: &str) -> Option<Reflexive> {
-    let transaction = transaction_id();
-    let request = encode_request(&transaction);
+    let transaction = TransactionId::new();
+    let request = encode_request(transaction);
     tokio::time::timeout(PER_SERVER_TIMEOUT, async {
         socket.send_to(&request, server).await.ok()?;
         let mut buf = vec![0u8; MAX_REPLY];
         loop {
             let (len, _) = socket.recv_from(&mut buf).await.ok()?;
-            if let Some(found) = decode_response(&buf[..len], &transaction) {
+            if let Some(found) = decode_response(&buf[..len], transaction) {
                 return Some(found);
             }
         }
@@ -258,53 +199,59 @@ async fn ask(socket: &UdpSocket, server: &str) -> Option<Reflexive> {
 mod tests {
     use super::*;
 
-    fn tid() -> [u8; 12] {
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    use stun::attributes::ATTR_SOFTWARE;
+    use stun::message::{MessageType, BINDING_ERROR, MESSAGE_HEADER_SIZE};
+    use stun::textattrs::Software;
+
+    fn tid() -> TransactionId {
+        TransactionId([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
     }
 
-    /// A success response carrying one XOR-MAPPED-ADDRESS, built the way a
-    /// server builds it so the decoder is tested against the encoding and not
-    /// against itself.
-    fn reply(kind: u16, cookie: u32, transaction: &[u8; 12], ip: Ipv4Addr, port: u16) -> Vec<u8> {
-        let mut value = vec![0u8, FAMILY_IPV4];
-        value.extend_from_slice(&(port ^ (MAGIC_COOKIE >> 16) as u16).to_be_bytes());
-        value.extend_from_slice(&(u32::from(ip) ^ MAGIC_COOKIE).to_be_bytes());
-        let mut attribute = XOR_MAPPED_ADDRESS.to_be_bytes().to_vec();
-        attribute.extend_from_slice(&(value.len() as u16).to_be_bytes());
-        attribute.extend_from_slice(&value);
+    /// A response carrying one XOR-MAPPED-ADDRESS, built the way a server builds
+    /// it. The crate encodes and the crate decodes, so what these tests ask is
+    /// whether our three judgements survive a round trip, and whether the crate
+    /// throws out the datagrams the hand rolled decoder used to throw out for
+    /// itself.
+    fn reply(kind: MessageType, transaction: TransactionId, ip: IpAddr, port: u16) -> Vec<u8> {
+        let mut message = Message::new();
+        message
+            .build(&[
+                Box::new(transaction),
+                Box::new(kind),
+                Box::new(XorMappedAddress { ip, port }),
+            ])
+            .expect("a reply with one address in it is buildable");
+        message.raw
+    }
 
-        let mut out = kind.to_be_bytes().to_vec();
-        out.extend_from_slice(&(attribute.len() as u16).to_be_bytes());
-        out.extend_from_slice(&cookie.to_be_bytes());
-        out.extend_from_slice(transaction);
-        out.extend_from_slice(&attribute);
-        out
+    fn v4(a: u8, b: u8, c: u8, d: u8) -> IpAddr {
+        IpAddr::V4(Ipv4Addr::new(a, b, c, d))
     }
 
     #[test]
     fn a_request_is_a_header_with_the_cookie_and_our_transaction_in_it() {
-        let request = encode_request(&tid());
-        assert_eq!(request.len(), 20);
-        assert_eq!(
-            u16::from_be_bytes([request[0], request[1]]),
-            BINDING_REQUEST
-        );
+        let request = encode_request(tid());
+        assert_eq!(request.len(), MESSAGE_HEADER_SIZE);
+
+        let mut read_back = Message::new();
+        read_back
+            .unmarshal_binary(&request)
+            .expect("our own request decodes, cookie and all");
+        assert_eq!(read_back.typ, BINDING_REQUEST);
+        assert_eq!(read_back.transaction_id, tid());
         // No attributes, so no length.
-        assert_eq!(u16::from_be_bytes([request[2], request[3]]), 0);
-        assert_eq!(
-            u32::from_be_bytes([request[4], request[5], request[6], request[7]]),
-            MAGIC_COOKIE
-        );
-        assert_eq!(&request[8..20], &tid());
+        assert_eq!(read_back.length, 0);
     }
 
     #[test]
     fn a_success_response_gives_back_the_address_and_port() {
-        let ip = Ipv4Addr::new(209, 35, 91, 246);
-        let bytes = reply(BINDING_SUCCESS, MAGIC_COOKIE, &tid(), ip, 8452);
+        let bytes = reply(BINDING_SUCCESS, tid(), v4(209, 35, 91, 246), 8452);
         assert_eq!(
-            decode_response(&bytes, &tid()),
-            Some(Reflexive { ip, port: 8452 })
+            decode_response(&bytes, tid()),
+            Some(Reflexive {
+                ip: Ipv4Addr::new(209, 35, 91, 246),
+                port: 8452
+            })
         );
     }
 
@@ -313,34 +260,30 @@ mod tests {
     /// on is the innocent version of the same thing.
     #[test]
     fn a_reply_to_somebody_elses_request_is_ignored() {
-        let bytes = reply(
-            BINDING_SUCCESS,
-            MAGIC_COOKIE,
-            &[9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
-            Ipv4Addr::new(1, 2, 3, 4),
-            1234,
-        );
-        assert_eq!(decode_response(&bytes, &tid()), None);
+        let theirs = TransactionId([9; 12]);
+        let bytes = reply(BINDING_SUCCESS, theirs, v4(1, 2, 3, 4), 1234);
+        assert_eq!(decode_response(&bytes, tid()), None);
     }
 
     #[test]
     fn an_error_response_is_not_read_as_an_address() {
-        let bytes = reply(0x0111, MAGIC_COOKIE, &tid(), Ipv4Addr::new(1, 2, 3, 4), 1);
-        assert_eq!(decode_response(&bytes, &tid()), None);
+        let bytes = reply(BINDING_ERROR, tid(), v4(1, 2, 3, 4), 1);
+        assert_eq!(decode_response(&bytes, tid()), None);
     }
 
     /// Without the cookie this is not a STUN message, whatever else it looks
     /// like.
     #[test]
     fn a_message_with_the_wrong_magic_cookie_is_ignored() {
-        let bytes = reply(BINDING_SUCCESS, 0xDEAD_BEEF, &tid(), Ipv4Addr::LOCALHOST, 1);
-        assert_eq!(decode_response(&bytes, &tid()), None);
+        let mut bytes = reply(BINDING_SUCCESS, tid(), v4(127, 0, 0, 1), 1);
+        bytes[4..8].copy_from_slice(&0xDEAD_BEEFu32.to_be_bytes());
+        assert_eq!(decode_response(&bytes, tid()), None);
     }
 
     #[test]
     fn a_datagram_too_short_to_be_stun_is_ignored() {
-        for len in 0..HEADER_LEN {
-            assert_eq!(decode_response(&vec![0u8; len], &tid()), None);
+        for len in 0..MESSAGE_HEADER_SIZE {
+            assert_eq!(decode_response(&vec![0u8; len], tid()), None);
         }
     }
 
@@ -348,54 +291,47 @@ mod tests {
     /// message, and reading it would be reading past the buffer.
     #[test]
     fn a_length_that_runs_off_the_end_is_ignored() {
-        let mut bytes = reply(
-            BINDING_SUCCESS,
-            MAGIC_COOKIE,
-            &tid(),
-            Ipv4Addr::LOCALHOST,
-            1,
-        );
+        let mut bytes = reply(BINDING_SUCCESS, tid(), v4(127, 0, 0, 1), 1);
         bytes[2..4].copy_from_slice(&999u16.to_be_bytes());
-        assert_eq!(decode_response(&bytes, &tid()), None);
+        assert_eq!(decode_response(&bytes, tid()), None);
     }
 
     /// An attribute whose own length runs past the stated body, which is the
     /// same read past the end one level down.
     #[test]
     fn an_attribute_that_runs_off_the_end_is_ignored() {
-        let mut bytes = reply(
-            BINDING_SUCCESS,
-            MAGIC_COOKIE,
-            &tid(),
-            Ipv4Addr::LOCALHOST,
-            1,
-        );
+        let mut bytes = reply(BINDING_SUCCESS, tid(), v4(127, 0, 0, 1), 1);
         // The attribute's length field, at the start of the body.
-        bytes[HEADER_LEN + 2..HEADER_LEN + 4].copy_from_slice(&200u16.to_be_bytes());
-        assert_eq!(decode_response(&bytes, &tid()), None);
+        bytes[MESSAGE_HEADER_SIZE + 2..MESSAGE_HEADER_SIZE + 4]
+            .copy_from_slice(&200u16.to_be_bytes());
+        assert_eq!(decode_response(&bytes, tid()), None);
     }
 
-    /// Attributes are padded to four bytes and the padding is not counted, so a
-    /// short one before the address has to be stepped over correctly or the
-    /// walk lands mid-attribute and finds nothing.
+    /// Attributes are padded to four bytes and the padding is not counted in an
+    /// attribute's own length, so a short one before the address has to be
+    /// stepped over correctly or the walk lands mid-attribute and finds nothing.
     #[test]
     fn a_padded_attribute_before_the_address_is_stepped_over() {
-        let ip = Ipv4Addr::new(81, 2, 3, 4);
-        let tail = reply(BINDING_SUCCESS, MAGIC_COOKIE, &tid(), ip, 8200);
-        // SOFTWARE (0x8022), five bytes of value, three of padding.
-        let mut first = vec![0x80u8, 0x22, 0x00, 0x05];
-        first.extend_from_slice(b"hello");
-        first.extend_from_slice(&[0, 0, 0]);
-
-        let mut bytes = tail[..HEADER_LEN].to_vec();
-        bytes.extend_from_slice(&first);
-        bytes.extend_from_slice(&tail[HEADER_LEN..]);
-        let body = (bytes.len() - HEADER_LEN) as u16;
-        bytes[2..4].copy_from_slice(&body.to_be_bytes());
+        let mut message = Message::new();
+        message
+            .build(&[
+                Box::new(tid()),
+                Box::new(BINDING_SUCCESS),
+                // Five bytes of value and three of padding.
+                Box::new(Software::new(ATTR_SOFTWARE, "hello".to_string())),
+                Box::new(XorMappedAddress {
+                    ip: v4(81, 2, 3, 4),
+                    port: 8200,
+                }),
+            ])
+            .expect("a reply with two attributes in it is buildable");
 
         assert_eq!(
-            decode_response(&bytes, &tid()),
-            Some(Reflexive { ip, port: 8200 })
+            decode_response(&message.raw, tid()),
+            Some(Reflexive {
+                ip: Ipv4Addr::new(81, 2, 3, 4),
+                port: 8200
+            })
         );
     }
 
@@ -403,27 +339,24 @@ mod tests {
     /// answering a request it did not understand looks like.
     #[test]
     fn a_response_with_no_address_attribute_gives_nothing() {
-        let mut bytes = encode_request(&tid()).to_vec();
-        bytes[0..2].copy_from_slice(&BINDING_SUCCESS.to_be_bytes());
-        assert_eq!(decode_response(&bytes, &tid()), None);
+        let mut message = Message::new();
+        message
+            .build(&[Box::new(tid()), Box::new(BINDING_SUCCESS)])
+            .expect("an empty success response is buildable");
+        assert_eq!(decode_response(&message.raw, tid()), None);
     }
 
     /// IPv6 has no NAT to traverse and nothing here can use the answer, so it is
     /// not read as an IPv4 address by accident.
     #[test]
     fn an_ipv6_address_is_not_read_as_ipv4() {
-        let mut value = vec![0u8, 0x02];
-        value.extend_from_slice(&[0u8; 18]);
-        let mut bytes = XOR_MAPPED_ADDRESS.to_be_bytes().to_vec();
-        bytes.extend_from_slice(&(value.len() as u16).to_be_bytes());
-        bytes.extend_from_slice(&value);
-
-        let mut message = BINDING_SUCCESS.to_be_bytes().to_vec();
-        message.extend_from_slice(&(bytes.len() as u16).to_be_bytes());
-        message.extend_from_slice(&MAGIC_COOKIE.to_be_bytes());
-        message.extend_from_slice(&tid());
-        message.extend_from_slice(&bytes);
-        assert_eq!(decode_response(&message, &tid()), None);
+        let bytes = reply(
+            BINDING_SUCCESS,
+            tid(),
+            IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+            1,
+        );
+        assert_eq!(decode_response(&bytes, tid()), None);
     }
 
     /// Every server is asked exactly once, whatever the run starts on, so one
@@ -456,6 +389,29 @@ mod tests {
 
     #[test]
     fn two_transaction_ids_in_a_row_are_different() {
-        assert_ne!(transaction_id(), transaction_id());
+        assert_ne!(TransactionId::new(), TransactionId::new());
+    }
+
+    /// Every server in [`SERVERS`], one at a time, against the real internet.
+    ///
+    /// The rotation means a normal run only ever reaches one of them, so a
+    /// server whose reply this cannot read would hide behind the three that
+    /// work and only surface for whoever the rotation sent there. Ignored
+    /// because CI has no reason to send traffic to four strangers, and printing
+    /// rather than asserting the address because what a machine's own address
+    /// is depends on the machine.
+    ///
+    /// ```text
+    /// cargo test -p tauri-plugin-coilbox-direct --lib -- --ignored --nocapture every_server
+    /// ```
+    #[tokio::test]
+    #[ignore = "needs the internet"]
+    async fn every_server_answers_in_a_form_this_can_read() {
+        let socket = bind(None).await.expect("an ephemeral socket binds");
+        for server in SERVERS {
+            let found = ask(&socket, server).await;
+            println!("{server} -> {found:?}");
+            assert!(found.is_some(), "{server} answered with an address");
+        }
     }
 }
