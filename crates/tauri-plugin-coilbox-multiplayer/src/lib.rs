@@ -3686,6 +3686,46 @@ mod tests {
             .unwrap_or_default());
     }
 
+    /// Hosting twice on one connection, where the first attempt was refused.
+    /// The second attempt must wait for its own answer rather than reading the
+    /// one still sitting in the slot, because the answer it would read is a
+    /// refusal and the relay it would take down is carrying a battle.
+    ///
+    /// A fresh reader of the slot has seen nothing that was ever put in it, so
+    /// without the `borrow_and_update` in `advertise` this reads the last
+    /// attempt's refusal the moment it starts waiting.
+    #[tokio::test]
+    async fn a_second_attempt_does_not_read_the_last_ones_answer() {
+        let (registry, _sent, answers) = a_connection("COMPFLAGS u sp r");
+        answers
+            .send(relay_host::OpenAnswer::Refused(
+                "the attempt before this one".to_string(),
+            ))
+            .expect("the slot is open");
+
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+        tokio::spawn(async move {
+            let _ = answers.send(relay_host::OpenAnswer::Opened(9));
+        });
+        let opened = advertise(
+            &registry,
+            "alice@bar:8200",
+            lines,
+            Some(relay),
+            HOSTING_PATIENCE,
+        )
+        .await;
+
+        assert!(opened.success, "got: {:?}", opened.error);
+        assert!(
+            !channel.was_stopped(),
+            "the last attempt's refusal must not take this battle's relay down, got: {:?}",
+            channel.sent()
+        );
+    }
+
     /// The second case the issue names: the connection dropping between the
     /// lines being queued and the server reading them. Nobody is ever going to
     /// say whether that battle opened, and the allocation is held either way.
