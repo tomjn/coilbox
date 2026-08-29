@@ -1724,6 +1724,18 @@ fn advertising(advertised: relay_host::Advertised, battle: &BattleToOpen) -> Vec
 /// `port` is the port the host's own engine will bind. On a relayed battle that
 /// is not the port anybody dials, so it stays out of the wire lines and goes to
 /// the relay agent instead, as `--engine-port`.
+///
+/// ## Why a relayed open waits for the lobby and a direct one does not
+///
+/// Queueing two lines is not opening a battle. The lobby can still refuse, and
+/// on the relay route a refusal leaves a sidecar holding an allocation for a
+/// battle that never existed, plus a run file that turns the host's next
+/// attempt into "a relay agent is already running as process 12345" with no way
+/// out but ending it by hand (issue #2058).
+///
+/// So the relay route waits to hear which happened and stops the agent unless
+/// the answer is a battle. A direct host has nothing running to stop, so
+/// nothing there changes.
 async fn open_battle(
     registry: &Registry,
     server_key: &str,
@@ -1771,8 +1783,6 @@ async fn open_battle(
         None => (relay_host::Advertised::direct(port), None),
     };
 
-    let lines = advertising(advertised, &battle);
-
     // Seat the host as a player by default (protocol default is spectator). The
     // frontend's colour/sync/spectate pushes then refine this via mp_set_battle_status.
     let seat = BattleStatus {
@@ -1781,21 +1791,87 @@ async fn open_battle(
     };
     set_intended_battle_status(registry, server_key, seat, 0);
 
-    let sent = enqueue_all(registry, server_key, lines);
-    match hosted {
-        // Held against the connection so the host's own start script knows to
-        // point the engine at loopback rather than at the relay.
-        Some(host) if sent.success => remember_relay(registry, server_key, host),
-        // The line never left, so there is no battle and the allocation is
-        // holding the relay's bandwidth for nothing. Asking the sidecar to stop
-        // is also what keeps the next attempt from meeting its own run file and
-        // refusing to start.
-        Some(host) => {
-            let _ = host.agent.stop();
+    advertise(
+        registry,
+        server_key,
+        advertising(advertised, &battle),
+        hosted,
+        READY_TIMEOUT,
+    )
+    .await
+}
+
+/// Queue the lines that advertise a battle, and on the relay route wait to hear
+/// whether the lobby opened one.
+///
+/// Split from [`open_battle`] because this is the half that can be driven
+/// without a sidecar and without a TURN server: hand it a `hosted` whose control
+/// channel is a pipe a test can read, and it is the whole of the decision issue
+/// #2058 is about.
+///
+/// `patience` is a parameter for the same reason [`turn::credentials`] takes
+/// one: the caller owns the budget and the tests own the clock.
+async fn advertise(
+    registry: &Registry,
+    server_key: &str,
+    lines: Vec<String>,
+    hosted: Option<relay_host::RelayHost>,
+    patience: Duration,
+) -> CliResult {
+    // Not a relayed battle, so there is no allocation riding on the answer and
+    // no reason to make the host wait for one. This is every host today.
+    let Some(host) = hosted else {
+        return enqueue_all(registry, server_key, lines);
+    };
+
+    // Taken before a line is queued and marked seen in the same breath, so an
+    // answer that lands while the lines are still being written is read as this
+    // attempt's rather than missed or mistaken for the last one's.
+    let mut answers = match open_slot(registry, server_key) {
+        Some(mut answers) => {
+            answers.borrow_and_update();
+            answers
         }
-        None => {}
+        // The connection went while the allocation was being opened. There is
+        // nothing to advertise on, so the relay is carrying nothing.
+        None => {
+            let _ = host.agent.stop();
+            return CliResult::err(format!("not connected: {server_key}"));
+        }
+    };
+
+    let sent = enqueue_all(registry, server_key, lines);
+    if !sent.success {
+        // The line never left, so there is no battle and the allocation is
+        // holding the relay's bandwidth for nothing.
+        let _ = host.agent.stop();
+        return sent;
     }
-    sent
+
+    match relay_host::confirmed(&mut answers, patience).await {
+        // Held against the connection so the host's own start script knows to
+        // point the engine at loopback rather than at the relay. From here on
+        // the relay is carrying a battle, it is out of this function's reach,
+        // and stopping it is issue #2018's with rules of its own.
+        Ok(_) => {
+            remember_relay(registry, server_key, host);
+            sent
+        }
+        // A refusal, a lobby that went quiet, or the connection ending: three
+        // ways of having advertised a battle that does not exist. Each of them
+        // leaves a sidecar that would hold its allocation and then refuse the
+        // host's next attempt, and none of them leaves a game to protect.
+        Err(why) => {
+            let _ = host.agent.stop();
+            CliResult::err(why.to_string())
+        }
+    }
+}
+
+/// The slot on `server_key`'s connection that the lobby's answer about a battle
+/// we opened arrives in, or `None` when there is no such connection.
+fn open_slot(registry: &Registry, server_key: &str) -> Option<relay_host::OpenSlot> {
+    Some(lock_or_recover(registry).get(server_key)?.opened.clone())
 }
 
 /// Hold the relay a battle is being hosted through against its connection.
@@ -3310,6 +3386,13 @@ mod tests {
 
     /// A relay carrying that battle, with a control channel that goes nowhere.
     fn a_relay() -> relay_host::RelayHost {
+        a_relay_writing_to(Vec::new())
+    }
+
+    /// The same relay, with its control channel pointed somewhere a test can
+    /// read. Which is how every test about issue #2058 asks its question: not
+    /// "was a flag set" but "did a `stop` reach the sidecar's stdin".
+    fn a_relay_writing_to(to_agent: impl std::io::Write + Send + 'static) -> relay_host::RelayHost {
         struct Nothing;
         impl std::io::Read for Nothing {
             fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
@@ -3319,7 +3402,33 @@ mod tests {
         relay_host::RelayHost {
             engine_port: RELAYED_ENGINE_PORT,
             relayed: "198.51.100.9:30001".parse().expect("an address"),
-            agent: relay_agent::RelayAgent::driving(Nothing, Vec::new(), |_| {}),
+            agent: relay_agent::RelayAgent::driving(Nothing, to_agent, |_| {}),
+        }
+    }
+
+    /// Everything coilbox wrote to a relay agent's stdin, readable while the
+    /// agent still holds its end.
+    #[derive(Clone, Default)]
+    struct Channelled(Arc<Mutex<Vec<u8>>>);
+
+    impl Channelled {
+        fn sent(&self) -> String {
+            String::from_utf8(lock_or_recover(&self.0).clone()).expect("the channel is UTF-8")
+        }
+
+        fn was_stopped(&self) -> bool {
+            self.sent().contains("\"type\":\"stop\"")
+        }
+    }
+
+    impl std::io::Write for Channelled {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            lock_or_recover(&self.0).extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
         }
     }
 
@@ -3439,16 +3548,24 @@ mod tests {
     }
 
     /// A registered TASServer connection whose compatibility flags are
-    /// `compflags`, and the receiving end of everything it sends.
+    /// `compflags`, the receiving end of everything it sends, and the slot the
+    /// connection task would be answering into about a battle of ours opening.
     ///
     /// Built here rather than shared with `turn.rs` because what these tests care
     /// about is the wire, and what those care about is the credential.
-    fn a_connection(compflags: &str) -> (Registry, tokio::sync::mpsc::UnboundedReceiver<Outbound>) {
+    fn a_connection(
+        compflags: &str,
+    ) -> (
+        Registry,
+        tokio::sync::mpsc::UnboundedReceiver<Outbound>,
+        tokio::sync::watch::Sender<relay_host::OpenAnswer>,
+    ) {
         use coilbox_lobby_protocol::{parse_line, reduce_at};
         use tokio::sync::watch;
 
         let registry = Registry::default();
         let (tx, sent) = tokio::sync::mpsc::unbounded_channel::<Outbound>();
+        let (answers, opened) = watch::channel(relay_host::OpenAnswer::Unasked);
         let state = Arc::new(Mutex::new(LobbyState::new()));
         reduce_at(&mut lock_or_recover(&state), parse_line(compflags), 0);
         lock_or_recover(&registry).insert(
@@ -3464,9 +3581,357 @@ mod tests {
                 started: conn::StartedBattle::default(),
                 turn: watch::channel(turn::TurnAnswer::Unasked).1,
                 relay: conn::HostedRelay::default(),
+                opened,
             },
         );
-        (registry, sent)
+        (registry, sent, answers)
+    }
+
+    /// How long a test waits for an answer that is already in the slot before
+    /// deciding it is never coming. Spent in full only by the one test that is
+    /// about a lobby saying nothing.
+    const HOSTING_PATIENCE: Duration = Duration::from_secs(5);
+
+    /// The lines a relayed battle advertises itself with. What they say is
+    /// tested above, so these tests only need something to queue.
+    fn relayed_lines(relay: &relay_host::RelayHost) -> Vec<String> {
+        advertising(relay_host::Advertised::relayed(relay), &a_battle_to_open())
+    }
+
+    /// Issue #2058, and the whole of it. The lobby refuses the battle after the
+    /// lines are already queued, which is the one failure `enqueue_all` cannot
+    /// see, and the relay it was opened on has to be told.
+    ///
+    /// The reason this is not a small leak: the sidecar's run file is what makes
+    /// the next attempt to host fail with the pid of a process nobody in coilbox
+    /// will end, so one refused battle costs hosting for the rest of the session.
+    #[tokio::test]
+    async fn a_battle_the_lobby_refuses_stops_the_relay_it_was_opened_on() {
+        let (registry, _sent, answers) = a_connection("COMPFLAGS u sp r");
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+
+        tokio::spawn(async move {
+            let _ = answers.send(relay_host::OpenAnswer::Refused(
+                "you already have a battle open".to_string(),
+            ));
+        });
+        let refused = advertise(
+            &registry,
+            "alice@bar:8200",
+            lines,
+            Some(relay),
+            HOSTING_PATIENCE,
+        )
+        .await;
+
+        assert!(
+            channel.was_stopped(),
+            "the relay has to be stopped, got: {:?}",
+            channel.sent()
+        );
+        assert!(!refused.success);
+        assert!(
+            refused
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("you already have a battle open"),
+            "the lobby's own words have to reach the host, got: {:?}",
+            refused.error
+        );
+        // And nothing is left describing this connection as relayed, so the next
+        // start script does not point an engine at an allocation that has gone.
+        assert!(lock_or_recover(&registry)
+            .get("alice@bar:8200")
+            .map(|conn| lock_or_recover(&conn.relay).is_none())
+            .unwrap_or_default());
+    }
+
+    /// The other half of the rule, and the one that makes the rest safe. A
+    /// battle the lobby did open is a relay with a game to carry, so nothing
+    /// here may touch it. Getting this wrong cuts a match off mid-play, which is
+    /// what the whole sidecar exists to prevent.
+    #[tokio::test]
+    async fn a_battle_the_lobby_opens_leaves_its_relay_running() {
+        let (registry, _sent, answers) = a_connection("COMPFLAGS u sp r");
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+
+        tokio::spawn(async move {
+            let _ = answers.send(relay_host::OpenAnswer::Opened(9));
+        });
+        let opened = advertise(
+            &registry,
+            "alice@bar:8200",
+            lines,
+            Some(relay),
+            HOSTING_PATIENCE,
+        )
+        .await;
+
+        assert!(opened.success, "got: {:?}", opened.error);
+        assert!(
+            !channel.was_stopped(),
+            "a relay carrying a battle must never be stopped here, got: {:?}",
+            channel.sent()
+        );
+        // And it is held against the connection, which is what takes it out of
+        // this function's reach for good.
+        assert!(lock_or_recover(&registry)
+            .get("alice@bar:8200")
+            .map(|conn| lock_or_recover(&conn.relay).is_some())
+            .unwrap_or_default());
+    }
+
+    /// The second case the issue names: the connection dropping between the
+    /// lines being queued and the server reading them. Nobody is ever going to
+    /// say whether that battle opened, and the allocation is held either way.
+    #[tokio::test]
+    async fn a_connection_that_ends_before_the_answer_stops_the_relay() {
+        let (registry, _sent, answers) = a_connection("COMPFLAGS u sp r");
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+
+        // Dropping the sender is what the connection task does when the socket
+        // closes, which is how anybody waiting learns the connection has gone.
+        tokio::spawn(async move { drop(answers) });
+        let closed = advertise(
+            &registry,
+            "alice@bar:8200",
+            lines,
+            Some(relay),
+            HOSTING_PATIENCE,
+        )
+        .await;
+
+        assert!(channel.was_stopped(), "got: {:?}", channel.sent());
+        assert!(!closed.success);
+        assert!(
+            closed
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("the connection closed"),
+            "got: {:?}",
+            closed.error
+        );
+    }
+
+    /// A lobby that reads the lines and says nothing at all. Waiting forever
+    /// would leave the host in front of a spinner with an allocation running
+    /// behind it, so the wait ends and takes the relay with it.
+    #[tokio::test]
+    async fn a_lobby_that_never_answers_stops_the_relay_rather_than_waiting() {
+        let (registry, _sent, _answers) = a_connection("COMPFLAGS u sp r");
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+
+        let quiet = advertise(
+            &registry,
+            "alice@bar:8200",
+            lines,
+            Some(relay),
+            Duration::from_millis(50),
+        )
+        .await;
+
+        assert!(channel.was_stopped(), "got: {:?}", channel.sent());
+        assert!(!quiet.success);
+    }
+
+    /// The connection going while the allocation was being opened, which is a
+    /// wait of up to `relay_host::ALLOCATION_PATIENCE` for the host to
+    /// disconnect in. There is nothing to advertise on, so the relay that just
+    /// came up is carrying nothing.
+    #[tokio::test]
+    async fn a_relay_with_no_connection_left_to_advertise_on_is_stopped() {
+        let registry = Registry::default();
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+
+        let gone = advertise(
+            &registry,
+            "alice@bar:8200",
+            lines,
+            Some(relay),
+            HOSTING_PATIENCE,
+        )
+        .await;
+
+        assert!(channel.was_stopped(), "got: {:?}", channel.sent());
+        assert!(!gone.success);
+    }
+
+    /// A lobby that logs a client in, says it has a relay, and answers an
+    /// `OPENBATTLE` with `answer`.
+    ///
+    /// `RELAYEDHOST` arrives first and is read and ignored, which is what a
+    /// server that has not landed ScarylePoo/uberserver#29 does with it.
+    async fn lobby_answering_an_open(answer: fn(u32) -> String) -> std::net::SocketAddr {
+        use coilbox_lobby_protocol::server::{line, parse_client_line, ClientCommand};
+        use futures_util::{SinkExt, StreamExt};
+        use tokio_util::codec::{Framed, LinesCodec};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("a free port");
+        let addr = listener.local_addr().expect("a bound address");
+        tokio::spawn(async move {
+            let Ok((stream, _)) = listener.accept().await else {
+                return;
+            };
+            let mut framed = Framed::new(stream, LinesCodec::new());
+            if framed
+                .send(line::tas_server("0.38", "*", 8452, 0))
+                .await
+                .is_err()
+            {
+                return;
+            }
+            while let Some(Ok(read)) = framed.next().await {
+                let reply = match parse_client_line(&read) {
+                    ClientCommand::ListCompFlags => line::comp_flags(&["u", "sp", "r"]),
+                    ClientCommand::Login { username, .. } => {
+                        if framed.send(line::accepted(&username)).await.is_err() {
+                            return;
+                        }
+                        line::login_info_end()
+                    }
+                    _ if read.starts_with("OPENBATTLE ") => answer(9),
+                    _ => continue,
+                };
+                if framed.send(reply).await.is_err() {
+                    return;
+                }
+            }
+        });
+        addr
+    }
+
+    /// Connect and log in the way `mp_connect` does, and hand back the key.
+    async fn logged_in(registry: &Registry, addr: std::net::SocketAddr) -> String {
+        use coilbox_lobby_protocol::{password_hash, LoginConfig, LoginMode};
+
+        let stream = tokio::net::TcpStream::connect(addr)
+            .await
+            .expect("the lobby is listening");
+        let key = format!("alice@{addr}");
+        let logs = std::env::temp_dir().join("coilbox-relayed-open-tests");
+        conn::spawn_connection(
+            registry.clone(),
+            key.clone(),
+            Box::new(stream),
+            LoginConfig {
+                username: "alice".to_string(),
+                password_hash: password_hash("hunter2"),
+                local_ip: "127.0.0.1".to_string(),
+                agent: "Coilbox test".to_string(),
+                client_id: "1".to_string(),
+                compat_flags: vec!["u".to_string()],
+                use_stls: false,
+                mode: LoginMode::Login,
+            },
+            Channel::new(|_| Ok(())),
+            dmlog::DmLog::new(&logs, &key),
+            dmlog::DmLog::new(&logs, &key),
+        );
+        conn::wait_until_ready(registry, &key, HOSTING_PATIENCE)
+            .await
+            .expect("the lobby logged us in");
+        key
+    }
+
+    /// The acceptance criterion of issue #2058, over a real socket and through
+    /// the real connection task. This is the only test here that covers the
+    /// whole chain: a refusal off the wire, the parser, the reducer, the slot
+    /// the connection task fills, and a `stop` arriving on the sidecar's stdin.
+    #[tokio::test]
+    async fn a_lobby_refusing_over_a_socket_stops_the_relay_the_battle_was_opened_on() {
+        let addr =
+            lobby_answering_an_open(|_| "OPENBATTLEFAILED you are not logged in yet".to_string())
+                .await;
+        let registry = Registry::default();
+        let key = logged_in(&registry, addr).await;
+
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+        let refused = advertise(&registry, &key, lines, Some(relay), HOSTING_PATIENCE).await;
+
+        assert!(
+            channel.was_stopped(),
+            "a battle the lobby refused leaves a relay to take down, got: {:?}",
+            channel.sent()
+        );
+        assert!(!refused.success);
+        assert!(
+            refused
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("you are not logged in yet"),
+            "got: {:?}",
+            refused.error
+        );
+    }
+
+    /// The same socket, the same code, and a lobby that opens the battle. The
+    /// relay is left running and held against the connection, which is what
+    /// says the test above is a refusal being acted on rather than every
+    /// relayed open being taken down.
+    #[tokio::test]
+    async fn a_lobby_opening_over_a_socket_leaves_the_relay_carrying_the_battle() {
+        let addr = lobby_answering_an_open(|id| format!("OPENBATTLE {id}")).await;
+        let registry = Registry::default();
+        let key = logged_in(&registry, addr).await;
+
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+        let opened = advertise(&registry, &key, lines, Some(relay), HOSTING_PATIENCE).await;
+
+        assert!(opened.success, "got: {:?}", opened.error);
+        assert!(
+            !channel.was_stopped(),
+            "the battle opened, so the relay carrying it must be left alone, got: {:?}",
+            channel.sent()
+        );
+        assert!(lock_or_recover(&registry)
+            .get(&key)
+            .map(|conn| lock_or_recover(&conn.relay).is_some())
+            .unwrap_or_default());
+    }
+
+    /// A line that never reached the writer, which is the one failure this could
+    /// already see. Kept because it is the same rule and the easiest to lose in
+    /// a rearrangement.
+    #[tokio::test]
+    async fn a_line_that_never_leaves_stops_the_relay_it_would_have_advertised() {
+        let (registry, sent, _answers) = a_connection("COMPFLAGS u sp r");
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+        // The writer's receiving end going is a closed connection as far as
+        // `enqueue` can tell, which is the failure it reports.
+        drop(sent);
+
+        let unsent = advertise(
+            &registry,
+            "alice@bar:8200",
+            lines,
+            Some(relay),
+            HOSTING_PATIENCE,
+        )
+        .await;
+
+        assert!(channel.was_stopped(), "got: {:?}", channel.sent());
+        assert!(!unsent.success);
     }
 
     /// The second acceptance criterion of issue #2017, and the failure that
@@ -3479,7 +3944,7 @@ mod tests {
     /// about: not "the OPENBATTLE was withheld", but "the wire is untouched".
     #[tokio::test]
     async fn a_host_who_cannot_get_a_relay_is_told_why_and_opens_nothing() {
-        let (registry, mut sent) = a_connection("COMPFLAGS u sp");
+        let (registry, mut sent, _answers) = a_connection("COMPFLAGS u sp");
 
         let refused = open_battle(
             &registry,
@@ -3510,7 +3975,7 @@ mod tests {
     /// this: one line, the port it was given, and no address.
     #[tokio::test]
     async fn hosting_without_a_relay_still_sends_one_ordinary_line() {
-        let (registry, mut sent) = a_connection("COMPFLAGS u sp");
+        let (registry, mut sent, _answers) = a_connection("COMPFLAGS u sp");
 
         let opened = open_battle(&registry, "alice@bar:8200", 8452, a_battle_to_open(), None).await;
 
@@ -3527,7 +3992,7 @@ mod tests {
     /// it must not be spent on a battle that was never going to open.
     #[tokio::test]
     async fn a_password_the_line_cannot_carry_is_refused_before_a_relay_is_asked_for() {
-        let (registry, mut sent) = a_connection("COMPFLAGS u sp r");
+        let (registry, mut sent, _answers) = a_connection("COMPFLAGS u sp r");
 
         let refused = open_battle(
             &registry,

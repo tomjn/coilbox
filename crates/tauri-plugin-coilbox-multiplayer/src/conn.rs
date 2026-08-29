@@ -24,6 +24,7 @@ use tokio_util::codec::{Framed, LinesCodec};
 
 use crate::dmlog::DmLog;
 use crate::lock_or_recover;
+use crate::relay_host::{OpenAnswer, OpenSlot};
 use crate::tachyon_rpc::TachyonClient;
 use crate::tls::AsyncReadWrite;
 use crate::turn::{TurnAnswer, TurnSlot};
@@ -259,6 +260,12 @@ pub struct ServerConn {
     /// The relay this connection's battle is being hosted through, if it is
     /// being hosted through one. See [`HostedRelay`].
     pub relay: HostedRelay,
+    /// The lobby's last answer about a battle we asked it to open, watched for
+    /// the same reason [`TurnSlot`] is: queueing `OPENBATTLE` is not opening a
+    /// battle, and a relayed host has an allocation riding on which of the two
+    /// happened. Stays at [`crate::relay_host::OpenAnswer::Unasked`] on a
+    /// connection nobody hosts on.
+    pub opened: OpenSlot,
 }
 
 /// The registry of live connections, keyed by a frontend-supplied `serverKey`
@@ -321,6 +328,11 @@ pub fn spawn_connection(
     // connection that ends wakes anybody waiting on a relay credential rather
     // than leaving them to wait out their own deadline.
     let (turn_tx, turn) = watch::channel(TurnAnswer::Unasked);
+    // And the same again for the battle we asked the lobby to open, which is
+    // the other thing somebody hosting through the relay is waiting on. A
+    // connection that ends while they wait is a battle that did not open, and
+    // they have an allocation to take down over it.
+    let (opened_tx, opened) = watch::channel(OpenAnswer::Unasked);
 
     tokio::spawn(run_loop(
         registry.clone(),
@@ -331,6 +343,7 @@ pub fn spawn_connection(
         phase_tx,
         agreement.clone(),
         turn_tx,
+        opened_tx,
         rx,
         state.clone(),
         dm_log,
@@ -359,6 +372,7 @@ pub fn spawn_connection(
             // Filled only by a host that takes the relay route, which is
             // decided when they press Host and not when they connect.
             relay: HostedRelay::default(),
+            opened,
         },
     );
 }
@@ -376,6 +390,7 @@ async fn run_loop(
     phase_slot: watch::Sender<LoginPhase>,
     agreement_slot: Arc<Mutex<Option<String>>>,
     turn_slot: watch::Sender<TurnAnswer>,
+    opened_slot: watch::Sender<OpenAnswer>,
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
     dm_log: DmLog,
@@ -505,6 +520,13 @@ async fn run_loop(
                         // battle, so wake them with what it said.
                         if let Some(answer) = crate::turn::answer_in(&delta, &state) {
                             let _ = turn_slot.send(answer);
+                        }
+                        // And somebody may be waiting on it to find out whether
+                        // the battle they advertised exists. On the relay route
+                        // that is the difference between a sidecar carrying a
+                        // battle and one holding an allocation for nothing.
+                        if let Some(answer) = crate::relay_host::open_answer_in(&delta, &state) {
+                            let _ = opened_slot.send(answer);
                         }
                         emit(&sink, LobbyEvent::Delta { delta });
                     }
