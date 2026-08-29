@@ -53,7 +53,9 @@
 //!
 //! [`run_file`] is the other half of the same problem: an agent that is
 //! running has to be findable, or a coilbox that reopens mid-game starts a
-//! second one over the top of it.
+//! second one over the top of it. It also carries the note such a coilbox
+//! leaves when it wants this agent to stop, which is the only thing it can say
+//! to a process whose pipes belong to a coilbox that has gone.
 //!
 //! ## Giving the allocation back
 //!
@@ -632,6 +634,19 @@ async fn main() -> ExitCode {
             }
         },
     };
+
+    // The only thing a coilbox that reopened after this agent started can say to
+    // it, since it holds no pipe to this process (issue #2062). Started
+    // alongside the claim because the two are the same channel: the run file is
+    // how such a coilbox finds this agent, and the note is what it says.
+    if let Some(path) = args.run_file.clone() {
+        tokio::spawn({
+            let stopping = Arc::clone(&stopping);
+            async move {
+                run_file::take_notes_asking_us_to_stop(&path, &stopping).await;
+            }
+        });
+    }
 
     let mut requests = Requests::listen(Arc::clone(&reporter), Arc::clone(&stopping));
     let open: OpenRelay<Transport> = OpenRelay::default();

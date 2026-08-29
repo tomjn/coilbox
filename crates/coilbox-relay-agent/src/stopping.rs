@@ -60,6 +60,23 @@
 //! without the shortcut they would leave an allocation standing for the four
 //! minutes of the backstop.
 //!
+//! ## A note from a coilbox that has no pipe to us is a sixth case
+//!
+//! An agent that outlived its coilbox is found by the next one through its run
+//! file, and cannot be spoken to: its stdin belongs to a process that has gone
+//! and a new parent cannot take over a child's pipes (issue #2074). Until now
+//! the only way to clear one was ending the process by hand, which needs
+//! somebody who knows what a process id is (issue #2062).
+//!
+//! So coilbox leaves a note beside the run file
+//! ([`coilbox_relay_protocol::StopNote`]) and
+//! [`crate::run_file::take_notes_asking_us_to_stop`] reads it. It gets the same
+//! answer as a battle ending, for the same reason and on the same fact: a relay
+//! no player has ever been heard through never carried a game, so it stops at
+//! once, and one that has carried players keeps running. That is what makes the
+//! button coilbox can now offer safe to press without knowing which of the two
+//! it is looking at.
+//!
 //! ## What is deliberately not a reason to stop
 //!
 //! - Losing the relay. The agent rebuilds it, because the game it is feeding
@@ -126,6 +143,10 @@ pub enum Reason {
     /// coilbox has gone and the relay has carried nothing for
     /// [`IDLE_TIMEOUT`]. The backstop.
     NothingLeftToCarry,
+    /// coilbox has gone, a later one left a note asking this agent to stop, and
+    /// no player was ever heard through the relay. See
+    /// [`Stopping::coilbox_left_a_note`].
+    AskedInANote,
 }
 
 impl std::fmt::Display for Reason {
@@ -146,6 +167,11 @@ impl std::fmt::Display for Reason {
                  which is longer than the engine waits before giving up on a connection",
                 IDLE_TIMEOUT.as_secs()
             ),
+            Reason::AskedInANote => write!(
+                f,
+                "coilbox left a note asking this relay to stop, and no player was ever \
+                 heard through it"
+            ),
         }
     }
 }
@@ -161,6 +187,10 @@ pub struct Stopping {
     /// Whether coilbox has said the lobby battle has ended. Weaker than
     /// `asked`: it starts the agent judging for itself rather than ending it.
     battle_over: AtomicBool,
+    /// Whether a coilbox with no pipe to this agent has left a note asking it
+    /// to stop. Weaker again than `battle_over`, because it comes from a
+    /// coilbox that knows nothing at all about what this relay is carrying.
+    asked_in_a_note: AtomicBool,
     /// Whether a datagram has ever arrived through the relay.
     ///
     /// Inbound only, and that is what makes it mean something. The only
@@ -188,6 +218,7 @@ impl Stopping {
             asked: AtomicBool::new(false),
             coilbox_gone: AtomicBool::new(false),
             battle_over: AtomicBool::new(false),
+            asked_in_a_note: AtomicBool::new(false),
             heard_a_player: AtomicBool::new(false),
             engine: AtomicU32::new(0),
             // Started here rather than left empty, so an agent that is killed
@@ -221,6 +252,35 @@ impl Stopping {
     /// agent is judging for itself.
     pub fn coilbox_has_gone(&self) {
         self.coilbox_gone.store(true, Ordering::Relaxed);
+    }
+
+    /// Whether the coilbox that started this agent has closed.
+    ///
+    /// Read by [`crate::run_file::take_notes_asking_us_to_stop`], which is the
+    /// only thing that needs to know. A note is what a coilbox with no pipe
+    /// says, so there is no reason to go looking for one while the pipe is
+    /// open, and every reason not to: a coilbox that is still hosting through
+    /// this relay would be talking down the channel instead.
+    pub fn has_coilbox_gone(&self) -> bool {
+        self.coilbox_gone.load(Ordering::Relaxed)
+    }
+
+    /// A later coilbox has left a note asking this agent to stop.
+    ///
+    /// The weakest of the three things that can end a battle from outside, and
+    /// deliberately so. [`Stopping::coilbox_asked`] comes from a coilbox
+    /// holding the pipe to this process, so it knows what it is stopping.
+    /// [`Stopping::battle_is_over`] comes from one that at least knows the
+    /// battle it opened has gone. A note comes from a coilbox that was started
+    /// after this agent and knows nothing about it beyond a process id read out
+    /// of a file.
+    ///
+    /// So it acts only where there is provably nothing to lose: a relay no
+    /// player has ever been heard through never carried a game. Anything else
+    /// carries on and is left to the engine and the traffic backstop, which is
+    /// the same answer a battle ending gets and for the same reason.
+    pub fn coilbox_left_a_note(&self) {
+        self.asked_in_a_note.store(true, Ordering::Relaxed);
     }
 
     /// A datagram went through the relay just now.
@@ -267,6 +327,21 @@ impl Stopping {
         // agent judges on the engine and its own traffic.
         if !self.coilbox_gone.load(Ordering::Relaxed) && !battle_over {
             return None;
+        }
+        // A note from a coilbox that has no pipe to this process, answered with
+        // the same fact the battle ending shortcut turns on: a relay nobody was
+        // ever heard through has never carried a game, so there is nothing on it
+        // to cut off. One that has carried players reads this and keeps going,
+        // which is what stops a host who reopened coilbox mid-match from ending
+        // everybody else's game with one press.
+        //
+        // Below the check above rather than beside the `asked` one at the top,
+        // so the rule holds even if a note somehow arrives while coilbox is
+        // still there: a coilbox with a pipe says `stop` down it.
+        if self.asked_in_a_note.load(Ordering::Relaxed)
+            && !self.heard_a_player.load(Ordering::Relaxed)
+        {
+            return Some(Reason::AskedInANote);
         }
         let engine = self.engine.load(Ordering::Relaxed);
         if engine != 0 && !coilbox_proc::is_running(engine) {
@@ -686,6 +761,74 @@ mod tests {
         stopping.battle_is_over();
 
         assert_eq!(stopping.reason(), Some(Reason::BattleOver));
+    }
+
+    /// The leftover agent issue #2062 is about. Its coilbox crashed, a new one
+    /// found it in the run file, and the only thing that new coilbox can say to
+    /// it is a note. Nothing was ever played through this relay, so there is
+    /// nothing to lose and it goes at once rather than being waited out by the
+    /// backstop.
+    #[tokio::test(start_paused = true)]
+    async fn a_note_stops_an_agent_that_never_carried_a_game() {
+        let stopping = Stopping::new();
+        stopping.coilbox_has_gone();
+        stopping.coilbox_left_a_note();
+
+        let started = Instant::now();
+        assert_eq!(stopping.wait().await, Reason::AskedInANote);
+        assert!(
+            started.elapsed() < IDLE_TIMEOUT,
+            "a note has to be acted on rather than waited out, or pressing the button does \
+             nothing a host would notice"
+        );
+    }
+
+    /// The one that costs a match, and the whole reason the note asks rather
+    /// than orders. Somebody who closed coilbox mid-game and opened it again is
+    /// looking at a relay carrying every other player in that match. A note
+    /// must not end it.
+    #[tokio::test(start_paused = true)]
+    async fn a_note_does_not_stop_a_relay_that_is_carrying_a_game() {
+        let stopping = Stopping::new();
+        let counted = Counted {
+            relay: &Busy,
+            stopping: &stopping,
+            traffic: &Traffic::new(),
+        };
+        // A player has been heard, which is what a game in progress looks like
+        // from here.
+        let mut buf = [0u8; 8];
+        counted.recv_from(&mut buf).await.expect("a busy relay");
+
+        stopping.coilbox_has_gone();
+        stopping.coilbox_left_a_note();
+
+        tokio::select! {
+            reason = stopping.wait() => panic!("a note ended a game in progress: {reason}"),
+            () = async {
+                // Three backstops' worth of a game still being played, so this
+                // is not a matter of the test not having waited long enough.
+                for _ in 0..6 {
+                    tokio::time::sleep(IDLE_TIMEOUT / 2).await;
+                    counted.recv_from(&mut buf).await.expect("a busy relay");
+                }
+            } => {}
+        }
+    }
+
+    /// A note arriving while the coilbox that started this agent is still there
+    /// changes nothing. That coilbox has a pipe and says `stop` down it, and a
+    /// battle it is holding open with no players in it yet looks exactly like a
+    /// leftover from here.
+    #[tokio::test(start_paused = true)]
+    async fn a_note_does_nothing_while_coilbox_is_still_there() {
+        let stopping = Stopping::new();
+        stopping.coilbox_left_a_note();
+
+        tokio::select! {
+            reason = stopping.wait() => panic!("stopped while coilbox was still there: {reason}"),
+            () = tokio::time::sleep(IDLE_TIMEOUT * 10) => {}
+        }
     }
 
     /// coilbox asking beats everything, including a game that is still being
