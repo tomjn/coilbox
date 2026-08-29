@@ -3423,7 +3423,7 @@ mod tests {
         relay_host::RelayHost {
             engine_port: RELAYED_ENGINE_PORT,
             relayed: "198.51.100.9:30001".parse().expect("an address"),
-            agent: relay_agent::RelayAgent::driving(Nothing, to_agent, |_| {}),
+            agent: Arc::new(relay_agent::RelayAgent::driving(Nothing, to_agent, |_| {})),
         }
     }
 

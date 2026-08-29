@@ -1128,6 +1128,17 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
               level: "error",
             });
           }
+        }
+        // A player is in our relayed battle and their traffic will not reach
+        // the game, because the relay would not take their address. Only the
+        // host is told, because only the host has anything to tell: the joiner
+        // sees a battle they are in and a game that never starts for them.
+        else if (d.kind === "joinerNotLetThrough") {
+          void notify({
+            title: `${d.username} cannot reach your relayed battle`,
+            body: d.reason || undefined,
+            level: "error",
+          });
         } else if (d.kind === "commandFailed") {
           // Ignore-sync commands are best-effort: a server without IGNORE support
           // may reject them, but local hiding still applies, so degrade silently

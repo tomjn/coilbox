@@ -68,16 +68,16 @@
 use std::net::{IpAddr, SocketAddr};
 use std::path::Path;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use coilbox_lobby_protocol::{Delta, LobbyState};
 use coilbox_relay_protocol::Event;
 use tokio::sync::watch;
 
-use crate::conn::Registry;
+use crate::conn::{HostedRelay, Registry};
 use crate::lock_or_recover;
-use crate::relay_agent::{NotStarted, RelayAgent};
+use crate::relay_agent::{NotAllowed, NotStarted, RelayAgent};
 use crate::relay_sidecar::{self, Battle};
 use crate::turn::{self, NoCredential};
 
@@ -96,6 +96,23 @@ use crate::turn::{self, NoCredential};
 /// is the one case where waiting beats guessing.
 pub const ALLOCATION_PATIENCE: Duration = Duration::from_secs(25);
 
+/// How long to wait for the agent to let a joiner through before deciding it is
+/// not going to.
+///
+/// The agent's worst case is an allocation it has lost. It waits out its rebuild
+/// backoff, at most the 32 seconds of `LONGEST_BACKOFF` in
+/// `coilbox-relay-agent`, and only then opens a new allocation, which is what
+/// [`ALLOCATION_PATIENCE`] above budgets 25 seconds for. An `allowPeer` is not
+/// answered until there is a relay to act on (`control.rs` in that crate says
+/// why), so anything shorter than the sum turns a relay that is coming back into
+/// a join that failed.
+///
+/// It can afford to be that long because nothing waits on it. The lobby
+/// connection carries on while it runs, and the join it belongs to is a player
+/// whose engine is not launched yet.
+pub const ALLOW_JOINER_PATIENCE: Duration =
+    Duration::from_secs(32).saturating_add(ALLOCATION_PATIENCE);
+
 /// A relay carrying a battle, once its allocation is open.
 ///
 /// Cannot be constructed anywhere but [`waiting_on`], and only from an agent
@@ -110,11 +127,16 @@ pub struct RelayHost {
     pub engine_port: u16,
     /// Where players send, on the relay server.
     pub relayed: SocketAddr,
-    /// The control channel, held so the battle can be admitted through and
-    /// stopped. `allow_joiner` still has no caller (see
-    /// [`crate::relay_agent`]), and `stop` is called when an open fails after
-    /// the allocation is already up.
-    pub agent: RelayAgent,
+    /// The control channel, held so joiners can be let through the relay and so
+    /// the battle can be stopped or ended.
+    ///
+    /// Shared rather than owned because [`let_joiner_through`] blocks for as
+    /// long as [`ALLOW_JOINER_PATIENCE`] and must not do it holding the lock on
+    /// the [`HostedRelay`] it came out of. Everything that reads that slot is a
+    /// command somebody is waiting on, `mp_build_host_config` most of all, and
+    /// launching the engine behind a join that is waiting out a relay rebuild
+    /// would be a worse failure than the one this fixes.
+    pub agent: Arc<RelayAgent>,
 }
 
 /// Hand-written because the control channel is a boxed writer and cannot be
@@ -265,7 +287,7 @@ pub fn waiting_on(
                 return Ok(RelayHost {
                     engine_port,
                     relayed: addr,
-                    agent,
+                    agent: Arc::new(agent),
                 })
             }
             // The agent is going to try again, and it may well succeed, but the
@@ -299,6 +321,63 @@ pub fn waiting_on(
     // outcome we wanted anyway.
     let _ = agent.stop();
     Err(why)
+}
+
+/// Let a joiner the lobby has just named through the relay, without holding up
+/// the lobby connection while it happens.
+///
+/// The last wire in relay hosting. `CLIENTIP` names the address, the relay agent
+/// installs the permission, and this is what carries one to the other.
+///
+/// ## Why it hands the address off rather than acting on it
+///
+/// [`RelayAgent::allow_joiner`] blocks until the agent answers, and the agent
+/// does not answer an `allowPeer` until it has a relay to act on. So calling it
+/// where `CLIENTIP` arrives, which is the connection's own read loop, would stop
+/// that connection reading anything at all for as long as
+/// [`ALLOW_JOINER_PATIENCE`]. Chat, joins, the battle list and the lobby's own
+/// PING would all stop with it, for one player joining.
+///
+/// The request itself is not deferred, only the wait for its answer. Writing it
+/// is the first thing the thread does, and it goes out ahead of the
+/// `JOINEDBATTLE` this line precedes, let alone ahead of the joiner's engine,
+/// which is not launched until the host starts the game.
+///
+/// ## A host who is not relaying
+///
+/// Does nothing, and says nothing. `CLIENTIP` only reaches a host that asked for
+/// relay support at login, but asking for it is a session-wide flag and hosting
+/// through the relay is a decision made per battle, so a host who took the
+/// direct route can be sent one. There is no agent to tell and nothing has gone
+/// wrong, and reporting it would put an error about a relay in front of somebody
+/// who is not using one.
+///
+/// `refused` is only called when there was a relay and it would not take the
+/// address. That is the case the host has to hear about: the player is in the
+/// battle room, they will be in the game, and nothing they send will arrive.
+pub fn let_joiner_through(
+    relay: &HostedRelay,
+    ip: IpAddr,
+    patience: Duration,
+    refused: impl FnOnce(NotAllowed) + Send + 'static,
+) {
+    // Taken out from under the lock and not used under it, so the slot is held
+    // for a clone of an `Arc` and not for the wait that follows.
+    let agent = lock_or_recover(relay)
+        .as_ref()
+        .map(|host| Arc::clone(&host.agent));
+    let Some(agent) = agent else {
+        return;
+    };
+    // A thread rather than a task on the runtime, because `allow_joiner` blocks
+    // and because this has to be callable from a test that has no runtime. One
+    // per join, and a battle's worth of joins is a battle's worth of threads,
+    // each of which lives only as long as the agent takes to answer.
+    std::thread::spawn(move || {
+        if let Err(why) = agent.allow_joiner(ip, patience) {
+            refused(why);
+        }
+    });
 }
 
 /// The lobby's last answer about a battle we asked it to open.
@@ -722,6 +801,162 @@ mod tests {
             written.sent()
         );
         assert_eq!(host.relayed, relayed());
+    }
+
+    /// A joiner's address, nothing like the relayed address above so a test that
+    /// confused the two says so.
+    fn joiner() -> IpAddr {
+        IpAddr::from([203, 0, 113, 7])
+    }
+
+    /// A relay slot holding a relay whose agent takes requests and never
+    /// answers them, which is the only version of an agent these tests can ask
+    /// their question of. One whose stdout has already ended answers everything
+    /// instantly with "it has gone", and against that a call that blocked for
+    /// the whole patience would look exactly like one that did not.
+    fn hosting_through(to_agent: impl Write + Send + 'static) -> HostedRelay {
+        struct NeverAnswers(Receiver<()>);
+        impl Read for NeverAnswers {
+            fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+                // Blocks until the sender is dropped, which nothing here does,
+                // so this is an agent that is still there and still quiet.
+                let _ = self.0.recv();
+                Ok(0)
+            }
+        }
+        let (held, quiet) = mpsc::channel();
+        std::mem::forget(held);
+        relay_slot(RelayAgent::driving(NeverAnswers(quiet), to_agent, |_| {}))
+    }
+
+    /// A relay slot holding a relay whose agent has gone: nothing can be written
+    /// to it at all, which is what a sidecar that has exited looks like from
+    /// here. Chosen over an agent whose stdout has ended because that one is only
+    /// noticed once the wait runs out, and a test racing its own patience would
+    /// be measuring the clock.
+    fn hosting_through_an_agent_that_has_gone() -> HostedRelay {
+        struct Broken;
+        impl Write for Broken {
+            fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+                Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "the agent has gone",
+                ))
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        hosting_through(Broken)
+    }
+
+    /// Put an agent behind an open allocation and into the slot a connection
+    /// holds it in, which is the shape [`let_joiner_through`] reads.
+    fn relay_slot(agent: RelayAgent) -> HostedRelay {
+        let (saw, heard) = mpsc::channel();
+        saw.send(Event::RelayOpen { addr: relayed() })
+            .expect("the channel is open");
+        let host =
+            waiting_on(agent, heard, ENGINE_PORT, PATIENCE).expect("the agent opened a relay");
+        Arc::new(Mutex::new(Some(host)))
+    }
+
+    /// Wait for something a background thread is going to write.
+    fn eventually(written: &Written, wanted: &str) -> bool {
+        let deadline = std::time::Instant::now() + PATIENCE;
+        while std::time::Instant::now() < deadline {
+            if written.sent().contains(wanted) {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        false
+    }
+
+    /// The whole issue: the lobby names an address and the relay is told to let
+    /// it through, with the address the lobby named.
+    #[test]
+    fn a_named_joiner_is_asked_through_the_relay() {
+        let written = Written::default();
+        let relay = hosting_through(written.clone());
+
+        let_joiner_through(&relay, joiner(), PATIENCE, |why| panic!("refused: {why}"));
+
+        assert!(
+            eventually(&written, "\"type\":\"allowPeer\""),
+            "the agent has to be asked to let somebody through, got: {}",
+            written.sent()
+        );
+        assert!(
+            written.sent().contains("\"ip\":\"203.0.113.7\""),
+            "the address asked for has to be the one the lobby named, got: {}",
+            written.sent()
+        );
+    }
+
+    /// A host on the direct route is still sent `CLIENTIP`, because the login
+    /// flag that asks for it is session wide and the route is chosen per battle.
+    /// There is no agent to tell, nothing has gone wrong, and an error about a
+    /// relay would be shown to somebody who is not using one.
+    #[test]
+    fn a_host_who_is_not_relaying_is_not_told_anything_went_wrong() {
+        let nobody: HostedRelay = HostedRelay::default();
+        let (complained, complaints) = mpsc::channel();
+
+        let_joiner_through(&nobody, joiner(), PATIENCE, move |why| {
+            let _ = complained.send(why.to_string());
+        });
+
+        // Either error means nothing was reported: the callback was never
+        // called, and then dropped. Only an `Ok` is a host being shown an error
+        // about a relay they are not using.
+        if let Ok(told) = complaints.recv_timeout(Duration::from_millis(100)) {
+            panic!("a host with no relay has nothing to report, and was told: {told}");
+        }
+    }
+
+    /// The point of not calling `allow_joiner` where `CLIENTIP` arrives. That
+    /// call blocks until the agent answers, and the agent does not answer until
+    /// it has a relay, so an inline version of this would stop the connection
+    /// reading chat, joins and the lobby's own PING for the whole patience.
+    ///
+    /// Asserted against an agent that never answers and a patience far longer
+    /// than the bound, so the only way to pass is not to wait for it.
+    #[test]
+    fn the_lobby_connection_is_not_held_while_the_agent_thinks() {
+        let relay = hosting_through(Vec::new());
+
+        let started = std::time::Instant::now();
+        let_joiner_through(&relay, joiner(), PATIENCE, |_| {});
+        let returned_in = started.elapsed();
+
+        assert!(
+            returned_in < Duration::from_millis(100),
+            "handing the address off took {returned_in:?}, which is the connection being held \
+             rather than the address being handed over"
+        );
+    }
+
+    /// A join that cannot be allowed through fails with the agent's own reason,
+    /// which is what the host is shown. The failure this replaces was the
+    /// player's traffic being dropped with nothing said to anybody.
+    #[test]
+    fn a_relay_that_will_not_take_the_address_says_why() {
+        let relay = hosting_through_an_agent_that_has_gone();
+        let (complained, complaints) = mpsc::channel();
+
+        let_joiner_through(&relay, joiner(), PATIENCE, move |why| {
+            let _ = complained.send(why.to_string());
+        });
+
+        let why = complaints
+            .recv_timeout(PATIENCE)
+            .expect("a refusal has to reach the host rather than being swallowed");
+        assert!(
+            why.contains("could not be reached"),
+            "the host has to be told what went wrong, got: {why}"
+        );
     }
 
     /// The lobby's verdict, in the three shapes it reaches a host in. Driven

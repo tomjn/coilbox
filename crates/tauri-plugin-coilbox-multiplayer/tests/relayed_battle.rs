@@ -19,7 +19,9 @@
 //! - coturn really does drop traffic from an address with no permission, and
 //!   the single byte `allowlist.rs` sends is really what puts one in its table.
 //!   The same player socket is refused before the permission and carried after
-//!   it, with nothing else changed.
+//!   it, with nothing else changed. The address that permission is installed for
+//!   is read out of a real `CLIENTIP` line by the real parser, which is the
+//!   route a joiner's address takes in a relayed battle (issue #2060).
 //! - Several players down one allocation reach the engine from one source port
 //!   each, and each one's reply comes back to the player it belongs to. That is
 //!   the property the whole sidecar exists for, now measured through a real
@@ -248,12 +250,15 @@ fn a_relayed_battle_carries_every_player_to_the_engine_and_back() {
          doing anything and letting joiners through is not what makes a relayed battle work"
     );
 
-    // The seam. Nothing in coilbox calls this yet, because coilbox has no route
-    // to a joiner's address (see `relay_agent.rs`), so this is the one place it
-    // is driven against a real allocation.
+    // The seam, driven from the wire rather than from a hand-written address.
+    // `CLIENTIP` is what a lobby with a relay sends a relay host before each
+    // `JOINEDBATTLE`, and the address in it is the only thing coilbox ever knows
+    // about who to let through. Parsing it here is what makes the rest of this
+    // test about the real path (issue #2060) rather than about a constant.
+    let named = joiner_named_in(&format!("CLIENTIP joiner {}", Ipv4Addr::LOCALHOST));
     sidecar
         .agent
-        .allow_joiner(IpAddr::V4(Ipv4Addr::LOCALHOST), PATIENCE)
+        .allow_joiner(named, PATIENCE)
         .expect("the agent let the joiner through the allocation");
 
     first.round_trip(b"after somebody vouched for me");
@@ -1017,6 +1022,19 @@ impl Drop for Sidecar {
         // outlives coilbox, and issue #2027 owns when that stops being true.
         let _ = self.child.kill();
         let _ = self.child.wait();
+    }
+}
+
+/// The address a `CLIENTIP` line names, read the way the connection reads it.
+///
+/// A test that took the address from a constant would say nothing about whether
+/// the line the lobby sends can be turned into one, which is the whole of what
+/// issue #2060 added. The parse is the real one out of
+/// `coilbox-lobby-protocol`.
+fn joiner_named_in(line: &str) -> IpAddr {
+    match coilbox_lobby_protocol::parse_line(line) {
+        coilbox_lobby_protocol::ServerMessage::ClientIp { ip, .. } => ip,
+        other => panic!("{line:?} was not read as a joiner's address, but as {other:?}"),
     }
 }
 

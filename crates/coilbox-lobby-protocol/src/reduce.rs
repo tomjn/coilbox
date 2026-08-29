@@ -112,6 +112,20 @@ pub enum Delta {
     TurnCredentialsRefused {
         reason: String,
     },
+    /// Somebody joined a battle we are hosting through the relay and the relay
+    /// would not let their address through, so nothing that player's game sends
+    /// will reach ours.
+    ///
+    /// Not produced by [`reduce`]: the plugin raises it after the relay agent
+    /// has answered, which is long after the line that named the joiner. It is a
+    /// [`Delta`] because it is a thing the host has to be shown, and the host is
+    /// the only person who can be shown it. The joiner's own client knows
+    /// nothing about the relay, and telling them through the lobby is
+    /// ScarylePoo/uberserver#29.
+    JoinerNotLetThrough {
+        username: String,
+        reason: String,
+    },
     LoggedIn {
         username: String,
     },
@@ -603,6 +617,11 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             vec![Delta::JoinBattleFailed { reason }]
         }
         ServerMessage::JoinBattleRequest { .. } => vec![],
+        // Nothing about the lobby changed, so there is nothing to mirror and
+        // nothing for the frontend to react to. The address has to reach the
+        // relay agent ahead of the join it belongs to, so the plugin acts on the
+        // message itself rather than waiting for a delta out of here.
+        ServerMessage::ClientIp { .. } => vec![],
         ServerMessage::ClientBattleStatus {
             username,
             battle_status,
