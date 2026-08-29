@@ -410,6 +410,14 @@ pub enum NoBattle {
     Closed,
     /// The lobby said nothing at all.
     Silent(Duration),
+    /// The lobby refused the address the battle was to be advertised at, so
+    /// whatever it opened is at this machine's own address rather than at the
+    /// relay's.
+    ///
+    /// `battle` is the id of the room the lobby opened anyway, or `None` when it
+    /// opened none. That is the difference between having something to close and
+    /// having nothing to close, and it is the only reason the id is carried.
+    NotRelayed { reason: String, battle: Option<u32> },
 }
 
 impl std::fmt::Display for NoBattle {
@@ -424,6 +432,20 @@ impl std::fmt::Display for NoBattle {
                 f,
                 "the lobby did not say whether the battle had opened within {} seconds",
                 waited.as_secs()
+            ),
+            NoBattle::NotRelayed {
+                reason,
+                battle: Some(_),
+            } => write!(
+                f,
+                "the lobby would not advertise your battle at the relay's address, so the room it opened at this machine's own address has been closed: {reason}"
+            ),
+            NoBattle::NotRelayed {
+                reason,
+                battle: None,
+            } => write!(
+                f,
+                "the lobby would not advertise your battle at the relay's address: {reason}"
             ),
         }
     }
@@ -488,6 +510,45 @@ pub(crate) fn open_answer_in(delta: &Delta, state: &Mutex<LobbyState>) -> Option
         Delta::OpenBattleFailed { reason } => Some(OpenAnswer::Refused(reason.clone())),
         _ => None,
     }
+}
+
+/// The lobby's refusal of the address this connection last said its battle
+/// lives at, or `None` when it has not refused one since the current attempt
+/// started.
+///
+/// Deliberately not part of [`OpenAnswer`]. `RELAYEDHOSTFAILED` and the
+/// `OPENBATTLE` answer are two lines the server writes back to back, so they
+/// usually arrive in one read and the connection task handles both before
+/// anybody waiting on the slot is polled again. A `watch` keeps only the last
+/// value written, so putting the refusal there would have the ack overwrite it
+/// and the host would be told their battle was relayed when it was not. A note
+/// that is set and never overwritten cannot lose that race.
+///
+/// It is read after the `OPENBATTLE` answer rather than waited on, which works
+/// because the server answers `RELAYEDHOST` where it reads it and only then goes
+/// on to the `OPENBATTLE` behind it. So by the time there is an answer about the
+/// battle, the note is already set if it is ever going to be.
+pub type RefusedRelayAddress = Arc<Mutex<Option<String>>>;
+
+/// Start an attempt with no refusal against it.
+///
+/// Called before the lines are queued and for the same reason
+/// [`watch::Receiver::borrow_and_update`] is: the last attempt's refusal must
+/// not be read as this one's.
+pub fn forget_refused_address(note: &RefusedRelayAddress) {
+    *lock_or_recover(note) = None;
+}
+
+/// Record that the lobby would not take the address we named. Called by the
+/// connection task off [`Delta::RelayedHostRefused`], which is raised for every
+/// `RELAYEDHOSTFAILED` whether or not anybody is waiting on one.
+pub fn note_refused_address(note: &RefusedRelayAddress, reason: &str) {
+    *lock_or_recover(note) = Some(reason.to_string());
+}
+
+/// What the lobby said about the address, if it said anything.
+pub fn refused_address(note: &RefusedRelayAddress) -> Option<String> {
+    lock_or_recover(note).clone()
 }
 
 #[cfg(test)]
@@ -1003,6 +1064,78 @@ mod tests {
             .expect_err("the lobby said nothing");
         assert!(matches!(quiet, NoBattle::Silent(_)), "got: {quiet}");
         drop(says);
+    }
+
+    /// Issue #2064, and the reason the refusal is a note rather than another
+    /// value in the answer slot.
+    ///
+    /// `RELAYEDHOSTFAILED` and the `OPENBATTLE` ack are written back to back by
+    /// the server, arrive in one read, and are handled by the connection task
+    /// one after the other with nothing waiting on the slot polled in between.
+    /// A `watch` keeps only the last value put in it, so a refusal routed
+    /// through the slot is overwritten by the ack and the host is told their
+    /// battle is relayed when it is not.
+    #[tokio::test]
+    async fn a_refusal_survives_the_ack_that_lands_in_the_same_read() {
+        let note = RefusedRelayAddress::default();
+        let (says, mut answers) = watch::channel(OpenAnswer::Unasked);
+        answers.borrow_and_update();
+        forget_refused_address(&note);
+
+        // Both lines handled before anybody waiting is polled again, which is
+        // what the connection task does with one read holding both.
+        note_refused_address(&note, "203.0.113.7 is this lobby server, not a relay");
+        says.send(OpenAnswer::Opened(9)).expect("the slot is open");
+
+        assert_eq!(
+            confirmed(&mut answers, PATIENCE)
+                .await
+                .expect("the lobby did open a battle"),
+            9
+        );
+        assert_eq!(
+            refused_address(&note).as_deref(),
+            Some("203.0.113.7 is this lobby server, not a relay"),
+            "the ack must not lose the refusal that came with it"
+        );
+    }
+
+    /// Hosting twice on one connection. The refusal is per attempt, so the
+    /// second attempt must not read the first one's: acting on it would close a
+    /// battle that opened properly and stop a relay carrying a game.
+    #[test]
+    fn a_second_attempt_starts_with_no_refusal_against_it() {
+        let note = RefusedRelayAddress::default();
+        note_refused_address(&note, "This server has no relay configured");
+        assert!(refused_address(&note).is_some());
+
+        forget_refused_address(&note);
+        assert_eq!(refused_address(&note), None);
+    }
+
+    /// The refusal reaches the note off a real line through the real parser and
+    /// reducer, whatever words the server chose. The set is written for a person
+    /// and will change, so nothing here may read it.
+    #[test]
+    fn a_line_off_the_wire_becomes_the_refusal_the_host_acts_on() {
+        use coilbox_lobby_protocol::{parse_line, reduce_at};
+
+        const NOW: u64 = 1_786_000_000_000;
+        let state = Mutex::new(LobbyState::new());
+        let refusal = reduce_at(
+            &mut lock_or_recover(&state),
+            parse_line("RELAYEDHOSTFAILED 203.0.113.7 is this lobby server, not a relay"),
+            NOW,
+        );
+        assert_eq!(
+            refusal,
+            vec![Delta::RelayedHostRefused {
+                reason: "203.0.113.7 is this lobby server, not a relay".to_string(),
+            }]
+        );
+        // And it is not an answer about the battle, which is a separate line the
+        // lobby has not sent yet.
+        assert_eq!(open_answer_in(&refusal[0], &state), None);
     }
 
     /// The connection task's half, off real lines through the real parser and

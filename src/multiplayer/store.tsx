@@ -1139,6 +1139,19 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             body: d.reason || undefined,
             level: "error",
           });
+        }
+        // The lobby would not advertise the battle at the relay's address. Rust
+        // closes the room the lobby opened anyway and returns the reason as the
+        // hosting command's error, so a host still looking at the Host button
+        // has already seen it. This is for the host who is not: the refusal can
+        // arrive after they have stopped waiting, and without it they find out
+        // from players saying they cannot connect.
+        else if (d.kind === "relayedHostRefused") {
+          void notify({
+            title: "Your battle is not going through the relay",
+            body: d.reason || undefined,
+            level: "error",
+          });
         } else if (d.kind === "commandFailed") {
           // Ignore-sync commands are best-effort: a server without IGNORE support
           // may reject them, but local hiding still applies, so degrade silently

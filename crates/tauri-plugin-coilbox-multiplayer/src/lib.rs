@@ -1744,6 +1744,11 @@ fn advertising(advertised: relay_host::Advertised, battle: &BattleToOpen) -> Vec
 /// So the relay route waits to hear which happened and stops the agent unless
 /// the answer is a battle. A direct host has nothing running to stop, so
 /// nothing there changes.
+///
+/// The lobby refusing the address, `RELAYEDHOSTFAILED`, is the same wait and the
+/// same stop, with one thing more to do: the lobby usually opens the battle
+/// anyway, at the address the route ladder measured as unreachable, so that room
+/// is closed rather than left for players to fail to join (issue #2064).
 async fn open_battle(
     registry: &Registry,
     server_key: &str,
@@ -1834,11 +1839,13 @@ async fn advertise(
 
     // Taken before a line is queued and marked seen in the same breath, so an
     // answer that lands while the lines are still being written is read as this
-    // attempt's rather than missed or mistaken for the last one's.
-    let mut answers = match open_slot(registry, server_key) {
-        Some(mut answers) => {
+    // attempt's rather than missed or mistaken for the last one's. The refusal
+    // note is cleared here for the same reason.
+    let (mut answers, refused) = match watched(registry, server_key) {
+        Some((mut answers, refused)) => {
             answers.borrow_and_update();
-            answers
+            relay_host::forget_refused_address(&refused);
+            (answers, refused)
         }
         // The connection went while the allocation was being opened. There is
         // nothing to advertise on, so the relay is carrying nothing.
@@ -1856,30 +1863,79 @@ async fn advertise(
         return sent;
     }
 
-    match relay_host::confirmed(&mut answers, patience).await {
+    let opened = relay_host::confirmed(&mut answers, patience).await;
+    // Read after the answer about the battle, never waited on. The server writes
+    // `RELAYEDHOSTFAILED` where it reads the line and only then handles the
+    // `OPENBATTLE` behind it, so a refusal that is coming has already been
+    // written down by the time there is anything to read here.
+    let address_refused = relay_host::refused_address(&refused);
+
+    match (opened, address_refused) {
         // Held against the connection so the host's own start script knows to
         // point the engine at loopback rather than at the relay. From here on
         // the relay is carrying a battle, it is out of this function's reach,
         // and stopping it is issue #2018's with rules of its own.
-        Ok(_) => {
+        (Ok(_), None) => {
             remember_relay(registry, server_key, host);
             sent
+        }
+        // A battle opened, and it is not going through the relay. It is at this
+        // machine's own address, which is the address the route ladder measured
+        // as unreachable, and measuring it that way is the only reason the relay
+        // route was taken at all. So the room is a door that does not open, and
+        // leaving it in the battle list sends players at it. Closing it costs a
+        // room that existed for a fraction of a second and that no engine has
+        // been launched into, because nothing launches until `mp_open_battle`
+        // has returned (issue #2064).
+        (Ok(battle), Some(reason)) => {
+            let _ = host.agent.stop();
+            let _ = enqueue(registry, server_key, command::leave_battle());
+            CliResult::err(
+                relay_host::NoBattle::NotRelayed {
+                    reason,
+                    battle: Some(battle),
+                }
+                .to_string(),
+            )
+        }
+        // No battle and a refused address. Nothing to close, and the address is
+        // the more useful of the two things to say: a lobby that would not take
+        // it is a problem the host can act on, where "the lobby said nothing" is
+        // not. The `OPENBATTLE` refusal is still on the console.
+        (Err(_), Some(reason)) => {
+            let _ = host.agent.stop();
+            CliResult::err(
+                relay_host::NoBattle::NotRelayed {
+                    reason,
+                    battle: None,
+                }
+                .to_string(),
+            )
         }
         // A refusal, a lobby that went quiet, or the connection ending: three
         // ways of having advertised a battle that does not exist. Each of them
         // leaves a sidecar that would hold its allocation and then refuse the
         // host's next attempt, and none of them leaves a game to protect.
-        Err(why) => {
+        (Err(why), None) => {
             let _ = host.agent.stop();
             CliResult::err(why.to_string())
         }
     }
 }
 
-/// The slot on `server_key`'s connection that the lobby's answer about a battle
-/// we opened arrives in, or `None` when there is no such connection.
-fn open_slot(registry: &Registry, server_key: &str) -> Option<relay_host::OpenSlot> {
-    Some(lock_or_recover(registry).get(server_key)?.opened.clone())
+/// The two places the lobby's verdict on a battle we are opening shows up: the
+/// slot its answer arrives in, and the note saying it would not take the address
+/// we said the battle lives at. `None` when there is no such connection.
+///
+/// Taken together in one lock rather than one at a time, so they cannot come
+/// from different connections under the same key.
+fn watched(
+    registry: &Registry,
+    server_key: &str,
+) -> Option<(relay_host::OpenSlot, relay_host::RefusedRelayAddress)> {
+    let registry = lock_or_recover(registry);
+    let conn = registry.get(server_key)?;
+    Some((conn.opened.clone(), conn.relay_refused.clone()))
 }
 
 /// Hold the relay a battle is being hosted through against its connection.
@@ -3607,6 +3663,7 @@ mod tests {
                 turn: watch::channel(turn::TurnAnswer::Unasked).1,
                 relay: conn::HostedRelay::default(),
                 opened,
+                relay_refused: relay_host::RefusedRelayAddress::default(),
             },
         );
         (registry, sent, answers)
@@ -3709,6 +3766,173 @@ mod tests {
             .get("alice@bar:8200")
             .map(|conn| lock_or_recover(&conn.relay).is_some())
             .unwrap_or_default());
+    }
+
+    /// The lines a connection has queued, oldest first.
+    fn queued(sent: &mut tokio::sync::mpsc::UnboundedReceiver<Outbound>) -> Vec<String> {
+        std::iter::from_fn(|| match sent.try_recv() {
+            Ok(Outbound::Line(line)) => Some(line),
+            _ => None,
+        })
+        .collect()
+    }
+
+    /// The note the connection task writes the lobby's refusal of our address
+    /// into. Taken out of the registry because that is where `advertise` reads
+    /// it from, and writing to it is exactly what the connection task does.
+    fn refusal_note(registry: &Registry, server_key: &str) -> relay_host::RefusedRelayAddress {
+        lock_or_recover(registry)
+            .get(server_key)
+            .expect("the connection is registered")
+            .relay_refused
+            .clone()
+    }
+
+    /// Issue #2064, and the case the issue is really about. The lobby refuses
+    /// the relay's address and then opens the battle anyway, at this machine's
+    /// own address, which is the address the route ladder already measured as
+    /// unreachable. That room is a door that does not open, so it is closed and
+    /// the host is told why in the lobby's own words.
+    ///
+    /// The relay agent has to stop too. Without it the sidecar holds an
+    /// allocation for a battle it is not carrying, and its run file turns the
+    /// host's next attempt into a pid nobody in coilbox will end (issue #2058).
+    #[tokio::test]
+    async fn a_refused_relay_address_closes_the_room_the_lobby_opened_anyway() {
+        let (registry, mut sent, answers) = a_connection("COMPFLAGS u sp r");
+        let note = refusal_note(&registry, "alice@bar:8200");
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+
+        tokio::spawn(async move {
+            // Both in one go, which is what the connection task does with a read
+            // holding both lines: the refusal is written down and the ack goes
+            // into the slot with nothing polled in between.
+            relay_host::note_refused_address(
+                &note,
+                "203.0.113.7 is this lobby server, not a relay",
+            );
+            let _ = answers.send(relay_host::OpenAnswer::Opened(9));
+        });
+        let refused = advertise(
+            &registry,
+            "alice@bar:8200",
+            lines,
+            Some(relay),
+            HOSTING_PATIENCE,
+        )
+        .await;
+
+        assert!(
+            channel.was_stopped(),
+            "a relay carrying nothing has to be stopped, got: {:?}",
+            channel.sent()
+        );
+        assert!(!refused.success);
+        let why = refused.error.as_deref().unwrap_or_default();
+        assert!(
+            why.contains("203.0.113.7 is this lobby server, not a relay"),
+            "the lobby's own words have to reach the host, got: {why}"
+        );
+
+        // The two advertising lines, and then the one that closes the room they
+        // opened. Last, because the close has to come after them.
+        let lines = queued(&mut sent);
+        assert_eq!(
+            lines.last().map(String::as_str),
+            Some("LEAVEBATTLE"),
+            "the room nobody can join has to be closed, queued: {lines:?}"
+        );
+        assert!(lock_or_recover(&registry)
+            .get("alice@bar:8200")
+            .map(|conn| lock_or_recover(&conn.relay).is_none())
+            .unwrap_or_default());
+    }
+
+    /// The lobby refused the address and then refused the battle too, so there
+    /// is no room to close. Sending `LEAVEBATTLE` here would be aimed at a
+    /// battle this client is not in, and on a host who is in an earlier battle
+    /// it would throw them out of that one.
+    #[tokio::test]
+    async fn a_refused_relay_address_closes_nothing_when_no_battle_opened() {
+        let (registry, mut sent, answers) = a_connection("COMPFLAGS u sp r");
+        let note = refusal_note(&registry, "alice@bar:8200");
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+
+        tokio::spawn(async move {
+            relay_host::note_refused_address(&note, "This server has no relay configured");
+            let _ = answers.send(relay_host::OpenAnswer::Refused(
+                "you already have a battle open".to_string(),
+            ));
+        });
+        let refused = advertise(
+            &registry,
+            "alice@bar:8200",
+            lines,
+            Some(relay),
+            HOSTING_PATIENCE,
+        )
+        .await;
+
+        assert!(channel.was_stopped(), "got: {:?}", channel.sent());
+        assert!(!refused.success);
+        assert!(
+            refused
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("This server has no relay configured"),
+            "got: {:?}",
+            refused.error
+        );
+        let lines = queued(&mut sent);
+        assert!(
+            !lines.iter().any(|l| l == "LEAVEBATTLE"),
+            "there is no room to close, queued: {lines:?}"
+        );
+    }
+
+    /// The refusal is per attempt. A host whose first attempt was refused and
+    /// who then hosts somewhere the lobby is happy with must keep that battle:
+    /// reading the stale note would close a working room and stop a relay with
+    /// a game about to run through it.
+    #[tokio::test]
+    async fn a_second_attempt_ignores_the_last_ones_refused_address() {
+        let (registry, mut sent, answers) = a_connection("COMPFLAGS u sp r");
+        relay_host::note_refused_address(
+            &refusal_note(&registry, "alice@bar:8200"),
+            "the attempt before this one",
+        );
+
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+        tokio::spawn(async move {
+            let _ = answers.send(relay_host::OpenAnswer::Opened(9));
+        });
+        let opened = advertise(
+            &registry,
+            "alice@bar:8200",
+            lines,
+            Some(relay),
+            HOSTING_PATIENCE,
+        )
+        .await;
+
+        assert!(opened.success, "got: {:?}", opened.error);
+        assert!(
+            !channel.was_stopped(),
+            "the last attempt's refusal must not take this battle's relay down, got: {:?}",
+            channel.sent()
+        );
+        let lines = queued(&mut sent);
+        assert!(
+            !lines.iter().any(|l| l == "LEAVEBATTLE"),
+            "this battle is relayed and must not be closed, queued: {lines:?}"
+        );
     }
 
     /// Issue #2018's coilbox half. A battle that ends has to tell the sidecar,
