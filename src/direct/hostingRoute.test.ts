@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   advertisedGamePort,
+  battleRouteLabel,
   chosenHostingRoute,
   hostingRoute,
   hostingRouteSummary,
@@ -336,6 +337,67 @@ describe("hostingRouteSummary", () => {
   it("does not repeat the relay's cost in the route it describes", () => {
     expect(hostingRouteSummary("relay", { lanRoom: false })).not.toContain(
       "ping",
+    );
+  });
+});
+
+describe("the word a battle room shows for its route", () => {
+  it("names each route somebody could be sitting on", () => {
+    expect(battleRouteLabel("direct", { lanRoom: false })?.word).toBe("Direct");
+    expect(battleRouteLabel("portMapped", { lanRoom: false })?.word).toBe(
+      "Port opened",
+    );
+    expect(battleRouteLabel("relay", { lanRoom: false })?.word).toBe("Relayed");
+    expect(battleRouteLabel("unreachable", { lanRoom: false })?.word).toBe(
+      "Not reachable",
+    );
+  });
+
+  // The reason somebody looks at this at all. The hosting form's sentence leaves
+  // the cost to the checkbox that asks about the relay, because that host is
+  // choosing. This reader is not, and "why is my ping worse" is the question
+  // that brought them here (issue #2071).
+  it("says what the relay costs, which the hosting form's sentence does not", () => {
+    const detail = battleRouteLabel("relay", { lanRoom: false })?.detail ?? "";
+    expect(detail).toContain("ping");
+    expect(hostingRouteSummary("relay", { lanRoom: false })).not.toContain(
+      "ping",
+    );
+  });
+
+  // The two direct routes are the good news, so neither may borrow the relay's
+  // explanation for a bad ping.
+  it("blames nothing for a battle that was never relayed", () => {
+    for (const route of ["direct", "portMapped"] as const) {
+      expect(battleRouteLabel(route, { lanRoom: false })?.detail).not.toContain(
+        "relay",
+      );
+      expect(battleRouteLabel(route, { lanRoom: false })?.detail).not.toContain(
+        "ping",
+      );
+    }
+  });
+
+  // The port check is off by default in both hosting forms, so this is what most
+  // battles report. A word for it would be a word on nearly every battle, saying
+  // only that nobody looked.
+  it("says nothing when nothing was ever checked", () => {
+    expect(battleRouteLabel("unchecked", { lanRoom: false })).toBe(null);
+    expect(battleRouteLabel(null, { lanRoom: false })).toBe(null);
+  });
+
+  // A room on a LAN that the internet cannot reach is a room on a LAN. Calling
+  // that "not reachable" would report the feature as a fault.
+  it("does not call a LAN room a failure for being a LAN room", () => {
+    expect(battleRouteLabel("unreachable", { lanRoom: true })).toBe(null);
+  });
+
+  // The good routes still mean the same thing in a room as on a server: someone
+  // outside can get in, which is worth knowing either way.
+  it("still names a room's route when there is one to name", () => {
+    expect(battleRouteLabel("direct", { lanRoom: true })?.word).toBe("Direct");
+    expect(battleRouteLabel("portMapped", { lanRoom: true })?.word).toBe(
+      "Port opened",
     );
   });
 });

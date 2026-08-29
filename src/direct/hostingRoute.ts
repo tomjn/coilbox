@@ -188,6 +188,78 @@ export function hostingRouteSummary(
 }
 
 /**
+ * The route a battle took, said to the people sitting in that battle. Pure.
+ *
+ * A word and the reason behind it, or null when there is nothing worth saying.
+ * The reader here is not choosing anything: the battle is open, the route is
+ * settled, and the only reason to look is that something feels wrong. So the
+ * word carries no weight on its own and the reason is a tooltip nobody has to
+ * read (issue #2022).
+ *
+ * # Why the relay says what it costs and {@link hostingRouteSummary} does not
+ *
+ * The hosting form's sentence leaves the relay's cost to the checkbox that asks
+ * whether to use one, because the host is deciding at that moment and the cost
+ * is the thing to decide on (issue #2023). Here nobody is deciding. The
+ * question that brings somebody to this word is "why is my ping worse than
+ * usual", and answering it is the whole point of the issue, so the cost is
+ * stated as a plain fact rather than held back as a warning (issue #2071).
+ *
+ * That checkbox defaults to on, so a relayed host has very likely never read
+ * it. Repeating the cost once, in a tooltip, is not repetition for them.
+ *
+ * # What is deliberately silent
+ *
+ * "unchecked" is the common case, because the port check is off by default in
+ * both hosting forms. Nothing is known about the route, and a word that means
+ * "we did not look" would be noise on every battle anybody hosts. The hosting
+ * form is where that is worth offering, and it already does.
+ *
+ * A LAN room that nothing outside can reach is likewise silent. That is what a
+ * LAN room is, and labelling it as a fault would report the feature as broken.
+ *
+ * `lanRoom` is why "unreachable" needs a caller's answer at all. Everything
+ * else means the same thing in a room and in a battle on a server.
+ */
+export function battleRouteLabel(
+  route: HostingRoute | null,
+  { lanRoom }: { lanRoom: boolean },
+): { word: string; detail: string } | null {
+  if (!route || route === "unchecked") return null;
+  switch (route) {
+    case "direct":
+      return {
+        word: "Direct",
+        detail:
+          "This machine is on the internet under its own address, so players connect straight to it.",
+      };
+    case "portMapped":
+      return {
+        word: "Port opened",
+        detail:
+          "Your router opened the port, so players connect straight to this machine.",
+      };
+    case "relay":
+      return {
+        word: "Relayed",
+        detail:
+          "Nothing opened on your router, so this battle goes through the server's relay. That adds a hop, so pings here are a little worse than a direct game.",
+      };
+    case "unreachable":
+      // Said without naming which of the two ways the ladder ended here, because
+      // this does not know. A host who turned the relay off and a host on a
+      // server that has none are told the same true thing, and the hosting form
+      // is where the difference between them is worth drawing.
+      if (lanRoom) return null;
+      return {
+        word: "Not reachable",
+        detail:
+          "Nothing opened on your router, so only players who can already reach this machine can join.",
+      };
+  }
+}
+
+/**
  * The route the battle this client last opened actually took.
  *
  * A module singleton, like `hostedRoom.ts`, because the route is decided in a
