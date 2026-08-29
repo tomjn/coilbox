@@ -4528,6 +4528,83 @@ mod tests {
         assert_eq!(cfg["restrictedUnits"].as_object().unwrap().len(), 2);
     }
 
+    /// A connection with nothing in its relay slot, which is every connection
+    /// that is not hosting a relayed battle and so is all of them most of the
+    /// time.
+    fn a_connection_hosting_nothing() -> conn::ServerConn {
+        conn::ServerConn {
+            protocol: conn::ConnProtocol::TasServer,
+            tx: tokio::sync::mpsc::unbounded_channel().0,
+            state: Arc::new(Mutex::new(LobbyState::new())),
+            sink: Arc::new(Mutex::new(Channel::new(|_| Ok(())))),
+            phase: tokio::sync::watch::channel(LoginPhase::Ready).1,
+            agreement: Arc::new(Mutex::new(None)),
+            tachyon: conn::TachyonHandle::default(),
+            started: conn::StartedBattle::default(),
+            turn: tokio::sync::watch::channel(turn::TurnAnswer::Unasked).1,
+            relay: conn::HostedRelay::default(),
+            opened: tokio::sync::watch::channel(relay_host::OpenAnswer::Unasked).1,
+            relay_refused: relay_host::RefusedRelayAddress::default(),
+        }
+    }
+
+    /// The registry scan behind `mp_relay_traffic`.
+    ///
+    /// Worth its own test because the honest answer and the answer a broken
+    /// version gives are the same shape. A scan that always found nothing would
+    /// leave the pill drawing exactly what it draws for an ordinary game, which
+    /// is the behaviour every other test in this feature is checking for, so
+    /// nothing else would notice.
+    #[test]
+    fn the_relay_figure_comes_from_the_connection_that_is_hosting_through_one() {
+        let registry = Registry::default();
+        assert_eq!(
+            relay_traffic(&registry),
+            None,
+            "nothing is being relayed, so there is nothing to say"
+        );
+
+        lock_or_recover(&registry)
+            .insert("alice@bar:8200".to_string(), a_connection_hosting_nothing());
+        assert_eq!(
+            relay_traffic(&registry),
+            None,
+            "a connection that is not hosting through a relay has no figure either"
+        );
+
+        // A relay that has said what it is carrying, put together the way
+        // `mp_open_battle` does: an agent that reported a rate, held against the
+        // connection.
+        let (coilbox_reads, mut agent_said) = std::io::pipe().expect("a pipe");
+        let agent = relay_agent::RelayAgent::driving(coilbox_reads, Vec::new(), |_| {});
+        std::io::Write::write_all(
+            &mut agent_said,
+            coilbox_relay_protocol::to_line(&coilbox_relay_protocol::Event::Traffic {
+                bytes_per_second: 41_984,
+            })
+            .as_bytes(),
+        )
+        .expect("the reading thread is still there");
+        let (saw, heard) = std::sync::mpsc::channel();
+        saw.send(coilbox_relay_protocol::Event::RelayOpen {
+            addr: "198.51.100.9:30001".parse().expect("an address"),
+        })
+        .expect("the channel is open");
+        let host = relay_host::waiting_on(agent, heard, 8452, Duration::from_secs(5))
+            .expect("the agent opened a relay");
+        remember_relay(&registry, "alice@bar:8200", host);
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while relay_traffic(&registry) != Some(41_984) {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the figure the relay reported has to reach the command, or the pill has \
+                 nothing to draw for a battle that is being relayed"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
     #[test]
     fn split_script_tags_pairs_restrict_indices() {
         let mut tags = BTreeMap::new();

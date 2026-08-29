@@ -145,6 +145,39 @@ mod tests {
         assert_eq!(per_second(9001, Duration::ZERO), 0);
     }
 
+    /// How many intervals a test will wait for a report before deciding one is
+    /// not coming.
+    ///
+    /// A bound rather than a wait, and the reason is what a missing report
+    /// looks like on a paused clock. [`report_forever`] sleeps and loops, so a
+    /// version that skipped a report would wind the test's own clock forward
+    /// forever without ever writing a line, and a test simply waiting for that
+    /// line would spin rather than fail. Falsification found exactly that:
+    /// making the agent report only when something had moved turned the test
+    /// below from a failure into a run that never ended.
+    const REPORTS_WITHIN: u32 = 5;
+
+    /// Run the reporter until it says something, or until it has plainly
+    /// decided not to.
+    async fn first_report(traffic: &Traffic) -> Event {
+        let (out, read) = tokio::io::duplex(4096);
+        let mut said = BufReader::new(read).lines();
+        let reporter = Reporter::writing(out);
+
+        let line = tokio::select! {
+            _ = report_forever(traffic, &reporter) => unreachable!("it never returns"),
+            line = said.next_line() => line,
+            () = tokio::time::sleep(TRAFFIC_EVERY * REPORTS_WITHIN) => panic!(
+                "the agent said nothing in {REPORTS_WITHIN} reporting intervals, so a host \
+                 would have no way to tell this relay from one that had died"
+            ),
+        };
+        let line = line
+            .expect("a readable pipe")
+            .expect("the reporter said something");
+        read_event(&line).expect("an event this build knows")
+    }
+
     /// The whole point, end to end inside the process: what goes through the
     /// relay comes out of the reporter as a rate.
     ///
@@ -152,24 +185,16 @@ mod tests {
     /// names and the assertion is a number rather than a range.
     #[tokio::test(start_paused = true)]
     async fn what_the_relay_carried_is_what_the_agent_says_it_carried() {
-        let (out, read) = tokio::io::duplex(4096);
-        let mut said = BufReader::new(read).lines();
-        let reporter = Reporter::writing(out);
         let traffic = Traffic::new();
-
         traffic.carried(4096);
         traffic.carried(2048);
 
-        tokio::select! {
-            _ = report_forever(&traffic, &reporter) => unreachable!("it never returns"),
-            line = said.next_line() => {
-                let line = line.expect("a readable pipe").expect("the reporter said something");
-                assert_eq!(
-                    read_event(&line),
-                    Ok(Event::Traffic { bytes_per_second: 6144 })
-                );
+        assert_eq!(
+            first_report(&traffic).await,
+            Event::Traffic {
+                bytes_per_second: 6144
             }
-        }
+        );
     }
 
     /// A relay that has stopped carrying anything has to say so, rather than
@@ -178,20 +203,11 @@ mod tests {
     /// looking at the last number it ever heard.
     #[tokio::test(start_paused = true)]
     async fn a_relay_carrying_nothing_says_nothing_is_going_through_it() {
-        let (out, read) = tokio::io::duplex(4096);
-        let mut said = BufReader::new(read).lines();
-        let reporter = Reporter::writing(out);
-        let traffic = Traffic::new();
-
-        tokio::select! {
-            _ = report_forever(&traffic, &reporter) => unreachable!("it never returns"),
-            line = said.next_line() => {
-                let line = line.expect("a readable pipe").expect("the reporter said something");
-                assert_eq!(
-                    read_event(&line),
-                    Ok(Event::Traffic { bytes_per_second: 0 })
-                );
+        assert_eq!(
+            first_report(&Traffic::new()).await,
+            Event::Traffic {
+                bytes_per_second: 0
             }
-        }
+        );
     }
 }

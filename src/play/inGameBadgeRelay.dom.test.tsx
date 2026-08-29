@@ -125,8 +125,14 @@ describe("an ordinary battle", () => {
     expect(relayTraffic).not.toHaveBeenCalled();
   });
 
-  /** Its X still ends the game on the first press, as it always has. */
+  /**
+   * Its X still ends the game on the first press, as it always has.
+   *
+   * With a rate waiting to be handed over, so that a pill which asked when it
+   * should not have is caught here too rather than only by the tests above.
+   */
   it("ends the game from the X without asking", async () => {
+    carrying(41984);
     await drawBadge("portMapped");
 
     fireEvent.click(screen.getByRole("button", { name: "End game" }));

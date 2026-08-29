@@ -309,7 +309,7 @@ fn a_battle_that_ends_while_a_player_is_relaying_leaves_the_agent_alone() {
 /// timing of one datagram.
 #[test]
 fn the_agent_says_how_much_it_is_carrying() {
-    let mut agent = Running::start();
+    let agent = Running::start();
     let relay = agent.relay_addr();
 
     assert_eq!(
