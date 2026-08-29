@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use coilbox_relay_protocol::Event;
 use tauri_plugin_coilbox_multiplayer::relay_agent::{NotStarted, RelayAgent};
-use tauri_plugin_coilbox_multiplayer::relay_sidecar::Battle;
+use tauri_plugin_coilbox_multiplayer::relay_sidecar::{self, Battle};
 
 /// How long to wait for the sidecar to say something before deciding it never
 /// will. Generous next to the milliseconds a loopback relay takes to open, and
@@ -131,6 +131,110 @@ fn a_reopened_coilbox_finds_the_running_sidecar_rather_than_starting_a_second() 
         .expect("the sidecar that was already relaying carries on doing so");
 
     first.stop().expect("a running sidecar is still reachable");
+}
+
+/// Wait for the sidecar named in `run_file` to go, or say it did not.
+///
+/// Polled on the sidecar's own interval, the same way the command does, and
+/// given the same budget. `false` means it is still there, which for a sidecar
+/// that took the note means it is carrying a game.
+fn goes_within_the_budget(run_file: &std::path::Path) -> bool {
+    let deadline = std::time::Instant::now() + relay_sidecar::NOTE_PATIENCE;
+    while std::time::Instant::now() < deadline {
+        if relay_sidecar::already_relaying(run_file).is_none() {
+            return true;
+        }
+        std::thread::sleep(coilbox_relay_protocol::NOTE_LOOKED_FOR_EVERY);
+    }
+    false
+}
+
+/// The one seam neither side's own tests can reach: coilbox's note writer
+/// against a real sidecar (issue #2062).
+///
+/// The sidecar's tests write the note by hand and coilbox's write it for a
+/// sidecar that is not there. Between them a note written to the wrong path, or
+/// in a shape the sidecar reads as somebody else's, would leave both green and
+/// ship a button that does nothing.
+///
+/// Nothing was ever played through this relay, so the sidecar takes the note and
+/// goes, and the run file that was refusing the host's next battle goes with it.
+#[test]
+fn coilbox_can_ask_a_sidecar_it_has_no_pipe_to_to_stop() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let run_file = dir.path().join("relay").join("agent.json");
+
+    let (agent, seen) = start(&run_file);
+    assert!(matches!(hears(&seen), Event::RelayOpen { .. }));
+    let pid = relay_sidecar::already_relaying(&run_file).expect("a running sidecar");
+
+    // The crash this issue is about: coilbox goes and the sidecar carries on,
+    // with nobody holding its control channel any more.
+    drop(agent);
+
+    relay_sidecar::leave_a_stop_note(&run_file, pid).expect("a writable temp dir");
+    assert!(
+        goes_within_the_budget(&run_file),
+        "a leftover sidecar with nothing to carry has to act on the note inside the budget \
+         the command gives it, or the host is told it would not stop"
+    );
+    assert!(
+        relay_sidecar::note_was_taken(&run_file),
+        "the note has to be taken, because that is the only proof of life coilbox can get \
+         from a process it holds no pipe to"
+    );
+}
+
+/// The same ask against a relay that is carrying a game, which is what somebody
+/// who closed coilbox mid-match and opened it again is looking at.
+///
+/// The sidecar reads the note, so coilbox knows it is alive, and keeps relaying,
+/// so nobody in that match is cut off. Both halves matter: without the first the
+/// host would be told nothing is listening, and without the second they would
+/// have ended everybody else's game.
+#[test]
+fn asking_a_sidecar_that_is_carrying_a_game_does_not_end_it() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let run_file = dir.path().join("relay").join("agent.json");
+
+    let (agent, seen) = start(&run_file);
+    let Event::RelayOpen { addr } = hears(&seen) else {
+        panic!("the first thing a sidecar says is where players send");
+    };
+    let pid = relay_sidecar::already_relaying(&run_file).expect("a running sidecar");
+
+    // A player's engine talking through the relay, which is what a game in
+    // progress looks like from the sidecar's side. The sidecar binds every
+    // interface, so loopback reaches the port it reported.
+    let player = UdpSocket::bind("127.0.0.1:0").expect("a free loopback port");
+    let relay = std::net::SocketAddr::from(([127, 0, 0, 1], addr.port()));
+    player
+        .send_to(b"a datagram from a player", relay)
+        .expect("the relay is bound");
+    // Given the sidecar a moment to read it, on its own interval, so the note
+    // below cannot land first.
+    std::thread::sleep(coilbox_relay_protocol::NOTE_LOOKED_FOR_EVERY);
+
+    drop(agent);
+    relay_sidecar::leave_a_stop_note(&run_file, pid).expect("a writable temp dir");
+    // Checked before the wait as well as after it. Without this the test would
+    // pass on a note that was never written, since a note that does not exist
+    // reads as one that has been taken.
+    assert!(
+        !relay_sidecar::note_was_taken(&run_file),
+        "there has to be a note outstanding, or the rest of this proves nothing"
+    );
+
+    assert!(
+        !goes_within_the_budget(&run_file),
+        "the note ended a relay that was carrying a game, so every other player in that \
+         match was cut off"
+    );
+    assert!(
+        relay_sidecar::note_was_taken(&run_file),
+        "the sidecar has to read the note even when it refuses it, or coilbox cannot tell a \
+         relay carrying a game from a process id that belongs to something else"
+    );
 }
 
 /// Once the battle has ended there is nothing to find, so the next one starts

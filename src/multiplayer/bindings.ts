@@ -1158,6 +1158,49 @@ export const mpRelayTraffic = defineCommand<
 >("coilbox-multiplayer", "mp_relay_traffic");
 
 /**
+ * Whether a relay agent from an earlier session is still running on this
+ * machine (issue #2062).
+ *
+ * A relayed battle will not open while one is, because a second agent would
+ * relay the same game to a second address. The host is told which process it is
+ * and, until now, nothing else.
+ *
+ * `pid` is null when there is nothing running. `ours` means the agent belongs
+ * to a battle this coilbox is hosting, which is not a leftover and needs the
+ * opposite advice.
+ */
+export const mpLeftoverRelayAgent = defineCommand<
+  Record<string, never>,
+  { pid: number | null; ours: boolean }
+>("coilbox-multiplayer", "mp_leftover_relay_agent");
+
+/**
+ * Ask a leftover relay agent to stop, and say what it did (issue #2062).
+ *
+ * It asks rather than ends, and that is the whole design. A running relay agent
+ * may be carrying a game other people are still playing, which is the reason it
+ * outlives coilbox at all, and coilbox has no pipe to it and no way of telling
+ * from out here. So the agent decides: one no player was ever heard through
+ * stops at once, and one carrying a game keeps going.
+ *
+ * Five outcomes, and the caller has something different to say for each:
+ *
+ * - `stopped`: it has gone, and hosting will work now.
+ * - `carrying`: it read the note and kept relaying, because a game is being
+ *   played through it. Nobody was cut off.
+ * - `noAnswer`: nothing read the note, so the process id in the record is no
+ *   longer the relay agent's.
+ * - `ours`: it is this coilbox's own relay, for a battle it is hosting.
+ * - `gone`: there was nothing running to ask.
+ *
+ * Takes a few seconds, because it waits to see what the agent did.
+ */
+export const mpAskLeftoverRelayToStop = defineCommand<
+  Record<string, never>,
+  { outcome: "stopped" | "carrying" | "noAnswer" | "ours" | "gone" }
+>("coilbox-multiplayer", "mp_ask_leftover_relay_to_stop");
+
+/**
  * Tell the relay sidecar which process the engine of a relayed battle is, so it
  * can give the relay back a second after the game ends rather than four minutes
  * later (issue #2065).

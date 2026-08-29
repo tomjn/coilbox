@@ -495,6 +495,152 @@ fn an_agent_that_stops_gives_its_run_file_back() {
     );
 }
 
+/// Leave a note asking the agent that holds `run_file` to stop, the way coilbox
+/// does: addressed to the process id in the run file.
+fn leave_a_stop_note(run_file: &Path, pid: u32) -> std::path::PathBuf {
+    let note = run_file.with_file_name("stop.json");
+    std::fs::write(&note, format!("{{\"pid\":{pid}}}")).expect("a writable temp dir");
+    note
+}
+
+/// The process id in the run file, which is the only handle a coilbox that
+/// reopened has on a leftover agent.
+fn agent_in(run_file: &Path) -> u32 {
+    let text = std::fs::read_to_string(run_file).expect("a running agent left one");
+    text.trim()
+        .strip_prefix("{\"pid\":")
+        .and_then(|rest| rest.strip_suffix('}'))
+        .and_then(|pid| pid.parse().ok())
+        .unwrap_or_else(|| panic!("a process id in the run file, got: {text}"))
+}
+
+/// Issue #2062 end to end, on the real process. The coilbox that started this
+/// agent has gone, a new one finds it through the run file and has no pipe to
+/// it, and the note is the only thing it can say. Nothing was ever played
+/// through the relay, so the agent takes the note and goes.
+///
+/// The run file going with it is the half that matters to the host: it is what
+/// was refusing their next battle.
+#[test]
+fn a_leftover_agent_carrying_nothing_takes_a_note_and_stops() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let run_file = dir.path().join("relay").join("agent.json");
+
+    let mut agent = Running::start_with(Some(&run_file));
+    assert!(agent.hears().starts_with("{\"type\":\"relayOpen\""));
+    let pid = agent_in(&run_file);
+
+    // The crash or force quit this issue is about. The agent carries on, and
+    // from here on it is the only thing that can decide to stop.
+    agent.coilbox_closes();
+    let note = leave_a_stop_note(&run_file, pid);
+
+    assert!(
+        agent.ends().success(),
+        "an agent that took a note and had nothing to carry left as a failure"
+    );
+    assert!(
+        !note.exists(),
+        "the note has to be taken, or coilbox cannot tell an agent that read it from a \
+         process id that belongs to something else entirely"
+    );
+    assert!(
+        !run_file.exists(),
+        "a run file outliving its agent is what refuses the host's next battle"
+    );
+}
+
+/// The one that costs a match, over the real process. Somebody closed coilbox
+/// mid-game and opened it again, so the relay in front of them is carrying every
+/// other player in that match. The note must not end it.
+#[test]
+fn a_leftover_agent_carrying_a_game_reads_a_note_and_keeps_going() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let run_file = dir.path().join("relay").join("agent.json");
+
+    let mut agent = Running::start_with(Some(&run_file));
+    let relay = agent.relay_addr();
+    let pid = agent_in(&run_file);
+
+    // A player's engine talking through the relay, waited for at the engine end
+    // so the agent has certainly seen it before anything is asked of it.
+    let player = UdpSocket::bind("127.0.0.1:0").expect("a free loopback port");
+    player
+        .send_to(b"a datagram from a player", relay)
+        .expect("the relay is bound");
+    agent.engine_hears();
+
+    agent.coilbox_closes();
+    let note = leave_a_stop_note(&run_file, pid);
+
+    // The note is read, which is what tells coilbox the agent is alive and has
+    // decided rather than that nothing is there at all.
+    let taken = Instant::now() + PATIENCE;
+    while note.exists() {
+        assert!(
+            Instant::now() < taken,
+            "the agent never read the note, so a host would be told nothing is listening"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+
+    // And it keeps relaying, for longer than it would take to act on a decision
+    // to stop. See `LONG_ENOUGH_TO_HAVE_STOPPED`.
+    let until = Instant::now() + LONG_ENOUGH_TO_HAVE_STOPPED;
+    while Instant::now() < until {
+        player
+            .send_to(b"the game is still going", relay)
+            .expect("the relay is bound");
+        agent.engine_hears();
+        assert!(
+            agent
+                .child
+                .try_wait()
+                .expect("a child we spawned")
+                .is_none(),
+            "a note ended a game that was still being played through the relay"
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(
+        run_file.exists(),
+        "an agent that kept relaying has to keep its run file, or the next battle starts a \
+         second relay over the top of this game"
+    );
+}
+
+/// A note addressed to somebody else is not this agent's to take. coilbox has
+/// no way of withdrawing a note, so one left over from an earlier session would
+/// otherwise stop the next agent to start.
+#[test]
+fn a_note_for_another_process_leaves_this_agent_alone() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let run_file = dir.path().join("relay").join("agent.json");
+
+    let mut agent = Running::start_with(Some(&run_file));
+    assert!(agent.hears().starts_with("{\"type\":\"relayOpen\""));
+    let pid = agent_in(&run_file);
+    agent.coilbox_closes();
+
+    // A number that is not this agent's, which is what a note left for an agent
+    // that has since been replaced looks like.
+    let note = leave_a_stop_note(&run_file, pid.wrapping_add(1));
+
+    std::thread::sleep(LONG_ENOUGH_TO_HAVE_STOPPED);
+    assert!(
+        agent
+            .child
+            .try_wait()
+            .expect("a child we spawned")
+            .is_none(),
+        "a note for a different process stopped this one"
+    );
+    assert!(
+        note.exists(),
+        "somebody else's note is not this agent's to take away"
+    );
+}
+
 /// A request the agent cannot act on is answered rather than swallowed, which
 /// is what stops a join that will never work from looking like one that has not
 /// happened yet.

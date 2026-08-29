@@ -21,8 +21,9 @@ import {
   battlePorts,
   type DirectReachability,
 } from "../../direct/reachability";
-import type { mpOpenBattle } from "../bindings";
+import { mpLeftoverRelayAgent, type mpOpenBattle } from "../bindings";
 import { hostBattleFailure } from "./hostBattle";
+import { LeftoverRelayAgent } from "./LeftoverRelayAgent";
 import { hashFailureMessage, useHostContent } from "./useHostContent";
 
 /** The `mpOpenBattle` argument shape, minus the connection key the parent supplies. */
@@ -109,6 +110,14 @@ export function HostBattlePopover({
   // (issue #1591).
   const [error, setError] = useState<string | null>(null);
   const [hosting, setHosting] = useState(false);
+  // A relay agent from an earlier session, which is the one hosting failure the
+  // host cannot act on from the error alone: it names a process id and nothing
+  // else (issue #2062). Only ever looked for after a relayed attempt failed,
+  // because it is the only attempt a leftover agent can refuse.
+  const [leftover, setLeftover] = useState<{
+    pid: number;
+    ours: boolean;
+  } | null>(null);
   // Whether to fall through to the relay when the router has refused. Stored, so
   // somebody who cares about their ping says it once rather than every time they
   // host, and on by default because the hosts who reach that rung are the ones
@@ -139,6 +148,7 @@ export function HostBattlePopover({
     e.preventDefault();
     if (!canHost || !target || hosting) return;
     setError(null);
+    setLeftover(null);
     setHosting(true);
     // Dropped before the attempt rather than after it, so a host that fails
     // leaves no route behind for the next reader to believe.
@@ -173,6 +183,17 @@ export function HostBattlePopover({
       // Left open on purpose: the answer is in here, and the fields that need
       // changing are too.
       setError(hostBattleFailure(err));
+      // Asked rather than read out of the error, because the refusal is a
+      // sentence for a person and matching on its wording would break the next
+      // time somebody improves it. Only after a relayed attempt: nothing else
+      // consults the run file, so a leftover agent cannot be what stopped an
+      // ordinary battle.
+      if (route === "relay") {
+        const found = await mpLeftoverRelayAgent({}).catch(() => null);
+        if (found?.pid != null) {
+          setLeftover({ pid: found.pid, ours: found.ours });
+        }
+      }
     } finally {
       setHosting(false);
     }
@@ -370,6 +391,10 @@ export function HostBattlePopover({
                 >
                   {error}
                 </p>
+              )}
+
+              {leftover && (
+                <LeftoverRelayAgent pid={leftover.pid} ours={leftover.ours} />
               )}
 
               <Button

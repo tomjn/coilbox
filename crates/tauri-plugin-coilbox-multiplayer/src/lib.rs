@@ -87,6 +87,7 @@ mod zerok_room;
 mod zerok_users;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
@@ -2009,6 +2010,167 @@ fn mp_relay_traffic(registry: State<'_, Registry>) -> CliResult {
     CliResult::ok(json!({ "bytesPerSecond": relay_traffic(&registry) }))
 }
 
+/// Whether this coilbox is itself hosting a battle through the relay sidecar.
+///
+/// The one thing that tells a leftover from the sidecar this coilbox started
+/// seconds ago. There is at most one sidecar on the machine, so a run file
+/// naming a live process while a connection holds a relay is naming that relay,
+/// and asking it to stop would end a battle the host is in the middle of
+/// opening.
+fn hosting_through_the_relay(registry: &Registry) -> bool {
+    lock_or_recover(registry)
+        .values()
+        .any(|conn| lock_or_recover(&conn.relay).is_some())
+}
+
+/// What came of asking a leftover relay sidecar to stop.
+///
+/// Five answers because the host needs five different things said to them, and
+/// two of them are opposites that look identical from out here until the
+/// sidecar has answered.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StopAnswer {
+    /// There was no sidecar to ask. Either nothing was running or it has gone
+    /// since the host was told about it, and either way they can host now.
+    Gone,
+    /// It is this coilbox's own relay, for a battle it is hosting. Not a
+    /// leftover, and ending it would end that battle.
+    Ours,
+    /// It took the note and stopped. Nothing was ever played through it.
+    Stopped,
+    /// It took the note and kept running, which it does when a player has been
+    /// heard through the relay. Stopping it would have cut off a game.
+    Carrying,
+    /// Nothing took the note. Nothing is reading them, so the process id in the
+    /// run file is no longer the sidecar's.
+    NoAnswer,
+}
+
+impl StopAnswer {
+    /// The word the frontend switches on.
+    fn word(self) -> &'static str {
+        match self {
+            StopAnswer::Gone => "gone",
+            StopAnswer::Ours => "ours",
+            StopAnswer::Stopped => "stopped",
+            StopAnswer::Carrying => "carrying",
+            StopAnswer::NoAnswer => "noAnswer",
+        }
+    }
+}
+
+/// Ask the sidecar named in `run_file` to stop, and wait to see what it did.
+///
+/// The body of [`mp_ask_leftover_relay_to_stop`], with the app handle taken out
+/// so the whole rule can be tested against real files.
+///
+/// ## Why this cannot end somebody's match
+///
+/// Three separate things, and any one of them would be enough on its own.
+///
+/// Nothing here ends a process. It writes a note and reads the answer, and the
+/// sidecar decides, because the sidecar is the only thing that knows whether a
+/// game is being played through the relay. Its rule is in `stopping.rs` in
+/// `coilbox-relay-agent`: a relay a player has ever been heard through keeps
+/// running.
+///
+/// A sidecar this coilbox is hosting through is not asked at all, because it is
+/// not a leftover. That is `we_are_hosting`, and without it a host who opened a
+/// relayed battle and then tried to open a second one could end the first.
+///
+/// And the sidecar ignores a note while its own coilbox is still there, so even
+/// a note written by mistake reaches a process that will not act on it.
+async fn ask_the_leftover_sidecar_to_stop(
+    run_file: &Path,
+    we_are_hosting: bool,
+) -> Result<StopAnswer, String> {
+    if we_are_hosting {
+        return Ok(StopAnswer::Ours);
+    }
+    let Some(pid) = relay_sidecar::already_relaying(run_file) else {
+        return Ok(StopAnswer::Gone);
+    };
+    relay_sidecar::leave_a_stop_note(run_file, pid)
+        .map_err(|e| format!("could not leave a note for the relay agent: {e}"))?;
+
+    let until = tokio::time::Instant::now() + relay_sidecar::NOTE_PATIENCE;
+    while tokio::time::Instant::now() < until {
+        tokio::time::sleep(coilbox_relay_protocol::NOTE_LOOKED_FOR_EVERY).await;
+        // The run file going is the sidecar's own last act, so this is the
+        // answer rather than an inference from one.
+        if relay_sidecar::already_relaying(run_file).is_none() {
+            return Ok(StopAnswer::Stopped);
+        }
+    }
+    // Still running, so the difference is whether anything read the note. A
+    // sidecar carrying a game takes it and stays. A process id that is not the
+    // sidecar's leaves it where it is.
+    Ok(if relay_sidecar::note_was_taken(run_file) {
+        StopAnswer::Carrying
+    } else {
+        StopAnswer::NoAnswer
+    })
+}
+
+/// `mp_leftover_relay_agent`: whether a relay sidecar from an earlier session is
+/// still running on this machine (issue #2062).
+///
+/// Asked by the hosting form when a battle would not open, so the host who was
+/// told "a relay agent is already running as process 12345" gets somewhere to go
+/// rather than a number. Reading the run file rather than matching on the
+/// refusal's wording, because the sentence is for a person and is not a
+/// protocol.
+///
+/// `pid` is null when there is nothing running to talk about. `ours` says the
+/// sidecar belongs to a battle this coilbox is hosting, which is a different
+/// problem with a different answer: end that battle first.
+#[tauri::command]
+fn mp_leftover_relay_agent<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    registry: State<'_, Registry>,
+) -> CliResult {
+    let run_file = match relay_sidecar::run_file_path(&app) {
+        Ok(path) => path,
+        Err(e) => return CliResult::err(e),
+    };
+    CliResult::ok(json!({
+        "pid": relay_sidecar::already_relaying(&run_file),
+        "ours": hosting_through_the_relay(&registry),
+    }))
+}
+
+/// `mp_ask_leftover_relay_to_stop`: ask a leftover relay sidecar to stop, and
+/// say what it did (issue #2062).
+///
+/// The way out of the dead end. A sidecar that outlived its coilbox cannot be
+/// spoken to over the control channel, because that is a dead process's pipes,
+/// so this leaves a note beside the run file and reads the answer.
+///
+/// It asks rather than ends, and [`ask_the_leftover_sidecar_to_stop`] carries
+/// the three reasons that makes it safe to offer as a button. The short version
+/// is that a running sidecar may be carrying a match, and the one process that
+/// knows is the one that decides.
+///
+/// Takes up to [`relay_sidecar::NOTE_PATIENCE`], which is spent in full only
+/// when the answer is that the sidecar kept going.
+#[tauri::command]
+async fn mp_ask_leftover_relay_to_stop<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    registry: State<'_, Registry>,
+) -> Result<CliResult, ()> {
+    let run_file = match relay_sidecar::run_file_path(&app) {
+        Ok(path) => path,
+        Err(e) => return Ok(CliResult::err(e)),
+    };
+    let we_are_hosting = hosting_through_the_relay(&registry);
+    Ok(
+        match ask_the_leftover_sidecar_to_stop(&run_file, we_are_hosting).await {
+            Ok(answer) => CliResult::ok(json!({ "outcome": answer.word() })),
+            Err(e) => CliResult::err(e),
+        },
+    )
+}
+
 /// Tell whichever connection is hosting through a relay which process the
 /// engine is. Answers whether there was one to tell.
 ///
@@ -3304,6 +3466,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_probe_host,
             mp_turn_credentials,
             mp_relay_traffic,
+            mp_leftover_relay_agent,
+            mp_ask_leftover_relay_to_stop,
             mp_watch_engine,
             mp_chat_logs,
             mp_chat_log_open,
@@ -4676,6 +4840,161 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(5));
         }
+    }
+
+    /// A run file naming a process that is definitely running, which is what a
+    /// leftover sidecar leaves. This test process stands in for it.
+    fn a_run_file_naming_a_live_sidecar(dir: &std::path::Path) -> std::path::PathBuf {
+        let run_file = dir.join("relay").join("agent.json");
+        std::fs::create_dir_all(run_file.parent().expect("a parent")).expect("a writable temp dir");
+        std::fs::write(
+            &run_file,
+            coilbox_relay_protocol::RunFile {
+                pid: std::process::id(),
+            }
+            .to_json(),
+        )
+        .expect("a writable temp dir");
+        run_file
+    }
+
+    /// The note coilbox left, if it is still there.
+    fn note_beside(run_file: &std::path::Path) -> std::path::PathBuf {
+        coilbox_relay_protocol::stop_note_path(run_file)
+    }
+
+    /// Nothing to ask. The host was told a relay agent was running and by the
+    /// time they pressed the button it had gone, which is the ordinary way a
+    /// leftover from a crash clears itself.
+    #[tokio::test(start_paused = true)]
+    async fn asking_when_there_is_no_sidecar_says_so_rather_than_waiting() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("relay").join("agent.json");
+
+        assert_eq!(
+            ask_the_leftover_sidecar_to_stop(&run_file, false).await,
+            Ok(StopAnswer::Gone)
+        );
+        assert!(
+            !note_beside(&run_file).exists(),
+            "a note for a sidecar that is not there would be read by the next one to start"
+        );
+    }
+
+    /// The guard that keeps a host from ending their own battle. They opened a
+    /// relayed battle, tried to open a second one over the top, and were told a
+    /// relay agent was already running, which it is: theirs.
+    #[tokio::test(start_paused = true)]
+    async fn a_relay_this_coilbox_is_hosting_through_is_never_asked_to_stop() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = a_run_file_naming_a_live_sidecar(dir.path());
+
+        assert_eq!(
+            ask_the_leftover_sidecar_to_stop(&run_file, true).await,
+            Ok(StopAnswer::Ours)
+        );
+        assert!(
+            !note_beside(&run_file).exists(),
+            "a note was left for the sidecar carrying this coilbox's own battle"
+        );
+    }
+
+    /// The leftover this issue is about. The sidecar takes the note and goes,
+    /// and its run file goes with it, which is what was refusing the host's next
+    /// battle.
+    #[tokio::test(start_paused = true)]
+    async fn a_sidecar_that_takes_the_note_and_goes_is_reported_as_stopped() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = a_run_file_naming_a_live_sidecar(dir.path());
+
+        // A sidecar that reads the note, decides it has nothing to carry, and
+        // exits. One interval, which is what the real one takes.
+        let stopping = run_file.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(coilbox_relay_protocol::NOTE_LOOKED_FOR_EVERY).await;
+            std::fs::remove_file(note_beside(&stopping)).expect("coilbox left a note");
+            std::fs::remove_file(&stopping).expect("the sidecar had a run file");
+        });
+
+        assert_eq!(
+            ask_the_leftover_sidecar_to_stop(&run_file, false).await,
+            Ok(StopAnswer::Stopped)
+        );
+    }
+
+    /// The opposite case, and the one that costs a match if it is got wrong.
+    /// The sidecar read the note and kept running, which it does when a player
+    /// has been heard through the relay. The host has to be told that rather
+    /// than told nothing happened.
+    #[tokio::test(start_paused = true)]
+    async fn a_sidecar_that_takes_the_note_and_stays_is_reported_as_carrying_a_game() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = a_run_file_naming_a_live_sidecar(dir.path());
+
+        // Takes the note, keeps its run file, carries on relaying.
+        let carrying = run_file.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(coilbox_relay_protocol::NOTE_LOOKED_FOR_EVERY).await;
+            std::fs::remove_file(note_beside(&carrying)).expect("coilbox left a note");
+        });
+
+        assert_eq!(
+            ask_the_leftover_sidecar_to_stop(&run_file, false).await,
+            Ok(StopAnswer::Carrying)
+        );
+        assert!(
+            run_file.exists(),
+            "the sidecar carrying the game is still there, and coilbox must not have \
+             cleared the record of it"
+        );
+    }
+
+    /// Nothing read the note at all, which means nothing is there to read one.
+    /// A process id is unique only while its process lives, so the run file is
+    /// naming a number the OS has since given to something unrelated. Told
+    /// apart from the case above only by the note still sitting there.
+    #[tokio::test(start_paused = true)]
+    async fn a_note_nothing_ever_reads_is_reported_as_no_answer() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = a_run_file_naming_a_live_sidecar(dir.path());
+
+        assert_eq!(
+            ask_the_leftover_sidecar_to_stop(&run_file, false).await,
+            Ok(StopAnswer::NoAnswer)
+        );
+        assert_eq!(
+            std::fs::read_to_string(note_beside(&run_file)).expect("the note is still there"),
+            coilbox_relay_protocol::StopNote {
+                pid: std::process::id()
+            }
+            .to_json(),
+            "the note has to name the process the run file named, or a sidecar that is there \
+             would leave it alone"
+        );
+    }
+
+    /// The registry scan behind the guard above, which is the only thing
+    /// standing between a host and their own battle. A version that always said
+    /// no would pass every test that has no connection in it, which is most of
+    /// them.
+    #[test]
+    fn a_connection_hosting_through_the_relay_is_what_makes_the_sidecar_ours() {
+        let registry = Registry::default();
+        assert!(!hosting_through_the_relay(&registry));
+
+        lock_or_recover(&registry)
+            .insert("alice@bar:8200".to_string(), a_connection_hosting_nothing());
+        assert!(
+            !hosting_through_the_relay(&registry),
+            "an ordinary battle has no sidecar of its own"
+        );
+
+        remember_relay(
+            &registry,
+            "alice@bar:8200",
+            a_relay_writing_to(Channelled::default()),
+        );
+        assert!(hosting_through_the_relay(&registry));
     }
 
     /// The registry scan behind `mp_watch_engine`, asked the way the sidecar

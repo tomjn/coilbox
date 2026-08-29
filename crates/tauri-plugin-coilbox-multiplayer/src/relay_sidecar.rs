@@ -25,10 +25,31 @@
 //! it be, which means the players already in that game keep playing and
 //! nobody new can be let through until it ends. `relay_agent`'s module doc
 //! carries the same limitation from the sidecar's side.
+//!
+//! ## Asking one to stop without a pipe to it
+//!
+//! Finding a sidecar and being unable to say anything to it left a host with a
+//! process id and no way to host again for the rest of that machine's uptime
+//! (issue #2062). [`leave_a_stop_note`] is what closes that: a note beside the
+//! run file, which the sidecar reads on its own interval once its coilbox has
+//! closed.
+//!
+//! It asks rather than orders, and coilbox never ends the process itself. Two
+//! separate reasons, either of which is enough. The sidecar may be carrying a
+//! game other people are playing and coilbox has no way of telling from out
+//! here, so the one process that can tell is the one that decides. And a
+//! process id is unique only while its process lives, so a run file naming a
+//! number the OS has since handed to something unrelated would have coilbox
+//! ending whatever that turned out to be.
+//!
+//! [`note_was_taken`] is the answer. The sidecar removes a note addressed to
+//! it, which is the only proof of life a process with no pipe can give.
 
+use std::io;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
-use coilbox_relay_protocol::RunFile;
+use coilbox_relay_protocol::{stop_note_path, RunFile, StopNote, NOTE_LOOKED_FOR_EVERY};
 use tauri::{AppHandle, Runtime};
 
 /// The environment variable the sidecar reads the TURN password from.
@@ -120,6 +141,49 @@ pub fn already_relaying(run_file: &Path) -> Option<u32> {
     let text = std::fs::read_to_string(run_file).ok()?;
     let pid = RunFile::from_json(&text).ok()?.pid;
     coilbox_proc::is_running(pid).then_some(pid)
+}
+
+/// How long to give a note before deciding nothing is reading them.
+///
+/// Two of the sidecar's own intervals plus two more. It looks for a note every
+/// [`NOTE_LOOKED_FOR_EVERY`] and then acts on it in its next stopping check,
+/// which runs on the same interval (`LOOK_EVERY` in `coilbox-relay-agent`), so
+/// two is the honest floor and anything under it would report a sidecar that was
+/// about to stop as one that would not. The two on top are for a machine that is
+/// busy running a game, which is the machine this always runs on.
+///
+/// Spent in full only when a host is about to be told the sidecar kept going,
+/// which is the one case where waiting beats guessing.
+pub const NOTE_PATIENCE: Duration = NOTE_LOOKED_FOR_EVERY.saturating_mul(4);
+
+/// Leave a note asking the sidecar running as `pid` to stop.
+///
+/// The only thing coilbox can say to a sidecar it did not spawn, and
+/// [`coilbox_relay_protocol::StopNote`] carries why. It is a request: the
+/// sidecar answers it with its own stopping rule and keeps running if a game is
+/// still being played through it.
+///
+/// Written whole rather than appended to, so a note left by an earlier attempt
+/// is replaced rather than added to. `pid` comes from [`already_relaying`] at
+/// the moment of asking, so the note names the sidecar that is actually there.
+pub fn leave_a_stop_note(run_file: &Path, pid: u32) -> io::Result<()> {
+    let note = stop_note_path(run_file);
+    if let Some(parent) = note.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(note, StopNote { pid }.to_json())
+}
+
+/// Whether the note coilbox left has been taken.
+///
+/// The sidecar removes a note addressed to it, so this is the only proof of
+/// life available for a process coilbox has no pipe to, and it is what tells
+/// the two failures apart. A note that was taken means a sidecar read it and
+/// decided, which for one that is still running means it is carrying a game. A
+/// note nothing ever touched means nothing is there to read it, so the run file
+/// names a process id the OS has since given to something else.
+pub fn note_was_taken(run_file: &Path) -> bool {
+    !stop_note_path(run_file).exists()
 }
 
 /// The sidecar's argument vector. The password is deliberately not in it.
@@ -244,6 +308,60 @@ mod tests {
     fn nothing_is_relaying_when_there_is_no_run_file() {
         let dir = tempfile::tempdir().expect("a temp dir");
         assert_eq!(already_relaying(&dir.path().join("agent.json")), None);
+    }
+
+    /// The note names the sidecar it is for, in the shape that sidecar reads.
+    /// A note naming the wrong process is one it leaves alone, which reads to a
+    /// host as a relay that will not stop.
+    #[test]
+    fn a_note_names_the_sidecar_it_is_for() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("relay").join("agent.json");
+
+        leave_a_stop_note(&run_file, 4021).expect("a writable temp dir");
+
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("relay").join("stop.json"))
+                .expect("the note was written"),
+            "{\"pid\":4021}"
+        );
+    }
+
+    /// The proof of life, in both directions. Without it coilbox cannot tell a
+    /// sidecar that read the note and kept going, because it is carrying a
+    /// game, from a run file naming a process id that belongs to something else
+    /// entirely, and those two need opposite things said about them.
+    #[test]
+    fn a_note_nothing_has_taken_is_how_coilbox_knows_nothing_is_reading_them() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("relay").join("agent.json");
+        assert!(
+            note_was_taken(&run_file),
+            "there is no note yet, so nothing is outstanding"
+        );
+
+        leave_a_stop_note(&run_file, 4021).expect("a writable temp dir");
+        assert!(!note_was_taken(&run_file));
+
+        // The sidecar taking it, which it does by removing the file.
+        std::fs::remove_file(stop_note_path(&run_file)).expect("the note is there");
+        assert!(note_was_taken(&run_file));
+    }
+
+    /// A second ask replaces the first rather than leaving a note for a sidecar
+    /// that has since been replaced.
+    #[test]
+    fn asking_again_leaves_one_note_for_the_sidecar_that_is_there_now() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("relay").join("agent.json");
+
+        leave_a_stop_note(&run_file, 4021).expect("a writable temp dir");
+        leave_a_stop_note(&run_file, 4022).expect("a writable temp dir");
+
+        assert_eq!(
+            std::fs::read_to_string(stop_note_path(&run_file)).expect("the note was written"),
+            "{\"pid\":4022}"
+        );
     }
 
     /// A file left behind by a sidecar that was killed. Treating it as a

@@ -30,6 +30,15 @@
 //! a lot of machinery for a case that needs a killed agent, a recycled pid and
 //! a restart in between.
 //!
+//! ## The note that comes back the other way
+//!
+//! Being findable is only half of what a reopened coilbox needs. Finding an
+//! agent it cannot speak to and cannot stop left a host with a process id and
+//! no way to host again (issue #2062), so
+//! [`take_notes_asking_us_to_stop`] reads a note coilbox leaves beside this
+//! file. It is a request rather than an order, because the agent may be
+//! carrying a game and the coilbox asking has no idea whether it is.
+//!
 //! ## Two coilboxes starting at once
 //!
 //! Barely possible, since coilbox is single-instance on Windows and Linux
@@ -39,10 +48,15 @@
 //! two agents racing exactly one gets the file and the other refuses to start
 //! rather than both relaying the same battle to different addresses.
 
+use std::convert::Infallible;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use coilbox_relay_protocol::RunFile as Contents;
+use coilbox_relay_protocol::{
+    stop_note_path, RunFile as Contents, StopNote, NOTE_LOOKED_FOR_EVERY,
+};
+
+use crate::stopping::Stopping;
 
 /// Why this agent did not get the run file.
 #[derive(Debug)]
@@ -113,6 +127,65 @@ impl Drop for Claim {
             let _ = std::fs::remove_file(&self.path);
         }
     }
+}
+
+/// Read notes left beside `run_file` asking this agent to stop, forever.
+///
+/// The other half of the run file, and the reason it is in this module: the run
+/// file is how a coilbox with no pipe finds this agent, and this is the only
+/// thing it can then say to it. [`coilbox_relay_protocol::StopNote`] carries why
+/// the channel exists and why it is a request rather than an order.
+///
+/// Never returns. Nothing waits on it, and the process exiting is what ends it.
+///
+/// Two things about it are not obvious and neither can be dropped.
+///
+/// Nothing is read until this agent's own coilbox has closed. A note is what a
+/// coilbox with no pipe says, and while the pipe is open the coilbox on the
+/// other end of it is the one hosting through this relay: acting on a note then
+/// would let a second coilbox end a battle the first one is holding open.
+///
+/// A note is taken only if it names this process. That makes a note nobody ever
+/// took inert rather than a stop the next agent to start inherits, which
+/// matters because coilbox writes one and then has no way of withdrawing it.
+pub async fn take_notes_asking_us_to_stop(run_file: &Path, stopping: &Stopping) -> Infallible {
+    let note = stop_note_path(run_file);
+    let us = std::process::id();
+    loop {
+        tokio::time::sleep(NOTE_LOOKED_FOR_EVERY).await;
+        if stopping.has_coilbox_gone() && take_note_for(&note, us) {
+            eprintln!(
+                "coilbox-relay-agent: coilbox has left a note asking this relay to stop. If a \
+                 game is still being played through it, it carries on until that game ends."
+            );
+            stopping.coilbox_left_a_note();
+        }
+    }
+}
+
+/// Take the note at `path` if it is addressed to process `us`.
+///
+/// Taking it means removing it, which is how the coilbox that wrote it learns
+/// that something read it. That is the only proof of life it can get from a
+/// process it has no pipe to, and it is what tells "a relay that is carrying a
+/// game and would not stop" apart from "a run file naming a process id the OS
+/// has since given to something else".
+///
+/// Everything that is not a note for us is left where it is: no file, an
+/// unreadable one, or one naming a different process. Removing another agent's
+/// note would take away the answer its own coilbox is waiting for.
+fn take_note_for(path: &Path, us: u32) -> bool {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    if StopNote::from_json(&text).ok().map(|note| note.pid) != Some(us) {
+        return false;
+    }
+    // Removed before the flag is set rather than after, so a coilbox watching
+    // for the note to go never sees an agent that has already acted on one it
+    // still appears not to have read.
+    let _ = std::fs::remove_file(path);
+    true
 }
 
 /// Create the file and write this process into it, failing if it is there.
@@ -222,6 +295,100 @@ mod tests {
         drop(claim);
 
         assert!(path.exists(), "a claim only ever removes its own file");
+    }
+
+    /// Write a note addressed to `pid` where this agent will look for one.
+    fn leave_a_note(run_file: &Path, pid: u32) -> PathBuf {
+        let note = stop_note_path(run_file);
+        std::fs::create_dir_all(note.parent().expect("a parent")).expect("a writable temp dir");
+        std::fs::write(&note, StopNote { pid }.to_json()).expect("a writable file");
+        note
+    }
+
+    /// The channel itself: a note for this process is taken, and taking it
+    /// removes the file, which is the only answer the coilbox that wrote it
+    /// will ever get.
+    #[test]
+    fn a_note_for_this_process_is_taken_and_the_file_goes_with_it() {
+        let (_dir, path) = a_path();
+        let note = leave_a_note(&path, std::process::id());
+
+        assert!(take_note_for(&note, std::process::id()));
+        assert!(
+            !note.exists(),
+            "a note that stays put reads to coilbox as one nothing ever looked at"
+        );
+    }
+
+    /// A note for somebody else stays where it is. coilbox has no way to
+    /// withdraw one, so a note nobody took would otherwise become a stop the
+    /// next agent inherits, and removing it would take away the answer another
+    /// agent's coilbox is waiting on.
+    #[test]
+    fn a_note_for_another_process_is_left_alone() {
+        let (_dir, path) = a_path();
+        let note = leave_a_note(&path, gone_pid());
+
+        assert!(!take_note_for(&note, std::process::id()));
+        assert!(note.exists(), "somebody else's note is not ours to take");
+    }
+
+    /// Half a note, or one from a version that wrote a different shape. Reading
+    /// a stop out of it would end a relay nobody asked about.
+    #[test]
+    fn a_note_that_cannot_be_read_is_not_a_note_for_us() {
+        let (_dir, path) = a_path();
+        let note = stop_note_path(&path);
+        std::fs::create_dir_all(note.parent().expect("a parent")).expect("a writable temp dir");
+        std::fs::write(&note, "{\"pid\":").expect("a writable file");
+
+        assert!(!take_note_for(&note, std::process::id()));
+    }
+
+    #[test]
+    fn no_note_is_not_a_note() {
+        let (_dir, path) = a_path();
+        assert!(!take_note_for(&stop_note_path(&path), std::process::id()));
+    }
+
+    /// The gate, and the reason it is in the reader rather than only in the
+    /// stopping rule: while coilbox is there the note is not even read, so a
+    /// second coilbox cannot take the answer the first one is waiting on out
+    /// from under it either.
+    #[tokio::test(start_paused = true)]
+    async fn no_note_is_read_while_coilbox_is_still_there() {
+        let (_dir, path) = a_path();
+        let note = leave_a_note(&path, std::process::id());
+        let stopping = Stopping::new();
+
+        tokio::select! {
+            _ = take_notes_asking_us_to_stop(&path, &stopping) => unreachable!("it never returns"),
+            () = tokio::time::sleep(NOTE_LOOKED_FOR_EVERY * 10) => {}
+        }
+
+        assert!(
+            note.exists(),
+            "a coilbox holding the pipe to this agent says stop down it, so a note arriving \
+             now is somebody else's and must not be acted on"
+        );
+        assert_eq!(stopping.reason(), None);
+    }
+
+    /// The whole path inside the agent, on a leftover with nothing to protect:
+    /// coilbox has gone, a note turns up, and the agent decides to stop.
+    #[tokio::test(start_paused = true)]
+    async fn a_note_left_after_coilbox_has_gone_is_taken_and_acted_on() {
+        let (_dir, path) = a_path();
+        let note = leave_a_note(&path, std::process::id());
+        let stopping = Stopping::new();
+        stopping.coilbox_has_gone();
+
+        tokio::select! {
+            _ = take_notes_asking_us_to_stop(&path, &stopping) => unreachable!("it never returns"),
+            reason = stopping.wait() => assert_eq!(reason, crate::stopping::Reason::AskedInANote),
+        }
+
+        assert!(!note.exists(), "the note has to be taken, not only read");
     }
 
     /// A pid that is definitely not in use, for standing in for an agent that
