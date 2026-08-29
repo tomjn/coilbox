@@ -1156,3 +1156,22 @@ export const mpRelayTraffic = defineCommand<
   Record<string, never>,
   { bytesPerSecond: number | null }
 >("coilbox-multiplayer", "mp_relay_traffic");
+
+/**
+ * Tell the relay sidecar which process the engine of a relayed battle is, so it
+ * can give the relay back a second after the game ends rather than four minutes
+ * later (issue #2065).
+ *
+ * Takes the run id of the launch, never a process id. The sidecar stops
+ * relaying when the process it was told about exits, so the pid is looked up in
+ * Rust at the moment of asking rather than travelling out here and back: a run
+ * that has already finished has no pid to give and this fails instead. The Rust
+ * command's doc has the argument in full.
+ *
+ * Only worth calling for a battle this coilbox is hosting through the relay.
+ * `watching` is false when there was no relay to tell.
+ */
+export const mpWatchEngine = defineCommand<
+  { runId: string },
+  { watching: boolean }
+>("coilbox-multiplayer", "mp_watch_engine");

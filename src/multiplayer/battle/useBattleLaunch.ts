@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { contentListReplays } from "@/content/bindings";
 import { useReplayUserState } from "@/content/replayUserState";
+import { chosenHostingRoute } from "@/direct/hostingRoute";
 import { notify } from "@/notify/notify";
 import type { BattleConfig } from "@/play/bindings";
 import type { PlayTarget } from "@/play/config";
@@ -11,8 +12,32 @@ import {
   mpBuildBattleConfig,
   mpBuildHostConfig,
   mpProbeHost,
+  mpWatchEngine,
 } from "../bindings";
 import { checkHostAddress } from "./hostAddress";
+
+/**
+ * Tell the relay sidecar which process this game is, if there is a sidecar to
+ * tell (issue #2065).
+ *
+ * The sidecar is only there for a battle this coilbox opened through the relay,
+ * so that is the only launch that says anything. Every other game returns
+ * nothing here and makes no call at all, which is deliberate: the sidecar stops
+ * relaying when the process it was told about exits, and an engine that is
+ * nothing to do with a relay is not a process anything should be deciding on.
+ *
+ * Best-effort. A sidecar that cannot be reached has already stopped, and one
+ * that is never told falls back to its own traffic backstop, so a failure here
+ * costs four minutes of an allocation and never a game.
+ */
+function tellTheRelayAboutTheEngine(
+  host: boolean,
+): ((runId: string) => void) | undefined {
+  if (!host || chosenHostingRoute() !== "relay") return undefined;
+  return (runId) => {
+    void mpWatchEngine({ runId }).catch(() => {});
+  };
+}
 
 /**
  * Vet the address we are about to point the engine at, while the player can
@@ -137,6 +162,7 @@ export function useBattleLaunch(
         config,
         executable: target.executable,
         dataDir: target.dataDir,
+        onEngineStarted: tellTheRelayAboutTheEngine(host),
       });
       if (res.exitCode && res.exitCode !== 0) {
         setError(`Engine exited with code ${res.exitCode}.`);
