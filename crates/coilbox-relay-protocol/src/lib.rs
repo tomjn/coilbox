@@ -19,6 +19,13 @@
 //! buys nothing here: the traffic is a handful of short messages per battle,
 //! not a hot path.
 //!
+//! ## Two files are part of the contract as well
+//!
+//! [`RunFile`] is how a running agent is found once coilbox has been closed and
+//! reopened, and [`StopNote`] is the only thing that coilbox can say to one it
+//! finds, because a child's pipes cannot be taken over by a new parent. Both
+//! are here rather than on one side for the same reason the messages are.
+//!
 //! ## Why the shapes live in a crate of their own
 //!
 //! Both halves derive their wire shape from these declarations, so a field that
@@ -50,6 +57,7 @@
 //! variant, which is what lets a new request type reuse them.
 
 use std::net::{IpAddr, SocketAddr};
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -219,6 +227,92 @@ pub enum Event {
 pub struct RunFile {
     /// The sidecar's process id.
     pub pid: u32,
+}
+
+/// How often an agent whose coilbox has closed looks for a note asking it to
+/// stop.
+///
+/// Here rather than in the agent because both ends need it: the agent sleeps
+/// it, and coilbox multiplies it to decide how long to give a note before
+/// concluding that nothing is reading them. A number that lived on one side
+/// would be a number the other side guessed at.
+///
+/// A second, because it is the interval the agent already wakes on to decide
+/// whether it should stop (`LOOK_EVERY` in `coilbox-relay-agent`'s `stopping`),
+/// so a note is acted on in the same turn as everything else that could end this
+/// process. The reader is a host standing in front of a hosting form waiting to
+/// hear, which rules out anything much longer.
+pub const NOTE_LOOKED_FOR_EVERY: Duration = Duration::from_secs(1);
+
+/// Where coilbox leaves a note for an agent it has no pipe to.
+///
+/// Beside the run file, because the agent already has that path and a note in
+/// any other directory would be a second thing to agree about.
+pub fn stop_note_path(run_file: &Path) -> PathBuf {
+    run_file.with_file_name("stop.json")
+}
+
+/// coilbox asking an agent it cannot speak to whether it would stop.
+///
+/// ## Why this exists at all
+///
+/// The control channel is the agent's stdin and stdout, and there is no
+/// reattaching to a child's pipes from a process that did not spawn it
+/// (issue #2074). So a coilbox that has been closed and reopened can find the
+/// agent through [`RunFile`] and can say nothing to it. The only way it had of
+/// clearing one was ending the process by hand, outside coilbox, which needs
+/// somebody who knows what a process id is (issue #2062).
+///
+/// A note on disk is the channel that survives that. The agent reads it on the
+/// interval above, and reads it only once its own coilbox has closed, so the
+/// note is what a coilbox with no pipe says and the pipe is what a coilbox with
+/// one says.
+///
+/// ## Why it is a request and not an order
+///
+/// A running agent may be carrying a game other people are still playing, which
+/// is the entire reason it outlives coilbox. So this asks, and the agent
+/// answers with its own stopping rule: an agent no player has ever been heard
+/// through was never carrying a game and goes at once, and one that has carried
+/// players keeps running. That rule is in `coilbox-relay-agent`'s `stopping`
+/// module and it is the same one that already decides a battle ending.
+///
+/// The alternative was for coilbox to end the process itself, and it is worse
+/// twice over. It could end a match, and it could end something else entirely:
+/// a process id is unique only while its process lives, so a run file naming a
+/// number the OS has since handed to somebody's browser would have coilbox
+/// killing the browser.
+///
+/// ## Why it names the process it is for
+///
+/// So that a note nobody took cannot be acted on by the next agent to start.
+/// The agent takes a note addressed to itself and leaves any other alone, which
+/// makes a leftover note inert rather than a stop somebody did not ask for.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StopNote {
+    /// The process the note is for, which is the `pid` in the run file coilbox
+    /// read it out of.
+    pub pid: u32,
+}
+
+impl StopNote {
+    /// The note's contents. Serialising cannot fail for the same reason
+    /// [`to_line`] cannot.
+    pub fn to_json(&self) -> String {
+        match serde_json::to_string(self) {
+            Ok(json) => json,
+            Err(e) => unreachable!("a stop note that will not serialise: {e}"),
+        }
+    }
+
+    /// Read one, or say why it is not one.
+    ///
+    /// An unreadable note is treated as a note for somebody else, so a half
+    /// written file or one from another version never stops an agent.
+    pub fn from_json(text: &str) -> Result<StopNote, String> {
+        serde_json::from_str(text).map_err(|e| format!("not a relay agent stop note: {e}"))
+    }
 }
 
 impl RunFile {
@@ -403,6 +497,33 @@ mod tests {
         assert!(
             RunFile::from_json("4021").is_err(),
             "a file from some other version is unreadable rather than misread"
+        );
+    }
+
+    /// The note, spelled out for the same reason the run file is. coilbox
+    /// writing one shape and the agent reading another is a note nobody takes,
+    /// which reads to a host exactly like an agent that will not stop.
+    #[test]
+    fn the_stop_note_is_what_both_ends_agreed_on() {
+        assert_eq!(StopNote { pid: 4021 }.to_json(), "{\"pid\":4021}");
+        assert_eq!(
+            StopNote::from_json("{\"pid\":4021}").expect("its own output"),
+            StopNote { pid: 4021 }
+        );
+        assert!(
+            StopNote::from_json("{\"pid\":").is_err(),
+            "a half written note is unreadable rather than misread, because misreading one \
+             stops an agent that was never asked to stop"
+        );
+    }
+
+    /// The note sits beside the run file, so the agent that reads one has the
+    /// path to the other already.
+    #[test]
+    fn the_stop_note_sits_beside_the_run_file() {
+        assert_eq!(
+            stop_note_path(Path::new("/data/relay/agent.json")),
+            Path::new("/data/relay/stop.json")
         );
     }
 
