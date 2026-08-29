@@ -47,6 +47,12 @@
 //!   403 as a refused credential and end the battle over it, which is the one
 //!   thing in `allocation.rs` this file has shown to be wrong rather than
 //!   right.
+//! - A battle that ends really does give its allocation back, and a real coturn
+//!   really does put the relay port back into circulation because of it. That
+//!   is issue #2018, and it is paired with the case that does not: a sidecar
+//!   killed outright sends nothing, coturn goes on holding the port, and the
+//!   two together are what say the first is measuring the release rather than
+//!   the process ending.
 //!
 //! ## What it does not prove
 //!
@@ -78,11 +84,13 @@
 //! The build comes first because this test spawns the sidecar binary and cargo
 //! does not build another package's binaries for it.
 //!
-//! They run in parallel and all five take 3.1 seconds, which is what the
-//! credential expiry test takes on its own. It has to wait out a credential,
-//! and a credential's life is a whole number of seconds. See [`SHORT_LIFETIME`]
-//! and [`CREDENTIAL_LIFE`] for why those two seconds are the shortest that
-//! measure anything.
+//! They run in parallel and all seven take 5.1 seconds, which is what the
+//! killed sidecar test takes on its own. It spends
+//! [`RELEASE_SHOWS_UP_WITHIN`] in full every run, because what it is asserting
+//! is that nothing happens. The credential expiry test is the next longest at
+//! about 3 seconds: it has to wait out a credential, and a credential's life is
+//! a whole number of seconds. See [`SHORT_LIFETIME`] and [`CREDENTIAL_LIFE`]
+//! for why those two seconds are the shortest that measure anything.
 //!
 //! It runs coturn as a process rather than in a container, which is what issue
 //! #2025 imagined, because a container only works where the host can send UDP
@@ -177,6 +185,33 @@ const CREDENTIAL_LIFE: Duration = Duration::from_secs(2);
 /// well below the 49152 macOS starts at, so nothing else on the machine is
 /// likely to be sitting here.
 const RELAY_PORTS: (u16, u16) = (30000, 30099);
+
+/// The single relay ports the two release tests run coturn on.
+///
+/// One port each, which is what lets those tests ask their question at all. A
+/// coturn with exactly one relay port to give out can hold exactly one
+/// allocation, so whether a second sidecar gets that port is a direct reading of
+/// whether the first gave its own back. Nothing else here can see inside
+/// coturn's allocation table.
+///
+/// Above [`RELAY_PORTS`] rather than inside it, so a test running in parallel
+/// cannot take the port the answer depends on.
+const ONE_RELAY_PORT_RELEASED: u16 = 30100;
+const ONE_RELAY_PORT_ABANDONED: u16 = 30101;
+
+/// How long the two release tests give coturn to put a freed relay port back
+/// into circulation.
+///
+/// Measured rather than picked. Starting a fresh sidecar at 100 ms steps after
+/// the release, coturn 4.17.2 refused an Allocate with 508 Insufficient
+/// Capacity at 600, 700, 800 and 900 ms and granted one at 1000 ms, identically
+/// over two runs. So the port comes back a second after the release, and this
+/// is five times that.
+///
+/// Both tests use it, which is what makes the pair mean something. The one that
+/// expects the port back spends about a second of it and the one that expects
+/// it gone spends all of it, so neither result can be the wait being too short.
+const RELEASE_SHOWS_UP_WITHIN: Duration = Duration::from_secs(5);
 
 /// The point of the whole exercise: several players, one allocation on a real
 /// TURN server, one engine, and everybody's traffic arriving where it belongs.
@@ -490,6 +525,60 @@ fn a_server_draining_for_maintenance_is_not_a_refused_credential() {
     );
 }
 
+/// Issue #2018 against a real server, and the only way to know the release
+/// actually arrives. Everything else about it is a call this code makes.
+///
+/// The question is asked from outside coturn, because there is no way to ask it
+/// from inside: coturn is given one relay port, so it can hold one allocation,
+/// and whether a second sidecar can get that port is whether the first one gave
+/// it up. Nothing is expiring underneath either of them. The lifetime here is
+/// coturn's own default and no test waits anywhere near it.
+#[test]
+#[ignore = "needs coturn installed and a few seconds: see this file's comment for the command"]
+fn a_battle_that_ends_gives_its_allocation_back_to_the_server() {
+    let coturn = Coturn::with_only(ONE_RELAY_PORT_RELEASED);
+    let engine = FakeEngine::start();
+
+    let mut first = Sidecar::start(&coturn, engine.addr);
+    assert_eq!(first.relay_open().port(), ONE_RELAY_PORT_RELEASED);
+    first.ends_after_the_battle_is_over();
+
+    let second = Sidecar::start(&coturn, engine.addr);
+    assert_eq!(
+        second.relayed_port_within_the_wait(),
+        Some(ONE_RELAY_PORT_RELEASED),
+        "the port the first battle finished with never came back, so coturn was still holding an \
+         allocation for a battle that ended"
+    );
+}
+
+/// The same thing with the release taken away, which is the control that makes
+/// the test above mean something. Without it, "the second sidecar got the port"
+/// might only be saying the first process had exited.
+///
+/// It is also the honest statement of the limit. A sidecar killed outright
+/// sends nothing, so the allocation stands until the server's own timeout
+/// notices, and that is not something this can fix. It is the reason the polite
+/// release is worth having rather than a reason to skip it.
+#[test]
+#[ignore = "needs coturn installed and a few seconds: see this file's comment for the command"]
+fn a_sidecar_that_is_killed_outright_leaves_its_allocation_standing() {
+    let coturn = Coturn::with_only(ONE_RELAY_PORT_ABANDONED);
+    let engine = FakeEngine::start();
+
+    let mut first = Sidecar::start(&coturn, engine.addr);
+    assert_eq!(first.relay_open().port(), ONE_RELAY_PORT_ABANDONED);
+    first.is_killed_outright();
+
+    let second = Sidecar::start(&coturn, engine.addr);
+    assert_eq!(
+        second.relayed_port_within_the_wait(),
+        None,
+        "coturn handed the port out again, so the test above is measuring the sidecar's process \
+         ending rather than the release it sends"
+    );
+}
+
 /// A real coturn, running for the length of one test.
 struct Coturn {
     /// Where the agent sends its Allocate. Fixed at construction, so a coturn
@@ -523,7 +612,14 @@ enum Auth {
 impl Coturn {
     /// A coturn with the lifetimes it hands out left alone, which is an hour.
     fn start() -> Coturn {
-        Coturn::start_with(None, Auth::LongTerm)
+        Coturn::start_with(None, Auth::LongTerm, RELAY_PORTS)
+    }
+
+    /// A coturn with exactly one relay port to give out, and the lifetimes it
+    /// hands out left alone, so an allocation it is holding stays held for
+    /// far longer than any test here runs. See [`ONE_RELAY_PORT_RELEASED`].
+    fn with_only(relay_port: u16) -> Coturn {
+        Coturn::start_with(None, Auth::LongTerm, (relay_port, relay_port))
     }
 
     /// A coturn that will not grant an allocation for longer than
@@ -533,16 +629,16 @@ impl Coturn {
     /// coturn clamps this from below, so what it actually grants is worth
     /// asserting rather than assuming. See [`SHORT_LIFETIME`].
     fn granting_at_most(max_lifetime: Duration) -> Coturn {
-        Coturn::start_with(Some(max_lifetime), Auth::LongTerm)
+        Coturn::start_with(Some(max_lifetime), Auth::LongTerm, RELAY_PORTS)
     }
 
     /// The same, with credentials it works out from a shared secret rather than
     /// a user list, so a test can hand the agent one that is about to expire.
     fn minting_credentials(max_lifetime: Duration) -> Coturn {
-        Coturn::start_with(Some(max_lifetime), Auth::SharedSecret)
+        Coturn::start_with(Some(max_lifetime), Auth::SharedSecret, RELAY_PORTS)
     }
 
-    fn start_with(max_lifetime: Option<Duration>, auth: Auth) -> Coturn {
+    fn start_with(max_lifetime: Option<Duration>, auth: Auth, relay_ports: (u16, u16)) -> Coturn {
         let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, free_udp_port()));
         // Named after the port as well as the process, because the tests in
         // this file run in parallel and each one wants its own coturn with its
@@ -565,8 +661,8 @@ impl Coturn {
             format!("listening-port={}", addr.port()),
             "listening-ip=127.0.0.1".to_string(),
             "relay-ip=127.0.0.1".to_string(),
-            format!("min-port={}", RELAY_PORTS.0),
-            format!("max-port={}", RELAY_PORTS.1),
+            format!("min-port={}", relay_ports.0),
+            format!("max-port={}", relay_ports.1),
             format!("realm={TURN_REALM}"),
             "allow-loopback-peers".to_string(),
             "fingerprint".to_string(),
@@ -830,6 +926,66 @@ impl Sidecar {
             ),
             Err(RecvTimeoutError::Disconnected) => panic!("the agent's output ended"),
         }
+    }
+
+    /// The relayed port this agent gets, once it has one, or nothing if it has
+    /// not got one inside [`RELEASE_SHOWS_UP_WITHIN`].
+    ///
+    /// Tolerant of `relayDown` where [`Sidecar::relay_open`] is not, because a
+    /// server with no free relay port refuses the first Allocate and the agent
+    /// tries again. That is the whole question the release tests are asking, so
+    /// it has to be a wait rather than a first answer.
+    fn relayed_port_within_the_wait(&self) -> Option<u16> {
+        let deadline = std::time::Instant::now() + RELEASE_SHOWS_UP_WITHIN;
+        loop {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            match self.said.recv_timeout(left) {
+                Ok(Event::RelayOpen { addr }) => return Some(addr.port()),
+                Ok(Event::RelayDown { reason }) => {
+                    println!("  no relay yet, because {reason}");
+                }
+                Ok(_) => {}
+                Err(_) => return None,
+            }
+        }
+    }
+
+    /// Tell it the battle is over the way coilbox does, and wait for the
+    /// process to go.
+    ///
+    /// Waiting for the process rather than for the `stopping` line is the
+    /// point: the allocation is given back after that line and before the
+    /// process ends, so a test that carried on at the line would be racing the
+    /// release it is about to measure.
+    fn ends_after_the_battle_is_over(&mut self) {
+        self.agent
+            .battle_over()
+            .expect("the sidecar is still reading its stdin");
+        let last = self.said.recv_timeout(PATIENCE);
+        assert!(
+            matches!(last, Ok(Event::Stopping { .. })),
+            "a battle that ended with nobody ever having played in it has to stop the sidecar, \
+             and it said {last:?}"
+        );
+        self.waits_to_exit();
+    }
+
+    /// Kill it the way a crash or a power cut does, with nothing sent and no
+    /// code of ours run.
+    fn is_killed_outright(&mut self) {
+        self.child.kill().expect("a child we spawned");
+        self.waits_to_exit();
+    }
+
+    fn waits_to_exit(&mut self) {
+        let deadline = std::time::Instant::now() + PATIENCE;
+        while std::time::Instant::now() < deadline {
+            if self.child.try_wait().expect("a child we spawned").is_some() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("the sidecar is still running");
     }
 
     /// Wait for the agent to say it is giving up rather than rebuilding, and
