@@ -40,6 +40,11 @@
 //!   the engine like the whole battle leaving. It is the property `demux.rs`
 //!   was shaped around, and this is the first check of it against a relay that
 //!   really was rebuilt.
+//! - A player whose own address changes mid-game gets back into a battle with
+//!   every seat taken, and nobody else loses their place to make room. Two
+//!   halves, and the first is coturn's: a permission is per-IP, so a player who
+//!   keeps their address and changes only their port is still carried without
+//!   anybody vouching for them again. That is issue #2029.
 //! - A credential that expires under a live allocation costs nothing until the
 //!   relay has to be rebuilt. coturn judges a credential once, when it makes
 //!   the session, so the battle outlives it. The rebuild is where it bites, and
@@ -71,6 +76,12 @@
 //! get wrong: `allowlist.rs` holds a set of addresses and sends one byte to
 //! each.
 //!
+//! That is also the edge of what the address change test below can reach. A
+//! player who changes port keeps their permission and is carried. A player
+//! whose IP changes has no permission at the new address, and nothing on this
+//! machine can install one, because the lobby names a joiner's address once,
+//! when they join. Issue #2082 is that half.
+//!
 //! ## Running it
 //!
 //! Ignored, in the same way and for the same reason as
@@ -86,13 +97,16 @@
 //! The build comes first because this test spawns the sidecar binary and cargo
 //! does not build another package's binaries for it.
 //!
-//! They run in parallel and all seven take 5.1 seconds, which is what the
-//! killed sidecar test takes on its own. It spends
-//! [`RELEASE_SHOWS_UP_WITHIN`] in full every run, because what it is asserting
-//! is that nothing happens. The credential expiry test is the next longest at
-//! about 3 seconds: it has to wait out a credential, and a credential's life is
-//! a whole number of seconds. See [`SHORT_LIFETIME`] and [`CREDENTIAL_LIFE`]
-//! for why those two seconds are the shortest that measure anything.
+//! They run in parallel and all nine take 15.7 seconds, which is what the
+//! address change test takes on its own. It waits for the seat a moved player
+//! left behind to be given up, and that wait is the engine's own reconnect
+//! timeout of 15 seconds. Before it was added the whole file took 5.1 seconds,
+//! set by the killed sidecar test, which spends [`RELEASE_SHOWS_UP_WITHIN`] in
+//! full every run because what it is asserting is that nothing happens. The
+//! credential expiry test is next at about 3 seconds: it has to wait out a
+//! credential, and a credential's life is a whole number of seconds. See
+//! [`SHORT_LIFETIME`] and [`CREDENTIAL_LIFE`] for why those two seconds are the
+//! shortest that measure anything.
 //!
 //! It runs coturn as a process rather than in a container, which is what issue
 //! #2025 imagined, because a container only works where the host can send UDP
@@ -457,6 +471,80 @@ fn a_restarted_turn_server_costs_the_allocation_but_not_the_players() {
         before,
         "every player has to reach the engine on the port they had before the relay was rebuilt, \
          or the engine sees the whole battle leave and a set of strangers arrive"
+    );
+}
+
+/// A player whose own address changes mid-game, in a battle with every seat
+/// taken (issue #2029).
+///
+/// Home connections do not keep their public address for the length of a game:
+/// a NAT mapping expires and the router picks another port. The player's engine
+/// knows nothing about it and carries on sending. From the relay it is somebody
+/// nobody has ever heard of, arriving at a battle with no room left.
+///
+/// Two separate things have to hold for that player to get back in, and only
+/// one of them is ours.
+///
+/// The first belongs to coturn. A TURN permission is per-IP, so a player who
+/// keeps their address and changes only their port is still allowed through the
+/// allocation without anybody vouching for them again. That is RFC 5766 section
+/// 9.1 and the `turn` crate agrees with it, but nothing had ever watched a real
+/// server do it, and if it were wrong the moved player would be dropped by the
+/// server before the sidecar ever saw them.
+///
+/// The second is the peer table. It is capped at the seat count, so the address
+/// the player has left behind is a seat nobody can sit in, and the player who
+/// left it behind is the one refused. `demux.rs` gives that seat up once the
+/// address holding it has been quiet for as long as the engine's own
+/// reconnect timeout, which is why this test spends that wait. See
+/// `QUIET_ENOUGH_TO_RECLAIM` there for why the number is the engine's rather
+/// than one of ours.
+///
+/// What this deliberately does not assert is that the moved player keeps the
+/// endpoint they had. They must not: the engine re-identifies a player who
+/// moved by name and password on a connection from an endpoint it has never
+/// seen (`rts/Net/GameServer.cpp:2965-3070`), and handing them the socket they
+/// used to have would take that away.
+#[test]
+#[ignore = "needs coturn installed and a few seconds: see this file's comment for the command"]
+fn a_player_whose_address_changes_gets_back_into_a_full_battle() {
+    let coturn = Coturn::start();
+    let engine = FakeEngine::start();
+    let sidecar = Sidecar::start(&coturn, engine.addr);
+
+    let relayed = sidecar.relay_open();
+    sidecar
+        .agent
+        .allow_joiner(IpAddr::V4(Ipv4Addr::LOCALHOST), PATIENCE)
+        .expect("the agent let the joiner through the allocation");
+
+    let mut players: Vec<FakePlayer> = (0..SEATS).map(|_| FakePlayer::dialling(relayed)).collect();
+    for (seat, player) in players.iter().enumerate() {
+        player.round_trip(format!("hello from seat {seat}").as_bytes());
+    }
+    assert_eq!(engine.distinct_ports().len(), SEATS, "every seat is taken");
+
+    // The player whose router is about to pick a new port, out of the way, so
+    // that everybody left in the battle is somebody who must not lose their
+    // seat to make room for them.
+    let leaving = players.pop().expect("a battle with players in it");
+    let carry_on = KeepPlaying::start(players);
+
+    // Nobody vouches for the new address, and nobody can: the lobby names a
+    // joiner once, when they join, and a router picking a new port is not a
+    // join. The permission the player already has is per-IP and has to carry
+    // them.
+    let moved = leaving.moves_to_a_new_address(relayed);
+    moved.round_trip_once_it_can(b"my router picked a new port");
+    carry_on.stop();
+
+    let after = engine.distinct_ports();
+    assert_eq!(
+        after.len(),
+        SEATS + 1,
+        "the seat given up has to be the one the moved player left behind and nobody else's: the \
+         engine should see the battle it had plus one endpoint for the player who moved, and it \
+         saw {after:?}"
     );
 }
 
@@ -1182,6 +1270,19 @@ impl FakePlayer {
         );
     }
 
+    /// The same person, arriving from somewhere else.
+    ///
+    /// A new source port on the same machine, which is what a NAT mapping
+    /// expiring looks like from the far side of a relay. The player's engine
+    /// has no idea any of this happened, and neither does the lobby.
+    ///
+    /// The opposite of [`FakePlayer::redial`], and the pair is worth reading
+    /// together: there the relay moved and the player did not, here the player
+    /// moved and the relay did not.
+    fn moves_to_a_new_address(&self, relayed: SocketAddr) -> FakePlayer {
+        FakePlayer::dialling(relayed)
+    }
+
     /// Send to a different relayed address from now on, keeping the same
     /// socket.
     ///
@@ -1206,6 +1307,10 @@ impl FakePlayer {
     /// for having no permission yet. Resending is what a player's engine does
     /// anyway, and it is the only honest way to wait for a permission the test
     /// cannot see being installed.
+    ///
+    /// A player whose own address changed waits on something else the test
+    /// cannot see: the seat they left behind becoming free (issue #2029). Same
+    /// answer, and for the same reason. Their engine is sending all the while.
     fn round_trip_once_it_can(&self, what: &[u8]) {
         self.socket
             .set_read_timeout(Some(SILENCE))
@@ -1218,15 +1323,15 @@ impl FakePlayer {
                 assert_eq!(
                     &buf[..read],
                     what,
-                    "the reply reached the wrong player, so the rebuilt relay lost track of \
-                     whose socket is whose"
+                    "the reply reached the wrong player, so the relay lost track of whose socket \
+                     is whose"
                 );
                 return;
             }
         }
         panic!(
-            "nothing came back through the rebuilt relay within {} seconds, so a player who was \
-             in the battle before it was rebuilt is no longer in it",
+            "nothing came back through the relay within {} seconds, so a player who was in the \
+             battle is no longer in it",
             PATIENCE.as_secs()
         );
     }
@@ -1243,6 +1348,52 @@ impl FakePlayer {
             self.socket.recv(&mut buf).is_err(),
             "a TURN server carried traffic from an address with no permission for it"
         );
+    }
+}
+
+/// The rest of the battle, still being played, while a test waits for something
+/// else.
+///
+/// The agent gives a seat up once the address holding it has gone quiet, so a
+/// test where every player stops sending is one where any seat would do. These
+/// players carry on, which is what makes "the seat that was given up was the
+/// abandoned one" a question with an answer.
+struct KeepPlaying {
+    stop: Arc<Mutex<bool>>,
+    playing: Vec<std::thread::JoinHandle<()>>,
+}
+
+impl KeepPlaying {
+    /// How often each of them sends.
+    ///
+    /// Only has to be well inside the wait before a quiet address gives its
+    /// seat up, which is the engine's reconnect timeout of 15 seconds
+    /// (`QUIET_ENOUGH_TO_RECLAIM` in `coilbox-relay-agent`'s `demux`). A real
+    /// engine sends far more often than this.
+    const EVERY: Duration = Duration::from_millis(200);
+
+    fn start(players: Vec<FakePlayer>) -> KeepPlaying {
+        let stop = Arc::new(Mutex::new(false));
+        let playing = players
+            .into_iter()
+            .map(|player| {
+                let stop = Arc::clone(&stop);
+                std::thread::spawn(move || {
+                    while !*stop.lock().expect("a lock nothing panics under") {
+                        player.round_trip(b"still playing");
+                        std::thread::sleep(KeepPlaying::EVERY);
+                    }
+                })
+            })
+            .collect();
+        KeepPlaying { stop, playing }
+    }
+
+    fn stop(self) {
+        *self.stop.lock().expect("a lock nothing panics under") = true;
+        for player in self.playing {
+            player.join().expect("a player thread that did not panic");
+        }
     }
 }
 

@@ -80,7 +80,7 @@ const PROBE_PORT: u16 = 49152;
 /// the agent runs out of file descriptors. This one only grows when the process
 /// that started this one says so, an address costs nothing to hold, and a
 /// player whose address changes mid-game legitimately adds a second entry
-/// (issue #2029), so a ceiling here would refuse honest joins to defend against
+/// (issue #2082), so a ceiling here would refuse honest joins to defend against
 /// nothing.
 #[derive(Default)]
 pub struct Allowlist {
