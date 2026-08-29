@@ -75,6 +75,8 @@ permissions = [
   "allow-mp-probe-host",
   "allow-mp-turn-credentials",
   "allow-mp-relay-traffic",
+  "allow-mp-leftover-relay-agent",
+  "allow-mp-ask-leftover-relay-to-stop",
   "allow-mp-watch-engine",
   "allow-mp-chat-logs",
   "allow-mp-chat-log-open",
