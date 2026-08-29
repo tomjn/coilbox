@@ -33,9 +33,16 @@
 //! runtime, in a released sidecar, during somebody's game. That is the whole
 //! reason this is not two copies of a struct.
 //!
-//! It is deliberately IO-free and deliberately has no tokio. The coilbox side
-//! can depend on it without pulling in the sidecar's TURN stack, and each end
-//! carries the lines however it already carries lines.
+//! [`run_file_is_still_held`] is here for the same reason. It is the one thing
+//! in this crate that touches a file, and it is here because what it reads is
+//! the contract: the sidecar promises to hold a shared lock on its run file for
+//! as long as it runs, and coilbox reads that promise by trying to take an
+//! exclusive one. Split across the two crates, one end could stop making the
+//! promise while the other went on believing it.
+//!
+//! Otherwise it is deliberately IO-free and deliberately has no tokio. The
+//! coilbox side can depend on it without pulling in the sidecar's TURN stack,
+//! and each end carries the lines however it already carries lines.
 //!
 //! ## Adding to it later
 //!
@@ -229,6 +236,77 @@ pub enum Event {
 pub struct RunFile {
     /// The sidecar's process id.
     pub pid: u32,
+    /// Whether the sidecar that wrote this keeps a shared lock on the file for
+    /// as long as it runs, so that [`run_file_is_still_held`] answers for it
+    /// (issue #2078).
+    ///
+    /// A promise about behaviour, not a reading of the current state. Never
+    /// treat it as "the file is locked": the file cannot know that, and the
+    /// only thing that does is the kernel.
+    ///
+    /// False in a file from a build before the lock existed, and false when
+    /// the sidecar asked for the lock and the filesystem would not give it
+    /// one. Both mean the same thing to a reader, which is that a free lock
+    /// proves nothing about that record and the pid is all there is to go on.
+    #[serde(default)]
+    pub locked: bool,
+}
+
+/// Whether the sidecar that claimed the run file at `path` is still the one
+/// holding it.
+///
+/// ## The question this answers
+///
+/// A process id is unique only while its process lives. Once a sidecar has
+/// gone the OS is free to hand its number to anything else, and when it does,
+/// the run file names a process that is running and is not the relay agent.
+/// coilbox then refuses every relayed battle for the rest of that machine's
+/// uptime (issue #2078).
+///
+/// The pid cannot tell those apart and neither can a note: an agent reads
+/// notes only once its own coilbox has closed, so a note left where nothing
+/// takes it is an inference rather than proof. The lock is proof. The kernel
+/// gives it up when the process that took it ends, however it ends, and it
+/// gives it to nobody else in the meantime. So a free lock on a record whose
+/// writer promised to hold one means the writer is dead and the pid belongs to
+/// somebody else.
+///
+/// ## What "cannot tell" answers
+///
+/// True, meaning held, meaning leave it alone. A file that will not open, a
+/// filesystem with no locking, or an error from the lock itself all land here,
+/// because the cost of being wrong the other way is a second sidecar started
+/// over a game people are playing.
+///
+/// Only ask this about a record whose [`RunFile::locked`] is true. A record
+/// from an older build never took a lock, so its lock is free whether the
+/// sidecar is alive or not.
+///
+/// ## Why the sidecar's lock is a shared one
+///
+/// So that the file it is on stays readable. Windows range locks are mandatory
+/// rather than advisory, and an exclusive one denies other processes reads of
+/// the locked range as well as writes. A sidecar holding the file exclusively
+/// would therefore make every read of its own record fail, which reads as a
+/// record that cannot be parsed, which reads as no relay running. coilbox would
+/// start a second sidecar over a game people were playing, which is the failure
+/// the run file exists to prevent.
+///
+/// A shared lock denies writes and allows reads, and an exclusive attempt still
+/// fails while one is held, so the question here is answered either way.
+pub fn run_file_is_still_held(path: &Path) -> bool {
+    let Ok(file) = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+    else {
+        return true;
+    };
+    // Write access as well as read, because Windows will not give an exclusive
+    // range lock to a handle that only has read. Taking the lock here is how
+    // the question is asked, and dropping the handle at the end of this
+    // function gives it straight back.
+    file.try_lock().is_err()
 }
 
 /// How often an agent whose coilbox has closed looks for a note asking it to
@@ -491,15 +569,88 @@ mod tests {
     /// message.
     #[test]
     fn the_run_file_is_what_both_ends_agreed_on() {
-        assert_eq!(RunFile { pid: 4021 }.to_json(), "{\"pid\":4021}");
         assert_eq!(
-            RunFile::from_json("{\"pid\":4021}").expect("its own output"),
-            RunFile { pid: 4021 }
+            RunFile {
+                pid: 4021,
+                locked: true,
+            }
+            .to_json(),
+            "{\"pid\":4021,\"locked\":true}"
+        );
+        assert_eq!(
+            RunFile::from_json("{\"pid\":4021,\"locked\":true}").expect("its own output"),
+            RunFile {
+                pid: 4021,
+                locked: true,
+            }
         );
         assert!(
             RunFile::from_json("4021").is_err(),
             "a file from some other version is unreadable rather than misread"
         );
+    }
+
+    /// A file written before the lock existed. It has to keep reading, and it
+    /// has to read as a record whose lock says nothing, or upgrading coilbox
+    /// while a relay agent from the old build is carrying a game would have the
+    /// new coilbox clear a record belonging to a live sidecar.
+    #[test]
+    fn a_run_file_from_before_the_lock_reads_as_one_that_never_took_one() {
+        assert_eq!(
+            RunFile::from_json("{\"pid\":4021}").expect("a file an older build wrote"),
+            RunFile {
+                pid: 4021,
+                locked: false,
+            }
+        );
+    }
+
+    /// The proof itself, in the two states that matter. Nothing holding the
+    /// file is what tells a record left over from a dead sidecar apart from one
+    /// naming a sidecar that is still relaying.
+    #[test]
+    fn a_run_file_nothing_has_open_is_not_being_held() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let path = dir.path().join("agent.json");
+        std::fs::write(
+            &path,
+            RunFile {
+                pid: 4021,
+                locked: true,
+            }
+            .to_json(),
+        )
+        .expect("a writable temp dir");
+
+        assert!(!run_file_is_still_held(&path));
+
+        let held = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .expect("the file is there");
+        held.try_lock_shared().expect("nothing else has it");
+        assert!(
+            run_file_is_still_held(&path),
+            "a sidecar that is still running holds its own run file, and clearing that record \
+             would start a second sidecar over a game people are playing"
+        );
+        assert!(
+            RunFile::from_json(&std::fs::read_to_string(&path).expect("a readable record")).is_ok(),
+            "the record has to stay readable under the sidecar's lock. Windows range locks are \
+             mandatory, so an exclusive one would make this read fail, and a record that will \
+             not read is a record coilbox treats as no relay running"
+        );
+    }
+
+    /// No file at all. Nothing here can open it, and the safe answer to a
+    /// question that cannot be asked is the one that changes nothing.
+    #[test]
+    fn a_run_file_that_will_not_open_is_treated_as_held() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        assert!(run_file_is_still_held(
+            &dir.path().join("nothing-here.json")
+        ));
     }
 
     /// The note, spelled out for the same reason the run file is. coilbox
