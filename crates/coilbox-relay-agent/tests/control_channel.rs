@@ -31,6 +31,19 @@ use std::time::{Duration, Instant};
 /// and spent in full only when a test is about to fail.
 const PATIENCE: Duration = Duration::from_secs(10);
 
+/// How long a test watches an agent it expects to keep running.
+///
+/// It has to clear the agent's own polling interval, which is `LOOK_EVERY` in
+/// `stopping.rs` and is one second. An agent that had decided to stop takes up
+/// to that long to act on it, so a shorter window here would pass whatever the
+/// rule underneath said. Falsification found exactly that: making the agent
+/// treat a battle ending as an outright stop left this test green until the
+/// window was longer than the interval.
+///
+/// Twice the interval, so a run that is a little slow than usual still measures
+/// something.
+const LONG_ENOUGH_TO_HAVE_STOPPED: Duration = Duration::from_secs(2);
+
 /// The agent, running, with its control channel in hand.
 struct Running {
     child: Child,
@@ -230,23 +243,24 @@ fn a_battle_that_ends_while_a_player_is_relaying_leaves_the_agent_alone() {
     agent.ask("{\"type\":\"battleOver\",\"id\":12}");
     assert_eq!(agent.hears(), "{\"type\":\"done\",\"id\":12}");
 
-    // Still there, still relaying. The agent stopping would say `stopping` and
-    // close its stdout, so what is being asserted is that neither happens and
-    // the datagrams keep arriving at the engine.
-    for _ in 0..3 {
+    // Still there, still relaying, for longer than it would take the agent to
+    // act on a decision to stop. See `LONG_ENOUGH_TO_HAVE_STOPPED`.
+    let until = Instant::now() + LONG_ENOUGH_TO_HAVE_STOPPED;
+    while Instant::now() < until {
         player
             .send_to(b"the game is still going", relay)
             .expect("the relay is bound");
         agent.engine_hears();
+        assert!(
+            agent
+                .child
+                .try_wait()
+                .expect("a child we spawned")
+                .is_none(),
+            "the agent stopped while a game was still being relayed through it"
+        );
+        std::thread::sleep(Duration::from_millis(100));
     }
-    assert!(
-        agent
-            .child
-            .try_wait()
-            .expect("a child we spawned")
-            .is_none(),
-        "the agent stopped while a game was still being relayed through it"
-    );
 }
 
 /// Naming the engine is a request like any other and has to be answered like
