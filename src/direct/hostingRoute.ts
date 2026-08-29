@@ -37,6 +37,19 @@ import { type DirectReachability, isReachable } from "./reachability";
 export const NAT_TYPE_DIRECT = 0;
 
 /**
+ * Settings key: host through the lobby server's relay when nothing else worked.
+ *
+ * Default on, because the hosts who end up on the bottom rung are the ones least
+ * able to work out why hosting failed, and a battle with a slightly worse ping
+ * is better than a battle nobody can join (issue #2023).
+ *
+ * Stored rather than asked again each time. Somebody who turns this off is
+ * saying something about how they play, not about this one battle, and making
+ * them say it again every time they host is how a preference becomes a chore.
+ */
+export const HOST_THROUGH_RELAY_KEY = "multiplayer.hostThroughRelay";
+
+/**
  * How a hosted battle is reachable, or why it is not.
  *
  * The first three are the ladder from issue #2020. The last two are its two
@@ -77,12 +90,16 @@ export type HostingRoute =
  * reading two contradictory answers about their own router is worse off than one
  * reading a single answer that is sometimes optimistic.
  *
- * Issue #2023 adds a preference for refusing the relay. It belongs on the step
- * from the second rung to the third: `relayAvailable && wantsRelay`.
+ * `wantsRelay` is the host's own answer, from `HOST_THROUGH_RELAY_KEY`. It sits
+ * on the step from the second rung to the third and nowhere else, because a host
+ * who can be reached directly was never going to be relayed, and refusing the
+ * relay must not cost them the route they already had. There is no default here:
+ * the default belongs to the checkbox that asks the question (issue #2023).
  */
 export function hostingRoute(
   report: DirectReachability | null,
   relayAvailable: boolean,
+  wantsRelay: boolean,
 ): HostingRoute {
   if (!report) return "unchecked";
   // Rung one, and it asks nothing about the router on purpose. A machine already
@@ -95,7 +112,7 @@ export function hostingRoute(
     return "direct";
   }
   if (isReachable(report)) return "portMapped";
-  return relayAvailable ? "relay" : "unreachable";
+  return relayAvailable && wantsRelay ? "relay" : "unreachable";
 }
 
 /**
@@ -134,10 +151,21 @@ export function advertisedGamePort(
  * no way out of their network has a problem. A room on a LAN is doing exactly
  * what it is for with no way out at all, and telling that host they are
  * unreachable would be reporting the feature as a fault.
+ *
+ * `relayDeclined` splits the same route in two for the same reason. There are
+ * two ways to reach the end of the ladder and only one of them is somebody
+ * else's fault, so a host who turned the relay off themselves must not be told
+ * the server has none: they would go looking for a fault that is a checkbox they
+ * ticked. It says only what the host chose and not what the server has, which is
+ * true either way, and turning the relay back on then says the rest.
+ *
+ * The relay's own sentence does not name its cost. That is said once, next to
+ * the checkbox that asks about it, which is where somebody is deciding rather
+ * than reading what was decided (issue #2023).
  */
 export function hostingRouteSummary(
   route: HostingRoute,
-  { lanRoom }: { lanRoom: boolean },
+  { lanRoom, relayDeclined }: { lanRoom: boolean; relayDeclined?: boolean },
 ): string {
   switch (route) {
     case "direct":
@@ -145,10 +173,12 @@ export function hostingRouteSummary(
     case "portMapped":
       return "Your router opened the port, so players connect straight to this machine.";
     case "relay":
-      return "Nothing opened on your router, so this battle goes through the server's relay. That adds a hop, so pings are a little worse than a direct game.";
+      return "Nothing opened on your router, so this battle goes through the server's relay.";
     case "unreachable":
-      return lanRoom
-        ? "Nobody outside this network can reach this room, so it is for the people on this network."
+      if (lanRoom)
+        return "Nobody outside this network can reach this room, so it is for the people on this network.";
+      return relayDeclined
+        ? "Nothing opened on your router, and you have asked not to be relayed, so only players who can already reach this machine can join."
         : "Nothing opened on your router and this server has no relay, so only players who can already reach this machine can join.";
     case "unchecked":
       return lanRoom

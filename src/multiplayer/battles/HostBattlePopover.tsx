@@ -1,6 +1,7 @@
-import { Button, Input } from "@picoframe/frame";
+import { Button, Input, useSetting } from "@picoframe/frame";
 import { useState } from "react";
 import { Link } from "react-router";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
@@ -9,6 +10,7 @@ import {
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import {
   advertisedGamePort,
+  HOST_THROUGH_RELAY_KEY,
   hostingRoute,
   hostingRouteSummary,
   NAT_TYPE_DIRECT,
@@ -107,6 +109,14 @@ export function HostBattlePopover({
   // (issue #1591).
   const [error, setError] = useState<string | null>(null);
   const [hosting, setHosting] = useState(false);
+  // Whether to fall through to the relay when the router has refused. Stored, so
+  // somebody who cares about their ping says it once rather than every time they
+  // host, and on by default because the hosts who reach that rung are the ones
+  // least able to work out why hosting failed (issue #2023).
+  const [wantsRelay, setWantsRelay] = useSetting<boolean>(
+    HOST_THROUGH_RELAY_KEY,
+    true,
+  );
 
   function hostButtonLabel(): string {
     if (hosting) return "Hosting…";
@@ -119,7 +129,11 @@ export function HostBattlePopover({
 
   const noEngine = content.noEngine;
   const canHost = content.ready;
-  const route = hostingRoute(reachability, relayAvailable);
+  const route = hostingRoute(reachability, relayAvailable, wantsRelay);
+  // Only when there was a relay to refuse. On a server with none the host's
+  // answer changed nothing, and crediting them for an outcome that was never
+  // theirs would send them to a checkbox that cannot fix it.
+  const relayDeclined = relayAvailable && !wantsRelay;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -268,12 +282,42 @@ export function HostBattlePopover({
                 onReport={setReachability}
               />
 
+              {/* The bottom rung of the ladder, asked about next to the answer
+                  that decides whether it is reached. This is the one place the
+                  relay's cost is written down: the route sentence below says
+                  which way the battle is going, not what that is worth, because
+                  somebody choosing needs the price and somebody reading the
+                  outcome has already paid it (issue #2023). */}
+              {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the Checkbox control (implicit label association) */}
+              <label className="flex items-start gap-2 text-sm">
+                <Checkbox
+                  checked={wantsRelay}
+                  onCheckedChange={(checked) => setWantsRelay(checked === true)}
+                  className="mt-0.5"
+                />
+                <span className="flex flex-col gap-0.5">
+                  <span className="font-medium">
+                    Use the server's relay when nothing else works
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Only asked for once your own router has refused. A relay
+                    costs the lobby server bandwidth and puts an extra hop
+                    between you and every player, so pings are worse than a
+                    direct game. Turn it off and a battle that would have been
+                    relayed can only be joined by players who can already reach
+                    this machine.
+                    {!relayAvailable &&
+                      " This server has no relay, so nothing is relayed here either way."}
+                  </span>
+                </span>
+              </label>
+
               {/* What hosting is about to do, in the place where the answer it
                   is reading appears. Not the same thing as issue #2022, which
                   tells the people already in a battle why their ping is what it
                   is. This is the host, before they commit to anything. */}
               <p className="text-xs text-muted-foreground">
-                {hostingRouteSummary(route, { lanRoom: false })}
+                {hostingRouteSummary(route, { lanRoom: false, relayDeclined })}
               </p>
 
               {(gameFailed || mapFailed) && (
