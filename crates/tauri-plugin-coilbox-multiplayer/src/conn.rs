@@ -320,6 +320,11 @@ pub fn spawn_connection(
     initial.dms = dm_log.load();
     let state = Arc::new(Mutex::new(initial));
     let sink: EventSink = Arc::new(Mutex::new(on_event));
+    // Filled only by a host that takes the relay route, which is decided when
+    // they press Host and not when they connect. Shared with the task because
+    // the task is where a joiner's address arrives and the relay is what has to
+    // be told about it.
+    let relay = HostedRelay::default();
     // The sending half goes to the task and nowhere else, so it is dropped when
     // the connection ends and everything waiting on the phase is woken.
     let (phase_tx, phase) = watch::channel(LoginPhase::AwaitGreeting);
@@ -344,6 +349,7 @@ pub fn spawn_connection(
         agreement.clone(),
         turn_tx,
         opened_tx,
+        relay.clone(),
         rx,
         state.clone(),
         dm_log,
@@ -369,9 +375,7 @@ pub fn spawn_connection(
             // the battle it joined carries the host's address.
             started: StartedBattle::default(),
             turn,
-            // Filled only by a host that takes the relay route, which is
-            // decided when they press Host and not when they connect.
-            relay: HostedRelay::default(),
+            relay,
             opened,
         },
     );
@@ -391,6 +395,7 @@ async fn run_loop(
     agreement_slot: Arc<Mutex<Option<String>>>,
     turn_slot: watch::Sender<TurnAnswer>,
     opened_slot: watch::Sender<OpenAnswer>,
+    relay: HostedRelay,
     mut rx: mpsc::UnboundedReceiver<Outbound>,
     state: Arc<Mutex<LobbyState>>,
     dm_log: DmLog,
@@ -466,6 +471,38 @@ async fn run_loop(
                     // answer unconditionally.
                     if let ServerMessage::JoinBattleRequest { username, .. } = &msg {
                         outbound.push(command::join_battle_accept(username));
+                    }
+
+                    // As the host of a relayed battle, the lobby names each
+                    // joiner's public address just before announcing their join.
+                    // The relay drops traffic from an address it holds no
+                    // permission for, and says so to nobody, so this has to be
+                    // acted on before that player's engine sends anything.
+                    //
+                    // Handled here rather than off a delta because here is the
+                    // earliest point: the reducer has nothing to record about it
+                    // and the deltas from this line are read after it. The wait
+                    // for the relay's answer happens on a thread of its own, so
+                    // this loop carries on reading the connection either way.
+                    if let ServerMessage::ClientIp { username, ip } = &msg {
+                        let named = username.clone();
+                        let sink = sink.clone();
+                        crate::relay_host::let_joiner_through(
+                            &relay,
+                            *ip,
+                            crate::relay_host::ALLOW_JOINER_PATIENCE,
+                            move |why| {
+                                emit(
+                                    &sink,
+                                    LobbyEvent::Delta {
+                                        delta: Delta::JoinerNotLetThrough {
+                                            username: named,
+                                            reason: why.to_string(),
+                                        },
+                                    },
+                                );
+                            },
+                        );
                     }
 
                     // We just joined a channel and it starts empty: ask for its stored
@@ -726,11 +763,72 @@ mod tests {
         recorded
     }
 
+    /// A lobby that finishes a login and then says whatever the test hands it,
+    /// line by line.
+    ///
+    /// The lobbies above only answer what the client asks, which is enough for
+    /// the handshake but no use for a line the server sends unprompted.
+    /// `CLIENTIP` is one of those: it arrives because somebody else joined a
+    /// battle, at a moment nothing on this connection chose.
+    async fn lobby_that_says_what_it_is_told() -> (std::net::SocketAddr, UnboundedSender<String>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("a free port");
+        let addr = listener.local_addr().expect("a bound address");
+        let (says, mut told) = mpsc::unbounded_channel::<String>();
+        tokio::spawn(async move {
+            let Ok((stream, _)) = listener.accept().await else {
+                return;
+            };
+            let mut framed = Framed::new(stream, LinesCodec::new());
+            if framed
+                .send(line::tas_server("0.38", "*", 8452, 0))
+                .await
+                .is_err()
+            {
+                return;
+            }
+            loop {
+                tokio::select! {
+                    read = framed.next() => {
+                        let Some(Ok(read)) = read else { return };
+                        let reply = match parse_client_line(&read) {
+                            ClientCommand::ListCompFlags => line::comp_flags(&["u", "sp", "r"]),
+                            ClientCommand::Login { username, .. } => {
+                                if framed.send(line::accepted(&username)).await.is_err() {
+                                    return;
+                                }
+                                line::login_info_end()
+                            }
+                            _ => continue,
+                        };
+                        if framed.send(reply).await.is_err() {
+                            return;
+                        }
+                    }
+                    Some(line) = told.recv() => {
+                        if framed.send(line).await.is_err() {
+                            return;
+                        }
+                    }
+                }
+            }
+        });
+        (addr, says)
+    }
+
     /// Run `mode`'s handshake against `addr` through the real connection task,
     /// over a real socket, returning once it has reached its terminal phase. By
     /// then every line the handshake sent, the `LOGIN` included, has been
     /// written and has been through `console`.
-    async fn handshake(addr: std::net::SocketAddr, mode: LoginMode, events: Channel<LobbyEvent>) {
+    ///
+    /// Hands back the registry it registered the connection in, and the key it
+    /// used, so a test can reach the live connection afterwards.
+    async fn handshake(
+        addr: std::net::SocketAddr,
+        mode: LoginMode,
+        events: Channel<LobbyEvent>,
+    ) -> (Registry, String) {
         let stream = tokio::net::TcpStream::connect(addr)
             .await
             .expect("the lobby is listening");
@@ -771,6 +869,206 @@ mod tests {
             .await
             .expect("the handshake did not finish in time")
             .expect("the connection task is still running");
+        (registry, key)
+    }
+
+    /// The acceptance test for issue #2060, on the wire. A `CLIENTIP` arriving
+    /// on a connection that is hosting through the relay has to reach the relay
+    /// agent as a request to let that address through, and it has to be the
+    /// address the lobby named.
+    ///
+    /// Driven through the real connection task off a real socket, because the
+    /// question is whether this line is acted on where it arrives rather than
+    /// whether a function does what it says.
+    #[tokio::test]
+    async fn a_named_joiner_reaches_the_relay_this_connection_hosts_through() {
+        let (addr, lobby_says) = lobby_that_says_what_it_is_told().await;
+        let (registry, key) = handshake(addr, LoginMode::Login, Channel::new(|_| Ok(()))).await;
+
+        // Everything coilbox writes to the agent's stdin, which is where the
+        // answer to this test is.
+        #[derive(Clone, Default)]
+        struct Written(Arc<Mutex<Vec<u8>>>);
+        impl std::io::Write for Written {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().unwrap().extend_from_slice(buf);
+                Ok(buf.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        struct Nothing;
+        impl std::io::Read for Nothing {
+            fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+                Ok(0)
+            }
+        }
+
+        let written = Written::default();
+        put_a_relay_behind(
+            &registry,
+            &key,
+            crate::relay_agent::RelayAgent::driving(Nothing, written.clone(), |_| {}),
+        );
+
+        lobby_says
+            .send("CLIENTIP joiner 203.0.113.7".to_string())
+            .expect("the lobby is listening");
+
+        let deadline = std::time::Instant::now() + PATIENCE;
+        let asked = loop {
+            let asked =
+                String::from_utf8(written.0.lock().unwrap().clone()).expect("the channel is UTF-8");
+            if asked.contains("allowPeer") || std::time::Instant::now() > deadline {
+                break asked;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        };
+        assert!(
+            asked.contains("\"type\":\"allowPeer\""),
+            "the joiner the lobby named has to be asked through the relay, and the agent was \
+             sent: {asked:?}"
+        );
+        assert!(
+            asked.contains("\"ip\":\"203.0.113.7\""),
+            "the address asked for has to be the one the lobby named, and the agent was sent: \
+             {asked:?}"
+        );
+    }
+
+    /// The reason the address is handed off rather than acted on here.
+    /// `allow_joiner` waits for the agent, and the agent does not answer an
+    /// `allowPeer` until it has a relay, so acting on this line inline would
+    /// stop the connection reading anything for as long as
+    /// `ALLOW_JOINER_PATIENCE`. Chat, joins, the battle list and the lobby's own
+    /// PING would stop with it, for one player joining.
+    ///
+    /// The agent here takes the request and never answers it, and the line after
+    /// the `CLIENTIP` has to arrive anyway.
+    #[tokio::test]
+    async fn a_relayed_connection_keeps_reading_while_the_agent_thinks() {
+        let (addr, lobby_says) = lobby_that_says_what_it_is_told().await;
+        let (seen, events) = recording_channel();
+        let (registry, key) = handshake(addr, LoginMode::Login, events).await;
+        put_a_relay_behind(&registry, &key, silent_agent());
+
+        lobby_says
+            .send("CLIENTIP joiner 203.0.113.7".to_string())
+            .expect("the lobby is listening");
+        // Sent after it, so reading this one is proof the loop got past the one
+        // before rather than stopping on it.
+        lobby_says
+            .send("SERVERMSG still here".to_string())
+            .expect("the lobby is listening");
+
+        // How long it took, and not merely that it arrived. A connection task
+        // that blocked would still deliver this in the end, and on the
+        // single-threaded runtime a test runs on it would take the test's own
+        // timers down with it, so a deadline checked between polls would never
+        // get to fire. Elapsed wall time is the one measure that survives the
+        // runtime being held.
+        let started = std::time::Instant::now();
+        wait_until_heard(&seen, "still here").await;
+        let took = started.elapsed();
+
+        assert!(
+            took < PATIENCE,
+            "the line after the CLIENTIP took {took:?} to arrive, so the connection was held \
+             waiting on the relay agent rather than handing the address over"
+        );
+        assert!(
+            lock_or_recover(&registry).contains_key(&key),
+            "the connection ended on a CLIENTIP"
+        );
+    }
+
+    /// And the case that must not fire. A host on the direct route can still be
+    /// sent a `CLIENTIP`, because the login flag that asks for one is session
+    /// wide while the route is chosen per battle. There is no relay to tell, and
+    /// the connection has to carry on as if the line were any other it does not
+    /// act on.
+    #[tokio::test]
+    async fn a_connection_with_no_relay_carries_on_past_a_named_joiner() {
+        let (addr, lobby_says) = lobby_that_says_what_it_is_told().await;
+        let (seen, events) = recording_channel();
+        let (registry, key) = handshake(addr, LoginMode::Login, events).await;
+
+        lobby_says
+            .send("CLIENTIP joiner 203.0.113.7".to_string())
+            .expect("the lobby is listening");
+        lobby_says
+            .send("SERVERMSG still here".to_string())
+            .expect("the lobby is listening");
+
+        wait_until_heard(&seen, "still here").await;
+        assert!(
+            lock_or_recover(&registry).contains_key(&key),
+            "the connection ended on a CLIENTIP"
+        );
+    }
+
+    /// Every event the frontend was sent, as the JSON it was sent as.
+    fn recording_channel() -> (Arc<Mutex<Vec<String>>>, Channel<LobbyEvent>) {
+        let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+        let recorder = seen.clone();
+        let events = Channel::new(move |body| {
+            let json = match body {
+                tauri::ipc::InvokeResponseBody::Json(s) => s,
+                tauri::ipc::InvokeResponseBody::Raw(b) => String::from_utf8_lossy(&b).into_owned(),
+            };
+            lock_or_recover(&recorder).push(json);
+            Ok(())
+        });
+        (seen, events)
+    }
+
+    /// Wait for `wanted` to turn up in what the frontend was sent.
+    async fn wait_until_heard(seen: &Arc<Mutex<Vec<String>>>, wanted: &str) {
+        let deadline = std::time::Instant::now() + PATIENCE;
+        loop {
+            let heard = lock_or_recover(seen).join("\n");
+            if heard.contains(wanted) {
+                return;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "{wanted:?} never reached the frontend, so the connection stopped short of \
+                 it:\n{heard}"
+            );
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    }
+
+    /// An agent that takes requests and never answers them, which is what the
+    /// real one looks like while it is rebuilding a lost allocation.
+    fn silent_agent() -> crate::relay_agent::RelayAgent {
+        struct NeverAnswers(std::sync::mpsc::Receiver<()>);
+        impl std::io::Read for NeverAnswers {
+            fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+                // Blocks until the sender is dropped, which nothing here does.
+                let _ = self.0.recv();
+                Ok(0)
+            }
+        }
+        let (held, quiet) = std::sync::mpsc::channel();
+        std::mem::forget(held);
+        crate::relay_agent::RelayAgent::driving(NeverAnswers(quiet), Vec::new(), |_| {})
+    }
+
+    /// Put a relay behind a live connection, which is what `mp_open_battle` does
+    /// once its allocation is open.
+    fn put_a_relay_behind(registry: &Registry, key: &str, agent: crate::relay_agent::RelayAgent) {
+        *lock_or_recover(
+            &lock_or_recover(registry)
+                .get(key)
+                .expect("the connection is registered")
+                .relay,
+        ) = Some(crate::relay_host::RelayHost {
+            engine_port: 8452,
+            relayed: "198.51.100.9:30001".parse().expect("an address"),
+            agent: Arc::new(agent),
+        });
     }
 
     /// The acceptance test for issue #2021, on the wire, where it matters. A

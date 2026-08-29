@@ -337,6 +337,13 @@ export type Delta =
    */
   | { kind: "turnCredentials"; expiresAt: number }
   | { kind: "turnCredentialsRefused"; reason: string }
+  /**
+   * Somebody joined a battle we are hosting through the relay and the relay
+   * would not let their address through, so nothing their game sends will reach
+   * ours. Raised by the plugin rather than by a line off the wire, and only ever
+   * seen by the host: the joiner's own client knows nothing about the relay.
+   */
+  | { kind: "joinerNotLetThrough"; username: string; reason: string }
   | { kind: "loggedIn"; username: string }
   | { kind: "loginDenied"; reason: string }
   | { kind: "registrationDenied"; reason: string }
