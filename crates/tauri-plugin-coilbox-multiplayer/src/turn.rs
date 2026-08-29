@@ -49,19 +49,51 @@ pub enum TurnAnswer {
 /// caller can wait on the next answer rather than poll for it.
 pub type TurnSlot = watch::Receiver<TurnAnswer>;
 
-/// How much life a credential has to have left before it is worth taking to the
-/// relay.
+/// How much life a credential has to have left, on top of the game itself,
+/// before it is worth taking to the relay.
 ///
 /// The relay agent rebuilds an allocation it has lost, backing off up to 32
 /// seconds between tries (`LONGEST_BACKOFF` in `coilbox-relay-agent`'s
 /// `main.rs`), and it signs each try with this same credential. One with less
 /// than that left would be dead before the rebuild it has to sign, so a battle
 /// that survived losing its allocation would not survive getting it back.
-///
-/// This is not headroom for a long game. Nothing here can offer that: once
-/// coilbox is closed there is no lobby connection left to ask on, and issue
-/// #2042 is where that gap is written down.
 const REBUILD_HEADROOM: Duration = Duration::from_secs(32);
+
+/// How long a game coilbox refuses to host below.
+///
+/// A credential running out under a live allocation costs nothing. #2041 staged
+/// that against coturn 4.17.2: coturn works the key out once when it creates the
+/// session and checks every later request against the key it kept, so an
+/// allocation opened on a two second credential was still relaying at 2.7
+/// seconds. What ends a game is the credential being dead when the relay has to
+/// be **rebuilt**, because a rebuild opens a new session, the credential is
+/// judged again, and a dead one answers 401. Nothing renews it: the agent
+/// outlives the coilbox window on purpose (#2013), so once coilbox is closed
+/// there is no lobby connection left to ask on. The only lever left is refusing
+/// at hosting time.
+///
+/// A rebuild can happen at any moment, so the credential has to still be alive
+/// at the end of the game. That makes this a question about how long games run,
+/// which is measurable rather than arguable.
+///
+/// 5083 seconds is the 99th percentile of 18,418 multiplayer games, taken from
+/// `api.bar-rts.com/replays` on 30 August 2026: 20,000 replays covering 22 to 29
+/// August 2026, keeping the 18,418 with at least two human players and a
+/// recorded duration. Median 1302s, p90 3051s, p95 3597s, p99 5083s, p99.9
+/// 8437s, longest 26,396s.
+///
+/// The 99th percentile rather than anything further out because that is where
+/// the tail stops being measured and starts being one game. Split by day, p99
+/// sat between 4899s and 5529s across all eight days, while p99.9 swung from
+/// 7004s to 9593s and the maximum is a single 7.3 hour game. A threshold built
+/// on 14 games would move every time somebody played a long one.
+///
+/// The 23 replays in `~/.spring/demos` on the development machine were checked
+/// first and are not what this rests on: five are not demo files, ten recorded
+/// no game time, and three are copies of one match, leaving six distinct games
+/// with a longest of 2356s. Consistent with the figures above, far too few to
+/// take a percentile from.
+const LONGEST_GAME: Duration = Duration::from_secs(5083);
 
 /// Why there is no relay credential.
 ///
@@ -85,9 +117,10 @@ pub enum NoCredential {
     /// Nothing came back at all: a server that advertised a relay and then said
     /// nothing when asked for a credential.
     Silent(Duration),
-    /// The lobby minted one that was already spent, or so nearly spent that it
-    /// would not outlive the first thing that went wrong.
-    TooShort,
+    /// The lobby minted one too short to see a game out, so the battle would end
+    /// the first time the relay had to be rebuilt. `left` is what the lobby gave
+    /// and `needed` is [`hosting_needs`].
+    TooShort { left: Duration, needed: Duration },
     /// The lobby named a relay coilbox cannot use, and why.
     Unusable(String),
 }
@@ -111,9 +144,13 @@ impl std::fmt::Display for NoCredential {
                 "the lobby did not answer within {} seconds, so it probably does not hand out relay credentials at all",
                 waited.as_secs()
             ),
-            NoCredential::TooShort => write!(
+            NoCredential::TooShort { left, needed } => write!(
                 f,
-                "the lobby handed out a relay credential with too little time left on it to host with"
+                "the lobby's relay credential lasts {}, and hosting a relayed battle needs {}. \
+                 99 games in 100 finish inside that, and a relayed battle ends the moment its \
+                 relay has to be rebuilt on a credential that has run out",
+                plainly(*left),
+                plainly(round_up_to_a_minute(*needed)),
             ),
             NoCredential::Unusable(why) => write!(f, "the lobby named a relay coilbox cannot use: {why}"),
         }
@@ -129,9 +166,10 @@ impl std::error::Error for NoCredential {}
 /// Both are parameters because the caller is the one with a budget and the
 /// tests are the one place there is no clock.
 ///
-/// A credential is never handed back past its lifetime. The relay checks the
-/// expiry on every request, so reusing a spent one would not fail at hosting
-/// time, it would fail somewhere in the middle of a game.
+/// A credential is never handed back unless it has [`hosting_needs`] left on
+/// it. Anything shorter would open a battle that ends the first time its relay
+/// has to be rebuilt, which is a game lost rather than a battle that failed to
+/// open.
 pub async fn credentials(
     registry: &Registry,
     server_key: &str,
@@ -181,7 +219,10 @@ pub async fn credentials(
         None => Err(NoCredential::Closed),
         Some(TurnAnswer::Granted(minted)) => {
             if !minted.live_at(usable_until(now_ms)) {
-                return Err(NoCredential::TooShort);
+                return Err(NoCredential::TooShort {
+                    left: Duration::from_millis(minted.expires_at.saturating_sub(now_ms)),
+                    needed: hosting_needs(),
+                });
             }
             usable(&minted)
         }
@@ -209,9 +250,32 @@ pub(crate) fn answer_in(delta: &Delta, state: &Mutex<LobbyState>) -> Option<Turn
     }
 }
 
+/// How much life a credential needs on it before a relayed battle can be opened
+/// on it: a game of [`LONGEST_GAME`], and the rebuild that might be needed at
+/// the very end of it.
+fn hosting_needs() -> Duration {
+    LONGEST_GAME.saturating_add(REBUILD_HEADROOM)
+}
+
 /// The moment a credential has to still be live at for it to be worth using.
 fn usable_until(now_ms: u64) -> u64 {
-    now_ms.saturating_add(REBUILD_HEADROOM.as_millis() as u64)
+    now_ms.saturating_add(hosting_needs().as_millis() as u64)
+}
+
+/// A duration as a person would say it, for a sentence about hosting.
+fn plainly(d: Duration) -> String {
+    let seconds = d.as_secs();
+    if seconds < 60 {
+        format!("{seconds} seconds")
+    } else {
+        format!("{} minutes", seconds / 60)
+    }
+}
+
+/// Up to the next whole minute, for the figure somebody would act on. Rounding
+/// the requirement down would name a lifetime that still fails the gate.
+fn round_up_to_a_minute(d: Duration) -> Duration {
+    Duration::from_secs(d.as_secs().div_ceil(60) * 60)
 }
 
 /// Wait for the slot to change, or for the connection task to drop its end.
@@ -445,6 +509,34 @@ mod tests {
         ));
     }
 
+    /// Issue #2042. A credential that comfortably outlives a rebuild starting
+    /// now is still no good if it dies before the end of the game, because the
+    /// rebuild that matters is the one three hours in. Ten minutes is longer
+    /// than the agent's whole backoff and shorter than most games.
+    #[tokio::test]
+    async fn a_credential_that_survives_a_rebuild_now_but_not_a_whole_game_is_asked_for_again() {
+        let mut w = wired(ConnProtocol::TasServer);
+        minted(&w.state, 600, NOW);
+
+        let state = w.state.clone();
+        let answers = w.answers.clone();
+        tokio::spawn(async move {
+            let _ = answers.send(TurnAnswer::Granted(minted(&state, 86_400, NOW)));
+        });
+
+        credentials(&w.registry, "alice@bar:8200", NOW, PATIENCE)
+            .await
+            .expect("a fresh credential was minted");
+
+        // Not awaited: the ask is written before the wait begins, so by the
+        // time an answer is back the line is already in the channel. Waiting
+        // for it would hang rather than fail when it was never sent.
+        assert!(matches!(
+            w.sent.try_recv(),
+            Ok(Outbound::Line(line)) if line == "TURNCREDENTIALS"
+        ));
+    }
+
     /// And a fresh one that short is refused rather than taken to the relay,
     /// because asking again would only get the same one.
     #[tokio::test]
@@ -459,7 +551,54 @@ mod tests {
         let refused = credentials(&w.registry, "alice@bar:8200", NOW, PATIENCE)
             .await
             .expect_err("five seconds is not long enough to host with");
-        assert!(matches!(refused, NoCredential::TooShort), "got: {refused}");
+        assert!(
+            matches!(refused, NoCredential::TooShort { .. }),
+            "got: {refused}"
+        );
+    }
+
+    /// Issue #2042's first done-when. The refusal is the whole feature, so it
+    /// has to name what the lobby gave, what hosting needs, and why, rather than
+    /// leave somebody who cannot host guessing at any of the three.
+    #[tokio::test]
+    async fn the_refusal_names_what_was_given_what_is_needed_and_why() {
+        let w = wired(ConnProtocol::TasServer);
+        let state = w.state.clone();
+        let answers = w.answers.clone();
+        tokio::spawn(async move {
+            let _ = answers.send(TurnAnswer::Granted(minted(&state, 600, NOW)));
+        });
+
+        let refused = credentials(&w.registry, "alice@bar:8200", NOW, PATIENCE)
+            .await
+            .expect_err("ten minutes will not see a game out");
+        let said = refused.to_string();
+        assert!(said.contains("lasts 10 minutes"), "got: {said}");
+        assert!(said.contains("needs 86 minutes"), "got: {said}");
+        assert!(said.contains("has to be rebuilt"), "got: {said}");
+    }
+
+    /// The boundary the measurement puts the gate at, from both sides, so a
+    /// change to [`LONGEST_GAME`] cannot pass unnoticed.
+    ///
+    /// A lobby minting for the 99th percentile game plus the agent's rebuild
+    /// backoff is a lobby coilbox hosts on. One second less is not.
+    #[tokio::test]
+    async fn the_gate_sits_at_a_game_plus_the_rebuild_that_might_end_it() {
+        let needs = hosting_needs().as_secs();
+        assert_eq!(needs, 5_115, "5083s of game and 32s of rebuild backoff");
+
+        for (ttl, hosts) in [(needs + 1, true), (needs - 1, false)] {
+            let w = wired(ConnProtocol::TasServer);
+            let state = w.state.clone();
+            let answers = w.answers.clone();
+            tokio::spawn(async move {
+                let _ = answers.send(TurnAnswer::Granted(minted(&state, ttl, NOW)));
+            });
+
+            let got = credentials(&w.registry, "alice@bar:8200", NOW, PATIENCE).await;
+            assert_eq!(got.is_ok(), hosts, "for a {ttl} second credential: {got:?}");
+        }
     }
 
     /// A refusal has to reach the caller in the lobby's own words, because the
@@ -717,6 +856,35 @@ mod tests {
                 "TURNCREDENTIALS turn:relay.example.org:3478 <redacted> <redacted> 86400"
             ),
             "the console should still show the relay and the lifetime:\n{sent}"
+        );
+    }
+
+    /// Issue #2042 over a real socket. A lobby minting ten minutes is a lobby
+    /// that has read #2016 and sized the lifetime against opening a battle
+    /// rather than playing one, which is the mistake ScarylePoo/uberserver#27
+    /// exists to stop. Nothing about it looks wrong until a game is three hours
+    /// in, so the refusal has to happen here, before the battle is advertised.
+    #[tokio::test]
+    async fn a_lobby_minting_for_the_battle_rather_than_the_game_is_refused_over_a_socket() {
+        let addr = lobby_answering(Some(
+            "TURNCREDENTIALS turn:relay.example.org:3478 1786086400:alice bWFj= 600".to_string(),
+        ))
+        .await;
+        let registry = Registry::default();
+        let key = logged_in(&registry, addr).await;
+
+        // The lobby's own clock, because the reducer stamped the lifetime with
+        // it inside the connection task rather than with this test's `NOW`.
+        let refused = credentials(&registry, &key, crate::conn::now_ms(), PATIENCE)
+            .await
+            .expect_err("ten minutes will not see a game out");
+        assert!(
+            matches!(refused, NoCredential::TooShort { .. }),
+            "got: {refused}"
+        );
+        assert!(
+            refused.to_string().contains("lasts 10 minutes"),
+            "got: {refused}"
         );
     }
 
