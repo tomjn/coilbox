@@ -8,7 +8,11 @@ import {
   NAT_TYPE_DIRECT,
   recordHostingRoute,
 } from "./hostingRoute";
-import { type DirectReachability, reachabilityState } from "./reachability";
+import {
+  type DirectReachability,
+  isReachable,
+  reachabilityState,
+} from "./reachability";
 
 /** A report with nothing in it, so each test says only what it is about. */
 function report(over: Partial<DirectReachability> = {}): DirectReachability {
@@ -153,6 +157,19 @@ describe("hostingRoute", () => {
     });
     expect(hostingRoute(host, true, true)).toBe("direct");
     expect(reachabilityState(host)).toBe("direct");
+  });
+
+  // Issue #2085 widened the second rung's test: `isReachable` now answers yes
+  // for this host too, because being on the internet is being reachable. Only
+  // the rung order keeps the two apart, so swapping them would name a mapping
+  // that was never made.
+  it("does not call a machine that mapped nothing port mapped", () => {
+    const host = report({
+      lanAddress: "209.35.91.246",
+      publicAddress: "209.35.91.246",
+    });
+    expect(isReachable(host)).toBe(true);
+    expect(hostingRoute(host, true, true)).toBe("direct");
   });
 });
 

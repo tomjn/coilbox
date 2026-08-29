@@ -200,6 +200,26 @@ describe("joinAddress", () => {
   it("gives nothing when the router is itself behind a NAT", () => {
     expect(joinAddress(opened({ doubleNat: true }))).toBeNull();
   });
+
+  // Issue #2085. This host opened nothing because there was nothing to open, so
+  // the list of mappings is empty and the port they are listening on is the one
+  // they asked for. Reading only the mappings left them with a headline saying
+  // they were reachable and no address to send anybody.
+  it("gives a machine on its own public address the port it listens on", () => {
+    expect(joinAddress(onPublicAddress())).toBe("209.35.91.246:8200");
+  });
+
+  // The same host on the other form. A battle on a lobby server asks for the
+  // game's UDP port and no lobby port, and the server tells joiners the rest.
+  it("gives a machine on its own public address the address alone when it has no lobby port", () => {
+    expect(
+      joinAddress(
+        onPublicAddress({
+          wanted: [{ port: 8452, externalPort: 8452, transport: "udp" }],
+        }),
+      ),
+    ).toBe("209.35.91.246");
+  });
 });
 
 describe("isReachable", () => {
@@ -207,6 +227,13 @@ describe("isReachable", () => {
     expect(isReachable(opened())).toBe(true);
     expect(isReachable(opened({ doubleNat: true }))).toBe(false);
     expect(isReachable(report())).toBe(false);
+  });
+
+  // Issue #2085. The question is whether somebody outside can get in, not
+  // whether a mapping was made. A machine already on the internet never made
+  // one and is reachable anyway.
+  it("counts a machine on its own public address as reachable", () => {
+    expect(isReachable(onPublicAddress())).toBe(true);
   });
 });
 

@@ -30,6 +30,19 @@ const refused = {
   ports: [],
 } as unknown as DirectReachability;
 
+/** A machine on the internet under its own address: a VPS, or a home line with
+ *  no NAT. Nothing was mapped because there was no gateway to ask, and the
+ *  address the internet sees is one of this machine's own interfaces. */
+const direct = (address: string): DirectReachability =>
+  ({
+    method: null,
+    doubleNat: false,
+    lanAddress: address,
+    publicAddress: address,
+    ports: [],
+    wanted: [{ port: 8200, externalPort: 8200, transport: "tcp" }],
+  }) as unknown as DirectReachability;
+
 describe("shareAddresses", () => {
   it("names the one network address as this network, with no interface", () => {
     const found = shareAddresses(
@@ -104,6 +117,42 @@ describe("shareAddresses", () => {
     expect(found.some((a) => a.scope === "internet")).toBe(false);
   });
 
+  // Issue #2085. On a VPS this address is the internet, so calling it the one
+  // for somebody on the same network as you is the opposite of the truth.
+  it("calls a machine's own public address the one for outside", () => {
+    const found = shareAddresses(
+      [on("209.35.91.246", "eth0"), loopback],
+      8200,
+      direct("209.35.91.246"),
+    );
+    const outside = found.find((a) => a.scope === "internet");
+    expect(outside?.label).toBe("From outside");
+    expect(outside && addressText(outside)).toBe("209.35.91.246:8200");
+    expect(found.some((a) => a.scope === "network")).toBe(false);
+  });
+
+  it("lists a direct host's address once, not as a local one as well", () => {
+    const found = shareAddresses(
+      [on("209.35.91.246", "eth0"), loopback],
+      8200,
+      direct("209.35.91.246"),
+    );
+    expect(found.filter((a) => a.address === "209.35.91.246")).toHaveLength(1);
+  });
+
+  // A VPS with a VPN on it. The public address becomes the outside row, so the
+  // one private address left has nothing to be told apart from.
+  it("leaves the private address unnamed once the public one has moved", () => {
+    const found = shareAddresses(
+      [on("209.35.91.246", "eth0"), on("10.8.0.2", "utun4"), loopback],
+      8200,
+      direct("209.35.91.246"),
+    );
+    expect(
+      found.filter((a) => a.scope === "network").map((a) => a.label),
+    ).toEqual(["On this network"]);
+  });
+
   it("says so rather than pretending, on a machine with no network at all", () => {
     const found = shareAddresses([loopback], 8200, null);
     expect(found).toHaveLength(1);
@@ -126,6 +175,18 @@ describe("shareHeadline", () => {
       [on("192.168.1.45", "en0"), loopback],
       8200,
       null,
+    );
+    expect(shareHeadline(found)).toBe("Give joiners this address:");
+  });
+
+  // A machine whose one address is a public one is on a network, and it is the
+  // biggest one there is. Reading the empty list of local rows as "no network"
+  // would tell a VPS host nobody can reach them.
+  it("still offers the address of a machine whose only address is a public one", () => {
+    const found = shareAddresses(
+      [on("209.35.91.246", "eth0"), loopback],
+      8200,
+      direct("209.35.91.246"),
     );
     expect(shareHeadline(found)).toBe("Give joiners this address:");
   });

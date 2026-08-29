@@ -1,5 +1,9 @@
 import type { DirectLocalAddress } from "./bindings";
-import { type DirectReachability, joinAddress } from "./reachability";
+import {
+  type DirectReachability,
+  isOnPublicAddress,
+  joinAddress,
+} from "./reachability";
 
 /**
  * What a host reads out so somebody else can join their room (issue #1611).
@@ -42,7 +46,9 @@ export function addressText(address: ShareAddress): string {
  * The order is who is most likely to be asking: the local network first, since
  * that is what this milestone is for, then the internet when port mapping
  * worked, then this machine, which is only ever a second coilbox running beside
- * this one.
+ * this one. A host whose own address is the public one has no local row to come
+ * first, so the internet leads instead, which is the same rule read on a machine
+ * where the internet is the only network there is.
  *
  * Interfaces are named only when there is more than one to choose between. A VPN,
  * Docker or a virtual machine adapter gives a machine several private addresses
@@ -57,29 +63,40 @@ export function shareAddresses(
   reachability: DirectReachability | null,
 ): ShareAddress[] {
   const local = addresses.filter((a) => !a.loopback);
-  const named = local.length > 1;
-  const shared: ShareAddress[] = local.map((a) => ({
-    scope: "network",
-    label: named ? `On ${a.interface}` : "On this network",
-    address: a.address,
-    port,
-    who: named
-      ? `for somebody on the same network as this machine's ${a.interface}`
-      : "for somebody on the same network as you",
-  }));
+  // The one address this machine holds that the internet also sees, on a VPS or
+  // a home line with no NAT. It is a local address by every test here, and
+  // calling it one would tell that host their address reaches the room next
+  // door (issue #2085), so it is the outside row instead and is not counted
+  // among the networks there is a choice between.
+  const publicHost =
+    reachability && isOnPublicAddress(reachability)
+      ? reachability.publicAddress
+      : null;
+  const named = local.filter((a) => a.address !== publicHost).length > 1;
+  const shared: ShareAddress[] = local.map((a) =>
+    a.address === publicHost
+      ? outsideAddress(a.address, port)
+      : {
+          scope: "network",
+          label: named ? `On ${a.interface}` : "On this network",
+          address: a.address,
+          port,
+          who: named
+            ? `for somebody on the same network as this machine's ${a.interface}`
+            : "for somebody on the same network as you",
+        },
+  );
 
   // Already `address:port`, and the port in it is the router's rather than the
-  // room's whenever the router handed back a different one.
+  // room's whenever the router handed back a different one. Skipped when the
+  // address is one of this machine's own, which is the direct host above: the
+  // row is already there and a second copy of it helps nobody.
   const outside = reachability && joinAddress(reachability);
   if (outside) {
     const [host, mapped] = outside.split(":");
-    shared.push({
-      scope: "internet",
-      label: "From outside",
-      address: host,
-      port: mapped ? Number(mapped) : port,
-      who: "for somebody who is not on your network",
-    });
+    if (!shared.some((a) => a.address === host)) {
+      shared.push(outsideAddress(host, mapped ? Number(mapped) : port));
+    }
   }
 
   shared.push({
@@ -95,10 +112,26 @@ export function shareAddresses(
   return shared;
 }
 
+/** The row for whoever is not on this network, wherever the address came from.
+ *  One wording, because a joiner outside is a joiner outside whether the router
+ *  opened a port or this machine was on the internet all along. */
+function outsideAddress(address: string, port: number): ShareAddress {
+  return {
+    scope: "internet",
+    label: "From outside",
+    address,
+    port,
+    who: "for somebody who is not on your network",
+  };
+}
+
 /** The one line above the addresses, which changes with what there is to say.
  *  Pure. */
 export function shareHeadline(addresses: ShareAddress[]): string {
-  if (!addresses.some((a) => a.scope === "network")) {
+  // Anything but loopback. A machine whose only address is a public one is on
+  // the largest network there is, and asking for a "network" row would read
+  // that as no network at all.
+  if (!addresses.some((a) => a.scope !== "machine")) {
     return "This machine is on no network, so nobody else can reach this room.";
   }
   if (addresses.filter((a) => a.scope === "network").length > 1) {
