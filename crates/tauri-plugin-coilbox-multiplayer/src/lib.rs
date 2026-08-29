@@ -1970,6 +1970,45 @@ fn forget_relay(registry: &Registry, server_key: &str) {
     }
 }
 
+/// How much the relay is carrying right now, for whichever connection is
+/// hosting through one. `None` when nothing is.
+///
+/// No server key, and that is a fact about the sidecar rather than a shortcut.
+/// One run file means one sidecar on this machine, and
+/// [`relay_agent::RelayAgent::spawn`] refuses to start a second over a battle
+/// that is already being relayed, so there is at most one relay to ask about
+/// however many lobbies are connected. Making the caller name a connection
+/// would mean the in-game pill had to know which lobby a game came from, which
+/// it has no other reason to.
+///
+/// `None` also covers a relay whose sidecar has stopped saying anything. See
+/// [`relay_agent::RelayAgent::carrying`], which is where that decision is made
+/// and why.
+fn relay_traffic(registry: &Registry) -> Option<u64> {
+    lock_or_recover(registry).values().find_map(|conn| {
+        lock_or_recover(&conn.relay)
+            .as_ref()
+            .and_then(|host| host.agent.carrying())
+    })
+}
+
+/// `mp_relay_traffic`: how much a relayed battle's relay is carrying, so the
+/// in-game pill can show that a game hosted through the relay is still working
+/// (issue #2024).
+///
+/// Polled rather than pushed, once a second, by the one component that draws
+/// it. An event would go through the lobby event channel and redraw everything
+/// mirroring it, once a second, on a machine that is busy running a game.
+///
+/// `bytesPerSecond` is null when there is nothing to say, which is the ordinary
+/// answer: no relayed battle, or a relay coilbox has stopped hearing from. Zero
+/// is a different answer and a real one, and means the relay is there and
+/// carrying nothing.
+#[tauri::command]
+fn mp_relay_traffic(registry: State<'_, Registry>) -> CliResult {
+    CliResult::ok(json!({ "bytesPerSecond": relay_traffic(&registry) }))
+}
+
 /// `mp_zerok_open_battle`, Zero-K only: ask the server to open a room for us.
 ///
 /// The Zero-K counterpart of [`mp_open_battle`], and a different thing under the
@@ -3192,6 +3231,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_build_host_config,
             mp_probe_host,
             mp_turn_credentials,
+            mp_relay_traffic,
             mp_chat_logs,
             mp_chat_log_open,
             mp_tachyon_sign_in,

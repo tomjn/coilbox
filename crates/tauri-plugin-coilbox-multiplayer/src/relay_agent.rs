@@ -12,6 +12,13 @@
 //! their shape. This module is the driver: it writes requests, matches answers
 //! back to whoever is waiting on them, and hands everything else to a listener.
 //!
+//! It also holds the one number that is neither an answer nor an event about
+//! the relay: how much the relay said it was carrying a second ago. The host's
+//! in-game pill reads it through [`RelayAgent::carrying`] and issue #2024 says
+//! why it exists. It is kept here rather than pushed at anybody because it
+//! arrives every second for the life of the battle, and everything listening
+//! for events is deciding whether there is a relay at all.
+//!
 //! ## Where the address comes from, and why nothing calls this yet
 //!
 //! This is the honest gap in relay hosting today, and it is worth stating
@@ -60,9 +67,9 @@ use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use coilbox_relay_protocol::{read_event, to_line, Event, Request, RequestId};
+use coilbox_relay_protocol::{read_event, to_line, Event, Request, RequestId, TRAFFIC_EVERY};
 
 use crate::relay_sidecar::{self, Battle};
 
@@ -133,6 +140,32 @@ impl std::error::Error for NotStarted {}
 /// Answers still being waited on, by request id.
 type Waiting = Arc<Mutex<HashMap<RequestId, mpsc::Sender<Result<(), NotAllowed>>>>>;
 
+/// How long a rate the agent reported is worth showing before it counts as no
+/// news at all.
+///
+/// Three of the agent's own reporting intervals, which is the only number this
+/// could be derived from rather than guessed at. The agent says how much it is
+/// carrying every [`TRAFFIC_EVERY`] whether or not anything moved, so one late
+/// report is a scheduler having a bad moment on a machine that is running a
+/// game, and three in a row is the channel or the process rather than a quiet
+/// relay.
+///
+/// It has to exist, and the reason is the whole point of the figure. A relay
+/// that has stopped carrying anything reports a zero, and a sidecar that has
+/// died reports nothing. Without this the second one would leave the last
+/// healthy rate on screen for the rest of the game, which is the opposite of
+/// what the pill is for.
+const STALE_AFTER: Duration = TRAFFIC_EVERY.saturating_mul(3);
+
+/// The last rate the agent reported, and when it said it.
+///
+/// The timestamp is not decoration. See [`STALE_AFTER`].
+#[derive(Clone, Copy, Debug)]
+struct Carrying {
+    bytes_per_second: u64,
+    said_at: Instant,
+}
+
 /// The relay agent, as coilbox talks to it.
 pub struct RelayAgent {
     /// The agent's stdin. Behind a lock because a request is one whole line and
@@ -141,6 +174,13 @@ pub struct RelayAgent {
     /// Request ids are ours to mint and nobody else's, so a counter is enough.
     next_id: AtomicU64,
     waiting: Waiting,
+    /// What the relay last said it was carrying, for the in-game pill.
+    ///
+    /// Kept here rather than handed to the listener because the reader is a
+    /// command somebody polls while a game is on, not something waiting for an
+    /// event. Everything reading events is deciding whether there is a relay at
+    /// all, and a rate says nothing about that.
+    carrying: Arc<Mutex<Option<Carrying>>>,
 }
 
 impl RelayAgent {
@@ -260,11 +300,18 @@ impl RelayAgent {
     /// thread of its own, matching how this repo already reads a sidecar
     /// (`tauri-plugin-coilbox-downloads`, `run_sidecar_streaming`).
     ///
-    /// `on_event` gets everything that is not an answer to a request:
-    /// [`Event::RelayOpen`] when a relay opens or is rebuilt at a new address
-    /// (issue #2031), [`Event::RelayDown`] when there is not one, and
-    /// [`Event::Stopping`] when the agent is exiting. Answers are consumed
-    /// here and never reach it.
+    /// `on_event` gets everything that is not an answer to a request and not
+    /// the meter: [`Event::RelayOpen`] when a relay opens or is rebuilt at a
+    /// new address (issue #2031), [`Event::RelayDown`] when there is not one,
+    /// and [`Event::Stopping`] when the agent is exiting. Answers and
+    /// [`Event::Traffic`] are consumed here and never reach it.
+    ///
+    /// Keeping the meter off the listener is deliberate rather than tidiness.
+    /// It arrives every second for the life of the battle, and every listener
+    /// in coilbox is watching for whether there is a relay at all: one of them
+    /// waits for the first thing the agent says and treats anything unexpected
+    /// as a refusal to open one. A heartbeat down that channel would be a
+    /// battle that could not host.
     pub fn driving<R, W>(
         from_agent: R,
         to_agent: W,
@@ -276,12 +323,36 @@ impl RelayAgent {
     {
         let waiting: Waiting = Arc::default();
         let heard = Arc::clone(&waiting);
-        std::thread::spawn(move || read_events(from_agent, &heard, on_event));
+        let carrying: Arc<Mutex<Option<Carrying>>> = Arc::default();
+        let metered = Arc::clone(&carrying);
+        std::thread::spawn(move || read_events(from_agent, &heard, &metered, on_event));
         RelayAgent {
             to_agent: Mutex::new(Box::new(to_agent)),
             next_id: AtomicU64::new(1),
             waiting,
+            carrying,
         }
+    }
+
+    /// How much the relay carried in the last second, or `None` when there is
+    /// nothing worth saying.
+    ///
+    /// `None` covers an agent that has not reported yet, one whose reports have
+    /// stopped arriving, and one that has exited, and they all mean the same
+    /// thing to the caller: coilbox does not know, so it should say nothing
+    /// rather than repeat what it last heard. `Some(0)` is the opposite and is
+    /// a real answer: the relay is there and nothing is going through it.
+    pub fn carrying(&self) -> Option<u64> {
+        self.carrying_at(Instant::now())
+    }
+
+    /// The same, against a clock the caller names.
+    ///
+    /// Split out so the staleness rule can be asserted without a test that
+    /// sleeps for the three seconds it takes to become true.
+    fn carrying_at(&self, now: Instant) -> Option<u64> {
+        let carrying = (*self.carrying.lock().unwrap())?;
+        (now.duration_since(carrying.said_at) < STALE_AFTER).then_some(carrying.bytes_per_second)
     }
 
     /// Let `ip` through the relay, and wait to hear that it worked.
@@ -340,7 +411,12 @@ impl RelayAgent {
 /// the important part is what happens next: everybody still waiting is told,
 /// rather than being left to wait out their own deadline for an answer that is
 /// never coming.
-fn read_events<R: Read>(from_agent: R, waiting: &Waiting, on_event: impl Fn(Event)) {
+fn read_events<R: Read>(
+    from_agent: R,
+    waiting: &Waiting,
+    carrying: &Mutex<Option<Carrying>>,
+    on_event: impl Fn(Event),
+) {
     let mut ending = "its output ended".to_string();
     for line in BufReader::new(from_agent).lines() {
         let line = match line {
@@ -364,6 +440,12 @@ fn read_events<R: Read>(from_agent: R, waiting: &Waiting, on_event: impl Fn(Even
             Event::Done { id } => hand_over(waiting, id, Ok(())),
             Event::Failed { id, reason } => {
                 hand_over(waiting, id, Err(NotAllowed::Refused(reason)))
+            }
+            Event::Traffic { bytes_per_second } => {
+                *carrying.lock().unwrap() = Some(Carrying {
+                    bytes_per_second,
+                    said_at: Instant::now(),
+                });
             }
             Event::Stopping { ref reason } => {
                 ending = reason.clone();
@@ -683,9 +765,112 @@ mod tests {
         }
     }
 
-    /// An event from a newer agent than this coilbox is ignored, not fatal.
-    /// Issue #2024 is going to add one, and an older coilbox meeting it must
-    /// keep working rather than losing the channel.
+    /// Wait for the reading thread to have taken a line off the channel and
+    /// filed the rate in it.
+    fn eventually_carrying(agent: &RelayAgent) -> Option<u64> {
+        let deadline = std::time::Instant::now() + PATIENCE;
+        while std::time::Instant::now() < deadline {
+            if let Some(carrying) = agent.carrying() {
+                return Some(carrying);
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        None
+    }
+
+    /// The pill's whole supply, on this side of the channel: the agent says a
+    /// rate and coilbox can read it back.
+    #[test]
+    fn the_rate_the_agent_reports_is_the_one_coilbox_reads_back() {
+        let (scripted, reading) = Scripted::new();
+        let agent = RelayAgent::driving(reading, Written::default(), |_| {});
+
+        assert_eq!(
+            agent.carrying(),
+            None,
+            "an agent that has not reported yet has nothing to show, and a zero here would \
+             read as a relay that had stopped"
+        );
+
+        scripted.line(to_line(&Event::Traffic {
+            bytes_per_second: 41_984,
+        }));
+        assert_eq!(eventually_carrying(&agent), Some(41_984));
+
+        // And a later report replaces it rather than adding to it, because the
+        // figure is what is going through the relay now.
+        scripted.line(to_line(&Event::Traffic {
+            bytes_per_second: 0,
+        }));
+        let deadline = std::time::Instant::now() + PATIENCE;
+        while agent.carrying() != Some(0) {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "a relay that stopped carrying anything has to replace the last rate, or the \
+                 pill shows a healthy number for the rest of the game"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        drop(scripted);
+    }
+
+    /// The failure the timestamp exists to prevent. A sidecar that dies stops
+    /// reporting, and a figure with no expiry would sit on screen saying the
+    /// relay was fine for as long as the game ran.
+    #[test]
+    fn a_rate_nobody_has_repeated_stops_being_shown() {
+        let (scripted, reading) = Scripted::new();
+        let agent = RelayAgent::driving(reading, Written::default(), |_| {});
+
+        scripted.line(to_line(&Event::Traffic {
+            bytes_per_second: 41_984,
+        }));
+        assert_eq!(eventually_carrying(&agent), Some(41_984));
+
+        assert_eq!(
+            agent.carrying_at(std::time::Instant::now() + STALE_AFTER),
+            None,
+            "a rate nothing has repeated is no news, and showing it would be coilbox vouching \
+             for a sidecar it has not heard from"
+        );
+        drop(scripted);
+    }
+
+    /// The meter must not reach the listener. Every listener in coilbox is
+    /// working out whether there is a relay at all, and `relay_host::waiting_on`
+    /// treats what it hears as the agent's verdict on that. A rate arriving
+    /// there once a second would be a battle that could not host.
+    #[test]
+    fn the_meter_does_not_reach_the_listener_watching_for_a_relay() {
+        let (scripted, reading) = Scripted::new();
+        let (saw, seen) = mpsc::channel();
+        let agent = RelayAgent::driving(reading, Written::default(), move |event| {
+            let _ = saw.send(event);
+        });
+
+        scripted.line(to_line(&Event::Traffic {
+            bytes_per_second: 41_984,
+        }));
+        // Read back through `carrying` rather than by sleeping, so the rate has
+        // certainly been handled by the time the listener is asked about it.
+        assert_eq!(eventually_carrying(&agent), Some(41_984));
+
+        scripted.line(to_line(&Event::RelayOpen {
+            addr: (Ipv4Addr::new(198, 51, 100, 7), 41641).into(),
+        }));
+        assert_eq!(
+            seen.recv_timeout(PATIENCE).expect("an event arrived"),
+            Event::RelayOpen {
+                addr: (Ipv4Addr::new(198, 51, 100, 7), 41641).into(),
+            },
+            "the first thing the listener hears has to be the relay, not the meter"
+        );
+        drop(scripted);
+    }
+
+    /// An event from a newer agent than this coilbox is ignored, not fatal. The
+    /// name here is deliberately one no agent sends: `traffic` is a real event
+    /// now, so asking the question with it would stop asking it.
     #[test]
     fn an_event_this_coilbox_does_not_know_does_not_break_the_channel() {
         let (scripted, reading) = Scripted::new();
