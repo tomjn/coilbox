@@ -505,13 +505,16 @@ fn leave_a_stop_note(run_file: &Path, pid: u32) -> std::path::PathBuf {
 
 /// The process id in the run file, which is the only handle a coilbox that
 /// reopened has on a leftover agent.
+///
+/// Read with the shared parser rather than by hand. The exact bytes are
+/// asserted in `coilbox-relay-protocol`'s own tests, and a field added there is
+/// additive for every reader that goes through the parser, so a hand rolled one
+/// here only breaks tests that are about something else.
 fn agent_in(run_file: &Path) -> u32 {
     let text = std::fs::read_to_string(run_file).expect("a running agent left one");
-    text.trim()
-        .strip_prefix("{\"pid\":")
-        .and_then(|rest| rest.strip_suffix('}'))
-        .and_then(|pid| pid.parse().ok())
-        .unwrap_or_else(|| panic!("a process id in the run file, got: {text}"))
+    coilbox_relay_protocol::RunFile::from_json(&text)
+        .unwrap_or_else(|e| panic!("a run file coilbox can read, got: {text} ({e})"))
+        .pid
 }
 
 /// Issue #2062 end to end, on the real process. The coilbox that started this

@@ -22,13 +22,19 @@
 //! [`coilbox_proc::is_running`], and a stale file is cleared by whoever finds
 //! it next.
 //!
-//! One gap survives that, and it is worth writing down rather than leaving to
-//! be found: a pid the OS has since given to something unrelated reads as
-//! running. The cost is an agent that refuses to start and a coilbox that says
-//! a relay is already going when it is not, which the user can clear by
-//! deleting the file. Closing it properly means an OS-level lock, and that is
-//! a lot of machinery for a case that needs a killed agent, a recycled pid and
-//! a restart in between.
+//! The pid alone is not enough either, because a pid is unique only while its
+//! process lives. A number the OS has since given to somebody's browser reads
+//! as running, and that left a host unable to open a relayed battle until they
+//! restarted the machine (issue #2078). So the agent takes a shared lock on the
+//! file as well and keeps it for as long as it runs. The kernel gives that lock
+//! up the moment the process ends, however it ends, so a free lock is proof
+//! that the pid is somebody else's rather than an inference from one.
+//! [`coilbox_relay_protocol::run_file_is_still_held`] is the reading of it, and
+//! carries why the lock is shared rather than exclusive.
+//!
+//! A filesystem that will not lock leaves [`Contents::locked`] false, and the
+//! file is then back to the pid on its own. That is the old behaviour rather
+//! than a new failure.
 //!
 //! ## The note that comes back the other way
 //!
@@ -49,11 +55,12 @@
 //! rather than both relaying the same battle to different addresses.
 
 use std::convert::Infallible;
+use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use coilbox_relay_protocol::{
-    stop_note_path, RunFile as Contents, StopNote, NOTE_LOOKED_FOR_EVERY,
+    run_file_is_still_held, stop_note_path, RunFile as Contents, StopNote, NOTE_LOOKED_FOR_EVERY,
 };
 
 use crate::stopping::Stopping;
@@ -80,6 +87,11 @@ impl std::fmt::Display for Taken {
 #[derive(Debug)]
 pub struct Claim {
     path: PathBuf,
+    /// The file itself, kept open because the lock lives on the open handle.
+    /// Dropping it is what gives the lock back, so it is held here rather than
+    /// closed after the write, and the kernel gives it back for us if this
+    /// process is killed.
+    _locked: File,
 }
 
 impl Claim {
@@ -93,7 +105,12 @@ impl Claim {
             std::fs::create_dir_all(parent).map_err(Taken::Unwritable)?;
         }
         match create_new(&path) {
-            Ok(()) => return Ok(Claim { path }),
+            Ok(locked) => {
+                return Ok(Claim {
+                    path,
+                    _locked: locked,
+                })
+            }
             Err(e) if e.kind() != io::ErrorKind::AlreadyExists => return Err(Taken::Unwritable(e)),
             Err(_) => {}
         }
@@ -101,10 +118,13 @@ impl Claim {
             return Err(Taken::ByAgent(pid));
         }
         // Nobody is behind it, so it is a file an agent that was killed left
-        // lying around.
+        // lying around, or one naming a pid the OS has since given away.
         std::fs::remove_file(&path).map_err(Taken::Unwritable)?;
         match create_new(&path) {
-            Ok(()) => Ok(Claim { path }),
+            Ok(locked) => Ok(Claim {
+                path,
+                _locked: locked,
+            }),
             // Somebody claimed it in the moment between the two, which is the
             // race the exclusive create exists to settle. They won.
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
@@ -188,34 +208,58 @@ fn take_note_for(path: &Path, us: u32) -> bool {
     true
 }
 
-/// Create the file and write this process into it, failing if it is there.
+/// Create the file, lock it, and write this process into it, failing if it is
+/// already there. Answers with the open handle, which is where the lock lives.
 ///
-/// `create_new` is the whole mechanism: it is one atomic syscall, so two
-/// agents racing cannot both succeed.
-fn create_new(path: &Path) -> io::Result<()> {
+/// `create_new` is the whole mechanism for the race: it is one atomic syscall,
+/// so two agents racing cannot both succeed.
+///
+/// The lock is taken before the contents are written, so there is no moment
+/// where the file says a lock is held and none is. A filesystem that will not
+/// lock is written as a file that says so rather than being refused, because
+/// the run file still does its old job without one.
+///
+/// Shared rather than exclusive, so that the record stays readable on Windows.
+/// [`coilbox_relay_protocol::run_file_is_still_held`] has the reason, and it is
+/// not a small one: an exclusive lock there would make coilbox's own read of
+/// this file fail and have it start a second agent over a live game.
+fn create_new(path: &Path) -> io::Result<File> {
     use std::io::Write;
     let mut file = std::fs::OpenOptions::new()
+        .read(true)
         .write(true)
         .create_new(true)
         .open(path)?;
+    let locked = file.try_lock_shared().is_ok();
     file.write_all(
         Contents {
             pid: std::process::id(),
+            locked,
         }
         .to_json()
         .as_bytes(),
-    )
+    )?;
+    Ok(file)
 }
 
 /// The pid of the agent that holds `path`, if one still does.
 ///
 /// `None` covers every way of not having an answer: no file, an unreadable
-/// one, or one naming a process that has gone. They all mean the same thing to
+/// one, one naming a process that has gone, and one naming a process that is
+/// running but is not the agent that wrote it. They all mean the same thing to
 /// a caller, which is that nothing is relaying.
+///
+/// That last one is the pid the OS handed on to something else (issue #2078),
+/// and the lock is what settles it. It is only asked of a record that says its
+/// writer took one, because a record from an older build has a free lock
+/// whether its agent is alive or not.
 fn holder(path: &Path) -> Option<u32> {
     let text = std::fs::read_to_string(path).ok()?;
-    let pid = Contents::from_json(&text).ok()?.pid;
-    coilbox_proc::is_running(pid).then_some(pid)
+    let record = Contents::from_json(&text).ok()?;
+    if !coilbox_proc::is_running(record.pid) {
+        return None;
+    }
+    (!record.locked || run_file_is_still_held(path)).then_some(record.pid)
 }
 
 #[cfg(test)]
@@ -262,10 +306,67 @@ mod tests {
     fn a_file_left_by_an_agent_that_died_is_taken_over() {
         let (_dir, path) = a_path();
         std::fs::create_dir_all(path.parent().expect("a parent")).expect("a writable temp dir");
-        std::fs::write(&path, Contents { pid: gone_pid() }.to_json()).expect("a writable file");
+        std::fs::write(
+            &path,
+            Contents {
+                pid: gone_pid(),
+                locked: true,
+            }
+            .to_json(),
+        )
+        .expect("a writable file");
 
         let _claim = Claim::take(path.clone()).expect("a dead agent holds nothing");
         assert_eq!(holder(&path), Some(std::process::id()));
+    }
+
+    /// The bug in issue #2078, from the agent's side. The OS has given the dead
+    /// agent's number to something unrelated, so the file names a process that
+    /// is running and is not an agent. Nothing holds the file, and that is what
+    /// says so.
+    #[test]
+    fn a_file_naming_a_live_process_that_is_not_the_agent_is_taken_over() {
+        let (_dir, path) = a_path();
+        std::fs::create_dir_all(path.parent().expect("a parent")).expect("a writable temp dir");
+        let mut stranger = a_process_that_is_not_an_agent();
+        std::fs::write(
+            &path,
+            Contents {
+                pid: stranger.id(),
+                locked: true,
+            }
+            .to_json(),
+        )
+        .expect("a writable file");
+
+        let claim = Claim::take(path.clone());
+        let _ = stranger.kill();
+        let _ = stranger.wait();
+
+        let _claim = claim.expect("a process that is not holding the file is not an agent");
+        assert_eq!(holder(&path), Some(std::process::id()));
+    }
+
+    /// The same file from a build that took no lock. Its lock is free whether
+    /// the agent is alive or dead, so it proves nothing and the pid is all
+    /// there is. Getting this wrong would mean upgrading coilbox mid-battle
+    /// starts a second agent over the game the old one is carrying.
+    #[test]
+    fn a_file_from_a_build_that_took_no_lock_is_left_to_its_pid() {
+        let (_dir, path) = a_path();
+        std::fs::create_dir_all(path.parent().expect("a parent")).expect("a writable temp dir");
+        let mut older = a_process_that_is_not_an_agent();
+        let pid = older.id();
+        std::fs::write(&path, format!("{{\"pid\":{pid}}}")).expect("a writable file");
+
+        let refused = Claim::take(path.clone());
+        let _ = older.kill();
+        let _ = older.wait();
+
+        assert!(
+            matches!(refused, Err(Taken::ByAgent(named)) if named == pid),
+            "an older agent's record has to keep meaning what it meant, got: {refused:?}"
+        );
     }
 
     /// A file from some other version, or one somebody has half written. There
@@ -291,7 +392,15 @@ mod tests {
 
         // Somebody else's agent, written over the top the way a hand edit or a
         // restore from backup would.
-        std::fs::write(&path, Contents { pid: gone_pid() }.to_json()).expect("a writable file");
+        std::fs::write(
+            &path,
+            Contents {
+                pid: gone_pid(),
+                locked: true,
+            }
+            .to_json(),
+        )
+        .expect("a writable file");
         drop(claim);
 
         assert!(path.exists(), "a claim only ever removes its own file");
@@ -389,6 +498,23 @@ mod tests {
         }
 
         assert!(!note.exists(), "the note has to be taken, not only read");
+    }
+
+    /// A process that is running and has never heard of a run file, for
+    /// standing in for whatever the OS gave a dead agent's number to.
+    ///
+    /// The caller kills it, because a test that leaves one behind leaves it
+    /// behind for a minute.
+    fn a_process_that_is_not_an_agent() -> std::process::Child {
+        let (program, args): (&str, &[&str]) = if cfg!(windows) {
+            ("cmd", &["/C", "timeout", "/T", "60"])
+        } else {
+            ("sh", &["-c", "sleep 60"])
+        };
+        std::process::Command::new(program)
+            .args(args)
+            .spawn()
+            .expect("a shell to run")
     }
 
     /// A pid that is definitely not in use, for standing in for an agent that

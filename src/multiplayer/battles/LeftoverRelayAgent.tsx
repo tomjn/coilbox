@@ -16,6 +16,15 @@ export type StopOutcome = Awaited<
  * match that other people are still playing, and the sentence has to say that
  * nothing was cut off, because the host has just pressed a button and is owed
  * an account of what it did.
+ *
+ * `noAnswer` used to claim the process was no longer the relay agent, on the
+ * strength of a note nothing took. It cannot claim that any more, and it should
+ * never have: a note is only read once the agent's own coilbox has closed, so
+ * an untaken note is an inference. The proof is the lock the agent keeps on its
+ * run file, and coilbox now reads that before it ever offers this panel, which
+ * means a record naming a process number the OS handed on never reaches here
+ * (issue #2078). What is left is the case that genuinely cannot be told apart,
+ * and the sentence says so rather than guessing.
  */
 export function stopOutcomeMessage(outcome: StopOutcome): string {
   switch (outcome) {
@@ -24,7 +33,7 @@ export function stopOutcomeMessage(outcome: StopOutcome): string {
     case "carrying":
       return "It kept running, because a game is still being played through it. Nobody was cut off. It stops on its own once that game ends, and hosting will work again then.";
     case "noAnswer":
-      return "Nothing answered. That process is no longer the relay agent: process numbers are handed out again once a process ends, and this record is left over from one that did. Restarting this machine clears it.";
+      return "Nothing read the note. coilbox cannot rule out that the process really is the relay agent, so it has changed nothing and hosting is still refused. Restarting this machine clears the record.";
     case "ours":
       return "It is carrying a battle this coilbox is hosting right now. Leave that battle before opening another one.";
     case "gone":
