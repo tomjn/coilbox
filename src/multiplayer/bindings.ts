@@ -338,6 +338,14 @@ export type Delta =
   | { kind: "turnCredentials"; expiresAt: number }
   | { kind: "turnCredentialsRefused"; reason: string }
   /**
+   * The lobby would not take the address we said our relayed battle lives at, so
+   * the battle it opened a breath later is at this machine's own address rather
+   * than at the relay's. Raised for every `RELAYEDHOSTFAILED`, whether or not
+   * anybody was still waiting on the battle, because a host who is told nothing
+   * finds out from players saying they cannot connect.
+   */
+  | { kind: "relayedHostRefused"; reason: string }
+  /**
    * Somebody joined a battle we are hosting through the relay and the relay
    * would not let their address through, so nothing their game sends will reach
    * ours. Raised by the plugin rather than by a line off the wire, and only ever
