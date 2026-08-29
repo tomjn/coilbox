@@ -245,6 +245,17 @@ pub enum ServerMessage {
     /// `TURNCREDENTIALSFAILED <reason>`, the lobby declining to mint one. The
     /// reason is meant for the person trying to host, so it is carried whole.
     TurnCredentialsFailed { reason: String },
+    /// `RELAYEDHOSTFAILED <reason>`, the lobby refusing the address
+    /// [`crate::command::relayed_host`] named for the battle about to be opened.
+    /// There is no reply on success, so this is the only thing the lobby ever
+    /// says about that line.
+    ///
+    /// The reason is the rest of the line, may contain spaces, and is written
+    /// for a person, so it is carried whole and never matched on. The server's
+    /// set today covers a lobby with no relay, a client that did not ask for
+    /// relay support, an address that is not public or not an address at all,
+    /// and a port outside 1-65535, and it will grow.
+    RelayedHostFailed { reason: String },
     /// `PING [token]`
     Ping { token: Option<String> },
     /// `PONG [token]`
@@ -694,6 +705,9 @@ pub fn parse_line(line: &str) -> ServerMessage {
         },
         "TURNCREDENTIALS" => parse_turn_credentials(rest, raw),
         "TURNCREDENTIALSFAILED" => ServerMessage::TurnCredentialsFailed {
+            reason: rest.to_string(),
+        },
+        "RELAYEDHOSTFAILED" => ServerMessage::RelayedHostFailed {
             reason: rest.to_string(),
         },
         "PING" => ServerMessage::Ping {
@@ -1369,6 +1383,44 @@ mod tests {
         assert_eq!(
             parse_line("TURNCREDENTIALSFAILED"),
             ServerMessage::TurnCredentialsFailed { reason: "".into() }
+        );
+    }
+
+    /// The lobby's only answer to `RELAYEDHOST`, and the only way a host finds
+    /// out their battle is not going through the relay after all.
+    ///
+    /// Every reason the server has today is a sentence, so the whole of the rest
+    /// of the line is the reason. Taking only the first word would leave a host
+    /// reading "Port" or "This", which says nothing.
+    #[test]
+    fn parses_a_refusal_of_the_address_a_relayed_battle_lives_at() {
+        for (line, reason) in [
+            (
+                "RELAYEDHOSTFAILED This server has no relay configured",
+                "This server has no relay configured",
+            ),
+            (
+                "RELAYEDHOSTFAILED 192.168.1.5 is not a public address, so nobody could join a battle there",
+                "192.168.1.5 is not a public address, so nobody could join a battle there",
+            ),
+            (
+                "RELAYEDHOSTFAILED Port is out of range: 1-65535: 70000",
+                "Port is out of range: 1-65535: 70000",
+            ),
+        ] {
+            assert_eq!(
+                parse_line(line),
+                ServerMessage::RelayedHostFailed {
+                    reason: reason.into(),
+                },
+                "the whole sentence is the reason: {line}"
+            );
+        }
+        // A server that names no reason still refuses, and the refusal is what
+        // matters.
+        assert_eq!(
+            parse_line("RELAYEDHOSTFAILED"),
+            ServerMessage::RelayedHostFailed { reason: "".into() }
         );
     }
 

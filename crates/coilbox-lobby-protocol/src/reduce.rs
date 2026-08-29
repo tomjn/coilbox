@@ -112,6 +112,19 @@ pub enum Delta {
     TurnCredentialsRefused {
         reason: String,
     },
+    /// The lobby would not take the address we said our relayed battle lives at,
+    /// in its own words, so the battle we opened a breath later is not going
+    /// through the relay.
+    ///
+    /// Always raised, whenever the line arrives, because a host who is told
+    /// nothing finds out from players saying they cannot connect. Whoever is
+    /// waiting on that battle's answer acts on it too
+    /// (`relay_host::open_answer_in`), but that only covers a refusal that
+    /// arrives while somebody is still waiting, and this has to reach the host
+    /// either way.
+    RelayedHostRefused {
+        reason: String,
+    },
     /// Somebody joined a battle we are hosting through the relay and the relay
     /// would not let their address through, so nothing that player's game sends
     /// will reach ours.
@@ -782,6 +795,16 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                 reason: refusal_words(reason),
             }]
         }
+        ServerMessage::RelayedHostFailed { reason } => {
+            // Nothing in the state changes. The credential we hold is still
+            // good, the relay agent is still holding its allocation, and what is
+            // wrong is that the lobby will not tell anybody about it. All of
+            // that is somebody else's to unwind, and none of it is state this
+            // reducer keeps.
+            vec![Delta::RelayedHostRefused {
+                reason: refusal_words(reason),
+            }]
+        }
         ServerMessage::Ring { username } => {
             vec![Delta::Ring { from: username }]
         }
@@ -931,9 +954,10 @@ fn parse_failed(text: &str) -> (String, String) {
 
 /// What to tell somebody about a refusal the server gave no reason for.
 ///
-/// `TURNCREDENTIALSFAILED` carries its reason as the rest of the line, so a
-/// server that names none sends an empty one and the host would be told the
-/// lobby refused, followed by nothing. Saying that no reason was given is worth
+/// `TURNCREDENTIALSFAILED` and `RELAYEDHOSTFAILED` both carry their reason as
+/// the rest of the line, so a server that names none sends an empty one and the
+/// host would be told the lobby refused, followed by nothing. Saying that no
+/// reason was given is worth
 /// more than a sentence that trails off, and it is the same answer the relay
 /// agent gives for an error code with no phrase behind it (`reason_for` in
 /// `coilbox-relay-agent`).
@@ -1575,6 +1599,49 @@ mod tests {
                 reason: "no reason given".into()
             }]
         );
+    }
+
+    /// The lobby refusing the address a relayed battle lives at is the one thing
+    /// it ever says about `RELAYEDHOST`, and the host has to hear it: the battle
+    /// opening a breath later is at the address nobody could reach, which is the
+    /// reason the relay was chosen.
+    #[test]
+    fn a_refused_relay_address_reaches_the_host_in_words() {
+        let mut s = LobbyState::new();
+        assert_eq!(
+            reduce(
+                &mut s,
+                parse_line("RELAYEDHOSTFAILED 10.0.0.4 is not a public address, so nobody could join a battle there")
+            ),
+            vec![Delta::RelayedHostRefused {
+                reason: "10.0.0.4 is not a public address, so nobody could join a battle there"
+                    .into()
+            }]
+        );
+        assert_eq!(
+            reduce(&mut s, parse_line("RELAYEDHOSTFAILED")),
+            vec![Delta::RelayedHostRefused {
+                reason: "no reason given".into()
+            }]
+        );
+    }
+
+    /// The credential is not what was refused, and the relay agent is still
+    /// holding an allocation signed with it. Throwing it away here would take a
+    /// second host attempt back to the lobby for a credential it already has.
+    #[test]
+    fn a_refused_relay_address_leaves_the_credential_alone() {
+        let mut s = LobbyState::new();
+        reduce_at(
+            &mut s,
+            parse_line("TURNCREDENTIALS turn:relay.example.org:3478 alice hmac= 600"),
+            1_000,
+        );
+        reduce(
+            &mut s,
+            parse_line("RELAYEDHOSTFAILED 10.0.0.4 is not a public address"),
+        );
+        assert!(s.live_turn_credentials(1_000).is_some());
     }
 
     /// A refusal to mint a second credential must not throw away the first,
