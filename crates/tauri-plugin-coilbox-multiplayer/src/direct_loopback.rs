@@ -1365,3 +1365,118 @@ async fn a_handshake_missing_a_line_hangs_the_client_with_no_error() {
         );
     }
 }
+
+/// A lobby that refuses the address a relayed battle names and then opens the
+/// battle anyway, writing both answers into one flush.
+///
+/// One flush is the point. The two lines then arrive in one read, the connection
+/// task handles both before anything waiting on the battle is polled again, and
+/// a refusal kept in a `watch` slot would be overwritten by the ack behind it.
+/// A server that answered politely, one flush at a time, would never show that.
+async fn a_lobby_that_refuses_the_relays_address(reason: &'static str) -> SocketAddr {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("a free port");
+    let addr = listener.local_addr().expect("a bound address");
+    tokio::spawn(async move {
+        let Ok((stream, _)) = listener.accept().await else {
+            return;
+        };
+        let mut framed = Framed::new(stream, LinesCodec::new());
+        if framed
+            .send(line::tas_server("0.38", "*", 8452, 0))
+            .await
+            .is_err()
+        {
+            return;
+        }
+        while let Some(Ok(read)) = framed.next().await {
+            // Matched on the command rather than parsed, because `RELAYEDHOST`
+            // is a line this client sends and no server in this repo reads.
+            if read.starts_with("RELAYEDHOST ") {
+                if framed
+                    .feed(format!("RELAYEDHOSTFAILED {reason}"))
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
+                if framed.send("OPENBATTLE 9".to_string()).await.is_err() {
+                    return;
+                }
+                continue;
+            }
+            let reply = match parse_client_line(&read) {
+                ClientCommand::ListCompFlags => line::comp_flags(&["u", "sp", "r"]),
+                ClientCommand::Login { username, .. } => {
+                    if framed.send(line::accepted(&username)).await.is_err() {
+                        return;
+                    }
+                    line::login_info_end()
+                }
+                _ => continue,
+            };
+            if framed.send(reply).await.is_err() {
+                return;
+            }
+        }
+    });
+    addr
+}
+
+/// Issue #2064, through the real connection loop. A `RELAYEDHOSTFAILED` off the
+/// wire has to reach two places, and the loop is the only thing that puts it in
+/// either.
+///
+/// The note is what `advertise` reads to decide whether the battle it just
+/// advertised is going through the relay. The delta is what the host is shown.
+/// Neither is reachable from a unit test, because both are written in the middle
+/// of the loop and the loop is private to this crate.
+#[tokio::test]
+async fn a_refused_relay_address_reaches_both_the_host_and_whoever_is_hosting() {
+    const REASON: &str = "203.0.113.7 is this lobby server, not a relay";
+
+    let registry = Registry::default();
+    let client = Client::connect(
+        &registry,
+        a_lobby_that_refuses_the_relays_address(REASON).await,
+        "alice",
+    )
+    .await;
+    client.wait_for_ready().await;
+
+    client.send("RELAYEDHOST 203.0.113.7 30001".to_string());
+
+    let note = {
+        let registry = registry.lock().unwrap();
+        registry
+            .get(&client.key)
+            .expect("still connected")
+            .relay_refused
+            .clone()
+    };
+    wait_until(
+        || crate::relay_host::refused_address(&note).is_some(),
+        "the lobby's refusal to be written against the connection",
+    )
+    .await;
+    assert_eq!(
+        crate::relay_host::refused_address(&note).as_deref(),
+        Some(REASON),
+        "the ack that arrived in the same read must not have overwritten it"
+    );
+
+    // And the host is told, in the lobby's own words, whether or not anybody was
+    // still waiting on the battle by the time it arrived.
+    wait_until(
+        || {
+            client.events.lock().unwrap().iter().any(|e| {
+                let event: serde_json::Value = serde_json::from_str(e).unwrap_or_default();
+                event["delta"]["kind"] == "relayedHostRefused"
+                    && event["delta"]["reason"] == REASON
+            })
+        },
+        "the refusal to reach the frontend as a delta",
+    )
+    .await;
+
+    client.disconnect();
+}
