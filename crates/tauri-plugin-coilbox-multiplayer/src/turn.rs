@@ -316,6 +316,7 @@ mod tests {
                 started: StartedBattle::default(),
                 turn,
                 relay: crate::conn::HostedRelay::default(),
+                opened: watch::channel(crate::relay_host::OpenAnswer::Unasked).1,
             },
         );
         Wired {

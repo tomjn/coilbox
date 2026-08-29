@@ -177,8 +177,10 @@ pub fn spawn_connection(
             // Zero-K hosts its own battles on its own servers, so there is no
             // relay credential to ask it for and nothing ever fills this.
             turn: watch::channel(TurnAnswer::Unasked).1,
-            // And so nothing here is ever relayed.
+            // And so nothing here is ever relayed, and no `OPENBATTLE` of ours
+            // is ever answered on this connection.
             relay: crate::conn::HostedRelay::default(),
+            opened: watch::channel(crate::relay_host::OpenAnswer::Unasked).1,
         },
     );
 }

@@ -100,6 +100,7 @@ mod tests {
                 started: StartedBattle::default(),
                 turn: watch::channel(crate::turn::TurnAnswer::Unasked).1,
                 relay: crate::conn::HostedRelay::default(),
+                opened: watch::channel(crate::relay_host::OpenAnswer::Unasked).1,
             },
         );
         rx
