@@ -8,7 +8,7 @@ import {
   NAT_TYPE_DIRECT,
   recordHostingRoute,
 } from "./hostingRoute";
-import type { DirectReachability } from "./reachability";
+import { type DirectReachability, reachabilityState } from "./reachability";
 
 /** A report with nothing in it, so each test says only what it is about. */
 function report(over: Partial<DirectReachability> = {}): DirectReachability {
@@ -139,6 +139,20 @@ describe("hostingRoute", () => {
   it("says nothing is known when nobody asked the router anything", () => {
     expect(hostingRoute(null, true, true)).toBe("unchecked");
     expect(hostingRoute(null, false, true)).toBe("unchecked");
+  });
+
+  // Issue #2054. The ladder and the panel a few pixels above it read the same
+  // report, and for a while they disagreed about this one: hosting picked the
+  // direct route while the panel said the router had refused. Both now ask the
+  // same question, so a screen that contradicts itself would fail here.
+  it("agrees with the panel about a machine on its own public address", () => {
+    const host = report({
+      lanAddress: "209.35.91.246",
+      publicAddress: "209.35.91.246",
+      problem: "no UPnP gateway answered",
+    });
+    expect(hostingRoute(host, true, true)).toBe("direct");
+    expect(reachabilityState(host)).toBe("direct");
   });
 });
 

@@ -116,6 +116,28 @@ export function isReachable(report: DirectReachability): boolean {
 }
 
 /**
+ * Whether the address the internet sees is this machine's own. Pure.
+ *
+ * A VPS, a datacentre machine, or a home line with no NAT in front of it. There
+ * is no gateway for a port mapping request to reach, so nothing answers one and
+ * the report reads like a refusal, which is the opposite of the truth: this host
+ * needs nothing opened because nothing is shut (issue #2054).
+ *
+ * Two unknowns are not a match. A machine with no local address and no STUN
+ * answer knows nothing about itself, and calling that public would tell somebody
+ * unreachable that they are fine.
+ *
+ * Shared with {@link hostingRoute}'s first rung rather than written out twice,
+ * because the panel saying one thing while the hosting ladder a few pixels below
+ * says another is the bug this came from.
+ */
+export function isOnPublicAddress(report: DirectReachability): boolean {
+  return (
+    report.publicAddress !== null && report.publicAddress === report.lanAddress
+  );
+}
+
+/**
  * The address to send a friend, or null when there is nothing honest to send.
  * Pure.
  *
@@ -147,14 +169,26 @@ export function portList(ports: DirectPort[]): string {
     .join(" and ");
 }
 
-/** How the outcome should read: one of four states, and never a fifth. */
-export type ReachabilityState = "open" | "doubleNat" | "refused" | "noAddress";
+/** How the outcome should read. */
+export type ReachabilityState =
+  | "direct"
+  | "open"
+  | "doubleNat"
+  | "refused"
+  | "noAddress";
 
 /**
- * Which of the four things happened. Pure.
+ * Which of the five things happened. Pure.
  *
  * Split out from the wording because the wording differs between the two host
  * paths and the outcome does not.
+ *
+ * `direct` is asked first and asks nothing about the router, in the same order
+ * and for the same reason as {@link hostingRoute}'s first rung: a host whose own
+ * address is the one the internet sees is reachable whatever the router said,
+ * and a machine that is on the internet and also holds a mapping did not need
+ * the mapping. Asking later would leave a host with no gateway reading their
+ * unanswered request as a refusal (issue #2054).
  *
  * `noAddress` is the odd one: the ports opened and STUN could not be reached, so
  * the host has an open port and no way to know what address it is behind. That
@@ -164,6 +198,7 @@ export type ReachabilityState = "open" | "doubleNat" | "refused" | "noAddress";
 export function reachabilityState(
   report: DirectReachability,
 ): ReachabilityState {
+  if (isOnPublicAddress(report)) return "direct";
   if (report.doubleNat) return "doubleNat";
   if (report.method === null) return "refused";
   if (!report.publicAddress) return "noAddress";
@@ -175,9 +210,16 @@ export function reachabilityState(
  *
  * Leads with what happened rather than with what was tried, and never says
  * "reachable" about a mapping that is sitting behind the ISP's own NAT.
+ *
+ * The direct one names the address instead of the ports, because there are no
+ * ports to name and the address is the fact that proves the rest of the
+ * sentence. It says nothing about the router: this host has none to speak of,
+ * and the old wording blamed one that was never there.
  */
 export function reachabilityHeadline(report: DirectReachability): string {
   switch (reachabilityState(report)) {
+    case "direct":
+      return `Open. This machine is on the internet at ${report.publicAddress}, so there was nothing to forward.`;
     case "open":
       return `Open. ${methodLabel(report.method)} forwarded ${portList(report.ports)}.`;
     case "doubleNat":
@@ -200,6 +242,11 @@ export function reachabilityAdvice(report: DirectReachability): string | null {
   const to = report.lanAddress ? ` to ${report.lanAddress}` : "";
   const ports = portList(report.wanted);
   switch (reachabilityState(report)) {
+    // Both of the ways of being reachable. There is nothing to do about good
+    // news, and a host who is already on the internet is the one who most needs
+    // to be left alone: every word of the refusal advice below is a router
+    // setting, and they have no router to set it on.
+    case "direct":
     case "open":
       return null;
     case "doubleNat":
@@ -222,7 +269,11 @@ export function reachabilityAdvice(report: DirectReachability): string | null {
  *
  * Kept separate from the state so a caller styling a panel does not have to
  * enumerate the states to know which colour to use.
+ *
+ * Two of the five are good news, because there are two ways of being reachable
+ * and only one of them involved a router.
  */
 export function isReachabilityProblem(report: DirectReachability): boolean {
-  return reachabilityState(report) !== "open";
+  const state = reachabilityState(report);
+  return state !== "open" && state !== "direct";
 }

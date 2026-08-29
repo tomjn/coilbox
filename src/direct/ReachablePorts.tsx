@@ -77,8 +77,10 @@ export function ReachablePorts({
   );
 }
 
-/** What the router and the internet said. Four outcomes, and the way out of the
- *  three that are not success. */
+/** What the router and the internet said. Five outcomes, and the way out of the
+ *  three that are not success. A host who was already on the internet is one of
+ *  the other two, and is told so rather than being sent to a router that is not
+ *  there (issue #2054). */
 function Answer({
   busy,
   error,
@@ -124,8 +126,13 @@ function Answer({
       {advice && <span>{advice}</span>}
       {/* The router's own words, kept but not led with. They are the only thing
           that helps when the plain English above does not, and they are also
-          the only thing a bug report can be written from. */}
-      {report.problem && <span className="opacity-70">{report.problem}</span>}
+          the only thing a bug report can be written from. Only under an outcome
+          they explain: a host already on the internet has "no UPnP gateway
+          answered" against their name because there is no gateway to answer,
+          and under "Open." that reads as a fault they have not got. */}
+      {problem && report.problem && (
+        <span className="opacity-70">{report.problem}</span>
+      )}
     </div>
   );
 }
