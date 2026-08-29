@@ -417,10 +417,7 @@ pub enum NoBattle {
     /// `battle` is the id of the room the lobby opened anyway, or `None` when it
     /// opened none. That is the difference between having something to close and
     /// having nothing to close, and it is the only reason the id is carried.
-    NotRelayed {
-        reason: String,
-        battle: Option<u32>,
-    },
+    NotRelayed { reason: String, battle: Option<u32> },
 }
 
 impl std::fmt::Display for NoBattle {

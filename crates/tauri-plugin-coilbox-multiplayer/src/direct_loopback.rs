@@ -1470,8 +1470,7 @@ async fn a_refused_relay_address_reaches_both_the_host_and_whoever_is_hosting() 
         || {
             client.events.lock().unwrap().iter().any(|e| {
                 let event: serde_json::Value = serde_json::from_str(e).unwrap_or_default();
-                event["delta"]["kind"] == "relayedHostRefused"
-                    && event["delta"]["reason"] == REASON
+                event["delta"]["kind"] == "relayedHostRefused" && event["delta"]["reason"] == REASON
             })
         },
         "the refusal to reach the frontend as a delta",

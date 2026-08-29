@@ -3809,7 +3809,10 @@ mod tests {
             // Both in one go, which is what the connection task does with a read
             // holding both lines: the refusal is written down and the ack goes
             // into the slot with nothing polled in between.
-            relay_host::note_refused_address(&note, "203.0.113.7 is this lobby server, not a relay");
+            relay_host::note_refused_address(
+                &note,
+                "203.0.113.7 is this lobby server, not a relay",
+            );
             let _ = answers.send(relay_host::OpenAnswer::Opened(9));
         });
         let refused = advertise(
