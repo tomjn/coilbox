@@ -38,6 +38,35 @@
 //! A `DateTime` is a `String`. Json.NET round-trips the kind, so a UTC one ends
 //! in `Z`, a local one carries an offset and an unspecified one carries neither.
 //! A type that insisted on RFC 3339 would refuse the third.
+//!
+//! # What coilbox will not carry
+//!
+//! Every command in this crate is generated, so a message coilbox does nothing
+//! with is still parsed and still shows in the protocol console. Most of those
+//! are a gap waiting to be filled, which is what the `lobby-protocol-gap` label
+//! tracks. Two families are not, and are worth naming here so they are not
+//! mistaken for one.
+//!
+//! **Steam authentication.** `Login` and `Register` both carry a
+//! `SteamAuthToken`, and coilbox never sets it. A ticket is only valid for the
+//! Steam App ID it was minted under and the server checks Zero-K's, so a
+//! third-party client can only do this by introducing itself to Steam as Zero-K.
+//! Steam sign-in is bound up with account identity, ban evasion checks and the
+//! VPN exemption on Zero-K's server, and it belongs to that project rather than
+//! to us. Coilbox signs in with a name and password and says so on the login
+//! form. See coilbox issue #1988.
+//!
+//! **Planet Wars.** The `Pw*` commands, `JoinFactionRequest`, `Welcome`'s
+//! faction list and `User::faction` are Zero-K's persistent metagame: a
+//! campaign map, faction membership, attack charges and the votes that pick a
+//! planet to fight over. It is theirs to run, its state lives on their server
+//! and their website, and a lobby client that half implemented it would be a
+//! worse way to play it than the one they already ship. Coilbox reads these off
+//! the wire and does nothing with them, deliberately and not for now.
+//!
+//! `AutohostMode::Planetwars` is the exception that proves it. That is a battle
+//! mode a room can be in, which the battle list shows like any other, and
+//! showing it is not taking part.
 
 /// The wire line, which is a command name, a space and a JSON object.
 pub mod line;
