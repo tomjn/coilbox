@@ -29,11 +29,16 @@ socket2 = { version = "0.6", features = ["all"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 # Asking a router to open a port. Two protocols because a home router speaks
-# one, the other, both or neither. STUN is hand rolled in `stun.rs`: it is one
-# binding request and one attribute, and every STUN crate carries the ICE and
-# TURN machinery that none of this uses.
+# one, the other, both or neither.
 igd-next = { version = "0.17.1", default-features = false, features = ["aio_tokio"] }
 crab_nat = "0.8.1"
+# The other half of the same question: what the internet sees, in `stun.rs`.
+# This was hand rolled while the argument against a crate held, which was that
+# every STUN crate carries ICE and TURN machinery none of this uses. The relay
+# agent's `turn` dependency brought `stun` into `Cargo.lock` regardless, so the
+# machinery is in the build either way and the choice is now between one STUN
+# implementation and two.
+stun = "0.17"
 # The OS's interface list, with a netmask on every address and the default
 # gateway beside it. The beacon needs the netmask to address a broadcast to the
 # subnet it is leaving by, and port mapping needs the gateway to speak NAT-PMP
