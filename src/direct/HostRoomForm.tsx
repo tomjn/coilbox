@@ -100,7 +100,17 @@ export function HostRoomForm({
   // the ladder from issue #2020 ends at the port mapping. That is not a
   // shortcoming: the point of hosting on a LAN is the people on the LAN, so the
   // sentence below says so rather than reporting it as a failure.
-  const route = hostingRoute(reachability, false);
+  //
+  // It is also why the relay preference from issue #2023 is not in this form,
+  // only in the lobby one. A lobby server not having a relay is a fact about
+  // today that a server upgrade changes. A room not having one is what a room
+  // is. Asking here would put a checkbox in front of somebody that could never
+  // change a single thing about the room they are starting, which is worse than
+  // not asking. Nothing is lost by leaving it out, because the preference only
+  // ever decides whether an available relay is used, and there is never one
+  // here. Passed as true rather than as the stored answer for the same reason
+  // the false above is not a bare constant: it says what this call means.
+  const route = hostingRoute(reachability, false, true);
 
   const trimmedName = name.trim();
   const nameProblem = playerNameProblem(name);
