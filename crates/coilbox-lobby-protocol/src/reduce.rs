@@ -603,6 +603,11 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             vec![Delta::JoinBattleFailed { reason }]
         }
         ServerMessage::JoinBattleRequest { .. } => vec![],
+        // Nothing about the lobby changed, so there is nothing to mirror and
+        // nothing for the frontend to react to. The address has to reach the
+        // relay agent ahead of the join it belongs to, so the plugin acts on the
+        // message itself rather than waiting for a delta out of here.
+        ServerMessage::ClientIp { .. } => vec![],
         ServerMessage::ClientBattleStatus {
             username,
             battle_status,

@@ -12,6 +12,8 @@
 //! Lines may carry an optional `#<digits> ` message-id prefix, which is stripped
 //! here (the id itself is the plugin's concern, not the state's).
 
+use std::net::IpAddr;
+
 use serde::Serialize;
 
 /// The marker teiserver puts in front of its extension announcement, which it
@@ -156,6 +158,30 @@ pub enum ServerMessage {
     JoinBattleFailed { reason: String },
     /// `JOINBATTLEREQUEST <username> <ip>`
     JoinBattleRequest { username: String, ip: String },
+    /// `CLIENTIP <username> <ip>`, the address a joiner reaches the outside
+    /// world at.
+    ///
+    /// Sent to the host of a battle only, once per join, immediately before the
+    /// `JOINEDBATTLE` announcing the same player, and only where the host asked
+    /// for relay support at login and the lobby has a relay. Ordinary joins,
+    /// spectators and mid-game joins are all the same case. So a host that is
+    /// not relaying, and every host that is not coilbox, never sees one.
+    ///
+    /// It exists because a TURN relay drops traffic from an address it holds no
+    /// permission for and tells neither end, so a relay host has to vouch for a
+    /// joiner before that player's engine sends its first packet. The joiner
+    /// cannot supply the address themselves: the packets that would carry it are
+    /// the ones being dropped.
+    ///
+    /// There is no port, because a TURN permission matches on the address alone.
+    /// `CLIENTIPPORT` is a different message, for hole-punched battles, and this
+    /// does not replace it.
+    ///
+    /// The address is parsed rather than carried as text because the only thing
+    /// that is ever done with it is handing it to the relay agent, which takes
+    /// an [`IpAddr`]. A value that is not an address names nobody, so a line
+    /// carrying one is not a `CLIENTIP` at all.
+    ClientIp { username: String, ip: IpAddr },
     /// `CLIENTBATTLESTATUS <username> <battlestatus_int> <teamcolor_int>`
     ClientBattleStatus {
         username: String,
@@ -579,6 +605,21 @@ pub fn parse_line(line: &str) -> ServerMessage {
                 ip: ip.to_string(),
             },
             None => ServerMessage::Unknown { raw: raw() },
+        },
+        "CLIENTIP" => match fields::<2>(rest) {
+            // The last field is greedy, so a username with a space in it pushes
+            // the rest of the line into the address slot and the parse fails
+            // there. That is the shift guard: a `CLIENTIP` whose fields have
+            // moved along is not read as one, the same way a shifted
+            // `TURNCREDENTIALS` is not read as a credential.
+            Some([username, ip]) if !username.is_empty() => match ip.trim().parse() {
+                Ok(ip) => ServerMessage::ClientIp {
+                    username: username.to_string(),
+                    ip,
+                },
+                Err(_) => ServerMessage::Unknown { raw: raw() },
+            },
+            _ => ServerMessage::Unknown { raw: raw() },
         },
         "CLIENTBATTLESTATUS" => match fields::<3>(rest) {
             Some([username, bs, color]) => ServerMessage::ClientBattleStatus {
@@ -1329,6 +1370,79 @@ mod tests {
             parse_line("TURNCREDENTIALSFAILED"),
             ServerMessage::TurnCredentialsFailed { reason: "".into() }
         );
+    }
+
+    /// The line that makes relay hosting work. A battle host is told each
+    /// joiner's public address before the `JOINEDBATTLE` for the same player,
+    /// and the address is the whole point of the line.
+    #[test]
+    fn parses_a_joiners_address() {
+        assert_eq!(
+            parse_line("CLIENTIP alice 203.0.113.7"),
+            ServerMessage::ClientIp {
+                username: "alice".into(),
+                ip: "203.0.113.7".parse().expect("an address"),
+            }
+        );
+        // Nothing in the wire format says IPv4, and a lobby reached over IPv6
+        // observes its clients at IPv6 addresses.
+        assert_eq!(
+            parse_line("CLIENTIP alice 2001:db8::1"),
+            ServerMessage::ClientIp {
+                username: "alice".into(),
+                ip: "2001:db8::1".parse().expect("an address"),
+            }
+        );
+    }
+
+    /// A line this shape names nobody the host could let through, so it must not
+    /// be read as if it did. The address is parsed here rather than carried as
+    /// text because the only thing that happens to it is being handed to the
+    /// relay agent, and text that is not an address cannot be.
+    #[test]
+    fn a_line_that_names_no_address_is_not_a_joiner() {
+        for line in [
+            // Not an address at all.
+            "CLIENTIP alice not-an-address",
+            // A username with a space in it shifts the address out of its slot,
+            // and what lands there is the rest of the line.
+            "CLIENTIP alice smith 203.0.113.7",
+            // One field, so nothing to allow.
+            "CLIENTIP alice",
+            // A field the server left empty.
+            "CLIENTIP  203.0.113.7",
+            // An address with the port a TURN permission would ignore, which is
+            // a server sending a different message from the one agreed.
+            "CLIENTIP alice 203.0.113.7:8452",
+        ] {
+            assert_eq!(
+                parse_line(line),
+                ServerMessage::Unknown { raw: line.into() },
+                "a line this shape must not be read as a joiner's address: {line}"
+            );
+        }
+    }
+
+    /// `CLIENTIPPORT` is a different message, for hole-punched battles, and it
+    /// shares every letter of this one's name. Reading it as a `CLIENTIP` would
+    /// hand the relay an address for a battle that is not relayed at all.
+    ///
+    /// The second line is the one with teeth. A well-formed `CLIENTIPPORT` has a
+    /// port on the end, which lands in the greedy address slot and fails to
+    /// parse, so it would be refused by accident even if the command were
+    /// matched by its first eight letters. One without its port would not be.
+    #[test]
+    fn clientipport_is_not_clientip() {
+        for line in [
+            "CLIENTIPPORT alice 203.0.113.7 8452",
+            "CLIENTIPPORT alice 203.0.113.7",
+        ] {
+            assert_eq!(
+                parse_line(line),
+                ServerMessage::Unknown { raw: line.into() },
+                "a different command must not be read as a joiner's address: {line}"
+            );
+        }
     }
 
     #[test]
