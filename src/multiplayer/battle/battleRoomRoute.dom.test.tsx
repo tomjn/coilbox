@@ -100,6 +100,17 @@ function drawHeader(
   );
 }
 
+/**
+ * Whether the bar drew a route at all.
+ *
+ * Asked of the element rather than of a list of words, because a test that
+ * looks for the four words it knows about would stay green for a fifth. The
+ * route control is the only tooltip in this header.
+ */
+function routeShown(): boolean {
+  return !!document.querySelector('[data-slot="tooltip-trigger"]');
+}
+
 afterEach(() => {
   cleanup();
   recordHostingRoute(null);
@@ -142,22 +153,19 @@ describe("the battle room's route word", () => {
   it("shows a joiner nothing, whatever route this client last hosted", () => {
     drawHeader({ selfHost: false, route: "relay" });
     expect(screen.queryByText("Relayed")).toBe(null);
-    expect(screen.queryByText("Direct")).toBe(null);
-    expect(screen.queryByText("Port opened")).toBe(null);
-    expect(screen.queryByText("Not reachable")).toBe(null);
+    expect(routeShown()).toBe(false);
   });
 
   // The port check is off by default in both hosting forms, so this is the
   // ordinary case and it draws nothing at all.
   it("says nothing about a battle whose route was never checked", () => {
     drawHeader({ route: "unchecked" });
-    expect(screen.queryByText("Direct")).toBe(null);
-    expect(screen.queryByText("Not reachable")).toBe(null);
+    expect(routeShown()).toBe(false);
   });
 
   it("keeps quiet about a LAN room the internet cannot reach", () => {
     drawHeader({ route: "unreachable", directRoom: true });
-    expect(screen.queryByText("Not reachable")).toBe(null);
+    expect(routeShown()).toBe(false);
   });
 
   it("says so when a battle on a server can be reached by nobody", () => {
