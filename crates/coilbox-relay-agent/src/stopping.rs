@@ -78,6 +78,7 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use crate::relay::RelayLink;
+use crate::traffic::Traffic;
 
 /// How long the relay may carry nothing before the agent decides, on its own,
 /// that there is nobody left to carry anything for.
@@ -283,9 +284,17 @@ impl Stopping {
 /// whatever transport is underneath: what matters is that the relay carried
 /// something, not which relay it was. The agent gets through several of those
 /// in a long game.
+///
+/// It also feeds the meter the host is shown ([`crate::traffic`]), which is a
+/// second job for one wrapper and is on purpose. Every datagram already passes
+/// through here, and a meter of its own somewhere else would be a second count
+/// of the same thing that could drift from this one. Then the pill would say a
+/// game was still being played while the backstop below was deciding it was
+/// not.
 pub struct Counted<'a, R> {
     pub relay: &'a R,
     pub stopping: &'a Stopping,
+    pub traffic: &'a Traffic,
 }
 
 impl<R: RelayLink + Sync> RelayLink for Counted<'_, R> {
@@ -293,8 +302,9 @@ impl<R: RelayLink + Sync> RelayLink for Counted<'_, R> {
         let arrived = self.relay.recv_from(buf).await;
         // Only a datagram counts. A read that failed is the relay breaking,
         // which says nothing about whether anybody is still playing.
-        if arrived.is_ok() {
+        if let Ok((read, _)) = arrived {
             self.stopping.carried_something();
+            self.traffic.carried(read);
             // And a datagram that arrived is a player, where one that went out
             // might have been the agent's own permission probe. That is the
             // difference between "a game has run through this relay" and "the
@@ -306,8 +316,9 @@ impl<R: RelayLink + Sync> RelayLink for Counted<'_, R> {
 
     async fn send_to(&self, buf: &[u8], peer: SocketAddr) -> io::Result<usize> {
         let sent = self.relay.send_to(buf, peer).await;
-        if sent.is_ok() {
+        if let Ok(wrote) = sent {
             self.stopping.carried_something();
+            self.traffic.carried(wrote);
         }
         sent
     }
@@ -440,6 +451,7 @@ mod tests {
         let counted = Counted {
             relay: &Busy,
             stopping: &stopping,
+            traffic: &Traffic::new(),
         };
 
         tokio::time::sleep(IDLE_TIMEOUT).await;
@@ -465,6 +477,63 @@ mod tests {
         );
     }
 
+    /// The other thing [`Counted`] is the only route to: the meter the host is
+    /// shown. Every byte in both directions has to land on it, because a rate
+    /// that counted one direction would halve on screen the moment somebody
+    /// wondered whether their game had stopped.
+    ///
+    /// [`Busy`] hands over one byte per read and reports whatever it was given
+    /// per write, so the total is arithmetic rather than a guess.
+    #[tokio::test(start_paused = true)]
+    async fn every_datagram_the_relay_carries_lands_on_the_meter() {
+        let stopping = Stopping::new();
+        let traffic = Traffic::new();
+        let counted = Counted {
+            relay: &Busy,
+            stopping: &stopping,
+            traffic: &traffic,
+        };
+
+        let mut buf = [0u8; 8];
+        counted.recv_from(&mut buf).await.expect("a busy relay");
+        counted
+            .send_to(b"seven!!", a_peer())
+            .await
+            .expect("a busy relay");
+
+        assert_eq!(
+            traffic.take(),
+            8,
+            "one byte in and seven out, and the meter has to have both"
+        );
+    }
+
+    /// A relay that is only failing carries nothing, so it must not move the
+    /// meter either. A rate that counted failures would show a broken relay as
+    /// the busiest thing on the machine.
+    #[tokio::test(start_paused = true)]
+    async fn a_relay_that_is_only_failing_does_not_move_the_meter() {
+        let stopping = Stopping::new();
+        let traffic = Traffic::new();
+        let counted = Counted {
+            relay: &Broken,
+            stopping: &stopping,
+            traffic: &traffic,
+        };
+
+        let mut buf = [0u8; 8];
+        counted
+            .recv_from(&mut buf)
+            .await
+            .expect_err("a broken relay");
+        counted
+            .send_to(b"reply", a_peer())
+            .await
+            .expect_err("a broken relay");
+
+        assert_eq!(traffic.take(), 0);
+    }
+
     /// A relay that is failing is not a game in progress. Counting a failure
     /// would keep a dead battle alive on the strength of an allocation the
     /// server deleted.
@@ -475,6 +544,7 @@ mod tests {
         let counted = Counted {
             relay: &Broken,
             stopping: &stopping,
+            traffic: &Traffic::new(),
         };
 
         tokio::time::sleep(IDLE_TIMEOUT).await;
@@ -555,6 +625,7 @@ mod tests {
         let counted = Counted {
             relay: &Busy,
             stopping: &stopping,
+            traffic: &Traffic::new(),
         };
         // A player has been heard, which is what a game in progress looks like
         // from here.
@@ -585,6 +656,7 @@ mod tests {
         let counted = Counted {
             relay: &Busy,
             stopping: &stopping,
+            traffic: &Traffic::new(),
         };
         let mut buf = [0u8; 8];
         counted.recv_from(&mut buf).await.expect("a busy relay");
@@ -604,6 +676,7 @@ mod tests {
         let counted = Counted {
             relay: &Busy,
             stopping: &stopping,
+            traffic: &Traffic::new(),
         };
         counted
             .send_to(b"a permission probe", a_peer())
