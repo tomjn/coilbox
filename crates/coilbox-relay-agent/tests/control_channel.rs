@@ -47,7 +47,10 @@ const LONG_ENOUGH_TO_HAVE_STOPPED: Duration = Duration::from_secs(2);
 /// The agent, running, with its control channel in hand.
 struct Running {
     child: Child,
-    stdin: ChildStdin,
+    /// Held in an `Option` so a test can drop it. Closing the agent's stdin is
+    /// how coilbox going away is spelled, and it is the moment the agent starts
+    /// judging for itself whether it is still needed.
+    stdin: Option<ChildStdin>,
     said: Receiver<String>,
     /// Where the agent points its loopback sockets. Held rather than dropped so
     /// a test that sends a datagram through the relay can watch it come out the
@@ -97,7 +100,7 @@ impl Running {
 
         Running {
             child,
-            stdin,
+            stdin: Some(stdin),
             said,
             engine,
         }
@@ -126,8 +129,16 @@ impl Running {
     }
 
     fn ask(&mut self, line: &str) {
-        writeln!(self.stdin, "{line}").expect("the agent is still reading its stdin");
-        self.stdin.flush().expect("the agent is still reading");
+        let stdin = self.stdin.as_mut().expect("coilbox has not gone yet");
+        writeln!(stdin, "{line}").expect("the agent is still reading its stdin");
+        stdin.flush().expect("the agent is still reading");
+    }
+
+    /// coilbox closing, which the agent sees as its stdin reaching EOF. Not a
+    /// reason to stop on its own: it is the moment the agent starts deciding
+    /// for itself, and the whole reason the sidecar is a separate process.
+    fn coilbox_closes(&mut self) {
+        self.stdin = None;
     }
 
     /// The next line the agent writes, whatever it is.
@@ -337,10 +348,89 @@ fn the_agent_says_how_much_it_is_carrying() {
     }
 }
 
+/// What naming the engine actually buys, in real seconds against a real
+/// process (issue #2065).
+///
+/// `stopping.rs` proves the rule on a wound-forward clock, which can only say
+/// "sooner than the backstop". This says how much sooner, and it is the only
+/// test anywhere that the running binary acts on a pid rather than merely
+/// answering `done` to being given one.
+///
+/// A shell is the engine here. The agent only ever asks the OS whether the pid
+/// is still there, so anything it can see in the process table stands in for
+/// one, and a test that launched a real engine would be testing the engine.
+///
+/// The child is waited on and not merely killed. A process nobody has reaped is
+/// still in the table, so an unwaited engine reads as one that is still
+/// playing. That is exactly why the pid coilbox sends comes out of the
+/// launcher's registry, where reaping and forgetting happen together.
+#[test]
+fn a_named_engine_that_exits_gives_the_relay_back_in_seconds_not_minutes() {
+    let mut agent = Running::start();
+    assert!(agent.hears().starts_with("{\"type\":\"relayOpen\""));
+
+    let (program, args): (&str, &[&str]) = if cfg!(windows) {
+        ("cmd", &["/C", "ping -n 60 127.0.0.1 >NUL"])
+    } else {
+        ("sh", &["-c", "sleep 60"])
+    };
+    let mut engine = Command::new(program)
+        .args(args)
+        .stdout(Stdio::null())
+        .spawn()
+        .expect("a shell to run");
+    let pid = engine.id();
+    agent.ask(&format!(
+        "{{\"type\":\"watchEngine\",\"id\":7,\"pid\":{pid}}}"
+    ));
+    assert_eq!(agent.hears(), "{\"type\":\"done\",\"id\":7}");
+
+    // coilbox goes, and the game carries on. This is the case the sidecar
+    // exists for and nothing here may end it.
+    agent.coilbox_closes();
+    std::thread::sleep(LONG_ENOUGH_TO_HAVE_STOPPED);
+    assert!(
+        agent
+            .child
+            .try_wait()
+            .expect("a child we spawned")
+            .is_none(),
+        "the agent stopped while the engine it was told to watch was still running, which \
+         drops every other player in that game"
+    );
+
+    let ended = Instant::now();
+    let _ = engine.kill();
+    let _ = engine.wait();
+
+    let last = agent.hears();
+    let took = ended.elapsed();
+    assert!(
+        last.contains("\"type\":\"stopping\"") && last.contains(&pid.to_string()),
+        "the agent has to stop because the engine went, and say so, or this measured the \
+         wrong thing entirely, got: {last}"
+    );
+    assert!(
+        agent.ends().success(),
+        "a game that finished is not a failure"
+    );
+    // The backstop is 240 seconds and the agent looks once a second. Ten leaves
+    // room for a loaded machine without letting a regression to the backstop
+    // through.
+    assert!(
+        took < Duration::from_secs(10),
+        "naming the engine has to be worth having: the relay came back {}ms after it \
+         exited, against a 240 second backstop",
+        took.as_millis()
+    );
+    println!(
+        "the relay came back {}ms after the engine exited",
+        took.as_millis()
+    );
+}
+
 /// Naming the engine is a request like any other and has to be answered like
-/// one. Nothing here can prove the agent then outlives it, because that takes
-/// four minutes of relay traffic. `stopping.rs` tests that on a wound-forward
-/// clock.
+/// one. The timing test above is what proves the agent then acts on it.
 #[test]
 fn naming_the_engine_is_answered() {
     let mut agent = Running::start();

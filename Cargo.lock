@@ -5538,6 +5538,7 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "tauri-plugin-coilbox-direct",
+ "tauri-plugin-coilbox-play",
  "tauri-plugin-opener",
  "tempfile",
  "tokio",

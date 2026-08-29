@@ -46,6 +46,12 @@ coilbox-relay-protocol = { path = "../coilbox-relay-protocol" }
 # closing, and asking the OS whether the one named in a run file is still
 # there.
 coilbox-proc = { path = "../coilbox-proc" }
+# The launcher plugin holds the engine coilbox started, and the relay sidecar
+# has to be told which process that is. Depended on for one function,
+# `engine_pid`, so that the pid is looked up live in Rust rather than handed to
+# the frontend and handed back: see `mp_watch_engine` for why that difference
+# decides whether a game gets cut off.
+tauri-plugin-coilbox-play = { path = "../tauri-plugin-coilbox-play" }
 tauri-plugin-opener = "2"
 # rustls-tls keeps OpenSSL out of the build, the same reason the downloads plugin
 # picks it.

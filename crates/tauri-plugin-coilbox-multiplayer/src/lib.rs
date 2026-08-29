@@ -2009,6 +2009,78 @@ fn mp_relay_traffic(registry: State<'_, Registry>) -> CliResult {
     CliResult::ok(json!({ "bytesPerSecond": relay_traffic(&registry) }))
 }
 
+/// Tell whichever connection is hosting through a relay which process the
+/// engine is. Answers whether there was one to tell.
+///
+/// No server key, for the same reason [`relay_traffic`] takes none: one run
+/// file means one sidecar on this machine, so there is at most one relay to
+/// tell however many lobbies are connected.
+///
+/// The agent is taken out of the registry before the write, so the lock is not
+/// held across it. Nothing here waits for an answer and a write that fails is
+/// not reported, both for the reason on
+/// [`relay_agent::RelayAgent::watch_engine`]: a sidecar that cannot be reached
+/// has already stopped, and one that never hears this stops on its traffic
+/// backstop rather than leaking.
+fn watch_engine(registry: &Registry, pid: u32) -> bool {
+    let agent = lock_or_recover(registry).values().find_map(|conn| {
+        lock_or_recover(&conn.relay)
+            .as_ref()
+            .map(|host| Arc::clone(&host.agent))
+    });
+    match agent {
+        Some(agent) => {
+            let _ = agent.watch_engine(pid);
+            true
+        }
+        None => false,
+    }
+}
+
+/// `mp_watch_engine`: name the engine coilbox has just launched to the relay
+/// sidecar, so it knows the game is over once that process has gone (issue
+/// #2065).
+///
+/// Without this the sidecar has only its traffic backstop to go on, and a host
+/// who finishes a relayed game and leaves the battle holds the relay server's
+/// port and bandwidth for the four minutes of
+/// `coilbox_relay_agent::stopping::IDLE_TIMEOUT`. With it the allocation goes
+/// back about a second after the engine exits.
+///
+/// ## Why this takes a run id and not a pid
+///
+/// Because the sidecar stops relaying when the process it was told to watch
+/// exits. A pid that is not the engine's, or one belonging to something that
+/// ends early, cuts off a game other people are still playing, which is the
+/// failure the whole sidecar exists to prevent. So the pid is never a number
+/// somebody passes in. It is looked up here, at the moment of asking, in the
+/// launcher plugin's registry of running engines
+/// ([`tauri_plugin_coilbox_play::engine_pid`]), which only ever holds a child
+/// nothing has waited on. A run that has finished has no pid to give and this
+/// says so rather than sending the one it used to have.
+///
+/// A pid the OS later gives to something unrelated is the other way round and
+/// is safe: the sidecar reads it as an engine that is still running, so it
+/// falls back to the backstop it would have used anyway. `run_file.rs` in the
+/// agent reasons about a recycled pid the same way.
+///
+/// ## What calls it
+///
+/// Only a host whose battle went through the relay, on the launch of the engine
+/// that is playing it. An ordinary game never reaches here at all, and one that
+/// does with no relay to tell answers `watching: false` rather than failing.
+#[tauri::command]
+fn mp_watch_engine<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    registry: State<'_, Registry>,
+    run_id: String,
+) -> CliResult {
+    match tauri_plugin_coilbox_play::engine_pid(&app, &run_id) {
+        Some(pid) => CliResult::ok(json!({ "watching": watch_engine(&registry, pid) })),
+        None => CliResult::err("no running game with that id"),
+    }
+}
+
 /// `mp_zerok_open_battle`, Zero-K only: ask the server to open a room for us.
 ///
 /// The Zero-K counterpart of [`mp_open_battle`], and a different thing under the
@@ -3232,6 +3304,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_probe_host,
             mp_turn_credentials,
             mp_relay_traffic,
+            mp_watch_engine,
             mp_chat_logs,
             mp_chat_log_open,
             mp_tachyon_sign_in,
@@ -4603,6 +4676,46 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(5));
         }
+    }
+
+    /// The registry scan behind `mp_watch_engine`, asked the way the sidecar
+    /// will hear it: not "was a flag set" but "which line reached the agent's
+    /// stdin".
+    ///
+    /// Both halves matter and they fail in opposite directions. Telling nobody
+    /// costs four minutes of somebody else's bandwidth. Telling a relay about a
+    /// process that is not the engine ends a game that is still being played,
+    /// so the pid on the wire has to be the pid that was asked for and there
+    /// has to be nothing else on there.
+    #[test]
+    fn the_engine_is_named_only_to_a_battle_that_is_being_relayed() {
+        let registry = Registry::default();
+        assert!(
+            !watch_engine(&registry, 4242),
+            "nothing is being relayed, so there is nobody to tell"
+        );
+
+        lock_or_recover(&registry)
+            .insert("alice@bar:8200".to_string(), a_connection_hosting_nothing());
+        assert!(
+            !watch_engine(&registry, 4242),
+            "an ordinary battle has no sidecar of its own, and every game that is not \
+             relayed looks like this"
+        );
+
+        let channel = Channelled::default();
+        remember_relay(
+            &registry,
+            "alice@bar:8200",
+            a_relay_writing_to(channel.clone()),
+        );
+        assert!(watch_engine(&registry, 4242));
+        assert_eq!(
+            channel.sent().lines().collect::<Vec<_>>(),
+            vec!["{\"type\":\"watchEngine\",\"id\":1,\"pid\":4242}"],
+            "the sidecar has to be given the engine's pid and nothing else: it stops \
+             relaying when the process it was told about exits"
+        );
     }
 
     #[test]

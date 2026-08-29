@@ -48,6 +48,16 @@ interface LaunchOpts {
   config: BattleConfig;
   executable: string;
   dataDir: string;
+  /**
+   * Called once the engine process exists, with this run's id. Optional, and
+   * left out by every launch that has nothing to do once a game is under way,
+   * which is all of them but a battle hosted through the relay (#2065).
+   *
+   * The run id rather than the process id, because only Rust holds the child
+   * and the id is what finds it there. Kept out of the arguments sent to the
+   * launch command, which are serialized and would not take a function.
+   */
+  onEngineStarted?: (runId: string) => void;
 }
 
 interface ReplayOpts {
@@ -132,15 +142,20 @@ export function PlayProvider({ children }: { children: ReactNode }) {
         runId: string,
         onEvent: Channel<LaunchEvent>,
       ) => Promise<LaunchOutcome>,
+      onEngineStarted?: (runId: string) => void,
     ) => {
       if (runningRef.current) throw new Error("a game is already running");
       runningRef.current = true;
       const runId = crypto.randomUUID();
       activeRunIdRef.current = runId;
       const onEvent = new Channel<LaunchEvent>();
-      // The authoritative unfreeze is the launch promise resolving. The channel
-      // is required by the command signature but unused here.
-      onEvent.onmessage = () => {};
+      // The authoritative unfreeze is the launch promise resolving, so nothing
+      // here reads the exit. `started` is the only moment on this channel that
+      // says anything the promise cannot: the engine now exists as a process,
+      // which is what a caller needs before it can ask anything about it.
+      onEvent.onmessage = (event) => {
+        if (event.kind === "started") onEngineStarted?.(runId);
+      };
       // Recorded before the engine starts, so crash triage can tell this run's
       // log from the one an earlier session left behind (#379).
       const startedAtMs = Date.now();
@@ -174,17 +189,20 @@ export function PlayProvider({ children }: { children: ReactNode }) {
     (
       runKind: "skirmish" | "battle" | "campaign" | "conquest" | "runlite",
       opts: LaunchOpts,
-    ) =>
-      start(
+    ) => {
+      const { onEngineStarted, ...args } = opts;
+      return start(
         runKind,
         {
-          dataDir: opts.dataDir,
-          game: opts.config.gameType,
-          map: opts.config.mapName,
-          engine: opts.executable,
+          dataDir: args.dataDir,
+          game: args.config.gameType,
+          map: args.config.mapName,
+          engine: args.executable,
         },
-        (runId, onEvent) => playLaunch({ ...opts, runId, onEvent }),
-      ),
+        (runId, onEvent) => playLaunch({ ...args, runId, onEvent }),
+        onEngineStarted,
+      );
+    },
     [start],
   );
 
