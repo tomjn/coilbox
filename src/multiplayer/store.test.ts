@@ -26,6 +26,7 @@ vi.mock("./chat/mentionCue", () => ({
 }));
 
 import {
+  connectBlockedReason,
   initialMirror,
   mirrorReducer,
   RECONNECT_DELAYS_MS,
@@ -272,5 +273,70 @@ describe("mirrorReducer Tachyon battle start", () => {
       ev: { kind: "delta", delta: { kind: "battleOpened", id: 4 } },
     });
     expect(m.battleStartSeq).toBe(0);
+  });
+});
+
+describe("connectBlockedReason", () => {
+  const lobby = "AF_@server4.beyondallreason.info:8201";
+  const room = "AF@127.0.0.1:8200";
+
+  it("lets a connect through when there is nothing to be in the way", () => {
+    expect(connectBlockedReason(null, null, room)).toBeNull();
+  });
+
+  it("refuses a second connection and names where the first one is", () => {
+    const reason = connectBlockedReason(lobby, null, room);
+    expect(reason).toContain("server4.beyondallreason.info:8201");
+    expect(reason).toContain("one lobby connection");
+  });
+
+  it("refuses a connect racing one that is still shaking hands", () => {
+    const reason = connectBlockedReason(null, lobby, room);
+    expect(reason).toContain("server4.beyondallreason.info:8201");
+    expect(reason).toContain("already opening");
+  });
+
+  it("names the connection that exists over the one still opening", () => {
+    // Both can be set at once: a connect that has registered its key has not
+    // yet cleared it when the snapshot lands. The live one is the one somebody
+    // can act on, so it is the one worth naming.
+    expect(connectBlockedReason(lobby, room, "AF@127.0.0.1:8300")).toContain(
+      "server4.beyondallreason.info:8201",
+    );
+  });
+
+  it("leaves a connect to the key it already holds to the Rust side", () => {
+    // Reconnecting under a live key is a duplicate, which the registry refuses
+    // with its own words. This rule is about a *second* connection, so it says
+    // nothing about that one rather than shadowing a better message.
+    expect(connectBlockedReason(lobby, null, lobby)).toBeNull();
+    expect(connectBlockedReason(null, lobby, lobby)).toBeNull();
+  });
+
+  it("never uses a word the room join failure reads as a socket error", () => {
+    // A refused `connectDirect` reaches the join form through
+    // `joinRoomFailure`, which rewrites anything that looks like a dead socket
+    // and passes everything else through. This reason has to be everything
+    // else, or the join drawer would tell somebody their address was wrong.
+    const reasons = [
+      connectBlockedReason(lobby, null, room),
+      connectBlockedReason(null, lobby, room),
+    ];
+    for (const reason of reasons) {
+      const lower = String(reason).toLowerCase();
+      for (const word of [
+        "refused",
+        "timed out",
+        "timeout",
+        "unreachable",
+        "no route",
+        "dns",
+        "resolve",
+        "nodename",
+        "not known",
+      ]) {
+        expect(lower).not.toContain(word);
+      }
+    }
   });
 });

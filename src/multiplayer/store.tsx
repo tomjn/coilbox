@@ -122,6 +122,41 @@ export function serverAddressFromKey(serverKey: string): string {
 }
 
 /**
+ * Why a connect must not go ahead, or null when it may. Pure.
+ *
+ * Coilbox holds one lobby connection. `hostBlockedReason` and `joinBlockedReason`
+ * already say so on the three forms that need it, but a form is handed to a
+ * drawer as an element and the drawer keeps the element it was opened with, so a
+ * connection arriving behind an open form walks past all three (issue #2149).
+ * This is the same rule read where it can actually be enforced: at the moment
+ * the connection is opened.
+ *
+ * A connect still in its handshake counts as much as a live one. It is the case
+ * a form cannot see at all, because an auto-reconnect halfway through has no
+ * active key yet, and it is read from a ref written before the first `await`, so
+ * two connects racing each other cannot both find the way clear.
+ *
+ * The address is named rather than "the lobby server" or "the room". Both are
+ * `username@host:port` and nothing here can tell which is which, which is the
+ * mistake behind issue #1618, so this says where instead of what.
+ */
+export function connectBlockedReason(
+  activeKey: string | null,
+  /** The key of a connect still in its handshake, or null. */
+  connectingKey: string | null,
+  /** The key the caller is about to open. */
+  serverKey: string,
+): string | null {
+  if (activeKey != null && activeKey !== serverKey) {
+    return `Coilbox holds one lobby connection, and ${serverAddressFromKey(activeKey)} has it. Disconnect from that first.`;
+  }
+  if (connectingKey != null && connectingKey !== serverKey) {
+    return `Coilbox holds one lobby connection, and one to ${serverAddressFromKey(connectingKey)} is already opening. Wait for that one to finish.`;
+  }
+  return null;
+}
+
+/**
  * The just-arrived chat message referenced by a `chatMessage` / `privateMessage`
  * delta, resolved against the fresh snapshot (deltas carry only a location, not the
  * text). Returns null for any other delta or when it can't be resolved. Used to
@@ -486,6 +521,16 @@ const MultiplayerContext = createContext<MultiplayerContextValue | null>(null);
 export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const [mirror, dispatch] = useReducer(mirrorReducer, initialMirror);
   const [activeKey, setActiveKey] = useState<string | null>(null);
+  // The same key as a value rather than as state, because the two readers that
+  // decide with it both run before React has re-rendered: `doConnect` checks it
+  // before its first `await`, and the frozen event handler reads it from inside
+  // a Channel callback. Written here beside the state rather than synced from it
+  // in an effect, so it is never a render behind.
+  const activeKeyRef = useRef<string | null>(null);
+  const applyActiveKey = useCallback((key: string | null) => {
+    activeKeyRef.current = key;
+    setActiveKey(key);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [pendingAgreement, setPendingAgreement] = useState<{
     serverKey: string;
@@ -1253,25 +1298,41 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           flushTimer = null;
           pendingDeltas = [];
         }
-        setActiveKey(null);
         setPendingAgreement((p) => (p?.serverKey === serverKey ? null : p));
+        // Whose drop this was decides the rest, the way the line above already
+        // decides it. Clearing the key for any drop meant a connection somebody
+        // had stopped using could log them out of the one they were on, and
+        // start a reconnect loop for it as well (issue #2149).
+        if (activeKeyRef.current !== serverKey) return;
+        applyActiveKey(null);
         handleUnexpectedDropRef.current();
       }
     };
     return onEvent;
-  }, []);
+  }, [applyActiveKey]);
 
   // The core connect, shared by the public `connect` and the auto-reconnect loop.
   // Records the reconnect context and resets the per-session drop flags so a later
   // unexpected disconnect can rebuild the session.
   const doConnect = useCallback(
     async (server: LobbyServer, username: string, direct = false) => {
+      const serverKey = serverKeyFor(server, username);
+      // The one place every connection is opened, and so the one place the one-
+      // connection rule can hold. Read and thrown before anything is recorded,
+      // so a refused connect leaves no reconnect context and no busy flag behind
+      // (issue #2149). Every caller shows the message: the login panel, the host
+      // form and the join form all put a thrown reason on screen.
+      const blocked = connectBlockedReason(
+        activeKeyRef.current,
+        connectingKeyRef.current,
+        serverKey,
+      );
+      if (blocked) throw new Error(blocked);
       setBusy(true);
       intentionalRef.current = false;
       loggedInRef.current = false;
       deniedRef.current = false;
       reconnectCtxRef.current = { server, username, direct };
-      const serverKey = serverKeyFor(server, username);
       connectingKeyRef.current = serverKey;
       try {
         const onEvent = openChannel(serverKey);
@@ -1346,7 +1407,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         }
         const snap = await mpSnapshot({ serverKey });
         dispatch({ type: "snapshot", state: snap.state });
-        setActiveKey(serverKey);
+        applyActiveKey(serverKey);
         setRoomKeyRef.current(direct ? serverKey : "");
         setLoginPopoverOpen(false);
         // Remember this login as the last used, so opt-in auto-connect and the
@@ -1372,7 +1433,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         setBusy(false);
       }
     },
-    [openChannel],
+    [applyActiveKey, openChannel],
   );
 
   // The browser sign-in that gives a Tachyon connect something to refresh. Kept
@@ -1421,7 +1482,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         // so a second attempt would be refused as a duplicate. Drop it.
         await mpDisconnect({ serverKey }).catch(() => {});
         dispatch({ type: "reset" });
-        setActiveKey(null);
+        applyActiveKey(null);
         throw e;
       }
       return serverKey;
@@ -1683,10 +1744,10 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       await mpDisconnect({ serverKey: activeKey });
     } finally {
       dispatch({ type: "reset" });
-      setActiveKey(null);
+      applyActiveKey(null);
       setBusy(false);
     }
-  }, [activeKey, stopReconnect]);
+  }, [activeKey, applyActiveKey, stopReconnect]);
 
   const clearJoinError = useCallback(() => {
     dispatch({ type: "clearJoinError" });
@@ -1710,7 +1771,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           await mpReattach({ serverKey, onEvent });
           const snap = await mpSnapshot({ serverKey });
           dispatch({ type: "snapshot", state: snap.state });
-          setActiveKey(serverKey);
+          applyActiveKey(serverKey);
           return;
         }
       } catch {
@@ -1736,7 +1797,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         });
       });
     })();
-  }, [openChannel, connect]);
+  }, [applyActiveKey, openChannel, connect]);
 
   return (
     <MultiplayerContext.Provider
