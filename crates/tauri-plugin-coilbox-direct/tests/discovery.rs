@@ -392,6 +392,30 @@ async fn a_room_announced_both_ways_is_heard_both_ways_and_listed_once() {
 /// of loopback addresses is not defined, so a room list read at that moment is a
 /// coin toss, and it failed three times in eight runs. The record on the wire is
 /// what this fix is about, and it is unambiguous.
+///
+/// # Why the quiet half is not read off the browse
+///
+/// It was, and it was flaky on CI while passing every time here. A browsing
+/// daemon re-resolves a service for reasons of its own, so silence on a browse
+/// is not evidence that nothing was sent, and noise on one is not evidence that
+/// something was.
+///
+/// The specific one that bit: `mdns-sd` implements RFC 6762 section 10.2, so an
+/// address record replaced by a cache-flush answer is set to expire one second
+/// later rather than at once, and when it does expire the daemon re-resolves the
+/// instance and emits a fresh `ServiceResolved` carrying the surviving address.
+/// That path is only taken for a record already more than a second old
+/// (`apply_cache_flush` in `dns_cache.rs`), so on this Mac, where the first
+/// resolve and the address change are milliseconds apart, it never fires. On a
+/// slower runner it does. Sleeping 1.2 seconds between the two here reproduces
+/// it six times out of six, and 700 milliseconds passes six times out of six.
+///
+/// So the quiet half is asked of the responder instead. [`Advert::publications`]
+/// is the daemon's own count of records this code has asked it to publish, and
+/// `get_metrics` is a round trip to that daemon's thread, which executes its
+/// commands in order. A publication asked for before the call has been counted
+/// by the time it returns, so there is no window to get wrong and nothing to
+/// sleep for.
 #[test]
 fn a_host_whose_address_moves_is_advertised_at_the_new_one() {
     let browser = ServiceDaemon::new().expect("the mdns daemon starts");
@@ -400,6 +424,11 @@ fn a_host_whose_address_moves_is_advertised_at_the_new_one() {
     let id = named("moved");
     let room = beacon(&id);
     let mut advert = Advert::start(&room, &[Ipv4Addr::LOCALHOST]).expect("the mdns daemon starts");
+    assert_eq!(
+        advert.publications(),
+        Some(1),
+        "the room was published once"
+    );
 
     let started = resolved_with(&events, &id, Ipv4Addr::LOCALHOST, Duration::from_secs(30));
     assert!(started, "the advert was never resolved over mDNS");
@@ -408,6 +437,7 @@ fn a_host_whose_address_moves_is_advertised_at_the_new_one() {
     // about it is unchanged, which is exactly the case that used to be dropped.
     let moved = Ipv4Addr::new(127, 0, 0, 2);
     advert.update(&room, &[moved]);
+    assert_eq!(advert.publications(), Some(2), "and published again");
 
     let followed = resolved_with(&events, &id, moved, Duration::from_secs(30));
     assert!(
@@ -415,20 +445,18 @@ fn a_host_whose_address_moves_is_advertised_at_the_new_one() {
         "the advert kept naming the address the room started on"
     );
 
-    // And then it goes quiet again, which is the half of this the check has
-    // always been for. Five more ticks of the announce loop with nothing to say,
-    // and nothing goes on the wire. Measured before this test was written. An
-    // advert updated once a second for 20 seconds with an unchanged record
-    // produced no resolves at all, and one whose address moved each time
-    // produced 38.
-    while events.try_recv().is_ok() {}
+    // And then it goes quiet, which is the half of this the check has always
+    // been for. Five more ticks of the announce loop with nothing new to say.
+    // They are back to back rather than two seconds apart because `update` reads
+    // no clock: what decides it is the record it is handed, and five identical
+    // records are five identical decisions however they are spaced.
     for _ in 0..5 {
         advert.update(&room, &[moved]);
-        std::thread::sleep(BEACON_INTERVAL);
     }
-    assert!(
-        !resolved_with(&events, &id, moved, Duration::from_millis(500)),
-        "an advert with nothing new to say re-announced itself anyway"
+    assert_eq!(
+        advert.publications(),
+        Some(2),
+        "an advert with nothing new to say published itself again anyway"
     );
 
     drop(advert);
