@@ -1895,27 +1895,28 @@ async fn advertise(
         // room that existed for a fraction of a second and that no engine has
         // been launched into, because nothing launches until `mp_open_battle`
         // has returned (issue #2064).
-        (Ok(battle), Some(reason)) => {
+        (Ok(_), Some(reason)) => {
             let _ = host.agent.stop();
             let _ = enqueue(registry, server_key, command::leave_battle());
-            CliResult::err(
-                relay_host::NoBattle::NotRelayed {
-                    reason,
-                    battle: Some(battle),
-                }
-                .to_string(),
-            )
+            CliResult::err(relay_host::NoBattle::NotRelayed(reason).to_string())
         }
-        // No battle and a refused address. Nothing to close, and the address is
-        // the more useful of the two things to say: a lobby that would not take
-        // it is a problem the host can act on, where "the lobby said nothing" is
-        // not. The `OPENBATTLE` refusal is still on the console.
-        (Err(_), Some(reason)) => {
+        // No battle and a refused address. Nothing to close, and both reasons
+        // are said rather than one of them chosen.
+        //
+        // This arm used to report the address and drop the other, from when the
+        // other was only ever "the lobby said nothing". It is not: uberserver
+        // turns a battle down from six places in `in_OPENBATTLE`, none of which
+        // has anything to do with the address line ahead of it. A host whose
+        // coturn sits on a LAN and whose game hash came out zero has two
+        // separate faults and was told about both, so choosing between them
+        // throws away the one that may be the reason there is no battle (issue
+        // #2145).
+        (Err(why), Some(reason)) => {
             let _ = host.agent.stop();
             CliResult::err(
-                relay_host::NoBattle::NotRelayed {
+                relay_host::NoBattle::NotRelayedNorOpened {
                     reason,
-                    battle: None,
+                    why: Box::new(why),
                 }
                 .to_string(),
             )
@@ -4643,14 +4644,17 @@ mod tests {
 
         assert!(channel.was_stopped(), "got: {:?}", channel.sent());
         assert!(!refused.success);
+        let told = refused.error.as_deref().unwrap_or_default();
         assert!(
-            refused
-                .error
-                .as_deref()
-                .unwrap_or_default()
-                .contains("This server has no relay configured"),
-            "got: {:?}",
-            refused.error
+            told.contains("This server has no relay configured"),
+            "the address answer has to reach the host, got: {told}"
+        );
+        // Issue #2145. Two lines were turned down for two unrelated reasons and
+        // the host was told one of them, so the one that stopped their battle
+        // could be the one they never saw.
+        assert!(
+            told.contains("you already have a battle open"),
+            "the battle answer has to reach the host too, got: {told}"
         );
         let lines = queued(&mut sent);
         assert!(
@@ -5093,6 +5097,58 @@ mod tests {
                 .map(|conn| lock_or_recover(&conn.relay).is_none())
                 .unwrap_or_default(),
             "nothing may be held against the connection as a relayed battle"
+        );
+    }
+
+    /// Issue #2145, over a real socket and through the real connection task.
+    ///
+    /// Two lines turned down for two unrelated reasons, both of which the
+    /// uberserver in `~/dev/uberserver` at `6a3868f` can give an account it has
+    /// already handed a relay credential to. `_validRelayedHostAddress` refuses
+    /// an allocation whose address is not public, which is a coturn on a LAN or
+    /// one whose reflexive address came back private. `in_OPENBATTLE` behind it
+    /// refuses a game hash of zero, one of six places it turns a battle down
+    /// from and none of them about the address line ahead of it.
+    ///
+    /// So neither answer explains the other, and a host told only the address
+    /// goes looking for a relay problem behind a battle a bad hash stopped.
+    /// Both reasons are lines this server read and understood, so neither needs
+    /// a malformed one.
+    #[tokio::test]
+    async fn a_lobby_that_turns_down_both_lines_gives_the_host_both_reasons() {
+        let addr = lobby_scripted(
+            |_| "OPENBATTLEFAILED Invalid game hash 0".to_string(),
+            |_| {
+                Some(
+                    "RELAYEDHOSTFAILED 192.168.1.5 is not a public address, so nobody could join \
+                     a battle there"
+                        .to_string(),
+                )
+            },
+        )
+        .await;
+        let registry = Registry::default();
+        let (key, _logs) = logged_in(&registry, addr).await;
+
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+        let refused = advertise(&registry, &key, lines, Some(relay), HOSTING_PATIENCE).await;
+
+        assert!(!refused.success, "no battle was opened");
+        let told = refused.error.as_deref().unwrap_or_default();
+        assert!(
+            told.contains("Invalid game hash 0"),
+            "the reason no battle opened has to reach the host, got: {told}"
+        );
+        assert!(
+            told.contains("192.168.1.5 is not a public address"),
+            "the reason the address was refused has to reach the host, got: {told}"
+        );
+        assert!(
+            channel.was_stopped(),
+            "a battle that never opened leaves an allocation held for nothing, got: {:?}",
+            channel.sent()
         );
     }
 
