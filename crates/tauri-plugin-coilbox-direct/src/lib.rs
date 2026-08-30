@@ -97,6 +97,7 @@ async fn direct_start_room(
     active: State<'_, ActiveRoom>,
     host: String,
     ip: Option<String>,
+    public_address: Option<String>,
     port: Option<u16>,
     approve_joins: Option<bool>,
     advertise: Option<bool>,
@@ -117,6 +118,12 @@ async fn direct_start_room(
         // is usually a port forwarded to a public one, which nothing here can
         // work out and nothing here should overwrite.
         ip,
+        // What the reachability panel measured, not another thing to obey. The
+        // caller only sends it when STUN's answer was one of this machine's own
+        // addresses, and the room drops it again the moment the machine stops
+        // holding it. A string that does not parse is no measurement, so it is
+        // dropped rather than argued with.
+        public_address: public_address.and_then(|a| a.parse().ok()),
         port: port.unwrap_or(DEFAULT_LOBBY_PORT),
         approve_joins: approve_joins.unwrap_or(false),
         // On by default: the point of hosting on a LAN is that the people on it
