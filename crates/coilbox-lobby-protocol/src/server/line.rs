@@ -152,6 +152,22 @@ pub fn update_battle_info(
     )
 }
 
+/// `BATTLEHOSTMOVED <id> <ip> <port>`, an open battle that is now reachable
+/// somewhere else.
+///
+/// The two fields a joiner dials and nothing else, so the battle's room, its
+/// players, its chat and its map all stay where they are. A second
+/// [`battle_opened`] would carry the new address too and would cost all of
+/// that: `crate::reduce` builds a fresh `Battle` from one and seeds it with the
+/// founder alone, so the roster of everybody already in the battle is thrown
+/// away to correct one field.
+///
+/// Written for a lobby's relay (`crate::message::ServerMessage::BattleHostMoved`)
+/// and just as true of a host whose own address moved under it.
+pub fn battle_host_moved(id: u32, ip: &str, port: u16) -> String {
+    format!("BATTLEHOSTMOVED {id} {ip} {port}")
+}
+
 /// `BATTLECLOSED <id>`.
 pub fn battle_closed(id: u32) -> String {
     format!("BATTLECLOSED {id}")
