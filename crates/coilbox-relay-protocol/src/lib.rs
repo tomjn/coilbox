@@ -19,11 +19,12 @@
 //! buys nothing here: the traffic is a handful of short messages per battle,
 //! not a hot path.
 //!
-//! ## Two files are part of the contract as well
+//! ## Three files are part of the contract as well
 //!
 //! [`RunFile`] is how a running agent is found once coilbox has been closed and
 //! reopened, and [`StopNote`] is the only thing that coilbox can say to one it
-//! finds, because a child's pipes cannot be taken over by a new parent. Both
+//! finds, because a child's pipes cannot be taken over by a new parent.
+//! [`Carrying`] is what such an agent says back without being asked. All three
 //! are here rather than on one side for the same reason the messages are.
 //!
 //! ## Why the shapes live in a crate of their own
@@ -33,12 +34,13 @@
 //! runtime, in a released sidecar, during somebody's game. That is the whole
 //! reason this is not two copies of a struct.
 //!
-//! [`run_file_is_still_held`] is here for the same reason. It is the one thing
-//! in this crate that touches a file, and it is here because what it reads is
-//! the contract: the sidecar promises to hold a shared lock on its run file for
-//! as long as it runs, and coilbox reads that promise by trying to take an
-//! exclusive one. Split across the two crates, one end could stop making the
-//! promise while the other went on believing it.
+//! [`run_file_is_still_held`] and [`carrying_now`] are here for the same
+//! reason. They are the only things in this crate that touch a file, and what
+//! they read is the contract: the sidecar promises to hold a shared lock on its
+//! run file for as long as it runs and to rewrite [`Carrying`] every
+//! [`TRAFFIC_EVERY`], and these two are coilbox reading those promises. Split
+//! across the two crates, one end could stop making a promise while the other
+//! went on believing it.
 //!
 //! Otherwise it is deliberately IO-free and deliberately has no tokio. The
 //! coilbox side can depend on it without pulling in the sidecar's TURN stack,
@@ -376,6 +378,128 @@ pub struct StopNote {
     pub pid: u32,
 }
 
+/// What a running sidecar writes down about what it is carrying, so that a
+/// coilbox which has no pipe to it can still say something true about it.
+///
+/// ## Why this is a file rather than a message
+///
+/// [`Event::Traffic`] already carries the same figure, and it goes down a pipe
+/// that belongs to the coilbox which spawned the sidecar. Close that coilbox
+/// and open another and the pipe is a dead process's, so the next coilbox finds
+/// the sidecar through [`RunFile`], knows a relay is running, and has nothing to
+/// say about it beyond that (issue #2074).
+///
+/// So the sidecar writes the figure down as well as saying it. A file is the
+/// one channel that outlives the process that was listening, and this crate
+/// already has two of them going the other way.
+///
+/// ## Why it is not in the run file
+///
+/// The run file has to mean "a relay is running" and must never read as
+/// anything else, because a coilbox that reads it as absent starts a second
+/// sidecar over a game people are playing. Rewriting it once a second would put
+/// a torn read in the way of that, and a torn run file reads as no relay at all.
+///
+/// This record fails the other way round. Everything that can go wrong with it,
+/// a missing file, a half written one, one from a sidecar that has since gone,
+/// means coilbox does not know what the relay is carrying, and not knowing is
+/// drawn as nothing rather than as a figure.
+///
+/// ## What it deliberately does not carry
+///
+/// Whether the engine is still running, which the sidecar does know: coilbox
+/// names the engine's process (issue #2065) and the sidecar watches it. It is
+/// left out because it is a weaker fact than the rate and answers the same
+/// question worse. A process id reads as alive again once the OS hands the
+/// number on, where a rate is measured from datagrams that really moved.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Carrying {
+    /// The sidecar that wrote it, which is the `pid` in the run file beside it.
+    ///
+    /// Here so that a record left behind by a sidecar that was killed cannot be
+    /// read as the current one's. The same reason [`StopNote`] names a process,
+    /// and the same failure if it did not: a figure from a relay that has gone,
+    /// shown as one from the relay that is there.
+    pub pid: u32,
+    /// How much the relay carried in the last [`TRAFFIC_EVERY`], both
+    /// directions together. The same figure [`Event::Traffic`] carries and from
+    /// the same count, so a host watching the pipe and a host reading the file
+    /// cannot be shown different numbers.
+    pub bytes_per_second: u64,
+}
+
+impl Carrying {
+    /// The record's contents. Serialising cannot fail for the same reason
+    /// [`to_line`] cannot.
+    pub fn to_json(&self) -> String {
+        match serde_json::to_string(self) {
+            Ok(json) => json,
+            Err(e) => unreachable!("a carrying record that will not serialise: {e}"),
+        }
+    }
+
+    /// Read one, or say why it is not one.
+    pub fn from_json(text: &str) -> Result<Carrying, String> {
+        serde_json::from_str(text).map_err(|e| format!("not a relay agent carrying record: {e}"))
+    }
+}
+
+/// Where the sidecar writes down what it is carrying.
+///
+/// Beside the run file, like the stop note, because that is the one path both
+/// ends already have.
+pub fn carrying_path(run_file: &Path) -> PathBuf {
+    run_file.with_file_name("carrying.json")
+}
+
+/// How old a [`Carrying`] record may be before it is no news rather than news.
+///
+/// Three of the sidecar's own reporting intervals, which is the same rule
+/// `STALE_AFTER` in `tauri-plugin-coilbox-multiplayer`'s `relay_agent` applies
+/// to the figure that comes down the pipe, and it is derived from
+/// [`TRAFFIC_EVERY`] rather than picked. The sidecar rewrites this every
+/// interval whether or not anything moved, so one interval missed is a
+/// scheduler having a bad moment on a machine that is running a game, and three
+/// in a row is something wrong with the sidecar.
+///
+/// It has to exist even though the run file already proves the sidecar is
+/// alive, because those are different questions. The lock says the process is
+/// there. This says the process is still measuring. A sidecar whose reporting
+/// has stopped while the process lives would otherwise leave the last healthy
+/// rate on screen for the rest of the game, which is the opposite of what the
+/// figure is for.
+pub const CARRYING_STALE_AFTER: Duration = TRAFFIC_EVERY.saturating_mul(3);
+
+/// What the sidecar running as `pid` is carrying right now, as far as anybody
+/// out here can tell.
+///
+/// `None` is every way of not knowing, and they all mean the same thing to the
+/// caller: no record, one that will not read, one from a different sidecar, one
+/// older than [`CARRYING_STALE_AFTER`], and a clock that has moved backwards
+/// under it. Draw nothing for all of them. Zero is a different answer and a real
+/// one, and means the relay is there and carrying nothing.
+///
+/// `pid` comes from [`RunFile`] rather than being taken on trust from the
+/// record, so a record a dead sidecar left behind cannot be read as the live
+/// one's.
+///
+/// The age is the file's own modification time rather than a timestamp inside
+/// it. The writer would have to read a clock to put one there and the reader
+/// would have to trust it, where this is the one the filesystem stamped on the
+/// write itself.
+pub fn carrying_now(run_file: &Path, pid: u32) -> Option<u64> {
+    let path = carrying_path(run_file);
+    let written = std::fs::metadata(&path).ok()?.modified().ok()?;
+    // `duration_since` fails when the file is stamped in the future, which is a
+    // clock that has moved. That is not knowing, so it lands with the rest.
+    if std::time::SystemTime::now().duration_since(written).ok()? >= CARRYING_STALE_AFTER {
+        return None;
+    }
+    let record = Carrying::from_json(&std::fs::read_to_string(&path).ok()?).ok()?;
+    (record.pid == pid).then_some(record.bytes_per_second)
+}
+
 impl StopNote {
     /// The note's contents. Serialising cannot fail for the same reason
     /// [`to_line`] cannot.
@@ -678,6 +802,128 @@ mod tests {
             stop_note_path(Path::new("/data/relay/agent.json")),
             Path::new("/data/relay/stop.json")
         );
+    }
+
+    /// The carrying record, spelled out for the same reason the run file is.
+    /// The sidecar and coilbox ship separately, and a field that means one thing
+    /// on one side and nothing on the other is a host shown no figure at all.
+    #[test]
+    fn the_carrying_record_is_what_both_ends_agreed_on() {
+        assert_eq!(
+            Carrying {
+                pid: 4021,
+                bytes_per_second: 41_984,
+            }
+            .to_json(),
+            "{\"pid\":4021,\"bytesPerSecond\":41984}"
+        );
+        assert_eq!(
+            Carrying::from_json("{\"pid\":4021,\"bytesPerSecond\":41984}").expect("its own output"),
+            Carrying {
+                pid: 4021,
+                bytes_per_second: 41_984,
+            }
+        );
+        assert!(
+            Carrying::from_json("{\"pid\":4021").is_err(),
+            "a half written record is unreadable rather than misread"
+        );
+    }
+
+    /// It sits beside the run file, so a coilbox that found one has the path to
+    /// the other already.
+    #[test]
+    fn the_carrying_record_sits_beside_the_run_file() {
+        assert_eq!(
+            carrying_path(Path::new("/data/relay/agent.json")),
+            Path::new("/data/relay/carrying.json")
+        );
+    }
+
+    /// Write a carrying record where a sidecar running as `pid` would have.
+    fn a_relay_says_it_is_carrying(run_file: &Path, pid: u32, bytes_per_second: u64) {
+        std::fs::write(
+            carrying_path(run_file),
+            Carrying {
+                pid,
+                bytes_per_second,
+            }
+            .to_json(),
+        )
+        .expect("a writable temp dir");
+    }
+
+    /// The whole point: a coilbox with no pipe to the sidecar reads the figure
+    /// the sidecar wrote down, rather than having nothing to say.
+    #[test]
+    fn a_fresh_record_from_this_sidecar_is_what_it_is_carrying() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("agent.json");
+        a_relay_says_it_is_carrying(&run_file, 4021, 41_984);
+
+        assert_eq!(carrying_now(&run_file, 4021), Some(41_984));
+    }
+
+    /// Zero is a real answer and not a missing one. A relay that is up and
+    /// quiet is exactly what somebody reopening coilbox mid-game wants to be
+    /// told apart from a relay that has died.
+    #[test]
+    fn a_relay_carrying_nothing_is_not_the_same_as_no_record() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("agent.json");
+        a_relay_says_it_is_carrying(&run_file, 4021, 0);
+
+        assert_eq!(carrying_now(&run_file, 4021), Some(0));
+    }
+
+    /// A record a sidecar that has since gone left behind. The pid in the run
+    /// file is the only one worth believing, so a figure from a relay that is
+    /// not there is no figure at all.
+    #[test]
+    fn a_record_from_a_different_sidecar_says_nothing_about_this_one() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("agent.json");
+        a_relay_says_it_is_carrying(&run_file, 4021, 41_984);
+
+        assert_eq!(carrying_now(&run_file, 4022), None);
+    }
+
+    /// A sidecar that is alive and has stopped measuring. The run file lock
+    /// still says the process is there, so without the age check the last
+    /// healthy rate would sit on screen for the rest of the game.
+    #[test]
+    fn a_record_older_than_the_sidecar_would_ever_leave_it_is_no_news() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("agent.json");
+        a_relay_says_it_is_carrying(&run_file, 4021, 41_984);
+        let long_ago = std::time::SystemTime::now() - CARRYING_STALE_AFTER - Duration::from_secs(1);
+        std::fs::File::open(carrying_path(&run_file))
+            .expect("the record is there")
+            .set_modified(long_ago)
+            .expect("a temp dir that takes a modification time");
+
+        assert_eq!(carrying_now(&run_file, 4021), None);
+    }
+
+    /// No record at all, which is a sidecar from a build before this existed
+    /// and is the ordinary answer for most of coilbox's life. Nothing to say
+    /// rather than something to guess.
+    #[test]
+    fn no_record_is_nothing_to_say_rather_than_a_figure() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        assert_eq!(carrying_now(&dir.path().join("agent.json"), 4021), None);
+    }
+
+    /// Half a record, which is what a reader can catch mid-write if the writer
+    /// ever stops replacing the file whole. Not a figure, and not a crash.
+    #[test]
+    fn a_record_that_will_not_read_is_nothing_to_say() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("agent.json");
+        std::fs::write(carrying_path(&run_file), "{\"pid\":4021,\"bytesPer")
+            .expect("a writable temp dir");
+
+        assert_eq!(carrying_now(&run_file, 4021), None);
     }
 
     #[test]
