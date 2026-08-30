@@ -154,6 +154,42 @@ pub enum Request {
     /// relay is left to the engine and the traffic backstop.
     #[serde(rename_all = "camelCase")]
     BattleOver { id: RequestId },
+    /// A fresh relay credential, to sign the next allocation with.
+    ///
+    /// The lobby mints these with a lifetime on them and a game can outlive
+    /// one. That costs nothing while the allocation stays up, because the TURN
+    /// server worked the key out when it created the session and checks every
+    /// later request against the key it kept. What it costs is the next
+    /// allocation: a rebuild opens a new session, the credential is judged
+    /// again, and a dead one answers 401 and ends the game (issue #2092).
+    ///
+    /// So coilbox asks the lobby for another one before the old one runs out
+    /// and sends it down here. The sidecar keeps it for the next rebuild and
+    /// does not touch the allocation it already has, which does not need it.
+    ///
+    /// ## Why the password goes down the pipe
+    ///
+    /// The one at startup deliberately does not: it arrives in
+    /// `COILBOX_TURN_PASSWORD` rather than as an argument, because `ps` shows
+    /// one process's arguments to every other process on the machine. This pipe
+    /// is between the two processes and nothing else, so it is the stricter of
+    /// the two channels rather than a relaxation of the rule. Nothing echoes a
+    /// request back: an unreadable one is answered with the parser's complaint,
+    /// which names the field that was wrong and never its contents.
+    ///
+    /// The relay is carried as well as the credential because the lobby names
+    /// one every time it mints, and a lobby that has moved its relay would
+    /// otherwise hand out a credential for a server the sidecar is not talking
+    /// to. A rebuilt allocation is at a new address whatever happens, and
+    /// `relay_host::readvertise` in coilbox is what tells the lobby about that.
+    #[serde(rename_all = "camelCase")]
+    RenewCredential {
+        id: RequestId,
+        /// `host:port` of the TURN server, as `--turn-server` takes it.
+        server: String,
+        user: String,
+        password: String,
+    },
 }
 
 impl Request {
@@ -164,6 +200,7 @@ impl Request {
             Request::WatchEngine { id, .. } => *id,
             Request::Stop { id } => *id,
             Request::BattleOver { id } => *id,
+            Request::RenewCredential { id, .. } => *id,
         }
     }
 }
@@ -625,6 +662,16 @@ mod tests {
             "{\"type\":\"battleOver\",\"id\":10}\n"
         );
         assert_eq!(
+            to_line(&Request::RenewCredential {
+                id: 11,
+                server: "relay.example.org:3478".to_string(),
+                user: "1786086400:alice".to_string(),
+                password: "bWFj=".to_string(),
+            }),
+            "{\"type\":\"renewCredential\",\"id\":11,\"server\":\"relay.example.org:3478\",\
+             \"user\":\"1786086400:alice\",\"password\":\"bWFj=\"}\n"
+        );
+        assert_eq!(
             to_line(&Event::RelayOpen {
                 addr: SocketAddr::from(([198, 51, 100, 7], 41641)),
             }),
@@ -675,6 +722,27 @@ mod tests {
         let unreadable = read_request("{\"type\":\"rebindPeer\",\"id\":31,\"ip\":\"203.0.113.9\"}")
             .expect_err("a type from the future is not a request this build knows");
         assert_eq!(unreadable.id, Some(31));
+    }
+
+    /// A renewal a sidecar cannot read must not quote it back.
+    ///
+    /// The answer goes to coilbox, which already has the credential, but it is
+    /// written to the sidecar's log on the way and that log is what somebody
+    /// attaches to a bug report. So the reason has to name the shape and not the
+    /// contents. This is the whole of why the password is safe on this channel.
+    #[test]
+    fn a_renewal_that_cannot_be_read_is_refused_without_repeating_the_password() {
+        let unreadable = read_request(
+            "{\"type\":\"renewCredential\",\"id\":11,\"server\":\"relay.example.org:3478\",\
+             \"user\":\"1786086400:alice\"}",
+        )
+        .expect_err("a renewal with no password is not one");
+        assert_eq!(unreadable.id, Some(11));
+        assert!(
+            !unreadable.reason.contains("1786086400:alice"),
+            "the reason must not carry the credential: {}",
+            unreadable.reason
+        );
     }
 
     /// The same line with no id at all, which is a genuinely broken sender
