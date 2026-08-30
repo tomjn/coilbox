@@ -119,7 +119,14 @@ export default function GameUnitsPage() {
       </div>
     );
 
-  if (datasetStatus !== "ready" || gameInfoLoading)
+  // `datasetStatus` is not part of this gate: `UnitsyncInfoStatus` has five
+  // values (config.ts), and `unsyncable` (checksum came back 0) still carries
+  // a populated `dataset.units` that never becomes "ready" without a reload
+  // this page doesn't offer. `GameDetailPage` renders `FactionBuildList` from
+  // `dataset?.units ?? []` regardless of status for the same reason: what
+  // blocks a first paint is not having sides to group by yet, not the
+  // dataset's own status.
+  if (gameInfoLoading || !gameInfo || !selected)
     return <DetailLoading backTo={backTo} />;
 
   return (
@@ -157,6 +164,7 @@ export default function GameUnitsPage() {
                 <UnitCellItem
                   key={cell.id}
                   cell={cell}
+                  gameName={game.name}
                   display={buildpics?.units[cell.id]}
                 />
               ))}
@@ -175,19 +183,28 @@ export default function GameUnitsPage() {
 }
 
 /** One grid cell: a unit's build pic, its label, and how many stages fold into
- * it, linking through to the unit's own page. */
+ * it, linking through to the unit's own page.
+ *
+ * The link is built as an absolute path rather than a relative `../units/{id}`.
+ * Picoframe registers every plugin route as a single flat child of one root
+ * layout route, so the matched route stack here is just two entries: root,
+ * then the whole `content/games/:name/units` path as one match. A single
+ * `".."` pops that entire match rather than one URL segment, so a relative
+ * link resolves to `/units/{id}` instead of the unit's own page. */
 function UnitCellItem({
   cell,
+  gameName,
   display,
 }: {
   cell: UnitCell;
+  gameName: string;
   display?: UnitDisplay;
 }) {
   const src = unitIconSrc(display);
   return (
     <li>
       <Link
-        to={`../units/${encodeURIComponent(cell.id)}`}
+        to={`/content/games/${encodeURIComponent(gameName)}/units/${encodeURIComponent(cell.id)}`}
         className="flex flex-col items-center gap-1 rounded-lg border border-border/50 bg-card p-2 text-center transition-colors hover:border-border hover:bg-accent/50"
       >
         {src ? (

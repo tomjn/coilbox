@@ -20,6 +20,11 @@ const GAME_NAME = "Test Game";
 
 let mockUnits: UnitDatasetEntry[] = [];
 let mockSides: { name: string; startUnit?: string }[] = [];
+// Defaults to "ready". One test overrides it to "unsyncable" to prove the
+// page still draws a populated dataset in that status instead of sticking on
+// a loading skeleton forever. `UnitsyncInfoStatus` (config.ts) has five
+// values, not the three the page used to gate rendering on.
+let mockDatasetStatus: "ready" | "unsyncable" | "error" = "ready";
 
 vi.mock("../config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
@@ -52,7 +57,7 @@ vi.mock("../config", () => ({
   }),
   useUnitsyncUnitDataset: () => ({
     dataset: { units: mockUnits, errors: [] },
-    status: "ready",
+    status: mockDatasetStatus,
   }),
   useUnitsyncUnitBuildpics: () => null,
 }));
@@ -71,12 +76,15 @@ interface UnitFixture {
 function renderPage({
   units,
   sides,
+  datasetStatus = "ready",
 }: {
   units: UnitFixture[];
   sides: { name: string; startUnit?: string }[];
+  datasetStatus?: "ready" | "unsyncable" | "error";
 }) {
   mockUnits = units as UnitDatasetEntry[];
   mockSides = sides;
+  mockDatasetStatus = datasetStatus;
   return render(
     <MemoryRouter
       initialEntries={[`/content/games/${encodeURIComponent(GAME_NAME)}/units`]}
@@ -138,5 +146,29 @@ describe("GameUnitsPage", () => {
     });
     expect(await screen.findByText("Armada")).toBeTruthy();
     expect(screen.getByText("Other units")).toBeTruthy();
+  });
+
+  it("links a cell to the unit's own page as an absolute path", async () => {
+    // Picoframe registers a plugin's whole route path as one flat match, so a
+    // relative `../units/{id}` pops the entire `content/games/:name/units`
+    // match and lands on `/units/{id}`. The link has to be built absolute.
+    renderPage({
+      units: [{ name: "armcom", fullName: "Commander" }],
+      sides: [{ name: "Armada", startUnit: "armcom" }],
+    });
+    const cell = await screen.findByText("Commander");
+    const link = cell.closest("a");
+    expect(link?.getAttribute("href")).toBe(
+      `/content/games/${encodeURIComponent(GAME_NAME)}/units/armcom`,
+    );
+  });
+
+  it("draws the grid from an unsyncable dataset instead of loading forever", async () => {
+    renderPage({
+      units: [{ name: "armcom", fullName: "Commander" }],
+      sides: [{ name: "Armada", startUnit: "armcom" }],
+      datasetStatus: "unsyncable",
+    });
+    expect(await screen.findByText("Commander")).toBeTruthy();
   });
 });
