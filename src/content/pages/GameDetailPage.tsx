@@ -1,7 +1,7 @@
 import { Button, useSetting } from "@picoframe/frame";
 import { FolderOpen, Trophy } from "lucide-react";
 import { useMemo } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { GameEquivalents } from "@/blueprint/pages/components/GameEquivalents";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -225,12 +225,22 @@ export default function GameDetailPage() {
 
       {(gameInfoLoading || (gameInfo && gameInfo.sides.length > 0)) && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">
-            Sides
-            {gameInfo && gameInfo.unitCount > 0
-              ? ` · ${gameInfo.unitCount} units`
-              : ""}
-          </h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-medium">
+              Sides
+              {gameInfo && gameInfo.unitCount > 0
+                ? ` · ${gameInfo.unitCount} units`
+                : ""}
+            </h2>
+            {/* A reader looking at the build tree is already asking about this
+                game's units, so the encyclopedia grid is offered right beside it. */}
+            <Link
+              to={`/content/games/${encodeURIComponent(game.name)}/units`}
+              className="text-xs text-muted-foreground hover:underline"
+            >
+              Browse units
+            </Link>
+          </div>
           {/* An unreadable unit list leaves every faction button on nothing,
               which otherwise reads as a game with no build tree. */}
           {datasetStatus === "error" && (

@@ -136,6 +136,14 @@ const contentPlugin: FramePlugin = {
       crumb: (c) => c.params.name ?? "Game",
     },
     {
+      path: "content/games/:name/units",
+      lazy: gateProfileHidden(
+        "content.games",
+        () => import("./pages/GameUnitsPage"),
+      ),
+      crumb: "Units",
+    },
+    {
       // The blueprint library (issue #1415). Its pages live under
       // `../blueprint/`, with the model and the store they read, because a
       // layout is its own thing rather than part of the content browser.
