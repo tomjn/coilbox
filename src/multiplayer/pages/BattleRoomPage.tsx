@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useBrandingEntry } from "@/content/branding";
 import { PendingJoinsPanel, usePendingJoins } from "@/direct/PendingJoins";
+import { RoomMovedPanel } from "@/direct/RoomMoved";
 import { useFactionLogos } from "@/factions/logos";
 import { notify } from "@/notify/notify";
 import { useSkirmishAis } from "@/play/config";
@@ -413,6 +414,11 @@ function BattleRoomPage() {
       {/* Above everything else on the page: somebody is sitting on a spinner
           until this is answered, and nothing below is blocking anyone. */}
       <PendingJoinsPanel pending={joins.pending} onAnswer={joins.answer} />
+
+      {/* Below the joins, because nobody is waiting on this one. Above the rest,
+          because it is a fact about the room the host is running rather than
+          about something they just pressed (issue #2122). */}
+      <RoomMovedPanel />
 
       {room.currentVote && (
         <VotePanel vote={room.currentVote} onVote={room.castVote} />
