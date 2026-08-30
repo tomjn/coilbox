@@ -187,6 +187,40 @@ export function gameAddressNote(ip: string, previous: string | null): string {
   return `${now} It was handing out ${previous} earlier.`;
 }
 
+/**
+ * The same move, said to a host who is sitting in their battle room. Pure.
+ *
+ * Starting a room lands the host in their battle room and that is where they
+ * stay, so everything {@link gameAddressNote} says is on a page they left
+ * (issue #2122). The move is the half of it worth carrying across, because the
+ * address on its own is a fact a host can go and look up and this one arrives
+ * without being asked for. So this is only ever the move, and there is nothing
+ * to draw while the room has not moved.
+ *
+ * It leads with the move rather than with the address, which is the one thing it
+ * does differently from {@link gameAddressNote}. That line is always on screen,
+ * so the change is its last sentence and the address is its first. This appears
+ * out of nothing the moment the room moves, and a host skimming the top of a
+ * busy page needs to know what the strip is about before they read a number.
+ * Everything else is the same words, deliberately: a host who has read one of
+ * these should not have to work out that the other is about the same thing.
+ *
+ * The loopback clause is the same one and for the same reason. It is the one
+ * address a room can land on that cannot work, and it is what a machine that
+ * has lost every other interface falls back to, so a move onto it read as an
+ * ordinary move would be the worst case said in the mildest words.
+ *
+ * Says nothing about whether anybody can reach either address. That is the
+ * reachability panel's question and this one does not know the answer.
+ */
+export function roomMovedNotice(ip: string, previous: string | null): string {
+  if (!previous) return "";
+  const moved = `Your room has moved onto a different address. It was handing out ${previous} earlier and now hands joiners ${ip} for the game itself`;
+  return ip === LOOPBACK_HOST
+    ? `${moved}, which points back at their own machine rather than yours.`
+    : `${moved}.`;
+}
+
 /** How often the host's own room is asked what it holds. The command reads a
  *  struct out of a task in this same process, so two seconds costs nothing and is
  *  quick enough that somebody waiting at the door is not left there. */
