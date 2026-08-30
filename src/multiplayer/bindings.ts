@@ -1158,6 +1158,29 @@ export const mpRelayTraffic = defineCommand<
 >("coilbox-multiplayer", "mp_relay_traffic");
 
 /**
+ * Whether a relay this coilbox did not start is running on this machine, and
+ * what it says it is carrying (issue #2074).
+ *
+ * Somebody who closes coilbox during a relayed game and opens it again is still
+ * carrying every other player's traffic, and coilbox has no pipe to the sidecar
+ * doing it. `relaying` is proved rather than guessed: the sidecar holds a lock
+ * on its run file for as long as it lives.
+ *
+ * `bytesPerSecond` is the sidecar's own measurement, read from a record it
+ * writes beside that run file once a second, and it is null whenever there is no
+ * current one to read. Draw nothing for null rather than a zero, because zero
+ * means the relay is there and quiet and is a different thing to say.
+ *
+ * Nothing here says a game is running or offers to end one. coilbox did not
+ * launch that engine and holds no handle on it, so it cannot honestly claim
+ * either. The relay ends by itself when the game does.
+ */
+export const mpRelayLeftRunning = defineCommand<
+  Record<string, never>,
+  { relaying: boolean; bytesPerSecond: number | null }
+>("coilbox-multiplayer", "mp_relay_left_running");
+
+/**
  * Whether a relay agent from an earlier session is still running on this
  * machine (issue #2062).
  *
