@@ -6,6 +6,7 @@ import {
   battleOpened,
   DEFAULT_ROOM_PORT,
   directServer,
+  gameAddressNote,
   hostBlockedReason,
   newPendingNames,
   pendingJoinsHeadline,
@@ -190,6 +191,43 @@ describe("announcementNote", () => {
     expect(announcementNote(false, false)).toBe(
       "Not announced on this network, so give joiners your address.",
     );
+  });
+});
+
+describe("gameAddressNote", () => {
+  it("names the address the room puts in its battle", () => {
+    expect(gameAddressNote("192.168.1.45", null)).toBe(
+      "The room hands joiners 192.168.1.45 for the game itself.",
+    );
+  });
+
+  // The whole reason this is drawn at all. A room with no address of the host's
+  // own choosing follows the machine (issue #2116), so a VPN moves it, and
+  // "10.8.0.2" on its own does not read as something having changed.
+  it("names the address it moved off when the room has moved", () => {
+    expect(gameAddressNote("10.8.0.2", "192.168.1.45")).toBe(
+      "The room hands joiners 10.8.0.2 for the game itself. It was handing out 192.168.1.45 earlier.",
+    );
+  });
+
+  // The fallback for a machine on no network, and the one value here that
+  // cannot work. Said flatly it reads as fine.
+  it("says loopback is nobody else's address", () => {
+    const note = gameAddressNote("127.0.0.1", null);
+    expect(note).toContain("hands joiners 127.0.0.1");
+    expect(note).toContain(
+      "points back at their own machine rather than yours",
+    );
+  });
+
+  // Loopback and a move are independent facts, and a room that fell back to
+  // loopback because the network went is exactly when both are true at once.
+  it("says both when a room has moved onto loopback", () => {
+    const note = gameAddressNote("127.0.0.1", "192.168.1.45");
+    expect(note).toContain(
+      "points back at their own machine rather than yours",
+    );
+    expect(note).toContain("It was handing out 192.168.1.45 earlier.");
   });
 });
 

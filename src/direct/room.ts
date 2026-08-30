@@ -157,6 +157,36 @@ export function announcementNote(advertise: boolean, heard: boolean): string {
   return "Announced on this network.";
 }
 
+/**
+ * What a host reads about the address their running room hands out. Pure.
+ *
+ * `RoomStatus.ip` is the address the room writes into its battle, which a
+ * joiner's engine dials when the game starts. It is a different fact from the
+ * addresses beside it, which are what somebody types in to reach the room in the
+ * first place, so it is said in its own words and makes no claim about whether
+ * anybody can reach it.
+ *
+ * Nothing drew it at all until now, which did not matter while it could not
+ * change. A room with no address of the host's own choosing re-reads this
+ * machine's address on a timer and moves the battle when it changes (issue
+ * #2116), so a room that started on the network next door can be on a VPN
+ * twenty seconds later. `previous` is the address it was handing out before,
+ * or null while it has not moved, and it is named because "10.8.0.2" on its own
+ * does not read as "this changed under you".
+ *
+ * Loopback is the one value the room can arrive at that cannot work, and it is
+ * the fallback for a machine with no other address. Saying it flatly would read
+ * as fine.
+ */
+export function gameAddressNote(ip: string, previous: string | null): string {
+  const now =
+    ip === LOOPBACK_HOST
+      ? `The room hands joiners ${ip} for the game itself, which points back at their own machine rather than yours.`
+      : `The room hands joiners ${ip} for the game itself.`;
+  if (!previous) return now;
+  return `${now} It was handing out ${previous} earlier.`;
+}
+
 /** How often the host's own room is asked what it holds. The command reads a
  *  struct out of a task in this same process, so two seconds costs nothing and is
  *  quick enough that somebody waiting at the door is not left there. */
