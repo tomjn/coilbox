@@ -32,6 +32,19 @@ export const RELAY_CARRYING_DETAIL =
   "This game goes through your machine's relay, so every other player's traffic passes through here. This is how much went through in the last second.";
 
 /**
+ * Why a pill has appeared for a game this coilbox never started (issue #2074).
+ *
+ * Somebody who closed coilbox during a relayed game and opened it again is
+ * looking at a pill for a match they cannot see, cannot name and cannot end, so
+ * the first job of this sentence is to say why it is there at all. The second is
+ * to say what happens next without anybody having to do anything, because there
+ * is nothing they can do and being told that is better than looking for a
+ * button.
+ */
+export const RELAY_LEFT_RUNNING_DETAIL =
+  "A game you started earlier is still being played through your machine's relay, so every other player's traffic passes through here. Coilbox did not start this one and cannot end it. The relay stops on its own once that game finishes.";
+
+/**
  * The relay's rate in a few words. Pure.
  *
  * Zero gets words rather than "0 B/s" because it is the answer somebody is
