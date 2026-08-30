@@ -150,6 +150,19 @@ pub enum Delta {
     RelayedHostMoveRefused {
         reason: String,
     },
+    /// The lobby never said anything about the move at all, so our battle is
+    /// still advertised where the allocation used to be and nobody can reach it.
+    ///
+    /// The same outcome as [`Self::RelayedHostMoveRefused`] with none of the
+    /// words, because there is nobody to quote. A lobby that has never heard of
+    /// `MOVERELAYEDHOST` does not refuse it, and until a server ships the
+    /// command (ScarylePoo/uberserver#43) that is every lobby there is.
+    ///
+    /// Nothing on the wire produces this, so nothing in this module raises it.
+    /// It is raised by whoever sent the line and waited, which is
+    /// `tauri_plugin_coilbox_multiplayer::relay_host`, and it lives here so the
+    /// host hears about it down the same channel as its refused twin.
+    RelayedHostMoveUnanswered,
     /// Somebody joined a battle we are hosting through the relay and the relay
     /// would not let their address through, so nothing that player's game sends
     /// will reach ours.

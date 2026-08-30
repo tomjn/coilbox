@@ -361,6 +361,16 @@ export type Delta =
    */
   | { kind: "relayedHostMoveRefused"; reason: string }
   /**
+   * The lobby never answered the move at all, so our battle is still advertised
+   * where the allocation used to be and nobody can reach it. The same outcome as
+   * `relayedHostMoveRefused` with nobody to quote, because a lobby that has never
+   * heard of the command does not refuse it, and until a server ships the command
+   * that is every lobby there is. Raised by the plugin once the lobby's time is
+   * up, not by a line off the wire, and told once per battle rather than once per
+   * rebuild.
+   */
+  | { kind: "relayedHostMoveUnanswered" }
+  /**
    * Somebody joined a battle we are hosting through the relay and the relay
    * would not let their address through, so nothing their game sends will reach
    * ours. Raised by the plugin rather than by a line off the wire, and only ever

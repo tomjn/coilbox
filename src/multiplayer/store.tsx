@@ -1154,15 +1154,25 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           });
         }
         // The relay came back at a new address, the lobby was asked to move the
-        // battle to it, and the lobby said no. The battle is open, quite
-        // possibly with a game in it, and the address everybody was given has
-        // gone, so nobody new can join and nothing here can put that right. The
-        // host is the only person who can, by hosting again.
-        else if (d.kind === "relayedHostMoveRefused") {
+        // battle to it, and the lobby either said no or said nothing. The battle
+        // is open, quite possibly with a game in it, and the address everybody
+        // was given has gone, so nobody new can join and nothing here can put
+        // that right. The host is the only person who can, by hosting again.
+        //
+        // One warning covers both, because to the person hosting they are the
+        // same battle in the same state. A lobby too old to know the command
+        // does not refuse it, so silence is what today's servers all give, and
+        // reading differently from a refusal would only make it look less
+        // serious than it is.
+        else if (
+          d.kind === "relayedHostMoveRefused" ||
+          d.kind === "relayedHostMoveUnanswered"
+        ) {
+          const reason = d.kind === "relayedHostMoveRefused" ? d.reason : "";
           void notify({
             title: "Nobody can reach your battle any more",
-            body: d.reason
-              ? `Its relay moved and the lobby would not update the address: ${d.reason}`
+            body: reason
+              ? `Its relay moved and the lobby would not update the address: ${reason}`
               : "Its relay moved and the lobby would not update the address.",
             level: "error",
           });
