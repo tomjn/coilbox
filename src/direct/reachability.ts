@@ -39,6 +39,10 @@ export interface DirectReachability {
   /** What the internet sees, from STUN. Null when no STUN server answered, in
    *  which case the host is shown their local address and no guess. */
   publicAddress: string | null;
+  /** The address STUN saw is one this machine holds, so there is nothing in
+   *  front of it to forward anything. Answered in Rust, where the whole list of
+   *  this machine's addresses is (issue #2111). */
+  publicAddressIsLocal: boolean;
   /** The router's own address on its internet side, when it would say. */
   routerAddress: string | null;
   /** The router is itself behind another NAT, so an open port on it is not an
@@ -138,18 +142,25 @@ export function isReachable(report: DirectReachability): boolean {
  * the report reads like a refusal, which is the opposite of the truth: this host
  * needs nothing opened because nothing is shut (issue #2054).
  *
- * Two unknowns are not a match. A machine with no local address and no STUN
- * answer knows nothing about itself, and calling that public would tell somebody
- * unreachable that they are fine.
- *
  * Shared with {@link hostingRoute}'s first rung rather than written out twice,
  * because the panel saying one thing while the hosting ladder a few pixels below
  * says another is the bug this came from.
+ *
+ * The fact itself comes from Rust, and this reads it. It used to compare
+ * `publicAddress` against `lanAddress`, which is the single address a room
+ * announces itself at and prefers a private one, so a VPS with a Docker bridge,
+ * a VirtualBox adapter or a cloud provider's internal card compared the address
+ * STUN saw against 172.17.0.1 and told a host with no router that their router
+ * had refused (issue #2111). It is a question about the machine's whole address
+ * list, and the side that enumerated the list is the only one holding it.
+ *
+ * Two unknowns are still not a match: `publicAddressIsLocal` and
+ * `publicAddress` are both read off the one STUN answer, so a machine that knows
+ * nothing about itself has the flag false rather than matching null against
+ * null, which is what it did before.
  */
 export function isOnPublicAddress(report: DirectReachability): boolean {
-  return (
-    report.publicAddress !== null && report.publicAddress === report.lanAddress
-  );
+  return report.publicAddressIsLocal;
 }
 
 /**

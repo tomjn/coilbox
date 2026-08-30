@@ -45,6 +45,7 @@ const REFUSED: DirectReachability = {
   wanted: [{ port: 8452, externalPort: 8452, transport: "udp" }],
   lanAddress: "192.168.1.45",
   publicAddress: "209.35.91.246",
+  publicAddressIsLocal: false,
   routerAddress: null,
   doubleNat: false,
   confirmedPort: null,

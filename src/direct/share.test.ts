@@ -32,13 +32,21 @@ const refused = {
 
 /** A machine on the internet under its own address: a VPS, or a home line with
  *  no NAT. Nothing was mapped because there was no gateway to ask, and the
- *  address the internet sees is one of this machine's own interfaces. */
-const direct = (address: string): DirectReachability =>
+ *  address the internet sees is one of this machine's own interfaces.
+ *
+ *  `lanAddress` is separate because it is the address a room announces itself
+ *  at, and on any machine with a second interface that is the private one and
+ *  not this (issue #2111). */
+const direct = (
+  address: string,
+  lanAddress: string = address,
+): DirectReachability =>
   ({
     method: null,
     doubleNat: false,
-    lanAddress: address,
+    lanAddress,
     publicAddress: address,
+    publicAddressIsLocal: true,
     ports: [],
     wanted: [{ port: 8200, externalPort: 8200, transport: "tcp" }],
   }) as unknown as DirectReachability;
@@ -141,12 +149,15 @@ describe("shareAddresses", () => {
   });
 
   // A VPS with a VPN on it. The public address becomes the outside row, so the
-  // one private address left has nothing to be told apart from.
+  // one private address left has nothing to be told apart from. The report says
+  // the room is announced at 10.8.0.2, because that is what the Rust side picks
+  // on a machine with a private address on it, and it is not what decides which
+  // row the public address goes in (issue #2111).
   it("leaves the private address unnamed once the public one has moved", () => {
     const found = shareAddresses(
       [on("209.35.91.246", "eth0"), on("10.8.0.2", "utun4"), loopback],
       8200,
-      direct("209.35.91.246"),
+      direct("209.35.91.246", "10.8.0.2"),
     );
     expect(
       found.filter((a) => a.scope === "network").map((a) => a.label),

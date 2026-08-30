@@ -30,10 +30,18 @@ const ON_PUBLIC_ADDRESS: DirectReachability = {
   ],
   lanAddress: "209.35.91.246",
   publicAddress: "209.35.91.246",
+  publicAddressIsLocal: true,
   routerAddress: null,
   doubleNat: false,
   confirmedPort: 8452,
   problem: "no UPnP gateway answered",
+};
+
+/** The same machine with a Docker bridge on it, so the address the room
+ *  announces itself at is the bridge and not the public one (issue #2111). */
+const ON_PUBLIC_ADDRESS_WITH_A_BRIDGE: DirectReachability = {
+  ...ON_PUBLIC_ADDRESS,
+  lanAddress: "172.17.0.1",
 };
 
 /** The same report from an ordinary home connection, where the refusal is real
@@ -41,6 +49,7 @@ const ON_PUBLIC_ADDRESS: DirectReachability = {
 const REFUSED: DirectReachability = {
   ...ON_PUBLIC_ADDRESS,
   lanAddress: "192.168.1.45",
+  publicAddressIsLocal: false,
   confirmedPort: null,
 };
 
@@ -95,6 +104,37 @@ describe("the reachability panel for a host on a public address", () => {
     show(ON_PUBLIC_ADDRESS);
     const box = document.querySelector(".text-destructive");
     expect(box).toBeNull();
+  });
+});
+
+/**
+ * A VPS running Docker, which is the ordinary VPS (issue #2111).
+ *
+ * The panel read the bridge's address against the one STUN saw, found two
+ * different strings, and sent a host with no router to their router's settings
+ * page. Everything the panel is being asked here it already gets right for the
+ * machine above, so what is actually under test is that one more network card
+ * cannot take it away.
+ */
+describe("the reachability panel for a host on a public address with a docker bridge", () => {
+  it("says they are reachable as they are", () => {
+    show(ON_PUBLIC_ADDRESS_WITH_A_BRIDGE);
+    expect(
+      screen.getByText(
+        "Open. This machine is on the internet at 209.35.91.246, so there was nothing to forward.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("does not send them to a router setting", () => {
+    show(ON_PUBLIC_ADDRESS_WITH_A_BRIDGE);
+    expect(document.body.textContent).not.toContain("UPnP or NAT-PMP");
+    expect(document.body.textContent).not.toContain("172.17.0.1");
+  });
+
+  it("is not drawn as a problem", () => {
+    show(ON_PUBLIC_ADDRESS_WITH_A_BRIDGE);
+    expect(document.querySelector(".text-destructive")).toBeNull();
   });
 });
 

@@ -24,6 +24,7 @@ function report(over: Partial<DirectReachability> = {}): DirectReachability {
     ],
     lanAddress: "192.168.1.45",
     publicAddress: null,
+    publicAddressIsLocal: false,
     routerAddress: null,
     doubleNat: false,
     confirmedPort: null,
@@ -56,9 +57,20 @@ function onPublicAddress(
   return report({
     lanAddress: "209.35.91.246",
     publicAddress: "209.35.91.246",
+    publicAddressIsLocal: true,
     problem: "no UPnP gateway answered",
     ...over,
   });
+}
+
+/** The same VPS with a Docker bridge on it, which is the ordinary one. Rust
+ *  announces a room at the bridge, because a private address is the right one to
+ *  announce, and still says the address the internet sees is this machine's
+ *  (issue #2111). */
+function onPublicAddressWithABridge(
+  over: Partial<DirectReachability> = {},
+): DirectReachability {
+  return onPublicAddress({ lanAddress: "172.17.0.1", ...over });
 }
 
 describe("roomPorts", () => {
@@ -133,9 +145,20 @@ describe("reachabilityState", () => {
   it("prefers direct over a mapping the machine did not need", () => {
     expect(
       reachabilityState(
-        opened({ lanAddress: "209.35.91.246", publicAddress: "209.35.91.246" }),
+        opened({
+          lanAddress: "209.35.91.246",
+          publicAddress: "209.35.91.246",
+          publicAddressIsLocal: true,
+        }),
       ),
     ).toBe("direct");
+  });
+
+  // One more network card is all it took. This used to read the bridge's
+  // 172.17.0.1 against the address STUN saw, find them different, and tell a
+  // host with no router that their router had refused (issue #2111).
+  it("calls a machine with a docker bridge beside its public address direct", () => {
+    expect(reachabilityState(onPublicAddressWithABridge())).toBe("direct");
   });
 
   // Two unknowns are not a match. A machine with no local address and no STUN
@@ -148,10 +171,17 @@ describe("reachabilityState", () => {
 describe("isOnPublicAddress", () => {
   it("is true only when the address the internet sees is this machine's own", () => {
     expect(isOnPublicAddress(onPublicAddress())).toBe(true);
+    // Behind a router: STUN saw a public address and it belongs to the router.
     expect(isOnPublicAddress(report({ publicAddress: "209.35.91.246" }))).toBe(
       false,
     );
     expect(isOnPublicAddress(report({ lanAddress: null }))).toBe(false);
+  });
+
+  // The bug. The bridge's address is not the one STUN saw and never was the
+  // one to compare against it (issue #2111).
+  it("does not lose the answer to a second network card", () => {
+    expect(isOnPublicAddress(onPublicAddressWithABridge())).toBe(true);
   });
 });
 
