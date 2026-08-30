@@ -261,8 +261,12 @@ pub fn open_battle(
 /// battle at the host's own address, which is the broken host relay hosting
 /// exists to fix rather than a new failure.
 pub fn relayed_host(ip: std::net::IpAddr, port: u16) -> String {
-    format!("RELAYEDHOST {ip} {port}")
+    format!("{RELAYED_HOST} {ip} {port}")
 }
+
+/// The first word of [`relayed_host`], for a caller that has to recognise the
+/// command in something the server sends back rather than build the line.
+pub const RELAYED_HOST: &str = "RELAYEDHOST";
 
 /// `MOVERELAYEDHOST <ip> <port>`, telling the lobby that the battle this client
 /// is already hosting now lives somewhere else on the relay.
@@ -290,8 +294,12 @@ pub fn relayed_host(ip: std::net::IpAddr, port: u16) -> String {
 /// never heard of it says nothing, and the battle stays advertised at the
 /// address that has gone.
 pub fn move_relayed_host(ip: std::net::IpAddr, port: u16) -> String {
-    format!("MOVERELAYEDHOST {ip} {port}")
+    format!("{MOVE_RELAYED_HOST} {ip} {port}")
 }
+
+/// The first word of [`move_relayed_host`], for a caller that has to recognise
+/// the command in something the server sends back rather than build the line.
+pub const MOVE_RELAYED_HOST: &str = "MOVERELAYEDHOST";
 
 /// `TURNCREDENTIALS`, asking the lobby to mint a short-lived credential for its
 /// relay, so a host nothing can reach can open an allocation on it.
@@ -304,8 +312,12 @@ pub fn move_relayed_host(ip: std::net::IpAddr, port: u16) -> String {
 ///
 /// The command takes no arguments. Who is asking is who is logged in.
 pub fn turn_credentials() -> String {
-    "TURNCREDENTIALS".to_string()
+    TURN_CREDENTIALS.to_string()
 }
+
+/// The first word of [`turn_credentials`], which is the whole of it, for a
+/// caller that has to recognise the command in something the server sends back.
+pub const TURN_CREDENTIALS: &str = "TURNCREDENTIALS";
 
 /// `UPDATEBATTLEINFO <spectatorCount> <locked> <maphash> <map>`.
 pub fn update_battle_info(spectators: u32, locked: bool, maphash: i32, map: &str) -> String {
@@ -860,6 +872,22 @@ mod tests {
             "a server telling the two apart reads the command and nothing else"
         );
         assert!(!moving.starts_with("RELAYEDHOST "));
+    }
+
+    /// The three relay commands that are named as well as built, because
+    /// something has to recognise them in what the server sends back. A name
+    /// that stopped being the line's first word would leave that reader looking
+    /// for a command nobody sends, and looking for it silently.
+    #[test]
+    fn a_relay_command_is_named_by_the_word_it_is_sent_as() {
+        let ip = "198.51.100.9".parse().expect("an address");
+        for (named, sent) in [
+            (TURN_CREDENTIALS, turn_credentials()),
+            (RELAYED_HOST, relayed_host(ip, 30001)),
+            (MOVE_RELAYED_HOST, move_relayed_host(ip, 30002)),
+        ] {
+            assert_eq!(sent.split(' ').next(), Some(named), "for {sent}");
+        }
     }
 
     #[test]

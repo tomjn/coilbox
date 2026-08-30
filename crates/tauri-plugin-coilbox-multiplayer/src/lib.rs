@@ -70,6 +70,9 @@ mod tls;
 /// a public function taking one would make every type reachable through a
 /// connection part of this crate's public API.
 mod turn;
+/// Reading uberserver's sentence for a command it did not run, which is what
+/// three of coilbox's relay waits would otherwise sit out in silence.
+mod uberserver;
 /// Zero-K's battle stream, folded into the same battle list the other two
 /// protocols fill.
 mod zerok_battles;
@@ -4805,6 +4808,15 @@ mod tests {
     /// `RELAYEDHOST` arrives first and is read and ignored, which is what a
     /// server that has not landed ScarylePoo/uberserver#29 does with it.
     async fn lobby_answering_an_open(answer: fn(u32) -> String) -> std::net::SocketAddr {
+        lobby_scripted(answer, |_| None).await
+    }
+
+    /// The same lobby, plus what it says to the `RELAYEDHOST` in front of the
+    /// open. `None` is a server that reads the line and says nothing.
+    async fn lobby_scripted(
+        answer: fn(u32) -> String,
+        to_relayed_host: fn(&str) -> Option<String>,
+    ) -> std::net::SocketAddr {
         use coilbox_lobby_protocol::server::{line, parse_client_line, ClientCommand};
         use futures_util::{SinkExt, StreamExt};
         use tokio_util::codec::{Framed, LinesCodec};
@@ -4835,6 +4847,13 @@ mod tests {
                         line::login_info_end()
                     }
                     _ if read.starts_with("OPENBATTLE ") => answer(9),
+                    // Answered where it is read and before the `OPENBATTLE`
+                    // behind it, which is the ordering the whole refusal note
+                    // depends on.
+                    _ if read.starts_with("RELAYEDHOST ") => match to_relayed_host(&read) {
+                        Some(said) => said,
+                        None => continue,
+                    },
                     _ => continue,
                 };
                 if framed.send(reply).await.is_err() {
@@ -4942,6 +4961,69 @@ mod tests {
             .get(&key)
             .map(|conn| lock_or_recover(&conn.relay).is_some())
             .unwrap_or_default());
+    }
+
+    /// Issue #2141, over a real socket and through the real connection task.
+    ///
+    /// This is not the twenty second wait the issue was written about, and the
+    /// difference is worth being exact about. `RELAYEDHOST` goes out
+    /// immediately ahead of `OPENBATTLE`, and a lobby that will not run the
+    /// first still answers the second, promptly. So nothing here waits. What
+    /// happens without the rejection being read is worse than a wait: the
+    /// battle opens at this machine's own address, which is the address the
+    /// route ladder measured as unreachable, and the host is told it is up and
+    /// relayed.
+    ///
+    /// Reading the rejection puts it where `RELAYEDHOSTFAILED` already goes, so
+    /// the room is closed and the host is told the truth.
+    #[tokio::test]
+    async fn a_lobby_that_will_not_advertise_at_the_relay_does_not_leave_a_battle_nobody_can_join()
+    {
+        let addr = lobby_scripted(
+            |id| format!("OPENBATTLE {id}"),
+            |read| {
+                let args = read.strip_prefix("RELAYEDHOST ").unwrap_or_default();
+                Some(format!(
+                    "SERVERMSG RELAYEDHOST failed. Unknown command. (args='{args}')"
+                ))
+            },
+        )
+        .await;
+        let registry = Registry::default();
+        let (key, _logs) = logged_in(&registry, addr).await;
+
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+        let refused = advertise(&registry, &key, lines, Some(relay), HOSTING_PATIENCE).await;
+
+        assert!(
+            !refused.success,
+            "the lobby opened a battle at an address nobody can reach, and the host was told it \
+             had worked"
+        );
+        assert!(
+            refused
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("would not advertise your battle at the relay's address"),
+            "got: {:?}",
+            refused.error
+        );
+        assert!(
+            channel.was_stopped(),
+            "a battle that is not going through the relay leaves an allocation to take down, \
+             got: {:?}",
+            channel.sent()
+        );
+        assert!(
+            lock_or_recover(&registry)
+                .get(&key)
+                .map(|conn| lock_or_recover(&conn.relay).is_none())
+                .unwrap_or_default(),
+            "nothing may be held against the connection as a relayed battle"
+        );
     }
 
     /// A line that never reached the writer, which is the one failure this could

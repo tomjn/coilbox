@@ -505,39 +505,11 @@ pub(crate) fn move_unanswered(relay: &HostedRelay, number: u64) -> bool {
     true
 }
 
-/// The start of the `SERVERMSG` uberserver sends when it will not run a
-/// `MOVERELAYEDHOST`.
-///
-/// Uberserver rejects every command it will not run with `<COMMAND> failed.
-/// <reason>`, from three places in `protocol/Protocol.py`: an unknown command,
-/// a command the client's access level does not reach, and one with the wrong
-/// number of arguments. The command is upper-cased before it is written in, so
-/// it is the verb coilbox sent, character for character. All three mean the
-/// same thing here, which is that the battle did not move.
-///
-/// So this matches the shape uberserver rejects everything with, not one
-/// sentence. The part that varies is the reason, and the reason is the part
-/// this deliberately does not read.
-///
-/// Observed on 30 August 2026 on all three of the uberservers coilbox ships
-/// with, sending the line unauthenticated:
-///
-/// ```text
-/// SERVERMSG MOVERELAYEDHOST failed. Unknown command. (args='198.51.100.9 30002')
-/// ```
-///
-/// `lobby.springrts.com:8200` (0.38-84-gc8386e9), `lobby.techa-rts.com:8200`
-/// (0.38-95-gf595963) and `lobby.recoilengine.org:8200` (which gives its version
-/// as `unknown`) all answered with that line and nothing else.
-///
-/// It lives here rather than in `coilbox-lobby-protocol` on purpose. That crate
-/// is the protocol, and this is one server's wording for something the protocol
-/// gives no line to. `the_rejection_we_match_names_the_command_we_send` is what
-/// keeps it tied to [`command::move_relayed_host`].
-const MOVE_REJECTED: &str = "MOVERELAYEDHOST failed.";
-
 /// Whether a delta the reducer just produced is uberserver naming our
 /// `MOVERELAYEDHOST` in a `SERVERMSG` that says it will not run it.
+///
+/// The shape and why it can be read at all are [`crate::uberserver`]. The part
+/// that belongs here is the window and the reason.
 ///
 /// ## Why match a server's own words at all
 ///
@@ -545,39 +517,19 @@ const MOVE_REJECTED: &str = "MOVERELAYEDHOST failed.";
 /// where [`MOVE_ANSWER_PATIENCE`] takes 20 seconds to conclude the same thing
 /// from silence. The host is told either way, so this only decides how soon.
 ///
-/// ## Why this is safe to act on
+/// ## The window
 ///
-/// Not because the sentence is fixed, but because of when it is read.
-/// [`move_failed`] only acts on it while a move of ours is outstanding, which is
-/// the seconds between [`readvertise`] queuing the line and the lobby answering
-/// it. Outside that window this is inert. Inside it, a `SERVERMSG` beginning
-/// `MOVERELAYEDHOST failed.` can only have been produced by the line we just
-/// sent: `out_SERVERMSG` writes to one client, and no other client's move
-/// reaches us.
+/// [`move_failed`] only acts on this while a move of ours is outstanding, which
+/// is the seconds between [`readvertise`] queuing the line and the lobby
+/// answering it. Outside that window this is inert.
 ///
-/// The two ways it can be wrong are not the same size. If uberserver rewords the
-/// rejection, this stops matching and the wait runs its 20 seconds, which is the
-/// behaviour without this at all. If it fired on something that was not a
-/// rejection, a host with a working battle would be told it is unreachable. The
-/// window is what rules the second one out.
+/// ## Why the reason is thrown away
 ///
-/// ## What it deliberately does not cover
-///
-/// Teiserver, which words the same thing as `No incomming match for
-/// MOVERELAYEDHOST with data ...` from `_no_match` in `spring_in.ex`. Coilbox
-/// never sends it the line: [`crate::turn::credentials`] refuses a credential on
-/// a server whose compatibility flags lack `r`, and Teiserver's `@compflags` is
-/// `sp teiserver matchmaking token-auth`, confirmed against
-/// `server4.beyondallreason.info:8201` on 30 August 2026. Reading a second
-/// server's wording for a line it will never receive is two behaviours for no
-/// host.
+/// Uberserver has three, and a host whose battle cannot be reached can act on
+/// none of them. The battle did not move whichever it was, so there is one
+/// warning and nothing worth quoting in it.
 pub(crate) fn move_rejected_in(delta: &Delta) -> bool {
-    match delta {
-        // `boxed` is whether the server asked for a dialog rather than a line in
-        // the log, which is about how it is shown and not about what it means.
-        Delta::ServerMessage { text, .. } => text.starts_with(MOVE_REJECTED),
-        _ => false,
-    }
+    crate::uberserver::rejection_of(delta, command::MOVE_RELAYED_HOST).is_some()
 }
 
 /// The lobby has said it will not run this battle's outstanding move. Ends the
@@ -1306,9 +1258,47 @@ pub fn forget_refused_address(note: &RefusedRelayAddress) {
 
 /// Record that the lobby would not take the address we named. Called by the
 /// connection task off [`Delta::RelayedHostRefused`], which is raised for every
-/// `RELAYEDHOSTFAILED` whether or not anybody is waiting on one.
+/// `RELAYEDHOSTFAILED` whether or not anybody is waiting on one, and off
+/// [`advertise_rejected_in`].
 pub fn note_refused_address(note: &RefusedRelayAddress, reason: &str) {
     *lock_or_recover(note) = Some(reason.to_string());
+}
+
+/// Uberserver's reason for not running the `RELAYEDHOST` that says where this
+/// battle lives, if that is what this delta is.
+///
+/// The shape and why it can be read at all are [`crate::uberserver`]. Two
+/// things belong here, and neither is the same as the `MOVERELAYEDHOST` case
+/// this borrows from.
+///
+/// ## This is not about a wait
+///
+/// `RELAYEDHOST` goes out immediately ahead of `OPENBATTLE`, and what
+/// [`confirmed`] waits on is the answer to the `OPENBATTLE`. A lobby that will
+/// not run the address line still opens the battle behind it, promptly, at the
+/// address it worked out from our own connection. That address is the one the
+/// route ladder measured as unreachable, which is the only reason the relay
+/// route was taken. So without this the host is told their battle is up and
+/// relayed, and nobody can join it.
+///
+/// Reading the rejection turns that into the answer #2064 already wrote for
+/// `RELAYEDHOSTFAILED`: the room is closed and the host is told the lobby would
+/// not advertise their battle at the relay's address.
+///
+/// ## Why the reason is quoted here and not on a move
+///
+/// It is the difference between a lobby that has no relay hosting yet and one
+/// that would not let this account use it, and the host is standing at the
+/// hosting form where the first is nothing they can do and the second is.
+///
+/// ## Why it is written down rather than sent
+///
+/// The same race #2064 found. This line and the `OPENBATTLE` answer are written
+/// back to back by the server, so they usually arrive in one read, and a
+/// [`watch`] slot keeps only the last thing put in it. A note that is set and
+/// never overwritten cannot lose that race.
+pub(crate) fn advertise_rejected_in(delta: &Delta) -> Option<&str> {
+    crate::uberserver::rejection_of(delta, command::RELAYED_HOST)
 }
 
 /// What the lobby said about the address, if it said anything.
@@ -1772,9 +1762,15 @@ pub(crate) mod tests {
 
     /// A `SERVERMSG` in uberserver's rejection shape, which is what an
     /// uberserver too old for the command answers a `MOVERELAYEDHOST` with.
+    ///
+    /// Built from the command's own name, so it cannot drift away from the line
+    /// coilbox sends. Which rejections are read at all is
+    /// [`crate::uberserver`]'s to prove, and it proves it for every reason
+    /// uberserver has on all three commands. What is left for here is the
+    /// window and the once-per-battle rule.
     fn rejection(reason: &str) -> Delta {
         Delta::ServerMessage {
-            text: format!("MOVERELAYEDHOST failed. {reason}"),
+            text: format!("{} failed. {reason}", command::MOVE_RELAYED_HOST),
             boxed: false,
         }
     }
@@ -1782,24 +1778,6 @@ pub(crate) mod tests {
     /// What every uberserver coilbox ships with answered on 30 August 2026, word
     /// for word off the wire.
     const UNKNOWN: &str = "Unknown command. (args='198.51.100.9 30002')";
-
-    /// The one thing keeping [`MOVE_REJECTED`] tied to the line it is about. The
-    /// match is uberserver's `<COMMAND> failed.` shape with our command's verb in
-    /// front, so renaming the command in [`command::move_relayed_host`] without
-    /// touching the constant would leave a match that can never fire and a wait
-    /// that always runs its twenty seconds, silently.
-    #[test]
-    fn the_rejection_we_match_names_the_command_we_send() {
-        let sent = command::move_relayed_host(rebuilt().ip(), rebuilt().port());
-        let verb = sent.split(' ').next().expect("a command to send");
-
-        assert_eq!(
-            MOVE_REJECTED,
-            format!("{verb} failed."),
-            "uberserver writes the command back in upper case, so the rejection we look for has \
-             to be built from the verb we send"
-        );
-    }
 
     /// Issue #2103. An uberserver too old for the command does not stay silent:
     /// it names the command it did not understand, and it does it in the same
@@ -1823,22 +1801,6 @@ pub(crate) mod tests {
             !move_unanswered(&relay, moved.number),
             "the wait has had its answer and must not warn a second time"
         );
-    }
-
-    /// The other two rejections uberserver has, which reach the same battle by a
-    /// different route: a client whose access level does not reach the command,
-    /// and a server that read the wrong number of arguments. Both mean the
-    /// battle did not move, so both are told. This is why the match stops at
-    /// `failed.` and does not read the reason.
-    #[test]
-    fn every_shape_of_uberserver_rejection_counts() {
-        for reason in ["Insufficient rights.", "Incorrect arguments."] {
-            assert!(
-                move_rejected_in(&rejection(reason)),
-                "uberserver rejects every command it will not run this way, and {reason} is one \
-                 of them"
-            );
-        }
     }
 
     /// The window is the whole of why reading a server's own words is safe here.
@@ -1866,27 +1828,6 @@ pub(crate) mod tests {
         move_answered(&relay);
 
         assert!(!move_failed(&relay));
-    }
-
-    /// Anything the lobby says that is not this shape is somebody else's line.
-    /// A `SERVERMSG` is a general-purpose announcement written for a person, and
-    /// most of them have nothing to do with a relay at all.
-    #[test]
-    fn an_ordinary_server_message_is_not_a_rejection() {
-        for text in [
-            "Maintenance in 5 minutes",
-            "MOVERELAYEDHOST is now supported on this server",
-            "Your MOVERELAYEDHOST failed. Unknown command.",
-        ] {
-            assert!(
-                !move_rejected_in(&Delta::ServerMessage {
-                    text: text.to_string(),
-                    boxed: false,
-                }),
-                "only a line that opens with the command and the word failed is the server \
-                 rejecting ours, and {text} is not one"
-            );
-        }
     }
 
     /// Told once per battle, the same rule silence follows. A relay that keeps
