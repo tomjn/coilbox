@@ -59,5 +59,19 @@
       "unit": null,
       "note": "The engine's own name for the projectile the weapon fires: Cannon, BeamLaser, MissileLauncher, StarburstLauncher, TorpedoLauncher, LaserCannon, LightningCannon, EmgCannon, Flame, AircraftBomb, DGun, Melee, Rifle, Shield. A def that declares none has one worked out for it by the engine's own weapondefs_post before this is read."
     }
+  },
+  "morph": {
+    "note": "What a unit turns into (issue #2063), sent as morphTargets: one object per edge. Not part of a unitdef the way the stats above are. Read from two places at once: the def's own customparams (Zero-K's morphto, morphto_1 and upwards, with morphtime, morphcost, level and combatmorph carrying the same suffix) and the game's morph config, tried at luarules/configs/morph_defs.lua then gamedata/morph_defs.lua. A game may write neither, which is most of them.",
+    "into": {
+      "from": ["into", "customparams.morphto"],
+      "unit": null,
+      "note": "The target's def key, lowercased so the morph graph's edges match the build graph's node names. Always present: an entry without one names nothing and is dropped."
+    },
+    "conditions": {
+      "from": ["every other key the game wrote beside into"],
+      "unit": null,
+      "note": "Passed through under their own lowercased names, because no two games agree on them: research, require and tech in SplinterFaction, morphcost, level and combatmorph in Zero-K, xp and rank in the shared gadget's documentation, facing, directional and tech in Spring 1944. Numbers, strings and booleans only. A table value is dropped rather than flattened."
+    },
+    "maxMorphJson": 8192
   }
 }
