@@ -15,7 +15,13 @@
  * confirmation, and it is not what is being asked about here.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -123,6 +129,25 @@ beforeEach(() => {
 describe("the battle room's route word", () => {
   it("tells the host of a relayed battle that it is relayed", () => {
     drawHeader({ route: "relay" });
+    expect(screen.getByText("Relayed")).toBeTruthy();
+  });
+
+  /**
+   * The route can be recorded after the room is drawn, and on the one route the
+   * word exists for it usually is. A relayed `mp_open_battle` waits for the
+   * lobby's answer, and that answer is also the delta that puts this client in
+   * the battle and sends the page here, so the room arrives before the form gets
+   * its promise back and records anything. A header that read the record once on
+   * mount would leave a relayed host with no word at all.
+   */
+  it("takes a route recorded after the room is already on screen", () => {
+    drawHeader();
+    expect(routeShown()).toBe(false);
+
+    act(() => {
+      recordHostingRoute("relay");
+    });
+
     expect(screen.getByText("Relayed")).toBeTruthy();
   });
 

@@ -117,6 +117,12 @@ export function BattleRoomHeader({
   // the match rather than the founder, so a route left behind by a battle on
   // another server cannot surface in a room that never recorded one.
   //
+  // That holds because there is one battle room to be in. It would not hold for
+  // two: a host with a battle on each of two connections founded both, so both
+  // pass, and the record describes whichever they hosted last (issue #2147).
+  // `hostingRoute.ts` says why the record is not keyed and what asking the
+  // connection instead would and would not answer.
+  //
   // Which leaves the joiners with nothing, and there is nothing to give them.
   // A relayed battle is advertised at the relay's own public address with
   // `natType` 0, exactly like a direct one (issue #2017), so it is

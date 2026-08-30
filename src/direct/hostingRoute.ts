@@ -292,8 +292,47 @@ export function battleRouteLabel(
  * route is a fact about a battle that is open now, and a stale one read back
  * after a restart would be worse than none.
  *
- * Issue #2022 is the reader: it says which route a battle took so a worse ping
- * has an explanation.
+ * # Who reads it
+ *
+ * One reader, and it is the route word in {@link BattleRoomHeader}, which says
+ * which route a battle took so a worse ping has an explanation (issue #2022).
+ * The launch used to read it as well, to decide whether the game it was
+ * starting went through this machine's relay. That was issue #2099, and it asks
+ * the connection now, which holds that answer for its own battle rather than
+ * for the last battle hosted anywhere.
+ *
+ * # What it cannot say, and why nothing has fixed that
+ *
+ * There is no battle in here and no connection either, so it means "the route
+ * of the last battle this client hosted anywhere". A host with two hosted
+ * battles open would read one word on both rooms (issue #2147).
+ *
+ * There is only ever one battle room to draw, which is why the word is right
+ * today. `store.tsx` holds a single `activeKey` and a single mirror, and
+ * nothing sets that key to a connection that already exists, so there is no way
+ * to move the page from one connection's battle to another's.
+ *
+ * That is a weaker guarantee than the hosting forms make it sound.
+ * `hostBlockedReason` and `joinBlockedReason` say "Coilbox holds one lobby
+ * connection" and mean it, but they are read when a drawer opens and a drawer
+ * keeps the element it was opened with, so a reconnect landing while the form
+ * is on screen walks straight past them. `doConnect` refuses nothing and
+ * disconnects nothing, so two connections can be live in the registry at once.
+ * What stops a second battle room is the one mirror, not the copy.
+ *
+ * The connection cannot be asked this the way the launch asks it. What a
+ * connection holds is a relay handle, so all it can answer is relayed or not,
+ * and three of the label's four words are rungs of a ladder climbed in the
+ * hosting form against a reachability report the connection never sees.
+ *
+ * Keying this by server key is the other suggestion in issue #2147, and it does
+ * not work either. The key the header has is `room.serverKey`, which is
+ * `activeKey`, while the battle it is drawing comes from `currentBattle` in the
+ * one mirror every live connection writes into. With two of them those two can
+ * already disagree, so a key check would be wrong in the same cases `selfHost`
+ * is. Whoever gives a connection a mirror of its own fixes both at once, and
+ * until then this is a line of that work rather than a fix that stands up
+ * alone.
  *
  * # The one thing a reader has to do
  *
@@ -314,12 +353,22 @@ export function recordHostingRoute(route: HostingRoute | null): void {
   for (const listener of listeners) listener();
 }
 
-/** The recorded route, without subscribing to it. */
+/** The recorded route, without subscribing to it. The hook below reads through
+ *  this rather than reaching for the variable, so there is one way in. */
 export function chosenHostingRoute(): HostingRoute | null {
   return chosen;
 }
 
-/** The recorded route, for a component that should redraw when it changes. */
+/**
+ * The recorded route, for a component that should redraw when it changes.
+ *
+ * A subscription rather than a plain read, and the battle room needs it to be
+ * one. A relayed host's `mp_open_battle` waits for the lobby's answer, and that
+ * same answer is the delta that puts this client in the battle and sends the
+ * page to the battle room. So the room can be on screen before the form that
+ * hosted it gets its promise back and records the route, and a header that read
+ * once on mount would show a relayed host no word at all.
+ */
 export function useChosenHostingRoute(): HostingRoute | null {
   return useSyncExternalStore(
     (onChange) => {
@@ -328,7 +377,7 @@ export function useChosenHostingRoute(): HostingRoute | null {
         listeners.delete(onChange);
       };
     },
-    () => chosen,
-    () => chosen,
+    chosenHostingRoute,
+    chosenHostingRoute,
   );
 }
