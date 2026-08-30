@@ -788,7 +788,7 @@ mod tests {
             lock_or_recover(&recorder).push(json);
             Ok(())
         });
-        handshake(addr, mode, events).await;
+        let (_registry, _key, _logs) = handshake(addr, mode, events).await;
 
         let recorded = lock_or_recover(&seen).clone();
         recorded
@@ -853,13 +853,15 @@ mod tests {
     /// then every line the handshake sent, the `LOGIN` included, has been
     /// written and has been through `console`.
     ///
-    /// Hands back the registry it registered the connection in, and the key it
-    /// used, so a test can reach the live connection afterwards.
+    /// Hands back the registry it registered the connection in, the key it used,
+    /// so a test can reach the live connection afterwards, and the connection's
+    /// conversation logs, which the caller has to hold for as long as it uses
+    /// the connection.
     async fn handshake(
         addr: std::net::SocketAddr,
         mode: LoginMode,
         events: Channel<LobbyEvent>,
-    ) -> (Registry, String) {
+    ) -> (Registry, String, crate::dmlog::ScratchLogs) {
         let stream = tokio::net::TcpStream::connect(addr)
             .await
             .expect("the lobby is listening");
@@ -871,7 +873,7 @@ mod tests {
             LoginMode::Register { .. } => LoginPhase::Registered,
         };
 
-        let logs = std::env::temp_dir().join("coilbox-login-redaction-tests");
+        let logs = crate::dmlog::ScratchLogs::new();
         spawn_connection(
             registry.clone(),
             key.clone(),
@@ -887,8 +889,8 @@ mod tests {
                 mode,
             },
             events,
-            crate::dmlog::DmLog::new(&logs, &key),
-            crate::dmlog::DmLog::new(&logs, &key),
+            logs.dms(&key),
+            logs.channels(&key),
         );
 
         let mut phase = lock_or_recover(&registry)
@@ -900,7 +902,7 @@ mod tests {
             .await
             .expect("the handshake did not finish in time")
             .expect("the connection task is still running");
-        (registry, key)
+        (registry, key, logs)
     }
 
     /// The acceptance test for issue #2060, on the wire. A `CLIENTIP` arriving
@@ -914,7 +916,8 @@ mod tests {
     #[tokio::test]
     async fn a_named_joiner_reaches_the_relay_this_connection_hosts_through() {
         let (addr, lobby_says) = lobby_that_says_what_it_is_told().await;
-        let (registry, key) = handshake(addr, LoginMode::Login, Channel::new(|_| Ok(()))).await;
+        let (registry, key, _logs) =
+            handshake(addr, LoginMode::Login, Channel::new(|_| Ok(()))).await;
 
         // Everything coilbox writes to the agent's stdin, which is where the
         // answer to this test is.
@@ -980,7 +983,7 @@ mod tests {
     async fn a_lobby_that_answers_a_move_stands_the_warning_down() {
         let (addr, lobby_says) = lobby_that_says_what_it_is_told().await;
         let (seen, events) = recording_channel();
-        let (registry, key) = handshake(addr, LoginMode::Login, events).await;
+        let (registry, key, _logs) = handshake(addr, LoginMode::Login, events).await;
         put_a_relay_behind(&registry, &key, silent_agent());
 
         let relay = lock_or_recover(&registry)
@@ -1020,7 +1023,7 @@ mod tests {
     async fn a_relayed_connection_keeps_reading_while_the_agent_thinks() {
         let (addr, lobby_says) = lobby_that_says_what_it_is_told().await;
         let (seen, events) = recording_channel();
-        let (registry, key) = handshake(addr, LoginMode::Login, events).await;
+        let (registry, key, _logs) = handshake(addr, LoginMode::Login, events).await;
         put_a_relay_behind(&registry, &key, silent_agent());
 
         lobby_says
@@ -1062,7 +1065,7 @@ mod tests {
     async fn a_connection_with_no_relay_carries_on_past_a_named_joiner() {
         let (addr, lobby_says) = lobby_that_says_what_it_is_told().await;
         let (seen, events) = recording_channel();
-        let (registry, key) = handshake(addr, LoginMode::Login, events).await;
+        let (registry, key, _logs) = handshake(addr, LoginMode::Login, events).await;
 
         lobby_says
             .send("CLIENTIP joiner 203.0.113.7".to_string())
@@ -1157,7 +1160,8 @@ mod tests {
         ] {
             let sent: Arc<Mutex<Vec<String>>> = Arc::default();
             let addr = lobby_advertising(&advertised, sent.clone()).await;
-            handshake(addr, LoginMode::Login, Channel::new(|_| Ok(()))).await;
+            let (_registry, _key, _logs) =
+                handshake(addr, LoginMode::Login, Channel::new(|_| Ok(()))).await;
             assert_eq!(
                 *lock_or_recover(&sent),
                 claimed,
@@ -1233,7 +1237,7 @@ mod tests {
             Ok(())
         });
 
-        let logs = std::env::temp_dir().join("coilbox-battle-redaction-tests");
+        let logs = crate::dmlog::ScratchLogs::new();
         spawn_connection(
             registry.clone(),
             key.clone(),
@@ -1249,8 +1253,8 @@ mod tests {
                 mode: LoginMode::Login,
             },
             events,
-            crate::dmlog::DmLog::new(&logs, &key),
-            crate::dmlog::DmLog::new(&logs, &key),
+            logs.dms(&key),
+            logs.channels(&key),
         );
 
         // Wait for the login this fixture drives to finish, the same way
@@ -1368,7 +1372,7 @@ mod tests {
             Ok(())
         });
 
-        let logs = std::env::temp_dir().join("coilbox-join-redaction-tests");
+        let logs = crate::dmlog::ScratchLogs::new();
         spawn_connection(
             registry.clone(),
             key.clone(),
@@ -1384,8 +1388,8 @@ mod tests {
                 mode: LoginMode::Login,
             },
             events,
-            crate::dmlog::DmLog::new(&logs, &key),
-            crate::dmlog::DmLog::new(&logs, &key),
+            logs.dms(&key),
+            logs.channels(&key),
         );
 
         let mut phase = lock_or_recover(&registry)

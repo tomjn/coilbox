@@ -30,7 +30,7 @@ use tokio::sync::Notify;
 use tokio_util::codec::{Framed, LinesCodec};
 
 use crate::conn::{spawn_connection, wait_until_ready, Outbound, Registry};
-use crate::dmlog::DmLog;
+use crate::dmlog::ScratchLogs;
 
 /// How long a test waits for something that should happen in milliseconds.
 const PATIENCE: Duration = Duration::from_secs(5);
@@ -47,6 +47,8 @@ struct Client {
     /// Every event the connection has streamed, as the JSON the frontend would
     /// have received. The raw wire lines are in here too, as `console` events.
     events: Arc<Mutex<Vec<String>>>,
+    /// Where this connection's conversation logs live, deleted with the client.
+    _logs: ScratchLogs,
 }
 
 impl Client {
@@ -65,9 +67,7 @@ impl Client {
             Ok(())
         });
         let key = format!("{name}@{addr}");
-        // A directory nothing writes to unless the test sends named-channel
-        // chat, and one the run leaves behind either way.
-        let logs = std::env::temp_dir().join("coilbox-direct-loopback-tests");
+        let logs = ScratchLogs::new();
         spawn_connection(
             registry.clone(),
             key.clone(),
@@ -83,13 +83,14 @@ impl Client {
                 mode: LoginMode::Login,
             },
             channel,
-            DmLog::new(&logs, &key),
-            DmLog::new(&logs, &key),
+            logs.dms(&key),
+            logs.channels(&key),
         );
         Client {
             key,
             registry: registry.clone(),
             events,
+            _logs: logs,
         }
     }
 
@@ -633,6 +634,50 @@ fn battle_chat(state: &LobbyState) -> Vec<(String, String, ChatKind)> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// The guard for #2107, and for #2093 before it. A test connection starts with
+/// nothing said on it.
+///
+/// `spawn_connection` seeds `state.dms` from the log it is handed, so a fixture
+/// whose log another run can also open starts with that run's messages in state
+/// and every count in this file is off by however many they were. That is not a
+/// thing the tests above would say clearly if it happened: they would fail on a
+/// number, somewhere else, on a fraction of runs.
+///
+/// It asserts something no product code decides, which is the point. What is
+/// under test is [`ScratchLogs`], and what would break it is somebody going back
+/// to a fixed directory named after the connection key.
+#[tokio::test]
+async fn a_test_connection_starts_with_nothing_said_on_it() {
+    let room = room("alice", false).await;
+    let registry = Registry::default();
+
+    let client = Client::connect(&registry, loopback(room.port()), "alice").await;
+    client.wait_for_ready().await;
+    client.send(open_battle_line());
+    wait_until(
+        || client.state().current_battle == Some(1),
+        "the host to be in its own battle",
+    )
+    .await;
+    client.send(command::say_battle("anyone about?"));
+    wait_until(
+        || !battle_chat(&client.state()).is_empty(),
+        "the client to hear itself, so the channel log has been written",
+    )
+    .await;
+
+    // Said in the battle, so it belongs in the channel log and nowhere near the
+    // direct messages. Nothing on this connection was ever a direct message.
+    let dms = client.state().dms;
+    assert!(
+        dms.is_empty(),
+        "a fresh connection loaded somebody else's conversation: {:?}",
+        dms.keys().collect::<Vec<_>>()
+    );
+
+    room.stop("done").await;
 }
 
 /// A joiner who does not have the map or the game says so, and the host sees it.
