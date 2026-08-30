@@ -152,6 +152,18 @@ export function HostRoomForm({
           // only somebody outside would want the router's. Naming the router's
           // would break the case the room exists for to fix the case it does
           // not.
+          //
+          // Worth knowing before anybody revisits that trade, because it looks
+          // like a coin flip and is not. Making the two port numbers agree buys
+          // nothing at all. A room announces one address as well as one port,
+          // and for a room on a LAN that address is this machine on this
+          // network, so a joiner from outside is sent somewhere they cannot
+          // dial whichever port they are handed. A machine behind a router that
+          // could hand back a different external port holds a private address
+          // by definition, so the port is never the only thing in the way and
+          // never the first. Serving both sides means choosing the address per
+          // joiner as well, which the room cannot do today because its accept
+          // loop drops the peer's socket address (issue #2055).
           port: DEFAULT_HOST_PORT,
           // Never true here, and written as the same expression the lobby form
           // uses rather than a bare false, because the reason it is never true

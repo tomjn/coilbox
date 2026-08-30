@@ -133,8 +133,26 @@ pub struct PortRequest {
 pub struct Mapped {
     /// The port on this machine.
     pub port: u16,
-    /// The port on the router. Asked to match, and usually does, but a router
-    /// that already has that port spoken for may hand back another.
+    /// The port on the router. Asked to match, and only [`Method::NatPmp`] can
+    /// answer with a different one.
+    ///
+    /// NAT-PMP and PCP both treat the port asked for as a suggestion. RFC 6886
+    /// section 3.3 says a gateway "is not obliged to assign the port suggested",
+    /// either for policy reasons or because it is already assigned to some other
+    /// client. RFC 6887 section 11 goes further and tells a PCP client it "MUST
+    /// be written assuming that it may never be assigned the external port it
+    /// suggests". So a number that differs is an ordinary outcome rather than a
+    /// rare accident, and every caller that advertises a port reads this field
+    /// rather than the port it asked for.
+    ///
+    /// UPnP cannot produce one. `try_upnp` calls `add_port` with a fixed
+    /// external port, which answers `PortInUse` rather than substituting
+    /// another, and `add_any_port` is never called.
+    ///
+    /// For a room hosted on a LAN a difference here changes nothing on its own,
+    /// because the single address the room announces settles whether somebody
+    /// outside can join before the port gets a say. The comment on the port
+    /// field in `src/direct/HostRoomForm.tsx` has the rest (issue #2055).
     pub external_port: u16,
     pub transport: Transport,
 }
