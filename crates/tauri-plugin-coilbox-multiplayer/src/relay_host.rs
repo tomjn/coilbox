@@ -125,11 +125,12 @@ pub const ALLOW_JOINER_PATIENCE: Duration =
 /// case than either: one line out, one line back, on a connection that is
 /// already up and logged in.
 ///
-/// Measured on 30 August 2026 against the three TASServer lobbies coilbox ships
+/// Measured on 30 August 2026 against the four TASServer lobbies coilbox ships
 /// with, 30 `LISTCOMPFLAGS`-to-`COMPFLAGS` round trips each, no login. Slowest
-/// of the 90 was 234 ms, on `lobby.springrts.com`. Medians were 33.5 ms there,
-/// 17.9 ms on `lobby.techa-rts.com` and 32.8 ms on
-/// `server4.beyondallreason.info` over TLS. So the budget is around 85 times the
+/// of the 120 was 234 ms, on `lobby.springrts.com`. Medians were 33.5 ms there,
+/// 17.9 ms on `lobby.techa-rts.com`, 32.8 ms on `server4.beyondallreason.info`
+/// over TLS, and 155.4 ms on `lobby.recoilengine.org`, whose worst was 169.4 ms.
+/// So the budget is around 85 times the
 /// worst round trip anybody measured, which is the headroom a real
 /// `MOVERELAYEDHOST` needs and `LISTCOMPFLAGS` does not: the answer is a
 /// broadcast to every client that asked for relay support, not a constant read
@@ -526,8 +527,8 @@ pub(crate) fn move_unanswered(relay: &HostedRelay, number: u64) -> bool {
 /// ```
 ///
 /// `lobby.springrts.com:8200` (0.38-84-gc8386e9), `lobby.techa-rts.com:8200`
-/// (0.38-95-gf595963) and `lobby.recoilengine.org:8200` (version withheld) all
-/// answered with that line and nothing else.
+/// (0.38-95-gf595963) and `lobby.recoilengine.org:8200` (which gives its version
+/// as `unknown`) all answered with that line and nothing else.
 ///
 /// It lives here rather than in `coilbox-lobby-protocol` on purpose. That crate
 /// is the protocol, and this is one server's wording for something the protocol
