@@ -111,7 +111,7 @@ use tachyon_room::{NewLobby, RoomAction, VoteChoice};
 use tauri::{
     ipc::Channel,
     plugin::{Builder, TauriPlugin},
-    Manager, Runtime, State,
+    AppHandle, Manager, RunEvent, Runtime, State,
 };
 use tls::{ConnectError, TlsMode};
 use tokio_util::sync::CancellationToken;
@@ -3526,9 +3526,58 @@ async fn mp_tachyon_signed_in(server_id: String, username: String) -> CliResult 
     }
 }
 
+/// How long quitting waits for the lobby to mint one last relay credential.
+///
+/// A budget for the quit rather than a deadline the lobby has to meet. Half a
+/// second is more than twice the slowest lobby round trip anybody has measured
+/// for this repo, 234 ms across 90 `LISTCOMPFLAGS` exchanges with three real
+/// TASServer lobbies on 30 August 2026, recorded on
+/// [`relay_host::MOVE_ANSWER_PATIENCE`]. It is also the half second
+/// `tauri-plugin-coilbox-direct` already spends handing router ports back on
+/// the way out, and the two never fire together: a host takes the relay route
+/// precisely because their ports do not work.
+///
+/// Being mean costs the renewal, which leaves the sidecar holding what it holds
+/// today. Being generous costs a slow quit, and an app that hangs on quit is the
+/// worse bug.
+const EXIT_RENEWAL_BUDGET: Duration = Duration::from_millis(500);
+
+/// Top a relayed battle's credential up on the way out, so the sidecar carries a
+/// whole lifetime into the part of the game coilbox will not see (issue #2105).
+///
+/// [`relay_host::renew_before_quitting`] is what it does and why it is all that
+/// can be done. This is the wiring: the same shape as
+/// `tauri-plugin-coilbox-direct`'s port release, because it has the same
+/// problem. The work is async, `RunEvent::Exit` is not, and the runtime is still
+/// turning while this thread waits, so the ask makes progress and the app quits
+/// regardless once the budget is gone.
+///
+/// Nothing is spawned on a quit with no relayed battle, which is every quit but
+/// a host's.
+fn renew_relays_on_exit<R: Runtime>(app: &AppHandle<R>) {
+    let Some(registry) = app.try_state::<Registry>() else {
+        return;
+    };
+    let registry = Registry::clone(&registry);
+    if relay_host::relaying_on(&registry).is_empty() {
+        return;
+    }
+    let (done, finished) = std::sync::mpsc::channel();
+    tauri::async_runtime::spawn(async move {
+        relay_host::renew_before_quitting(&registry, EXIT_RENEWAL_BUDGET).await;
+        let _ = done.send(());
+    });
+    let _ = finished.recv_timeout(EXIT_RENEWAL_BUDGET);
+}
+
 /// Build the plugin. Registered as `"coilbox-multiplayer"`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-multiplayer")
+        .on_event(|app, event| {
+            if matches!(event, RunEvent::Exit) {
+                renew_relays_on_exit(app);
+            }
+        })
         .setup(|app, _api| {
             app.manage(Registry::default());
             app.manage(PendingConnects::default());
