@@ -7,6 +7,8 @@
 //! the exact bytes of the two lines a client hangs without, and the sweep that
 //! drops a peer whose machine went to sleep.
 
+use std::net::Ipv4Addr;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use coilbox_lobby_protocol::{command, default_battle_status, BattleStatus};
@@ -19,7 +21,7 @@ use tokio::net::TcpStream;
 async fn room() -> Room {
     Room::start(RoomOptions {
         host: "alice".to_string(),
-        ip: "192.168.0.5".to_string(),
+        ip: Some("192.168.0.5".to_string()),
         port: 0,
         approve_joins: false,
         // No beacon: this is about the bytes on the TCP socket, and a room
@@ -290,7 +292,7 @@ async fn the_sweep_frees_a_name_and_leaves_the_seat_alone() {
 async fn a_peer_that_stops_talking_is_dropped() {
     let (room, clock) = Room::start_on_a_manual_clock(RoomOptions {
         host: "alice".to_string(),
-        ip: "192.168.0.5".to_string(),
+        ip: Some("192.168.0.5".to_string()),
         port: 0,
         approve_joins: false,
         advertise: false,
@@ -315,6 +317,107 @@ async fn a_peer_that_stops_talking_is_dropped() {
         .expect("the sweep to close the socket");
     assert_eq!(ended, None, "the socket is closed");
     assert_eq!(room.status().await.map(|s| s.peers), Some(0));
+
+    room.stop("done").await;
+}
+
+/// A host connects to a VPN halfway through, and the room follows them.
+///
+/// The address a joining engine dials was worked out once, when the room
+/// started, so everybody who arrived after the host moved was sent to an address
+/// nothing answers on (issue #2116). This is the whole path on real sockets:
+/// the room re-reads the machine's addresses on its own timer, moves the battle,
+/// tells bob who is already in it, and hands carol the new address at login
+/// without being asked.
+///
+/// The machine underneath is the one thing that is not real. Moving this Mac's
+/// address needs root, so the address list the room reads is the test's to move
+/// and everything downstream of it is the room doing its ordinary job.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_room_that_works_out_its_own_address_follows_it() {
+    let home = Ipv4Addr::new(192, 168, 1, 45);
+    let vpn = Ipv4Addr::new(10, 8, 0, 2);
+    let machine = Arc::new(Mutex::new(vec![home, Ipv4Addr::LOCALHOST]));
+    let reading = Arc::clone(&machine);
+
+    let room = Room::start_on_chosen_addresses(
+        RoomOptions {
+            host: "alice".to_string(),
+            // The whole point: no address given, so the room works one out and
+            // keeps working it out.
+            ip: None,
+            port: 0,
+            approve_joins: false,
+            advertise: false,
+        },
+        Arc::new(move || reading.lock().expect("the address list").clone()),
+    )
+    .await
+    .expect("a free port");
+    assert_eq!(
+        room.status().await.map(|s| s.ip).as_deref(),
+        Some("192.168.1.45"),
+        "the room starts on the address the machine has"
+    );
+
+    let mut host = RawPeer::connect(&room).await;
+    host.log_in("alice").await;
+    host.send(&command::open_battle(
+        0,
+        0,
+        "*",
+        8452,
+        16,
+        -1,
+        0,
+        -1,
+        "spring",
+        "105.1.1",
+        "Red Comet",
+        "Tom's LAN game",
+        "Beyond All Reason test-1234",
+    ))
+    .await;
+    host.read_to("REQUESTBATTLESTATUS").await;
+
+    let mut bob = RawPeer::connect(&room).await;
+    let burst = bob.log_in("bob").await;
+    assert!(
+        burst
+            .iter()
+            .any(|l| l.contains("BATTLEOPENED 1 0 0 alice 192.168.1.45 8452")),
+        "bob was told the old address on the way in: {burst:?}"
+    );
+    bob.send("JOINBATTLE 1 * s3cret").await;
+    bob.read_to("REQUESTBATTLESTATUS").await;
+
+    // The VPN comes up and takes the default route with it.
+    *machine.lock().expect("the address list") = vec![vpn, Ipv4Addr::LOCALHOST];
+
+    // Five of the room's two second ticks, so a busy machine has room to be slow
+    // and a room that never moves still fails rather than hanging.
+    let told = tokio::time::timeout(Duration::from_secs(10), bob.read_to("BATTLEHOSTMOVED"))
+        .await
+        .expect("the room to notice the address it is on");
+    assert_eq!(
+        told.last().map(String::as_str),
+        Some("BATTLEHOSTMOVED 1 10.8.0.2 8452"),
+        "bob was already in the battle, so he is corrected in place"
+    );
+
+    let mut carol = RawPeer::connect(&room).await;
+    let arriving = carol.log_in("carol").await;
+    assert!(
+        arriving
+            .iter()
+            .any(|l| l.contains("BATTLEOPENED 1 0 0 alice 10.8.0.2 8452")),
+        "carol is given the address the host is on now: {arriving:?}"
+    );
+    assert_eq!(
+        room.status().await.map(|s| s.ip).as_deref(),
+        Some("10.8.0.2"),
+        "and the host's own screen reads the same"
+    );
 
     room.stop("done").await;
 }

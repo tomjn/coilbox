@@ -13,7 +13,7 @@
 //! deliberately broken one, used to show what the missing line costs.
 
 use std::collections::BTreeMap;
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -195,7 +195,7 @@ fn loopback(port: u16) -> SocketAddr {
 async fn room(host: &str, approve_joins: bool) -> Room {
     Room::start(RoomOptions {
         host: host.to_string(),
-        ip: "127.0.0.1".to_string(),
+        ip: Some("127.0.0.1".to_string()),
         // Port 0 so the OS picks a free one: the tests run in parallel, and the
         // real default (8200) may well be a room the developer is hosting.
         port: 0,
@@ -491,6 +491,98 @@ async fn the_hosts_options_reach_joiners_whenever_they_arrived() {
         "the late joiner to be caught up on the map and options",
     )
     .await;
+
+    room.stop("done").await;
+}
+
+/// The host joins a VPN mid-room, and everybody ends up dialling the new
+/// address without leaving the battle.
+///
+/// The room's own crate proves it puts `BATTLEHOSTMOVED` on the socket. This
+/// proves the client acts on it, which is the half that decides whether the fix
+/// needed anything new on the joining side. It did not: the message already
+/// existed for a lobby moving a relayed battle (#2098) and the reducer already
+/// folds it into the address a joiner would dial.
+///
+/// The roster is the reason it is this message and not a second `BATTLEOPENED`.
+/// A repeat announcement carries the new address too, and the reducer builds a
+/// fresh battle out of one with only the founder in it, so correcting one field
+/// would throw everybody else out of the room. Bob is checked before and after
+/// for exactly that.
+///
+/// This machine's real address cannot be moved without root, so the address list
+/// the room reads is the test's. Everything above it is real: two real clients,
+/// real sockets, and the room's own two second timer.
+#[tokio::test]
+async fn a_host_whose_address_moves_takes_the_battle_with_them() {
+    let machine = Arc::new(Mutex::new(vec![
+        Ipv4Addr::new(192, 168, 1, 45),
+        Ipv4Addr::LOCALHOST,
+    ]));
+    let reading = Arc::clone(&machine);
+    let room = Room::start_on_chosen_addresses(
+        RoomOptions {
+            host: "alice".to_string(),
+            // Worked out rather than typed, which is what makes it the room's to
+            // keep current.
+            ip: None,
+            port: 0,
+            approve_joins: false,
+            advertise: false,
+        },
+        Arc::new(move || reading.lock().expect("the address list").clone()),
+    )
+    .await
+    .expect("a free port");
+
+    let registry = Registry::default();
+    let host = Client::connect(&registry, loopback(room.port()), "alice").await;
+    host.wait_for_ready().await;
+    host.send(open_battle_line());
+    wait_until(
+        || host.state().current_battle == Some(1),
+        "the host to be in its own battle",
+    )
+    .await;
+    let joiner = Client::connect(&registry, loopback(room.port()), "bob").await;
+    joiner.wait_for_ready().await;
+    joiner.send(command::join_battle(1, None, Some("s3cret")));
+    wait_until(
+        || joiner.state().current_battle == Some(1),
+        "the joiner to be in the battle",
+    )
+    .await;
+
+    let dialled = |client: &Client| client.state().battles[&1].ip.clone();
+    let in_the_room = |client: &Client| {
+        let mut names: Vec<String> = client.state().battles[&1].members.keys().cloned().collect();
+        names.sort();
+        names
+    };
+    assert_eq!(dialled(&joiner), "192.168.1.45");
+    assert_eq!(in_the_room(&joiner), ["alice", "bob"]);
+
+    // The VPN comes up.
+    *machine.lock().expect("the address list") =
+        vec![Ipv4Addr::new(10, 8, 0, 2), Ipv4Addr::LOCALHOST];
+    wait_until(
+        || dialled(&joiner) == "10.8.0.2",
+        "the joiner to be moved to the address the host is on now",
+    )
+    .await;
+    assert_eq!(
+        in_the_room(&joiner),
+        ["alice", "bob"],
+        "and moved without being thrown out of the battle to do it"
+    );
+    assert_eq!(joiner.state().current_battle, Some(1));
+    assert_eq!(dialled(&host), "10.8.0.2", "the host's own copy moves too");
+
+    // Somebody who arrives afterwards is told the new address at login, which
+    // needs no message at all.
+    let late = Client::connect(&registry, loopback(room.port()), "carol").await;
+    late.wait_for_ready().await;
+    assert_eq!(dialled(&late), "10.8.0.2");
 
     room.stop("done").await;
 }
@@ -1150,7 +1242,7 @@ async fn a_port_in_use_is_refused_and_freed_again() {
 
     let clash = Room::start(RoomOptions {
         host: "alice".to_string(),
-        ip: "127.0.0.1".to_string(),
+        ip: Some("127.0.0.1".to_string()),
         port,
         approve_joins: false,
         advertise: false,
@@ -1168,7 +1260,7 @@ async fn a_port_in_use_is_refused_and_freed_again() {
     // not told the port is taken by the room they just closed.
     let again = Room::start(RoomOptions {
         host: "alice".to_string(),
-        ip: "127.0.0.1".to_string(),
+        ip: Some("127.0.0.1".to_string()),
         port,
         approve_joins: false,
         advertise: false,

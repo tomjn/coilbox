@@ -266,6 +266,42 @@ impl RoomState {
         &self.pending
     }
 
+    /// The address a joining engine is currently told to dial.
+    pub fn ip(&self) -> &str {
+        &self.config.ip
+    }
+
+    /// Move the room to a new address, and tell everybody who is already in it.
+    ///
+    /// The address is worked out once, when the room starts, and it is only true
+    /// for as long as the host stays on the network they started on. A VPN
+    /// coming up, a DHCP lease landing somewhere else, or a second network card
+    /// appearing all move it, and the address the room hands out has to move
+    /// with it or nobody who joins afterwards can reach the game.
+    ///
+    /// Two audiences, one field. Somebody who logs in later reads the new
+    /// address off [`RoomState::announcement`] like any other joiner and needs
+    /// no telling. Somebody already here was told the old one and holds it until
+    /// they launch, so they are sent `BATTLEHOSTMOVED`, which is the one line
+    /// that corrects an address without disturbing the battle around it (see
+    /// [`line::battle_host_moved`]).
+    ///
+    /// Silent when the address has not changed, so this can be called on a
+    /// timer, and silent before a battle is open, because there is no battle to
+    /// move and the address is read fresh when one opens.
+    pub fn set_ip(&mut self, ip: String) -> Vec<Outbound> {
+        if ip == self.config.ip {
+            return vec![];
+        }
+        self.config.ip = ip;
+        let Some(b) = self.battle.as_ref() else {
+            return vec![];
+        };
+        vec![Outbound::All {
+            line: line::battle_host_moved(b.id, &self.config.ip, b.port),
+        }]
+    }
+
     /// The connection the host is logged in on, if they are here yet.
     ///
     /// Approval never reaches the wire (see [`RoomConfig::approve_joins`]), so the
@@ -1432,6 +1468,41 @@ mod tests {
         assert_eq!(
             due(&second, ALICE),
             ["OPENBATTLEFAILED this room already has a battle"]
+        );
+    }
+
+    /// A host whose address moves has two audiences, and both have to end up
+    /// dialling the same place.
+    ///
+    /// Bob is already here and was told the old address at login, so he is sent
+    /// `BATTLEHOSTMOVED` and nothing else. Carol arrives afterwards and reads
+    /// the new address off her own `BATTLEOPENED`, which is the ordinary path
+    /// and needs no help. The move is silent when there is nothing to say,
+    /// because a room calls this on a timer (issue #2116).
+    #[test]
+    fn a_room_that_moves_tells_the_people_in_it_and_the_people_who_come_later() {
+        const CAROL: PeerId = 3;
+        let mut room = started(false);
+        assert_eq!(room.ip(), "192.168.0.5");
+
+        let moved = room.set_ip("10.1.2.3".into());
+        assert_eq!(due(&moved, BOB), ["BATTLEHOSTMOVED 1 10.1.2.3 8452"]);
+        assert_eq!(due(&moved, ALICE), ["BATTLEHOSTMOVED 1 10.1.2.3 8452"]);
+        assert_eq!(room.ip(), "10.1.2.3");
+
+        let arriving = log_in(&mut room, CAROL, "carol");
+        let opened: Vec<&str> = due(&arriving, CAROL)
+            .into_iter()
+            .filter(|l| l.starts_with("BATTLEOPENED "))
+            .collect();
+        assert_eq!(
+            opened,
+            ["BATTLEOPENED 1 0 0 alice 10.1.2.3 8452 16 0 0 -1 spring\t105.1.1\tRed Comet\tTom's LAN game\tBeyond All Reason test-1234\t__battle__1"]
+        );
+
+        assert!(
+            room.set_ip("10.1.2.3".into()).is_empty(),
+            "a move to the address the room is already on is not a move"
         );
     }
 

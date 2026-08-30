@@ -261,6 +261,32 @@ impl Advert {
             self.addresses = addresses.to_vec();
         }
     }
+
+    /// How many times this room's record has been published, counted by the
+    /// responder rather than by us.
+    ///
+    /// One per [`Advert::start`] and one per [`Advert::update`] that found
+    /// something to say. It does not count the second announcement RFC 6762
+    /// section 8.3 asks for, or an announcement on an interface that appeared
+    /// later, because neither is this code deciding to republish.
+    ///
+    /// Here so that [`Advert::update`]'s promise to stay quiet can be checked
+    /// against the daemon that would do the talking. A browsing daemon cannot
+    /// answer that question: it re-resolves a service for reasons of its own,
+    /// including a flushed address record ageing out of its cache one second
+    /// later (RFC 6762 section 10.2), so silence on a browse is not evidence
+    /// that nothing was sent.
+    ///
+    /// The answer is a round trip to the daemon thread, and its commands are
+    /// executed in order, so a publication asked for before this call has
+    /// already been counted by the time it returns.
+    ///
+    /// `None` from a daemon that has stopped answering, which is one that has
+    /// shut down.
+    pub fn publications(&self) -> Option<i64> {
+        let metrics = self.daemon.get_metrics().ok()?.recv().ok()?;
+        metrics.get("register").copied()
+    }
 }
 
 impl Drop for Advert {
