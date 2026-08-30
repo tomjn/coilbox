@@ -8,6 +8,12 @@ import { defineCommand } from "@picoframe/plugin-sdk";
  * `stun.rs`. Everything here is either a binding to it or a pure reading of what
  * it answered, because the interesting part of this feature is the failure, and
  * the failure has to be readable.
+ *
+ * None of it is a connection from outside, so none of it settles whether
+ * anybody can actually get in. That is issue #2119, and every route to a real
+ * inbound connection was measured and ruled out in
+ * `docs/superpowers/specs/2026-08-30-reachability-probe-design.md`. Read it
+ * before reaching for a new signal to add here.
  */
 
 /** Whether a port carries the lobby (TCP) or the game (UDP). */
