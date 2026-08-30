@@ -128,6 +128,50 @@ impl DmLog {
     }
 }
 
+/// Somewhere for a test to keep conversation logs that is not the developer's own
+/// store, and that no other run can reach.
+///
+/// Every fixture in this crate that drives a real connection has to hand
+/// [`crate::conn::spawn_connection`] a real [`DmLog`], because the connection task
+/// seeds `state.dms` from one and writes chat to it. They used to build that log
+/// under a fixed directory in the system temp directory, named after the
+/// connection key. The key carries the loopback port the stand-in server was
+/// handed, the OS hands the same ephemeral port out again on a later run, and
+/// nothing deleted the file, so a run could open a log an earlier run had left
+/// behind and start with that run's messages already in state. That is #2093,
+/// found after 5 failures in 300 runs, and #2107 for the five fixtures with the
+/// same shape that had not yet asserted on anything that would show it.
+///
+/// A random directory per client rather than a delete-afterwards step: the name
+/// cannot collide with an earlier run even if the connection task writes one more
+/// line after the test has finished with it. Hold this for as long as the
+/// connection lives, so the directory goes when the fixture does.
+#[cfg(test)]
+pub(crate) struct ScratchLogs {
+    dir: tempfile::TempDir,
+}
+
+#[cfg(test)]
+impl ScratchLogs {
+    pub(crate) fn new() -> Self {
+        ScratchLogs {
+            dir: tempfile::tempdir().expect("a scratch directory for the conversation logs"),
+        }
+    }
+
+    /// The direct-message log for `server_key`.
+    pub(crate) fn dms(&self, server_key: &str) -> DmLog {
+        DmLog::new(&self.dir.path().join("lobby-dms"), server_key)
+    }
+
+    /// The channel log for `server_key`. A separate directory from [`Self::dms`],
+    /// the way [`crate::log_dirs`] keeps them, so battle chat is not written into
+    /// the file the direct-message loader reads back.
+    pub(crate) fn channels(&self, server_key: &str) -> DmLog {
+        DmLog::new(&self.dir.path().join("lobby-channels"), server_key)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,8 +190,8 @@ mod tests {
 
     #[test]
     fn round_trips_grouped_by_peer_in_order() {
-        let dir = std::env::temp_dir().join(format!("coilbox-dmlog-test-{}", std::process::id()));
-        let log = DmLog::new(&dir, "me@host:8200");
+        let dir = tempfile::tempdir().expect("a scratch directory");
+        let log = DmLog::new(dir.path(), "me@host:8200");
         log.append("bob", &msg("me", "hi bob", 1));
         log.append("bob", &msg("bob", "hi me", 2));
         log.append("carol", &msg("carol", "yo", 3));
@@ -157,8 +201,6 @@ mod tests {
         assert_eq!(loaded["bob"][0].text, "hi bob");
         assert_eq!(loaded["bob"][1].from, "bob");
         assert_eq!(loaded["carol"].len(), 1);
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Lines written before `ChatMsg` grew an `id` have no such field. Bad lines
@@ -166,21 +208,18 @@ mod tests {
     /// - it would just quietly discard every existing user's DM history.
     #[test]
     fn loads_lines_written_before_the_id_field_existed() {
-        let dir = std::env::temp_dir().join(format!("coilbox-dmlog-legacy-{}", std::process::id()));
-        fs::create_dir_all(&dir).expect("temp dir");
+        let dir = tempfile::tempdir().expect("a scratch directory");
         let key = "me@host:8200";
         fs::write(
-            dir.join(format!("{}.jsonl", sanitize_key(key))),
+            dir.path().join(format!("{}.jsonl", sanitize_key(key))),
             "{\"peer\":\"bob\",\"msg\":{\"channel\":null,\"from\":\"bob\",\"text\":\"from before\",\"kind\":\"private\",\"at\":1}}\n",
         )
         .expect("seed legacy log");
 
-        let loaded = DmLog::new(&dir, key).load();
+        let loaded = DmLog::new(dir.path(), key).load();
         assert_eq!(loaded["bob"].len(), 1, "legacy line must still load");
         assert_eq!(loaded["bob"][0].text, "from before");
         assert_eq!(loaded["bob"][0].id, None);
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

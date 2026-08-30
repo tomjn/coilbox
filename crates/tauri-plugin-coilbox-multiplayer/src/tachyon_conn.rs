@@ -1295,7 +1295,7 @@ mod tests {
             std::future::pending::<()>().await;
         });
         let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-        let logs = std::env::temp_dir().join("coilbox-tachyon-conn-test");
+        let logs = crate::dmlog::ScratchLogs::new();
         let (line_channel, _line_rx) = recording();
         crate::conn::spawn_connection(
             registry.clone(),
@@ -1312,8 +1312,8 @@ mod tests {
                 mode: LoginMode::Login,
             },
             line_channel,
-            crate::dmlog::DmLog::new(&logs, "alice@bar:8200"),
-            crate::dmlog::DmLog::new(&logs, "alice@bar:8200"),
+            logs.dms("alice@bar:8200"),
+            logs.channels("alice@bar:8200"),
         );
 
         let map = lock_or_recover(&registry);

@@ -898,8 +898,13 @@ pub(crate) mod tests {
         addr
     }
 
-    /// Connect and log in the way `mp_connect` does, and hand back the key.
-    async fn logged_in(registry: &Registry, addr: std::net::SocketAddr) -> String {
+    /// Connect and log in the way `mp_connect` does, and hand back the key and
+    /// the connection's conversation logs, which the caller has to hold for as
+    /// long as it uses the connection.
+    async fn logged_in(
+        registry: &Registry,
+        addr: std::net::SocketAddr,
+    ) -> (String, crate::dmlog::ScratchLogs) {
         logged_in_watching(registry, addr, Channel::new(|_| Ok(()))).await
     }
 
@@ -909,14 +914,14 @@ pub(crate) mod tests {
         registry: &Registry,
         addr: std::net::SocketAddr,
         events: Channel<crate::conn::LobbyEvent>,
-    ) -> String {
+    ) -> (String, crate::dmlog::ScratchLogs) {
         use coilbox_lobby_protocol::{password_hash, LoginConfig, LoginMode};
 
         let stream = tokio::net::TcpStream::connect(addr)
             .await
             .expect("the lobby is listening");
         let key = format!("alice@{addr}");
-        let logs = std::env::temp_dir().join("coilbox-turn-credentials-tests");
+        let logs = crate::dmlog::ScratchLogs::new();
         crate::conn::spawn_connection(
             registry.clone(),
             key.clone(),
@@ -932,13 +937,13 @@ pub(crate) mod tests {
                 mode: LoginMode::Login,
             },
             events,
-            crate::dmlog::DmLog::new(&logs, &key),
-            crate::dmlog::DmLog::new(&logs, &key),
+            logs.dms(&key),
+            logs.channels(&key),
         );
         crate::conn::wait_until_ready(registry, &key, PATIENCE)
             .await
             .expect("the lobby logged us in");
-        key
+        (key, logs)
     }
 
     /// The whole exchange over a real socket, through the real connection task,
@@ -950,7 +955,7 @@ pub(crate) mod tests {
         ))
         .await;
         let registry = Registry::default();
-        let key = logged_in(&registry, addr).await;
+        let (key, _logs) = logged_in(&registry, addr).await;
 
         let turn = credentials(&registry, &key, NOW, PATIENCE)
             .await
@@ -997,7 +1002,7 @@ pub(crate) mod tests {
         });
 
         let registry = Registry::default();
-        let key = logged_in_watching(&registry, addr, events).await;
+        let (key, _logs) = logged_in_watching(&registry, addr, events).await;
         let turn = credentials(&registry, &key, NOW, PATIENCE)
             .await
             .expect("the lobby minted one");
@@ -1033,7 +1038,7 @@ pub(crate) mod tests {
         ))
         .await;
         let registry = Registry::default();
-        let key = logged_in(&registry, addr).await;
+        let (key, _logs) = logged_in(&registry, addr).await;
 
         // The lobby's own clock, because the reducer stamped the lifetime with
         // it inside the connection task rather than with this test's `NOW`.
@@ -1059,7 +1064,7 @@ pub(crate) mod tests {
         ))
         .await;
         let registry = Registry::default();
-        let key = logged_in(&registry, addr).await;
+        let (key, _logs) = logged_in(&registry, addr).await;
 
         let refused = credentials(&registry, &key, NOW, PATIENCE)
             .await
@@ -1077,7 +1082,7 @@ pub(crate) mod tests {
     async fn a_lobby_without_the_command_over_a_socket_is_not_an_error_it_is_a_silence() {
         let addr = lobby_answering(None).await;
         let registry = Registry::default();
-        let key = logged_in(&registry, addr).await;
+        let (key, _logs) = logged_in(&registry, addr).await;
 
         let quiet = credentials(&registry, &key, NOW, Duration::from_millis(250))
             .await

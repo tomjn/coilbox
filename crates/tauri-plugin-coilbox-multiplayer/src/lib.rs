@@ -4709,15 +4709,20 @@ mod tests {
         addr
     }
 
-    /// Connect and log in the way `mp_connect` does, and hand back the key.
-    async fn logged_in(registry: &Registry, addr: std::net::SocketAddr) -> String {
+    /// Connect and log in the way `mp_connect` does, and hand back the key and
+    /// the connection's conversation logs, which the caller has to hold for as
+    /// long as it uses the connection.
+    async fn logged_in(
+        registry: &Registry,
+        addr: std::net::SocketAddr,
+    ) -> (String, dmlog::ScratchLogs) {
         use coilbox_lobby_protocol::{password_hash, LoginConfig, LoginMode};
 
         let stream = tokio::net::TcpStream::connect(addr)
             .await
             .expect("the lobby is listening");
         let key = format!("alice@{addr}");
-        let logs = std::env::temp_dir().join("coilbox-relayed-open-tests");
+        let logs = dmlog::ScratchLogs::new();
         conn::spawn_connection(
             registry.clone(),
             key.clone(),
@@ -4733,13 +4738,13 @@ mod tests {
                 mode: LoginMode::Login,
             },
             Channel::new(|_| Ok(())),
-            dmlog::DmLog::new(&logs, &key),
-            dmlog::DmLog::new(&logs, &key),
+            logs.dms(&key),
+            logs.channels(&key),
         );
         conn::wait_until_ready(registry, &key, HOSTING_PATIENCE)
             .await
             .expect("the lobby logged us in");
-        key
+        (key, logs)
     }
 
     /// The acceptance criterion of issue #2058, over a real socket and through
@@ -4752,7 +4757,7 @@ mod tests {
             lobby_answering_an_open(|_| "OPENBATTLEFAILED you are not logged in yet".to_string())
                 .await;
         let registry = Registry::default();
-        let key = logged_in(&registry, addr).await;
+        let (key, _logs) = logged_in(&registry, addr).await;
 
         let channel = Channelled::default();
         let relay = a_relay_writing_to(channel.clone());
@@ -4784,7 +4789,7 @@ mod tests {
     async fn a_lobby_opening_over_a_socket_leaves_the_relay_carrying_the_battle() {
         let addr = lobby_answering_an_open(|id| format!("OPENBATTLE {id}")).await;
         let registry = Registry::default();
-        let key = logged_in(&registry, addr).await;
+        let (key, _logs) = logged_in(&registry, addr).await;
 
         let channel = Channelled::default();
         let relay = a_relay_writing_to(channel.clone());
