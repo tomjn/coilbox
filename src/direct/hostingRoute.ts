@@ -167,6 +167,15 @@ export function advertisedGamePort(
  * the checkbox that asks about it, which is where somebody is deciding rather
  * than reading what was decided (issue #2023).
  *
+ * The mapped route says two different things to the two forms, and this is the
+ * one place they disagree about good news. On a lobby server the ports opening
+ * is the whole story. On a LAN room it is half of one, because a room announces
+ * a single address to everybody in it and that address is this machine on this
+ * network. So the ports opening lets somebody outside reach the room and does
+ * not let them into the game, and a host who ticked "Reachable over the
+ * internet" and read only the first half would send a friend an address that
+ * gets them as far as the chat (issue #2055).
+ *
  * The bottom two routes name no router, and the mapped one does. A mapping only
  * happens when there is a router to make it, so that sentence has its device
  * established. The other two are reached by a request going unanswered, which is
@@ -184,6 +193,8 @@ export function hostingRouteSummary(
     case "direct":
       return "This machine is on the internet under its own address, so players connect straight to it.";
     case "portMapped":
+      if (lanRoom)
+        return "Your router opened the ports, so somebody outside can reach this room. They still will not get into the game, because the room gives everybody in it this machine's address on this network, and nothing outside this network can dial that.";
       return "Your router opened the port, so players connect straight to this machine.";
     case "relay":
       return "Nothing would open the ports, so this battle goes through the server's relay.";

@@ -334,6 +334,20 @@ describe("hostingRouteSummary", () => {
     }
   });
 
+  // Issue #2055. The ports opening is the whole story for a battle on a lobby
+  // server and half of one for a room, because a room hands everybody in it
+  // this machine's address on this network. A host who ticked "Reachable over
+  // the internet" and got the lobby server's sentence would send a friend an
+  // address that gets them into the room and no further.
+  it("tells a LAN room's host that an opened port does not get outsiders into the game", () => {
+    const room = hostingRouteSummary("portMapped", { lanRoom: true });
+    expect(room).toContain("will not get into the game");
+    expect(room).toContain("this network");
+    expect(room).not.toBe(
+      hostingRouteSummary("portMapped", { lanRoom: false }),
+    );
+  });
+
   it("has a sentence for every route", () => {
     for (const route of [
       "direct",
