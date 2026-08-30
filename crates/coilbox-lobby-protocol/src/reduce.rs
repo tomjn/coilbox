@@ -163,6 +163,23 @@ pub enum Delta {
     /// `tauri_plugin_coilbox_multiplayer::relay_host`, and it lives here so the
     /// host hears about it down the same channel as its refused twin.
     RelayedHostMoveUnanswered,
+    /// The credential our relayed battle is running on has run out, and the
+    /// lobby would not mint another before it did.
+    ///
+    /// The battle and the game in it carry on, because a TURN server works the
+    /// credential out once when it creates the session and checks every request
+    /// after that against the key it kept. What has gone is the ability to
+    /// survive losing the relay: a rebuild opens a new session, the credential
+    /// is judged again, and a dead one is refused. So this is a battle that is
+    /// fine until the first hiccup and then ends for everybody at once.
+    ///
+    /// Nothing on the wire produces this, for the same reason as
+    /// [`Self::RelayedHostMoveUnanswered`] above. It is raised by whoever was
+    /// doing the renewing, which is
+    /// `tauri_plugin_coilbox_multiplayer::relay_host`, and it lives here so the
+    /// host hears about it down the same channel as everything else about their
+    /// battle.
+    RelayCredentialExpired,
     /// Somebody joined a battle we are hosting through the relay and the relay
     /// would not let their address through, so nothing that player's game sends
     /// will reach ours.

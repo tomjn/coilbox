@@ -171,6 +171,9 @@ pub struct RelayHost {
     /// What the lobby has made of the moves this battle has asked for. See
     /// [`MoveWatch`].
     pub moves: MoveWatch,
+    /// How much life is left in the credential the sidecar is signing with. See
+    /// [`CredentialWatch`].
+    pub credential: CredentialWatch,
 }
 
 /// What has become of the `MOVERELAYEDHOST` lines this battle has sent.
@@ -196,6 +199,30 @@ pub struct MoveWatch {
     /// would otherwise put the same error in front of the host every time it
     /// came back. The first one is news. The second says nothing the first did
     /// not, because the battle has been unreachable since then.
+    told: bool,
+}
+
+/// How much life is left in the credential the sidecar is signing with, and
+/// whether the host has been told it has run out.
+///
+/// It lives on the [`RelayHost`] for the same reason [`MoveWatch`] does: its
+/// life is the battle's, a new hosting attempt starts with a clean one, and
+/// there is no reset to forget.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CredentialWatch {
+    /// Unix millis, the moment the credential the sidecar is holding stops
+    /// being good.
+    ///
+    /// `None` is a relay whose credential nobody recorded, which is a
+    /// hand-built [`RelayHost`] in a test and nothing else. Nothing is renewed
+    /// and nobody is warned, because there is no schedule to work out.
+    expires_at: Option<u64>,
+    /// Whether the host has already been told this battle is running on a
+    /// credential that has run out.
+    ///
+    /// Once per battle, on the same argument as [`MoveWatch::told`]: the second
+    /// warning says nothing the first did not, because the battle has been on
+    /// borrowed time since then.
     told: bool,
 }
 
@@ -313,7 +340,7 @@ pub async fn allocate(
     now_ms: u64,
     patience: Duration,
 ) -> Result<RelayHost, NoRelay> {
-    let turn = turn::credentials(registry, server_key, now_ms, patience)
+    let credential = turn::credentials(registry, server_key, now_ms, patience)
         .await
         .map_err(NoRelay::NoCredential)?;
     let binary =
@@ -322,7 +349,7 @@ pub async fn allocate(
     let battle = Battle {
         engine_port,
         max_peers,
-        turn: Some(turn),
+        turn: Some(credential.turn),
     };
     let (saw, heard) = mpsc::channel();
     let agent = RelayAgent::spawn(
@@ -333,7 +360,12 @@ pub async fn allocate(
     )
     .map_err(NoRelay::NotStarted)?;
 
-    waiting_on(agent, heard, engine_port, ALLOCATION_PATIENCE)
+    let mut host = waiting_on(agent, heard, engine_port, ALLOCATION_PATIENCE)?;
+    // Written on here rather than passed into `waiting_on`, because this is the
+    // only place that knows it and `waiting_on` is the half that runs without a
+    // lobby. [`renewing`] reads it to work out when to ask for the next one.
+    host.credential.expires_at = Some(credential.expires_at);
+    Ok(host)
 }
 
 /// What happens to every event the agent produces, for the life of the sidecar.
@@ -567,6 +599,228 @@ pub fn readvertise(relay: &HostedRelay, addr: SocketAddr) -> Option<Move> {
     })
 }
 
+/// How long to wait before asking the lobby for the credential after this one,
+/// or `None` when there is no longer enough left to be worth asking for.
+///
+/// Half of whatever is left, which is not a number so much as the convention
+/// this exact problem already has two answers in. The `turn` crate refreshes a
+/// TURN allocation at half the lifetime the server granted it, which
+/// `coilbox-relay-agent`'s `allocation.rs` records and this repo's coturn tests
+/// are built around. DHCP renews a lease at half its duration for the same
+/// reason, RFC 2131 section 4.4.5's T1.
+///
+/// What the halving buys is the retry budget. Ask at the halfway point and a
+/// lobby that says nothing, or refuses, or is briefly unreachable gets asked
+/// again at half of what is left, and again, for as many tries as the remaining
+/// life divides into [`crate::turn::REBUILD_HEADROOM`]. On the shortest
+/// credential coilbox will host at all, 5115 seconds, that is eight asks spread
+/// over eighty-five minutes rather than a fixed interval that either hammers a
+/// lobby or gets one chance. `halving_gives_a_lobby_a_bounded_run_of_tries` is
+/// where that eight is counted rather than reasoned about.
+///
+/// `None` at the end of that, and the end is where it matters: a credential with
+/// less than the sidecar's worst-case rebuild backoff left cannot survive the
+/// rebuild it would have to sign, so there is nothing left to protect and the
+/// host is told instead.
+fn renew_in(expires_at: u64, now_ms: u64) -> Option<Duration> {
+    let left = Duration::from_millis(expires_at.saturating_sub(now_ms));
+    (left > crate::turn::REBUILD_HEADROOM).then(|| left / 2)
+}
+
+/// Keep the credential this battle's relay signs with ahead of its own expiry,
+/// for as long as the battle lasts and coilbox is open (issue #2092).
+///
+/// ## What it fixes and what it cannot
+///
+/// A relayed battle survives its credential running out, right up until the
+/// relay has to be rebuilt. A rebuild opens a new session, the TURN server
+/// judges the credential afresh, and a dead one answers 401 and ends the game
+/// for everybody. #2042 stopped a battle opening on a credential too short to
+/// see a typical game out. This is the other one in a hundred: the game that
+/// runs longer, or the credential that was already part spent when hosting
+/// began.
+///
+/// It works only while the coilbox window is open, and that limit is the honest
+/// half of the answer rather than an oversight. The sidecar outlives coilbox on
+/// purpose (#2013) and has no lobby connection of its own, so the moment coilbox
+/// closes there is nobody left to mint anything. What a host gets from this is
+/// that the credential is never more than half spent while coilbox is there, so
+/// closing the window leaves the relay with at least half a lifetime of rebuilds
+/// in hand rather than however much happened to be left. Closing it and playing
+/// on for longer than that is still a battle a rebuild would end.
+///
+/// ## A task rather than a thread
+///
+/// Unlike [`warn_if_unanswered`], which is set off by the sidecar's reader
+/// thread. This is started from `advertise`, which is already on the runtime,
+/// and the work it does is an async lobby round trip. One task per relayed
+/// battle.
+///
+/// ## When it stops
+///
+/// Four ways, and every one of them is the battle no longer being this one: the
+/// slot is empty because the host left the battle, it holds a different relay
+/// because they opened another, the credential has run down past the point of
+/// renewing, or the sidecar will not take a write because it has gone.
+pub fn renewing(registry: &Registry, server_key: &str, patience: Duration) {
+    let registry = Arc::clone(registry);
+    let server_key = server_key.to_string();
+    tokio::spawn(async move {
+        loop {
+            let Some((agent, expires_at)) = still_ours(&registry, &server_key, None) else {
+                return;
+            };
+            let Some(wait) = renew_in(expires_at, crate::conn::now_ms()) else {
+                out_of_credential(&registry, &server_key);
+                return;
+            };
+            tokio::time::sleep(wait).await;
+
+            // Read again rather than trusting what was read before the sleep,
+            // which on a fresh credential was the better part of an hour ago.
+            let Some((agent, held_until)) = still_ours(&registry, &server_key, Some(&agent)) else {
+                return;
+            };
+
+            match renew_now(&registry, &server_key, &agent, held_until, patience).await {
+                // Nothing better came back: the lobby refused, said nothing, or
+                // offered one that expires sooner than what the sidecar has. The
+                // next turn asks again at half of what is left, and running out
+                // of turns is what tells the host.
+                Renewed::NotYet => continue,
+                Renewed::Until(expires_at) => {
+                    credential_now_expires_at(&registry, &server_key, expires_at)
+                }
+                Renewed::NobodyThere => return,
+            }
+        }
+    });
+}
+
+/// What one ask of the lobby came to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Renewed {
+    /// The sidecar is now signing with a credential good until this moment.
+    Until(u64),
+    /// Nothing better came back, and the sidecar is still on the old one.
+    NotYet,
+    /// The sidecar would not take the write, so it has gone and there is nobody
+    /// left to renew for.
+    NobodyThere,
+}
+
+/// Ask the lobby for the credential after this one and hand it to the sidecar.
+///
+/// Split from [`renewing`] for the same reason [`waiting_on`] is split from
+/// [`allocate`]: it is the half worth testing, and running it inside the loop
+/// would mean waiting out half a credential's lifetime to see it happen once.
+///
+/// `held_until` is when the credential the sidecar is on runs out. A lobby free
+/// to mint whatever it likes is free to mint something worse than that, and
+/// taking one of those would shorten the battle rather than lengthen it.
+pub(crate) async fn renew_now(
+    registry: &Registry,
+    server_key: &str,
+    agent: &RelayAgent,
+    held_until: u64,
+    patience: Duration,
+) -> Renewed {
+    let Ok(fresh) = crate::turn::renewed(registry, server_key, patience).await else {
+        return Renewed::NotYet;
+    };
+    if fresh.expires_at <= held_until {
+        return Renewed::NotYet;
+    }
+    match agent.renew_credential(&fresh.turn) {
+        Ok(()) => Renewed::Until(fresh.expires_at),
+        Err(_) => Renewed::NobodyThere,
+    }
+}
+
+/// The relay this connection is hosting through, if it is still the one
+/// `ours` names, along with when its credential runs out.
+///
+/// `ours` is `None` on the first look, when there is nothing to compare against
+/// yet. After that it is the agent the last look found, and a slot holding a
+/// different one is a second battle that has taken over: its own [`renewing`]
+/// is looking after it and this one has to stand down rather than renew a
+/// credential for somebody else's relay.
+fn still_ours(
+    registry: &Registry,
+    server_key: &str,
+    ours: Option<&Arc<RelayAgent>>,
+) -> Option<(Arc<RelayAgent>, u64)> {
+    let relay = lock_or_recover(registry)
+        .get(server_key)
+        .map(|conn| Arc::clone(&conn.relay))?;
+    let held = lock_or_recover(&relay);
+    let host = held.as_ref()?;
+    if ours.is_some_and(|ours| !Arc::ptr_eq(ours, &host.agent)) {
+        return None;
+    }
+    Some((Arc::clone(&host.agent), host.credential.expires_at?))
+}
+
+/// Record that the sidecar is now signing with a credential good until
+/// `expires_at`.
+///
+/// Written back against the connection rather than kept in the loop, because
+/// the number is what the next battle's warning is judged against and a loop
+/// that stood down would take its copy with it.
+fn credential_now_expires_at(registry: &Registry, server_key: &str, expires_at: u64) {
+    let Some(relay) = lock_or_recover(registry)
+        .get(server_key)
+        .map(|conn| Arc::clone(&conn.relay))
+    else {
+        return;
+    };
+    let mut held = lock_or_recover(&relay);
+    if let Some(host) = held.as_mut() {
+        host.credential.expires_at = Some(expires_at);
+    }
+}
+
+/// Tell the host their battle is running on a credential that has run out, once
+/// per battle.
+///
+/// The one thing left to do when renewal has run out of tries. Nothing here can
+/// keep the battle safe any more, and the host is the only person who can: the
+/// game they are in carries on, and hosting again is what gets them a live
+/// credential.
+fn out_of_credential(registry: &Registry, server_key: &str) {
+    let held = lock_or_recover(registry)
+        .get(server_key)
+        .map(|conn| (Arc::clone(&conn.relay), conn.sink.clone()));
+    let Some((relay, sink)) = held else { return };
+    if !credential_is_dead(&relay) {
+        return;
+    }
+    crate::conn::emit(
+        &sink,
+        crate::conn::LobbyEvent::Delta {
+            delta: Delta::RelayCredentialExpired,
+        },
+    );
+}
+
+/// Whether this battle's credential has run out and the host has not been told
+/// yet. Marks them told, because it is the caller that goes on to tell them.
+///
+/// The twin of [`move_unanswered`], and false on the same kind of ordinary
+/// grounds: the host already knows, or the battle is over and the slot is empty,
+/// and a battle nobody is in does not need a credential.
+pub(crate) fn credential_is_dead(relay: &HostedRelay) -> bool {
+    let mut held = lock_or_recover(relay);
+    let Some(host) = held.as_mut() else {
+        return false;
+    };
+    if host.credential.told {
+        return false;
+    }
+    host.credential.told = true;
+    true
+}
+
 /// Wait for an agent that is already being driven to open an allocation.
 ///
 /// Split from [`allocate`] for the same reason [`RelayAgent::driving`] is split
@@ -591,7 +845,13 @@ pub fn waiting_on(
                     relayed: addr,
                     agent: Arc::new(agent),
                     moves: MoveWatch::default(),
-                })
+                    // Nothing here knows when the credential runs out, and
+                    // nothing here should: this is the half a test can drive
+                    // without a lobby. [`allocate`] fills it in from the
+                    // credential it fetched, and a relay that never went through
+                    // one has nothing to renew.
+                    credential: CredentialWatch::default(),
+                });
             }
             // The agent is going to try again, and it may well succeed, but the
             // host is standing in front of a form waiting to hear. Reporting
@@ -894,23 +1154,42 @@ mod tests {
         RelayAgent::driving(Nothing, to_agent, |_| {})
     }
 
-    /// Everything coilbox wrote to the agent's stdin.
+    /// Everything coilbox wrote to the agent's stdin, and a way to have the
+    /// channel stop taking it.
     #[derive(Clone, Default)]
-    struct Written(Arc<Mutex<Vec<u8>>>);
+    struct Written {
+        sent: Arc<Mutex<Vec<u8>>>,
+        /// Set by [`Written::breaks`], which is a sidecar that has exited.
+        broken: Arc<std::sync::atomic::AtomicBool>,
+    }
 
     impl Written {
         fn sent(&self) -> String {
-            String::from_utf8(self.0.lock().unwrap().clone()).expect("the channel is UTF-8")
+            String::from_utf8(self.sent.lock().unwrap().clone()).expect("the channel is UTF-8")
         }
 
         fn was_stopped(&self) -> bool {
             self.sent().contains("\"type\":\"stop\"")
         }
+
+        /// The sidecar has gone, so nothing more can be written to it. Chosen
+        /// over an agent whose stdout has ended because that one is only noticed
+        /// once a wait runs out.
+        fn breaks(&self) {
+            self.broken
+                .store(true, std::sync::atomic::Ordering::Relaxed);
+        }
     }
 
     impl Write for Written {
         fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-            self.0.lock().unwrap().extend_from_slice(buf);
+            if self.broken.load(std::sync::atomic::Ordering::Relaxed) {
+                return Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "the agent has gone",
+                ));
+            }
+            self.sent.lock().unwrap().extend_from_slice(buf);
             Ok(buf.len())
         }
 
@@ -1424,6 +1703,242 @@ mod tests {
         let host =
             waiting_on(agent, heard, ENGINE_PORT, PATIENCE).expect("the agent opened a relay");
         Arc::new(Mutex::new(Some(host)))
+    }
+
+    /// A moment with room either side of it, so a test can talk about a
+    /// credential that ran out without arithmetic underflowing.
+    use crate::turn::tests::{minted, wired_watching, KEY, NOW};
+    use crate::turn::TurnAnswer;
+
+    /// A lobby connection with a relayed battle already hosting through it,
+    /// which is the state every renewal test starts in.
+    struct Renewing {
+        registry: Registry,
+        /// The sidecar's end of the control channel, so a test can read what
+        /// coilbox sent it.
+        written: Written,
+        /// The agent behind that channel, taken back out of the relay slot.
+        agent: Arc<RelayAgent>,
+        answers: tokio::sync::watch::Sender<TurnAnswer>,
+        state: Arc<Mutex<coilbox_lobby_protocol::LobbyState>>,
+        /// Every event the frontend was sent, as the JSON it would have seen.
+        seen: Arc<Mutex<Vec<String>>>,
+        /// The lobby's end of the outbound queue. Held and never read, because
+        /// dropping it is the connection closing and `turn::renewed` would then
+        /// answer that rather than asking anything.
+        _sent: tokio::sync::mpsc::UnboundedReceiver<crate::conn::Outbound>,
+    }
+
+    fn hosting_and_renewing() -> Renewing {
+        let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+        let recorder = seen.clone();
+        let sink = Arc::new(Mutex::new(tauri::ipc::Channel::new(move |body| {
+            let json = match body {
+                tauri::ipc::InvokeResponseBody::Json(s) => s,
+                tauri::ipc::InvokeResponseBody::Raw(b) => String::from_utf8_lossy(&b).into_owned(),
+            };
+            lock_or_recover(&recorder).push(json);
+            Ok(())
+        })));
+
+        let w = wired_watching(crate::conn::ConnProtocol::TasServer, sink);
+        let written = Written::default();
+        let relay = relay_slot(agent_writing_to(written.clone()));
+        let agent = lock_or_recover(&relay)
+            .as_ref()
+            .map(|host| Arc::clone(&host.agent))
+            .expect("the slot was just filled");
+        *lock_or_recover(
+            &lock_or_recover(&w.registry)
+                .get(KEY)
+                .expect("the connection is registered")
+                .relay,
+        ) = lock_or_recover(&relay).take();
+
+        Renewing {
+            registry: w.registry,
+            written,
+            agent,
+            answers: w.answers,
+            state: w.state,
+            seen,
+            _sent: w.sent,
+        }
+    }
+
+    impl Renewing {
+        /// Have the lobby answer the next `TURNCREDENTIALS` with a credential
+        /// good for `ttl_seconds` from `at`.
+        fn lobby_mints(&self, ttl_seconds: u64, at: u64) {
+            let state = self.state.clone();
+            let answers = self.answers.clone();
+            tokio::spawn(async move {
+                let _ = answers.send(TurnAnswer::Granted(minted(&state, ttl_seconds, at)));
+            });
+        }
+
+        /// Whether the frontend was sent a delta of this kind, within
+        /// `patience`. Polled, because the thing that raises it is a task.
+        async fn told_the_frontend(&self, kind: &str, patience: Duration) -> bool {
+            let looking_for = format!("\"kind\":\"{kind}\"");
+            let deadline = tokio::time::Instant::now() + patience;
+            while tokio::time::Instant::now() < deadline {
+                if lock_or_recover(&self.seen)
+                    .iter()
+                    .any(|told| told.contains(&looking_for))
+                {
+                    return true;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+            false
+        }
+    }
+
+    /// The schedule, at the two points that decide anything: half of whatever is
+    /// left, and nothing at all once there is less left than the rebuild the
+    /// credential would have to sign.
+    #[test]
+    fn a_credential_is_renewed_at_half_of_whatever_it_has_left() {
+        let headroom = crate::turn::REBUILD_HEADROOM;
+
+        // The shortest credential coilbox will host on at all.
+        assert_eq!(
+            renew_in(NOW + 5_115_000, NOW),
+            Some(Duration::from_millis(2_557_500))
+        );
+        // Halved again, which is what a lobby that would not answer the first
+        // ask gets.
+        assert_eq!(
+            renew_in(NOW + 2_557_500, NOW),
+            Some(Duration::from_millis(1_278_750))
+        );
+
+        // One second the right side of the line is still worth an ask.
+        assert_eq!(
+            renew_in(NOW + headroom.as_millis() as u64 + 1_000, NOW),
+            Some(Duration::from_millis(16_500))
+        );
+        // On it and past it there is nothing left to protect: a credential with
+        // less than the rebuild backoff on it cannot survive the rebuild.
+        assert_eq!(renew_in(NOW + headroom.as_millis() as u64, NOW), None);
+        assert_eq!(renew_in(NOW, NOW), None);
+        assert_eq!(renew_in(NOW - 60_000, NOW), None);
+    }
+
+    /// Halving cannot run forever, and this is how many asks a lobby gets before
+    /// the host is told instead. Seven, on the shortest credential coilbox will
+    /// host on, spread over the whole of its life.
+    #[test]
+    fn halving_gives_a_lobby_a_bounded_run_of_tries() {
+        let mut left = Duration::from_secs(5_115);
+        let mut asks = 0;
+        while let Some(wait) = renew_in(NOW + left.as_millis() as u64, NOW) {
+            left -= wait;
+            asks += 1;
+            assert!(asks < 100, "the schedule has to run out, and it did not");
+        }
+        assert_eq!(asks, 8);
+    }
+
+    /// Issue #2092's warning. A battle whose credential has run out is told
+    /// once, because the second telling says nothing the first did not: the
+    /// battle has been on borrowed time since then.
+    #[test]
+    fn a_battle_out_of_credential_tells_the_host_once() {
+        let relay = relay_slot(silent_agent());
+
+        assert!(credential_is_dead(&relay));
+        assert!(!credential_is_dead(&relay));
+    }
+
+    /// The battle ended before the credential did. Nobody is in it, so there is
+    /// nothing to warn anybody about.
+    #[test]
+    fn a_battle_that_is_over_is_not_warned_about_its_credential() {
+        let relay = relay_slot(silent_agent());
+        *lock_or_recover(&relay) = None;
+
+        assert!(!credential_is_dead(&relay));
+    }
+
+    /// The ask, which is the whole renewal in one turn: the lobby mints
+    /// something better than the sidecar is holding, and the sidecar is handed
+    /// it down the control channel.
+    #[tokio::test]
+    async fn a_fresh_credential_reaches_the_sidecar() {
+        let w = hosting_and_renewing();
+        w.lobby_mints(86_400, NOW);
+
+        let renewed = renew_now(&w.registry, KEY, &w.agent, NOW + 60_000, PATIENCE).await;
+
+        assert_eq!(renewed, Renewed::Until(NOW + 86_400_000));
+        let sent = w.written.sent();
+        assert!(
+            sent.contains("\"type\":\"renewCredential\"")
+                && sent.contains("\"user\":\"1786086400:alice\"")
+                && sent.contains("\"password\":\"bWFj=\""),
+            "the sidecar has to be handed the credential itself: {sent}"
+        );
+    }
+
+    /// A lobby free to mint whatever it likes can mint something worse than the
+    /// sidecar already has. Taking it would shorten the battle, so nothing goes
+    /// down the channel at all.
+    #[tokio::test]
+    async fn a_renewal_that_expires_sooner_than_the_held_one_is_not_taken() {
+        let w = hosting_and_renewing();
+        w.lobby_mints(60, NOW);
+
+        let renewed = renew_now(&w.registry, KEY, &w.agent, NOW + 3_600_000, PATIENCE).await;
+
+        assert_eq!(renewed, Renewed::NotYet);
+        assert!(
+            !w.written.sent().contains("renewCredential"),
+            "a shorter credential must not replace a longer one: {}",
+            w.written.sent()
+        );
+    }
+
+    /// The sidecar has gone. There is nobody left to renew for, so the loop has
+    /// to stand down rather than ask the lobby every half life for the rest of
+    /// the session.
+    #[tokio::test]
+    async fn a_sidecar_that_has_gone_ends_the_renewing() {
+        let w = hosting_and_renewing();
+        w.written.breaks();
+        w.lobby_mints(86_400, NOW);
+
+        assert_eq!(
+            renew_now(&w.registry, KEY, &w.agent, NOW, PATIENCE).await,
+            Renewed::NobodyThere
+        );
+    }
+
+    /// The loop itself, on the case it exists for: a battle whose credential has
+    /// already run out. There is nothing left to renew, so the host is told and
+    /// the loop ends rather than sitting there asking.
+    ///
+    /// No clock anywhere in it. The credential is expired before the loop starts,
+    /// so `renew_in` answers `None` on the first look and nothing is ever slept.
+    #[tokio::test]
+    async fn a_battle_whose_credential_ran_out_tells_the_host_and_stops() {
+        let w = hosting_and_renewing();
+        credential_now_expires_at(&w.registry, KEY, NOW);
+
+        renewing(&w.registry, KEY, PATIENCE);
+
+        assert!(
+            w.told_the_frontend("relayCredentialExpired", PATIENCE)
+                .await,
+            "a host on a dead credential has to be told, because hosting again is \
+             the only thing that mends it"
+        );
+        assert!(
+            !w.written.sent().contains("renewCredential"),
+            "there is nothing left worth renewing: {}",
+            w.written.sent()
+        );
     }
 
     /// Wait for something a background thread is going to write.

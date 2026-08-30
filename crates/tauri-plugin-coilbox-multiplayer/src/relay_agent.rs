@@ -71,7 +71,7 @@ use std::time::{Duration, Instant};
 
 use coilbox_relay_protocol::{read_event, to_line, Event, Request, RequestId, TRAFFIC_EVERY};
 
-use crate::relay_sidecar::{self, Battle};
+use crate::relay_sidecar::{self, Battle, Turn};
 
 /// Why a joiner could not be let through the relay.
 ///
@@ -291,6 +291,27 @@ impl RelayAgent {
     pub fn battle_over(&self) -> io::Result<()> {
         self.write(&Request::BattleOver {
             id: self.next_id.fetch_add(1, Ordering::Relaxed),
+        })
+    }
+
+    /// Hand the sidecar a credential to sign its next allocation with.
+    ///
+    /// The lobby mints these with a lifetime and a game can run past it. That
+    /// costs nothing while the allocation stays up, and costs the game the
+    /// moment the relay has to be rebuilt on a credential the server judges
+    /// afresh and refuses (issue #2092). This is what keeps that from
+    /// happening, for as long as coilbox is open to send it.
+    ///
+    /// Not waited on, for the same reason as [`RelayAgent::watch_engine`]. The
+    /// only answer worth acting on is the write failing, which means the sidecar
+    /// has gone, and [`crate::relay_host::renewing`] reads that from the return
+    /// and stops.
+    pub fn renew_credential(&self, turn: &Turn) -> io::Result<()> {
+        self.write(&Request::RenewCredential {
+            id: self.next_id.fetch_add(1, Ordering::Relaxed),
+            server: turn.server.clone(),
+            user: turn.user.clone(),
+            password: turn.password.clone(),
         })
     }
 

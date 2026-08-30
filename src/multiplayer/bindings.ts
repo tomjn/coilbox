@@ -371,6 +371,14 @@ export type Delta =
    */
   | { kind: "relayedHostMoveUnanswered" }
   /**
+   * The credential our relayed battle runs on has expired and the lobby would
+   * not mint another before it did. The game carries on, because the relay
+   * server checks the key it worked out when the allocation opened, but the
+   * battle no longer survives losing that allocation: a rebuild is judged on the
+   * dead credential and refused. Told once per battle.
+   */
+  | { kind: "relayCredentialExpired" }
+  /**
    * Somebody joined a battle we are hosting through the relay and the relay
    * would not let their address through, so nothing their game sends will reach
    * ours. Raised by the plugin rather than by a line off the wire, and only ever
