@@ -1152,10 +1152,15 @@ export const mpBuildBattleConfig = defineCommand<
  * Map the battle WE host into a host-mode `BattleConfig` (`isHost:true`, bound to
  * our assigned `HOSTPORT`, teams/allies renumbered contiguously). Errors if we are
  * not the founder of the current battle.
+ *
+ * `relayed` says whether this connection's battle is going through this
+ * machine's relay sidecar. It comes back with the config rather than being
+ * asked for separately because the launch needs both and they have to be about
+ * the same battle (issue #2099).
  */
 export const mpBuildHostConfig = defineCommand<
   { serverKey: string },
-  { config: BattleConfig }
+  { config: BattleConfig; relayed: boolean }
 >("coilbox-multiplayer", "mp_build_host_config");
 
 /** What a single UDP probe found out about a battle host's game port. */
@@ -1268,10 +1273,15 @@ export const mpAskLeftoverRelayToStop = defineCommand<
  * that has already finished has no pid to give and this fails instead. The Rust
  * command's doc has the argument in full.
  *
+ * The server key names the relay the other half of the pairing, so an engine
+ * can only ever be named to the relay carrying its own battle. A connection
+ * hosting through no relay answers `watching: false` and nothing is sent
+ * (issue #2099).
+ *
  * Only worth calling for a battle this coilbox is hosting through the relay.
  * `watching` is false when there was no relay to tell.
  */
 export const mpWatchEngine = defineCommand<
-  { runId: string },
+  { serverKey: string; runId: string },
   { watching: boolean }
 >("coilbox-multiplayer", "mp_watch_engine");

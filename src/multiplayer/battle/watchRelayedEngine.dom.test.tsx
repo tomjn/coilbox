@@ -15,11 +15,15 @@
  * The run id is what makes the first of those worth asserting. A test that
  * only checked the call happened would pass on a version that sent the wrong
  * run, and the wrong run is the whole hazard.
+ *
+ * The server key is the other half of the same hazard (issue #2099). It names
+ * which relay is being told, so a launch that sent the right run to the wrong
+ * connection would be handing an engine to a sidecar carrying somebody else's
+ * battle. Both are asserted on every call below.
  */
 
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { recordHostingRoute } from "@/direct/hostingRoute";
 import type { LaunchEvent } from "@/play/bindings";
 import type { PlayTarget } from "@/play/config";
 import { PlayProvider } from "@/play/PlayProvider";
@@ -58,14 +62,18 @@ vi.mock("@/play/bindings", () => ({
   ),
 }));
 
-const { mpWatchEngine } = vi.hoisted(() => ({
+const { mpWatchEngine, mpBuildHostConfig } = vi.hoisted(() => ({
   mpWatchEngine: vi.fn(async () => ({ watching: true })),
+  // Whether the battle on this connection is going through the relay, which is
+  // what Rust answers from the relay handle it built the config out of.
+  mpBuildHostConfig: vi.fn(async () => ({
+    config: { gameType: "g", mapName: "m" },
+    relayed: false,
+  })),
 }));
 
 vi.mock("../bindings", () => ({
-  mpBuildHostConfig: vi.fn(async () => ({
-    config: { gameType: "g", mapName: "m" },
-  })),
+  mpBuildHostConfig,
   mpBuildBattleConfig: vi.fn(async () => ({
     config: {
       gameType: "g",
@@ -111,9 +119,12 @@ const target: PlayTarget = {
   engineVersion: "2026.01",
 };
 
+const ALICE = "alice@bar:8200";
+const BOB = "bob@baz:8200";
+
 /** Starts a battle the moment it renders, the way the host's Start button does. */
-function Launcher({ host }: { host: boolean }) {
-  const { launch } = useBattleLaunch("alice@bar:8200", target, host);
+function Launcher({ host, serverKey }: { host: boolean; serverKey: string }) {
+  const { launch } = useBattleLaunch(serverKey, target, host);
   return (
     <button type="button" onClick={() => void launch()}>
       start
@@ -122,21 +133,39 @@ function Launcher({ host }: { host: boolean }) {
 }
 
 /** Render, press start, and wait for the engine to have been launched. */
-async function launchBattle(host: boolean): Promise<Launched> {
+async function launchBattle(host: boolean, serverKey = ALICE): Promise<Launched> {
+  const before = launched.length;
   const { getByText } = render(
     <PlayProvider>
-      <Launcher host={host} />
+      <Launcher host={host} serverKey={serverKey} />
     </PlayProvider>,
   );
   getByText("start").click();
-  await waitFor(() => expect(launched).toHaveLength(1));
-  const run = launched[0];
+  await waitFor(() => expect(launched).toHaveLength(before + 1));
+  const run = launched[before];
   if (!run) throw new Error("no launch was made");
   return run;
 }
 
+/**
+ * Say that the battle on one connection is going through this machine's relay,
+ * and that every other connection's is not.
+ *
+ * The shape Rust answers in: the verdict rides on the host config, built from
+ * the relay handle held against the connection that was asked about.
+ */
+function relayedBattleOn(relayedKey: string | null) {
+  mpBuildHostConfig.mockImplementation(
+    async ({ serverKey }: { serverKey: string }) => ({
+      config: { gameType: "g", mapName: "m" },
+      relayed: serverKey === relayedKey,
+    }),
+  );
+}
+
 beforeEach(() => {
   launched.length = 0;
+  relayedBattleOn(null);
   // `Channel` asks Tauri for a callback id the moment it is built, and there is
   // no Tauri behind a test. The provider only reads messages back out of the
   // channel it made, so handing the callback straight back is enough.
@@ -149,24 +178,26 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  recordHostingRoute(null);
   vi.clearAllMocks();
 });
 
 it("names the run it started to the sidecar when the battle is relayed", async () => {
-  recordHostingRoute("relay");
+  relayedBattleOn(ALICE);
 
   const run = await launchBattle(true);
   run.started();
 
   await waitFor(() =>
-    expect(mpWatchEngine).toHaveBeenCalledWith({ runId: run.runId }),
+    expect(mpWatchEngine).toHaveBeenCalledWith({
+      serverKey: ALICE,
+      runId: run.runId,
+    }),
   );
   expect(mpWatchEngine).toHaveBeenCalledTimes(1);
 });
 
 it("waits for the engine to exist rather than firing on any news of it", async () => {
-  recordHostingRoute("relay");
+  relayedBattleOn(ALICE);
 
   const run = await launchBattle(true);
   expect(mpWatchEngine).not.toHaveBeenCalled();
@@ -181,7 +212,7 @@ it("waits for the engine to exist rather than firing on any news of it", async (
 });
 
 it("says nothing for a battle hosted without the relay", async () => {
-  recordHostingRoute("direct");
+  relayedBattleOn(null);
 
   const run = await launchBattle(true);
   run.started();
@@ -192,9 +223,10 @@ it("says nothing for a battle hosted without the relay", async () => {
 });
 
 it("says nothing for a game this coilbox is only joining", async () => {
-  // A joiner in somebody else's relayed battle. The route was recorded by
-  // whoever last hosted here, and it is not this game's.
-  recordHostingRoute("relay");
+  // A joiner in somebody else's relayed battle. This machine runs no sidecar
+  // for a battle it did not open, so there is nothing here to name an engine
+  // to whatever the host's connection is doing.
+  relayedBattleOn(ALICE);
 
   const run = await launchBattle(false);
   run.started();
@@ -202,4 +234,35 @@ it("says nothing for a game this coilbox is only joining", async () => {
 
   await waitFor(() => expect(launched).toHaveLength(1));
   expect(mpWatchEngine).not.toHaveBeenCalled();
+});
+
+/**
+ * Issue #2099: a launch asks the connection its own battle is on, not "is
+ * anything on this machine being relayed".
+ *
+ * The two battles here are both hosted by this client and only one of them is
+ * relayed. A launch that read a machine-wide answer would name bob's engine to
+ * the sidecar carrying alice's battle, and the sidecar stops relaying when the
+ * process it was named exits, so bob quitting would drop everybody playing in
+ * alice's game.
+ */
+it("asks about the battle it is launching and not about the machine", async () => {
+  relayedBattleOn(ALICE);
+
+  const bobsGame = await launchBattle(true, BOB);
+  bobsGame.started();
+  bobsGame.finish();
+  await waitFor(() => expect(launched).toHaveLength(1));
+  expect(mpWatchEngine).not.toHaveBeenCalled();
+
+  cleanup();
+  const alicesGame = await launchBattle(true, ALICE);
+  alicesGame.started();
+  await waitFor(() =>
+    expect(mpWatchEngine).toHaveBeenCalledWith({
+      serverKey: ALICE,
+      runId: alicesGame.runId,
+    }),
+  );
+  expect(mpWatchEngine).toHaveBeenCalledTimes(1);
 });
