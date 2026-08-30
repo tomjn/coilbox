@@ -278,7 +278,10 @@ fn a_running_sidecar_holds_its_own_run_file_and_says_it_does() {
 /// four minutes of the traffic backstop.
 fn end_the_sidecar(pid: u32) {
     let (program, args): (&str, Vec<String>) = if cfg!(windows) {
-        ("taskkill", vec!["/PID".into(), pid.to_string(), "/F".into()])
+        (
+            "taskkill",
+            vec!["/PID".into(), pid.to_string(), "/F".into()],
+        )
     } else {
         ("kill", vec!["-9".into(), pid.to_string()])
     };
