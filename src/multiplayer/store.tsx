@@ -1033,7 +1033,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<number | null>(null);
   // Late-bound so the frozen `openChannel` handler can invoke the latest logic.
-  const handleUnexpectedDropRef = useRef<() => void>(() => {});
+  // It is handed the key that dropped, because which connection it was decides
+  // everything the handler does (issue #2149).
+  const handleDropRef = useRef<(serverKey: string) => void>(() => {});
 
   // Cancel any running reconnect loop (a manual connect/disconnect supersedes it).
   const stopReconnect = useCallback(() => {
@@ -1051,6 +1053,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   // Rust side evicts the connection on any teardown (socket close, or a rejected
   // login), so a `disconnected` event clears the active key to return the UI to the
   // connect screen while keeping the reason.
+  //
+  // Only the agreement prompt and the drop below ask which connection an event
+  // belongs to. Everything else here is connection-blind on purpose: there is one
+  // mirror, one `deniedRef`, one `loggedInRef`, and every snapshot is dispatched
+  // into that mirror whoever fetched it. That is correct only because there is one
+  // connection, which `connectBlockedReason` is what makes true (issue #2149).
+  // Giving each connection a mirror of its own is what a second one would need,
+  // and nobody has asked for a second one. The interface promises the opposite.
   const openChannel = useCallback((serverKey: string) => {
     const onEvent = new Channel<LobbyEvent>();
     // The Rust side emits one delta per server line, and the mirror is rebuilt
@@ -1300,16 +1310,14 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         }
         setPendingAgreement((p) => (p?.serverKey === serverKey ? null : p));
         // Whose drop this was decides the rest, the way the line above already
-        // decides it. Clearing the key for any drop meant a connection somebody
-        // had stopped using could log them out of the one they were on, and
-        // start a reconnect loop for it as well (issue #2149).
-        if (activeKeyRef.current !== serverKey) return;
-        applyActiveKey(null);
-        handleUnexpectedDropRef.current();
+        // decides it, so the key goes with it. Acting on every drop meant a
+        // connection somebody had stopped using could log them out of the one
+        // they were on, and start a reconnect loop for it too (issue #2149).
+        handleDropRef.current(serverKey);
       }
     };
     return onEvent;
-  }, [applyActiveKey]);
+  }, []);
 
   // The core connect, shared by the public `connect` and the auto-reconnect loop.
   // Records the reconnect context and resets the per-session drop flags so a later
@@ -1487,7 +1495,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       }
       return serverKey;
     },
-    [doConnect, stopReconnect],
+    [applyActiveKey, doConnect, stopReconnect],
   );
 
   // Run the reconnect loop after an unexpected drop: retry `doConnect` on a bounded
@@ -1548,32 +1556,42 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
     reconnectTimerRef.current = window.setTimeout(step, reconnectDelay(0));
   }, [doConnect]);
 
-  // React to a `disconnected` event: start the reconnect loop only for a genuine,
-  // unexpected drop of a logged-in session (not a manual disconnect, a login
-  // denial, or when the feature is off). Captures the current battle first so it
-  // can be rejoined once reconnected.
-  const handleUnexpectedDrop = useCallback(() => {
-    if (intentionalRef.current) return;
-    if (!autoRejoinRef.current) return;
-    if (!loggedInRef.current) return;
-    if (!reconnectCtxRef.current) return;
-    const st = stateRef.current;
-    if (st?.currentBattle != null) {
-      const battle = st.battles[String(st.currentBattle)];
-      const me = st.myUsername ? battle?.members[st.myUsername] : undefined;
-      rejoinBattleRef.current = {
-        id: st.currentBattle,
-        scriptPassword: me?.scriptPassword ?? null,
-      };
-    } else {
-      rejoinBattleRef.current = null;
-    }
-    void notify({ title: "Connection lost — reconnecting…" });
-    runReconnect();
-  }, [runReconnect]);
+  // React to a `disconnected` event: return the UI to disconnected, and start the
+  // reconnect loop only for a genuine, unexpected drop of a logged-in session
+  // (not a manual disconnect, a login denial, or when the feature is off).
+  // Captures the current battle first so it can be rejoined once reconnected.
+  //
+  // Nothing happens at all for a connection that is not the one in use. A
+  // connection somebody has moved on from still has a socket to lose, and losing
+  // it used to clear the key and start a reconnect for whoever held it next
+  // (issue #2149).
+  const handleDrop = useCallback(
+    (serverKey: string) => {
+      if (activeKeyRef.current !== serverKey) return;
+      applyActiveKey(null);
+      if (intentionalRef.current) return;
+      if (!autoRejoinRef.current) return;
+      if (!loggedInRef.current) return;
+      if (!reconnectCtxRef.current) return;
+      const st = stateRef.current;
+      if (st?.currentBattle != null) {
+        const battle = st.battles[String(st.currentBattle)];
+        const me = st.myUsername ? battle?.members[st.myUsername] : undefined;
+        rejoinBattleRef.current = {
+          id: st.currentBattle,
+          scriptPassword: me?.scriptPassword ?? null,
+        };
+      } else {
+        rejoinBattleRef.current = null;
+      }
+      void notify({ title: "Connection lost — reconnecting…" });
+      runReconnect();
+    },
+    [applyActiveKey, runReconnect],
+  );
   useEffect(() => {
-    handleUnexpectedDropRef.current = handleUnexpectedDrop;
-  }, [handleUnexpectedDrop]);
+    handleDropRef.current = handleDrop;
+  }, [handleDrop]);
 
   // After a reconnect reaches `ready`, rejoin the battle captured before the drop if
   // it's still open (channels replay via the effect above). Once per connection and

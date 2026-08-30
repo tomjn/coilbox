@@ -210,7 +210,9 @@ describe("one lobby connection", () => {
     const first = store.connectDirect(8200, "AF");
     wire.gate = null;
 
-    await expect(store.connect(LOBBY, "AF_")).rejects.toThrow(/already opening/);
+    await expect(store.connect(LOBBY, "AF_")).rejects.toThrow(
+      /already opening/,
+    );
 
     await act(async () => {
       release();
