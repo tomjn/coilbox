@@ -123,6 +123,22 @@ export function BattleRoomHeader({
   // indistinguishable from the outside on purpose and no lobby protocol carries
   // the route. Guessing from a ping would be inventing an answer. Telling the
   // joiners needs the host to say so over the wire, which nothing does yet.
+  //
+  // Issue #2073 went back and checked that against the relay commands the
+  // server side has written since, rather than against the state of things when
+  // this was first put here, and the answer has not changed. `CLIENTIP` goes to
+  // the host alone. `RELAYEDHOSTFAILED` and `MOVERELAYEDHOSTFAILED` go to
+  // whoever sent the command. `BATTLEOPENED` for a relayed battle is unchanged
+  // to the byte, which is the property the whole scheme rests on.
+  //
+  // One line does reach a joiner and does prove a relay, which is
+  // `BATTLEHOSTMOVED`: a lobby server refuses to move a battle that was never
+  // relayed, so receiving one says this battle is. It is still not a badge. It
+  // fires only when a live allocation is rebuilt, so its absence says nothing at
+  // all, and a word that appeared halfway through some relayed battles and never
+  // in the rest would read as "direct" every other time. What the move is worth
+  // saying is that the address moved, which is true of every move on every kind
+  // of host, and that is a strip of its own rather than a word up here.
   const routeLabel = selfHost
     ? battleRouteLabel(hostingRoute, { lanRoom: directRoom })
     : null;
