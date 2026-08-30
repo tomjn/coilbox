@@ -20,6 +20,7 @@ import { BattleChatCard } from "../battle/BattleChatCard";
 import { BattleGameCard } from "../battle/BattleGameCard";
 import { BattleMapCard } from "../battle/BattleMapCard";
 import { BattleMembersTable } from "../battle/BattleMembersTable";
+import { BattleMovedPanel } from "../battle/BattleMovedPanel";
 import { BattleOptionsDrawer } from "../battle/BattleOptionsDrawer";
 import { BattlePresetsDrawer } from "../battle/BattlePresetsDrawer";
 import { BattleRoomHeader } from "../battle/BattleRoomHeader";
@@ -419,6 +420,11 @@ function BattleRoomPage() {
           because it is a fact about the room the host is running rather than
           about something they just pressed (issue #2122). */}
       <RoomMovedPanel />
+
+      {/* The same news for everybody who is not running the battle, which the
+          strip above never reaches (issue #2073). Below it because a host who
+          somehow saw both should read their own room's first. */}
+      <BattleMovedPanel battleId={battle.id} selfHost={room.selfHost} />
 
       {room.currentVote && (
         <VotePanel vote={room.currentVote} onVote={room.castVote} />
