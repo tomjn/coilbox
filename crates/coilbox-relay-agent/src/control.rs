@@ -24,18 +24,23 @@
 //! unaffected. [`Requests::listen`] writes that to stderr at the moment it
 //! becomes true, so it lands in a log next to the join that failed.
 //!
-//! ## Three requests never reach the relay loop
+//! ## Four requests never reach the relay loop
 //!
-//! [`Request::Stop`], [`Request::BattleOver`] and [`Request::WatchEngine`] are
-//! answered here, in the reading task, because none of them needs a relay to
-//! carry out. Everything else waits for one, and waiting is right for those: an
-//! `allowPeer` answered while there is no relay would be a lie either way
-//! round.
+//! [`Request::Stop`], [`Request::BattleOver`], [`Request::WatchEngine`] and
+//! [`Request::RenewCredential`] are answered here, in the reading task, because
+//! none of them needs a relay to carry out. Everything else waits for one, and
+//! waiting is right for those: an `allowPeer` answered while there is no relay
+//! would be a lie either way round.
 //!
 //! Answering them here is what makes them prompt. A relay being rebuilt can
 //! take 32 seconds (`LONGEST_BACKOFF` in `main`), and a coilbox that has said
 //! "stop" should not spend that holding an allocation for a battle that is
 //! over.
+//!
+//! The renewal is the one where being prompt is the whole point rather than a
+//! courtesy. It exists to be in place before the next rebuild, so queueing it
+//! for the relay loop would hold it until after the rebuild it was sent to
+//! sign, which is exactly the game issue #2092 is about losing.
 //!
 //! ## Every request gets exactly one answer
 //!
@@ -52,6 +57,7 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader
 use tokio::sync::{mpsc, Mutex};
 
 use crate::stopping::Stopping;
+use crate::HeldCredential;
 
 /// How many requests may be waiting for a relay to open before the agent stops
 /// taking them.
@@ -118,8 +124,12 @@ impl Requests {
     /// request that arrives while the relay is being rebuilt waits in the queue
     /// rather than being lost, and is answered once there is a relay to answer
     /// it with.
-    pub fn listen(reporter: std::sync::Arc<Reporter>, stopping: Arc<Stopping>) -> Requests {
-        Requests::reading(tokio::io::stdin(), reporter, stopping)
+    pub fn listen(
+        reporter: std::sync::Arc<Reporter>,
+        stopping: Arc<Stopping>,
+        turn: HeldCredential,
+    ) -> Requests {
+        Requests::reading(tokio::io::stdin(), reporter, stopping, turn)
     }
 
     /// The same reader pointed somewhere other than stdin, which is how a test
@@ -128,6 +138,7 @@ impl Requests {
         from: impl AsyncRead + Send + Unpin + 'static,
         reporter: std::sync::Arc<Reporter>,
         stopping: Arc<Stopping>,
+        turn: HeldCredential,
     ) -> Requests {
         let (heard, asked) = mpsc::channel(QUEUED_REQUESTS);
         tokio::spawn(async move {
@@ -177,6 +188,50 @@ impl Requests {
                              ends, and nobody new can be let through from now on."
                         );
                         return;
+                    }
+                    // Answered here for the sharpest version of the reason the
+                    // three above are: a renewal queued for the relay loop
+                    // would be read after the rebuild it exists to sign.
+                    Ok(Request::RenewCredential {
+                        id,
+                        server,
+                        user,
+                        password,
+                    }) => {
+                        let swapped = {
+                            let mut held = turn.lock().unwrap_or_else(|e| e.into_inner());
+                            held.as_mut().map(|held| {
+                                held.server = server;
+                                held.username = user;
+                                held.password = password;
+                            })
+                        };
+                        match swapped {
+                            Some(()) => {
+                                // Worth a line, because the log is where
+                                // somebody looks after a battle that ended
+                                // badly and "the credential was renewed at
+                                // 14:02" is what says whether it did. No part
+                                // of the credential, for the same reason it is
+                                // not an argument.
+                                eprintln!(
+                                    "coilbox-relay-agent: coilbox sent a fresh relay credential. \
+                                     The allocation that is open is unaffected and the next \
+                                     rebuild will be signed with the new one."
+                                );
+                                reporter.say(Event::Done { id }).await;
+                            }
+                            None => {
+                                reporter
+                                    .say(Event::Failed {
+                                        id,
+                                        reason: "this relay is not going through a TURN server, \
+                                                 so there is no credential to renew"
+                                            .to_string(),
+                                    })
+                                    .await;
+                            }
+                        }
                     }
                     Ok(request) => {
                         if heard.send(request).await.is_err() {
@@ -237,7 +292,130 @@ pub async fn answer(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::allocation::TurnCredentials;
     use crate::stopping::{Reason, IDLE_TIMEOUT};
+
+    /// The credential a sidecar was started with.
+    fn started_with() -> TurnCredentials {
+        TurnCredentials {
+            server: "relay.example.org:3478".to_string(),
+            username: "1786086400:alice".to_string(),
+            password: "the-old-one".to_string(),
+        }
+    }
+
+    /// A reader over the agent's control channel, with the credential it holds
+    /// and a way to read back what it said.
+    struct Wired {
+        to_agent: tokio::io::DuplexStream,
+        said: tokio::io::DuplexStream,
+        turn: HeldCredential,
+        _requests: Requests,
+    }
+
+    fn wired(holding: Option<TurnCredentials>) -> Wired {
+        let (to_agent, agent_stdin) = tokio::io::duplex(1024);
+        let (agent_stdout, said) = tokio::io::duplex(1024);
+        let turn: HeldCredential = Arc::new(std::sync::Mutex::new(holding));
+        let requests = Requests::reading(
+            agent_stdin,
+            Arc::new(Reporter::writing(agent_stdout)),
+            Arc::new(Stopping::new()),
+            Arc::clone(&turn),
+        );
+        Wired {
+            to_agent,
+            said,
+            turn,
+            _requests: requests,
+        }
+    }
+
+    impl Wired {
+        async fn asked(&mut self, request: &Request) {
+            self.to_agent
+                .write_all(coilbox_relay_protocol::to_line(request).as_bytes())
+                .await
+                .expect("the agent is reading");
+        }
+
+        /// The one answer the agent gave, which every request gets exactly one
+        /// of.
+        async fn answer(&mut self) -> Event {
+            let mut line = String::new();
+            BufReader::new(&mut self.said)
+                .read_line(&mut line)
+                .await
+                .expect("the agent answered");
+            coilbox_relay_protocol::read_event(line.trim()).expect("an event this build knows")
+        }
+
+        fn holding(&self) -> Option<TurnCredentials> {
+            self.turn.lock().unwrap().clone()
+        }
+    }
+
+    /// Issue #2092, at the seam where a renewal lands. The credential the next
+    /// rebuild will sign with is the one coilbox last sent, not the one this
+    /// process was started with.
+    ///
+    /// There is no relay anywhere in this test, and that is the assertion as much
+    /// as the swap is. A renewal is served in the reading task rather than queued
+    /// for the relay loop, so one that arrives while an allocation is being
+    /// rebuilt is in place before the rebuild it has to sign, which is the only
+    /// moment it was ever needed.
+    #[tokio::test]
+    async fn a_renewal_replaces_the_credential_the_next_rebuild_will_sign_with() {
+        let mut w = wired(Some(started_with()));
+
+        w.asked(&Request::RenewCredential {
+            id: 3,
+            server: "relay2.example.org:3478".to_string(),
+            user: "1786090000:alice".to_string(),
+            password: "the-new-one".to_string(),
+        })
+        .await;
+
+        assert_eq!(w.answer().await, Event::Done { id: 3 });
+        let held = w.holding().expect("a credential is still held");
+        assert_eq!(held.server, "relay2.example.org:3478");
+        assert_eq!(held.username, "1786090000:alice");
+        assert_eq!(held.password, "the-new-one");
+    }
+
+    /// A relay that is not going through a TURN server has no credential to
+    /// replace, so the renewal is refused rather than quietly inventing one.
+    ///
+    /// coilbox never sends one of these, because it only renews for a battle it
+    /// opened on a credential. Storing it anyway would turn a plain UDP relay
+    /// into one that tries to allocate on a TURN server the moment it was
+    /// rebuilt, which is a working relay swapped for a failing one.
+    #[tokio::test]
+    async fn a_renewal_for_a_relay_with_no_credential_is_refused() {
+        let mut w = wired(None);
+
+        w.asked(&Request::RenewCredential {
+            id: 4,
+            server: "relay.example.org:3478".to_string(),
+            user: "1786090000:alice".to_string(),
+            password: "the-new-one".to_string(),
+        })
+        .await;
+
+        let Event::Failed { id, reason } = w.answer().await else {
+            panic!("a renewal with nothing to renew has to be refused");
+        };
+        assert_eq!(id, 4);
+        assert!(
+            reason.contains("not going through a TURN server"),
+            "{reason}"
+        );
+        assert!(w.holding().is_none(), "nothing may be invented here");
+        assert!(
+            !reason.contains("the-new-one"),
+            "the refusal must not quote the credential: {reason}"
+        );
+    }
 
     /// The handover, and the one piece of wiring nothing else can reach. The
     /// agent's own tests prove what it decides once coilbox has gone, and the
@@ -253,8 +431,12 @@ mod tests {
         let (to_agent, agent_stdin) = tokio::io::duplex(64);
         let reporter = Arc::new(Reporter::writing(tokio::io::sink()));
         let stopping = Arc::new(Stopping::new());
-        let mut requests =
-            Requests::reading(agent_stdin, Arc::clone(&reporter), Arc::clone(&stopping));
+        let mut requests = Requests::reading(
+            agent_stdin,
+            Arc::clone(&reporter),
+            Arc::clone(&stopping),
+            Arc::new(std::sync::Mutex::new(None)),
+        );
 
         tokio::time::sleep(IDLE_TIMEOUT).await;
         assert_eq!(

@@ -1878,6 +1878,10 @@ async fn advertise(
         // and stopping it is issue #2018's with rules of its own.
         (Ok(_), None) => {
             remember_relay(registry, server_key, host);
+            // Started here rather than in `allocate`, because until the lobby
+            // has said the battle exists there is nothing in the slot for the
+            // renewal loop to recognise as its own. Issue #2092.
+            relay_host::renewing(registry, server_key, patience);
             sent
         }
         // A battle opened, and it is not going through the relay. It is at this
@@ -3897,6 +3901,7 @@ mod tests {
             relayed: "198.51.100.9:30001".parse().expect("an address"),
             agent: Arc::new(relay_agent::RelayAgent::driving(Nothing, to_agent, |_| {})),
             moves: relay_host::MoveWatch::default(),
+            credential: relay_host::CredentialWatch::default(),
         }
     }
 

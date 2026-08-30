@@ -57,7 +57,7 @@ pub type TurnSlot = watch::Receiver<TurnAnswer>;
 /// `main.rs`), and it signs each try with this same credential. One with less
 /// than that left would be dead before the rebuild it has to sign, so a battle
 /// that survived losing its allocation would not survive getting it back.
-const REBUILD_HEADROOM: Duration = Duration::from_secs(32);
+pub(crate) const REBUILD_HEADROOM: Duration = Duration::from_secs(32);
 
 /// How long a game coilbox refuses to host below.
 ///
@@ -159,6 +159,22 @@ impl std::fmt::Display for NoCredential {
 
 impl std::error::Error for NoCredential {}
 
+/// A relay credential, and the moment it stops being good.
+///
+/// The expiry travels with it because a battle now has to keep the credential
+/// alive rather than only check it once (issue #2092), and the whole renewal
+/// schedule is worked out from this one number. Reading it back out of
+/// [`LobbyState`] later would read whichever credential the connection last
+/// minted, which after the first renewal is not the one the sidecar is holding.
+#[derive(Clone, Debug)]
+pub struct Credential {
+    /// The credential itself, as the relay agent takes it.
+    pub turn: Turn,
+    /// Unix millis, straight off
+    /// [`coilbox_lobby_protocol::TurnCredentials::expires_at`].
+    pub expires_at: u64,
+}
+
 /// A relay credential for `server_key`, asking the lobby for a fresh one if the
 /// held one has run out or there is not one.
 ///
@@ -175,10 +191,8 @@ pub async fn credentials(
     server_key: &str,
     now_ms: u64,
     patience: Duration,
-) -> Result<Turn, NoCredential> {
-    // Everything that touches the registry happens here, in one place, because
-    // the lock must not be held across the wait below.
-    let (held, mut answers, tx) = {
+) -> Result<Credential, NoCredential> {
+    let held = {
         let map = lock_or_recover(registry);
         let conn = map
             .get(server_key)
@@ -195,14 +209,77 @@ pub async fn credentials(
         if !state.relay_hosting_available() {
             return Err(NoCredential::NoRelay);
         }
-        let held = state.live_turn_credentials(usable_until(now_ms)).cloned();
-        drop(state);
-        (held, conn.turn.clone(), conn.tx.clone())
+        state.live_turn_credentials(usable_until(now_ms)).cloned()
     };
 
     if let Some(held) = held {
         return usable(&held);
     }
+
+    let minted = ask_the_lobby(registry, server_key, patience).await?;
+    if !minted.live_at(usable_until(now_ms)) {
+        return Err(NoCredential::TooShort {
+            left: Duration::from_millis(minted.expires_at.saturating_sub(now_ms)),
+            needed: hosting_needs(),
+        });
+    }
+    usable(&minted)
+}
+
+/// A credential to replace the one a relay is already running on, whatever the
+/// lobby last minted.
+///
+/// The difference from [`credentials`] is the whole of issue #2092 on this side,
+/// and it is two things.
+///
+/// Nothing held is reused. A held credential is the one the sidecar already has,
+/// so handing it back would be answering "renew this" with "here is the one that
+/// is running out". The lobby is asked every time.
+///
+/// [`hosting_needs`] is not applied. That gate is about whether a game can be
+/// started at all, and this is a game that is already being played: a shorter
+/// credential than the gate would allow still buys the battle the time it
+/// covers, and refusing it would leave the relay on one that has less. What the
+/// caller must not do is take one that expires sooner than the one it is
+/// holding, and [`crate::relay_host::renewing`] is where that is decided,
+/// because this function has no idea what the sidecar is holding.
+pub async fn renewed(
+    registry: &Registry,
+    server_key: &str,
+    patience: Duration,
+) -> Result<Credential, NoCredential> {
+    {
+        let map = lock_or_recover(registry);
+        let conn = map
+            .get(server_key)
+            .ok_or_else(|| NoCredential::NotConnected(server_key.to_string()))?;
+        if conn.protocol != ConnProtocol::TasServer {
+            return Err(NoCredential::WrongProtocol);
+        }
+        if !lock_or_recover(&conn.state).relay_hosting_available() {
+            return Err(NoCredential::NoRelay);
+        }
+    }
+    let minted = ask_the_lobby(registry, server_key, patience).await?;
+    usable(&minted)
+}
+
+/// Send `TURNCREDENTIALS` and wait for what comes back.
+///
+/// The registry lock is taken and dropped inside the block below, because it
+/// must not be held across the wait.
+async fn ask_the_lobby(
+    registry: &Registry,
+    server_key: &str,
+    patience: Duration,
+) -> Result<TurnCredentials, NoCredential> {
+    let (mut answers, tx) = {
+        let map = lock_or_recover(registry);
+        let conn = map
+            .get(server_key)
+            .ok_or_else(|| NoCredential::NotConnected(server_key.to_string()))?;
+        (conn.turn.clone(), conn.tx.clone())
+    };
 
     // Mark whatever is in the slot as seen before asking, so an answer that
     // arrives while the ask is still being written is not missed.
@@ -217,15 +294,7 @@ pub async fn credentials(
         // The connection ended while we waited, which is the same shape of
         // nothing as a server that never answers.
         None => Err(NoCredential::Closed),
-        Some(TurnAnswer::Granted(minted)) => {
-            if !minted.live_at(usable_until(now_ms)) {
-                return Err(NoCredential::TooShort {
-                    left: Duration::from_millis(minted.expires_at.saturating_sub(now_ms)),
-                    needed: hosting_needs(),
-                });
-            }
-            usable(&minted)
-        }
+        Some(TurnAnswer::Granted(minted)) => Ok(minted),
         Some(TurnAnswer::Refused(why)) => Err(NoCredential::Refused(why)),
         // The slot only ever changes to an answer, so this is unreachable in
         // practice. Treating it as no answer beats waiting again.
@@ -285,11 +354,14 @@ async fn next_answer(answers: &mut TurnSlot) -> Option<TurnAnswer> {
 }
 
 /// The credential as the relay agent takes it.
-fn usable(minted: &TurnCredentials) -> Result<Turn, NoCredential> {
-    Ok(Turn {
-        server: relay_address(&minted.uri)?,
-        user: minted.username.clone(),
-        password: minted.password.clone(),
+fn usable(minted: &TurnCredentials) -> Result<Credential, NoCredential> {
+    Ok(Credential {
+        turn: Turn {
+            server: relay_address(&minted.uri)?,
+            user: minted.username.clone(),
+            password: minted.password.clone(),
+        },
+        expires_at: minted.expires_at,
     })
 }
 
@@ -328,7 +400,7 @@ fn relay_address(uri: &str) -> Result<String, NoCredential> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::conn::{EventSink, ServerConn, StartedBattle, TachyonHandle};
     use coilbox_lobby_protocol::{parse_line, reduce_at, LoginPhase};
@@ -338,30 +410,43 @@ mod tests {
 
     /// A moment with room either side of it, so a test can talk about a
     /// credential that has run out without arithmetic underflowing.
-    const NOW: u64 = 1_786_000_000_000;
+    pub(crate) const NOW: u64 = 1_786_000_000_000;
+
+    /// The one connection every test here drives.
+    pub(crate) const KEY: &str = "alice@bar:8200";
 
     /// How long a test waits before deciding an answer is never coming.
     const PATIENCE: Duration = Duration::from_secs(5);
 
     /// The ends of a registered connection a test drives: what it sent, and the
     /// slot the connection task would be answering into.
-    struct Wired {
-        registry: Registry,
-        sent: mpsc::UnboundedReceiver<Outbound>,
-        answers: watch::Sender<TurnAnswer>,
-        state: Arc<Mutex<LobbyState>>,
+    pub(crate) struct Wired {
+        pub(crate) registry: Registry,
+        pub(crate) sent: mpsc::UnboundedReceiver<Outbound>,
+        pub(crate) answers: watch::Sender<TurnAnswer>,
+        pub(crate) state: Arc<Mutex<LobbyState>>,
     }
 
     /// A connection to a server with a relay, which is what every test bar the
     /// one about the gate is about.
-    fn wired(protocol: ConnProtocol) -> Wired {
-        wired_with_flags(protocol, "COMPFLAGS u sp r")
+    pub(crate) fn wired(protocol: ConnProtocol) -> Wired {
+        wired_with_flags(
+            protocol,
+            "COMPFLAGS u sp r",
+            Arc::new(Mutex::new(Channel::new(|_| Ok(())))),
+        )
+    }
+
+    /// The same, with the frontend's end of the event channel handed in, which
+    /// is how a caller in another module asserts what the host was told.
+    pub(crate) fn wired_watching(protocol: ConnProtocol, sink: EventSink) -> Wired {
+        wired_with_flags(protocol, "COMPFLAGS u sp r", sink)
     }
 
     /// `compflags` is the server's answer to `LISTCOMPFLAGS`, folded through the
     /// real parser and reducer, because it is what decides whether the lobby is
     /// asked for a credential at all.
-    fn wired_with_flags(protocol: ConnProtocol, compflags: &str) -> Wired {
+    fn wired_with_flags(protocol: ConnProtocol, compflags: &str, sink: EventSink) -> Wired {
         let registry = Registry::default();
         let (tx, sent) = mpsc::unbounded_channel::<Outbound>();
         let (answers, turn) = watch::channel(TurnAnswer::Unasked);
@@ -373,7 +458,7 @@ mod tests {
                 protocol,
                 tx,
                 state: state.clone(),
-                sink: Arc::new(Mutex::new(Channel::new(|_| Ok(())))) as EventSink,
+                sink,
                 phase: watch::channel(LoginPhase::Ready).1,
                 agreement: Arc::new(Mutex::new(None)),
                 tachyon: TachyonHandle::default(),
@@ -395,7 +480,11 @@ mod tests {
     /// The answer a lobby running ScarylePoo/uberserver#27 would send, folded
     /// through the real parser and reducer rather than hand-built, so a change
     /// to either shows up here.
-    fn minted(state: &Arc<Mutex<LobbyState>>, ttl_seconds: u64, at: u64) -> TurnCredentials {
+    pub(crate) fn minted(
+        state: &Arc<Mutex<LobbyState>>,
+        ttl_seconds: u64,
+        at: u64,
+    ) -> TurnCredentials {
         reduce_at(
             &mut lock_or_recover(state),
             parse_line(&format!(
@@ -424,9 +513,9 @@ mod tests {
             .await
             .expect("the lobby answered with a credential");
 
-        assert_eq!(turn.server, "relay.example.org:3478");
-        assert_eq!(turn.user, "1786086400:alice");
-        assert_eq!(turn.password, "bWFj=");
+        assert_eq!(turn.turn.server, "relay.example.org:3478");
+        assert_eq!(turn.turn.user, "1786086400:alice");
+        assert_eq!(turn.turn.password, "bWFj=");
         // Not awaited: the ask is written before the wait begins, so by the
         // time an answer is back the line is already in the channel. Waiting
         // for it would hang rather than fail when it was never sent.
@@ -601,6 +690,75 @@ mod tests {
         }
     }
 
+    /// Issue #2092, at the ask. A renewal goes to the lobby even when a
+    /// perfectly live credential is held, because the held one is the one the
+    /// sidecar is already running on and the point is to replace it.
+    #[tokio::test]
+    async fn a_renewal_asks_the_lobby_even_with_a_live_credential_in_hand() {
+        let mut w = wired(ConnProtocol::TasServer);
+        // Long enough that `credentials` would hand it straight back.
+        minted(&w.state, 86_400, NOW);
+
+        let state = w.state.clone();
+        let answers = w.answers.clone();
+        tokio::spawn(async move {
+            let _ = answers.send(TurnAnswer::Granted(minted(&state, 86_400, NOW + 1_000)));
+        });
+
+        let fresh = renewed(&w.registry, "alice@bar:8200", PATIENCE)
+            .await
+            .expect("the lobby minted another");
+        assert_eq!(fresh.expires_at, NOW + 1_000 + 86_400_000);
+        // Not awaited: the ask is written before the wait begins, so by the
+        // time an answer is back the line is already in the channel. Waiting
+        // for it would hang rather than fail when it was never sent.
+        assert!(matches!(
+            w.sent.try_recv(),
+            Ok(Outbound::Line(line)) if line == "TURNCREDENTIALS"
+        ));
+    }
+
+    /// A renewal shorter than the hosting gate is still handed back, because it
+    /// is a game already being played rather than one about to start.
+    ///
+    /// Refusing it would leave the relay on the credential it already has, which
+    /// by definition has less left than this one. Whether it is worth taking at
+    /// all is the caller's to decide, and `relay_host::renewing` is where that
+    /// happens.
+    #[tokio::test]
+    async fn a_renewal_shorter_than_the_hosting_gate_is_still_a_renewal() {
+        let w = wired(ConnProtocol::TasServer);
+        let state = w.state.clone();
+        let answers = w.answers.clone();
+        tokio::spawn(async move {
+            let _ = answers.send(TurnAnswer::Granted(minted(&state, 600, NOW)));
+        });
+
+        let fresh = renewed(&w.registry, "alice@bar:8200", PATIENCE)
+            .await
+            .expect("ten minutes is ten minutes the battle did not have");
+        assert_eq!(fresh.expires_at, NOW + 600_000);
+    }
+
+    /// A lobby that will not mint another one has to say so in its own words,
+    /// because the host is about to be told their battle is on borrowed time.
+    #[tokio::test]
+    async fn a_refused_renewal_carries_the_lobbys_reason() {
+        let w = wired(ConnProtocol::TasServer);
+        let answers = w.answers.clone();
+        tokio::spawn(async move {
+            let _ = answers.send(TurnAnswer::Refused("you have asked too often".to_string()));
+        });
+
+        let refused = renewed(&w.registry, "alice@bar:8200", PATIENCE)
+            .await
+            .expect_err("the lobby said no");
+        assert!(
+            refused.to_string().contains("you have asked too often"),
+            "got: {refused}"
+        );
+    }
+
     /// A refusal has to reach the caller in the lobby's own words, because the
     /// caller is a person who is about to be told they cannot host.
     #[tokio::test]
@@ -625,7 +783,11 @@ mod tests {
     /// waited out, just not asked.
     #[tokio::test]
     async fn a_server_without_a_relay_is_not_asked_for_a_credential() {
-        let mut w = wired_with_flags(ConnProtocol::TasServer, "COMPFLAGS u sp b");
+        let mut w = wired_with_flags(
+            ConnProtocol::TasServer,
+            "COMPFLAGS u sp b",
+            Arc::new(Mutex::new(Channel::new(|_| Ok(())))),
+        );
 
         let refused = credentials(&w.registry, "alice@bar:8200", NOW, PATIENCE)
             .await
@@ -793,9 +955,9 @@ mod tests {
         let turn = credentials(&registry, &key, NOW, PATIENCE)
             .await
             .expect("the lobby minted one");
-        assert_eq!(turn.server, "relay.example.org:3478");
-        assert_eq!(turn.user, "1786086400:alice");
-        assert_eq!(turn.password, "bWFj=");
+        assert_eq!(turn.turn.server, "relay.example.org:3478");
+        assert_eq!(turn.turn.user, "1786086400:alice");
+        assert_eq!(turn.turn.password, "bWFj=");
     }
 
     /// Issue #2019. The credential must not reach the frontend, because the
@@ -842,8 +1004,8 @@ mod tests {
 
         // The credential did arrive, so the absence below is redaction rather
         // than a line that never got read.
-        assert_eq!(turn.user, username);
-        assert_eq!(turn.password, password);
+        assert_eq!(turn.turn.user, username);
+        assert_eq!(turn.turn.password, password);
 
         let sent = lock_or_recover(&seen).join("\n");
         assert!(

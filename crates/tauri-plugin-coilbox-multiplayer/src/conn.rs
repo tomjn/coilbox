@@ -1139,6 +1139,7 @@ mod tests {
             relayed: "198.51.100.9:30001".parse().expect("an address"),
             agent: Arc::new(agent),
             moves: crate::relay_host::MoveWatch::default(),
+            credential: crate::relay_host::CredentialWatch::default(),
         });
     }
 

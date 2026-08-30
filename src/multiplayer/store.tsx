@@ -1176,6 +1176,18 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
               : "Its relay moved and the lobby would not update the address.",
             level: "error",
           });
+        }
+        // The relay credential the lobby minted has run out and it would not
+        // mint another. Nothing is broken yet and nothing looks wrong, which is
+        // exactly why the host has to be told: the game carries on until the
+        // relay has to be rebuilt, and then it ends for everybody at once.
+        // Hosting again is the only thing that gets a live credential.
+        else if (d.kind === "relayCredentialExpired") {
+          void notify({
+            title: "Your battle is running on an expired relay pass",
+            body: "The lobby would not issue another one. The game carries on, but if the relay has to reconnect everybody will be dropped. Host again when you can.",
+            level: "error",
+          });
         } else if (d.kind === "commandFailed") {
           // Ignore-sync commands are best-effort: a server without IGNORE support
           // may reject them, but local hiding still applies, so degrade silently
