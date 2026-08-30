@@ -1895,10 +1895,10 @@ async fn advertise(
         // room that existed for a fraction of a second and that no engine has
         // been launched into, because nothing launches until `mp_open_battle`
         // has returned (issue #2064).
-        (Ok(battle), Some(reason)) => {
+        (Ok(_), Some(reason)) => {
             let _ = host.agent.stop();
             let _ = enqueue(registry, server_key, command::leave_battle());
-            CliResult::err(relay_host::NoBattle::NotRelayed { reason, battle }.to_string())
+            CliResult::err(relay_host::NoBattle::NotRelayed(reason).to_string())
         }
         // No battle and a refused address. Nothing to close, and both reasons
         // are said rather than one of them chosen.
@@ -1906,10 +1906,11 @@ async fn advertise(
         // This arm used to report the address and drop the other, from when the
         // other was only ever "the lobby said nothing". It is not: uberserver
         // turns a battle down from six places in `in_OPENBATTLE`, none of which
-        // has anything to do with the address line ahead of it, so a host whose
-        // lobby has no relay configured and whose game hash came out zero has
-        // two separate faults and was told about both. Choosing between them
-        // throws one away (issue #2145).
+        // has anything to do with the address line ahead of it. A host whose
+        // coturn sits on a LAN and whose game hash came out zero has two
+        // separate faults and was told about both, so choosing between them
+        // throws away the one that may be the reason there is no battle (issue
+        // #2145).
         (Err(why), Some(reason)) => {
             let _ = host.agent.stop();
             CliResult::err(
@@ -5101,20 +5102,29 @@ mod tests {
 
     /// Issue #2145, over a real socket and through the real connection task.
     ///
-    /// Two lines turned down for two unrelated reasons. `in_RELAYEDHOST` finds
-    /// no relay on this server, and `in_OPENBATTLE` behind it finds a game hash
-    /// of zero, which is one of six places uberserver turns a battle down from
-    /// and has nothing to do with the address line ahead of it. So neither
-    /// answer explains the other, and a host told only the address goes looking
-    /// for a relay problem behind a battle a bad hash stopped.
+    /// Two lines turned down for two unrelated reasons, both of which the
+    /// uberserver in `~/dev/uberserver` at `6a3868f` can give an account it has
+    /// already handed a relay credential to. `_validRelayedHostAddress` refuses
+    /// an allocation whose address is not public, which is a coturn on a LAN or
+    /// one whose reflexive address came back private. `in_OPENBATTLE` behind it
+    /// refuses a game hash of zero, one of six places it turns a battle down
+    /// from and none of them about the address line ahead of it.
     ///
-    /// Nothing about this needs a malformed line. Both refusals are ones
-    /// uberserver writes about lines it read and understood.
+    /// So neither answer explains the other, and a host told only the address
+    /// goes looking for a relay problem behind a battle a bad hash stopped.
+    /// Both reasons are lines this server read and understood, so neither needs
+    /// a malformed one.
     #[tokio::test]
     async fn a_lobby_that_turns_down_both_lines_gives_the_host_both_reasons() {
         let addr = lobby_scripted(
             |_| "OPENBATTLEFAILED Invalid game hash 0".to_string(),
-            |_| Some("RELAYEDHOSTFAILED This server has no relay configured".to_string()),
+            |_| {
+                Some(
+                    "RELAYEDHOSTFAILED 192.168.1.5 is not a public address, so nobody could join \
+                     a battle there"
+                        .to_string(),
+                )
+            },
         )
         .await;
         let registry = Registry::default();
@@ -5132,7 +5142,7 @@ mod tests {
             "the reason no battle opened has to reach the host, got: {told}"
         );
         assert!(
-            told.contains("This server has no relay configured"),
+            told.contains("192.168.1.5 is not a public address"),
             "the reason the address was refused has to reach the host, got: {told}"
         );
         assert!(

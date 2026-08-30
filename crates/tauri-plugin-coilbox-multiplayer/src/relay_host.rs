@@ -1143,20 +1143,21 @@ pub enum NoBattle {
     /// opened the room anyway, so it is at this machine's own address rather
     /// than at the relay's.
     ///
-    /// `battle` is the id of that room, carried because it is the thing that
-    /// then has to be closed.
-    NotRelayed { reason: String, battle: u32 },
+    /// The id of that room used to be carried here, as the `Option` that told
+    /// this case apart from the one below. The variants tell them apart now,
+    /// and nothing ever read the id: closing the room is `LEAVEBATTLE`, which
+    /// names no battle.
+    NotRelayed(String),
     /// The lobby refused the address and there is no battle either, which is
     /// two answers to two lines rather than one answer to one.
     ///
     /// Both are said, because both are true and neither implies the other.
     /// `RELAYEDHOST` and `OPENBATTLE` are separate commands and uberserver
-    /// answers them separately: `in_RELAYEDHOST` writes
-    /// `RELAYEDHOSTFAILED This server has no relay configured` where it reads
-    /// the address, and `in_OPENBATTLE` then turns the battle down on its own
-    /// terms from any of six places. So the two reasons are about two different
-    /// faults and picking one throws away a fact the host was told (issue
-    /// #2145).
+    /// answers them separately: `in_RELAYEDHOST` turns down an allocation whose
+    /// address is not a public one where it reads the address, and
+    /// `in_OPENBATTLE` then turns the battle down on its own terms from any of
+    /// six places. So the two reasons are about two different faults and
+    /// picking one throws away a fact the host was told (issue #2145).
     ///
     /// `why` leads because it is the larger fact. Nothing opened, so the
     /// address is about where a battle would have been advertised had there
@@ -1188,7 +1189,7 @@ impl std::fmt::Display for NoBattle {
                 f,
                 "coilbox sent an OPENBATTLE line this lobby would not run, so no battle was opened and sending it again would send the same line: {reason}"
             ),
-            NoBattle::NotRelayed { reason, .. } => write!(
+            NoBattle::NotRelayed(reason) => write!(
                 f,
                 "the lobby would not advertise your battle at the relay's address, so the room it opened at this machine's own address has been closed: {reason}"
             ),
