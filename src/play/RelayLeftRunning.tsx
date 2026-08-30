@@ -37,9 +37,7 @@ export default function RelayLeftRunning() {
       className="flex animate-pulse items-center gap-1.5 rounded-full bg-orange-500/15 px-3 py-1 text-xs font-medium text-orange-600 motion-reduce:animate-none dark:text-orange-400"
     >
       <span className="size-2 rounded-full bg-orange-500" />
-      {relay.bytesPerSecond === null
-        ? "Relaying"
-        : relayCarryingLabel(relay.bytesPerSecond)}
+      {relayCarryingLabel(relay.bytesPerSecond)}
     </div>
   );
 }

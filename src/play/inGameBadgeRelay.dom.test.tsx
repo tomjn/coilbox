@@ -33,7 +33,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type HostingRoute, recordHostingRoute } from "../direct/hostingRoute";
 import InGameBadge from "./InGameBadge";
-import { ASK_EVERY_MS } from "./relayCarrying";
+import { ASK_EVERY_MS, RELAY_CARRYING_DETAIL } from "./relayCarrying";
 
 vi.mock("@/components/ui/popover", () => ({
   Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -59,9 +59,14 @@ vi.mock("@/multiplayer/bindings", () => ({
   mpRelayTraffic: (args: Record<string, never>) => relayTraffic(args),
 }));
 
-/** What the backend says the relay is carrying, from here on. */
+/** What the backend says about the relay behind the game, from here on. */
 function carrying(bytesPerSecond: number | null) {
-  relayTraffic.mockResolvedValue({ bytesPerSecond });
+  relayTraffic.mockResolvedValue({ relaying: true, bytesPerSecond });
+}
+
+/** No relay behind this game at all, which is the ordinary answer. */
+function noRelay() {
+  relayTraffic.mockResolvedValue({ relaying: false, bytesPerSecond: null });
 }
 
 /**
@@ -85,13 +90,24 @@ function pillSays(): string {
   );
 }
 
+/**
+ * The part of the pill that talks about the relay, or null when there is none.
+ *
+ * Read on its own because the stubbed popover puts its whole warning inside the
+ * pill, so {@link pillSays} cannot be matched exactly once the X is the one that
+ * asks first.
+ */
+function relaySays(): string | null {
+  return screen.queryByTitle(RELAY_CARRYING_DETAIL)?.textContent ?? null;
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   running = true;
   cancel.mockClear();
   focusGame.mockClear();
   relayTraffic.mockReset();
-  carrying(null);
+  noRelay();
   recordHostingRoute(null);
 });
 
@@ -176,15 +192,18 @@ describe("a relayed battle", () => {
   });
 
   /**
-   * A reopened coilbox, and a sidecar that has died. Neither leaves anything
-   * coilbox can honestly say, so the pill goes back to what an ordinary game
-   * draws rather than repeating the last figure it heard.
+   * A sidecar that has gone, after a battle whose route this client still
+   * remembers. There is no relay to describe and nothing left to end for
+   * anybody else, so the pill goes back to what an ordinary game draws rather
+   * than repeating the last figure it heard.
    */
   it("draws nothing about the relay when the backend has nothing to say", async () => {
-    carrying(null);
+    noRelay();
     await drawBadge("relay");
 
     expect(pillSays()).toBe("In game");
+    fireEvent.click(screen.getByRole("button", { name: "End game" }));
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 
   /** Ending it is two presses, and the first one says what the second will do. */
@@ -203,6 +222,61 @@ describe("a relayed battle", () => {
       screen.getByRole("button", { name: "End it for everybody" }),
     );
     expect(cancel).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * The whole of issue #2094, from the pill's side.
+ *
+ * The warning used to be drawn from the figure, so anything that took the
+ * figure away took the warning with it and left the X ending everybody's game
+ * on the first press. The backend now answers the two separately, and these are
+ * the cases where they disagree.
+ */
+describe("a relay coilbox can see but cannot get a figure out of", () => {
+  it("still asks before the X ends everybody's game", async () => {
+    carrying(null);
+    await drawBadge("relay");
+
+    fireEvent.click(screen.getByRole("button", { name: "End game" }));
+
+    expect(cancel).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/ends it for everybody playing in it/),
+    ).toBeTruthy();
+  });
+
+  /**
+   * And it says the relay is there, rather than looking like an ordinary game
+   * with an X that unexpectedly argues back. "Relaying nothing" would be a
+   * different claim: that is a relay that is up and idle, and this is one that
+   * has not said either way.
+   */
+  it("says a relay is there without inventing a rate for it", async () => {
+    carrying(null);
+    await drawBadge("relay");
+
+    expect(relaySays()).toBe("Relaying");
+  });
+
+  /**
+   * A poll that never landed. The command cannot fail in Rust, so a rejection
+   * is the IPC dropping a message, and one dropped message must not quietly
+   * take the warning off a button that ends everybody's game.
+   */
+  it("keeps the warning when a poll fails outright", async () => {
+    carrying(41984);
+    await drawBadge("relay");
+    expect(relaySays()).toBe("Relaying 41.0 KB/s");
+
+    relayTraffic.mockRejectedValue(new Error("the call never landed"));
+    await act(async () => {
+      vi.advanceTimersByTime(ASK_EVERY_MS);
+    });
+
+    expect(relaySays()).toBe("Relaying");
+    fireEvent.click(screen.getByRole("button", { name: "End game" }));
+    expect(cancel).not.toHaveBeenCalled();
   });
 });
 

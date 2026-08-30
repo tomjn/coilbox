@@ -27,6 +27,18 @@ import {
  * from one that is working. And its X asks first, because everybody else in that
  * game is connected through this machine and ending it here ends it for all of
  * them.
+ *
+ * ## The two are not the same question (issue #2094)
+ *
+ * They were, and that was the bug. The X asked first only when there was a
+ * figure to draw, so anything that took the figure away took the warning with
+ * it and left the button doing the dangerous thing on the first press. Leaving
+ * the battle room mid-game did exactly that.
+ *
+ * A figure is a nice-to-have that goes missing for several ordinary reasons. A
+ * relay carrying every other player's traffic is a fact about what the X does.
+ * So `relaying` decides the warning and `bytesPerSecond` decides the figure, and
+ * nothing about the warning depends on coilbox managing to read a number.
  */
 export default function InGameBadge() {
   const { running, focusGame, cancel } = usePlay();
@@ -34,7 +46,7 @@ export default function InGameBadge() {
   // decides whether to ask the backend anything at all. An ordinary battle
   // never polls, never redraws on a timer and never renders any of the below.
   const relayed = useChosenHostingRoute() === "relay";
-  const carrying = useRelayCarrying(running && relayed);
+  const relay = useRelayCarrying(running && relayed);
   const [confirmEnd, setConfirmEnd] = useState(false);
   if (!running) return null;
   return (
@@ -48,12 +60,12 @@ export default function InGameBadge() {
         <span className="size-2 rounded-full bg-orange-500" />
         In game
       </button>
-      {carrying !== null && (
+      {relay.relaying && (
         <span title={RELAY_CARRYING_DETAIL} className="border-l pl-2">
-          {relayCarryingLabel(carrying)}
+          {relayCarryingLabel(relay.bytesPerSecond)}
         </span>
       )}
-      {carrying === null ? (
+      {!relay.relaying ? (
         <Button
           type="button"
           variant="ghost"
@@ -110,8 +122,22 @@ export default function InGameBadge() {
   );
 }
 
+/** The relay behind the running game, as far as coilbox can see it. */
+type RelayBehindTheGame = {
+  /** A relay on this machine is up and this game's traffic goes through it. */
+  relaying: boolean;
+  /** What it last said it was carrying, or null if it has not said. */
+  bytesPerSecond: number | null;
+};
+
+/** Nothing known, which is what an ordinary game has and never asks about. */
+const NOT_RELAYED: RelayBehindTheGame = {
+  relaying: false,
+  bytesPerSecond: null,
+};
+
 /**
- * How much the relay is carrying, asked once a second while `watch` is true and
+ * The relay behind the game, asked once a second while `watch` is true and
  * never otherwise.
  *
  * Polled rather than pushed, and the alternative is what makes this the cheap
@@ -119,25 +145,31 @@ export default function InGameBadge() {
  * mirroring lobby state once a second, on a machine that is running a game. This
  * redraws one pill, and only for a host who is relaying one.
  *
- * `null` is every way of having nothing to say: not relaying, the sidecar gone,
- * or the command failing. Each of them means coilbox does not know, and the pill
- * draws nothing rather than repeating the last figure it heard.
+ * A `null` figure is every way of having nothing to say about the rate: a
+ * sidecar coilbox has stopped hearing from, or one whose last word is too old to
+ * repeat. The pill draws no number rather than the last one it heard.
+ *
+ * A failed call is the one case that does not clear `relaying`. The command
+ * cannot fail on the Rust side, so a rejection here is the IPC itself, and
+ * treating that as "no relay" would take the warning off the X for a second on
+ * the strength of a dropped message. The figure still goes, because a figure
+ * from a call that did not happen is not a figure.
  */
-function useRelayCarrying(watch: boolean): number | null {
-  const [carrying, setCarrying] = useState<number | null>(null);
+function useRelayCarrying(watch: boolean): RelayBehindTheGame {
+  const [relay, setRelay] = useState<RelayBehindTheGame>(NOT_RELAYED);
   useEffect(() => {
     if (!watch) {
-      setCarrying(null);
+      setRelay(NOT_RELAYED);
       return;
     }
     let live = true;
     const ask = () => {
       mpRelayTraffic({})
         .then((answer) => {
-          if (live) setCarrying(answer.bytesPerSecond);
+          if (live) setRelay(answer);
         })
         .catch(() => {
-          if (live) setCarrying(null);
+          if (live) setRelay((was) => ({ ...was, bytesPerSecond: null }));
         });
     };
     ask();
@@ -147,5 +179,5 @@ function useRelayCarrying(watch: boolean): number | null {
       clearInterval(timer);
     };
   }, [watch]);
-  return carrying;
+  return relay;
 }

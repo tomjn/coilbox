@@ -26,4 +26,13 @@ describe("what the pill says a relay is carrying", () => {
     expect(relayCarryingLabel(-1)).toBe("Relaying nothing");
     expect(relayCarryingLabel(Number.NaN)).toBe("Relaying nothing");
   });
+
+  /**
+   * A relay coilbox can see but cannot get a figure out of. It must not read as
+   * "Relaying nothing", because that says the relay is up and idle, and this
+   * says coilbox has not been told either way.
+   */
+  it("says only that a relay is there when it has not said what it carries", () => {
+    expect(relayCarryingLabel(null)).toBe("Relaying");
+  });
 });
