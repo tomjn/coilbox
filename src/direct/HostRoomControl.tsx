@@ -116,7 +116,7 @@ function RunningRoom({
       <span className="text-right text-xs text-muted-foreground">
         {announcementNote(room.advertise, heardOnNetwork)}
       </span>
-      <RoomAddresses port={room.port} />
+      <RoomAddresses port={room.port} announced={room.ip} />
       <GameAddress ip={room.ip} />
       {error && (
         <p role="alert" className="text-xs text-destructive">
@@ -167,8 +167,19 @@ function GameAddress({ ip }: { ip: string }) {
  * Read once on mount rather than polled. Ports do not open and close by
  * themselves, an interface does not usually appear while a room is up, and this
  * component only exists while one is.
+ *
+ * `announced` is the exception, and comes down as a prop because it does move:
+ * it is the address the room is putting in its battle, re-read on the poll that
+ * feeds `GameAddress` below (issue #2116). It is what decides whether the
+ * outside row can deliver a game as well as a room (issue #2127).
  */
-function RoomAddresses({ port }: { port: number }) {
+function RoomAddresses({
+  port,
+  announced,
+}: {
+  port: number;
+  announced: string;
+}) {
   const [addresses, setAddresses] = useState<DirectLocalAddress[] | null>(null);
   const [report, setReport] = useState<DirectReachability | null>(null);
   useEffect(() => {
@@ -192,7 +203,7 @@ function RoomAddresses({ port }: { port: number }) {
   // moment showing only loopback, which is the one address that is never the
   // answer.
   if (!addresses) return null;
-  const shared = shareAddresses(addresses, port, report);
+  const shared = shareAddresses(addresses, port, report, announced);
   return (
     <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
       <span>{shareHeadline(shared)}</span>
@@ -205,25 +216,33 @@ function RoomAddresses({ port }: { port: number }) {
           return (
             <li
               key={`${address.scope}-${address.address}`}
-              className="flex items-center gap-2"
+              className="flex flex-col items-end gap-0.5"
             >
-              <span>{address.label}</span>
-              <code className="select-all rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
-                {addressText(address)}
-              </code>
-              <CopyButton
-                value={addressText(address)}
-                label={`Copy ${addressText(address)}, ${address.who}`}
-              >
-                Copy
-              </CopyButton>
-              {link && (
+              <div className="flex items-center gap-2">
+                <span>{address.label}</span>
+                <code className="select-all rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
+                  {addressText(address)}
+                </code>
                 <CopyButton
-                  value={link}
-                  label={`Copy a link that joins at ${addressText(address)}, ${address.who}`}
+                  value={addressText(address)}
+                  label={`Copy ${addressText(address)}, ${address.who}`}
                 >
-                  Copy link
+                  Copy
                 </CopyButton>
+                {link && (
+                  <CopyButton
+                    value={link}
+                    label={`Copy a link that joins at ${addressText(address)}, ${address.who}`}
+                  >
+                    Copy link
+                  </CopyButton>
+                )}
+              </div>
+              {/* Under the row rather than beside it, because it is a sentence
+                  and the row is a heading, an address and two buttons already
+                  (issue #2127). */}
+              {address.caveat && (
+                <span className="max-w-sm text-right">{address.caveat}</span>
               )}
             </li>
           );
