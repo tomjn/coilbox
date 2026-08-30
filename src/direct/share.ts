@@ -33,6 +33,14 @@ export interface ShareAddress {
   /** Who it is for, as the tail of "Copy 192.168.1.5:8200 …". Carries the whole
    *  of what the label leaves implicit, so a button can be named with it. */
   who: string;
+  /** What this address does not get somebody, when it gets them less than the
+   *  label promises. Absent on a row that delivers everything it says.
+   *
+   *  Shown beside the row rather than folded into {@link ShareAddress.who},
+   *  because `who` only ever reaches a screen reader through a button's name and
+   *  this is the sort of thing a host has to read before they send the address
+   *  rather than after they have copied it. */
+  caveat?: string;
 }
 
 /** `address:port`, which is what "Join by address" takes in one field. */
@@ -56,11 +64,17 @@ export function addressText(address: ShareAddress): string {
  * host is shown all of them with the interface against each rather than being
  * handed one and left to find out it was the wrong one. On the ordinary machine
  * with one network there is nothing to choose, and "On en0" would be noise.
+ *
+ * `announced` is the address the room is putting in its battle right now, which
+ * is what decides whether the outside row can deliver a game as well as a room
+ * (issue #2127). Read live off the room rather than worked out here, so a room
+ * that moves onto a VPN moves this with it.
  */
 export function shareAddresses(
   addresses: DirectLocalAddress[],
   port: number,
   reachability: DirectReachability | null,
+  announced: string,
 ): ShareAddress[] {
   const local = addresses.filter((a) => !a.loopback);
   // The one address this machine holds that the internet also sees, on a VPS or
@@ -75,7 +89,7 @@ export function shareAddresses(
   const named = local.filter((a) => a.address !== publicHost).length > 1;
   const shared: ShareAddress[] = local.map((a) =>
     a.address === publicHost
-      ? outsideAddress(a.address, port)
+      ? outsideAddress(a.address, port, announced)
       : {
           scope: "network",
           label: named ? `On ${a.interface}` : "On this network",
@@ -95,7 +109,9 @@ export function shareAddresses(
   if (outside) {
     const [host, mapped] = outside.split(":");
     if (!shared.some((a) => a.address === host)) {
-      shared.push(outsideAddress(host, mapped ? Number(mapped) : port));
+      shared.push(
+        outsideAddress(host, mapped ? Number(mapped) : port, announced),
+      );
     }
   }
 
@@ -112,16 +128,45 @@ export function shareAddresses(
   return shared;
 }
 
-/** The row for whoever is not on this network, wherever the address came from.
- *  One wording, because a joiner outside is a joiner outside whether the router
- *  opened a port or this machine was on the internet all along. */
-function outsideAddress(address: string, port: number): ShareAddress {
-  return {
+/**
+ * The row for whoever is not on this network, wherever the address came from.
+ *
+ * One wording for the address itself, because a joiner outside is a joiner
+ * outside whether the router opened a port or this machine was on the internet
+ * all along. What differs is what the address buys them, and that is `announced`
+ * against this one (issue #2127).
+ *
+ * A room announces a single address to everybody in it. Somebody who dials this
+ * row reaches the room, and their engine then dials whatever the room announced.
+ * When those two are the same address, as they are on a machine that is on the
+ * internet under its own address, they get the game as well as the room. When
+ * they differ, which is every room behind a router that opened a port, the room
+ * has handed them this machine's address on this network and their engine sits
+ * on "Connecting to" until they give up.
+ *
+ * So the row says the second half rather than being taken away. The host can
+ * read their public address off the panel in the hosting form whatever this does
+ * with it, and a row that quietly vanished after the router opened a port would
+ * leave a host who had just read that it opened with nothing to square that
+ * against. It is the promise that was wrong, not the address.
+ */
+function outsideAddress(
+  address: string,
+  port: number,
+  announced: string,
+): ShareAddress {
+  const row: ShareAddress = {
     scope: "internet",
     label: "From outside",
     address,
     port,
     who: "for somebody who is not on your network",
+  };
+  if (announced === address) return row;
+  return {
+    ...row,
+    who: `${row.who}, who can join this room and chat but cannot start the game`,
+    caveat: `They can join this room and chat. They cannot start the game, because the room gives everybody in it ${announced}, which nothing outside your network can dial.`,
   };
 }
 

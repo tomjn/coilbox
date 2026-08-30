@@ -109,8 +109,18 @@ pub struct RoomConfig {
     /// over loopback like any other, so this is the only thing that tells them
     /// apart.
     pub host: String,
-    /// The address a joining engine dials, announced in `BATTLEOPENED`. The LAN
-    /// address on a LAN, the mapped public one when a port has been forwarded.
+    /// The address a joining engine dials, announced in `BATTLEOPENED`.
+    ///
+    /// One address for the whole room, and in practice always this machine's
+    /// address on the network it is on. The plugin will take one the host names
+    /// instead, but nothing does: the LAN hosting form starts a room without an
+    /// address and the room works its own out.
+    ///
+    /// So a joiner from outside is sent somewhere they cannot dial, and telling
+    /// them apart from a joiner on the network means an address per peer rather
+    /// than an address per room. That was weighed and turned down (issue #2127).
+    /// The reasoning is on `accept_loop` in `tauri-plugin-coilbox-direct`, beside
+    /// the peer address it would be read from.
     pub ip: String,
     /// Whether a join waits for the host to answer it.
     ///

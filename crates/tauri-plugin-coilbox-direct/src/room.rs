@@ -438,6 +438,52 @@ impl Room {
 
 /// Accept sockets until the task is cancelled, giving each one its own peer id
 /// and its own task.
+///
+/// # The peer's address is dropped on purpose
+///
+/// `TcpListener::accept` answers with the peer's `SocketAddr` and this throws it
+/// away. It is the one thing standing between a room and telling each joiner a
+/// different address for the game, so it is worth saying why it stays thrown
+/// away (issue #2127).
+///
+/// A room announces one address to everybody in it, and for a room on a LAN that
+/// is this machine on this network. Somebody outside, who is only ever here
+/// because the host copied them an address, reaches the room and then cannot
+/// reach the game. Keeping the address here, carrying it to [`Peer`] and picking
+/// per joiner in `RoomState::announcement` is the shape of the fix. It was turned
+/// down for four reasons rather than one.
+///
+/// Three things send the address, not one. Login sends `BATTLEOPENED` to a single
+/// peer already, so that much is free. Opening the battle broadcasts it to
+/// everybody logged in, and `RoomState::set_ip` broadcasts `BATTLEHOSTMOVED`
+/// every time this machine's address moves. Both would have to become a line per
+/// peer, and every line written afterwards that carries the address would have to
+/// remember there are two answers to give.
+///
+/// The room does not hold the second address. [`RoomOptions::ip`] is one field,
+/// the LAN hosting form never fills it, and the public address and the router's
+/// external port both live in the reachability report on the frontend, where they
+/// move as the mapping renews.
+///
+/// The port splits the same way and is not fixed either. `BATTLEOPENED` carries
+/// the engine's port beside the address, the LAN form sends the port the engine
+/// binds, and RFC 6887 section 11 tells a PCP client it "MUST be written assuming
+/// that it may never be assigned the external port it suggests". The address on
+/// its own gets a joiner outside to the right machine on the wrong port.
+///
+/// And there is no audience waiting. A LAN room cannot be found from outside at
+/// all, because the beacon goes out with multicast TTL 1 and mDNS is link-local,
+/// so an outsider is in one only because the host sent them an address. Coilbox
+/// answers hosting for people who are not on your network twice over already,
+/// with a battle on a lobby server and with the relay. What shipped instead is
+/// the room saying what that copied address does not buy, in `outsideAddress` in
+/// `src/direct/share.ts`.
+///
+/// One thing that cannot go wrong, for whoever does build it. A peer's side never
+/// changes under them: which side of the router a peer is on is the source
+/// address of their TCP connection, and that is fixed for the life of the socket.
+/// A peer that changes network drops the connection and comes back with a new
+/// peer id and a fresh address.
 async fn accept_loop(listener: TcpListener, requests: mpsc::UnboundedSender<Request>) {
     let mut next: PeerId = 1;
     loop {

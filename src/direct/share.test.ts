@@ -57,6 +57,7 @@ describe("shareAddresses", () => {
       [on("192.168.1.45", "en0"), loopback],
       8200,
       null,
+      "192.168.1.45",
     );
     const network = found.filter((a) => a.scope === "network");
     expect(network).toHaveLength(1);
@@ -72,6 +73,7 @@ describe("shareAddresses", () => {
       [on("192.168.1.45", "en0"), on("10.8.0.2", "utun4"), loopback],
       8200,
       null,
+      "192.168.1.45",
     );
     expect(
       found.filter((a) => a.scope === "network").map((a) => a.label),
@@ -83,6 +85,7 @@ describe("shareAddresses", () => {
       [on("192.168.1.45", "en0"), on("10.8.0.2", "utun4"), loopback],
       8200,
       null,
+      "192.168.1.45",
     );
     expect(found.map((a) => a.address)).toEqual([
       "192.168.1.45",
@@ -96,6 +99,7 @@ describe("shareAddresses", () => {
       [on("192.168.1.45", "en0"), loopback],
       8200,
       null,
+      "192.168.1.45",
     );
     const last = found[found.length - 1];
     expect(last.scope).toBe("machine");
@@ -109,6 +113,7 @@ describe("shareAddresses", () => {
       [on("192.168.1.45", "en0"), loopback],
       8200,
       mapped("81.2.3.4", 8300),
+      "192.168.1.45",
     );
     const outside = found.find((a) => a.scope === "internet");
     expect(outside && addressText(outside)).toBe("81.2.3.4:8300");
@@ -121,6 +126,7 @@ describe("shareAddresses", () => {
       [on("192.168.1.45", "en0"), loopback],
       8200,
       refused,
+      "192.168.1.45",
     );
     expect(found.some((a) => a.scope === "internet")).toBe(false);
   });
@@ -132,6 +138,7 @@ describe("shareAddresses", () => {
       [on("209.35.91.246", "eth0"), loopback],
       8200,
       direct("209.35.91.246"),
+      "209.35.91.246",
     );
     const outside = found.find((a) => a.scope === "internet");
     expect(outside?.label).toBe("From outside");
@@ -144,6 +151,7 @@ describe("shareAddresses", () => {
       [on("209.35.91.246", "eth0"), loopback],
       8200,
       direct("209.35.91.246"),
+      "209.35.91.246",
     );
     expect(found.filter((a) => a.address === "209.35.91.246")).toHaveLength(1);
   });
@@ -158,14 +166,63 @@ describe("shareAddresses", () => {
       [on("209.35.91.246", "eth0"), on("10.8.0.2", "utun4"), loopback],
       8200,
       direct("209.35.91.246", "10.8.0.2"),
+      "10.8.0.2",
     );
     expect(
       found.filter((a) => a.scope === "network").map((a) => a.label),
     ).toEqual(["On this network"]);
   });
 
+  // Issue #2127. The router opened the room's port, so this address reaches the
+  // room. The room then hands everybody in it 192.168.1.45, which the joiner
+  // outside cannot dial, so their engine hangs on "Connecting to". Without this
+  // the host reads "From outside" and sends a friend into a dead end.
+  it("says what an outside address does not buy when the room is announced elsewhere", () => {
+    const found = shareAddresses(
+      [on("192.168.1.45", "en0"), loopback],
+      8200,
+      mapped("81.2.3.4", 8300),
+      "192.168.1.45",
+    );
+    const outside = found.find((a) => a.scope === "internet");
+    expect(outside?.caveat).toContain("cannot start the game");
+    expect(outside?.caveat).toContain("192.168.1.45");
+    expect(outside?.who).toContain("cannot start the game");
+  });
+
+  // The other side of the same rule. A machine on the internet under its own
+  // address announces that address, so the outside row delivers the game as well
+  // as the room and has nothing to warn about.
+  it("keeps the outside address unqualified when the room is announced at it", () => {
+    const found = shareAddresses(
+      [on("209.35.91.246", "eth0"), loopback],
+      8200,
+      direct("209.35.91.246"),
+      "209.35.91.246",
+    );
+    const outside = found.find((a) => a.scope === "internet");
+    expect(outside?.caveat).toBeUndefined();
+    expect(outside?.who).toBe("for somebody who is not on your network");
+  });
+
+  // A VPS with Docker on it holds 172.17.0.1 as well as its public address, and
+  // the Rust side picks the private one to announce (issue #2111). The machine
+  // is on the internet under its own address and the outside row still cannot
+  // deliver a game, which is why this asks what the room announced rather than
+  // how the address was found.
+  it("qualifies a direct host's own address when the room announced a private one", () => {
+    const found = shareAddresses(
+      [on("209.35.91.246", "eth0"), on("172.17.0.1", "docker0"), loopback],
+      8200,
+      direct("209.35.91.246", "172.17.0.1"),
+      "172.17.0.1",
+    );
+    const outside = found.find((a) => a.scope === "internet");
+    expect(outside?.caveat).toContain("172.17.0.1");
+  });
+
   it("says so rather than pretending, on a machine with no network at all", () => {
-    const found = shareAddresses([loopback], 8200, null);
+    const found = shareAddresses([loopback], 8200, null, "127.0.0.1");
     expect(found).toHaveLength(1);
     expect(found[0].who).toContain("on no network");
   });
@@ -177,6 +234,7 @@ describe("shareHeadline", () => {
       [on("192.168.1.45", "en0"), on("10.8.0.2", "utun4"), loopback],
       8200,
       null,
+      "192.168.1.45",
     );
     expect(shareHeadline(found)).toContain("the network they are on");
   });
@@ -186,6 +244,7 @@ describe("shareHeadline", () => {
       [on("192.168.1.45", "en0"), loopback],
       8200,
       null,
+      "192.168.1.45",
     );
     expect(shareHeadline(found)).toBe("Give joiners this address:");
   });
@@ -198,13 +257,14 @@ describe("shareHeadline", () => {
       [on("209.35.91.246", "eth0"), loopback],
       8200,
       direct("209.35.91.246"),
+      "209.35.91.246",
     );
     expect(shareHeadline(found)).toBe("Give joiners this address:");
   });
 
   it("does not offer an address nobody else can reach", () => {
-    expect(shareHeadline(shareAddresses([loopback], 8200, null))).toContain(
-      "nobody else can reach",
-    );
+    expect(
+      shareHeadline(shareAddresses([loopback], 8200, null, "127.0.0.1")),
+    ).toContain("nobody else can reach");
   });
 });
