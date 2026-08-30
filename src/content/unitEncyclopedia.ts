@@ -49,9 +49,14 @@ export function unitLabel(
  * The grid, grouped by faction with a unit's morph stages folded into one cell.
  *
  * `roots` is the game's start units with the faction names to head their
- * blocks. A root the dataset does not hold is dropped by `buildTechForest`, so
- * a game whose sides could not be read degrades to one block of everything
- * rather than to nothing.
+ * blocks, exactly as the engine reports them: a `startUnit` can name any stage
+ * of its morph group, not just the base, and this resolves each one to its
+ * group's base before the build graph is walked, so a caller does not have to
+ * do that itself. `buildTechForest` walks morph edges forward only, so a root
+ * left as a later stage would never reach the base stage backwards, and the
+ * faction's own commander would fall out of its own block. A root the dataset
+ * does not hold is dropped by `buildTechForest`, so a game whose sides could
+ * not be read degrades to one block of everything rather than to nothing.
  *
  * A cell matches the search when its own def key matches, when the name a
  * reader sees matches, or when one of its folded stages' def keys matches. The
@@ -65,13 +70,23 @@ export function encyclopediaSections(
   query: string,
 ): UnitSection[] {
   const byId = new Map(units.map((u) => [u.name.toLowerCase(), u]));
+
+  // Computed once and reused for both root resolution and folding stages
+  // below: `buildTechForest` needs the roots already resolved to their base
+  // before it runs, so its own identical `forest.morphBase` isn't available
+  // yet at this point.
+  const base = groupOf(morphGroups(units));
+  const resolvedRoots = roots.map((r) => {
+    const id = r.id.toLowerCase();
+    return { id: base.get(id) ?? id, label: r.label };
+  });
+
   const forest = buildTechForest(
     units,
-    roots.map((r) => r.id),
+    resolvedRoots.map((r) => r.id),
   );
-  const headings = new Map(roots.map((r) => [r.id.toLowerCase(), r.label]));
+  const headings = new Map(resolvedRoots.map((r) => [r.id, r.label]));
 
-  const base = groupOf(morphGroups(units));
   const stagesOf = new Map<string, string[]>();
   for (const [stage, root] of base) {
     if (stage === root) continue;

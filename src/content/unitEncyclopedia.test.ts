@@ -87,6 +87,23 @@ describe("encyclopediaSections", () => {
     ]);
   });
 
+  it("keeps a faction's commander under its own heading when the start unit is a later stage", () => {
+    // buildTechForest walks morph edges forward only, so a root left as
+    // "armcom1" would never reach "armcom" backwards, and the commander
+    // would fall out of Armada and into "Other units".
+    const units = [
+      unit("armcom", { morphTargets: [{ into: "armcom1" }] }),
+      unit("armcom1"),
+    ];
+    const sections = encyclopediaSections(
+      units,
+      [{ id: "armcom1", label: "Armada" }],
+      "",
+    );
+    expect(sections.map((s) => s.label)).toEqual(["Armada"]);
+    expect(sections[0].cells.map((c) => c.id)).toEqual(["armcom"]);
+  });
+
   it("drops a section left empty by the search", () => {
     const units = [unit("armcom"), unit("armghost")];
     const sections = encyclopediaSections(units, ARMADA, "armghost");
