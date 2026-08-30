@@ -49,6 +49,10 @@
 //!   relay has to be rebuilt. coturn judges a credential once, when it makes
 //!   the session, so the battle outlives it. The rebuild is where it bites, and
 //!   coturn refuses that with 401, which the agent is right to stop for.
+//! - A credential coilbox sent down the control channel mid-battle is the one
+//!   the next rebuild is signed with, and coturn accepts it. That is the whole
+//!   of issue #2092 measured rather than argued: the same battle that ends in
+//!   the test above comes back at a new address and carries on being played.
 //! - A coturn draining for maintenance refuses an Allocate with 403 while
 //!   having no complaint about the credential at all. The agent used to treat
 //!   403 as a refused credential and end the battle over it, which is the one
@@ -126,6 +130,7 @@ use std::time::Duration;
 
 use coilbox_relay_protocol::Event;
 use tauri_plugin_coilbox_multiplayer::relay_agent::RelayAgent;
+use tauri_plugin_coilbox_multiplayer::relay_sidecar::Turn;
 
 /// How many players take a seat. Four, matching the demux's own test, which is
 /// enough for "one endpoint each" to mean something and small enough to read.
@@ -630,6 +635,95 @@ fn a_credential_that_expires_costs_nothing_until_the_relay_has_to_be_rebuilt() {
         minted.elapsed()
     );
 }
+
+/// The same battle again, with coilbox renewing the credential before the
+/// rebuild instead of watching the game end (issue #2092).
+///
+/// The twin of the test above and the only way to know the renewal is worth
+/// anything. Everything up to the restart is identical: a credential good for
+/// two seconds, an allocation opened on it, a player playing through it, and the
+/// credential expiring underneath a game that carries on regardless. Then the
+/// one difference, which is coilbox sending a fresh credential down the control
+/// channel, and a different answer at the end: coturn judges the new credential
+/// on the Allocate that rebuilds the relay, accepts it, and the battle comes back
+/// at a new address rather than stopping.
+///
+/// The credential it is handed is minted the same way the first one was, so
+/// nothing here is testing a special case coturn treats differently. The only
+/// thing that has changed is which credential the agent signs with.
+#[test]
+#[ignore = "needs coturn installed and a few seconds: see this file's comment for the command"]
+fn a_renewed_credential_gets_the_battle_through_a_rebuild() {
+    let mut coturn = Coturn::minting_credentials(SHORT_LIFETIME);
+    let engine = FakeEngine::start();
+    let (user, password, stops_working_at) = coturn.credential_expiring_in(CREDENTIAL_LIFE);
+    let minted = std::time::Instant::now();
+    let sidecar = Sidecar::start_holding(&coturn, engine.addr, &user, &password);
+
+    let relayed = sidecar.relay_open();
+    sidecar
+        .agent
+        .allow_joiner(IpAddr::V4(Ipv4Addr::LOCALHOST), PATIENCE)
+        .expect("the agent let the joiner through the allocation");
+    let player = FakePlayer::dialling(relayed);
+    player.round_trip(b"the relay is working while the credential is good");
+
+    while std::time::SystemTime::now() < stops_working_at {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    player.round_trip(b"still here after the credential expired");
+
+    // What coilbox does while it is still open, and the whole of the fix. The
+    // lifetime is coturn's own maximum rather than another two seconds, because
+    // a renewal that expired again before the restart would be testing nothing.
+    let (fresh_user, fresh_password, _) = coturn.credential_expiring_in(RENEWAL_LIFE);
+    sidecar
+        .agent
+        .renew_credential(&Turn {
+            server: coturn.addr.to_string(),
+            user: fresh_user,
+            password: fresh_password,
+        })
+        .expect("the sidecar is still reading its stdin");
+
+    // The same restart as the test above, and this time the credential the agent
+    // signs the rebuild with is one coturn will accept.
+    coturn.stop();
+    coturn.start_again();
+
+    let back = sidecar
+        .relayed_port_within_the_wait()
+        .expect("the battle has to come back on the credential coilbox sent");
+    println!(
+        "rebuilt at port {back} {:?} after minting a {}s credential, on a renewal",
+        minted.elapsed(),
+        CREDENTIAL_LIFE.as_secs()
+    );
+
+    // And it is a relay somebody can actually play through, not only an address
+    // the agent reported. The player is let through again because a permission
+    // belongs to the allocation that has gone, which is what coilbox does on
+    // every rebuild.
+    let (relay_port_from, relay_port_to) = RELAY_PORTS;
+    assert!(
+        (relay_port_from..=relay_port_to).contains(&back),
+        "the rebuilt relay has to be one coturn handed out, and it was at {back}"
+    );
+    sidecar
+        .agent
+        .allow_joiner(IpAddr::V4(Ipv4Addr::LOCALHOST), PATIENCE)
+        .expect("the agent let the joiner through the rebuilt allocation");
+    player
+        .moves_to_a_new_address(SocketAddr::new(relayed.ip(), back))
+        .round_trip_once_it_can(b"playing on through a relay a renewed credential rebuilt");
+}
+
+/// How long the credential coilbox sends as a renewal is good for.
+///
+/// Long enough that nothing in the test races it, and short enough to be
+/// obviously deliberate. The point of the number is only that it outlives the
+/// restart the test performs, which takes about 100 ms.
+const RENEWAL_LIFE: Duration = Duration::from_secs(300);
 
 /// A server on its way out for maintenance, which refuses an allocation while
 /// having no complaint at all about the credential.
