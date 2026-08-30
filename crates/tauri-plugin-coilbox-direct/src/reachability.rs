@@ -26,6 +26,14 @@ use crate::portmap::{self, is_public_v4, Mapped, Method, Open, PortRequest, Refu
 use crate::stun;
 
 /// Everything a host needs to know about whether anybody outside can reach them.
+///
+/// The facts, not the verdict. Whether a host is reachable is worked out once,
+/// in `src/direct/reachability.ts`, so the panel, the hosting ladder and the
+/// sharing rows cannot disagree about the same host. This struct used to carry a
+/// second answer, an `open()` that asked only whether a mapping was made and so
+/// said no about a machine already on the internet under its own address. It had
+/// no caller, and a second answer that nothing compares to the first is how the
+/// two drifted (issue #2090).
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Reachability {
@@ -54,13 +62,6 @@ pub struct Reachability {
     pub confirmed_port: Option<u16>,
     /// Why nothing opened, in as much of the router's own words as there were.
     pub problem: Option<String>,
-}
-
-impl Reachability {
-    /// Whether somebody outside this network can actually get in.
-    pub fn open(&self) -> bool {
-        self.method.is_some() && !self.double_nat
-    }
 }
 
 /// A live set of mappings and the task keeping them alive.
@@ -225,7 +226,7 @@ mod tests {
             None,
             Some(refused()),
         );
-        assert!(!out.open());
+        assert_eq!(out.method, None);
         assert_eq!(out.wanted.len(), 2);
         assert_eq!(out.public_address.as_deref(), Some("209.35.91.246"));
         assert!(out.problem.unwrap().contains("NAT-PMP"));
@@ -245,6 +246,33 @@ mod tests {
         assert_eq!(out.public_address, None);
         assert_eq!(out.confirmed_port, None);
         assert_eq!(out.lan_address.as_deref(), Some("192.168.1.45"));
+    }
+
+    /// A machine already on the internet: nothing answered the mapping request
+    /// because there is no gateway to answer it, and the address STUN saw is one
+    /// of this machine's own.
+    ///
+    /// `isOnPublicAddress` in `src/direct/reachability.ts` spots that host by
+    /// comparing these two strings, so they have to leave here in the same form
+    /// or a VPS is told its router refused. That is the bug #2054 and #2085
+    /// fixed on the reading side, and nothing on this side held the two fields
+    /// to a shape it could compare.
+    #[test]
+    fn a_host_whose_only_address_is_public_reports_it_as_both() {
+        let out = report(
+            None,
+            &asked(),
+            Some("209.35.91.246".to_string()),
+            Some(stun::Reflexive {
+                ip: Ipv4Addr::new(209, 35, 91, 246),
+                port: 8452,
+            }),
+            None,
+            Some(refused()),
+        );
+        assert_eq!(out.public_address.as_deref(), Some("209.35.91.246"));
+        assert_eq!(out.lan_address, out.public_address);
+        assert_eq!(out.method, None);
     }
 
     /// The reflexive port matching a port we asked for is the mapping
@@ -299,8 +327,8 @@ mod tests {
             open.router_ip,
             None,
         );
+        assert_eq!(out.method, Some(Method::Upnp));
         assert!(out.double_nat);
-        assert!(!out.open());
     }
 
     #[test]
@@ -312,7 +340,6 @@ mod tests {
         );
         let out = report(Some(&open), &asked(), None, None, open.router_ip, None);
         assert!(!out.double_nat);
-        assert!(out.open());
         assert_eq!(out.method, Some(Method::NatPmp));
     }
 
@@ -323,6 +350,6 @@ mod tests {
         let open = Open::for_test(Method::NatPmp, asked(), None);
         let out = report(Some(&open), &asked(), None, None, None, None);
         assert!(!out.double_nat);
-        assert!(out.open());
+        assert_eq!(out.method, Some(Method::NatPmp));
     }
 }
