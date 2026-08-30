@@ -22,10 +22,15 @@ import { mpLeaveBattle } from "../bindings";
  * Dropped after the leave lands rather than before it, which is the opposite of
  * what the hosting forms do with the same record. They drop it first so a host
  * that fails leaves nothing behind. Here the failure is the other way round: a
- * leave that did not happen leaves this client sitting in its own relayed
- * battle, and a host who then presses Start would launch a game nothing knows
- * is relayed, which is a missing warning on a button that ends everybody's
- * game.
+ * leave that did not happen leaves this client sitting in its own battle, and
+ * dropping the record first would take the route label off a battle room that
+ * is still open.
+ *
+ * The launch no longer reads this at all. It asks the connection whose battle
+ * it is launching whether that battle is relayed, so a stale record can no
+ * longer cost a missing warning on the button that ends everybody's game
+ * (issue #2099). What is left here is the battle room's route label, where a
+ * wrong answer is a wrong word in a tooltip.
  */
 export function leaveBattle(serverKey: string) {
   return mpLeaveBattle({ serverKey }).then((answer) => {

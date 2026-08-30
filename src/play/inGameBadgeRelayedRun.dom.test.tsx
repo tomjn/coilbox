@@ -24,7 +24,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { recordHostingRoute } from "@/direct/hostingRoute";
 import { useBattleLaunch } from "@/multiplayer/battle/useBattleLaunch";
 import type { BattleConfig, LaunchEvent } from "@/play/bindings";
 import type { PlayTarget } from "@/play/config";
@@ -84,8 +83,11 @@ const { mpRelayTraffic, mpWatchEngine } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/multiplayer/bindings", () => ({
+  // The battle this client hosts is the relayed one, which is what Rust
+  // answers from the relay handle held against that connection.
   mpBuildHostConfig: vi.fn(async () => ({
     config: { gameType: "g", mapName: "m" },
+    relayed: true,
   })),
   mpBuildBattleConfig: vi.fn(async () => ({
     config: { gameType: "g", mapName: "m" },
@@ -185,7 +187,6 @@ beforeEach(() => {
   ).window.__TAURI_INTERNALS__ = {
     transformCallback: (cb: unknown) => cb,
   };
-  recordHostingRoute("relay");
   render(
     <PlayProvider>
       <Screen />
@@ -195,7 +196,6 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  recordHostingRoute(null);
   vi.clearAllMocks();
 });
 

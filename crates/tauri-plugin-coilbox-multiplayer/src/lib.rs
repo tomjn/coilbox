@@ -2316,12 +2316,22 @@ async fn mp_ask_leftover_relay_to_stop<R: Runtime>(
     )
 }
 
-/// Tell whichever connection is hosting through a relay which process the
+/// Tell the relay this connection's battle is hosted through which process the
 /// engine is. Answers whether there was one to tell.
 ///
-/// No server key, for the same reason [`relay_traffic`] takes none: one run
-/// file means one sidecar on this machine, so there is at most one relay to
-/// tell however many lobbies are connected.
+/// Named by connection rather than found by looking, which is the difference
+/// between "the relay for the battle that was launched" and "a relay". Those
+/// are the same thing today only because [`relay_agent::RelayAgent::spawn`]
+/// refuses to start a second sidecar over a run file that already names a live
+/// one, so a scan of the registry has at most one thing to find. That is a
+/// check on a file made by a process that has not written it yet, in a plugin
+/// two layers down, and the thing riding on it is which game's players get cut
+/// off. So this asks the connection whose engine it is (issue #2099).
+///
+/// [`relay_traffic`] still takes no key, and that is not an inconsistency. It
+/// answers "is there a relay on this machine", which the in-game pill asks
+/// without knowing which lobby a game came from. This one names a process to a
+/// specific sidecar and has a caller that always knows.
 ///
 /// The agent is taken out of the registry before the write, so the lock is not
 /// held across it. Nothing here waits for an answer and a write that fails is
@@ -2329,8 +2339,8 @@ async fn mp_ask_leftover_relay_to_stop<R: Runtime>(
 /// [`relay_agent::RelayAgent::watch_engine`]: a sidecar that cannot be reached
 /// has already stopped, and one that never hears this stops on its traffic
 /// backstop rather than leaking.
-fn watch_engine(registry: &Registry, pid: u32) -> bool {
-    let agent = lock_or_recover(registry).values().find_map(|conn| {
+fn watch_engine(registry: &Registry, server_key: &str, pid: u32) -> bool {
+    let agent = lock_or_recover(registry).get(server_key).and_then(|conn| {
         lock_or_recover(&conn.relay)
             .as_ref()
             .map(|host| Arc::clone(&host.agent))
@@ -2371,6 +2381,14 @@ fn watch_engine(registry: &Registry, pid: u32) -> bool {
 /// falls back to the backstop it would have used anyway. `run_file.rs` in the
 /// agent reasons about a recycled pid the same way.
 ///
+/// ## Why it also takes a server key
+///
+/// Because "which engine" and "which relay" are two halves of one pairing and
+/// both have to be about the same battle. The run id settles the engine. The
+/// key settles the relay, so a launch on a connection that is hosting nothing
+/// through a relay answers `watching: false` and writes no line, rather than
+/// handing its pid to a sidecar carrying a different battle (issue #2099).
+///
 /// ## What calls it
 ///
 /// Only a host whose battle went through the relay, on the launch of the engine
@@ -2380,10 +2398,13 @@ fn watch_engine(registry: &Registry, pid: u32) -> bool {
 fn mp_watch_engine<R: Runtime>(
     app: tauri::AppHandle<R>,
     registry: State<'_, Registry>,
+    server_key: String,
     run_id: String,
 ) -> CliResult {
     match tauri_plugin_coilbox_play::engine_pid(&app, &run_id) {
-        Some(pid) => CliResult::ok(json!({ "watching": watch_engine(&registry, pid) })),
+        Some(pid) => {
+            CliResult::ok(json!({ "watching": watch_engine(&registry, &server_key, pid) }))
+        }
         None => CliResult::err("no running game with that id"),
     }
 }
@@ -3321,7 +3342,20 @@ fn host_team_value(ally: usize, color: u32, leader: usize) -> Value {
 }
 
 /// `mp_build_host_config` — return the current (hosted) battle as a host-mode
-/// `play` `BattleConfig`.
+/// `play` `BattleConfig`, and say whether that battle is going through a relay.
+///
+/// `relayed` is the same handle the config is built from, said out loud. The
+/// launch needs it: the in-game pill's warning and the engine it names to the
+/// sidecar both turn on whether this game is the relayed one, and until issue
+/// #2099 the launch worked that out from a module singleton holding the route
+/// of the last battle this client hosted anywhere. Here it is a fact about the
+/// connection whose battle is being launched, read under the same lock as the
+/// config, so the two cannot come from different battles.
+///
+/// The handle is exactly "the relay the battle currently open on this
+/// connection is hosted through". [`open_battle`] drops it before every attempt
+/// and [`forget_relay`] drops it when the host leaves, so it never outlives the
+/// battle it describes.
 #[tauri::command]
 fn mp_build_host_config(registry: State<'_, Registry>, server_key: String) -> CliResult {
     let map = lock_or_recover(&registry);
@@ -3329,13 +3363,25 @@ fn mp_build_host_config(registry: State<'_, Registry>, server_key: String) -> Cl
         Some(conn) => {
             let relay = lock_or_recover(&conn.relay);
             let state = lock_or_recover(&conn.state);
-            match battle_to_host_config(&state, relay.as_ref()) {
-                Ok(config) => CliResult::ok(json!({ "config": config })),
+            match host_config_answer(&state, relay.as_ref()) {
+                Ok(answer) => CliResult::ok(answer),
                 Err(e) => CliResult::err(e),
             }
         }
         None => CliResult::err(format!("not connected: {server_key}")),
     }
+}
+
+/// Both halves of [`mp_build_host_config`]'s answer, built from one relay
+/// handle so they cannot disagree about whether this battle is relayed.
+fn host_config_answer(
+    state: &LobbyState,
+    relay: Option<&relay_host::RelayHost>,
+) -> Result<Value, String> {
+    Ok(json!({
+        "config": battle_to_host_config(state, relay)?,
+        "relayed": relay.is_some(),
+    }))
 }
 
 /// `mp_build_battle_config` — return the current battle as a `play` `BattleConfig`.
@@ -4127,6 +4173,30 @@ mod tests {
         // engine's warning would be true.
         let direct = battle_to_host_config(&hosted_state(), None).unwrap();
         assert!(direct.get("hostLoopbackReason").is_none());
+    }
+
+    /// The launch is told whether its own battle is relayed, rather than
+    /// working it out from the route of the last battle hosted anywhere
+    /// (issue #2099).
+    ///
+    /// This is what the in-game pill's warning and the engine named to the
+    /// sidecar both turn on, and the two directions cost different things. Said
+    /// falsely, an unrelated process decides when a relayed match ends. Not
+    /// said at all, the X on the pill ends a relayed game for everybody in it
+    /// with no warning, which is issue #2094.
+    ///
+    /// Asserted next to the config rather than on its own, because the point is
+    /// that one relay handle produces both and a caller cannot pair the config
+    /// for one battle with the verdict for another.
+    #[test]
+    fn a_host_config_says_whether_that_battle_is_going_through_a_relay() {
+        let relayed = host_config_answer(&relayed_state(), Some(&a_relay())).unwrap();
+        assert_eq!(relayed["relayed"], true);
+        assert_eq!(relayed["config"]["hostIp"], "127.0.0.1");
+
+        let direct = host_config_answer(&hosted_state(), None).unwrap();
+        assert_eq!(direct["relayed"], false);
+        assert_eq!(direct["config"]["hostIp"], "0.0.0.0");
     }
 
     /// A battle with nothing interesting in it, so the tests below are about the
@@ -5782,7 +5852,7 @@ mod tests {
         assert!(hosting_through_the_relay(&registry));
     }
 
-    /// The registry scan behind `mp_watch_engine`, asked the way the sidecar
+    /// The registry lookup behind `mp_watch_engine`, asked the way the sidecar
     /// will hear it: not "was a flag set" but "which line reached the agent's
     /// stdin".
     ///
@@ -5795,14 +5865,14 @@ mod tests {
     fn the_engine_is_named_only_to_a_battle_that_is_being_relayed() {
         let registry = Registry::default();
         assert!(
-            !watch_engine(&registry, 4242),
+            !watch_engine(&registry, "alice@bar:8200", 4242),
             "nothing is being relayed, so there is nobody to tell"
         );
 
         lock_or_recover(&registry)
             .insert("alice@bar:8200".to_string(), a_connection_hosting_nothing());
         assert!(
-            !watch_engine(&registry, 4242),
+            !watch_engine(&registry, "alice@bar:8200", 4242),
             "an ordinary battle has no sidecar of its own, and every game that is not \
              relayed looks like this"
         );
@@ -5813,12 +5883,63 @@ mod tests {
             "alice@bar:8200",
             a_relay_writing_to(channel.clone()),
         );
-        assert!(watch_engine(&registry, 4242));
+        assert!(watch_engine(&registry, "alice@bar:8200", 4242));
         assert_eq!(
             channel.sent().lines().collect::<Vec<_>>(),
             vec!["{\"type\":\"watchEngine\",\"id\":1,\"pid\":4242}"],
             "the sidecar has to be given the engine's pid and nothing else: it stops \
              relaying when the process it was told about exits"
+        );
+    }
+
+    /// A second lobby connection cannot hand its engine to the first one's
+    /// relay (issue #2099).
+    ///
+    /// The registry is keyed by server key and has always held one relay slot
+    /// per connection, so two entries is the shape it is built for. What used
+    /// to happen is that the pid went to whichever entry the scan reached
+    /// first, and a `HashMap` has no first. The relay here is carrying alice's
+    /// battle, and the engine being launched belongs to bob's, so the only safe
+    /// answer is to send nothing at all: the sidecar stops when the process it
+    /// was named exits, and bob's engine exiting has nothing to say about
+    /// whether alice's game is over.
+    ///
+    /// Asserted on the wire rather than on the return value, because
+    /// `watching: false` with a line already written would be the failure
+    /// happening quietly.
+    #[test]
+    fn an_engine_is_never_named_to_another_connections_relay() {
+        let registry = Registry::default();
+        {
+            let mut map = lock_or_recover(&registry);
+            map.insert("alice@bar:8200".to_string(), a_connection_hosting_nothing());
+            map.insert("bob@baz:8200".to_string(), a_connection_hosting_nothing());
+        }
+        let channel = Channelled::default();
+        remember_relay(
+            &registry,
+            "alice@bar:8200",
+            a_relay_writing_to(channel.clone()),
+        );
+
+        assert!(
+            !watch_engine(&registry, "bob@baz:8200", 4242),
+            "bob's battle is hosted through no relay, so there is nothing of bob's to tell"
+        );
+        assert_eq!(
+            channel.sent(),
+            "",
+            "alice's relay is carrying alice's battle, and bob's engine exiting must not \
+             be what ends it"
+        );
+
+        assert!(
+            watch_engine(&registry, "alice@bar:8200", 4242),
+            "the connection that does hold the relay is still told"
+        );
+        assert_eq!(
+            channel.sent().lines().collect::<Vec<_>>(),
+            vec!["{\"type\":\"watchEngine\",\"id\":1,\"pid\":4242}"]
         );
     }
 

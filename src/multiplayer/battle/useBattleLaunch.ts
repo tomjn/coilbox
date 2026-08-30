@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import { contentListReplays } from "@/content/bindings";
 import { useReplayUserState } from "@/content/replayUserState";
-import { chosenHostingRoute } from "@/direct/hostingRoute";
 import { notify } from "@/notify/notify";
 import type { BattleConfig } from "@/play/bindings";
 import type { PlayTarget } from "@/play/config";
@@ -32,30 +31,12 @@ import { checkHostAddress } from "./hostAddress";
  */
 function tellTheRelayAboutTheEngine(
   relayed: boolean,
+  serverKey: string,
 ): ((runId: string) => void) | undefined {
   if (!relayed) return undefined;
   return (runId) => {
-    void mpWatchEngine({ runId }).catch(() => {});
+    void mpWatchEngine({ serverKey, runId }).catch(() => {});
   };
-}
-
-/**
- * Whether the game about to start is the one this machine's relay is carrying
- * (issue #2097).
- *
- * Asked once, at the launch, and handed to the run rather than left for a
- * reader to work out later. Only a host can be relaying, and only through the
- * route their own hosting form settled on, so this is both halves of it.
- *
- * The recorded route is read here and nowhere downstream on purpose. It is a
- * module singleton with no battle in it, so wherever it is read it means "the
- * last battle this client hosted". At this moment, on a host pressing Start in
- * the battle they opened, that is this battle. A second later it is a sentence
- * about a battle that may be over, which is what the in-game pill used to
- * believe and the bug this fixes.
- */
-function relayCarriesThisGame(host: boolean): boolean {
-  return host && chosenHostingRoute() === "relay";
 }
 
 /**
@@ -162,8 +143,27 @@ export function useBattleLaunch(
       // the relay route too: the host binds loopback and the relay agent dials
       // in, so there is still no remote address for this machine to reach.
       let config: BattleConfig;
+      // Whether this machine's relay is carrying the game about to start
+      // (issues #2097 and #2099). Two things read it: the in-game pill, which
+      // warns that its X ends the game for everybody, and the sidecar, which is
+      // told which process to stop relaying behind.
+      //
+      // It comes back with the config rather than being worked out here,
+      // because the config is built from the relay handle held against this
+      // connection and this is that same handle said out loud. Nothing out here
+      // can pair the config for one battle with the verdict for another. The
+      // route the hosting form settled on is deliberately not read: it is a
+      // module singleton with no battle in it, so it means "the last battle
+      // this client hosted anywhere", and coilbox holding one lobby connection
+      // is the only reason that has been the same thing.
+      //
+      // A joiner is never relaying. Only the host runs a sidecar, and only for
+      // the battle they opened.
+      let relayed = false;
       if (host) {
-        config = (await mpBuildHostConfig({ serverKey })).config;
+        const built = await mpBuildHostConfig({ serverKey });
+        config = built.config;
+        relayed = built.relayed;
       } else {
         const built = await mpBuildBattleConfig({ serverKey });
         const refusal = await vetHostAddress(
@@ -177,13 +177,12 @@ export function useBattleLaunch(
         }
         config = built.config;
       }
-      const relayed = relayCarriesThisGame(host);
       const res = await launch("battle", {
         config,
         executable: target.executable,
         dataDir: target.dataDir,
         relayed,
-        onEngineStarted: tellTheRelayAboutTheEngine(relayed),
+        onEngineStarted: tellTheRelayAboutTheEngine(relayed, serverKey),
       });
       if (res.exitCode && res.exitCode !== 0) {
         setError(`Engine exited with code ${res.exitCode}.`);
