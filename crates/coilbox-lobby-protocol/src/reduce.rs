@@ -125,6 +125,31 @@ pub enum Delta {
     RelayedHostRefused {
         reason: String,
     },
+    /// A battle that is open has moved to a new address on the lobby's relay,
+    /// and the copy of it in [`crate::LobbyState`] has moved with it.
+    ///
+    /// Sent to everybody who asked for relay support at login, so this arrives
+    /// for other people's battles as well as for our own. For somebody watching
+    /// the battle list it is the only way the address they would dial stops
+    /// being a dead one. For the host it is the lobby confirming the move it was
+    /// asked for, and the state change is the same one either way.
+    BattleHostMoved {
+        id: u32,
+    },
+    /// The lobby would not move our battle to the address its relay came back
+    /// at, in its own words, so the battle is still advertised where the
+    /// allocation used to be.
+    ///
+    /// Worse than [`Self::RelayedHostRefused`] and separate from it. That one is
+    /// a battle that is about to open, with the host waiting on the answer. This
+    /// is a battle that is open now, quite possibly with a game in it, and
+    /// nobody is waiting on anything: the move was set off by the relay agent
+    /// rebuilding an allocation while the host was busy elsewhere. So this delta
+    /// is the only way the host finds out that their battle has stopped being
+    /// reachable.
+    RelayedHostMoveRefused {
+        reason: String,
+    },
     /// Somebody joined a battle we are hosting through the relay and the relay
     /// would not let their address through, so nothing that player's game sends
     /// will reach ours.
@@ -805,6 +830,35 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                 reason: refusal_words(reason),
             }]
         }
+        ServerMessage::BattleHostMoved {
+            battle_id,
+            ip,
+            port,
+        } => {
+            // The pair a joiner dials, and nothing else about the battle. Its
+            // room, its players, its chat and its map are all where they were,
+            // which is the whole reason the server moves a battle rather than
+            // closing it and opening another.
+            if let Some(b) = state.battles.get_mut(&battle_id) {
+                b.ip = ip;
+                b.port = port;
+            }
+            // Raised even for a battle this client has never heard of, because
+            // a battle we hold nothing for is one the list is about to be told
+            // about, and a delta about a battle that is not there costs a
+            // refresh of a list that is already refreshing.
+            vec![Delta::BattleHostMoved { id: battle_id }]
+        }
+        ServerMessage::MoveRelayedHostFailed { reason } => {
+            // Nothing here changes, and there is nothing here that could be put
+            // right. The battle is open, the relay agent is holding its new
+            // allocation, and what is wrong is the address the lobby is handing
+            // out for it. Only the host can act on that, so the whole of the
+            // answer is telling them.
+            vec![Delta::RelayedHostMoveRefused {
+                reason: refusal_words(reason),
+            }]
+        }
         ServerMessage::Ring { username } => {
             vec![Delta::Ring { from: username }]
         }
@@ -954,13 +1008,12 @@ fn parse_failed(text: &str) -> (String, String) {
 
 /// What to tell somebody about a refusal the server gave no reason for.
 ///
-/// `TURNCREDENTIALSFAILED` and `RELAYEDHOSTFAILED` both carry their reason as
-/// the rest of the line, so a server that names none sends an empty one and the
-/// host would be told the lobby refused, followed by nothing. Saying that no
-/// reason was given is worth
-/// more than a sentence that trails off, and it is the same answer the relay
-/// agent gives for an error code with no phrase behind it (`reason_for` in
-/// `coilbox-relay-agent`).
+/// `TURNCREDENTIALSFAILED`, `RELAYEDHOSTFAILED` and `MOVERELAYEDHOSTFAILED` all
+/// carry their reason as the rest of the line, so a server that names none sends
+/// an empty one and the host would be told the lobby refused, followed by
+/// nothing. Saying that no reason was given is worth more than a sentence that
+/// trails off, and it is the same answer the relay agent gives for an error code
+/// with no phrase behind it (`reason_for` in `coilbox-relay-agent`).
 fn refusal_words(reason: String) -> String {
     if reason.trim().is_empty() {
         return "no reason given".to_string();
@@ -1621,6 +1674,76 @@ mod tests {
         assert_eq!(
             reduce(&mut s, parse_line("RELAYEDHOSTFAILED")),
             vec![Delta::RelayedHostRefused {
+                reason: "no reason given".into()
+            }]
+        );
+    }
+
+    /// The other half of issue #2098, and the half that is about somebody else's
+    /// battle. A relayed host's allocation moves, the lobby says so to everybody
+    /// watching the battle list, and the address this client would dial moves
+    /// with it. Without this the row still looks joinable and the join goes to
+    /// an allocation that has gone.
+    #[test]
+    fn a_battle_that_moved_is_dialled_at_its_new_address() {
+        let mut s = LobbyState::new();
+        reduce(
+            &mut s,
+            parse_line(
+                "BATTLEOPENED 9 0 0 bob 198.51.100.9 30001 8 0 0 -1 spring\t105\tComet Catcher\tTheirs\tBAR",
+            ),
+        );
+
+        assert_eq!(
+            reduce(&mut s, parse_line("BATTLEHOSTMOVED 9 198.51.100.4 30002")),
+            vec![Delta::BattleHostMoved { id: 9 }]
+        );
+        let moved = s.battles.get(&9).expect("the battle is still open");
+        assert_eq!(
+            (moved.ip.as_str(), moved.port.as_str()),
+            ("198.51.100.4", "30002")
+        );
+        // And nothing else about the battle moved with it. The room, the people
+        // in it and the map are all where they were, which is why the server
+        // moves a battle rather than closing it and opening another.
+        assert_eq!(moved.host, "bob");
+        assert_eq!(moved.map, "Comet Catcher");
+        assert!(moved.members.contains_key("bob"));
+    }
+
+    /// A move for a battle this client holds nothing for. The list is about to
+    /// be told about that battle, or it has just been closed, and either way
+    /// there is nothing here to write the address into.
+    #[test]
+    fn a_move_for_a_battle_we_do_not_have_changes_nothing() {
+        let mut s = LobbyState::new();
+        let before = s.clone();
+        assert_eq!(
+            reduce(&mut s, parse_line("BATTLEHOSTMOVED 9 198.51.100.4 30002")),
+            vec![Delta::BattleHostMoved { id: 9 }]
+        );
+        assert_eq!(s, before);
+    }
+
+    /// The refusal that matters most in relay hosting, because the battle it is
+    /// about is already open and quite possibly has a game running in it. The
+    /// host is the only person who can act on it, and this delta is the only
+    /// thing that reaches them.
+    #[test]
+    fn a_refused_move_reaches_the_host_in_words() {
+        let mut s = LobbyState::new();
+        assert_eq!(
+            reduce(
+                &mut s,
+                parse_line("MOVERELAYEDHOSTFAILED you are not hosting a battle to move")
+            ),
+            vec![Delta::RelayedHostMoveRefused {
+                reason: "you are not hosting a battle to move".into()
+            }]
+        );
+        assert_eq!(
+            reduce(&mut s, parse_line("MOVERELAYEDHOSTFAILED")),
+            vec![Delta::RelayedHostMoveRefused {
                 reason: "no reason given".into()
             }]
         );

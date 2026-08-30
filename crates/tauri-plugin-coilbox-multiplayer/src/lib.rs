@@ -4185,9 +4185,9 @@ mod tests {
     }
 
     /// Issue #2031, from the sidecar's event to the wire. The relay agent says
-    /// its allocation came back somewhere else and a `RELAYEDHOST` naming the new
-    /// address goes out on the lobby connection, without the battle being
-    /// reopened.
+    /// its allocation came back somewhere else and a `MOVERELAYEDHOST` naming
+    /// the new address goes out on the lobby connection, without the battle
+    /// being reopened.
     ///
     /// Driven through the listener `allocate` installs, because that is the seam:
     /// the event arrives on the agent's own thread long after anybody was waiting
@@ -4203,7 +4203,10 @@ mod tests {
             addr: "198.51.100.9:30002".parse().expect("an address"),
         });
 
-        assert_eq!(queued(&mut sent), vec!["RELAYEDHOST 198.51.100.9 30002"]);
+        assert_eq!(
+            queued(&mut sent),
+            vec!["MOVERELAYEDHOST 198.51.100.9 30002"]
+        );
         // And the event still reaches whoever is waiting for an address, because
         // the same listener is what tells a host their first allocation is up.
         assert!(matches!(
@@ -4214,8 +4217,8 @@ mod tests {
 
     /// And the case that must not fire. A host who is not relaying anything gets
     /// the same events from a sidecar that is still coming up, and a
-    /// `RELAYEDHOST` on the wire before there is a battle would name an address
-    /// against a battle the host has not opened yet.
+    /// `MOVERELAYEDHOST` on the wire before there is a battle would ask the
+    /// lobby to move a battle the host has not opened yet.
     #[test]
     fn a_relay_that_is_still_opening_advertises_nothing_on_its_own() {
         let (registry, mut sent, _answers) = a_connection("COMPFLAGS u sp r");

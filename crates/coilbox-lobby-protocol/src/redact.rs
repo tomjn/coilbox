@@ -320,6 +320,12 @@ mod tests {
             // password at all.
             "LOGININFOEND",
             "REGISTRATIONACCEPTED",
+            // The relay lines carry an address and a port and nothing else, so
+            // the console shows them whole. Somebody working out why a battle
+            // moved and then could not be joined needs to read both.
+            "RELAYEDHOST 198.51.100.9 30001",
+            "MOVERELAYEDHOST 198.51.100.9 30002",
+            "BATTLEHOSTMOVED 9 198.51.100.9 30002",
         ] {
             assert!(
                 matches!(redact_line(line), Cow::Borrowed(kept) if kept == line),

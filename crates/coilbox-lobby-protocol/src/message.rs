@@ -256,6 +256,35 @@ pub enum ServerMessage {
     /// relay support, an address that is not public or not an address at all,
     /// and a port outside 1-65535, and it will grow.
     RelayedHostFailed { reason: String },
+    /// `BATTLEHOSTMOVED <battle_id> <ip> <port>`, a battle that is already open
+    /// now living somewhere else on the lobby's relay.
+    ///
+    /// Sent to every client that asked for relay support at login, not only to
+    /// the host, because the address a joiner dials is in the battle list and
+    /// everybody holding that list is holding one that has stopped working.
+    ///
+    /// The host gets it too, where it is the answer to
+    /// [`crate::command::move_relayed_host`] rather than news.
+    ///
+    /// `ip` and `port` are carried as text, like [`Self::BattleOpened`]'s, and
+    /// land in the same two fields of the same battle.
+    BattleHostMoved {
+        battle_id: u32,
+        ip: String,
+        port: String,
+    },
+    /// `MOVERELAYEDHOSTFAILED <reason>`, the lobby refusing to move a battle to
+    /// the address [`crate::command::move_relayed_host`] named.
+    ///
+    /// The same shape as [`Self::RelayedHostFailed`] and worse news. That one is
+    /// a battle that is about to open at the wrong address, and the host is
+    /// standing in front of the form it was opened from. This is a battle that
+    /// is already open, quite possibly with a game running in it, left
+    /// advertised at an allocation that has gone.
+    ///
+    /// The reason is the rest of the line, may contain spaces, and is written
+    /// for a person, so it is carried whole and never matched on.
+    MoveRelayedHostFailed { reason: String },
     /// `PING [token]`
     Ping { token: Option<String> },
     /// `PONG [token]`
@@ -708,6 +737,17 @@ pub fn parse_line(line: &str) -> ServerMessage {
             reason: rest.to_string(),
         },
         "RELAYEDHOSTFAILED" => ServerMessage::RelayedHostFailed {
+            reason: rest.to_string(),
+        },
+        "BATTLEHOSTMOVED" => match fields::<3>(rest) {
+            Some([battle_id, ip, port]) => ServerMessage::BattleHostMoved {
+                battle_id: battle_id.trim().parse().unwrap_or(0),
+                ip: ip.to_string(),
+                port: port.to_string(),
+            },
+            None => ServerMessage::Unknown { raw: raw() },
+        },
+        "MOVERELAYEDHOSTFAILED" => ServerMessage::MoveRelayedHostFailed {
             reason: rest.to_string(),
         },
         "PING" => ServerMessage::Ping {
@@ -1421,6 +1461,67 @@ mod tests {
         assert_eq!(
             parse_line("RELAYEDHOSTFAILED"),
             ServerMessage::RelayedHostFailed { reason: "".into() }
+        );
+    }
+
+    /// A battle that has moved, which is what everybody watching the battle list
+    /// is sent so their copy of the address stops being a dead one.
+    #[test]
+    fn parses_a_battle_that_has_moved_to_a_new_address() {
+        assert_eq!(
+            parse_line("BATTLEHOSTMOVED 9 198.51.100.9 30002"),
+            ServerMessage::BattleHostMoved {
+                battle_id: 9,
+                ip: "198.51.100.9".into(),
+                port: "30002".into(),
+            }
+        );
+        // A relay on IPv6 hands out an IPv6 allocation, and the address is
+        // carried as the server wrote it either way.
+        assert_eq!(
+            parse_line("BATTLEHOSTMOVED 9 2001:db8::1 30002"),
+            ServerMessage::BattleHostMoved {
+                battle_id: 9,
+                ip: "2001:db8::1".into(),
+                port: "30002".into(),
+            }
+        );
+    }
+
+    /// A line missing a field is not a battle that moved to somewhere unknown,
+    /// it is a line this client cannot act on. Guessing at the missing half
+    /// would move a battle to half an address.
+    #[test]
+    fn a_short_battle_host_moved_is_not_read_as_a_move() {
+        for line in [
+            "BATTLEHOSTMOVED 9 198.51.100.9",
+            "BATTLEHOSTMOVED 9",
+            "BATTLEHOSTMOVED",
+        ] {
+            assert_eq!(
+                parse_line(line),
+                ServerMessage::Unknown { raw: line.into() },
+                "a line this shape says nothing about where a battle is: {line}"
+            );
+        }
+    }
+
+    /// The refusal to move an open battle. Same shape as the one about opening,
+    /// and the reason is the whole of the rest of the line for the same reason:
+    /// it is a sentence written for the host to read. The words below are a
+    /// stand-in, because the server's set for this command is not published
+    /// yet, and nothing here may match on them whatever they turn out to be.
+    #[test]
+    fn parses_a_refusal_to_move_a_battle_to_a_new_address() {
+        assert_eq!(
+            parse_line("MOVERELAYEDHOSTFAILED you are not hosting a battle to move"),
+            ServerMessage::MoveRelayedHostFailed {
+                reason: "you are not hosting a battle to move".into(),
+            }
+        );
+        assert_eq!(
+            parse_line("MOVERELAYEDHOSTFAILED"),
+            ServerMessage::MoveRelayedHostFailed { reason: "".into() }
         );
     }
 
