@@ -1993,21 +1993,84 @@ fn relay_traffic(registry: &Registry) -> Option<u64> {
     })
 }
 
-/// `mp_relay_traffic`: how much a relayed battle's relay is carrying, so the
-/// in-game pill can show that a game hosted through the relay is still working
-/// (issue #2024).
+/// What coilbox can say about the relay carrying the game that is running.
+///
+/// Two answers, because they go missing separately and the in-game pill uses
+/// them for different things (issue #2094). That a relay is carrying the game
+/// is what decides whether ending it here ends it for everybody else, so it is
+/// what the X's warning hangs on. The rate is evidence that the relay is
+/// working, and a rate coilbox cannot read is not a reason to stop warning.
+#[derive(Debug, PartialEq, Eq)]
+struct RelayBehindTheGame {
+    /// A relay on this machine is up and this game's traffic goes through it.
+    relaying: bool,
+    /// What it last said it was carrying, or `None` if it has not said.
+    bytes_per_second: Option<u64>,
+}
+
+/// The relay behind the running game: from the handle while coilbox holds one,
+/// and from the sidecar's own run file once it does not.
+///
+/// The second half is the whole of issue #2094. A host who leaves their battle
+/// room mid-game has the handle taken off them by [`forget_relay`], and that is
+/// right: the lobby battle really is over and the sidecar has been told so. The
+/// game is not over. The engine is still running, every other player is still
+/// connected through this machine, and ending it here still ends it for all of
+/// them, so the topbar has to carry on saying so. The run file the sidecar
+/// holds a lock on is the only thing left that knows.
+///
+/// It asks the handle first rather than only reading the file, because the file
+/// cannot tell a relay this coilbox is hosting through from one left over by a
+/// previous session, and [`relay_left_running`] needs that difference to stay
+/// out of the topbar of a host who is in their own battle.
+///
+/// `run_file` is `None` only when the data directory could not be resolved.
+/// That leaves the handle's answer standing rather than turning a path problem
+/// into "no relay", which would be a missing warning on a destructive button.
+fn relay_behind_the_game(registry: &Registry, run_file: Option<&Path>) -> RelayBehindTheGame {
+    if hosting_through_the_relay(registry) {
+        return RelayBehindTheGame {
+            relaying: true,
+            bytes_per_second: relay_traffic(registry),
+        };
+    }
+    // The outer `Option` is whether a sidecar is there, the inner one is
+    // whether it has written down what it is carrying lately, and they are not
+    // the same question.
+    let left_running = run_file.and_then(|path| {
+        relay_sidecar::already_relaying(path)
+            .map(|pid| coilbox_relay_protocol::carrying_now(path, pid))
+    });
+    RelayBehindTheGame {
+        relaying: left_running.is_some(),
+        bytes_per_second: left_running.flatten(),
+    }
+}
+
+/// `mp_relay_traffic`: whether a relay on this machine is carrying the game
+/// that is running and how much it is carrying, so the in-game pill can show
+/// that a relayed game is still working and can ask before its X ends that game
+/// for everybody (issues #2024 and #2094).
 ///
 /// Polled rather than pushed, once a second, by the one component that draws
 /// it. An event would go through the lobby event channel and redraw everything
 /// mirroring it, once a second, on a machine that is busy running a game.
 ///
-/// `bytesPerSecond` is null when there is nothing to say, which is the ordinary
-/// answer: no relayed battle, or a relay coilbox has stopped hearing from. Zero
-/// is a different answer and a real one, and means the relay is there and
-/// carrying nothing.
+/// `relaying` is false only when there is no relay on this machine at all.
+/// `bytesPerSecond` is null when there is no figure to give, which includes a
+/// relay that is up and has not been heard from lately. Zero is a different
+/// answer and a real one, and means the relay is there and carrying nothing.
 #[tauri::command]
-fn mp_relay_traffic(registry: State<'_, Registry>) -> CliResult {
-    CliResult::ok(json!({ "bytesPerSecond": relay_traffic(&registry) }))
+fn mp_relay_traffic<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    registry: State<'_, Registry>,
+) -> CliResult {
+    let run_file = relay_sidecar::run_file_path(&app).ok();
+    let relay = relay_behind_the_game(&registry, run_file.as_deref());
+    CliResult::ok(json!({
+        "relaying": relay.relaying,
+        "bytesPerSecond": relay.bytes_per_second,
+    }))
 }
 
 /// Whether this coilbox is itself hosting a battle through the relay sidecar.
@@ -2161,6 +2224,13 @@ fn mp_leftover_relay_agent<R: Runtime>(
 /// from a previous one are the same run file, and only the registry tells them
 /// apart. Without the check, opening a relayed battle would put a second pill in
 /// the topbar telling the host about their own game in the third person.
+///
+/// That check goes false the moment the host leaves their battle room, which is
+/// the window [`relay_behind_the_game`] covers, so for that window both readers
+/// answer yes about the same sidecar. Two pills do not appear, because the
+/// caller here stops asking the first time it hears no and a coilbox that could
+/// host through the relay had already heard one: a sidecar is refused while
+/// another is relaying, so there was nothing to find when this coilbox opened.
 ///
 /// The pid stays in Rust. It is what [`coilbox_relay_protocol::carrying_now`]
 /// checks the figure against, and it has no other reader.
@@ -4924,27 +4994,7 @@ mod tests {
             "a connection that is not hosting through a relay has no figure either"
         );
 
-        // A relay that has said what it is carrying, put together the way
-        // `mp_open_battle` does: an agent that reported a rate, held against the
-        // connection.
-        let (coilbox_reads, mut agent_said) = std::io::pipe().expect("a pipe");
-        let agent = relay_agent::RelayAgent::driving(coilbox_reads, Vec::new(), |_| {});
-        std::io::Write::write_all(
-            &mut agent_said,
-            coilbox_relay_protocol::to_line(&coilbox_relay_protocol::Event::Traffic {
-                bytes_per_second: 41_984,
-            })
-            .as_bytes(),
-        )
-        .expect("the reading thread is still there");
-        let (saw, heard) = std::sync::mpsc::channel();
-        saw.send(coilbox_relay_protocol::Event::RelayOpen {
-            addr: "198.51.100.9:30001".parse().expect("an address"),
-        })
-        .expect("the channel is open");
-        let host = relay_host::waiting_on(agent, heard, 8452, Duration::from_secs(5))
-            .expect("the agent opened a relay");
-        remember_relay(&registry, "alice@bar:8200", host);
+        let _agent_said = hosting_through_a_relay(&registry, "alice@bar:8200", Some(41_984));
 
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         while relay_traffic(&registry) != Some(41_984) {
@@ -4955,6 +5005,42 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(5));
         }
+    }
+
+    /// A relay held against a connection that is already in `registry`, put
+    /// together the way `mp_open_battle` does: an agent that has reported
+    /// `bytes_per_second` if it has reported anything at all, and a relay it
+    /// said was open.
+    ///
+    /// The writer comes back because dropping it closes the agent's pipe, so
+    /// the caller has to hold it for as long as it reads anything off the
+    /// agent.
+    fn hosting_through_a_relay(
+        registry: &Registry,
+        server_key: &str,
+        bytes_per_second: Option<u64>,
+    ) -> std::io::PipeWriter {
+        let (coilbox_reads, mut agent_said) = std::io::pipe().expect("a pipe");
+        let agent = relay_agent::RelayAgent::driving(coilbox_reads, Vec::new(), |_| {});
+        if let Some(bytes_per_second) = bytes_per_second {
+            std::io::Write::write_all(
+                &mut agent_said,
+                coilbox_relay_protocol::to_line(&coilbox_relay_protocol::Event::Traffic {
+                    bytes_per_second,
+                })
+                .as_bytes(),
+            )
+            .expect("the reading thread is still there");
+        }
+        let (saw, heard) = std::sync::mpsc::channel();
+        saw.send(coilbox_relay_protocol::Event::RelayOpen {
+            addr: "198.51.100.9:30001".parse().expect("an address"),
+        })
+        .expect("the channel is open");
+        let host = relay_host::waiting_on(agent, heard, 8452, Duration::from_secs(5))
+            .expect("the agent opened a relay");
+        remember_relay(registry, server_key, host);
+        agent_said
     }
 
     /// A run file naming a process that is definitely running and holding the
@@ -5209,6 +5295,100 @@ mod tests {
 
         let found = relay_left_running(&run_file, false).expect("the sidecar is there");
         assert_eq!(coilbox_relay_protocol::carrying_now(&run_file, found), None);
+    }
+
+    /// The whole of issue #2094. The host has left their battle room while the
+    /// game is still being played, so [`forget_relay`] has taken the handle
+    /// away and the sidecar is carrying every other player as it was a second
+    /// ago. Both of those have to reach the topbar, or its X ends the game for
+    /// all of them on the first press with nothing said.
+    #[test]
+    fn a_relay_is_still_behind_the_game_after_the_host_leaves_the_battle_room() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let (run_file, _held) = a_run_file_naming_a_live_sidecar(dir.path());
+        std::fs::write(
+            coilbox_relay_protocol::carrying_path(&run_file),
+            coilbox_relay_protocol::Carrying {
+                pid: std::process::id(),
+                bytes_per_second: 41_984,
+            }
+            .to_json(),
+        )
+        .expect("a writable temp dir");
+        // Nothing holds a relay, which is exactly what leaving the battle room
+        // leaves behind.
+        let registry = Registry::default();
+
+        assert_eq!(
+            relay_behind_the_game(&registry, Some(&run_file)),
+            RelayBehindTheGame {
+                relaying: true,
+                bytes_per_second: Some(41_984),
+            }
+        );
+    }
+
+    /// The same window with no figure to be had, which is a sidecar from a
+    /// build before the record existed or one whose last word has gone stale.
+    /// The warning is not the figure's to give. Everybody in that game is
+    /// connected through this machine either way, which is the coupling that
+    /// made #2094 a bug in the first place.
+    #[test]
+    fn a_relay_with_nothing_to_say_is_still_a_relay_behind_the_game() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let (run_file, _held) = a_run_file_naming_a_live_sidecar(dir.path());
+        let registry = Registry::default();
+
+        assert_eq!(
+            relay_behind_the_game(&registry, Some(&run_file)),
+            RelayBehindTheGame {
+                relaying: true,
+                bytes_per_second: None,
+            }
+        );
+    }
+
+    /// The game ending. The sidecar has gone, nobody else is connected through
+    /// this machine any more, and the X goes back to ending a game that is only
+    /// this host's.
+    #[test]
+    fn nothing_is_behind_the_game_once_the_sidecar_has_gone() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let (run_file, held) = a_run_file_naming_a_live_sidecar(dir.path());
+        // The sidecar dying, which is the kernel giving the lock back.
+        drop(held);
+        let registry = Registry::default();
+
+        assert_eq!(
+            relay_behind_the_game(&registry, Some(&run_file)),
+            RelayBehindTheGame {
+                relaying: false,
+                bytes_per_second: None,
+            }
+        );
+    }
+
+    /// The ordinary case, which must not regress on the way to fixing the one
+    /// above. coilbox is hosting the battle and holds the handle, and the
+    /// sidecar has not reported a rate yet, as it has not in the first second
+    /// of every relayed game there has ever been. The warning is on from that
+    /// first second, and it stays on with no run file to read at all, because a
+    /// data directory coilbox could not resolve is not evidence that nobody
+    /// else is in this game.
+    #[test]
+    fn the_handle_is_enough_to_warn_before_any_figure_arrives() {
+        let registry = Registry::default();
+        lock_or_recover(&registry)
+            .insert("alice@bar:8200".to_string(), a_connection_hosting_nothing());
+        let _agent_said = hosting_through_a_relay(&registry, "alice@bar:8200", None);
+
+        assert_eq!(
+            relay_behind_the_game(&registry, None),
+            RelayBehindTheGame {
+                relaying: true,
+                bytes_per_second: None,
+            }
+        );
     }
 
     /// The registry scan behind the guard above, which is the only thing
