@@ -26,8 +26,13 @@ import { newPendingNames, waitingJoinNotice } from "./room";
 export function HostedRoomProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // A room outlives the frontend that started it, so ask once on the way up.
-    // In dev that is every hot reload, and the answer is null for everybody who
-    // is not hosting, which stops the clock before it starts.
+    // The answer is null for everybody who is not hosting, which stops the clock
+    // before it starts.
+    //
+    // Once, and not once per hot update: a hot update of `hostedRoom` re-renders
+    // this component without re-running this effect, so a fresh copy of that
+    // module is never asked for anything and has to come up already knowing
+    // (issue #2126).
     void readHostedRoom();
 
     let seen: string[] = [];
