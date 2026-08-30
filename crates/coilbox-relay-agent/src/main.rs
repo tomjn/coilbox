@@ -41,9 +41,15 @@
 //! `coilbox_relay_protocol` and carried by [`control`]. stderr stays sentences
 //! for a human.
 //!
-//! Today that channel carries one request, "let this address through the
-//! relay", which is the thing a relayed battle cannot work without and the
-//! reason the channel exists (issue #2015). [`allowlist`] is what does it.
+//! The credentials are the exception to "settled before the process starts".
+//! They arrive as arguments and can be replaced later, because a game can
+//! outlive the lifetime the lobby minted them with and a rebuild signed with a
+//! dead one ends the battle (issue #2092). [`HeldCredential`] is where they
+//! live once the process is up.
+//!
+//! The main thing that channel carries is "let this address through the relay",
+//! which is what a relayed battle cannot work without and the reason the
+//! channel exists (issue #2015). [`allowlist`] is what does it.
 //!
 //! ## When it stops
 //!
@@ -255,6 +261,52 @@ fn parse_args() -> Result<Args, String> {
     })
 }
 
+/// The credential the next relay will be opened with.
+///
+/// Shared and mutable rather than read straight off [`Args`], because a game can
+/// outlive the credential that started it and the rebuild is where that costs
+/// something (issue #2092). coilbox asks the lobby for another one while it is
+/// still open and sends it down the control channel as
+/// [`Request::RenewCredential`], [`control`] puts it in here, and the next turn
+/// of the rebuild loop signs with whatever it finds.
+///
+/// The allocation that is already open is deliberately left alone. The TURN
+/// server worked its key out when it created that session and checks every later
+/// request against the key it kept, so a live allocation neither needs the new
+/// credential nor notices the old one dying. `allocation.rs` carries the
+/// measurement.
+///
+/// `None` is a relay that is not going through a TURN server at all, which is
+/// what `--relay-bind` on its own gives and what the demux tests drive. Nothing
+/// can renew a credential that was never there, so a renewal aimed at one of
+/// those is refused rather than stored.
+pub type HeldCredential = Arc<std::sync::Mutex<Option<TurnCredentials>>>;
+
+/// The credential right now, taken out from under the lock.
+fn held(turn: &HeldCredential) -> Option<TurnCredentials> {
+    turn.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+/// Whether the credential a relay was signed with is still the one this process
+/// is holding.
+///
+/// This is what makes a refused credential final or not, and it is the whole
+/// difference issue #2092 makes to that rule. 401 means the credential that
+/// signed the request is no good, and there is no point trying the same one
+/// again. It says nothing about a different one. So the agent gives up only when
+/// there is no different one to try, and carries on into the rebuild when
+/// coilbox has sent a replacement since.
+///
+/// Measured against a real coturn in
+/// `tauri-plugin-coilbox-multiplayer/tests/relayed_battle.rs`, where without
+/// this the renewal never got used: the allocation that was already open is
+/// refreshed on the old credential, coturn answers that 401 once it has
+/// forgotten the session, and the agent stopped there rather than rebuilding on
+/// the credential it had just been handed.
+fn still_held(turn: &HeldCredential, signed_with: &Option<TurnCredentials>) -> bool {
+    *turn.lock().unwrap_or_else(|e| e.into_inner()) == *signed_with
+}
+
 /// Whatever the relay is running over this time round.
 enum Transport {
     /// A plain UDP socket, for a relay that can already reach the host.
@@ -264,8 +316,16 @@ enum Transport {
 }
 
 impl Transport {
-    async fn open(args: &Args) -> Result<Transport, AllocationFailure> {
-        match &args.turn {
+    /// Open a relay signed with `credentials`.
+    ///
+    /// Handed in rather than read out of [`HeldCredential`] here, because the
+    /// caller has to keep hold of which credential this relay was signed with:
+    /// it is what a later refusal is judged against. See [`still_held`].
+    async fn open(
+        args: &Args,
+        credentials: Option<TurnCredentials>,
+    ) -> Result<Transport, AllocationFailure> {
+        match &credentials {
             Some(credentials) => TurnAllocation::open(args.relay_bind, credentials)
                 .await
                 .map(Transport::Relayed),
@@ -442,7 +502,13 @@ async fn serve<R: RelayLink>(
             // one would mean a battle that is over holding its allocation
             // through a rebuild. Named rather than caught by a wildcard so
             // that a new request has to be placed on purpose.
-            Request::WatchEngine { .. } | Request::Stop { .. } | Request::BattleOver { .. } => {}
+            //
+            // A renewal is the sharpest case of the four: waiting for a relay
+            // would hold it until after the rebuild it exists to sign.
+            Request::WatchEngine { .. }
+            | Request::Stop { .. }
+            | Request::BattleOver { .. }
+            | Request::RenewCredential { .. } => {}
         }
     }
 }
@@ -486,6 +552,7 @@ async fn carry<R: RelayLink>(
 /// [`OpenRelay`].
 async fn relay_until_it_gives_up(
     args: &Args,
+    turn: &HeldCredential,
     stopping: &Stopping,
     traffic: &Traffic,
     open: &OpenRelay<Transport>,
@@ -507,9 +574,13 @@ async fn relay_until_it_gives_up(
 
     let mut backoff = FIRST_BACKOFF;
     loop {
-        let relay = match Transport::open(args).await {
+        // Read once here rather than inside `Transport::open`, because a refusal
+        // has to be judged against the credential that was refused rather than
+        // against whatever coilbox has sent since.
+        let signed_with = held(turn);
+        let relay = match Transport::open(args, signed_with.clone()).await {
             Ok(relay) => relay,
-            Err(failure) if failure.is_credential_failure() => {
+            Err(failure) if failure.is_credential_failure() && still_held(turn, &signed_with) => {
                 eprintln!("coilbox-relay-agent: the TURN credential was refused: {failure}");
                 reporter
                     .say(Event::Stopping {
@@ -559,7 +630,7 @@ async fn relay_until_it_gives_up(
         let down = match relay.failure() {
             Some(failure) => {
                 eprintln!("coilbox-relay-agent: allocation lost: {failure}");
-                if failure.is_credential_failure() {
+                if failure.is_credential_failure() && still_held(turn, &signed_with) {
                     reporter
                         .say(Event::Stopping {
                             reason: format!("the TURN credential was refused: {failure}"),
@@ -648,7 +719,15 @@ async fn main() -> ExitCode {
         });
     }
 
-    let mut requests = Requests::listen(Arc::clone(&reporter), Arc::clone(&stopping));
+    // The credential the arguments started this process with, in the place
+    // coilbox can replace it (issue #2092).
+    let turn: HeldCredential = Arc::new(std::sync::Mutex::new(args.turn.clone()));
+
+    let mut requests = Requests::listen(
+        Arc::clone(&reporter),
+        Arc::clone(&stopping),
+        Arc::clone(&turn),
+    );
     let open: OpenRelay<Transport> = OpenRelay::default();
 
     // The meter the host's in-game pill reads (issue #2024). Started here
@@ -680,17 +759,18 @@ async fn main() -> ExitCode {
     // dropping it tells the relay server nothing, which is why it lives in
     // `open` and is given back by hand.
     tokio::select! {
-        gave_up = relay_until_it_gives_up(&args, &stopping, &traffic, &open, &mut requests, &reporter) => gave_up,
+        gave_up = relay_until_it_gives_up(&args, &turn, &stopping, &traffic, &open, &mut requests, &reporter) => gave_up,
         _ = until_nobody_needs_it(&stopping, &open, &reporter) => ExitCode::SUCCESS,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    //! Two things, and they are the two pieces of this file that are not
-    //! obvious from reading it and that cost a game in progress if they slip.
-    //! What [`carry`] does with a relay it has just been handed, and whether
-    //! the exit path gives an allocation back.
+    //! Three things, and they are the pieces of this file that are not obvious
+    //! from reading it and that cost a game in progress if they slip. What
+    //! [`carry`] does with a relay it has just been handed, whether the exit
+    //! path gives an allocation back, and when a refused credential is the end
+    //! of the battle.
 
     use super::*;
     use allowlist::Allowlist;
@@ -703,6 +783,48 @@ mod tests {
 
     /// How long a test waits for a line before deciding it is never coming.
     const PATIENCE: Duration = Duration::from_secs(5);
+
+    fn a_credential(password: &str) -> TurnCredentials {
+        TurnCredentials {
+            server: "relay.example.org:3478".to_string(),
+            username: "1786086400:alice".to_string(),
+            password: password.to_string(),
+        }
+    }
+
+    /// The rule that decides whether a refused credential ends the battle, which
+    /// is the whole of issue #2092 inside this process.
+    ///
+    /// The coturn test in `tauri-plugin-coilbox-multiplayer` measures it against
+    /// a real server and is ignored, so this is the version CI runs. Getting it
+    /// backwards costs a game either way: too eager and a battle ends on a
+    /// credential that had already been replaced, too shy and it hangs on
+    /// retrying one nothing will ever accept.
+    #[test]
+    fn a_refused_credential_is_final_only_while_it_is_the_one_we_still_hold() {
+        let signed_with = Some(a_credential("the-one-that-was-refused"));
+        let turn: HeldCredential = Arc::new(std::sync::Mutex::new(signed_with.clone()));
+
+        assert!(
+            still_held(&turn, &signed_with),
+            "nothing has replaced it, so there is nothing else to sign with and the battle ends"
+        );
+
+        *turn.lock().unwrap() = Some(a_credential("the-one-coilbox-just-sent"));
+        assert!(
+            !still_held(&turn, &signed_with),
+            "coilbox sent another one, so the refusal says nothing about the rebuild ahead"
+        );
+    }
+
+    /// A relay that never went through a TURN server. It has no credential to
+    /// be refused, and the comparison has to hold up rather than panic on the
+    /// `None`.
+    #[test]
+    fn a_relay_with_no_credential_is_still_holding_the_nothing_it_started_with() {
+        let turn: HeldCredential = Arc::new(std::sync::Mutex::new(None));
+        assert!(still_held(&turn, &None));
+    }
 
     /// A relay that writes down who it was asked to send to and otherwise sits
     /// there, which is what a healthy relay carrying no traffic looks like.
@@ -752,6 +874,7 @@ mod tests {
                     agent_stdin,
                     Arc::clone(&reporter),
                     Arc::new(Stopping::new()),
+                    Arc::new(std::sync::Mutex::new(None)),
                 ),
                 reporter,
                 to_agent,

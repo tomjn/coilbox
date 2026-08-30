@@ -35,15 +35,25 @@
 //! [`AllocationFailure::is_credential_failure`] exists: everything else is
 //! worth retrying and that one is not.
 //!
+//! Renewal (issue #2092) narrows that rather than removing it, and the
+//! narrowing is done by the caller. 401 means the credential that signed the
+//! request is no good and there is no point signing another with the same one.
+//! It says nothing about a different one. So `main`'s `still_held` is what
+//! decides: give up when this process is still holding the credential that was
+//! refused, and rebuild when coilbox has sent a replacement since.
+//!
+//! Nothing here changes. Both branches are ones a caller has to choose between
+//! and only the caller knows what it is holding.
+//!
 //! A credential expiring does not on its own cost anybody a battle, which is
 //! not what this module was written believing. coturn works the credential out
 //! once, when the session is created, and every request after that is checked
 //! against the key it kept, so an allocation goes on being refreshed long after
 //! the credential that opened it stopped being good. What the expiry costs is
 //! the next allocation: the moment a relay has to be rebuilt, the credential is
-//! judged again and refused, and there is nowhere to get a better one. Both
-//! halves are measured against a real coturn in
-//! `tauri-plugin-coilbox-multiplayer/tests/relayed_battle.rs`.
+//! judged again and refused. Both halves are measured against a real coturn in
+//! `tauri-plugin-coilbox-multiplayer/tests/relayed_battle.rs`, along with the
+//! third: a rebuild signed with a credential coilbox sent since is accepted.
 
 use std::io;
 use std::net::SocketAddr;
@@ -70,7 +80,7 @@ use crate::relay::RelayLink;
 ///
 /// These come from the lobby, which mints them per battle. Fetching them is
 /// coilbox's job, and issue #2016's. The sidecar is handed the answer.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TurnCredentials {
     /// `host:port` of the TURN server.
     pub server: String,
@@ -130,6 +140,11 @@ impl AllocationFailure {
     /// Nothing is lost by leaving those two out. A dead credential is caught on
     /// the Allocate that opens the next relay, which is where a server judges
     /// one, and answers 401.
+    ///
+    /// This says the credential was refused. It does not say the battle is over,
+    /// and the two stopped being the same thing in issue #2092. `main`'s
+    /// `still_held` is what turns one into the other, by asking whether there is
+    /// a different credential to try.
     pub fn is_credential_failure(&self) -> bool {
         matches!(self, AllocationFailure::Refused { code: 401, .. })
     }
