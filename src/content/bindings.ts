@@ -1252,6 +1252,17 @@ export interface UnitDatasetEntry {
    * present, which is not the same as zero: zero is a claim about the game.
    */
   stats?: Record<string, unknown>;
+  /**
+   * What this unit turns into: a morph, an upgrade, a tech level (issue #2063).
+   * One object per edge, each with `into` (the target's lowercased def key) and
+   * whatever conditions the game declared beside it, under the game's own
+   * lowercased names. Untyped past `into` on purpose, because no two games
+   * spell the conditions the same way.
+   *
+   * Absent from a dataset read by a worker too old to report it, which reads
+   * the same as a unit that morphs nowhere: draw no edge either way.
+   */
+  morphTargets?: ({ into: string } & Record<string, unknown>)[];
 }
 
 export interface UnitDatasetResult {

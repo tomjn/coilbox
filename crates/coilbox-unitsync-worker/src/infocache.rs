@@ -39,8 +39,11 @@ use std::path::Path;
 /// v14: a read that failed outright used to be cached as though it were the
 /// answer (#1927), and an install that hit one has a blob saying the game is
 /// empty. Nothing but this bump gets rid of it, because the key is otherwise
-/// the archive's own identity and that has not changed.
-const INFO_CACHE_VERSION: u32 = 14;
+/// the archive's own identity and that has not changed. v15: the unit dataset
+/// gained each unit's morph targets (#2063), and a game already scanned would
+/// otherwise report no morphs for ever, since the cache is keyed on file
+/// identity and knows nothing about a shim change.
+const INFO_CACHE_VERSION: u32 = 15;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.

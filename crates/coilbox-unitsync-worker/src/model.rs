@@ -598,6 +598,23 @@ pub struct UnitDatasetEntry {
     /// game, absent is a fact about what could be read.
     #[serde(skip_serializing_if = "serde_json::Map::is_empty")]
     pub stats: serde_json::Map<String, serde_json::Value>,
+    /// What this unit can turn into: a morph, an upgrade, a tech level
+    /// (issue #2063). One object per edge, each holding `into` (the target's
+    /// lowercased def key) plus whatever conditions the game declared beside
+    /// it, lowercased and passed through as written.
+    ///
+    /// Deliberately untyped, for the reason `stats` is. Four games spell the
+    /// conditions four ways: `research` and `require` in SplinterFaction,
+    /// `morphcost` and `level` in Zero-K, `xp` and `rank` in the shared morph
+    /// gadget's documentation, `facing` and `tech` in Spring 1944. A struct
+    /// naming today's set would be wrong by the fifth game.
+    ///
+    /// Empty for a unit that morphs nowhere and for a line written before the
+    /// column existed. The two are the same claim here, which they are not for
+    /// `max_slope`: an edge nobody reported and an edge that does not exist
+    /// both mean no reader should draw one.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub morph_targets: Vec<serde_json::Map<String, serde_json::Value>>,
 }
 
 /// Output of the lazy `--unit-dataset` mode: the whole game's unit graph (units +

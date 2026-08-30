@@ -154,6 +154,19 @@ export function UnitPicker({
     () => unknownSelected(selected, known),
     [selected, known],
   );
+  // A restriction that disabled a commander and left its tech levels buildable
+  // would be a hole rather than a restriction, so picking the group's row
+  // toggles every stage in it, not just the base.
+  const pick = (id: string, on: boolean) => {
+    if (!onChange) return;
+    const stages = [...known].filter(
+      (u) => (forest.morphBase.get(u) ?? u) === id,
+    );
+    const targets = stages.length > 0 ? stages : [id];
+    onChange(
+      targets.reduce((next, stage) => toggleUnit(next, stage, on), selected),
+    );
+  };
 
   if (known.size === 0) {
     return (
@@ -184,7 +197,7 @@ export function UnitPicker({
         count={`${selected.length} of ${allIds.length} ${selectedLabel}`}
         isOn={(id) => isSelected(selected, id)}
         mode={readOnly ? "read-only" : "multi"}
-        onPick={(id, on) => onChange?.(toggleUnit(selected, id, on))}
+        onPick={pick}
       />
       {unknown.length > 0 && (
         <UnknownList
@@ -481,7 +494,43 @@ function UnitList({
   autoFocusSearch?: boolean;
 }) {
   const [query, setQuery] = useState("");
-  const label = (id: string) => labels.get(id) ?? id;
+
+  // A commander's tech levels are one row here, not five (issue #2063): only
+  // the multi and read-only lists fold a stage into its base, because the
+  // single-select pickers (placing an exact unit, a blueprint substitution)
+  // need to offer the stage itself. A stage stands on its own row when its
+  // base isn't among these ids either, so a caller's filtered subset never
+  // loses a unit it did offer.
+  const { rowIds, upgradeCount, stagesOf } = useMemo(() => {
+    if (mode === "single")
+      return {
+        rowIds: ids,
+        upgradeCount: new Map<string, number>(),
+        stagesOf: new Map<string, string[]>(),
+      };
+    const idSet = new Set(ids.map((raw) => raw.toLowerCase()));
+    const upgradeCount = new Map<string, number>();
+    // A folded stage is still what someone pastes out of a mission file or a
+    // replay, so its own def key has to keep finding the base's row.
+    const stagesOf = new Map<string, string[]>();
+    const rowIds = ids.filter((raw) => {
+      const id = raw.toLowerCase();
+      const base = forest.morphBase.get(id) ?? id;
+      if (base === id || !idSet.has(base)) return true;
+      upgradeCount.set(base, (upgradeCount.get(base) ?? 0) + 1);
+      stagesOf.set(base, [...(stagesOf.get(base) ?? []), id]);
+      return false;
+    });
+    return { rowIds, upgradeCount, stagesOf };
+  }, [ids, forest, mode]);
+
+  const label = (id: string) => {
+    const name = labels.get(id) ?? id;
+    const extra = upgradeCount.get(id) ?? 0;
+    return extra > 0
+      ? `${name}, ${extra} upgrade${extra === 1 ? "" : "s"}`
+      : name;
+  };
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -490,10 +539,13 @@ function UnitList({
       factions.find((f) => f.startUnit.toLowerCase() === root)?.name ??
       name(root);
     const match = q
-      ? (id: string) => id.includes(q) || name(id).toLowerCase().includes(q)
+      ? (id: string) =>
+          id.includes(q) ||
+          name(id).toLowerCase().includes(q) ||
+          (stagesOf.get(id) ?? []).some((stage) => stage.includes(q))
       : undefined;
-    return factionGroups(forest, ids, name, heading, match);
-  }, [forest, ids, labels, factions, query]);
+    return factionGroups(forest, rowIds, name, heading, match);
+  }, [forest, rowIds, stagesOf, labels, factions, query]);
 
   const total = groups.reduce((n, g) => n + g.units.length, 0);
   const capped = total > SEARCH_CAP;

@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnitDatasetEntry } from "../../bindings";
 
 // The picker pulls in picoframe and the unitsync bindings, whose published dists
@@ -37,11 +37,52 @@ vi.mock("../../config", () => ({
   // it was handed, which is what a test without unitsync should get.
   useUnitsyncUnitDataset: () => ({ dataset: null, status: "idle" }),
 }));
+// Static markup attaches no real DOM listeners, so a toggle test cannot click a
+// checkbox. It can still capture the exact closure React built for a row during
+// the render call, and invoke it directly, which is what this records.
+const { checkboxes } = vi.hoisted(() => ({
+  checkboxes: [] as {
+    label?: string;
+    onCheckedChange?: (v: boolean) => void;
+  }[],
+}));
+vi.mock("@/components/ui/checkbox", () => ({
+  Checkbox: (props: {
+    onCheckedChange?: (v: boolean) => void;
+    "aria-label"?: string;
+  }) => {
+    checkboxes.push({
+      label: props["aria-label"],
+      onCheckedChange: props.onCheckedChange,
+    });
+    return createElement("input", { type: "checkbox", readOnly: true });
+  },
+}));
+// Radix mounts a popover's content through a Presence-gated portal, so it
+// renders nothing while closed, and these tests never open one interactively.
+// Rendering the content unconditionally is what lets a static render see it.
+vi.mock("@/components/ui/popover", () => ({
+  Popover: (props: { children?: ReactNode }) =>
+    createElement("div", {}, props.children),
+  PopoverTrigger: (props: { children?: ReactNode }) => props.children,
+  PopoverContent: (props: { children?: ReactNode }) =>
+    createElement("div", {}, props.children),
+}));
 
-const { UnitPicker } = await import("./UnitPicker");
+const { UnitPicker, UnitPickerButton } = await import("./UnitPicker");
 
-function unit(name: string, fullName: string, buildOptions: string[] = []) {
-  return { name, fullName, buildOptions } as UnitDatasetEntry;
+function unit(
+  name: string,
+  fullName: string,
+  buildOptions: string[] = [],
+  morphTargets?: string[],
+) {
+  return {
+    name,
+    fullName,
+    buildOptions,
+    morphTargets: morphTargets?.map((into) => ({ into })),
+  } as UnitDatasetEntry;
 }
 
 /** Two factions, and a builder whose units are alphabetically before it. */
@@ -118,5 +159,79 @@ describe("the unit picker's list", () => {
 
   it("leaves a ticked row unhighlighted, since the checkbox is the state", () => {
     expect(render(["armpw"])).not.toContain("bg-primary/10");
+  });
+});
+
+/** A commander with two upgrade stages, which used to be three separate rows
+ * (issue #2063). */
+const MORPH_UNITS = [
+  unit("armcom", "Commander", [], ["armcom1"]),
+  unit("armcom1", "Commander", [], ["armcom2"]),
+  unit("armcom2", "Commander"),
+];
+const MORPH_FACTIONS = [{ startUnit: "armcom", name: "Armada" }];
+
+function renderMorph(selected: string[] = []) {
+  const onChange = vi.fn();
+  const html = renderToStaticMarkup(
+    createElement(UnitPicker, {
+      units: MORPH_UNITS,
+      factions: MORPH_FACTIONS,
+      selected,
+      onChange,
+    }),
+  );
+  return { html, onChange };
+}
+
+function renderMorphButton(): string {
+  return renderToStaticMarkup(
+    createElement(UnitPickerButton, {
+      units: MORPH_UNITS,
+      factions: MORPH_FACTIONS,
+      value: "",
+      onValueChange: () => {},
+    }),
+  );
+}
+
+describe("the unit picker's morph groups", () => {
+  beforeEach(() => {
+    checkboxes.length = 0;
+  });
+
+  it("offers one row for a commander's upgrades, not one per stage", () => {
+    const { html } = renderMorph();
+    expect(html).not.toContain("armcom1");
+    expect(html).not.toContain("armcom2");
+    expect(html).toContain("Commander, 2 upgrades");
+  });
+
+  it("selects every stage when the group's row is turned on", () => {
+    const { onChange } = renderMorph([]);
+    const row = checkboxes.find((c) => c.label?.includes("upgrades"));
+    expect(row).toBeDefined();
+    row?.onCheckedChange?.(true);
+    expect(onChange).toHaveBeenCalledWith(["armcom", "armcom1", "armcom2"]);
+  });
+
+  it("clears every stage when the group's row is turned off, even half selected", () => {
+    // Only the one stage stored is the hole a group toggle exists to close: the
+    // commander would read as disabled in some places and buildable in others.
+    const { onChange } = renderMorph(["armcom1"]);
+    const row = checkboxes.find((c) => c.label?.includes("upgrades"));
+    expect(row).toBeDefined();
+    row?.onCheckedChange?.(false);
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("still lists every stage on its own row for a single-select picker", () => {
+    // Placing an exact stage (e.g. a scenario's starting unit) needs the stage
+    // itself, so the fold that serves restrictions and unlocks does not apply
+    // here.
+    const html = renderMorphButton();
+    expect(html).toContain("armcom1");
+    expect(html).toContain("armcom2");
+    expect(html).not.toContain("upgrades");
   });
 });

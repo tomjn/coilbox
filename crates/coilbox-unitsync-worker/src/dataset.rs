@@ -261,6 +261,132 @@ local function stats_of(d, wdefs)
   return '{' .. table.concat(parts, ',') .. '}'
 end
 
+-- What a unit turns into (issue #2063). Not a unitdef field: games arrange it
+-- themselves, and two arrangements are both real. Zero-K writes the target onto
+-- the def's own `customparams`. Metal Factions, Spring 1944, Expand and
+-- Exterminate and SplinterFaction ship a config file that a gadget loads. Both
+-- are read and a unit's edges are the union, because a game may do both and
+-- taking both costs one table lookup.
+--
+-- Zero-K's own config file cannot stand in for its customparams: it loops over
+-- `UnitDefs` and `UnitDefNames`, which this parser does not have, and wants
+-- `Spring.Utilities.CMD` and `gadget:GetInfo()` besides.
+local MORPH_CONFIGS = { 'luarules/configs/morph_defs.lua', 'gamedata/morph_defs.lua' }
+
+-- The conditions Zero-K writes beside a customparams target, each carrying the
+-- same suffix the target does.
+local MORPH_PARAMS = { 'morphtime', 'morphcost', 'level', 'combatmorph' }
+
+-- One morph edge as a target key and a JSON object. Everything the game wrote
+-- beside `into` rides along under its own lowercased name, because no two games
+-- name these the same. A table value is dropped rather than flattened: it
+-- cannot be shown next to the edge, and guessing at it would put words in the
+-- game's mouth.
+local function morph_entry(e)
+  if type(e) ~= 'table' then return nil end
+  local low = lowered(e)
+  local into = low['into']
+  if type(into) ~= 'string' or into == '' then return nil end
+  into = string.lower(into)
+  local parts = { '"into":' .. json_string(into) }
+  local keys = {}
+  for k in pairs(low) do
+    if k ~= 'into' then keys[#keys + 1] = k end
+  end
+  table.sort(keys)
+  for _, k in ipairs(keys) do
+    local v = low[k]
+    if type(v) == 'number' then
+      local n = json_number(v)
+      if n then parts[#parts + 1] = json_string(k) .. ':' .. n end
+    elseif type(v) == 'string' and v ~= '' then
+      parts[#parts + 1] = json_string(k) .. ':' .. json_string(v)
+    elseif type(v) == 'boolean' then
+      parts[#parts + 1] = json_string(k) .. ':' .. tostring(v)
+    end
+  end
+  return into, '{' .. table.concat(parts, ',') .. '}'
+end
+
+-- A config's value for one unit, as a list of entries. Spring 1944 writes one
+-- table per unit and Metal Factions writes a list of them, so a value with a
+-- table at [1] is a list and anything else is a single entry.
+local function morph_list(v)
+  if type(v) ~= 'table' then return {} end
+  if type(v[1]) == 'table' then return v end
+  return { v }
+end
+
+-- The game's morph config, keyed by lowercased source unit. The paths are tried
+-- in order and the first that yields anything wins. Each `VFS.Include` is
+-- pcall'd because it raises on a file the archive does not have, which is most
+-- games: a game with no morph config is a game with no morphs, not a dataset
+-- with no units.
+local morphs = {}
+for _, path in ipairs(MORPH_CONFIGS) do
+  if next(morphs) == nil then
+    local ok, cfg = pcall(VFS.Include, path)
+    if ok and type(cfg) == 'table' then
+      for k, v in pairs(cfg) do
+        if type(k) == 'string' then
+          local entries = {}
+          for _, e in ipairs(morph_list(v)) do
+            local into, json = morph_entry(e)
+            if into then entries[#entries + 1] = { into = into, json = json } end
+          end
+          if #entries > 0 then morphs[string.lower(k)] = entries end
+        end
+      end
+    end
+  end
+end
+
+-- What a def says about morphing on its own customparams. Zero-K spells a
+-- single target `morphto` and a list `morphto_1`, `morphto_2` and upwards, and
+-- takes the list when both are present, which is the precedence its own config
+-- applies.
+local function morph_from_params(d)
+  local cp = lowered(type(d) == 'table' and (d.customparams or d.customParams) or nil)
+  local out = {}
+  local function add(suffix)
+    local into = cp['morphto' .. suffix]
+    if type(into) ~= 'string' or into == '' then return false end
+    local e = { into = into }
+    for _, p in ipairs(MORPH_PARAMS) do
+      if cp[p .. suffix] ~= nil then e[p] = cp[p .. suffix] end
+    end
+    local key, json = morph_entry(e)
+    if key then out[#out + 1] = { into = key, json = json } end
+    return true
+  end
+  if cp['morphto_1'] ~= nil then
+    local i = 1
+    while add('_' .. i) do i = i + 1 end
+  else
+    add('')
+  end
+  return out
+end
+
+-- One unit's edges, both sources merged, deduplicated by target and sorted by
+-- it. A game that declares the same morph twice has said one thing, and the
+-- order two sources happen to arrive in is not a fact worth a new digest.
+local function morph_of(k, d)
+  local seen, picked = {}, {}
+  for _, source in ipairs({ morphs[string.lower(tostring(k))] or {}, morph_from_params(d) }) do
+    for _, e in ipairs(source) do
+      if not seen[e.into] then
+        seen[e.into] = true
+        picked[#picked + 1] = e
+      end
+    end
+  end
+  table.sort(picked, function(a, b) return a.into < b.into end)
+  local out = {}
+  for _, e in ipairs(picked) do out[#out + 1] = e.json end
+  return '[' .. table.concat(out, ',') .. ']'
+end
+
 -- The game's weapondefs once, indexed by lowercased name: that is how a
 -- unitdef's weapons list points at them, and how the engine's own lookup
 -- matches them.
@@ -298,6 +424,7 @@ for _, k in ipairs(names) do
     .. '\t' .. string.format('%.4f', depth(d, 'maxwaterdepth', 'maxWaterDepth', 10e6))
     .. '\t' .. string.format('%.4f', waterline_of(d))
     .. '\t' .. stats_of(d, wdefs)
+    .. '\t' .. morph_of(k, d)
 end
 -- A big game's list runs to hundreds of kilobytes, far past what unitsync can
 -- hand back in one string, so it goes back in pieces.
@@ -512,6 +639,38 @@ fn parse_stats(field: Option<&str>) -> Map<String, Value> {
         .unwrap_or_default()
 }
 
+/// The morph edges the line's last column carries.
+///
+/// An element with no `into` string names nothing and is dropped, and a column
+/// that is missing, empty or not an array is no edges at all. None of it is an
+/// error: a line written before the column existed still describes a real unit,
+/// and one unreadable edge is not a reason to lose the unit that has it.
+///
+/// What sits beside `into` is deliberately not typed, for the reason
+/// [`parse_stats`] does not type a stat.
+fn parse_morph_targets(field: Option<&str>) -> Vec<Map<String, Value>> {
+    field
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .and_then(|s| serde_json::from_str::<Value>(s).ok())
+        .and_then(|value| match value {
+            Value::Array(items) => Some(items),
+            _ => None,
+        })
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|item| match item {
+            Value::Object(map) => Some(map),
+            _ => None,
+        })
+        .filter(|map| {
+            map.get("into")
+                .and_then(Value::as_str)
+                .is_some_and(|s| !s.is_empty())
+        })
+        .collect()
+}
+
 /// Parse the `name\tfullname\topt1,opt2,...` lines [`UNIT_DATASET_SHIM_SCRIPT`]
 /// returns into `UnitDatasetEntry`s. A full name equal to the internal name (the
 /// script's fallback) or missing collapses to `None`; an empty options field
@@ -536,6 +695,7 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
             let max_water_depth = parse_water(it.next());
             let waterline = parse_water(it.next());
             let stats = parse_stats(it.next());
+            let morph_targets = parse_morph_targets(it.next());
             let build_options = opts
                 .split(',')
                 .map(str::trim)
@@ -556,6 +716,7 @@ fn parse_dataset_units(raw: &str) -> Vec<UnitDatasetEntry> {
                 max_water_depth,
                 waterline,
                 stats,
+                morph_targets,
             })
         })
         .collect()
@@ -973,20 +1134,21 @@ mod tests {
 
     // ------------------------------------------------- extraction, in real Lua
 
-    /// Run [`UNIT_DATASET_SHIM_SCRIPT`] over a fixture `defs` table in stock Lua
-    /// 5.1 and parse what it wrote back.
+    /// Run [`UNIT_DATASET_SHIM_SCRIPT`] over a fixture `defs` table, and
+    /// optionally one morph config mounted at `path`, in stock Lua 5.1.
     ///
-    /// This is the extraction end to end rather than the parser on its own: the
-    /// shim is where a stat is turned into a number or dropped, and a Lua `or 0`
-    /// slipped into it would quietly turn every absent field into a claim of
-    /// zero without any line-parsing test noticing.
-    ///
-    /// `VFS.Include` and `__cb_chunk` stand in for what the real run gets from
-    /// unitsync: the game's `gamedata/defs.lua` and the chunked string return.
-    fn extract(defs_lua: &str) -> Vec<UnitDatasetEntry> {
+    /// `VFS.Include` answers by path and raises on anything else, the way the
+    /// real one does: the shim asks for two config paths that most games do
+    /// not have, and a stub that answered every path would hide a missing
+    /// `pcall`.
+    fn extract_with_config(defs_lua: &str, path: &str, config_lua: &str) -> Vec<UnitDatasetEntry> {
         let lua = mlua::Lua::new();
         let script = format!(
-            "VFS = {{ Include = function() return {defs_lua} end }}\n\
+            "VFS = {{ Include = function(name)\n\
+               if name == 'gamedata/defs.lua' then return {defs_lua} end\n\
+               if name == '{path}' then return {config_lua} end\n\
+               error(\"Include() file missing '\" .. name .. \"'\")\n\
+             end }}\n\
              __cb_chunk = function(s) return s end\n\
              return (function()\n{UNIT_DATASET_SHIM_SCRIPT}\nend)()"
         );
@@ -995,6 +1157,163 @@ mod tests {
             .eval()
             .expect("the shim script did not run");
         parse_dataset_units(&raw)
+    }
+
+    /// This is the extraction end to end rather than the parser on its own: the
+    /// shim is where a stat is turned into a number or dropped, and a Lua `or 0`
+    /// slipped into it would quietly turn every absent field into a claim of
+    /// zero without any line-parsing test noticing.
+    fn extract(defs_lua: &str) -> Vec<UnitDatasetEntry> {
+        extract_with_config(defs_lua, "", "nil")
+    }
+
+    /// A commander whose two stages live in the config shape Metal Factions,
+    /// SplinterFaction and Zero-K's own generated half all write: a list of
+    /// entries per source unit.
+    const A_MORPH_CONFIG: &str = r#"{
+      fedcommander = {
+        {
+          into = 'fedcommander_up1',
+          time = 3,
+          research = 150,
+          require = 'tech1',
+          cmdname = 'Tech 1 Upgrade',
+        },
+      },
+    }"#;
+
+    /// The shape Spring 1944 writes: one entry per source unit, not a list.
+    const A_SINGLE_MORPH_CONFIG: &str = r#"{
+      swepontoontruck = { into = 'sweboatyard', time = 5, metal = 0 },
+    }"#;
+
+    const TWO_COMMANDERS: &str = r#"{
+      unitdefs = {
+        fedcommander = { name = 'Commander' },
+        fedcommander_up1 = { name = 'Commander Tech 1' },
+      },
+    }"#;
+
+    #[test]
+    fn a_morph_config_names_what_a_unit_turns_into() {
+        let units = extract_with_config(
+            TWO_COMMANDERS,
+            "luarules/configs/morph_defs.lua",
+            A_MORPH_CONFIG,
+        );
+        let com = units.iter().find(|u| u.name == "fedcommander").unwrap();
+        assert_eq!(com.morph_targets.len(), 1);
+        assert_eq!(
+            com.morph_targets[0]["into"],
+            serde_json::json!("fedcommander_up1")
+        );
+    }
+
+    #[test]
+    fn a_morph_carries_the_conditions_the_game_wrote() {
+        let units = extract_with_config(
+            TWO_COMMANDERS,
+            "luarules/configs/morph_defs.lua",
+            A_MORPH_CONFIG,
+        );
+        let entry = &units
+            .iter()
+            .find(|u| u.name == "fedcommander")
+            .unwrap()
+            .morph_targets[0];
+        assert_eq!(entry["research"], serde_json::json!(150));
+        assert_eq!(entry["require"], serde_json::json!("tech1"));
+        assert_eq!(entry["time"], serde_json::json!(3));
+        assert_eq!(entry["cmdname"], serde_json::json!("Tech 1 Upgrade"));
+    }
+
+    #[test]
+    fn a_config_that_writes_one_entry_rather_than_a_list_is_read_too() {
+        let defs = r#"{
+          unitdefs = {
+            swepontoontruck = { name = 'Pontoon Truck' },
+            sweboatyard = { name = 'Boatyard' },
+          },
+        }"#;
+        let units = extract_with_config(
+            defs,
+            "luarules/configs/morph_defs.lua",
+            A_SINGLE_MORPH_CONFIG,
+        );
+        let truck = units.iter().find(|u| u.name == "swepontoontruck").unwrap();
+        assert_eq!(truck.morph_targets.len(), 1);
+        assert_eq!(
+            truck.morph_targets[0]["into"],
+            serde_json::json!("sweboatyard")
+        );
+    }
+
+    #[test]
+    fn a_def_that_names_its_own_morph_in_customparams_is_read() {
+        let defs = r#"{
+          unitdefs = {
+            armcom0 = {
+              name = 'Commander',
+              customparams = { morphto = 'ARMCOM1', morphtime = 10, level = 0 },
+            },
+            armcom1 = { name = 'Commander' },
+          },
+        }"#;
+        let units = extract(defs);
+        let com = units.iter().find(|u| u.name == "armcom0").unwrap();
+        assert_eq!(com.morph_targets[0]["into"], serde_json::json!("armcom1"));
+        assert_eq!(com.morph_targets[0]["morphtime"], serde_json::json!(10));
+        assert_eq!(com.morph_targets[0]["level"], serde_json::json!(0));
+    }
+
+    #[test]
+    fn a_def_that_lists_several_morphs_in_customparams_gets_all_of_them() {
+        let defs = r#"{
+          unitdefs = {
+            factory = {
+              name = 'Factory',
+              customparams = {
+                morphto_1 = 'gunyard',
+                morphcost_1 = 250,
+                morphto_2 = 'airyard',
+                morphcost_2 = 400,
+              },
+            },
+            gunyard = { name = 'Gun Yard' },
+            airyard = { name = 'Air Yard' },
+          },
+        }"#;
+        let units = extract(defs);
+        let factory = units.iter().find(|u| u.name == "factory").unwrap();
+        let into: Vec<&serde_json::Value> =
+            factory.morph_targets.iter().map(|m| &m["into"]).collect();
+        assert_eq!(
+            into,
+            vec![&serde_json::json!("airyard"), &serde_json::json!("gunyard")]
+        );
+    }
+
+    #[test]
+    fn a_unit_that_morphs_nowhere_claims_nothing() {
+        let units = extract(TWO_COMMANDERS);
+        assert!(units.iter().all(|u| u.morph_targets.is_empty()));
+    }
+
+    #[test]
+    fn a_line_written_before_the_column_existed_claims_no_morphs() {
+        let units = parse_dataset_units("armsolar\tSolar\t\t0\tARMSOLAR");
+        assert!(units[0].morph_targets.is_empty());
+    }
+
+    #[test]
+    fn a_morph_column_that_is_not_an_array_of_targets_is_dropped() {
+        // A target with no `into` names nothing, and a column that is not an
+        // array at all is a line this cannot read. Neither is an error: the
+        // rest of the unit is still a unit.
+        let units = parse_dataset_units(
+            "armcom\tCommander\t\t1\tARMCOM\t2\t2\t0.0000\t0\t0\t0\t0\t{}\t[{\"time\":3},\"nonsense\"]",
+        );
+        assert!(units[0].morph_targets.is_empty());
     }
 
     /// One unit's stat as a number, or `None` when it does not carry one.

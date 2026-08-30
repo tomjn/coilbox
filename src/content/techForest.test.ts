@@ -79,6 +79,34 @@ describe("buildTechForest", () => {
     expect(forest.factionOf.get("armsolar")).toBe("armcom");
     expect(forest.known.has("armsolar")).toBe(true);
   });
+
+  it("lists a commander's upgrades under the commander", () => {
+    const units = [
+      {
+        name: "armcom",
+        buildOptions: ["armsolar"],
+        morphTargets: [{ into: "armcom1" }],
+      },
+      { name: "armcom1", buildOptions: ["armsolar", "armlab"] },
+      { name: "armsolar" },
+      { name: "armlab" },
+    ];
+    const forest = buildTechForest(units, ["armcom"]);
+    expect(forest.morphBase.get("armcom1")).toBe("armcom");
+    expect(forest.morphBase.get("armsolar")).toBe("armsolar");
+  });
+
+  it("gives an upgraded stage the faction its base has", () => {
+    const units = [
+      { name: "armcom", morphTargets: [{ into: "armcom1" }] },
+      { name: "armcom1" },
+    ];
+    const forest = buildTechForest(units, ["armcom"]);
+    // armcom1 is not built by anything, so without the morph edge it would be
+    // ungrouped and shown under "Other units".
+    expect(forest.factionOf.get("armcom1")).toBe("armcom");
+    expect(forest.ungrouped).toEqual([]);
+  });
 });
 
 describe("factionGroups", () => {

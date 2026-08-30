@@ -1,5 +1,6 @@
 import type { UnitDatasetEntry } from "./bindings";
 import { buildEdgeMap } from "./buildTree";
+import { groupOf, morphEdgeMap, morphGroups } from "./morphGraph";
 
 /**
  * Shared build-graph model for the tech-tree picker. Turns a game's unit dataset
@@ -25,6 +26,10 @@ export interface TechForest {
   ungrouped: string[];
   /** Every known unit id (lowercased). */
   known: Set<string>;
+  /** Every unit id to the id it is listed under: a morph stage maps to its
+   * group's base, everything else maps to itself. A commander's five tech
+   * levels are one row in a picker rather than five (issue #2063). */
+  morphBase: Map<string, string>;
 }
 
 /**
@@ -45,6 +50,21 @@ export function buildTechForest(
 ): TechForest {
   const edges = buildEdgeMap(units);
   const known = new Set(units.map((u) => u.name.toLowerCase()));
+
+  // A stage is reached by morphing, not by building, so the faction walk has to
+  // cross morph edges too. Without this an upgraded commander nothing builds is
+  // in no faction at all, and lands in the picker's "Other units" block next to
+  // the game's leftovers.
+  const morphEdges = morphEdgeMap(units);
+  for (const [from, targets] of morphEdges) {
+    if (targets.length === 0) continue;
+    edges.set(from, [...(edges.get(from) ?? []), ...targets]);
+  }
+  const morphBase = new Map<string, string>();
+  for (const id of known) morphBase.set(id, id);
+  for (const [stage, base] of groupOf(morphGroups(units))) {
+    morphBase.set(stage, base);
+  }
 
   const rootIds: string[] = [];
   const factionOf = new Map<string, string>();
@@ -69,7 +89,7 @@ export function buildTechForest(
 
   const ungrouped = [...known].filter((id) => !factionOf.has(id)).sort();
 
-  return { roots: rootIds, factionOf, ungrouped, known };
+  return { roots: rootIds, factionOf, ungrouped, known, morphBase };
 }
 
 /** A faction's units, as one flat block of the picker's list. */

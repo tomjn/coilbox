@@ -105,6 +105,12 @@ pub struct GameUnitFacts {
     /// cannot churn a revision.
     #[serde(default)]
     pub build_options: Vec<String>,
+    /// What this unit turns into: a morph, an upgrade, a tech level
+    /// (issue #2063). Sent in target order, deduplicated by the shim that read
+    /// it, so the hub's digest does not churn on the order two sources happened
+    /// to arrive in. Sent even when empty, the way `build_options` is.
+    #[serde(default)]
+    pub morph_targets: Vec<Map<String, Value>>,
     /// Everything else the unit declares. Empty until issue #1876 extends the
     /// extraction, and sent anyway so the shape does not change when it does.
     #[serde(default)]
@@ -374,6 +380,7 @@ mod tests {
             full_name: Some(format!("The {name}")),
             faction_key: Some("armada".into()),
             build_options: Vec::new(),
+            morph_targets: Vec::new(),
             stats: Map::new(),
         }
     }
@@ -456,13 +463,47 @@ mod tests {
         unit_fields.sort();
         assert_eq!(
             unit_fields,
-            vec!["buildOptions", "factionKey", "fullName", "name", "stats"]
+            vec![
+                "buildOptions",
+                "factionKey",
+                "fullName",
+                "morphTargets",
+                "name",
+                "stats"
+            ]
         );
 
         let mut faction_fields: Vec<&String> =
             sent["factions"][0].as_object().unwrap().keys().collect();
         faction_fields.sort();
         assert_eq!(faction_fields, vec!["key", "name"]);
+    }
+
+    /// What a unit turns into travels with the rest of it (issue #2063).
+    #[test]
+    fn a_unit_sends_what_it_turns_into() {
+        let mut facts = game();
+        facts.units[0].morph_targets = vec![serde_json::json!({
+            "into": "armcom1",
+            "morphtime": 10,
+        })
+        .as_object()
+        .unwrap()
+        .clone()];
+        let sent: Value = serde_json::from_str(&check_and_build(&facts).unwrap()).unwrap();
+        assert_eq!(
+            sent["units"][0]["morphTargets"],
+            serde_json::json!([{ "into": "armcom1", "morphtime": 10 }])
+        );
+    }
+
+    /// The field is sent even when there is nothing in it, the way
+    /// `build_options` is: a worker too old to report morphs sends an empty
+    /// list, not an absent field.
+    #[test]
+    fn a_unit_that_morphs_nowhere_sends_an_empty_list() {
+        let sent: Value = serde_json::from_str(&check_and_build(&game()).unwrap()).unwrap();
+        assert_eq!(sent["units"][0]["morphTargets"], serde_json::json!([]));
     }
 
     /// The hub reads a missing `factions` and a null one the same way, and both
