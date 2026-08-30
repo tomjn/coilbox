@@ -5026,6 +5026,57 @@ mod tests {
         );
     }
 
+    /// Issue #2143, over a real socket and through the real connection task.
+    ///
+    /// The wait is armed with the real [`READY_TIMEOUT`] and the answer is given
+    /// [`HOSTING_PATIENCE`], which is a quarter of it. So a refusal that arrives
+    /// here arrived because the lobby named the command, with fifteen seconds
+    /// still on the clock. Without the rejection being read this test does not
+    /// fail on the words, it hangs until the quarter runs out.
+    #[tokio::test]
+    async fn a_lobby_that_will_not_run_the_open_says_so_rather_than_being_waited_out() {
+        assert!(
+            READY_TIMEOUT > HOSTING_PATIENCE,
+            "this test only means anything while the budget outlasts what it waits"
+        );
+        let addr = lobby_answering_an_open(|_| {
+            "SERVERMSG OPENBATTLE failed. Incorrect arguments.".to_string()
+        })
+        .await;
+        let registry = Registry::default();
+        let (key, _logs) = logged_in(&registry, addr).await;
+
+        let channel = Channelled::default();
+        let relay = a_relay_writing_to(channel.clone());
+        let lines = relayed_lines(&relay);
+        let refused = tokio::time::timeout(
+            HOSTING_PATIENCE,
+            advertise(&registry, &key, lines, Some(relay), READY_TIMEOUT),
+        )
+        .await
+        .expect("the lobby answered at once, so there is nothing left here to wait for");
+
+        assert!(!refused.success, "no battle was opened");
+        let told = refused.error.as_deref().unwrap_or_default();
+        assert!(
+            told.contains("coilbox sent an OPENBATTLE line this lobby would not run"),
+            "got: {told}"
+        );
+        assert!(told.contains("Incorrect arguments."), "got: {told}");
+        assert!(
+            channel.was_stopped(),
+            "a battle that never opened leaves an allocation held for nothing, got: {:?}",
+            channel.sent()
+        );
+        assert!(
+            lock_or_recover(&registry)
+                .get(&key)
+                .map(|conn| lock_or_recover(&conn.relay).is_none())
+                .unwrap_or_default(),
+            "nothing may be held against the connection as a relayed battle"
+        );
+    }
+
     /// A line that never reached the writer, which is the one failure this could
     /// already see. Kept because it is the same rule and the easiest to lose in
     /// a rearrangement.

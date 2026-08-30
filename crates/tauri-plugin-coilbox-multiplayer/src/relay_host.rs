@@ -1111,6 +1111,15 @@ pub enum OpenAnswer {
     Opened(u32),
     /// The lobby refused to open one, in its own words.
     Refused(String),
+    /// The lobby never ran the `OPENBATTLE` at all, in its own words.
+    ///
+    /// Kept apart from [`OpenAnswer::Refused`] the way
+    /// [`crate::turn::NoCredential::NotRun`] is kept apart from its refusal,
+    /// and for the same reason. `OPENBATTLEFAILED` is a lobby that read the
+    /// line and turned the battle down. `OPENBATTLE failed.` is a lobby that
+    /// could not read the line, which is a different fact and points somewhere
+    /// else entirely.
+    NotRun(String),
 }
 
 /// A connection's slot for [`OpenAnswer`], watched rather than locked so a
@@ -1127,6 +1136,9 @@ pub enum NoBattle {
     Closed,
     /// The lobby said nothing at all.
     Silent(Duration),
+    /// The lobby would not run the `OPENBATTLE` line, so there is no battle and
+    /// the line is what is at fault rather than the battle it asked for.
+    NotRun(String),
     /// The lobby refused the address the battle was to be advertised at, so
     /// whatever it opened is at this machine's own address rather than at the
     /// relay's.
@@ -1149,6 +1161,16 @@ impl std::fmt::Display for NoBattle {
                 f,
                 "the lobby did not say whether the battle had opened within {} seconds",
                 waited.as_secs()
+            ),
+            // Deliberately not "the lobby would not open the battle". On the
+            // relay route this can only be a line coilbox built wrong, so
+            // blaming the lobby would send the host, and whoever reads their
+            // bug report, looking in the wrong place. The reason is quoted
+            // because it is the only thing that says which way it was wrong,
+            // and `lobby.techa-rts.com` appends the fields it expected.
+            NoBattle::NotRun(reason) => write!(
+                f,
+                "coilbox sent an OPENBATTLE line this lobby would not run, so no battle was opened and sending it again would send the same line: {reason}"
             ),
             NoBattle::NotRelayed {
                 reason,
@@ -1189,6 +1211,7 @@ pub async fn confirmed(answers: &mut OpenSlot, patience: Duration) -> Result<u32
         None => Err(NoBattle::Closed),
         Some(OpenAnswer::Opened(id)) => Ok(id),
         Some(OpenAnswer::Refused(why)) => Err(NoBattle::Refused(why)),
+        Some(OpenAnswer::NotRun(why)) => Err(NoBattle::NotRun(why)),
         // The slot only ever changes to an answer, so this is unreachable in
         // practice. Treating it as no answer beats waiting again.
         Some(OpenAnswer::Unasked) => Err(NoBattle::Silent(patience)),
@@ -1212,6 +1235,21 @@ async fn next_answer(answers: &mut OpenSlot) -> Option<OpenAnswer> {
 /// question being asked here is whether the relay is carrying a battle. More
 /// evidence that it is can only stop an agent from being stopped, which is the
 /// side of that decision it is safe to be wrong on.
+///
+/// ## Why uberserver's rejection belongs in the slot and the address one does
+/// not
+///
+/// #2064 found that a `watch` slot keeps only the last value put in it, so a
+/// `RELAYEDHOSTFAILED` routed through here would be overwritten by the
+/// `OPENBATTLE` ack that arrives in the same read. That is two commands with
+/// two answers, written back to back.
+///
+/// `OPENBATTLE failed.` is one command with one answer, and uberserver writes
+/// it in place of running `in_OPENBATTLE` rather than alongside it. So no ack
+/// follows it, there is no second value to overwrite it with, and nothing here
+/// can turn a battle that opened into a refusal. The one thing that could is a
+/// lobby sending that exact sentence while our battle was opening, and
+/// `out_SERVERMSG` writes to the one client whose own command it is answering.
 pub(crate) fn open_answer_in(delta: &Delta, state: &Mutex<LobbyState>) -> Option<OpenAnswer> {
     match delta {
         // Our own `OPENBATTLE` ack, which is what uberserver sends the founder
@@ -1225,7 +1263,12 @@ pub(crate) fn open_answer_in(delta: &Delta, state: &Mutex<LobbyState>) -> Option
             ours.then_some(OpenAnswer::Opened(*id))
         }
         Delta::OpenBattleFailed { reason } => Some(OpenAnswer::Refused(reason.clone())),
-        _ => None,
+        // Uberserver would not run the line at all and says so by naming it.
+        // That answer is in before the wait starts counting, where waiting it
+        // out takes twenty seconds to conclude the lobby said nothing, which
+        // is the one thing it did not do (issue #2143).
+        _ => crate::uberserver::rejection_of(delta, command::OPEN_BATTLE)
+            .map(|reason| OpenAnswer::NotRun(reason.to_string())),
     }
 }
 
@@ -2585,6 +2628,30 @@ pub(crate) mod tests {
             ))
         );
 
+        // And the lobby that would not read the line at all, which is neither
+        // of those and must not be told as either (issue #2143).
+        let not_run = reduce_at(
+            &mut lock_or_recover(&state),
+            parse_line("SERVERMSG OPENBATTLE failed. Incorrect arguments."),
+            NOW,
+        );
+        assert_eq!(
+            open_answer_in(&not_run[0], &state),
+            Some(OpenAnswer::NotRun("Incorrect arguments.".to_string()))
+        );
+
+        // A server message about somebody else's command, and one that only
+        // mentions ours. Acting on either would stop a relay carrying a battle
+        // that opened perfectly well.
+        for text in [
+            "SERVERMSG RELAYEDHOST failed. Incorrect arguments.",
+            "SERVERMSG Your OPENBATTLE failed. Incorrect arguments.",
+            "SERVERMSG Maintenance in 5 minutes",
+        ] {
+            let said = reduce_at(&mut lock_or_recover(&state), parse_line(text), NOW);
+            assert_eq!(open_answer_in(&said[0], &state), None, "for {text}");
+        }
+
         // Everything else leaves a waiting host waiting.
         let unrelated = reduce_at(
             &mut lock_or_recover(&state),
@@ -2592,5 +2659,42 @@ pub(crate) mod tests {
             NOW,
         );
         assert_eq!(open_answer_in(&unrelated[0], &state), None);
+    }
+
+    /// Issue #2143's sentence, which is the whole point of telling this apart
+    /// from a refusal.
+    ///
+    /// A host who is told the lobby would not open their battle has somewhere
+    /// to go and something to try. A host whose `OPENBATTLE` the lobby could
+    /// not read has neither, because the line came from coilbox. The words have
+    /// to say so, and they have to carry the lobby's reason, which is the only
+    /// thing that says which way the line was wrong.
+    #[tokio::test]
+    async fn a_line_the_lobby_would_not_read_is_not_told_as_a_refused_battle() {
+        let (says, mut answers) = watch::channel(OpenAnswer::Unasked);
+        answers.borrow_and_update();
+        says.send(OpenAnswer::NotRun(
+            "Incorrect arguments. Expected: type natType key port".to_string(),
+        ))
+        .expect("the slot is open");
+
+        let told = confirmed(&mut answers, PATIENCE)
+            .await
+            .expect_err("no battle was opened")
+            .to_string();
+
+        assert!(
+            told.contains("coilbox sent an OPENBATTLE line this lobby would not run"),
+            "the host has to be told where the fault is, got: {told}"
+        );
+        assert!(
+            told.contains("Expected: type natType key port"),
+            "the lobby's reason is the only thing that says which way the line was wrong, got: \
+             {told}"
+        );
+        assert!(
+            !told.contains("the lobby would not open the battle"),
+            "a line the lobby could not read is not a battle the lobby turned down, got: {told}"
+        );
     }
 }

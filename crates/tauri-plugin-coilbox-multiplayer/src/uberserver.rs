@@ -6,7 +6,7 @@
 //! milliseconds where a wait for the answer that is never coming takes twenty
 //! seconds to reach the same conclusion.
 //!
-//! Three of coilbox's commands are waited on that way, so this is the one place
+//! Four of coilbox's commands are waited on that way, so this is the one place
 //! that knows what the sentence looks like.
 //!
 //! ## The shape
@@ -33,6 +33,14 @@
 //! `lobby.springrts.com:8200` (0.38-84-gc8386e9), `lobby.techa-rts.com:8200`
 //! (0.38-95-gf595963) and `lobby.recoilengine.org:8200` (version `unknown`) all
 //! answered with that line and nothing else.
+//!
+//! The three are three different builds, and the reason is where they differ.
+//! Asked for a `LOGIN` with no arguments on 30 August 2026, springrts and
+//! recoilengine both said `LOGIN failed. Incorrect arguments.` and techa-rts
+//! said `LOGIN failed. Incorrect arguments. Expected: username password [cpu]
+//! [local_ip] [sentence_args]`. That is the whole argument for handing the
+//! reason back untouched: one of the three names the fields it wanted, and
+//! that sentence is what a bug report needs.
 //!
 //! ## Why this is not in `coilbox-lobby-protocol`
 //!
@@ -99,7 +107,7 @@ mod tests {
         }
     }
 
-    /// The three reasons uberserver has, on each of the three commands coilbox
+    /// The three reasons uberserver has, on each of the four commands coilbox
     /// waits for an answer to. Every one of them means the command did not run,
     /// which is why the reason is carried out rather than read here.
     #[test]
@@ -108,11 +116,13 @@ mod tests {
             command::TURN_CREDENTIALS,
             command::RELAYED_HOST,
             command::MOVE_RELAYED_HOST,
+            command::OPEN_BATTLE,
         ] {
             for reason in [
                 "Unknown command. (args='198.51.100.9 30002')",
                 "Insufficient rights.",
                 "Incorrect arguments.",
+                "Incorrect arguments. Expected: username password [cpu] [local_ip] [sentence_args]",
             ] {
                 assert_eq!(
                     rejection_of(&said(&format!("{command} failed. {reason}")), command),
@@ -150,6 +160,15 @@ mod tests {
             ),
             None,
             "the space after the command is what keeps a longer name from matching"
+        );
+        assert_eq!(
+            rejection_of(
+                &said("OPENBATTLEFAILED failed. Unknown command."),
+                command::OPEN_BATTLE
+            ),
+            None,
+            "the refusal line's own name starts with the command's, and reading one as the other \
+             would take down a relay carrying a battle that opened"
         );
     }
 
