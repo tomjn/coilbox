@@ -446,10 +446,13 @@ mod tests {
         // where one call can take them.
         let parked = std::sync::Mutex::new(Some(ports));
         quit(move |handle| {
-            *handle.state::<ActivePorts>().0.blocking_lock() =
-                Some(parked.lock().expect("nothing else takes this").take().expect(
-                    "the app is ready once, so this is the only call",
-                ));
+            *handle.state::<ActivePorts>().0.blocking_lock() = Some(
+                parked
+                    .lock()
+                    .expect("nothing else takes this")
+                    .take()
+                    .expect("the app is ready once, so this is the only call"),
+            );
         });
 
         assert!(
