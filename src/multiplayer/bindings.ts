@@ -1140,21 +1140,22 @@ export const mpProbeHost = defineCommand<
 >("coilbox-multiplayer", "mp_probe_host");
 
 /**
- * How much a relayed battle's relay carried in the last second, both directions
- * together (issue #2024).
+ * Whether a relay on this machine is carrying the game that is running, and how
+ * much it carried in the last second, both directions together (issue #2024).
  *
- * Three answers, and the difference between the last two is the point.
- * `bytesPerSecond` is null when nothing is being relayed at all, or when
- * coilbox has stopped hearing from the sidecar that was, and a caller showing
- * anything for that would be vouching for a relay it cannot see. Zero is a real
- * answer: the relay is there and nothing is going through it.
+ * Two answers rather than one, because they go missing separately (issue
+ * #2094). `relaying` is the fact that decides what ending the game does to
+ * everybody else, and it holds while the sidecar does. `bytesPerSecond` is
+ * evidence that it is working, and it is null whenever coilbox cannot read a
+ * current figure. Zero is a real answer and a different one: the relay is there
+ * and nothing is going through it.
  *
  * No server key, because there is at most one relay sidecar on the machine
  * whatever is connected. The Rust command's doc says why.
  */
 export const mpRelayTraffic = defineCommand<
   Record<string, never>,
-  { bytesPerSecond: number | null }
+  { relaying: boolean; bytesPerSecond: number | null }
 >("coilbox-multiplayer", "mp_relay_traffic");
 
 /**

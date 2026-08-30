@@ -51,8 +51,15 @@ export const RELAY_LEFT_RUNNING_DETAIL =
  * looking at the pill to find, and a number that happens to be zero is easy to
  * read past. It is also not a fault on its own: a game that has not started yet
  * carries nothing, and so does one that is over.
+ *
+ * `null` is a relay that is up and has not said what it is carrying, which is a
+ * different thing from one carrying nothing and gets a shorter sentence rather
+ * than an invented figure. It is the honest answer for a sidecar coilbox is
+ * reading off disk rather than talking to, and for one whose last word has gone
+ * stale.
  */
-export function relayCarryingLabel(bytesPerSecond: number): string {
+export function relayCarryingLabel(bytesPerSecond: number | null): string {
+  if (bytesPerSecond === null) return "Relaying";
   if (!(bytesPerSecond > 0)) return "Relaying nothing";
   return `Relaying ${formatSpeed(bytesPerSecond)}`;
 }
