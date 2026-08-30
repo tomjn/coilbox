@@ -9,6 +9,7 @@ import type {
 } from "../../bindings";
 import type { BrandingEntry } from "../../branding";
 import { buildEdgeMap, reachableCounts } from "../../buildTree";
+import { foldMorphs } from "../../morphGraph";
 import { unitIconSrc } from "../../unitIcon";
 import { BuildTreeDrawer } from "./BuildTreeDrawer";
 
@@ -135,11 +136,13 @@ export function FactionBuildList({
     factionLogos,
     branding,
   };
-  // Units reachable from each faction's commander via buildoptions. Omitted (and the
-  // button left inert) when the dataset is still loading or the game exposes no
-  // buildoptions (0).
+  // Units reachable from each faction's commander via buildoptions, with each
+  // morph group folded onto its base so an upgrade stage's build options count
+  // under the commander rather than a stage of its own (issue #2063). Omitted
+  // (and the button left inert) when the dataset is still loading or the game
+  // exposes no buildoptions (0).
   const counts = useMemo(
-    () => reachableCounts(sides, buildEdgeMap(units)),
+    () => reachableCounts(sides, foldMorphs(units, buildEdgeMap(units))),
     [sides, units],
   );
   return (

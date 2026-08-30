@@ -26,6 +26,7 @@ import {
   focusNeighbours,
 } from "../../buildTree";
 import { useUnitsyncUnitBuildpics } from "../../config";
+import { foldMorphs, morphGroups } from "../../morphGraph";
 import { unitIconSrc } from "../../unitIcon";
 import { BuildTreeExportButton } from "./BuildTreeExportButton";
 import { layoutBuildTree, layoutFocusTree } from "./buildTreeLayout";
@@ -43,8 +44,17 @@ interface UnitNodeData extends Record<string, unknown> {
   isStart?: boolean;
   /** Mobile (can move) vs a static building — only distinguishes non-builders. */
   isMobile?: boolean;
+  /** How many morph stages (including this one) this node folds together, so
+   * the label can say so. Unset or 1 for a unit with no morph group (#2063). */
+  stageCount?: number;
   /** True for the currently-hovered node; reveals its connection handles. */
   hovered?: boolean;
+}
+
+/** A node's label, with its morph stage count appended for a folded node, e.g.
+ * "Commander (3 stages)" (#2063). */
+function nodeLabel(name: string, stageCount?: number): string {
+  return stageCount && stageCount > 1 ? `${name} (${stageCount} stages)` : name;
 }
 
 /** A build-tree node: build-pic (square, fills the node) above the unit name.
@@ -215,7 +225,9 @@ export function BuildTreeDrawer({
     return () => window.removeEventListener("keydown", onKey);
   }, [focusedUnit]);
 
-  const edges = useMemo(() => buildEdgeMap(units), [units]);
+  // Each morph group collapsed onto its base, so a commander's upgrade stages
+  // are one node in the tree rather than one each (#2063).
+  const edges = useMemo(() => foldMorphs(units, buildEdgeMap(units)), [units]);
   // Internal name (lowercased) -> its dataset entry, so a focused unit can be
   // looked up for the model its definition names.
   const unitByName = useMemo(() => {
@@ -228,6 +240,12 @@ export function BuildTreeDrawer({
     const m = new Map<string, string>();
     for (const u of units)
       if (u.fullName) m.set(u.name.toLowerCase(), u.fullName);
+    return m;
+  }, [units]);
+  // Base id -> how many stages its morph group folds together, for the label.
+  const stageCountByBase = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const g of morphGroups(units)) m.set(g.base, g.stages.length);
     return m;
   }, [units]);
   // Units that can move, so non-builders can be split into mobile vs building.
@@ -279,12 +297,15 @@ export function BuildTreeDrawer({
       initialWidth: 92,
       initialHeight: 120,
       data: {
+        // Bare name here. The stage-count suffix is added once the final label
+        // (buildpics name, or this fallback) is picked, below.
         label: fullByName.get(name) ?? name,
         // A builder is any unit that can build others, even if the spanning tree
         // handed its shared children to another builder.
         isBuilder: (edges.get(name)?.length ?? 0) > 0,
         isStart: startSet.has(name),
         isMobile: mobileSet.has(name),
+        stageCount: stageCountByBase.get(name),
       },
     }));
     const treeEdges: Edge[] = graph.treeEdges.map((e) => ({
@@ -305,7 +326,7 @@ export function BuildTreeDrawer({
       nodes: layoutBuildTree(nodes, treeEdges),
       edgeDefs: [...treeEdges, ...extraEdges],
     };
-  }, [graph, edges, fullByName, startSet, mobileSet]);
+  }, [graph, edges, fullByName, startSet, mobileSet, stageCountByBase]);
 
   // Undirected adjacency (tree + extra) for hover highlighting.
   const adjacency = useMemo(() => {
@@ -377,12 +398,13 @@ export function BuildTreeDrawer({
           ...n,
           position: focusPos ?? n.position,
           data: {
-            label: display?.name ?? prev.label,
+            label: nodeLabel(display?.name ?? prev.label, prev.stageCount),
             icon: unitIconSrc(display),
             iconSkipped: display?.iconSkipped,
             isBuilder: prev.isBuilder,
             isStart: prev.isStart,
             isMobile: prev.isMobile,
+            stageCount: prev.stageCount,
             hovered: n.id === emphasisId,
           },
           style: {

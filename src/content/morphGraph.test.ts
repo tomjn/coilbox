@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { UnitDatasetEntry } from "./bindings";
-import { groupOf, morphEdgeMap, morphGroups } from "./morphGraph";
+import { buildEdgeMap } from "./buildTree";
+import { foldMorphs, groupOf, morphEdgeMap, morphGroups } from "./morphGraph";
 
 function unit(
   name: string,
@@ -83,5 +84,25 @@ describe("groupOf", () => {
     const map = groupOf(groups);
     expect(map.get("armcom1")).toBe("armcom0");
     expect(map.get("armcom0")).toBe("armcom0");
+  });
+});
+
+describe("foldMorphs", () => {
+  it("counts a commander and its upgrades once", () => {
+    const units = [
+      {
+        name: "armcom",
+        buildOptions: ["armsolar"],
+        morphTargets: [{ into: "armcom1" }],
+      },
+      { name: "armcom1", buildOptions: ["armsolar", "armlab"] },
+      { name: "armsolar" },
+      { name: "armlab" },
+    ];
+    const edges = foldMorphs(units, buildEdgeMap(units));
+    // What the second stage builds is what the commander builds, and the stage
+    // itself is not a node.
+    expect(edges.get("armcom")?.sort()).toEqual(["armlab", "armsolar"]);
+    expect(edges.has("armcom1")).toBe(false);
   });
 });

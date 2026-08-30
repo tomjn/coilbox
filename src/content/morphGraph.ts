@@ -102,3 +102,31 @@ export function groupOf(groups: MorphGroup[]): Map<string, string> {
   }
   return map;
 }
+
+/**
+ * The build edge map with each morph group collapsed onto its base: what any
+ * stage builds is what the unit builds, and no stage is a node of its own.
+ *
+ * This is the whole of "one node in the tree". A level that unlocks a new build
+ * option folds it into the same node rather than starting a second subtree, and
+ * an edge that pointed at a stage is redirected to the stage's base, so nothing
+ * dangles.
+ */
+export function foldMorphs(
+  units: UnitDatasetEntry[],
+  edges: Map<string, string[]>,
+): Map<string, string[]> {
+  const base = groupOf(morphGroups(units));
+  const at = (id: string) => base.get(id) ?? id;
+  const folded = new Map<string, Set<string>>();
+  for (const [from, targets] of edges) {
+    const parent = at(from);
+    if (!folded.has(parent)) folded.set(parent, new Set());
+    for (const to of targets) {
+      const child = at(to);
+      // A stage building its own next stage is the group building itself.
+      if (child !== parent) folded.get(parent)?.add(child);
+    }
+  }
+  return new Map([...folded].map(([k, v]) => [k, [...v].sort()]));
+}
