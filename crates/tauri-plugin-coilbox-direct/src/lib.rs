@@ -325,6 +325,12 @@ async fn direct_port_status(active: State<'_, ActivePorts>) -> Result<CliResult,
 /// lease runs out an hour later. On the routers that refuse a finite lease there
 /// is no expiry to fall back on, which is why the release is worth waiting half
 /// a second for rather than firing and forgetting.
+///
+/// `quitting_with_a_port_open_hands_it_back` drives this through a real
+/// `RunEvent::Exit`. The early return above it has no test of its own and issue
+/// #2136 asked for one: a quit with nothing open spawns nothing, and a version
+/// that spawned regardless would find nothing and finish just as fast, so there
+/// is no difference between the two to assert on.
 fn release_ports_on_exit<R: Runtime>(app: &AppHandle<R>) {
     let Some(state) = app.try_state::<ActivePorts>() else {
         return;

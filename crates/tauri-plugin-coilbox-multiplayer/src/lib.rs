@@ -3554,6 +3554,12 @@ const EXIT_RENEWAL_BUDGET: Duration = Duration::from_millis(500);
 ///
 /// Nothing is spawned on a quit with no relayed battle, which is every quit but
 /// a host's.
+///
+/// `quitting_hands_a_relayed_battle_one_last_credential` drives this through a
+/// real `RunEvent::Exit`. The sentence above has no test of its own and issue
+/// #2136 asked for one: a version that spawned regardless would find nothing to
+/// renew and finish just as fast, so there is no difference between the two to
+/// assert on.
 fn renew_relays_on_exit<R: Runtime>(app: &AppHandle<R>) {
     let Some(registry) = app.try_state::<Registry>() else {
         return;
