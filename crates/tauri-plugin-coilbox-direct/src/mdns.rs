@@ -201,6 +201,11 @@ pub struct Advert {
     fullname: String,
     /// What was last published, so an unchanged room is not re-announced.
     txt: Vec<(String, String)>,
+    /// The addresses last published, for the same reason. The A records are as
+    /// much a part of what a listener sees as the TXT is, and they move on their
+    /// own: a VPN coming up or a DHCP lease landing somewhere else changes these
+    /// and nothing else.
+    addresses: Vec<Ipv4Addr>,
 }
 
 impl Advert {
@@ -221,6 +226,7 @@ impl Advert {
             daemon,
             fullname,
             txt,
+            addresses: addresses.to_vec(),
         })
     }
 
@@ -231,9 +237,17 @@ impl Advert {
     /// every two seconds to every machine on the network for no reason. DNS-SD
     /// expects a record to be sent when it changes and cached in between, so a
     /// player joining or the map changing is what puts one on the wire.
+    ///
+    /// The addresses count as a change as much as the TXT does, because the A
+    /// records are what a joiner dials, and a host whose address moved while the
+    /// room ran is unreachable at the one it started on. The order is the one
+    /// [`crate::discovery::local_addrs`] produces, which is a stable sort over
+    /// the OS's interface list, so the slices are compared as they arrive. The
+    /// same addresses in a different order would cost one republish and nothing
+    /// else.
     pub fn update(&mut self, beacon: &Beacon, addresses: &[Ipv4Addr]) {
         let txt = to_txt(beacon);
-        if txt == self.txt {
+        if txt == self.txt && addresses == self.addresses {
             return;
         }
         let Ok(mut info) = service_info(beacon, addresses, &txt) else {
@@ -244,6 +258,7 @@ impl Advert {
         info.set_requires_probe(false);
         if self.daemon.register(info).is_ok() {
             self.txt = txt;
+            self.addresses = addresses.to_vec();
         }
     }
 }
