@@ -1741,6 +1741,133 @@ async fn a_refused_move_and_a_refused_open_reach_the_host_as_different_things() 
     client.disconnect();
 }
 
+/// A lobby too old to know `MOVERELAYEDHOST`, answering it the way every
+/// uberserver coilbox ships with answered it on 30 August 2026.
+///
+/// The reply is uberserver's own, from `out_SERVERMSG` in
+/// `protocol/Protocol.py`: the command upper-cased, the word failed, the reason
+/// and the arguments it could not place. It is addressed to a person, it names
+/// no battle, and it is neither of the two answers the command has.
+async fn a_lobby_that_does_not_know_the_move() -> SocketAddr {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("a free port");
+    let addr = listener.local_addr().expect("a bound address");
+    tokio::spawn(async move {
+        let Ok((stream, _)) = listener.accept().await else {
+            return;
+        };
+        let mut framed = Framed::new(stream, LinesCodec::new());
+        if framed
+            .send(line::tas_server("0.38", "*", 8452, 0))
+            .await
+            .is_err()
+        {
+            return;
+        }
+        while let Some(Ok(read)) = framed.next().await {
+            let reply = if let Some(args) = read.strip_prefix("MOVERELAYEDHOST ") {
+                format!("SERVERMSG MOVERELAYEDHOST failed. Unknown command. (args='{args}')")
+            } else {
+                match parse_client_line(&read) {
+                    ClientCommand::ListCompFlags => line::comp_flags(&["u", "sp", "r"]),
+                    ClientCommand::Login { username, .. } => {
+                        if framed.send(line::accepted(&username)).await.is_err() {
+                            return;
+                        }
+                        line::login_info_end()
+                    }
+                    _ => continue,
+                }
+            };
+            if framed.send(reply).await.is_err() {
+                return;
+            }
+        }
+    });
+    addr
+}
+
+/// The relay a battle is being hosted through, holding an allocation at
+/// `relayed`. Hand-built because these tests have no sidecar: what is under test
+/// is the connection loop, and the agent is only here because a `RelayHost`
+/// cannot exist without one.
+fn a_relay_at(relayed: SocketAddr) -> crate::relay_host::RelayHost {
+    struct Nothing;
+    impl std::io::Read for Nothing {
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            Ok(0)
+        }
+    }
+    crate::relay_host::RelayHost {
+        engine_port: 8452,
+        relayed,
+        agent: Arc::new(crate::relay_agent::RelayAgent::driving(
+            Nothing,
+            Vec::new(),
+            |_| {},
+        )),
+        moves: crate::relay_host::MoveWatch::default(),
+        credential: crate::relay_host::CredentialWatch::default(),
+    }
+}
+
+/// Issue #2103, through the real connection loop and from the sidecar's event
+/// to the host's screen.
+///
+/// A relay host loses their allocation, the sidecar rebuilds it somewhere else,
+/// and the lobby is asked to move the battle. This lobby has never heard of the
+/// command, so it says so in a `SERVERMSG` and the battle stays advertised at an
+/// address that has gone.
+///
+/// The wait is armed with the real [`MOVE_ANSWER_PATIENCE`] and the assertion is
+/// given [`PATIENCE`], which is a quarter of it. So a warning that arrives here
+/// arrived because the lobby named the command, not because a timer ran out: the
+/// timer still has fifteen seconds to go.
+#[tokio::test]
+async fn a_lobby_that_names_the_command_warns_the_host_without_waiting_it_out() {
+    use crate::relay_host::MOVE_ANSWER_PATIENCE;
+
+    assert!(
+        MOVE_ANSWER_PATIENCE > PATIENCE,
+        "this test only means anything while the budget outlasts what it waits"
+    );
+
+    let registry = Registry::default();
+    let client = Client::connect(
+        &registry,
+        a_lobby_that_does_not_know_the_move().await,
+        "alice",
+    )
+    .await;
+    client.wait_for_ready().await;
+    crate::remember_relay(
+        &registry,
+        &client.key,
+        a_relay_at("198.51.100.9:30001".parse().expect("an address")),
+    );
+
+    // What the sidecar says when a lost allocation comes back somewhere else,
+    // down the listener `allocate` wires it to.
+    let (saw, heard) = std::sync::mpsc::channel();
+    let listener = crate::relay_host::listening(&registry, &client.key, saw, MOVE_ANSWER_PATIENCE);
+    listener(coilbox_relay_protocol::Event::RelayOpen {
+        addr: "198.51.100.9:30002".parse().expect("an address"),
+    });
+
+    wait_until(
+        || {
+            client.events.lock().unwrap().iter().any(|e| {
+                let event: serde_json::Value = serde_json::from_str(e).unwrap_or_default();
+                event["delta"]["kind"] == "relayedHostMoveUnanswered"
+            })
+        },
+        "the host to be told their battle cannot be reached",
+    )
+    .await;
+
+    drop(heard);
+    client.disconnect();
+}
+
 /// A lobby with somebody else's relayed battle in its list, which moves the
 /// moment the client has finished logging in.
 async fn a_lobby_whose_relayed_battle_moves(from: (&str, u16), to: (&str, u16)) -> SocketAddr {
