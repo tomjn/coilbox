@@ -38,6 +38,10 @@ import {
   sameStatus,
 } from "./awayStatus";
 import {
+  forgetBattleMovedUnless,
+  recordBattleMoved,
+} from "./battle/battleMoved";
+import {
   type ChatMsg,
   type Delta,
   type LobbyEvent,
@@ -1153,6 +1157,15 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             level: "error",
           });
         }
+        // A battle changed address without closing. The reducer has already
+        // pointed us at the new one, so nothing here has to be repaired, and
+        // until issue #2073 that was the whole of it: everybody in the room was
+        // silently moved and never told. Recorded rather than notified, because
+        // it is a fact that keeps rather than a question waiting on an answer,
+        // and the panel that reads it decides who it is worth saying to.
+        else if (d.kind === "battleHostMoved") {
+          recordBattleMoved(d.id);
+        }
         // The relay came back at a new address, the lobby was asked to move the
         // battle to it, and the lobby either said no or said nothing. The battle
         // is open, quite possibly with a game in it, and the address everybody
@@ -1530,6 +1543,17 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
       scriptPassword: target.scriptPassword ?? newScriptPassword(),
     }).catch((e) => console.warn("multiplayer: auto-rejoin battle failed", e));
   }, [activeKey, mirror.phase, mirror.state]);
+
+  // Drop a move that is about a battle this client has left. Somebody who leaves
+  // and rejoins the same battle is handed its address afresh and was never
+  // holding a dead one, so the strip would be telling them about a move they
+  // were not in. Driven from the battle we are in rather than from leaving,
+  // because being kicked and the host closing the battle arrive as state rather
+  // than as an action (issue #2073).
+  const inBattle = mirror.state?.currentBattle ?? null;
+  useEffect(() => {
+    forgetBattleMovedUnless(inBattle);
+  }, [inBattle]);
 
   // Register a new account: open a throwaway connection that sends REGISTER, then
   // resolve on the `registered` phase / reject on `disconnected` (denial). The
