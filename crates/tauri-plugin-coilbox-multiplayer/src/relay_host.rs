@@ -1216,7 +1216,7 @@ pub fn refused_address(note: &RefusedRelayAddress) -> Option<String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     //! Driven through [`waiting_on`] with a scripted agent rather than a real
     //! sidecar, so what is under test is the decision and not the process.
     //! `tests/relayed_battle.rs` runs the same decision against a real coturn.
@@ -1258,14 +1258,14 @@ mod tests {
     /// Everything coilbox wrote to the agent's stdin, and a way to have the
     /// channel stop taking it.
     #[derive(Clone, Default)]
-    struct Written {
+    pub(crate) struct Written {
         sent: Arc<Mutex<Vec<u8>>>,
         /// Set by [`Written::breaks`], which is a sidecar that has exited.
         broken: Arc<std::sync::atomic::AtomicBool>,
     }
 
     impl Written {
-        fn sent(&self) -> String {
+        pub(crate) fn sent(&self) -> String {
             String::from_utf8(self.sent.lock().unwrap().clone()).expect("the channel is UTF-8")
         }
 
@@ -1813,11 +1813,11 @@ mod tests {
 
     /// A lobby connection with a relayed battle already hosting through it,
     /// which is the state every renewal test starts in.
-    struct Renewing {
-        registry: Registry,
+    pub(crate) struct Renewing {
+        pub(crate) registry: Registry,
         /// The sidecar's end of the control channel, so a test can read what
         /// coilbox sent it.
-        written: Written,
+        pub(crate) written: Written,
         /// The agent behind that channel, taken back out of the relay slot.
         agent: Arc<RelayAgent>,
         answers: tokio::sync::watch::Sender<TurnAnswer>,
@@ -1830,7 +1830,7 @@ mod tests {
         _sent: tokio::sync::mpsc::UnboundedReceiver<crate::conn::Outbound>,
     }
 
-    fn hosting_and_renewing() -> Renewing {
+    pub(crate) fn hosting_and_renewing() -> Renewing {
         let seen: Arc<Mutex<Vec<String>>> = Arc::default();
         let recorder = seen.clone();
         let sink = Arc::new(Mutex::new(tauri::ipc::Channel::new(move |body| {
@@ -1870,11 +1870,45 @@ mod tests {
     impl Renewing {
         /// Have the lobby answer the next `TURNCREDENTIALS` with a credential
         /// good for `ttl_seconds` from `at`.
-        fn lobby_mints(&self, ttl_seconds: u64, at: u64) {
+        pub(crate) fn lobby_mints(&self, ttl_seconds: u64, at: u64) {
             let state = self.state.clone();
             let answers = self.answers.clone();
             tokio::spawn(async move {
                 let _ = answers.send(TurnAnswer::Granted(minted(&state, ttl_seconds, at)));
+            });
+        }
+
+        /// When the credential the sidecar is holding runs out. Until this is
+        /// set there is no expiry to compare a fresh one against, and
+        /// [`still_ours`] answers `None` rather than something to renew.
+        pub(crate) fn credential_runs_out_at(&self, at: u64) {
+            credential_now_expires_at(&self.registry, KEY, at);
+        }
+
+        /// The same lobby, answering only once it has actually been asked.
+        ///
+        /// [`Self::lobby_mints`] puts the answer in the slot straight away and
+        /// relies on the ask already waiting, which holds on a current thread
+        /// runtime because the spawn does not run until the first await. It does
+        /// not hold when the ask is on a runtime of its own, and
+        /// [`crate::turn::ask_the_lobby`] marks whatever is in the slot as seen
+        /// before it writes the command, so an early answer is missed rather
+        /// than taken.
+        ///
+        /// Takes the lobby's end of the outbound queue, so the connection stays
+        /// open for as long as this is listening on it.
+        pub(crate) fn lobby_answers_when_asked(&mut self, ttl_seconds: u64, at: u64) {
+            let (_dead, spare) = tokio::sync::mpsc::unbounded_channel();
+            let mut asked = std::mem::replace(&mut self._sent, spare);
+            let state = self.state.clone();
+            let answers = self.answers.clone();
+            tokio::spawn(async move {
+                while let Some(out) = asked.recv().await {
+                    if matches!(&out, crate::conn::Outbound::Line(line) if line == "TURNCREDENTIALS")
+                    {
+                        let _ = answers.send(TurnAnswer::Granted(minted(&state, ttl_seconds, at)));
+                    }
+                }
             });
         }
 
