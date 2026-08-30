@@ -232,9 +232,13 @@ pub fn open_battle(
     modname: &str,
 ) -> String {
     format!(
-        "OPENBATTLE {battle_type} {nat_type} {key} {port} {max_players} {modhash} {rank} {maphash} {engine}\t{version}\t{map}\t{title}\t{modname}"
+        "{OPEN_BATTLE} {battle_type} {nat_type} {key} {port} {max_players} {modhash} {rank} {maphash} {engine}\t{version}\t{map}\t{title}\t{modname}"
     )
 }
+
+/// The first word of [`open_battle`], for a caller that has to recognise the
+/// command in something the server sends back rather than build the line.
+pub const OPEN_BATTLE: &str = "OPENBATTLE";
 
 /// `RELAYEDHOST <ip> <port>`, telling the lobby that the battle this client is
 /// about to open is reachable at the relay rather than at this machine.
@@ -874,10 +878,10 @@ mod tests {
         assert!(!moving.starts_with("RELAYEDHOST "));
     }
 
-    /// The three relay commands that are named as well as built, because
-    /// something has to recognise them in what the server sends back. A name
-    /// that stopped being the line's first word would leave that reader looking
-    /// for a command nobody sends, and looking for it silently.
+    /// The commands that are named as well as built, because something has to
+    /// recognise them in what the server sends back. A name that stopped being
+    /// the line's first word would leave that reader looking for a command
+    /// nobody sends, and looking for it silently.
     #[test]
     fn a_relay_command_is_named_by_the_word_it_is_sent_as() {
         let ip = "198.51.100.9".parse().expect("an address");
@@ -885,6 +889,12 @@ mod tests {
             (TURN_CREDENTIALS, turn_credentials()),
             (RELAYED_HOST, relayed_host(ip, 30001)),
             (MOVE_RELAYED_HOST, move_relayed_host(ip, 30002)),
+            (
+                OPEN_BATTLE,
+                open_battle(
+                    0, 0, "*", 8452, 16, -1, 0, -1, "spring", "105", "Map", "T", "BAR",
+                ),
+            ),
         ] {
             assert_eq!(sent.split(' ').next(), Some(named), "for {sent}");
         }
