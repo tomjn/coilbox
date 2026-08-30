@@ -8,6 +8,12 @@
 //! internet side, and if that side is itself behind the ISP's NAT then the
 //! mapping is real and useless.
 //!
+//! Neither half is a connection from outside, so neither settles whether
+//! anybody can actually get in. That is issue #2119, and every route to a real
+//! inbound connection was measured and ruled out in
+//! `docs/superpowers/specs/2026-08-30-reachability-probe-design.md`. Read it
+//! before reaching for a new signal to add here.
+//!
 //! # What is kept while a room runs
 //!
 //! One [`Ports`] at a time, holding the live mappings and a task that renews
