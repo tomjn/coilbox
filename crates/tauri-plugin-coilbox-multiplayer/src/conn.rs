@@ -587,6 +587,15 @@ async fn run_loop(
                         if let Delta::RelayedHostRefused { reason } = &delta {
                             crate::relay_host::note_refused_address(&relay_refused, reason);
                         }
+                        // Or it would not run the line at all and says so in its
+                        // own words, which is the same battle at the same
+                        // unreachable address and so goes in the same place
+                        // (issue #2141). Without this the `OPENBATTLE` behind it
+                        // is acknowledged, nothing contradicts it, and the host
+                        // is told their battle is relayed when it is not.
+                        if let Some(reason) = crate::relay_host::advertise_rejected_in(&delta) {
+                            crate::relay_host::note_refused_address(&relay_refused, reason);
+                        }
                         // And the lobby has said something about a battle of
                         // ours moving, which is the only proof there is that it
                         // read the `MOVERELAYEDHOST` behind it. Whichever way it

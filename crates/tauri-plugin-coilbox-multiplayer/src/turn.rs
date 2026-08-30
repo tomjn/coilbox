@@ -43,6 +43,11 @@ pub enum TurnAnswer {
     Granted(TurnCredentials),
     /// The lobby said no, in its own words.
     Refused(String),
+    /// The lobby did not run the command, in its own words. Kept apart from
+    /// [`Self::Refused`] because a server that answered `TURNCREDENTIALSFAILED`
+    /// has relay hosting and turned this ask down, and one that says the
+    /// command failed has not run it at all.
+    NotRun(String),
 }
 
 /// A connection's slot for [`TurnAnswer`], watched rather than locked so a
@@ -110,6 +115,14 @@ pub enum NoCredential {
     Closed,
     /// The lobby refused, in its own words.
     Refused(String),
+    /// The lobby did not run the command, in its own words.
+    ///
+    /// The reason is carried because unlike a refused move there is something
+    /// worth quoting. `Insufficient rights.` is a fresh or knocked-down account
+    /// and the person reading it can go and verify theirs. `Unknown command.`
+    /// is a server that advertised a relay it has not finished building, which
+    /// is not their problem but is worth knowing it is not their fault.
+    NotRun(String),
     /// The server has no relay, so there is nothing to ask it for. Far and away
     /// the likeliest answer today, because the flag that says otherwise is
     /// ScarylePoo/uberserver#26 and no server names it yet.
@@ -139,6 +152,10 @@ impl std::fmt::Display for NoCredential {
                 "this server has no relay, so there is no credential for one to ask it for"
             ),
             NoCredential::Refused(why) => write!(f, "the lobby would not hand out a relay credential: {why}"),
+            NoCredential::NotRun(why) => write!(
+                f,
+                "the lobby did not run the command that asks for a relay credential: {why}"
+            ),
             NoCredential::Silent(waited) => write!(
                 f,
                 "the lobby did not answer within {} seconds, so it probably does not hand out relay credentials at all",
@@ -296,6 +313,7 @@ async fn ask_the_lobby(
         None => Err(NoCredential::Closed),
         Some(TurnAnswer::Granted(minted)) => Ok(minted),
         Some(TurnAnswer::Refused(why)) => Err(NoCredential::Refused(why)),
+        Some(TurnAnswer::NotRun(why)) => Err(NoCredential::NotRun(why)),
         // The slot only ever changes to an answer, so this is unreachable in
         // practice. Treating it as no answer beats waiting again.
         Some(TurnAnswer::Unasked) => Err(NoCredential::Silent(patience)),
@@ -315,7 +333,19 @@ pub(crate) fn answer_in(delta: &Delta, state: &Mutex<LobbyState>) -> Option<Turn
             lock_or_recover(state).turn_credentials.clone()?,
         )),
         Delta::TurnCredentialsRefused { reason } => Some(TurnAnswer::Refused(reason.clone())),
-        _ => None,
+        // Neither of the command's two answers, and an uberserver that has not
+        // run it says so in its own words rather than staying silent. Without
+        // this the ask waits out its whole budget for something that arrived in
+        // milliseconds, with somebody standing at the hosting form for the
+        // whole of it (issue #2141).
+        //
+        // The window that makes this safe is the slot's own. `ask_the_lobby`
+        // marks the slot seen before it writes the command and then waits for a
+        // change, so a rejection arriving when nobody asked is written into a
+        // slot nothing reads and thrown away by the next asker. Nothing else
+        // writes this slot, so there is no answer for a rejection to overwrite.
+        _ => crate::uberserver::rejection_of(delta, command::TURN_CREDENTIALS)
+            .map(|why| TurnAnswer::NotRun(why.to_string())),
     }
 }
 
@@ -1073,6 +1103,71 @@ pub(crate) mod tests {
             refused.to_string().contains("you asked too often"),
             "got: {refused}"
         );
+    }
+
+    /// Issue #2141, over a real socket and through the real connection task.
+    ///
+    /// An uberserver that will not run the command does not stay silent, so the
+    /// person standing at the hosting form does not have to be kept there. The
+    /// budget handed in is the one a host really waits,
+    /// [`crate::conn::READY_TIMEOUT`], and the assertion is given [`PATIENCE`],
+    /// which is a quarter of it. An answer that arrives here arrived because
+    /// the lobby said something, not because a timer ran out.
+    ///
+    /// `Insufficient rights.` rather than `Unknown command.` because it is the
+    /// one worth quoting: the account is fresh, unverified or knocked down a
+    /// level, and the person reading it can go and fix that.
+    #[tokio::test]
+    async fn a_lobby_that_will_not_run_the_command_says_so_rather_than_being_waited_out() {
+        assert!(
+            crate::conn::READY_TIMEOUT > PATIENCE,
+            "this test only means anything while the budget outlasts what it waits"
+        );
+
+        let addr = lobby_answering(Some(
+            "SERVERMSG TURNCREDENTIALS failed. Insufficient rights.".to_string(),
+        ))
+        .await;
+        let registry = Registry::default();
+        let (key, _logs) = logged_in(&registry, addr).await;
+
+        let refused = tokio::time::timeout(
+            PATIENCE,
+            credentials(&registry, &key, NOW, crate::conn::READY_TIMEOUT),
+        )
+        .await
+        .expect("the ask ended long before the budget did")
+        .expect_err("the lobby did not run the command");
+
+        assert!(matches!(refused, NoCredential::NotRun(_)), "got: {refused}");
+        let said = refused.to_string();
+        assert!(said.contains("did not run the command"), "got: {said}");
+        assert!(
+            said.contains("Insufficient rights."),
+            "the lobby's reason is the only thing here somebody can act on, got: {said}"
+        );
+    }
+
+    /// The window, which is the whole of why reading a server's own words is
+    /// safe. A rejection that arrives when nobody has asked goes into a slot
+    /// nothing is reading, and the next ask marks the slot seen before it writes
+    /// the command, so it cannot be handed that stale line as its answer.
+    #[tokio::test]
+    async fn a_rejection_that_arrived_before_anybody_asked_is_not_the_next_asks_answer() {
+        let w = wired(ConnProtocol::TasServer);
+        w.answers
+            .send(TurnAnswer::NotRun("Insufficient rights.".to_string()))
+            .expect("the slot is open");
+
+        let state = w.state.clone();
+        let answers = w.answers.clone();
+        tokio::spawn(async move {
+            let _ = answers.send(TurnAnswer::Granted(minted(&state, 86_400, NOW)));
+        });
+
+        credentials(&w.registry, "alice@bar:8200", NOW, PATIENCE)
+            .await
+            .expect("the lobby answered this ask with a credential");
     }
 
     /// Every real server today. Nothing answers, and the ask has to end in a
