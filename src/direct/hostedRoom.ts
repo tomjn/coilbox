@@ -13,8 +13,9 @@ import { ROOM_POLL_MS } from "./room";
  * polled once.
  *
  * Polled rather than subscribed to because the direct plugin emits no events.
- * The timer runs only while there is a room to describe: with none, this is a
- * module holding a null and no clock at all.
+ * The timer runs while there is a room to describe, and while the last reading
+ * failed and this module cannot say whether there is one. Once a reading lands
+ * saying there is no room, this is a module holding a null and no clock at all.
  *
  * A module singleton rather than a context, so the notification watcher and the
  * two pages read the same thing without every consumer having to sit under one
@@ -47,15 +48,20 @@ let movedFrom: string | null = null;
  */
 let generation = 0;
 
+/** Keep asking, on the cadence everything else here runs on. Does nothing when
+ *  the clock is already running, so it is safe to call on every reading. */
+function startClock(): void {
+  if (timer) return;
+  timer = setInterval(() => {
+    void readHostedRoom();
+  }, ROOM_POLL_MS);
+}
+
 function publish(next: DirectRoomStatus | null): void {
   if (!next) movedFrom = null;
   else if (room && room.ip !== next.ip) movedFrom = room.ip;
   room = next;
-  if (room && !timer) {
-    timer = setInterval(() => {
-      void readHostedRoom();
-    }, ROOM_POLL_MS);
-  }
+  if (room) startClock();
   if (!room && timer) {
     clearInterval(timer);
     timer = null;
@@ -76,7 +82,13 @@ export async function readHostedRoom(): Promise<DirectRoomStatus | null> {
     if (asked === generation) publish(latest);
   } catch {
     // A room that cannot be read is not a room that has gone. Leave the last
-    // reading standing and let the next tick settle it.
+    // reading standing, and make sure there is a next tick to settle it: the
+    // first reading of all is made once from a mount effect, so a failure there
+    // used to leave a host running a room described nowhere for the rest of the
+    // session, with nothing on screen to suggest restarting was the cure
+    // (issue #2124). A reading a deliberate write has overtaken is not ours to
+    // start a clock for, the same as one that succeeds.
+    if (asked === generation) startClock();
   }
   return room;
 }

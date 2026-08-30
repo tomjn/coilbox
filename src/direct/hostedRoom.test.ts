@@ -99,4 +99,56 @@ describe("the shared reading of a hosted room", () => {
     status.mockRejectedValue(new Error("the window is closing"));
     expect((await readHostedRoom())?.pending).toEqual(["bob"]);
   });
+
+  // The failure this module was built with (issue #2124). The first reading of
+  // all is asked for once, from a mount effect, and it is the reading that
+  // starts the clock. So a first reading that failed had nothing coming after it
+  // to try again, and a host running a room went undescribed everywhere for the
+  // rest of the session.
+  it("asks again when the first reading fails", async () => {
+    const { readHostedRoom, subscribeHostedRoom } = await load();
+    const seen: (DirectRoomStatus | null)[] = [];
+    subscribeHostedRoom((room) => seen.push(room));
+    status.mockRejectedValue(new Error("the plugin is not ready"));
+
+    await readHostedRoom();
+    status.mockResolvedValue({ room: running() });
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(seen.at(-1)?.host).toBe("alice");
+  });
+
+  // Asking again is the fix, asking forever is not. A client that is simply not
+  // hosting must end up back where it started, with no clock.
+  it("stops asking once a reading says there is no room", async () => {
+    const { readHostedRoom } = await load();
+    status.mockRejectedValue(new Error("the plugin is not ready"));
+    await readHostedRoom();
+
+    status.mockResolvedValue({ room: null });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(status).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(status).toHaveBeenCalledTimes(2);
+  });
+
+  // A stop is deliberate, and a failed reading it overtook says nothing about
+  // the room. Retrying it would put a clock back on a room the host has ended.
+  it("does not ask again after a failure a deliberate stop has overtaken", async () => {
+    const { readHostedRoom, setHostedRoom } = await load();
+    let refuse: (reason: Error) => void = () => {};
+    status.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        refuse = reject;
+      }),
+    );
+
+    const inFlight = readHostedRoom();
+    setHostedRoom(null);
+    refuse(new Error("the window is closing"));
+    await inFlight;
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(status).toHaveBeenCalledTimes(1);
+  });
 });
