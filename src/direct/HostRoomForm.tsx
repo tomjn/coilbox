@@ -33,7 +33,11 @@ import {
   recordHostingRoute,
 } from "./hostingRoute";
 import { ReachablePorts } from "./ReachablePorts";
-import { type DirectReachability, roomPorts } from "./reachability";
+import {
+  type DirectReachability,
+  ownPublicAddress,
+  roomPorts,
+} from "./reachability";
 import {
   DEFAULT_ROOM_PORT,
   playerNameProblem,
@@ -54,6 +58,11 @@ export interface StartRoomArgs {
   advertise: boolean;
   /** Hold every join until the host answers it. */
   approveJoins: boolean;
+  /** The address the internet sees this machine at, when the machine holds it
+   *  itself, so the room can announce something somebody outside can dial. Null
+   *  when nothing was measured, which is every host who left the reachability
+   *  box unticked. */
+  publicAddress: string | null;
   /** The battle to open once the host's client has connected. */
   battle: OpenBattleArgs;
 }
@@ -138,6 +147,10 @@ export function HostRoomForm({
         port: Number(port),
         advertise,
         approveJoins,
+        // The panel above already measured this and already tells this host
+        // they are directly reachable. Handing it to the room is what makes
+        // that true of the game as well as the room (issue #2130).
+        publicAddress: ownPublicAddress(reachability),
         battle: {
           battleType: 0,
           natType: NAT_TYPE_DIRECT,

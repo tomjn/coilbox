@@ -340,6 +340,7 @@ function BattlesPage() {
         port: args.port,
         advertise: args.advertise,
         approveJoins: args.approveJoins,
+        publicAddress: args.publicAddress,
       }));
     } catch (e) {
       setRoomBusy(false);

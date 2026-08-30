@@ -164,6 +164,32 @@ export function isOnPublicAddress(report: DirectReachability): boolean {
 }
 
 /**
+ * The address the internet sees this machine at, when the machine holds it
+ * itself, and null in every other case. Pure.
+ *
+ * This is what a room needs in order to announce an address somebody outside can
+ * dial. It works its own address out from the list the machine holds and prefers
+ * a private one, which is right on a LAN and picks Docker's bridge on a VPS, so
+ * a host who is directly reachable handed every joiner 172.17.0.1 (issue #2130).
+ *
+ * Null when the host never ticked "Reachable over the internet", when no STUN
+ * server answered, and when there is a router in front. In all three there is
+ * nothing measured to send and the room goes on working the address out for
+ * itself.
+ *
+ * A measurement rather than an instruction, which is why the room takes it in a
+ * field of its own rather than in the address the host may type. The room checks
+ * it against the machine on every tick and drops it once the machine stops
+ * holding it, so this being a few minutes old is safe.
+ */
+export function ownPublicAddress(
+  report: DirectReachability | null,
+): string | null {
+  if (!report || !isOnPublicAddress(report)) return null;
+  return report.publicAddress;
+}
+
+/**
  * The address to send a friend, or null when there is nothing honest to send.
  * Pure.
  *

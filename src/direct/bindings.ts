@@ -46,6 +46,11 @@ export const directStartRoom = defineCommand<
      *  moves the battle with it. Loopback only if the machine is on no network.
      *  An address given here is the host's and never changes under them. */
     ip?: string | null;
+    /** The address the internet sees this machine at, when the machine holds it
+     *  itself. Not an address to obey: the room announces it while the machine
+     *  still has it and goes back to working one out when it does not, which is
+     *  what keeps it apart from {@link ip}. See `ownPublicAddress`. */
+    publicAddress?: string | null;
     /** Defaults to 8200 on the Rust side. */
     port?: number | null;
     approveJoins?: boolean | null;
