@@ -286,6 +286,25 @@ describe("factionKeys", () => {
 
     expect([...new Set(keys.values())].sort()).toEqual(["armada", "cortex"]);
   });
+
+  // A morph stage is reached by morphing, not by building (issue #2063), so
+  // the forest's faction walk crosses morph edges too. Before that, a stage
+  // nothing built had no faction at all. Now it gets its base's, never a
+  // different one.
+  it("gives a stage nothing builds its base's faction key rather than none", () => {
+    const withUpgrade = [
+      unit("armcom", ["armlab", "armsolar"], undefined, undefined, ["armcom1"]),
+      unit("armlab", ["armflash"]),
+      unit("armsolar"),
+      unit("armflash"),
+      unit("armcom1"),
+      unit("corcom", ["corlab"]),
+      unit("corlab", ["corraid"]),
+      unit("corraid"),
+    ];
+
+    expect(factionKeys(withUpgrade, sides).get("armcom1")).toBe("armada");
+  });
 });
 
 describe("gameFactions", () => {

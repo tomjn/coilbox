@@ -501,19 +501,27 @@ function UnitList({
   // need to offer the stage itself. A stage stands on its own row when its
   // base isn't among these ids either, so a caller's filtered subset never
   // loses a unit it did offer.
-  const { rowIds, upgradeCount } = useMemo(() => {
+  const { rowIds, upgradeCount, stagesOf } = useMemo(() => {
     if (mode === "single")
-      return { rowIds: ids, upgradeCount: new Map<string, number>() };
+      return {
+        rowIds: ids,
+        upgradeCount: new Map<string, number>(),
+        stagesOf: new Map<string, string[]>(),
+      };
     const idSet = new Set(ids.map((raw) => raw.toLowerCase()));
     const upgradeCount = new Map<string, number>();
+    // A folded stage is still what someone pastes out of a mission file or a
+    // replay, so its own def key has to keep finding the base's row.
+    const stagesOf = new Map<string, string[]>();
     const rowIds = ids.filter((raw) => {
       const id = raw.toLowerCase();
       const base = forest.morphBase.get(id) ?? id;
       if (base === id || !idSet.has(base)) return true;
       upgradeCount.set(base, (upgradeCount.get(base) ?? 0) + 1);
+      stagesOf.set(base, [...(stagesOf.get(base) ?? []), id]);
       return false;
     });
-    return { rowIds, upgradeCount };
+    return { rowIds, upgradeCount, stagesOf };
   }, [ids, forest, mode]);
 
   const label = (id: string) => {
@@ -531,10 +539,13 @@ function UnitList({
       factions.find((f) => f.startUnit.toLowerCase() === root)?.name ??
       name(root);
     const match = q
-      ? (id: string) => id.includes(q) || name(id).toLowerCase().includes(q)
+      ? (id: string) =>
+          id.includes(q) ||
+          name(id).toLowerCase().includes(q) ||
+          (stagesOf.get(id) ?? []).some((stage) => stage.includes(q))
       : undefined;
     return factionGroups(forest, rowIds, name, heading, match);
-  }, [forest, rowIds, labels, factions, query]);
+  }, [forest, rowIds, stagesOf, labels, factions, query]);
 
   const total = groups.reduce((n, g) => n + g.units.length, 0);
   const capped = total > SEARCH_CAP;

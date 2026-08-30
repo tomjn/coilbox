@@ -73,8 +73,10 @@ describe("BuildTreeDrawer's morph fold", () => {
     expect(html).not.toContain("armcom1");
     expect(html).toContain('data-node-id="armlab"');
     expect(html).toContain('data-node-id="armsolar"');
-    // The folded node is labelled with its stage count.
-    expect(html).toContain("armcom (2 stages)");
+    // The folded node is labelled with its upgrade count, excluding the base
+    // (armcom -> armcom1 is one stage beyond armcom), matching the unit
+    // picker's "Commander, 2 upgrades" wording.
+    expect(html).toContain("armcom (1 upgrade)");
   });
 
   it("still draws the tree when the side's start unit is a non-base stage", () => {

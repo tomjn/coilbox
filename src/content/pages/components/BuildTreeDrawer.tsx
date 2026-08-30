@@ -44,17 +44,23 @@ interface UnitNodeData extends Record<string, unknown> {
   isStart?: boolean;
   /** Mobile (can move) vs a static building — only distinguishes non-builders. */
   isMobile?: boolean;
-  /** How many morph stages (including this one) this node folds together, so
-   * the label can say so. Unset or 1 for a unit with no morph group (#2063). */
+  /** How many morph stages beyond this one its group folds together, so the
+   * label can say so. Unset or 0 for a unit with no morph group, or the base
+   * of one with nothing beyond it. Matches the unit picker's upgrade count,
+   * which also excludes the base (#2063). */
   stageCount?: number;
   /** True for the currently-hovered node; reveals its connection handles. */
   hovered?: boolean;
 }
 
-/** A node's label, with its morph stage count appended for a folded node, e.g.
- * "Commander (3 stages)" (#2063). */
+/** A node's label, with how many stages beyond it its morph group folds
+ * together appended, e.g. "Commander (2 upgrades)" (#2063). The count excludes
+ * the base, matching the unit picker's "Commander, 2 upgrades" wording, so the
+ * two halves of the picture agree on what the number means. */
 function nodeLabel(name: string, stageCount?: number): string {
-  return stageCount && stageCount > 1 ? `${name} (${stageCount} stages)` : name;
+  return stageCount && stageCount > 0
+    ? `${name} (${stageCount} upgrade${stageCount === 1 ? "" : "s"})`
+    : name;
 }
 
 /** A build-tree node: build-pic (square, fills the node) above the unit name.
@@ -244,10 +250,11 @@ export function BuildTreeDrawer({
   }, [units]);
   // Computed once and shared below, rather than walking the morph graph twice.
   const morphGroupList = useMemo(() => morphGroups(units), [units]);
-  // Base id -> how many stages its morph group folds together, for the label.
+  // Base id -> how many stages beyond it its morph group folds together, for
+  // the label. Excludes the base itself, matching the unit picker's count.
   const stageCountByBase = useMemo(() => {
     const m = new Map<string, number>();
-    for (const g of morphGroupList) m.set(g.base, g.stages.length);
+    for (const g of morphGroupList) m.set(g.base, g.stages.length - 1);
     return m;
   }, [morphGroupList]);
   // Every stage id -> its group's base. A side's engine-reported start unit
