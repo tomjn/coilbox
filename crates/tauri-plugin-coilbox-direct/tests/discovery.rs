@@ -223,7 +223,7 @@ async fn a_room_with_a_battle_in_it_announces_what_it_holds() {
     let listening = Discovery::start().expect("the beacon port binds");
     let room = Room::start(RoomOptions {
         host: "alice".to_string(),
-        ip: "127.0.0.1".to_string(),
+        ip: Some("127.0.0.1".to_string()),
         port: 0,
         approve_joins: false,
         advertise: true,
@@ -302,7 +302,7 @@ async fn a_room_announced_both_ways_is_heard_both_ways_and_listed_once() {
     let listening = Discovery::start().expect("the beacon port binds");
     let room = Room::start(RoomOptions {
         host: "alice".to_string(),
-        ip: "127.0.0.1".to_string(),
+        ip: Some("127.0.0.1".to_string()),
         port: 0,
         approve_joins: false,
         advertise: true,
@@ -469,7 +469,7 @@ async fn a_room_with_no_battle_in_it_is_not_announced() {
     let listening = Discovery::start().expect("the beacon port binds");
     let room = Room::start(RoomOptions {
         host: "alice".to_string(),
-        ip: "127.0.0.1".to_string(),
+        ip: Some("127.0.0.1".to_string()),
         // The OS picks the lobby port, so this never fights a room the developer
         // is hosting. The beacon port is fixed and shared, which is the point.
         port: 0,

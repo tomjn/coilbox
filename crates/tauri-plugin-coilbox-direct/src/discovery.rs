@@ -239,25 +239,21 @@ pub fn local_addrs() -> Vec<Ipv4Addr> {
     local_nets().into_iter().map(|net| net.addr).collect()
 }
 
-/// The address to tell a joining engine to connect to, or `None` when this
-/// machine is on no network at all.
+/// The address to tell a joining engine to connect to, out of the addresses a
+/// machine holds, or `None` when it is on no network at all. Pure.
 ///
 /// A private address first, because this is LAN hosting and a VPN's address is
 /// no use to somebody in the same room. Announcing 127.0.0.1, which is what a
 /// room did before it could announce anything, is a room only its own host can
 /// reach.
-pub fn lan_address() -> Option<String> {
-    lan_address_of(&local_addrs())
-}
-
-/// [`lan_address`], given the addresses rather than reading them off the
-/// machine. Pure.
 ///
-/// Split out so the choice can be tested on a machine that does not have the
-/// addresses in question, and so [`crate::reachability`] can read this and the
-/// whole list from one enumeration. A host on a public address with a Docker
-/// bridge beside it gets the bridge from here, which is right for announcing a
-/// room and wrong for anything comparing an address against STUN (issue #2111).
+/// The addresses are passed in rather than read here so the choice can be tested
+/// on a machine that does not have the addresses in question, so
+/// [`crate::reachability`] can read this and the whole list from one
+/// enumeration, and so a running room can re-read it (issue #2116). A host on a
+/// public address with a Docker bridge beside it gets the bridge from here,
+/// which is right for announcing a room and wrong for anything comparing an
+/// address against STUN (issue #2111).
 pub(crate) fn lan_address_of(addrs: &[Ipv4Addr]) -> Option<String> {
     let routable = || addrs.iter().find(|a| !a.is_loopback());
     addrs
@@ -509,7 +505,7 @@ mod tests {
     /// exists.
     #[test]
     fn the_announced_address_is_never_loopback() {
-        if let Some(address) = lan_address() {
+        if let Some(address) = lan_address_of(&local_addrs()) {
             assert_ne!(address, "127.0.0.1");
         }
     }
@@ -542,8 +538,9 @@ mod tests {
             Some("192.168.1.45")
         );
         // Nothing but loopback is no answer at all rather than an answer only
-        // this machine can use. `direct_start_room` holds the 127.0.0.1
-        // fallback, so the choice is not made twice.
+        // this machine can use. `Room::listen` holds the 127.0.0.1 fallback, so
+        // the choice is not made twice, and a room already running keeps the
+        // address it had rather than moving to loopback.
         assert_eq!(of(&[[127, 0, 0, 1]]), None);
         assert_eq!(of(&[]), None);
     }

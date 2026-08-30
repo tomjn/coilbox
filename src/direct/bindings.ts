@@ -40,8 +40,11 @@ export const directStartRoom = defineCommand<
   {
     /** The player who holds host powers, by the name their client logs in under. */
     host: string;
-    /** The address announced to joiners for the game. This machine's address on
-     *  the network it is on when omitted, and loopback only if it is on none. */
+    /** The address announced to joiners for the game, when the host has one in
+     *  mind. Omit it and the room uses this machine's address on the network it
+     *  is on, re-reading it while the room runs so a VPN or a new DHCP lease
+     *  moves the battle with it. Loopback only if the machine is on no network.
+     *  An address given here is the host's and never changes under them. */
     ip?: string | null;
     /** Defaults to 8200 on the Rust side. */
     port?: number | null;

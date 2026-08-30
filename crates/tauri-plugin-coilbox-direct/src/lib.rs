@@ -110,14 +110,13 @@ async fn direct_start_room(
     }
     let options = RoomOptions {
         host,
-        // This machine's address on the network it is actually on. Loopback was
-        // the honest default while nothing here could work out anything better,
-        // and it is still the fallback, but a room announcing 127.0.0.1 is a
-        // room only its own host can reach. The public address behind a router
-        // is port mapping's job and is still somebody else's work.
-        ip: ip
-            .or_else(discovery::lan_address)
-            .unwrap_or_else(|| "127.0.0.1".to_string()),
+        // Passed through as the host gave it. `None` is the ordinary case and
+        // means this machine's address on the network it is actually on, worked
+        // out by the room and re-read while the room runs, because a VPN or a
+        // new DHCP lease moves it. An address the host named is left alone: it
+        // is usually a port forwarded to a public one, which nothing here can
+        // work out and nothing here should overwrite.
+        ip,
         port: port.unwrap_or(DEFAULT_LOBBY_PORT),
         approve_joins: approve_joins.unwrap_or(false),
         // On by default: the point of hosting on a LAN is that the people on it

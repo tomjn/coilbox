@@ -25,6 +25,8 @@
 //! that has said nothing for [`IDLE_TIMEOUT`] is treated as disconnected.
 
 use std::collections::BTreeMap;
+use std::net::Ipv4Addr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use coilbox_lobby_protocol::server::{
@@ -40,7 +42,7 @@ use tokio::time::Instant;
 use tokio_util::codec::{Framed, LinesCodec};
 
 use crate::beacon::{self, Beacon, BEACON_INTERVAL};
-use crate::discovery::{announce_once, local_addrs};
+use crate::discovery::{announce_once, lan_address_of, local_addrs};
 use crate::mdns::Advert;
 
 /// The port a room listens on unless the host picks another. Distinct from the
@@ -58,15 +60,29 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 /// How often idle peers are looked for.
 const SWEEP_INTERVAL: Duration = Duration::from_secs(15);
 
+/// Where a room reads this machine's addresses.
+///
+/// [`local_addrs`] everywhere a room is really started, and something a test can
+/// move under a running room. See [`Room::start_on_chosen_addresses`].
+pub type Addresses = Arc<dyn Fn() -> Vec<Ipv4Addr> + Send + Sync>;
+
 /// What the caller has to decide before a room can listen.
 #[derive(Clone, Debug)]
 pub struct RoomOptions {
     /// The player who holds host powers. Their client connects over loopback
     /// like anybody else, so the name is the only thing that marks them out.
     pub host: String,
-    /// The address a joining engine dials, announced in `BATTLEOPENED`. The
-    /// host's LAN address on a LAN, the mapped public one behind a router.
-    pub ip: String,
+    /// The address a joining engine dials, announced in `BATTLEOPENED`, when the
+    /// host has one in mind. The mapped public address behind a router, or
+    /// anything else the room cannot work out for itself.
+    ///
+    /// `None` means this machine's own address on whatever network it is on, and
+    /// means it for as long as the room runs rather than only at the moment it
+    /// starts. A room that works its own address out re-reads it every
+    /// [`BEACON_INTERVAL`] and moves the battle when it changes, because a VPN or
+    /// a new DHCP lease moves it without asking. An address the host named is
+    /// theirs and is never second-guessed.
+    pub ip: Option<String>,
     /// The port to listen on.
     pub port: u16,
     /// Whether a join waits for the host to answer it.
@@ -108,8 +124,9 @@ pub struct Room {
     beacon_id: String,
     requests: mpsc::UnboundedSender<Request>,
     listener: JoinHandle<()>,
-    /// The task announcing this room, if it is being announced.
-    announcer: Option<JoinHandle<()>>,
+    /// The task that announces this room and keeps its address current, if it
+    /// has either job to do. See [`upkeep_loop`].
+    upkeep: Option<JoinHandle<()>>,
 }
 
 /// Something for the task that owns the room state to do.
@@ -130,6 +147,10 @@ enum Request {
         peer: PeerId,
     },
     Status(oneshot::Sender<RoomStatus>),
+    /// This machine's address as of the last look, for a room that works its own
+    /// address out. Sent every tick and ignored unless it has changed, so the
+    /// comparison happens once, in the room that holds the old value.
+    AddressIs(String),
     /// The host's answer to a queued join, applied as though they had sent it.
     AnswerJoin {
         name: String,
@@ -243,7 +264,7 @@ impl Room {
     /// Fails if the port is taken, which is the failure a host meets most: a
     /// second coilbox, or a room they forgot they left running.
     pub async fn start(options: RoomOptions) -> Result<Room, String> {
-        Room::listen(options, Sweeper::runtime()).await
+        Room::listen(options, Sweeper::runtime(), Arc::new(local_addrs)).await
     }
 
     /// Start a room whose idle sweep only happens when the returned clock is
@@ -258,10 +279,31 @@ impl Room {
             elapsed: Duration::ZERO,
             moves: rx,
         };
-        Ok((Room::listen(options, sweeper).await?, ManualClock(moves)))
+        Ok((
+            Room::listen(options, sweeper, Arc::new(local_addrs)).await?,
+            ManualClock(moves),
+        ))
     }
 
-    async fn listen(options: RoomOptions, sweeper: Sweeper) -> Result<Room, String> {
+    /// Start a room that reads the machine's addresses from `addresses` rather
+    /// than off the machine itself.
+    ///
+    /// For tests, and for the same reason [`ManualClock`] exists: moving this
+    /// machine's real address needs root, and a room whose address cannot be
+    /// moved cannot be shown to follow it. Everything downstream of this call is
+    /// the real thing, sockets and protocol lines included.
+    pub async fn start_on_chosen_addresses(
+        options: RoomOptions,
+        addresses: Addresses,
+    ) -> Result<Room, String> {
+        Room::listen(options, Sweeper::runtime(), addresses).await
+    }
+
+    async fn listen(
+        options: RoomOptions,
+        sweeper: Sweeper,
+        addresses: Addresses,
+    ) -> Result<Room, String> {
         // 0.0.0.0 rather than loopback: the host's own client is not the only
         // one that has to reach this, and a LAN peer cannot dial 127.0.0.1.
         let bind = format!("0.0.0.0:{}", options.port);
@@ -275,9 +317,20 @@ impl Room {
             .map_err(|e| format!("cannot read the listening address: {e}"))?
             .port();
 
+        // A room the host gave no address for takes this machine's, and keeps
+        // taking it: `track_address` is what says the answer is allowed to
+        // change later. Loopback is the last resort and means this machine is on
+        // no network at all, which is a room only its own host can reach.
+        let track_address = options.ip.is_none();
+        let ip = options
+            .ip
+            .clone()
+            .or_else(|| lan_address_of(&addresses()))
+            .unwrap_or_else(|| "127.0.0.1".to_string());
+
         let state = RoomState::new(RoomConfig {
             host: options.host.clone(),
-            ip: options.ip.clone(),
+            ip,
             approve_joins: options.approve_joins,
         });
         let (requests, rx) = mpsc::unbounded_channel();
@@ -285,9 +338,15 @@ impl Room {
         let listener = tokio::spawn(accept_loop(listener, requests.clone()));
 
         let beacon_id = beacon::room_id();
-        let announcer = options
-            .advertise
-            .then(|| tokio::spawn(announce_loop(beacon_id.clone(), requests.clone())));
+        let upkeep = (options.advertise || track_address).then(|| {
+            tokio::spawn(upkeep_loop(
+                beacon_id.clone(),
+                requests.clone(),
+                options.advertise,
+                track_address,
+                addresses,
+            ))
+        });
 
         Ok(Room {
             port,
@@ -295,7 +354,7 @@ impl Room {
             beacon_id,
             requests,
             listener,
-            announcer,
+            upkeep,
         })
     }
 
@@ -347,9 +406,9 @@ impl Room {
         // seconds. Aborting drops the task, which drops the DNS-SD advert, which
         // is what sends the goodbye that takes the room out of everybody's list
         // at once instead of leaving it to its TTL.
-        if let Some(announcer) = self.announcer {
-            announcer.abort();
-            let _ = announcer.await;
+        if let Some(upkeep) = self.upkeep {
+            upkeep.abort();
+            let _ = upkeep.await;
         }
         // Then the listener: a socket accepted after the room task has gone
         // would be a connection nothing ever answers.
@@ -369,7 +428,9 @@ impl Room {
         }
     }
 
-    /// The options the room was started with.
+    /// The options the room was started with, which is not always what it holds
+    /// now: [`RoomOptions::ip`] is what the host asked for, and
+    /// [`RoomStatus::ip`] from [`Room::status`] is where the room actually is.
     pub fn options(&self) -> &RoomOptions {
         &self.options
     }
@@ -470,6 +531,9 @@ async fn run_room(
                     Request::Status(reply) => {
                         let _ = reply.send(status_of(&state, &options, port, peers.len()));
                     }
+                    Request::AddressIs(ip) => {
+                        deliver(&peers, state.set_ip(ip));
+                    }
                     Request::AnswerJoin { name, allow, reason } => {
                         let Some(host) = state.host_peer() else { continue };
                         let answer = if allow {
@@ -501,7 +565,13 @@ async fn run_room(
     }
 }
 
-/// Announce this room every [`BEACON_INTERVAL`] until the task is aborted.
+/// Say where this room is, every [`BEACON_INTERVAL`], until the task is aborted.
+///
+/// Two jobs, because they are two halves of one answer. `advertise` puts the
+/// room on the network so somebody looking finds it. `track_address` keeps the
+/// address a joiner is told to dial pointing at this machine. They read the same
+/// enumeration on the same tick, so the room cannot advertise itself at one
+/// address and hand out another (issues #2112 and #2116).
 ///
 /// The room is asked what it holds on every tick rather than being described
 /// once, because the player count, the map and the game all change while a room
@@ -510,7 +580,12 @@ async fn run_room(
 /// own screen, so there is one source of truth and not two.
 ///
 /// A room with no battle in it yet is not announced. See
-/// [`Beacon::from_status`].
+/// [`Beacon::from_status`]. Its address is still tracked, so the battle it goes
+/// on to open is opened at wherever this machine is by then.
+///
+/// A machine that is on no network at all keeps the address it had. Rewriting
+/// the battle to loopback while a cable is out, and moving it back a tick later,
+/// is two moves to say nothing.
 ///
 /// # Both announcements, one switch
 ///
@@ -518,16 +593,22 @@ async fn run_room(
 /// room that says two different things about itself is worse than a room that
 /// says one. One task rather than two, and one description read once.
 ///
-/// This whole task only exists when the host left announcements on, so mDNS is
-/// governed by the same switch. Announcing on a second channel after somebody
-/// turned announcements off would be the opposite of what they asked for, and
-/// they have no way of knowing there is a second channel to turn off.
+/// `advertise` governs mDNS as well as the beacon. Announcing on a second
+/// channel after somebody turned announcements off would be the opposite of what
+/// they asked for, and they have no way of knowing there is a second channel to
+/// turn off.
 ///
 /// The mDNS advert is only put on the wire when something about it changes,
 /// which is what DNS-SD expects and is why it is held across ticks rather than
 /// rebuilt on each one. It is dropped with the task, which is what sends the
 /// goodbye packet.
-async fn announce_loop(id: String, requests: mpsc::UnboundedSender<Request>) {
+async fn upkeep_loop(
+    id: String,
+    requests: mpsc::UnboundedSender<Request>,
+    advertise: bool,
+    track_address: bool,
+    addresses: Addresses,
+) {
     let mut tick = tokio::time::interval(BEACON_INTERVAL);
     let mut advert: Option<Advert> = None;
     loop {
@@ -538,10 +619,23 @@ async fn announce_loop(id: String, requests: mpsc::UnboundedSender<Request>) {
             return;
         }
         let Ok(status) = rx.await else { return };
-        let Some(beacon) = Beacon::from_status(&status, &id) else {
+        let beacon = advertise
+            .then(|| Beacon::from_status(&status, &id))
+            .flatten();
+        // Nothing this tick needs the machine's addresses, and reading them is
+        // the expensive part.
+        if beacon.is_none() && !track_address {
             continue;
-        };
-        let addresses = local_addrs();
+        }
+        let addresses = addresses();
+        if track_address {
+            if let Some(ip) = lan_address_of(&addresses) {
+                if requests.send(Request::AddressIs(ip)).is_err() {
+                    return;
+                }
+            }
+        }
+        let Some(beacon) = beacon else { continue };
         match &mut advert {
             Some(advert) => advert.update(&beacon, &addresses),
             // A machine with no working mDNS gets one attempt per tick and
@@ -589,7 +683,10 @@ fn status_of(state: &RoomState, options: &RoomOptions, port: u16, peers: usize) 
     RoomStatus {
         port,
         host: options.host.clone(),
-        ip: options.ip.clone(),
+        // Off the room and not off the options: a room that works its own
+        // address out has moved since, and this is what the host's own screen
+        // reads.
+        ip: state.ip().to_string(),
         approve_joins: options.approve_joins,
         advertise: options.advertise,
         peers,
