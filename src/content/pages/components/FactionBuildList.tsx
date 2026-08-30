@@ -9,7 +9,7 @@ import type {
 } from "../../bindings";
 import type { BrandingEntry } from "../../branding";
 import { buildEdgeMap, reachableCounts } from "../../buildTree";
-import { foldMorphs } from "../../morphGraph";
+import { foldMorphs, groupOf, morphGroups } from "../../morphGraph";
 import { unitIconSrc } from "../../unitIcon";
 import { BuildTreeDrawer } from "./BuildTreeDrawer";
 
@@ -141,10 +141,22 @@ export function FactionBuildList({
   // under the commander rather than a stage of its own (issue #2063). Omitted
   // (and the button left inert) when the dataset is still loading or the game
   // exposes no buildoptions (0).
-  const counts = useMemo(
-    () => reachableCounts(sides, foldMorphs(units, buildEdgeMap(units))),
-    [sides, units],
-  );
+  const counts = useMemo(() => {
+    // The engine's reported start unit can be any stage of its morph group,
+    // not necessarily the base the folded edge map keys its node on, so it's
+    // resolved here first or the lookup misses and the count reads 0.
+    const morphBase = groupOf(morphGroups(units));
+    const resolvedSides = sides.map((s) => {
+      const startUnit = s.startUnit?.toLowerCase();
+      return startUnit
+        ? { ...s, startUnit: morphBase.get(startUnit) ?? startUnit }
+        : s;
+    });
+    return reachableCounts(
+      resolvedSides,
+      foldMorphs(units, buildEdgeMap(units)),
+    );
+  }, [sides, units]);
   return (
     <ul className="flex flex-col gap-2">
       {sides.map((s) => {

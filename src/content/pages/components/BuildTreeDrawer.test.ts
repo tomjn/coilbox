@@ -76,4 +76,30 @@ describe("BuildTreeDrawer's morph fold", () => {
     // The folded node is labelled with its stage count.
     expect(html).toContain("armcom (2 stages)");
   });
+
+  it("still draws the tree when the side's start unit is a non-base stage", () => {
+    // The engine can report any stage as a faction's spawn unit, not just the
+    // one morphGroups picked as the base. The folded edge map only has the
+    // base as a key, so a caller that hands the raw stage straight to the
+    // graph walk would find nothing.
+    const units = [
+      unit("armcom", ["armsolar"], ["armcom1"]),
+      unit("armcom1", ["armsolar", "armlab"]),
+      unit("armsolar"),
+      unit("armlab"),
+    ];
+    const html = renderToStaticMarkup(
+      createElement(BuildTreeDrawer, {
+        enginePath: "",
+        dataDir: "",
+        gameArchive: "",
+        sides: [{ name: "Arm", startUnit: "armcom1" }],
+        units,
+        initialSide: "Arm",
+      }),
+    );
+    expect(html).not.toContain("No build options found");
+    expect(html).toContain('data-node-id="armlab"');
+    expect(html).toContain('data-node-id="armsolar"');
+  });
 });

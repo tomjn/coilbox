@@ -26,7 +26,7 @@ import {
   focusNeighbours,
 } from "../../buildTree";
 import { useUnitsyncUnitBuildpics } from "../../config";
-import { foldMorphs, morphGroups } from "../../morphGraph";
+import { foldMorphs, groupOf, morphGroups } from "../../morphGraph";
 import { unitIconSrc } from "../../unitIcon";
 import { BuildTreeExportButton } from "./BuildTreeExportButton";
 import { layoutBuildTree, layoutFocusTree } from "./buildTreeLayout";
@@ -242,32 +242,49 @@ export function BuildTreeDrawer({
       if (u.fullName) m.set(u.name.toLowerCase(), u.fullName);
     return m;
   }, [units]);
+  // Computed once and shared below, rather than walking the morph graph twice.
+  const morphGroupList = useMemo(() => morphGroups(units), [units]);
   // Base id -> how many stages its morph group folds together, for the label.
   const stageCountByBase = useMemo(() => {
     const m = new Map<string, number>();
-    for (const g of morphGroups(units)) m.set(g.base, g.stages.length);
+    for (const g of morphGroupList) m.set(g.base, g.stages.length);
     return m;
-  }, [units]);
+  }, [morphGroupList]);
+  // Every stage id -> its group's base. A side's engine-reported start unit
+  // can be any stage of its group, not necessarily the base the folded graph
+  // keys its node on (#2063), so anything handed to the folded `edges` below
+  // has to be resolved through this first or it looks up a key that isn't
+  // there and comes back empty.
+  const morphBase = useMemo(() => groupOf(morphGroupList), [morphGroupList]);
   // Units that can move, so non-builders can be split into mobile vs building.
   const mobileSet = useMemo(
     () =>
       new Set(units.filter((u) => u.mobile).map((u) => u.name.toLowerCase())),
     [units],
   );
-  // Every faction's start unit, so commanders can be blue-ringed.
+  // Every faction's start unit, resolved to its morph group's base, so
+  // commanders can be blue-ringed. Ringing the raw (unresolved) id would miss
+  // a commander whose folded node is keyed on a different stage.
   const startSet = useMemo(
     () =>
       new Set(
         sides
           .map((s) => s.startUnit?.toLowerCase())
-          .filter((u): u is string => !!u),
+          .filter((u): u is string => !!u)
+          .map((u) => morphBase.get(u) ?? u),
       ),
-    [sides],
+    [sides, morphBase],
   );
+  // The active faction's start unit, resolved the same way, so it always
+  // lands on a key the folded `edges` map actually has.
+  const activeStart = useMemo(() => {
+    const raw = active?.startUnit?.toLowerCase();
+    return raw ? (morphBase.get(raw) ?? raw) : undefined;
+  }, [active, morphBase]);
 
   const graph = useMemo(
-    () => buildBuildGraph(active?.startUnit, edges),
-    [active, edges],
+    () => buildBuildGraph(activeStart, edges),
+    [activeStart, edges],
   );
   const reachableCount = graph.order.length;
   const reachableKey = useMemo(

@@ -57,4 +57,31 @@ describe("FactionBuildList's Sides card count", () => {
     expect(html).not.toContain("1 units");
     expect(html).toContain("2 units");
   });
+
+  it("still counts correctly when the side's start unit is a non-base stage", () => {
+    // The engine can report the upgraded stage as the spawn unit rather than
+    // the base morphGroups picked. The folded edge map only has the base as a
+    // key, so resolving the raw stage id straight to reachableCounts would
+    // find nothing and read 0.
+    const units = [
+      unit("armcom", [], ["armcom1"]),
+      unit("armcom1", ["armsolar"]),
+      unit("armsolar"),
+    ];
+    const html = renderToStaticMarkup(
+      createElement(FactionBuildList, {
+        enginePath: "",
+        dataDir: "",
+        gameArchive: "",
+        gameName: "Test Game",
+        sides: [{ name: "Arm", startUnit: "armcom1" }],
+        units,
+        buildpics: null,
+      }),
+    );
+    // Unresolved, the count reads 0 and the button renders no "N units" text
+    // at all (only shown when count > 0) and stays disabled.
+    expect(html).toContain("2 units");
+    expect(html).not.toContain("disabled");
+  });
 });
