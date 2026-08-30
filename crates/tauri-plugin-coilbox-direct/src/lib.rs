@@ -376,3 +376,86 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         ])
         .build()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::portmap::{Mapped, Method, Open};
+    use tauri::test::{mock_app, mock_builder, mock_context, noop_assets, MockRuntime};
+    use tauri::WebviewWindowBuilder;
+
+    /// Build the plugin into an app and quit it, so the handler is reached the
+    /// way a real quit reaches it rather than by being called by hand.
+    ///
+    /// `fill` runs once the plugin's setup has, which is where the state the
+    /// handler reads comes from. Closing the only window is how this runtime is
+    /// asked to quit: `request_exit` is unimplemented on it, so `AppHandle::exit`
+    /// is not a route.
+    fn quit(fill: impl Fn(&AppHandle<MockRuntime>) + 'static) {
+        let app = mock_builder()
+            .plugin(init())
+            .build(mock_context(noop_assets()))
+            .expect("the plugin builds into an app");
+        WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .expect("a window, because closing the last one is the quit");
+        app.run(move |handle, event| {
+            if matches!(event, RunEvent::Ready) {
+                fill(handle);
+                handle
+                    .get_webview_window("main")
+                    .expect("the window is still open")
+                    .close()
+                    .expect("closing it asks the app to quit");
+            }
+        });
+    }
+
+    /// One mapping, of the shape a host who ticked the box would be holding.
+    fn mapping() -> Open {
+        Open::for_test(
+            Method::NatPmp,
+            vec![Mapped {
+                port: 8200,
+                external_port: 8200,
+                transport: Transport::Tcp,
+            }],
+            None,
+        )
+    }
+
+    /// What quitting is for: a host who closes coilbox with a port open hands it
+    /// back, rather than leaving a hole on their router until the lease runs out
+    /// an hour later.
+    ///
+    /// The assertion is on the slot [`Ports::release`] empties rather than the
+    /// one the handler takes from, so it fails if the handler stops being wired
+    /// to `RunEvent::Exit`, if `ActivePorts` stops being managed, and if the
+    /// release is spawned but the quit no longer waits for it. What it cannot
+    /// prove is that a router answered, because there is no router in a test.
+    #[test]
+    fn quitting_with_a_port_open_hands_it_back() {
+        let (ports, held) = Ports::holding(mapping());
+        // `fill` is called rather than consumed, so the mappings are parked
+        // where one call can take them.
+        let parked = std::sync::Mutex::new(Some(ports));
+        quit(move |handle| {
+            *handle.state::<ActivePorts>().0.blocking_lock() =
+                Some(parked.lock().expect("nothing else takes this").take().expect(
+                    "the app is ready once, so this is the only call",
+                ));
+        });
+
+        assert!(
+            held.blocking_lock().is_none(),
+            "a host who quits with a port open has to have it handed back"
+        );
+    }
+
+    /// The plugin's setup has not run, so there is no [`ActivePorts`] to read.
+    /// Quitting has to be nothing at all rather than a panic on the way out.
+    #[test]
+    fn quitting_with_nothing_managed_is_not_a_panic() {
+        release_ports_on_exit(mock_app().handle());
+    }
+}

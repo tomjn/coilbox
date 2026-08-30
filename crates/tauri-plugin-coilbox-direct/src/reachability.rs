@@ -87,6 +87,29 @@ pub struct Ports {
 }
 
 impl Ports {
+    /// A set of mappings a test can put in [`crate::ActivePorts`], handed back
+    /// with the slot [`Self::release`] empties so the caller can watch it
+    /// happen.
+    ///
+    /// The mapping holds no router handles, which is what [`Open::for_test`] is
+    /// for, so releasing it is the code path and not the datagram. The renewal
+    /// task goes on the same runtime the quit handler spawns onto, because
+    /// [`Self::release`] aborts it and there is no runtime of the test's own
+    /// where that could happen.
+    #[cfg(test)]
+    pub(crate) fn holding(open: Open) -> (Ports, Arc<Mutex<Option<Open>>>) {
+        let shared = Arc::new(Mutex::new(Some(open)));
+        let renewal = tauri::async_runtime::handle()
+            .inner()
+            .spawn(renew_loop(Arc::clone(&shared)));
+        let ports = Ports {
+            report: report(None, &[], &[], None, None, None),
+            open: Arc::clone(&shared),
+            renewal,
+        };
+        (ports, shared)
+    }
+
     /// Hand the ports back to the router and stop renewing them.
     pub async fn release(self) {
         self.renewal.abort();
