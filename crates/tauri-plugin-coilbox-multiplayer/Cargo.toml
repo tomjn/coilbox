@@ -28,6 +28,12 @@ tempfile = "3"
 # `base64` under `stun`, so neither adds a package to the tree.
 ring = "0.17"
 base64 = "0.22"
+# `tauri::test::mock_builder`, so the quit renewal can be driven through a real
+# `RunEvent::Exit` instead of being called by hand. `test` is an empty feature
+# list in tauri's manifest, so it adds no package to `Cargo.lock`, and asking
+# for it here rather than in `[dependencies]` keeps the mock runtime out of the
+# app anybody ships.
+tauri = { version = "2", features = ["test"] }
 
 [dependencies]
 tauri = { version = "2" }

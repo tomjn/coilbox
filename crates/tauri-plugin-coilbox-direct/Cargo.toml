@@ -15,6 +15,12 @@ tauri-plugin = { version = "2", features = ["build"] }
 # A runtime of their own, and a clock the idle-peer test can wind forward
 # rather than waiting out the real ninety seconds.
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "io-util", "test-util"] }
+# `tauri::test::mock_builder`, so the quit handler can be driven through a real
+# `RunEvent::Exit` instead of being called by hand. `test` is an empty feature
+# list in tauri's manifest, so it adds no package to `Cargo.lock`, and asking
+# for it here rather than in `[dependencies]` keeps the mock runtime out of the
+# app anybody ships.
+tauri = { version = "2", features = ["test"] }
 
 [dependencies]
 tauri = { version = "2" }

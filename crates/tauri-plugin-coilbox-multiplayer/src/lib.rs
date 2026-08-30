@@ -3554,6 +3554,12 @@ const EXIT_RENEWAL_BUDGET: Duration = Duration::from_millis(500);
 ///
 /// Nothing is spawned on a quit with no relayed battle, which is every quit but
 /// a host's.
+///
+/// `quitting_hands_a_relayed_battle_one_last_credential` drives this through a
+/// real `RunEvent::Exit`. The sentence above has no test of its own and issue
+/// #2136 asked for one: a version that spawned regardless would find nothing to
+/// renew and finish just as fast, so there is no difference between the two to
+/// assert on.
 fn renew_relays_on_exit<R: Runtime>(app: &AppHandle<R>) {
     let Some(registry) = app.try_state::<Registry>() else {
         return;
@@ -3674,8 +3680,89 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::relay_host::tests::hosting_and_renewing;
+    use crate::turn::tests::{KEY, NOW};
     use coilbox_lobby_protocol::{Battle, Bot, MemberStatus, StartRect};
     use std::sync::Arc;
+    use tauri::test::{mock_app, mock_builder, mock_context, noop_assets, MockRuntime};
+    use tauri::WebviewWindowBuilder;
+
+    /// Build the plugin into an app and quit it, so the handler is reached the
+    /// way a real quit reaches it rather than by being called by hand.
+    ///
+    /// `fill` runs once the plugin's setup has, which is where the state the
+    /// handler reads comes from. Closing the only window is how this runtime is
+    /// asked to quit: `request_exit` is unimplemented on it, so `AppHandle::exit`
+    /// is not a route.
+    fn quit(fill: impl Fn(&AppHandle<MockRuntime>) + 'static) {
+        let app = mock_builder()
+            .plugin(init())
+            .build(mock_context(noop_assets()))
+            .expect("the plugin builds into an app");
+        WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .expect("a window, because closing the last one is the quit");
+        app.run(move |handle, event| {
+            if matches!(event, RunEvent::Ready) {
+                fill(handle);
+                handle
+                    .get_webview_window("main")
+                    .expect("the window is still open")
+                    .close()
+                    .expect("closing it asks the app to quit");
+            }
+        });
+    }
+
+    /// Issue #2105's wiring. A host who closes coilbox mid-battle hands the
+    /// sidecar one last credential on the way out, so it carries a whole
+    /// lifetime into the part of the game coilbox will not see.
+    ///
+    /// [`relay_host::renew_before_quitting`] is what happens and has its own
+    /// tests. This one is about the quit reaching it at all, so it fails if the
+    /// handler stops being wired to `RunEvent::Exit`, if the [`Registry`] stops
+    /// being managed, and if the ask is spawned but the quit no longer waits
+    /// for it.
+    #[test]
+    fn quitting_hands_a_relayed_battle_one_last_credential() {
+        let mut w = hosting_and_renewing();
+        // Nothing due for the better part of an hour, so a schedule is not what
+        // makes this happen.
+        w.credential_runs_out_at(NOW + 5_115_000);
+        // `EXIT_RENEWAL_BUDGET` is spent on the runtime the handler spawns onto,
+        // so the lobby has to be answering on that same runtime rather than on
+        // one of the test's own.
+        let runtime = tauri::async_runtime::handle();
+        let inside = runtime.inner().enter();
+        w.lobby_answers_when_asked(86_400, NOW);
+        drop(inside);
+
+        // `hosting_and_renewing` builds its own registry, and the plugin manages
+        // its own, so the relaying connection is moved across into the one the
+        // handler will look up.
+        let hosting = Mutex::new(lock_or_recover(&w.registry).remove(KEY));
+        quit(move |handle| {
+            let taken = lock_or_recover(&hosting)
+                .take()
+                .expect("the app is ready once, so this is the only call");
+            lock_or_recover(&handle.state::<Registry>()).insert(KEY.to_string(), taken);
+        });
+
+        let sent = w.written.sent();
+        assert!(
+            sent.contains("\"type\":\"renewCredential\"")
+                && sent.contains("\"user\":\"1786086400:alice\"")
+                && sent.contains("\"password\":\"bWFj=\""),
+            "quitting has to put a fresh credential in the sidecar's hands: {sent}"
+        );
+    }
+
+    /// The plugin's setup has not run, so there is no [`Registry`] to read.
+    /// Quitting has to be nothing at all rather than a panic on the way out.
+    #[test]
+    fn quitting_with_nothing_managed_is_not_a_panic() {
+        renew_relays_on_exit(mock_app().handle());
+    }
 
     #[test]
     fn lock_or_recover_survives_poison() {
