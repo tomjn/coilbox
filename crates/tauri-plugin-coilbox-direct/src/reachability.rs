@@ -52,6 +52,19 @@ pub struct Reachability {
     /// be reached, in which case the host is shown their local address and no
     /// guess.
     pub public_address: Option<String>,
+    /// The address STUN saw is one this machine holds, so there is nothing in
+    /// front of it to forward anything.
+    ///
+    /// Answered here because this is where the whole address list is. The
+    /// reading side used to work it out by comparing [`Self::public_address`]
+    /// against [`Self::lan_address`], which is the one address a room announces
+    /// itself at and prefers a private one, so a VPS with a Docker bridge on it
+    /// compared 209.35.91.246 against 172.17.0.1 and told a host with no router
+    /// that their router had refused (issue #2111).
+    ///
+    /// A fact rather than a verdict. Whether that makes a host reachable is
+    /// still worked out once, in `src/direct/reachability.ts` (issue #2090).
+    pub public_address_is_local: bool,
     /// The router's own address on its internet side, when it would say.
     pub router_address: Option<String>,
     /// The router is behind another NAT, so an open port on it is not an open
@@ -94,7 +107,9 @@ impl Ports {
 /// error, and the report says so in [`Reachability::problem`] with every port
 /// number the manual instructions need.
 pub async fn open(wanted: Vec<PortRequest>) -> (Reachability, Option<Ports>) {
-    let lan_address = discovery::lan_address();
+    // One enumeration, two questions: which address a room announces itself at,
+    // and whether the address STUN comes back with is one of them.
+    let local = discovery::local_addrs();
     let asked: Vec<Mapped> = wanted
         .iter()
         .map(|w| Mapped {
@@ -116,18 +131,11 @@ pub async fn open(wanted: Vec<PortRequest>) -> (Reachability, Option<Ports>) {
 
     match attempt {
         Err(refused) => (
-            report(None, &asked, lan_address, reflexive, None, Some(refused)),
+            report(None, &asked, &local, reflexive, None, Some(refused)),
             None,
         ),
         Ok(open) => {
-            let report = report(
-                Some(&open),
-                &asked,
-                lan_address,
-                reflexive,
-                open.router_ip,
-                None,
-            );
+            let report = report(Some(&open), &asked, &local, reflexive, open.router_ip, None);
             let shared = Arc::new(Mutex::new(Some(open)));
             let renewal = tokio::spawn(renew_loop(Arc::clone(&shared)));
             (
@@ -143,10 +151,14 @@ pub async fn open(wanted: Vec<PortRequest>) -> (Reachability, Option<Ports>) {
 }
 
 /// Assemble what the host reads. Pure, given the four answers above.
+///
+/// `local` is every address this machine holds, not the one chosen to announce a
+/// room at, because two different questions are asked of it here. See
+/// [`Reachability::public_address_is_local`].
 fn report(
     open: Option<&Open>,
     asked: &[Mapped],
-    lan_address: Option<String>,
+    local: &[Ipv4Addr],
     reflexive: Option<stun::Reflexive>,
     router_ip: Option<Ipv4Addr>,
     refused: Option<Refused>,
@@ -161,8 +173,9 @@ fn report(
         method: open.map(|o| o.method),
         ports: open.map(|o| o.ports.clone()).unwrap_or_default(),
         wanted: asked.to_vec(),
-        lan_address,
+        lan_address: discovery::lan_address_of(local),
         public_address: reflexive.map(|r| r.ip.to_string()),
+        public_address_is_local: reflexive.is_some_and(|r| local.contains(&r.ip)),
         router_address: router_ip.map(|ip| ip.to_string()),
         double_nat,
         confirmed_port,
@@ -218,7 +231,7 @@ mod tests {
         let out = report(
             None,
             &asked(),
-            Some("192.168.1.45".to_string()),
+            &[Ipv4Addr::new(192, 168, 1, 45)],
             Some(stun::Reflexive {
                 ip: Ipv4Addr::new(209, 35, 91, 246),
                 port: 51234,
@@ -238,7 +251,7 @@ mod tests {
         let out = report(
             None,
             &asked(),
-            Some("192.168.1.45".to_string()),
+            &[Ipv4Addr::new(192, 168, 1, 45)],
             None,
             None,
             Some(refused()),
@@ -252,17 +265,19 @@ mod tests {
     /// because there is no gateway to answer it, and the address STUN saw is one
     /// of this machine's own.
     ///
-    /// `isOnPublicAddress` in `src/direct/reachability.ts` spots that host by
-    /// comparing these two strings, so they have to leave here in the same form
-    /// or a VPS is told its router refused. That is the bug #2054 and #2085
-    /// fixed on the reading side, and nothing on this side held the two fields
-    /// to a shape it could compare.
+    /// The two fields hold the same string here because there is only one
+    /// address to put in either of them. `isOnPublicAddress` in
+    /// `src/direct/reachability.ts` used to be that comparison, which is why
+    /// #2090 pinned the form. It reads `public_address_is_local` now, and the
+    /// test below this one is the machine that has more than one address. What
+    /// is left worth holding is that the sole address still reaches
+    /// `lan_address`, since the share rows and the manual instructions read it.
     #[test]
     fn a_host_whose_only_address_is_public_reports_it_as_both() {
         let out = report(
             None,
             &asked(),
-            Some("209.35.91.246".to_string()),
+            &[Ipv4Addr::new(209, 35, 91, 246)],
             Some(stun::Reflexive {
                 ip: Ipv4Addr::new(209, 35, 91, 246),
                 port: 8452,
@@ -272,7 +287,70 @@ mod tests {
         );
         assert_eq!(out.public_address.as_deref(), Some("209.35.91.246"));
         assert_eq!(out.lan_address, out.public_address);
+        assert!(out.public_address_is_local);
         assert_eq!(out.method, None);
+    }
+
+    /// The same host with a Docker bridge on it, which is the ordinary VPS.
+    ///
+    /// `lan_address` is the bridge, because that is the address a room announces
+    /// itself at and a private one is right for that. So the two strings differ
+    /// and the reading side, which compared them, told this host their router
+    /// had refused (issue #2111). The flag is what it reads now, and it is asked
+    /// of the whole list.
+    #[test]
+    fn a_second_address_does_not_stop_a_host_being_on_their_public_one() {
+        let out = report(
+            None,
+            &asked(),
+            &[
+                Ipv4Addr::new(172, 17, 0, 1),
+                Ipv4Addr::new(209, 35, 91, 246),
+            ],
+            Some(stun::Reflexive {
+                ip: Ipv4Addr::new(209, 35, 91, 246),
+                port: 8452,
+            }),
+            None,
+            Some(refused()),
+        );
+        assert!(out.public_address_is_local);
+        assert_eq!(out.lan_address.as_deref(), Some("172.17.0.1"));
+        assert_eq!(out.public_address.as_deref(), Some("209.35.91.246"));
+    }
+
+    /// The ordinary home connection, and the reason the flag cannot simply be
+    /// "STUN answered". This host is behind a router and none of their addresses
+    /// is the one the internet sees.
+    #[test]
+    fn a_host_behind_a_router_does_not_hold_the_address_the_internet_sees() {
+        let out = report(
+            None,
+            &asked(),
+            &[Ipv4Addr::new(192, 168, 1, 45)],
+            Some(stun::Reflexive {
+                ip: Ipv4Addr::new(209, 35, 91, 246),
+                port: 51234,
+            }),
+            None,
+            Some(refused()),
+        );
+        assert!(!out.public_address_is_local);
+    }
+
+    /// No STUN answer is not a match with anything, however many addresses this
+    /// machine has.
+    #[test]
+    fn without_a_reflexive_address_nothing_is_claimed_about_it() {
+        let out = report(
+            None,
+            &asked(),
+            &[Ipv4Addr::new(209, 35, 91, 246)],
+            None,
+            None,
+            Some(refused()),
+        );
+        assert!(!out.public_address_is_local);
     }
 
     /// The reflexive port matching a port we asked for is the mapping
@@ -282,7 +360,7 @@ mod tests {
         let out = report(
             None,
             &asked(),
-            None,
+            &[],
             Some(stun::Reflexive {
                 ip: Ipv4Addr::new(209, 35, 91, 246),
                 port: 8452,
@@ -300,7 +378,7 @@ mod tests {
         let out = report(
             None,
             &asked(),
-            None,
+            &[],
             Some(stun::Reflexive {
                 ip: Ipv4Addr::new(209, 35, 91, 246),
                 port: 51234,
@@ -319,7 +397,7 @@ mod tests {
         let out = report(
             Some(&open),
             &asked(),
-            Some("192.168.1.45".to_string()),
+            &[Ipv4Addr::new(192, 168, 1, 45)],
             Some(stun::Reflexive {
                 ip: Ipv4Addr::new(209, 35, 91, 246),
                 port: 8452,
@@ -338,7 +416,7 @@ mod tests {
             asked(),
             Some(Ipv4Addr::new(209, 35, 91, 246)),
         );
-        let out = report(Some(&open), &asked(), None, None, open.router_ip, None);
+        let out = report(Some(&open), &asked(), &[], None, open.router_ip, None);
         assert!(!out.double_nat);
         assert_eq!(out.method, Some(Method::NatPmp));
     }
@@ -348,7 +426,7 @@ mod tests {
     #[test]
     fn a_router_that_will_not_name_its_own_address_is_not_assumed_to_be_natted() {
         let open = Open::for_test(Method::NatPmp, asked(), None);
-        let out = report(Some(&open), &asked(), None, None, None, None);
+        let out = report(Some(&open), &asked(), &[], None, None, None);
         assert!(!out.double_nat);
         assert_eq!(out.method, Some(Method::NatPmp));
     }
