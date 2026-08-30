@@ -24,7 +24,7 @@ let mockSides: { name: string; startUnit?: string }[] = [];
 // page still draws a populated dataset in that status instead of sticking on
 // a loading skeleton forever. `UnitsyncInfoStatus` (config.ts) has five
 // values, not the three the page used to gate rendering on.
-let mockDatasetStatus: "ready" | "unsyncable" | "error" = "ready";
+let mockDatasetStatus: "ready" | "unsyncable" | "error" | "loading" = "ready";
 
 vi.mock("../config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
@@ -80,7 +80,7 @@ function renderPage({
 }: {
   units: UnitFixture[];
   sides: { name: string; startUnit?: string }[];
-  datasetStatus?: "ready" | "unsyncable" | "error";
+  datasetStatus?: "ready" | "unsyncable" | "error" | "loading";
 }) {
   mockUnits = units as UnitDatasetEntry[];
   mockSides = sides;
@@ -170,5 +170,20 @@ describe("GameUnitsPage", () => {
       datasetStatus: "unsyncable",
     });
     expect(await screen.findByText("Commander")).toBeTruthy();
+  });
+
+  it("stays on the loading state while the dataset is still parsing, even once game info is ready", async () => {
+    // `gameInfo` resolves long before the dataset (which parses every unit
+    // def in the game), so gating on `gameInfoLoading` alone would render
+    // this page's "No units found for this game" text while the dataset is
+    // still in flight: a confident false claim rather than a spinner.
+    renderPage({
+      units: [{ name: "armcom", fullName: "Commander" }],
+      sides: [{ name: "Armada", startUnit: "armcom" }],
+      datasetStatus: "loading",
+    });
+    expect(await screen.findByText("Back")).toBeTruthy();
+    expect(screen.queryByText("No units found for this game.")).toBeNull();
+    expect(screen.queryByText("Commander")).toBeNull();
   });
 });

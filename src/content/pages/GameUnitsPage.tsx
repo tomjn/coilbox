@@ -119,14 +119,26 @@ export default function GameUnitsPage() {
       </div>
     );
 
-  // `datasetStatus` is not part of this gate: `UnitsyncInfoStatus` has five
-  // values (config.ts), and `unsyncable` (checksum came back 0) still carries
-  // a populated `dataset.units` that never becomes "ready" without a reload
-  // this page doesn't offer. `GameDetailPage` renders `FactionBuildList` from
-  // `dataset?.units ?? []` regardless of status for the same reason: what
-  // blocks a first paint is not having sides to group by yet, not the
-  // dataset's own status.
-  if (gameInfoLoading || !gameInfo || !selected)
+  // `gameInfo` and the unit dataset are independent async reads, and the
+  // dataset is the slow one: it parses every unit def in the game, measured
+  // at 23.4 seconds cold on a large archive, against a cheap `gameInfo` read.
+  // Gating on `gameInfoLoading` alone let the page render before the dataset
+  // arrived, and this whole page's content is that dataset, so rendering
+  // early meant the "No units found for this game" branch below rendered a
+  // confident false statement about a game whose units had simply not
+  // loaded yet. `"idle"` and `"loading"` both still block. `"unsyncable"`
+  // does not, since its `dataset.units` is already populated (see the error
+  // branch above for why status alone cannot be trusted to mean "nothing to
+  // show"). This is not the same gate `GameDetailPage` uses: that page's
+  // `FactionBuildList` never states a unit count in text, it only disables
+  // build buttons, so it has no equivalent false statement to avoid.
+  if (
+    datasetStatus === "idle" ||
+    datasetStatus === "loading" ||
+    gameInfoLoading ||
+    !gameInfo ||
+    !selected
+  )
     return <DetailLoading backTo={backTo} />;
 
   return (
