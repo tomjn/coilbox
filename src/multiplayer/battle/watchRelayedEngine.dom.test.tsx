@@ -65,8 +65,10 @@ vi.mock("@/play/bindings", () => ({
 const { mpWatchEngine, mpBuildHostConfig } = vi.hoisted(() => ({
   mpWatchEngine: vi.fn(async () => ({ watching: true })),
   // Whether the battle on this connection is going through the relay, which is
-  // what Rust answers from the relay handle it built the config out of.
-  mpBuildHostConfig: vi.fn(async () => ({
+  // what Rust answers from the relay handle it built the config out of. Every
+  // test replaces this through `relayedBattleOn`, so the argument is here to
+  // fix the shape rather than to be read.
+  mpBuildHostConfig: vi.fn(async (_args: { serverKey: string }) => ({
     config: { gameType: "g", mapName: "m" },
     relayed: false,
   })),
@@ -133,7 +135,10 @@ function Launcher({ host, serverKey }: { host: boolean; serverKey: string }) {
 }
 
 /** Render, press start, and wait for the engine to have been launched. */
-async function launchBattle(host: boolean, serverKey = ALICE): Promise<Launched> {
+async function launchBattle(
+  host: boolean,
+  serverKey = ALICE,
+): Promise<Launched> {
   const before = launched.length;
   const { getByText } = render(
     <PlayProvider>
