@@ -58,6 +58,17 @@ interface LaunchOpts {
    * launch command, which are serialized and would not take a function.
    */
   onEngineStarted?: (runId: string) => void;
+  /**
+   * This game's traffic goes out through the relay sidecar on this machine, so
+   * ending it here ends it for everybody else playing in it (#2097).
+   *
+   * Said by the launch, because the launch is the only thing that knows. A
+   * relay is a fact about one battle and one run of the engine, and every
+   * signal outside this launch answers something else: the sidecar's own
+   * liveness outlives the game it carried by up to four minutes, and the
+   * recorded hosting route outlives the battle it describes.
+   */
+  relayed?: boolean;
 }
 
 interface ReplayOpts {
@@ -78,6 +89,14 @@ interface PlayContextValue {
   /** Run id of the live game, for `focusGame`. Null when idle. */
   activeRunId: string | null;
   kind: RunKind | null;
+  /**
+   * True while the game that is running is the one going through this
+   * machine's relay (#2097).
+   *
+   * Already compared against the live run rather than handed out as a run id to
+   * compare, because forgetting to compare is the bug this exists for.
+   */
+  relayed: boolean;
   /** Launch a skirmish, battle or campaign mission; resolves when the engine exits. */
   launch: (
     kind: "skirmish" | "battle" | "campaign" | "conquest" | "runlite",
@@ -110,6 +129,10 @@ export function PlayProvider({ children }: { children: ReactNode }) {
   const [running, setRunning] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [kind, setKind] = useState<RunKind | null>(null);
+  // The run whose traffic goes through this machine's relay, by id rather than
+  // as a flag, so the pill that warns about it is naming a game rather than
+  // reading that a relay exists somewhere (#2097).
+  const [relayedRunId, setRelayedRunId] = useState<string | null>(null);
   // Synchronous guard: `running` state lags a render behind, so gate on a ref to
   // reject a second launch without disturbing the in-flight run.
   const runningRef = useRef(false);
@@ -132,6 +155,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
     setRunning(false);
     setActiveRunId(null);
     setKind(null);
+    setRelayedRunId(null);
   }, []);
 
   const start = useCallback(
@@ -142,7 +166,10 @@ export function PlayProvider({ children }: { children: ReactNode }) {
         runId: string,
         onEvent: Channel<LaunchEvent>,
       ) => Promise<LaunchOutcome>,
-      onEngineStarted?: (runId: string) => void,
+      {
+        onEngineStarted,
+        relayed,
+      }: Pick<LaunchOpts, "onEngineStarted" | "relayed"> = {},
     ) => {
       if (runningRef.current) throw new Error("a game is already running");
       runningRef.current = true;
@@ -162,6 +189,10 @@ export function PlayProvider({ children }: { children: ReactNode }) {
       setRunning(true);
       setActiveRunId(runId);
       setKind(runKind);
+      // Set to null for every ordinary launch as well as recorded for a relayed
+      // one, so a run that has nothing to do with a relay says so rather than
+      // inheriting whatever the last one left behind.
+      setRelayedRunId(relayed ? runId : null);
       try {
         const outcome = await run(runId, onEvent);
         // Only triage the run that is still current. A run the user cancelled
@@ -190,7 +221,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
       runKind: "skirmish" | "battle" | "campaign" | "conquest" | "runlite",
       opts: LaunchOpts,
     ) => {
-      const { onEngineStarted, ...args } = opts;
+      const { onEngineStarted, relayed, ...args } = opts;
       return start(
         runKind,
         {
@@ -200,7 +231,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
           engine: args.executable,
         },
         (runId, onEvent) => playLaunch({ ...args, runId, onEvent }),
-        onEngineStarted,
+        { onEngineStarted, relayed },
       );
     },
     [start],
@@ -258,6 +289,7 @@ export function PlayProvider({ children }: { children: ReactNode }) {
         running,
         activeRunId,
         kind,
+        relayed: activeRunId !== null && activeRunId === relayedRunId,
         launch,
         launchReplay,
         launchSave,

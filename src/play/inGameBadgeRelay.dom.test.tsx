@@ -31,7 +31,6 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type HostingRoute, recordHostingRoute } from "../direct/hostingRoute";
 import InGameBadge from "./InGameBadge";
 import { ASK_EVERY_MS, RELAY_CARRYING_DETAIL } from "./relayCarrying";
 
@@ -48,9 +47,10 @@ vi.mock("@/components/ui/popover", () => ({
 const cancel = vi.fn();
 const focusGame = vi.fn();
 let running = true;
+let relayed = false;
 
 vi.mock("./PlayProvider", () => ({
-  usePlay: () => ({ running, focusGame, cancel }),
+  usePlay: () => ({ running, relayed, focusGame, cancel }),
 }));
 
 const relayTraffic = vi.fn();
@@ -70,14 +70,16 @@ function noRelay() {
 }
 
 /**
- * Draw the pill for a game hosted over `route`, and let the first poll land.
+ * Draw the pill for a run that is or is not the one going through the relay,
+ * and let the first poll land.
  *
- * The route goes in through `recordHostingRoute`, which is where the hosting
- * forms put it, so what is under test is the join between the two rather than a
- * prop a test chose.
+ * Which run the relay is carrying is settled by the launch and reaches the pill
+ * through `usePlay`, so it is stubbed here. That the launch sets it for the
+ * right run, and for no other, is `inGameBadgeRelayedRun.dom.test.tsx` driving
+ * the real provider (issue #2097).
  */
-async function drawBadge(route: HostingRoute) {
-  recordHostingRoute(route);
+async function drawBadge(throughTheRelay: boolean) {
+  relayed = throughTheRelay;
   await act(async () => {
     render(<InGameBadge />);
   });
@@ -104,11 +106,11 @@ function relaySays(): string | null {
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   running = true;
+  relayed = false;
   cancel.mockClear();
   focusGame.mockClear();
   relayTraffic.mockReset();
   noRelay();
-  recordHostingRoute(null);
 });
 
 afterEach(() => {
@@ -126,14 +128,14 @@ describe("an ordinary battle", () => {
     // A rate the backend would hand over if it were ever asked, so a pill that
     // drew it would say so loudly rather than passing on a null.
     carrying(41984);
-    await drawBadge("portMapped");
+    await drawBadge(false);
 
     expect(pillSays()).toBe("In game");
   });
 
   /** And it never asks, so an ordinary game pays nothing for this feature. */
   it("does not ask the backend anything, then or a second later", async () => {
-    await drawBadge("portMapped");
+    await drawBadge(false);
     await act(async () => {
       vi.advanceTimersByTime(ASK_EVERY_MS * 5);
     });
@@ -149,7 +151,7 @@ describe("an ordinary battle", () => {
    */
   it("ends the game from the X without asking", async () => {
     carrying(41984);
-    await drawBadge("portMapped");
+    await drawBadge(false);
 
     fireEvent.click(screen.getByRole("button", { name: "End game" }));
 
@@ -160,7 +162,7 @@ describe("an ordinary battle", () => {
 describe("a relayed battle", () => {
   it("says the relay is carrying the game, and how much", async () => {
     carrying(41984);
-    await drawBadge("relay");
+    await drawBadge(true);
 
     expect(pillSays()).toContain("Relaying 41.0 KB/s");
   });
@@ -172,7 +174,7 @@ describe("a relayed battle", () => {
    */
   it("says when nothing is going through it", async () => {
     carrying(0);
-    await drawBadge("relay");
+    await drawBadge(true);
 
     expect(pillSays()).toContain("Relaying nothing");
   });
@@ -180,7 +182,7 @@ describe("a relayed battle", () => {
   /** A figure that moves, because a figure that does not is not evidence. */
   it("follows the relay rather than showing the first figure it heard", async () => {
     carrying(41984);
-    await drawBadge("relay");
+    await drawBadge(true);
     expect(pillSays()).toContain("Relaying 41.0 KB/s");
 
     carrying(0);
@@ -199,7 +201,7 @@ describe("a relayed battle", () => {
    */
   it("draws nothing about the relay when the backend has nothing to say", async () => {
     noRelay();
-    await drawBadge("relay");
+    await drawBadge(true);
 
     expect(pillSays()).toBe("In game");
     fireEvent.click(screen.getByRole("button", { name: "End game" }));
@@ -209,7 +211,7 @@ describe("a relayed battle", () => {
   /** Ending it is two presses, and the first one says what the second will do. */
   it("asks before ending the game, and says who else it ends it for", async () => {
     carrying(41984);
-    await drawBadge("relay");
+    await drawBadge(true);
 
     fireEvent.click(screen.getByRole("button", { name: "End game" }));
     expect(cancel).not.toHaveBeenCalled();
@@ -236,7 +238,7 @@ describe("a relayed battle", () => {
 describe("a relay coilbox can see but cannot get a figure out of", () => {
   it("still asks before the X ends everybody's game", async () => {
     carrying(null);
-    await drawBadge("relay");
+    await drawBadge(true);
 
     fireEvent.click(screen.getByRole("button", { name: "End game" }));
 
@@ -254,7 +256,7 @@ describe("a relay coilbox can see but cannot get a figure out of", () => {
    */
   it("says a relay is there without inventing a rate for it", async () => {
     carrying(null);
-    await drawBadge("relay");
+    await drawBadge(true);
 
     expect(relaySays()).toBe("Relaying");
   });
@@ -266,7 +268,7 @@ describe("a relay coilbox can see but cannot get a figure out of", () => {
    */
   it("keeps the warning when a poll fails outright", async () => {
     carrying(41984);
-    await drawBadge("relay");
+    await drawBadge(true);
     expect(relaySays()).toBe("Relaying 41.0 KB/s");
 
     relayTraffic.mockRejectedValue(new Error("the call never landed"));
@@ -283,7 +285,7 @@ describe("a relay coilbox can see but cannot get a figure out of", () => {
 /** Nothing runs at all while no game is, which is most of the time. */
 it("asks nothing while no game is running", async () => {
   running = false;
-  await drawBadge("relay");
+  await drawBadge(true);
   await act(async () => {
     vi.advanceTimersByTime(ASK_EVERY_MS * 5);
   });
