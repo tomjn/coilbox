@@ -329,11 +329,20 @@ fn rebuilt_at(registry: &Registry, server_key: &str, addr: SocketAddr) {
 ///
 /// ## Why one line and not a new battle
 ///
-/// `RELAYEDHOST` carries the port as well as the address, which is the whole
-/// reason it does (`coilbox_lobby_protocol::command::relayed_host`). So a battle
-/// that has moved is one line, and the room, its players, its chat and its map
-/// choice all stay where they are. Closing the battle and opening another one
-/// would throw everybody in the room out to fix an address they never saw.
+/// `MOVERELAYEDHOST` carries the port as well as the address
+/// (`coilbox_lobby_protocol::command::move_relayed_host`). So a battle that has
+/// moved is one line, and the room, its players, its chat and its map choice all
+/// stay where they are. Closing the battle and opening another one would throw
+/// everybody in the room out to fix an address they never saw.
+///
+/// ## Why it is not a second `RELAYEDHOST`
+///
+/// Because the server cannot tell the two apart. A relay host reopening its
+/// battle sends `RELAYEDHOST` while the old battle is still open, and the
+/// server reads the staged address before the `LEAVEBATTLE` that closes the old
+/// one. Under one command that reopen reads as a move, applied to a battle
+/// about to be destroyed, and the replacement opens at the host's own
+/// unreachable address (issue #2098, ScarylePoo/uberserver#43).
 ///
 /// ## What this does not fix
 ///
@@ -344,11 +353,20 @@ fn rebuilt_at(registry: &Registry, server_key: &str, addr: SocketAddr) {
 /// which has gone, and the only way to correct it is the line below reaching
 /// them through the lobby.
 ///
-/// No lobby server implements `RELAYEDHOST` at all yet
-/// (ScarylePoo/uberserver#32), and that issue explicitly leaves out updating a
-/// battle that is already open. So today this line is read by nobody and the
-/// battle stays advertised where it was, which is the same silent degradation
-/// #2017 ships with rather than a new failure.
+/// No lobby server runs the move yet. ScarylePoo/uberserver#43 is the server
+/// half and it is open, so today this line is read by nobody and the battle
+/// stays advertised where it was, which is the same silent degradation #2017
+/// ships with rather than a new failure.
+///
+/// ## What the lobby says back
+///
+/// `BATTLEHOSTMOVED` when it took the move, which everybody watching the battle
+/// list gets and which reaches the host as confirmation. `MOVERELAYEDHOSTFAILED`
+/// when it did not, which only the host gets and which the host has to see: a
+/// refused move is a battle that is live and unreachable. Both are handled where
+/// every other line off the wire is, in the reducer, because nothing here is
+/// waiting on an answer. The rebuild that set this off happened while the host
+/// was doing something else, very likely playing the game the relay is carrying.
 ///
 /// ## Nothing to tell it
 ///
@@ -364,7 +382,7 @@ pub fn readvertise(relay: &HostedRelay, addr: SocketAddr) -> Option<String> {
         return None;
     }
     host.relayed = addr;
-    Some(command::relayed_host(addr.ip(), addr.port()))
+    Some(command::move_relayed_host(addr.ip(), addr.port()))
 }
 
 /// Wait for an agent that is already being driven to open an allocation.
@@ -974,13 +992,18 @@ mod tests {
 
     /// The whole of issue #2031. The relay comes back somewhere else and the
     /// battle the lobby is advertising moves with it, in one line.
+    ///
+    /// The line is `MOVERELAYEDHOST` rather than a second `RELAYEDHOST` because
+    /// the server reads a `RELAYEDHOST` from a host who is already hosting as
+    /// the address for the battle they are about to open, which is what a relay
+    /// host reopening a battle sends (issue #2098).
     #[test]
     fn a_relay_that_comes_back_elsewhere_moves_the_battle_with_it() {
         let relay = relay_slot(silent_agent());
 
         assert_eq!(
             readvertise(&relay, rebuilt()).as_deref(),
-            Some("RELAYEDHOST 198.51.100.9 30002")
+            Some("MOVERELAYEDHOST 198.51.100.9 30002")
         );
         assert_eq!(
             lock_or_recover(&relay).as_ref().map(|host| host.relayed),

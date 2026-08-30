@@ -251,9 +251,10 @@ pub fn open_battle(
 /// exists. A lobby that has not seen one of these opens the battle the way it
 /// always has.
 ///
-/// The port is here as well as in `OPENBATTLE` because a rebuilt allocation
-/// changes both, and issue #2031 has to be able to say so in one line without
-/// reopening the battle.
+/// The port is here as well as in `OPENBATTLE` so that this line and
+/// [`move_relayed_host`] are the same two fields in the same order, and so the
+/// server reads a whole address out of either without looking at the battle
+/// behind it.
 ///
 /// ScarylePoo/uberserver#32 is the server half, and no server runs it yet. A
 /// lobby that does not understand this line ignores it and advertises the
@@ -261,6 +262,35 @@ pub fn open_battle(
 /// exists to fix rather than a new failure.
 pub fn relayed_host(ip: std::net::IpAddr, port: u16) -> String {
     format!("RELAYEDHOST {ip} {port}")
+}
+
+/// `MOVERELAYEDHOST <ip> <port>`, telling the lobby that the battle this client
+/// is already hosting now lives somewhere else on the relay.
+///
+/// The sidecar rebuilds an allocation it has lost and the new one is at a
+/// different address, so the battle is advertised where nothing answers. One
+/// line moves it, and the room, its players, its chat and its map choice all
+/// stay where they are (issue #2031).
+///
+/// Same two fields as [`relayed_host`], and a separate command rather than a
+/// second `RELAYEDHOST` because the server cannot tell the two apart by
+/// context. A relay host reopening its battle sends `RELAYEDHOST` while the old
+/// battle is still open, and the server reads the staged address in
+/// `in_OPENBATTLE` before the `in_LEAVEBATTLE` that closes the old one. Reusing
+/// the command would have the server move a battle that is about to be
+/// destroyed and then open the replacement at the host's own unreachable
+/// address (ScarylePoo/uberserver#43).
+///
+/// The address is the one the TURN server handed out, never one we hoped for:
+/// the only caller is `relay_host::readvertise`, which is reached from an agent
+/// event saying the allocation is open.
+///
+/// Answered with `BATTLEHOSTMOVED` on success, broadcast to everybody watching
+/// the battle list, or `MOVERELAYEDHOSTFAILED` on refusal. A lobby that has
+/// never heard of it says nothing, and the battle stays advertised at the
+/// address that has gone.
+pub fn move_relayed_host(ip: std::net::IpAddr, port: u16) -> String {
+    format!("MOVERELAYEDHOST {ip} {port}")
 }
 
 /// `TURNCREDENTIALS`, asking the lobby to mint a short-lived credential for its
@@ -798,6 +828,38 @@ mod tests {
         let line = relayed_host("2001:db8::1".parse().expect("an address"), 30001);
         assert_eq!(line, "RELAYEDHOST 2001:db8::1 30001");
         assert_eq!(line.split(' ').count(), 3);
+    }
+
+    /// Moving a battle that is already open is its own command, carrying the
+    /// same two fields. Sharing the shape is what lets a host build either from
+    /// the same allocation, and not sharing the name is what stops the server
+    /// reading a reopen as a move.
+    #[test]
+    fn move_relayed_host_line() {
+        assert_eq!(
+            move_relayed_host("198.51.100.9".parse().expect("an address"), 30002),
+            "MOVERELAYEDHOST 198.51.100.9 30002"
+        );
+        assert_eq!(
+            move_relayed_host("2001:db8::1".parse().expect("an address"), 30002),
+            "MOVERELAYEDHOST 2001:db8::1 30002"
+        );
+    }
+
+    /// The two are different commands and neither is a prefix the other can be
+    /// mistaken for by anything reading the first word, which is how both the
+    /// server and coilbox's own test lobby tell them apart.
+    #[test]
+    fn moving_a_battle_and_opening_one_are_not_the_same_command() {
+        let ip = "198.51.100.9".parse().expect("an address");
+        let opening = relayed_host(ip, 30001);
+        let moving = move_relayed_host(ip, 30002);
+        assert_ne!(
+            opening.split(' ').next(),
+            moving.split(' ').next(),
+            "a server telling the two apart reads the command and nothing else"
+        );
+        assert!(!moving.starts_with("RELAYEDHOST "));
     }
 
     #[test]
