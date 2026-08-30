@@ -93,8 +93,8 @@ function Answer({
   if (busy || (!report && !error)) {
     return (
       <p className="pl-6 text-xs text-muted-foreground">
-        Asking your router… This takes a few seconds, and longer on a router
-        that is going to say no.
+        Looking for a way in… This takes a few seconds, and longer when nothing
+        is going to answer.
       </p>
     );
   }

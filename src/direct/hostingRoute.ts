@@ -166,6 +166,15 @@ export function advertisedGamePort(
  * The relay's own sentence does not name its cost. That is said once, next to
  * the checkbox that asks about it, which is where somebody is deciding rather
  * than reading what was decided (issue #2023).
+ *
+ * The bottom two routes name no router, and the mapped one does. A mapping only
+ * happens when there is a router to make it, so that sentence has its device
+ * established. The other two are reached by a request going unanswered, which is
+ * a home router with UPnP switched off and is equally a cloud instance that has
+ * no gateway of its own for the request to have reached (issue #2114). This
+ * sentence sits directly under the reachability panel in both hosting forms, so
+ * it saying "your router" while the panel above it does not is the kind of
+ * disagreement issue #2054 was about.
  */
 export function hostingRouteSummary(
   route: HostingRoute,
@@ -177,13 +186,13 @@ export function hostingRouteSummary(
     case "portMapped":
       return "Your router opened the port, so players connect straight to this machine.";
     case "relay":
-      return "Nothing opened on your router, so this battle goes through the server's relay.";
+      return "Nothing would open the ports, so this battle goes through the server's relay.";
     case "unreachable":
       if (lanRoom)
         return "Nobody outside this network can reach this room, so it is for the people on this network.";
       return relayDeclined
-        ? "Nothing opened on your router, and you have asked not to be relayed, so only players who can already reach this machine can join."
-        : "Nothing opened on your router and this server has no relay, so only players who can already reach this machine can join.";
+        ? "Nothing would open the ports, and you have asked not to be relayed, so only players who can already reach this machine can join."
+        : "Nothing would open the ports and this server has no relay, so only players who can already reach this machine can join.";
     case "unchecked":
       return lanRoom
         ? "People on this network can join. Turn on “Reachable over the internet” above to find out whether anybody outside can."
@@ -247,7 +256,7 @@ export function battleRouteLabel(
       return {
         word: "Relayed",
         detail:
-          "Nothing opened on your router, so this battle goes through the server's relay. That adds a hop, so pings here are a little worse than a direct game.",
+          "Nothing would open the ports, so this battle goes through the server's relay. That adds a hop, so pings here are a little worse than a direct game.",
       };
     case "unreachable":
       // Said without naming which of the two ways the ladder ended here, because
@@ -258,7 +267,7 @@ export function battleRouteLabel(
       return {
         word: "Not reachable",
         detail:
-          "Nothing opened on your router, so only players who can already reach this machine can join.",
+          "Nothing would open the ports, so only players who can already reach this machine can join.",
       };
   }
 }

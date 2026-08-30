@@ -12,6 +12,10 @@
  * The port opener is stood in for, because this machine has no public address to
  * be reached at and the milestone's other issues have already established that
  * the state cannot be reached on the network coilbox is developed on.
+ *
+ * The cloud instance at the bottom is issue #2114, and it is the other half of
+ * the same mistake: the panel stating a cause it had not established. That host
+ * is not on a public address, holds no mapping, and has no router either.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -44,13 +48,25 @@ const ON_PUBLIC_ADDRESS_WITH_A_BRIDGE: DirectReachability = {
   lanAddress: "172.17.0.1",
 };
 
-/** The same report from an ordinary home connection, where the refusal is real
- *  and every word of the advice applies. */
+/** The same report from an ordinary home connection, where there is a router and
+ *  it opened nothing. */
 const REFUSED: DirectReachability = {
   ...ON_PUBLIC_ADDRESS,
   lanAddress: "192.168.1.45",
   publicAddressIsLocal: false,
   confirmedPort: null,
+  problem:
+    "Nothing opened the ports. NAT-PMP: nothing answered on UDP 5351. UPnP: no UPnP gateway answered.",
+};
+
+/** A cloud instance whose provider translates its public address one to one, so
+ *  the card holds only 172.31.14.9 and the report is the one above with
+ *  different numbers in it (issue #2114). */
+const ON_A_CLOUD_INSTANCE: DirectReachability = {
+  ...REFUSED,
+  lanAddress: "172.31.14.9",
+  publicAddress: "13.40.72.15",
+  confirmedPort: 8452,
 };
 
 const report = vi.hoisted(() => ({
@@ -139,11 +155,9 @@ describe("the reachability panel for a host on a public address with a docker br
 });
 
 describe("the reachability panel for a host behind a router", () => {
-  it("still says the router refused, with the way out", () => {
+  it("still says nothing opened, with the way out", () => {
     show(REFUSED);
-    expect(
-      screen.getByText("Your router would not open the ports."),
-    ).toBeTruthy();
+    expect(screen.getByText("Nothing would open the ports.")).toBeTruthy();
     expect(document.body.textContent).toContain("UPnP or NAT-PMP");
     expect(document.body.textContent).toContain("192.168.1.45");
   });
@@ -156,5 +170,33 @@ describe("the reachability panel for a host behind a router", () => {
   it("is drawn as a problem", () => {
     show(REFUSED);
     expect(document.querySelector(".text-destructive")).not.toBeNull();
+  });
+});
+
+/**
+ * A cloud instance behind its provider's one to one NAT (issue #2114).
+ *
+ * Nothing in the report separates this host from the one above, so the panel
+ * cannot draw them differently and does not try. What it must do is give this
+ * reader something they can act on, which is a firewall rule in a browser and
+ * not a setting on a router they have not got.
+ */
+describe("the reachability panel for a host on a cloud instance", () => {
+  it("offers the firewall rule that is the only thing this host can change", () => {
+    show(ON_A_CLOUD_INSTANCE);
+    expect(screen.getByText("Nothing would open the ports.")).toBeTruthy();
+    expect(document.body.textContent).toContain("firewall or security group");
+    expect(document.body.textContent).toContain("TCP 8200 and UDP 8452");
+  });
+
+  // The detail line is Rust's sentence, and this only proves the panel still
+  // puts it on the screen for this host. That the sentence itself names no
+  // router is `portmap.rs`'s own test, since the string here is a fixture.
+  it("shows the two unanswered requests without calling either one a router", () => {
+    show(ON_A_CLOUD_INSTANCE);
+    expect(document.body.textContent).toContain(
+      "Nothing opened the ports. NAT-PMP:",
+    );
+    expect(document.body.textContent).not.toContain("Your router");
   });
 });

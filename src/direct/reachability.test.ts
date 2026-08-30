@@ -73,6 +73,33 @@ function onPublicAddressWithABridge(
   return onPublicAddress({ lanAddress: "172.17.0.1", ...over });
 }
 
+/**
+ * A cloud instance with a public IPv4, which the provider translates one to one.
+ *
+ * The card holds only the private address, so STUN comes back with one this
+ * machine does not hold and `publicAddressIsLocal` is false. Nothing answers the
+ * mapping request because there is no gateway to answer it. Byte for byte the
+ * same report as a home router with UPnP switched off, and the host has no
+ * router and no UPnP (issue #2114).
+ *
+ * The reflexive port survives a one to one NAT, which is why `confirmedPort` is
+ * set here and not on {@link report}. It is the nearest thing to a signal and it
+ * is not one: home routers preserve the source port too.
+ */
+function onCloudInstance(
+  over: Partial<DirectReachability> = {},
+): DirectReachability {
+  return report({
+    lanAddress: "172.31.14.9",
+    publicAddress: "13.40.72.15",
+    publicAddressIsLocal: false,
+    confirmedPort: 8452,
+    problem:
+      "Nothing opened the ports. NAT-PMP: nothing answered on UDP 5351. UPnP: no UPnP gateway answered.",
+    ...over,
+  });
+}
+
 describe("roomPorts", () => {
   // The whole point of the issue: one port gets everybody into the room and
   // then fails at launch, which is worse than not trying.
@@ -113,10 +140,31 @@ describe("reachabilityState", () => {
     ).toBe("doubleNat");
   });
 
-  it("calls a router that opened nothing refused", () => {
+  it("calls a run where nothing opened refused", () => {
     expect(reachabilityState(report({ problem: "no gateway" }))).toBe(
       "refused",
     );
+  });
+
+  /**
+   * A cloud instance behind its provider's one to one NAT, which is issue
+   * #2114's host. The wording it reads changed and the verdict did not, on
+   * purpose.
+   *
+   * Coilbox has no way to find out whether this host is reachable: the one to
+   * one NAT is transparent, and whether anybody gets in is a firewall rule in
+   * the provider's console that nothing here can see. So the two wrong answers
+   * are not symmetric. Calling them refused costs a reachable host a relay hop
+   * and a battle that works. Calling them direct sends whoever has not opened
+   * the firewall off to host a battle nobody can join, with no advice on the
+   * screen to act on and the relay skipped.
+   *
+   * The reflexive port is the nearest thing to a signal and it is set here, so
+   * this fails if a later change reads it as proof of the transparent case.
+   */
+  it("does not promote a cloud instance to direct on a preserved port", () => {
+    expect(reachabilityState(onCloudInstance())).toBe("refused");
+    expect(isReachable(onCloudInstance())).toBe(false);
   });
 
   // The ports are open and nothing would say what address they are behind.
@@ -300,9 +348,15 @@ describe("reachabilityHeadline", () => {
     expect(said).toContain("nobody outside can reach you");
   });
 
-  it("says the router refused when it did", () => {
+  // Two hosts, one report. Coilbox observed that nothing opened the ports and
+  // did not observe a router, so the headline says the first and not the second
+  // (issue #2114).
+  it("says nothing opened the ports rather than naming a device it did not find", () => {
     expect(reachabilityHeadline(report())).toBe(
-      "Your router would not open the ports.",
+      "Nothing would open the ports.",
+    );
+    expect(reachabilityHeadline(onCloudInstance())).toBe(
+      "Nothing would open the ports.",
     );
   });
 
@@ -325,6 +379,28 @@ describe("reachabilityAdvice", () => {
     expect(said).toContain("TCP 8200 and UDP 8452");
     expect(said).toContain("192.168.1.45");
     expect(said).toContain("UPnP or NAT-PMP");
+  });
+
+  /**
+   * The issue. Two hosts read this one sentence and coilbox cannot tell them
+   * apart, so it has to be true for both (issue #2114).
+   *
+   * The home host's way out is UPnP or a forwarding page. The cloud host's is a
+   * firewall rule in their provider's console, and every word of the old advice
+   * was a router setting they have not got. The reports are identical, so the
+   * advice names both rather than picking one and being wrong about half of
+   * them.
+   */
+  it("names the cloud firewall as well as the router setting, since it cannot tell which host is reading", () => {
+    const said = reachabilityAdvice(onCloudInstance()) ?? "";
+    expect(said).toContain("UPnP or NAT-PMP");
+    expect(said).toContain("firewall or security group");
+    expect(said).toContain("TCP 8200 and UDP 8452");
+    // And the identical report from a home connection reads the same, which is
+    // the whole reason this wording exists.
+    expect(reachabilityAdvice(report({ lanAddress: "172.31.14.9" }))).toBe(
+      said,
+    );
   });
 
   // A machine on no network at all still gets instructions worth reading.

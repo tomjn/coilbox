@@ -354,9 +354,14 @@ pub struct Refused {
 
 impl Refused {
     /// One sentence, for a host who is not going to read two.
+    ///
+    /// It says nothing opened rather than that a router refused, because this
+    /// side never established that there is a router. A cloud instance behind
+    /// its provider's one to one NAT gets exactly these two lines, and it has no
+    /// gateway of its own for either request to have reached (issue #2114).
     pub fn summary(&self) -> String {
         format!(
-            "Your router did not open the ports. NAT-PMP: {}. UPnP: {}.",
+            "Nothing opened the ports. NAT-PMP: {}. UPnP: {}.",
             self.nat_pmp, self.upnp
         )
     }
@@ -688,6 +693,25 @@ mod tests {
     #[test]
     fn nat_pmp_is_tried_before_upnp() {
         assert_eq!(ORDER, [Method::NatPmp, Method::Upnp]);
+    }
+
+    /// The detail line under the headline, and the reason it names no router.
+    ///
+    /// A cloud instance whose public address the provider translates one to one
+    /// produces exactly these two lines, because it has no gateway of its own
+    /// for either request to have reached. Saying "your router did not" asserted
+    /// a device this side never found (issue #2114).
+    #[test]
+    fn the_summary_says_nothing_opened_rather_than_that_a_router_refused() {
+        let said = Refused {
+            nat_pmp: "nothing answered on UDP 5351".to_string(),
+            upnp: "no UPnP gateway answered".to_string(),
+        }
+        .summary();
+        assert_eq!(
+            said,
+            "Nothing opened the ports. NAT-PMP: nothing answered on UDP 5351. UPnP: no UPnP gateway answered."
+        );
     }
 
     fn on(addr: [u8; 4], prefix_len: u8, gateway: Option<[u8; 4]>) -> LocalNet {
