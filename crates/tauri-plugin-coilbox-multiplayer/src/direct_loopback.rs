@@ -196,6 +196,7 @@ async fn room(host: &str, approve_joins: bool) -> Room {
     Room::start(RoomOptions {
         host: host.to_string(),
         ip: Some("127.0.0.1".to_string()),
+        public_address: None,
         // Port 0 so the OS picks a free one: the tests run in parallel, and the
         // real default (8200) may well be a room the developer is hosting.
         port: 0,
@@ -526,6 +527,7 @@ async fn a_host_whose_address_moves_takes_the_battle_with_them() {
             // Worked out rather than typed, which is what makes it the room's to
             // keep current.
             ip: None,
+            public_address: None,
             port: 0,
             approve_joins: false,
             advertise: false,
@@ -1243,6 +1245,7 @@ async fn a_port_in_use_is_refused_and_freed_again() {
     let clash = Room::start(RoomOptions {
         host: "alice".to_string(),
         ip: Some("127.0.0.1".to_string()),
+        public_address: None,
         port,
         approve_joins: false,
         advertise: false,
@@ -1261,6 +1264,7 @@ async fn a_port_in_use_is_refused_and_freed_again() {
     let again = Room::start(RoomOptions {
         host: "alice".to_string(),
         ip: Some("127.0.0.1".to_string()),
+        public_address: None,
         port,
         approve_joins: false,
         advertise: false,

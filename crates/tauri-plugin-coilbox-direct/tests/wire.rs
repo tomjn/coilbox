@@ -22,6 +22,7 @@ async fn room() -> Room {
     Room::start(RoomOptions {
         host: "alice".to_string(),
         ip: Some("192.168.0.5".to_string()),
+        public_address: None,
         port: 0,
         approve_joins: false,
         // No beacon: this is about the bytes on the TCP socket, and a room
@@ -293,6 +294,7 @@ async fn a_peer_that_stops_talking_is_dropped() {
     let (room, clock) = Room::start_on_a_manual_clock(RoomOptions {
         host: "alice".to_string(),
         ip: Some("192.168.0.5".to_string()),
+        public_address: None,
         port: 0,
         approve_joins: false,
         advertise: false,
@@ -346,6 +348,7 @@ async fn a_room_that_works_out_its_own_address_follows_it() {
             // The whole point: no address given, so the room works one out and
             // keeps working it out.
             ip: None,
+            public_address: None,
             port: 0,
             approve_joins: false,
             advertise: false,
@@ -417,6 +420,100 @@ async fn a_room_that_works_out_its_own_address_follows_it() {
         room.status().await.map(|s| s.ip).as_deref(),
         Some("10.8.0.2"),
         "and the host's own screen reads the same"
+    );
+
+    room.stop("done").await;
+}
+
+/// A VPS with Docker on it hands out the address the internet reaches it at,
+/// not the bridge.
+///
+/// The machine holds 172.17.0.1 and 209.35.91.246, and the address a room
+/// worked out for itself was the bridge, because that is the private one and
+/// `lan_address_of` prefers a private one. Everything else on that machine said
+/// the host was directly reachable and said it correctly, so a joiner reached
+/// the room at the public address and was then told to dial 172.17.0.1
+/// (issue #2130).
+///
+/// The second half is why the measurement is not simply copied into
+/// `RoomOptions::ip`. It is checked against the machine on every tick, so a
+/// machine that stops holding the address STUN saw goes back to working one out.
+///
+/// The address list is the test's to move, for the reason the test above says:
+/// moving this Mac's real addresses needs root. Everything downstream of it is
+/// the room on real sockets.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_room_on_a_public_address_announces_it_rather_than_the_docker_bridge() {
+    let bridge = Ipv4Addr::new(172, 17, 0, 1);
+    let public = Ipv4Addr::new(209, 35, 91, 246);
+    // The bridge first, which is the order `local_nets_named` ranks them in and
+    // the order that produced the bug.
+    let machine = Arc::new(Mutex::new(vec![bridge, public, Ipv4Addr::LOCALHOST]));
+    let reading = Arc::clone(&machine);
+
+    let room = Room::start_on_chosen_addresses(
+        RoomOptions {
+            host: "alice".to_string(),
+            ip: None,
+            // What the reachability panel measured: STUN came back with an
+            // address this machine holds itself, so there is no router in front.
+            public_address: Some(public),
+            port: 0,
+            approve_joins: false,
+            advertise: false,
+        },
+        Arc::new(move || reading.lock().expect("the address list").clone()),
+    )
+    .await
+    .expect("a free port");
+    assert_eq!(
+        room.status().await.map(|s| s.ip).as_deref(),
+        Some("209.35.91.246"),
+        "the room starts on the address the internet reaches this machine at"
+    );
+
+    let mut host = RawPeer::connect(&room).await;
+    host.log_in("alice").await;
+    host.send(&command::open_battle(
+        0,
+        0,
+        "*",
+        8452,
+        16,
+        -1,
+        0,
+        -1,
+        "spring",
+        "105.1.1",
+        "Red Comet",
+        "Tom's game",
+        "Beyond All Reason test-1234",
+    ))
+    .await;
+    host.read_to("REQUESTBATTLESTATUS").await;
+
+    let mut bob = RawPeer::connect(&room).await;
+    let burst = bob.log_in("bob").await;
+    assert!(
+        burst
+            .iter()
+            .any(|l| l.contains("BATTLEOPENED 1 0 0 alice 209.35.91.246 8452")),
+        "bob is given an address he can dial from outside: {burst:?}"
+    );
+    bob.send("JOINBATTLE 1 * s3cret").await;
+    bob.read_to("REQUESTBATTLESTATUS").await;
+
+    // The public interface goes away and the bridge is all that is left, so the
+    // measurement names an address the machine no longer has.
+    *machine.lock().expect("the address list") = vec![bridge, Ipv4Addr::LOCALHOST];
+
+    let told = tokio::time::timeout(Duration::from_secs(10), bob.read_to("BATTLEHOSTMOVED"))
+        .await
+        .expect("the room to drop an address the machine no longer holds");
+    assert_eq!(
+        told.last().map(String::as_str),
+        Some("BATTLEHOSTMOVED 1 172.17.0.1 8452"),
+        "a measurement the machine has outgrown is dropped, not obeyed"
     );
 
     room.stop("done").await;

@@ -83,6 +83,16 @@ pub struct RoomOptions {
     /// a new DHCP lease moves it without asking. An address the host named is
     /// theirs and is never second-guessed.
     pub ip: Option<String>,
+    /// The address the internet sees this machine at, when STUN saw one and it
+    /// is one of the machine's own. `None` when nobody looked, when nothing
+    /// answered, or when there is a router in front.
+    ///
+    /// A fact rather than an instruction, which is what keeps it apart from
+    /// [`RoomOptions::ip`]. `ip` is the host's decision and freezes the address
+    /// for as long as the room runs. This is a measurement, so the room checks
+    /// each tick whether the machine still holds it and goes back to working the
+    /// address out itself when it does not. See [`announced_address`].
+    pub public_address: Option<Ipv4Addr>,
     /// The port to listen on.
     pub port: u16,
     /// Whether a join waits for the host to answer it.
@@ -325,7 +335,7 @@ impl Room {
         let ip = options
             .ip
             .clone()
-            .or_else(|| lan_address_of(&addresses()))
+            .or_else(|| announced_address(&addresses(), options.public_address))
             .unwrap_or_else(|| "127.0.0.1".to_string());
 
         let state = RoomState::new(RoomConfig {
@@ -344,6 +354,7 @@ impl Room {
                 requests.clone(),
                 options.advertise,
                 track_address,
+                options.public_address,
                 addresses,
             ))
         });
@@ -433,6 +444,47 @@ impl Room {
     /// [`RoomStatus::ip`] from [`Room::status`] is where the room actually is.
     pub fn options(&self) -> &RoomOptions {
         &self.options
+    }
+}
+
+/// The address a room puts in `BATTLEOPENED`, out of the addresses this machine
+/// holds right now. Pure.
+///
+/// `public` is the address STUN saw, and is only ever `Some` when the machine
+/// holds that address itself. It wins, because it is the one address here that
+/// reaches everybody who can reach this machine at all. A peer outside has no
+/// other way in, and a peer on the local network gets there the long way round,
+/// out through their own gateway and back.
+///
+/// [`lan_address_of`] prefers a private address and is right to. It answers a
+/// different question, which is the address a room announces itself at on a LAN
+/// and the address a host is told to forward a port to, and both of those want
+/// the private one. Issues #2111 and #2115 both looked at that preference and
+/// left it alone, so this picks in front of it rather than changing it.
+///
+/// The case this exists for is a VPS with Docker on it (issue #2130). Its
+/// addresses are 209.35.91.246 and 172.17.0.1, [`lan_address_of`] takes the
+/// bridge, and every joiner is handed an address nothing but that machine's own
+/// containers can dial, while the reachability panel correctly tells the host
+/// they are on the internet and need nothing opened.
+///
+/// The address is checked against the current list on every tick rather than
+/// trusted, so a measurement taken when the room started cannot outlive the
+/// address it named. A machine that loses its public address falls back to
+/// [`lan_address_of`] on the next tick. That is the whole reason this is a
+/// second field rather than [`RoomOptions::ip`], which freezes the address and
+/// is the host's own answer to overrule everything here.
+///
+/// # What it does not settle
+///
+/// A peer that shares a network with this machine and has no route to the
+/// internet can still only dial the private address. Nothing here can tell that
+/// peer apart from any other, because a room has one address to give everybody
+/// (issue #2127).
+fn announced_address(addrs: &[Ipv4Addr], public: Option<Ipv4Addr>) -> Option<String> {
+    match public {
+        Some(ip) if addrs.contains(&ip) => Some(ip.to_string()),
+        _ => lan_address_of(addrs),
     }
 }
 
@@ -653,6 +705,7 @@ async fn upkeep_loop(
     requests: mpsc::UnboundedSender<Request>,
     advertise: bool,
     track_address: bool,
+    public_address: Option<Ipv4Addr>,
     addresses: Addresses,
 ) {
     let mut tick = tokio::time::interval(BEACON_INTERVAL);
@@ -675,7 +728,7 @@ async fn upkeep_loop(
         }
         let addresses = addresses();
         if track_address {
-            if let Some(ip) = lan_address_of(&addresses) {
+            if let Some(ip) = announced_address(&addresses, public_address) {
                 if requests.send(Request::AddressIs(ip)).is_err() {
                     return;
                 }
@@ -778,5 +831,42 @@ mod tests {
             Duration::from_secs(120),
         ]);
         assert_eq!(idle_peers(&peers, Instant::now()), vec![3]);
+    }
+
+    /// The rule itself, on addresses this machine does not have.
+    ///
+    /// `lan_address_of`'s own test holds the private preference, and that
+    /// preference is still what answers every case here bar the first.
+    #[test]
+    fn the_announced_address_is_the_public_one_only_while_the_machine_holds_it() {
+        let bridge = Ipv4Addr::new(172, 17, 0, 1);
+        let public = Ipv4Addr::new(209, 35, 91, 246);
+        let home = Ipv4Addr::new(192, 168, 1, 45);
+
+        // The VPS with Docker on it, which is the case this exists for.
+        assert_eq!(
+            announced_address(&[bridge, public], Some(public)).as_deref(),
+            Some("209.35.91.246")
+        );
+        // The same measurement after the machine lost that interface. A room
+        // re-reads this every tick, so this is the tick after.
+        assert_eq!(
+            announced_address(&[bridge], Some(public)).as_deref(),
+            Some("172.17.0.1")
+        );
+        // Nobody looked, which is every host who left the reachability box
+        // unticked. The private preference is untouched.
+        assert_eq!(
+            announced_address(&[bridge, public], None).as_deref(),
+            Some("172.17.0.1")
+        );
+        // The ordinary machine behind a router. There is no public address of
+        // its own to prefer and nothing here changes what it announces.
+        assert_eq!(
+            announced_address(&[home, Ipv4Addr::LOCALHOST], None).as_deref(),
+            Some("192.168.1.45")
+        );
+        // On no network at all, the caller's own loopback fallback answers.
+        assert_eq!(announced_address(&[], Some(public)), None);
     }
 }
