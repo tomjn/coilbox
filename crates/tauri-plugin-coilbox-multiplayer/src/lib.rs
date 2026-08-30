@@ -3896,6 +3896,7 @@ mod tests {
             engine_port: RELAYED_ENGINE_PORT,
             relayed: "198.51.100.9:30001".parse().expect("an address"),
             agent: Arc::new(relay_agent::RelayAgent::driving(Nothing, to_agent, |_| {})),
+            moves: relay_host::MoveWatch::default(),
         }
     }
 
@@ -4198,7 +4199,12 @@ mod tests {
         remember_relay(&registry, "alice@bar:8200", a_relay());
 
         let (saw, heard) = std::sync::mpsc::channel();
-        let listener = relay_host::listening(&registry, "alice@bar:8200", saw);
+        let listener = relay_host::listening(
+            &registry,
+            "alice@bar:8200",
+            saw,
+            relay_host::MOVE_ANSWER_PATIENCE,
+        );
         listener(coilbox_relay_protocol::Event::RelayOpen {
             addr: "198.51.100.9:30002".parse().expect("an address"),
         });
@@ -4224,12 +4230,91 @@ mod tests {
         let (registry, mut sent, _answers) = a_connection("COMPFLAGS u sp r");
 
         let (saw, heard) = std::sync::mpsc::channel();
-        let listener = relay_host::listening(&registry, "alice@bar:8200", saw);
+        let listener = relay_host::listening(
+            &registry,
+            "alice@bar:8200",
+            saw,
+            relay_host::MOVE_ANSWER_PATIENCE,
+        );
         listener(coilbox_relay_protocol::Event::RelayOpen {
             addr: "198.51.100.9:30001".parse().expect("an address"),
         });
 
         assert_eq!(queued(&mut sent), Vec::<String>::new());
+        drop(heard);
+    }
+
+    /// Every event a connection sent the frontend, by swapping the channel
+    /// `a_connection` installs, which throws them away, for one that keeps them.
+    fn recording_events(registry: &Registry, server_key: &str) -> Arc<Mutex<Vec<String>>> {
+        let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+        let recorder = Arc::clone(&seen);
+        let sink = lock_or_recover(registry)
+            .get(server_key)
+            .expect("the connection is registered")
+            .sink
+            .clone();
+        *lock_or_recover(&sink) = Channel::new(move |body| {
+            let json = match body {
+                tauri::ipc::InvokeResponseBody::Json(s) => s,
+                tauri::ipc::InvokeResponseBody::Raw(b) => String::from_utf8_lossy(&b).into_owned(),
+            };
+            lock_or_recover(&recorder).push(json);
+            Ok(())
+        });
+        seen
+    }
+
+    /// Issue #2102, from the sidecar's event to the host's screen, and the case
+    /// that is every lobby server alive today. Nobody implements
+    /// `MOVERELAYEDHOST` (ScarylePoo/uberserver#43), so nobody refuses it
+    /// either, and the battle is left in the list at an allocation that has gone
+    /// with the host hearing nothing.
+    ///
+    /// Driven with a patience a test can afford rather than
+    /// `MOVE_ANSWER_PATIENCE`, because what is under test is that the silence is
+    /// noticed and reaches the frontend, not how long the real budget is. The
+    /// budget's own derivation is on the constant.
+    #[test]
+    fn a_move_no_lobby_answers_tells_the_host_the_battle_cannot_be_reached() {
+        let (registry, mut sent, _answers) = a_connection("COMPFLAGS u sp r");
+        remember_relay(&registry, "alice@bar:8200", a_relay());
+        let seen = recording_events(&registry, "alice@bar:8200");
+
+        let (saw, heard) = std::sync::mpsc::channel();
+        let listener =
+            relay_host::listening(&registry, "alice@bar:8200", saw, Duration::from_millis(50));
+        listener(coilbox_relay_protocol::Event::RelayOpen {
+            addr: "198.51.100.9:30002".parse().expect("an address"),
+        });
+
+        assert_eq!(
+            queued(&mut sent),
+            vec!["MOVERELAYEDHOST 198.51.100.9 30002"],
+            "the line has to go out before anybody can call it unanswered"
+        );
+        // And nothing is said on the way out. A verdict passed at the moment the
+        // line was written would condemn a lobby that answers instantly.
+        assert!(
+            !lock_or_recover(&seen)
+                .join("\n")
+                .contains("relayedHostMove"),
+            "the host must not be warned before the lobby has had its turn"
+        );
+
+        let deadline = std::time::Instant::now() + HOSTING_PATIENCE;
+        let told = loop {
+            let told = lock_or_recover(&seen).join("\n");
+            if told.contains("relayedHostMoveUnanswered") || std::time::Instant::now() > deadline {
+                break told;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        assert!(
+            told.contains(r#""kind":"relayedHostMoveUnanswered""#),
+            "a lobby that says nothing leaves the same unreachable battle as one that refuses, \
+             and the frontend was sent: {told}"
+        );
         drop(heard);
     }
 

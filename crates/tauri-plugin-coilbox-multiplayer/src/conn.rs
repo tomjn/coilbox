@@ -587,6 +587,15 @@ async fn run_loop(
                         if let Delta::RelayedHostRefused { reason } = &delta {
                             crate::relay_host::note_refused_address(&relay_refused, reason);
                         }
+                        // And the lobby has said something about a battle of
+                        // ours moving, which is the only proof there is that it
+                        // read the `MOVERELAYEDHOST` behind it. Whichever way it
+                        // answered, it answered, so the wait that would have
+                        // called the battle unreachable stands down (issue
+                        // #2102).
+                        if crate::relay_host::move_answer_in(&delta, &state) {
+                            crate::relay_host::move_answered(&relay);
+                        }
                         emit(&sink, LobbyEvent::Delta { delta });
                     }
 
@@ -959,6 +968,45 @@ mod tests {
         );
     }
 
+    /// Issue #2102, and the half of it that must not fire. A lobby that does
+    /// answer a `MOVERELAYEDHOST` stands the wait down, so a host whose battle
+    /// moved successfully is never told nobody can reach it.
+    ///
+    /// Driven through the real connection task because the wiring is the whole
+    /// question: the answer arrives as an ordinary battle-list line, and unless
+    /// the read loop recognises it as ours, every relayed battle on every server
+    /// gets the warning whether the move worked or not.
+    #[tokio::test]
+    async fn a_lobby_that_answers_a_move_stands_the_warning_down() {
+        let (addr, lobby_says) = lobby_that_says_what_it_is_told().await;
+        let (seen, events) = recording_channel();
+        let (registry, key) = handshake(addr, LoginMode::Login, events).await;
+        put_a_relay_behind(&registry, &key, silent_agent());
+
+        let relay = lock_or_recover(&registry)
+            .get(&key)
+            .map(|conn| Arc::clone(&conn.relay))
+            .expect("the connection is registered");
+        let moved = crate::relay_host::readvertise(&relay, "198.51.100.4:30002".parse().unwrap())
+            .expect("the relay moved, which is what put the line on the wire");
+
+        for line in [
+            "BATTLEOPENED 9 0 0 alice 198.51.100.9 30001 8 0 0 -1 spring\t105\tComet \
+             Catcher\tMine\tBAR",
+            "BATTLEHOSTMOVED 9 198.51.100.4 30002",
+        ] {
+            lobby_says
+                .send(line.to_string())
+                .expect("the lobby is listening");
+        }
+        wait_until_heard(&seen, "battleHostMoved").await;
+
+        assert!(
+            !crate::relay_host::move_unanswered(&relay, moved.number),
+            "the lobby moved the battle, so the wait on that move has to be over"
+        );
+    }
+
     /// The reason the address is handed off rather than acted on here.
     /// `allow_joiner` waits for the agent, and the agent does not answer an
     /// `allowPeer` until it has a relay, so acting on this line inline would
@@ -1090,6 +1138,7 @@ mod tests {
             engine_port: 8452,
             relayed: "198.51.100.9:30001".parse().expect("an address"),
             agent: Arc::new(agent),
+            moves: crate::relay_host::MoveWatch::default(),
         });
     }
 

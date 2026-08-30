@@ -116,6 +116,30 @@ pub const ALLOCATION_PATIENCE: Duration = Duration::from_secs(25);
 pub const ALLOW_JOINER_PATIENCE: Duration =
     Duration::from_secs(32).saturating_add(ALLOCATION_PATIENCE);
 
+/// How long to wait for the lobby to answer a `MOVERELAYEDHOST` before deciding
+/// it never will, and telling the host their battle cannot be reached.
+///
+/// The login handshake's budget, because it is the same round trip to the same
+/// server. `mp_turn_credentials` and the `OPENBATTLE` wait already reuse
+/// [`crate::conn::READY_TIMEOUT`] on that argument, and the move is a plainer
+/// case than either: one line out, one line back, on a connection that is
+/// already up and logged in.
+///
+/// Measured on 30 August 2026 against the three TASServer lobbies coilbox ships
+/// with, 30 `LISTCOMPFLAGS`-to-`COMPFLAGS` round trips each, no login. Slowest
+/// of the 90 was 234 ms, on `lobby.springrts.com`. Medians were 33.5 ms there,
+/// 17.9 ms on `lobby.techa-rts.com` and 32.8 ms on
+/// `server4.beyondallreason.info` over TLS. So the budget is around 85 times the
+/// worst round trip anybody measured, which is the headroom a real
+/// `MOVERELAYEDHOST` needs and `LISTCOMPFLAGS` does not: the answer is a
+/// broadcast to every client that asked for relay support, not a constant read
+/// back out of memory.
+///
+/// Being generous costs only how late the warning is, because nothing waits on
+/// it and the host is playing. Being mean costs an error toast telling somebody
+/// their working battle is unreachable, which is the failure worth avoiding.
+pub const MOVE_ANSWER_PATIENCE: Duration = crate::conn::READY_TIMEOUT;
+
 /// A relay carrying a battle, once its allocation is open.
 ///
 /// Cannot be constructed anywhere but [`waiting_on`], and only from an agent
@@ -144,6 +168,47 @@ pub struct RelayHost {
     /// launching the engine behind a join that is waiting out a relay rebuild
     /// would be a worse failure than the one this fixes.
     pub agent: Arc<RelayAgent>,
+    /// What the lobby has made of the moves this battle has asked for. See
+    /// [`MoveWatch`].
+    pub moves: MoveWatch,
+}
+
+/// What has become of the `MOVERELAYEDHOST` lines this battle has sent.
+///
+/// It lives on the [`RelayHost`] so that its life is the battle's. A new
+/// hosting attempt builds a new `RelayHost` and so starts with a clean one, and
+/// a battle that has ended leaves an empty [`HostedRelay`] with nothing here to
+/// warn about. There is no reset to forget to call.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MoveWatch {
+    /// How many moves this battle has asked for, which is also what numbers
+    /// them. A wait that finds a higher number than the one it armed on has been
+    /// overtaken by a later rebuild, and it is that rebuild's wait that decides
+    /// whether the lobby is listening.
+    sent: u64,
+    /// Whether the lobby has answered move number [`Self::sent`], either way.
+    answered: bool,
+    /// Whether the host has already been told this battle cannot be reached.
+    ///
+    /// Told once per battle, not once per rebuild. No lobby server implements
+    /// the move yet (ScarylePoo/uberserver#43), so every rebuild on every server
+    /// there is goes unanswered, and a relay that keeps losing its allocation
+    /// would otherwise put the same error in front of the host every time it
+    /// came back. The first one is news. The second says nothing the first did
+    /// not, because the battle has been unreachable since then.
+    told: bool,
+}
+
+/// A `MOVERELAYEDHOST` to send, and the number to wait on an answer to it
+/// under.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Move {
+    /// The line for the lobby.
+    pub line: String,
+    /// Which of this battle's moves this is. Passed back to [`move_unanswered`]
+    /// once the wait is over, so a wait that a later rebuild overtook knows to
+    /// stand down.
+    pub number: u64,
 }
 
 /// Hand-written because the control channel is a boxed writer and cannot be
@@ -264,7 +329,7 @@ pub async fn allocate(
         &binary,
         &battle,
         run_file,
-        listening(registry, server_key, saw),
+        listening(registry, server_key, saw, MOVE_ANSWER_PATIENCE),
     )
     .map_err(NoRelay::NotStarted)?;
 
@@ -282,16 +347,21 @@ pub async fn allocate(
 ///
 /// So the two are one listener rather than two, and it outlives the wait
 /// deliberately. It runs on the agent's own reading thread.
+///
+/// `patience` is how long the lobby gets to answer the move a rebuild sends, and
+/// it is a parameter for the same reason [`allocate`]'s is: the caller owns the
+/// budget and the tests own the clock.
 pub(crate) fn listening(
     registry: &Registry,
     server_key: &str,
     saw: mpsc::Sender<Event>,
+    patience: Duration,
 ) -> impl Fn(Event) + Send + 'static {
     let registry = Arc::clone(registry);
     let server_key = server_key.to_string();
     move |event| {
         if let Event::RelayOpen { addr } = &event {
-            rebuilt_at(&registry, &server_key, *addr);
+            rebuilt_at(&registry, &server_key, *addr, patience);
         }
         let _ = saw.send(event);
     }
@@ -310,22 +380,122 @@ pub(crate) fn listening(
 /// afterwards to queue the line. Everything else in coilbox that touches both
 /// locks holds the registry's while it takes the relay's, so this must not hold
 /// the relay's while it takes the registry's.
-fn rebuilt_at(registry: &Registry, server_key: &str, addr: SocketAddr) {
-    let relay = lock_or_recover(registry)
+fn rebuilt_at(registry: &Registry, server_key: &str, addr: SocketAddr, patience: Duration) {
+    let held = lock_or_recover(registry)
         .get(server_key)
-        .map(|conn| Arc::clone(&conn.relay));
-    let Some(relay) = relay else { return };
-    let Some(line) = readvertise(&relay, addr) else {
+        .map(|conn| (Arc::clone(&conn.relay), conn.sink.clone()));
+    let Some((relay, sink)) = held else { return };
+    let Some(moved) = readvertise(&relay, addr) else {
         return;
     };
-    // Discarded because the only failure is a connection that has gone, and a
-    // lobby coilbox is no longer talking to cannot be told anything about a
-    // battle it is no longer advertising.
-    let _ = crate::enqueue(registry, server_key, line);
+    // A connection that has gone cannot be told anything about a battle it is no
+    // longer advertising, and it cannot answer either, so there is nothing to
+    // wait for and nothing to warn about.
+    if !crate::enqueue(registry, server_key, moved.line).success {
+        return;
+    }
+    warn_if_unanswered(relay, moved.number, patience, move || {
+        crate::conn::emit(
+            &sink,
+            crate::conn::LobbyEvent::Delta {
+                delta: Delta::RelayedHostMoveUnanswered,
+            },
+        );
+    });
+}
+
+/// Tell the host their battle cannot be reached if the lobby has not answered
+/// move `number` within `patience`.
+///
+/// ## Why a wait at all
+///
+/// Because nothing else can tell us. Coilbox only relay-hosts on a server whose
+/// compatibility flags carried `r`, which `turn::credentials` makes structural
+/// by refusing a credential without one, so there is no relayed battle on a
+/// server that never claimed a relay and no move to go unanswered there. But `r`
+/// is one flag for the whole of relay hosting and carries no version, and
+/// `MOVERELAYEDHOST` was added to the protocol long after it
+/// (ScarylePoo/uberserver#43, still open). So a server that advertised `r` says
+/// nothing about whether it knows this command, and today none of them do. What
+/// the server does with the line is the only evidence there is.
+///
+/// ## Why a thread
+///
+/// The same reason [`let_joiner_through`] uses one. The caller is the relay
+/// agent's own reading thread, which has no runtime under it, and the wait is
+/// long enough that spending the agent's reader on it would stop coilbox hearing
+/// anything else the sidecar says.
+///
+/// One thread per rebuild, each living as long as the lobby has to answer.
+fn warn_if_unanswered(
+    relay: HostedRelay,
+    number: u64,
+    patience: Duration,
+    unanswered: impl FnOnce() + Send + 'static,
+) {
+    std::thread::spawn(move || {
+        std::thread::sleep(patience);
+        if move_unanswered(&relay, number) {
+            unanswered();
+        }
+    });
+}
+
+/// The lobby has answered a move of ours, so the wait on it ends.
+///
+/// Called for both answers, because either is the lobby proving it read the
+/// line. Which of the two it was is the reducer's business and the host hears
+/// about a refusal from there.
+pub fn move_answered(relay: &HostedRelay) {
+    if let Some(host) = lock_or_recover(relay).as_mut() {
+        host.moves.answered = true;
+    }
+}
+
+/// Whether move `number` ran out of patience unanswered and the host has not
+/// been told about this battle yet. Marks them told, because it is the caller
+/// that goes on to tell them.
+///
+/// False on three counts, all of them ordinary. The lobby answered. A later
+/// rebuild has already sent another move, so this wait has been overtaken and
+/// the later one is the one that decides. Or the battle is over and the slot is
+/// empty, and a battle nobody is in does not need to be reachable.
+pub(crate) fn move_unanswered(relay: &HostedRelay, number: u64) -> bool {
+    let mut held = lock_or_recover(relay);
+    let Some(host) = held.as_mut() else {
+        return false;
+    };
+    if host.moves.sent != number || host.moves.answered || host.moves.told {
+        return false;
+    }
+    host.moves.told = true;
+    true
+}
+
+/// Whether a delta the reducer just produced is the lobby answering a
+/// `MOVERELAYEDHOST` of ours.
+///
+/// The twin of [`open_answer_in`], and it sits beside it in the same loop.
+///
+/// `BATTLEHOSTMOVED` goes to everybody watching the battle list, so it only
+/// counts when the battle it names is one we are hosting. Somebody else's relay
+/// moving says nothing about whether this lobby read our line.
+/// `MOVERELAYEDHOSTFAILED` only ever reaches the client that sent one.
+pub(crate) fn move_answer_in(delta: &Delta, state: &Mutex<LobbyState>) -> bool {
+    match delta {
+        Delta::BattleHostMoved { id } => {
+            let state = lock_or_recover(state);
+            let ours = || Some(state.battles.get(id)?.host == *state.my_username.as_ref()?);
+            ours().unwrap_or(false)
+        }
+        Delta::RelayedHostMoveRefused { .. } => true,
+        _ => false,
+    }
 }
 
 /// Move a hosted battle to the address its relay came back at, and give back the
-/// line that tells the lobby. `None` when there is nothing to tell it.
+/// line that tells the lobby along with the number to wait on its answer under.
+/// `None` when there is nothing to tell it.
 ///
 /// ## Why one line and not a new battle
 ///
@@ -355,8 +525,7 @@ fn rebuilt_at(registry: &Registry, server_key: &str, addr: SocketAddr) {
 ///
 /// No lobby server runs the move yet. ScarylePoo/uberserver#43 is the server
 /// half and it is open, so today this line is read by nobody and the battle
-/// stays advertised where it was, which is the same silent degradation #2017
-/// ships with rather than a new failure.
+/// stays advertised where it was.
 ///
 /// ## What the lobby says back
 ///
@@ -364,9 +533,14 @@ fn rebuilt_at(registry: &Registry, server_key: &str, addr: SocketAddr) {
 /// list gets and which reaches the host as confirmation. `MOVERELAYEDHOSTFAILED`
 /// when it did not, which only the host gets and which the host has to see: a
 /// refused move is a battle that is live and unreachable. Both are handled where
-/// every other line off the wire is, in the reducer, because nothing here is
-/// waiting on an answer. The rebuild that set this off happened while the host
+/// every other line off the wire is, in the reducer, because nothing is waiting
+/// on the answer as such. The rebuild that set this off happened while the host
 /// was doing something else, very likely playing the game the relay is carrying.
+///
+/// Or nothing at all, on every lobby that exists today, which is the same
+/// unreachable battle as a refusal with nobody saying so. That one is not on the
+/// wire to be reduced, so [`warn_if_unanswered`] is what notices it and
+/// [`MoveWatch`] is what counts the moves it needs to notice with (issue #2102).
 ///
 /// ## Nothing to tell it
 ///
@@ -375,14 +549,22 @@ fn rebuilt_at(registry: &Registry, server_key: &str, addr: SocketAddr) {
 /// connection during the wait for the first allocation. Or the relay came back
 /// exactly where it was, which a TURN server is free to do, and a battle that has
 /// not moved is not news.
-pub fn readvertise(relay: &HostedRelay, addr: SocketAddr) -> Option<String> {
+pub fn readvertise(relay: &HostedRelay, addr: SocketAddr) -> Option<Move> {
     let mut held = lock_or_recover(relay);
     let host = held.as_mut()?;
     if host.relayed == addr {
         return None;
     }
     host.relayed = addr;
-    Some(command::move_relayed_host(addr.ip(), addr.port()))
+    // Numbered here rather than by the caller, under the same lock that moved
+    // the address, so a second rebuild cannot slip between the two and leave a
+    // wait armed on a number that was never sent.
+    host.moves.sent += 1;
+    host.moves.answered = false;
+    Some(Move {
+        line: command::move_relayed_host(addr.ip(), addr.port()),
+        number: host.moves.sent,
+    })
 }
 
 /// Wait for an agent that is already being driven to open an allocation.
@@ -408,6 +590,7 @@ pub fn waiting_on(
                     engine_port,
                     relayed: addr,
                     agent: Arc::new(agent),
+                    moves: MoveWatch::default(),
                 })
             }
             // The agent is going to try again, and it may well succeed, but the
@@ -1002,8 +1185,11 @@ mod tests {
         let relay = relay_slot(silent_agent());
 
         assert_eq!(
-            readvertise(&relay, rebuilt()).as_deref(),
-            Some("MOVERELAYEDHOST 198.51.100.9 30002")
+            readvertise(&relay, rebuilt()),
+            Some(Move {
+                line: "MOVERELAYEDHOST 198.51.100.9 30002".to_string(),
+                number: 1,
+            })
         );
         assert_eq!(
             lock_or_recover(&relay).as_ref().map(|host| host.relayed),
@@ -1029,6 +1215,156 @@ mod tests {
     fn the_address_a_battle_opens_at_is_not_advertised_a_second_time() {
         let opening = HostedRelay::default();
         assert_eq!(readvertise(&opening, relayed()), None);
+    }
+
+    /// Somewhere else again, which a relay that keeps losing its allocation
+    /// produces.
+    fn rebuilt_again() -> SocketAddr {
+        SocketAddr::from((Ipv4Addr::new(198, 51, 100, 9), 30003))
+    }
+
+    /// Issue #2102, and the case that is every lobby server there is. Nobody
+    /// implements `MOVERELAYEDHOST`, so nobody refuses it either, and the host
+    /// is left with a battle that is still in the list and cannot be joined.
+    #[test]
+    fn a_move_the_lobby_never_answers_reaches_the_host() {
+        let relay = relay_slot(silent_agent());
+        let moved = readvertise(&relay, rebuilt()).expect("the relay moved");
+
+        assert!(
+            move_unanswered(&relay, moved.number),
+            "silence is the same unreachable battle as a refusal, so it has to be told"
+        );
+    }
+
+    /// The lobby answered, either way, so there is nothing to warn about. A
+    /// refusal is the reducer's to raise and an ack is the battle working.
+    #[test]
+    fn a_move_the_lobby_answers_says_nothing_more() {
+        let relay = relay_slot(silent_agent());
+        let moved = readvertise(&relay, rebuilt()).expect("the relay moved");
+
+        move_answered(&relay);
+
+        assert!(!move_unanswered(&relay, moved.number));
+    }
+
+    /// Told once per battle, not once per rebuild. A relay that keeps losing its
+    /// allocation on a lobby that never answers would otherwise raise the same
+    /// error every time it came back, about a battle that has been unreachable
+    /// since the first one.
+    #[test]
+    fn a_second_unanswered_move_does_not_tell_the_host_twice() {
+        let relay = relay_slot(silent_agent());
+
+        let first = readvertise(&relay, rebuilt()).expect("the relay moved");
+        assert!(move_unanswered(&relay, first.number));
+
+        let again = readvertise(&relay, rebuilt_again()).expect("the relay moved again");
+        assert_eq!(again.number, 2, "each move is numbered as it goes out");
+        assert!(!move_unanswered(&relay, again.number));
+    }
+
+    /// A wait that a later rebuild overtook. The lobby has had no time to answer
+    /// the newer move, so calling the battle unreachable off the older one would
+    /// be a warning about a question that is still open.
+    #[test]
+    fn a_move_a_later_rebuild_overtook_stands_down() {
+        let relay = relay_slot(silent_agent());
+        let first = readvertise(&relay, rebuilt()).expect("the relay moved");
+        let _second = readvertise(&relay, rebuilt_again()).expect("the relay moved again");
+
+        assert!(!move_unanswered(&relay, first.number));
+    }
+
+    /// The battle ended while the lobby was being waited on. Nobody is in it and
+    /// nobody is going to join it, so there is nothing to tell the host.
+    #[test]
+    fn a_battle_that_is_over_before_the_wait_ends_says_nothing() {
+        let relay = relay_slot(silent_agent());
+        let moved = readvertise(&relay, rebuilt()).expect("the relay moved");
+
+        *lock_or_recover(&relay) = None;
+
+        assert!(!move_unanswered(&relay, moved.number));
+    }
+
+    /// The wiring around all of the above: the wait runs on a thread of its own
+    /// and calls back when it is over. Driven with a patience a test can afford
+    /// rather than [`MOVE_ANSWER_PATIENCE`], because what is under test is that
+    /// the callback happens and not how long the real budget is.
+    #[test]
+    fn the_wait_for_an_answer_runs_off_the_calling_thread() {
+        let relay = relay_slot(silent_agent());
+        let moved = readvertise(&relay, rebuilt()).expect("the relay moved");
+        let told = Arc::new(Mutex::new(false));
+
+        let flag = Arc::clone(&told);
+        warn_if_unanswered(
+            Arc::clone(&relay),
+            moved.number,
+            Duration::from_millis(50),
+            move || *lock_or_recover(&flag) = true,
+        );
+        // Nothing has been said yet, which is what makes this a wait rather than
+        // a verdict passed at the moment the line went out.
+        assert!(!*lock_or_recover(&told));
+
+        let gave_up_at = std::time::Instant::now() + PATIENCE;
+        while !*lock_or_recover(&told) && std::time::Instant::now() < gave_up_at {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(
+            *lock_or_recover(&told),
+            "the host has to be told once the lobby's time is up"
+        );
+    }
+
+    /// A state with a battle in it, hosted by whoever `host` names, and logged in
+    /// as alice. Folded through the real parser so nothing here has to know the
+    /// shape of a `BATTLEOPENED`.
+    fn watching_a_battle_hosted_by(host: &str) -> Mutex<LobbyState> {
+        use coilbox_lobby_protocol::{parse_line, reduce};
+
+        let mut state = LobbyState::new();
+        reduce(&mut state, parse_line("ACCEPTED alice"));
+        reduce(
+            &mut state,
+            parse_line(&format!(
+                "BATTLEOPENED 9 0 0 {host} 198.51.100.9 30001 8 0 0 -1 spring\t105\tComet \
+                 Catcher\tTheirs\tBAR"
+            )),
+        );
+        Mutex::new(state)
+    }
+
+    /// Which lines off the wire count as the lobby having read our move.
+    ///
+    /// `BATTLEHOSTMOVED` is a battle-list line everybody with relay support
+    /// gets, so somebody else's relay moving proves nothing about ours. Reading
+    /// it as an answer would leave a lobby that ignores the command looking like
+    /// one that took it, for as long as anybody else on the server is relaying.
+    #[test]
+    fn only_a_move_of_our_own_battle_counts_as_an_answer() {
+        let ours = watching_a_battle_hosted_by("alice");
+        let theirs = watching_a_battle_hosted_by("bob");
+
+        assert!(move_answer_in(&Delta::BattleHostMoved { id: 9 }, &ours));
+        assert!(!move_answer_in(&Delta::BattleHostMoved { id: 9 }, &theirs));
+        // A battle this client holds nothing for, which the reducer raises a
+        // delta for anyway because the list is about to be told about it.
+        assert!(!move_answer_in(&Delta::BattleHostMoved { id: 4 }, &ours));
+        // The refusal only ever reaches the client that sent the line, so it
+        // needs no such check.
+        assert!(move_answer_in(
+            &Delta::RelayedHostMoveRefused {
+                reason: "you are not hosting a battle to move".to_string()
+            },
+            &theirs
+        ));
+        // And an unrelated line is not an answer, or every busy lobby would look
+        // like one that read the move.
+        assert!(!move_answer_in(&Delta::BattleOpened { id: 9 }, &ours));
     }
 
     /// A joiner's address, nothing like the relayed address above so a test that
