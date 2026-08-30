@@ -270,6 +270,88 @@ fn a_running_sidecar_holds_its_own_run_file_and_says_it_does() {
     agent.stop().expect("a running sidecar is still reachable");
 }
 
+/// End a sidecar this test holds no handle on.
+///
+/// Every other test here stops its sidecar politely, and one carrying a game
+/// cannot be: it refuses a stop note, which is the whole point of the note being
+/// a request. So the process has to go, or the test leaves one behind for the
+/// four minutes of the traffic backstop.
+fn end_the_sidecar(pid: u32) {
+    let (program, args): (&str, Vec<String>) = if cfg!(windows) {
+        ("taskkill", vec!["/PID".into(), pid.to_string(), "/F".into()])
+    } else {
+        ("kill", vec!["-9".into(), pid.to_string()])
+    };
+    let _ = std::process::Command::new(program).args(args).status();
+}
+
+/// The whole of issue #2074 across both processes. A real sidecar writes down
+/// what it is carrying, and a coilbox holding no pipe to it reads the figure
+/// back off the disk.
+///
+/// The seam neither side's unit tests can reach. The sidecar's own tests read
+/// the record it wrote in the same process, and coilbox's read one a test wrote
+/// by hand, so a record written to the wrong path, in the wrong shape, or by a
+/// process whose id does not match the run file would leave both green and put
+/// nothing on the host's screen.
+///
+/// coilbox's end of the control channel is let go of first, because that is the
+/// state this is about: a host who closed coilbox mid-game and opened it again.
+/// What that does not reach is a stdout that has genuinely broken, since the
+/// reader thread this test started is still holding the other end of it.
+#[test]
+fn a_coilbox_with_no_pipe_can_read_what_a_running_sidecar_is_carrying() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let run_file = dir.path().join("relay").join("agent.json");
+
+    let (agent, seen) = start(&run_file);
+    let Event::RelayOpen { addr } = hears(&seen) else {
+        panic!("the first thing a sidecar says is where players send");
+    };
+    let pid = relay_sidecar::already_relaying(&run_file).expect("a running sidecar");
+
+    // coilbox closing mid-game, which is what leaves the sidecar deciding for
+    // itself and nobody listening to what it says.
+    drop(agent);
+
+    // A relay that is up and quiet, which has to read as a real zero rather than
+    // as no record. Without this the test below would pass on a record that only
+    // ever appeared once traffic did.
+    let deadline = std::time::Instant::now() + PATIENCE;
+    while std::time::Instant::now() < deadline
+        && coilbox_relay_protocol::carrying_now(&run_file, pid).is_none()
+    {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert_eq!(
+        coilbox_relay_protocol::carrying_now(&run_file, pid),
+        Some(0),
+        "a sidecar that has written nothing leaves a reopened coilbox with nothing to say"
+    );
+
+    // A player's engine talking through the relay, which is what a game in
+    // progress looks like from out here. Sent on a shorter interval than the
+    // sidecar reports on, so every interval it measures has traffic in it.
+    let player = UdpSocket::bind("127.0.0.1:0").expect("a free loopback port");
+    let relay = std::net::SocketAddr::from(([127, 0, 0, 1], addr.port()));
+    let deadline = std::time::Instant::now() + PATIENCE;
+    let mut carried = None;
+    while std::time::Instant::now() < deadline && carried.is_none() {
+        player
+            .send_to(b"a datagram from a player", relay)
+            .expect("the relay is bound");
+        std::thread::sleep(Duration::from_millis(100));
+        carried = coilbox_relay_protocol::carrying_now(&run_file, pid).filter(|&bytes| bytes > 0);
+    }
+
+    end_the_sidecar(pid);
+    assert!(
+        carried.is_some(),
+        "a game going through the relay has to reach a coilbox that can only read the disk, \
+         or somebody who reopened coilbox mid-game is shown a relay carrying nothing"
+    );
+}
+
 /// Once the battle has ended there is nothing to find, so the next one starts
 /// a relay instead of being told one is already running.
 #[test]

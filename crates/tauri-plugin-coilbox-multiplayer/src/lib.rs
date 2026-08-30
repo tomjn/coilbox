@@ -2149,6 +2149,64 @@ fn mp_leftover_relay_agent<R: Runtime>(
     }))
 }
 
+/// The sidecar relaying a battle this coilbox did not start, if there is one.
+///
+/// The one question a reopened coilbox can answer about a game it knows nothing
+/// about (issue #2074). Somebody who closes coilbox mid-game and opens it again
+/// is still carrying every other player's traffic on their machine, and until
+/// this there was nothing on screen to say so.
+///
+/// `we_are_hosting` is what keeps a host's own battle out of it. There is one
+/// sidecar per machine, so the relay this coilbox started and a relay left over
+/// from a previous one are the same run file, and only the registry tells them
+/// apart. Without the check, opening a relayed battle would put a second pill in
+/// the topbar telling the host about their own game in the third person.
+///
+/// The pid stays in Rust. It is what [`coilbox_relay_protocol::carrying_now`]
+/// checks the figure against, and it has no other reader.
+fn relay_left_running(run_file: &Path, we_are_hosting: bool) -> Option<u32> {
+    if we_are_hosting {
+        return None;
+    }
+    relay_sidecar::already_relaying(run_file)
+}
+
+/// `mp_relay_left_running`: whether a relay this coilbox did not start is
+/// running on this machine, and what it says it is carrying (issue #2074).
+///
+/// ## What it can and cannot know
+///
+/// That a relay is running is proved rather than inferred: the sidecar holds a
+/// shared lock on its run file for as long as it lives, so the record naming a
+/// live process is the sidecar and not a process id the OS handed on
+/// (issue #2078).
+///
+/// The rate is the sidecar's own measurement, read from the record it writes
+/// beside that run file every second. `bytesPerSecond` is null whenever coilbox
+/// cannot read a current one, which the caller draws as nothing at all rather
+/// than as a figure.
+///
+/// What is not here is anything about the game. coilbox did not launch this
+/// engine, has no handle on it and no record of it, so it cannot say a game is
+/// running, cannot say which battle it is, and cannot end it. The relay ends on
+/// its own when the game does, which is `stopping.rs` in `coilbox-relay-agent`.
+#[tauri::command]
+fn mp_relay_left_running<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    registry: State<'_, Registry>,
+) -> CliResult {
+    let run_file = match relay_sidecar::run_file_path(&app) {
+        Ok(path) => path,
+        Err(e) => return CliResult::err(e),
+    };
+    let found = relay_left_running(&run_file, hosting_through_the_relay(&registry));
+    CliResult::ok(json!({
+        "relaying": found.is_some(),
+        "bytesPerSecond": found
+            .and_then(|pid| coilbox_relay_protocol::carrying_now(&run_file, pid)),
+    }))
+}
+
 /// `mp_ask_leftover_relay_to_stop`: ask a leftover relay sidecar to stop, and
 /// say what it did (issue #2062).
 ///
@@ -3477,6 +3535,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             mp_turn_credentials,
             mp_relay_traffic,
             mp_leftover_relay_agent,
+            mp_relay_left_running,
             mp_ask_leftover_relay_to_stop,
             mp_watch_engine,
             mp_chat_logs,
@@ -5064,6 +5123,92 @@ mod tests {
             Ok(StopAnswer::Gone)
         );
         assert!(!note_beside(&run_file).exists());
+    }
+
+    /// The whole of issue #2074's first half. Somebody closed coilbox mid-game
+    /// and opened it again, and the relay carrying everybody else's traffic is
+    /// still there. coilbox has no pipe to it and never will, so the run file is
+    /// the only thing that can say it is there, and it does.
+    #[test]
+    fn a_relay_from_an_earlier_session_is_found_by_a_coilbox_that_never_started_it() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let (run_file, _held) = a_run_file_naming_a_live_sidecar(dir.path());
+
+        assert_eq!(
+            relay_left_running(&run_file, false),
+            Some(std::process::id())
+        );
+    }
+
+    /// The host's own battle, which is the same run file and needs the opposite
+    /// answer. Without this the topbar would tell a host who is hosting a
+    /// relayed battle about their own game as though somebody else had left it
+    /// running.
+    #[test]
+    fn a_relay_this_coilbox_is_hosting_through_is_not_one_left_running() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let (run_file, _held) = a_run_file_naming_a_live_sidecar(dir.path());
+
+        assert_eq!(relay_left_running(&run_file, true), None);
+    }
+
+    /// A record naming a process id the OS has handed on to something else, so
+    /// nothing holds the file. There is no relay, and claiming one would put a
+    /// pill in the topbar for a game nobody is playing.
+    #[test]
+    fn a_record_nothing_is_holding_is_not_a_relay_left_running() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let (run_file, held) = a_run_file_naming_a_live_sidecar(dir.path());
+        // The sidecar dying, which is the kernel giving the lock back.
+        drop(held);
+
+        assert_eq!(relay_left_running(&run_file, false), None);
+    }
+
+    #[test]
+    fn nothing_is_left_running_when_there_is_no_run_file() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        assert_eq!(
+            relay_left_running(&dir.path().join("relay").join("agent.json"), false),
+            None
+        );
+    }
+
+    /// The second half, and the only figure a reopened coilbox has any right to
+    /// show. The sidecar writes down what it is carrying beside its run file,
+    /// and this is coilbox reading it back through the same pid the run file
+    /// named.
+    #[test]
+    fn what_a_relay_left_running_is_carrying_is_read_from_the_record_it_wrote() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let (run_file, _held) = a_run_file_naming_a_live_sidecar(dir.path());
+        std::fs::write(
+            coilbox_relay_protocol::carrying_path(&run_file),
+            coilbox_relay_protocol::Carrying {
+                pid: std::process::id(),
+                bytes_per_second: 41_984,
+            }
+            .to_json(),
+        )
+        .expect("a writable temp dir");
+
+        let found = relay_left_running(&run_file, false).expect("the sidecar is there");
+        assert_eq!(
+            coilbox_relay_protocol::carrying_now(&run_file, found),
+            Some(41_984)
+        );
+    }
+
+    /// A relay that is there and has written nothing, which is a sidecar from a
+    /// build before the record existed. It is still a relay and the host still
+    /// needs telling, and the figure is simply missing rather than invented.
+    #[test]
+    fn a_relay_left_running_that_says_nothing_is_still_a_relay_left_running() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let (run_file, _held) = a_run_file_naming_a_live_sidecar(dir.path());
+
+        let found = relay_left_running(&run_file, false).expect("the sidecar is there");
+        assert_eq!(coilbox_relay_protocol::carrying_now(&run_file, found), None);
     }
 
     /// The registry scan behind the guard above, which is the only thing

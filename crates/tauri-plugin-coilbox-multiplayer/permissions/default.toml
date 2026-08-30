@@ -76,6 +76,7 @@ permissions = [
   "allow-mp-turn-credentials",
   "allow-mp-relay-traffic",
   "allow-mp-leftover-relay-agent",
+  "allow-mp-relay-left-running",
   "allow-mp-ask-leftover-relay-to-stop",
   "allow-mp-watch-engine",
   "allow-mp-chat-logs",
