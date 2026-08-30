@@ -150,13 +150,20 @@ pub enum Delta {
     RelayedHostMoveRefused {
         reason: String,
     },
-    /// The lobby never said anything about the move at all, so our battle is
+    /// The lobby gave the move neither of its two answers, so our battle is
     /// still advertised where the allocation used to be and nobody can reach it.
     ///
     /// The same outcome as [`Self::RelayedHostMoveRefused`] with none of the
-    /// words, because there is nobody to quote. A lobby that has never heard of
-    /// `MOVERELAYEDHOST` does not refuse it, and until a server ships the
-    /// command (ScarylePoo/uberserver#43) that is every lobby there is.
+    /// words, because there is nothing worth quoting. A lobby that has never
+    /// heard of `MOVERELAYEDHOST` does not refuse it, and until a server ships
+    /// the command (ScarylePoo/uberserver#43) that is every lobby there is.
+    ///
+    /// Two ways to arrive here, and they are one thing to the host. The lobby
+    /// says nothing and a wait runs out. Or it says something that is not
+    /// `BATTLEHOSTMOVED` and not `MOVERELAYEDHOSTFAILED`: uberserver answers an
+    /// unknown command with a `SERVERMSG` naming it, which is addressed to a
+    /// person, carries no battle and is not an answer to the command (issue
+    /// #2103).
     ///
     /// Nothing on the wire produces this, so nothing in this module raises it.
     /// It is raised by whoever sent the line and waited, which is

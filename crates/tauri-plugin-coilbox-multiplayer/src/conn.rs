@@ -596,6 +596,23 @@ async fn run_loop(
                         if crate::relay_host::move_answer_in(&delta, &state) {
                             crate::relay_host::move_answered(&relay);
                         }
+                        // Or the lobby has neither of those two answers in it,
+                        // and says so by naming the command in a `SERVERMSG`
+                        // (issue #2103). Same unreachable battle, same warning,
+                        // told while the rebuild is still fresh rather than
+                        // twenty seconds later. Only heard while a move is
+                        // outstanding, which is what makes reading a server's
+                        // own words safe here.
+                        if crate::relay_host::move_rejected_in(&delta)
+                            && crate::relay_host::move_failed(&relay)
+                        {
+                            emit(
+                                &sink,
+                                LobbyEvent::Delta {
+                                    delta: Delta::RelayedHostMoveUnanswered,
+                                },
+                            );
+                        }
                         emit(&sink, LobbyEvent::Delta { delta });
                     }
 
