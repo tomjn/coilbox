@@ -24,7 +24,6 @@ import {
   mpForceSpectator,
   mpForceTeam,
   mpKick,
-  mpLeaveBattle,
   mpRemoveBot,
   mpRemoveScriptTags,
   mpRemoveStartRect,
@@ -61,6 +60,7 @@ import {
   startPosTypeOf,
   usedColorsFromBattle,
 } from "./config";
+import { leaveBattle } from "./leaveBattle";
 import { diffRestrictTags } from "./restrictTags";
 
 /** Format a rejected command for the action-error banner (matches useBattleLaunch). */
@@ -581,7 +581,7 @@ export function useBattleRoom(): BattleRoomView {
 
   const leave = useCallback(async () => {
     if (!activeKey) return;
-    await mpLeaveBattle({ serverKey: activeKey }).then(clearErr, setErr);
+    await leaveBattle(activeKey).then(clearErr, setErr);
   }, [activeKey, clearErr, setErr]);
 
   // Host map/lock edits. UPDATEBATTLEINFO carries map + lock + spectator count

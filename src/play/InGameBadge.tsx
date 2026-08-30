@@ -6,7 +6,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useChosenHostingRoute } from "@/direct/hostingRoute";
 import { mpRelayTraffic } from "@/multiplayer/bindings";
 import { usePlay } from "./PlayProvider";
 import {
@@ -39,13 +38,23 @@ import {
  * relay carrying every other player's traffic is a fact about what the X does.
  * So `relaying` decides the warning and `bytesPerSecond` decides the figure, and
  * nothing about the warning depends on coilbox managing to read a number.
+ *
+ * ## And they are both about this game (issue #2097)
+ *
+ * `relayed` is a fact about the run that is on screen, put there by the launch
+ * that started the relayed battle. It used to be the route this client last
+ * hosted at, which describes a battle rather than a game and outlives the
+ * battle it describes. A sidecar outlives its game too, by up to the four
+ * minutes of its traffic backstop, and between them they put the relay label
+ * and the warning on a single player skirmish started inside that window.
+ * Ending that ends it for nobody.
+ *
+ * It is also the free local check that decides whether to ask the backend
+ * anything at all. An ordinary game never polls, never redraws on a timer and
+ * never renders any of the below.
  */
 export default function InGameBadge() {
-  const { running, focusGame, cancel } = usePlay();
-  // The route this client last hosted at, which is a free local check and
-  // decides whether to ask the backend anything at all. An ordinary battle
-  // never polls, never redraws on a timer and never renders any of the below.
-  const relayed = useChosenHostingRoute() === "relay";
+  const { running, relayed, focusGame, cancel } = usePlay();
   const relay = useRelayCarrying(running && relayed);
   const [confirmEnd, setConfirmEnd] = useState(false);
   if (!running) return null;

@@ -15,12 +15,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  type ChatMsg,
-  mpLeaveBattle,
-  mpLeaveChannel,
-  mpSend,
-} from "../bindings";
+import { leaveBattle } from "../battle/leaveBattle";
+import { type ChatMsg, mpLeaveChannel, mpSend } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
 import { ChannelTopicMenu } from "../chat/ChannelTopicMenu";
 import { ChatPane } from "../chat/ChatPane";
@@ -273,10 +269,10 @@ function ChatPage() {
 
   // Leave the current battle. Battle chat isn't a leavable channel of its own, so
   // the header's leave action drops the whole battle (SAYBATTLE ends with it).
-  async function leaveBattle() {
+  async function leaveCurrentBattle() {
     if (!activeKey) return;
     try {
-      await mpLeaveBattle({ serverKey: activeKey });
+      await leaveBattle(activeKey);
     } catch {
       // Best-effort; deselect regardless.
     }
@@ -421,7 +417,10 @@ function ChatPage() {
                       <Gamepad2 className="size-4" />
                       Go to battle
                     </Button>
-                    <Button className="h-7 gap-1.5 px-2" onClick={leaveBattle}>
+                    <Button
+                      className="h-7 gap-1.5 px-2"
+                      onClick={leaveCurrentBattle}
+                    >
                       <LogOut className="size-4" />
                       Leave
                     </Button>

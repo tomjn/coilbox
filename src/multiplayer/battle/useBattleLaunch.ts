@@ -31,12 +31,31 @@ import { checkHostAddress } from "./hostAddress";
  * costs four minutes of an allocation and never a game.
  */
 function tellTheRelayAboutTheEngine(
-  host: boolean,
+  relayed: boolean,
 ): ((runId: string) => void) | undefined {
-  if (!host || chosenHostingRoute() !== "relay") return undefined;
+  if (!relayed) return undefined;
   return (runId) => {
     void mpWatchEngine({ runId }).catch(() => {});
   };
+}
+
+/**
+ * Whether the game about to start is the one this machine's relay is carrying
+ * (issue #2097).
+ *
+ * Asked once, at the launch, and handed to the run rather than left for a
+ * reader to work out later. Only a host can be relaying, and only through the
+ * route their own hosting form settled on, so this is both halves of it.
+ *
+ * The recorded route is read here and nowhere downstream on purpose. It is a
+ * module singleton with no battle in it, so wherever it is read it means "the
+ * last battle this client hosted". At this moment, on a host pressing Start in
+ * the battle they opened, that is this battle. A second later it is a sentence
+ * about a battle that may be over, which is what the in-game pill used to
+ * believe and the bug this fixes.
+ */
+function relayCarriesThisGame(host: boolean): boolean {
+  return host && chosenHostingRoute() === "relay";
 }
 
 /**
@@ -158,11 +177,13 @@ export function useBattleLaunch(
         }
         config = built.config;
       }
+      const relayed = relayCarriesThisGame(host);
       const res = await launch("battle", {
         config,
         executable: target.executable,
         dataDir: target.dataDir,
-        onEngineStarted: tellTheRelayAboutTheEngine(host),
+        relayed,
+        onEngineStarted: tellTheRelayAboutTheEngine(relayed),
       });
       if (res.exitCode && res.exitCode !== 0) {
         setError(`Engine exited with code ${res.exitCode}.`);

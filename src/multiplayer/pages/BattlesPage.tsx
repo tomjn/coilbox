@@ -39,6 +39,7 @@ import { useLanRooms } from "../../direct/useLanRooms";
 import { useLastLogin } from "../../lobby-servers/config";
 import { notify } from "../../notify/notify";
 import { getGameMatcher } from "../../profile/profile";
+import { leaveBattle } from "../battle/leaveBattle";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
 import { BattleList } from "../battles/BattleList";
 import { filterSortBattles } from "../battles/battleFilters";
@@ -59,7 +60,6 @@ import {
   type Battle,
   mpCreateLobby,
   mpJoinBattle,
-  mpLeaveBattle,
   mpOpenBattle,
   mpSnapshot,
   mpZerokOpenBattle,
@@ -321,7 +321,7 @@ function BattlesPage() {
 
   const leave = useCallback(async () => {
     if (!activeKey) return;
-    await mpLeaveBattle({ serverKey: activeKey }).catch(() => {});
+    await leaveBattle(activeKey).catch(() => {});
   }, [activeKey]);
 
   // Start a room of our own: bind the port, dial it over loopback like any other
