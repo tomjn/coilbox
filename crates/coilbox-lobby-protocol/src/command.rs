@@ -891,7 +891,9 @@ mod tests {
             (MOVE_RELAYED_HOST, move_relayed_host(ip, 30002)),
             (
                 OPEN_BATTLE,
-                open_battle(0, 0, "*", 8452, 16, -1, 0, -1, "spring", "105", "Map", "T", "BAR"),
+                open_battle(
+                    0, 0, "*", 8452, 16, -1, 0, -1, "spring", "105", "Map", "T", "BAR",
+                ),
             ),
         ] {
             assert_eq!(sent.split(' ').next(), Some(named), "for {sent}");
