@@ -9,8 +9,9 @@ import {
 } from "./bindings";
 import { CopyButton } from "./CopyButton";
 import { HostRoomForm, type StartRoomArgs } from "./HostRoomForm";
+import { useRoomMovedFrom } from "./hostedRoom";
 import { type DirectReachability, directPortStatus } from "./reachability";
-import { announcementNote, roomSummary } from "./room";
+import { announcementNote, gameAddressNote, roomSummary } from "./room";
 import { addressText, shareAddresses, shareHeadline } from "./share";
 
 export type { StartRoomArgs } from "./HostRoomForm";
@@ -116,12 +117,37 @@ function RunningRoom({
         {announcementNote(room.advertise, heardOnNetwork)}
       </span>
       <RoomAddresses port={room.port} />
+      <GameAddress ip={room.ip} />
       {error && (
         <p role="alert" className="text-xs text-destructive">
           {error}
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The address the room itself hands out, while it is up (issue #2118).
+ *
+ * Below the addresses to read out rather than among them, because it is not one
+ * of them. Those are what somebody types in to reach the room. This is the one
+ * the room has picked to put in its battle, which a joiner's engine dials when
+ * the game starts. A host reads it when people are in the room and the game will
+ * not start for them.
+ *
+ * It learns about a move from the poll that already feeds the line above it, so
+ * a room that moves onto a VPN says so within one tick of `ROOM_POLL_MS`
+ * (issue #2116). The move is a change nobody asked for, so this is a live
+ * region. A host who is reading the line hears it rather than having to notice
+ * the number is different from the one they read a minute ago.
+ */
+function GameAddress({ ip }: { ip: string }) {
+  const movedFrom = useRoomMovedFrom();
+  return (
+    <span role="status" className="text-right text-xs text-muted-foreground">
+      {gameAddressNote(ip, movedFrom)}
+    </span>
   );
 }
 
