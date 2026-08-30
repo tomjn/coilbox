@@ -252,6 +252,9 @@ struct Client {
     registry: Registry,
     /// Every event the connection streamed, as the JSON the frontend receives.
     events: Arc<Mutex<Vec<String>>>,
+    /// Where this connection's conversation log lives, kept until the client is
+    /// dropped and then deleted with it.
+    _logs: tempfile::TempDir,
 }
 
 impl Client {
@@ -269,6 +272,16 @@ impl Client {
 
     async fn open(port: u16, username: &str, mode: LoginMode) -> Client {
         let stream = connect_to(port).await;
+        // A scratch directory rather than the app's, so a test never reads or
+        // writes the real conversation log. One per connection, and it goes
+        // when the client does.
+        //
+        // This was one shared directory with the log named after the connection
+        // key, which carries the port. The OS hands the same loopback port out
+        // again on a later run, so a run that drew a port an earlier run had
+        // used opened a log that already held that run's message, and counted
+        // two where the test expects one.
+        let logs = tempfile::tempdir().expect("a scratch directory for the conversation log");
         let events: Arc<Mutex<Vec<String>>> = Arc::default();
         let sink = Arc::clone(&events);
         let channel = Channel::new(move |body: tauri::ipc::InvokeResponseBody| {
@@ -291,15 +304,13 @@ impl Client {
                 mode,
             },
             channel,
-            // A scratch directory rather than the app's, so a test never reads
-            // or writes the real conversation log. The key is unique per test
-            // (it carries the port), so two of these never share a file.
-            DmLog::new(&std::env::temp_dir().join("coilbox-zerok-conn-tests"), &key),
+            DmLog::new(logs.path(), &key),
         );
         Client {
             key,
             registry,
             events,
+            _logs: logs,
         }
     }
 
