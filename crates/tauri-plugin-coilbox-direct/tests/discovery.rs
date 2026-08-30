@@ -15,9 +15,11 @@
 //! each other's beacons, and a developer hosting a room, or a second run of this
 //! suite anywhere on the network, would break them.
 
+use std::net::Ipv4Addr;
 use std::time::Duration;
 
 use coilbox_lobby_protocol::command;
+use mdns_sd::ServiceDaemon;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
@@ -25,6 +27,7 @@ use tauri_plugin_coilbox_direct::beacon::{
     encode, room_id, Beacon, LanRoom, Source, BEACON_EXPIRY, BEACON_INTERVAL,
 };
 use tauri_plugin_coilbox_direct::discovery::{announce_once, Discovery};
+use tauri_plugin_coilbox_direct::mdns::{self, Advert, SERVICE_TYPE};
 use tauri_plugin_coilbox_direct::room::{Room, RoomOptions};
 
 /// Wait for `check` to be true, up to `within`. Answers false if it never is.
@@ -365,6 +368,98 @@ async fn a_room_announced_both_ways_is_heard_both_ways_and_listed_once() {
 
     room.stop("done").await;
     listening.stop();
+}
+
+/// A host whose address moves is advertised at the new one, without anything
+/// else about the room changing.
+///
+/// This is the VPN case, and the DHCP lease landing somewhere else case: the
+/// room is the same room, so its TXT record is identical, and the only thing
+/// that moved is the address a joiner has to dial. A listener that still has the
+/// old one cannot reach the host at all.
+///
+/// Both addresses are on the loopback network on purpose. `mdns-sd` only puts an
+/// address on the wire out of an interface whose own subnet contains it
+/// (`valid_ip_on_intf` in its `service_info`), and loopback is a /8 everywhere,
+/// so 127.0.0.2 is announced on lo0 whatever else this machine has. A test that
+/// needed a second real interface would pass here and skip itself on CI.
+///
+/// What is read is the browse's own view of the record rather than [`Discovery`]'s
+/// room list, because the two are not the same question. The moment the address
+/// moves, the responder sends the old A record as a removal and the new one as an
+/// addition, and a resolve can land carrying both. Which of the two
+/// [`tauri_plugin_coilbox_direct::mdns::address_to_dial`] then picks out of a set
+/// of loopback addresses is not defined, so a room list read at that moment is a
+/// coin toss, and it failed three times in eight runs. The record on the wire is
+/// what this fix is about, and it is unambiguous.
+#[test]
+fn a_host_whose_address_moves_is_advertised_at_the_new_one() {
+    let browser = ServiceDaemon::new().expect("the mdns daemon starts");
+    let events = browser.browse(SERVICE_TYPE).expect("a browse starts");
+
+    let id = named("moved");
+    let room = beacon(&id);
+    let mut advert = Advert::start(&room, &[Ipv4Addr::LOCALHOST]).expect("the mdns daemon starts");
+
+    let started = resolved_with(&events, &id, Ipv4Addr::LOCALHOST, Duration::from_secs(30));
+    assert!(started, "the advert was never resolved over mDNS");
+
+    // The address moves under the running room. Everything a person can see
+    // about it is unchanged, which is exactly the case that used to be dropped.
+    let moved = Ipv4Addr::new(127, 0, 0, 2);
+    advert.update(&room, &[moved]);
+
+    let followed = resolved_with(&events, &id, moved, Duration::from_secs(30));
+    assert!(
+        followed,
+        "the advert kept naming the address the room started on"
+    );
+
+    // And then it goes quiet again, which is the half of this the check has
+    // always been for. Five more ticks of the announce loop with nothing to say,
+    // and nothing goes on the wire. Measured before this test was written. An
+    // advert updated once a second for 20 seconds with an unchanged record
+    // produced no resolves at all, and one whose address moved each time
+    // produced 38.
+    while events.try_recv().is_ok() {}
+    for _ in 0..5 {
+        advert.update(&room, &[moved]);
+        std::thread::sleep(BEACON_INTERVAL);
+    }
+    assert!(
+        !resolved_with(&events, &id, moved, Duration::from_millis(500)),
+        "an advert with nothing new to say re-announced itself anyway"
+    );
+
+    drop(advert);
+}
+
+/// Wait up to `within` for one room's DNS-SD record to resolve carrying
+/// `address`.
+///
+/// The room is picked out by its id, which is in the hostname the A records hang
+/// off, because these are real packets and every other coilbox on the network is
+/// on this browse too.
+fn resolved_with(
+    events: &mdns_sd::Receiver<mdns_sd::ServiceEvent>,
+    id: &str,
+    address: Ipv4Addr,
+    within: Duration,
+) -> bool {
+    let deadline = std::time::Instant::now() + within;
+    while let Some(left) = deadline.checked_duration_since(std::time::Instant::now()) {
+        let Ok(event) = events.recv_timeout(left) else {
+            return false;
+        };
+        if let mdns_sd::ServiceEvent::ServiceResolved(info) = event {
+            if info.get_hostname() == mdns::host_name(id)
+                && info.get_addresses_v4().contains(&address)
+            {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// A room with nothing in it yet is not announced. Its beacon would carry no
