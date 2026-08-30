@@ -22,6 +22,7 @@ function report(over: Partial<DirectReachability> = {}): DirectReachability {
     wanted: [{ port: 8452, externalPort: 8452, transport: "udp" }],
     lanAddress: "192.168.1.45",
     publicAddress: null,
+    publicAddressIsLocal: false,
     routerAddress: null,
     doubleNat: false,
     confirmedPort: null,
@@ -58,7 +59,11 @@ describe("hostingRoute", () => {
   // refusal must not push a host who is already on the internet down the ladder.
   it("takes the direct route when this machine's own address is the public one", () => {
     const out = hostingRoute(
-      report({ lanAddress: "209.35.91.246", publicAddress: "209.35.91.246" }),
+      report({
+        lanAddress: "209.35.91.246",
+        publicAddress: "209.35.91.246",
+        publicAddressIsLocal: true,
+      }),
       true,
       true,
     );
@@ -84,7 +89,11 @@ describe("hostingRoute", () => {
   it("prefers a route it already has over one it could ask for", () => {
     expect(
       hostingRoute(
-        opened({ lanAddress: "209.35.91.246", publicAddress: "209.35.91.246" }),
+        opened({
+          lanAddress: "209.35.91.246",
+          publicAddress: "209.35.91.246",
+          publicAddressIsLocal: true,
+        }),
         true,
         true,
       ),
@@ -153,6 +162,21 @@ describe("hostingRoute", () => {
     const host = report({
       lanAddress: "209.35.91.246",
       publicAddress: "209.35.91.246",
+      publicAddressIsLocal: true,
+      problem: "no UPnP gateway answered",
+    });
+    expect(hostingRoute(host, true, true)).toBe("direct");
+    expect(reachabilityState(host)).toBe("direct");
+  });
+
+  // The same host with a Docker bridge on it, which is the ordinary VPS. The
+  // room announces itself at the bridge, and that is not the address to weigh
+  // against the one STUN saw (issue #2111).
+  it("keeps the direct route when the machine has a second address as well", () => {
+    const host = report({
+      lanAddress: "172.17.0.1",
+      publicAddress: "209.35.91.246",
+      publicAddressIsLocal: true,
       problem: "no UPnP gateway answered",
     });
     expect(hostingRoute(host, true, true)).toBe("direct");
@@ -167,6 +191,7 @@ describe("hostingRoute", () => {
     const host = report({
       lanAddress: "209.35.91.246",
       publicAddress: "209.35.91.246",
+      publicAddressIsLocal: true,
     });
     expect(isReachable(host)).toBe(true);
     expect(hostingRoute(host, true, true)).toBe("direct");
@@ -199,7 +224,11 @@ describe("hostingRoute with the relay turned off", () => {
   it("leaves every other route exactly as it was", () => {
     const reports = [
       null,
-      report({ lanAddress: "209.35.91.246", publicAddress: "209.35.91.246" }),
+      report({
+        lanAddress: "209.35.91.246",
+        publicAddress: "209.35.91.246",
+        publicAddressIsLocal: true,
+      }),
       opened(),
       opened({ publicAddress: null }),
       // Both ends of the ladder as well, so a route that was already

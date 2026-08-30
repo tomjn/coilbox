@@ -247,7 +247,18 @@ pub fn local_addrs() -> Vec<Ipv4Addr> {
 /// room did before it could announce anything, is a room only its own host can
 /// reach.
 pub fn lan_address() -> Option<String> {
-    let addrs = local_addrs();
+    lan_address_of(&local_addrs())
+}
+
+/// [`lan_address`], given the addresses rather than reading them off the
+/// machine. Pure.
+///
+/// Split out so the choice can be tested on a machine that does not have the
+/// addresses in question, and so [`crate::reachability`] can read this and the
+/// whole list from one enumeration. A host on a public address with a Docker
+/// bridge beside it gets the bridge from here, which is right for announcing a
+/// room and wrong for anything comparing an address against STUN (issue #2111).
+pub(crate) fn lan_address_of(addrs: &[Ipv4Addr]) -> Option<String> {
     let routable = || addrs.iter().find(|a| !a.is_loopback());
     addrs
         .iter()
@@ -501,6 +512,40 @@ mod tests {
         if let Some(address) = lan_address() {
             assert_ne!(address, "127.0.0.1");
         }
+    }
+
+    /// The preference itself, on addresses this machine does not have.
+    ///
+    /// A private address wins because the reader is somebody in the same room,
+    /// and it wins even when a public address is sitting beside it, which is the
+    /// VPS with a Docker bridge on it. Right here and wrong to compare against
+    /// STUN, which is what `Reachability::public_address_is_local` is for
+    /// (issue #2111).
+    #[test]
+    fn the_announced_address_is_the_private_one_even_beside_a_public_one() {
+        let of = |addrs: &[[u8; 4]]| {
+            lan_address_of(
+                &addrs
+                    .iter()
+                    .copied()
+                    .map(Ipv4Addr::from)
+                    .collect::<Vec<_>>(),
+            )
+        };
+        assert_eq!(
+            of(&[[172, 17, 0, 1], [209, 35, 91, 246]]).as_deref(),
+            Some("172.17.0.1")
+        );
+        assert_eq!(of(&[[209, 35, 91, 246]]).as_deref(), Some("209.35.91.246"));
+        assert_eq!(
+            of(&[[127, 0, 0, 1], [192, 168, 1, 45]]).as_deref(),
+            Some("192.168.1.45")
+        );
+        // Nothing but loopback is no answer at all rather than an answer only
+        // this machine can use. `direct_start_room` holds the 127.0.0.1
+        // fallback, so the choice is not made twice.
+        assert_eq!(of(&[[127, 0, 0, 1]]), None);
+        assert_eq!(of(&[]), None);
     }
 
     /// The netmask is the whole reason for enumerating: a beacon goes to the
