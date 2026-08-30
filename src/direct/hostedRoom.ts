@@ -26,6 +26,21 @@ let timer: ReturnType<typeof setInterval> | null = null;
 const listeners = new Set<(room: DirectRoomStatus | null) => void>();
 
 /**
+ * The address the room was handing out before its current one, or null while it
+ * has not moved.
+ *
+ * A room that works its own address out moves onto a new one by itself (issue
+ * #2116), and the reading that carries the move is gone by the next tick. Held
+ * here rather than in whatever is drawing it because a host is usually in their
+ * battle room when a VPN comes up, and a component that was not mounted at the
+ * time would have nothing to say when they came back.
+ *
+ * Only ever the previous reading, so it says the room moved and never claims to
+ * know the address it started on. This client may not have been watching then.
+ */
+let movedFrom: string | null = null;
+
+/**
  * Bumped by every deliberate write. A poll started before one lands describes a
  * room that has since been stopped or answered, so it is dropped rather than
  * allowed to put the old reading back for one more tick.
@@ -33,6 +48,8 @@ const listeners = new Set<(room: DirectRoomStatus | null) => void>();
 let generation = 0;
 
 function publish(next: DirectRoomStatus | null): void {
+  if (!next) movedFrom = null;
+  else if (room && room.ip !== next.ip) movedFrom = room.ip;
   room = next;
   if (room && !timer) {
     timer = setInterval(() => {
@@ -86,6 +103,18 @@ export function subscribeHostedRoom(
   return () => {
     listeners.delete(listener);
   };
+}
+
+/**
+ * The address the hosted room was handing out before its current one, or null
+ * while it has not moved. See {@link movedFrom}.
+ */
+export function useRoomMovedFrom(): string | null {
+  return useSyncExternalStore(
+    (onChange) => subscribeHostedRoom(onChange),
+    () => movedFrom,
+    () => movedFrom,
+  );
 }
 
 /** The room this client hosts, or null when it is not hosting. */
