@@ -656,12 +656,17 @@ async fn main() -> ExitCode {
     // is exactly when somebody wants to know what is going through: reports
     // carry on saying zero across the gap, and a reader that heard nothing at
     // all could not tell that from a sidecar that had died.
+    //
+    // It writes the same figure beside the run file as well as saying it, which
+    // is the only way a coilbox that was closed and reopened can read it: this
+    // process's stdout belongs to the coilbox that has gone (issue #2074).
     let traffic = Arc::new(Traffic::new());
     tokio::spawn({
         let traffic = Arc::clone(&traffic);
         let reporter = Arc::clone(&reporter);
+        let run_file = args.run_file.clone();
         async move {
-            traffic::report_forever(&traffic, &reporter).await;
+            traffic::report_forever(&traffic, &reporter, run_file.as_deref()).await;
         }
     });
 

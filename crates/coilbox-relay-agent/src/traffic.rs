@@ -25,10 +25,21 @@
 //! rate out here from the elapsed time it measured means a tick that ran late
 //! reports the traffic it really carried rather than a figure that is low by
 //! however late it was.
+//!
+//! ## Why the same figure is also written down
+//!
+//! The event goes down a pipe that belongs to the coilbox which started this
+//! process, and that coilbox is the one thing guaranteed to have gone by the
+//! time anybody needs to ask. Somebody who closes coilbox mid-game and opens it
+//! again finds this agent through its run file and can hear nothing it says
+//! (issue #2074), so the figure is written beside that run file as well as sent.
+//! [`coilbox_relay_protocol::Carrying`] is the record and carries the rest of
+//! the reasoning.
 
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use coilbox_relay_protocol::{Event, TRAFFIC_EVERY};
+use coilbox_relay_protocol::{carrying_path, Carrying, Event, TRAFFIC_EVERY};
 use tokio::time::Instant;
 
 use crate::control::Reporter;
@@ -64,7 +75,8 @@ impl Traffic {
 }
 
 /// Say how much is being carried, every [`TRAFFIC_EVERY`], for as long as this
-/// process lives.
+/// process lives, and write it down beside `run_file` for whoever cannot hear
+/// it said.
 ///
 /// Never returns. Nothing waits on it and nothing else has to be told to stop
 /// it: the process exiting is what ends it, which is the same moment coilbox
@@ -72,7 +84,20 @@ impl Traffic {
 ///
 /// Reported whether or not anything moved. See [`Event::Traffic`] for why the
 /// zero is the half that matters.
-pub async fn report_forever(traffic: &Traffic, reporter: &Reporter) -> std::convert::Infallible {
+///
+/// The record is written before the event is sent, and the order is on purpose.
+/// [`Reporter::say`] holds a lock across a write to a pipe, and a pipe nobody is
+/// draining does not fail, it fills. Writing second would mean a coilbox that
+/// had stopped reading stdout could stop the record from ever being updated,
+/// and the reader of the record is by definition a different coilbox.
+///
+/// `run_file` is optional because the agent runs perfectly well without one,
+/// which is how the tests drive it. coilbox always passes one.
+pub async fn report_forever(
+    traffic: &Traffic,
+    reporter: &Reporter,
+    run_file: Option<&Path>,
+) -> std::convert::Infallible {
     let mut counted_from = Instant::now();
     loop {
         tokio::time::sleep(TRAFFIC_EVERY).await;
@@ -80,11 +105,36 @@ pub async fn report_forever(traffic: &Traffic, reporter: &Reporter) -> std::conv
         let now = Instant::now();
         let interval = now.duration_since(counted_from);
         counted_from = now;
-        reporter
-            .say(Event::Traffic {
-                bytes_per_second: per_second(bytes, interval),
-            })
-            .await;
+        let bytes_per_second = per_second(bytes, interval);
+        if let Some(run_file) = run_file {
+            write_down(run_file, bytes_per_second);
+        }
+        reporter.say(Event::Traffic { bytes_per_second }).await;
+    }
+}
+
+/// Write the rate beside `run_file`, replacing whatever was there.
+///
+/// Written to a temporary name and renamed over the top rather than written in
+/// place, so a reader never catches half a record. A torn read is not dangerous
+/// here, since an unreadable record means the same thing as no record, but it
+/// would take the figure off a host's screen for a moment at random and put it
+/// back, which reads as a relay flickering in and out.
+///
+/// A write that fails is dropped on the floor and tried again next interval.
+/// There is nothing useful to do about it, the only channel for saying so is a
+/// pipe that may belong to a process that has gone, and the reader treats a
+/// record that stopped being updated as nothing to say. Logging it every second
+/// would fill the log with the same line.
+fn write_down(run_file: &Path, bytes_per_second: u64) {
+    let path = carrying_path(run_file);
+    let half_written = path.with_extension("tmp");
+    let record = Carrying {
+        pid: std::process::id(),
+        bytes_per_second,
+    };
+    if std::fs::write(&half_written, record.to_json()).is_ok() {
+        let _ = std::fs::rename(&half_written, &path);
     }
 }
 
@@ -160,12 +210,17 @@ mod tests {
     /// Run the reporter until it says something, or until it has plainly
     /// decided not to.
     async fn first_report(traffic: &Traffic) -> Event {
+        first_report_beside(traffic, None).await
+    }
+
+    /// The same, with somewhere to write the figure down as well as say it.
+    async fn first_report_beside(traffic: &Traffic, run_file: Option<&Path>) -> Event {
         let (out, read) = tokio::io::duplex(4096);
         let mut said = BufReader::new(read).lines();
         let reporter = Reporter::writing(out);
 
         let line = tokio::select! {
-            _ = report_forever(traffic, &reporter) => unreachable!("it never returns"),
+            _ = report_forever(traffic, &reporter, run_file) => unreachable!("it never returns"),
             line = said.next_line() => line,
             () = tokio::time::sleep(TRAFFIC_EVERY * REPORTS_WITHIN) => panic!(
                 "the agent said nothing in {REPORTS_WITHIN} reporting intervals, so a host \
@@ -208,6 +263,74 @@ mod tests {
             Event::Traffic {
                 bytes_per_second: 0
             }
+        );
+    }
+
+    /// The whole of issue #2074 from this side. The figure has to end up
+    /// somewhere a coilbox that never had a pipe to this process can read it,
+    /// and it has to be the same figure that went down the pipe, or a host who
+    /// closed and reopened coilbox would be shown a different number from the
+    /// one they were shown a minute earlier.
+    #[tokio::test(start_paused = true)]
+    async fn what_the_agent_says_it_is_carrying_is_also_written_down() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("agent.json");
+        let traffic = Traffic::new();
+        traffic.carried(41_984);
+
+        let said = first_report_beside(&traffic, Some(&run_file)).await;
+
+        assert_eq!(
+            said,
+            Event::Traffic {
+                bytes_per_second: 41_984
+            }
+        );
+        assert_eq!(
+            coilbox_relay_protocol::carrying_now(&run_file, std::process::id()),
+            Some(41_984),
+            "a coilbox with no pipe to this agent has nowhere else to read the figure"
+        );
+    }
+
+    /// The record names this process, so that a coilbox reading one can throw
+    /// away a figure left behind by an agent that has since gone rather than
+    /// showing it as the live relay's.
+    #[tokio::test(start_paused = true)]
+    async fn the_record_names_the_agent_that_wrote_it() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("agent.json");
+
+        first_report_beside(&Traffic::new(), Some(&run_file)).await;
+
+        let written = std::fs::read_to_string(carrying_path(&run_file)).expect("a record");
+        assert_eq!(
+            Carrying::from_json(&written).expect("a record this build wrote"),
+            Carrying {
+                pid: std::process::id(),
+                bytes_per_second: 0,
+            }
+        );
+    }
+
+    /// Replaced whole rather than written over, so a coilbox reading it once a
+    /// second never catches half of one. Half a record is not dangerous, it
+    /// reads as no figure, but it would take the number off a host's screen at
+    /// random and put it back.
+    #[tokio::test(start_paused = true)]
+    async fn nothing_is_left_half_written_where_a_reader_would_find_it() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let run_file = dir.path().join("agent.json");
+
+        first_report_beside(&Traffic::new(), Some(&run_file)).await;
+
+        assert!(
+            carrying_path(&run_file).exists(),
+            "there has to be a record, or the rest of this test proves nothing"
+        );
+        assert!(
+            !carrying_path(&run_file).with_extension("tmp").exists(),
+            "the half written record has to be renamed into place, not copied and left"
         );
     }
 }

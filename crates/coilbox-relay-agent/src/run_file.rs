@@ -60,7 +60,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use coilbox_relay_protocol::{
-    run_file_is_still_held, stop_note_path, RunFile as Contents, StopNote, NOTE_LOOKED_FOR_EVERY,
+    carrying_path, run_file_is_still_held, stop_note_path, RunFile as Contents, StopNote,
+    NOTE_LOOKED_FOR_EVERY,
 };
 
 use crate::stopping::Stopping;
@@ -144,6 +145,12 @@ impl Drop for Claim {
     /// for.
     fn drop(&mut self) {
         if holder(&self.path) == Some(std::process::id()) {
+            // The figure goes with the claim, for the same reason and under the
+            // same guard. It is already ignored once the run file it names has
+            // gone, so this is tidiness rather than correctness, but a directory
+            // left holding one file and not the other is a puzzle for whoever
+            // reads it next.
+            let _ = std::fs::remove_file(carrying_path(&self.path));
             let _ = std::fs::remove_file(&self.path);
         }
     }
@@ -380,6 +387,20 @@ mod tests {
 
         let _claim = Claim::take(path.clone()).expect("an unreadable file holds nothing");
         assert_eq!(holder(&path), Some(std::process::id()));
+    }
+
+    /// The figure the agent writes down goes when the agent does, so the relay
+    /// directory does not end up holding a rate for a relay that is not there.
+    #[test]
+    fn a_stopped_agent_takes_the_figure_it_wrote_with_it() {
+        let (_dir, path) = a_path();
+        let claim = Claim::take(path.clone()).expect("nothing else has it");
+        std::fs::write(carrying_path(&path), "{\"pid\":1,\"bytesPerSecond\":0}")
+            .expect("a writable temp dir");
+
+        drop(claim);
+
+        assert!(!carrying_path(&path).exists());
     }
 
     /// Dropping a claim must not take away a file that is now somebody else's,
