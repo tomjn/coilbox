@@ -1152,6 +1152,20 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             body: d.reason || undefined,
             level: "error",
           });
+        }
+        // The relay came back at a new address, the lobby was asked to move the
+        // battle to it, and the lobby said no. The battle is open, quite
+        // possibly with a game in it, and the address everybody was given has
+        // gone, so nobody new can join and nothing here can put that right. The
+        // host is the only person who can, by hosting again.
+        else if (d.kind === "relayedHostMoveRefused") {
+          void notify({
+            title: "Nobody can reach your battle any more",
+            body: d.reason
+              ? `Its relay moved and the lobby would not update the address: ${d.reason}`
+              : "Its relay moved and the lobby would not update the address.",
+            level: "error",
+          });
         } else if (d.kind === "commandFailed") {
           // Ignore-sync commands are best-effort: a server without IGNORE support
           // may reject them, but local hiding still applies, so degrade silently

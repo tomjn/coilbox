@@ -346,6 +346,21 @@ export type Delta =
    */
   | { kind: "relayedHostRefused"; reason: string }
   /**
+   * A battle that is open has moved to a new address on the lobby's relay, and
+   * the snapshot has moved with it. Sent to everybody who asked for relay
+   * support at login, so this arrives for other people's battles as well as our
+   * own: for a watcher it is what stops the battle list holding an address that
+   * has gone, and for the host it is the lobby confirming the move.
+   */
+  | { kind: "battleHostMoved"; id: number }
+  /**
+   * The lobby would not move our battle to the address its relay came back at,
+   * so the battle is still advertised where the allocation used to be. Worse
+   * than `relayedHostRefused`: that one is a battle about to open, this one is a
+   * battle that is open now and cannot be reached.
+   */
+  | { kind: "relayedHostMoveRefused"; reason: string }
+  /**
    * Somebody joined a battle we are hosting through the relay and the relay
    * would not let their address through, so nothing their game sends will reach
    * ours. Raised by the plugin rather than by a line off the wire, and only ever
