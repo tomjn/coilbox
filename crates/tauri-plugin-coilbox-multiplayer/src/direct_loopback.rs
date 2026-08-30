@@ -1479,3 +1479,232 @@ async fn a_refused_relay_address_reaches_both_the_host_and_whoever_is_hosting() 
 
     client.disconnect();
 }
+
+/// A lobby that refuses both of the lines a relay host sends about an address,
+/// each with words of its own.
+///
+/// The two commands are told apart the way a real server tells them apart, by
+/// reading the command and nothing else. `MOVERELAYEDHOST` is checked first
+/// because it is the longer of the two, though neither is a prefix of the other
+/// and that is the point of the pair of them (issue #2098).
+async fn a_lobby_that_refuses_both_addresses(
+    opening: &'static str,
+    moving: &'static str,
+) -> SocketAddr {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("a free port");
+    let addr = listener.local_addr().expect("a bound address");
+    tokio::spawn(async move {
+        let Ok((stream, _)) = listener.accept().await else {
+            return;
+        };
+        let mut framed = Framed::new(stream, LinesCodec::new());
+        if framed
+            .send(line::tas_server("0.38", "*", 8452, 0))
+            .await
+            .is_err()
+        {
+            return;
+        }
+        while let Some(Ok(read)) = framed.next().await {
+            let refusal = if read.starts_with("MOVERELAYEDHOST ") {
+                format!("MOVERELAYEDHOSTFAILED {moving}")
+            } else if read.starts_with("RELAYEDHOST ") {
+                format!("RELAYEDHOSTFAILED {opening}")
+            } else {
+                match parse_client_line(&read) {
+                    ClientCommand::ListCompFlags => line::comp_flags(&["u", "sp", "r"]),
+                    ClientCommand::Login { username, .. } => {
+                        if framed.send(line::accepted(&username)).await.is_err() {
+                            return;
+                        }
+                        line::login_info_end()
+                    }
+                    _ => continue,
+                }
+            };
+            if framed.send(refusal).await.is_err() {
+                return;
+            }
+        }
+    });
+    addr
+}
+
+/// Issue #2098, through the real connection loop. A host whose relay came back
+/// somewhere else asks the lobby to move the battle, and the lobby says no.
+///
+/// This is the refusal that matters most in relay hosting. The battle is
+/// already open, quite possibly with a game running in it, and a refused move
+/// leaves it advertised at an allocation that has gone. Nothing in coilbox is
+/// waiting on the answer, because the rebuild that set the move off happened
+/// while the host was busy elsewhere, so the delta below is the only way the
+/// host ever finds out.
+///
+/// The refusal of the opening address is sent through the same connection to
+/// show the two being told apart: one line each, one refusal each, neither read
+/// as the other.
+#[tokio::test]
+async fn a_refused_move_and_a_refused_open_reach_the_host_as_different_things() {
+    const OPENING: &str = "203.0.113.7 is this lobby server, not a relay";
+    const MOVING: &str = "you are not hosting a battle to move";
+
+    let registry = Registry::default();
+    let client = Client::connect(
+        &registry,
+        a_lobby_that_refuses_both_addresses(OPENING, MOVING).await,
+        "alice",
+    )
+    .await;
+    client.wait_for_ready().await;
+
+    client.send(command::relayed_host(
+        "203.0.113.7".parse().expect("an address"),
+        30001,
+    ));
+    client.send(command::move_relayed_host(
+        "198.51.100.9".parse().expect("an address"),
+        30002,
+    ));
+
+    let told = |kind: &'static str, reason: &'static str| {
+        let events = Arc::clone(&client.events);
+        move || {
+            events.lock().unwrap().iter().any(|e| {
+                let event: serde_json::Value = serde_json::from_str(e).unwrap_or_default();
+                event["delta"]["kind"] == kind && event["delta"]["reason"] == reason
+            })
+        }
+    };
+
+    wait_until(
+        told("relayedHostMoveRefused", MOVING),
+        "the refusal to move the battle to reach the host",
+    )
+    .await;
+    wait_until(
+        told("relayedHostRefused", OPENING),
+        "the refusal of the opening address to reach the host",
+    )
+    .await;
+    // And neither refusal was raised as the other, which is what a server or a
+    // client reading `MOVERELAYEDHOST` as a `RELAYEDHOST` would produce.
+    assert!(
+        !told("relayedHostRefused", MOVING)(),
+        "a refused move is not a refused open"
+    );
+    assert!(
+        !told("relayedHostMoveRefused", OPENING)(),
+        "a refused open is not a refused move"
+    );
+
+    client.disconnect();
+}
+
+/// A lobby with somebody else's relayed battle in its list, which moves the
+/// moment the client has finished logging in.
+async fn a_lobby_whose_relayed_battle_moves(from: (&str, u16), to: (&str, u16)) -> SocketAddr {
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("a free port");
+    let addr = listener.local_addr().expect("a bound address");
+    let (from_ip, from_port) = (from.0.to_string(), from.1);
+    let (to_ip, to_port) = (to.0.to_string(), to.1);
+    tokio::spawn(async move {
+        let Ok((stream, _)) = listener.accept().await else {
+            return;
+        };
+        let mut framed = Framed::new(stream, LinesCodec::new());
+        if framed
+            .send(line::tas_server("0.38", "*", 8452, 0))
+            .await
+            .is_err()
+        {
+            return;
+        }
+        while let Some(Ok(read)) = framed.next().await {
+            match parse_client_line(&read) {
+                ClientCommand::ListCompFlags => {
+                    if framed
+                        .send(line::comp_flags(&["u", "sp", "r"]))
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
+                }
+                ClientCommand::Login { username, .. } => {
+                    for out in [
+                        line::accepted(&username),
+                        line::login_info_end(),
+                        line::battle_opened(&line::BattleOpened {
+                            id: 9,
+                            battle_type: 0,
+                            nat_type: 0,
+                            host: "bob".to_string(),
+                            ip: from_ip.clone(),
+                            port: from_port,
+                            max_players: 8,
+                            passworded: false,
+                            rank: 0,
+                            maphash: -1,
+                            engine: "spring".to_string(),
+                            version: "105".to_string(),
+                            map: "Comet Catcher".to_string(),
+                            title: "Theirs".to_string(),
+                            modname: "BAR".to_string(),
+                            channel: None,
+                        }),
+                        format!("BATTLEHOSTMOVED 9 {to_ip} {to_port}"),
+                    ] {
+                        if framed.send(out).await.is_err() {
+                            return;
+                        }
+                    }
+                }
+                _ => continue,
+            }
+        }
+    });
+    addr
+}
+
+/// The half of issue #2098 that is about everybody who is not hosting. Bob's
+/// relay comes back somewhere else, the lobby says so to everybody watching the
+/// battle list, and this client's copy of the address moves with it.
+///
+/// Without it the row still looks joinable and the join goes to an allocation
+/// that has gone, which is exactly what an old client does.
+#[tokio::test]
+async fn a_battle_somebody_else_moved_is_dialled_at_its_new_address() {
+    let registry = Registry::default();
+    let client = Client::connect(
+        &registry,
+        a_lobby_whose_relayed_battle_moves(("198.51.100.9", 30001), ("198.51.100.4", 30002)).await,
+        "alice",
+    )
+    .await;
+    client.wait_for_ready().await;
+
+    wait_until(
+        || {
+            client
+                .state()
+                .battles
+                .get(&9)
+                .is_some_and(|b| b.ip == "198.51.100.4" && b.port == "30002")
+        },
+        "the moved battle to be dialled at the address the lobby moved it to",
+    )
+    .await;
+
+    // And the battle is the same battle. Moving one is a change of address, not
+    // a new room, so everybody in it stays in it.
+    let battle = client
+        .state()
+        .battles
+        .get(&9)
+        .cloned()
+        .expect("bob's battle");
+    assert_eq!(battle.host, "bob");
+    assert_eq!(battle.map, "Comet Catcher");
+
+    client.disconnect();
+}
