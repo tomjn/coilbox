@@ -308,19 +308,31 @@ export function battleRouteLabel(
  * battles open would read one word on both rooms (issue #2147).
  *
  * There is only ever one battle room to draw, which is why the word is right
- * today. `store.tsx` keeps a single `activeKey` and a single mirror, and
- * `hostBlockedReason` turns away every way of hosting while a connection is
- * live, in as many words: "Coilbox holds one lobby connection".
+ * today. `store.tsx` holds a single `activeKey` and a single mirror, and
+ * nothing sets that key to a connection that already exists, so there is no way
+ * to move the page from one connection's battle to another's.
+ *
+ * That is a weaker guarantee than the hosting forms make it sound.
+ * `hostBlockedReason` and `joinBlockedReason` say "Coilbox holds one lobby
+ * connection" and mean it, but they are read when a drawer opens and a drawer
+ * keeps the element it was opened with, so a reconnect landing while the form
+ * is on screen walks straight past them. `doConnect` refuses nothing and
+ * disconnects nothing, so two connections can be live in the registry at once.
+ * What stops a second battle room is the one mirror, not the copy.
  *
  * The connection cannot be asked this the way the launch asks it. What a
  * connection holds is a relay handle, so all it can answer is relayed or not,
  * and three of the label's four words are rungs of a ladder climbed in the
  * hosting form against a reachability report the connection never sees.
  *
- * Which leaves keying this by server key, and that is machinery for a second
- * battle room that cannot be drawn. Whoever draws one is rewriting the mirror
- * that stops it, and this is a line of that work rather than a fix that stands
- * up on its own.
+ * Keying this by server key is the other suggestion in issue #2147, and it does
+ * not work either. The key the header has is `room.serverKey`, which is
+ * `activeKey`, while the battle it is drawing comes from `currentBattle` in the
+ * one mirror every live connection writes into. With two of them those two can
+ * already disagree, so a key check would be wrong in the same cases `selfHost`
+ * is. Whoever gives a connection a mirror of its own fixes both at once, and
+ * until then this is a line of that work rather than a fix that stands up
+ * alone.
  *
  * # The one thing a reader has to do
  *
