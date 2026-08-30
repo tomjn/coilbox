@@ -249,6 +249,13 @@ export function reachabilityState(
  * ports to name and the address is the fact that proves the rest of the
  * sentence. It says nothing about the router: this host has none to speak of,
  * and the old wording blamed one that was never there.
+ *
+ * The refused one names no router either, and for a weaker reason: coilbox does
+ * not know whether there is one. What it observed is that two requests to open a
+ * port went unanswered, which is what a router with UPnP switched off looks like
+ * and equally what a cloud instance behind its provider's one to one NAT looks
+ * like. Saying "your router would not" asserted a cause and a device, and the
+ * cloud host has neither (issue #2114).
  */
 export function reachabilityHeadline(report: DirectReachability): string {
   switch (reachabilityState(report)) {
@@ -261,7 +268,7 @@ export function reachabilityHeadline(report: DirectReachability): string {
     case "noAddress":
       return `${methodLabel(report.method)} forwarded ${portList(report.ports)}, but nothing on the internet would say what your address is.`;
     case "refused":
-      return "Your router would not open the ports.";
+      return "Nothing would open the ports.";
   }
 }
 
@@ -271,6 +278,16 @@ export function reachabilityHeadline(report: DirectReachability): string {
  *
  * `forwardTo` is the address a router's port forwarding page asks for, which is
  * this machine on its own network rather than the address anybody outside sees.
+ *
+ * The refused case has two readers and cannot tell which one is reading. One is
+ * behind a home router with UPnP switched off, and every word about UPnP is for
+ * them. The other is on a cloud instance whose public address the provider
+ * translates one to one, so no gateway exists to have answered, and the thing
+ * that decides whether anybody can reach them is a firewall rule in a browser
+ * (issue #2114). Nothing coilbox can measure separates the two: the reflexive
+ * port survives a one to one NAT, but plenty of home routers preserve the source
+ * port as well, so a guess would send home users to a console they have not got.
+ * Both are named instead, the home router first because that is most people.
  */
 export function reachabilityAdvice(report: DirectReachability): string | null {
   const to = report.lanAddress ? ` to ${report.lanAddress}` : "";
@@ -294,7 +311,7 @@ export function reachabilityAdvice(report: DirectReachability): string | null {
         report.lanAddress ?? "your local address"
       }.`;
     case "refused":
-      return `Turn on UPnP or NAT-PMP in your router's settings and try again, or forward ${ports}${to} by hand.`;
+      return `Whatever is between this machine and the internet has to let ${ports} through${to}. On a home router, turn on UPnP or NAT-PMP and try again, or forward the ports by hand. On a cloud instance there is no router to set, so open them in the provider's firewall or security group.`;
   }
 }
 
