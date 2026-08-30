@@ -27,6 +27,10 @@ export interface GameUnitFacts {
   /** The units this one can build, in whatever order the game listed them. The
    *  hub sorts and deduplicates before it digests. */
   buildOptions: string[];
+  /** What this unit turns into (issue #2063): one object per edge, each with
+   *  `into` and whatever conditions the game declared. The hub stores it as
+   *  schemaless JSON and renders what arrives. Sent even when empty. */
+  morphTargets: Record<string, unknown>[];
   /** Everything the unitdef declares about the unit (issue #1876). The hub
    *  stores it as schemaless JSON and renders what arrives, so nothing here
    *  narrows it. Sent even when empty, the way `buildOptions` is. */

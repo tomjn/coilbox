@@ -35,12 +35,16 @@ function unit(
   buildOptions: string[] = [],
   fullName?: string,
   stats?: Record<string, unknown>,
+  morphTargets?: string[],
 ): UnitDatasetEntry {
   return {
     name,
     buildOptions,
     ...(fullName ? { fullName } : {}),
     ...(stats ? { stats } : {}),
+    ...(morphTargets
+      ? { morphTargets: morphTargets.map((into) => ({ into })) }
+      : {}),
   };
 }
 
@@ -404,6 +408,7 @@ describe("sweepGameFacts", () => {
             fullName: "Commander",
             factionKey: "armada",
             buildOptions: ["armlab"],
+            morphTargets: [],
             stats: {},
           },
           {
@@ -411,6 +416,7 @@ describe("sweepGameFacts", () => {
             fullName: "Vehicle Lab",
             factionKey: "armada",
             buildOptions: [],
+            morphTargets: [],
             stats: {},
           },
         ],
@@ -462,6 +468,24 @@ describe("sweepGameFacts", () => {
     expect(solar.stats).toEqual({ health: 355 });
     expect(nothing.stats).toEqual({});
     expect(nothing.stats).not.toHaveProperty("health");
+  });
+
+  /// What a unit turns into travels with the rest of it (issue #2063), the same
+  /// way `stats` does: present and empty for a unit that morphs nowhere, rather
+  /// than absent.
+  it("sends what a unit turns into, and an empty list for one that morphs nowhere", async () => {
+    const kit = tools([game("Balanced Annihilation 12.24", "ba1224.sdz")], {
+      "ba1224.sdz": [
+        unit("armcom", [], "Commander", undefined, ["armcom1"]),
+        unit("armlab", [], "Vehicle Lab"),
+      ],
+    });
+
+    await sweepGameFacts(target, () => {}, kit);
+    const [commander, lab] = kit.sent()[0].units;
+
+    expect(commander.morphTargets).toEqual([{ into: "armcom1" }]);
+    expect(lab.morphTargets).toEqual([]);
   });
 
   /// The whole point of the skip rules, end to end: a working folder's archives

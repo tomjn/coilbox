@@ -325,6 +325,10 @@ function factsFor(
         ...(unit.fullName ? { fullName: unit.fullName } : {}),
         ...(key ? { factionKey: key } : {}),
         buildOptions: unit.buildOptions ?? [],
+        // Passed through as the worker read them (issue #2063). A worker too
+        // old to report morphs sends `[]`, the same shape as one that read the
+        // unitdef and found no edges out.
+        morphTargets: unit.morphTargets ?? [],
         // Passed through as the worker read them (issue #1876). Nothing here
         // decides which stats a unit has: the shim that reads the unitdef does,
         // and the hub renders whatever arrives. A worker too old to report any
