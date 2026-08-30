@@ -98,7 +98,9 @@ async function startedWith(
   report: DirectReachability | null,
 ): Promise<StartRoomArgs> {
   answer.current = report;
-  const onStart = vi.fn(async () => {});
+  // Typed with the signature the form calls it with, so the arguments come back
+  // as `StartRoomArgs` rather than out of an empty tuple that has to be cast.
+  const onStart = vi.fn<(args: StartRoomArgs) => Promise<void>>(async () => {});
   // The form reads the drawer it lives in, for its Cancel button.
   render(
     <DrawerProvider>
@@ -111,8 +113,12 @@ async function startedWith(
   }
   fireEvent.click(screen.getByRole("button", { name: /start/i }));
 
+  // The assertion that Start ran at all, and the reason the read below is safe.
+  // A form that stopped submitting fails here, naming that, rather than handing
+  // back an undefined for a later line to trip over.
   await waitFor(() => expect(onStart).toHaveBeenCalled());
-  return onStart.mock.calls[0][0] as StartRoomArgs;
+  const [args] = onStart.mock.calls[0];
+  return args;
 }
 
 afterEach(cleanup);
