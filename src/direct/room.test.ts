@@ -11,6 +11,7 @@ import {
   newPendingNames,
   pendingJoinsHeadline,
   playerNameProblem,
+  roomMovedNotice,
   roomPasswordProblem,
   roomPortProblem,
   roomStopReason,
@@ -228,6 +229,33 @@ describe("gameAddressNote", () => {
       "points back at their own machine rather than yours",
     );
     expect(note).toContain("It was handing out 192.168.1.45 earlier.");
+  });
+});
+
+describe("roomMovedNotice", () => {
+  // Leads with the move, unlike gameAddressNote, because this appears out of
+  // nothing at the top of a page about a game rather than sitting in a block
+  // about the room.
+  it("names both addresses and says the room moved between them", () => {
+    expect(roomMovedNotice("10.8.0.2", "192.168.1.45")).toBe(
+      "Your room has moved onto a different address. It was handing out 192.168.1.45 earlier and now hands joiners 10.8.0.2 for the game itself.",
+    );
+  });
+
+  // The move is the whole of what this is for, so with nothing to report there
+  // is no sentence to draw a strip around.
+  it("has nothing to say about a room that has not moved", () => {
+    expect(roomMovedNotice("192.168.1.45", null)).toBe("");
+  });
+
+  // A machine that loses every interface falls back here, which is the worst
+  // move a room can make, so it must not read like any other one.
+  it("says loopback is nobody else's address when a room lands on it", () => {
+    const note = roomMovedNotice("127.0.0.1", "192.168.1.45");
+    expect(note).toContain("now hands joiners 127.0.0.1 for the game itself");
+    expect(note).toContain(
+      "points back at their own machine rather than yours",
+    );
   });
 });
 
