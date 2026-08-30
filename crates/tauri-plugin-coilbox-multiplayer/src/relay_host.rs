@@ -646,8 +646,13 @@ fn renew_in(expires_at: u64, now_ms: u64) -> Option<Duration> {
 /// closes there is nobody left to mint anything. What a host gets from this is
 /// that the credential is never more than half spent while coilbox is there, so
 /// closing the window leaves the relay with at least half a lifetime of rebuilds
-/// in hand rather than however much happened to be left. Closing it and playing
-/// on for longer than that is still a battle a rebuild would end.
+/// in hand rather than however much happened to be left.
+///
+/// [`renew_before_quitting`] takes the other half of that: one more ask on the
+/// way out, so the sidecar carries a whole lifetime rather than somewhere
+/// between a whole one and half of one. Playing on for longer than that after
+/// quitting is still a battle a rebuild would end, and the reason no client-side
+/// design closes it is written down there (issue #2105).
 ///
 /// ## A task rather than a thread
 ///
@@ -734,6 +739,102 @@ pub(crate) async fn renew_now(
     match agent.renew_credential(&fresh.turn) {
         Ok(()) => Renewed::Until(fresh.expires_at),
         Err(_) => Renewed::NobodyThere,
+    }
+}
+
+/// Which of this coilbox's connections are hosting a battle through a relay
+/// right now.
+///
+/// A list rather than an option because the registry holds one entry per lobby
+/// and somebody can be logged in to more than one. In practice it is empty or
+/// holds one key, because hosting is one battle and one engine.
+///
+/// Public so that quitting can decide whether there is anything to do before it
+/// spawns anything, which is what keeps an ordinary quit free.
+pub fn relaying_on(registry: &Registry) -> Vec<String> {
+    lock_or_recover(registry)
+        .iter()
+        .filter(|(_, conn)| lock_or_recover(&conn.relay).is_some())
+        .map(|(key, _)| key.clone())
+        .collect()
+}
+
+/// Ask the lobby for one last credential for every relayed battle, on the way
+/// out of coilbox (issue #2105).
+///
+/// ## What quitting decides
+///
+/// The number the sidecar carries into the rest of the game. [`renewing`] keeps
+/// the credential topped up while coilbox is open, and the moment coilbox goes
+/// that stops for good: the sidecar has no lobby connection of its own, so
+/// whatever it is holding when the window closes is what it has for the rest of
+/// the battle. Rebuild the relay after that runs out and coturn judges the
+/// credential afresh, answers 401, and everybody in the game is dropped.
+///
+/// [`renewing`] on its own leaves that number anywhere between a full lifetime
+/// and half of one, because it renews at half life and quitting lands wherever
+/// it lands. Asking once more on the way out makes it a full lifetime every
+/// time. On 5115 seconds, the shortest credential coilbox will host on at all,
+/// that is the difference between 42 minutes of unattended rebuilds and 85.
+///
+/// What it cannot cover is a kill, a crash or a power cut, where none of our
+/// code runs and the sidecar keeps whatever it had, which is what happens today
+/// anyway.
+///
+/// ## Why this is as far as coilbox can go
+///
+/// Renewing after the window has gone needs the sidecar to hold something it
+/// can present to the lobby on its own behalf, and every shape of that costs
+/// more than it buys.
+///
+/// A second lobby login means the sidecar holds something it can be the user
+/// with, for the length of a game, where today it holds one short-lived
+/// credential scoped to one TURN server. Most TASServer implementations also
+/// refuse or displace a second concurrent login for one account, so the sidecar
+/// connecting would knock out the host's own session and end the battle it was
+/// meant to protect.
+///
+/// A credential written beside the run file, the way #2062's stop note is,
+/// works, and puts a live relay credential in a predictable path for the length
+/// of a game. The credential reaches the sidecar in its environment today, and
+/// `relay_sidecar::build_args` keeps the password out of argv on purpose, so a
+/// file is a step down from where it is rather than a sideways move.
+///
+/// A narrow token, minted once by the lobby, that buys relay credentials and
+/// cannot log in or chat or be the user, is the design that would actually
+/// close this. It is a server-side decision and there is nothing to build
+/// against: no lobby implements even `TURNCREDENTIALS` yet
+/// (ScarylePoo/uberserver#46), so the client half would be guesswork about a
+/// protocol nobody has written.
+///
+/// So the limit is a decision rather than an omission. What is left after this
+/// is a host who quits, plays on for longer than a whole credential lifetime,
+/// and then loses their relay. The only lever left on that one is the lobby
+/// minting longer, which is ScarylePoo/uberserver#27.
+///
+/// ## Why the host is not warned about it
+///
+/// [`crate::turn::credentials`] refuses to open a relayed battle on a
+/// credential shorter than the 99th percentile game plus a rebuild, so at the
+/// moment a battle opens the honest sentence is that it is fine, 99 times in a
+/// hundred. A line on every relayed battle about a risk that needs a long game
+/// and a quit and a rebuild is a line people learn to skip past.
+/// [`MoveWatch::told`] and [`CredentialWatch::told`] are both in this file
+/// because a warning repeated was already judged worse than none. The moment it
+/// stops being fine is the credential actually running down, and
+/// [`out_of_credential`] says so then, while coilbox is open and while hosting
+/// again is still something the host can do.
+pub async fn renew_before_quitting(registry: &Registry, patience: Duration) {
+    for key in relaying_on(registry) {
+        let Some((agent, held_until)) = still_ours(registry, &key, None) else {
+            continue;
+        };
+        // The answer is discarded because there is nowhere left to put it:
+        // [`credential_now_expires_at`] writes the number that the next turn of
+        // a loop reads, and this process will not live to take one. The write
+        // to the sidecar is the point, and `renew_now` has already made it by
+        // the time this returns.
+        let _ = renew_now(registry, &key, &agent, held_until, patience).await;
     }
 }
 
@@ -1939,6 +2040,64 @@ mod tests {
             "there is nothing left worth renewing: {}",
             w.written.sent()
         );
+    }
+
+    /// Issue #2105's half. Quitting is the last moment coilbox can put anything
+    /// in the sidecar's hands, so it asks once more whatever the schedule says,
+    /// and the sidecar goes into the unattended part of the game on a whole
+    /// credential rather than on whatever half life it happened to be at.
+    #[tokio::test]
+    async fn quitting_hands_the_sidecar_one_last_credential() {
+        let w = hosting_and_renewing();
+        // Nothing due for the better part of an hour, so a schedule is not what
+        // makes this happen.
+        credential_now_expires_at(&w.registry, KEY, NOW + 5_115_000);
+        w.lobby_mints(86_400, NOW);
+
+        renew_before_quitting(&w.registry, PATIENCE).await;
+
+        let sent = w.written.sent();
+        assert!(
+            sent.contains("\"type\":\"renewCredential\"")
+                && sent.contains("\"user\":\"1786086400:alice\"")
+                && sent.contains("\"password\":\"bWFj=\""),
+            "the sidecar has to carry a fresh credential out of the quit: {sent}"
+        );
+    }
+
+    /// The lobby is free to mint something worse than the sidecar already has,
+    /// and quitting is not a reason to take it. Shortening the credential on the
+    /// way out is the one way this could make #2105 worse rather than better.
+    #[tokio::test]
+    async fn quitting_does_not_take_a_shorter_credential_than_the_one_held() {
+        let w = hosting_and_renewing();
+        credential_now_expires_at(&w.registry, KEY, NOW + 5_115_000);
+        w.lobby_mints(60, NOW);
+
+        renew_before_quitting(&w.registry, PATIENCE).await;
+
+        assert!(
+            !w.written.sent().contains("renewCredential"),
+            "a shorter credential must not replace a longer one: {}",
+            w.written.sent()
+        );
+    }
+
+    /// What quitting looks for, which is what keeps an ordinary quit free: a
+    /// connection is only worth asking about while it is actually relaying a
+    /// battle, and it stops being one the moment the host leaves.
+    #[test]
+    fn only_a_connection_that_is_relaying_is_worth_asking_about() {
+        let w = hosting_and_renewing();
+        assert_eq!(relaying_on(&w.registry), vec![KEY.to_string()]);
+
+        let relay = lock_or_recover(&w.registry)
+            .get(KEY)
+            .map(|conn| Arc::clone(&conn.relay))
+            .expect("the connection is registered");
+        *lock_or_recover(&relay) = None;
+
+        assert!(relaying_on(&w.registry).is_empty());
     }
 
     /// Wait for something a background thread is going to write.
