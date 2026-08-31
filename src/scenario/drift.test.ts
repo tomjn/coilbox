@@ -48,20 +48,23 @@ describe("drift", () => {
    * Every committed fixture goes through it, since a field only one mission
    * uses is where a lossy parse would hide.
    */
-  describe.each(["ambush", "garrison", "jericho", "siege", "splinter"])(
-    "%s.json, written into a game and read back",
-    (name) => {
-      it("compiles to the same mission it shipped", () => {
-        const path = join(__dirname, "fixtures", `${name}.json`);
-        const authored = parseScenario(JSON.parse(readFileSync(path, "utf8")));
-        if (!authored) throw new Error(`${name}.json is not a valid scenario`);
-        const shipped = compileScenario(authored);
+  describe.each([
+    "ambush",
+    "garrison",
+    "jericho",
+    "siege",
+    "splinter",
+  ])("%s.json, written into a game and read back", (name) => {
+    it("compiles to the same mission it shipped", () => {
+      const path = join(__dirname, "fixtures", `${name}.json`);
+      const authored = parseScenario(JSON.parse(readFileSync(path, "utf8")));
+      if (!authored) throw new Error(`${name}.json is not a valid scenario`);
+      const shipped = compileScenario(authored);
 
-        const readBack = parseScenario(JSON.parse(JSON.stringify(authored)));
-        if (!readBack) throw new Error(`${name}.json did not survive the trip`);
+      const readBack = parseScenario(JSON.parse(JSON.stringify(authored)));
+      if (!readBack) throw new Error(`${name}.json did not survive the trip`);
 
-        expect(missionDrifted(readBack, shipped)).toBe(false);
-      });
-    },
-  );
+      expect(missionDrifted(readBack, shipped)).toBe(false);
+    });
+  });
 });
