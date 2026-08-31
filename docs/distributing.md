@@ -57,6 +57,8 @@ Inside each package's `.coilbox/`:
 
 Coilbox creates `data/` and `cache/` inside `.coilbox/` on first run — you don't ship those. See [portable-mode.md](portable-mode.md#what-lives-where) for the full breakdown, and note the game content goes in a **sibling** folder (e.g. `game/`), never inside `.coilbox/`.
 
+> **A bundled scenario needs a game that can play it.** A file in `scenarios/` is the authored document and nothing else. It is played by [the mission runtime](mission-runtime.md), which lives in the game, so the copy you put in `game/` wants to be a loose `.sdd` with the runtime installed and the adoption guards applied. Bundle a packaged `.sd7` or `.sdz` and every scenario in the package falls back to a generated test game, which plays, but leaves your own end conditions and pre-game phases running over the top of the mission. See [what the other machine needs](scenarios.md#what-the-other-machine-needs).
+
 ## Getting the binaries
 
 Each release build produces the per-OS binaries you drop into these packages: Windows `.exe`, Linux `.AppImage`, macOS `.app`. See [portable-mode.md](portable-mode.md#packaging-checklist) for the end-to-end packaging checklist, and [distribution-profile.md](distribution-profile.md) for everything `profile.json` can do (title, theme, hidden nav, welcome screen, links, and self-updating from GitHub releases).
