@@ -23,11 +23,19 @@ const LABELS: Record<number, string> = {
 export function StartPosOptions({
   battle,
   canEdit,
+  unavailable,
   sendOption,
   note,
   children,
 }: {
   battle: Battle;
+  /**
+   * Why this connection has no start position mode at all, or null where it has
+   * one (issue #1979). Replaces the whole control rather than disabling it: a
+   * greyed-out select still claims the room has a mode, and on a protocol that
+   * carries none the value shown would be a default nobody chose.
+   */
+  unavailable?: string | null;
   /** Host may change the mode; joiners see it read-only. */
   canEdit: boolean;
   sendOption: (tagKey: string, spadsName: string, value: string) => void;
@@ -48,7 +56,11 @@ export function StartPosOptions({
       <span className="block text-[11px] uppercase tracking-wide text-muted-foreground">
         Start positions
       </span>
-      {canEdit ? (
+      {unavailable ? (
+        <span className="mt-1 block text-sm text-muted-foreground">
+          {unavailable}
+        </span>
+      ) : canEdit ? (
         <OptionSelect
           className="mt-1"
           size="sm"
@@ -59,7 +71,7 @@ export function StartPosOptions({
       ) : (
         <span className="text-sm">{LABELS[Number(value)] ?? "Fixed"}</span>
       )}
-      {note && (
+      {!unavailable && note && (
         <span className="mt-1 block text-xs text-muted-foreground">{note}</span>
       )}
       {children}

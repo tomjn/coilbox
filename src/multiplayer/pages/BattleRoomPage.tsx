@@ -553,6 +553,9 @@ function BattleRoomPage() {
           <StartPosOptions
             battle={battle}
             canEdit={room.canEditOptions}
+            // Zero-K carries no start position mode, so the card says so rather
+            // than showing a default nobody chose (issue #1979).
+            unavailable={room.startPositionsUnavailable}
             sendOption={room.sendOption}
             note={
               room.startPosType === 0
@@ -585,6 +588,8 @@ function BattleRoomPage() {
             mapMissing={room.mapMissing}
             sendOption={room.sendOption}
             canEditRestrictions={room.canEditRestrictions}
+            restrictionsUnavailable={room.restrictionsUnavailable}
+            startPositionsUnavailable={room.startPositionsUnavailable}
             onRestrictChange={room.setRestrictions}
           />
           {room.canEditOptions && (
