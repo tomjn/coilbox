@@ -40,6 +40,8 @@ import {
   carriesBotAlly,
   founderRunsTheGame,
   seatIsServerAssigned,
+  startPositionsUnavailable,
+  unitRestrictionsUnavailable,
 } from "../protocol";
 import { useMultiplayer } from "../store";
 import {
@@ -129,6 +131,14 @@ export interface BattleRoomView {
    * founder (we own the `game/restrict/*` script tags — there's no autohost path).
    */
   canEditRestrictions: boolean;
+  /**
+   * Why this connection cannot carry unit restrictions, or null where it can
+   * (issue #1979). Said rather than hidden, so a founder is not left looking for
+   * a setting every other lobby has.
+   */
+  restrictionsUnavailable: string | null;
+  /** The same for start positions, which Zero-K also has nowhere to put. */
+  startPositionsUnavailable: string | null;
   /** Set the full disabled-unit set as engine-native `game/restrict/*` script tags. */
   setRestrictions: (disabled: string[]) => void;
   /**
@@ -354,6 +364,11 @@ export function useBattleRoom(): BattleRoomView {
     battle && !takesBots
       ? "This room type takes no AIs. Only a custom or cooperative room does."
       : null;
+  // Two settings this connection may have nowhere to put (issue #1979). Both are
+  // real gaps in Zero-K's protocol rather than work coilbox has not done, so the
+  // room says why instead of offering a control that writes to nothing.
+  const restrictionsRefused = unitRestrictionsUnavailable(protocol);
+  const startPositionsRefused = startPositionsUnavailable(protocol);
   // A bot's ally team is settable wherever the protocol carries one, which is
   // everywhere but Tachyon. Its team number is a separate matter: Zero-K has no
   // team number for anyone, so nothing here offers one.
@@ -1100,9 +1115,12 @@ export function useBattleRoom(): BattleRoomView {
     canEditOptions,
     sendOption,
     applyOptionTags,
-    canEditRestrictions: isFounder,
+    canEditRestrictions: isFounder && !restrictionsRefused,
+    restrictionsUnavailable: restrictionsRefused,
+    startPositionsUnavailable: startPositionsRefused,
     setRestrictions,
-    canEditBoxes: canEditOptions && startPosType === 2,
+    canEditBoxes:
+      canEditOptions && startPosType === 2 && !startPositionsRefused,
     setStartBox,
     clearStartBox,
     startPosType,

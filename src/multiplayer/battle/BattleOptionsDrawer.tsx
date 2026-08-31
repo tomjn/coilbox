@@ -39,6 +39,8 @@ export function BattleOptionsDrawer({
   mapMissing,
   sendOption,
   canEditRestrictions,
+  restrictionsUnavailable,
+  startPositionsUnavailable,
   onRestrictChange,
 }: {
   battle: Battle;
@@ -50,6 +52,14 @@ export function BattleOptionsDrawer({
   sendOption: (tagKey: string, spadsName: string, value: string) => void;
   /** Whether the local user may edit unit restrictions (founder only). */
   canEditRestrictions: boolean;
+  /**
+   * Why this connection carries no unit restrictions, or null where it does
+   * (issue #1979). Said in the section it belongs to, because "No restrictions"
+   * would be a claim about this room rather than about the protocol.
+   */
+  restrictionsUnavailable?: string | null;
+  /** The same for the start position mode, in the section above it. */
+  startPositionsUnavailable?: string | null;
   /** Apply the full disabled-unit set (writes `game/restrict/*` script tags). */
   onRestrictChange: (disabled: string[]) => void;
 }) {
@@ -114,14 +124,20 @@ export function BattleOptionsDrawer({
                 <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                   Start positions
                 </div>
-                <OptionSelect
-                  value={startPos}
-                  disabled={!canEdit}
-                  options={START_POS_OPTIONS}
-                  onValueChange={(v) =>
-                    setOption(STARTPOSTYPE_KEY, "startpostype", v)
-                  }
-                />
+                {startPositionsUnavailable ? (
+                  <p className="text-xs text-muted-foreground">
+                    {startPositionsUnavailable}
+                  </p>
+                ) : (
+                  <OptionSelect
+                    value={startPos}
+                    disabled={!canEdit}
+                    options={START_POS_OPTIONS}
+                    onValueChange={(v) =>
+                      setOption(STARTPOSTYPE_KEY, "startpostype", v)
+                    }
+                  />
+                )}
               </section>
 
               <OptionSection
@@ -148,6 +164,7 @@ export function BattleOptionsDrawer({
                 gameName={battle.modname}
                 scriptTags={battle.scriptTags}
                 canEdit={canEditRestrictions}
+                unavailable={restrictionsUnavailable}
                 onChange={onRestrictChange}
               />
             </div>
@@ -252,11 +269,14 @@ function RestrictSection({
   gameName,
   scriptTags,
   canEdit,
+  unavailable,
   onChange,
 }: {
   gameName: string;
   scriptTags: Record<string, string>;
   canEdit: boolean;
+  /** Why the protocol carries none, or null where it does (issue #1979). */
+  unavailable?: string | null;
   onChange: (disabled: string[]) => void;
 }) {
   const confirmed = useMemo(() => disabledFromTags(scriptTags), [scriptTags]);
@@ -272,7 +292,9 @@ function RestrictSection({
       <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
         Unit restrictions
       </div>
-      {canEdit ? (
+      {unavailable ? (
+        <p className="text-xs text-muted-foreground">{unavailable}</p>
+      ) : canEdit ? (
         <UnitRestrictions
           gameName={gameName}
           disabledUnits={disabled}

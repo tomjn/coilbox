@@ -23,7 +23,9 @@ import {
   publishesStatus,
   relayHostingAvailable,
   seatIsServerAssigned,
+  startPositionsUnavailable,
   syncsOnReady,
+  unitRestrictionsUnavailable,
 } from "./protocol";
 
 /** A built-in server by id, failing loudly if the catalog entry is renamed. */
@@ -147,6 +149,46 @@ describe("Zero-K", () => {
 
   it("sets no message limit, because none is published", () => {
     expect(messageLimit("zerok")).toBeNull();
+  });
+
+  // Issue #1979: a connection presents only what it can do. Both of these are
+  // real gaps rather than unfinished work. `mp_set_script_tags` splits a tag map
+  // into Zero-K's `SetModOptions` and `SetMapOptions`, and neither namespace has
+  // a home for a start position type or a unit restriction, so a founder who set
+  // one was writing to nothing.
+  it("names why start positions cannot be set, rather than offering a dead control", () => {
+    expect(startPositionsUnavailable("zerok")).toContain(
+      "carries no start positions",
+    );
+  });
+
+  it("names why unit restrictions cannot be set", () => {
+    expect(unitRestrictionsUnavailable("zerok")).toContain(
+      "carries no unit restrictions",
+    );
+  });
+});
+
+describe("what a connection can carry", () => {
+  // The other two protocols declare the same capabilities rather than being
+  // assumed to have them, which is what stops the third from being special-cased
+  // at every surface that reads one.
+  it("sets start positions on both of the protocols that carry them", () => {
+    expect(startPositionsUnavailable("tasserver")).toBeNull();
+    expect(startPositionsUnavailable("tachyon")).toBeNull();
+  });
+
+  it("sets unit restrictions on both of the protocols that carry them", () => {
+    expect(unitRestrictionsUnavailable("tasserver")).toBeNull();
+    expect(unitRestrictionsUnavailable("tachyon")).toBeNull();
+  });
+
+  // The words go on screen, so they have to read as a sentence to somebody who
+  // has never heard of a script tag.
+  it("says why in a whole sentence, because it is shown to a person", () => {
+    const said = startPositionsUnavailable("zerok") ?? "";
+    expect(said.startsWith("Zero-K")).toBe(true);
+    expect(said.endsWith(".")).toBe(true);
   });
 });
 
