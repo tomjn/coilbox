@@ -212,7 +212,7 @@ describe("membersToRows", () => {
     expect(row.colorHex).toBe("#ff0000");
   });
 
-  it("enriches human rows with country + rank from the users map", () => {
+  it("enriches human rows with country, rank and rating from the users map", () => {
     const battle = mkBattle({
       members: { alice: member() },
       bots: {
@@ -238,16 +238,19 @@ describe("membersToRows", () => {
           access: false,
           bot: false,
         },
+        rating: { casual: 1650, matchmaking: 1720, overall: null },
       },
     };
     const rows = membersToRows(battle, "alice", users);
     const alice = rows.find((r) => r.name === "alice");
     expect(alice?.country).toBe("GB");
     expect(alice?.rank).toBe(4);
-    // Bots carry no country/rank.
+    expect(alice?.rating?.casual).toBe(1650);
+    // Bots carry no country, rank or rating. Nobody rates an AI.
     const bot = rows.find((r) => r.kind === "bot");
     expect(bot?.country).toBeUndefined();
     expect(bot?.rank).toBeUndefined();
+    expect(bot?.rating).toBeUndefined();
   });
 
   it("leaves country/rank undefined when no users map is given", () => {

@@ -1,9 +1,12 @@
 import { cn } from "@picoframe/frame";
 import { ChevronUp, Globe } from "lucide-react";
+import type { Rating } from "./bindings";
+import { ratingParts, ratingSummary } from "./rating";
 
 /**
  * Small per-user adornments for the lobby user list and battle roster: a country
- * flag (from ADDUSER) and a rank insignia (from ClientStatus). `CountryFlag` always
+ * flag (from ADDUSER), a rank insignia (from ClientStatus) and a rating from
+ * whichever server sent one (issue #2002). `CountryFlag` always
  * renders (a neutral placeholder when the country is unknown) so names in a list
  * stay aligned; `RankBadge` renders nothing for rank 0.
  */
@@ -53,6 +56,45 @@ export function CountryFlag({
       aria-label={`Country: ${label}`}
       title={label}
     />
+  );
+}
+
+/**
+ * A player's rating, or nothing at all when the server sent none.
+ *
+ * Nothing is the normal case. Coilbox speaks to three kinds of server and only
+ * Zero-K rates anybody, so this draws for a Zero-K connection and stays out of
+ * the way everywhere else. A dash or a zero would read as a bad rating rather
+ * than as an unrated player, which is why an absent rating is absent rather
+ * than drawn empty.
+ *
+ * One number, because a roster row has space for one. Zero-K sends two that
+ * mean different things, so the label names every one it has and the number on
+ * screen is the first of them. See `ratingParts`.
+ */
+export function RatingBadge({
+  rating,
+  className,
+}: {
+  rating: Rating | undefined;
+  className?: string;
+}) {
+  const parts = ratingParts(rating);
+  const summary = ratingSummary(rating);
+  const first = parts[0];
+  if (!first || !summary) return null;
+  return (
+    <span
+      className={cn(
+        "shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground",
+        className,
+      )}
+      role="img"
+      aria-label={summary}
+      title={summary}
+    >
+      {first.value}
+    </span>
   );
 }
 

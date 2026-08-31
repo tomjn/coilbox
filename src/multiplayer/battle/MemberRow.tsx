@@ -26,7 +26,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import { NoteButton } from "../NoteButton";
-import { CountryFlag, RankBadge } from "../UserBadges";
+import { CountryFlag, RankBadge, RatingBadge } from "../UserBadges";
 import { allyLetter, type MemberRow as Row } from "./config";
 
 /**
@@ -268,6 +268,7 @@ export function MemberRow({
                   {row.name}
                 </span>
                 {row.rank != null && <RankBadge rank={row.rank} />}
+                <RatingBadge rating={row.rating} />
               </div>
               {canChangeAi && (
                 <OptionSelect

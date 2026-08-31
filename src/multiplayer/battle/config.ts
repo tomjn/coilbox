@@ -1,5 +1,5 @@
 import { randomTeamColorHex } from "@/lib/teamColor";
-import type { Battle, BattleStatus, User, Vote } from "../bindings";
+import type { Battle, BattleStatus, Rating, User, Vote } from "../bindings";
 
 // Re-exported so existing call sites (and config.test.ts) keep importing the
 // random-colour helper from `./config` unchanged; the implementation now lives in
@@ -122,6 +122,10 @@ export interface MemberRow {
   country?: string;
   /** Humans only: server rank 0-7 (from ClientStatus), when known. */
   rank?: number;
+  /** Humans only: what the server says about their skill, where it says
+   * anything (issue #2002). Absent for a bot, which nobody rates, and for a
+   * connection to a server that rates nobody. */
+  rating?: Rating;
   /** Humans only: stable account id (from `User.userId`), when known. Used to
    * key client-local per-player notes so they survive a nick change. */
   userId?: string;
@@ -177,6 +181,7 @@ export function membersToRows(
         }),
         country: u?.country,
         rank: u?.status.rank,
+        rating: u?.rating,
         userId: u?.userId,
       };
     });
