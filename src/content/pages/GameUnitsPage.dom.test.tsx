@@ -99,10 +99,13 @@ function renderPage({
   units,
   sides,
   datasetStatus = "ready",
+  search = "",
 }: {
   units: UnitFixture[];
   sides: { name: string; startUnit?: string }[];
   datasetStatus?: "ready" | "unsyncable" | "error" | "loading";
+  /** e.g. "?faction=corcom", to prove the faction filter narrows the grid. */
+  search?: string;
 }) {
   mockUnits = units as UnitDatasetEntry[];
   mockDatasetStatus = datasetStatus;
@@ -117,7 +120,9 @@ function renderPage({
   buildpicsCalls = [];
   return render(
     <MemoryRouter
-      initialEntries={[`/content/games/${encodeURIComponent(GAME_NAME)}/units`]}
+      initialEntries={[
+        `/content/games/${encodeURIComponent(GAME_NAME)}/units${search}`,
+      ]}
     >
       <Routes>
         <Route path="/content/games/:name/units" element={<GameUnitsPage />} />
@@ -176,6 +181,44 @@ describe("GameUnitsPage", () => {
     });
     expect(await screen.findByText("Armada")).toBeTruthy();
     expect(screen.getByText("Other units")).toBeTruthy();
+  });
+
+  it("shows every faction's block with no faction param", async () => {
+    renderPage({
+      units: [
+        { name: "armcom", buildOptions: ["armsolar"] },
+        { name: "armsolar" },
+        { name: "corcom", buildOptions: ["corsolar"] },
+        { name: "corsolar" },
+      ],
+      sides: [
+        { name: "Armada", startUnit: "armcom" },
+        { name: "Cortex", startUnit: "corcom" },
+      ],
+    });
+    expect(await screen.findByText("Armada")).toBeTruthy();
+    expect(screen.getByText("Cortex")).toBeTruthy();
+  });
+
+  it("narrows the grid to one faction's block via ?faction=<rootId>", async () => {
+    // `rootId` is the value `FactionBuildList`'s "Browse units" button links
+    // with: a side's start unit id, which is also the id `encyclopediaSections`
+    // keys that faction's `section.id` on.
+    renderPage({
+      units: [
+        { name: "armcom", buildOptions: ["armsolar"] },
+        { name: "armsolar" },
+        { name: "corcom", buildOptions: ["corsolar"] },
+        { name: "corsolar" },
+      ],
+      sides: [
+        { name: "Armada", startUnit: "armcom" },
+        { name: "Cortex", startUnit: "corcom" },
+      ],
+      search: "?faction=corcom",
+    });
+    expect(await screen.findByText("Cortex")).toBeTruthy();
+    expect(screen.queryByText("Armada")).toBeNull();
   });
 
   it("links a cell to the unit's own page as an absolute path", async () => {

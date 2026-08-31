@@ -1,5 +1,6 @@
-import { Button, useDrawer } from "@picoframe/frame";
+import { Button, buttonVariants, cn, useDrawer } from "@picoframe/frame";
 import { useMemo } from "react";
+import { Link } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import type {
@@ -16,10 +17,12 @@ import { BuildTreeDrawer } from "./BuildTreeDrawer";
 /**
  * The per-faction build-tree buttons, extracted from GameDetailPage so the game detail
  * screen and the `@widget/faction-button` / `@widget/build-tree` embeds (issue #274)
- * share one implementation. Each button shows a faction's start unit + reachable-unit
- * count and opens the {@link BuildTreeDrawer} on that faction. The drawer-open params
+ * share one implementation. Each faction shows its start unit + reachable-unit count
+ * next to two equal-weight actions: one opens the {@link BuildTreeDrawer} on that
+ * faction, the other links to the units grid narrowed to it (`?faction=<startUnit>`,
+ * the same id `encyclopediaSections` keys its blocks on). The drawer-open params
  * (engine/dataDir/archive/game name) plus the full sides + unit dataset are passed
- * through; counts and icons are derived here so callers don't duplicate that.
+ * through, and counts and icons are derived here so callers don't duplicate that.
  */
 
 /** Everything a build button needs to open the shared drawer on a given faction. */
@@ -73,32 +76,62 @@ export function FactionBuildButton({
         />
       ),
     });
+  // The units grid keys a faction's block on its start unit id
+  // (`encyclopediaSections`), so that id is what narrows the grid to this side
+  // alone. A side reporting no start unit has no block of its own to narrow
+  // to, so this falls back to the same disabled treatment as a 0 count below
+  // rather than linking to a filter that would just come back empty.
+  const browseHref = side.startUnit
+    ? `/content/games/${encodeURIComponent(ctx.gameName)}/units?faction=${encodeURIComponent(side.startUnit)}`
+    : undefined;
   return (
-    <Button
-      type="button"
-      variant="outline"
-      disabled={count === 0}
-      onClick={open}
-      className="h-auto w-full justify-between gap-3 p-3"
-    >
-      <span className="flex items-center gap-3">
-        {icon && (
-          <img
-            src={icon}
-            alt=""
-            className="h-16 w-16 shrink-0 rounded object-contain"
-          />
-        )}
-        <span className="flex items-center gap-2 font-medium">
-          {logo && <FactionLogo logo={logo} sideName={side.name} size={20} />}
-          {side.name}
+    <div className="flex flex-col gap-2 rounded-lg border border-border/50 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-3">
+          {icon && (
+            <img
+              src={icon}
+              alt=""
+              className="h-16 w-16 shrink-0 rounded object-contain"
+            />
+          )}
+          <span className="flex items-center gap-2 font-medium">
+            {logo && <FactionLogo logo={logo} sideName={side.name} size={20} />}
+            {side.name}
+          </span>
         </span>
-      </span>
-      <span className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground">
-        {count > 0 && <span>{count} units</span>}
-        {unitLabel && <span>{unitLabel}</span>}
-      </span>
-    </Button>
+        <span className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground">
+          {count > 0 && <span>{count} units</span>}
+          {unitLabel && <span>{unitLabel}</span>}
+        </span>
+      </div>
+      {/* Equal weight: the drawer answers "what does this faction lead to",
+          the grid answers "what does this faction have", and neither is the
+          other's afterthought. */}
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={count === 0}
+          onClick={open}
+          className="flex-1"
+        >
+          Build tree
+        </Button>
+        {browseHref && count > 0 ? (
+          <Link
+            to={browseHref}
+            className={cn(buttonVariants({ variant: "outline" }), "flex-1")}
+          >
+            Browse units
+          </Link>
+        ) : (
+          <Button type="button" variant="outline" disabled className="flex-1">
+            Browse units
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 

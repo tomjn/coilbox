@@ -1,6 +1,6 @@
 import { Input } from "@picoframe/frame";
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { UnitDisplay } from "../bindings";
 import {
@@ -29,10 +29,18 @@ const RENDER_CAP = 500;
  * same scan/game-info/unit-dataset hooks `GameDetailPage` reads, then hands the
  * dataset and the game's sides to `encyclopediaSections`, which resolves each
  * side's start unit to its morph group's base itself.
+ *
+ * An optional `?faction=<rootId>` narrows the grid to one faction's block, so
+ * `FactionBuildList`'s "Browse units" button can link straight into a single
+ * side rather than the whole game. `rootId` is a side's start unit id, the
+ * same id `encyclopediaSections` keys each block's `section.id` on, so the
+ * filter below just compares against that rather than re-deriving it.
  */
 export default function GameUnitsPage() {
   const { name } = useParams();
   const decoded = name ? decodeURIComponent(name) : "";
+  const [searchParams] = useSearchParams();
+  const factionParam = searchParams.get("faction");
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
     selected?.enginePath,
@@ -69,12 +77,20 @@ export default function GameUnitsPage() {
     [gameInfo],
   );
   const sections = encyclopediaSections(dataset?.units ?? [], roots, query);
-  const total = sections.reduce((n, s) => n + s.cells.length, 0);
+  // Computed over every faction's roots regardless of the param. Handing
+  // `encyclopediaSections` just the one requested root would make it treat
+  // every other faction's units as unreached, dumping them into "Other
+  // units" instead of leaving them off this page entirely. Narrowing to one
+  // faction's block happens after that walk, here.
+  const scoped = factionParam
+    ? sections.filter((s) => s.id.toLowerCase() === factionParam.toLowerCase())
+    : sections;
+  const total = scoped.reduce((n, s) => n + s.cells.length, 0);
 
   // The budget crosses section boundaries so one big faction can't starve every
   // faction after it, matching how `UnitPicker.tsx:577` caps its own list.
   let left = RENDER_CAP;
-  const rows = sections
+  const rows = scoped
     .map((section) => {
       const shown = section.cells.slice(0, Math.max(left, 0));
       left -= shown.length;
@@ -93,13 +109,13 @@ export default function GameUnitsPage() {
   // the in-flight worker job. `UnitPicker.tsx:445` avoids exactly this by
   // memoising its own `allIds` over the whole unit list rather than the
   // filtered one, and this does the same over the query-less sections.
-  const allCellIds = useMemo(
-    () =>
-      encyclopediaSections(dataset?.units ?? [], roots, "").flatMap((s) =>
-        s.cells.map((c) => c.id),
-      ),
-    [dataset, roots],
-  );
+  const allCellIds = useMemo(() => {
+    const all = encyclopediaSections(dataset?.units ?? [], roots, "");
+    const allScoped = factionParam
+      ? all.filter((s) => s.id.toLowerCase() === factionParam.toLowerCase())
+      : all;
+    return allScoped.flatMap((s) => s.cells.map((c) => c.id));
+  }, [dataset, roots, factionParam]);
 
   const buildpics = useUnitsyncUnitBuildpics(
     selected?.enginePath,

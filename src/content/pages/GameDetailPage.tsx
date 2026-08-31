@@ -1,5 +1,5 @@
-import { Button, useSetting } from "@picoframe/frame";
-import { FolderOpen, Trophy } from "lucide-react";
+import { Button, buttonVariants, cn, useSetting } from "@picoframe/frame";
+import { FolderOpen, Loader2, Trophy } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { GameEquivalents } from "@/blueprint/pages/components/GameEquivalents";
@@ -209,20 +209,6 @@ export default function GameDetailPage() {
         <WarningBanner warnings={game.warnings} noun="game" />
       ) : null}
 
-      {otherInfo.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">Metadata</h2>
-          <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
-            {otherInfo.map(([k, v]) => (
-              <div key={k} className="contents">
-                <dt className="font-mono text-xs text-muted-foreground">{k}</dt>
-                <dd className="break-words">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      )}
-
       {(gameInfoLoading || (gameInfo && gameInfo.sides.length > 0)) && (
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
@@ -232,13 +218,14 @@ export default function GameDetailPage() {
                 ? ` · ${gameInfo.unitCount} units`
                 : ""}
             </h2>
-            {/* A reader looking at the build tree is already asking about this
-                game's units, so the encyclopedia grid is offered right beside it. */}
+            {/* Per-faction browsing (FactionBuildList) never reaches the units no
+                faction's build tree reaches, so this is the one way back to all
+                of them, "Other units" included. */}
             <Link
               to={`/content/games/${encodeURIComponent(game.name)}/units`}
-              className="text-xs text-muted-foreground hover:underline"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
             >
-              Browse units
+              All units
             </Link>
           </div>
           {/* An unreadable unit list leaves every faction button on nothing,
@@ -249,7 +236,10 @@ export default function GameDetailPage() {
             </p>
           )}
           {gameInfoLoading || !gameInfo || !selected ? (
-            <Skeleton className="h-12 rounded-lg border border-border/50 bg-card" />
+            <div className="flex h-12 items-center justify-center gap-2 rounded-lg border border-border/50 bg-card text-xs text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Loading sides…
+            </div>
           ) : (
             <FactionBuildList
               enginePath={selected.enginePath}
@@ -263,6 +253,20 @@ export default function GameDetailPage() {
               branding={brand}
             />
           )}
+        </section>
+      )}
+
+      {otherInfo.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium">Metadata</h2>
+          <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
+            {otherInfo.map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt className="font-mono text-xs text-muted-foreground">{k}</dt>
+                <dd className="break-words">{v}</dd>
+              </div>
+            ))}
+          </dl>
         </section>
       )}
 
