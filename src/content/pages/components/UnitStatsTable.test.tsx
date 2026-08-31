@@ -49,4 +49,16 @@ describe("UnitStatsTable", () => {
     );
     expect(container.textContent).toBe("");
   });
+
+  it("gives the stat list a second column from lg up", () => {
+    // The wide-screen layout ask: the list itself flows into two columns
+    // rather than sitting next to the weapons table, so this pins the grid
+    // that does it rather than the fact that some class changed.
+    const { container } = render(
+      <UnitStatsTable unit={{ name: "armsolar", stats: { metalCost: 155 } }} />,
+    );
+    expect(container.querySelector("dl")?.className).toContain(
+      "lg:grid-cols-[minmax(8rem,auto)_1fr_minmax(8rem,auto)_1fr]",
+    );
+  });
 });
