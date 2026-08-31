@@ -14,6 +14,7 @@ const COMMANDS: &[&str] = &[
     "scenario_export",
     "scenario_import",
     "scenario_read_mission",
+    "scenario_eval_mission",
     "scenario_runtime_install",
     "scenario_runtime_consolidate",
     "scenario_runtime_status",

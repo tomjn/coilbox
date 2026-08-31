@@ -1,4 +1,4 @@
-import { scenarioReadMission } from "./bindings";
+import { scenarioEvalMission, scenarioReadMission } from "./bindings";
 import { missionPath } from "./compile";
 import { amountVar } from "./model";
 import {
@@ -813,6 +813,30 @@ export async function validateCompiledMission(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return [{ path, message }];
+  }
+  return validateMission(mission, map, units);
+}
+
+/**
+ * Validate a compiled mission that has already been read, whatever read it.
+ *
+ * A mission inside a packaged `.sd7`/`.sdz` has no path on disk for
+ * `VFS.Include` to open, so the archive reader pulls the bytes out and hands
+ * the text here. `scenario_eval_mission` builds the same table
+ * `scenario_read_mission` does, so a mission is told the same things whichever
+ * way it was read.
+ */
+export async function validateCompiledMissionText(
+  missionLua: string,
+  map?: MapExtent,
+  units?: { name: string }[],
+): Promise<MissionIssue[]> {
+  let mission: unknown;
+  try {
+    ({ mission } = await scenarioEvalMission({ source: missionLua }));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return [{ path: "mission.lua", message }];
   }
   return validateMission(mission, map, units);
 }

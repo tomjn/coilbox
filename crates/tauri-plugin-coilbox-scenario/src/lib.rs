@@ -354,6 +354,45 @@ async fn scenario_read_mission(root: String, path: String) -> CliResult {
     }
 }
 
+/// Evaluate a compiled mission the caller already holds as text. Shared by
+/// [`scenario_eval_mission`] and its own tests, since a `#[tauri::command]`
+/// function cannot be called directly from a plain `#[test]`.
+///
+/// `eval_value_raw`, not `eval_value`. A mission's keys are author data (team
+/// ids, variable names) and the emitter writes `schemaVersion` and `unitDef` in
+/// camelCase, so lowercasing them would give a different table from the one
+/// [`scenario_read_mission`] returns for the same file. `include_value` does not
+/// lowercase, and this must agree with it or a mission would validate one way
+/// out of a folder and another way out of an archive.
+///
+/// The VM is rooted at a path under the temp dir that coilbox never creates, so
+/// every `VFS` read fails. Text is all there is here: a mission that came out of
+/// an archive has no folder to chase siblings in, and a compiled mission is a
+/// single `return { ... }` that never asks for one.
+fn eval_mission_text(source: &str) -> Result<serde_json::Value, String> {
+    let root = std::env::temp_dir().join("coilbox-mission-text-has-no-vfs");
+    let lua = coilbox_springlua::SpringLua::new(root)
+        .map_err(|e| format!("could not start the Lua sandbox: {e}"))?;
+    lua.eval_value_raw(source, "mission.lua")
+        .map_err(|e| format!("could not read mission.lua: {e}"))
+}
+
+/// `scenario_eval_mission`, the same read-back validation as
+/// [`scenario_read_mission`] for a mission that is already in hand as text.
+///
+/// A mission inside a packaged `.sd7`/`.sdz` has no path on disk for
+/// `VFS.Include` to open, so the archive reader pulls the bytes out and this
+/// evaluates them. Same table back, same frontend validator
+/// (`src/scenario/validate.ts`), so the way a mission was read does not change
+/// what it is told about.
+#[tauri::command]
+async fn scenario_eval_mission(source: String) -> CliResult {
+    match eval_mission_text(&source) {
+        Ok(mission) => CliResult::ok(json!({ "mission": mission })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// A game folder coilbox may write the runtime into: an absolute path to a
 /// directory that exists. A packaged `.sd7`/`.sdz` is a file, so it fails here,
 /// which is the read-only case the test mutator answers (issue #754).
@@ -866,6 +905,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_export,
             scenario_import,
             scenario_read_mission,
+            scenario_eval_mission,
             scenario_runtime_install,
             scenario_runtime_consolidate,
             scenario_runtime_status,
@@ -1108,5 +1148,28 @@ mod tests {
 
         assert_eq!(installed["schemaVersion"], 1);
         assert!(installed.get("schemaversion").is_none());
+    }
+
+    /// A mission read as text has to come back as the same table
+    /// `scenario_read_mission` builds through `VFS.Include`, which does not
+    /// lowercase. The emitter writes `schemaVersion` and `unitDef` in camelCase
+    /// and team ids are whatever the author typed, so `eval_value` here would
+    /// make the same mission validate differently depending on which read it
+    /// came from.
+    #[test]
+    fn mission_text_keeps_camelcase_keys_and_author_ids() {
+        let mission = eval_mission_text(
+            "return { schemaVersion = 1, teams = { [\"Enemy-1\"] = { team = 1 } } }",
+        )
+        .unwrap();
+
+        assert_eq!(mission["schemaVersion"], 1);
+        assert!(mission.get("schemaversion").is_none());
+        assert_eq!(mission["teams"]["Enemy-1"]["team"], 1);
+    }
+
+    #[test]
+    fn mission_text_that_does_not_evaluate_is_an_error() {
+        assert!(eval_mission_text("return {").is_err());
     }
 }

@@ -98,6 +98,18 @@ export const scenarioReadMission = defineCommand<
 >("coilbox-scenario", "scenario_read_mission");
 
 /**
+ * Evaluate a compiled mission the caller already holds as text, and return the
+ * table it built. What {@link scenarioReadMission} does for a mission on disk,
+ * for one that came out of a packaged `.sd7`/`.sdz` and so has no path for
+ * `VFS.Include` to open. Same table either way. See
+ * {@link validateCompiledMissionText}.
+ */
+export const scenarioEvalMission = defineCommand<
+  { source: string },
+  { mission: unknown }
+>("coilbox-scenario", "scenario_eval_mission");
+
+/**
  * A runtime's version marker and capability table, as `missions/runtime.lua`
  * declares it. `conditions` and `actions` are the trigger types that runtime
  * implements, which is what the editor's palette is gated on (issue #765).
