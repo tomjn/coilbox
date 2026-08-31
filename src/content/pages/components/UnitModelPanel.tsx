@@ -38,7 +38,9 @@ interface Props {
   /**
    * Omits the header's name/def-key text. For an embedding that already shows
    * the unit's name itself (the unit's own page), so the same string isn't a
-   * heading twice. The close button still renders. Defaults to showing it,
+   * heading twice. The close button still renders, relabelled to "Back to the
+   * units grid" since on that embedding it navigates rather than closes.
+   * Defaults to showing the title (and the "Close model view" label),
    * matching the build tree drawer's original use.
    */
   hideTitle?: boolean;
@@ -82,7 +84,7 @@ export function UnitModelPanel({
           size="sm"
           variant="ghost"
           onClick={onClose}
-          aria-label="Close model view"
+          aria-label={hideTitle ? "Back to the units grid" : "Close model view"}
         >
           <X size={16} />
         </Button>

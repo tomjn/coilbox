@@ -49,11 +49,19 @@ export default function GameUnitPage() {
   // Computed unconditionally, ahead of every early return below, so
   // `useUnitsyncUnitBuildpics` is called on every render in the same order,
   // the same reasoning `GameUnitsPage` documents for its own call.
+  //
+  // Fetches with `id` (the lowercased route param), not `unit.name` (the
+  // dataset's original-case string): the worker keys its result map with
+  // exactly the string it was handed, and the read below looks it up by
+  // `id`. A game whose def key isn't already all lowercase would fetch under
+  // one key and read under another, matching nothing. `GameUnitsPage` avoids
+  // this the same way, fetching and reading with its already-lowercased
+  // `cell.id` throughout.
   const buildpics = useUnitsyncUnitBuildpics(
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
-    unit ? [unit.name] : [],
+    unit ? [id] : [],
   );
 
   if (error && !data)

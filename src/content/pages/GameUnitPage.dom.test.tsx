@@ -21,6 +21,7 @@ const GAME_NAME = "Test Game";
 
 let mockUnits: UnitDatasetEntry[] = [];
 let mockModelPending = false;
+const mockIconSrc = "mock-icon-src";
 
 vi.mock("../config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
@@ -55,7 +56,25 @@ vi.mock("../config", () => ({
     dataset: { units: mockUnits, errors: [] },
     status: "ready",
   }),
-  useUnitsyncUnitBuildpics: () => null,
+  // Keys the result by exactly the id(s) it was handed, the way the real
+  // worker keys its map with exactly the string it was passed (it does not
+  // lowercase anything itself). This is what makes a fetch/read key mismatch
+  // in the page visible: fetching under the dataset's original-case name but
+  // reading under the lowercased route param would look up a key this mock
+  // never populated.
+  useUnitsyncUnitBuildpics: (
+    _enginePath?: string,
+    _dataDir?: string,
+    _gameArchive?: string,
+    units?: string[],
+  ) =>
+    units && units.length > 0
+      ? {
+          units: Object.fromEntries(
+            units.map((u) => [u, { icon: mockIconSrc }]),
+          ),
+        }
+      : null,
   useUnitsyncUnitModel: () =>
     mockModelPending
       ? { model: null, loading: true, failed: false }
@@ -103,6 +122,15 @@ describe("GameUnitPage", () => {
     expect(screen.getByText("armsolar")).toBeTruthy();
   });
 
+  it("labels the model panel's button by what it does here (navigate back), not by the drawer's close wording", async () => {
+    renderUnit("armsolar", [{ name: "armsolar", fullName: "Solar Collector" }]);
+    await screen.findByRole("heading", { name: "Solar Collector" });
+    expect(
+      screen.getByRole("button", { name: "Back to the units grid" }),
+    ).toBeTruthy();
+    expect(screen.queryByLabelText("Close model view")).toBeNull();
+  });
+
   it("is readable while the model is still loading", async () => {
     // The model hook never resolves here. Leading with the model is a layout
     // decision, so everything the dataset already holds must be on screen anyway.
@@ -122,5 +150,18 @@ describe("GameUnitPage", () => {
   it("says plainly when the game has no such unit", async () => {
     renderUnit("nosuchunit", [{ name: "armsolar" }]);
     expect(await screen.findByText(/not in this game/i)).toBeTruthy();
+  });
+
+  it("fetches and reads the buildpic under the same key, even when the dataset's def key isn't lowercase", async () => {
+    // The dataset entry's own name is mixed-case, as a game may write it. The
+    // route param ("armsolar") is always lowercase. A page that fetched with
+    // `unit.name` but read with the lowercased id would ask the mock for
+    // "ArmSolar" and look up "armsolar", missing every time.
+    const { container } = renderUnit("armsolar", [
+      { name: "ArmSolar", fullName: "Solar Collector" },
+    ]);
+    await screen.findByRole("heading", { name: "Solar Collector" });
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src")).toBe(mockIconSrc);
   });
 });
