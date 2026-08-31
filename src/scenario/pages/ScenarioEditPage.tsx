@@ -11,8 +11,9 @@ import {
   NotFound,
 } from "../../content/pages/components/states";
 import type { Scenario } from "../model";
+import { saveEditedScenario } from "../saveIntoGame";
 import { refreshScenarios, useScenarios } from "../scenarios";
-import { isEditable, type LoadedScenario, saveScenario } from "../storage";
+import { isEditable, type LoadedScenario } from "../storage";
 import { BlueprintPanel } from "./components/BlueprintPanel";
 import { DialoguePanel } from "./components/DialoguePanel";
 import { applyEdit, type ScenarioEdit } from "./components/edits";
@@ -51,8 +52,10 @@ const BACK = "/scenario-builder";
  * placement modes and panels that hang off that scene arrive in #757 onwards.
  *
  * The working document is held in local state and written back with
- * {@link saveScenario} on every change, which stamps `updatedAt` and hands back
- * the stamped document, so what is on screen is what is on disk.
+ * {@link saveEditedScenario} on every change, which stamps `updatedAt` and hands
+ * back the stamped document, so what is on screen is what is on disk. Where it
+ * is written depends on where it came from: coilbox's store for a local
+ * scenario, the game's own `missions/<folder>/` for one of a game's missions.
  */
 export default function ScenarioEditPage() {
   const { id } = useParams();
@@ -87,6 +90,12 @@ export default function ScenarioEditPage() {
   scenarioRef.current = scenario;
   const historyRef = useRef(history);
   historyRef.current = history;
+  // Where the document came from, read at the moment a write happens rather
+  // than at the render the saver was built on. The saver is built once, on the
+  // first render, which is usually before the list has resolved and said
+  // whether this document is one of a game's own missions.
+  const loadedRef = useRef<LoadedScenario | undefined>(loaded);
+  loadedRef.current = loaded;
 
   // Seed the editable copy once this id's document is available, and re-seed if
   // the route id changes under the same component instance.
@@ -104,7 +113,7 @@ export default function ScenarioEditPage() {
   const saver = useRef<ScenarioSaver>(undefined);
   if (!saver.current) {
     saver.current = createScenarioSaver({
-      write: saveScenario,
+      write: (document) => saveEditedScenario(loadedRef.current, document),
       onWritten: async (written) => {
         scenarioRef.current = written;
         setScenario(written);
