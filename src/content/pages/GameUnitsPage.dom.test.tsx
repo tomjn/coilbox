@@ -260,6 +260,19 @@ describe("GameUnitsPage", () => {
     expect(screen.queryByText("Commander")).toBeNull();
   });
 
+  it("wraps a long unit name onto a second line instead of truncating it", async () => {
+    // Real example from SplinterFaction: long enough that the old `truncate`
+    // class cut it to an ellipsis, making cells indistinguishable.
+    const longName = "Federation of Kala Command Unit";
+    renderPage({
+      units: [{ name: "fedcom", fullName: longName }],
+      sides: [{ name: "Federation", startUnit: "fedcom" }],
+    });
+    const label = await screen.findByText(longName);
+    expect(label.className).toContain("line-clamp-2");
+    expect(label.className).not.toContain("truncate");
+  });
+
   it("keeps the same buildpic id list when the search query changes", async () => {
     // The id list handed to `useUnitsyncUnitBuildpics` used to be the
     // search-filtered `rows`, so it changed on every keystroke, which

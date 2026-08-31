@@ -266,13 +266,19 @@ function UnitCellItem({
             src={src}
             alt=""
             loading="lazy"
-            className="size-12 rounded object-contain"
+            className="size-16 rounded object-contain"
           />
         ) : (
-          <span aria-hidden className="size-12 shrink-0 rounded bg-muted" />
+          <span aria-hidden className="size-16 shrink-0 rounded bg-muted" />
         )}
+        {/* Wraps to a second line rather than truncating: a game unit's name
+            (e.g. SplinterFaction's "Federation of Kala Command Unit") is
+            often too long for the cell, and cutting it off leaves cells
+            indistinguishable from each other. `line-clamp-2` still bounds the
+            height, so every cell in a CSS grid row stretches to the same,
+            bounded row height instead of growing without limit. */}
         <span
-          className="w-full truncate text-xs font-medium"
+          className="line-clamp-2 w-full text-xs font-medium"
           title={cell.label}
         >
           {cell.label}
