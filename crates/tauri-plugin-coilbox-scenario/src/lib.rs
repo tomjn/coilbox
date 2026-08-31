@@ -597,32 +597,39 @@ async fn scenario_game_mission_file(root: String, folder: String, file: String) 
     }
 }
 
+/// Read and evaluate `missions/runtime.lua` out of the game at `root`, however
+/// it is packaged. Uses `eval_value_raw`, not `eval_value`. The marker's keys
+/// are author data, the same "don't lowercase" contract `runtime::read_marker`
+/// gets from `include_value` for a loose game, so a packaged and a loose game
+/// have to agree on whether `schemaVersion` survives as itself. Shared by
+/// [`scenario_game_runtime`] and its own tests, since a `#[tauri::command]`
+/// function cannot be called directly from a plain `#[test]`.
+fn read_game_runtime(root: &str) -> Result<serde_json::Value, String> {
+    let bytes = archive::read_root_file(Path::new(root), "runtime.lua")?;
+    let src = std::str::from_utf8(&bytes)
+        .map_err(|e| format!("{}: not valid UTF-8: {e}", runtime::MARKER))?;
+    let lua = coilbox_springlua::SpringLua::new(root)
+        .map_err(|e| format!("could not start the Lua sandbox: {e}"))?;
+    lua.eval_value_raw(src, runtime::MARKER)
+        .map_err(|e| format!("could not read {}: {e}", runtime::MARKER))
+}
+
 /// `scenario_game_runtime`, the runtime version marker a game declares for
 /// itself in its own `missions/runtime.lua`.
 ///
 /// Unlike [`scenario_runtime_status`], which reads a loose game's installed
 /// marker through `VFS.Include` against a working directory on disk, this reads
 /// the file out through [`archive`] first, so it works on a packaged
-/// `.sd7`/`.sdz` too: the archive read handles the packaging, and the sandboxed
-/// eval is the same the loose read uses. Same shape as `installed` there,
-/// because it comes from the same file.
+/// `.sd7`/`.sdz` too. The archive read handles the packaging. The evaluation
+/// after that is `eval_value_raw`, not `VFS.Include`, a different path through
+/// the sandbox that is kept to the same "keys are author data, never
+/// lowercased" rule so the two routes agree on casing. Same shape as
+/// `installed` there, because it comes from the same file.
 #[tauri::command]
 async fn scenario_game_runtime(root: String) -> CliResult {
-    let bytes = match archive::read_root_file(Path::new(&root), "runtime.lua") {
-        Ok(b) => b,
-        Err(e) => return CliResult::err(e),
-    };
-    let src = match std::str::from_utf8(&bytes) {
-        Ok(s) => s,
-        Err(e) => return CliResult::err(format!("{}: not valid UTF-8: {e}", runtime::MARKER)),
-    };
-    let lua = match coilbox_springlua::SpringLua::new(&root) {
-        Ok(l) => l,
-        Err(e) => return CliResult::err(format!("could not start the Lua sandbox: {e}")),
-    };
-    match lua.eval_value(src, runtime::MARKER) {
+    match read_game_runtime(&root) {
         Ok(installed) => CliResult::ok(json!({ "installed": installed })),
-        Err(e) => CliResult::err(format!("could not read {}: {e}", runtime::MARKER)),
+        Err(e) => CliResult::err(e),
     }
 }
 
@@ -1068,5 +1075,30 @@ mod tests {
         assert!(is_safe_rel(Path::new("abc.png")));
         assert!(!is_safe_rel(Path::new("../x.png")));
         assert!(!is_safe_rel(Path::new("/abs.png")));
+    }
+
+    /// A packaged game's own `missions/runtime.lua` has to read the same as a
+    /// loose one's marker: `schemaVersion`, not `schemaversion`. `eval_value`
+    /// would silently lowercase this key through `__lowerkeys`, which is the
+    /// bug `eval_value_raw` exists to avoid, so this asserts the camelCase key
+    /// survives out of a `.sdz` rather than merely that some value comes back.
+    #[test]
+    fn game_runtime_keeps_camelcase_keys_from_a_packaged_archive() {
+        use std::io::Write;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("game.sdz");
+        let file = std::fs::File::create(&path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let opts = zip::write::SimpleFileOptions::default();
+        zip.start_file("missions/runtime.lua", opts).unwrap();
+        zip.write_all(b"return { version = 4, schemaVersion = 1 }")
+            .unwrap();
+        zip.finish().unwrap();
+
+        let installed = read_game_runtime(path.to_str().unwrap()).unwrap();
+
+        assert_eq!(installed["schemaVersion"], 1);
+        assert!(installed.get("schemaversion").is_none());
     }
 }
