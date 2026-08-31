@@ -112,6 +112,42 @@ export function publishesStatus(protocol: LobbyProtocol): boolean {
 }
 
 /**
+ * Why coilbox cannot set start positions on this connection, or null where it
+ * can. Pure.
+ *
+ * Zero-K carries battle options as `SetModOptions` and `SetMapOptions`, two
+ * dictionaries with nothing in either for a start position type, and its
+ * protocol has no start rectangle message at all. So the mode select wrote to
+ * nothing and the box editor would have put a TASServer line on a socket that
+ * does not speak one. See `mp_set_script_tags` on the Rust side, which is where
+ * a tag map is split into the two commands and the rest is dropped.
+ *
+ * A reason rather than a flag, because hiding the control silently would leave a
+ * founder looking for a setting every other lobby has (issue #1979).
+ */
+export function startPositionsUnavailable(
+  protocol: LobbyProtocol,
+): string | null {
+  if (protocol !== "zerok") return null;
+  return "Zero-K's lobby protocol carries no start positions, so coilbox cannot set them for this room.";
+}
+
+/**
+ * Why coilbox cannot set unit restrictions on this connection, or null where it
+ * can. Pure.
+ *
+ * The same gap as {@link startPositionsUnavailable} and for the same reason:
+ * restrictions travel as `game/restrict/*` script tags, and Zero-K's two option
+ * commands have nowhere to put them.
+ */
+export function unitRestrictionsUnavailable(
+  protocol: LobbyProtocol,
+): string | null {
+  if (protocol !== "zerok") return null;
+  return "Zero-K's lobby protocol carries no unit restrictions, so coilbox cannot set them for this room.";
+}
+
+/**
  * The compatibility flag a server names when it has a relay to host battles
  * through (ScarylePoo/uberserver#26, mirrors `command::RELAY_COMPAT_FLAG`).
  */
