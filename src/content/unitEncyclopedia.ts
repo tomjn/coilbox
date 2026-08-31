@@ -71,10 +71,11 @@ export function encyclopediaSections(
 ): UnitSection[] {
   const byId = new Map(units.map((u) => [u.name.toLowerCase(), u]));
 
-  // Computed once and reused for both root resolution and folding stages
-  // below: `buildTechForest` needs the roots already resolved to their base
-  // before it runs, so its own identical `forest.morphBase` isn't available
-  // yet at this point.
+  // Computed once and reused for root resolution, folding stages below, and
+  // `buildTechForest` itself: the roots have to be resolved to their base
+  // before that call, so its own copy of this grouping isn't available yet,
+  // and passing this one through means the morph graph is walked once for the
+  // whole function rather than once per caller.
   const base = groupOf(morphGroups(units));
   const resolvedRoots = roots.map((r) => {
     const id = r.id.toLowerCase();
@@ -84,6 +85,7 @@ export function encyclopediaSections(
   const forest = buildTechForest(
     units,
     resolvedRoots.map((r) => r.id),
+    base,
   );
   const headings = new Map(resolvedRoots.map((r) => [r.id, r.label]));
 

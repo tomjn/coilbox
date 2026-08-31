@@ -43,10 +43,16 @@ export interface TechForest {
  * row showed an arbitrary subset of what it builds, and the units it lost were
  * invisible (#1051). Two factions that share a unit still have to put it
  * somewhere, but a faction heading claims far less than an indent does.
+ *
+ * `groupBase` is `groupOf(morphGroups(units))`, for a caller that already
+ * walked the morph graph for its own reasons (the encyclopedia resolves its
+ * roots to their group's base before calling this). Without it, this walks
+ * the graph itself, so an existing caller is unaffected either way.
  */
 export function buildTechForest(
   units: UnitDatasetEntry[],
   roots: string[],
+  groupBase?: Map<string, string>,
 ): TechForest {
   const edges = buildEdgeMap(units);
   const known = new Set(units.map((u) => u.name.toLowerCase()));
@@ -62,7 +68,7 @@ export function buildTechForest(
   }
   const morphBase = new Map<string, string>();
   for (const id of known) morphBase.set(id, id);
-  for (const [stage, base] of groupOf(morphGroups(units))) {
+  for (const [stage, base] of groupBase ?? groupOf(morphGroups(units))) {
     morphBase.set(stage, base);
   }
 
