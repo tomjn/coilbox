@@ -255,3 +255,42 @@ export const scenarioMediaSweep = defineCommand<
   { keep: Record<string, string[]>; apply: boolean },
   { summary: MediaSweepSummary }
 >("coilbox-scenario", "scenario_media_sweep");
+
+/** One mission a game ships in its own archive. */
+export interface GameMissionEntry {
+  /** The game's own folder name, which is what `coilbox_mission` carries. */
+  folder: string;
+  /** True when `scenario.json` is beside the compiled mission, so it can be edited. */
+  hasDocument: boolean;
+  hasCompiled: boolean;
+}
+
+/**
+ * The missions a game ships inside its own archive, sorted by folder. Works on a
+ * packaged `.sd7`/`.sdz` as well as a loose `.sdd`, unlike
+ * {@link scenarioListMissions}, which lists what coilbox wrote while testing.
+ */
+export const scenarioGameMissions = defineCommand<
+  { root: string },
+  { missions: GameMissionEntry[] }
+>("coilbox-scenario", "scenario_game_missions");
+
+/**
+ * One file out of one of a game's own missions, base64 encoded. Nothing is
+ * written to disk, so a game's dialogue media stays in its archive.
+ */
+export const scenarioGameMissionFile = defineCommand<
+  { root: string; folder: string; file: string },
+  { base64: string }
+>("coilbox-scenario", "scenario_game_mission_file");
+
+/**
+ * The runtime version marker a game declares for itself in its own
+ * `missions/runtime.lua`. Same shape as {@link scenarioRuntimeStatus}'s
+ * `installed`, but works on a packaged `.sd7`/`.sdz` too: reach for this one
+ * over `scenarioRuntimeStatus` when `root` may not be a loose game folder.
+ */
+export const scenarioGameRuntime = defineCommand<
+  { root: string },
+  { installed: RuntimeMarker }
+>("coilbox-scenario", "scenario_game_runtime");

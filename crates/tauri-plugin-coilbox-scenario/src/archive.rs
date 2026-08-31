@@ -6,11 +6,9 @@
 //! out of one. Nothing here writes, and nothing here needs an engine, so a
 //! mission list costs no unitsync scan.
 //!
-//! Nothing in this crate calls `list_missions` or `read_file` yet. The Tauri
-//! commands that expose them to the frontend land in a follow-up task. Until
-//! then the module is reachable only from its own tests, so it needs its own
-//! dead-code allowance rather than tripping the crate-wide `-D warnings` gate.
-#![allow(dead_code)]
+//! The Tauri commands that expose these to the frontend
+//! (`scenario_game_missions`, `scenario_game_mission_file`,
+//! `scenario_game_runtime`) live in `lib.rs`.
 
 use coilbox_portable::is_safe_rel;
 use serde::Serialize;
@@ -165,9 +163,25 @@ fn kind(root: &Path) -> Kind {
 pub fn read_file(root: &Path, folder: &str, file: &str) -> Result<Vec<u8>, String> {
     safe_part(folder)?;
     safe_part(file)?;
-    let member = format!("missions/{folder}/{file}");
+    read_member(root, &format!("missions/{folder}/{file}"))
+}
+
+/// One file directly under `missions/`, outside any mission folder: currently
+/// only `runtime.lua`, the version marker a packaged game declares for itself
+/// the same way a loose one's install marker does (`runtime::read_marker`).
+/// Kept apart from [`read_file`], whose member path always nests a mission
+/// folder, because a folder of `"."` is exactly what `safe_part` refuses.
+pub fn read_root_file(root: &Path, file: &str) -> Result<Vec<u8>, String> {
+    safe_part(file)?;
+    read_member(root, &format!("missions/{file}"))
+}
+
+/// Read one archive member, whatever the game is packaged as. Shared by
+/// [`read_file`] and [`read_root_file`], which differ only in the member path
+/// they resolve to.
+fn read_member(root: &Path, member: &str) -> Result<Vec<u8>, String> {
     if root.is_dir() {
-        let path: PathBuf = root.join(&member);
+        let path: PathBuf = root.join(member);
         return std::fs::read(&path).map_err(|e| format!("could not read {member}: {e}"));
     }
     match kind(root) {
@@ -175,7 +189,7 @@ pub fn read_file(root: &Path, folder: &str, file: &str) -> Result<Vec<u8>, Strin
             let f = std::fs::File::open(root).map_err(|e| format!("{e}"))?;
             let mut zip = zip::ZipArchive::new(f).map_err(|e| format!("{e}"))?;
             let mut entry = zip
-                .by_name(&member)
+                .by_name(member)
                 .map_err(|e| format!("could not read {member}: {e}"))?;
             let mut bytes = Vec::new();
             entry
@@ -188,7 +202,7 @@ pub fn read_file(root: &Path, folder: &str, file: &str) -> Result<Vec<u8>, Strin
                 sevenz_rust2::ArchiveReader::open(root, sevenz_rust2::Password::empty())
                     .map_err(|e| format!("{e}"))?;
             archive
-                .read_file(&member)
+                .read_file(member)
                 .map_err(|e| format!("could not read {member}: {e}"))
         }
         Kind::Unknown => Err(format!("not a game archive: {}", root.display())),
@@ -245,6 +259,7 @@ mod tests {
             ("missions/first-contact/mission.lua", "return {}"),
             ("missions/first-contact/scenario.json", "{}"),
             ("missions/compiled-only/mission.lua", "return {}"),
+            ("missions/runtime.lua", "return { version = 3 }"),
         ] {
             writer
                 .push_archive_entry(
@@ -314,6 +329,30 @@ mod tests {
 
         assert!(read_file(game.path(), "../..", "modinfo.lua").is_err());
         assert!(read_file(game.path(), "first-contact", "../modinfo.lua").is_err());
+    }
+
+    #[test]
+    fn reads_the_runtime_marker_out_of_every_kind() {
+        let loose = loose_game();
+        let dir = tempfile::tempdir().unwrap();
+
+        for root in [
+            loose.path().to_path_buf(),
+            zipped_game(dir.path()),
+            sevenzipped_game(dir.path()),
+        ] {
+            let bytes = read_root_file(&root, "runtime.lua").unwrap();
+
+            assert_eq!(bytes, b"return { version = 3 }", "in {}", root.display());
+        }
+    }
+
+    #[test]
+    fn read_root_file_refuses_a_path_that_climbs_out() {
+        let game = loose_game();
+
+        assert!(read_root_file(game.path(), "../modinfo.lua").is_err());
+        assert!(read_root_file(game.path(), "sub/file.lua").is_err());
     }
 
     #[test]

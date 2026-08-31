@@ -21,6 +21,9 @@ const COMMANDS: &[&str] = &[
     "scenario_delete_mission",
     "scenario_test_mutator",
     "scenario_write_mission",
+    "scenario_game_missions",
+    "scenario_game_mission_file",
+    "scenario_game_runtime",
 ];
 
 fn main() {

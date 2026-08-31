@@ -571,6 +571,61 @@ async fn scenario_delete_mission(root: String, scenario_id: String) -> CliResult
     }
 }
 
+/// `scenario_game_missions`, the missions a game ships inside its own archive.
+///
+/// Unlike [`scenario_list_missions`], which lists what coilbox wrote into a loose
+/// game while testing, this reads the game's own content and works on a packaged
+/// `.sd7`/`.sdz` too. That is the point: a game can distribute finished missions.
+#[tauri::command]
+async fn scenario_game_missions(root: String) -> CliResult {
+    match archive::list_missions(Path::new(&root)) {
+        Ok(missions) => CliResult::ok(json!({ "missions": missions })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `scenario_game_mission_file`, one file out of one of a game's own missions.
+///
+/// Base64 because a portrait and a voice clip are binary and this crosses the
+/// IPC boundary as JSON. Nothing is written to disk: the caller holds what it
+/// needs for the session, which is what keeps a game's media in its archive.
+#[tauri::command]
+async fn scenario_game_mission_file(root: String, folder: String, file: String) -> CliResult {
+    match archive::read_file(Path::new(&root), &folder, &file) {
+        Ok(bytes) => CliResult::ok(json!({ "base64": STANDARD.encode(bytes) })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `scenario_game_runtime`, the runtime version marker a game declares for
+/// itself in its own `missions/runtime.lua`.
+///
+/// Unlike [`scenario_runtime_status`], which reads a loose game's installed
+/// marker through `VFS.Include` against a working directory on disk, this reads
+/// the file out through [`archive`] first, so it works on a packaged
+/// `.sd7`/`.sdz` too: the archive read handles the packaging, and the sandboxed
+/// eval is the same the loose read uses. Same shape as `installed` there,
+/// because it comes from the same file.
+#[tauri::command]
+async fn scenario_game_runtime(root: String) -> CliResult {
+    let bytes = match archive::read_root_file(Path::new(&root), "runtime.lua") {
+        Ok(b) => b,
+        Err(e) => return CliResult::err(e),
+    };
+    let src = match std::str::from_utf8(&bytes) {
+        Ok(s) => s,
+        Err(e) => return CliResult::err(format!("{}: not valid UTF-8: {e}", runtime::MARKER)),
+    };
+    let lua = match coilbox_springlua::SpringLua::new(&root) {
+        Ok(l) => l,
+        Err(e) => return CliResult::err(format!("could not start the Lua sandbox: {e}")),
+    };
+    match lua.eval_value(src, runtime::MARKER) {
+        Ok(installed) => CliResult::ok(json!({ "installed": installed })),
+        Err(e) => CliResult::err(format!("could not read {}: {e}", runtime::MARKER)),
+    }
+}
+
 /// `scenario_test_mutator`, generating the game a scenario is tested in.
 ///
 /// A game that has not vendored the runtime, and a packaged one that cannot be
@@ -802,7 +857,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_list_missions,
             scenario_delete_mission,
             scenario_test_mutator,
-            scenario_write_mission
+            scenario_write_mission,
+            scenario_game_missions,
+            scenario_game_mission_file,
+            scenario_game_runtime
         ])
         .build()
 }
