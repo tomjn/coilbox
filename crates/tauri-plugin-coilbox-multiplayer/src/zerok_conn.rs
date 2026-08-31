@@ -44,7 +44,7 @@ use crate::conn::{
 use crate::dmlog::DmLog;
 use crate::tls::ConnectError;
 use crate::turn::TurnAnswer;
-use crate::{lock_or_recover, zerok_battles, zerok_chat, zerok_room, zerok_users};
+use crate::{lock_or_recover, zerok_battles, zerok_chat, zerok_debrief, zerok_room, zerok_users};
 
 /// How long the socket may be idle before the kernel starts probing, and how far
 /// apart the probes go.
@@ -328,6 +328,9 @@ async fn run_loop(
                         deltas.extend(room);
                         let (chat, chat_replies) = zerok_chat::reduce(&mut held, &message, now);
                         deltas.extend(chat);
+                        // Reads who we are and writes nothing, because a match
+                        // that has ended is not a fact about the lobby.
+                        deltas.extend(zerok_debrief::reduce(&held, &message));
                         // Built here, under the same lock the fold ran under, so
                         // the answer to a join is the state that join produced
                         // rather than whatever a later line left behind.

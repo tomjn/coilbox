@@ -59,6 +59,58 @@ impl Rating {
     }
 }
 
+/// What the server said about the match that has just finished, about us
+/// (issue #2003).
+///
+/// Zero-K's `BattleDebriefing` and nothing else. Beyond All Reason has no
+/// equivalent anywhere in Tachyon and TASServer has no notion of a result, so
+/// this is one protocol's message rather than a shared idea, and it is only ever
+/// carried on [`crate::reduce::Delta::Debriefed`].
+///
+/// Whole points throughout. The server sends floats, a lobby shows a rating as a
+/// number, and a rating change of less than half a point rounds to no change,
+/// which is what it looks like on the website too.
+///
+/// Only our own row. The message carries one of these per player and the rest
+/// belong to the people they are about.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Debriefing {
+    /// The server's own id for the match, which is what its web page is keyed
+    /// by. Not the lobby battle id, and not comparable with one.
+    pub server_battle_id: i32,
+    /// Which of Zero-K's ratings this game counted toward, in the server's own
+    /// words. "Unrated" when it counted toward none, which is what upstream
+    /// defaults the field to and what most custom games are.
+    pub rating_category: String,
+    /// Whether we were on the winning side.
+    pub won: bool,
+    /// What our rating did, and where it landed.
+    pub elo_change: i32,
+    pub new_elo: i32,
+    /// The rank the match left us on, 0 to 7.
+    pub new_rank: u8,
+    /// Whether this match moved us a rank. Both false is the usual answer.
+    pub rank_up: bool,
+    pub rank_down: bool,
+    /// The ratings at the two ends of the band this rank covers, so how far
+    /// there is to go can be said rather than guessed at.
+    pub prev_rank_elo: i32,
+    pub next_rank_elo: i32,
+    /// Experience, which goes up for playing rather than for winning. Kept apart
+    /// from the rating for that reason.
+    pub xp_change: i32,
+    pub new_xp: i32,
+    /// The chat channel the server opened for the people who played this match,
+    /// and put us in. `None` when it named none.
+    pub chat_channel: Option<String>,
+    /// The server's own page about the match, if it gave one. A web page rather
+    /// than a replay file.
+    pub url: Option<String>,
+    /// Whatever the server chose to say about the match, unchanged.
+    pub message: Option<String>,
+}
+
 /// The kind of a chat message, so the frontend can render it appropriately.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

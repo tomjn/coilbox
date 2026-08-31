@@ -7,8 +7,8 @@
 
 use crate::message::ServerMessage;
 use crate::state::{
-    Battle, Bot, ChannelState, ChatKind, ChatMsg, DirChannel, LobbyState, MemberStatus, Rating,
-    StartRect, TurnCredentials, User, Vote,
+    Battle, Bot, ChannelState, ChatKind, ChatMsg, Debriefing, DirChannel, LobbyState, MemberStatus,
+    Rating, StartRect, TurnCredentials, User, Vote,
 };
 use crate::status::{BattleStatus, ClientStatus};
 use crate::vote::{parse_vote_line, VoteLine};
@@ -213,6 +213,16 @@ pub enum Delta {
     /// A `SERVERMSG` (plain announcement) or `SERVERMSGBOX` (the server asked the
     /// client to show it prominently). `boxed` distinguishes the two so the
     /// frontend can render a toast vs. a dismissible dialog.
+    /// A Zero-K match we played has finished and the server has said what it
+    /// did to our rating (issue #2003).
+    ///
+    /// Carries its payload rather than naming a place to read it, because it is
+    /// news about a match rather than a fact about the lobby: nothing in
+    /// `LobbyState` is a match that has ended, and a snapshot taken a minute
+    /// later has nothing to say about one.
+    Debriefed {
+        debriefing: Debriefing,
+    },
     ServerMessage {
         text: String,
         boxed: bool,
