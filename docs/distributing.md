@@ -57,7 +57,7 @@ Inside each package's `.coilbox/`:
 
 Coilbox creates `data/` and `cache/` inside `.coilbox/` on first run — you don't ship those. See [portable-mode.md](portable-mode.md#what-lives-where) for the full breakdown, and note the game content goes in a **sibling** folder (e.g. `game/`), never inside `.coilbox/`.
 
-> **A bundled scenario needs a game that can play it.** A file in `scenarios/` is the authored document and nothing else. It is played by [the mission runtime](mission-runtime.md), which lives in the game, so the copy you put in `game/` wants to be a loose `.sdd` with the runtime installed and the adoption guards applied. Bundle a packaged `.sd7` or `.sdz` and every scenario in the package falls back to a generated test game, which plays, but leaves your own end conditions and pre-game phases running over the top of the mission. See [what the other machine needs](scenarios.md#what-the-other-machine-needs).
+> **A bundled scenario needs a game that can play it.** A file in `scenarios/` is the authored document and nothing else. It is played by [the mission runtime](mission-runtime.md), which lives in the game, so the copy you put in `game/` has to be a loose `.sdd` with the runtime installed and the two guards from [the adoption contract](mission-runtime.md#the-adoption-contract) added to your own gadgets. Bundle a packaged `.sd7` or `.sdz` instead and every scenario in the package falls back to a generated test game. They play, but your end conditions and opening phases run over the top of the mission. See [what a player needs to play your scenario](scenarios.md#what-a-player-needs-to-play-your-scenario).
 
 ## Getting the binaries
 
