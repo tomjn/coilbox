@@ -42,6 +42,7 @@ describe("a game's own missions", () => {
         { folder: "first-contact", hasDocument: true, hasCompiled: true },
         { folder: "compiled-only", hasDocument: false, hasCompiled: true },
       ],
+      stamp: null,
     });
     vi.mocked(scenarioGameMissionFile).mockResolvedValue({
       base64: btoa(document),
@@ -64,6 +65,7 @@ describe("a game's own missions", () => {
       missions: [
         { folder: "first-contact", hasDocument: true, hasCompiled: true },
       ],
+      stamp: "1024:1700000000",
     });
     vi.mocked(scenarioGameMissionFile).mockResolvedValue({
       base64: btoa(document),
@@ -72,6 +74,27 @@ describe("a game's own missions", () => {
     const found = await gameScenarios([game("SplinterFaction", "sf.sd7")]);
 
     expect(found[0].origin?.loose).toBe(false);
+  });
+
+  it("never caches a loose mission's document, so an edit on disk shows up at once", async () => {
+    vi.mocked(scenarioGameMissions).mockResolvedValue({
+      missions: [
+        { folder: "first-contact", hasDocument: true, hasCompiled: true },
+      ],
+      stamp: null,
+    });
+    const before = JSON.parse(document);
+    const after = { ...before, name: "First contact, revised" };
+    vi.mocked(scenarioGameMissionFile)
+      .mockResolvedValueOnce({ base64: btoa(JSON.stringify(before)) })
+      .mockResolvedValueOnce({ base64: btoa(JSON.stringify(after)) });
+
+    const target = game("SplinterFaction", "sf.sdd");
+    const first = await gameScenarios([target]);
+    const second = await gameScenarios([target]);
+
+    expect(first[0].scenario.name).toBe("First contact");
+    expect(second[0].scenario.name).toBe("First contact, revised");
   });
 
   it("skips a game it cannot read rather than failing the whole list", async () => {

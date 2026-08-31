@@ -138,6 +138,25 @@ fn list_packaged(root: &Path) -> Result<Vec<GameMissionEntry>, String> {
     }
 }
 
+/// A change signal for a packaged archive, or `None` for a loose `.sdd`.
+///
+/// Computed from the archive file's own size and modified time rather than
+/// anything the frontend already holds (like a checksum unitsync may never
+/// have populated), because those are the two things that are guaranteed to
+/// move when the file at `root` is replaced. `None` for a loose folder rather
+/// than a folder stamp, because a directory's own modified time does not move
+/// when a file inside it changes, which would make a folder stamp a false
+/// signal that nothing changed.
+pub fn stamp(root: &Path) -> Option<String> {
+    if root.is_dir() {
+        return None;
+    }
+    let meta = std::fs::metadata(root).ok()?;
+    let modified = meta.modified().ok()?;
+    let since_epoch = modified.duration_since(std::time::UNIX_EPOCH).ok()?;
+    Some(format!("{}:{}", meta.len(), since_epoch.as_nanos()))
+}
+
 enum Kind {
     Zip,
     SevenZip,
@@ -360,5 +379,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
 
         assert_eq!(list_missions(dir.path()).unwrap(), Vec::new());
+    }
+
+    #[test]
+    fn a_packaged_archive_gets_a_stamp_and_a_loose_folder_does_not() {
+        let loose = loose_game();
+        let dir = tempfile::tempdir().unwrap();
+        let packaged = zipped_game(dir.path());
+
+        assert_eq!(stamp(loose.path()), None);
+        assert!(stamp(&packaged).is_some());
     }
 }

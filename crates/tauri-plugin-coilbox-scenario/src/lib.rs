@@ -576,10 +576,18 @@ async fn scenario_delete_mission(root: String, scenario_id: String) -> CliResult
 /// Unlike [`scenario_list_missions`], which lists what coilbox wrote into a loose
 /// game while testing, this reads the game's own content and works on a packaged
 /// `.sd7`/`.sdz` too. That is the point: a game can distribute finished missions.
+///
+/// `stamp` is [`archive::stamp`]: a real change signal for a packaged archive, or
+/// `null` for a loose one, so the frontend can cache a packaged archive's
+/// contents for the session without ever caching a loose folder's, which an
+/// author may be editing right now.
 #[tauri::command]
 async fn scenario_game_missions(root: String) -> CliResult {
-    match archive::list_missions(Path::new(&root)) {
-        Ok(missions) => CliResult::ok(json!({ "missions": missions })),
+    let path = Path::new(&root);
+    match archive::list_missions(path) {
+        Ok(missions) => {
+            CliResult::ok(json!({ "missions": missions, "stamp": archive::stamp(path) }))
+        }
         Err(e) => CliResult::err(e),
     }
 }

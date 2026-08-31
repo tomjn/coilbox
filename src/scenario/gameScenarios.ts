@@ -30,52 +30,79 @@ function text(base64: string): string {
 }
 
 /**
- * A packaged game's mission list, keyed by the archive and what it was when we
- * read it. A packaged archive is one file, so its reported size and checksum
- * say whether its contents changed. A loose `.sdd` is deliberately absent: a
- * folder's checksum does not move when a file inside it does, and re-reading a
- * directory listing is cheap, which is what makes an edit show up at once.
+ * Whether a game's own missions may be cached for the session, for both the
+ * listing and file contents. This is the one place that rule is decided, so
+ * neither cache below can be reached for a loose game by a call site that
+ * forgot to check.
+ *
+ * A loose `.sdd` is a folder someone may be editing right now, so its listing
+ * and every file inside it are read fresh on every call: nothing about it is
+ * ever cached. A packaged `.sd7`/`.sdz` cannot be edited in place the way a
+ * folder can, so its listing and file contents are safe to keep for the
+ * session, as long as the archive at that path has not been replaced
+ * underneath us (which `stamp` below exists to notice).
  */
-const packagedLists = new Map<
-  string,
-  { stamp: string; missions: GameMissionEntry[] }
->();
-
-/** Files already pulled out of an archive this session, keyed archive + path. */
-const files = new Map<string, string>();
+function cacheable(loose: boolean): boolean {
+  return !loose;
+}
 
 /**
- * A game's mission list, cached for a packaged archive since pulling its
- * listing means opening the archive, and re-read every time for a loose
- * `.sdd` because a directory listing costs almost nothing.
+ * The last stamp seen for a packaged archive's root (from `scenario_game_missions`).
+ * Used only to notice a game reinstalled at the same path, so the `files` bytes
+ * cached under that root can be dropped rather than served from the version
+ * that used to be there. Never populated for a loose `.sdd`, which is never
+ * cached in the first place.
+ */
+const packagedStamps = new Map<string, string | null>();
+
+/** Files already pulled out of a packaged archive this session, keyed archive + path. */
+const files = new Map<string, string>();
+
+/** Drop every cached file under a root, because the archive there has changed. */
+function forgetFiles(root: string): void {
+  const prefix = `${root} `;
+  for (const key of files.keys()) {
+    if (key.startsWith(prefix)) files.delete(key);
+  }
+}
+
+/**
+ * A game's mission list. Always read fresh: there is no way to learn whether a
+ * packaged archive changed without asking, since `stamp` itself comes back on
+ * this same call. For a packaged archive, a stamp that differs from the one
+ * last seen for this root means the archive was replaced, so any file bytes
+ * cached under it are dropped before anything new is cached.
  */
 async function missionList(
   game: GameItem,
   root: string,
 ): Promise<GameMissionEntry[]> {
-  const archive = game.primaryArchive;
-  if (isSdd(archive)) {
-    const { missions } = await scenarioGameMissions({ root });
-    return missions;
+  const { missions, stamp } = await scenarioGameMissions({ root });
+  if (cacheable(isSdd(game.primaryArchive))) {
+    const previous = packagedStamps.get(root);
+    if (previous !== undefined && previous !== stamp) forgetFiles(root);
+    packagedStamps.set(root, stamp);
   }
-  const stamp = `${archive.size ?? ""}:${archive.checksum ?? ""}`;
-  const cached = packagedLists.get(root);
-  if (cached && cached.stamp === stamp) return cached.missions;
-  const { missions } = await scenarioGameMissions({ root });
-  packagedLists.set(root, { stamp, missions });
   return missions;
 }
 
 /**
- * One file out of a game's mission, base64 encoded and cached: a `.sd7` is
- * usually solid LZMA, so pulling one member can mean decompressing a large
- * block, and a redraw must not pay that twice.
+ * One file out of a game's mission, base64 encoded. Cached for a packaged
+ * archive, since a `.sd7` is usually solid LZMA and pulling one member can mean
+ * decompressing a large block, and a redraw must not pay that twice. Never
+ * cached for a loose `.sdd`, so an author editing a mission's document on disk
+ * sees the edit on the next read within the same session.
  */
 async function fileBase64(
   root: string,
   folder: string,
   file: string,
+  loose: boolean,
 ): Promise<string> {
+  if (!cacheable(loose)) {
+    const { base64 } = await scenarioGameMissionFile({ root, folder, file });
+    return base64;
+  }
   const key = `${root} ${folder} ${file}`;
   const cached = files.get(key);
   if (cached !== undefined) return cached;
@@ -103,6 +130,7 @@ export async function gameScenarios(
   for (const game of games) {
     const archivePath = game.primaryArchive.path;
     if (!archivePath) continue;
+    const loose = isSdd(game.primaryArchive);
     try {
       const missions = await missionList(game, archivePath);
       for (const mission of missions) {
@@ -111,6 +139,7 @@ export async function gameScenarios(
           archivePath,
           mission.folder,
           "scenario.json",
+          loose,
         );
         const scenario = parseStoredScenario(text(base64));
         if (!scenario) {
@@ -128,7 +157,7 @@ export async function gameScenarios(
             gameName: game.name,
             archivePath,
             folder: mission.folder,
-            loose: isSdd(game.primaryArchive),
+            loose,
           },
         });
       }
@@ -148,6 +177,11 @@ export async function missionFileUrl(
   origin: GameOrigin,
   file: string,
 ): Promise<string> {
-  const base64 = await fileBase64(origin.archivePath, origin.folder, file);
+  const base64 = await fileBase64(
+    origin.archivePath,
+    origin.folder,
+    file,
+    origin.loose,
+  );
   return `data:application/octet-stream;base64,${base64}`;
 }

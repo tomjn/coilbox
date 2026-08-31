@@ -269,10 +269,15 @@ export interface GameMissionEntry {
  * The missions a game ships inside its own archive, sorted by folder. Works on a
  * packaged `.sd7`/`.sdz` as well as a loose `.sdd`, unlike
  * {@link scenarioListMissions}, which lists what coilbox wrote while testing.
+ *
+ * `stamp` is a real change signal for a packaged archive (its size and modified
+ * time), computed on the Rust side rather than inferred from data the frontend
+ * happens to have. It is `null` for a loose `.sdd`, which is never cached: a
+ * folder someone may be editing right now must always be read fresh.
  */
 export const scenarioGameMissions = defineCommand<
   { root: string },
-  { missions: GameMissionEntry[] }
+  { missions: GameMissionEntry[]; stamp: string | null }
 >("coilbox-scenario", "scenario_game_missions");
 
 /**
