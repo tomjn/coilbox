@@ -12,6 +12,7 @@ import type { GameItem } from "../../bindings";
 
 vi.mock("@/scenario/bindings", () => ({
   scenarioListMissions: () => Promise.resolve({ missions: [] }),
+  scenarioGameMissions: () => Promise.resolve({ missions: [], stamp: null }),
   scenarioRuntimeStatus: () =>
     Promise.resolve({
       installed: null,
