@@ -35,6 +35,13 @@ interface Props {
   /** Its dataset entry, which is where the model's name comes from. */
   unit?: UnitDatasetEntry;
   onClose: () => void;
+  /**
+   * Omits the header's name/def-key text. For an embedding that already shows
+   * the unit's name itself (the unit's own page), so the same string isn't a
+   * heading twice. The close button still renders. Defaults to showing it,
+   * matching the build tree drawer's original use.
+   */
+  hideTitle?: boolean;
 }
 
 export function UnitModelPanel({
@@ -44,6 +51,7 @@ export function UnitModelPanel({
   unitId,
   unit,
   onClose,
+  hideTitle,
 }: Props) {
   const object = unit?.objectName?.trim();
   const { model, loading, failed } = useUnitsyncUnitModel(
@@ -55,15 +63,21 @@ export function UnitModelPanel({
 
   return (
     <aside className="flex w-72 shrink-0 flex-col overflow-y-auto rounded-lg border border-border/50 bg-card">
-      <header className="flex items-start justify-between gap-2 border-b border-border/50 px-3 py-2">
-        <div className="min-w-0">
-          <h3 className="truncate text-sm font-medium leading-tight">
-            {unit?.fullName ?? unitId}
-          </h3>
-          <p className="truncate font-mono text-xs text-muted-foreground">
-            {unitId}
-          </p>
-        </div>
+      <header
+        className={`flex items-start gap-2 border-b border-border/50 px-3 py-2 ${
+          hideTitle ? "justify-end" : "justify-between"
+        }`}
+      >
+        {!hideTitle && (
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-medium leading-tight">
+              {unit?.fullName ?? unitId}
+            </h3>
+            <p className="truncate font-mono text-xs text-muted-foreground">
+              {unitId}
+            </p>
+          </div>
+        )}
         <Button
           size="sm"
           variant="ghost"
