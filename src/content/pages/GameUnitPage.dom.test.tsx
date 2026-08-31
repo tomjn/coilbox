@@ -32,6 +32,12 @@ let mockRenders: Record<
   string,
   { angle: string; status: string; url?: string; message?: string }
 > = {};
+// Every `object` the page has asked `useUnitsyncUnitModel` to read, in call
+// order. The mock still answers with no model (the existing tests never draw
+// one), but recording the argument is what lets a test tell one stage's
+// request apart from another's, which the page's own computation of `object`
+// from `unit?.objectName` is the only thing that could get wrong.
+let mockModelRequests: (string | undefined)[] = [];
 const mockIconSrc = "mock-icon-src";
 // A def key the buildpics mock deliberately resolves nothing for, so a test
 // can render a unit with no build picture without the mock's own blanket
@@ -103,10 +109,17 @@ vi.mock("../config", () => ({
           ),
         }
       : null,
-  useUnitsyncUnitModel: () =>
-    mockModelPending
+  useUnitsyncUnitModel: (
+    _enginePath?: string,
+    _dataDir?: string,
+    _gameArchive?: string,
+    object?: string,
+  ) => {
+    mockModelRequests.push(object);
+    return mockModelPending
       ? { model: null, loading: true, failed: false }
-      : { model: null, loading: false, failed: false },
+      : { model: null, loading: false, failed: false };
+  },
 }));
 
 const { default: GameUnitPage } = await import("./GameUnitPage");
@@ -141,6 +154,7 @@ function renderUnit(
   mockUnits = units as UnitDatasetEntry[];
   mockModelPending = opts.modelPending ?? false;
   mockRenders = opts.renders ?? {};
+  mockModelRequests = [];
   return render(
     <MemoryRouter
       initialEntries={[
@@ -325,6 +339,32 @@ describe("GameUnitPage", () => {
     // The edge condition into the current stage is still shown.
     expect(section.getByText(/research/i)).toBeTruthy();
     expect(section.getByText("150")).toBeTruthy();
+  });
+
+  it("asks the hero to draw the stage on screen, not another stage's model", async () => {
+    // SplinterFaction's real fedcommander/fedcommander_up1..4 (issue #2063
+    // again): every stage carries its own `objectname` (fedcommander2.s3o,
+    // fedcommander2_up1.s3o, ...), so a page opened on the base stage must
+    // read its own model rather than a stage further up the chain's.
+    const fixture = [
+      {
+        name: "fedcommander",
+        fullName: "Federation of Kala Command Unit",
+        objectName: "fedcommander2.s3o",
+        morphTargets: [{ into: "fedcommander_up1" }],
+      },
+      {
+        name: "fedcommander_up1",
+        fullName: "Federation of Kala Command Unit",
+        objectName: "fedcommander2_up1.s3o",
+      },
+    ];
+    renderUnit("fedcommander", fixture);
+    await screen.findByRole("heading", {
+      name: "Federation of Kala Command Unit",
+    });
+    expect(mockModelRequests).toContain("fedcommander2.s3o");
+    expect(mockModelRequests).not.toContain("fedcommander2_up1.s3o");
   });
 
   it("shows the same placeholder as the rest of the page for a build target with no build picture", async () => {
