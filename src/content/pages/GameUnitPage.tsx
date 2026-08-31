@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   useScanTargetSelection,
@@ -7,26 +7,31 @@ import {
   useUnitsyncScan,
   useUnitsyncUnitBuildpics,
   useUnitsyncUnitDataset,
+  useUnitsyncUnitModel,
 } from "../config";
 import { encyclopediaSections, unitLabel } from "../unitEncyclopedia";
 import { unitIconSrc } from "../unitIcon";
+import { countPieces, countTriangles } from "../unitModel";
 import { DetailError, DetailLoading, NotFound } from "./components/states";
-import { UnitModelPanel } from "./components/UnitModelPanel";
+import { UnitHero } from "./components/UnitHero";
+import { UnitRendersRow } from "./components/UnitRendersRow";
 import { UnitStatsTable } from "./components/UnitStatsTable";
+import { useUnitRenders } from "./components/useUnitRenders";
 
 /**
- * One unit's own page: its model first, then its identity (name, def key,
- * faction and buildpic). Task 4 adds the stats, build relationships, morph
- * stages and terrain limits below this, and this page is the shell those
- * attach to. Reads the same scan/game-info/unit-dataset hooks `GameUnitsPage`
- * reads, so the dataset this page's unit is found in is the one already
- * cached by the grid a reader came from.
+ * One unit's own page: its model first, full width, then its four rendered
+ * angles, then its identity (buildpic, name, def key and faction), then its
+ * stats, build relationships, morph stages and terrain limits. `UnitHero` and
+ * `useUnitRenders` both key off `object`/`model`, read once here and handed
+ * down, rather than each reading the model a second time. Reads the same
+ * scan/game-info/unit-dataset hooks `GameUnitsPage` reads, so the dataset
+ * this page's unit is found in is the one already cached by the grid a
+ * reader came from.
  */
 export default function GameUnitPage() {
   const { name, unit: unitParam } = useParams();
   const decoded = name ? decodeURIComponent(name) : "";
   const id = unitParam ? decodeURIComponent(unitParam).toLowerCase() : "";
-  const navigate = useNavigate();
 
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
@@ -63,6 +68,36 @@ export default function GameUnitPage() {
     selected?.rootPath,
     game?.primaryArchive.name,
     unit ? [id] : [],
+  );
+
+  // Same object the hero draws, called here rather than inside `UnitHero` so
+  // the render row below can draw from the one model already in memory
+  // instead of reading it a second time.
+  const object = unit?.objectName?.trim();
+  const {
+    model,
+    loading: modelLoading,
+    failed: modelFailed,
+  } = useUnitsyncUnitModel(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+    object,
+  );
+
+  // The render cache is keyed on the game's modinfo shortname, never its
+  // archive name (see `useUnitRenders`), and a game need not declare one.
+  const gameShortname = game?.info.shortname?.trim() || undefined;
+  const renders = useUnitRenders(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+    gameShortname,
+    unit ? id : undefined,
+    object,
+    unit?.footprintX ?? 1,
+    unit?.footprintZ ?? 1,
+    model,
   );
 
   if (error && !data)
@@ -226,27 +261,34 @@ export default function GameUnitPage() {
         <ArrowLeft className="size-3.5" /> Back
       </Link>
 
-      <UnitModelPanel
-        enginePath={selected.enginePath}
-        dataDir={selected.rootPath}
+      <UnitHero
+        object={object}
+        model={model}
+        loading={modelLoading}
+        failed={modelFailed}
         gameArchive={game.primaryArchive.name}
-        unitId={id}
-        unit={unit}
-        onClose={() => navigate(unitsBackTo)}
-        hideTitle
       />
 
-      <div>
-        <h1 className="text-xl font-semibold">{unitLabel(unit, id)}</h1>
-        <p className="font-mono text-xs text-muted-foreground">{id}</p>
-        {faction && <p className="text-xs text-muted-foreground">{faction}</p>}
+      <div className="flex items-center gap-3">
+        {src ? (
+          <img
+            src={src}
+            alt=""
+            className="size-16 shrink-0 rounded object-contain"
+          />
+        ) : (
+          <span aria-hidden className="size-16 shrink-0 rounded bg-muted" />
+        )}
+        <div>
+          <h1 className="text-xl font-semibold">{unitLabel(unit, id)}</h1>
+          <p className="font-mono text-xs text-muted-foreground">{id}</p>
+          {faction && (
+            <p className="text-xs text-muted-foreground">{faction}</p>
+          )}
+        </div>
       </div>
 
-      {src ? (
-        <img src={src} alt="" className="size-16 rounded object-contain" />
-      ) : (
-        <span aria-hidden className="size-16 shrink-0 rounded bg-muted" />
-      )}
+      <UnitRendersRow renders={renders} />
 
       <UnitStatsTable unit={unit} />
 
@@ -354,6 +396,42 @@ export default function GameUnitPage() {
                 </dd>
               </div>
             )}
+          </dl>
+        </section>
+      )}
+
+      {/* Developer detail rather than player detail (the model's file, format,
+          triangle count and textures), so it sits quietly below everything a
+          player actually came here for rather than above it. */}
+      {model?.root && object && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Model file
+          </h2>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 rounded-lg border border-border/50 bg-card px-3 py-2 text-xs">
+            <dt className="text-muted-foreground">Model</dt>
+            <dd className="break-all font-mono">{model.path}</dd>
+
+            <dt className="text-muted-foreground">Format</dt>
+            <dd>
+              {model.format === "3do" ? "3do (Total Annihilation)" : "s3o"}
+            </dd>
+
+            <dt className="text-muted-foreground">Size</dt>
+            <dd>
+              {countTriangles(model.root).toLocaleString()} triangles in{" "}
+              {countPieces(model.root).toLocaleString()} pieces
+            </dd>
+
+            <dt className="text-muted-foreground">Textures</dt>
+            <dd className="break-all font-mono">
+              {model.textures.length === 0
+                ? "none"
+                : model.textures
+                    .filter((t) => !t.teamColour)
+                    .map((t) => t.name)
+                    .join(", ") || "none"}
+            </dd>
           </dl>
         </section>
       )}

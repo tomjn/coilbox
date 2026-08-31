@@ -3,7 +3,14 @@
  * Drives `GameUnitPage` under a real DOM, following the mocking shape
  * `GameUnitsPage.dom.test.tsx` uses: the unitsync hooks are mocked so the test
  * exercises the rendered page rather than a real scan. `useUnitsyncUnitModel`
- * is mocked too, because `UnitModelPanel` (embedded here) calls it directly.
+ * is mocked too, because `UnitHero` calls it directly (via the page).
+ *
+ * `useUnitRenders` is mocked at the hook boundary rather than at the bindings
+ * it calls: its own cache-then-draw wiring, including "asks about all four
+ * angles" and "a cached render is not redrawn", is `useUnitRenders.test.tsx`'s
+ * job, run against real WebGL/IPC stand-ins. Mocking it here keeps this file
+ * about what the page does with whatever the hook reports, not about the hook
+ * itself.
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -21,7 +28,22 @@ const GAME_NAME = "Test Game";
 
 let mockUnits: UnitDatasetEntry[] = [];
 let mockModelPending = false;
+let mockRenders: Record<
+  string,
+  { angle: string; status: string; url?: string; message?: string }
+> = {};
 const mockIconSrc = "mock-icon-src";
+const ANGLE_LABELS: Record<string, string> = {
+  top: "Top down",
+  front: "Front",
+  side: "Side",
+  angled: "Angled",
+};
+
+vi.mock("./components/useUnitRenders", () => ({
+  useUnitRenders: () => mockRenders,
+  angleLabel: (angle: string) => ANGLE_LABELS[angle] ?? angle,
+}));
 
 vi.mock("../config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
@@ -102,10 +124,17 @@ interface UnitFixture {
 function renderUnit(
   id: string,
   units: UnitFixture[],
-  opts: { modelPending?: boolean } = {},
+  opts: {
+    modelPending?: boolean;
+    renders?: Record<
+      string,
+      { angle: string; status: string; url?: string; message?: string }
+    >;
+  } = {},
 ) {
   mockUnits = units as UnitDatasetEntry[];
   mockModelPending = opts.modelPending ?? false;
+  mockRenders = opts.renders ?? {};
   return render(
     <MemoryRouter
       initialEntries={[
@@ -131,13 +160,50 @@ describe("GameUnitPage", () => {
     expect(screen.getByText("armsolar")).toBeTruthy();
   });
 
-  it("labels the model panel's button by what it does here (navigate back), not by the drawer's close wording", async () => {
+  it("has no close control of its own: the page's own breadcrumb is the only way back", async () => {
+    // The hero used to be `UnitModelPanel`, whose close button read as a
+    // cross even though it navigated rather than closed anything. The page
+    // has its own "Back" link already, so there is nothing here to relabel.
     renderUnit("armsolar", [{ name: "armsolar", fullName: "Solar Collector" }]);
     await screen.findByRole("heading", { name: "Solar Collector" });
-    expect(
-      screen.getByRole("button", { name: "Back to the units grid" }),
-    ).toBeTruthy();
     expect(screen.queryByLabelText("Close model view")).toBeNull();
+    expect(screen.queryByLabelText("Back to the units grid")).toBeNull();
+    expect(screen.getByRole("link", { name: /back/i })).toBeTruthy();
+  });
+
+  it("shows all four rendered angles, each labelled", async () => {
+    renderUnit(
+      "armsolar",
+      [{ name: "armsolar", fullName: "Solar Collector" }],
+      {
+        renders: {
+          top: { angle: "top", status: "ready", url: "armsolar-top.webp" },
+          front: { angle: "front", status: "drawing" },
+          side: { angle: "side", status: "checking" },
+          angled: {
+            angle: "angled",
+            status: "unavailable",
+            message: "This unit's definition names no model.",
+          },
+        },
+      },
+    );
+    await screen.findByRole("heading", { name: "Solar Collector" });
+
+    expect(screen.getByText("Top down")).toBeTruthy();
+    expect(screen.getByText("Front")).toBeTruthy();
+    expect(screen.getByText("Side")).toBeTruthy();
+    expect(screen.getByText("Angled")).toBeTruthy();
+
+    // The one angle already drawn shows its picture rather than a status word.
+    const img = screen.getByAltText("Top down render of this unit");
+    expect(img.getAttribute("src")).toBe("armsolar-top.webp");
+
+    // A render this unit has none of says so, rather than showing a broken
+    // image or nothing at all.
+    expect(
+      screen.getByText("This unit's definition names no model."),
+    ).toBeTruthy();
   });
 
   it("is readable while the model is still loading", async () => {

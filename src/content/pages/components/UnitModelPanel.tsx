@@ -326,8 +326,10 @@ function HubRender({
 }
 
 /** What each refusal means, in a sentence, because the reasons are different
- *  problems with different owners. */
-function renderSkipReason(skip: RenderSkip): string {
+ *  problems with different owners. Exported for {@link ../useUnitRenders},
+ *  which hits the same refusals drawing a unit page's render row and would
+ *  otherwise need its own copy of what each one means. */
+export function renderSkipReason(skip: RenderSkip): string {
   switch (skip) {
     case "mis-framed":
       return "the picture is not the shape this unit's footprint frames to, which is a bug in coilbox rather than in the game.";
