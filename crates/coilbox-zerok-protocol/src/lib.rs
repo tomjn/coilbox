@@ -38,6 +38,56 @@
 //! A `DateTime` is a `String`. Json.NET round-trips the kind, so a UTC one ends
 //! in `Z`, a local one carries an offset and an unspecified one carries neither.
 //! A type that insisted on RFC 3339 would refuse the third.
+//!
+//! # What coilbox will not carry
+//!
+//! Every command in this crate is generated, so a message coilbox does nothing
+//! with is still parsed and still shows in the protocol console. Most of those
+//! are a gap waiting to be filled, which is what the `lobby-protocol-gap` label
+//! tracks. Two families are not, and are worth naming here so they are not
+//! mistaken for one.
+//!
+//! **Steam authentication.** `Login` and `Register` both carry a
+//! `SteamAuthToken`, and coilbox never sets it. A ticket is only valid for the
+//! Steam App ID it was minted under and the server checks Zero-K's, so a
+//! third-party client can only do this by introducing itself to Steam as Zero-K.
+//! Steam sign-in is bound up with account identity, ban evasion checks and the
+//! VPN exemption on Zero-K's server, and it belongs to that project rather than
+//! to us. Coilbox signs in with a name and password and says so on the login
+//! form. See coilbox issue #1988.
+//!
+//! **Planet Wars.** The `Pw*` commands, `JoinFactionRequest`, `Welcome`'s
+//! faction list and `User::faction` are Zero-K's persistent metagame: a
+//! campaign map, faction membership, attack charges and the votes that pick a
+//! planet to fight over. It is theirs to run, its state lives on their server
+//! and their website, and a lobby client that half implemented it would be a
+//! worse way to play it than the one they already ship. Coilbox reads these off
+//! the wire and does nothing with them, deliberately and not for now.
+//!
+//! `AutohostMode::Planetwars` is the exception that proves it. That is a battle
+//! mode a room can be in, which the battle list shows like any other, and
+//! showing it is not taking part.
+//!
+//! **Zero-K's own content distribution.** The engine mirror at
+//! `zero-k.info/engine`, the `ContentService.svc` endpoint and the `Resources`
+//! image host are infrastructure the Zero-K project runs for its own client, not
+//! shared Spring ecosystem services of the kind coilbox already uses. Coilbox
+//! fetches Zero-K content through rapid from `repos.springrts.com` like anything
+//! else, and a battle naming something rapid does not carry stays unjoinable.
+//! See coilbox issues #1976, #1977 and #1980.
+//!
+//! # Which server this is for
+//!
+//! The official one, `zero-k.info`, speaking the protocol these types are
+//! generated from.
+//!
+//! `FIGHTORDER/ZkInfraNeo` is a separate from-scratch rewrite of the Zero-K
+//! backend. Its own planning document says it is "not obligated to preserve
+//! legacy protocols, schemas, class designs, routes, or bugs" and that backward
+//! compatibility is opt-in, so it is not a server these types describe and
+//! coilbox does not target it. If it ever becomes the server Zero-K's players
+//! are on, that is a decision to take then, against whatever protocol it has
+//! settled on by that point.
 
 /// The wire line, which is a command name, a space and a JSON object.
 pub mod line;
