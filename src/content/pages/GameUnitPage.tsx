@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -9,11 +9,13 @@ import {
   useUnitsyncUnitDataset,
   useUnitsyncUnitModel,
 } from "../config";
+import { groupOf, morphGroups } from "../morphGraph";
 import { encyclopediaSections, unitLabel } from "../unitEncyclopedia";
 import { unitIconSrc } from "../unitIcon";
 import { countPieces, countTriangles } from "../unitModel";
 import { DetailError, DetailLoading, NotFound } from "./components/states";
 import { UnitHero } from "./components/UnitHero";
+import { UnitPictureCard } from "./components/UnitPictureCard";
 import { UnitRendersRow } from "./components/UnitRendersRow";
 import { UnitStatsTable } from "./components/UnitStatsTable";
 import { useUnitRenders } from "./components/useUnitRenders";
@@ -52,6 +54,46 @@ export default function GameUnitPage() {
 
   const unit = dataset?.units.find((u) => u.name.toLowerCase() === id);
 
+  // Keyed lowercase on both sides, matching every other id lookup on this
+  // page: a def key is only ever compared case-insensitively.
+  const byId = new Map(
+    (dataset?.units ?? []).map((u) => [u.name.toLowerCase(), u]),
+  );
+
+  // What this unit builds: its own `buildOptions`, resolved against the
+  // dataset so a stripped or unrecognised target is silently dropped rather
+  // than linking somewhere.
+  const builds = [
+    ...new Set((unit?.buildOptions ?? []).map((t) => t.toLowerCase())),
+  ].filter((t) => byId.has(t));
+
+  // What builds this unit: the reverse of `buildOptions`, built once as a
+  // single map over every unit rather than filtering the whole dataset again
+  // for each render. Each target's builders are a `Set`, not an array: a
+  // builder whose own `buildOptions` names the same target twice would
+  // otherwise list itself twice under one duplicate React key.
+  const builtByMap = new Map<string, Set<string>>();
+  for (const u of dataset?.units ?? []) {
+    for (const target of u.buildOptions ?? []) {
+      const key = target.toLowerCase();
+      const builders = builtByMap.get(key);
+      if (builders) builders.add(u.name.toLowerCase());
+      else builtByMap.set(key, new Set([u.name.toLowerCase()]));
+    }
+  }
+  const builtBy = [...(builtByMap.get(id) ?? [])];
+
+  // This unit's whole morph group: every stage from the ladder's bottom rung
+  // to its top, in the order `morphGroups` (`morphGraph.ts`, vendored byte
+  // identical into the hub, so it is read here rather than reimplemented)
+  // already gives them. A unit with no morph edge at all is in no group, so
+  // `stageChain` comes back empty and the section built from it stays
+  // hidden rather than showing a chain of one.
+  const morphGroupList = morphGroups(dataset?.units ?? []);
+  const morphBase = groupOf(morphGroupList).get(id);
+  const stageChain =
+    morphGroupList.find((g) => g.base === morphBase)?.stages ?? [];
+
   // Computed unconditionally, ahead of every early return below, so
   // `useUnitsyncUnitBuildpics` is called on every render in the same order,
   // the same reasoning `GameUnitsPage` documents for its own call.
@@ -63,11 +105,20 @@ export default function GameUnitPage() {
   // one key and read under another, matching nothing. `GameUnitsPage` avoids
   // this the same way, fetching and reading with its already-lowercased
   // `cell.id` throughout.
+  //
+  // One call for every picture this page can show, not one per section: this
+  // unit itself, what it builds, what builds it, and every morph stage. That
+  // is also why this reads `builds`/`builtBy`/`stageChain` computed above
+  // rather than after the gates below: they all have to exist before this
+  // call, not just before the JSX that draws them.
+  const buildpicIds = unit
+    ? [...new Set([id, ...builds, ...builtBy, ...stageChain])]
+    : [];
   const buildpics = useUnitsyncUnitBuildpics(
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
-    unit ? [id] : [],
+    buildpicIds,
   );
 
   // Same object the hero draws, called here rather than inside `UnitHero` so
@@ -190,42 +241,23 @@ export default function GameUnitPage() {
   const display = buildpics?.units[id];
   const src = unitIconSrc(display);
 
-  // Keyed lowercase on both sides, matching every other id lookup on this
-  // page: a def key is only ever compared case-insensitively.
-  const byId = new Map(
-    (dataset?.units ?? []).map((u) => [u.name.toLowerCase(), u]),
-  );
   const label = (targetId: string) => unitLabel(byId.get(targetId), targetId);
   const unitPath = (targetId: string) =>
     `/content/games/${encodeURIComponent(game.name)}/units/${encodeURIComponent(targetId)}`;
 
-  // What this unit builds: its own `buildOptions`, resolved against the
-  // dataset so a stripped or unrecognised target is silently dropped rather
-  // than linking somewhere.
-  const builds = [
-    ...new Set((unit.buildOptions ?? []).map((t) => t.toLowerCase())),
-  ].filter((t) => byId.has(t));
+  // The game's own data for one hop of the morph chain: whichever of
+  // `fromId`'s declared morph targets names `toId`, with every key but
+  // `into` kept exactly as the game wrote it. This is free-form JSON keyed
+  // however a game likes (`cmdname`, `energy`, `research`, ...), so nothing
+  // here assumes a fixed set of keys.
+  const edgeConditions = (fromId: string, toId: string) =>
+    (byId.get(fromId)?.morphTargets ?? [])
+      .filter((m) => m.into?.toLowerCase() === toId)
+      .flatMap((m) => Object.entries(m).filter(([key]) => key !== "into"));
 
-  // What builds this unit: the reverse of `buildOptions`, built once as a
-  // single map over every unit rather than filtering the whole dataset again
-  // for each render. Each target's builders are a `Set`, not an array: a
-  // builder whose own `buildOptions` names the same target twice would
-  // otherwise list itself twice under one duplicate React key.
-  const builtByMap = new Map<string, Set<string>>();
-  for (const u of dataset?.units ?? []) {
-    for (const target of u.buildOptions ?? []) {
-      const key = target.toLowerCase();
-      const builders = builtByMap.get(key);
-      if (builders) builders.add(u.name.toLowerCase());
-      else builtByMap.set(key, new Set([u.name.toLowerCase()]));
-    }
-  }
-  const builtBy = [...(builtByMap.get(id) ?? [])];
-
-  const morphs = unit.morphTargets ?? [];
-
-  // "Where it stands" is a section about static placement, so it is gated on
-  // `mobile === false` rather than on whether any of its fields are present.
+  // "Where it can be built" is a section about static placement, so it is
+  // gated on `mobile === false` rather than on whether any of its fields are
+  // present.
   // `footprintX`, `footprintZ` and `floatOnWater` are never optional on the
   // wire (model.rs's `UnitDatasetEntry` declares them as plain `u32`/`bool`,
   // not `Option`), so a presence check here was always true and every mobile
@@ -251,6 +283,17 @@ export default function GameUnitPage() {
   const hasMaxWaterLimit =
     unit.maxWaterDepth !== undefined && unit.maxWaterDepth < NO_MAX_WATER_DEPTH;
   const hasWaterLimit = hasMinWaterLimit || hasMaxWaterLimit;
+
+  // "elmos" is the engine's own unit of length, meaningless to a player. A
+  // bound the def leaves at the sentinel says nothing, so it is dropped
+  // rather than spelled out as "any": a unit declaring only a maximum reads
+  // as "600 deep", not "any to 600 elmos".
+  const waterDepthText =
+    hasMinWaterLimit && hasMaxWaterLimit
+      ? `${unit.minWaterDepth} to ${unit.maxWaterDepth} deep`
+      : hasMaxWaterLimit
+        ? `${unit.maxWaterDepth} deep`
+        : `${unit.minWaterDepth} deep`;
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -295,12 +338,14 @@ export default function GameUnitPage() {
       {builds.length > 0 && (
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-medium">What it builds</h2>
-          <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+          <ul className="flex flex-wrap gap-3">
             {builds.map((targetId) => (
               <li key={targetId}>
-                <Link to={unitPath(targetId)} className="hover:underline">
-                  {label(targetId)}
-                </Link>
+                <UnitPictureCard
+                  to={unitPath(targetId)}
+                  label={label(targetId)}
+                  src={unitIconSrc(buildpics?.units[targetId])}
+                />
               </li>
             ))}
           </ul>
@@ -310,62 +355,66 @@ export default function GameUnitPage() {
       {builtBy.length > 0 && (
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-medium">What builds it</h2>
-          <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+          <ul className="flex flex-wrap gap-3">
             {builtBy.map((builderId) => (
               <li key={builderId}>
-                <Link to={unitPath(builderId)} className="hover:underline">
-                  {label(builderId)}
-                </Link>
+                <UnitPictureCard
+                  to={unitPath(builderId)}
+                  label={label(builderId)}
+                  src={unitIconSrc(buildpics?.units[builderId])}
+                />
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      {morphs.length > 0 && (
+      {/* Every stage of the group, not just the next hop: a game can carry
+          every tech level of a commander under one shared display name (issue
+          #2063's fedcommander_up1..up4 all read "Federation of Kala Command
+          Unit"), so a list of one link at a time gave a reader no way to tell
+          where they stood. The def key on each card, and the current stage
+          rendered as a plain block rather than a link, are what make the
+          chain readable when the names collide. */}
+      {stageChain.length > 1 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">Turns into</h2>
-          <ul className="flex flex-col gap-2">
-            {morphs.map((morph, i) => {
-              const targetId = morph.into.toLowerCase();
-              const conditions = Object.entries(morph).filter(
-                ([key]) => key !== "into",
-              );
-              return (
-                // A game can declare two edges to the same target under
-                // different conditions, so `morph.into` alone can collide.
-                // The index makes the key unique regardless.
-                <li
-                  // biome-ignore lint/suspicious/noArrayIndexKey: morph edges carry no id of their own, and `into` alone can repeat
-                  key={`${morph.into}-${i}`}
-                  className="flex flex-col gap-1 rounded-lg border border-border/50 bg-card p-2 text-sm"
-                >
-                  <Link
-                    to={unitPath(targetId)}
-                    className="font-medium hover:underline"
-                  >
-                    {label(targetId)}
-                  </Link>
-                  {conditions.length > 0 && (
-                    <dl className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                      {conditions.map(([key, value]) => (
-                        <div key={key} className="contents">
-                          <dt>{key}</dt>
-                          <dd>{String(value)}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <h2 className="text-sm font-medium">Upgrade path</h2>
+          <ol className="flex flex-wrap items-center gap-2">
+            {stageChain.map((stageId, i) => (
+              <li key={stageId} className="flex items-center gap-2">
+                <UnitPictureCard
+                  to={unitPath(stageId)}
+                  label={label(stageId)}
+                  src={unitIconSrc(buildpics?.units[stageId])}
+                  defKey={stageId}
+                  current={stageId === id}
+                />
+                {i < stageChain.length - 1 && (
+                  <div className="flex shrink-0 flex-col items-center gap-1 text-xs text-muted-foreground">
+                    <ArrowRight className="size-4" aria-hidden />
+                    {edgeConditions(stageId, stageChain[i + 1]).length > 0 && (
+                      <dl className="flex flex-col items-center gap-0">
+                        {edgeConditions(stageId, stageChain[i + 1]).map(
+                          ([key, value]) => (
+                            <div key={key} className="flex gap-1">
+                              <dt>{key}:</dt>
+                              <dd>{String(value)}</dd>
+                            </div>
+                          ),
+                        )}
+                      </dl>
+                    )}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
         </section>
       )}
 
       {isStationary && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">Where it stands</h2>
+          <h2 className="text-sm font-medium">Where it can be built</h2>
           <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
             {unit.footprintX !== undefined && unit.footprintZ !== undefined && (
               <div className="contents">
@@ -390,10 +439,7 @@ export default function GameUnitPage() {
             {hasWaterLimit && (
               <div className="contents">
                 <dt className="text-muted-foreground">Water depth</dt>
-                <dd>
-                  {hasMinWaterLimit ? unit.minWaterDepth : "any"} to{" "}
-                  {hasMaxWaterLimit ? unit.maxWaterDepth : "any"} elmos
-                </dd>
+                <dd>{waterDepthText}</dd>
               </div>
             )}
           </dl>

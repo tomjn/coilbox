@@ -12,7 +12,7 @@
  * about what the page does with whatever the hook reports, not about the hook
  * itself.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UnitDatasetEntry } from "../bindings";
@@ -33,6 +33,10 @@ let mockRenders: Record<
   { angle: string; status: string; url?: string; message?: string }
 > = {};
 const mockIconSrc = "mock-icon-src";
+// A def key the buildpics mock deliberately resolves nothing for, so a test
+// can render a unit with no build picture without the mock's own blanket
+// "every id gets an icon" behaviour hiding that case.
+const mockNoIconId = "unpicturedtarget";
 const ANGLE_LABELS: Record<string, string> = {
   top: "Top down",
   front: "Front",
@@ -93,7 +97,9 @@ vi.mock("../config", () => ({
     units && units.length > 0
       ? {
           units: Object.fromEntries(
-            units.map((u) => [u, { icon: mockIconSrc }]),
+            units
+              .filter((u) => u !== mockNoIconId)
+              .map((u) => [u, { icon: mockIconSrc }]),
           ),
         }
       : null,
@@ -240,17 +246,19 @@ describe("GameUnitPage", () => {
     expect(img?.getAttribute("src")).toBe(mockIconSrc);
   });
 
-  it("links what it builds and what builds it", async () => {
+  it("shows a picture card, not plain text, for what it builds and what builds it", async () => {
     renderUnit("armlab", [
       { name: "armcom", fullName: "Commander", buildOptions: ["armlab"] },
       { name: "armlab", fullName: "Bot Lab", buildOptions: ["armpw"] },
       { name: "armpw", fullName: "Peewee" },
     ]);
-    expect(await screen.findByRole("link", { name: "Peewee" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Commander" })).toBeTruthy();
+    const built = await screen.findByRole("link", { name: "Peewee" });
+    expect(built.querySelector("img")?.getAttribute("src")).toBe(mockIconSrc);
+    const builder = screen.getByRole("link", { name: "Commander" });
+    expect(builder.querySelector("img")?.getAttribute("src")).toBe(mockIconSrc);
   });
 
-  it("lists a unit's morph stages with what the game asks for", async () => {
+  it("lists a unit's whole upgrade path with what the game asks for at each step", async () => {
     renderUnit("fedcommander", [
       {
         name: "fedcommander",
@@ -262,10 +270,72 @@ describe("GameUnitPage", () => {
       { name: "fedcommander_up1", fullName: "Commander Tech 1" },
     ]);
     expect(
-      await screen.findByRole("link", { name: "Commander Tech 1" }),
+      await screen.findByRole("heading", { name: "Upgrade path" }),
     ).toBeTruthy();
+    // The card's own label carries the def key too now, so this matches on
+    // the name rather than the whole (now longer) accessible name.
+    expect(screen.getByRole("link", { name: /Commander Tech 1/ })).toBeTruthy();
     expect(screen.getByText(/research/i)).toBeTruthy();
     expect(screen.getByText(/150/)).toBeTruthy();
+  });
+
+  it("tells apart a unit's morph stages even when the game names them all the same", async () => {
+    // SplinterFaction's real commander (issue #2063): every tech level reads
+    // "Federation of Kala Command Unit", so the def key and the build pic on
+    // each card are the only things left that tell one stage from another.
+    const SHARED_NAME = "Federation of Kala Command Unit";
+    renderUnit("fedcommander_up1", [
+      {
+        name: "fedcommander",
+        fullName: SHARED_NAME,
+        morphTargets: [{ into: "fedcommander_up1" }],
+      },
+      {
+        name: "fedcommander_up1",
+        fullName: SHARED_NAME,
+        morphTargets: [{ into: "fedcommander_up2", research: 150 }],
+      },
+      { name: "fedcommander_up2", fullName: SHARED_NAME },
+    ]);
+    const heading = await screen.findByRole("heading", {
+      name: "Upgrade path",
+    });
+    // biome-ignore lint/style/noNonNullAssertion: the heading's own section is always its parent
+    const section = within(heading.closest("section")!);
+
+    // All three stages are on the page, distinguished by their def keys. (The
+    // page's identity block above also prints the current stage's id, so
+    // these three are checked against the upgrade-path section alone rather
+    // than the whole page.)
+    expect(section.getByText("fedcommander")).toBeTruthy();
+    expect(section.getByText("fedcommander_up1")).toBeTruthy();
+    expect(section.getByText("fedcommander_up2")).toBeTruthy();
+
+    // The stage a reader is already on is not a link to itself.
+    expect(
+      section.queryByRole("link", { name: /fedcommander_up1/ }),
+    ).toBeNull();
+    expect(section.getByText("Current")).toBeTruthy();
+
+    // The stage before and after it still link onward, to different pages.
+    const earlier = section.getByRole("link", { name: /fedcommander$/ });
+    const later = section.getByRole("link", { name: /fedcommander_up2/ });
+    expect(earlier.getAttribute("href")).not.toBe(later.getAttribute("href"));
+
+    // The edge condition into the current stage is still shown.
+    expect(section.getByText(/research/i)).toBeTruthy();
+    expect(section.getByText("150")).toBeTruthy();
+  });
+
+  it("shows the same placeholder as the rest of the page for a build target with no build picture", async () => {
+    renderUnit("armlab", [
+      { name: "armlab", fullName: "Bot Lab", buildOptions: [mockNoIconId] },
+      { name: mockNoIconId, fullName: "Unpictured Target" },
+    ]);
+    const card = await screen.findByRole("link", {
+      name: "Unpictured Target",
+    });
+    expect(card.querySelector("img")).toBeNull();
   });
 
   it("lists a builder once even when its buildOptions repeats the target", async () => {
@@ -284,7 +354,7 @@ describe("GameUnitPage", () => {
     expect(screen.getAllByRole("link", { name: "Bot Lab" })).toHaveLength(1);
   });
 
-  it("shows where a building may stand", async () => {
+  it("shows where a building may stand, under a heading a player understands", async () => {
     renderUnit("armsolar", [
       {
         name: "armsolar",
@@ -295,7 +365,11 @@ describe("GameUnitPage", () => {
         floatOnWater: false,
       },
     ]);
-    expect(await screen.findByText(/4 by 4/)).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: "Where it can be built" }),
+    ).toBeTruthy();
+    expect(screen.queryByText("Where it stands")).toBeNull();
+    expect(screen.getByText(/4 by 4/)).toBeTruthy();
   });
 
   it("shows no terrain section for a mobile unit", async () => {
@@ -335,7 +409,7 @@ describe("GameUnitPage", () => {
     expect(screen.queryByText("Water depth")).toBeNull();
   });
 
-  it("shows a real water depth limit next to any for the sentinel bound", async () => {
+  it("shows a real water depth limit as a plain number, not the engine's unit or its sentinel bound", async () => {
     renderUnit("armsolar", [
       {
         name: "armsolar",
@@ -346,7 +420,7 @@ describe("GameUnitPage", () => {
     ]);
     await screen.findByRole("heading", { name: "armsolar" });
     expect(screen.getByText("Water depth")).toBeTruthy();
-    expect(screen.getByText(/any to 40 elmos/)).toBeTruthy();
+    expect(screen.getByText("40 deep")).toBeTruthy();
   });
 
   it("does not claim the rest block's label as a unit's faction", async () => {
