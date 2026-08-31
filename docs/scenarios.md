@@ -297,7 +297,7 @@ Part of that the runtime covers by itself. An anchor unit on each human mission 
 
 So a scenario you want other people to play as you wrote it needs their copy of the game to be a loose `.sdd`, bundling a runtime at least as new as the scenario needs, with both guards in it. Installing the runtime is something any player can do from **Content > Games**. The guards are the game maintainer's to add, once, in the copy everybody downloads, and [the adoption contract](mission-runtime.md#the-adoption-contract) is the page to send them.
 
-If you ship the game as well as the scenario, all of that is yours to settle. Bundle a loose `.sdd` with the runtime installed and both guards added, and every scenario in the package is played by the game itself. See [Distributing coilbox with your game](distributing.md).
+If you ship the game as well as the scenario, the runtime and the guards are simply part of it, taken once into your own source rather than installed copy by copy. What you still have to decide is the packaging. Coilbox writes each compiled mission into the game's `missions/` folder as it launches, so the copy in your package has to be a loose `.sdd`. A game shipped as a packaged `.sd7` or `.sdz` falls to the mutator however complete its runtime is, because there is nowhere to put the mission. See [Distributing coilbox with your game](distributing.md).
 
 ## Play the example mission
 
