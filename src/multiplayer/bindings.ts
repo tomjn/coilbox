@@ -63,6 +63,42 @@ export interface User {
   rating: Rating;
 }
 
+/**
+ * What the server said about the match that has just finished, about us (issue
+ * #2003). Mirrors the Rust `Debriefing`.
+ *
+ * Zero-K only. Whole points throughout, rounded from the floats the server
+ * sends, because that is what a rating is shown as.
+ */
+export interface Debriefing {
+  /** The server's id for the match, which its web page is keyed by. Not the
+   * lobby battle id. */
+  serverBattleId: number;
+  /** Which of Zero-K's ratings this counted toward, in the server's own words.
+   * "Unrated" when it counted toward none, which most custom games are. */
+  ratingCategory: string;
+  won: boolean;
+  eloChange: number;
+  newElo: number;
+  /** The rank the match left us on, 0 to 7. */
+  newRank: number;
+  rankUp: boolean;
+  rankDown: boolean;
+  /** The ratings at the two ends of the band this rank covers. */
+  prevRankElo: number;
+  nextRankElo: number;
+  /** Experience, which goes up for playing rather than for winning. */
+  xpChange: number;
+  newXp: number;
+  /** The chat channel the server opened for the people who played, and put us
+   * in. Null when it named none. */
+  chatChannel: string | null;
+  /** The server's own page about the match. A web page, not a replay file. */
+  url: string | null;
+  /** Whatever the server chose to say about the match. */
+  message: string | null;
+}
+
 export type ChatKind =
   | "said"
   | "saidEx"
@@ -372,6 +408,12 @@ export type Delta =
    * has gone, and for the host it is the lobby confirming the move.
    */
   | { kind: "battleHostMoved"; id: number }
+  /**
+   * A Zero-K match we played has finished and the server has said what it did
+   * to our rating (issue #2003). Zero-K only: no other protocol coilbox speaks
+   * says anything at all after a game.
+   */
+  | { kind: "debriefed"; debriefing: Debriefing }
   /**
    * The lobby would not move our battle to the address its relay came back at,
    * so the battle is still advertised where the allocation used to be. Worse

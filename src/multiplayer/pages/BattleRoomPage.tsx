@@ -27,6 +27,7 @@ import { BattleRoomHeader } from "../battle/BattleRoomHeader";
 import { battleOptionTags } from "../battle/battleOptions";
 import { useBattlePresets } from "../battle/battlePresets";
 import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
+import { DebriefingPanel } from "../battle/DebriefingPanel";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
 import { MissingContentCard } from "../battle/MissingContentCard";
 import { matchStartAction } from "../battle/matchStart";
@@ -425,6 +426,11 @@ function BattleRoomPage() {
           strip above never reaches (issue #2073). Below it because a host who
           somehow saw both should read their own room's first. */}
       <BattleMovedPanel battleId={battle.id} selfHost={room.selfHost} />
+
+      {/* What the Zero-K match that just ended did to this player's rating
+          (issue #2003). Below the address strips because those are about a
+          room that is broken now and this is about a game that is over. */}
+      <DebriefingPanel />
 
       {room.currentVote && (
         <VotePanel vote={room.currentVote} onVote={room.castVote} />

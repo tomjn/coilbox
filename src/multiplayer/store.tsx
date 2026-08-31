@@ -42,6 +42,11 @@ import {
   recordBattleMoved,
 } from "./battle/battleMoved";
 import {
+  debriefingNotice,
+  forgetDebriefing,
+  recordDebriefing,
+} from "./battle/debriefing";
+import {
   type ChatMsg,
   type Delta,
   type LobbyEvent,
@@ -1221,6 +1226,22 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
         else if (d.kind === "battleHostMoved") {
           recordBattleMoved(d.id);
         }
+        // A Zero-K match we played has finished and the server has said what it
+        // did to our rating (issue #2003). Recorded rather than notified, for
+        // the same reason a move is: it is a fact that keeps, the reader is in
+        // the room it is about, and a toast that scrolls away is a poor place
+        // for four numbers.
+        else if (d.kind === "debriefed") {
+          recordDebriefing(d.debriefing);
+          // And said out loud as well, for the player whose room closed at the
+          // end of the game. The panel has nowhere to draw then, and a result
+          // nobody sees is the state this issue found things in.
+          void notify({
+            ...debriefingNotice(d.debriefing),
+            level: d.debriefing.won ? "success" : "info",
+            to: "/battle",
+          });
+        }
         // The relay came back at a new address, the lobby was asked to move the
         // battle to it, and the lobby either said no or said nothing. The battle
         // is open, quite possibly with a game in it, and the address everybody
@@ -1632,6 +1653,11 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const inBattle = mirror.state?.currentBattle ?? null;
   useEffect(() => {
     forgetBattleMovedUnless(inBattle);
+    // And a result that is about the match before this room. Held past the end
+    // of the match on purpose, because the server keeps a Zero-K room and its
+    // people together across one, but walking into another battle is walking
+    // away from the game it is about (issue #2003).
+    forgetDebriefing();
   }, [inBattle]);
 
   // Register a new account: open a throwaway connection that sends REGISTER, then

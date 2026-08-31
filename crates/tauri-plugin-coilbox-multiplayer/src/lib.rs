@@ -83,6 +83,9 @@ mod zerok_chat;
 /// Private, like the other two connection modules: exporting it would drag the
 /// registry's `pub(crate)` action types out with it.
 mod zerok_conn;
+/// What a finished Zero-K match did to our rating, which is the only post-match
+/// feedback any of the three protocols carries.
+mod zerok_debrief;
 /// The Zero-K battle room we are in, held as that protocol describes it and
 /// projected into the same room the other two fill.
 mod zerok_room;
