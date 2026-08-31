@@ -19,12 +19,35 @@ const SELECTED = {
 const GAME_NAME = "Test Game";
 
 let mockUnits: UnitDatasetEntry[] = [];
-let mockSides: { name: string; startUnit?: string }[] = [];
 // Defaults to "ready". One test overrides it to "unsyncable" to prove the
 // page still draws a populated dataset in that status instead of sticking on
 // a loading skeleton forever. `UnitsyncInfoStatus` (config.ts) has five
 // values, not the three the page used to gate rendering on.
 let mockDatasetStatus: "ready" | "unsyncable" | "error" | "loading" = "ready";
+
+// The real `useUnitsyncGameInfo`/`useUnitsyncUnitDataset` (config.ts) only
+// call `setInfo`/`setDataset` once a fetch resolves, then leave that state
+// alone: typing in the search box re-renders the page without either hook
+// running again, so `info`/`dataset` keep the same object reference across
+// those renders. These two are set once per `renderPage` call (not
+// reconstructed inside the mock hooks below) so they carry the same
+// stability, which is what lets a test tell a real memoisation fix apart
+// from one that merely looks memoised against an unstable double.
+let mockGameInfo: {
+  sides: { name: string; startUnit?: string }[];
+  unitCount: number;
+  units: never[];
+  options: never[];
+  errors: never[];
+} = { sides: [], unitCount: 0, units: [], options: [], errors: [] };
+let mockDataset: { units: UnitDatasetEntry[]; errors: string[] } = {
+  units: [],
+  errors: [],
+};
+
+/** Every id list `useUnitsyncUnitBuildpics` was called with, in render order,
+ * so a test can check whether typing in the search box changed it. */
+let buildpicsCalls: (string[] | undefined)[] = [];
 
 vi.mock("../config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
@@ -45,21 +68,20 @@ vi.mock("../config", () => ({
     error: null,
     run: () => {},
   }),
-  useUnitsyncGameInfo: () => ({
-    info: {
-      sides: mockSides,
-      unitCount: mockUnits.length,
-      units: [],
-      options: [],
-      errors: [],
-    },
-    loading: false,
-  }),
+  useUnitsyncGameInfo: () => ({ info: mockGameInfo, loading: false }),
   useUnitsyncUnitDataset: () => ({
-    dataset: { units: mockUnits, errors: [] },
+    dataset: mockDataset,
     status: mockDatasetStatus,
   }),
-  useUnitsyncUnitBuildpics: () => null,
+  useUnitsyncUnitBuildpics: (
+    _enginePath?: string,
+    _dataDir?: string,
+    _gameArchive?: string,
+    units?: string[],
+  ) => {
+    buildpicsCalls.push(units);
+    return null;
+  },
 }));
 
 const { default: GameUnitsPage } = await import("./GameUnitsPage");
@@ -83,8 +105,16 @@ function renderPage({
   datasetStatus?: "ready" | "unsyncable" | "error" | "loading";
 }) {
   mockUnits = units as UnitDatasetEntry[];
-  mockSides = sides;
   mockDatasetStatus = datasetStatus;
+  mockGameInfo = {
+    sides,
+    unitCount: mockUnits.length,
+    units: [],
+    options: [],
+    errors: [],
+  };
+  mockDataset = { units: mockUnits, errors: [] };
+  buildpicsCalls = [];
   return render(
     <MemoryRouter
       initialEntries={[`/content/games/${encodeURIComponent(GAME_NAME)}/units`]}
@@ -185,5 +215,35 @@ describe("GameUnitsPage", () => {
     expect(await screen.findByText("Back")).toBeTruthy();
     expect(screen.queryByText("No units found for this game.")).toBeNull();
     expect(screen.queryByText("Commander")).toBeNull();
+  });
+
+  it("keeps the same buildpic id list when the search query changes", async () => {
+    // The id list handed to `useUnitsyncUnitBuildpics` used to be the
+    // search-filtered `rows`, so it changed on every keystroke, which
+    // refetches and remounts the game's archive on every keystroke
+    // (config.ts:837 keys the fetch on a join of that list). It has to come
+    // from the unfiltered grid instead, so it stays the same array across a
+    // query change.
+    renderPage({
+      units: [
+        { name: "armcom", fullName: "Commander", buildOptions: ["armsolar"] },
+        { name: "armsolar", fullName: "Solar Collector" },
+      ],
+      sides: [{ name: "Armada", startUnit: "armcom" }],
+    });
+    await screen.findByText("Commander");
+    const idsBeforeIndex = buildpicsCalls.length - 1;
+    expect(idsBeforeIndex).toBeGreaterThanOrEqual(0);
+    const idsBefore = buildpicsCalls[idsBeforeIndex];
+
+    fireEvent.change(screen.getByRole("searchbox"), {
+      target: { value: "solar" },
+    });
+    await screen.findByText("Solar Collector");
+    expect(screen.queryByText("Commander")).toBeNull();
+
+    const idsAfter = buildpicsCalls[buildpicsCalls.length - 1];
+    expect(idsAfter).toBe(idsBefore);
+    expect(idsAfter).toEqual(["armcom", "armsolar"]);
   });
 });

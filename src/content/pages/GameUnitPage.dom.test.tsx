@@ -90,10 +90,13 @@ interface UnitFixture {
   fullName?: string;
   buildOptions?: string[];
   morphTargets?: ({ into: string } & Record<string, unknown>)[];
+  mobile?: boolean;
   footprintX?: number;
   footprintZ?: number;
   maxSlope?: number;
   floatOnWater?: boolean;
+  minWaterDepth?: number;
+  maxWaterDepth?: number;
 }
 
 function renderUnit(
@@ -199,10 +202,27 @@ describe("GameUnitPage", () => {
     expect(screen.getByText(/150/)).toBeTruthy();
   });
 
+  it("lists a builder once even when its buildOptions repeats the target", async () => {
+    // A builder whose own `buildOptions` names this unit twice used to push
+    // itself onto the reverse index twice, giving "What builds it" two
+    // identical entries under one duplicate React key.
+    renderUnit("armpw", [
+      {
+        name: "armlab",
+        fullName: "Bot Lab",
+        buildOptions: ["armpw", "armpw"],
+      },
+      { name: "armpw", fullName: "Peewee" },
+    ]);
+    await screen.findByRole("heading", { name: "Peewee" });
+    expect(screen.getAllByRole("link", { name: "Bot Lab" })).toHaveLength(1);
+  });
+
   it("shows where a building may stand", async () => {
     renderUnit("armsolar", [
       {
         name: "armsolar",
+        mobile: false,
         footprintX: 4,
         footprintZ: 4,
         maxSlope: 10,
@@ -210,5 +230,66 @@ describe("GameUnitPage", () => {
       },
     ]);
     expect(await screen.findByText(/4 by 4/)).toBeTruthy();
+  });
+
+  it("shows no terrain section for a mobile unit", async () => {
+    // footprintX, footprintZ and floatOnWater are always present on the
+    // wire, mobile or not (model.rs declares them as plain fields, not
+    // optional ones), so a presence check alone would show this section on
+    // every unit's page. Gating on `mobile` is what keeps a Peewee from
+    // reporting whether it floats.
+    renderUnit("armpw", [
+      {
+        name: "armpw",
+        fullName: "Peewee",
+        mobile: true,
+        footprintX: 2,
+        footprintZ: 2,
+        floatOnWater: false,
+      },
+    ]);
+    await screen.findByRole("heading", { name: "Peewee" });
+    expect(screen.queryByText(/2 by 2/)).toBeNull();
+    expect(screen.queryByText("Floats")).toBeNull();
+  });
+
+  it("treats the engine's water-depth sentinel as no limit, not a real bound", async () => {
+    // -10e6/10e6 is the engine's own "no limit" default (bindings.ts), not a
+    // declared restriction. A unit carrying only the sentinel on both bounds
+    // gets no water depth row at all.
+    renderUnit("armsolar", [
+      {
+        name: "armsolar",
+        mobile: false,
+        minWaterDepth: -10e6,
+        maxWaterDepth: 10e6,
+      },
+    ]);
+    await screen.findByRole("heading", { name: "armsolar" });
+    expect(screen.queryByText("Water depth")).toBeNull();
+  });
+
+  it("shows a real water depth limit next to any for the sentinel bound", async () => {
+    renderUnit("armsolar", [
+      {
+        name: "armsolar",
+        mobile: false,
+        minWaterDepth: -10e6,
+        maxWaterDepth: 40,
+      },
+    ]);
+    await screen.findByRole("heading", { name: "armsolar" });
+    expect(screen.getByText("Water depth")).toBeTruthy();
+    expect(screen.getByText(/any to 40 elmos/)).toBeTruthy();
+  });
+
+  it("does not claim the rest block's label as a unit's faction", async () => {
+    // The mocked game info reports no sides, so every unit falls into
+    // `factionGroups`'s unheaded rest block (id "", label "Other units").
+    // That block is not a faction, so the page must say nothing here rather
+    // than print the rest block's own label.
+    renderUnit("armsolar", [{ name: "armsolar", fullName: "Solar Collector" }]);
+    await screen.findByRole("heading", { name: "Solar Collector" });
+    expect(screen.queryByText("Other units")).toBeNull();
   });
 });

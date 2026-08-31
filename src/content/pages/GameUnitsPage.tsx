@@ -1,5 +1,5 @@
 import { Input } from "@picoframe/frame";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { UnitDisplay } from "../bindings";
@@ -56,8 +56,17 @@ export default function GameUnitsPage() {
   // `useUnitsyncUnitBuildpics` is called on every render in the same order:
   // gating it behind a `datasetStatus` check would call it on some renders
   // and not others, which breaks the rules of hooks.
-  const roots = (gameInfo?.sides ?? []).flatMap((s) =>
-    s.startUnit ? [{ id: s.startUnit, label: s.name }] : [],
+  //
+  // `gameInfo` and `dataset` only change reference when a fetch actually
+  // resolves (`config.ts`'s hooks call `setInfo`/`setDataset` once, then
+  // leave the state alone), so both memos below stay referentially stable
+  // across a keystroke in the search box.
+  const roots = useMemo(
+    () =>
+      (gameInfo?.sides ?? []).flatMap((s) =>
+        s.startUnit ? [{ id: s.startUnit, label: s.name }] : [],
+      ),
+    [gameInfo],
   );
   const sections = encyclopediaSections(dataset?.units ?? [], roots, query);
   const total = sections.reduce((n, s) => n + s.cells.length, 0);
@@ -75,11 +84,28 @@ export default function GameUnitsPage() {
   const shownCount = rows.reduce((n, s) => n + s.cells.length, 0);
   const capped = total > shownCount;
 
+  // Every cell id the unfiltered grid could ever show, not `rows`' own
+  // search-filtered set. `useUnitsyncUnitBuildpics` keys its effect on a
+  // sorted join of the id list it is handed (`config.ts:837`), so an id list
+  // that shrinks and grows with `query` produced a new key, and so a new
+  // worker call that remounts the game's archive, on every keystroke. The
+  // cleanup on that effect only flips a cancelled flag, and does not cancel
+  // the in-flight worker job. `UnitPicker.tsx:445` avoids exactly this by
+  // memoising its own `allIds` over the whole unit list rather than the
+  // filtered one, and this does the same over the query-less sections.
+  const allCellIds = useMemo(
+    () =>
+      encyclopediaSections(dataset?.units ?? [], roots, "").flatMap((s) =>
+        s.cells.map((c) => c.id),
+      ),
+    [dataset, roots],
+  );
+
   const buildpics = useUnitsyncUnitBuildpics(
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
-    rows.flatMap((s) => s.cells.map((c) => c.id)),
+    allCellIds,
   );
 
   if (error && !data)

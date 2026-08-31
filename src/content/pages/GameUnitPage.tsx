@@ -139,9 +139,18 @@ export default function GameUnitPage() {
     s.startUnit ? [{ id: s.startUnit, label: s.name }] : [],
   );
   const sections = encyclopediaSections(dataset?.units ?? [], roots, "");
-  const faction = sections.find((s) =>
+  const factionSection = sections.find((s) =>
     s.cells.some((c) => c.id === id || c.stages.includes(id)),
-  )?.label;
+  );
+  // `factionGroups` (techForest.ts) always labels the block nothing reaches
+  // "Other units" under the empty id, for the units no side's tech forest
+  // touches. That block is not a faction, so a unit landing in it (or every
+  // unit, on a game whose sides could not be read) should say nothing here
+  // rather than claim "Other units" as its faction.
+  const faction =
+    factionSection && factionSection.id !== ""
+      ? factionSection.label
+      : undefined;
 
   const display = buildpics?.units[id];
   const src = unitIconSrc(display);
@@ -164,26 +173,49 @@ export default function GameUnitPage() {
 
   // What builds this unit: the reverse of `buildOptions`, built once as a
   // single map over every unit rather than filtering the whole dataset again
-  // for each render.
-  const builtByMap = new Map<string, string[]>();
+  // for each render. Each target's builders are a `Set`, not an array: a
+  // builder whose own `buildOptions` names the same target twice would
+  // otherwise list itself twice under one duplicate React key.
+  const builtByMap = new Map<string, Set<string>>();
   for (const u of dataset?.units ?? []) {
     for (const target of u.buildOptions ?? []) {
       const key = target.toLowerCase();
       const builders = builtByMap.get(key);
-      if (builders) builders.push(u.name.toLowerCase());
-      else builtByMap.set(key, [u.name.toLowerCase()]);
+      if (builders) builders.add(u.name.toLowerCase());
+      else builtByMap.set(key, new Set([u.name.toLowerCase()]));
     }
   }
-  const builtBy = builtByMap.get(id) ?? [];
+  const builtBy = [...(builtByMap.get(id) ?? [])];
 
   const morphs = unit.morphTargets ?? [];
 
-  const hasTerrain =
-    (unit.footprintX !== undefined && unit.footprintZ !== undefined) ||
-    unit.maxSlope !== undefined ||
-    unit.floatOnWater !== undefined ||
-    unit.minWaterDepth !== undefined ||
-    unit.maxWaterDepth !== undefined;
+  // "Where it stands" is a section about static placement, so it is gated on
+  // `mobile === false` rather than on whether any of its fields are present.
+  // `footprintX`, `footprintZ` and `floatOnWater` are never optional on the
+  // wire (model.rs's `UnitDatasetEntry` declares them as plain `u32`/`bool`,
+  // not `Option`), so a presence check here was always true and every mobile
+  // unit's page carried a section reporting whether it floats. `mobile` is
+  // the field the worker itself derives to mean exactly "static building vs
+  // mobile unit" (model.rs:541-543), so it stands in for that question
+  // directly. The one thing this misses: a mobile unit the game still
+  // declares a slope or water limit for (a hovercraft, say) would lose this
+  // section too, since nothing here distinguishes that case from an ordinary
+  // mobile unit.
+  const isStationary = unit.mobile === false;
+
+  // The engine's own "no limit" sentinels (bindings.ts documents them:
+  // -10e6/+10e6, a band wide enough to refuse nothing), not just an absent
+  // field. On a cached Metal Factions roster, 294 of 716 units carrying
+  // these fields have both bounds sitting exactly on the sentinel, and
+  // printing that as "Water depth -10000000 to 10000000 elmos" would read as
+  // a real limit when the def declared none.
+  const NO_MIN_WATER_DEPTH = -10e6;
+  const NO_MAX_WATER_DEPTH = 10e6;
+  const hasMinWaterLimit =
+    unit.minWaterDepth !== undefined && unit.minWaterDepth > NO_MIN_WATER_DEPTH;
+  const hasMaxWaterLimit =
+    unit.maxWaterDepth !== undefined && unit.maxWaterDepth < NO_MAX_WATER_DEPTH;
+  const hasWaterLimit = hasMinWaterLimit || hasMaxWaterLimit;
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -252,14 +284,18 @@ export default function GameUnitPage() {
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-medium">Turns into</h2>
           <ul className="flex flex-col gap-2">
-            {morphs.map((morph) => {
+            {morphs.map((morph, i) => {
               const targetId = morph.into.toLowerCase();
               const conditions = Object.entries(morph).filter(
                 ([key]) => key !== "into",
               );
               return (
+                // A game can declare two edges to the same target under
+                // different conditions, so `morph.into` alone can collide.
+                // The index makes the key unique regardless.
                 <li
-                  key={morph.into}
+                  // biome-ignore lint/suspicious/noArrayIndexKey: morph edges carry no id of their own, and `into` alone can repeat
+                  key={`${morph.into}-${i}`}
                   className="flex flex-col gap-1 rounded-lg border border-border/50 bg-card p-2 text-sm"
                 >
                   <Link
@@ -285,7 +321,7 @@ export default function GameUnitPage() {
         </section>
       )}
 
-      {hasTerrain && (
+      {isStationary && (
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-medium">Where it stands</h2>
           <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
@@ -309,13 +345,12 @@ export default function GameUnitPage() {
                 <dd>{unit.floatOnWater ? "Yes" : "No"}</dd>
               </div>
             )}
-            {(unit.minWaterDepth !== undefined ||
-              unit.maxWaterDepth !== undefined) && (
+            {hasWaterLimit && (
               <div className="contents">
                 <dt className="text-muted-foreground">Water depth</dt>
                 <dd>
-                  {unit.minWaterDepth ?? "any"} to {unit.maxWaterDepth ?? "any"}{" "}
-                  elmos
+                  {hasMinWaterLimit ? unit.minWaterDepth : "any"} to{" "}
+                  {hasMaxWaterLimit ? unit.maxWaterDepth : "any"} elmos
                 </dd>
               </div>
             )}
