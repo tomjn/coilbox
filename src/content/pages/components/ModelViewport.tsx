@@ -92,7 +92,7 @@ export function ModelViewport({
 
   useCanvas3D(
     containerRef,
-    ({ renderer }) => {
+    ({ renderer, host }) => {
       const built = buildModel(model);
 
       const scene = new THREE.Scene();
@@ -141,6 +141,35 @@ export function ModelViewport({
       const render = () => renderer.render(scene, camera);
       controls.addEventListener("change", render);
 
+      // The hero placement on the unit page puts far more empty space around
+      // the model than there is model, so a scroll anywhere on the canvas
+      // used to zoom rather than scroll the page. OrbitControls listens for
+      // `wheel` on the canvas itself and always calls `preventDefault`, so
+      // the only way to let an empty-space scroll through to the page is to
+      // stop that event before it gets there. A capture-phase listener on
+      // `host`, the canvas's own parent, runs before the canvas's own
+      // listeners however they were registered, so `stopPropagation` here
+      // keeps OrbitControls from ever seeing the event. `raycaster` and
+      // `pointer` are reused across events rather than built per scroll, and
+      // a miss over empty space costs one bounding-sphere test per mesh, not
+      // one per triangle, because that is where three's own hit test bails
+      // out first.
+      const raycaster = new THREE.Raycaster();
+      const pointer = new THREE.Vector2();
+      const onWheel = (event: WheelEvent) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        if (raycaster.intersectObject(built.object, true).length === 0) {
+          event.stopPropagation();
+        }
+      };
+      host.addEventListener("wheel", onWheel, {
+        capture: true,
+        passive: true,
+      });
+
       // Damping needs a frame loop to settle. Without it the view still moves,
       // it just stops the moment the pointer does.
       let frame = 0;
@@ -161,6 +190,7 @@ export function ModelViewport({
         },
         dispose: () => {
           cancelAnimationFrame(frame);
+          host.removeEventListener("wheel", onWheel, { capture: true });
           controls.removeEventListener("change", render);
           controls.dispose();
           built.dispose();
