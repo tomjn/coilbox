@@ -6,6 +6,7 @@ const testMutatorMock = vi.fn();
 const readMissionMock = vi.fn();
 const gameRuntimeMock = vi.fn();
 const gameMissionFileMock = vi.fn();
+const writeGameMissionMock = vi.fn();
 const evalMissionMock = vi.fn();
 
 // launch.ts reaches the plugin through bindings.ts, whose plugin-sdk import
@@ -18,12 +19,15 @@ vi.mock("./bindings", () => ({
   scenarioReadMission: (...args: unknown[]) => readMissionMock(...args),
   scenarioGameRuntime: (...args: unknown[]) => gameRuntimeMock(...args),
   scenarioGameMissionFile: (...args: unknown[]) => gameMissionFileMock(...args),
+  scenarioWriteGameMission: (...args: unknown[]) =>
+    writeGameMissionMock(...args),
   scenarioEvalMission: (...args: unknown[]) => evalMissionMock(...args),
 }));
 
 import type { GameItem } from "../content/bindings";
 import { MUTATOR_FOLDER } from "../lib/generatedGames";
 import type { Participant } from "../play/participants";
+import { compileScenario } from "./compile";
 import {
   launchScenario,
   MISSION_MODOPTION,
@@ -33,6 +37,7 @@ import {
 } from "./launch";
 import { parseScenario, type Scenario } from "./model";
 import type { GameOrigin } from "./storage";
+import { missionDriftedFromDocument } from "./wording";
 
 const you: Participant = {
   id: "you",
@@ -87,8 +92,27 @@ const SHIPPED: GameOrigin = {
   loose: false,
 };
 
-/** What that mission's `mission.lua` holds, as the archive hands it over. */
+/** The same mission, in a loose game coilbox can write back into. */
+const SHIPPED_LOOSE: GameOrigin = {
+  gameName: "Splinter Faction test",
+  archivePath: "/games/sf.sdd",
+  folder: "first-contact",
+  loose: true,
+};
+
+/**
+ * What that mission's `mission.lua` holds, as the archive hands it over.
+ *
+ * Nothing compiled this, so it has drifted from every document: the tests that
+ * care about a mission still matching its document ship
+ * `compileScenario(build())` instead.
+ */
 const SHIPPED_LUA = "return { schemaVersion = 1 }";
+
+/** The archive handing a file over, as `scenario_game_mission_file` does. */
+const archived = (text: string) => ({
+  base64: Buffer.from(text).toString("base64"),
+});
 
 describe("scenarioRoute", () => {
   it("lets a game that vendors a new enough runtime play the scenario itself", () => {
@@ -237,6 +261,7 @@ describe("launchScenario", () => {
     readMissionMock.mockReset();
     gameRuntimeMock.mockReset();
     gameMissionFileMock.mockReset();
+    writeGameMissionMock.mockReset();
     evalMissionMock.mockReset();
     launch.mockReset();
     rescan.mockReset();
@@ -244,8 +269,9 @@ describe("launchScenario", () => {
     gameRuntimeMock.mockResolvedValue({
       installed: { version: 1, schemaVersion: 1, conditions: [], actions: [] },
     });
-    gameMissionFileMock.mockResolvedValue({
-      base64: Buffer.from(SHIPPED_LUA).toString("base64"),
+    gameMissionFileMock.mockResolvedValue(archived(SHIPPED_LUA));
+    writeGameMissionMock.mockResolvedValue({
+      dir: "/games/sf.sdd/missions/first-contact",
     });
     evalMissionMock.mockResolvedValue({ mission: { schemaVersion: 1 } });
     runtimeStatusMock.mockResolvedValue({
@@ -480,6 +506,96 @@ describe("launchScenario", () => {
     expect(result.ok && result.config.modOptions?.[MISSION_MODOPTION]).toBe(
       "s1",
     );
+  });
+
+  /**
+   * Issue #2160. A game ships both the compiled mission and the document it was
+   * built from, and the two can fall out of step. What happens next is decided
+   * by whether coilbox can write into the game at all.
+   */
+  describe("when a game's mission has drifted from its document", () => {
+    /** The scenario every drift test compiles, and its compiled mission. */
+    const document = build();
+    const compiled = compileScenario(document);
+
+    function play(games: GameItem[], origin: GameOrigin, reader = "author") {
+      return launchScenario({
+        scenario: document,
+        reader: reader as "author" | "player",
+        dataDir: "/data",
+        games,
+        optionSchema: [],
+        mapOptionSchema: [],
+        rescan,
+        launch,
+        origin,
+      });
+    }
+
+    it("writes nothing when what the game ships still matches its document", async () => {
+      gameMissionFileMock.mockResolvedValue(archived(compiled));
+
+      const result = await play([LOOSE], SHIPPED_LOOSE);
+
+      expect(writeGameMissionMock).not.toHaveBeenCalled();
+      expect(evalMissionMock).toHaveBeenCalledWith({ source: compiled });
+      expect(result.ok).toBe(true);
+      expect(result.ok && result.warnings).toEqual([]);
+    });
+
+    it("recompiles a drifted loose game's mission and plays that one", async () => {
+      const result = await play([LOOSE], SHIPPED_LOOSE);
+
+      expect(writeGameMissionMock).toHaveBeenCalledWith({
+        root: "/games/sf.sdd",
+        folder: "first-contact",
+        document: JSON.stringify(document),
+        mission: compiled,
+      });
+      // Read back off disk, so what validated is the file that was just
+      // written rather than the stale bytes the archive handed over.
+      expect(readMissionMock).toHaveBeenCalledWith({
+        root: "/games/sf.sdd",
+        path: "missions/first-contact/mission.lua",
+      });
+      expect(evalMissionMock).not.toHaveBeenCalled();
+      expect(result.ok && result.route).toBe("adopted");
+      expect(result.ok && result.mission).toBe(
+        "missions/first-contact/mission.lua",
+      );
+      expect(result.ok && result.warnings).toEqual([]);
+    });
+
+    it("refuses a loose game whose mission could not be rewritten", async () => {
+      writeGameMissionMock.mockRejectedValue(
+        new Error("read-only file system"),
+      );
+
+      const result = await play([LOOSE], SHIPPED_LOOSE);
+
+      expect(launch).not.toHaveBeenCalled();
+      expect(!result.ok && result.message).toContain("read-only file system");
+    });
+
+    it("plays a drifted packaged game's shipped mission and warns the author", async () => {
+      const result = await play([PACKAGED_AT], SHIPPED);
+
+      expect(writeGameMissionMock).not.toHaveBeenCalled();
+      // The shipped bytes are what validated, and what played.
+      expect(evalMissionMock).toHaveBeenCalledWith({ source: SHIPPED_LUA });
+      expect(result.ok).toBe(true);
+      expect(launch).toHaveBeenCalled();
+      expect(result.ok && result.warnings.map((i) => i.message)).toEqual([
+        missionDriftedFromDocument("author", "Splinter Faction test"),
+      ]);
+    });
+
+    it("tells a player nothing about a drift they cannot act on", async () => {
+      const result = await play([PACKAGED_AT], SHIPPED, "player");
+
+      expect(result.ok).toBe(true);
+      expect(result.ok && result.warnings).toEqual([]);
+    });
   });
 
   it("refuses to launch a mission that did not validate", async () => {

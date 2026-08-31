@@ -13,9 +13,11 @@
  * runtime gets it in its own `missions/` folder and is launched as itself. One
  * that has not is played through the generated test mutator, which brings
  * coilbox's runtime and depends on the game for everything else. A game that
- * ships the mission in its own archive is launched as itself with nothing
- * written at all, which is the one route a packaged `.sd7`/`.sdz` can take,
- * since it cannot be written into. See {@link scenarioRoute}.
+ * ships the mission in its own archive is launched as itself and normally has
+ * nothing written into it, which is the one route a packaged `.sd7`/`.sdz` can
+ * take, since it cannot be written into. The exception is a loose game whose
+ * shipped mission no longer matches the document beside it, which is recompiled
+ * in place before it plays. See {@link scenarioRoute} and `drift.ts`.
  *
  * Either way the mission is compiled, written and read back before the engine is
  * started, and a scenario that does not validate is not launched. The engine's
@@ -31,9 +33,11 @@ import {
   scenarioGameMissionFile,
   scenarioGameRuntime,
   scenarioRuntimeStatus,
+  scenarioWriteGameMission,
   scenarioWriteMission,
 } from "./bindings";
 import { compileScenario, missionPath } from "./compile";
+import { missionDrifted } from "./drift";
 import type { Scenario } from "./model";
 import { writeTestMutator } from "./mutator";
 import type { GameOrigin } from "./storage";
@@ -50,6 +54,7 @@ import {
   coilboxTooOld,
   gameNotInstalled,
   gameOwnMissionRoute,
+  missionDriftedFromDocument,
   missionProblems,
   olderRuntimeRoute,
   packagedGameRoute,
@@ -330,15 +335,28 @@ async function missionFileText(
 }
 
 /**
- * Read a mission the game ships and validate it, without writing anything.
+ * Read a mission the game ships and validate it.
  *
  * The adopted route's other half. A game carrying its own mission is already
- * holding what the engine will load, so the only thing left to do is the read
+ * holding what the engine will load, so the usual thing left to do is the read
  * back every launch does: nothing reaches the engine unvalidated, whoever
  * compiled it.
+ *
+ * The exception is drift. A game ships the document beside the compiled mission,
+ * and the two can fall out of step, so `scenario` here is the document the game
+ * carries (`gameScenarios` lists a mission only when it has one). What happens
+ * then is decided by whether coilbox can write into the game:
+ *
+ * - a loose `.sdd` is corrected. The document is the source, so it is recompiled
+ *   and written back, and that file is what validates and what plays.
+ * - a packaged `.sd7`/`.sdz` cannot be written into, so the mission it ships is
+ *   the one that plays, and the mismatch comes back as a warning. An author is
+ *   told. A player is not, because they can do nothing about it.
  */
 async function readFromGame(
   origin: GameOrigin,
+  scenario: Scenario,
+  reader: ScenarioReader,
   map?: MapExtent,
   units?: { name: string }[],
 ): Promise<{ mission: string; issues: MissionIssue[] }> {
@@ -350,9 +368,49 @@ async function readFromGame(
     const message = err instanceof Error ? err.message : String(err);
     return { mission: path, issues: [{ path, message }] };
   }
+
+  if (!missionDrifted(scenario, source)) {
+    return {
+      mission: path,
+      issues: await validateCompiledMissionText(source, map, units),
+    };
+  }
+
+  if (origin.loose) {
+    // The document goes back with the mission because the write command takes
+    // the pair, which also settles any difference between the bytes on disk and
+    // the document as coilbox reads it.
+    try {
+      await scenarioWriteGameMission({
+        root: origin.archivePath,
+        folder: origin.folder,
+        document: JSON.stringify(scenario),
+        mission: compileScenario(scenario),
+      });
+    } catch (err) {
+      // Nothing was corrected, so playing on would play the stale mission the
+      // author has already moved past. Refuse and say why.
+      const message = err instanceof Error ? err.message : String(err);
+      return { mission: path, issues: [{ path, message }] };
+    }
+    return {
+      mission: path,
+      issues: await validateCompiledMission(
+        origin.archivePath,
+        origin.folder,
+        map,
+        units,
+      ),
+    };
+  }
+
+  const issues = await validateCompiledMissionText(source, map, units);
+  const drifted = missionDriftedFromDocument(reader, origin.gameName);
   return {
     mission: path,
-    issues: await validateCompiledMissionText(source, map, units),
+    issues: drifted
+      ? [...issues, { path, message: drifted, severity: "warning" as const }]
+      : issues,
   };
 }
 
@@ -438,7 +496,7 @@ export async function launchScenario(
   if (shipped) {
     dir = shipped.archivePath;
     folder = shipped.folder;
-    written = await readFromGame(shipped, map, units);
+    written = await readFromGame(shipped, scenario, reader, map, units);
   } else if (adopted) {
     dir = adopted;
     written = await writeIntoGame(adopted, scenario, map, units);
