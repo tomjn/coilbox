@@ -19,6 +19,44 @@ pub struct User {
     pub user_id: String,
     pub agent: String,
     pub status: ClientStatus,
+    /// What the server says about how good they are, empty where it says
+    /// nothing. See [`Rating`].
+    pub rating: Rating,
+}
+
+/// A player's skill, in whatever categories the server that sent it keeps.
+///
+/// Not one number, on purpose (issue #2002). Zero-K keeps a casual rating and a
+/// matchmaking rating at the same time, both live, and a queue picks between
+/// them, so a single field would be showing the wrong one somewhere. A Tachyon
+/// server offers one number with no category on it at all.
+///
+/// Every field is optional and every one is usually `None`: TASServer has no
+/// rating in the protocol, and Teiserver never fills the key Tachyon reserves
+/// for one. A player nobody rated and a player rated zero are different things,
+/// so absent is absent rather than 0.
+///
+/// Whole points, because that is what a lobby shows and what Zero-K sends. A
+/// Tachyon rating arrives as a fraction and is rounded on the way in.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Rating {
+    /// Zero-K's `EffectiveElo`: what an ordinary custom battle counts toward.
+    pub casual: Option<i32>,
+    /// Zero-K's `EffectiveMmElo`: what the matchmaker queues on. A different
+    /// number from [`Rating::casual`] for the same person, often by a lot.
+    pub matchmaking: Option<i32>,
+    /// A rating the server put no category on, which is all Tachyon's `user`
+    /// definition carries.
+    pub overall: Option<i32>,
+}
+
+impl Rating {
+    /// Whether the server said nothing at all about this player's skill, which
+    /// is the normal case on two of the three protocols.
+    pub fn is_empty(&self) -> bool {
+        self.casual.is_none() && self.matchmaking.is_none() && self.overall.is_none()
+    }
 }
 
 /// The kind of a chat message, so the frontend can render it appropriately.

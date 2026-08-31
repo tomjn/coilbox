@@ -3,7 +3,7 @@ import { UserCheck, UserX } from "lucide-react";
 import type { ReactNode } from "react";
 import type { User } from "../bindings";
 import { NoteButton } from "../NoteButton";
-import { CountryFlag, RankBadge } from "../UserBadges";
+import { CountryFlag, RankBadge, RatingBadge } from "../UserBadges";
 import { PRESENCE_META, type Presence } from "./presence";
 
 /**
@@ -84,6 +84,7 @@ export function MemberList({
                 {u.name}
               </span>
               <RankBadge rank={u.status.rank} />
+              <RatingBadge rating={u.rating} />
               {meta && (
                 <span
                   className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground"

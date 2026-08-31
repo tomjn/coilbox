@@ -36,12 +36,31 @@ export interface BattleStatus {
   side: number;
 }
 
+/**
+ * What a server says about a player's skill, in whatever categories it keeps
+ * (issue #2002). Mirrors the Rust `Rating`.
+ *
+ * Every field is usually null. TASServer has no rating in the protocol at all,
+ * and Teiserver never fills the key Tachyon reserves for one, so Zero-K is the
+ * only connection where any of this arrives. Null is "nobody rated them", which
+ * is a different thing from a rating of zero.
+ */
+export interface Rating {
+  /** Zero-K's `EffectiveElo`: what an ordinary custom battle counts toward. */
+  casual: number | null;
+  /** Zero-K's `EffectiveMmElo`: what the matchmaker queues on. */
+  matchmaking: number | null;
+  /** A rating the server put no category on, which is all Tachyon carries. */
+  overall: number | null;
+}
+
 export interface User {
   name: string;
   country: string;
   userId: string;
   agent: string;
   status: ClientStatus;
+  rating: Rating;
 }
 
 export type ChatKind =
