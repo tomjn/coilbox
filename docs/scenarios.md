@@ -6,7 +6,7 @@ The **Scenario Builder** is an advanced-mode tool: turn on Advanced mode in Sett
 
 Two things to know before you spend an evening on this:
 
-- **The game has to have adopted coilbox's mission runtime**, or the scenario is played through a generated test game instead. That plays, and it is how you develop a mission, but the game's own end conditions and opening phases still run over the top of it, so it is not how you ship a finished mission. See [Which game can play it](#which-game-can-play-it) and [What a player needs to play your scenario](#what-a-player-needs-to-play-your-scenario).
+- **The game has to have adopted coilbox's mission runtime**, or the scenario will be played through a generated test game instead. See [Which game can play it](#which-game-can-play-it) and [What a player needs to play your scenario](#what-a-player-needs-to-play-your-scenario).
 - **Scenarios are single player.** Nothing stops you giving a scenario several human participants, but nothing has been built or tested for it, and two of the actions ignore teams entirely ([issue #827](https://github.com/tomjn/coilbox/issues/827)).
 
 ## Scenario, mission, campaign
