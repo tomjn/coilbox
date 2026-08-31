@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import type { GameItem } from "../content/bindings";
 import { useUnitsyncScan } from "../content/config";
 import { usePreferredTarget } from "../play/config";
 import { gameScenarios } from "./gameScenarios";
@@ -12,20 +11,19 @@ import { type LoadedScenario, listScenarios } from "./storage";
  * module-cache-plus-listeners shape the campaign list uses, so a save or delete
  * in the editor updates every mounted consumer, including the list behind it.
  *
- * Holds all three sources merged: stored (local and bundled) plus whatever a
- * game's own archive shipped, newest edit first.
+ * Split into two halves read on their own terms, rather than one fetch that
+ * waits on both: `storedCache` is coilbox's own documents, which depend on
+ * nothing else and are read once per session. `gamesCache` is what a game's
+ * own archive ships, which depends on the installed games list and is only
+ * re-read when that list actually changes. Folding both into a single fetch
+ * would mean re-reading storage every time the games list resolves or a mount
+ * outlives the render the games list first showed up on, which is wasted work
+ * on a path nothing asked to be more expensive.
  */
+let storedCache: LoadedScenario[] | null = null;
+let gamesCache: LoadedScenario[] = [];
 let cache: LoadedScenario[] | null = null;
 const listeners = new Set<(scenarios: LoadedScenario[]) => void>();
-
-/**
- * The `scan?.games` reference `cache` was last built from, so a mount whose
- * content scan resolves after the initial (gameless) fetch already landed
- * knows to fetch again rather than serve a cache with no game missions in it
- * forever. `undefined` matches the case nothing has resolved yet, the same as
- * `scan?.games` itself before the scan completes.
- */
-let cacheGamesSource: readonly GameItem[] | undefined;
 
 /** Newest edit first: `listScenarios`'s own order, reapplied once a game's
  * missions are folded in. */
@@ -33,6 +31,14 @@ function byRecency(loaded: LoadedScenario[]): LoadedScenario[] {
   return [...loaded].sort((a, b) =>
     b.scenario.updatedAt.localeCompare(a.scenario.updatedAt),
   );
+}
+
+/** Recompute the published cache from the two halves and notify every
+ * mounted consumer. */
+function publish(): LoadedScenario[] {
+  cache = byRecency([...(storedCache ?? []), ...gamesCache]);
+  for (const listener of listeners) listener(cache);
+  return cache;
 }
 
 /**
@@ -44,12 +50,8 @@ function byRecency(loaded: LoadedScenario[]): LoadedScenario[] {
  * than dropped from the list until the next full reload.
  */
 export async function refreshScenarios(): Promise<LoadedScenario[]> {
-  const loaded = await listScenarios();
-  const fromGames = (cache ?? []).filter((l) => l.source === "game");
-  const merged = byRecency([...loaded, ...fromGames]);
-  cache = merged;
-  for (const listener of listeners) listener(merged);
-  return merged;
+  storedCache = await listScenarios();
+  return publish();
 }
 
 /**
@@ -59,7 +61,7 @@ export async function refreshScenarios(): Promise<LoadedScenario[]> {
  */
 export function useScenarios() {
   const [scenarios, setScenarios] = useState<LoadedScenario[]>(cache ?? []);
-  const [loading, setLoading] = useState(cache === null);
+  const [loading, setLoading] = useState(storedCache === null);
   const [error, setError] = useState<string | null>(null);
   // A game's own missions need the installed games list. The content scan
   // already resolves and caches that (the sidebar and the Scenarios page both
@@ -75,32 +77,23 @@ export function useScenarios() {
     };
   }, []);
 
+  // The stored documents: read once per session, independent of the games
+  // list, so a mount never re-reads storage just because the scan answered
+  // (or because a later mount's own scan hook starts out unresolved again).
   useEffect(() => {
-    // The content scan resolves after its own round of async work, often
-    // later than the first pass of this effect. Reusing the cache is only
-    // safe once it was built from this same games list, otherwise a game's
-    // missions would never make it in past the instant-from-cache path below.
-    if (cache && cacheGamesSource === scan?.games) {
-      setScenarios(cache);
+    if (storedCache) {
+      setScenarios(publish());
       setLoading(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
-    Promise.all([listScenarios(), gameScenarios(scan?.games ?? [])])
-      .then(([stored, fromGames]) => {
-        const loaded = byRecency([...stored, ...fromGames]);
-        // Gated on `cancelled` rather than written unconditionally: the games
-        // list arrives after its own async resolution, so this effect can
-        // rerun with a fuller `scan.games` before an earlier run (fetched
-        // with none yet known) has finished. Writing the stale result here
-        // would clobber the newer one that already landed.
-        if (!cancelled) {
-          cache = loaded;
-          cacheGamesSource = scan?.games;
-          setScenarios(loaded);
-          setError(null);
-        }
+    listScenarios()
+      .then((loaded) => {
+        if (cancelled) return;
+        storedCache = loaded;
+        setScenarios(publish());
+        setError(null);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -111,7 +104,30 @@ export function useScenarios() {
     return () => {
       cancelled = true;
     };
-  }, [scan?.games]);
+  }, []);
+
+  // A game's missions, read separately because they depend on the content
+  // scan rather than on coilbox's own storage. Nothing is read here until the
+  // scan actually answers: `scan` is `undefined` while it is still resolving,
+  // and reading with an empty list this early would publish a mission-less
+  // version of what a later-resolving mount already had cached, only to
+  // correct itself a render later.
+  useEffect(() => {
+    if (!scan) return;
+    let cancelled = false;
+    gameScenarios(scan.games)
+      .then((loaded) => {
+        if (cancelled) return;
+        gamesCache = loaded;
+        setScenarios(publish());
+      })
+      .catch((e) => {
+        console.warn("could not read a game's own missions", e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scan]);
 
   const refresh = useCallback(async () => {
     setError(null);
