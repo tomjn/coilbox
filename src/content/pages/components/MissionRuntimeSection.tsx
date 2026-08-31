@@ -67,7 +67,7 @@ function summary(
   switch (state) {
     case "unavailable":
       return installed
-        ? `This game vendors runtime version ${installed.version}. This build of coilbox has no runtime of its own to measure it against.`
+        ? `This game bundles runtime version ${installed.version}. This build of coilbox has no runtime of its own to measure it against.`
         : "This build of coilbox has no mission runtime to install.";
     case "missing":
       return "Coilbox found no runtime marker in this game, so it cannot play scenarios yet. Installing writes coilbox's luarules, luaui and missions folders into the game folder.";
@@ -76,9 +76,9 @@ function summary(
       // the path it used to spell out (issue #915).
       return `This game has a runtime marker, but it would not load: ${installedError}. Until that is fixed the engine will not read it either, so coilbox cannot tell what this runtime supports. Repairing overwrites it with the version ${available?.version} coilbox ships.`;
     case "newer":
-      return `This game vendors runtime version ${installed?.version}, newer than the version ${available?.version} coilbox ships. Installing would take it backwards.`;
+      return `This game bundles runtime version ${installed?.version}, newer than the version ${available?.version} coilbox ships. Installing would take it backwards.`;
     default:
-      return `This game vendors runtime version ${installed?.version}. Coilbox ships version ${available?.version}.`;
+      return `This game bundles runtime version ${installed?.version}. Coilbox ships version ${available?.version}.`;
   }
 }
 
@@ -519,7 +519,7 @@ function PackagedOffer({
  * supports, so a player knows before building a scenario which triggers this
  * game can actually run.
  *
- * Only a loose `.sdd` can be installed into: adoption means the game vendors
+ * Only a loose `.sdd` can be installed into. Adoption means the game bundles
  * `luarules/`, `luaui/` and `missions/`, which coilbox cannot write into a
  * packaged `.sd7`/`.sdz`. A packaged game gets {@link PackagedOffer} instead.
  *
