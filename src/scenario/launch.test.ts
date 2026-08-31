@@ -4,6 +4,9 @@ const runtimeStatusMock = vi.fn();
 const writeMissionMock = vi.fn();
 const testMutatorMock = vi.fn();
 const readMissionMock = vi.fn();
+const gameRuntimeMock = vi.fn();
+const gameMissionFileMock = vi.fn();
+const evalMissionMock = vi.fn();
 
 // launch.ts reaches the plugin through bindings.ts, whose plugin-sdk import
 // Vitest's node resolver cannot load from the published dist. Stubbed the way
@@ -13,6 +16,9 @@ vi.mock("./bindings", () => ({
   scenarioWriteMission: (...args: unknown[]) => writeMissionMock(...args),
   scenarioTestMutator: (...args: unknown[]) => testMutatorMock(...args),
   scenarioReadMission: (...args: unknown[]) => readMissionMock(...args),
+  scenarioGameRuntime: (...args: unknown[]) => gameRuntimeMock(...args),
+  scenarioGameMissionFile: (...args: unknown[]) => gameMissionFileMock(...args),
+  scenarioEvalMission: (...args: unknown[]) => evalMissionMock(...args),
 }));
 
 import type { GameItem } from "../content/bindings";
@@ -26,6 +32,7 @@ import {
   scenarioRoute,
 } from "./launch";
 import { parseScenario, type Scenario } from "./model";
+import type { GameOrigin } from "./storage";
 
 const you: Participant = {
   id: "you",
@@ -68,7 +75,20 @@ function game(name: string, archive: string, path?: string): GameItem {
 
 const LOOSE = game("Splinter Faction test", "sf.sdd", "/games/sf.sdd");
 const PACKAGED = game("Splinter Faction test", "sf.sdz");
+/** The same packaged game, at the path a real content scan reports for it. */
+const PACKAGED_AT = game("Splinter Faction test", "sf.sdz", "/games/sf.sdz");
 const MUTATOR = game("Coilbox mission test test", MUTATOR_FOLDER, "/m");
+
+/** A mission the packaged game ships in its own archive (issue #2160). */
+const SHIPPED: GameOrigin = {
+  gameName: "Splinter Faction test",
+  archivePath: "/games/sf.sdz",
+  folder: "first-contact",
+  loose: false,
+};
+
+/** What that mission's `mission.lua` holds, as the archive hands it over. */
+const SHIPPED_LUA = "return { schemaVersion = 1 }";
 
 describe("scenarioRoute", () => {
   it("lets a game that vendors a new enough runtime play the scenario itself", () => {
@@ -131,6 +151,66 @@ describe("scenarioRoute", () => {
     expect(choice.route).toBe("mutator");
     expect(choice.reason).toContain("needs version 3");
   });
+
+  /**
+   * Issue #2160. The `.sdd` test is really "can coilbox write the mission?",
+   * and a game that ships the mission itself is never asked to be written into.
+   */
+  it("lets a packaged game play a mission it ships itself", () => {
+    const choice = scenarioRoute({
+      game: PACKAGED,
+      installed: 3,
+      required: 3,
+      reader: "author",
+      missionInGame: true,
+    });
+
+    expect(choice.route).toBe("adopted");
+    expect(choice.reason).toContain("ships this mission");
+  });
+
+  it("still sends a packaged game to the mutator when the mission is not in it", () => {
+    const choice = scenarioRoute({
+      game: PACKAGED,
+      installed: 3,
+      required: 3,
+      reader: "author",
+      missionInGame: false,
+    });
+
+    expect(choice.route).toBe("mutator");
+    expect(choice.reason).toContain("packaged archive");
+  });
+
+  it("sends a packaged game to the mutator when its runtime is too old", () => {
+    const choice = scenarioRoute({
+      game: PACKAGED,
+      installed: 1,
+      required: 3,
+      reader: "author",
+      missionInGame: true,
+    });
+
+    expect(choice.route).toBe("mutator");
+    expect(choice.reason).toContain("needs version 3");
+  });
+
+  /**
+   * The runtime question is asked before the write question, so a packaged game
+   * with no runtime hears the one thing a maintainer can act on: adopt it.
+   */
+  it("tells a packaged game with no runtime to adopt one, not that it is packaged", () => {
+    const choice = scenarioRoute({
+      game: PACKAGED,
+      installed: null,
+      required: 1,
+      reader: "author",
+      missionInGame: false,
+    });
+
+    expect(choice.route).toBe("mutator");
+    expect(choice.reason).toContain("has not adopted");
+  });
 });
 
 describe("launchScenario", () => {
@@ -155,9 +235,19 @@ describe("launchScenario", () => {
     writeMissionMock.mockReset();
     testMutatorMock.mockReset();
     readMissionMock.mockReset();
+    gameRuntimeMock.mockReset();
+    gameMissionFileMock.mockReset();
+    evalMissionMock.mockReset();
     launch.mockReset();
     rescan.mockReset();
 
+    gameRuntimeMock.mockResolvedValue({
+      installed: { version: 1, schemaVersion: 1, conditions: [], actions: [] },
+    });
+    gameMissionFileMock.mockResolvedValue({
+      base64: Buffer.from(SHIPPED_LUA).toString("base64"),
+    });
+    evalMissionMock.mockResolvedValue({ mission: { schemaVersion: 1 } });
     runtimeStatusMock.mockResolvedValue({
       installed: { version: 1, schemaVersion: 1, conditions: [], actions: [] },
       available: { version: 1, schemaVersion: 1, conditions: [], actions: [] },
@@ -282,6 +372,113 @@ describe("launchScenario", () => {
     expect(result.ok && result.route).toBe("mutator");
     expect(result.ok && result.config.gameType).toBe(
       "Coilbox mission test test",
+    );
+  });
+
+  /**
+   * Issue #2160. The game brought the mission with it, so there is nothing to
+   * write and nowhere to write it. The archive is read and the game plays as
+   * itself, under the folder name its own archive uses.
+   */
+  it("plays a packaged game's own mission out of its archive, writing nothing", async () => {
+    const result = await launchScenario({
+      scenario: build(),
+      reader: "author",
+      dataDir: "/data",
+      games: [PACKAGED_AT],
+      optionSchema: [],
+      mapOptionSchema: [],
+      rescan,
+      launch,
+      origin: SHIPPED,
+    });
+
+    expect(writeMissionMock).not.toHaveBeenCalled();
+    expect(testMutatorMock).not.toHaveBeenCalled();
+    expect(rescan).not.toHaveBeenCalled();
+    expect(gameMissionFileMock).toHaveBeenCalledWith({
+      root: "/games/sf.sdz",
+      folder: "first-contact",
+      file: "mission.lua",
+    });
+    expect(evalMissionMock).toHaveBeenCalledWith({ source: SHIPPED_LUA });
+    expect(result.ok && result.route).toBe("adopted");
+    expect(result.ok && result.config.gameType).toBe("Splinter Faction test");
+    expect(result.ok && result.mission).toBe(
+      "missions/first-contact/mission.lua",
+    );
+  });
+
+  it("arms the runtime with the game's own folder, not the document id", async () => {
+    const result = await launchScenario({
+      scenario: build(),
+      reader: "author",
+      dataDir: "/data",
+      games: [PACKAGED_AT],
+      optionSchema: [],
+      mapOptionSchema: [],
+      rescan,
+      launch,
+      origin: SHIPPED,
+    });
+
+    expect(result.ok && result.config.modOptions).toEqual({
+      deathmode: "com",
+      [MISSION_MODOPTION]: "first-contact",
+    });
+  });
+
+  it("refuses a shipped mission that did not validate", async () => {
+    evalMissionMock.mockResolvedValue({
+      mission: {
+        schemaVersion: 1,
+        teams: { you: { team: 0 } },
+        actors: [{ id: "boss", unitDef: "armcom", team: "nobody" }],
+      },
+    });
+
+    const result = await launchScenario({
+      scenario: build(),
+      reader: "author",
+      dataDir: "/data",
+      games: [PACKAGED_AT],
+      optionSchema: [],
+      mapOptionSchema: [],
+      rescan,
+      launch,
+      origin: SHIPPED,
+    });
+
+    expect(launch).not.toHaveBeenCalled();
+    expect(!result.ok && result.message).toContain('no team called "nobody"');
+  });
+
+  /**
+   * A game can ship a mission without shipping a runtime new enough to play it.
+   * That takes the mutator route, and the mission travels as the bytes the
+   * archive holds rather than being recompiled from the document.
+   */
+  it("carries a game's own mission into the mutator when the game has no runtime", async () => {
+    gameRuntimeMock.mockRejectedValue(new Error("no missions/runtime.lua"));
+
+    const result = await launchScenario({
+      scenario: build(),
+      reader: "author",
+      dataDir: "/data",
+      games: [PACKAGED_AT],
+      optionSchema: [],
+      mapOptionSchema: [],
+      rescan,
+      launch,
+      origin: SHIPPED,
+    });
+
+    expect(testMutatorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ mission: SHIPPED_LUA }),
+    );
+    expect(result.ok && result.route).toBe("mutator");
+    expect(result.ok && result.config.modOptions?.[MISSION_MODOPTION]).toBe(
+      "s1",
     );
   });
 
