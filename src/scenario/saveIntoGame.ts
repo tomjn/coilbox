@@ -55,6 +55,11 @@ export async function saveMissionIntoGame(
     folder: origin.folder,
     document: JSON.stringify(stamped),
     mission: compileScenario(stamped),
+    // A clip the author adds while editing in place is imported into coilbox's
+    // store, and the compiled mission names it as a bare filename resolved
+    // beside itself. Without this the game would ship a mission naming a
+    // portrait it does not hold.
+    scenarioId: stamped.id,
   });
   // The games half of the list is read from the installed games list, not after
   // a save, so an edit that changed the name would otherwise show the archive's

@@ -98,6 +98,10 @@ describe("saving a mission that lives in a loose game", () => {
       folder: "silence-the-jericho",
       document: JSON.stringify(saved),
       mission: compileScenario(saved),
+      // Names the scenario, so a clip added while editing in place travels
+      // into the game rather than the game shipping a mission that points at
+      // a portrait it does not hold.
+      scenarioId: "s1",
     });
   });
 
