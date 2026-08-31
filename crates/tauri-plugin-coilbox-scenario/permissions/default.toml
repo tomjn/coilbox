@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the scenario plugin's storage, dialogue-media, file export and import, compiled-mission read-back, write, list and remove, mission-runtime install and test-mutator commands."
+description = "Allows the scenario plugin's storage, dialogue-media, file export and import, compiled-mission read-back, write, list and remove, mission-runtime install and test-mutator, and game-archive mission and runtime commands."
 permissions = [
   "allow-scenario-list",
   "allow-scenario-save",
@@ -14,6 +14,7 @@ permissions = [
   "allow-scenario-export",
   "allow-scenario-import",
   "allow-scenario-read-mission",
+  "allow-scenario-eval-mission",
   "allow-scenario-runtime-install",
   "allow-scenario-runtime-consolidate",
   "allow-scenario-runtime-status",
@@ -21,4 +22,8 @@ permissions = [
   "allow-scenario-delete-mission",
   "allow-scenario-test-mutator",
   "allow-scenario-write-mission",
+  "allow-scenario-write-game-mission",
+  "allow-scenario-game-missions",
+  "allow-scenario-game-mission-file",
+  "allow-scenario-game-runtime",
 ]

@@ -25,10 +25,43 @@ import {
  * documents, never with JSON text or file names.
  */
 
-/** A parsed scenario plus where it came from. Bundled ones are read-only. */
+/**
+ * Where a scenario came from when it is one of a game's own missions, rather
+ * than something coilbox stored or a distribution bundled. `archivePath` and
+ * `folder` are what a later read reaches back into the archive with, the way
+ * `gameScenarios` (`src/scenario/gameScenarios.ts`) built the entry in the
+ * first place.
+ */
+export interface GameOrigin {
+  gameName: string;
+  archivePath: string;
+  folder: string;
+  /** True for a loose `.sdd` game folder, false for a packaged `.sd7`/`.sdz`. */
+  loose: boolean;
+}
+
+/**
+ * A parsed scenario plus where it came from. Bundled and game ones are
+ * read-only. `origin` is only present for a `"game"` scenario, since that is
+ * the only source with an archive to reach back into.
+ */
 export interface LoadedScenario {
   scenario: Scenario;
-  source: "local" | "bundled";
+  source: "local" | "bundled" | "game";
+  origin?: GameOrigin;
+}
+
+/**
+ * Whether the editor may write this scenario back where it came from.
+ *
+ * One rule in one place, because three pages ask it. A `.sdd` is a development
+ * format, so a mission inside one is edited in place. A packaged archive cannot
+ * be written into at all, and a bundled scenario belongs to the distribution.
+ */
+export function isEditable(loaded: LoadedScenario): boolean {
+  if (loaded.source === "local") return true;
+  if (loaded.source === "game") return loaded.origin?.loose === true;
+  return false;
 }
 
 /**

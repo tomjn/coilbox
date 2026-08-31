@@ -36,8 +36,12 @@ describe("mutatorOffer", () => {
 
     expect(reason).toBe(
       scenarioRoute({
+        // The runtime the offer itself is about, so this asks the question the
+        // offer asks: a packaged game that has adopted the runtime and still
+        // cannot be written into. A null here would ask whether it has adopted
+        // one at all, which is a different sentence.
         game: PACKAGED,
-        installed: null,
+        installed: 2,
         required: 1,
         reader: "author",
       }).reason,

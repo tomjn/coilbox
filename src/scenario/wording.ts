@@ -96,6 +96,33 @@ export function adoptedGameRoute(
 }
 
 /**
+ * A game playing a mission out of its own archive, which needs no write from
+ * coilbox at all.
+ */
+export function gameOwnMissionRoute(
+  reader: ScenarioReader,
+  gameName: string,
+): string {
+  return reader === "player"
+    ? `This mission comes with ${gameName}, which plays it itself.`
+    : `${gameName} ships this mission in its own archive, so it plays it itself and coilbox writes nothing.`;
+}
+
+/**
+ * A packaged game whose shipped mission no longer matches the document beside
+ * it. Only an author hears this, because a player cannot rebuild somebody
+ * else's game.
+ */
+export function missionDriftedFromDocument(
+  reader: ScenarioReader,
+  gameName: string,
+): string {
+  return reader === "player"
+    ? ""
+    : `The mission ${gameName} ships does not match the document beside it. The shipped mission is what played.`;
+}
+
+/**
  * A scenario written against a runtime newer than this build of coilbox ships.
  * Both readers do the same thing about it, and neither can do it from here, so
  * only the framing changes.

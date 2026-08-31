@@ -11,10 +11,13 @@
  *
  * Where the mission is written depends on the game. One that has vendored the
  * runtime gets it in its own `missions/` folder and is launched as itself. One
- * that has not, including any packaged `.sd7`/`.sdz`, which cannot be written
- * into at all, is played through the generated test mutator. That brings
- * coilbox's runtime and depends on the game for everything else. See
- * {@link scenarioRoute}.
+ * that has not is played through the generated test mutator, which brings
+ * coilbox's runtime and depends on the game for everything else. A game that
+ * ships the mission in its own archive is launched as itself and normally has
+ * nothing written into it, which is the one route a packaged `.sd7`/`.sdz` can
+ * take, since it cannot be written into. The exception is a loose game whose
+ * shipped mission no longer matches the document beside it, which is recompiled
+ * in place before it plays. See {@link scenarioRoute} and `drift.ts`.
  *
  * Either way the mission is compiled, written and read back before the engine is
  * started, and a scenario that does not validate is not launched. The engine's
@@ -26,21 +29,34 @@ import { isSdd } from "../content/format";
 import { isMutatorArchive } from "../lib/generatedGames";
 import type { BattleConfig } from "../play/bindings";
 import { applyRestrictions, toBattleConfig } from "../play/participants";
-import { scenarioRuntimeStatus, scenarioWriteMission } from "./bindings";
+import {
+  scenarioGameMissionFile,
+  scenarioGameRuntime,
+  scenarioMediaWrite,
+  scenarioRuntimeStatus,
+  scenarioWriteGameMission,
+  scenarioWriteMission,
+} from "./bindings";
 import { compileScenario, missionPath } from "./compile";
+import { missionDrifted } from "./drift";
 import type { Scenario } from "./model";
 import { writeTestMutator } from "./mutator";
+import type { GameOrigin } from "./storage";
+import { scenarioMediaFiles } from "./transfer";
 import {
   describeIssue,
   isBlocking,
   type MapExtent,
   type MissionIssue,
   validateCompiledMission,
+  validateCompiledMissionText,
 } from "./validate";
 import {
   adoptedGameRoute,
   coilboxTooOld,
   gameNotInstalled,
+  gameOwnMissionRoute,
+  missionDriftedFromDocument,
   missionProblems,
   olderRuntimeRoute,
   packagedGameRoute,
@@ -50,8 +66,9 @@ import {
 } from "./wording";
 
 /**
- * The modoption that turns a game into a mission. Its value is the scenario id,
- * which is the folder the runtime includes the compiled mission from.
+ * The modoption that turns a game into a mission. Its value is the folder the
+ * runtime includes the compiled mission from: the scenario id for a mission
+ * coilbox wrote, and the game's own folder name for one the game ships.
  */
 export const MISSION_MODOPTION = "coilbox_mission";
 
@@ -78,6 +95,12 @@ export interface RouteChoice {
  * triggers it does not know and play a quietly broken mission, so it is treated
  * the same as a game with no runtime at all.
  *
+ * `missionInGame` is the game already carrying this mission in its own archive,
+ * which is the one case a packaged `.sd7`/`.sdz` can be adopted in: there is
+ * nothing for coilbox to write, so being unwritable does not matter (issue
+ * #2160). It defaults to false, which is a caller saying "coilbox would have to
+ * write this one".
+ *
  * `reader` decides how much of that a sentence says: see `wording.ts`.
  */
 export function scenarioRoute(opts: {
@@ -86,25 +109,37 @@ export function scenarioRoute(opts: {
   /** The lowest runtime version that can play the scenario. */
   required: number;
   reader: ScenarioReader;
+  /** True when the game already ships this mission. See above. */
+  missionInGame?: boolean;
 }): RouteChoice {
-  const { game, installed, required, reader } = opts;
+  const { game, installed, required, reader, missionInGame } = opts;
   const mutator = (reason: string): RouteChoice => ({
     route: "mutator",
     reason,
   });
 
-  if (!isSdd(game.primaryArchive) || !game.primaryArchive.path) {
-    return mutator(packagedGameRoute(reader, game.name));
-  }
+  // The runtime question comes first. A packaged game with no runtime hears
+  // that it has not adopted one rather than that it is packaged: both are true,
+  // and adopting the runtime is the one a maintainer can act on.
   if (installed === null) {
     return mutator(unadoptedGameRoute(reader, game.name));
   }
   if (installed < required) {
     return mutator(olderRuntimeRoute(reader, game.name, installed, required));
   }
+  // The `.sdd` test is "can coilbox write the mission?", which only comes up
+  // when the mission is not in the game already.
+  if (
+    !missionInGame &&
+    (!isSdd(game.primaryArchive) || !game.primaryArchive.path)
+  ) {
+    return mutator(packagedGameRoute(reader, game.name));
+  }
   return {
     route: "adopted",
-    reason: adoptedGameRoute(reader, game.name, installed),
+    reason: missionInGame
+      ? gameOwnMissionRoute(reader, game.name)
+      : adoptedGameRoute(reader, game.name, installed),
   };
 }
 
@@ -225,6 +260,13 @@ export interface ScenarioLaunchInput {
    * treating as a mission with nothing wrong.
    */
   units?: { name: string }[];
+  /**
+   * Where the scenario came from, when it is one of a game's own missions. The
+   * game already holds the compiled mission, so that one is read out of the
+   * archive rather than written into it, and the runtime is armed with the
+   * game's own folder name. Absent for a scenario coilbox stored.
+   */
+  origin?: GameOrigin;
 }
 
 export type ScenarioLaunchResult =
@@ -255,14 +297,171 @@ const refuse = (
   issues: MissionIssue[] = [],
 ): ScenarioLaunchResult => ({ ok: false, message, issues });
 
-/** A game's vendored runtime version, or null when it has none to read. */
-async function installedRuntime(root: string): Promise<number | null> {
+/**
+ * A game's vendored runtime version, or null when it has none to read.
+ *
+ * A loose game is asked through `scenario_runtime_status`, which also reads the
+ * things only a folder has. A packaged `.sd7`/`.sdz` has no folder to root that
+ * read at, so its marker comes out of the archive instead.
+ */
+async function installedRuntime(
+  root: string,
+  loose: boolean,
+): Promise<number | null> {
   try {
+    if (!loose) {
+      const { installed } = await scenarioGameRuntime({ root });
+      return installed.version;
+    }
     const { installed } = await scenarioRuntimeStatus({ root });
     return installed ? installed.version : null;
   } catch {
     return null;
   }
+}
+
+/** One of a game's own mission files as text. */
+async function missionFileText(
+  origin: GameOrigin,
+  file: string,
+): Promise<string> {
+  const { base64 } = await scenarioGameMissionFile({
+    root: origin.archivePath,
+    folder: origin.folder,
+    file,
+  });
+  const binary = atob(base64);
+  return new TextDecoder().decode(
+    Uint8Array.from(binary, (c) => c.charCodeAt(0)),
+  );
+}
+
+/**
+ * Copy a game's own dialogue clips into coilbox's media store, before its
+ * mission is carried into the test mutator.
+ *
+ * The mutator builds a mission folder out of two things: the compiled mission it
+ * is handed, and the clips it copies out of the store under the scenario's id. A
+ * game's mission keeps its clips inside the game's own archive, so that store
+ * holds nothing for it and the mutator would write a mission whose only symptom
+ * is that nobody speaks.
+ *
+ * `ensureBundledScenarioMedia` (`storage.ts`) is the same move for a bundled
+ * scenario, and for the same reason: the store is the one place the write step
+ * reads clips from. Read fresh every launch rather than cached for the session,
+ * because a loose game's clips can change between two launches and a wrong
+ * portrait is worse than a repeated read.
+ *
+ * A clip that will not come out is warned about and skipped. It costs a line its
+ * picture, which is never a reason to refuse the launch.
+ */
+async function carryGameMissionMedia(
+  origin: GameOrigin,
+  scenario: Scenario,
+): Promise<void> {
+  for (const file of scenarioMediaFiles(scenario)) {
+    try {
+      const { base64 } = await scenarioGameMissionFile({
+        root: origin.archivePath,
+        folder: origin.folder,
+        file,
+      });
+      await scenarioMediaWrite({
+        scenarioId: scenario.id,
+        file,
+        // The clip is stored under the name the document already uses, and the
+        // engine picks its loader by that extension, so the content type here
+        // is never read by anything.
+        dataUri: `data:application/octet-stream;base64,${base64}`,
+      });
+    } catch (e) {
+      console.warn(
+        "skipping a game mission's unreadable dialogue clip",
+        file,
+        e,
+      );
+    }
+  }
+}
+
+/**
+ * Read a mission the game ships and validate it.
+ *
+ * The adopted route's other half. A game carrying its own mission is already
+ * holding what the engine will load, so the usual thing left to do is the read
+ * back every launch does: nothing reaches the engine unvalidated, whoever
+ * compiled it.
+ *
+ * The exception is drift. A game ships the document beside the compiled mission,
+ * and the two can fall out of step, so `scenario` here is the document the game
+ * carries (`gameScenarios` lists a mission only when it has one). What happens
+ * then is decided by whether coilbox can write into the game:
+ *
+ * - a loose `.sdd` is corrected. The document is the source, so it is recompiled
+ *   and written back, and that file is what validates and what plays.
+ * - a packaged `.sd7`/`.sdz` cannot be written into, so the mission it ships is
+ *   the one that plays, and the mismatch comes back as a warning. An author is
+ *   told. A player is not, because they can do nothing about it.
+ */
+async function readFromGame(
+  origin: GameOrigin,
+  scenario: Scenario,
+  reader: ScenarioReader,
+  map?: MapExtent,
+  units?: { name: string }[],
+): Promise<{ mission: string; issues: MissionIssue[] }> {
+  const path = missionPath(origin.folder);
+  let source: string;
+  try {
+    source = await missionFileText(origin, "mission.lua");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { mission: path, issues: [{ path, message }] };
+  }
+
+  if (!missionDrifted(scenario, source)) {
+    return {
+      mission: path,
+      issues: await validateCompiledMissionText(source, map, units),
+    };
+  }
+
+  if (origin.loose) {
+    // The document goes back with the mission because the write command takes
+    // the pair, which also settles any difference between the bytes on disk and
+    // the document as coilbox reads it.
+    try {
+      await scenarioWriteGameMission({
+        root: origin.archivePath,
+        folder: origin.folder,
+        document: JSON.stringify(scenario),
+        mission: compileScenario(scenario),
+      });
+    } catch (err) {
+      // Nothing was corrected, so playing on would play the stale mission the
+      // author has already moved past. Refuse and say why.
+      const message = err instanceof Error ? err.message : String(err);
+      return { mission: path, issues: [{ path, message }] };
+    }
+    return {
+      mission: path,
+      issues: await validateCompiledMission(
+        origin.archivePath,
+        origin.folder,
+        map,
+        units,
+      ),
+    };
+  }
+
+  const issues = await validateCompiledMissionText(source, map, units);
+  const drifted = missionDriftedFromDocument(reader, origin.gameName);
+  return {
+    mission: path,
+    issues: drifted
+      ? [...issues, { path, message: drifted, severity: "warning" as const }]
+      : issues,
+  };
 }
 
 /**
@@ -308,6 +507,7 @@ export async function launchScenario(
     disabledUnits,
     map,
     units,
+    origin,
   } = input;
   const wanted = scenario.setup.gameName;
   const game = games.find((g) => g.name === wanted);
@@ -315,28 +515,70 @@ export async function launchScenario(
     return refuse(gameNotInstalled(reader, wanted));
   }
 
+  // The mission is in the game only when the document came out of this very
+  // game. A scenario merely set in it is still coilbox's to write.
+  const inGame = origin?.gameName === game.name ? origin : undefined;
   const root = game.primaryArchive.path;
-  const installed =
-    isSdd(game.primaryArchive) && root ? await installedRuntime(root) : null;
+  const installed = root
+    ? await installedRuntime(root, isSdd(game.primaryArchive))
+    : null;
   const { route, reason } = scenarioRoute({
     game,
     installed,
     required: scenario.runtimeVersion,
     reader,
+    missionInGame: inGame !== undefined,
   });
 
-  // Only the adopted route has a folder to write into, and `scenarioRoute` only
-  // picks it when the game has one.
-  const adopted = route === "adopted" ? root : undefined;
+  // The game already holds this mission, so the adopted route reads it rather
+  // than writing it. This is the one adopted case a packaged archive reaches.
+  const shipped = route === "adopted" ? inGame : undefined;
+  // Everything else on the adopted route is written, and `scenarioRoute` only
+  // picks it for a write when the game has a folder to write into.
+  const adopted = route === "adopted" && !shipped ? root : undefined;
 
   let dir: string;
+  // The folder the runtime is pointed at, which is the game's own name for the
+  // mission when the game brought it, and the document id everywhere else.
+  let folder = scenario.id;
   let written: { mission: string; issues: MissionIssue[] };
 
-  if (adopted) {
+  if (shipped) {
+    dir = shipped.archivePath;
+    folder = shipped.folder;
+    written = await readFromGame(shipped, scenario, reader, map, units);
+  } else if (adopted) {
     dir = adopted;
     written = await writeIntoGame(adopted, scenario, map, units);
   } else {
-    const mutator = await writeTestMutator(dataDir, scenario, map, units);
+    // A game's own mission may have no document to compile from, so on this
+    // route it travels as the bytes the archive holds. A read that fails is a
+    // refusal rather than a quiet fall back to compiling the document, which
+    // would play something the game does not ship.
+    let source: string | undefined;
+    if (inGame) {
+      try {
+        source = await missionFileText(inGame, "mission.lua");
+      } catch (err) {
+        const issues = [
+          {
+            path: missionPath(inGame.folder),
+            message: err instanceof Error ? err.message : String(err),
+          },
+        ];
+        return refuse(missionIssueMessage(reader, issues), issues);
+      }
+      // The clips are in the archive beside that mission, and the mutator only
+      // knows how to copy them out of coilbox's store.
+      await carryGameMissionMedia(inGame, scenario);
+    }
+    const mutator = await writeTestMutator(
+      dataDir,
+      scenario,
+      map,
+      units,
+      source,
+    );
     dir = mutator.dir;
     written = { mission: missionPath(scenario.id), issues: mutator.issues };
     if (mutator.version < scenario.runtimeVersion) {
@@ -359,7 +601,7 @@ export async function launchScenario(
   // writes, so a forced rescan both registers the generated game and tells us
   // the name a start script has to ask for.
   let gameType = game.name;
-  if (!adopted) {
+  if (!adopted && !shipped) {
     const found = (await rescan()).find((g) =>
       isMutatorArchive(g.primaryArchive.name),
     );
@@ -389,7 +631,7 @@ export async function launchScenario(
       ],
       modOptions: {
         ...scenario.setup.modOptionValues,
-        [MISSION_MODOPTION]: scenario.id,
+        [MISSION_MODOPTION]: folder,
       },
       optionSchema,
       mapOptionSchema,

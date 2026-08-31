@@ -67,7 +67,9 @@ import { type SkirmishPreset, useSkirmishPresets } from "@/play/presets";
 import { getProfile } from "@/profile/profile";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { Scenario } from "../../model";
+import type { LoadedScenario } from "../../storage";
 import { defsMissingFrom, unitDefsIn } from "../../validate";
+import { MissionHomeActions } from "./MissionHomeActions";
 import { EditorPanel } from "./panels";
 import { StartConditions } from "./StartConditions";
 import {
@@ -123,9 +125,16 @@ function placedList(scenario: Scenario): string {
 
 export function SetupPanel({
   scenario,
+  loaded,
   onChange,
 }: {
   scenario: Scenario;
+  /**
+   * Where this document was read from, which is what says whether the mission
+   * can be moved into the game named below or taken back out. Only this panel
+   * needs it, because the game is what the move is about.
+   */
+  loaded?: LoadedScenario;
   onChange: (next: Scenario) => void;
 }) {
   const drawer = useDrawer();
@@ -409,6 +418,14 @@ export function SetupPanel({
         {setup.mapName && !selectedMap && !scan.loading && (
           <MissingNote what={setup.mapName} />
         )}
+
+        {/* Where the mission lives, which is a fact about the game named here
+            rather than about the document, so it sits with the setup. */}
+        <MissionHomeActions
+          scenario={scenario}
+          loaded={loaded}
+          game={selectedGame}
+        />
 
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
           <div className="flex flex-col gap-4">

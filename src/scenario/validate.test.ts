@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 const readMissionMock = vi.fn();
+const evalMissionMock = vi.fn();
 
 // validate.ts reaches the plugin through bindings.ts, whose plugin-sdk import
 // Vitest's node resolver cannot load from the published dist. Stubbed the way
 // storage.test.ts stubs it.
 vi.mock("./bindings", () => ({
   scenarioReadMission: (...args: unknown[]) => readMissionMock(...args),
+  scenarioEvalMission: (...args: unknown[]) => evalMissionMock(...args),
 }));
 
 import { newScenario } from "./create";
@@ -18,6 +20,7 @@ import {
   issueLocation,
   unitDefsIn,
   validateCompiledMission,
+  validateCompiledMissionText,
   validateMission,
 } from "./validate";
 
@@ -739,6 +742,27 @@ describe("validateCompiledMission", () => {
         path: "missions/demo/mission.lua",
         message: "unexpected symbol near '}'",
       },
+    ]);
+  });
+});
+
+describe("validateCompiledMissionText", () => {
+  it("validates a mission it was handed as text", async () => {
+    evalMissionMock.mockResolvedValue({ mission: mission() });
+
+    expect(await validateCompiledMissionText("return { actors = {} }")).toEqual(
+      [],
+    );
+    expect(evalMissionMock).toHaveBeenCalledWith({
+      source: "return { actors = {} }",
+    });
+  });
+
+  it("turns text that will not evaluate into an issue like any other", async () => {
+    evalMissionMock.mockRejectedValue(new Error("unexpected symbol near '}'"));
+
+    expect(await validateCompiledMissionText("return {")).toEqual([
+      { path: "mission.lua", message: "unexpected symbol near '}'" },
     ]);
   });
 });

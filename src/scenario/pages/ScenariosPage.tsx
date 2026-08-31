@@ -3,6 +3,7 @@ import { Play } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
+import { Badge } from "@/components/ui/badge";
 import { useUnitsyncScan } from "@/content/config";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { useOneShotParam } from "@/deeplink/useOneShotParam";
@@ -15,9 +16,10 @@ import {
   SkeletonList,
 } from "../../content/pages/components/states";
 import { scenarioLaunchBlocker } from "../launch";
-import { isSetUp, playableScenarios, scenarioContents } from "../listing";
+import { isSetUp, scenarioContents } from "../listing";
 import type { Scenario } from "../model";
 import { scenarioRoute, useScenarios } from "../scenarios";
+import type { LoadedScenario } from "../storage";
 import { ScenarioImportButton } from "./components/ScenarioImportButton";
 import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
 
@@ -50,10 +52,12 @@ export default function ScenariosPage() {
   const { code: importCode, hubItemId } = useImportParam();
   const recordHubImport = useRecordHubImport();
 
-  // Documents only: a bundled scenario is played exactly as a local one is, and
-  // where it came from only matters where it can be edited.
+  // A bundled scenario is played exactly as a local one is, so the filter is
+  // the document's own ({@link isSetUp}). Where it came from is carried along
+  // rather than dropped, because a game's own mission is badged with the game
+  // and plays out of that game's archive (issue #2160).
   const playable = useMemo(
-    () => playableScenarios(scenarios.map((l) => l.scenario)),
+    () => scenarios.filter((l) => isSetUp(l.scenario)),
     [scenarios],
   );
 
@@ -82,11 +86,17 @@ export default function ScenariosPage() {
           reader: "player",
         });
 
-  const openPlay = (scenario: Scenario) =>
+  const openPlay = (loaded: LoadedScenario) =>
     drawer.open({
-      title: `Play ${scenario.name}`,
+      title: `Play ${loaded.scenario.name}`,
       width: "32rem",
-      content: <ScenarioTestDrawer scenario={scenario} mode="play" />,
+      content: (
+        <ScenarioTestDrawer
+          scenario={loaded.scenario}
+          origin={loaded.origin}
+          mode="play"
+        />
+      ),
     });
 
   // Opening one scenario by address (issue #1372, `scenarioRoute`): the same
@@ -101,8 +111,8 @@ export default function ScenariosPage() {
     if (!openScenarioId || loading) return;
     if (opened.current === openScenarioId) return;
     opened.current = openScenarioId;
-    const scenario = playable.find((s) => s.id === openScenarioId);
-    if (scenario) return void openPlay(scenario);
+    const found = playable.find((l) => l.scenario.id === openScenarioId);
+    if (found) return void openPlay(found);
     toast.warning(
       scenarios.some((l) => l.scenario.id === openScenarioId)
         ? "That scenario names no game and map, so there is nothing to play yet."
@@ -131,12 +141,15 @@ export default function ScenariosPage() {
         <EmptyState label="No scenarios are ready to play yet. Import one someone shared with you." />
       ) : (
         <ul className="flex flex-col gap-2">
-          {playable.map((scenario) => (
-            <li key={scenario.id}>
+          {playable.map((loaded) => (
+            <li key={loaded.scenario.id}>
               <ScenarioCard
-                scenario={scenario}
-                blocker={blockerFor(scenario)}
-                onPlay={() => openPlay(scenario)}
+                scenario={loaded.scenario}
+                fromGame={
+                  loaded.source === "game" ? loaded.origin?.gameName : undefined
+                }
+                blocker={blockerFor(loaded.scenario)}
+                onPlay={() => openPlay(loaded)}
               />
             </li>
           ))}
@@ -148,10 +161,13 @@ export default function ScenariosPage() {
 
 function ScenarioCard({
   scenario,
+  fromGame,
   blocker,
   onPlay,
 }: {
   scenario: Scenario;
+  /** The game this mission came out of, when the game ships it itself. */
+  fromGame?: string;
   /** Why it cannot be played right now, or null. */
   blocker: string | null;
   onPlay: () => void;
@@ -159,7 +175,14 @@ function ScenarioCard({
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50">
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate text-sm font-medium">{scenario.name}</span>
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium">{scenario.name}</span>
+          {fromGame && (
+            <Badge variant="secondary" className="shrink-0 text-[10px]">
+              From {fromGame}
+            </Badge>
+          )}
+        </div>
         {scenario.description && (
           <p className="line-clamp-2 text-xs text-muted-foreground">
             {scenario.description}

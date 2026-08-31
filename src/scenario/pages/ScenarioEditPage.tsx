@@ -11,8 +11,9 @@ import {
   NotFound,
 } from "../../content/pages/components/states";
 import type { Scenario } from "../model";
+import { saveEditedScenario } from "../saveIntoGame";
 import { refreshScenarios, useScenarios } from "../scenarios";
-import { saveScenario } from "../storage";
+import { isEditable, type LoadedScenario } from "../storage";
 import { BlueprintPanel } from "./components/BlueprintPanel";
 import { DialoguePanel } from "./components/DialoguePanel";
 import { applyEdit, type ScenarioEdit } from "./components/edits";
@@ -51,8 +52,10 @@ const BACK = "/scenario-builder";
  * placement modes and panels that hang off that scene arrive in #757 onwards.
  *
  * The working document is held in local state and written back with
- * {@link saveScenario} on every change, which stamps `updatedAt` and hands back
- * the stamped document, so what is on screen is what is on disk.
+ * {@link saveEditedScenario} on every change, which stamps `updatedAt` and hands
+ * back the stamped document, so what is on screen is what is on disk. Where it
+ * is written depends on where it came from: coilbox's store for a local
+ * scenario, the game's own `missions/<folder>/` for one of a game's missions.
  */
 export default function ScenarioEditPage() {
   const { id } = useParams();
@@ -60,10 +63,10 @@ export default function ScenarioEditPage() {
   const drawer = useDrawer();
 
   const loaded = scenarios.find((l) => l.scenario.id === id);
-  // A bundled scenario is a distribution's own file in a folder coilbox does
-  // not write to, so it is never opened here. The whole editor saves on every
-  // keystroke, and there is nowhere for those saves to go (issue #786).
-  const stored = loaded?.source === "bundled" ? undefined : loaded?.scenario;
+  // A read-only scenario (bundled, or a game's own packaged mission) is never
+  // opened here. The whole editor saves on every keystroke, and there is
+  // nowhere for those saves to go (issue #786).
+  const stored = loaded && isEditable(loaded) ? loaded.scenario : undefined;
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +77,11 @@ export default function ScenarioEditPage() {
   // Read once for the page rather than in the trigger panel, because every
   // panel that renames a reference needs the game's own declared types to carry
   // that reference over (issue #913).
-  const { gate, extensions, note } = useScenarioGate(scenario, "author");
+  const { gate, extensions, note } = useScenarioGate(
+    scenario,
+    "author",
+    loaded?.origin,
+  );
   const [history, setHistory] = useState<EditHistory<Scenario>>(emptyHistory);
   // Both are also held in refs, because an edit and a step through the history
   // read them at the moment they happen rather than at the last render: two
@@ -83,6 +90,12 @@ export default function ScenarioEditPage() {
   scenarioRef.current = scenario;
   const historyRef = useRef(history);
   historyRef.current = history;
+  // Where the document came from, read at the moment a write happens rather
+  // than at the render the saver was built on. The saver is built once, on the
+  // first render, which is usually before the list has resolved and said
+  // whether this document is one of a game's own missions.
+  const loadedRef = useRef<LoadedScenario | undefined>(loaded);
+  loadedRef.current = loaded;
 
   // Seed the editable copy once this id's document is available, and re-seed if
   // the route id changes under the same component instance.
@@ -100,7 +113,7 @@ export default function ScenarioEditPage() {
   const saver = useRef<ScenarioSaver>(undefined);
   if (!saver.current) {
     saver.current = createScenarioSaver({
-      write: saveScenario,
+      write: (document) => saveEditedScenario(loadedRef.current, document),
       onWritten: async (written) => {
         scenarioRef.current = written;
         setScenario(written);
@@ -167,8 +180,8 @@ export default function ScenarioEditPage() {
   }, [undo, redo]);
 
   if (loading && !scenario) return <DetailLoading backTo={BACK} />;
-  if (loaded?.source === "bundled") {
-    return <BundledScenario name={loaded.scenario.name} />;
+  if (loaded && !isEditable(loaded)) {
+    return <ReadOnlyScenario loaded={loaded} />;
   }
   if (!scenario) return <NotFound backTo={BACK} label="scenario" />;
 
@@ -176,7 +189,9 @@ export default function ScenarioEditPage() {
     drawer.open({
       title: `Test ${scenario.name} in game`,
       width: "32rem",
-      content: <ScenarioTestDrawer scenario={scenario} />,
+      content: (
+        <ScenarioTestDrawer scenario={scenario} origin={loaded?.origin} />
+      ),
     });
 
   // Held loosely, the way a base being moved is: a step that has been deleted
@@ -259,7 +274,11 @@ export default function ScenarioEditPage() {
 
         {/* The setup: the game and map the scene below draws, and the
           participants everything placed on it belongs to. */}
-        <SetupPanel scenario={scenario} onChange={(next) => apply(next)} />
+        <SetupPanel
+          scenario={scenario}
+          loaded={loaded}
+          onChange={(next) => apply(next)}
+        />
 
         {/* The editing surface: the document's units drawn on the map, the mode
           strip that places more, and the picking and dragging that moves them.
@@ -330,10 +349,16 @@ export default function ScenarioEditPage() {
 }
 
 /**
- * What a bundled scenario's route shows instead of the editor: it is there, it
- * plays, and it is not yours to change. Export is the way to a copy that is.
+ * What a read-only scenario's route shows instead of the editor: it is
+ * there, it plays, and it is not yours to change. A bundled scenario and a
+ * game's own packaged mission land here for different reasons, so each says
+ * its own reason rather than one generic message.
  */
-function BundledScenario({ name }: { name: string }) {
+function ReadOnlyScenario({ loaded }: { loaded: LoadedScenario }) {
+  const reason =
+    loaded.source === "game"
+      ? `This mission ships inside ${loaded.origin?.gameName ?? "this game"}, which is packaged, so it cannot be edited here. Share it to make a copy of your own.`
+      : "It came with this copy of coilbox, so it is read-only. Play it from Scenarios, or Export it and import that file back to get a copy you can edit.";
   return (
     <div className="flex flex-col gap-4 p-4">
       <Link
@@ -343,12 +368,10 @@ function BundledScenario({ name }: { name: string }) {
         <ArrowLeft className="size-3.5" /> Back to scenarios
       </Link>
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
-        <p className="text-sm font-medium">{name} can't be edited</p>
-        <p className="text-sm text-muted-foreground">
-          It came with this copy of coilbox, so it is read-only. Play it from
-          Scenarios, or Export it and import that file back to get a copy you
-          can edit.
+        <p className="text-sm font-medium">
+          {loaded.scenario.name} can't be edited
         </p>
+        <p className="text-sm text-muted-foreground">{reason}</p>
       </div>
     </div>
   );

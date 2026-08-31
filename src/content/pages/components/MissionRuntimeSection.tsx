@@ -21,8 +21,10 @@ import {
 } from "@/components/ui/popover";
 import { isGeneratedGame } from "@/lib/generatedGames";
 import {
+  type GameMissionEntry,
   type RuntimeMarker,
   scenarioDeleteMission,
+  scenarioGameMissions,
   scenarioListMissions,
   scenarioRuntimeConsolidate,
   scenarioRuntimeInstall,
@@ -194,7 +196,7 @@ function CapabilityPanel({
   );
 }
 
-/** One mission folder: what it is called, and where it came from. */
+/** One mission folder coilbox wrote: what it is called, and a way to take it out. */
 function MissionRow({
   mission,
   busy,
@@ -210,34 +212,106 @@ function MissionRow({
         <span className={cn("truncate text-sm", !mission.name && "font-mono")}>
           {mission.name ?? mission.id}
         </span>
-        {mission.ours && !mission.name && (
+        {!mission.name && (
           <Badge variant="outline" className="text-[10px]">
             no scenario here any more
           </Badge>
         )}
-        {!mission.ours && (
-          <Badge variant="secondary" className="text-[10px]">
-            the game's own
-          </Badge>
-        )}
       </div>
-      {mission.ours && (
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled={busy}
-          onClick={onRemove}
-        >
-          {busy ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Trash2 className="size-4" />
-          )}
-          Remove
-        </Button>
-      )}
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        disabled={busy}
+        onClick={onRemove}
+      >
+        {busy ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Trash2 className="size-4" />
+        )}
+        Remove
+      </Button>
     </li>
+  );
+}
+
+/**
+ * The missions this game ships inside its own archive (issue #2160).
+ *
+ * A game that bundles the mission runtime can bundle finished missions too, and
+ * those are the game's content: coilbox did not write them and nothing here
+ * removes them. So this is a list and nothing else, beside
+ * {@link WrittenMissions}, which is the opposite question and the only one with
+ * a Remove button.
+ *
+ * Each is named from the `scenario.json` beside its compiled mission, which is
+ * what {@link useScenarios} already read and parsed for the Scenarios list. A
+ * mission that ships only `mission.lua` has no name to show, so it is listed by
+ * its folder, which is also what `coilbox_mission` carries.
+ *
+ * Works on a packaged `.sd7`/`.sdz` as well as a loose `.sdd`, unlike every
+ * other read on this page, because a packaged game shipping its own missions is
+ * the whole point.
+ */
+function ShippedMissions({ root }: { root: string }) {
+  const { scenarios } = useScenarios();
+  const [shipped, setShipped] = useState<GameMissionEntry[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    scenarioGameMissions({ root })
+      .then(({ missions }) => {
+        if (!cancelled) setShipped(missions);
+      })
+      .catch(() => {
+        // A game whose archive cannot be read simply shows none, the same way
+        // the scenario list skips it. There is nothing here to act on.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [root]);
+
+  if (shipped.length === 0) return null;
+
+  /** The name in the mission's own document, when it ships one that parsed. */
+  const named = (folder: string): string | null =>
+    scenarios.find(
+      (l) => l.origin?.archivePath === root && l.origin.folder === folder,
+    )?.scenario.name ?? null;
+
+  return (
+    <Collapsible className="border-t border-border/50 pt-3">
+      <CollapsibleTrigger className="group flex w-full cursor-pointer items-center gap-1 text-left text-sm text-muted-foreground hover:text-foreground">
+        <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+        This game ships {shipped.length} mission
+        {shipped.length === 1 ? "" : "s"}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <p className="mt-3 max-w-prose text-sm text-muted-foreground">
+          These come with the game and play as the game itself. They are listed
+          under Play, and coilbox neither wrote them nor removes them.
+        </p>
+        <ul className="mt-3 flex flex-col gap-2">
+          {shipped.map((mission) => {
+            const name = named(mission.folder);
+            return (
+              <li key={mission.folder} className="flex min-w-0 flex-col">
+                <span className={cn("truncate text-sm", !name && "font-mono")}>
+                  {name ?? mission.folder}
+                </span>
+                {name && (
+                  <span className="truncate font-mono text-xs text-muted-foreground">
+                    {mission.folder}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -248,8 +322,9 @@ function MissionRow({
  * Launching a scenario here writes `missions/<scenario id>/` and nothing has
  * ever removed it, so a game a player tests against collects a folder per
  * scenario, and one whose scenario was deleted since is still launchable by
- * hand. The game's own missions are listed beside them but carry no Remove
- * button: they are the game's content, and coilbox did not put them there.
+ * hand. The game's own missions share that folder and are listed by
+ * {@link ShippedMissions} instead, because they are the game's content and
+ * nothing here removes them.
  */
 function WrittenMissions({ root }: { root: string }) {
   const { scenarios: loaded } = useScenarios();
@@ -272,14 +347,10 @@ function WrittenMissions({ root }: { root: string }) {
     };
   }, [root]);
 
-  const missions = gameMissions(folders, scenarios);
+  const missions = gameMissions(folders, scenarios).filter((m) => m.ours);
   if (missions.length === 0) return null;
 
-  const ours = missions.filter((m) => m.ours).length;
-  const headline =
-    ours > 0
-      ? `Coilbox has written ${ours} mission${ours === 1 ? "" : "s"} into this game`
-      : `This game ships ${missions.length} mission${missions.length === 1 ? "" : "s"} of its own`;
+  const headline = `Coilbox has written ${missions.length} mission${missions.length === 1 ? "" : "s"} into this game`;
 
   const remove = async (mission: GameMission) => {
     setRemoving(mission.id);
@@ -486,9 +557,11 @@ function RuntimeSectionShell({ children }: { children: ReactNode }) {
  * tested here can use.
  */
 function PackagedOffer({
+  root,
   gameName,
   available,
 }: {
+  root: string;
   gameName: string;
   available: RuntimeMarker | null;
 }) {
@@ -509,6 +582,7 @@ function PackagedOffer({
           installed={available}
           available={available}
         />
+        <ShippedMissions root={root} />
       </div>
     </RuntimeSectionShell>
   );
@@ -559,7 +633,9 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
 
   if (generated || !root) return null;
   if (!loose)
-    return <PackagedOffer gameName={game.name} available={available} />;
+    return (
+      <PackagedOffer root={root} gameName={game.name} available={available} />
+    );
 
   const state = runtimeInstallState(installed, available, installedError);
 
@@ -630,6 +706,7 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
           installed={installed}
           available={available}
         />
+        <ShippedMissions root={root} />
         <WrittenMissions root={root} />
       </div>
       {error && <p className="break-words text-sm text-destructive">{error}</p>}

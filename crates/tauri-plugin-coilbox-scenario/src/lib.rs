@@ -36,6 +36,7 @@ use serde::Serialize;
 use serde_json::json;
 use std::path::{Path, PathBuf};
 
+mod archive;
 mod mutator;
 // Public so the harness scripts can install through it rather than copying the
 // runtime into a game by hand (issue #934). See
@@ -353,6 +354,45 @@ async fn scenario_read_mission(root: String, path: String) -> CliResult {
     }
 }
 
+/// Evaluate a compiled mission the caller already holds as text. Shared by
+/// [`scenario_eval_mission`] and its own tests, since a `#[tauri::command]`
+/// function cannot be called directly from a plain `#[test]`.
+///
+/// `eval_value_raw`, not `eval_value`. A mission's keys are author data (team
+/// ids, variable names) and the emitter writes `schemaVersion` and `unitDef` in
+/// camelCase, so lowercasing them would give a different table from the one
+/// [`scenario_read_mission`] returns for the same file. `include_value` does not
+/// lowercase, and this must agree with it or a mission would validate one way
+/// out of a folder and another way out of an archive.
+///
+/// The VM is rooted at a path under the temp dir that coilbox never creates, so
+/// every `VFS` read fails. Text is all there is here: a mission that came out of
+/// an archive has no folder to chase siblings in, and a compiled mission is a
+/// single `return { ... }` that never asks for one.
+fn eval_mission_text(source: &str) -> Result<serde_json::Value, String> {
+    let root = std::env::temp_dir().join("coilbox-mission-text-has-no-vfs");
+    let lua = coilbox_springlua::SpringLua::new(root)
+        .map_err(|e| format!("could not start the Lua sandbox: {e}"))?;
+    lua.eval_value_raw(source, "mission.lua")
+        .map_err(|e| format!("could not read mission.lua: {e}"))
+}
+
+/// `scenario_eval_mission`, the same read-back validation as
+/// [`scenario_read_mission`] for a mission that is already in hand as text.
+///
+/// A mission inside a packaged `.sd7`/`.sdz` has no path on disk for
+/// `VFS.Include` to open, so the archive reader pulls the bytes out and this
+/// evaluates them. Same table back, same frontend validator
+/// (`src/scenario/validate.ts`), so the way a mission was read does not change
+/// what it is told about.
+#[tauri::command]
+async fn scenario_eval_mission(source: String) -> CliResult {
+    match eval_mission_text(&source) {
+        Ok(mission) => CliResult::ok(json!({ "mission": mission })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// A game folder coilbox may write the runtime into: an absolute path to a
 /// directory that exists. A packaged `.sd7`/`.sdz` is a file, so it fails here,
 /// which is the read-only case the test mutator answers (issue #754).
@@ -531,6 +571,83 @@ async fn scenario_write_mission<R: Runtime>(
     }
 }
 
+/// Write the document, the compiled mission and the dialogue clips of a mission
+/// an author is putting into a game, under `missions/<folder>/`, and hand back
+/// the folder and the clips that went in.
+///
+/// `media` is the scenario's stored clip folder, or `None` for a caller with no
+/// clips to bring. They travel because the compiled mission names its portraits
+/// and voice clips by bare file name and the runtime resolves those beside
+/// `mission.lua`: left in coilbox's store they would keep playing on the
+/// author's machine and on nobody else's.
+///
+/// The fence is the same shape as the test mutator's. A loose `.sdd` only, one
+/// folder only, and nothing else in the game is written or removed. A packaged
+/// archive is a file rather than a directory, so it fails in
+/// [`writable_game_dir`], which is what makes a shipped game's missions
+/// read-only. Shared by [`scenario_write_game_mission`] and its own tests, since
+/// a `#[tauri::command]` function cannot be called directly from a plain
+/// `#[test]`.
+fn write_game_mission(
+    root: &str,
+    folder: &str,
+    document: &str,
+    mission: &str,
+    media: Option<&Path>,
+) -> Result<(PathBuf, Vec<String>), String> {
+    if !valid_id(folder) {
+        return Err(format!("invalid mission folder: {folder}"));
+    }
+    let dir = writable_game_dir(root)?;
+    let missions = mutator::mission_dir(&dir, folder);
+    mutator::write_file(&missions.join("mission.lua"), mission)?;
+    mutator::write_file(&missions.join("scenario.json"), document)?;
+    let clips = match media {
+        Some(src) => mutator::copy_media(src, &missions)?,
+        None => Vec::new(),
+    };
+    Ok((missions, clips))
+}
+
+/// `scenario_write_game_mission`, writing a mission the author is putting into a
+/// game: the compiled `mission.lua` and the `scenario.json` it was compiled from.
+///
+/// Unlike [`scenario_write_mission`], which writes what a launch needs into a
+/// folder coilbox owns and may later remove, this writes the game's own content,
+/// under a name the author chose. The document goes in beside the compiled file
+/// because that is what makes the mission editable and nameable wherever the game
+/// ends up (issue #2160).
+///
+/// `scenario_id` is the document's id, which is where its dialogue clips are
+/// stored, and it is optional: a caller writing a mission it did not compile
+/// from a stored document has no clip folder to name and passes nothing.
+#[tauri::command]
+async fn scenario_write_game_mission<R: Runtime>(
+    app: AppHandle<R>,
+    root: String,
+    folder: String,
+    document: String,
+    mission: String,
+    scenario_id: Option<String>,
+) -> CliResult {
+    let media = match scenario_id {
+        Some(id) => {
+            if !valid_id(&id) {
+                return CliResult::err(format!("invalid scenario id: {id}"));
+            }
+            match media_dir(&app) {
+                Ok(dir) => Some(dir.join(id)),
+                Err(e) => return CliResult::err(e),
+            }
+        }
+        None => None,
+    };
+    match write_game_mission(&root, &folder, &document, &mission, media.as_deref()) {
+        Ok((dir, _)) => CliResult::ok(json!({ "dir": dir.to_string_lossy() })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `scenario_list_missions`, the compiled mission folders in a loose game.
 ///
 /// Every launch into a game that vendors the runtime writes one and leaves it
@@ -566,6 +683,76 @@ async fn scenario_delete_mission(root: String, scenario_id: String) -> CliResult
     };
     match mutator::remove_mission(&dir, &scenario_id) {
         Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `scenario_game_missions`, the missions a game ships inside its own archive.
+///
+/// Unlike [`scenario_list_missions`], which lists what coilbox wrote into a loose
+/// game while testing, this reads the game's own content and works on a packaged
+/// `.sd7`/`.sdz` too. That is the point: a game can distribute finished missions.
+///
+/// `stamp` is [`archive::stamp`]: a real change signal for a packaged archive, or
+/// `null` for a loose one, so the frontend can cache a packaged archive's
+/// contents for the session without ever caching a loose folder's, which an
+/// author may be editing right now.
+#[tauri::command]
+async fn scenario_game_missions(root: String) -> CliResult {
+    let path = Path::new(&root);
+    match archive::list_missions(path) {
+        Ok(missions) => {
+            CliResult::ok(json!({ "missions": missions, "stamp": archive::stamp(path) }))
+        }
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `scenario_game_mission_file`, one file out of one of a game's own missions.
+///
+/// Base64 because a portrait and a voice clip are binary and this crosses the
+/// IPC boundary as JSON. Nothing is written to disk: the caller holds what it
+/// needs for the session, which is what keeps a game's media in its archive.
+#[tauri::command]
+async fn scenario_game_mission_file(root: String, folder: String, file: String) -> CliResult {
+    match archive::read_file(Path::new(&root), &folder, &file) {
+        Ok(bytes) => CliResult::ok(json!({ "base64": STANDARD.encode(bytes) })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// Read and evaluate `missions/runtime.lua` out of the game at `root`, however
+/// it is packaged. Uses `eval_value_raw`, not `eval_value`. The marker's keys
+/// are author data, the same "don't lowercase" contract `runtime::read_marker`
+/// gets from `include_value` for a loose game, so a packaged and a loose game
+/// have to agree on whether `schemaVersion` survives as itself. Shared by
+/// [`scenario_game_runtime`] and its own tests, since a `#[tauri::command]`
+/// function cannot be called directly from a plain `#[test]`.
+fn read_game_runtime(root: &str) -> Result<serde_json::Value, String> {
+    let bytes = archive::read_root_file(Path::new(root), "runtime.lua")?;
+    let src = std::str::from_utf8(&bytes)
+        .map_err(|e| format!("{}: not valid UTF-8: {e}", runtime::MARKER))?;
+    let lua = coilbox_springlua::SpringLua::new(root)
+        .map_err(|e| format!("could not start the Lua sandbox: {e}"))?;
+    lua.eval_value_raw(src, runtime::MARKER)
+        .map_err(|e| format!("could not read {}: {e}", runtime::MARKER))
+}
+
+/// `scenario_game_runtime`, the runtime version marker a game declares for
+/// itself in its own `missions/runtime.lua`.
+///
+/// Unlike [`scenario_runtime_status`], which reads a loose game's installed
+/// marker through `VFS.Include` against a working directory on disk, this reads
+/// the file out through [`archive`] first, so it works on a packaged
+/// `.sd7`/`.sdz` too. The archive read handles the packaging. The evaluation
+/// after that is `eval_value_raw`, not `VFS.Include`, a different path through
+/// the sandbox that is kept to the same "keys are author data, never
+/// lowercased" rule so the two routes agree on casing. Same shape as
+/// `installed` there, because it comes from the same file.
+#[tauri::command]
+async fn scenario_game_runtime(root: String) -> CliResult {
+    match read_game_runtime(&root) {
+        Ok(installed) => CliResult::ok(json!({ "installed": installed })),
         Err(e) => CliResult::err(e),
     }
 }
@@ -795,13 +982,18 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_export,
             scenario_import,
             scenario_read_mission,
+            scenario_eval_mission,
             scenario_runtime_install,
             scenario_runtime_consolidate,
             scenario_runtime_status,
             scenario_list_missions,
             scenario_delete_mission,
             scenario_test_mutator,
-            scenario_write_mission
+            scenario_write_mission,
+            scenario_write_game_mission,
+            scenario_game_missions,
+            scenario_game_mission_file,
+            scenario_game_runtime
         ])
         .build()
 }
@@ -1009,5 +1201,135 @@ mod tests {
         assert!(is_safe_rel(Path::new("abc.png")));
         assert!(!is_safe_rel(Path::new("../x.png")));
         assert!(!is_safe_rel(Path::new("/abs.png")));
+    }
+
+    /// A packaged game's own `missions/runtime.lua` has to read the same as a
+    /// loose one's marker: `schemaVersion`, not `schemaversion`. `eval_value`
+    /// would silently lowercase this key through `__lowerkeys`, which is the
+    /// bug `eval_value_raw` exists to avoid, so this asserts the camelCase key
+    /// survives out of a `.sdz` rather than merely that some value comes back.
+    #[test]
+    fn game_runtime_keeps_camelcase_keys_from_a_packaged_archive() {
+        use std::io::Write;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("game.sdz");
+        let file = std::fs::File::create(&path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let opts = zip::write::SimpleFileOptions::default();
+        zip.start_file("missions/runtime.lua", opts).unwrap();
+        zip.write_all(b"return { version = 4, schemaVersion = 1 }")
+            .unwrap();
+        zip.finish().unwrap();
+
+        let installed = read_game_runtime(path.to_str().unwrap()).unwrap();
+
+        assert_eq!(installed["schemaVersion"], 1);
+        assert!(installed.get("schemaversion").is_none());
+    }
+
+    /// A mission read as text has to come back as the same table
+    /// `scenario_read_mission` builds through `VFS.Include`, which does not
+    /// lowercase. The emitter writes `schemaVersion` and `unitDef` in camelCase
+    /// and team ids are whatever the author typed, so `eval_value` here would
+    /// make the same mission validate differently depending on which read it
+    /// came from.
+    #[test]
+    fn mission_text_keeps_camelcase_keys_and_author_ids() {
+        let mission = eval_mission_text(
+            "return { schemaVersion = 1, teams = { [\"Enemy-1\"] = { team = 1 } } }",
+        )
+        .unwrap();
+
+        assert_eq!(mission["schemaVersion"], 1);
+        assert!(mission.get("schemaversion").is_none());
+        assert_eq!(mission["teams"]["Enemy-1"]["team"], 1);
+    }
+
+    #[test]
+    fn mission_text_that_does_not_evaluate_is_an_error() {
+        assert!(eval_mission_text("return {").is_err());
+    }
+
+    /// Putting a mission into a game writes the two files that make it both
+    /// playable and editable, and writes them under the folder the author named.
+    #[test]
+    fn a_mission_put_into_a_game_ships_its_document_beside_the_compiled_file() {
+        let game = tempfile::tempdir().unwrap();
+        let root = game.path().to_str().unwrap();
+
+        let (dir, clips) = write_game_mission(
+            root,
+            "silence-the-jericho",
+            "{\"id\":\"s1\"}",
+            "return {}",
+            None,
+        )
+        .unwrap();
+
+        assert!(clips.is_empty());
+        assert_eq!(dir, game.path().join("missions/silence-the-jericho"));
+        assert_eq!(
+            std::fs::read_to_string(dir.join("mission.lua")).unwrap(),
+            "return {}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("scenario.json")).unwrap(),
+            "{\"id\":\"s1\"}"
+        );
+    }
+
+    /// The fence: a packaged archive is a file, and a folder name that could
+    /// climb out of `missions/` is refused before anything is opened.
+    #[test]
+    fn a_packaged_game_and_a_climbing_folder_are_both_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let packaged = dir.path().join("game.sd7");
+        std::fs::write(&packaged, b"not a folder").unwrap();
+
+        assert!(
+            write_game_mission(packaged.to_str().unwrap(), "demo", "{}", "return {}", None)
+                .is_err()
+        );
+        assert!(write_game_mission(
+            dir.path().to_str().unwrap(),
+            "../evil",
+            "{}",
+            "return {}",
+            None
+        )
+        .is_err());
+        assert!(!dir.path().join("evil").exists());
+    }
+
+    /// A mission put into a game takes its dialogue portraits and voice clips
+    /// with it, because the runtime resolves them beside `mission.lua`. Leave
+    /// them in coilbox's store and the author's own machine plays the mission
+    /// perfectly while everyone the game ships to gets silence.
+    #[test]
+    fn a_mission_put_into_a_game_takes_its_dialogue_clips_with_it() {
+        let game = tempfile::tempdir().unwrap();
+        let media = tempfile::tempdir().unwrap();
+        std::fs::write(media.path().join("kesh.png"), b"portrait").unwrap();
+        std::fs::write(media.path().join("kesh.ogg"), b"voice").unwrap();
+
+        let (dir, clips) = write_game_mission(
+            game.path().to_str().unwrap(),
+            "silence-the-jericho",
+            "{\"id\":\"s1\"}",
+            "return {}",
+            Some(media.path()),
+        )
+        .unwrap();
+
+        assert_eq!(clips, vec!["kesh.ogg", "kesh.png"]);
+        assert_eq!(
+            std::fs::read_to_string(dir.join("kesh.png")).unwrap(),
+            "portrait"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("kesh.ogg")).unwrap(),
+            "voice"
+        );
     }
 }

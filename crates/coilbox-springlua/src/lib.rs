@@ -110,6 +110,23 @@ impl SpringLua {
         self.lua.from_value(value)
     }
 
+    /// Evaluate `src` and return what it returned as [`serde_json::Value`],
+    /// with no `lowerkeys` pass. The same "author data, not engine config"
+    /// contract as [`include_value`](Self::include_value), but for a chunk the
+    /// caller already holds as a string rather than one loaded through
+    /// `VFS.Include`. Use this over [`eval_value`](Self::eval_value) whenever
+    /// the source did not come from an engine-config file whose casing the
+    /// engine itself normalises.
+    pub fn eval_value_raw(&self, src: &str, name: &str) -> Result<serde_json::Value> {
+        let chunk: Value = self.lua.load(src).set_name(name).eval()?;
+        if chunk.is_nil() {
+            return Err(Error::RuntimeError(format!(
+                "{name}: chunk did not return a value"
+            )));
+        }
+        self.lua.from_value(chunk)
+    }
+
     /// Load + evaluate the chunk, require it to return a value, and apply
     /// `lowerkeys`. Shared by both eval entry points.
     fn eval_lowered(&self, src: &str, name: &str) -> Result<Value> {

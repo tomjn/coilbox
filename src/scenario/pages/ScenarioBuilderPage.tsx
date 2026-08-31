@@ -3,6 +3,7 @@ import { Loader2, Pencil, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
+import { Badge } from "@/components/ui/badge";
 import {
   Popover,
   PopoverContent,
@@ -22,7 +23,7 @@ import { newScenario } from "../create";
 import { scenarioContents } from "../listing";
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
-import { deleteScenario, saveScenario } from "../storage";
+import { deleteScenario, isEditable, saveScenario } from "../storage";
 import { ReclaimClipsButton } from "./components/ReclaimClipsButton";
 import { ScenarioImportButton } from "./components/ScenarioImportButton";
 
@@ -152,11 +153,18 @@ export default function ScenarioBuilderPage() {
         <EmptyState label="No scenarios yet. Start one with New scenario, or import a shared one." />
       ) : (
         <ul className="flex flex-col gap-2">
-          {scenarios.map(({ scenario, source }) => {
+          {scenarios.map((loaded) => {
+            const { scenario, source, origin } = loaded;
             // A bundled scenario is a distribution's own file, so it is listed
             // and exportable but not editable or deletable. Same treatment as a
             // bundled campaign.
+            //
+            // A game's own mission is listed with them and shares the read-only
+            // half, but never offers Delete even when it is editable: taking a
+            // mission out of a game puts the document back in coilbox's store,
+            // which is its own action rather than a delete (issue #2160).
             const bundled = source === "bundled";
+            const fromGame = source === "game";
             return (
               <li
                 key={scenario.id}
@@ -172,6 +180,14 @@ export default function ScenarioBuilderPage() {
                         Bundled
                       </span>
                     )}
+                    {fromGame && origin && (
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0 text-[10px]"
+                      >
+                        From {origin.gameName}
+                      </Badge>
+                    )}
                   </div>
                   <span className="truncate text-xs text-muted-foreground">
                     {scenario.setup.gameName || "No game"} ·{" "}
@@ -182,7 +198,7 @@ export default function ScenarioBuilderPage() {
                   </span>
                 </div>
                 <div className="ml-auto flex shrink-0 items-center gap-2">
-                  {!bundled && (
+                  {isEditable(loaded) && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -202,7 +218,7 @@ export default function ScenarioBuilderPage() {
                   >
                     <Share2 className="size-4" /> Share
                   </Button>
-                  {!bundled && (
+                  {!bundled && !fromGame && (
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button

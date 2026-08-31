@@ -37,7 +37,7 @@ Take `luarules/`, `luaui/` and `missions/`, and nothing else. In practice you do
 
 The button reads **Install the mission runtime**, **Update the mission runtime**, **Reinstall the mission runtime** or **Replace with coilbox's mission runtime**, depending on what it found. Underneath it, coilbox says which version your game bundles, which version it ships, and which condition and action types each supports.
 
-Only `.sdd` games can be installed into. A packaged `.sd7` or `.sdz` cannot be written into at all, so coilbox offers the test mutator there and says why.
+Only `.sdd` games can be installed into. A packaged `.sd7` or `.sdz` cannot be written into at all, so coilbox offers the test mutator there and says why. Build the runtime into your own source and the question does not arise, which is what a game shipping its own missions does.
 
 An update removes stale runtime files, and only those. A file is coilbox's to remove if it sits under `luarules/mission_runtime/` or its name starts with `coilbox_`, and the new runtime did not just write it. Your own gadgets and any compiled `missions/<id>/mission.lua` are never touched. The path comparison is case-insensitive, so a game that spells the folder `LuaRules/Gadgets/` survives.
 
@@ -46,6 +46,26 @@ On Linux a game can end up with two spellings of one of these folders: the `LuaR
 Coilbox never reports what it meant to write. After installing it evaluates `missions/runtime.lua` back out of the folder, through the same sandboxed Spring Lua reader the rest of the app uses, and shows you what that file actually says.
 
 The tests under `lua/mission-runtime/tests/` are deliberately outside the three folders you bundle, and are never installed.
+
+#### Missions your game ships
+
+`missions/` holds the runtime's own `runtime.lua`, and one folder per mission your game ships:
+
+```
+missions/
+  runtime.lua
+  first-contact/
+    mission.lua
+    scenario.json
+    kesh.png
+    kesh-briefing.ogg
+```
+
+`mission.lua` is the compiled mission, which is what the runtime loads. `scenario.json` is the document it was compiled from, and it is what makes the mission editable rather than only playable. The dialogue portraits and clips sit beside them, because a compiled mission names them as bare filenames and the engine resolves those next to `mission.lua`.
+
+A game that ships missions this way plays them itself whatever its archive format, since there is nothing for coilbox to write. That is the one route open to a packaged `.sd7` or `.sdz`. Coilbox writes these folders for you when an author moves a mission into the game, so hand-building one is only for a game that generates its missions some other way.
+
+The folder name is what the `coilbox_mission` mod option carries, so it is the mission's identity as far as a launch is concerned. Do not name one after a UUID: coilbox reads a UUID folder as a compiled mission it wrote itself while testing, and offers to clear it out.
 
 ### 2. Guard your game over
 

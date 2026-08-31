@@ -44,7 +44,7 @@ import {
 } from "../../launch";
 import type { Scenario } from "../../model";
 import { mutatorOffer } from "../../offer";
-import { ensureBundledScenarioMedia } from "../../storage";
+import { ensureBundledScenarioMedia, type GameOrigin } from "../../storage";
 import { describeIssue, type MissionIssue } from "../../validate";
 import { missionWarnings, type ScenarioReader } from "../../wording";
 import { useScenarioGate } from "./useScenarioGate";
@@ -68,6 +68,14 @@ const BUSY_LABEL: Record<string, string> = {
 export function ScenarioTestDrawer({
   scenario,
   /**
+   * Where the document came from, when it is one of a game's own missions. It
+   * decides both the sentence above the button and the route the launch takes:
+   * a game that ships this mission plays it itself, packaged or loose, rather
+   * than having it written in (issue #2160). Absent for every other scenario,
+   * which is coilbox's to write.
+   */
+  origin,
+  /**
    * Who pressed the button. The launch is identical either way. What changes is
    * the wording and how much of the result is worth showing, because a player
    * is not testing anything and the folder the mission was written into is the
@@ -76,6 +84,7 @@ export function ScenarioTestDrawer({
   mode = "test",
 }: {
   scenario: Scenario;
+  origin?: GameOrigin;
   mode?: "test" | "play";
 }) {
   const testing = mode === "test";
@@ -105,7 +114,11 @@ export function ScenarioTestDrawer({
   const gameUnits = useGameUnits(scenario.setup.gameName);
   const play = usePlay();
   const reader: ScenarioReader = testing ? "author" : "player";
-  const { route, reason, available } = useScenarioGate(scenario, reader);
+  const { route, reason, available } = useScenarioGate(
+    scenario,
+    reader,
+    origin,
+  );
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
 
   const busy =
@@ -148,6 +161,7 @@ export function ScenarioTestDrawer({
       await ensureBundledScenarioMedia(scenario.id);
       const result = await launchScenario({
         scenario,
+        origin,
         reader,
         dataDir: target.dataDir,
         games: scan.data?.games ?? [],

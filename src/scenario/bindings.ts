@@ -98,6 +98,18 @@ export const scenarioReadMission = defineCommand<
 >("coilbox-scenario", "scenario_read_mission");
 
 /**
+ * Evaluate a compiled mission the caller already holds as text, and return the
+ * table it built. What {@link scenarioReadMission} does for a mission on disk,
+ * for one that came out of a packaged `.sd7`/`.sdz` and so has no path for
+ * `VFS.Include` to open. Same table either way. See
+ * {@link validateCompiledMissionText}.
+ */
+export const scenarioEvalMission = defineCommand<
+  { source: string },
+  { mission: unknown }
+>("coilbox-scenario", "scenario_eval_mission");
+
+/**
  * A runtime's version marker and capability table, as `missions/runtime.lua`
  * declares it. `conditions` and `actions` are the trigger types that runtime
  * implements, which is what the editor's palette is gated on (issue #765).
@@ -205,6 +217,33 @@ export const scenarioWriteMission = defineCommand<
 >("coilbox-scenario", "scenario_write_mission");
 
 /**
+ * Write a mission an author is putting into the loose game at `root`: the
+ * compiled `mission.lua` and the `scenario.json` it came from, under
+ * `missions/<folder>/`. `dir` is the folder they landed in.
+ *
+ * Not {@link scenarioWriteMission}, which writes what one launch needs into a
+ * folder named after the scenario id. This writes the game's own content under a
+ * name the author chose, and the document beside the compiled file is what keeps
+ * it editable wherever the game ends up. Fails on a packaged `.sd7`/`.sdz`, which
+ * is what makes a shipped game's missions read-only.
+ *
+ * `scenarioId` names the stored media folder whose dialogue clips go in beside
+ * the two files, because the runtime loads a portrait and a voice clip from
+ * wherever `mission.lua` is. Leave it out when the clips are already in the game,
+ * which is the case a drifted mission is rewritten in.
+ */
+export const scenarioWriteGameMission = defineCommand<
+  {
+    root: string;
+    folder: string;
+    document: string;
+    mission: string;
+    scenarioId?: string;
+  },
+  { dir: string }
+>("coilbox-scenario", "scenario_write_game_mission");
+
+/**
  * The compiled mission folders in the loose game at `root`, sorted. Every launch
  * into a game that vendors the runtime writes one and leaves it there, so this
  * is what a game has accumulated. Folders only: the runtime's own `runtime.lua`
@@ -255,3 +294,47 @@ export const scenarioMediaSweep = defineCommand<
   { keep: Record<string, string[]>; apply: boolean },
   { summary: MediaSweepSummary }
 >("coilbox-scenario", "scenario_media_sweep");
+
+/** One mission a game ships in its own archive. */
+export interface GameMissionEntry {
+  /** The game's own folder name, which is what `coilbox_mission` carries. */
+  folder: string;
+  /** True when `scenario.json` is beside the compiled mission, so it can be edited. */
+  hasDocument: boolean;
+  hasCompiled: boolean;
+}
+
+/**
+ * The missions a game ships inside its own archive, sorted by folder. Works on a
+ * packaged `.sd7`/`.sdz` as well as a loose `.sdd`, unlike
+ * {@link scenarioListMissions}, which lists what coilbox wrote while testing.
+ *
+ * `stamp` is a real change signal for a packaged archive (its size and modified
+ * time), computed on the Rust side rather than inferred from data the frontend
+ * happens to have. It is `null` for a loose `.sdd`, which is never cached: a
+ * folder someone may be editing right now must always be read fresh.
+ */
+export const scenarioGameMissions = defineCommand<
+  { root: string },
+  { missions: GameMissionEntry[]; stamp: string | null }
+>("coilbox-scenario", "scenario_game_missions");
+
+/**
+ * One file out of one of a game's own missions, base64 encoded. Nothing is
+ * written to disk, so a game's dialogue media stays in its archive.
+ */
+export const scenarioGameMissionFile = defineCommand<
+  { root: string; folder: string; file: string },
+  { base64: string }
+>("coilbox-scenario", "scenario_game_mission_file");
+
+/**
+ * The runtime version marker a game declares for itself in its own
+ * `missions/runtime.lua`. Same shape as {@link scenarioRuntimeStatus}'s
+ * `installed`, but works on a packaged `.sd7`/`.sdz` too: reach for this one
+ * over `scenarioRuntimeStatus` when `root` may not be a loose game folder.
+ */
+export const scenarioGameRuntime = defineCommand<
+  { root: string },
+  { installed: RuntimeMarker }
+>("coilbox-scenario", "scenario_game_runtime");

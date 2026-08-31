@@ -88,6 +88,16 @@ describe("writeTestMutator", () => {
     expect(written.issues).toEqual([]);
   });
 
+  it("carries a game's own mission across as bytes rather than recompiling it", async () => {
+    readMissionMock.mockResolvedValue({ mission: { schemaVersion: 1 } });
+    const shipped = "return { --[[ the game's own ]] }";
+
+    await writeTestMutator("/data", build(), undefined, undefined, shipped);
+
+    const [args] = mutatorMock.mock.calls[0];
+    expect(args.mission).toBe(shipped);
+  });
+
   it("reports a mission the engine could not load rather than throwing", async () => {
     readMissionMock.mockRejectedValue(
       new Error("attempt to index a nil value"),

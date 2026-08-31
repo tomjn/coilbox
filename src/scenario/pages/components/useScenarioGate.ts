@@ -32,6 +32,7 @@ import {
 } from "../../gating";
 import { type ScenarioRoute, scenarioRoute } from "../../launch";
 import type { Scenario } from "../../model";
+import type { GameOrigin } from "../../storage";
 import type { ScenarioReader } from "../../wording";
 
 export interface ScenarioGate {
@@ -78,6 +79,14 @@ export function useScenarioGate(
   scenario: Scenario | null,
   /** Who reads the route sentence this hands back. See `wording.ts`. */
   reader: ScenarioReader,
+  /**
+   * Where the document came from, when it is one of a game's own missions. The
+   * game already holds the compiled mission, so there is nothing for coilbox to
+   * write and a packaged archive reaches the adopted route (issue #2160).
+   * Without this a packaged game is told it will play through the test mutator
+   * when it will play the mission it ships.
+   */
+  origin?: GameOrigin,
 ): ScenarioGate {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -125,6 +134,10 @@ export function useScenarioGate(
       installed: status.installed?.version ?? null,
       required,
       reader,
+      // The same test `launchScenario` makes: the mission is in the game only
+      // when the document came out of this very game. One merely set in it is
+      // still coilbox's to write.
+      missionInGame: origin?.gameName === game.name,
     });
     const gate = paletteGate(
       gateTarget(route, status.installed, status.available),
@@ -144,5 +157,5 @@ export function useScenarioGate(
       reason,
       available,
     };
-  }, [game, status, required, reader]);
+  }, [game, status, required, reader, origin]);
 }

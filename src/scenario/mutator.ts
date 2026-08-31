@@ -94,12 +94,18 @@ export async function writeTestMutator(
   scenario: Scenario,
   map?: MapExtent,
   units?: { name: string }[],
+  /**
+   * The mission text to carry, when it came out of a game rather than from this
+   * document. A packaged game may ship `mission.lua` with no document, so there
+   * is nothing to compile and the bytes travel as they are.
+   */
+  shipped?: string,
 ): Promise<TestMutator> {
   const result = await scenarioTestMutator({
     dataDir,
     scenarioId: scenario.id,
     modinfo: buildMutatorModInfo(scenario.setup.gameName, scenario.name),
-    mission: compileScenario(scenario),
+    mission: shipped ?? compileScenario(scenario),
   });
   return {
     dir: result.dir,

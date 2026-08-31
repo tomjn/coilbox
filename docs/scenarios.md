@@ -27,10 +27,11 @@ Playing a scenario is an ordinary skirmish plus two things. The scenario, which 
 
 Which route your scenario takes is decided per launch, and coilbox tells you which one it picked before you press the button. The two differ only in where that compiled file is written and which game the start script names:
 
+- **The game ships the mission itself.** Nothing is written at all. The game already holds both the runtime and the compiled mission, so it is launched as itself and told which of its own missions to play. This is the route a mission that comes with a game takes, and it is open to a packaged `.sd7` or `.sdz` as well as a loose `.sdd`.
 - **The game archive bundles the coilbox mission runtime.** The compiled mission is written into the game's own `missions/` folder and the game is launched as itself. This is the route a shipped scenario is meant to take.
 - **Anything else** goes through the **test mutator**: coilbox writes a small game of its own, `coilbox-mission-test.sdd`, into your content root's `games/` folder. It depends on the game you set the scenario in for units, sides and everything else, and adds coilbox's runtime plus the one scenario under test. Your install is not touched, and deleting that folder undoes everything the flow has ever written.
 
-A packaged `.sd7` or `.sdz` game always takes the mutator route, because a packaged archive cannot be written into. For a game to play scenarios itself it needs a loose `.sdd` copy with the runtime installed, which is done from Content > Games. See [the mission runtime](mission-runtime.md).
+The question a packaged `.sd7` or `.sdz` is asked is whether the mission is already in it. One it ships plays as itself. One it does not takes the mutator route, because a packaged archive cannot be written into and the mission has to go somewhere. For a game to play scenarios you wrote, it needs a loose `.sdd` copy with the runtime installed, which is done from Content > Games. See [the mission runtime](mission-runtime.md).
 
 ## Author a scenario
 
@@ -291,7 +292,7 @@ A code, a link, an export file and a bundled scenario all carry the same thing: 
 
 If they do not have the game or the map, import offers to download both. Past that there is nothing for a player to set up. Coilbox tells them it is setting up what the game needs and leaving their copy alone, and says nothing about runtimes, mutators or archive formats, because none of that is theirs to fix.
 
-What the mutator route costs a player is quality, not effort. A downloaded game arrives as a packaged `.sd7` or `.sdz`, which always takes that route, and a mission played through it can run into the game's own end conditions and opening phases. Fixing that is the game's job, which is the next section.
+What the mutator route costs a player is quality, not effort. A downloaded game arrives as a packaged `.sd7` or `.sdz`, and a scenario you sent them is not one it ships, so it takes that route and can run into the game's own end conditions and opening phases. Fixing that is the game's job, which is the next section.
 
 ## Getting a game to play your scenario properly
 
@@ -301,7 +302,30 @@ Part of that the runtime covers by itself. An anchor unit on each human mission 
 
 So a scenario you want other people to play as you wrote it needs their copy of the game to be a loose `.sdd`, bundling a runtime at least as new as the scenario needs, with both guards in it. None of that is a player's job. The guards are the game maintainer's to add, once, in the copy everybody downloads, and [the adoption contract](mission-runtime.md#the-adoption-contract) is the page to send them. A player who already has a loose copy can install the runtime from **Content > Games** themselves, but nobody outside the game can add the guards.
 
-If you ship the game as well as the scenario, the runtime and the guards are simply part of it, taken once into your own source rather than installed copy by copy. What you still have to decide is the packaging. Coilbox writes each compiled mission into the game's `missions/` folder as it launches, so the copy in your package has to be a loose `.sdd`. A game shipped as a packaged `.sd7` or `.sdz` falls to the mutator however complete its runtime is, because there is nowhere to put the mission. See [Distributing coilbox with your game](distributing.md).
+If you ship the game as well as the scenario, the runtime and the guards are simply part of it, taken once into your own source rather than installed copy by copy. Ship the missions in it too and the packaging stops mattering: a game that holds a mission plays it as itself, packaged or loose, because there is nothing left to write. That is [shipping missions in your game](#ship-missions-in-your-game) below.
+
+The packaging only decides what happens to a mission the game does not hold. Coilbox writes one of those into the game's `missions/` folder as it launches, which needs a loose `.sdd`. A packaged `.sd7` or `.sdz` falls to the mutator for those, however complete its runtime is. See [Distributing coilbox with your game](distributing.md).
+
+### Ship missions in your game
+
+A mission inside your game's own archive is your content. It is listed, played and shared like any other scenario, and a player is told it comes with the game.
+
+Each one is a folder under `missions/` holding the compiled `mission.lua`, the `scenario.json` it was built from, and the dialogue portraits and clips it names:
+
+```
+missions/
+  first-contact/
+    mission.lua
+    scenario.json
+    kesh.png
+    kesh-briefing.ogg
+```
+
+Write scenarios the ordinary way first. Every scenario starts in coilbox's own store, whoever made it, so nothing you import or write is ever put in somebody's game without you saying so. When one is ready, open it in the Scenario Builder and press **Put this mission in the game** in the Setup card. That moves it: the document and the compiled mission are written into the game and the local copy goes, so there is one of it. **Take it out of the game** is the reverse.
+
+Editing follows the archive format. A mission in a loose `.sdd` is edited in place, and each save rewrites both the document and the compiled mission beside it, so the two never disagree. A mission in a packaged `.sd7` or `.sdz` is read-only, because coilbox cannot write into one. It still plays, and it can still be shared as a code or a link.
+
+If the two ever do disagree, because the archive was built by hand or the document was edited outside coilbox, a loose game is corrected on the next launch and a packaged one plays what it ships and tells the author. A player is not told, since they cannot rebuild somebody else's game.
 
 ## Play the example mission
 
