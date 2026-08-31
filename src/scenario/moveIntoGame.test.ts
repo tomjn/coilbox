@@ -84,6 +84,22 @@ describe("putting a mission into a game", () => {
     });
   });
 
+  /**
+   * The dialogue names its portraits and voice clips by bare file name, and the
+   * runtime loads them beside `mission.lua`. Leaving them in coilbox's store
+   * gives everyone the game ships to a mission with no picture and no voice, and
+   * leaves the author's own machine playing it fine.
+   */
+  it("names the scenario, so its dialogue clips travel into the game with it", async () => {
+    const scenario = build("Silence the Jericho");
+
+    await putMissionInGame(scenario, game("SplinterFaction", "sf.sdd"));
+
+    expect(vi.mocked(scenarioWriteGameMission)).toHaveBeenCalledWith(
+      expect.objectContaining({ scenarioId: "s1" }),
+    );
+  });
+
   it("slugs the folder the author typed, so a name with spaces still writes", async () => {
     await putMissionInGame(
       build("Silence the Jericho"),

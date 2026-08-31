@@ -226,9 +226,20 @@ export const scenarioWriteMission = defineCommand<
  * name the author chose, and the document beside the compiled file is what keeps
  * it editable wherever the game ends up. Fails on a packaged `.sd7`/`.sdz`, which
  * is what makes a shipped game's missions read-only.
+ *
+ * `scenarioId` names the stored media folder whose dialogue clips go in beside
+ * the two files, because the runtime loads a portrait and a voice clip from
+ * wherever `mission.lua` is. Leave it out when the clips are already in the game,
+ * which is the case a drifted mission is rewritten in.
  */
 export const scenarioWriteGameMission = defineCommand<
-  { root: string; folder: string; document: string; mission: string },
+  {
+    root: string;
+    folder: string;
+    document: string;
+    mission: string;
+    scenarioId?: string;
+  },
   { dir: string }
 >("coilbox-scenario", "scenario_write_game_mission");
 

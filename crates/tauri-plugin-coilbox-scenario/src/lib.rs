@@ -571,8 +571,15 @@ async fn scenario_write_mission<R: Runtime>(
     }
 }
 
-/// Write the document and the compiled mission of a mission an author is putting
-/// into a game, under `missions/<folder>/`, and hand back the folder.
+/// Write the document, the compiled mission and the dialogue clips of a mission
+/// an author is putting into a game, under `missions/<folder>/`, and hand back
+/// the folder and the clips that went in.
+///
+/// `media` is the scenario's stored clip folder, or `None` for a caller with no
+/// clips to bring. They travel because the compiled mission names its portraits
+/// and voice clips by bare file name and the runtime resolves those beside
+/// `mission.lua`: left in coilbox's store they would keep playing on the
+/// author's machine and on nobody else's.
 ///
 /// The fence is the same shape as the test mutator's. A loose `.sdd` only, one
 /// folder only, and nothing else in the game is written or removed. A packaged
@@ -586,7 +593,8 @@ fn write_game_mission(
     folder: &str,
     document: &str,
     mission: &str,
-) -> Result<PathBuf, String> {
+    media: Option<&Path>,
+) -> Result<(PathBuf, Vec<String>), String> {
     if !valid_id(folder) {
         return Err(format!("invalid mission folder: {folder}"));
     }
@@ -594,7 +602,11 @@ fn write_game_mission(
     let missions = mutator::mission_dir(&dir, folder);
     mutator::write_file(&missions.join("mission.lua"), mission)?;
     mutator::write_file(&missions.join("scenario.json"), document)?;
-    Ok(missions)
+    let clips = match media {
+        Some(src) => mutator::copy_media(src, &missions)?,
+        None => Vec::new(),
+    };
+    Ok((missions, clips))
 }
 
 /// `scenario_write_game_mission`, writing a mission the author is putting into a
@@ -605,15 +617,33 @@ fn write_game_mission(
 /// under a name the author chose. The document goes in beside the compiled file
 /// because that is what makes the mission editable and nameable wherever the game
 /// ends up (issue #2160).
+///
+/// `scenario_id` is the document's id, which is where its dialogue clips are
+/// stored, and it is optional: a caller writing a mission it did not compile
+/// from a stored document has no clip folder to name and passes nothing.
 #[tauri::command]
-async fn scenario_write_game_mission(
+async fn scenario_write_game_mission<R: Runtime>(
+    app: AppHandle<R>,
     root: String,
     folder: String,
     document: String,
     mission: String,
+    scenario_id: Option<String>,
 ) -> CliResult {
-    match write_game_mission(&root, &folder, &document, &mission) {
-        Ok(dir) => CliResult::ok(json!({ "dir": dir.to_string_lossy() })),
+    let media = match scenario_id {
+        Some(id) => {
+            if !valid_id(&id) {
+                return CliResult::err(format!("invalid scenario id: {id}"));
+            }
+            match media_dir(&app) {
+                Ok(dir) => Some(dir.join(id)),
+                Err(e) => return CliResult::err(e),
+            }
+        }
+        None => None,
+    };
+    match write_game_mission(&root, &folder, &document, &mission, media.as_deref()) {
+        Ok((dir, _)) => CliResult::ok(json!({ "dir": dir.to_string_lossy() })),
         Err(e) => CliResult::err(e),
     }
 }
@@ -1228,9 +1258,16 @@ mod tests {
         let game = tempfile::tempdir().unwrap();
         let root = game.path().to_str().unwrap();
 
-        let dir = write_game_mission(root, "silence-the-jericho", "{\"id\":\"s1\"}", "return {}")
-            .unwrap();
+        let (dir, clips) = write_game_mission(
+            root,
+            "silence-the-jericho",
+            "{\"id\":\"s1\"}",
+            "return {}",
+            None,
+        )
+        .unwrap();
 
+        assert!(clips.is_empty());
         assert_eq!(dir, game.path().join("missions/silence-the-jericho"));
         assert_eq!(
             std::fs::read_to_string(dir.join("mission.lua")).unwrap(),
@@ -1250,10 +1287,49 @@ mod tests {
         let packaged = dir.path().join("game.sd7");
         std::fs::write(&packaged, b"not a folder").unwrap();
 
-        assert!(write_game_mission(packaged.to_str().unwrap(), "demo", "{}", "return {}").is_err());
         assert!(
-            write_game_mission(dir.path().to_str().unwrap(), "../evil", "{}", "return {}").is_err()
+            write_game_mission(packaged.to_str().unwrap(), "demo", "{}", "return {}", None)
+                .is_err()
         );
+        assert!(write_game_mission(
+            dir.path().to_str().unwrap(),
+            "../evil",
+            "{}",
+            "return {}",
+            None
+        )
+        .is_err());
         assert!(!dir.path().join("evil").exists());
+    }
+
+    /// A mission put into a game takes its dialogue portraits and voice clips
+    /// with it, because the runtime resolves them beside `mission.lua`. Leave
+    /// them in coilbox's store and the author's own machine plays the mission
+    /// perfectly while everyone the game ships to gets silence.
+    #[test]
+    fn a_mission_put_into_a_game_takes_its_dialogue_clips_with_it() {
+        let game = tempfile::tempdir().unwrap();
+        let media = tempfile::tempdir().unwrap();
+        std::fs::write(media.path().join("kesh.png"), b"portrait").unwrap();
+        std::fs::write(media.path().join("kesh.ogg"), b"voice").unwrap();
+
+        let (dir, clips) = write_game_mission(
+            game.path().to_str().unwrap(),
+            "silence-the-jericho",
+            "{\"id\":\"s1\"}",
+            "return {}",
+            Some(media.path()),
+        )
+        .unwrap();
+
+        assert_eq!(clips, vec!["kesh.ogg", "kesh.png"]);
+        assert_eq!(
+            std::fs::read_to_string(dir.join("kesh.png")).unwrap(),
+            "portrait"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("kesh.ogg")).unwrap(),
+            "voice"
+        );
     }
 }

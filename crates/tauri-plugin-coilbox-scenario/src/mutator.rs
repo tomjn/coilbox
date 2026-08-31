@@ -127,9 +127,16 @@ pub fn remove_mission(dir: &Path, scenario_id: &str) -> Result<(), String> {
 /// engine loads a portrait or a sound out of the archive. A missing media
 /// folder is the ordinary case of a scenario with no dialogue clips, not an
 /// error.
+///
+/// Only a missing folder, though. Every other reason a folder will not open is
+/// an error, because a mission that copied no clips and a mission that has none
+/// look identical afterwards: the game plays either way, and the only symptom is
+/// that nobody speaks.
 pub fn copy_media(src: &Path, dest: &Path) -> Result<Vec<String>, String> {
-    let Ok(entries) = std::fs::read_dir(src) else {
-        return Ok(Vec::new());
+    let entries = match std::fs::read_dir(src) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(format!("could not read {}: {e}", src.display())),
     };
     std::fs::create_dir_all(dest)
         .map_err(|e| format!("could not create {}: {e}", dest.display()))?;
@@ -238,6 +245,19 @@ mod tests {
         let dest = tempfile::tempdir().expect("tempdir");
         let copied = copy_media(Path::new("/no/such/media"), dest.path()).expect("copy");
         assert!(copied.is_empty());
+    }
+
+    /// The one that matters: a folder that is there and will not open is not a
+    /// scenario without dialogue. Reading it as one ships a mission whose only
+    /// symptom is silence, which is what let this go unnoticed for four rounds.
+    #[test]
+    fn a_media_folder_that_will_not_open_is_an_error_rather_than_silence() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let not_a_folder = dir.path().join("media");
+        std::fs::write(&not_a_folder, "this is a file").expect("write");
+        let dest = tempfile::tempdir().expect("tempdir");
+
+        assert!(copy_media(&not_a_folder, dest.path()).is_err());
     }
 
     /// A game with a runtime and two launches behind it: the two missions are

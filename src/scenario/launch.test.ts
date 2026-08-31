@@ -8,6 +8,7 @@ const gameRuntimeMock = vi.fn();
 const gameMissionFileMock = vi.fn();
 const writeGameMissionMock = vi.fn();
 const evalMissionMock = vi.fn();
+const mediaWriteMock = vi.fn();
 
 // launch.ts reaches the plugin through bindings.ts, whose plugin-sdk import
 // Vitest's node resolver cannot load from the published dist. Stubbed the way
@@ -22,6 +23,7 @@ vi.mock("./bindings", () => ({
   scenarioWriteGameMission: (...args: unknown[]) =>
     writeGameMissionMock(...args),
   scenarioEvalMission: (...args: unknown[]) => evalMissionMock(...args),
+  scenarioMediaWrite: (...args: unknown[]) => mediaWriteMock(...args),
 }));
 
 import type { GameItem } from "../content/bindings";
@@ -263,8 +265,10 @@ describe("launchScenario", () => {
     gameMissionFileMock.mockReset();
     writeGameMissionMock.mockReset();
     evalMissionMock.mockReset();
+    mediaWriteMock.mockReset();
     launch.mockReset();
     rescan.mockReset();
+    mediaWriteMock.mockResolvedValue({});
 
     gameRuntimeMock.mockResolvedValue({
       installed: { version: 1, schemaVersion: 1, conditions: [], actions: [] },
@@ -506,6 +510,89 @@ describe("launchScenario", () => {
     expect(result.ok && result.config.modOptions?.[MISSION_MODOPTION]).toBe(
       "s1",
     );
+  });
+
+  /**
+   * The clips travel with the mission. A game keeps them inside its archive
+   * beside `mission.lua`, and the mutator copies clips out of coilbox's own
+   * media store, where a game's mission has nothing at all. So without this the
+   * mission plays on this route with no portrait and no voice, on a machine
+   * whose only sign of trouble is silence.
+   */
+  it("carries a game's own dialogue clips into the mutator, so it is not silent", async () => {
+    gameRuntimeMock.mockRejectedValue(new Error("no missions/runtime.lua"));
+    gameMissionFileMock.mockImplementation(async ({ file }: { file: string }) =>
+      archived(file === "mission.lua" ? SHIPPED_LUA : `the ${file} bytes`),
+    );
+
+    const result = await launchScenario({
+      scenario: build({
+        dialogue: [
+          {
+            id: "d1",
+            speaker: "Kesh",
+            text: "Move.",
+            portrait: "kesh.png",
+            audio: "kesh.ogg",
+          },
+        ],
+      }),
+      reader: "author",
+      dataDir: "/data",
+      games: [PACKAGED_AT],
+      optionSchema: [],
+      mapOptionSchema: [],
+      rescan,
+      launch,
+      origin: SHIPPED,
+    });
+
+    expect(gameMissionFileMock).toHaveBeenCalledWith({
+      root: "/games/sf.sdz",
+      folder: "first-contact",
+      file: "kesh.png",
+    });
+    expect(mediaWriteMock).toHaveBeenCalledWith({
+      scenarioId: "s1",
+      file: "kesh.png",
+      dataUri: `data:application/octet-stream;base64,${Buffer.from("the kesh.png bytes").toString("base64")}`,
+    });
+    expect(mediaWriteMock).toHaveBeenCalledWith(
+      expect.objectContaining({ file: "kesh.ogg" }),
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  /** A clip that will not come out of the archive costs a line its picture, and
+   * nothing more. Refusing the launch over it would be worse than the silence.
+   */
+  it("plays on when one of a game's clips cannot be read", async () => {
+    gameRuntimeMock.mockRejectedValue(new Error("no missions/runtime.lua"));
+    gameMissionFileMock.mockImplementation(
+      async ({ file }: { file: string }) => {
+        if (file === "mission.lua") return archived(SHIPPED_LUA);
+        throw new Error(`no such member: ${file}`);
+      },
+    );
+
+    const result = await launchScenario({
+      scenario: build({
+        dialogue: [
+          { id: "d1", speaker: "Kesh", text: "…", portrait: "gone.png" },
+        ],
+      }),
+      reader: "author",
+      dataDir: "/data",
+      games: [PACKAGED_AT],
+      optionSchema: [],
+      mapOptionSchema: [],
+      rescan,
+      launch,
+      origin: SHIPPED,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(launch).toHaveBeenCalled();
   });
 
   /**

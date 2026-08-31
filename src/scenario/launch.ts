@@ -32,6 +32,7 @@ import { applyRestrictions, toBattleConfig } from "../play/participants";
 import {
   scenarioGameMissionFile,
   scenarioGameRuntime,
+  scenarioMediaWrite,
   scenarioRuntimeStatus,
   scenarioWriteGameMission,
   scenarioWriteMission,
@@ -41,6 +42,7 @@ import { missionDrifted } from "./drift";
 import type { Scenario } from "./model";
 import { writeTestMutator } from "./mutator";
 import type { GameOrigin } from "./storage";
+import { scenarioMediaFiles } from "./transfer";
 import {
   describeIssue,
   isBlocking,
@@ -335,6 +337,54 @@ async function missionFileText(
 }
 
 /**
+ * Copy a game's own dialogue clips into coilbox's media store, before its
+ * mission is carried into the test mutator.
+ *
+ * The mutator builds a mission folder out of two things: the compiled mission it
+ * is handed, and the clips it copies out of the store under the scenario's id. A
+ * game's mission keeps its clips inside the game's own archive, so that store
+ * holds nothing for it and the mutator would write a mission whose only symptom
+ * is that nobody speaks.
+ *
+ * `ensureBundledScenarioMedia` (`storage.ts`) is the same move for a bundled
+ * scenario, and for the same reason: the store is the one place the write step
+ * reads clips from. Read fresh every launch rather than cached for the session,
+ * because a loose game's clips can change between two launches and a wrong
+ * portrait is worse than a repeated read.
+ *
+ * A clip that will not come out is warned about and skipped. It costs a line its
+ * picture, which is never a reason to refuse the launch.
+ */
+async function carryGameMissionMedia(
+  origin: GameOrigin,
+  scenario: Scenario,
+): Promise<void> {
+  for (const file of scenarioMediaFiles(scenario)) {
+    try {
+      const { base64 } = await scenarioGameMissionFile({
+        root: origin.archivePath,
+        folder: origin.folder,
+        file,
+      });
+      await scenarioMediaWrite({
+        scenarioId: scenario.id,
+        file,
+        // The clip is stored under the name the document already uses, and the
+        // engine picks its loader by that extension, so the content type here
+        // is never read by anything.
+        dataUri: `data:application/octet-stream;base64,${base64}`,
+      });
+    } catch (e) {
+      console.warn(
+        "skipping a game mission's unreadable dialogue clip",
+        file,
+        e,
+      );
+    }
+  }
+}
+
+/**
  * Read a mission the game ships and validate it.
  *
  * The adopted route's other half. A game carrying its own mission is already
@@ -518,6 +568,9 @@ export async function launchScenario(
         ];
         return refuse(missionIssueMessage(reader, issues), issues);
       }
+      // The clips are in the archive beside that mission, and the mutator only
+      // knows how to copy them out of coilbox's store.
+      await carryGameMissionMedia(inGame, scenario);
     }
     const mutator = await writeTestMutator(
       dataDir,

@@ -38,12 +38,17 @@ export function missionFolderName(scenarioName: string): string {
 }
 
 /**
- * Put a local scenario into a game: write the document and the compiled mission
- * into `missions/<folder>/`, then delete the local copy.
+ * Put a local scenario into a game: write the document, the compiled mission and
+ * the dialogue clips into `missions/<folder>/`, then delete the local copy.
  *
- * A move rather than a copy, so the document has one home. The dialogue clips
- * stay in coilbox's media store, because the mission still names them by the
- * same file names and the compile step reads them from there.
+ * A move rather than a copy, so the document has one home. The clips go with it
+ * because the compiled mission names them by bare file name and the runtime
+ * resolves those beside `mission.lua`. Left in coilbox's store they would keep
+ * playing here and nowhere else, so the author would never see what everyone the
+ * game ships to gets: a mission with no portraits and no voice.
+ *
+ * The store keeps its copy anyway (`keepMedia`), because a campaign mission that
+ * attached this scenario still loads the same clips out of it by name.
  *
  * `folder` is what the author typed, slugged the same way the default is, so a
  * name with a space in it becomes a folder the game can hold rather than a write
@@ -66,6 +71,7 @@ export async function putMissionInGame(
     folder: named,
     document: JSON.stringify(scenario),
     mission: compileScenario(scenario),
+    scenarioId: scenario.id,
   });
   await deleteScenario(scenario.id, { keepMedia: true });
   return { gameName: game.name, archivePath, folder: named, loose: true };
