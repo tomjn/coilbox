@@ -35,6 +35,15 @@ interface Props {
   /** Its dataset entry, which is where the model's name comes from. */
   unit?: UnitDatasetEntry;
   onClose: () => void;
+  /**
+   * Omits the header's name/def-key text. For an embedding that already shows
+   * the unit's name itself (the unit's own page), so the same string isn't a
+   * heading twice. The close button still renders, relabelled to "Back to the
+   * units grid" since on that embedding it navigates rather than closes.
+   * Defaults to showing the title (and the "Close model view" label),
+   * matching the build tree drawer's original use.
+   */
+  hideTitle?: boolean;
 }
 
 export function UnitModelPanel({
@@ -44,6 +53,7 @@ export function UnitModelPanel({
   unitId,
   unit,
   onClose,
+  hideTitle,
 }: Props) {
   const object = unit?.objectName?.trim();
   const { model, loading, failed } = useUnitsyncUnitModel(
@@ -55,20 +65,26 @@ export function UnitModelPanel({
 
   return (
     <aside className="flex w-72 shrink-0 flex-col overflow-y-auto rounded-lg border border-border/50 bg-card">
-      <header className="flex items-start justify-between gap-2 border-b border-border/50 px-3 py-2">
-        <div className="min-w-0">
-          <h3 className="truncate text-sm font-medium leading-tight">
-            {unit?.fullName ?? unitId}
-          </h3>
-          <p className="truncate font-mono text-xs text-muted-foreground">
-            {unitId}
-          </p>
-        </div>
+      <header
+        className={`flex items-start gap-2 border-b border-border/50 px-3 py-2 ${
+          hideTitle ? "justify-end" : "justify-between"
+        }`}
+      >
+        {!hideTitle && (
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-medium leading-tight">
+              {unit?.fullName ?? unitId}
+            </h3>
+            <p className="truncate font-mono text-xs text-muted-foreground">
+              {unitId}
+            </p>
+          </div>
+        )}
         <Button
           size="sm"
           variant="ghost"
           onClick={onClose}
-          aria-label="Close model view"
+          aria-label={hideTitle ? "Back to the units grid" : "Close model view"}
         >
           <X size={16} />
         </Button>
@@ -310,8 +326,10 @@ function HubRender({
 }
 
 /** What each refusal means, in a sentence, because the reasons are different
- *  problems with different owners. */
-function renderSkipReason(skip: RenderSkip): string {
+ *  problems with different owners. Exported for {@link ../useUnitRenders},
+ *  which hits the same refusals drawing a unit page's render row and would
+ *  otherwise need its own copy of what each one means. */
+export function renderSkipReason(skip: RenderSkip): string {
   switch (skip) {
     case "mis-framed":
       return "the picture is not the shape this unit's footprint frames to, which is a bug in coilbox rather than in the game.";

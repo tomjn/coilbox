@@ -1,16 +1,30 @@
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type { UnitDatasetEntry } from "../../bindings";
 
 vi.mock("@picoframe/frame", () => ({
-  Button: (props: { children?: ReactNode; disabled?: boolean }) =>
+  Button: (props: {
+    children?: ReactNode;
+    disabled?: boolean;
+    className?: string;
+  }) =>
     createElement(
       "button",
-      { type: "button", disabled: props.disabled },
+      {
+        type: "button",
+        disabled: props.disabled,
+        className: props.className,
+      },
       props.children,
     ),
   useDrawer: () => ({ open: () => {} }),
+  // The browse-units link styles itself through these rather than through
+  // `Button`, matching how the real component composes a `Link` into a
+  // button look (see `home/suggestedMap.test.ts` for the same stand-in).
+  cn: (...parts: unknown[]) => parts.filter(Boolean).join(" "),
+  buttonVariants: () => "button-variant",
 }));
 // The drawer never opens in this test (the button is never clicked), so its
 // own React Flow dependency tree never has to load.
@@ -42,15 +56,21 @@ describe("FactionBuildList's Sides card count", () => {
       unit("armsolar"),
     ];
     const html = renderToStaticMarkup(
-      createElement(FactionBuildList, {
-        enginePath: "",
-        dataDir: "",
-        gameArchive: "",
-        gameName: "Test Game",
-        sides: [{ name: "Arm", startUnit: "armcom" }],
-        units,
-        buildpics: null,
-      }),
+      // The browse-units button is a real `Link`, which needs a router context
+      // to render at all (see `home/suggestedMap.test.ts` for the same wrap).
+      createElement(
+        MemoryRouter,
+        null,
+        createElement(FactionBuildList, {
+          enginePath: "",
+          dataDir: "",
+          gameArchive: "",
+          gameName: "Test Game",
+          sides: [{ name: "Arm", startUnit: "armcom" }],
+          units,
+          buildpics: null,
+        }),
+      ),
     );
     // Without folding the morph stage in, armcom's own buildOptions is empty
     // and the count would read 1 (armcom alone).
@@ -69,15 +89,19 @@ describe("FactionBuildList's Sides card count", () => {
       unit("armsolar"),
     ];
     const html = renderToStaticMarkup(
-      createElement(FactionBuildList, {
-        enginePath: "",
-        dataDir: "",
-        gameArchive: "",
-        gameName: "Test Game",
-        sides: [{ name: "Arm", startUnit: "armcom1" }],
-        units,
-        buildpics: null,
-      }),
+      createElement(
+        MemoryRouter,
+        null,
+        createElement(FactionBuildList, {
+          enginePath: "",
+          dataDir: "",
+          gameArchive: "",
+          gameName: "Test Game",
+          sides: [{ name: "Arm", startUnit: "armcom1" }],
+          units,
+          buildpics: null,
+        }),
+      ),
     );
     // Unresolved, the count reads 0 and the button renders no "N units" text
     // at all (only shown when count > 0) and stays disabled.

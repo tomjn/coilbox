@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UnitDatasetEntry } from "./bindings";
+import { groupOf, morphGroups } from "./morphGraph";
 import {
   buildTechForest,
   factionGroups,
@@ -106,6 +107,26 @@ describe("buildTechForest", () => {
     // ungrouped and shown under "Other units".
     expect(forest.factionOf.get("armcom1")).toBe("armcom");
     expect(forest.ungrouped).toEqual([]);
+  });
+
+  it("builds the same forest whether a caller hands over its own morph grouping or not", () => {
+    const units = [
+      {
+        name: "armcom",
+        buildOptions: ["armsolar"],
+        morphTargets: [{ into: "armcom1" }],
+      },
+      { name: "armcom1", buildOptions: ["armlab"] },
+      { name: "armsolar" },
+      { name: "armlab" },
+    ];
+    const withoutMap = buildTechForest(units, ["armcom"]);
+    const withMap = buildTechForest(
+      units,
+      ["armcom"],
+      groupOf(morphGroups(units)),
+    );
+    expect(withMap).toEqual(withoutMap);
   });
 });
 

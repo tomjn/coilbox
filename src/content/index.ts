@@ -136,6 +136,26 @@ const contentPlugin: FramePlugin = {
       crumb: (c) => c.params.name ?? "Game",
     },
     {
+      path: "content/games/:name/units",
+      lazy: gateProfileHidden(
+        "content.games",
+        () => import("./pages/GameUnitsPage"),
+      ),
+      crumb: "Units",
+    },
+    {
+      // The crumb is the def key rather than the display name, because it
+      // renders before the dataset is read. A def key is a worse label than a
+      // name and a better one than nothing, the same trade the blueprint
+      // route already makes for a uuid.
+      path: "content/games/:name/units/:unit",
+      lazy: gateProfileHidden(
+        "content.games",
+        () => import("./pages/GameUnitPage"),
+      ),
+      crumb: (c) => c.params.unit ?? "Unit",
+    },
+    {
       // The blueprint library (issue #1415). Its pages live under
       // `../blueprint/`, with the model and the store they read, because a
       // layout is its own thing rather than part of the content browser.
