@@ -21,13 +21,13 @@ A mission does not have to have a scenario. A mission built from a preset alone 
 
 ## Which game can play it
 
-A scenario is played by coilbox's [mission runtime](mission-runtime.md), a set of Lua files a game bundles in its own archive.
+A scenario is played by coilbox's [mission runtime](mission-runtime.md), a set of Lua files the game archive bundles.
 
 Playing a scenario is an ordinary skirmish plus two things. The scenario, which is JSON, is compiled to a Lua file at `missions/<id>/mission.lua` where the game will look for it, and the start script is given `coilbox_mission = <scenario id>`. That mod option is the only signal the runtime has. Without it the runtime switches itself off before it reads anything, so a game that has adopted it plays every ordinary match exactly as it did before.
 
 Which route your scenario takes is decided per launch, and coilbox tells you which one it picked before you press the button. The two differ only in where that compiled file is written and which game the start script names:
 
-- **The game bundles the runtime.** The compiled mission is written into the game's own `missions/` folder and the game is launched as itself. This is the route a shipped scenario is meant to take.
+- **The game archive bundles the coilbox mission runtime.** The compiled mission is written into the game's own `missions/` folder and the game is launched as itself. This is the route a shipped scenario is meant to take.
 - **Anything else** goes through the **test mutator**: coilbox writes a small game of its own, `coilbox-mission-test.sdd`, into your content root's `games/` folder. It depends on the game you set the scenario in for units, sides and everything else, and adds coilbox's runtime plus the one scenario under test. Your install is not touched, and deleting that folder undoes everything the flow has ever written.
 
 A packaged `.sd7` or `.sdz` game always takes the mutator route, because a packaged archive cannot be written into. For a game to play scenarios itself it needs a loose `.sdd` copy with the runtime installed, which is done from Content > Games. See [the mission runtime](mission-runtime.md).

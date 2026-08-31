@@ -1,6 +1,6 @@
 # The mission runtime
 
-The runtime is the Lua that plays a coilbox [scenario](scenarios.md) inside the engine. It is coilbox-authored and game-agnostic, and a game **bundles a copy of it in its own archive**. Coilbox writes the files into a loose `.sdd` game folder and updates them from there.
+The runtime is the Lua that plays a coilbox [scenario](scenarios.md) inside the engine. It is coilbox-authored and game-agnostic, and the game archive **bundles a copy of it**. Coilbox writes the files into a loose `.sdd` game folder and updates them from there.
 
 This page is for two readers. The first half is the adoption contract, for anyone maintaining a game deciding whether to take it. The second half is the architecture, for anyone working on coilbox.
 
@@ -19,7 +19,7 @@ A game that has not adopted the runtime is not shut out of scenarios. It just ca
 
 ## The adoption contract
 
-### 1. Bundle the runtime in your game
+### 1. Bundle the runtime in your game archive
 
 Take `luarules/`, `luaui/` and `missions/`, and nothing else. In practice you do not copy them by hand: open **Content > Games**, pick your game, and use the **Mission runtime** section. That writes:
 
