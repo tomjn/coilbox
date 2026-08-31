@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowDown, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -13,6 +13,7 @@ import { groupOf, morphGroups } from "../morphGraph";
 import { encyclopediaSections, unitLabel } from "../unitEncyclopedia";
 import { unitIconSrc } from "../unitIcon";
 import { countPieces, countTriangles } from "../unitModel";
+import { StatusBadge } from "./components/StatusBadge";
 import { DetailError, DetailLoading, NotFound } from "./components/states";
 import { UnitHero } from "./components/UnitHero";
 import { UnitPictureCard } from "./components/UnitPictureCard";
@@ -373,41 +374,50 @@ export default function GameUnitPage() {
           every tech level of a commander under one shared display name (issue
           #2063's fedcommander_up1..up4 all read "Federation of Kala Command
           Unit"), so a list of one link at a time gave a reader no way to tell
-          where they stood. The def key on each card, and the current stage
-          rendered as a plain block rather than a link, are what make the
-          chain readable when the names collide. */}
+          where they stood. A vertical list keeps the reading order to one
+          direction: the wrapping row this replaced put a card, then a wide
+          block of condition text, then an arrow, then the next card on
+          whichever line it happened to wrap to, with nothing saying a reader
+          should follow it top to bottom rather than left to right. Each row's
+          own def key, and the current stage rendered as a plain block rather
+          than a link, are what make the chain readable when the names
+          collide. */}
       {stageChain.length > 1 && (
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-medium">Upgrade path</h2>
-          <ol className="flex flex-wrap items-center gap-2">
-            {stageChain.map((stageId, i) => (
-              <li key={stageId} className="flex items-center gap-2">
-                <UnitPictureCard
-                  to={unitPath(stageId)}
-                  label={label(stageId)}
-                  src={unitIconSrc(buildpics?.units[stageId])}
-                  defKey={stageId}
-                  current={stageId === id}
-                />
-                {i < stageChain.length - 1 && (
-                  <div className="flex shrink-0 flex-col items-center gap-1 text-xs text-muted-foreground">
-                    <ArrowRight className="size-4" aria-hidden />
-                    {edgeConditions(stageId, stageChain[i + 1]).length > 0 && (
-                      <dl className="flex flex-col items-center gap-0">
-                        {edgeConditions(stageId, stageChain[i + 1]).map(
-                          ([key, value]) => (
-                            <div key={key} className="flex gap-1">
-                              <dt>{key}:</dt>
-                              <dd>{String(value)}</dd>
-                            </div>
-                          ),
-                        )}
+          <ol className="flex flex-col gap-1.5">
+            {stageChain.map((stageId, i) => {
+              const conditions =
+                i > 0 ? edgeConditions(stageChain[i - 1], stageId) : [];
+              return (
+                <li key={stageId} className="flex flex-col gap-1.5">
+                  {/* What it costs to reach this stage from the one above it,
+                      so the cost sits with the stage it buys rather than
+                      trailing the stage it leaves. The top stage has nothing
+                      above it, so it carries no cost row. */}
+                  {conditions.length > 0 && (
+                    <div className="flex items-start gap-2 pl-5 text-xs text-muted-foreground">
+                      <ArrowDown className="size-3.5 shrink-0" aria-hidden />
+                      <dl className="flex flex-wrap gap-x-3 gap-y-0.5">
+                        {conditions.map(([key, value]) => (
+                          <div key={key} className="flex gap-1">
+                            <dt>{key}:</dt>
+                            <dd>{String(value)}</dd>
+                          </div>
+                        ))}
                       </dl>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
+                    </div>
+                  )}
+                  <UpgradeStageRow
+                    to={unitPath(stageId)}
+                    label={label(stageId)}
+                    defKey={stageId}
+                    src={unitIconSrc(buildpics?.units[stageId])}
+                    current={stageId === id}
+                  />
+                </li>
+              );
+            })}
           </ol>
         </section>
       )}
@@ -482,5 +492,71 @@ export default function GameUnitPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * One row of the upgrade path: a 64px buildpic (matching the grid cell
+ * `GameUnitsPage` draws, so a stage looks the same picture wherever a reader
+ * meets it), the name wrapping onto a second line rather than eliding it, and
+ * the def key in full since that is the one thing on this row that still
+ * tells two identically-named stages apart. `current` swaps the link for a
+ * plain block, the same rule `UnitPictureCard` follows for the same reason:
+ * the stage a reader is already on must never link to itself.
+ */
+function UpgradeStageRow({
+  to,
+  label,
+  defKey,
+  src,
+  current,
+}: {
+  to: string;
+  label: string;
+  defKey: string;
+  src?: string;
+  current: boolean;
+}) {
+  const content = (
+    <>
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          className="size-16 shrink-0 rounded object-contain"
+        />
+      ) : (
+        <span aria-hidden className="size-16 shrink-0 rounded bg-muted" />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-2 text-sm font-medium">{label}</p>
+        <p className="break-all font-mono text-xs text-muted-foreground">
+          {defKey}
+        </p>
+      </div>
+      {current && (
+        <StatusBadge tone="info" className="shrink-0">
+          <CheckCircle2 /> Current
+        </StatusBadge>
+      )}
+    </>
+  );
+
+  if (current) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg border border-primary/60 bg-primary/5 p-2">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      to={to}
+      className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-2 transition-colors hover:border-border hover:bg-accent/50"
+    >
+      {content}
+    </Link>
   );
 }
