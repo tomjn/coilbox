@@ -12,11 +12,7 @@ import {
   HostRoomControl,
   type StartRoomArgs,
 } from "../../direct/HostRoomControl";
-import {
-  readHostedRoom,
-  setHostedRoom,
-  useHostedRoom,
-} from "../../direct/hostedRoom";
+import { setHostedRoom, useHostedRoom } from "../../direct/hostedRoom";
 import { type JoinRoomArgs, LanRooms } from "../../direct/LanRooms";
 import { LinkedRoomJoin } from "../../direct/LinkedRoomJoin";
 import {
@@ -27,14 +23,13 @@ import {
   ownRoomHeard,
   roomBattle,
 } from "../../direct/lan";
-import { directClosePorts } from "../../direct/reachability";
 import {
   battleOpened,
   hostBlockedReason,
   noBattleFailure,
-  roomStopReason,
   startRoomFailure,
 } from "../../direct/room";
+import { stopHostedRoom } from "../../direct/stopRoom";
 import { useLanRooms } from "../../direct/useLanRooms";
 import { useLastLogin } from "../../lobby-servers/config";
 import { notify } from "../../notify/notify";
@@ -384,18 +379,8 @@ function BattlesPage() {
     setRoomBusy(true);
     setStopError(null);
     try {
-      const reason = roomStopReason(room?.host ?? "");
-      await disconnect();
-      await directStopRoom({ reason });
-      // The room is what wanted the ports open, so the room ending is what hands
-      // them back. Leaving a mapping on somebody's router after the thing that
-      // asked for it has gone is rude, and the hour-long lease only limits the
-      // damage when this never runs, which is a host whose machine was killed.
-      await directClosePorts({}).catch(() => {});
-      setHostedRoom(null);
+      await stopHostedRoom(room?.host ?? "", disconnect);
     } catch (e) {
-      // The room is still there, so let a fresh reading speak for it again.
-      void readHostedRoom();
       setStopError(e instanceof Error ? e.message : String(e));
     } finally {
       setRoomBusy(false);
