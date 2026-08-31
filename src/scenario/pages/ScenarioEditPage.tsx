@@ -12,7 +12,7 @@ import {
 } from "../../content/pages/components/states";
 import type { Scenario } from "../model";
 import { refreshScenarios, useScenarios } from "../scenarios";
-import { saveScenario } from "../storage";
+import { isEditable, type LoadedScenario, saveScenario } from "../storage";
 import { BlueprintPanel } from "./components/BlueprintPanel";
 import { DialoguePanel } from "./components/DialoguePanel";
 import { applyEdit, type ScenarioEdit } from "./components/edits";
@@ -60,10 +60,10 @@ export default function ScenarioEditPage() {
   const drawer = useDrawer();
 
   const loaded = scenarios.find((l) => l.scenario.id === id);
-  // A bundled scenario is a distribution's own file in a folder coilbox does
-  // not write to, so it is never opened here. The whole editor saves on every
-  // keystroke, and there is nowhere for those saves to go (issue #786).
-  const stored = loaded?.source === "bundled" ? undefined : loaded?.scenario;
+  // A read-only scenario (bundled, or a game's own packaged mission) is never
+  // opened here. The whole editor saves on every keystroke, and there is
+  // nowhere for those saves to go (issue #786).
+  const stored = loaded && isEditable(loaded) ? loaded.scenario : undefined;
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [loadedId, setLoadedId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -167,8 +167,8 @@ export default function ScenarioEditPage() {
   }, [undo, redo]);
 
   if (loading && !scenario) return <DetailLoading backTo={BACK} />;
-  if (loaded?.source === "bundled") {
-    return <BundledScenario name={loaded.scenario.name} />;
+  if (loaded && !isEditable(loaded)) {
+    return <ReadOnlyScenario loaded={loaded} />;
   }
   if (!scenario) return <NotFound backTo={BACK} label="scenario" />;
 
@@ -330,10 +330,16 @@ export default function ScenarioEditPage() {
 }
 
 /**
- * What a bundled scenario's route shows instead of the editor: it is there, it
- * plays, and it is not yours to change. Export is the way to a copy that is.
+ * What a read-only scenario's route shows instead of the editor: it is
+ * there, it plays, and it is not yours to change. A bundled scenario and a
+ * game's own packaged mission land here for different reasons, so each says
+ * its own reason rather than one generic message.
  */
-function BundledScenario({ name }: { name: string }) {
+function ReadOnlyScenario({ loaded }: { loaded: LoadedScenario }) {
+  const reason =
+    loaded.source === "game"
+      ? `This mission ships inside ${loaded.origin?.gameName ?? "this game"}, which is packaged, so it cannot be edited here. Share it to make a copy of your own.`
+      : "It came with this copy of coilbox, so it is read-only. Play it from Scenarios, or Export it and import that file back to get a copy you can edit.";
   return (
     <div className="flex flex-col gap-4 p-4">
       <Link
@@ -343,12 +349,10 @@ function BundledScenario({ name }: { name: string }) {
         <ArrowLeft className="size-3.5" /> Back to scenarios
       </Link>
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
-        <p className="text-sm font-medium">{name} can't be edited</p>
-        <p className="text-sm text-muted-foreground">
-          It came with this copy of coilbox, so it is read-only. Play it from
-          Scenarios, or Export it and import that file back to get a copy you
-          can edit.
+        <p className="text-sm font-medium">
+          {loaded.scenario.name} can't be edited
         </p>
+        <p className="text-sm text-muted-foreground">{reason}</p>
       </div>
     </div>
   );

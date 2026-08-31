@@ -52,6 +52,19 @@ export interface LoadedScenario {
 }
 
 /**
+ * Whether the editor may write this scenario back where it came from.
+ *
+ * One rule in one place, because three pages ask it. A `.sdd` is a development
+ * format, so a mission inside one is edited in place. A packaged archive cannot
+ * be written into at all, and a bundled scenario belongs to the distribution.
+ */
+export function isEditable(loaded: LoadedScenario): boolean {
+  if (loaded.source === "local") return true;
+  if (loaded.source === "game") return loaded.origin?.loose === true;
+  return false;
+}
+
+/**
  * One stored file as a document, whether it is a bare scenario or the whole
  * export file the builder writes.
  *

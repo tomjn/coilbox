@@ -29,6 +29,7 @@ import {
   ensureBundledScenarioMedia,
   gatherScenarioExport,
   importScenarioMedia,
+  isEditable,
   listScenarios,
   saveScenario,
   storeScenario,
@@ -314,5 +315,47 @@ describe("storeScenario", () => {
 
     expect(saved.dialogue[0].portrait).toBeUndefined();
     expect(mediaWriteMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("what may be edited", () => {
+  const doc = { id: "x" } as never;
+
+  it("lets a local scenario be edited", () => {
+    expect(isEditable({ scenario: doc, source: "local" })).toBe(true);
+  });
+
+  it("refuses a bundled scenario", () => {
+    expect(isEditable({ scenario: doc, source: "bundled" })).toBe(false);
+  });
+
+  it("lets a mission in a loose game be edited in place", () => {
+    expect(
+      isEditable({
+        scenario: doc,
+        source: "game",
+        origin: {
+          gameName: "SF",
+          archivePath: "/games/sf.sdd",
+          folder: "first-contact",
+          loose: true,
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("refuses a mission in a packaged game", () => {
+    expect(
+      isEditable({
+        scenario: doc,
+        source: "game",
+        origin: {
+          gameName: "SF",
+          archivePath: "/games/sf.sd7",
+          folder: "first-contact",
+          loose: false,
+        },
+      }),
+    ).toBe(false);
   });
 });
