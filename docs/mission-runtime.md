@@ -1,6 +1,6 @@
 # The mission runtime
 
-The runtime is the Lua that plays a coilbox [scenario](scenarios.md) inside the engine. It is coilbox-authored and game-agnostic, and a game **vendors a copy**: coilbox writes the files into a loose `.sdd` game folder and updates them from there.
+The runtime is the Lua that plays a coilbox [scenario](scenarios.md) inside the engine. It is coilbox-authored and game-agnostic, and a game **bundles a copy of it in its own archive**. Coilbox writes the files into a loose `.sdd` game folder and updates them from there.
 
 This page is for two readers. The first half is the adoption contract, for anyone maintaining a game deciding whether to take it. The second half is the architecture, for anyone working on coilbox.
 
@@ -19,7 +19,7 @@ A game that has not adopted the runtime is not shut out of scenarios. It just ca
 
 ## The adoption contract
 
-### 1. Vendor the runtime
+### 1. Bundle the runtime in your game
 
 Take `luarules/`, `luaui/` and `missions/`, and nothing else. In practice you do not copy them by hand: open **Content > Games**, pick your game, and use the **Mission runtime** section. That writes:
 
@@ -35,7 +35,7 @@ Take `luarules/`, `luaui/` and `missions/`, and nothing else. In practice you do
     runtime.lua
 ```
 
-The button reads **Install the mission runtime**, **Update the mission runtime**, **Reinstall the mission runtime** or **Replace with coilbox's mission runtime**, depending on what it found. Underneath it, coilbox says which version your game vendors, which version it ships, and which condition and action types each supports.
+The button reads **Install the mission runtime**, **Update the mission runtime**, **Reinstall the mission runtime** or **Replace with coilbox's mission runtime**, depending on what it found. Underneath it, coilbox says which version your game bundles, which version it ships, and which condition and action types each supports.
 
 Only `.sdd` games can be installed into. A packaged `.sd7` or `.sdz` cannot be written into at all, so coilbox offers the test mutator there and says why.
 
@@ -45,7 +45,7 @@ On Linux a game can end up with two spellings of one of these folders: the `LuaR
 
 Coilbox never reports what it meant to write. After installing it evaluates `missions/runtime.lua` back out of the folder, through the same sandboxed Spring Lua reader the rest of the app uses, and shows you what that file actually says.
 
-The tests under `lua/mission-runtime/tests/` are deliberately outside the three vendored folders, and are never installed.
+The tests under `lua/mission-runtime/tests/` are deliberately outside the three folders you bundle, and are never installed.
 
 ### 2. Guard your game over
 
@@ -336,7 +336,7 @@ Three rules keep this honest, and all three matter to anyone adding a type:
 
 Features that land in one release share one bump. Four separate bumps would give a game four floors to chase and coilbox four gates to reason about, for work that arrives at a player's machine all at once.
 
-The editor greys types the target runtime cannot run, and a game vendoring a runtime older than a scenario needs is treated as a game with no runtime at all, so it falls to the mutator rather than playing a mission with silently dead triggers.
+The editor greys types the target runtime cannot run, and a game bundling a runtime older than a scenario needs is treated as a game with no runtime at all, so it falls to the mutator rather than playing a mission with silently dead triggers.
 
 ## How the runtime is tested
 
@@ -414,7 +414,7 @@ What did not hold was the start, twice over, and both are why contract item 3 ex
 
 ### What is still unproven
 
-The mission UI widget is loaded and run by a real game's own widget handler in the headless run, which is as far as a run with no screen goes ([issue #850](https://github.com/tomjn/coilbox/issues/850)). It initialises out of the vendored `luaui/widgets/`, registers the global the runtime's dialogue call reaches, draws every frame of the mission without raising, and takes itself back off in a game with no mission.
+The mission UI widget is loaded and run by a real game's own widget handler in the headless run, which is as far as a run with no screen goes ([issue #850](https://github.com/tomjn/coilbox/issues/850)). It initialises out of the game's own `luaui/widgets/`, registers the global the runtime's dialogue call reaches, draws every frame of the mission without raising, and takes itself back off in a game with no mission.
 
 What is left is what a screen would show:
 

@@ -21,13 +21,13 @@ A mission does not have to have a scenario. A mission built from a preset alone 
 
 ## Which game can play it
 
-A scenario is played by coilbox's [mission runtime](mission-runtime.md), a set of Lua files a game vendors.
+A scenario is played by coilbox's [mission runtime](mission-runtime.md), a set of Lua files a game bundles in its own archive.
 
 Playing a scenario is an ordinary skirmish plus two things. The scenario, which is JSON, is compiled to a Lua file at `missions/<id>/mission.lua` where the game will look for it, and the start script is given `coilbox_mission = <scenario id>`. That mod option is the only signal the runtime has. Without it the runtime switches itself off before it reads anything, so a game that has adopted it plays every ordinary match exactly as it did before.
 
 Which route your scenario takes is decided per launch, and coilbox tells you which one it picked before you press the button. The two differ only in where that compiled file is written and which game the start script names:
 
-- **The game vendors the runtime.** The compiled mission is written into the game's own `missions/` folder and the game is launched as itself. This is the route a shipped scenario is meant to take.
+- **The game bundles the runtime.** The compiled mission is written into the game's own `missions/` folder and the game is launched as itself. This is the route a shipped scenario is meant to take.
 - **Anything else** goes through the **test mutator**: coilbox writes a small game of its own, `coilbox-mission-test.sdd`, into your content root's `games/` folder. It depends on the game you set the scenario in for units, sides and everything else, and adds coilbox's runtime plus the one scenario under test. Your install is not touched, and deleting that folder undoes everything the flow has ever written.
 
 A packaged `.sd7` or `.sdz` game always takes the mutator route, because a packaged archive cannot be written into. For a game to play scenarios itself it needs a loose `.sdd` copy with the runtime installed, which is done from Content > Games. See [the mission runtime](mission-runtime.md).
@@ -199,7 +199,7 @@ You cannot build this out of `units_in_zone` with `max = 0`. That reads the mome
 
 The **Add a condition** and **Add an action** dropdowns list every type coilbox knows, and grey out the ones the runtime that will actually play this scenario does not implement, with the reason beside each. A type that is greyed out cannot be added, because a runtime that does not know a trigger type ignores it and plays a quietly broken mission.
 
-Which runtime it measures against depends on the route. A game that has adopted the runtime is measured by its own vendored version. Anything else is measured by the runtime this build of coilbox ships, because that is what the test mutator carries. If the game is not installed, or the scan has not answered yet, nothing is greyed.
+Which runtime it measures against depends on the route. A game that has adopted the runtime is measured by the version it bundles. Anything else is measured by the runtime this build of coilbox ships, because that is what the test mutator carries. If the game is not installed, or the scan has not answered yet, nothing is greyed.
 
 A type can also be greyed because there is nothing for it to point at yet. `units_in_zone` needs a zone to exist first.
 
@@ -287,7 +287,7 @@ Coilbox never writes into `.coilbox/`, so removing a bundled scenario means remo
 
 ## What a player needs to play your scenario
 
-A code, a link, an export file and a bundled scenario all carry the same thing: the scenario document, plus the portraits and clips its dialogue names. None of them carries the game, the map or the mission runtime. Coilbox picks [the route](#which-game-can-play-it) again on the player's machine, against their copy of the game, so a scenario you tested on a game that vendors the runtime can still play through the mutator for them.
+A code, a link, an export file and a bundled scenario all carry the same thing: the scenario document, plus the portraits and clips its dialogue names. None of them carries the game, the map or the mission runtime. Coilbox picks [the route](#which-game-can-play-it) again on the player's machine, against their copy of the game, so a scenario you tested on a game that bundles the runtime can still play through the mutator for them.
 
 If they do not have the game or the map, import offers to download both, which is the quickest way to get a scenario playing at all. A download arrives as a packaged `.sd7` or `.sdz`, and a packaged archive cannot be written into, so a scenario played on a downloaded game always takes the mutator route. It does play. Coilbox tells the player it is setting up what the game needs and leaving their copy alone, and says nothing to them about runtimes or mutators.
 
@@ -295,7 +295,7 @@ If they do not have the game or the map, import offers to download both, which i
 
 Part of that the runtime covers by itself. An anchor unit on each human mission team stops the engine ending the mission early, and a commander the game spawned before the end of game frame 1 is removed again from any team the scenario said starts without one. What it cannot cover is a game that declares a winner by its own end conditions, or one that spawns and asks its opening questions after frame 1. Splinter Faction spawns on frame 1800, so through the mutator its faction picker and start-spot picker run over the top of a mission that has already placed its units, and its end conditions can declare a winner while the objectives are still open.
 
-So a scenario you want other people to play as you wrote it needs their copy of the game to be a loose `.sdd`, vendoring a runtime at least as new as the scenario needs, with both guards in it. Installing the runtime is something any player can do from **Content > Games**. The guards are the game maintainer's to add, once, in the copy everybody downloads, and [the adoption contract](mission-runtime.md#the-adoption-contract) is the page to send them.
+So a scenario you want other people to play as you wrote it needs their copy of the game to be a loose `.sdd`, bundling a runtime at least as new as the scenario needs, with both guards in it. Installing the runtime is something any player can do from **Content > Games**. The guards are the game maintainer's to add, once, in the copy everybody downloads, and [the adoption contract](mission-runtime.md#the-adoption-contract) is the page to send them.
 
 If you ship the game as well as the scenario, all of that is yours to settle. Bundle a loose `.sdd` with the runtime installed and both guards added, and every scenario in the package is played by the game itself. See [Distributing coilbox with your game](distributing.md).
 
