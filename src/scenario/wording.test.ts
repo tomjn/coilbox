@@ -3,6 +3,8 @@ import {
   adoptedGameRoute,
   coilboxTooOld,
   gameNotInstalled,
+  gameOwnMissionRoute,
+  missionDriftedFromDocument,
   missionProblems,
   missionWarnings,
   olderRuntimeRoute,
@@ -21,6 +23,8 @@ function everything(reader: ScenarioReader): string[] {
     unadoptedGameRoute(reader, "Balanced Annihilation"),
     olderRuntimeRoute(reader, "Balanced Annihilation", 1, 3),
     adoptedGameRoute(reader, "Balanced Annihilation", 3),
+    gameOwnMissionRoute(reader, "Balanced Annihilation"),
+    missionDriftedFromDocument(reader, "Balanced Annihilation"),
     coilboxTooOld(reader, 9, 3),
     setupNotFound(reader, "Balanced Annihilation"),
     missionProblems(reader, 2),
@@ -70,6 +74,19 @@ describe("player wording", () => {
     expect(olderRuntimeRoute("player", game, 1, 3)).toBe(said);
   });
 
+  it("tells a player a mission comes with the game, and nothing else", () => {
+    const said = gameOwnMissionRoute("player", "SplinterFaction");
+
+    expect(said).toContain("comes with SplinterFaction");
+    for (const pattern of AUTHOR_ONLY) {
+      expect(said).not.toMatch(pattern);
+    }
+  });
+
+  it("says nothing to a player about a mission that has drifted", () => {
+    expect(missionDriftedFromDocument("player", "SplinterFaction")).toBe("");
+  });
+
   it("sends a broken scenario back to whoever shared it", () => {
     expect(missionProblems("player", 2)).toContain("2 problems");
     expect(missionProblems("player", 1)).toContain("1 problem,");
@@ -91,6 +108,19 @@ describe("author wording", () => {
       "needs version 3",
     );
     expect(adoptedGameRoute("author", "BA", 3)).toContain("version 3");
+  });
+
+  it("tells an author which mission the game is playing", () => {
+    expect(gameOwnMissionRoute("author", "SplinterFaction")).toContain(
+      "ships this mission",
+    );
+  });
+
+  it("tells an author when the shipped mission has drifted", () => {
+    const said = missionDriftedFromDocument("author", "SplinterFaction");
+
+    expect(said).toContain("does not match the document beside it");
+    expect(said).toContain("SplinterFaction");
   });
 
   it("names the versions when coilbox is the one that is out of date", () => {
