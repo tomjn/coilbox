@@ -20,6 +20,10 @@ picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
 coilbox-springlua = { path = "../coilbox-springlua" }
 uuid = { version = "1", features = ["v4"] }
+# Reading a game's own missions out of the archive it ships them in. `.sdz` is a
+# zip and `.sd7` is 7-zip, the same two readers content and mapconv already use.
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+sevenz-rust2 = "0.21.1"
 
 [dev-dependencies]
 tempfile = "3"

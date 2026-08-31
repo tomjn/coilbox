@@ -5603,10 +5603,12 @@ dependencies = [
  "picoframe-core",
  "serde",
  "serde_json",
+ "sevenz-rust2",
  "tauri",
  "tauri-plugin",
  "tempfile",
  "uuid",
+ "zip 8.6.0",
 ]
 
 [[package]]

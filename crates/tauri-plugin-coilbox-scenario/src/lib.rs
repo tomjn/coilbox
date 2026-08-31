@@ -36,6 +36,7 @@ use serde::Serialize;
 use serde_json::json;
 use std::path::{Path, PathBuf};
 
+mod archive;
 mod mutator;
 // Public so the harness scripts can install through it rather than copying the
 // runtime into a game by hand (issue #934). See
