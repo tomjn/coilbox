@@ -46,6 +46,10 @@ struct Fields<'a> {
     online: Option<bool>,
     ingame: Option<bool>,
     moderator: Option<bool>,
+    /// The one rating Tachyon carries, in whole points (issue #2002). `None`
+    /// covers both "not mentioned by this update" and "the server rates nobody",
+    /// which is every Teiserver there is.
+    rating: Option<i32>,
 }
 
 /// Apply a Tachyon message to the lobby state, returning the deltas produced.
@@ -187,6 +191,9 @@ fn apply(state: &mut LobbyState, fields: Fields<'_>) -> Vec<Delta> {
     if let Some(moderator) = fields.moderator {
         user.status.access = moderator;
     }
+    if let Some(rating) = fields.rating {
+        user.rating.overall = Some(rating);
+    }
     let unchanged = user == before;
     state.users.insert(name.clone(), user);
 
@@ -210,6 +217,7 @@ fn from_private(me: &PrivateUser) -> Fields<'_> {
         online: Some(online),
         ingame: Some(ingame),
         moderator: me.roles.as_ref().map(|roles| moderator(roles)),
+        rating: me.rating.as_ref().map(|rating| points(rating.value)),
     }
 }
 
@@ -223,6 +231,7 @@ fn from_user(user: &coilbox_tachyon_protocol::types::User) -> Fields<'_> {
         online: Some(online),
         ingame: Some(ingame),
         moderator: user.roles.as_ref().map(|roles| moderator(roles)),
+        rating: user.rating.as_ref().map(|rating| points(rating.value)),
     }
 }
 
@@ -237,7 +246,17 @@ fn from_updated(item: &UserUpdatedEventDataUsersItem) -> Option<Fields<'_>> {
         online: presence.map(|(online, _)| online),
         ingame: presence.map(|(_, ingame)| ingame),
         moderator: item.roles.as_ref().map(|roles| moderator(roles)),
+        rating: item.rating.as_ref().map(|rating| points(rating.value)),
     })
+}
+
+/// A Tachyon rating as the whole points a lobby shows.
+///
+/// The schema types it as a number and Teiserver's ratings are fractional, so
+/// something has to happen to the fraction. Rounding rather than truncating,
+/// because a rating is a position rather than a count and 24.9 is a 25.
+fn points(value: f64) -> i32 {
+    value.round() as i32
 }
 
 /// Split a Tachyon status into the two bits [`coilbox_lobby_protocol::ClientStatus`]
@@ -360,6 +379,53 @@ mod tests {
                 },
             ]
         );
+    }
+
+    /// The key Tachyon reserves for a rating, read for the day something fills
+    /// it (issue #2002). Teiserver does not, so nothing on Beyond All Reason
+    /// exercises this but the schema.
+    #[test]
+    fn a_rating_is_taken_from_the_key_tachyon_reserves_for_one() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            &self_frame(json!({ "rating": { "value": 25.4 } })),
+        );
+
+        let rating = user_named(&state, "alice").rating;
+        // Whole points. A lobby shows a rating as a number, and the fraction
+        // Tachyon carries is below anything worth drawing.
+        assert_eq!(rating.overall, Some(25));
+        // Tachyon names no category, so neither does this. Guessing which of
+        // Zero-K's two it stood for would be inventing an answer.
+        assert_eq!(rating.casual, None);
+        assert_eq!(rating.matchmaking, None);
+    }
+
+    /// The normal case on the one server that speaks this protocol.
+    #[test]
+    fn a_user_with_no_rating_key_is_rated_by_nobody() {
+        let mut state = LobbyState::new();
+        feed(&mut state, &self_frame(json!({})));
+        assert!(user_named(&state, "alice").rating.is_empty());
+    }
+
+    /// A partial update says only what changed, so a frame that does not mention
+    /// the rating must leave the one we hold alone.
+    #[test]
+    fn an_update_that_says_nothing_about_a_rating_keeps_the_one_we_have() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            &self_frame(json!({ "rating": { "value": 25.4 } })),
+        );
+
+        feed(
+            &mut state,
+            &updated_frame(json!([{ "userId": "1", "countryCode": "FR" }])),
+        );
+
+        assert_eq!(user_named(&state, "alice").rating.overall, Some(25));
     }
 
     #[test]

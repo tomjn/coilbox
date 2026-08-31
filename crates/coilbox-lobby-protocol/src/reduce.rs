@@ -7,8 +7,8 @@
 
 use crate::message::ServerMessage;
 use crate::state::{
-    Battle, Bot, ChannelState, ChatKind, ChatMsg, DirChannel, LobbyState, MemberStatus, StartRect,
-    TurnCredentials, User, Vote,
+    Battle, Bot, ChannelState, ChatKind, ChatMsg, DirChannel, LobbyState, MemberStatus, Rating,
+    StartRect, TurnCredentials, User, Vote,
 };
 use crate::status::{BattleStatus, ClientStatus};
 use crate::vote::{parse_vote_line, VoteLine};
@@ -308,6 +308,9 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                     user_id,
                     agent,
                     status: ClientStatus::default(),
+                    // TASServer has no rating anywhere in the protocol, so
+                    // nobody on one is ever rated (issue #2002).
+                    rating: Rating::default(),
                 },
             );
             vec![Delta::UserAdded { name: username }]

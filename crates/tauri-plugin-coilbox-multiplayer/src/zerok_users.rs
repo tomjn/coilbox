@@ -26,7 +26,7 @@
 //! That echo is the notification, which is why membership is maintained here
 //! rather than beside the room.
 
-use coilbox_lobby_protocol::{ClientStatus, Delta, LobbyState, MemberStatus, User};
+use coilbox_lobby_protocol::{ClientStatus, Delta, LobbyState, MemberStatus, Rating, User};
 use coilbox_zerok_protocol::types;
 use coilbox_zerok_protocol::ZerokMessage;
 
@@ -62,6 +62,7 @@ fn put(state: &mut LobbyState, record: &types::User) -> Vec<Delta> {
         // TASServer connection too.
         agent: record.lobby_version.clone().unwrap_or_default(),
         status,
+        rating: rating_of(record),
     };
 
     let mut deltas = Vec::new();
@@ -152,6 +153,31 @@ fn remove(state: &mut LobbyState, name: &str) -> Vec<Delta> {
 /// Zero-K carries these as timestamps rather than flags: `InGameSince` and
 /// `AwaySince` are set to when it started and cleared when it stops, so their
 /// presence is the flag.
+/// Both of the ratings a Zero-K record carries (issue #2002).
+///
+/// The two are live at once and mean different things: `EffectiveElo` is what a
+/// custom battle counts toward, `EffectiveMmElo` is what the matchmaker queues
+/// on, and upstream keeps them apart because they are far enough apart to matter.
+///
+/// `Level` is deliberately not here. It is experience rather than skill, and a
+/// number that goes up for playing at all does not belong beside two that go up
+/// for winning.
+///
+/// Zero is not a rating. Both members are plain ints upstream, so they arrive as
+/// 0 for an account nobody has rated yet rather than being left out.
+fn rating_of(record: &types::User) -> Rating {
+    Rating {
+        casual: rated(record.effective_elo),
+        matchmaking: rated(record.effective_mm_elo),
+        overall: None,
+    }
+}
+
+/// A rating, or nothing where the number stands for the absence of one.
+fn rated(value: i32) -> Option<i32> {
+    (value > 0).then_some(value)
+}
+
 fn status_of(record: &types::User) -> ClientStatus {
     ClientStatus {
         ingame: record.in_game_since.is_some(),
@@ -209,6 +235,53 @@ mod tests {
         assert_eq!(
             deltas,
             vec![Delta::UserAdded {
+                name: "someone".into()
+            }]
+        );
+    }
+
+    /// The one protocol of the three that rates everybody, on every record, all
+    /// the time (issue #2002).
+    #[test]
+    fn a_record_carries_both_of_the_ratings_zero_k_keeps() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            r#"User {"Name":"someone","EffectiveElo":1650,"EffectiveMmElo":1720}"#,
+        );
+
+        let rating = state.users["someone"].rating;
+        assert_eq!(rating.casual, Some(1650));
+        assert_eq!(rating.matchmaking, Some(1720));
+        // The category Zero-K keeps and this does not, because a Zero-K record
+        // never arrives without one.
+        assert_eq!(rating.overall, None);
+    }
+
+    /// `EffectiveElo` is a plain int upstream, so an account nobody has rated
+    /// arrives as 0. Showing that as a rating would put every new player at the
+    /// bottom of a table they are not on.
+    #[test]
+    fn a_zero_is_nobody_s_rating() {
+        let mut state = LobbyState::new();
+        feed(&mut state, r#"User {"Name":"someone","EffectiveElo":0}"#);
+
+        assert!(state.users["someone"].rating.is_empty());
+    }
+
+    /// A rating moves after every rated game, and the roster showing it has to
+    /// hear about that the same way it hears about anything else on the record.
+    #[test]
+    fn a_rating_that_moves_is_worth_a_delta() {
+        let mut state = LobbyState::new();
+        feed(&mut state, r#"User {"Name":"someone","EffectiveElo":1650}"#);
+
+        let deltas = feed(&mut state, r#"User {"Name":"someone","EffectiveElo":1672}"#);
+
+        assert_eq!(state.users["someone"].rating.casual, Some(1672));
+        assert_eq!(
+            deltas,
+            vec![Delta::UserStatusChanged {
                 name: "someone".into()
             }]
         );
