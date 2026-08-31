@@ -171,9 +171,10 @@ export default function GameUnitsPage() {
   // loaded yet. `"idle"` and `"loading"` both still block. `"unsyncable"`
   // does not, since its `dataset.units` is already populated (see the error
   // branch above for why status alone cannot be trusted to mean "nothing to
-  // show"). This is not the same gate `GameDetailPage` uses: that page's
-  // `FactionBuildList` never states a unit count in text, it only disables
-  // build buttons, so it has no equivalent false statement to avoid.
+  // show"). This is not the same gate `GameDetailPage` uses: its own "every
+  // side is dead" note is gated on `datasetStatus === "ready"` rather than on
+  // `gameInfoLoading`, so it has its own guard against the same false
+  // statement, and `FactionBuildList`'s buttons just disable on a 0 count.
   if (
     datasetStatus === "idle" ||
     datasetStatus === "loading" ||

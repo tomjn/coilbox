@@ -136,6 +136,38 @@ export function FactionBuildButton({
   );
 }
 
+/**
+ * Units reachable from each side's commander via buildoptions, with each morph
+ * group folded onto its base so an upgrade stage's build options count under
+ * the commander rather than a stage of its own (issue #2063). A side maps to 0
+ * when the dataset is still loading, the game exposes no buildoptions, or (as
+ * on Zero-K) the engine reports a start unit the dataset never defines.
+ * Exported so `GameDetailPage` can tell "every side is dead" from "some are"
+ * using the exact numbers the buttons below disable on, rather than a second
+ * guess at the same reachability.
+ */
+export function useFactionReachableCounts(
+  sides: Side[],
+  units: UnitDatasetEntry[],
+) {
+  return useMemo(() => {
+    // The engine's reported start unit can be any stage of its morph group,
+    // not necessarily the base the folded edge map keys its node on, so it's
+    // resolved here first or the lookup misses and the count reads 0.
+    const morphBase = groupOf(morphGroups(units));
+    const resolvedSides = sides.map((s) => {
+      const startUnit = s.startUnit?.toLowerCase();
+      return startUnit
+        ? { ...s, startUnit: morphBase.get(startUnit) ?? startUnit }
+        : s;
+    });
+    return reachableCounts(
+      resolvedSides,
+      foldMorphs(units, buildEdgeMap(units)),
+    );
+  }, [sides, units]);
+}
+
 /** The list of faction build buttons for a game's sides. */
 export function FactionBuildList({
   enginePath,
@@ -170,27 +202,7 @@ export function FactionBuildList({
     factionLogos,
     branding,
   };
-  // Units reachable from each faction's commander via buildoptions, with each
-  // morph group folded onto its base so an upgrade stage's build options count
-  // under the commander rather than a stage of its own (issue #2063). Omitted
-  // (and the button left inert) when the dataset is still loading or the game
-  // exposes no buildoptions (0).
-  const counts = useMemo(() => {
-    // The engine's reported start unit can be any stage of its morph group,
-    // not necessarily the base the folded edge map keys its node on, so it's
-    // resolved here first or the lookup misses and the count reads 0.
-    const morphBase = groupOf(morphGroups(units));
-    const resolvedSides = sides.map((s) => {
-      const startUnit = s.startUnit?.toLowerCase();
-      return startUnit
-        ? { ...s, startUnit: morphBase.get(startUnit) ?? startUnit }
-        : s;
-    });
-    return reachableCounts(
-      resolvedSides,
-      foldMorphs(units, buildEdgeMap(units)),
-    );
-  }, [sides, units]);
+  const counts = useFactionReachableCounts(sides, units);
   return (
     <ul className="flex flex-col gap-2">
       {sides.map((s) => {

@@ -3,7 +3,7 @@ import { FolderOpen, Loader2, Trophy } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { GameEquivalents } from "@/blueprint/pages/components/GameEquivalents";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFactionLogos } from "@/factions/logos";
 import { generatedGameNote } from "@/lib/generatedGames";
@@ -28,7 +28,10 @@ import { ArchiveRow } from "./components/ArchiveRow";
 import { BrandingLinks } from "./components/BrandingLinks";
 import { BrandingScreenshots } from "./components/BrandingScreenshots";
 import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
-import { FactionBuildList } from "./components/FactionBuildList";
+import {
+  FactionBuildList,
+  useFactionReachableCounts,
+} from "./components/FactionBuildList";
 import { GameHeader } from "./components/GameHeader";
 import { MissionRuntimeSection } from "./components/MissionRuntimeSection";
 import { OptionsList } from "./components/OptionsList";
@@ -90,6 +93,14 @@ export default function GameDetailPage() {
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
+  );
+  // Same counts FactionBuildList's buttons disable on, so the "every side is
+  // dead" note below (Zero-K: a readable 614-unit roster whose one side reports
+  // a start unit, `update_your_damn_engine`, that unit dataset never defines)
+  // and the buttons it explains never disagree.
+  const factionCounts = useFactionReachableCounts(
+    gameInfo?.sides ?? [],
+    dataset?.units ?? [],
   );
   const brand = useBrandingEntry(game);
   const factionNames = useMemo(
@@ -163,6 +174,17 @@ export default function GameDetailPage() {
     contentOpenPath({ path: target }).catch(() => {});
   };
 
+  // Gated on "ready" (a genuine read, checksum and all) rather than just
+  // `dataset` being non-null, or this reads true for a heartbeat while the
+  // dataset is still loading and every side's count is 0 because there are no
+  // units yet, not because none of them resolve. A game whose read failed
+  // entirely gets its own message below instead.
+  const noSideReachesAnything =
+    datasetStatus === "ready" &&
+    (dataset?.units.length ?? 0) > 0 &&
+    (gameInfo?.sides.length ?? 0) > 0 &&
+    gameInfo?.sides.every((s) => (factionCounts.get(s.name) ?? 0) === 0);
+
   return (
     <div className="flex flex-col gap-5 p-4">
       <GameHeader
@@ -220,19 +242,52 @@ export default function GameDetailPage() {
             </h2>
             {/* Per-faction browsing (FactionBuildList) never reaches the units no
                 faction's build tree reaches, so this is the one way back to all
-                of them, "Other units" included. */}
-            <Link
-              to={`/content/games/${encodeURIComponent(game.name)}/units`}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-            >
-              All units
-            </Link>
+                of them, "Other units" included, unless the read that would
+                populate it failed outright. Then there is nothing for it to
+                link to either. */}
+            {datasetStatus === "error" ? (
+              <Button type="button" variant="outline" size="sm" disabled>
+                All units
+              </Button>
+            ) : (
+              <Link
+                to={`/content/games/${encodeURIComponent(game.name)}/units`}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                )}
+              >
+                All units
+              </Link>
+            )}
           </div>
-          {/* An unreadable unit list leaves every faction button on nothing,
-              which otherwise reads as a game with no build tree. */}
+          {/* An unreadable unit list leaves every faction button, and All
+              units, on nothing. The errors say this is a coilbox read
+              failure, not the game shipping none. */}
           {datasetStatus === "error" && (
+            <Alert variant="destructive">
+              <AlertTitle>Could not read this game&apos;s units</AlertTitle>
+              <AlertDescription>
+                <ul className="flex flex-col gap-1 font-mono text-xs">
+                  {(dataset?.errors ?? []).map((e) => (
+                    <li key={e} className="break-words">
+                      {e}
+                    </li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+          {/* The read succeeded (Zero-K: 614 units, no errors) but every side's
+              start unit is one the dataset never defines, so every per-faction
+              button below is correctly dead. Without this, that reads as a
+              broken page rather than the game's own sides.lua declining to
+              hand back a usable commander. All units still works, since the
+              roster it lists never depended on a side resolving. */}
+          {noSideReachesAnything && (
             <p className="text-xs text-muted-foreground">
-              Could not read this game's units, so its build trees are empty.
+              None of this game&apos;s sides resolve to a start unit in its
+              roster, so every build tree below is empty. All units still lists
+              the full roster.
             </p>
           )}
           {gameInfoLoading || !gameInfo || !selected ? (
