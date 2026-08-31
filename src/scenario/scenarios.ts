@@ -22,6 +22,9 @@ import { type LoadedScenario, listScenarios } from "./storage";
  */
 let storedCache: LoadedScenario[] | null = null;
 let gamesCache: LoadedScenario[] = [];
+/** Whether the games half has settled at least once this session, so a later
+ *  mount does not report itself as still loading over a list it already has. */
+let gamesRead = false;
 let cache: LoadedScenario[] | null = null;
 const listeners = new Set<(scenarios: LoadedScenario[]) => void>();
 
@@ -62,12 +65,15 @@ export async function refreshScenarios(): Promise<LoadedScenario[]> {
 export function useScenarios() {
   const [scenarios, setScenarios] = useState<LoadedScenario[]>(cache ?? []);
   const [loading, setLoading] = useState(storedCache === null);
+  const [gamesDone, setGamesDone] = useState(gamesRead);
   const [error, setError] = useState<string | null>(null);
   // A game's own missions need the installed games list. The content scan
   // already resolves and caches that (the sidebar and the Scenarios page both
   // already pay for it), so this reuses it rather than scanning again.
-  const { target } = usePreferredTarget();
-  const { data: scan } = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const { target, loading: targetLoading } = usePreferredTarget();
+  const enginePath = target?.enginePath;
+  const dataDir = target?.dataDir;
+  const { data: scan } = useUnitsyncScan(enginePath, dataDir);
 
   useEffect(() => {
     const listener = (loaded: LoadedScenario[]) => setScenarios(loaded);
@@ -113,6 +119,16 @@ export function useScenarios() {
   // version of what a later-resolving mount already had cached, only to
   // correct itself a render later.
   useEffect(() => {
+    if (targetLoading) return;
+    // No engine means no installed game, so there is nothing to wait for and
+    // the games half is already as complete as it will get. Settling here is
+    // what stops the page holding `loading` true forever on a machine that has
+    // no engine, where the scan never runs and never answers.
+    if (!enginePath || !dataDir) {
+      gamesRead = true;
+      setGamesDone(true);
+      return;
+    }
     if (!scan) return;
     let cancelled = false;
     gameScenarios(scan.games)
@@ -123,11 +139,16 @@ export function useScenarios() {
       })
       .catch((e) => {
         console.warn("could not read a game's own missions", e);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        gamesRead = true;
+        setGamesDone(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [scan]);
+  }, [scan, targetLoading, enginePath, dataDir]);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -138,7 +159,11 @@ export function useScenarios() {
     }
   }, []);
 
-  return { scenarios, loading, error, refresh };
+  // Loading covers both halves. Reporting the stored half's own state would
+  // settle before a game's missions have been read, which shows a player whose
+  // only scenarios come from a game an empty list first and the real one a
+  // moment later.
+  return { scenarios, loading: loading || !gamesDone, error, refresh };
 }
 
 /**

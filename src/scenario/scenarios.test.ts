@@ -26,6 +26,10 @@ const gameScenariosMock = vi.fn();
  *  for real. */
 let scanData: { games: GameItem[] } | null = null;
 
+/** What `usePreferredTarget` currently reports. Null stands in for a machine
+ *  with no engine installed, where the scan never runs at all. */
+let targetData: { enginePath: string; dataDir: string } | null = null;
+
 vi.mock("./storage", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./storage")>();
   return {
@@ -41,7 +45,7 @@ vi.mock("../content/config", () => ({
 }));
 vi.mock("../play/config", () => ({
   usePreferredTarget: () => ({
-    target: { enginePath: "/engine", dataDir: "/data" },
+    target: targetData,
     loading: false,
     error: null,
   }),
@@ -54,6 +58,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   scanData = null;
+  targetData = { enginePath: "/engine", dataDir: "/data" };
   listScenariosMock.mockResolvedValue([]);
   gameScenariosMock.mockResolvedValue([]);
 });
@@ -79,5 +84,32 @@ describe("useScenarios", () => {
       expect(gameScenariosMock).toHaveBeenCalledWith([game("SplinterFaction")]),
     );
     expect(listScenariosMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays loading until a game's own missions have been read", async () => {
+    const { useScenarios } = await import("./scenarios");
+    const { result, rerender } = renderHook(() => useScenarios());
+
+    // The stored half has answered, and it found nothing. The games half has
+    // not, because the scan has not resolved, so this must not read as a
+    // finished empty list.
+    await waitFor(() => expect(listScenariosMock).toHaveBeenCalledTimes(1));
+    expect(result.current.loading).toBe(true);
+
+    scanData = { games: [game("SplinterFaction")] };
+    rerender();
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+  });
+
+  it("settles with no engine installed, where the scan never answers", async () => {
+    targetData = null;
+    const { useScenarios } = await import("./scenarios");
+    const { result } = renderHook(() => useScenarios());
+
+    // Nothing can ship a mission without an engine, so waiting on the games
+    // half here would hold the page loading for good.
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(gameScenariosMock).not.toHaveBeenCalled();
   });
 });
