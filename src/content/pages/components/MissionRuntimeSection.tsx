@@ -6,7 +6,7 @@ import {
   Loader2,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -457,6 +457,27 @@ function DuplicateFolders({
 }
 
 /**
+ * The "Mission runtime" heading both branches below share, collapsed by
+ * default. This section is the game page's longest, running to a full install
+ * summary, a capability breakdown and a written-missions list, and this page
+ * has only ever had one caller, so it can start closed without any other
+ * screen noticing.
+ */
+function RuntimeSectionShell({ children }: { children: ReactNode }) {
+  return (
+    <Collapsible className="flex flex-col gap-2">
+      <CollapsibleTrigger className="group flex w-fit cursor-pointer items-center gap-1 text-left">
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
+        <h2 className="text-sm font-medium">Mission runtime</h2>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2 flex flex-col gap-2">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/**
  * What a packaged `.sd7`/`.sdz` gets in place of the install action: why the
  * runtime cannot go into it, and the test mutator coilbox generates instead.
  *
@@ -474,8 +495,7 @@ function PackagedOffer({
   const { reason, offer, limit } = mutatorOffer(gameName, available);
   const { conditions, actions } = runtimeCapabilities(available, available);
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Mission runtime</h2>
+    <RuntimeSectionShell>
       <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
         <div className="flex max-w-prose flex-col gap-2 text-sm text-muted-foreground">
           <p>{reason}</p>
@@ -490,7 +510,7 @@ function PackagedOffer({
           available={available}
         />
       </div>
-    </section>
+    </RuntimeSectionShell>
   );
 }
 
@@ -567,8 +587,7 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
   const note = formatNote(installed, available);
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Mission runtime</h2>
+    <RuntimeSectionShell>
       <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-prose text-sm text-muted-foreground">
@@ -614,6 +633,6 @@ export function MissionRuntimeSection({ game }: { game: GameItem }) {
         <WrittenMissions root={root} />
       </div>
       {error && <p className="break-words text-sm text-destructive">{error}</p>}
-    </section>
+    </RuntimeSectionShell>
   );
 }

@@ -367,7 +367,14 @@ export default function GameDetailPage() {
         </section>
       )}
 
-      <OptionsList options={gameInfo?.options ?? []} title="Game options" />
+      {/* Both this and the mission runtime below can run long enough on their
+          own to push the primary archive and dependencies off the first
+          screen, so they open collapsed. */}
+      <OptionsList
+        options={gameInfo?.options ?? []}
+        title="Game options"
+        defaultOpen={false}
+      />
 
       <MissionRuntimeSection game={game} />
 

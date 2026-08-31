@@ -13,10 +13,10 @@
  * MissionRuntimeSection, GameEquivalents) is stubbed out, following
  * `GameUnitsPage.dom.test.tsx`'s mocking shape for the unitsync hooks.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { UnitDatasetEntry } from "../bindings";
+import type { ConfigOption, UnitDatasetEntry } from "../bindings";
 
 vi.mock("@picoframe/frame", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("@picoframe/frame")),
@@ -66,7 +66,7 @@ let mockGameInfo: {
   sides: { name: string; startUnit?: string }[];
   unitCount: number;
   units: never[];
-  options: never[];
+  options: ConfigOption[];
   errors: never[];
   checksum?: string;
 } = { sides: [], unitCount: 0, units: [], options: [], errors: [] };
@@ -119,17 +119,19 @@ function renderPage({
   units,
   datasetStatus,
   errors = [],
+  options = [],
 }: {
   sides: { name: string; startUnit?: string }[];
   units: UnitDatasetEntry[];
   datasetStatus: "ready" | "unsyncable" | "error" | "loading";
   errors?: string[];
+  options?: ConfigOption[];
 }) {
   mockGameInfo = {
     sides,
     unitCount: units.length,
     units: [],
-    options: [],
+    options,
     errors: [],
     checksum: "abc123",
   };
@@ -199,5 +201,34 @@ describe("GameDetailPage's Sides section", () => {
       "disabled",
       false,
     );
+  });
+});
+
+describe("GameDetailPage's Game options section", () => {
+  it("starts closed and shows an option's description only once opened", async () => {
+    renderPage({
+      sides: [],
+      units: [],
+      datasetStatus: "ready",
+      options: [
+        {
+          key: "fixedallies",
+          name: "Fixed Allies",
+          description: "Allies are set before the game starts.",
+        },
+      ],
+    });
+    const trigger = await screen.findByRole("button", {
+      name: /Game options \(1\)/,
+    });
+    expect(
+      screen.queryByText("Allies are set before the game starts."),
+    ).toBeNull();
+
+    fireEvent.click(trigger);
+
+    expect(
+      await screen.findByText("Allies are set before the game starts."),
+    ).toBeTruthy();
   });
 });
