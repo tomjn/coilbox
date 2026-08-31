@@ -107,26 +107,27 @@ export function FactionBuildButton({
       </div>
       {/* Equal weight: the drawer answers "what does this faction lead to",
           the grid answers "what does this faction have", and neither is the
-          other's afterthought. */}
-      <div className="flex gap-2">
+          other's afterthought. Sized to their labels and pushed to the right
+          edge of the row rather than stretched full-width, or a two-word
+          button reads as a banner rather than an action. */}
+      <div className="flex justify-end gap-2">
         <Button
           type="button"
           variant="outline"
           disabled={count === 0}
           onClick={open}
-          className="flex-1"
         >
           Build tree
         </Button>
         {browseHref && count > 0 ? (
           <Link
             to={browseHref}
-            className={cn(buttonVariants({ variant: "outline" }), "flex-1")}
+            className={cn(buttonVariants({ variant: "outline" }))}
           >
             Browse units
           </Link>
         ) : (
-          <Button type="button" variant="outline" disabled className="flex-1">
+          <Button type="button" variant="outline" disabled>
             Browse units
           </Button>
         )}
