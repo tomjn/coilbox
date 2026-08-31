@@ -98,6 +98,7 @@ function drawHeader(
       onLeave={() => {}}
       onStart={() => {}}
       selfHost={over.selfHost ?? true}
+      closesRoom={false}
       locked={false}
       onToggleLock={() => {}}
       serverKey={null}

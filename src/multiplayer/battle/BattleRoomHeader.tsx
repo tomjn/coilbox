@@ -33,7 +33,9 @@ import { startAnywayWarning } from "./startBlockers";
  *
  * When we host the battle ourselves (`selfHost`), the bar also carries a native
  * Lock toggle, and Leave becomes "Close battle" (leaving tears the battle down
- * for everyone, so it confirms first).
+ * for everyone, so it confirms first). In a LAN room of our own it takes the
+ * room down too, and says so, because the room and the battle in it were started
+ * together and are read as one thing (issue #2057).
  *
  * Start confirms too when somebody in the room says they cannot play it
  * (issue #1605), because in a room coilbox hosts itself there is no server
@@ -53,6 +55,7 @@ export function BattleRoomHeader({
   onLeave,
   onStart,
   selfHost,
+  closesRoom,
   locked,
   onToggleLock,
   serverKey,
@@ -75,6 +78,9 @@ export function BattleRoomHeader({
   onLeave: () => void;
   onStart: () => void;
   selfHost: boolean;
+  /** Whether closing this battle takes down the LAN room it is in as well, which
+   * is what the confirmation has to promise (issue #2057). */
+  closesRoom: boolean;
   locked: boolean;
   onToggleLock: (locked: boolean) => void;
   /** This room's connection key (issue #498), for a "Copy invite link"
@@ -275,8 +281,9 @@ export function BattleRoomHeader({
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 space-y-3">
                 <p className="text-sm">
-                  Close this battle? Everyone will be removed and it will
-                  disappear from the battle list.
+                  {closesRoom
+                    ? "Close this battle? Everyone will be removed, and the room it is in will stop hosting and give its port back."
+                    : "Close this battle? Everyone will be removed and it will disappear from the battle list."}
                 </p>
                 <div className="flex justify-end gap-2">
                   <Button

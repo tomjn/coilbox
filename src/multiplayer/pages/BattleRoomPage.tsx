@@ -3,8 +3,11 @@ import { Bookmark, Gamepad2, LogIn } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useBrandingEntry } from "@/content/branding";
+import { useHostedRoom } from "@/direct/hostedRoom";
 import { PendingJoinsPanel, usePendingJoins } from "@/direct/PendingJoins";
 import { RoomMovedPanel } from "@/direct/RoomMoved";
+import { closeEndsTheRoom } from "@/direct/room";
+import { stopHostedRoom } from "@/direct/stopRoom";
 import { useFactionLogos } from "@/factions/logos";
 import { notify } from "@/notify/notify";
 import { useSkirmishAis } from "@/play/config";
@@ -45,7 +48,7 @@ import { VotePanel } from "../battle/VotePanel";
 import { useNoteActions } from "../notes";
 import { useStatsRelations } from "../statsRelation";
 import { relationSummary } from "../statsRelationSummary";
-import { useMpRevealed } from "../store";
+import { useMpRevealed, useMultiplayer } from "../store";
 
 /**
  * The battle room for a joined multiplayer battle. Reads the live battle from the
@@ -57,6 +60,11 @@ import { useMpRevealed } from "../store";
  */
 function BattleRoomPage() {
   const room = useBattleRoom();
+  const { disconnect } = useMultiplayer();
+  // The room this client hosts, if it hosts one. Read here because the battle on
+  // screen may be the one inside it, and then closing the battle is closing the
+  // room (issue #2057).
+  const hostedRoom = useHostedRoom();
   const factionLogos = useFactionLogos({
     game: room.localGame,
     enginePath: room.enginePath,
@@ -375,8 +383,36 @@ function BattleRoomPage() {
   }
 
   const battle = room.battle;
+  // Whether "Close battle" ends the room as well as the battle in it, which
+  // decides both what the button does and what its confirmation promises.
+  const endsTheRoom = closeEndsTheRoom({
+    selfHost: room.selfHost,
+    directRoom: room.directRoom,
+    hosting: !!hostedRoom,
+  });
 
   async function onLeave() {
+    // A battle in this client's own LAN room is the room, so the button that
+    // closes one closes both (issue #2057). Not a leave followed by a stop: the
+    // room's own "Stop room" drops this client first on purpose, and the two
+    // buttons now do the same thing in the same order.
+    if (endsTheRoom) {
+      try {
+        await stopHostedRoom(hostedRoom?.host ?? "", disconnect);
+      } catch (e) {
+        // Said out here rather than in the room's own line, which is on the page
+        // this is about to leave for and describes a room that is still up. The
+        // "Stop room" button beside it is the way out.
+        void notify({
+          title: "The room is still running",
+          body: `Coilbox could not close it: ${e instanceof Error ? e.message : String(e)}. Stop it from the Battles page.`,
+          level: "error",
+        });
+      } finally {
+        navigate("/battles");
+      }
+      return;
+    }
     // `leave` reports its own failure via `room.actionError` and never throws;
     // navigate regardless so a failed LEAVE can't strand the user in the room.
     try {
@@ -402,6 +438,7 @@ function BattleRoomPage() {
         onLeave={onLeave}
         onStart={onStart}
         selfHost={room.selfHost}
+        closesRoom={endsTheRoom}
         locked={battle.locked}
         onToggleLock={room.setLocked}
         // Same as the battle row on the Battles page: a room of our own is

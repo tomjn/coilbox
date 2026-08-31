@@ -4,6 +4,7 @@ import type { DirectRoomStatus } from "./bindings";
 import {
   announcementNote,
   battleOpened,
+  closeEndsTheRoom,
   DEFAULT_ROOM_PORT,
   directServer,
   gameAddressNote,
@@ -93,6 +94,41 @@ describe("startRoomFailure", () => {
     expect(startRoomFailure(null, 8200)).toBe(
       "Could not start a room on port 8200.",
     );
+  });
+});
+
+describe("closeEndsTheRoom", () => {
+  // The failure this exists for (issue #2057). The room and the battle in it are
+  // one thing to the host who started them together, so closing the battle has
+  // to take the room with it or the promise on the button is not kept.
+  it("takes the room down with the battle the host opened in it", () => {
+    expect(
+      closeEndsTheRoom({ selfHost: true, directRoom: true, hosting: true }),
+    ).toBe(true);
+  });
+
+  // A battle this client founded on a lobby server. Leaving closes the battle
+  // and nothing else, because there is no room here to close and the connection
+  // is an account somebody logged in with.
+  it("leaves a battle on a server as a battle to leave", () => {
+    expect(
+      closeEndsTheRoom({ selfHost: true, directRoom: false, hosting: true }),
+    ).toBe(false);
+  });
+
+  // In somebody else's room. Their room is theirs, and this client hosts none.
+  it("never closes a room this client is only a guest in", () => {
+    expect(
+      closeEndsTheRoom({ selfHost: false, directRoom: true, hosting: false }),
+    ).toBe(false);
+  });
+
+  // The founder is the one the room gave host powers to, so a battle in our own
+  // room that somebody else founded is not ours to close either.
+  it("wants the battle to be ours as well as the room", () => {
+    expect(
+      closeEndsTheRoom({ selfHost: false, directRoom: true, hosting: true }),
+    ).toBe(false);
   });
 });
 

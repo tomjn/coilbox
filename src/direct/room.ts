@@ -69,6 +69,36 @@ export function hostBlockedReason(
   return "Log out of the lobby server first. Coilbox holds one lobby connection, and hosting a room needs it.";
 }
 
+/**
+ * Whether closing this battle ends the room it is in as well. Pure.
+ *
+ * A host who picks "Host on LAN" starts two things in one go, a room and a
+ * battle inside it, and reads them as one. So "Close battle" in that room has to
+ * end both. It used to leave the battle and nothing else, which left the room
+ * listening, still holding its port and still announcing itself on the network,
+ * under a confirmation that had just said it would disappear (issue #2057).
+ *
+ * All three have to hold. `hosting` is the room this client runs, `directRoom`
+ * is the connection being that room rather than a lobby server, and `selfHost`
+ * is this client being the founder of the battle on screen. A battle founded on
+ * a real server is left and not closed, because there is no room of ours behind
+ * it.
+ */
+export function closeEndsTheRoom({
+  selfHost,
+  directRoom,
+  hosting,
+}: {
+  /** This client founded the battle on screen and runs it. */
+  selfHost: boolean;
+  /** The live connection is a room somebody hosts rather than a lobby server. */
+  directRoom: boolean;
+  /** This client is hosting a room right now. */
+  hosting: boolean;
+}): boolean {
+  return selfHost && directRoom && hosting;
+}
+
 /** The words a stopped room gives its joiners, so the drop is named rather than
  *  silent. Pure. */
 export function roomStopReason(host: string): string {
