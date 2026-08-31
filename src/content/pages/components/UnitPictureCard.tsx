@@ -37,16 +37,20 @@ export function UnitPictureCard({
       src={src}
       alt=""
       loading="lazy"
-      className="size-12 rounded object-contain"
+      className="size-16 rounded object-contain"
     />
   ) : (
-    <span aria-hidden className="size-12 shrink-0 rounded bg-muted" />
+    <span aria-hidden className="size-16 shrink-0 rounded bg-muted" />
   );
 
   const content = (
     <>
       {picture}
-      <span className="w-full truncate text-xs font-medium" title={label}>
+      {/* Wraps to a second line rather than truncating, the same reason
+          `GameUnitsPage`'s grid cell gives: several units sharing a prefix
+          (SplinterFaction's commander tech levels among them) are only told
+          apart by their full name. */}
+      <span className="line-clamp-2 w-full text-xs font-medium" title={label}>
         {label}
       </span>
       {defKey && (
@@ -67,7 +71,7 @@ export function UnitPictureCard({
 
   if (current) {
     return (
-      <div className="flex w-28 flex-col items-center gap-1 rounded-lg border border-primary/60 bg-primary/5 p-2 text-center">
+      <div className="flex w-32 flex-col items-center gap-1 rounded-lg border border-primary/60 bg-primary/5 p-2 text-center">
         {content}
       </div>
     );
@@ -76,7 +80,7 @@ export function UnitPictureCard({
   return (
     <Link
       to={to}
-      className="flex w-28 flex-col items-center gap-1 rounded-lg border border-border/50 bg-card p-2 text-center transition-colors hover:border-border hover:bg-accent/50"
+      className="flex w-32 flex-col items-center gap-1 rounded-lg border border-border/50 bg-card p-2 text-center transition-colors hover:border-border hover:bg-accent/50"
     >
       {content}
     </Link>
