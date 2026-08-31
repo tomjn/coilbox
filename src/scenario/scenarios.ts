@@ -3,7 +3,7 @@ import { useUnitsyncScan } from "../content/config";
 import { usePreferredTarget } from "../play/config";
 import { gameScenarios } from "./gameScenarios";
 import { playableScenarios } from "./listing";
-import { type LoadedScenario, listScenarios } from "./storage";
+import { type GameOrigin, type LoadedScenario, listScenarios } from "./storage";
 
 /**
  * Session cache of the parsed scenario list, so navigating back to the Scenario
@@ -47,13 +47,39 @@ function publish(): LoadedScenario[] {
 /**
  * Re-read every stored scenario and push the result to every consumer.
  *
- * A game's own missions are not re-read here: nothing this is called after (a
- * save, a delete, a rescan of stored documents) ever changes one, so whatever
- * `useScenarios` last folded in from the game's archive is carried over rather
- * than dropped from the list until the next full reload.
+ * A game's own missions are not re-read here: almost nothing this is called
+ * after (a save, a delete, a rescan of stored documents) ever changes one, so
+ * whatever `useScenarios` last folded in from the game's archive is carried over
+ * rather than dropped from the list until the next full reload. The one thing
+ * that does change one says so through {@link addGameMission} and
+ * {@link forgetGameMission}.
  */
 export async function refreshScenarios(): Promise<LoadedScenario[]> {
   storedCache = await listScenarios();
+  return publish();
+}
+
+/**
+ * Fold in a mission an author has just moved into a game (`moveIntoGame.ts`).
+ *
+ * The games half is read from the installed games list rather than on demand, so
+ * a move that changes what a game ships would otherwise not show until the next
+ * full reload, and the editor would find nothing at the route it just moved the
+ * document to. The document written into the game is the one being handed over
+ * here, so this splices rather than reading the archive back.
+ */
+export function addGameMission(loaded: LoadedScenario): LoadedScenario[] {
+  gamesCache = [...gamesCache, loaded];
+  return publish();
+}
+
+/** The reverse: a mission an author has taken back out of a game. */
+export function forgetGameMission(origin: GameOrigin): LoadedScenario[] {
+  gamesCache = gamesCache.filter(
+    (l) =>
+      l.origin?.archivePath !== origin.archivePath ||
+      l.origin.folder !== origin.folder,
+  );
   return publish();
 }
 

@@ -571,6 +571,53 @@ async fn scenario_write_mission<R: Runtime>(
     }
 }
 
+/// Write the document and the compiled mission of a mission an author is putting
+/// into a game, under `missions/<folder>/`, and hand back the folder.
+///
+/// The fence is the same shape as the test mutator's. A loose `.sdd` only, one
+/// folder only, and nothing else in the game is written or removed. A packaged
+/// archive is a file rather than a directory, so it fails in
+/// [`writable_game_dir`], which is what makes a shipped game's missions
+/// read-only. Shared by [`scenario_write_game_mission`] and its own tests, since
+/// a `#[tauri::command]` function cannot be called directly from a plain
+/// `#[test]`.
+fn write_game_mission(
+    root: &str,
+    folder: &str,
+    document: &str,
+    mission: &str,
+) -> Result<PathBuf, String> {
+    if !valid_id(folder) {
+        return Err(format!("invalid mission folder: {folder}"));
+    }
+    let dir = writable_game_dir(root)?;
+    let missions = mutator::mission_dir(&dir, folder);
+    mutator::write_file(&missions.join("mission.lua"), mission)?;
+    mutator::write_file(&missions.join("scenario.json"), document)?;
+    Ok(missions)
+}
+
+/// `scenario_write_game_mission`, writing a mission the author is putting into a
+/// game: the compiled `mission.lua` and the `scenario.json` it was compiled from.
+///
+/// Unlike [`scenario_write_mission`], which writes what a launch needs into a
+/// folder coilbox owns and may later remove, this writes the game's own content,
+/// under a name the author chose. The document goes in beside the compiled file
+/// because that is what makes the mission editable and nameable wherever the game
+/// ends up (issue #2160).
+#[tauri::command]
+async fn scenario_write_game_mission(
+    root: String,
+    folder: String,
+    document: String,
+    mission: String,
+) -> CliResult {
+    match write_game_mission(&root, &folder, &document, &mission) {
+        Ok(dir) => CliResult::ok(json!({ "dir": dir.to_string_lossy() })),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// `scenario_list_missions`, the compiled mission folders in a loose game.
 ///
 /// Every launch into a game that vendors the runtime writes one and leaves it
@@ -913,6 +960,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scenario_delete_mission,
             scenario_test_mutator,
             scenario_write_mission,
+            scenario_write_game_mission,
             scenario_game_missions,
             scenario_game_mission_file,
             scenario_game_runtime
@@ -1171,5 +1219,41 @@ mod tests {
     #[test]
     fn mission_text_that_does_not_evaluate_is_an_error() {
         assert!(eval_mission_text("return {").is_err());
+    }
+
+    /// Putting a mission into a game writes the two files that make it both
+    /// playable and editable, and writes them under the folder the author named.
+    #[test]
+    fn a_mission_put_into_a_game_ships_its_document_beside_the_compiled_file() {
+        let game = tempfile::tempdir().unwrap();
+        let root = game.path().to_str().unwrap();
+
+        let dir = write_game_mission(root, "silence-the-jericho", "{\"id\":\"s1\"}", "return {}")
+            .unwrap();
+
+        assert_eq!(dir, game.path().join("missions/silence-the-jericho"));
+        assert_eq!(
+            std::fs::read_to_string(dir.join("mission.lua")).unwrap(),
+            "return {}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("scenario.json")).unwrap(),
+            "{\"id\":\"s1\"}"
+        );
+    }
+
+    /// The fence: a packaged archive is a file, and a folder name that could
+    /// climb out of `missions/` is refused before anything is opened.
+    #[test]
+    fn a_packaged_game_and_a_climbing_folder_are_both_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let packaged = dir.path().join("game.sd7");
+        std::fs::write(&packaged, b"not a folder").unwrap();
+
+        assert!(write_game_mission(packaged.to_str().unwrap(), "demo", "{}", "return {}").is_err());
+        assert!(
+            write_game_mission(dir.path().to_str().unwrap(), "../evil", "{}", "return {}").is_err()
+        );
+        assert!(!dir.path().join("evil").exists());
     }
 }

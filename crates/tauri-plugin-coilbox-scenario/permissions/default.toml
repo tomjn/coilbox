@@ -22,6 +22,7 @@ permissions = [
   "allow-scenario-delete-mission",
   "allow-scenario-test-mutator",
   "allow-scenario-write-mission",
+  "allow-scenario-write-game-mission",
   "allow-scenario-game-missions",
   "allow-scenario-game-mission-file",
   "allow-scenario-game-runtime",

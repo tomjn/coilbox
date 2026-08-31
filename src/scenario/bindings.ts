@@ -217,6 +217,22 @@ export const scenarioWriteMission = defineCommand<
 >("coilbox-scenario", "scenario_write_mission");
 
 /**
+ * Write a mission an author is putting into the loose game at `root`: the
+ * compiled `mission.lua` and the `scenario.json` it came from, under
+ * `missions/<folder>/`. `dir` is the folder they landed in.
+ *
+ * Not {@link scenarioWriteMission}, which writes what one launch needs into a
+ * folder named after the scenario id. This writes the game's own content under a
+ * name the author chose, and the document beside the compiled file is what keeps
+ * it editable wherever the game ends up. Fails on a packaged `.sd7`/`.sdz`, which
+ * is what makes a shipped game's missions read-only.
+ */
+export const scenarioWriteGameMission = defineCommand<
+  { root: string; folder: string; document: string; mission: string },
+  { dir: string }
+>("coilbox-scenario", "scenario_write_game_mission");
+
+/**
  * The compiled mission folders in the loose game at `root`, sorted. Every launch
  * into a game that vendors the runtime writes one and leaves it there, so this
  * is what a game has accumulated. Folders only: the runtime's own `runtime.lua`

@@ -112,4 +112,37 @@ describe("useScenarios", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(gameScenariosMock).not.toHaveBeenCalled();
   });
+
+  /**
+   * A move is the one thing that changes what a game ships without the games
+   * list changing, and the games half is only re-read when that list does. So
+   * without this the editor would route to a mission the list had never heard
+   * of, and show "not found" over a document that had just been written.
+   */
+  it("shows a mission the moment it is moved into a game, and drops it when it is taken out", async () => {
+    const { addGameMission, forgetGameMission, useScenarios } = await import(
+      "./scenarios"
+    );
+    const { result } = renderHook(() => useScenarios());
+    await waitFor(() => expect(listScenariosMock).toHaveBeenCalledTimes(1));
+
+    const origin = {
+      gameName: "SplinterFaction",
+      archivePath: "/games/SplinterFaction",
+      folder: "silence-the-jericho",
+      loose: true,
+    };
+    const moved = {
+      scenario: { id: "s1", name: "Silence the Jericho", updatedAt: "2026" },
+      source: "game",
+      origin,
+    } as never;
+
+    addGameMission(moved);
+    await waitFor(() => expect(result.current.scenarios).toHaveLength(1));
+    expect(result.current.scenarios[0].origin).toEqual(origin);
+
+    forgetGameMission(origin);
+    await waitFor(() => expect(result.current.scenarios).toHaveLength(0));
+  });
 });

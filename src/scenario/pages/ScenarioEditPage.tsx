@@ -259,7 +259,11 @@ export default function ScenarioEditPage() {
 
         {/* The setup: the game and map the scene below draws, and the
           participants everything placed on it belongs to. */}
-        <SetupPanel scenario={scenario} onChange={(next) => apply(next)} />
+        <SetupPanel
+          scenario={scenario}
+          loaded={loaded}
+          onChange={(next) => apply(next)}
+        />
 
         {/* The editing surface: the document's units drawn on the map, the mode
           strip that places more, and the picking and dragging that moves them.
