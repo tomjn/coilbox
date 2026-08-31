@@ -12,6 +12,7 @@ import { encyclopediaSections, unitLabel } from "../unitEncyclopedia";
 import { unitIconSrc } from "../unitIcon";
 import { DetailError, DetailLoading, NotFound } from "./components/states";
 import { UnitModelPanel } from "./components/UnitModelPanel";
+import { UnitStatsTable } from "./components/UnitStatsTable";
 
 /**
  * One unit's own page: its model first, then its identity (name, def key,
@@ -145,6 +146,45 @@ export default function GameUnitPage() {
   const display = buildpics?.units[id];
   const src = unitIconSrc(display);
 
+  // Keyed lowercase on both sides, matching every other id lookup on this
+  // page: a def key is only ever compared case-insensitively.
+  const byId = new Map(
+    (dataset?.units ?? []).map((u) => [u.name.toLowerCase(), u]),
+  );
+  const label = (targetId: string) => unitLabel(byId.get(targetId), targetId);
+  const unitPath = (targetId: string) =>
+    `/content/games/${encodeURIComponent(game.name)}/units/${encodeURIComponent(targetId)}`;
+
+  // What this unit builds: its own `buildOptions`, resolved against the
+  // dataset so a stripped or unrecognised target is silently dropped rather
+  // than linking somewhere.
+  const builds = [
+    ...new Set((unit.buildOptions ?? []).map((t) => t.toLowerCase())),
+  ].filter((t) => byId.has(t));
+
+  // What builds this unit: the reverse of `buildOptions`, built once as a
+  // single map over every unit rather than filtering the whole dataset again
+  // for each render.
+  const builtByMap = new Map<string, string[]>();
+  for (const u of dataset?.units ?? []) {
+    for (const target of u.buildOptions ?? []) {
+      const key = target.toLowerCase();
+      const builders = builtByMap.get(key);
+      if (builders) builders.push(u.name.toLowerCase());
+      else builtByMap.set(key, [u.name.toLowerCase()]);
+    }
+  }
+  const builtBy = builtByMap.get(id) ?? [];
+
+  const morphs = unit.morphTargets ?? [];
+
+  const hasTerrain =
+    (unit.footprintX !== undefined && unit.footprintZ !== undefined) ||
+    unit.maxSlope !== undefined ||
+    unit.floatOnWater !== undefined ||
+    unit.minWaterDepth !== undefined ||
+    unit.maxWaterDepth !== undefined;
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <Link
@@ -174,6 +214,113 @@ export default function GameUnitPage() {
         <img src={src} alt="" className="size-16 rounded object-contain" />
       ) : (
         <span aria-hidden className="size-16 shrink-0 rounded bg-muted" />
+      )}
+
+      <UnitStatsTable unit={unit} />
+
+      {builds.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium">What it builds</h2>
+          <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+            {builds.map((targetId) => (
+              <li key={targetId}>
+                <Link to={unitPath(targetId)} className="hover:underline">
+                  {label(targetId)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {builtBy.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium">What builds it</h2>
+          <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+            {builtBy.map((builderId) => (
+              <li key={builderId}>
+                <Link to={unitPath(builderId)} className="hover:underline">
+                  {label(builderId)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {morphs.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium">Turns into</h2>
+          <ul className="flex flex-col gap-2">
+            {morphs.map((morph) => {
+              const targetId = morph.into.toLowerCase();
+              const conditions = Object.entries(morph).filter(
+                ([key]) => key !== "into",
+              );
+              return (
+                <li
+                  key={morph.into}
+                  className="flex flex-col gap-1 rounded-lg border border-border/50 bg-card p-2 text-sm"
+                >
+                  <Link
+                    to={unitPath(targetId)}
+                    className="font-medium hover:underline"
+                  >
+                    {label(targetId)}
+                  </Link>
+                  {conditions.length > 0 && (
+                    <dl className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      {conditions.map(([key, value]) => (
+                        <div key={key} className="contents">
+                          <dt>{key}</dt>
+                          <dd>{String(value)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {hasTerrain && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium">Where it stands</h2>
+          <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1 rounded-lg border border-border/50 bg-card p-3 text-sm">
+            {unit.footprintX !== undefined && unit.footprintZ !== undefined && (
+              <div className="contents">
+                <dt className="text-muted-foreground">Footprint</dt>
+                <dd>
+                  {unit.footprintX} by {unit.footprintZ} squares
+                </dd>
+              </div>
+            )}
+            {unit.maxSlope !== undefined && (
+              <div className="contents">
+                <dt className="text-muted-foreground">Maximum slope</dt>
+                <dd>{unit.maxSlope}°</dd>
+              </div>
+            )}
+            {unit.floatOnWater !== undefined && (
+              <div className="contents">
+                <dt className="text-muted-foreground">Floats</dt>
+                <dd>{unit.floatOnWater ? "Yes" : "No"}</dd>
+              </div>
+            )}
+            {(unit.minWaterDepth !== undefined ||
+              unit.maxWaterDepth !== undefined) && (
+              <div className="contents">
+                <dt className="text-muted-foreground">Water depth</dt>
+                <dd>
+                  {unit.minWaterDepth ?? "any"} to {unit.maxWaterDepth ?? "any"}{" "}
+                  elmos
+                </dd>
+              </div>
+            )}
+          </dl>
+        </section>
       )}
     </div>
   );

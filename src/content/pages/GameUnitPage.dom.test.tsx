@@ -88,6 +88,12 @@ afterEach(cleanup);
 interface UnitFixture {
   name: string;
   fullName?: string;
+  buildOptions?: string[];
+  morphTargets?: ({ into: string } & Record<string, unknown>)[];
+  footprintX?: number;
+  footprintZ?: number;
+  maxSlope?: number;
+  floatOnWater?: boolean;
 }
 
 function renderUnit(
@@ -163,5 +169,46 @@ describe("GameUnitPage", () => {
     await screen.findByRole("heading", { name: "Solar Collector" });
     const img = container.querySelector("img");
     expect(img?.getAttribute("src")).toBe(mockIconSrc);
+  });
+
+  it("links what it builds and what builds it", async () => {
+    renderUnit("armlab", [
+      { name: "armcom", fullName: "Commander", buildOptions: ["armlab"] },
+      { name: "armlab", fullName: "Bot Lab", buildOptions: ["armpw"] },
+      { name: "armpw", fullName: "Peewee" },
+    ]);
+    expect(await screen.findByRole("link", { name: "Peewee" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Commander" })).toBeTruthy();
+  });
+
+  it("lists a unit's morph stages with what the game asks for", async () => {
+    renderUnit("fedcommander", [
+      {
+        name: "fedcommander",
+        fullName: "Commander",
+        morphTargets: [
+          { into: "fedcommander_up1", research: 150, require: "tech1" },
+        ],
+      },
+      { name: "fedcommander_up1", fullName: "Commander Tech 1" },
+    ]);
+    expect(
+      await screen.findByRole("link", { name: "Commander Tech 1" }),
+    ).toBeTruthy();
+    expect(screen.getByText(/research/i)).toBeTruthy();
+    expect(screen.getByText(/150/)).toBeTruthy();
+  });
+
+  it("shows where a building may stand", async () => {
+    renderUnit("armsolar", [
+      {
+        name: "armsolar",
+        footprintX: 4,
+        footprintZ: 4,
+        maxSlope: 10,
+        floatOnWater: false,
+      },
+    ]);
+    expect(await screen.findByText(/4 by 4/)).toBeTruthy();
   });
 });
