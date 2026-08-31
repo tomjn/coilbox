@@ -62,7 +62,7 @@ export function packagedGameRoute(
     : `${gameName} is a packaged archive, which cannot be written into. The scenario is played through coilbox's test mutator instead.`;
 }
 
-/** A loose game that has not vendored the mission runtime. */
+/** A loose game whose archive does not bundle the mission runtime. */
 export function unadoptedGameRoute(
   reader: ScenarioReader,
   gameName: string,
@@ -72,7 +72,7 @@ export function unadoptedGameRoute(
     : `${gameName} has not adopted coilbox's mission runtime, so it cannot play a scenario itself. The scenario is played through the test mutator instead.`;
 }
 
-/** A game whose vendored runtime is older than the scenario needs. */
+/** A game whose bundled runtime is older than the scenario needs. */
 export function olderRuntimeRoute(
   reader: ScenarioReader,
   gameName: string,
@@ -81,10 +81,10 @@ export function olderRuntimeRoute(
 ): string {
   return reader === "player"
     ? coilboxSetsItUp(gameName)
-    : `${gameName} vendors mission runtime version ${installed}, and this scenario needs version ${required}. The scenario is played through the test mutator instead.`;
+    : `${gameName} bundles mission runtime version ${installed}, and this scenario needs version ${required}. The scenario is played through the test mutator instead.`;
 }
 
-/** A game that vendors a runtime new enough to play the scenario itself. */
+/** A game that bundles a runtime new enough to play the scenario itself. */
 export function adoptedGameRoute(
   reader: ScenarioReader,
   gameName: string,
@@ -92,7 +92,7 @@ export function adoptedGameRoute(
 ): string {
   return reader === "player"
     ? `${gameName} plays this scenario itself.`
-    : `${gameName} vendors mission runtime version ${installed}, so it plays the scenario itself.`;
+    : `${gameName} bundles mission runtime version ${installed}, so it plays the scenario itself.`;
 }
 
 /**

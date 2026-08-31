@@ -50,6 +50,6 @@ export function mutatorOffer(
   return {
     reason: packagedGameRoute("author", gameName),
     offer: `Coilbox writes a game of its own, ${MUTATOR_FOLDER}, beside this one. It depends on ${gameName} for units, sides and everything else, and carries mission runtime version ${available.version} plus the one scenario under test. Testing a scenario writes it, and deleting that folder undoes it.`,
-    limit: `It is a test route and never a distribution one. For ${gameName} to play scenarios itself it has to vendor the runtime, and coilbox can only install that into a loose .sdd copy of the game.`,
+    limit: `It is a test route and never a distribution one. For ${gameName} to play scenarios itself its archive has to bundle the runtime, and coilbox can only install that into a loose .sdd copy of the game.`,
   };
 }

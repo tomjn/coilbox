@@ -37,7 +37,7 @@ const AUTHOR_ONLY = [
   /mission runtime/i,
   /runtime version/i,
   /compiled mission/i,
-  /vendors/i,
+  /bundles/i,
   /packaged archive/i,
   /\.sdd|\.sd7|\.sdz/i,
   /set the scenario up/i,
