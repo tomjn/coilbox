@@ -247,18 +247,76 @@ async fn campaign_image_read<R: Runtime>(
     }
 }
 
-/// `campaign_image_delete` — best-effort removal of a stored panorama (dropping an
-/// image from a mission needn't fail if the file is already gone).
+/// Whether `file` is a name this plugin could itself have written: a bare
+/// `<uuid>.<ext>` sitting directly in a campaign's own folder.
+///
+/// Stricter than the read path's [`is_safe_rel`], which also allows sub-paths.
+/// A delete is the destructive one, so it takes the tighter guard: with no
+/// separator, no `..` and no root, the joined path can only be a file inside the
+/// campaign folder it was built from.
+fn is_stored_file_name(file: &str) -> bool {
+    let rel = Path::new(file);
+    is_safe_rel(rel) && rel.components().count() == 1
+}
+
+/// Remove one stored media file from whichever of the two campaign folders holds
+/// it, and say which that was. `Ok(None)` means neither held it.
+///
+/// The roots are passed in rather than read from the app handle so the guards and
+/// the folder choice are testable against real directories.
+fn delete_stored_media(
+    images: &Path,
+    media: &Path,
+    campaign_id: &str,
+    file: &str,
+) -> Result<Option<&'static str>, String> {
+    if !valid_id(campaign_id) {
+        return Err(format!("invalid campaign id: {campaign_id}"));
+    }
+    if !is_stored_file_name(file) {
+        return Err(format!("unsafe media file name: {file}"));
+    }
+    for (folder, root) in [("images", images), ("media", media)] {
+        match std::fs::remove_file(root.join(campaign_id).join(file)) {
+            Ok(()) => return Ok(Some(folder)),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(format!("could not delete media: {e}")),
+        }
+    }
+    Ok(None)
+}
+
+/// `campaign_media_delete` — remove one file a mission imported, whichever folder
+/// it went into (issue #2210).
+///
+/// An image is re-encoded into `images/<id>/` and audio/video is copied verbatim
+/// into `media/<id>/`, but the document stores a bare filename and no record of
+/// which. So this looks in both, and reports what it found: `deleted` false means
+/// the file was not there, which is fine when a mission is dropping a reference
+/// but is not the same as having removed something. The command this replaces
+/// resolved `images/` alone and returned success either way, so every video it
+/// was asked to delete stayed on disk with the caller told otherwise.
+///
+/// A campaign id or file name that could reach outside those two folders is
+/// refused rather than ignored.
 #[tauri::command]
-async fn campaign_image_delete<R: Runtime>(
+async fn campaign_media_delete<R: Runtime>(
     app: AppHandle<R>,
     campaign_id: String,
     file: String,
 ) -> CliResult {
-    if let Ok(path) = image_path(&app, &campaign_id, &file) {
-        let _ = std::fs::remove_file(path);
+    let images = match images_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    let media = match media_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    match delete_stored_media(&images, &media, &campaign_id, &file) {
+        Ok(from) => CliResult::ok(json!({ "deleted": from.is_some(), "from": from })),
+        Err(e) => CliResult::err(e),
     }
-    CliResult::ok(json!({}))
 }
 
 /// `campaign_media_import` — copy an audio/video file the user picked into the
@@ -409,7 +467,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             campaign_image_import,
             campaign_image_import_data,
             campaign_image_read,
-            campaign_image_delete,
+            campaign_media_delete,
             campaign_media_import,
             campaign_media_import_data,
             campaign_export,
@@ -473,6 +531,120 @@ mod tests {
         let mut items = Vec::new();
         read_json_dir(Path::new("/no/such/campaign/dir"), "local", &mut items);
         assert!(items.is_empty());
+    }
+
+    /// `images/<id>/` and `media/<id>/` under one temp dir, each holding `file`.
+    fn media_roots(id: &str, file: &str) -> (tempfile::TempDir, PathBuf, PathBuf) {
+        let tmp = tempfile::tempdir().unwrap();
+        let images = tmp.path().join("images");
+        let media = tmp.path().join("media");
+        for root in [&images, &media] {
+            std::fs::create_dir_all(root.join(id)).unwrap();
+            std::fs::write(root.join(id).join(file), b"bytes").unwrap();
+        }
+        (tmp, images, media)
+    }
+
+    #[test]
+    fn delete_stored_media_removes_a_re_encoded_image() {
+        let (_tmp, images, media) = media_roots("camp-1", "art.jpg");
+        std::fs::remove_file(media.join("camp-1").join("art.jpg")).unwrap();
+
+        assert_eq!(
+            delete_stored_media(&images, &media, "camp-1", "art.jpg"),
+            Ok(Some("images"))
+        );
+        assert!(!images.join("camp-1").join("art.jpg").exists());
+    }
+
+    /// The case the old `campaign_image_delete` could not reach: a verbatim clip
+    /// under `media/`, which is where every voiceover, cutscene and video
+    /// panorama lives.
+    #[test]
+    fn delete_stored_media_removes_a_verbatim_clip() {
+        let (_tmp, images, media) = media_roots("camp-1", "intro.mp4");
+        std::fs::remove_file(images.join("camp-1").join("intro.mp4")).unwrap();
+
+        assert_eq!(
+            delete_stored_media(&images, &media, "camp-1", "intro.mp4"),
+            Ok(Some("media"))
+        );
+        assert!(!media.join("camp-1").join("intro.mp4").exists());
+    }
+
+    /// A file that was never there is not an error, but the caller is told so
+    /// rather than being handed a success that removed nothing.
+    #[test]
+    fn delete_stored_media_reports_a_file_that_is_not_there() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert_eq!(
+            delete_stored_media(
+                &tmp.path().join("images"),
+                &tmp.path().join("media"),
+                "camp-1",
+                "gone.ogg"
+            ),
+            Ok(None)
+        );
+    }
+
+    /// Only the campaign's own file goes, whichever folder it was found in.
+    #[test]
+    fn delete_stored_media_leaves_the_other_campaigns_alone() {
+        let (tmp, images, media) = media_roots("camp-1", "art.jpg");
+        std::fs::create_dir_all(media.join("camp-2")).unwrap();
+        std::fs::write(media.join("camp-2").join("art.jpg"), b"bytes").unwrap();
+
+        delete_stored_media(&images, &media, "camp-1", "art.jpg").unwrap();
+
+        assert!(media.join("camp-2").join("art.jpg").exists());
+        assert!(tmp.path().join("media").exists());
+    }
+
+    #[test]
+    fn delete_stored_media_refuses_an_id_that_is_not_one() {
+        let (_tmp, images, media) = media_roots("camp-1", "art.jpg");
+        for id in ["", "../camp-1", "camp 1", "camp/1", "café"] {
+            assert!(
+                delete_stored_media(&images, &media, id, "art.jpg").is_err(),
+                "accepted campaign id {id:?}"
+            );
+        }
+    }
+
+    /// The guard is what stops a delete reaching outside the two folders it
+    /// owns, so it is asserted against a real file that must survive.
+    #[test]
+    fn delete_stored_media_refuses_a_name_that_could_escape() {
+        let (tmp, images, media) = media_roots("camp-1", "art.jpg");
+        let outside = tmp.path().join("keep.json");
+        std::fs::write(&outside, b"campaign document").unwrap();
+
+        for file in [
+            "",
+            "../keep.json",
+            "../../keep.json",
+            "./art.jpg",
+            "sub/art.jpg",
+            "camp-1/../../keep.json",
+        ] {
+            let result = delete_stored_media(&images, &media, "camp-1", file);
+            assert!(result.is_err(), "accepted file name {file:?}");
+        }
+        assert!(outside.exists());
+        assert!(images.join("camp-1").join("art.jpg").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn delete_stored_media_refuses_an_absolute_path() {
+        let (tmp, images, media) = media_roots("camp-1", "art.jpg");
+        let outside = tmp.path().join("keep.json");
+        std::fs::write(&outside, b"campaign document").unwrap();
+
+        let absolute = outside.to_string_lossy().to_string();
+        assert!(delete_stored_media(&images, &media, "camp-1", &absolute).is_err());
+        assert!(outside.exists());
     }
 
     #[test]

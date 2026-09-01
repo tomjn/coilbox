@@ -15,8 +15,9 @@ import {
   ErrorBanner,
   NotFound,
 } from "../../content/pages/components/states";
-import { campaignImageDelete, campaignSave } from "../bindings";
+import { campaignSave } from "../bindings";
 import { refreshCampaigns, useCampaigns } from "../campaigns";
+import { deleteDroppedMedia } from "../media";
 import { missionFromScenario, scenarioAttachment } from "../missionScenario";
 import type { Campaign, CampaignMission } from "../model";
 import { CampaignImage, CampaignImageField } from "./components/CampaignImage";
@@ -171,39 +172,28 @@ export default function CampaignEditPage() {
     void persist({ ...campaign, missions });
   };
 
-  const removeMission = async (m: CampaignMission) => {
-    if (m.panorama?.kind === "file") {
-      await campaignImageDelete({
-        campaignId: campaign.id,
-        file: m.panorama.file,
-      }).catch(() => {});
-    }
-    void persist({
+  /** Persist, having taken off disk whatever the new document stops naming.
+   *  Every edit that can drop or replace an imported file comes through here,
+   *  because a slot the delete forgets leaks a file nothing on this page can
+   *  see again (issue #2210). `media.ts` owns which slots those are. */
+  const persistMedia = async (next: Campaign) => {
+    await deleteDroppedMedia(campaign.id, campaign, next);
+    await persist(next);
+  };
+
+  const removeMission = (m: CampaignMission) =>
+    persistMedia({
       ...campaign,
       missions: campaign.missions.filter((x) => x.id !== m.id),
     });
-  };
 
-  const applyMission = async (updated: CampaignMission) => {
-    const prev = campaign.missions.find((x) => x.id === updated.id);
-    // The original panorama file is superseded — delete it now that we're saving.
-    if (
-      prev?.panorama?.kind === "file" &&
-      (updated.panorama?.kind !== "file" ||
-        updated.panorama.file !== prev.panorama.file)
-    ) {
-      await campaignImageDelete({
-        campaignId: campaign.id,
-        file: prev.panorama.file,
-      }).catch(() => {});
-    }
-    await persist({
+  const applyMission = (updated: CampaignMission) =>
+    persistMedia({
       ...campaign,
       missions: campaign.missions.map((x) =>
         x.id === updated.id ? updated : x,
       ),
     });
-  };
 
   const openMission = (m: CampaignMission) =>
     drawer.open({
@@ -295,7 +285,7 @@ export default function CampaignEditPage() {
           campaignId={campaign.id}
           kind="icon"
           value={campaign.icon}
-          onChange={(icon) => void persist({ ...campaign, icon })}
+          onChange={(icon) => void persistMedia({ ...campaign, icon })}
           label="Icon"
           help="Small emblem shown on this campaign in lists. Transparency is kept."
           gameName={campaign.missions[0]?.snapshot.gameName}
@@ -314,7 +304,9 @@ export default function CampaignEditPage() {
           campaignId={campaign.id}
           kind="background"
           value={campaign.background}
-          onChange={(background) => void persist({ ...campaign, background })}
+          onChange={(background) =>
+            void persistMedia({ ...campaign, background })
+          }
           label="Background"
           help="Backdrop behind the campaign's mission list — an image or a looping video. A video imported here only plays back on this machine (it isn't bundled into a single-file export)."
           gameName={campaign.missions[0]?.snapshot.gameName}
