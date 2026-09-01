@@ -22,6 +22,7 @@ import { useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { UnitDatasetEntry } from "@/content/bindings";
+import { useFieldText } from "@/lib/useFieldText";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ExtensionTypes } from "../../extensions";
 import type { PaletteGate } from "../../gating";
@@ -348,9 +349,17 @@ function TriggerForm({
   );
 }
 
-/** The trigger's name, which is its id. Committed when the box is left, and put
- *  back when the name is empty or another trigger already has it, because both
- *  make a document that will not load. */
+/**
+ * The trigger's name, which is its id. Committed when the box is left, and put
+ * back when the name is empty or another trigger already has it, because both
+ * make a document that will not load.
+ *
+ * The box follows the name when the name changes on its own. The form around it
+ * is mounted keyed by this same id, so a rename remounts it and a fresh copy is
+ * seeded either way, which is why this field never showed the drift of issue
+ * #2185 that the box below it did. The hook is what makes that true of the field
+ * rather than of where it happens to be mounted.
+ */
 function TriggerName({
   id,
   onRename,
@@ -358,7 +367,7 @@ function TriggerName({
   id: string;
   onRename: (name: string) => boolean;
 }) {
-  const [name, setName] = useState(id);
+  const [name, setName] = useFieldText(id);
 
   return (
     <Input
@@ -377,8 +386,16 @@ function TriggerName({
   );
 }
 
-/** How long a repeating trigger waits between firings. Seconds, because that is
- *  what the runtime reads and what an author thinks in. */
+/**
+ * How long a repeating trigger waits between firings. Seconds, because that is
+ * what the runtime reads and what an author thinks in.
+ *
+ * The box follows the wait when the wait changes on its own, which is what an
+ * undo does (issue #2185). Nothing remounts this field: the form it sits in is
+ * keyed by the trigger's name, and changing the wait leaves the name alone. So
+ * the box carried on showing the wait from before the step back, and the next
+ * keystroke wrote it over the restored one.
+ */
 function CooldownField({
   seconds,
   onChange,
@@ -386,7 +403,7 @@ function CooldownField({
   seconds: number | undefined;
   onChange: (seconds: number | undefined) => void;
 }) {
-  const [text, setText] = useState(
+  const [text, setText] = useFieldText(
     seconds === undefined ? "" : String(seconds),
   );
 
