@@ -1,12 +1,20 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { Loader2, Plus, RefreshCw } from "lucide-react";
+import { ChevronDown, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncScan, useUnitsyncThumbnails } from "@/content/config";
+import { nextDrawerKey } from "@/general/drawerKey";
 import { relativeTime } from "@/lib/relativeTime";
 import { usePreferredTarget } from "@/play/config";
 import { useCampaigns } from "../../campaign/campaigns";
@@ -25,7 +33,7 @@ import {
   type LoadedScenario,
   saveScenario,
 } from "../storage";
-import { ReclaimClipsButton } from "./components/ReclaimClipsButton";
+import { ReclaimClipsForm } from "./components/ReclaimClipsForm";
 import { ScenarioContentChips } from "./components/ScenarioContentChips";
 import { ScenarioImportButton } from "./components/ScenarioImportButton";
 import { ScenarioMapThumb } from "./components/ScenarioMapThumb";
@@ -119,14 +127,34 @@ export default function ScenarioBuilderPage() {
       ),
     });
 
+  // The list is re-read in place, so a rescan that changes nothing looks exactly
+  // like a click that did nothing. The spinning button used to say it was
+  // running. From inside a menu that closes on select there is nothing left to
+  // spin, so the toast carries it instead. A rescan that fails sets the page's
+  // error and the banner above the list says so.
   const rescan = async () => {
+    if (rescanning) return;
     setRescanning(true);
     try {
       await refresh();
+      toast.success("Rescanned. The scenario list is up to date.");
     } finally {
       setRescanning(false);
     }
   };
+
+  // Reclaiming is a preview first and a delete only on confirm, so what the menu
+  // item opens is the preview. A fresh form every time, because the drawer keeps
+  // the last one mounted and it would still be showing the count it found the
+  // time before (issue #1395).
+  const openReclaim = () =>
+    drawer.open({
+      title: "Reclaim dialogue clips",
+      width: "24rem",
+      content: (
+        <ReclaimClipsForm key={nextDrawerKey()} onDone={() => drawer.close()} />
+      ),
+    });
 
   // Share: a code, a link or a file (issue #1336). The drawer owns all three,
   // and says so when the scenario's dialogue clips make it too big for a code.
@@ -288,20 +316,9 @@ export default function ScenarioBuilderPage() {
         description="Author a mission's in-engine content: what spawns, what the triggers watch for, and what wins it. A scenario stands alone, so you can play one on its own or attach it to a campaign mission later."
         actions={
           <>
-            <Button
-              variant="outline"
-              className="gap-1.5"
-              onClick={rescan}
-              disabled={rescanning}
-            >
-              {rescanning ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
-              Rescan
-            </Button>
-            <ReclaimClipsButton />
+            {/* The two the page exists for. Getting hold of a scenario and
+                starting one are what an author came here to do, so they are the
+                only two the header spends a button on (issue #2184). */}
             <ScenarioImportButton
               onImported={(scenario) =>
                 navigate(`/scenario-builder/${scenario.id}`)
@@ -310,6 +327,53 @@ export default function ScenarioBuilderPage() {
             <Button className="gap-1.5" onClick={openNew}>
               <Plus className="size-4" /> New scenario
             </Button>
+            {/* Rescan and Reclaim clips are housekeeping on the store behind the
+                list rather than authoring, and they were sitting at the same
+                weight as the two above. Three weights now: filled for New
+                scenario, outlined for Import, and this one ghosted.
+
+                Labelled "More" rather than drawn as three dots alone. A row's
+                menu is explained by the row it sits on. A header menu has no
+                such neighbour, so an unlabelled trigger here would be a control
+                nobody can name without opening it.
+
+                Ghost, not hidden. It is muted at rest and takes its background
+                on hover or when open, which changes emphasis without ever
+                changing whether it is there (issue #2203). */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="gap-1.5 text-muted-foreground data-[state=open]:text-foreground"
+                  aria-label="More scenario actions"
+                >
+                  More <ChevronDown className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem
+                  disabled={rescanning}
+                  onSelect={() => void rescan()}
+                >
+                  {rescanning ? (
+                    <Loader2
+                      className="size-4 animate-spin"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <RefreshCw className="size-4" aria-hidden="true" />
+                  )}
+                  Rescan
+                </DropdownMenuItem>
+                {/* Not marked destructive, because this item deletes nothing.
+                    It opens a dry run that names the count and the size, and
+                    the confirm inside it is the destructive control. */}
+                <DropdownMenuItem onSelect={openReclaim}>
+                  <Trash2 className="size-4" aria-hidden="true" /> Reclaim clips
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
       >

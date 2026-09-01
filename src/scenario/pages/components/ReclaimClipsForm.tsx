@@ -1,12 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Loader2, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { loadedCampaigns } from "../../../campaign/campaigns";
 import {
   namedScenarioClips,
@@ -29,7 +24,7 @@ function summarize(s: MediaSweepSummary): string {
 }
 
 /**
- * "Reclaim clips" control for the Scenario Builder.
+ * "Reclaim clips" for the Scenario Builder, as the body of a drawer.
  *
  * Deleting a scenario a campaign mission attached keeps its clips, and so does
  * replacing one that a mission still names, because the mission plays the file
@@ -38,18 +33,22 @@ function summarize(s: MediaSweepSummary): string {
  * only once and only on the next start, so an author who has just deleted the
  * mission can clear them here and see what went first.
  *
- * Opening it dry-runs the sweep and previews the result. Only an explicit
+ * It dry-runs the sweep as it mounts and previews the result. Only an explicit
  * confirm deletes. Both halves read the campaigns and the stored scenarios
  * fresh, because a keep set a failed read left short would take a live clip.
  *
- * It lives on the builder's list page rather than in Settings because that is
- * the one place with no scenario editor mounted: the editor writes an imported
- * clip to disk before the document naming it is saved, so a sweep alongside it
- * could take a file that is about to be named.
+ * A drawer rather than the popover this used to hang off its own header button.
+ * The header button is now a menu item (issue #2184), and the menu has closed by
+ * the time the preview is on screen, so there is nothing left for a popover to
+ * point at. Same move the row menu makes for its delete confirmation.
+ *
+ * It stays on the builder's list page rather than going to Settings because that
+ * is the one place with no scenario editor mounted: the editor writes an
+ * imported clip to disk before the document naming it is saved, so a sweep
+ * alongside it could take a file that is about to be named.
  */
-export function ReclaimClipsButton() {
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+export function ReclaimClipsForm({ onDone }: { onDone: () => void }) {
+  const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [preview, setPreview] = useState<MediaSweepSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,10 +69,10 @@ export function ReclaimClipsButton() {
     }
   };
 
-  const onOpenChange = (next: boolean) => {
-    setOpen(next);
-    if (next) void runDryRun();
-  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the preview is taken once, when the drawer opens
+  useEffect(() => {
+    void runDryRun();
+  }, []);
 
   const apply = async () => {
     setApplying(true);
@@ -88,7 +87,7 @@ export function ReclaimClipsButton() {
         true,
       );
       toast.success(summarize(summary));
-      setOpen(false);
+      onDone();
     } catch (e) {
       setError(msg(e));
     } finally {
@@ -98,65 +97,47 @@ export function ReclaimClipsButton() {
 
   const clean = preview !== null && sweptCount(preview) === 0;
 
+  if (loading)
+    return (
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Looking for leftover dialogue clips...
+      </p>
+    );
+  if (error)
+    return <p className="break-words text-sm text-destructive">{error}</p>;
+  if (!preview) return null;
+
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          className="gap-1.5"
-          title="Find and remove dialogue clips no scenario or campaign names"
-        >
-          <Trash2 className="size-4" />
-          Reclaim clips
+    <div className="flex flex-col gap-3">
+      <p className="text-sm">{summarize(preview)}</p>
+      {!clean && (
+        <p className="text-xs text-muted-foreground">
+          Portraits and voice clips that no stored scenario and no campaign
+          mission names. This can't be undone.
+        </p>
+      )}
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onDone}>
+          {clean ? "Close" : "Cancel"}
         </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80">
-        {loading ? (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Looking for leftover dialogue clips...
-          </p>
-        ) : error ? (
-          <p className="break-words text-sm text-destructive">{error}</p>
-        ) : preview ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm">{summarize(preview)}</p>
-            {!clean && (
-              <p className="text-xs text-muted-foreground">
-                Portraits and voice clips that no stored scenario and no
-                campaign mission names. This can't be undone.
-              </p>
+        {!clean && (
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            disabled={applying}
+            onClick={apply}
+          >
+            {applying ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Trash2 className="size-4" />
             )}
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setOpen(false)}
-              >
-                {clean ? "Close" : "Cancel"}
-              </Button>
-              {!clean && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="destructive"
-                  disabled={applying}
-                  onClick={apply}
-                >
-                  {applying ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-4" />
-                  )}
-                  Reclaim
-                </Button>
-              )}
-            </div>
-          </div>
-        ) : null}
-      </PopoverContent>
-    </Popover>
+            Reclaim
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
