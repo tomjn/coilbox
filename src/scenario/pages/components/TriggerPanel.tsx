@@ -46,6 +46,63 @@ import {
   triggerSummary,
 } from "./triggers";
 
+/** A rename the panel has made: the name the trigger had, and the name it was
+ *  given. Newest last. */
+interface TriggerRename {
+  from: string;
+  to: string;
+}
+
+/**
+ * The trigger the panel is showing.
+ *
+ * A trigger's id is its name, so a rename moves the very thing the selection is
+ * held by. An undo puts the old name back in the document without the panel
+ * hearing about it, and the name the panel holds then matches nothing. It used
+ * to show the first trigger in the list at that point, so an author who undid a
+ * rename and carried on typing was editing a trigger they had not picked
+ * (issue #2202).
+ *
+ * Every rename in the editor goes through this panel, so the renames it has made
+ * say which names belong to the same trigger. Walking them backwards finds the
+ * trigger an undo has renamed back, and walking them forwards finds the one a
+ * redo has renamed on. The walk is ordered rather than a set of names, because a
+ * name a rename frees can be given to another trigger, and only the order says
+ * which trigger a name meant at the time.
+ *
+ * Nothing is found when the selected trigger is not there under any of its
+ * names, which is what undoing a new trigger does. The panel shows no form, so
+ * it never puts a trigger nobody picked under the cursor.
+ */
+function selectedTrigger(
+  triggers: ScenarioTrigger[],
+  selectedId: string | null,
+  renames: TriggerRename[],
+): ScenarioTrigger | null {
+  if (selectedId === null) return triggers[0] ?? null;
+
+  const held = triggers.find((t) => t.id === selectedId);
+  if (held) return held;
+
+  let older = selectedId;
+  for (let i = renames.length - 1; i >= 0; i--) {
+    if (renames[i].to !== older) continue;
+    older = renames[i].from;
+    const back = triggers.find((t) => t.id === older);
+    if (back) return back;
+  }
+
+  let newer = selectedId;
+  for (const rename of renames) {
+    if (rename.from !== newer) continue;
+    newer = rename.to;
+    const forward = triggers.find((t) => t.id === newer);
+    if (forward) return forward;
+  }
+
+  return null;
+}
+
 export function TriggerPanel({
   scenario,
   onChange,
@@ -73,10 +130,8 @@ export function TriggerPanel({
   onPick: (target: PointTarget | null) => void;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected =
-    scenario.triggers.find((t) => t.id === selectedId) ??
-    scenario.triggers[0] ??
-    null;
+  const [renames, setRenames] = useState<TriggerRename[]>([]);
+  const selected = selectedTrigger(scenario.triggers, selectedId, renames);
   const unitDefs = useMemo(() => units.map((u) => u.name), [units]);
 
   const count = scenario.triggers.length;
@@ -156,8 +211,18 @@ export function TriggerPanel({
               onPick={onPick}
               onChange={onChange}
               onSelect={setSelectedId}
+              onRenamed={(from, to) => {
+                setRenames((made) => [...made, { from, to }]);
+                setSelectedId(to);
+              }}
             />
           </div>
+        )}
+        {!selected && count > 0 && (
+          <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+            The trigger you were on is not in the list any more. Pick one to
+            carry on.
+          </p>
         )}
       </div>
     </EditorPanel>
@@ -218,6 +283,7 @@ function TriggerForm({
   onPick,
   onChange,
   onSelect,
+  onRenamed,
 }: {
   trigger: ScenarioTrigger;
   scenario: Scenario;
@@ -233,6 +299,9 @@ function TriggerForm({
   onPick: (target: PointTarget | null) => void;
   onChange: (next: Scenario) => void;
   onSelect: (id: string | null) => void;
+  /** A rename that went through, so the panel can find this trigger again under
+   *  its old name after an undo. */
+  onRenamed: (from: string, to: string) => void;
 }) {
   const at = scenario.triggers.indexOf(trigger);
   const edit = (patch: Partial<Omit<ScenarioTrigger, "id">>) =>
@@ -247,7 +316,7 @@ function TriggerForm({
             const next = renameTrigger(scenario, trigger.id, name, extensions);
             if (next === scenario) return false;
             onChange(next);
-            onSelect(name.trim());
+            onRenamed(trigger.id, name.trim());
             return true;
           }}
         />
