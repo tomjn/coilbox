@@ -1,14 +1,9 @@
 import { Button, Input, useDrawer } from "@picoframe/frame";
-import { Loader2, Pencil, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
+import { Loader2, Plus, RefreshCw } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
@@ -26,6 +21,7 @@ import { refreshScenarios, useScenarios } from "../scenarios";
 import { deleteScenario, isEditable, saveScenario } from "../storage";
 import { ReclaimClipsButton } from "./components/ReclaimClipsButton";
 import { ScenarioImportButton } from "./components/ScenarioImportButton";
+import { ScenarioRowMenu } from "./components/ScenarioRowMenu";
 
 /**
  * Scenario Builder landing: create a scenario, import a shared one, and list
@@ -46,7 +42,6 @@ export default function ScenarioBuilderPage() {
   const navigate = useNavigate();
   const drawer = useDrawer();
   const [rescanning, setRescanning] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const openNew = () =>
     drawer.open({
@@ -101,14 +96,12 @@ export default function ScenarioBuilderPage() {
       id,
     );
 
+  // Failure is reported by the confirmation drawer that asked for the delete,
+  // which is what somebody is looking at when it fails, so nothing is caught
+  // here.
   const remove = async (id: string) => {
-    setActionError(null);
-    try {
-      await deleteScenario(id, { keepMedia: attached(id) });
-      await refreshScenarios();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
-    }
+    await deleteScenario(id, { keepMedia: attached(id) });
+    await refreshScenarios();
   };
 
   return (
@@ -144,7 +137,6 @@ export default function ScenarioBuilderPage() {
         }
       />
 
-      {actionError && <ErrorBanner message={actionError} />}
       {error && <ErrorBanner message={error} />}
 
       {loading ? (
@@ -168,9 +160,16 @@ export default function ScenarioBuilderPage() {
             return (
               <li
                 key={scenario.id}
-                className="flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3"
+                className="group flex items-center gap-3 rounded-lg border border-border/50 bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/50"
               >
-                <div className="flex min-w-0 flex-col gap-0.5">
+                {/* The whole row opens the scenario, which is what nearly every
+                    click on one wants. A read-only scenario goes to the same
+                    route and lands on the read-only view there, which says why
+                    it cannot be edited, so no row is a dead click. */}
+                <Link
+                  to={`/scenario-builder/${scenario.id}`}
+                  className="flex min-w-0 flex-1 flex-col gap-0.5"
+                >
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium">
                       {scenario.name}
@@ -196,58 +195,15 @@ export default function ScenarioBuilderPage() {
                   <span className="truncate text-xs text-muted-foreground">
                     {scenarioContents(scenario)}
                   </span>
-                </div>
-                <div className="ml-auto flex shrink-0 items-center gap-2">
-                  {isEditable(loaded) && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={() =>
-                        navigate(`/scenario-builder/${scenario.id}`)
-                      }
-                    >
-                      <Pencil className="size-4" /> Edit
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                    onClick={() => void openShare(scenario)}
-                  >
-                    <Share2 className="size-4" /> Share
-                  </Button>
-                  {!bundled && !fromGame && (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          aria-label={`Delete ${scenario.name}`}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="flex w-56 flex-col gap-2">
-                        <p className="text-sm">
-                          Delete{" "}
-                          <span className="font-medium">{scenario.name}</span>
-                          {attached(scenario.id)
-                            ? "? A campaign mission uses it, so its dialogue clips stay behind for that mission. This can't be undone."
-                            : " and its dialogue clips? This can't be undone."}
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => remove(scenario.id)}
-                        >
-                          Delete
-                        </Button>
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                </div>
+                </Link>
+                <ScenarioRowMenu
+                  scenario={scenario}
+                  editable={isEditable(loaded)}
+                  deletable={!bundled && !fromGame}
+                  attached={attached(scenario.id)}
+                  onShare={() => void openShare(scenario)}
+                  onDelete={() => remove(scenario.id)}
+                />
               </li>
             );
           })}

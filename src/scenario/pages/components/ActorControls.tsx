@@ -12,11 +12,21 @@
  * written when the gesture ends, because every change to the document is saved:
  * a dragged slider would otherwise write a file per frame. Mount this keyed by
  * the actor's id so moving the selection reseeds both.
+ *
+ * Both copies follow the actor when its overrides change on their own, which is
+ * what an undo does (issue #2185). An actor's id is not its health or its name,
+ * so the key does not cover that: before this, the slider and the box carried on
+ * showing what was there before the step back, and the next nudge or keystroke
+ * wrote it over the restored value.
+ *
+ * What each follows is what it shows rather than what is written down, because
+ * neither is stored as it is shown. Health is a percentage of a fraction and
+ * full health is no override at all, so `hp` is absent at 100%. The display name
+ * is dropped when it is blank, so an actor with no name has no `name` either.
  */
 
 import { Button, Input } from "@picoframe/frame";
 import { SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
 
 import { Label } from "@/components/ui/label";
 import {
@@ -26,6 +36,7 @@ import {
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { useFieldText } from "@/lib/useFieldText";
 import type { Participant } from "@/play/config";
 import { OptionSelect } from "@/uberstress/pages/components/OptionSelect";
 import type { ActorState, Facing, ScenarioActor } from "../../model";
@@ -54,8 +65,11 @@ export function ActorControls({
   onState: (state: ActorState) => void;
 }) {
   const state = actor.state ?? {};
-  const [health, setHealth] = useState(Math.round((state.hp ?? 1) * 100));
-  const [name, setName] = useState(state.name ?? "");
+  const [shown, setShown] = useFieldText(
+    String(Math.round((state.hp ?? 1) * 100)),
+  );
+  const health = Number(shown);
+  const [name, setName] = useFieldText(state.name ?? "");
 
   return (
     <>
@@ -94,7 +108,7 @@ export function ActorControls({
               max={100}
               step={1}
               value={[health]}
-              onValueChange={([next]) => setHealth(next)}
+              onValueChange={([next]) => setShown(String(next))}
               onValueCommit={([next]) => onState({ ...state, hp: next / 100 })}
             />
           </Field>
