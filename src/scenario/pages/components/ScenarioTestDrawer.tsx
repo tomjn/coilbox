@@ -56,7 +56,11 @@ import {
 import { mutatorOffer } from "../../offer";
 import { type RunLog, readRunLog } from "../../runLog";
 import { ensureBundledScenarioMedia, type GameOrigin } from "../../storage";
-import { describeIssue, type MissionIssue } from "../../validate";
+import {
+  describeIssue,
+  type MissionIssue,
+  missionIssueLabels,
+} from "../../validate";
 import {
   engineRunProblems,
   missionRunLogMissing,
@@ -186,6 +190,11 @@ export function ScenarioTestDrawer({
   // are three buttons worth leaving out, and every scenario written before
   // difficulty existed is one of those.
   const varies = useMemo(() => usesDifficulty(scenario), [scenario]);
+  // The author's own name for everything a problem below can point at, so a
+  // refusal names the row rather than the id in the compiled file (issue
+  // #2249). A player reads these sentences too, and they are the scenario's own
+  // faults either way, so there is nothing reader-specific in them.
+  const labels = useMemo(() => missionIssueLabels(scenario), [scenario]);
   const [difficulty, setDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
   // What the engine's log said about the run that just finished (issue #2165).
@@ -391,7 +400,7 @@ export function ScenarioTestDrawer({
             <ul className="flex list-disc flex-col gap-1 pl-4">
               {phase.issues.map((issue) => (
                 <li key={`${issue.path}:${issue.message}`}>
-                  {describeIssue(issue)}
+                  {describeIssue(issue, labels)}
                 </li>
               ))}
             </ul>
@@ -408,7 +417,7 @@ export function ScenarioTestDrawer({
           <ul className="flex list-disc flex-col gap-1 pl-4">
             {phase.result.warnings.map((issue) => (
               <li key={`${issue.path}:${issue.message}`}>
-                {describeIssue(issue)}
+                {describeIssue(issue, labels)}
               </li>
             ))}
           </ul>
