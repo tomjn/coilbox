@@ -23,7 +23,7 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NO_EXTENSIONS } from "../../extensions";
 import { NO_GATE } from "../../gating";
 import type { Scenario, ScenarioTrigger } from "../../model";
@@ -35,6 +35,29 @@ import {
   undoEdit,
 } from "./history";
 import { TriggerPanel } from "./TriggerPanel";
+
+/**
+ * A longer budget than the 5000ms default, and this one is mitigation rather
+ * than a fix (issue #2215).
+ *
+ * Nothing here is slow by accident. A rename that is accepted changes the
+ * trigger's id, the id is the form's React key, so the whole form remounts, and
+ * mounting it once costs about 160ms under happy-dom because it carries a Radix
+ * select and a switch. "follows the rename forward again when it is redone" does
+ * four of those remounts and measured 753ms run on its own. Under the full suite
+ * in parallel the same test measured 5483ms and failed the default budget.
+ *
+ * That budget was never a statement about the panel. It was a race against
+ * whatever else the machine happened to be doing, and every test in this file is
+ * synchronous, so a real hang would block the event loop and never trip a
+ * timeout anyway. The number below is 40 times the measured 753ms, which leaves
+ * it able to catch a test that has stopped without failing one that is only
+ * waiting its turn.
+ *
+ * What this stands in for is in `TriggerPanel` itself, which remounts the entire
+ * form to rename a trigger.
+ */
+vi.setConfig({ testTimeout: 30_000 });
 
 afterEach(cleanup);
 
