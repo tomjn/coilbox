@@ -1,12 +1,18 @@
 // @vitest-environment happy-dom
 /**
- * What it takes to remove a mission from a campaign (issue #2192).
+ * The two irreversible things a mission row offers: removing the mission
+ * (issue #2192) and re-copying its scenario (issue #2199).
  *
  * The trash button used to remove the mission on the first click, and delete
  * its panorama from disk with it, so a misclick on the row next to Edit threw
  * away a briefing, objectives and an attached scenario. The half of that worth
  * pinning is the cancel: the mission has to survive, and so does the file,
  * because the file is the part nothing can bring back.
+ *
+ * Updating the scenario is the same shape of loss in a quieter form. A mission
+ * plays its own copy, and once the builder's document has moved on the copy is
+ * the only one of itself, so the case worth pinning is which document ends up
+ * saved and when the action is offered at all.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -21,13 +27,15 @@ vi.mock("@picoframe/frame", async () => ({
 
 // The campaign comes off disk through the plugin, and the writes go back the
 // same way. Both stand in, so what is asserted is what the page asked for.
-const { campaignSave, campaignImageDelete, useCampaigns } = vi.hoisted(() => ({
-  campaignSave: vi.fn(async (_args: { id: string; json: string }) => ({})),
-  campaignImageDelete: vi.fn(
-    async (_args: { campaignId: string; file: string }) => ({}),
-  ),
-  useCampaigns: vi.fn(),
-}));
+const { campaignSave, campaignImageDelete, useCampaigns, useScenarios } =
+  vi.hoisted(() => ({
+    campaignSave: vi.fn(async (_args: { id: string; json: string }) => ({})),
+    campaignImageDelete: vi.fn(
+      async (_args: { campaignId: string; file: string }) => ({}),
+    ),
+    useCampaigns: vi.fn(),
+    useScenarios: vi.fn(),
+  }));
 vi.mock("../bindings", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../bindings")),
   campaignSave,
@@ -37,9 +45,9 @@ vi.mock("../campaigns", () => ({
   useCampaigns,
   refreshCampaigns: async () => [],
 }));
-vi.mock("@/scenario/scenarios", () => ({
-  useScenarios: () => ({ scenarios: [], loading: false }),
-}));
+// What the scenario builder holds, which is the other half of every staleness
+// question this page asks.
+vi.mock("@/scenario/scenarios", () => ({ useScenarios }));
 vi.mock("@/play/presets", () => ({
   useSkirmishPresets: () => ({ presets: [] }),
 }));
@@ -58,6 +66,7 @@ vi.mock("./components/PanoramaScroller", () => ({
 }));
 
 import { newScenario } from "@/scenario/create";
+import type { Scenario } from "@/scenario/model";
 import { attachScenario } from "../missionScenario";
 import type { Campaign, CampaignMission } from "../model";
 import CampaignEditPage from "./CampaignEditPage";
@@ -94,11 +103,15 @@ function campaign(missions: CampaignMission[]): Campaign {
   };
 }
 
-function show(missions: CampaignMission[]) {
+function show(missions: CampaignMission[], stored: Scenario[] = []) {
   useCampaigns.mockReturnValue({
     campaigns: [{ campaign: campaign(missions), source: "local" }],
     loading: false,
     error: null,
+  });
+  useScenarios.mockReturnValue({
+    scenarios: stored.map((scenario) => ({ scenario })),
+    loading: false,
   });
   render(
     <MemoryRouter initialEntries={["/campaign-builder/c1"]}>
@@ -190,6 +203,133 @@ describe("removing a campaign mission", () => {
 
     expect(
       screen.getByText(/nothing has been written on this mission/),
+    ).toBeTruthy();
+  });
+});
+
+const ATTACHED_AT = "2026-01-01T00:00:00.000Z";
+const STORED_AT = "2026-06-01T00:00:00.000Z";
+
+/** The scenario as the mission copied it: one zone, on Comet Catcher. */
+const asAttached: Scenario = {
+  ...source,
+  updatedAt: ATTACHED_AT,
+  setup: { ...source.setup, gameName: "BAR 1.0", mapName: "Comet Catcher" },
+  zones: [
+    {
+      id: "landing",
+      name: "Landing",
+      shape: "circle",
+      center: { x: 512, z: 512 },
+      radius: 300,
+    },
+  ],
+};
+
+/** The same scenario after the builder went on editing it: the zone is gone. */
+const asStored: Scenario = { ...asAttached, updatedAt: STORED_AT, zones: [] };
+
+/** A mission carrying a copy of `scenario`, with authoring of its own on top. */
+function scenarioMission(scenario: Scenario): CampaignMission {
+  return attachScenario(
+    {
+      id: "m1",
+      title: "Beachhead",
+      briefing: "Take the shore before dawn.",
+      objectives: ["Hold the beach"],
+      snapshot: scenario.setup,
+      disabledUnits: [],
+      skippable: false,
+    },
+    scenario,
+  );
+}
+
+const STALE = "The scenario has been edited since this copy was attached.";
+const UPDATE = "Update to latest: Beachhead";
+
+describe("re-copying a mission's scenario", () => {
+  it("offers the update beside the warning that says it is needed", () => {
+    show([scenarioMission(asAttached)], [asStored]);
+
+    expect(screen.getByText(STALE)).toBeTruthy();
+    expect(screen.getByRole("button", { name: UPDATE })).toBeTruthy();
+  });
+
+  it("offers nothing when the copy is the scenario the builder holds", () => {
+    show([scenarioMission(asAttached)], [asAttached]);
+
+    expect(screen.queryByText(STALE)).toBeNull();
+    expect(screen.queryByRole("button", { name: UPDATE })).toBeNull();
+  });
+
+  it("offers nothing when the source scenario is gone", () => {
+    // Nothing to copy from, so a button here could only fail. The mission plays
+    // its own copy and that is the whole of the story.
+    show([scenarioMission(asAttached)], []);
+
+    expect(screen.queryByText(STALE)).toBeNull();
+    expect(screen.queryByRole("button", { name: UPDATE })).toBeNull();
+  });
+
+  it("says what the copy loses before anything is written", () => {
+    show([scenarioMission(asAttached)], [asStored]);
+
+    fireEvent.click(screen.getByRole("button", { name: UPDATE }));
+
+    expect(
+      screen.getByText(/no other copy of what the mission is playing/),
+    ).toBeTruthy();
+    // The counts are the concrete part: one zone now, none afterwards.
+    expect(
+      screen.getByText(/0 unit placements · 1 zone · 0 triggers/),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/0 unit placements · 0 zones · 0 triggers/),
+    ).toBeTruthy();
+    expect(campaignSave).not.toHaveBeenCalled();
+  });
+
+  it("keeps the mission's own copy when the answer is no", () => {
+    show([scenarioMission(asAttached)], [asStored]);
+
+    fireEvent.click(screen.getByRole("button", { name: UPDATE }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByText(STALE)).toBeTruthy();
+    expect(campaignSave).not.toHaveBeenCalled();
+  });
+
+  it("replaces the copy once confirmed, keeping the mission's own fields", async () => {
+    show([scenarioMission(asAttached)], [asStored]);
+
+    fireEvent.click(screen.getByRole("button", { name: UPDATE }));
+    fireEvent.click(screen.getByRole("button", { name: "Update" }));
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+
+    const saved = savedMissions()[0];
+    expect(saved.scenario?.updatedAt).toBe(STORED_AT);
+    expect(saved.scenario?.zones).toEqual([]);
+    expect(saved.title).toBe("Beachhead");
+    expect(saved.briefing).toBe("Take the shore before dawn.");
+    expect(saved.objectives).toEqual(["Hold the beach"]);
+    // The row has caught up, so there is nothing left to warn about.
+    expect(screen.queryByText(STALE)).toBeNull();
+  });
+
+  it("warns when the update moves the mission to another map", () => {
+    const moved: Scenario = {
+      ...asStored,
+      setup: { ...asStored.setup, mapName: "Red Comet" },
+    };
+    show([scenarioMission(asAttached)], [moved]);
+
+    fireEvent.click(screen.getByRole("button", { name: UPDATE }));
+
+    expect(
+      screen.getByText(
+        /The mission's map changes from Comet Catcher to Red Comet\./,
+      ),
     ).toBeTruthy();
   });
 });

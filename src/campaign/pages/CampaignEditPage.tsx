@@ -22,6 +22,7 @@ import { CampaignImage, CampaignImageField } from "./components/CampaignImage";
 import { DECORATIVE_DEFAULTS, PlaybackTuning } from "./components/MediaPlayer";
 import { MissionEditorDrawer } from "./components/MissionEditorDrawer";
 import { MissionRemoveButton } from "./components/MissionRemoveButton";
+import { MissionScenarioUpdateButton } from "./components/MissionScenarioUpdateButton";
 import { PanoramaScroller } from "./components/PanoramaScroller";
 import { PresetPickerDrawer } from "./components/PresetPickerDrawer";
 import { ScenarioPickerDrawer } from "./components/ScenarioPicker";
@@ -331,6 +332,7 @@ export default function CampaignEditPage() {
           <ul className="flex flex-col gap-3">
             {campaign.missions.map((m, i) => {
               const thumb = thumbs.get(m.snapshot.mapName)?.url;
+              const attachment = scenarioAttachment(m, scenarios);
               return (
                 <li
                   key={m.id}
@@ -391,11 +393,18 @@ export default function CampaignEditPage() {
                         {m.scenario ? ` · scenario: ${m.scenario.name}` : ""}
                         {m.skippable ? " · skippable" : ""}
                       </span>
-                      {scenarioAttachment(m, scenarios).state === "stale" && (
-                        <span className="truncate text-xs text-amber-600 dark:text-amber-500">
-                          The scenario has been edited since this copy was
-                          attached.
-                        </span>
+                      {attachment.state === "stale" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-amber-600 dark:text-amber-500">
+                            The scenario has been edited since this copy was
+                            attached.
+                          </span>
+                          <MissionScenarioUpdateButton
+                            mission={m}
+                            attachment={attachment}
+                            onUpdate={applyMission}
+                          />
+                        </div>
                       )}
                     </div>
                     <div className="ml-auto flex shrink-0 items-center gap-2">
