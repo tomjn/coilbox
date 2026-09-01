@@ -103,8 +103,12 @@ export function ScenarioRowMenu({
 }
 
 /** The confirmation behind Delete. It reports its own failure, because the page
- *  behind the drawer is not what somebody is looking at when it fails. */
-function DeleteScenarioForm({
+ *  behind the drawer is not what somebody is looking at when it fails.
+ *
+ *  Exported because the editor deletes the scenario it has open through the
+ *  same drawer (issue #2203), and one wording of "this can't be undone" is
+ *  worth more than a second copy of it. */
+export function DeleteScenarioForm({
   scenario,
   attached,
   onDelete,

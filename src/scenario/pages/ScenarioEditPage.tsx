@@ -1,10 +1,28 @@
 import { Button, Drawer, Input, useDrawer } from "@picoframe/frame";
-import { ArrowLeft, FileCode2, Rocket, TriangleAlert } from "lucide-react";
+import {
+  ArrowLeft,
+  FileCode2,
+  MoreVertical,
+  Rocket,
+  Share2,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
+import { useUnitsyncScan } from "@/content/config";
 import { UnitGameProvider } from "@/content/pages/components/UnitPicker";
 import { useGameUnits } from "@/content/useGameUnits";
+import { usePreferredTarget } from "@/play/config";
+import { useCampaigns } from "../../campaign/campaigns";
+import { scenarioIsAttached } from "../../campaign/missionScenario";
 import {
   DetailLoading,
   ErrorBanner,
@@ -13,7 +31,7 @@ import {
 import type { Scenario } from "../model";
 import { saveEditedScenario } from "../saveIntoGame";
 import { refreshScenarios, useScenarios } from "../scenarios";
-import { isEditable, type LoadedScenario } from "../storage";
+import { deleteScenario, isEditable, type LoadedScenario } from "../storage";
 import { missionProblemCount } from "../wording";
 import { BlueprintPanel } from "./components/BlueprintPanel";
 import { DialoguePanel } from "./components/DialoguePanel";
@@ -33,6 +51,7 @@ import { ObjectivePanel } from "./components/ObjectivePanel";
 import { orderPathId } from "./components/orderPaths";
 import { RestrictionPanel } from "./components/RestrictionPanel";
 import { ScenarioMapScene } from "./components/ScenarioMapScene";
+import { DeleteScenarioForm } from "./components/ScenarioRowMenu";
 import { ScenarioTestDrawer } from "./components/ScenarioTestDrawer";
 import { SetupPanel } from "./components/SetupPanel";
 import { createScenarioSaver, type ScenarioSaver } from "./components/saving";
@@ -66,6 +85,18 @@ export default function ScenarioEditPage() {
   const { id } = useParams();
   const { scenarios, loading } = useScenarios();
   const drawer = useDrawer();
+  const navigate = useNavigate();
+  // The same games list the share on the list page carries, read only for the
+  // modinfo shortname the export records beside the archive name (#1335). This
+  // is the scan `useGameUnits` below already runs for this page, served from
+  // the same cache, so the header costs no extra read.
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  // Whether a campaign mission is carrying a copy of this scenario, which
+  // decides whether deleting it takes the dialogue clips with it (issue #866).
+  // The same question the list asks, asked the same way, because a delete from
+  // here has to leave a campaign playing exactly what a delete from there does.
+  const { campaigns } = useCampaigns();
 
   const loaded = scenarios.find((l) => l.scenario.id === id);
   // A read-only scenario (bundled, or a game's own packaged mission) is never
@@ -219,6 +250,56 @@ export default function ScenarioEditPage() {
       ),
     });
 
+  // Share: the same code, link and file the list offers (issue #1336), loaded
+  // on demand so the editor does not carry the export path until it is asked
+  // for.
+  const openShare = async () => {
+    const { ShareScenarioForm } = await import(
+      "./components/ShareScenarioForm"
+    );
+    drawer.open({
+      title: `Share ${scenario.name}`,
+      width: "28rem",
+      content: (
+        <ShareScenarioForm
+          scenario={scenario}
+          installed={scan.data?.games ?? []}
+        />
+      ),
+    });
+  };
+
+  // Only a scenario in coilbox's own store is deleted. A game's own mission is
+  // editable here when the game is a loose `.sdd`, but taking it out of the
+  // game is a move rather than a delete, and that is what the setup panel's
+  // "Take out of game" is for (issue #2160).
+  const deletable = loaded?.source === "local";
+
+  // Deleting the document that is open leaves the editor with nothing to edit,
+  // so it goes back to the list. Cancelling is the drawer closing and nothing
+  // else: the author is still here, on the scenario they were editing.
+  const attached = scenarioIsAttached(
+    campaigns.map((c) => c.campaign),
+    scenario.id,
+  );
+  const confirmDelete = () =>
+    drawer.open({
+      title: `Delete ${scenario.name}`,
+      width: "24rem",
+      content: (
+        <DeleteScenarioForm
+          scenario={scenario}
+          attached={attached}
+          onDelete={async () => {
+            await deleteScenario(scenario.id, { keepMedia: attached });
+            await refreshScenarios();
+            navigate(BACK);
+          }}
+          onDone={() => drawer.close()}
+        />
+      ),
+    });
+
   // Held loosely, the way a base being moved is: a step that has been deleted
   // stops the map waiting for a point nothing would receive.
   const asked = pick && stepAt(scenario, pick.ref);
@@ -298,6 +379,42 @@ export default function ScenarioEditPage() {
             <Button size="sm" onClick={openTest}>
               <Rocket className="size-4" /> Test in game
             </Button>
+            {/* What can be done to the scenario as a document rather than to
+              its contents: sharing it, and deleting it (issue #2203). The
+              moment an author wants either is usually with the scenario open,
+              so the list's row menu is a shortcut rather than the only way.
+
+              A menu rather than two more buttons. The header already carries
+              the problem count, Mission Lua and Test in game, all of which act
+              on the mission being made. These act on the file it is kept in,
+              and Delete has no business sitting one click away from Test.
+              Duplicate joins them here when #2183 lands. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-8 shrink-0 text-muted-foreground"
+                  aria-label={`Actions for ${scenario.name}`}
+                >
+                  <MoreVertical className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onSelect={() => void openShare()}>
+                  <Share2 className="size-4" aria-hidden="true" /> Share
+                </DropdownMenuItem>
+                {deletable && (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={confirmDelete}
+                  >
+                    <Trash2 className="size-4" aria-hidden="true" /> Delete
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
