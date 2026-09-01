@@ -16,6 +16,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnitsyncThumbnails } from "@/content/config";
 import { refIsVideo } from "@/lib/assetUrl";
@@ -395,22 +396,57 @@ export default function CampaignEditPage() {
 
       {error && <ErrorBanner message={error} />}
 
+      {/* The top of the page is the campaign, not a form (issue #2193). Both
+          boxes used to be bare bordered inputs with nothing saying what either
+          one was for, and a lone bordered box across the top of a page is the
+          shape of a search field.
+
+          The title is now the page's heading and is still edited where it
+          sits, the way the lego builder edits a unit's name
+          (`src/lego/pages/BuilderPage.tsx`): a real input carrying no box of
+          its own, drawn at the size the campaign's own detail page draws the
+          same string, showing its border on hover and on keyboard focus. It
+          stays an input rather than becoming text that swaps for one on click,
+          so it is in the tab order already and there is no edit mode for a
+          keyboard to have to find. Enter leaves the box, which is what writes
+          it, so renaming never needs the mouse.
+
+          It is also the page's first `h1`. There were two `h2`s below and
+          nothing above them, so the outline started at level two.
+
+          The description keeps its box and gains a visible label instead. It
+          is a field about the campaign rather than the campaign's identity,
+          and a second borderless line would leave an empty description with
+          nothing to see and no affordance at all. */}
       <header className="flex flex-col gap-3">
-        <Input
-          aria-label="Campaign title"
-          value={campaign.title}
-          onChange={(e) => edit((c) => ({ ...c, title: e.target.value }))}
-          onBlur={() => void persist(campaign)}
-          className="text-base font-semibold"
-        />
-        <Textarea
-          aria-label="Campaign description"
-          value={campaign.description}
-          placeholder="Description"
-          className="min-h-16"
-          onChange={(e) => edit((c) => ({ ...c, description: e.target.value }))}
-          onBlur={() => void persist(campaign)}
-        />
+        <h1>
+          <Input
+            aria-label="Campaign title"
+            value={campaign.title}
+            placeholder="Untitled campaign"
+            onChange={(e) => edit((c) => ({ ...c, title: e.target.value }))}
+            onBlur={() => void persist(campaign)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            className="-mx-2 h-auto border-transparent bg-transparent px-2 py-1 text-lg font-semibold shadow-none hover:border-border focus-visible:border-border"
+          />
+        </h1>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="campaign-description" className="text-sm font-medium">
+            Description
+          </Label>
+          <Textarea
+            id="campaign-description"
+            value={campaign.description}
+            placeholder="What this campaign is about. Players read it on the campaign's own page."
+            className="min-h-16"
+            onChange={(e) =>
+              edit((c) => ({ ...c, description: e.target.value }))
+            }
+            onBlur={() => void persist(campaign)}
+          />
+        </div>
       </header>
 
       {/* The art is set once and the missions are edited constantly, so the
