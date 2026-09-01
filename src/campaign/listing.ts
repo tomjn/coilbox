@@ -53,6 +53,29 @@ export function campaignSummary(
 }
 
 /**
+ * Whether a campaign can be played from its first mission to its last.
+ *
+ * Two things stop it, and both are reachable without leaving the builder:
+ *
+ * - No missions at all. A campaign starts this way, and one that was never
+ *   finished stays this way.
+ * - A mission whose snapshot names no game or no map. The preset picker offers
+ *   a preset reading "No game · No map" as readily as a complete one, and the
+ *   snapshot is a copy of whatever was picked. Play order is the array order, so
+ *   one such mission blocks every mission after it.
+ *
+ * A mission with no attached scenario is not one of them. That is a preset-only
+ * mission, which plays as an ordinary skirmish by design (see
+ * `CampaignMission.scenario`), so a campaign made entirely of them is finished.
+ */
+export function campaignIsPlayable(campaign: Campaign): boolean {
+  if (campaign.missions.length === 0) return false;
+  return campaign.missions.every(
+    (m) => !!m.snapshot?.gameName && !!m.snapshot?.mapName,
+  );
+}
+
+/**
  * The map a campaign's row can draw when the campaign has no emblem of its own:
  * the first mission's, because that is the one an author sees first and the one
  * the campaign opens on. Null when there are no missions, or the first has no
