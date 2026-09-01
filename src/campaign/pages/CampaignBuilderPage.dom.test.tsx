@@ -30,10 +30,18 @@ vi.mock("@picoframe/frame", async () => ({
 
 // Stored campaigns come off disk through the plugin. What is under test is the
 // row built from them, not the read.
-const { useCampaigns, campaignDelete, campaignExport } = vi.hoisted(() => ({
+const {
+  useCampaigns,
+  campaignDelete,
+  campaignExport,
+  campaignSave,
+  campaignImageRead,
+} = vi.hoisted(() => ({
   useCampaigns: vi.fn(),
   campaignDelete: vi.fn(async () => ({})),
   campaignExport: vi.fn(async () => ({})),
+  campaignSave: vi.fn(async () => ({})),
+  campaignImageRead: vi.fn(async () => ({ dataUrl: "data:image/png;base64," })),
 }));
 vi.mock("../campaigns", () => ({
   useCampaigns,
@@ -43,6 +51,15 @@ vi.mock("../bindings", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("../bindings")),
   campaignDelete,
   campaignExport,
+  campaignSave,
+  campaignImageRead,
+}));
+
+// Duplicating a bundled campaign puts its dialogue clips in the media store
+// first, which reads the campaign list off disk. Not what is under test here.
+vi.mock("../scenarioMedia", async () => ({
+  ...(await vi.importActual<Record<string, unknown>>("../scenarioMedia")),
+  ensureCampaignScenarioMedia: vi.fn(async () => {}),
 }));
 
 // Export picks its destination with the OS file dialog.
@@ -161,11 +178,12 @@ describe("a campaign row", () => {
     expect(screen.getByText("Editing this campaign")).toBeTruthy();
   });
 
-  it("reaches Edit, Export and Delete from the keyboard alone", () => {
+  it("reaches Edit, Duplicate, Export and Delete from the keyboard alone", () => {
     show([local]);
 
     expect(openMenuByKeyboard("Beachhead")).toEqual([
       expect.stringContaining("Edit"),
+      expect.stringContaining("Duplicate"),
       expect.stringContaining("Export"),
       expect.stringContaining("Delete"),
     ]);
@@ -234,10 +252,11 @@ describe("a campaign row", () => {
 // Issue #2191: the whole menu hung off `!bundled`, so a bundled campaign had no
 // way out of the app at all while a bundled scenario kept its Share.
 describe("a bundled campaign's row", () => {
-  it("offers Export, and nothing it cannot do", () => {
+  it("offers Duplicate and Export, and nothing it cannot do", () => {
     show([bundled]);
 
     expect(openMenuByKeyboard("Tutorial")).toEqual([
+      expect.stringContaining("Duplicate"),
       expect.stringContaining("Export"),
     ]);
   });
@@ -275,6 +294,100 @@ describe("a bundled campaign's row", () => {
     expect(
       screen.getByRole("link", { name: /Tutorial/ }).getAttribute("href"),
     ).toBe("/campaign-builder/tutorial");
+  });
+});
+
+/**
+ * Duplicate (issue #2189). Every field that decides whether a campaign is
+ * playable comes from a preset on this machine, so coilbox cannot ship a starter
+ * template that is not a Draft on arrival. A campaign this install already has is
+ * the only starter there is, and this is how an author takes one.
+ *
+ * What a copy carries is `duplicate.test.ts`. What is pinned here is that the
+ * action is on the row, that it writes the copy, and that it lands the author in
+ * the editor on it.
+ */
+describe("duplicating a campaign", () => {
+  /** Take Duplicate from a row's menu, keyboard only, and hand back the saved
+   *  document. */
+  async function duplicateFromMenu(name: string): Promise<Campaign> {
+    openMenuByKeyboard(name);
+    fireEvent.keyDown(screen.getByRole("menuitem", { name: /Duplicate/ }), {
+      key: "Enter",
+    });
+    await vi.waitFor(() => expect(campaignSave).toHaveBeenCalled());
+    const [{ id, json }] = campaignSave.mock.calls[0] as unknown as [
+      { id: string; json: string },
+    ];
+    const saved = JSON.parse(json) as Campaign;
+    expect(saved.id).toBe(id);
+    return saved;
+  }
+
+  it("writes a copy under a new id and opens the editor on it", async () => {
+    show([local]);
+
+    const saved = await duplicateFromMenu("Beachhead");
+
+    expect(saved.id).not.toBe("beachhead");
+    expect(saved.title).toBe("Copy of Beachhead");
+    await vi.waitFor(() =>
+      expect(screen.getByText("Editing this campaign")).toBeTruthy(),
+    );
+  });
+
+  // Comparing two variants is a reason to duplicate at all, and two rows with
+  // one title cannot be told apart in a list that shows the title.
+  it("counts up when the copy's name is already on the list", async () => {
+    show([
+      local,
+      {
+        campaign: campaignNamed("copy1", "Copy of Beachhead"),
+        source: "local",
+      },
+    ]);
+
+    expect((await duplicateFromMenu("Beachhead")).title).toBe(
+      "Copy of Beachhead (2)",
+    );
+  });
+
+  // Issue #2224 wants a one-step way to make a bundled campaign editable, which
+  // today is an export, a save dialog, an import and a resolve gate. A copy is
+  // written to the app's own campaign folder, so it is local and editable
+  // wherever it came from.
+  it("makes a local campaign out of a bundled one", async () => {
+    show([bundled]);
+
+    const saved = await duplicateFromMenu("Tutorial");
+
+    expect(saved.id).not.toBe("tutorial");
+    expect(saved.title).toBe("Copy of Tutorial");
+    await vi.waitFor(() =>
+      expect(screen.getByText("Editing this campaign")).toBeTruthy(),
+    );
+  });
+
+  // A copy that lost a picture stays on the list, because the banner saying so
+  // is on the list. Opening the editor would put it behind the page nobody is
+  // looking at any more.
+  it("says what it could not copy, and stays put when something went", async () => {
+    campaignImageRead.mockRejectedValue(new Error("no such file"));
+    show([
+      {
+        campaign: campaignNamed("beachhead", "Beachhead", {
+          icon: { kind: "file", file: "lost-emblem.png" },
+        }),
+        source: "local",
+      },
+    ]);
+
+    await duplicateFromMenu("Beachhead");
+
+    expect(
+      screen.getByText(/1 media file could not be read and was left out/),
+    ).toBeTruthy();
+    expect(screen.queryByText("Editing this campaign")).toBeNull();
   });
 });
 

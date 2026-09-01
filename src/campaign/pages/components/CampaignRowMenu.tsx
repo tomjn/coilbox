@@ -13,16 +13,17 @@
  * has no affordance at rest, cannot be found on a touch screen, and is the
  * regression issue #2203 records against the scenario list's version of this.
  *
- * Every campaign gets a menu, because every campaign can be exported (issue
- * #2191). Export only reads the campaign and writes a file the author picked, so
- * a bundled campaign is as exportable as a local one, and exporting one then
- * importing it back is how an author gets a copy they may edit. Which of Edit
- * and Delete appear is the caller's call, since the page is what knows where a
- * campaign came from. Same shape as `ScenarioRowMenu`.
+ * Every campaign gets Export and Duplicate, because neither writes to the
+ * campaign it is aimed at (issues #2191 and #2189). Export reads it and writes a
+ * file the author picked. Duplicate reads it and writes a new local campaign. So
+ * a bundled campaign offers both, and Duplicate is the one step that used to be
+ * Export followed by Import. Which of Edit and Delete appear is the caller's
+ * call, since the page is what knows where a campaign came from. Same shape as
+ * `ScenarioRowMenu`.
  */
 
 import { Button, useDrawer } from "@picoframe/frame";
-import { MoreVertical, Pencil, Trash2, Upload } from "lucide-react";
+import { Copy, MoreVertical, Pencil, Trash2, Upload } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -38,6 +39,7 @@ export function CampaignRowMenu({
   campaign,
   editable,
   deletable,
+  onDuplicate,
   onExport,
   onDelete,
 }: {
@@ -49,6 +51,8 @@ export function CampaignRowMenu({
    *  way they are on the scenario side, even though a campaign is only ever
    *  local or bundled and so answers both the same way today. */
   deletable: boolean;
+  /** Copy this campaign to a new local one and open it. */
+  onDuplicate: () => void;
   onExport: () => void;
   onDelete: () => Promise<void>;
 }) {
@@ -91,6 +95,11 @@ export function CampaignRowMenu({
             <Pencil className="size-4" aria-hidden="true" /> Edit
           </DropdownMenuItem>
         )}
+        {/* No confirmation. A copy takes nothing away, and the copy is the one
+            thing an author can undo by deleting it. */}
+        <DropdownMenuItem onSelect={onDuplicate}>
+          <Copy className="size-4" aria-hidden="true" /> Duplicate
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={onExport}>
           <Upload className="size-4" aria-hidden="true" /> Export
         </DropdownMenuItem>
